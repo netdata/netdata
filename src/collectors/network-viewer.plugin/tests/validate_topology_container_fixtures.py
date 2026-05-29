@@ -13,6 +13,7 @@ GROUP_BY = ["process_name", "pid", "container"]
 
 NEW_COLUMNS = {
     "container_name": ("string", "group_key"),
+    "cgroup_status": ("string", "attribute"),
     "cgroup_path": ("string", "attribute"),
     "cgroup_name": ("string", "attribute"),
     "orchestrator": ("string", "attribute"),
@@ -22,6 +23,35 @@ NEW_COLUMNS = {
     "docker_container_name": ("string", "attribute"),
     "docker_image": ("string", "attribute"),
     "systemd_unit_name": ("string", "attribute"),
+}
+
+SET_AGGREGATION_COLUMNS = {
+    "machine_guid",
+    "hostname",
+    "container_name",
+    "cgroup_status",
+    "cgroup_path",
+    "cgroup_name",
+    "orchestrator",
+    "k8s_pod_name",
+    "k8s_namespace",
+    "k8s_workload",
+    "docker_container_name",
+    "docker_image",
+    "systemd_unit_name",
+}
+
+SEARCH_LABEL_KEYS = {
+    "process",
+    "container_name",
+    "cgroup_status",
+    "orchestrator",
+    "k8s_pod_name",
+    "k8s_namespace",
+    "k8s_workload",
+    "docker_container_name",
+    "docker_image",
+    "systemd_unit_name",
 }
 
 SCOPES = {
@@ -77,6 +107,9 @@ def assert_contract(payload):
     assert process_scopes == ["process_name", "pid"]
     container_scopes = data["types"]["actor_types"]["container"]["aggregation_scopes"]
     assert container_scopes == ["container"]
+    for actor_type in ("process", "container"):
+        search = data["types"]["actor_types"][actor_type]["search"]
+        assert SEARCH_LABEL_KEYS.issubset(set(search["label_keys"]))
 
     actor_columns = {column["id"]: column for column in data["actors"]["columns"]}
     for name, (column_type, role) in NEW_COLUMNS.items():
@@ -84,6 +117,10 @@ def assert_contract(payload):
         assert column["type"] == column_type
         assert column["role"] == role
         assert column.get("nullable") is True
+
+    for name in SET_AGGREGATION_COLUMNS:
+        column = actor_columns[name]
+        assert column["aggregation"] == "set"
 
     aggregation_scopes = data["types"]["aggregation_scopes"]
     for scope, columns in SCOPES.items():
@@ -105,6 +142,7 @@ def assert_with_containers(payload):
     rows = actor_rows(payload)
 
     assert row_by_pid(rows, 101)["orchestrator"] == "docker"
+    assert row_by_pid(rows, 101)["cgroup_status"] == "known"
     assert row_by_pid(rows, 101)["container_name"] == "demo-nginx"
     assert row_by_pid(rows, 101)["cgroup_name"] == "demo-nginx"
     assert row_by_pid(rows, 201)["orchestrator"] == "k8s"
@@ -117,6 +155,7 @@ def assert_with_containers(payload):
     assert row_by_pid(rows, 401)["orchestrator"] == "lxc"
     assert row_by_pid(rows, 501)["orchestrator"] == "kvm"
     assert row_by_pid(rows, 601)["orchestrator"] == "host_root"
+    assert row_by_pid(rows, 601)["cgroup_status"] == "host_root"
     assert row_by_pid(rows, 601)["container_name"] == "bash"
     assert row_by_pid(rows, 601)["cgroup_name"] is None
 
@@ -162,8 +201,10 @@ def assert_mixed(payload):
         assert rows["display_name"][idx]
 
         if rows["orchestrator"][idx] == "host_root":
+            assert rows["cgroup_status"][idx] == "host_root"
             host_root += 1
         else:
+            assert rows["cgroup_status"][idx] == "known"
             enriched += 1
 
         for column in sparse_columns:

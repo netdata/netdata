@@ -228,7 +228,18 @@ static bool cgroup_matches_systemd_service_path(struct cgroup *cg)
         return false;
 
     name = &cg->id[sizeof(prefix) - 1];
-    return *name && !strchr(name, '/') && cgroup_string_ends_with(name, ".service");
+    if (!*name || !cgroup_string_ends_with(name, ".service"))
+        return false;
+
+    for (const char *slash = strchr(name, '/'); slash; slash = strchr(slash + 1, '/')) {
+        const char *service_suffix = ".service";
+        size_t suffix_len = strlen(service_suffix);
+
+        if ((size_t)(slash - name) >= suffix_len && strncmp(slash - suffix_len, service_suffix, suffix_len) == 0)
+            return false;
+    }
+
+    return true;
 }
 
 static enum cgroups_container_orchestrator discovery_detect_orchestrator(const char *id)

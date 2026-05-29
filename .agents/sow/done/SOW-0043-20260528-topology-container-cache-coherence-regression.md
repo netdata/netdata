@@ -656,8 +656,8 @@ together.
 
 ## Followup
 
-- Cloud grouped-attribute merge support remains out of scope under decision 1A.
-  If product requirements change, create a separate Cloud/schema SOW.
+- Cloud grouped-attribute merge support was out of scope for this regression
+  repair and is superseded by SOW-0044's grouped enrichment consistency work.
 - Cloud-proxied Function validation can be added when a `.env` Cloud token is
   available in the checkout; direct-agent validation already covers the Agent
   producer behavior.
@@ -666,3 +666,19 @@ together.
 
 - This SOW is the regression repair for SOW-0035/SOW-0036 cache coherence and
   actor grouping behavior discovered during local runtime inspection.
+
+## Correction - 2026-05-28
+
+SOW-0044 supersedes this SOW's earlier decision that grouped topology views
+should leave variable enrichment out of actor-visible metadata. The current
+contract is:
+
+- PID grouping emits scalar per-PID enrichment.
+- Process-name and container grouping merge per-PID enrichment through
+  deduplicated actor labels and schema-declared `set` aggregation metadata.
+- Cloud/UI remain generic topology consumers; Cloud work, if needed, is generic
+  schema/aggregation validation or repair, not container-specific logic.
+
+The cache lifetime decision from this SOW remains current: no whole-cache
+invalidation and no timer refresh; consumers re-query incomplete entries while
+the PID remains in their current working set.

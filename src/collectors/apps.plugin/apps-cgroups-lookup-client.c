@@ -406,13 +406,13 @@ static bool cgroups_lookup_client_ready(nipc_client_ctx_t *client, bool *was_rea
 
     if (*was_ready) {
         cgroups_lookup_counter_inc(&cgroups_lookup_peer_disconnects);
-        netdata_log_info("apps.plugin lost CGROUPS_LOOKUP service; cgroup enrichment will retry");
+        netdata_log_error("apps.plugin lost CGROUPS_LOOKUP service; cgroup enrichment will retry");
     }
     else {
         static bool logged_absent = false;
         if (!logged_absent) {
             logged_absent = true;
-            netdata_log_info("apps.plugin CGROUPS_LOOKUP service unavailable; cgroup enrichment will retry");
+            netdata_log_error("apps.plugin CGROUPS_LOOKUP service unavailable; cgroup enrichment will retry");
         }
     }
 
@@ -435,6 +435,7 @@ static void cgroups_lookup_worker(void *arg __maybe_unused)
     bool was_ready = false;
     usec_t next_retry_ut = 0;
     uint64_t last_observed_generation = 0;
+    bool request_failure_logged = false;
 
     while (!__atomic_load_n(&cgroups_lookup_worker_stop, __ATOMIC_ACQUIRE)) {
         cgroups_lookup_queue_wait_for_work();
@@ -465,11 +466,23 @@ static void cgroups_lookup_worker(void *arg __maybe_unused)
 
         if (err != NIPC_OK) {
             cgroups_lookup_counter_inc(&cgroups_lookup_requests_error);
+            if (!request_failure_logged) {
+                netdata_log_error("apps.plugin CGROUPS_LOOKUP request failed (error %u); cgroup enrichment will retry",
+                                  (unsigned int)err);
+                request_failure_logged = true;
+            }
             cgroups_lookup_clear_pending_for_paths(paths, count);
             was_ready = false;
         }
         else if (response.item_count != count) {
             cgroups_lookup_counter_inc(&cgroups_lookup_requests_error);
+            if (!request_failure_logged) {
+                netdata_log_error(
+                    "apps.plugin CGROUPS_LOOKUP response item count mismatch (requested %u, received %u); cgroup enrichment will retry",
+                    count,
+                    response.item_count);
+                request_failure_logged = true;
+            }
             cgroups_lookup_clear_pending_for_paths(paths, count);
             was_ready = false;
         }
@@ -485,11 +498,16 @@ static void cgroups_lookup_worker(void *arg __maybe_unused)
 
             if (malformed) {
                 cgroups_lookup_counter_inc(&cgroups_lookup_requests_error);
+                if (!request_failure_logged) {
+                    netdata_log_error("apps.plugin CGROUPS_LOOKUP response decode failed; cgroup enrichment will retry");
+                    request_failure_logged = true;
+                }
                 cgroups_lookup_clear_pending_for_paths(paths, count);
                 was_ready = false;
                 goto free_paths;
             }
 
+            request_failure_logged = false;
             cgroups_lookup_counter_inc(&cgroups_lookup_requests_responded);
 
             netdata_mutex_lock(&apps_pids_mutex);

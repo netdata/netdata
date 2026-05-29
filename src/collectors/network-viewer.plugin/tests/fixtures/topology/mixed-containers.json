@@ -53,6 +53,29 @@
             "columns": [
               "display_name",
               "process"
+            ],
+            "label_keys": [
+              "pid",
+              "ppid",
+              "uid",
+              "net_ns_inode",
+              "username",
+              "cmdline",
+              "namespace_type",
+              "local_ip",
+              "local_address_space",
+              "process",
+              "container_name",
+              "cgroup_status",
+              "orchestrator",
+              "cgroup_name",
+              "cgroup_path",
+              "k8s_pod_name",
+              "k8s_namespace",
+              "k8s_workload",
+              "docker_container_name",
+              "docker_image",
+              "systemd_unit_name"
             ]
           }
         },
@@ -71,6 +94,29 @@
             "columns": [
               "display_name",
               "container_name"
+            ],
+            "label_keys": [
+              "pid",
+              "ppid",
+              "uid",
+              "net_ns_inode",
+              "username",
+              "cmdline",
+              "namespace_type",
+              "local_ip",
+              "local_address_space",
+              "process",
+              "container_name",
+              "cgroup_status",
+              "orchestrator",
+              "cgroup_name",
+              "cgroup_path",
+              "k8s_pod_name",
+              "k8s_namespace",
+              "k8s_workload",
+              "docker_container_name",
+              "docker_image",
+              "systemd_unit_name"
             ]
           }
         }
@@ -152,12 +198,16 @@
         {
           "id": "machine_guid",
           "type": "string",
-          "nullable": true
+          "nullable": true,
+          "role": "merge_identity",
+          "aggregation": "set"
         },
         {
           "id": "hostname",
           "type": "string",
-          "nullable": true
+          "nullable": true,
+          "role": "merge_identity",
+          "aggregation": "set"
         },
         {
           "id": "process",
@@ -176,64 +226,81 @@
           "role": "identity"
         },
         {
+          "id": "cgroup_status",
+          "type": "string",
+          "role": "attribute",
+          "nullable": true,
+          "aggregation": "set"
+        },
+        {
           "id": "cgroup_path",
           "type": "string",
           "role": "attribute",
-          "nullable": true
+          "nullable": true,
+          "aggregation": "set"
         },
         {
           "id": "cgroup_name",
           "type": "string",
           "role": "attribute",
-          "nullable": true
+          "nullable": true,
+          "aggregation": "set"
         },
         {
           "id": "container_name",
           "type": "string",
           "role": "group_key",
-          "nullable": true
+          "nullable": true,
+          "aggregation": "set"
         },
         {
           "id": "orchestrator",
           "type": "string",
           "role": "attribute",
-          "nullable": true
+          "nullable": true,
+          "aggregation": "set"
         },
         {
           "id": "k8s_pod_name",
           "type": "string",
           "role": "attribute",
-          "nullable": true
+          "nullable": true,
+          "aggregation": "set"
         },
         {
           "id": "k8s_namespace",
           "type": "string",
           "role": "attribute",
-          "nullable": true
+          "nullable": true,
+          "aggregation": "set"
         },
         {
           "id": "k8s_workload",
           "type": "string",
           "role": "attribute",
-          "nullable": true
+          "nullable": true,
+          "aggregation": "set"
         },
         {
           "id": "docker_container_name",
           "type": "string",
           "role": "attribute",
-          "nullable": true
+          "nullable": true,
+          "aggregation": "set"
         },
         {
           "id": "docker_image",
           "type": "string",
           "role": "attribute",
-          "nullable": true
+          "nullable": true,
+          "aggregation": "set"
         },
         {
           "id": "systemd_unit_name",
           "type": "string",
           "role": "attribute",
-          "nullable": true
+          "nullable": true,
+          "aggregation": "set"
         },
         {
           "id": "display_name",
@@ -302,6 +369,17 @@
             1601,
             1602,
             1603
+          ]
+        },
+        {
+          "codec": "values",
+          "values": [
+            "known",
+            "known",
+            "known",
+            "host_root",
+            "host_root",
+            "host_root"
           ]
         },
         {

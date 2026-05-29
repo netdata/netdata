@@ -10,33 +10,14 @@ SIMPLE_PATTERN *nv_label_whitelist_parse(const char *pattern)
     return simple_pattern_create(pattern, "|", SIMPLE_PATTERN_EXACT, true);
 }
 
+const char *nv_cgroup_status_name(uint16_t cgroup_status)
+{
+    return cgroup_topology_cgroup_status_name(cgroup_status);
+}
+
 const char *nv_orchestrator_name(uint16_t cgroup_status, uint16_t orchestrator)
 {
-    if (cgroup_status == NIPC_APPS_CGROUP_HOST_ROOT)
-        return "host_root";
-
-    if (cgroup_status == NIPC_APPS_CGROUP_UNKNOWN_PERMANENT)
-        return "unknown";
-
-    switch (orchestrator) {
-        case NIPC_ORCHESTRATOR_SYSTEMD:
-            return "systemd";
-        case NIPC_ORCHESTRATOR_DOCKER:
-            return "docker";
-        case NIPC_ORCHESTRATOR_K8S:
-            return "k8s";
-        case NIPC_ORCHESTRATOR_KVM:
-            return "kvm";
-        case NIPC_ORCHESTRATOR_LXC:
-            return "lxc";
-        case NIPC_ORCHESTRATOR_PODMAN:
-            return "podman";
-        case NIPC_ORCHESTRATOR_NSPAWN:
-            return "nspawn";
-        case NIPC_ORCHESTRATOR_UNKNOWN:
-        default:
-            return "unknown";
-    }
+    return cgroup_topology_orchestrator_name(cgroup_status, orchestrator);
 }
 
 const char *nv_cached_label_value(const NV_APPS_LOOKUP_FIELDS *fields, const char *key)
@@ -223,46 +204,11 @@ void nv_derive_docker_image(const NV_APPS_LOOKUP_FIELDS *fields, char *dst, size
     nv_copy_label(fields, "image", dst, dst_size);
 }
 
-static bool nv_systemd_unit_suffix(const char *name)
-{
-    static const char *suffixes[] = {
-        ".service", ".scope", ".slice", ".socket", ".target", ".timer", ".mount", ".path", ".swap", ".device"
-    };
-
-    if (!name || !*name)
-        return false;
-
-    for (size_t i = 0; i < _countof(suffixes); i++) {
-        size_t suffix_len = strlen(suffixes[i]);
-        size_t name_len = strlen(name);
-        if (name_len >= suffix_len && strcmp(&name[name_len - suffix_len], suffixes[i]) == 0)
-            return true;
-    }
-
-    return false;
-}
-
 void nv_derive_systemd_unit_name(const char *cgroup_path, char *dst, size_t dst_size)
 {
-    if (!dst || !dst_size)
+    if(!dst || !dst_size)
         return;
 
     dst[0] = '\0';
-    if (!cgroup_path || !*cgroup_path)
-        return;
-
-    char path[NV_TOPOLOGY_SYSTEMD_UNIT_MAX];
-    strncpyz(path, cgroup_path, sizeof(path) - 1);
-
-    char *candidate = NULL;
-    char *remaining = path;
-    char *component;
-    while (remaining && (component = strsep_skip_consecutive_separators(&remaining, "/"))) {
-        component = trim(component);
-        if (nv_systemd_unit_suffix(component))
-            candidate = component;
-    }
-
-    if (candidate && *candidate)
-        strncpyz(dst, candidate, dst_size - 1);
+    (void)cgroup_topology_derive_systemd_unit(cgroup_path, dst, dst_size, NULL, 0);
 }

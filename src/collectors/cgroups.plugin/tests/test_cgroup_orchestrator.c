@@ -159,6 +159,21 @@ int main(void)
             .expected = CGROUPS_ORCHESTRATOR_SYSTEMD,
         },
         {
+            .name = "systemd service under slice",
+            .path = "/system.slice/system-cups.slice/cups.service",
+            .expected = CGROUPS_ORCHESTRATOR_SYSTEMD,
+        },
+        {
+            .name = "systemd service under service remains unknown",
+            .path = "/system.slice/foo.service/bar.service",
+            .expected = CGROUPS_ORCHESTRATOR_UNKNOWN,
+        },
+        {
+            .name = "systemd slice remains unknown",
+            .path = "/system.slice/system-cups.slice",
+            .expected = CGROUPS_ORCHESTRATOR_UNKNOWN,
+        },
+        {
             .name = "standalone crio remains unknown",
             .path = "/system.slice/crio-0123456789abcdef.scope",
             .expected = CGROUPS_ORCHESTRATOR_UNKNOWN,
@@ -175,6 +190,43 @@ int main(void)
         if (!run_case(&cases[i]))
             failures++;
     }
+
+    systemd_services_cgroups = simple_pattern_create(
+        " !/system.slice/*.service/*.service "
+        " /system.slice/*.service ",
+        NULL,
+        SIMPLE_PATTERN_EXACT,
+        true);
+
+    static const struct orchestrator_case configured_systemd_cases[] = {
+        {
+            .name = "configured systemd service",
+            .path = "/system.slice/ssh.service",
+            .expected = CGROUPS_ORCHESTRATOR_SYSTEMD,
+        },
+        {
+            .name = "configured systemd service under slice",
+            .path = "/system.slice/system-cups.slice/cups.service",
+            .expected = CGROUPS_ORCHESTRATOR_SYSTEMD,
+        },
+        {
+            .name = "configured systemd service under service remains unknown",
+            .path = "/system.slice/foo.service/bar.service",
+            .expected = CGROUPS_ORCHESTRATOR_UNKNOWN,
+        },
+        {
+            .name = "configured systemd slice remains unknown",
+            .path = "/system.slice/system-cups.slice",
+            .expected = CGROUPS_ORCHESTRATOR_UNKNOWN,
+        },
+    };
+
+    for (size_t i = 0; i < sizeof(configured_systemd_cases) / sizeof(configured_systemd_cases[0]); i++) {
+        if (!run_case(&configured_systemd_cases[i]))
+            failures++;
+    }
+
+    simple_pattern_free(systemd_services_cgroups);
 
     if (failures) {
         fprintf(stderr, "%zu cgroup orchestrator classifier tests failed\n", failures);

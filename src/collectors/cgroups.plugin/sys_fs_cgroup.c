@@ -419,7 +419,7 @@ void read_cgroup_plugin_configuration() {
         inicfg_get(&netdata_config, 
             "plugin:cgroups",
             "cgroups to match as systemd services",
-            " !/system.slice/*/*.service "
+            " !/system.slice/*.service/*.service "
             " /system.slice/*.service "),
         NULL,
         SIMPLE_PATTERN_EXACT,

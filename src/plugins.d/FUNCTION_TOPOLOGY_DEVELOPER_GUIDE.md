@@ -600,7 +600,8 @@ Icon tokens:
 `router`, `switch`, `firewall`, `access_point`, `server`, `storage`,
 `load_balancer`, `printer`, `phone`, `ups`, `camera`, `process`, `agent`,
 `netdata-agent`, `parent`, `remote-endpoint`, `local-endpoint`, `segment`,
-`self`, `ip`, `cloud`, `container`, `vm`, `database`, `service`, `datacenter`,
+`self`, `ip`, `cloud`, `container`, `docker`, `kubernetes`, `lxc`, `nspawn`,
+`podman`, `systemd`, `user`, `vm`, `database`, `service`, `datacenter`,
 `cluster`, `host`, `network`, `datastore`, `datastore_cluster`,
 `resource_pool`, `device`, `endpoint`, `correlation`, `interface`, `group`,
 `unknown`.
@@ -1050,8 +1051,10 @@ attached to their owner. Do not silently drop rows.
 - `group_by:pid`: one `process` actor per PID. This is the only mode that may
   emit raw per-PID fields.
 - `group_by:container`: one `container` actor per canonical `container_name`.
-  For systemd services, `container_name` is the service name. For non-container,
-  non-service processes, it falls back to process name.
+  For systemd services, `container_name` is the service name. For
+  `user.slice/user-UID.slice`, it is the resolved username, or `user${UID}` if
+  username resolution is unavailable. For non-container, non-service processes,
+  it falls back to process name.
 
 The actor columns are:
 
@@ -1059,7 +1062,7 @@ The actor columns are:
 |---|---|---|
 | `process` | group key | process name; populated for `process_name` and `pid` modes |
 | `pid` | identity | host PID; populated only for `group_by:pid` |
-| `container_name` | group key | systemd unit, Docker/Kubernetes container name, cgroup name, then process fallback |
+| `container_name` | group key | user-slice username, systemd unit, Docker/Kubernetes container name, cgroup name, then process fallback |
 | `cgroup_path` | attribute | APPS_LOOKUP cgroup path; populated only for `group_by:pid` |
 | `cgroup_name` | attribute | APPS_LOOKUP cgroup name; populated only for `group_by:pid` |
 | `orchestrator` | attribute | rendered from APPS_LOOKUP cgroup status and orchestrator enum; populated only for `group_by:pid` |

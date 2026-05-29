@@ -3,6 +3,7 @@
 #ifndef NETDATA_NETWORK_VIEWER_TOPOLOGY_CONTAINERS_H
 #define NETDATA_NETWORK_VIEWER_TOPOLOGY_CONTAINERS_H
 
+#include "collectors/common-cgroups/cgroup-topology-rules.h"
 #include "network-viewer-apps-lookup-client.h"
 
 #define NV_TOPOLOGY_CGROUP_PATH_MAX 256
@@ -11,8 +12,12 @@
 #define NV_TOPOLOGY_K8S_NAME_MAX 64
 #define NV_TOPOLOGY_DOCKER_IMAGE_MAX 256
 #define NV_TOPOLOGY_SYSTEMD_UNIT_MAX 256
+#define NV_TOPOLOGY_SYSTEMD_KIND_MAX 24
+#define NV_TOPOLOGY_ACTOR_TYPE_MAX 32
+#define NV_TOPOLOGY_ACTOR_KIND_MAX 32
 
 SIMPLE_PATTERN *nv_label_whitelist_parse(const char *pattern);
+const char *nv_cgroup_status_name(uint16_t cgroup_status);
 const char *nv_orchestrator_name(uint16_t cgroup_status, uint16_t orchestrator);
 const char *nv_cached_label_value(const NV_APPS_LOOKUP_FIELDS *fields, const char *key);
 

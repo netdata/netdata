@@ -221,7 +221,8 @@ Closed token values are part of the schema contract:
 - icons: `router`, `switch`, `firewall`, `access_point`, `server`, `storage`,
   `load_balancer`, `printer`, `phone`, `ups`, `camera`, `process`, `agent`,
   `netdata-agent`, `parent`, `remote-endpoint`, `local-endpoint`, `segment`,
-  `self`, `ip`, `cloud`, `container`, `vm`, `database`, `service`,
+  `self`, `ip`, `cloud`, `container`, `docker`, `kubernetes`, `lxc`,
+  `nspawn`, `podman`, `systemd`, `user`, `vm`, `database`, `service`,
   `datacenter`, `cluster`, `host`, `network`, `datastore`,
   `datastore_cluster`, `resource_pool`, `device`, `endpoint`, `correlation`,
   `interface`, `group`, `unknown`.
@@ -525,14 +526,37 @@ inventory for process port bullets only; it is not a standalone modal tab for
 network-connections.
 
 Network-connections supports three actor grouping levels: `process_name`,
-`pid`, and `container`. `group_by:pid` emits one `process` actor per PID and is
-the only mode that may emit raw variable fields such as PID, UID, network
-namespace, command line, cgroup path, and detailed container metadata.
-`group_by:process_name` emits grouped `process` actors and must not populate
-fields that can vary across grouped processes. `group_by:container` emits
-`container` actors grouped by canonical `container_name`; systemd services use
-the service name, and non-container/non-service processes fall back to process
-name. The three aggregation scopes use `evidence_policy: "preserve"`.
+`pid`, and `container`. `group_by:pid` emits one `process` actor per PID and may
+emit raw variable fields as scalar actor columns: PID, UID, network namespace,
+command line, cgroup status/path/name, and detailed container metadata.
+`group_by:process_name` emits grouped `process` actors; fields that can vary
+across grouped PIDs must be represented as merged/set-valued actor labels or
+columns with declared `set` aggregation, not as arbitrary scalar replacements.
+`group_by:container` emits actors grouped by canonical `container_name`;
+runtime-specific actor types such as Docker containers, Kubernetes containers,
+VMs, systemd services, user slices, and process fallbacks are producer-declared
+actor types that share the `container` aggregation scope. Systemd services use
+the service unit name. `user.slice/user-UID.slice` paths use the resolved
+username as the grouped actor name, or `user${UID}` when username resolution is
+unavailable, while leaf scopes stay in cgroup/detail evidence. Known host/root
+processes fall back to process name, and unresolved retry-later lookups remain
+explicit pending/unknown container identity instead of being fabricated as final
+process-name containers. The three aggregation scopes use `evidence_policy:
+"preserve"`.
+
+Network-connections topology keeps cgroup metric-monitoring rules separate from
+topology display classification rules. Topology producers may derive
+`systemd_unit_name`, `systemd_unit_kind`, `actor_kind`, specific actor types,
+and display icons from cgroup path/orchestrator rule modules without widening
+the netipc orchestrator enum for each display subtype.
+
+Network-connections actor modals expose producer-declared actor-owned
+`processes` and `cgroups` tables in addition to labels and relationship
+sections. `processes` contains contributing PID/process/user/namespace/command
+rows. `cgroups` contains contributing PID cgroup status/path/name,
+container/service name, effective display orchestrator, actor kind, Kubernetes,
+Docker/Podman, and systemd unit fields. These are topology schema tables, not
+Cloud/UI hardcoded container views.
 The Function info response advertises `v: 3`, and data requests consume the
 selected grouping from the v3 POST payload shape
 `{"selections":{"group_by":["..."]}}`; legacy function-string aliases such as
@@ -546,8 +570,9 @@ topology value, not a netipc enum member.
 Free-form cgroup labels are denied by default in Function output. Operators
 opt in with `labels:<pattern>` using pipe-separated `simple_pattern` tokens.
 The whitelist is applied at network-viewer Function emission only; upstream
-cgroup caches and IPC payloads carry raw labels. Raw cgroup paths are emitted
-only in `group_by:pid`.
+cgroup caches and IPC payloads carry raw labels. Raw cgroup paths are scalar
+actor columns only in `group_by:pid`; grouped views preserve them as
+deduplicated actor-label values when available.
 
 `topology:snmp` now emits `netdata.topology.v1` from the Function handler
 through an adapter over the existing SNMP topology engine output. The adapter

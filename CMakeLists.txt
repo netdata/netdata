@@ -2806,8 +2806,12 @@ if(ENABLE_PLUGIN_APPS)
     set(APPS_PLUGIN_FILES
             src/collectors/apps.plugin/apps_plugin.c
             src/collectors/apps.plugin/apps_plugin.h
+            src/collectors/common-cgroups/cgroup-topology-rules.c
+            src/collectors/common-cgroups/cgroup-topology-rules.h
             src/collectors/apps.plugin/apps-cgroups-path.c
             src/collectors/apps.plugin/apps-cgroups-path.h
+            src/collectors/apps.plugin/apps-cgroups-enrichment.c
+            src/collectors/apps.plugin/apps-cgroups-enrichment.h
             src/collectors/apps.plugin/apps-cgroups-lookup-client.c
             src/collectors/apps.plugin/apps-cgroups-lookup-client.h
             src/collectors/apps.plugin/apps-lookup-netipc.c
@@ -3326,6 +3330,8 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         if(OS_LINUX)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/libnetdata/local-sockets/local-sockets.h
+                        src/collectors/common-cgroups/cgroup-topology-rules.c
+                        src/collectors/common-cgroups/cgroup-topology-rules.h
                         src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.c
                         src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
                         src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
@@ -3368,6 +3374,7 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
 
         add_executable(network-viewer-topology-containers-test EXCLUDE_FROM_ALL
                 src/collectors/network-viewer.plugin/tests/test_network_viewer_topology_containers.c
+                src/collectors/common-cgroups/cgroup-topology-rules.c
                 src/collectors/network-viewer.plugin/network-viewer-topology-containers.c)
         target_link_libraries(network-viewer-topology-containers-test libnetdata)
 

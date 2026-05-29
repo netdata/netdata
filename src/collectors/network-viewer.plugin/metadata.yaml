@@ -162,8 +162,8 @@ modules:
             Shows active network connections with protocol details, states, addresses, ports, and performance metrics.
 
             Provides both aggregated and detailed views of TCP and UDP connections for IPv4 and IPv6,
-            including connection direction (listen, inbound, outbound, local), process information,
-            and TCP performance metrics (RTT, retransmissions).
+            including connection direction (listen, inbound, outbound), process information,
+            cgroup/container/service enrichment when available, and TCP performance metrics (RTT, retransmissions).
 
             On Linux, connections are classified as system or container based on network namespace.
             On FreeBSD, namespaces are not exposed to userspace and the classification is omitted.
@@ -200,13 +200,15 @@ modules:
             Shows active network connections as a topology graph with self, process or container, and endpoint actors.
 
             The group_by selector controls the actor level. process_name groups sockets by process name, pid shows
-            one actor per PID with the raw per-PID information, and container groups sockets by canonical
+            one actor per PID with scalar per-PID information, and container groups sockets by canonical
             container_name. For systemd services, container_name is the service name. For non-container,
             non-service processes, container_name falls back to the process name.
 
-            Raw fields that can vary across grouped processes, such as PID, UID, network namespace, command line,
-            cgroup path, and detailed container metadata, are emitted only in group_by:pid. Free-form labels are
-            hidden by default and can be allowed per request with labels:<pattern>, where patterns are pipe-separated.
+            Fields that can vary across grouped processes, such as PID, UID, network namespace, command line,
+            cgroup path, and detailed container metadata, are scalar columns in group_by:pid and merged actor
+            labels in grouped views. Free-form labels are hidden by default and can be allowed per request with
+            labels:<pattern>, where patterns are pipe-separated. Actor modals also expose producer-declared
+            Processes and CGroups tables for the selected actor.
           parameters:
             - id: group_by
               name: Group By
@@ -239,42 +241,54 @@ modules:
               - name: cgroup_path
                 type: string
                 unit: ""
-                description: "Full cgroup path, emitted only in group_by:pid."
+                description: "Full cgroup path; scalar in group_by:pid and merged as actor labels in grouped views."
               - name: cgroup_name
                 type: string
                 unit: ""
-                description: "Cgroup or container display name, emitted only in group_by:pid."
+                description: "Cgroup or container display name; scalar in group_by:pid and merged as actor labels in grouped views."
+              - name: cgroup_status
+                type: string
+                unit: ""
+                description: "Cgroup enrichment status: known, host_root, retry_later, unknown_permanent, or unknown."
               - name: orchestrator
                 type: string
                 unit: ""
-                description: "Container/orchestrator family, emitted only in group_by:pid."
+                description: "Container/orchestrator family; scalar in group_by:pid and merged as actor labels in grouped views."
               - name: k8s_pod_name
                 type: string
                 unit: ""
-                description: "Kubernetes pod name, emitted only in group_by:pid."
+                description: "Kubernetes pod name; scalar in group_by:pid and merged as actor labels in grouped views."
               - name: k8s_namespace
                 type: string
                 unit: ""
-                description: "Kubernetes namespace, emitted only in group_by:pid."
+                description: "Kubernetes namespace; scalar in group_by:pid and merged as actor labels in grouped views."
               - name: k8s_workload
                 type: string
                 unit: ""
-                description: "Kubernetes controller name, emitted only in group_by:pid."
+                description: "Kubernetes controller name; scalar in group_by:pid and merged as actor labels in grouped views."
               - name: docker_container_name
                 type: string
                 unit: ""
-                description: "Kubernetes container, Docker/Podman container, or cgroup fallback name, emitted only in group_by:pid."
+                description: "Kubernetes container, Docker/Podman container, or cgroup fallback name; scalar in group_by:pid and merged as actor labels in grouped views."
               - name: docker_image
                 type: string
                 unit: ""
-                description: "Docker/Podman image label, emitted only in group_by:pid."
+                description: "Docker/Podman image label; scalar in group_by:pid and merged as actor labels in grouped views."
               - name: systemd_unit_name
                 type: string
                 unit: ""
-                description: "systemd unit name, emitted only in group_by:pid."
+                description: "systemd unit name; scalar in group_by:pid and merged as actor labels in grouped views."
+              - name: systemd_unit_kind
+                type: string
+                unit: ""
+                description: "systemd unit kind such as service, scope, or slice; scalar in group_by:pid and merged as actor labels in grouped views."
+              - name: actor_kind
+                type: string
+                unit: ""
+                description: "Producer-derived actor kind used to classify containers, services, slices, scopes, VMs, and process fallbacks."
           performance: "group_by:container performs APPS_LOOKUP cache reads to derive canonical container_name; cache warming runs asynchronously."
-          security: "Free-form labels are denied by default. Raw cgroup paths are emitted only in group_by:pid and may expose operator-chosen path segments."
-          availability: "container_name uses APPS_LOOKUP data when available and falls back to process name when no container or service identity exists."
+          security: "Free-form labels are denied by default. Raw cgroup paths may expose operator-chosen path segments and are hidden in table views by default."
+          availability: "container_name uses APPS_LOOKUP data when available, keeps retry-later lookups pending, and falls back to process name only for known host/root or permanently unknown cgroup cases."
   - meta:
       plugin_name: network-viewer.plugin
       module_name: PerflibNetworkProtocols

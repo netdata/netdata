@@ -1,55 +1,69 @@
-# SOW-0041 - Cloud topology group_by consumer
+# SOW-0041 - Cloud topology generic aggregation verification
 
 ## Status
 
 Status: open
 
-Sub-state: tracked from SOW-0036 follow-up item 3. Not started.
+Sub-state: corrected by SOW-0044. Not started.
 
 ## Requirements
 
 ### Purpose
 
-Implement the Cloud-side consumer work needed for the
-`topology:network-connections` `view.group_by` metadata emitted by the Agent to
-become an operator-visible grouping control.
+Verify and, only if needed, fix the generic Cloud topology aggregation path so
+producer-declared `group_by`, actor rows, actor labels, and column aggregation
+rules are preserved without topology-specific Cloud code. When the Cloud PR
+changes the shared topology schema or adds merge features, keep the Agent copy
+of the schema, developer documentation, and topology-authoring skill in sync.
 
 ### User Request
 
-Track the Cloud consumer half separately from the Agent producer work so the
-Agent-side SOW can close without claiming Cloud UI grouping is already done.
+Track the Cloud-side generic validation separately from the Agent producer work.
+The Cloud topology service and frontend must remain topology-agnostic; this SOW
+must not implement container-specific behavior.
 
 ### Assistant Understanding
 
 Facts:
 
-- SOW-0036 regression repair emits the Agent payload with three actor grouping
-  choices: `process_name`, `pid`, and `container`.
-- `group_by:pid` returns per-PID `process` actors with raw per-PID fields.
-- `group_by:process_name` returns grouped `process` actors without variable
-  per-process/container fields.
-- `group_by:container` returns grouped `container` actors keyed by canonical
-  `container_name`.
-- SOW-0036 explicitly does not implement Cloud frontend or Cloud topology
-  service selection UX.
+- SOW-0044 repairs the Agent producer contract so grouped views merge variable
+  enrichment through actor labels and declared `set` aggregation metadata.
+- Cloud request forwarding is generic: reserved metadata names do not include
+  `group_by`, and advertised non-reserved parameters are forwarded.
+- Cloud actor aggregation is generic and producer-declared through actor
+  identity/merge identity and column aggregation rules.
+- Frontend Function selections and topology v1 actor attributes are generic.
+- The topology schema source-of-truth is mirrored across Cloud and Agent work:
+  a Cloud PR that changes merge/schema semantics also requires updates in this
+  repository to `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`,
+  `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`, and
+  `.agents/skills/project-create-topology/SKILL.md`.
 
 Inferences:
 
-- This SOW will likely touch Cloud repositories outside this Agent checkout.
+- This SOW should become a Cloud test/fixture PR only if generic verification
+  exposes a gap.
 
 Unknowns:
 
-- Exact Cloud repo branch, ownership, and delivery sequencing must be confirmed
-  before implementation.
+- Exact Cloud repo branch and PR sequencing must be confirmed before
+  implementation.
 
 ### Acceptance Criteria
 
-- Cloud frontend exposes a grouping selector for topology payloads that declare
-  `view.group_by`.
-- Cloud topology aggregation honors the selected actor grouping.
-- Cloud grouping respects the Agent actor type and merge identity emitted for
-  the selected mode.
-- Agent payloads emitted by SOW-0036 require no further Agent-side changes.
+- Cloud forwarding accepts producer-advertised `group_by` selections without
+  hardcoded topology knowledge.
+- Cloud aggregation preserves actor rows, actor labels, and producer-declared
+  `set` aggregation for merged attributes.
+- Frontend topology v1 rendering consumes producer-declared actor rows, labels,
+  modal recipes, and selections without container-specific code.
+- Any Cloud changes are generic tests or generic schema/aggregation fixes.
+- If the Cloud PR adds or changes topology merge/schema features, the same PR
+  sequence updates this repository's topology schema
+  (`src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`), developer guide
+  (`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`), and topology producer
+  skill (`.agents/skills/project-create-topology/SKILL.md`) before the work is
+  considered complete.
 
 ## Analysis
 
@@ -59,13 +73,13 @@ Sources checked:
 
 Current state:
 
-- Agent producer work is implemented in this repository; Cloud consumer work is
-  tracked separately.
+- Agent producer work is implemented in this repository; Cloud generic
+  verification is tracked separately.
 
 Risks:
 
-- Cross-repository sequencing and API contract drift can produce UI controls
-  that do not match Agent payload semantics.
+- Cross-repository sequencing and API contract drift can produce UI controls or
+  aggregation behavior that do not match Agent payload semantics.
 
 ## Pre-Implementation Gate
 
@@ -73,8 +87,9 @@ Status: blocked
 
 Problem / root-cause model:
 
-- The Agent emits grouping metadata, but Cloud consumers must turn that metadata
-  into rebucketing behavior and UI controls.
+- The Agent emits generic topology metadata. Cloud consumers should forward
+  selections and aggregate rows using the schema; if tests fail, the bug is in a
+  generic Cloud topology path, not in missing container-specific Cloud logic.
 
 Evidence reviewed:
 
@@ -82,16 +97,24 @@ Evidence reviewed:
 
 Affected contracts and surfaces:
 
-- Cloud frontend topology adapter, Cloud topology aggregation service, and
-  topology Function query flow.
+- Cloud topology request forwarding, aggregation service, frontend Function
+  selection flow, and topology v1 rendering.
+- Agent topology schema copy:
+  `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`.
+- Agent topology developer guide:
+  `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`.
+- Agent topology authoring skill:
+  `.agents/skills/project-create-topology/SKILL.md`.
 
 Existing patterns to reuse:
 
-- Existing topology v1 normalization and aggregation paths in the Cloud repos.
+- Existing topology v1 request, normalization, aggregation, and frontend
+  producer-declared modal/actor rendering paths in the Cloud repos.
 
 Risk and blast radius:
 
-- High. This is cross-repository user-visible Cloud behavior.
+- Medium-high. This is cross-repository user-visible Cloud behavior, but the
+  intended changes are generic tests or generic aggregation fixes.
 
 Sensitive data handling plan:
 
@@ -100,19 +123,35 @@ Sensitive data handling plan:
 Implementation plan:
 
 1. Confirm Cloud repositories, owners, and target branch.
-2. Audit current Cloud normalization and aggregation behavior.
-3. Implement group_by selection and sparse-scope identity preservation.
+2. Audit current Cloud request forwarding, aggregation, and frontend selection
+   behavior.
+3. If Cloud merge/schema behavior changes, update the Agent schema copy,
+   developer guide, and topology-authoring skill in the same implementation
+   sequence.
+4. Add generic tests or generic aggregation/schema fixes only if evidence shows
+   a gap.
 
 Validation plan:
 
-- Synthetic SOW-0036 payloads through frontend and aggregation tests.
+- Synthetic SOW-0044 payloads through frontend and aggregation tests.
+- Agent-side schema validation with the updated
+  `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`.
+- Developer-guide/skill consistency check for every new merge/schema feature:
+  schema keyword exists, guide describes producer usage, and
+  `project-create-topology` tells future topology producers how to use it.
 - Manual Cloud UI verification in a non-production environment.
 
 Artifact impact plan:
 
 - AGENTS.md: update only if cross-repo workflow guardrails change.
-- Runtime project skills: update topology skill if Cloud consumer workflow is documented here.
-- Specs: update if topology consumer semantics become part of Agent-side spec.
+- Runtime project skills: update `.agents/skills/project-create-topology/SKILL.md`
+  when Cloud schema/merge features change producer authoring rules.
+- Specs: update only if generic topology consumer semantics change.
+- Topology schema: update `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` when
+  the Cloud PR adds or changes merge-feature schema.
+- Developer documentation: update
+  `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md` for every schema merge
+  feature producers can use.
 - End-user/operator docs: update Cloud topology operator docs.
 - End-user/operator skills: update query topology skills if workflow changes.
 - SOW lifecycle: move to current only after repository and ownership are confirmed.
@@ -123,7 +162,8 @@ Open-source reference evidence:
 
 Open decisions:
 
-- Confirm whether Cloud rebucketing happens server-side, client-side, or both.
+- None for container-specific behavior. Open only: confirm whether generic
+  verification needs a Cloud PR after SOW-0044 payload testing.
 
 ## Implications And Decisions
 

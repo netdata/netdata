@@ -116,3 +116,19 @@ Open decisions: none. User decision 1A in SOW-0043 fixes grouped-attribute behav
 ## Outcome
 
 SOW-0036 is complete after regression repair. `topology:network-connections` now exposes actor-level grouping through `group_by=process_name|pid|container`; PID mode carries raw enrichment; grouped modes remain stable and do not mix process actors into container responses.
+
+## Correction - 2026-05-28
+
+SOW-0044 supersedes this SOW's earlier grouped-view enrichment restriction.
+The current product contract is:
+
+- `group_by=pid` emits scalar per-PID process, cgroup, container, and service
+  enrichment.
+- `group_by=process_name` and `group_by=container` preserve variable per-PID
+  enrichment through deduplicated actor labels and schema-declared `set`
+  aggregation metadata.
+- grouped views must not silently drop cgroup/container/service enrichment and
+  must not replace variable facts with an arbitrary PID's scalar values.
+
+This correction is recorded here so future readers do not treat the original
+PID-only enrichment wording as current design.

@@ -20,6 +20,15 @@ static bool expect_true(bool condition, const char *message)
     return false;
 }
 
+static bool expect_uint(uint32_t actual, uint32_t expected, const char *message)
+{
+    if(actual == expected)
+        return true;
+
+    fprintf(stderr, "%s: got '%u', expected '%u'\n", message, actual, expected);
+    return false;
+}
+
 static NV_APPS_LOOKUP_LABEL label(const char *key, const char *value)
 {
     return (NV_APPS_LOOKUP_LABEL){ .key = (char *)key, .value = (char *)value };
@@ -153,6 +162,63 @@ static bool test_systemd_and_orchestrator(void)
     nv_derive_systemd_unit_name("/sys/fs/cgroup/user.slice/user-1000.slice/session-2.scope", value, sizeof(value));
     ok = expect_string(value, "session-2.scope", "systemd scope path") && ok;
 
+    char unit_kind[NV_TOPOLOGY_SYSTEMD_KIND_MAX];
+    ok = expect_true(
+             cgroup_topology_derive_systemd_unit(
+                 "/sys/fs/cgroup/system.slice/system-cups.slice/cups.service",
+                 value, sizeof(value), unit_kind, sizeof(unit_kind)),
+             "nested systemd service should be classified") && ok;
+    ok = expect_string(value, "cups.service", "nested systemd service name") && ok;
+    ok = expect_string(unit_kind, "service", "nested systemd service kind") && ok;
+
+    CGROUP_TOPOLOGY_CLASSIFICATION classification;
+    cgroup_topology_classify(
+        NIPC_APPS_CGROUP_KNOWN, NIPC_ORCHESTRATOR_UNKNOWN,
+        "/sys/fs/cgroup/user.slice/user-1000.slice/app.slice/app-code.scope",
+        &classification);
+    ok = expect_string(classification.effective_orchestrator, "systemd", "systemd scope effective orchestrator") && ok;
+    ok = expect_string(classification.actor_type, "systemd_scope", "systemd scope actor type") && ok;
+    ok = expect_string(classification.actor_kind, "scope", "systemd scope actor kind") && ok;
+    ok = expect_string(classification.actor_icon, "systemd", "systemd scope actor icon") && ok;
+
+    uint32_t user_slice_uid = NIPC_UID_UNSET;
+    ok = expect_true(
+             cgroup_topology_parse_user_slice_uid(
+                 "/sys/fs/cgroup/user.slice/user-1001.slice/app.slice/app-code.scope",
+                 &user_slice_uid),
+             "user.slice path should be detected") && ok;
+    ok = expect_uint(user_slice_uid, 1001, "user.slice uid should be parsed") && ok;
+
+    user_slice_uid = NIPC_UID_UNSET;
+    ok = expect_true(
+             cgroup_topology_parse_user_slice_uid(
+                 "user.slice_user-1002.slice_user@1002.service_app.slice_app-code.scope",
+                 &user_slice_uid),
+             "normalized user.slice path should be detected") && ok;
+    ok = expect_uint(user_slice_uid, 1002, "normalized user.slice uid should be parsed") && ok;
+
+    user_slice_uid = NIPC_UID_UNSET;
+    ok = expect_true(
+             !cgroup_topology_parse_user_slice_uid(
+                 "/sys/fs/cgroup/system.slice/nginx.service",
+                 &user_slice_uid),
+             "system.slice service should not be treated as user.slice") && ok;
+    ok = expect_uint(user_slice_uid, NIPC_UID_UNSET, "non-user.slice uid should remain unset") && ok;
+
+    cgroup_topology_classify(
+        NIPC_APPS_CGROUP_KNOWN, NIPC_ORCHESTRATOR_DOCKER,
+        "/sys/fs/cgroup/docker/container.scope",
+        &classification);
+    ok = expect_string(classification.actor_type, "docker_container", "known container orchestrator should win over systemd-shaped path") && ok;
+    ok = expect_string(classification.actor_icon, "docker", "known container orchestrator icon should win over systemd-shaped path") && ok;
+
+    cgroup_topology_classify(
+        NIPC_APPS_CGROUP_KNOWN, NIPC_ORCHESTRATOR_DOCKER,
+        "/sys/fs/cgroup/docker/0123456789abcdef",
+        &classification);
+    ok = expect_string(classification.actor_type, "docker_container", "docker actor type") && ok;
+    ok = expect_string(classification.actor_icon, "docker", "docker actor icon") && ok;
+
     ok = expect_string(
              nv_orchestrator_name(NIPC_APPS_CGROUP_KNOWN, NIPC_ORCHESTRATOR_DOCKER),
              "docker",
@@ -165,6 +231,14 @@ static bool test_systemd_and_orchestrator(void)
              nv_orchestrator_name(NIPC_APPS_CGROUP_UNKNOWN_PERMANENT, NIPC_ORCHESTRATOR_UNKNOWN),
              "unknown",
              "unknown-permanent orchestrator rendering") && ok;
+    ok = expect_string(
+             nv_cgroup_status_name(NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER),
+             "retry_later",
+             "retry-later cgroup status rendering") && ok;
+    ok = expect_string(
+             nv_cgroup_status_name(NIPC_APPS_CGROUP_KNOWN),
+             "known",
+             "known cgroup status rendering") && ok;
 
     return ok;
 }

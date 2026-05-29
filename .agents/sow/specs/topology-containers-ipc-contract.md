@@ -131,7 +131,11 @@ Role-specific telemetry covers request outcomes, cache outcomes, peer lifecycle,
 - process/actor identity remains available for the existing views;
 - container grouping is available when APPS_LOOKUP returns known container metadata;
 - orchestrator grouping is available from the `CGROUPS_LOOKUP` orchestrator value propagated through apps.plugin;
-- host/root and unknown cases remain explicit fallback states rather than fabricated container identities.
+- host/root and unknown cases remain explicit fallback states rather than fabricated container identities;
+- `group_by:pid` exposes per-PID enrichment as scalar actor fields and actor labels;
+- grouped `process_name` and `container` views merge per-PID enrichment through deduplicated actor labels and schema-declared `set` aggregation metadata, not by replacing variable values with whichever PID happened to be processed first;
+- the tabular `network-connections` Function and apps.plugin `processes` Function expose the same per-PID cgroup/container/service enrichment fields where the PID context is available.
+- topology actor kind/type/icon classification is derived by a shared rule module from cgroup path and orchestrator data. This is separate from cgroups.plugin metric inclusion rules, so systemd slices/scopes can have clean topology names without being monitored as overlapping service metric charts.
 
 The Cloud topology aggregator must preserve the grouping fields, `view.group_by`, actor rows, and `evidence_policy: "preserve"` string form. Changing `evidence_policy` to an object is a schema change and requires Cloud schema coordination first.
 

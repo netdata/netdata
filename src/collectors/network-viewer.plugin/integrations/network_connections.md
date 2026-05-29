@@ -163,8 +163,8 @@ on FreeBSD, system-wide TCP and UDP stack statistics.
 Shows active network connections with protocol details, states, addresses, ports, and performance metrics.
 
 Provides both aggregated and detailed views of TCP and UDP connections for IPv4 and IPv6,
-including connection direction (listen, inbound, outbound, local), process information,
-and TCP performance metrics (RTT, retransmissions).
+including connection direction (listen, inbound, outbound), process information,
+cgroup/container/service enrichment when available, and TCP performance metrics (RTT, retransmissions).
 
 On Linux, connections are classified as system or container based on network namespace.
 On FreeBSD, namespaces are not exposed to userspace and the classification is omitted.
@@ -236,13 +236,15 @@ This function has no parameters.
 Shows active network connections as a topology graph with self, process or container, and endpoint actors.
 
 The group_by selector controls the actor level. process_name groups sockets by process name, pid shows
-one actor per PID with the raw per-PID information, and container groups sockets by canonical
+one actor per PID with scalar per-PID information, and container groups sockets by canonical
 container_name. For systemd services, container_name is the service name. For non-container,
 non-service processes, container_name falls back to the process name.
 
-Raw fields that can vary across grouped processes, such as PID, UID, network namespace, command line,
-cgroup path, and detailed container metadata, are emitted only in group_by:pid. Free-form labels are
-hidden by default and can be allowed per request with labels:<pattern>, where patterns are pipe-separated.
+Fields that can vary across grouped processes, such as PID, UID, network namespace, command line,
+cgroup path, and detailed container metadata, are scalar columns in group_by:pid and merged actor
+labels in grouped views. Free-form labels are hidden by default and can be allowed per request with
+labels:<pattern>, where patterns are pipe-separated. Actor modals also expose producer-declared
+Processes and CGroups tables for the selected actor.
 
 
 | Aspect | Description |
@@ -250,8 +252,8 @@ hidden by default and can be allowed per request with labels:<pattern>, where pa
 | Name | `Network-viewer.plugin:topology:network-connections` |
 | Require Cloud | no |
 | Performance | group_by:container performs APPS_LOOKUP cache reads to derive canonical container_name; cache warming runs asynchronously. |
-| Security | Free-form labels are denied by default. Raw cgroup paths are emitted only in group_by:pid and may expose operator-chosen path segments. |
-| Availability | container_name uses APPS_LOOKUP data when available and falls back to process name when no container or service identity exists. |
+| Security | Free-form labels are denied by default. Raw cgroup paths may expose operator-chosen path segments and are hidden in table views by default. |
+| Availability | container_name uses APPS_LOOKUP data when available, keeps retry-later lookups pending, and falls back to process name only for known host/root or permanently unknown cgroup cases. |
 
 #### Prerequisites
 
@@ -271,12 +273,15 @@ Topology payload using netdata.topology.v1.
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
 | container_name | string |  |  | Canonical container/service actor name used by group_by:container. |
-| cgroup_path | string |  |  | Full cgroup path, emitted only in group_by:pid. |
-| cgroup_name | string |  |  | Cgroup or container display name, emitted only in group_by:pid. |
-| orchestrator | string |  |  | Container/orchestrator family, emitted only in group_by:pid. |
-| k8s_pod_name | string |  |  | Kubernetes pod name, emitted only in group_by:pid. |
-| k8s_namespace | string |  |  | Kubernetes namespace, emitted only in group_by:pid. |
-| k8s_workload | string |  |  | Kubernetes controller name, emitted only in group_by:pid. |
-| docker_container_name | string |  |  | Kubernetes container, Docker/Podman container, or cgroup fallback name, emitted only in group_by:pid. |
-| docker_image | string |  |  | Docker/Podman image label, emitted only in group_by:pid. |
-| systemd_unit_name | string |  |  | systemd unit name, emitted only in group_by:pid. |
+| cgroup_path | string |  |  | Full cgroup path; scalar in group_by:pid and merged as actor labels in grouped views. |
+| cgroup_name | string |  |  | Cgroup or container display name; scalar in group_by:pid and merged as actor labels in grouped views. |
+| cgroup_status | string |  |  | Cgroup enrichment status: known, host_root, retry_later, unknown_permanent, or unknown. |
+| orchestrator | string |  |  | Container/orchestrator family; scalar in group_by:pid and merged as actor labels in grouped views. |
+| k8s_pod_name | string |  |  | Kubernetes pod name; scalar in group_by:pid and merged as actor labels in grouped views. |
+| k8s_namespace | string |  |  | Kubernetes namespace; scalar in group_by:pid and merged as actor labels in grouped views. |
+| k8s_workload | string |  |  | Kubernetes controller name; scalar in group_by:pid and merged as actor labels in grouped views. |
+| docker_container_name | string |  |  | Kubernetes container, Docker/Podman container, or cgroup fallback name; scalar in group_by:pid and merged as actor labels in grouped views. |
+| docker_image | string |  |  | Docker/Podman image label; scalar in group_by:pid and merged as actor labels in grouped views. |
+| systemd_unit_name | string |  |  | systemd unit name; scalar in group_by:pid and merged as actor labels in grouped views. |
+| systemd_unit_kind | string |  |  | systemd unit kind such as service, scope, or slice; scalar in group_by:pid and merged as actor labels in grouped views. |
+| actor_kind | string |  |  | Producer-derived actor kind used to classify containers, services, slices, scopes, VMs, and process fallbacks. |

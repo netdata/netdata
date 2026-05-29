@@ -609,13 +609,13 @@ static bool nv_apps_lookup_client_ensure_ready(void)
 
     if (apps_lookup_peer_was_ready) {
         nv_apps_lookup_counter_inc(&apps_lookup_peer_disconnects);
-        netdata_log_info("network-viewer.plugin lost APPS_LOOKUP service; cache warming will retry");
+        netdata_log_error("network-viewer.plugin lost APPS_LOOKUP service; cache warming will retry");
     }
     else {
         static bool logged_absent = false;
         if (!logged_absent) {
             logged_absent = true;
-            netdata_log_info("network-viewer.plugin APPS_LOOKUP service unavailable; cache warming will retry");
+            netdata_log_error("network-viewer.plugin APPS_LOOKUP service unavailable; cache warming will retry");
         }
     }
 
@@ -639,6 +639,7 @@ static void nv_apps_lookup_worker_cancel(void *data __maybe_unused)
 static void nv_apps_lookup_worker_main(void *arg __maybe_unused)
 {
     nd_thread_register_canceller(nv_apps_lookup_worker_cancel, NULL);
+    bool request_failure_logged = false;
 
     while (!__atomic_load_n(&apps_lookup_worker_stop, __ATOMIC_ACQUIRE) &&
            !nd_thread_signaled_to_cancel() &&
@@ -692,6 +693,11 @@ static void nv_apps_lookup_worker_main(void *arg __maybe_unused)
         if (err != NIPC_OK) {
             nv_apps_lookup_counter_inc(&apps_lookup_requests_failed);
             nv_apps_lookup_counter_inc(&apps_lookup_peer_disconnects);
+            if (!request_failure_logged) {
+                netdata_log_error("network-viewer.plugin APPS_LOOKUP request failed (error %u); cache warming will retry",
+                                  (unsigned int)err);
+                request_failure_logged = true;
+            }
             netdata_mutex_unlock(&apps_lookup_client_mutex);
             freez(pids);
             continue;
@@ -700,11 +706,19 @@ static void nv_apps_lookup_worker_main(void *arg __maybe_unused)
         nv_apps_lookup_counter_inc(&apps_lookup_requests_responded);
         if (response.item_count != pid_count) {
             nv_apps_lookup_counter_inc(&apps_lookup_requests_failed);
+            if (!request_failure_logged) {
+                netdata_log_error(
+                    "network-viewer.plugin APPS_LOOKUP response item count mismatch (requested %u, received %u); cache warming will retry",
+                    pid_count,
+                    response.item_count);
+                request_failure_logged = true;
+            }
             netdata_mutex_unlock(&apps_lookup_client_mutex);
             freez(pids);
             continue;
         }
 
+        request_failure_logged = false;
         nv_apps_lookup_apply_response(pids, pid_count, &response);
         netdata_mutex_unlock(&apps_lookup_client_mutex);
         freez(pids);

@@ -2,10 +2,10 @@
 
 ## Status
 
-Status: open
+Status: closed
 
-Sub-state: tracked from SOW-0036 follow-up item 2 and SOW-0035 follow-up
-mapping. Not started.
+Sub-state: superseded by SOW-0044, which implements detailed-view PID warming
+as part of the broader topology enrichment consistency repair.
 
 ## Requirements
 
@@ -17,7 +17,8 @@ tabular `network-connections` Function's `sockets:detailed` mode.
 ### User Request
 
 Track the detailed-view cache-population gap as real work instead of leaving it
-inside the completed topology grouping SOW.
+inside the completed topology grouping SOW. This narrow tracker is now closed
+because SOW-0044 absorbed and implements the work.
 
 ### Assistant Understanding
 
@@ -131,19 +132,20 @@ Pending activation.
 
 ## Execution Log
 
-No work yet.
+2026-05-28: closed as superseded by
+`.agents/sow/current/SOW-0044-20260528-topology-enrichment-consistency.md`.
 
 ## Validation
 
-Pending activation.
+Closed without separate implementation. SOW-0044 owns validation.
 
 ## Outcome
 
-Pending.
+Superseded by SOW-0044.
 
 ## Lessons Extracted
 
-Pending.
+No separate lessons; see SOW-0044.
 
 ## Followup
 

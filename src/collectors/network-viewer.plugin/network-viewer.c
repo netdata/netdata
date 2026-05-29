@@ -39,6 +39,7 @@ static SPAWN_SERVER *spawn_srv = NULL;
 #define NETWORK_TOPOLOGY_SOURCE "network-connections"
 #define NETWORK_TOPOLOGY_LAYER "network"
 #define NV_TOPOLOGY_MAX_PPID_DEPTH 64
+#define NV_TOPOLOGY_PENDING_CONTAINER_NAME "[pending]"
 
 #define NV_TOPOLOGY_USERNAME_MAX 128
 #define NV_TOPOLOGY_CMDLINE_MAX 512
@@ -173,6 +174,7 @@ typedef struct {
     char cgroup_path[NV_TOPOLOGY_CGROUP_PATH_MAX];
     char cgroup_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
     char container_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
+    char cgroup_status[32];
     char orchestrator[NV_TOPOLOGY_ORCHESTRATOR_MAX];
     char k8s_pod_name[NV_TOPOLOGY_K8S_NAME_MAX];
     char k8s_namespace[NV_TOPOLOGY_K8S_NAME_MAX];
@@ -180,6 +182,9 @@ typedef struct {
     char docker_container_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
     char docker_image[NV_TOPOLOGY_DOCKER_IMAGE_MAX];
     char systemd_unit_name[NV_TOPOLOGY_SYSTEMD_UNIT_MAX];
+    char systemd_unit_kind[NV_TOPOLOGY_SYSTEMD_KIND_MAX];
+    char actor_kind[NV_TOPOLOGY_ACTOR_KIND_MAX];
+    char actor_type[NV_TOPOLOGY_ACTOR_TYPE_MAX];
     bool from_cache;
 } NV_TOPOLOGY_CONTAINER_FIELDS;
 
@@ -238,6 +243,9 @@ ENUM_STR_DEFINE_FUNCTIONS(TCP_STATE, 0, "unknown");
 
 struct sockets_stats {
     BUFFER *wb;
+    uint32_t *pids;
+    size_t pid_count;
+    size_t pid_capacity;
 
     struct {
         uint32_t tcpi_rtt;
@@ -245,6 +253,8 @@ struct sockets_stats {
         uint32_t tcpi_total_retrans;
     } max;
 };
+
+static void nv_pid_append(uint32_t **pids, size_t *count, size_t *capacity, pid_t pid);
 
 static inline const char *network_viewer_machine_guid(void) {
     const char *guid = getenv("NETDATA_REGISTRY_UNIQUE_ID");
@@ -984,8 +994,69 @@ static void topology_actor_id_for_process(
     }
 }
 
+static void topology_user_actor_name(uid_t uid, char *dst, size_t dst_size)
+{
+    if(!dst || !dst_size)
+        return;
+
+    dst[0] = '\0';
+    if(uid == UID_UNSET)
+        return;
+
+    CACHED_USERNAME cu = cached_username_get_by_uid(uid);
+    const char *username = string2str(cu.username);
+    if(username && *username && strcmp(username, "[unknown]") != 0)
+        strncpyz(dst, username, dst_size - 1);
+    cached_username_release(cu);
+
+    if(!dst[0])
+        snprintfz(dst, dst_size, "user%u", (unsigned)uid);
+}
+
+static bool topology_user_slice_actor_name(
+    const char *cgroup_path,
+    uid_t process_uid,
+    char *dst,
+    size_t dst_size)
+{
+    if(!dst || !dst_size)
+        return false;
+
+    dst[0] = '\0';
+
+    uint32_t path_uid = NIPC_UID_UNSET;
+    if(!cgroup_topology_parse_user_slice_uid(cgroup_path, &path_uid))
+        return false;
+
+    uid_t uid = process_uid != UID_UNSET ? process_uid : (uid_t)path_uid;
+    topology_user_actor_name(uid, dst, dst_size);
+
+    return dst[0] != '\0';
+}
+
+static bool topology_container_fields_apply_user_slice(
+    const char *cgroup_path,
+    uid_t process_uid,
+    NV_TOPOLOGY_CONTAINER_FIELDS *fields)
+{
+    if(!fields)
+        return false;
+
+    char name[NV_TOPOLOGY_USERNAME_MAX];
+    if(!topology_user_slice_actor_name(cgroup_path, process_uid, name, sizeof(name)))
+        return false;
+
+    strncpyz(fields->container_name, name, sizeof(fields->container_name) - 1);
+    strncpyz(fields->orchestrator, "systemd", sizeof(fields->orchestrator) - 1);
+    strncpyz(fields->actor_type, "user", sizeof(fields->actor_type) - 1);
+    strncpyz(fields->actor_kind, "user", sizeof(fields->actor_kind) - 1);
+
+    return true;
+}
+
 static void topology_container_fields_fill(
     uint32_t pid,
+    uid_t uid,
     const char *process,
     NV_TOPOLOGY_CONTAINER_FIELDS *fields)
 {
@@ -994,7 +1065,11 @@ static void topology_container_fields_fill(
 
     *fields = (NV_TOPOLOGY_CONTAINER_FIELDS){ 0 };
     const char *fallback = (process && *process) ? process : "[unknown]";
-    strncpyz(fields->container_name, fallback, sizeof(fields->container_name) - 1);
+    strncpyz(fields->container_name, NV_TOPOLOGY_PENDING_CONTAINER_NAME, sizeof(fields->container_name) - 1);
+    strncpyz(fields->cgroup_status, nv_cgroup_status_name(NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER), sizeof(fields->cgroup_status) - 1);
+    strncpyz(fields->orchestrator, "unknown", sizeof(fields->orchestrator) - 1);
+    strncpyz(fields->actor_type, "container", sizeof(fields->actor_type) - 1);
+    strncpyz(fields->actor_kind, "pending", sizeof(fields->actor_kind) - 1);
 
     if(!pid)
         return;
@@ -1004,24 +1079,45 @@ static void topology_container_fields_fill(
         return;
 
     fields->from_cache = true;
+    strncpyz(fields->cgroup_status, nv_cgroup_status_name(cached.cgroup_status), sizeof(fields->cgroup_status) - 1);
     strncpyz(fields->cgroup_path, cached.cgroup_path ? cached.cgroup_path : "", sizeof(fields->cgroup_path) - 1);
     strncpyz(fields->cgroup_name, cached.cgroup_name ? cached.cgroup_name : "", sizeof(fields->cgroup_name) - 1);
-    strncpyz(fields->orchestrator, nv_orchestrator_name(cached.cgroup_status, cached.orchestrator), sizeof(fields->orchestrator) - 1);
+    CGROUP_TOPOLOGY_CLASSIFICATION classification;
+    cgroup_topology_classify(cached.cgroup_status, cached.orchestrator, cached.cgroup_path, &classification);
+    strncpyz(fields->orchestrator, classification.effective_orchestrator, sizeof(fields->orchestrator) - 1);
+    strncpyz(fields->systemd_unit_name, classification.systemd_unit_name, sizeof(fields->systemd_unit_name) - 1);
+    strncpyz(fields->systemd_unit_kind, classification.systemd_unit_kind, sizeof(fields->systemd_unit_kind) - 1);
+    strncpyz(fields->actor_kind, classification.actor_kind, sizeof(fields->actor_kind) - 1);
+    strncpyz(fields->actor_type, classification.actor_type, sizeof(fields->actor_type) - 1);
+    bool use_user_slice_name = topology_container_fields_apply_user_slice(cached.cgroup_path, uid, fields);
+    bool use_systemd_unit_name = !use_user_slice_name && strncmp(fields->actor_type, "systemd_", strlen("systemd_")) == 0;
+
+    if(cached.cgroup_status != NIPC_APPS_CGROUP_KNOWN) {
+        if(use_systemd_unit_name && fields->systemd_unit_name[0])
+            strncpyz(fields->container_name, fields->systemd_unit_name, sizeof(fields->container_name) - 1);
+        else if(cached.cgroup_status == NIPC_APPS_CGROUP_HOST_ROOT ||
+           cached.cgroup_status == NIPC_APPS_CGROUP_UNKNOWN_PERMANENT)
+            strncpyz(fields->container_name, fallback, sizeof(fields->container_name) - 1);
+
+        nv_cache_lookup_fields_free(&cached);
+        return;
+    }
+
     nv_derive_k8s_pod_name(&cached, fields->k8s_pod_name, sizeof(fields->k8s_pod_name));
     nv_derive_k8s_namespace(&cached, fields->k8s_namespace, sizeof(fields->k8s_namespace));
     nv_derive_k8s_workload(&cached, fields->k8s_workload, sizeof(fields->k8s_workload));
     nv_derive_docker_container_name(
         &cached, fields->cgroup_name, fields->docker_container_name, sizeof(fields->docker_container_name));
     nv_derive_docker_image(&cached, fields->docker_image, sizeof(fields->docker_image));
-    if(cached.orchestrator == NIPC_ORCHESTRATOR_SYSTEMD)
-        nv_derive_systemd_unit_name(cached.cgroup_path, fields->systemd_unit_name, sizeof(fields->systemd_unit_name));
 
-    if(fields->systemd_unit_name[0])
-        strncpyz(fields->container_name, fields->systemd_unit_name, sizeof(fields->container_name) - 1);
-    else if(fields->docker_container_name[0])
-        strncpyz(fields->container_name, fields->docker_container_name, sizeof(fields->container_name) - 1);
-    else if(fields->cgroup_name[0])
-        strncpyz(fields->container_name, fields->cgroup_name, sizeof(fields->container_name) - 1);
+    if(!use_user_slice_name) {
+        if(use_systemd_unit_name && fields->systemd_unit_name[0])
+            strncpyz(fields->container_name, fields->systemd_unit_name, sizeof(fields->container_name) - 1);
+        else if(fields->docker_container_name[0])
+            strncpyz(fields->container_name, fields->docker_container_name, sizeof(fields->container_name) - 1);
+        else if(fields->cgroup_name[0])
+            strncpyz(fields->container_name, fields->cgroup_name, sizeof(fields->container_name) - 1);
+    }
 
     nv_cache_lookup_fields_free(&cached);
 }
@@ -1029,6 +1125,7 @@ static void topology_container_fields_fill(
 static void topology_container_fields_snapshot(
     const NV_TOPOLOGY_CONTEXT *ctx,
     uint32_t pid,
+    uid_t uid,
     const char *process,
     NV_TOPOLOGY_CONTAINER_FIELDS *fields)
 {
@@ -1036,7 +1133,7 @@ static void topology_container_fields_snapshot(
         return;
 
     if(!ctx || !ctx->container_field_snapshot || !pid) {
-        topology_container_fields_fill(pid, process, fields);
+        topology_container_fields_fill(pid, uid, process, fields);
         return;
     }
 
@@ -1049,9 +1146,34 @@ static void topology_container_fields_snapshot(
     }
 
     NV_TOPOLOGY_CONTAINER_FIELDS tmp;
-    topology_container_fields_fill(pid, process, &tmp);
+    topology_container_fields_fill(pid, uid, process, &tmp);
     dictionary_set(ctx->container_field_snapshot, key, &tmp, sizeof(tmp));
     *fields = tmp;
+}
+
+static void network_viewer_add_enrichment_value(BUFFER *wb, const char *value)
+{
+    buffer_json_add_array_item_string(wb, value && *value ? value : NULL);
+}
+
+static void network_viewer_add_socket_enrichment_values(BUFFER *wb, pid_t pid, uid_t uid, const char *process)
+{
+    NV_TOPOLOGY_CONTAINER_FIELDS fields;
+    topology_container_fields_fill((uint32_t)pid, uid, process, &fields);
+
+    network_viewer_add_enrichment_value(wb, fields.cgroup_status);
+    network_viewer_add_enrichment_value(wb, fields.cgroup_path);
+    network_viewer_add_enrichment_value(wb, fields.cgroup_name);
+    network_viewer_add_enrichment_value(wb, fields.container_name);
+    network_viewer_add_enrichment_value(wb, fields.orchestrator);
+    network_viewer_add_enrichment_value(wb, fields.k8s_pod_name);
+    network_viewer_add_enrichment_value(wb, fields.k8s_namespace);
+    network_viewer_add_enrichment_value(wb, fields.k8s_workload);
+    network_viewer_add_enrichment_value(wb, fields.docker_container_name);
+    network_viewer_add_enrichment_value(wb, fields.docker_image);
+    network_viewer_add_enrichment_value(wb, fields.systemd_unit_name);
+    network_viewer_add_enrichment_value(wb, fields.systemd_unit_kind);
+    network_viewer_add_enrichment_value(wb, fields.actor_kind);
 }
 
 static bool topology_process_name_is_unknown(const char *process_name) {
@@ -1103,6 +1225,9 @@ static const char *topology_group_by_id(NV_TOPOLOGY_GROUP_BY group_by)
 static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOCKET *n, uint64_t proc_self_net_ns_inode, bool aggregated) {
     if(n->direction == SOCKET_DIRECTION_NONE)
         return;
+
+    if(!aggregated)
+        nv_pid_append(&st->pids, &st->pid_count, &st->pid_capacity, n->pid);
 
     BUFFER *wb = st->wb;
 
@@ -1175,6 +1300,8 @@ static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOC
             buffer_json_add_array_item_string(wb, string2str(cu.username));
             cached_username_release(cu);
         }
+
+        network_viewer_add_socket_enrichment_values(wb, n->pid, n->uid, n->comm[0] ? n->comm : "[unknown]");
 
         const struct socket_endpoint *server_endpoint;
         const char *server_address;
@@ -1554,17 +1681,10 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
     }
 
     char process_key[NV_TOPOLOGY_KEY_MAX];
-    if(ctx->options.group_by != NV_TOPOLOGY_GROUP_BY_PROCESS_NAME) {
-        snprintf(process_key, sizeof(process_key), "pid=%d|uid=%u|ns=%llu",
-                 n->pid,
-                 (unsigned)n->uid,
-                 (unsigned long long)n->net_ns_inode);
-    }
-    else {
-        char encoded_process[((TASK_COMM_LEN + 1) * 3) + 1];
-        topology_encode_identifier_component(encoded_process, sizeof(encoded_process), process_name);
-        snprintf(process_key, sizeof(process_key), "comm=%s", encoded_process);
-    }
+    snprintf(process_key, sizeof(process_key), "pid=%d|uid=%u|ns=%llu",
+             n->pid,
+             (unsigned)n->uid,
+             (unsigned long long)n->net_ns_inode);
 
     NV_PROCESS_ACTOR *pa = dictionary_get(ctx->process_actors, process_key);
     if(!pa) {
@@ -2085,7 +2205,7 @@ static void topology_write_response_metadata(BUFFER *wb) {
 
 typedef struct {
     char id[NV_TOPOLOGY_KEY_MAX];
-    char type[16];
+    char type[NV_TOPOLOGY_ACTOR_TYPE_MAX];
     char machine_guid[128];
     char hostname[256];
     char process[TASK_COMM_LEN + 1];
@@ -2098,6 +2218,7 @@ typedef struct {
     char cgroup_path[NV_TOPOLOGY_CGROUP_PATH_MAX];
     char cgroup_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
     char container_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
+    char cgroup_status[32];
     char orchestrator[NV_TOPOLOGY_ORCHESTRATOR_MAX];
     char k8s_pod_name[NV_TOPOLOGY_K8S_NAME_MAX];
     char k8s_namespace[NV_TOPOLOGY_K8S_NAME_MAX];
@@ -2105,6 +2226,8 @@ typedef struct {
     char docker_container_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
     char docker_image[NV_TOPOLOGY_DOCKER_IMAGE_MAX];
     char systemd_unit_name[NV_TOPOLOGY_SYSTEMD_UNIT_MAX];
+    char systemd_unit_kind[NV_TOPOLOGY_SYSTEMD_KIND_MAX];
+    char actor_kind[NV_TOPOLOGY_ACTOR_KIND_MAX];
     char display_name[NV_TOPOLOGY_KEY_MAX];
     char cmdline[NV_TOPOLOGY_CMDLINE_MAX];
     uint64_t pid;
@@ -2162,6 +2285,38 @@ typedef struct {
 
 typedef struct {
     uint64_t actor;
+    uint64_t pid;
+    uint64_t ppid;
+    uint64_t uid;
+    uint64_t net_ns_inode;
+    char process[TASK_COMM_LEN + 1];
+    char username[NV_TOPOLOGY_USERNAME_MAX];
+    char namespace_type[16];
+    char local_ip[INET6_ADDRSTRLEN];
+    char local_address_space[16];
+    char cmdline[NV_TOPOLOGY_CMDLINE_MAX];
+} NV_TOPOLOGY_V1_PROCESS_ROW;
+
+typedef struct {
+    uint64_t actor;
+    uint64_t pid;
+    char cgroup_status[32];
+    char cgroup_path[NV_TOPOLOGY_CGROUP_PATH_MAX];
+    char cgroup_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
+    char container_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
+    char orchestrator[NV_TOPOLOGY_ORCHESTRATOR_MAX];
+    char actor_kind[NV_TOPOLOGY_ACTOR_KIND_MAX];
+    char k8s_pod_name[NV_TOPOLOGY_K8S_NAME_MAX];
+    char k8s_namespace[NV_TOPOLOGY_K8S_NAME_MAX];
+    char k8s_workload[NV_TOPOLOGY_K8S_NAME_MAX];
+    char docker_container_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
+    char docker_image[NV_TOPOLOGY_DOCKER_IMAGE_MAX];
+    char systemd_unit_name[NV_TOPOLOGY_SYSTEMD_UNIT_MAX];
+    char systemd_unit_kind[NV_TOPOLOGY_SYSTEMD_KIND_MAX];
+} NV_TOPOLOGY_V1_CGROUP_ROW;
+
+typedef struct {
+    uint64_t actor;
     uint64_t port;
     char protocol[16];
     char address_space[16];
@@ -2199,6 +2354,14 @@ typedef struct {
     size_t ports_used;
     size_t ports_size;
 
+    NV_TOPOLOGY_V1_PROCESS_ROW *processes;
+    size_t processes_used;
+    size_t processes_size;
+
+    NV_TOPOLOGY_V1_CGROUP_ROW *cgroups;
+    size_t cgroups_used;
+    size_t cgroups_size;
+
     NV_TOPOLOGY_V1_CORRELATION_ROW *correlation_points;
     size_t correlation_points_used;
     size_t correlation_points_size;
@@ -2215,8 +2378,11 @@ typedef struct {
     DICTIONARY *graph_link_index;
     DICTIONARY *connection_index;
     DICTIONARY *port_index;
+    DICTIONARY *process_index;
+    DICTIONARY *cgroup_index;
     DICTIONARY *correlation_point_index;
     DICTIONARY *correlation_claim_index;
+    DICTIONARY *label_index;
 } NV_TOPOLOGY_V1_PAYLOAD;
 
 typedef struct {
@@ -2380,6 +2546,89 @@ static void topology_v1_add_port_row(
     dictionary_set(payload->port_index, key, &index, sizeof(index));
 }
 
+static void topology_v1_add_process_row(
+    NV_TOPOLOGY_V1_PAYLOAD *payload,
+    uint64_t actor,
+    const NV_PROCESS_ACTOR *source)
+{
+    if(!payload || !payload->process_index || !source || !source->pid)
+        return;
+
+    char key[NV_TOPOLOGY_KEY_MAX];
+    snprintfz(key, sizeof(key), "%"PRIu64"|%"PRIu64"|%"PRIu64,
+              actor, source->pid, source->net_ns_inode);
+
+    if(dictionary_get(payload->process_index, key))
+        return;
+
+    if(payload->processes_used == payload->processes_size) {
+        size_t new_size = payload->processes_size ? payload->processes_size * 2 : 128;
+        payload->processes = reallocz(payload->processes, new_size * sizeof(*payload->processes));
+        payload->processes_size = new_size;
+    }
+
+    uint64_t index = payload->processes_used;
+    NV_TOPOLOGY_V1_PROCESS_ROW *row = &payload->processes[payload->processes_used++];
+    *row = (NV_TOPOLOGY_V1_PROCESS_ROW){ 0 };
+    row->actor = actor;
+    row->pid = source->pid;
+    row->ppid = source->ppid;
+    row->uid = source->uid;
+    row->net_ns_inode = source->net_ns_inode;
+    topology_v1_strncpy(row->process, sizeof(row->process), source->process);
+    topology_v1_strncpy(row->username, sizeof(row->username), source->username);
+    topology_v1_strncpy(row->namespace_type, sizeof(row->namespace_type), source->namespace_type);
+    topology_v1_strncpy(row->local_ip, sizeof(row->local_ip), source->local_ip);
+    topology_v1_strncpy(row->local_address_space, sizeof(row->local_address_space), source->local_address_space);
+    topology_v1_strncpy(row->cmdline, sizeof(row->cmdline), source->cmdline);
+
+    dictionary_set(payload->process_index, key, &index, sizeof(index));
+}
+
+static void topology_v1_add_cgroup_row(
+    NV_TOPOLOGY_V1_PAYLOAD *payload,
+    uint64_t actor,
+    uint64_t pid,
+    const NV_TOPOLOGY_CONTAINER_FIELDS *fields)
+{
+    if(!payload || !payload->cgroup_index || !fields || !pid)
+        return;
+
+    char key[NV_TOPOLOGY_KEY_MAX];
+    snprintfz(key, sizeof(key), "%"PRIu64"|%"PRIu64"|%s|%s|%s",
+              actor, pid, fields->cgroup_status, fields->cgroup_path, fields->container_name);
+
+    if(dictionary_get(payload->cgroup_index, key))
+        return;
+
+    if(payload->cgroups_used == payload->cgroups_size) {
+        size_t new_size = payload->cgroups_size ? payload->cgroups_size * 2 : 128;
+        payload->cgroups = reallocz(payload->cgroups, new_size * sizeof(*payload->cgroups));
+        payload->cgroups_size = new_size;
+    }
+
+    uint64_t index = payload->cgroups_used;
+    NV_TOPOLOGY_V1_CGROUP_ROW *row = &payload->cgroups[payload->cgroups_used++];
+    *row = (NV_TOPOLOGY_V1_CGROUP_ROW){ 0 };
+    row->actor = actor;
+    row->pid = pid;
+    topology_v1_strncpy(row->cgroup_status, sizeof(row->cgroup_status), fields->cgroup_status);
+    topology_v1_strncpy(row->cgroup_path, sizeof(row->cgroup_path), fields->cgroup_path);
+    topology_v1_strncpy(row->cgroup_name, sizeof(row->cgroup_name), fields->cgroup_name);
+    topology_v1_strncpy(row->container_name, sizeof(row->container_name), fields->container_name);
+    topology_v1_strncpy(row->orchestrator, sizeof(row->orchestrator), fields->orchestrator);
+    topology_v1_strncpy(row->actor_kind, sizeof(row->actor_kind), fields->actor_kind);
+    topology_v1_strncpy(row->k8s_pod_name, sizeof(row->k8s_pod_name), fields->k8s_pod_name);
+    topology_v1_strncpy(row->k8s_namespace, sizeof(row->k8s_namespace), fields->k8s_namespace);
+    topology_v1_strncpy(row->k8s_workload, sizeof(row->k8s_workload), fields->k8s_workload);
+    topology_v1_strncpy(row->docker_container_name, sizeof(row->docker_container_name), fields->docker_container_name);
+    topology_v1_strncpy(row->docker_image, sizeof(row->docker_image), fields->docker_image);
+    topology_v1_strncpy(row->systemd_unit_name, sizeof(row->systemd_unit_name), fields->systemd_unit_name);
+    topology_v1_strncpy(row->systemd_unit_kind, sizeof(row->systemd_unit_kind), fields->systemd_unit_kind);
+
+    dictionary_set(payload->cgroup_index, key, &index, sizeof(index));
+}
+
 static void topology_v1_add_actor_label_ex(
     NV_TOPOLOGY_V1_PAYLOAD *payload,
     uint64_t actor,
@@ -2391,6 +2640,23 @@ static void topology_v1_add_actor_label_ex(
     uint64_t value_index) {
     if(!payload || !key || !*key || !value || !*value)
         return;
+
+    const char *label_source = source ? source : NETWORK_TOPOLOGY_SOURCE;
+    const char *label_kind = kind ? kind : "attribute";
+    if(payload->label_index) {
+        char index_key[NV_TOPOLOGY_KEY_MAX];
+        snprintfz(index_key, sizeof(index_key), "%"PRIu64"|%zu:%s|%zu:%s|%zu:%s|%zu:%s",
+                  actor,
+                  strlen(key), key,
+                  strlen(value), value,
+                  strlen(label_source), label_source,
+                  strlen(label_kind), label_kind);
+        if(dictionary_get(payload->label_index, index_key))
+            return;
+
+        bool stored = true;
+        dictionary_set(payload->label_index, index_key, &stored, sizeof(stored));
+    }
 
     if(payload->labels_used == payload->labels_size) {
         size_t new_size = payload->labels_size ? payload->labels_size * 2 : 128;
@@ -2405,8 +2671,8 @@ static void topology_v1_add_actor_label_ex(
     row->value_index = value_index;
     topology_v1_strncpy(row->key, sizeof(row->key), key);
     topology_v1_strncpy(row->value, sizeof(row->value), value);
-    topology_v1_strncpy(row->source, sizeof(row->source), source ? source : NETWORK_TOPOLOGY_SOURCE);
-    topology_v1_strncpy(row->kind, sizeof(row->kind), kind ? kind : "attribute");
+    topology_v1_strncpy(row->source, sizeof(row->source), label_source);
+    topology_v1_strncpy(row->kind, sizeof(row->kind), label_kind);
 }
 
 static void topology_v1_add_actor_label(
@@ -2445,47 +2711,108 @@ static void topology_v1_enrich_process_actor_from_cache(
     NV_TOPOLOGY_V1_PAYLOAD *payload,
     uint64_t actor_index,
     NV_TOPOLOGY_V1_ACTOR *actor,
-    uint32_t pid)
+    uint32_t pid,
+    uid_t uid,
+    bool fill_actor_fields)
 {
     if(!ctx || !payload || !actor || !pid)
         return;
 
+    char cgroup_status[32] = "retry_later";
+    char cgroup_path[NV_TOPOLOGY_CGROUP_PATH_MAX] = "";
+    char cgroup_name[NV_TOPOLOGY_CGROUP_NAME_MAX] = "";
+    char container_name[NV_TOPOLOGY_CGROUP_NAME_MAX] = NV_TOPOLOGY_PENDING_CONTAINER_NAME;
+    char orchestrator_value[NV_TOPOLOGY_ORCHESTRATOR_MAX] = "";
+    char k8s_pod_name[NV_TOPOLOGY_K8S_NAME_MAX] = "";
+    char k8s_namespace[NV_TOPOLOGY_K8S_NAME_MAX] = "";
+    char k8s_workload[NV_TOPOLOGY_K8S_NAME_MAX] = "";
+    char docker_container_name[NV_TOPOLOGY_CGROUP_NAME_MAX] = "";
+    char docker_image[NV_TOPOLOGY_DOCKER_IMAGE_MAX] = "";
+    char systemd_unit_name[NV_TOPOLOGY_SYSTEMD_UNIT_MAX] = "";
+    char systemd_unit_kind[NV_TOPOLOGY_SYSTEMD_KIND_MAX] = "";
+    char actor_kind[NV_TOPOLOGY_ACTOR_KIND_MAX] = "pending";
+    char actor_type[NV_TOPOLOGY_ACTOR_TYPE_MAX] = "container";
+    bool have_cached = false;
     NV_APPS_LOOKUP_FIELDS cached;
-    if(!nv_cache_lookup_pid(pid, &cached))
-        return;
 
-    const char *orchestrator = nv_orchestrator_name(cached.cgroup_status, cached.orchestrator);
-    topology_v1_strncpy(actor->cgroup_path, sizeof(actor->cgroup_path), cached.cgroup_path);
-    topology_v1_strncpy(actor->cgroup_name, sizeof(actor->cgroup_name), cached.cgroup_name);
-    topology_v1_strncpy(actor->orchestrator, sizeof(actor->orchestrator), orchestrator);
+    if(nv_cache_lookup_pid(pid, &cached)) {
+        have_cached = true;
 
-    nv_derive_k8s_pod_name(&cached, actor->k8s_pod_name, sizeof(actor->k8s_pod_name));
-    nv_derive_k8s_namespace(&cached, actor->k8s_namespace, sizeof(actor->k8s_namespace));
-    nv_derive_k8s_workload(&cached, actor->k8s_workload, sizeof(actor->k8s_workload));
-    nv_derive_docker_container_name(
-        &cached, actor->cgroup_name, actor->docker_container_name, sizeof(actor->docker_container_name));
-    nv_derive_docker_image(&cached, actor->docker_image, sizeof(actor->docker_image));
-    if(cached.orchestrator == NIPC_ORCHESTRATOR_SYSTEMD)
-        nv_derive_systemd_unit_name(cached.cgroup_path, actor->systemd_unit_name, sizeof(actor->systemd_unit_name));
-    if(actor->systemd_unit_name[0])
-        topology_v1_strncpy(actor->container_name, sizeof(actor->container_name), actor->systemd_unit_name);
-    else if(actor->docker_container_name[0])
-        topology_v1_strncpy(actor->container_name, sizeof(actor->container_name), actor->docker_container_name);
-    else if(actor->cgroup_name[0])
-        topology_v1_strncpy(actor->container_name, sizeof(actor->container_name), actor->cgroup_name);
+        CGROUP_TOPOLOGY_CLASSIFICATION classification;
+        cgroup_topology_classify(cached.cgroup_status, cached.orchestrator, cached.cgroup_path, &classification);
+        topology_v1_strncpy(cgroup_status, sizeof(cgroup_status), nv_cgroup_status_name(cached.cgroup_status));
+        topology_v1_strncpy(cgroup_path, sizeof(cgroup_path), cached.cgroup_path);
+        topology_v1_strncpy(cgroup_name, sizeof(cgroup_name), cached.cgroup_name);
+        topology_v1_strncpy(orchestrator_value, sizeof(orchestrator_value), classification.effective_orchestrator);
+        topology_v1_strncpy(systemd_unit_name, sizeof(systemd_unit_name), classification.systemd_unit_name);
+        topology_v1_strncpy(systemd_unit_kind, sizeof(systemd_unit_kind), classification.systemd_unit_kind);
+        topology_v1_strncpy(actor_kind, sizeof(actor_kind), classification.actor_kind);
+        topology_v1_strncpy(actor_type, sizeof(actor_type), classification.actor_type);
+        char user_slice_name[NV_TOPOLOGY_USERNAME_MAX] = "";
+        bool use_user_slice_name =
+            topology_user_slice_actor_name(cached.cgroup_path, uid, user_slice_name, sizeof(user_slice_name));
+        if(use_user_slice_name) {
+            topology_v1_strncpy(orchestrator_value, sizeof(orchestrator_value), "systemd");
+            topology_v1_strncpy(actor_kind, sizeof(actor_kind), "user");
+            topology_v1_strncpy(actor_type, sizeof(actor_type), "user");
+        }
+        bool use_systemd_unit_name = !use_user_slice_name && strncmp(actor_type, "systemd_", strlen("systemd_")) == 0;
 
-    topology_v1_add_actor_label_if_set(payload, actor_index, "cgroup_path", actor->cgroup_path, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "cgroup_name", actor->cgroup_name, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "container_name", actor->container_name, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "orchestrator", actor->orchestrator, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_pod_name", actor->k8s_pod_name, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_namespace", actor->k8s_namespace, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_workload", actor->k8s_workload, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "docker_container_name", actor->docker_container_name, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "docker_image", actor->docker_image, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "systemd_unit_name", actor->systemd_unit_name, "attribute");
+        nv_derive_k8s_pod_name(&cached, k8s_pod_name, sizeof(k8s_pod_name));
+        nv_derive_k8s_namespace(&cached, k8s_namespace, sizeof(k8s_namespace));
+        nv_derive_k8s_workload(&cached, k8s_workload, sizeof(k8s_workload));
+        nv_derive_docker_container_name(
+            &cached, cgroup_name, docker_container_name, sizeof(docker_container_name));
+        nv_derive_docker_image(&cached, docker_image, sizeof(docker_image));
+        if(use_user_slice_name)
+            topology_v1_strncpy(container_name, sizeof(container_name), user_slice_name);
+        else if(use_systemd_unit_name && systemd_unit_name[0])
+            topology_v1_strncpy(container_name, sizeof(container_name), systemd_unit_name);
+        else if(docker_container_name[0])
+            topology_v1_strncpy(container_name, sizeof(container_name), docker_container_name);
+        else if(cgroup_name[0])
+            topology_v1_strncpy(container_name, sizeof(container_name), cgroup_name);
+        else if((cached.cgroup_status == NIPC_APPS_CGROUP_HOST_ROOT ||
+                 cached.cgroup_status == NIPC_APPS_CGROUP_UNKNOWN_PERMANENT) &&
+                actor->process[0])
+            topology_v1_strncpy(container_name, sizeof(container_name), actor->process);
+    }
 
-    if(ctx->options.label_whitelist) {
+    if(fill_actor_fields) {
+        topology_v1_strncpy(actor->cgroup_status, sizeof(actor->cgroup_status), cgroup_status);
+        topology_v1_strncpy(actor->cgroup_path, sizeof(actor->cgroup_path), cgroup_path);
+        topology_v1_strncpy(actor->cgroup_name, sizeof(actor->cgroup_name), cgroup_name);
+        topology_v1_strncpy(actor->container_name, sizeof(actor->container_name), container_name);
+        topology_v1_strncpy(actor->orchestrator, sizeof(actor->orchestrator), orchestrator_value);
+        topology_v1_strncpy(actor->k8s_pod_name, sizeof(actor->k8s_pod_name), k8s_pod_name);
+        topology_v1_strncpy(actor->k8s_namespace, sizeof(actor->k8s_namespace), k8s_namespace);
+        topology_v1_strncpy(actor->k8s_workload, sizeof(actor->k8s_workload), k8s_workload);
+        topology_v1_strncpy(actor->docker_container_name, sizeof(actor->docker_container_name), docker_container_name);
+        topology_v1_strncpy(actor->docker_image, sizeof(actor->docker_image), docker_image);
+        topology_v1_strncpy(actor->systemd_unit_name, sizeof(actor->systemd_unit_name), systemd_unit_name);
+        topology_v1_strncpy(actor->systemd_unit_kind, sizeof(actor->systemd_unit_kind), systemd_unit_kind);
+        topology_v1_strncpy(actor->actor_kind, sizeof(actor->actor_kind), actor_kind);
+        if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
+            topology_v1_strncpy(actor->type, sizeof(actor->type), actor_type);
+    }
+
+    topology_v1_add_actor_label_if_set(payload, actor_index, "cgroup_status", cgroup_status, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "cgroup_path", cgroup_path, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "cgroup_name", cgroup_name, "attribute");
+    if(!(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER &&
+         strcmp(actor->container_name, container_name) == 0))
+        topology_v1_add_actor_label_if_set(payload, actor_index, "container_name", container_name, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "orchestrator", orchestrator_value, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_pod_name", k8s_pod_name, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_namespace", k8s_namespace, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_workload", k8s_workload, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "docker_container_name", docker_container_name, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "docker_image", docker_image, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "systemd_unit_name", systemd_unit_name, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "systemd_unit_kind", systemd_unit_kind, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "actor_kind", actor_kind, "attribute");
+
+    if(have_cached && ctx->options.label_whitelist) {
         for(uint16_t i = 0; i < cached.cgroup_label_count; i++) {
             const char *key = cached.cgroup_labels[i].key;
             const char *value = cached.cgroup_labels[i].value;
@@ -2494,7 +2821,8 @@ static void topology_v1_enrich_process_actor_from_cache(
         }
     }
 
-    nv_cache_lookup_fields_free(&cached);
+    if(have_cached)
+        nv_cache_lookup_fields_free(&cached);
 }
 
 static void topology_v1_add_correlation_row(
@@ -2592,6 +2920,8 @@ static void topology_v1_free(NV_TOPOLOGY_V1_PAYLOAD *payload) {
     freez(payload->evidence);
     freez(payload->connections);
     freez(payload->ports);
+    freez(payload->processes);
+    freez(payload->cgroups);
     freez(payload->correlation_points);
     freez(payload->correlation_claims);
     freez(payload->labels);
@@ -2603,10 +2933,16 @@ static void topology_v1_free(NV_TOPOLOGY_V1_PAYLOAD *payload) {
         dictionary_destroy(payload->connection_index);
     if(payload->port_index)
         dictionary_destroy(payload->port_index);
+    if(payload->process_index)
+        dictionary_destroy(payload->process_index);
+    if(payload->cgroup_index)
+        dictionary_destroy(payload->cgroup_index);
     if(payload->correlation_point_index)
         dictionary_destroy(payload->correlation_point_index);
     if(payload->correlation_claim_index)
         dictionary_destroy(payload->correlation_claim_index);
+    if(payload->label_index)
+        dictionary_destroy(payload->label_index);
     *payload = (NV_TOPOLOGY_V1_PAYLOAD){ 0 };
 }
 
@@ -2644,8 +2980,7 @@ static void topology_v1_collect_actors(
         char actor_id[NV_TOPOLOGY_KEY_MAX];
         char display_name[NV_TOPOLOGY_KEY_MAX];
         NV_TOPOLOGY_CONTAINER_FIELDS container_fields = { 0 };
-        if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
-            topology_container_fields_snapshot(ctx, (uint32_t)pa->pid, pa->process, &container_fields);
+        topology_container_fields_snapshot(ctx, (uint32_t)pa->pid, pa->uid, pa->process, &container_fields);
 
         topology_actor_id_for_process(
             ctx,
@@ -2662,16 +2997,32 @@ static void topology_v1_collect_actors(
         else
             topology_process_display_name(ctx, pa->process, pa->pid, display_name, sizeof(display_name));
 
+        const char *pid_label_kind = ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PID ? "identity" : "attribute";
         uint64_t actor_index = 0;
         if(topology_v1_actor_index_get(payload, actor_id, &actor_index)) {
             payload->actors[actor_index].sockets += pa->sockets;
+            topology_v1_add_process_row(payload, actor_index, pa);
+            topology_v1_add_cgroup_row(payload, actor_index, pa->pid, &container_fields);
+            topology_v1_enrich_process_actor_from_cache(
+                ctx, payload, actor_index, &payload->actors[actor_index], (uint32_t)pa->pid, pa->uid, false);
+            if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
+                topology_v1_add_actor_label_if_set(payload, actor_index, "process", pa->process, "attribute");
+            topology_v1_add_actor_label_if_set(payload, actor_index, "username", pa->username, "attribute");
+            topology_v1_add_actor_label_if_set(payload, actor_index, "cmdline", pa->cmdline, "attribute");
+            topology_v1_add_actor_label_if_set(payload, actor_index, "namespace_type", pa->namespace_type, "attribute");
+            topology_v1_add_actor_label_if_set(payload, actor_index, "local_ip", pa->local_ip, "attribute");
+            topology_v1_add_actor_label_if_set(payload, actor_index, "local_address_space", pa->local_address_space, "attribute");
+            topology_v1_add_actor_label_uint(payload, actor_index, "pid", (uint64_t)pa->pid, pid_label_kind);
+            topology_v1_add_actor_label_uint(payload, actor_index, "ppid", (uint64_t)pa->ppid, "attribute");
+            topology_v1_add_actor_label_uint(payload, actor_index, "uid", (uint64_t)pa->uid, "attribute");
+            topology_v1_add_actor_label_uint(payload, actor_index, "net_ns_inode", pa->net_ns_inode, pid_label_kind);
             continue;
         }
 
         NV_TOPOLOGY_V1_ACTOR *actor = topology_v1_add_actor(payload, actor_id);
         topology_v1_strncpy(
             actor->type, sizeof(actor->type),
-            ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER ? "container" : "process");
+            ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER ? container_fields.actor_type : "process");
         topology_v1_strncpy(actor->machine_guid, sizeof(actor->machine_guid), ctx->machine_guid);
         topology_v1_strncpy(actor->hostname, sizeof(actor->hostname), ctx->hostname);
         topology_v1_strncpy(actor->display_name, sizeof(actor->display_name), display_name);
@@ -2684,7 +3035,7 @@ static void topology_v1_collect_actors(
             topology_v1_strncpy(actor->local_ip, sizeof(actor->local_ip), pa->local_ip);
             topology_v1_strncpy(actor->local_address_space, sizeof(actor->local_address_space), pa->local_address_space);
             topology_v1_strncpy(actor->cmdline, sizeof(actor->cmdline), pa->cmdline);
-            topology_v1_enrich_process_actor_from_cache(ctx, payload, actor_index, actor, (uint32_t)pa->pid);
+            topology_v1_enrich_process_actor_from_cache(ctx, payload, actor_index, actor, (uint32_t)pa->pid, pa->uid, true);
             actor->pid = (uint64_t)pa->pid;
             actor->ppid = (uint64_t)pa->ppid;
             actor->uid = (uint64_t)pa->uid;
@@ -2699,9 +3050,23 @@ static void topology_v1_collect_actors(
         }
         else {
             topology_v1_strncpy(actor->container_name, sizeof(actor->container_name), container_fields.container_name);
+            topology_v1_strncpy(actor->cgroup_status, sizeof(actor->cgroup_status), container_fields.cgroup_status);
+            topology_v1_strncpy(actor->cgroup_path, sizeof(actor->cgroup_path), container_fields.cgroup_path);
+            topology_v1_strncpy(actor->cgroup_name, sizeof(actor->cgroup_name), container_fields.cgroup_name);
+            topology_v1_strncpy(actor->orchestrator, sizeof(actor->orchestrator), container_fields.orchestrator);
+            topology_v1_strncpy(actor->k8s_pod_name, sizeof(actor->k8s_pod_name), container_fields.k8s_pod_name);
+            topology_v1_strncpy(actor->k8s_namespace, sizeof(actor->k8s_namespace), container_fields.k8s_namespace);
+            topology_v1_strncpy(actor->k8s_workload, sizeof(actor->k8s_workload), container_fields.k8s_workload);
+            topology_v1_strncpy(actor->docker_container_name, sizeof(actor->docker_container_name), container_fields.docker_container_name);
+            topology_v1_strncpy(actor->docker_image, sizeof(actor->docker_image), container_fields.docker_image);
+            topology_v1_strncpy(actor->systemd_unit_name, sizeof(actor->systemd_unit_name), container_fields.systemd_unit_name);
+            topology_v1_strncpy(actor->systemd_unit_kind, sizeof(actor->systemd_unit_kind), container_fields.systemd_unit_kind);
+            topology_v1_strncpy(actor->actor_kind, sizeof(actor->actor_kind), container_fields.actor_kind);
         }
 
         actor->sockets = pa->sockets;
+        topology_v1_add_process_row(payload, actor_index, pa);
+        topology_v1_add_cgroup_row(payload, actor_index, pa->pid, &container_fields);
 
         topology_v1_add_actor_label(payload, actor_index, "display_name", actor->display_name, "attribute");
         topology_v1_add_actor_label(payload, actor_index, "type", actor->type, "metadata");
@@ -2709,6 +3074,21 @@ static void topology_v1_collect_actors(
             topology_v1_add_actor_label(payload, actor_index, "container_name", actor->container_name, "identity");
         else
             topology_v1_add_actor_label(payload, actor_index, "process", actor->process, "identity");
+
+        if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
+            topology_v1_add_actor_label_if_set(payload, actor_index, "process", pa->process, "attribute");
+        topology_v1_add_actor_label_if_set(payload, actor_index, "username", pa->username, "attribute");
+        topology_v1_add_actor_label_if_set(payload, actor_index, "cmdline", pa->cmdline, "attribute");
+        topology_v1_add_actor_label_if_set(payload, actor_index, "namespace_type", pa->namespace_type, "attribute");
+        topology_v1_add_actor_label_if_set(payload, actor_index, "local_ip", pa->local_ip, "attribute");
+        topology_v1_add_actor_label_if_set(payload, actor_index, "local_address_space", pa->local_address_space, "attribute");
+        topology_v1_add_actor_label_uint(payload, actor_index, "pid", (uint64_t)pa->pid, pid_label_kind);
+        topology_v1_add_actor_label_uint(payload, actor_index, "ppid", (uint64_t)pa->ppid, "attribute");
+        topology_v1_add_actor_label_uint(payload, actor_index, "uid", (uint64_t)pa->uid, "attribute");
+        topology_v1_add_actor_label_uint(payload, actor_index, "net_ns_inode", pa->net_ns_inode, pid_label_kind);
+
+        if(ctx->options.group_by != NV_TOPOLOGY_GROUP_BY_PID)
+            topology_v1_enrich_process_actor_from_cache(ctx, payload, actor_index, actor, (uint32_t)pa->pid, pa->uid, false);
 
         if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PID) {
             topology_v1_add_actor_label(payload, actor_index, "username", actor->username, "attribute");
@@ -2772,7 +3152,7 @@ static bool topology_v1_process_actor_index(
     char actor_id[NV_TOPOLOGY_KEY_MAX];
     NV_TOPOLOGY_CONTAINER_FIELDS container_fields = { 0 };
     if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
-        topology_container_fields_snapshot(ctx, (uint32_t)pid, process, &container_fields);
+        topology_container_fields_snapshot(ctx, (uint32_t)pid, (uid_t)uid, process, &container_fields);
 
     topology_actor_id_for_process(
         ctx,
@@ -3134,30 +3514,33 @@ static void topology_v1_emit_actor_columns(BUFFER *wb) {
     topology_v1_emit_column(wb, "id", "string", "identity", false, NULL);
     topology_v1_emit_column(wb, "type", "string", "group_key", false, NULL);
     topology_v1_emit_column(wb, "layer", "string", "group_key", false, NULL);
-    topology_v1_emit_column(wb, "machine_guid", "string", "merge_identity", true, NULL);
-    topology_v1_emit_column(wb, "hostname", "string", "merge_identity", true, NULL);
+    topology_v1_emit_column(wb, "machine_guid", "string", "merge_identity", true, "set");
+    topology_v1_emit_column(wb, "hostname", "string", "merge_identity", true, "set");
     topology_v1_emit_column(wb, "process", "string", "group_key", true, NULL);
-    topology_v1_emit_column(wb, "username", "string", "attribute", true, NULL);
-    topology_v1_emit_column(wb, "cmdline", "string", "attribute", true, NULL);
+    topology_v1_emit_column(wb, "username", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "cmdline", "string", "attribute", true, "set");
     topology_v1_emit_column(wb, "pid", "uint", "identity", true, NULL);
-    topology_v1_emit_column(wb, "ppid", "uint", "attribute", true, NULL);
-    topology_v1_emit_column(wb, "uid", "uint", "attribute", true, NULL);
+    topology_v1_emit_column(wb, "ppid", "uint", "attribute", true, "set");
+    topology_v1_emit_column(wb, "uid", "uint", "attribute", true, "set");
     topology_v1_emit_column(wb, "net_ns_inode", "uint", "identity", true, NULL);
     topology_v1_emit_column(wb, "namespace_type", "string", "group_key", true, NULL);
-    topology_v1_emit_column(wb, "local_ip", "ip", "attribute", true, NULL);
-    topology_v1_emit_column(wb, "local_address_space", "string", "attribute", true, NULL);
+    topology_v1_emit_column(wb, "local_ip", "ip", "attribute", true, "set");
+    topology_v1_emit_column(wb, "local_address_space", "string", "attribute", true, "set");
     topology_v1_emit_column(wb, "ip", "ip", "identity", true, NULL);
     topology_v1_emit_column(wb, "address_space", "string", "group_key", true, NULL);
-    topology_v1_emit_column(wb, "cgroup_path", "string", "attribute", true, NULL);
-    topology_v1_emit_column(wb, "cgroup_name", "string", "attribute", true, NULL);
-    topology_v1_emit_column(wb, "container_name", "string", "group_key", true, NULL);
-    topology_v1_emit_column(wb, "orchestrator", "string", "attribute", true, NULL);
-    topology_v1_emit_column(wb, "k8s_pod_name", "string", "attribute", true, NULL);
-    topology_v1_emit_column(wb, "k8s_namespace", "string", "attribute", true, NULL);
-    topology_v1_emit_column(wb, "k8s_workload", "string", "attribute", true, NULL);
-    topology_v1_emit_column(wb, "docker_container_name", "string", "attribute", true, NULL);
-    topology_v1_emit_column(wb, "docker_image", "string", "attribute", true, NULL);
-    topology_v1_emit_column(wb, "systemd_unit_name", "string", "attribute", true, NULL);
+    topology_v1_emit_column(wb, "cgroup_status", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "cgroup_path", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "cgroup_name", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "container_name", "string", "group_key", true, "set");
+    topology_v1_emit_column(wb, "orchestrator", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "k8s_pod_name", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "k8s_namespace", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "k8s_workload", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "docker_container_name", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "docker_image", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "systemd_unit_name", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "systemd_unit_kind", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "actor_kind", "string", "attribute", true, "set");
     topology_v1_emit_column(wb, "display_name", "string", "attribute", true, NULL);
     topology_v1_emit_column(wb, "socket_count", "uint", "metric", false, "sum");
     topology_v1_emit_column(wb, "local_ip_count", "uint", "metric", true, "sum");
@@ -3218,6 +3601,38 @@ static void topology_v1_emit_socket_port_columns(BUFFER *wb) {
     topology_v1_emit_column(wb, "port", "uint", "group_key", false, NULL);
     topology_v1_emit_column(wb, "protocol", "string", "group_key", false, NULL);
     topology_v1_emit_column(wb, "socket_count", "uint", "metric", false, "sum");
+}
+
+static void topology_v1_emit_process_detail_columns(BUFFER *wb) {
+    topology_v1_emit_column(wb, "actor", "actor_ref", "reference", false, NULL);
+    topology_v1_emit_column(wb, "pid", "uint", "identity", false, NULL);
+    topology_v1_emit_column(wb, "ppid", "uint", "attribute", true, "set");
+    topology_v1_emit_column(wb, "uid", "uint", "attribute", true, "set");
+    topology_v1_emit_column(wb, "net_ns_inode", "uint", "identity", true, NULL);
+    topology_v1_emit_column(wb, "process", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "username", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "namespace_type", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "local_ip", "ip", "attribute", true, "set");
+    topology_v1_emit_column(wb, "local_address_space", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "cmdline", "string", "attribute", true, "set");
+}
+
+static void topology_v1_emit_cgroup_detail_columns(BUFFER *wb) {
+    topology_v1_emit_column(wb, "actor", "actor_ref", "reference", false, NULL);
+    topology_v1_emit_column(wb, "pid", "uint", "identity", false, NULL);
+    topology_v1_emit_column(wb, "cgroup_status", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "cgroup_path", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "cgroup_name", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "container_name", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "orchestrator", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "actor_kind", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "k8s_pod_name", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "k8s_namespace", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "k8s_workload", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "docker_container_name", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "docker_image", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "systemd_unit_name", "string", "attribute", true, "set");
+    topology_v1_emit_column(wb, "systemd_unit_kind", "string", "attribute", true, "set");
 }
 
 static void topology_v1_emit_actor_label_columns(BUFFER *wb) {
@@ -3312,6 +3727,73 @@ static void topology_v1_emit_modal_formatted_endpoint_column(
     buffer_json_object_close(wb);
 }
 
+static void topology_v1_emit_actor_processes_modal_section(BUFFER *wb, uint64_t order) {
+    buffer_json_add_array_item_object(wb);
+    {
+        buffer_json_member_add_string(wb, "id", "processes");
+        buffer_json_member_add_string(wb, "label", "Processes");
+        buffer_json_member_add_uint64(wb, "order", order);
+        buffer_json_member_add_object(wb, "source");
+        {
+            buffer_json_member_add_string(wb, "kind", "actor_table");
+            buffer_json_member_add_string(wb, "table", "processes");
+        }
+        buffer_json_object_close(wb);
+        buffer_json_member_add_object(wb, "owner_filter");
+        {
+            buffer_json_member_add_string(wb, "mode", "actor_column");
+            buffer_json_member_add_string(wb, "actor_column", "actor");
+        }
+        buffer_json_object_close(wb);
+        buffer_json_member_add_array(wb, "columns");
+        {
+            topology_v1_emit_modal_direct_column(wb, "pid", "PID", "pid", "number");
+            topology_v1_emit_modal_direct_column(wb, "process", "Process", "process", "text");
+            topology_v1_emit_modal_direct_column(wb, "user", "User", "username", "text");
+            topology_v1_emit_modal_direct_column(wb, "namespace", "Namespace", "namespace_type", "badge");
+            topology_v1_emit_modal_direct_column(wb, "local_ip", "Local IP", "local_ip", "text");
+            topology_v1_emit_modal_direct_column_with_visibility(wb, "cmdline", "Command", "cmdline", "text", "expanded");
+        }
+        buffer_json_array_close(wb);
+    }
+    buffer_json_object_close(wb);
+}
+
+static void topology_v1_emit_actor_cgroups_modal_section(BUFFER *wb, uint64_t order) {
+    buffer_json_add_array_item_object(wb);
+    {
+        buffer_json_member_add_string(wb, "id", "cgroups");
+        buffer_json_member_add_string(wb, "label", "CGroups");
+        buffer_json_member_add_uint64(wb, "order", order);
+        buffer_json_member_add_object(wb, "source");
+        {
+            buffer_json_member_add_string(wb, "kind", "actor_table");
+            buffer_json_member_add_string(wb, "table", "cgroups");
+        }
+        buffer_json_object_close(wb);
+        buffer_json_member_add_object(wb, "owner_filter");
+        {
+            buffer_json_member_add_string(wb, "mode", "actor_column");
+            buffer_json_member_add_string(wb, "actor_column", "actor");
+        }
+        buffer_json_object_close(wb);
+        buffer_json_member_add_array(wb, "columns");
+        {
+            topology_v1_emit_modal_direct_column(wb, "pid", "PID", "pid", "number");
+            topology_v1_emit_modal_direct_column(wb, "status", "Status", "cgroup_status", "badge");
+            topology_v1_emit_modal_direct_column(wb, "orchestrator", "Orchestrator", "orchestrator", "badge");
+            topology_v1_emit_modal_direct_column(wb, "kind", "Kind", "actor_kind", "badge");
+            topology_v1_emit_modal_direct_column(wb, "container", "Container", "container_name", "text");
+            topology_v1_emit_modal_direct_column(wb, "systemd_unit", "Systemd Unit", "systemd_unit_name", "text");
+            topology_v1_emit_modal_direct_column(wb, "systemd_kind", "Systemd Kind", "systemd_unit_kind", "badge");
+            topology_v1_emit_modal_direct_column_with_visibility(wb, "cgroup_name", "Cgroup", "cgroup_name", "text", "expanded");
+            topology_v1_emit_modal_direct_column_with_visibility(wb, "cgroup_path", "Cgroup Path", "cgroup_path", "text", "expanded");
+        }
+        buffer_json_array_close(wb);
+    }
+    buffer_json_object_close(wb);
+}
+
 static void topology_v1_emit_network_connection_modal_section(
     BUFFER *wb,
     const char *id,
@@ -3367,15 +3849,29 @@ static void topology_v1_emit_modal_identification_field(BUFFER *wb, const char *
     {
         buffer_json_member_add_string(wb, "key", key);
         buffer_json_member_add_string(wb, "label", label);
-        buffer_json_member_add_uint64(wb, "max_values", 1);
+        buffer_json_member_add_uint64(wb, "max_values", 5);
     }
     buffer_json_object_close(wb);
+}
+
+static bool topology_v1_actor_type_has_process_enrichment(const char *actor_type)
+{
+    return actor_type &&
+           strcmp(actor_type, "self") != 0 &&
+           strcmp(actor_type, "endpoint") != 0;
+}
+
+static bool topology_v1_actor_type_is_grouped_runtime(const char *actor_type)
+{
+    return actor_type && strcmp(actor_type, "process") != 0 && topology_v1_actor_type_has_process_enrichment(actor_type);
 }
 
 static void topology_v1_emit_modal_label_identification(
     BUFFER *wb,
     const char *actor_type,
     NV_TOPOLOGY_GROUP_BY group_by) {
+    (void)group_by;
+
     buffer_json_member_add_object(wb, "identification");
     {
         buffer_json_member_add_boolean(wb, "enabled", true);
@@ -3388,26 +3884,49 @@ static void topology_v1_emit_modal_label_identification(
             }
             else if(strcmp(actor_type, "process") == 0) {
                 topology_v1_emit_modal_identification_field(wb, "process", "Process");
-                if(group_by == NV_TOPOLOGY_GROUP_BY_PID) {
-                    topology_v1_emit_modal_identification_field(wb, "username", "User");
-                    topology_v1_emit_modal_identification_field(wb, "namespace_type", "Namespace");
-                    topology_v1_emit_modal_identification_field(wb, "local_ip", "Local IP");
-                    topology_v1_emit_modal_identification_field(wb, "container_name", "Container");
-                    topology_v1_emit_modal_identification_field(wb, "orchestrator", "Orchestrator");
-                    topology_v1_emit_modal_identification_field(wb, "cgroup_name", "Cgroup");
-                    topology_v1_emit_modal_identification_field(wb, "cgroup_path", "Cgroup Path");
-                    topology_v1_emit_modal_identification_field(wb, "k8s_pod_name", "K8s Pod");
-                    topology_v1_emit_modal_identification_field(wb, "k8s_namespace", "K8s Namespace");
-                    topology_v1_emit_modal_identification_field(wb, "k8s_workload", "K8s Workload");
-                    topology_v1_emit_modal_identification_field(wb, "docker_container_name", "Docker Container");
-                    topology_v1_emit_modal_identification_field(wb, "docker_image", "Docker Image");
-                    topology_v1_emit_modal_identification_field(wb, "systemd_unit_name", "Systemd Unit");
-                    topology_v1_emit_modal_identification_field(wb, "cmdline", "Command");
-                }
+                topology_v1_emit_modal_identification_field(wb, "pid", "PID");
+                topology_v1_emit_modal_identification_field(wb, "username", "User");
+                topology_v1_emit_modal_identification_field(wb, "namespace_type", "Namespace");
+                topology_v1_emit_modal_identification_field(wb, "local_ip", "Local IP");
+                topology_v1_emit_modal_identification_field(wb, "container_name", "Container");
+                topology_v1_emit_modal_identification_field(wb, "cgroup_status", "Cgroup Status");
+                topology_v1_emit_modal_identification_field(wb, "orchestrator", "Orchestrator");
+                topology_v1_emit_modal_identification_field(wb, "cgroup_name", "Cgroup");
+                topology_v1_emit_modal_identification_field(wb, "cgroup_path", "Cgroup Path");
+                topology_v1_emit_modal_identification_field(wb, "k8s_pod_name", "K8s Pod");
+                topology_v1_emit_modal_identification_field(wb, "k8s_namespace", "K8s Namespace");
+                topology_v1_emit_modal_identification_field(wb, "k8s_workload", "K8s Workload");
+                topology_v1_emit_modal_identification_field(wb, "docker_container_name", "Docker Container");
+                topology_v1_emit_modal_identification_field(wb, "docker_image", "Docker Image");
+                topology_v1_emit_modal_identification_field(wb, "systemd_unit_name", "Systemd Unit");
+                topology_v1_emit_modal_identification_field(wb, "systemd_unit_kind", "Systemd Kind");
+                topology_v1_emit_modal_identification_field(wb, "actor_kind", "Kind");
+                topology_v1_emit_modal_identification_field(wb, "cmdline", "Command");
                 topology_v1_emit_modal_identification_field(wb, "socket_count", "Sockets");
             }
-            else if(strcmp(actor_type, "container") == 0) {
+            else if(strcmp(actor_type, "user") == 0) {
+                topology_v1_emit_modal_identification_field(wb, "container_name", "User");
+                topology_v1_emit_modal_identification_field(wb, "process", "Process");
+                topology_v1_emit_modal_identification_field(wb, "pid", "PID");
+                topology_v1_emit_modal_identification_field(wb, "uid", "UID");
+                topology_v1_emit_modal_identification_field(wb, "cgroup_status", "Cgroup Status");
+                topology_v1_emit_modal_identification_field(wb, "systemd_unit_name", "Systemd Unit");
+                topology_v1_emit_modal_identification_field(wb, "socket_count", "Sockets");
+            }
+            else if(topology_v1_actor_type_is_grouped_runtime(actor_type)) {
                 topology_v1_emit_modal_identification_field(wb, "container_name", "Container");
+                topology_v1_emit_modal_identification_field(wb, "process", "Process");
+                topology_v1_emit_modal_identification_field(wb, "pid", "PID");
+                topology_v1_emit_modal_identification_field(wb, "cgroup_status", "Cgroup Status");
+                topology_v1_emit_modal_identification_field(wb, "orchestrator", "Orchestrator");
+                topology_v1_emit_modal_identification_field(wb, "actor_kind", "Kind");
+                topology_v1_emit_modal_identification_field(wb, "k8s_pod_name", "K8s Pod");
+                topology_v1_emit_modal_identification_field(wb, "k8s_namespace", "K8s Namespace");
+                topology_v1_emit_modal_identification_field(wb, "k8s_workload", "K8s Workload");
+                topology_v1_emit_modal_identification_field(wb, "docker_container_name", "Docker Container");
+                topology_v1_emit_modal_identification_field(wb, "docker_image", "Docker Image");
+                topology_v1_emit_modal_identification_field(wb, "systemd_unit_name", "Systemd Unit");
+                topology_v1_emit_modal_identification_field(wb, "systemd_unit_kind", "Systemd Kind");
                 topology_v1_emit_modal_identification_field(wb, "socket_count", "Sockets");
             }
             else if(strcmp(actor_type, "endpoint") == 0) {
@@ -3419,6 +3938,37 @@ static void topology_v1_emit_modal_label_identification(
         buffer_json_array_close(wb);
     }
     buffer_json_object_close(wb);
+}
+
+static void topology_v1_emit_actor_search_label_keys(BUFFER *wb, const char *actor_type)
+{
+    buffer_json_member_add_array(wb, "label_keys");
+    if(topology_v1_actor_type_has_process_enrichment(actor_type)) {
+        buffer_json_add_array_item_string(wb, "pid");
+        buffer_json_add_array_item_string(wb, "ppid");
+        buffer_json_add_array_item_string(wb, "uid");
+        buffer_json_add_array_item_string(wb, "net_ns_inode");
+        buffer_json_add_array_item_string(wb, "username");
+        buffer_json_add_array_item_string(wb, "cmdline");
+        buffer_json_add_array_item_string(wb, "namespace_type");
+        buffer_json_add_array_item_string(wb, "local_ip");
+        buffer_json_add_array_item_string(wb, "local_address_space");
+        buffer_json_add_array_item_string(wb, "process");
+        buffer_json_add_array_item_string(wb, "container_name");
+        buffer_json_add_array_item_string(wb, "cgroup_status");
+        buffer_json_add_array_item_string(wb, "orchestrator");
+        buffer_json_add_array_item_string(wb, "cgroup_name");
+        buffer_json_add_array_item_string(wb, "cgroup_path");
+        buffer_json_add_array_item_string(wb, "k8s_pod_name");
+        buffer_json_add_array_item_string(wb, "k8s_namespace");
+        buffer_json_add_array_item_string(wb, "k8s_workload");
+        buffer_json_add_array_item_string(wb, "docker_container_name");
+        buffer_json_add_array_item_string(wb, "docker_image");
+        buffer_json_add_array_item_string(wb, "systemd_unit_name");
+        buffer_json_add_array_item_string(wb, "systemd_unit_kind");
+        buffer_json_add_array_item_string(wb, "actor_kind");
+    }
+    buffer_json_array_close(wb);
 }
 
 static void topology_v1_emit_actor_type(
@@ -3471,31 +4021,44 @@ static void topology_v1_emit_actor_type(
             else if(strcmp(id, "process") == 0) {
                 buffer_json_add_array_item_string(wb, "display_name");
                 buffer_json_add_array_item_string(wb, "process");
-                if(group_by == NV_TOPOLOGY_GROUP_BY_PID) {
-                    buffer_json_add_array_item_string(wb, "username");
-                    buffer_json_add_array_item_string(wb, "cmdline");
-                    buffer_json_add_array_item_string(wb, "local_ip");
-                    buffer_json_add_array_item_string(wb, "container_name");
-                    buffer_json_add_array_item_string(wb, "orchestrator");
-                    buffer_json_add_array_item_string(wb, "cgroup_name");
-                    buffer_json_add_array_item_string(wb, "cgroup_path");
-                    buffer_json_add_array_item_string(wb, "k8s_pod_name");
-                    buffer_json_add_array_item_string(wb, "k8s_namespace");
-                    buffer_json_add_array_item_string(wb, "k8s_workload");
-                    buffer_json_add_array_item_string(wb, "docker_container_name");
-                    buffer_json_add_array_item_string(wb, "docker_image");
-                    buffer_json_add_array_item_string(wb, "systemd_unit_name");
-                }
+                buffer_json_add_array_item_string(wb, "username");
+                buffer_json_add_array_item_string(wb, "cmdline");
+                buffer_json_add_array_item_string(wb, "local_ip");
+                buffer_json_add_array_item_string(wb, "container_name");
+                buffer_json_add_array_item_string(wb, "cgroup_status");
+                buffer_json_add_array_item_string(wb, "orchestrator");
+                buffer_json_add_array_item_string(wb, "cgroup_name");
+                buffer_json_add_array_item_string(wb, "cgroup_path");
+                buffer_json_add_array_item_string(wb, "k8s_pod_name");
+                buffer_json_add_array_item_string(wb, "k8s_namespace");
+                buffer_json_add_array_item_string(wb, "k8s_workload");
+                buffer_json_add_array_item_string(wb, "docker_container_name");
+                buffer_json_add_array_item_string(wb, "docker_image");
+                buffer_json_add_array_item_string(wb, "systemd_unit_name");
+                buffer_json_add_array_item_string(wb, "systemd_unit_kind");
+                buffer_json_add_array_item_string(wb, "actor_kind");
             }
-            else if(strcmp(id, "container") == 0) {
+            else if(topology_v1_actor_type_is_grouped_runtime(id)) {
                 buffer_json_add_array_item_string(wb, "display_name");
                 buffer_json_add_array_item_string(wb, "container_name");
+                buffer_json_add_array_item_string(wb, "process");
+                buffer_json_add_array_item_string(wb, "cgroup_status");
+                buffer_json_add_array_item_string(wb, "orchestrator");
+                buffer_json_add_array_item_string(wb, "actor_kind");
+                buffer_json_add_array_item_string(wb, "k8s_pod_name");
+                buffer_json_add_array_item_string(wb, "k8s_namespace");
+                buffer_json_add_array_item_string(wb, "k8s_workload");
+                buffer_json_add_array_item_string(wb, "docker_container_name");
+                buffer_json_add_array_item_string(wb, "docker_image");
+                buffer_json_add_array_item_string(wb, "systemd_unit_name");
+                buffer_json_add_array_item_string(wb, "systemd_unit_kind");
             }
             else if(strcmp(id, "endpoint") == 0) {
                 buffer_json_add_array_item_string(wb, "display_name");
                 buffer_json_add_array_item_string(wb, "ip");
             }
             buffer_json_array_close(wb);
+            topology_v1_emit_actor_search_label_keys(wb, id);
         }
         buffer_json_object_close(wb);
         buffer_json_member_add_object(wb, "presentation");
@@ -3617,6 +4180,13 @@ static void topology_v1_emit_actor_type(
                         buffer_json_object_close(wb);
                     }
                     else {
+                        bool is_endpoint = strcmp(id, "endpoint") == 0;
+                        uint64_t dependency_order = 1;
+                        if(!is_endpoint) {
+                            topology_v1_emit_actor_processes_modal_section(wb, 1);
+                            topology_v1_emit_actor_cgroups_modal_section(wb, 2);
+                            dependency_order = 3;
+                        }
                         topology_v1_emit_network_connection_modal_section(
                             wb,
                             detailed ? "dependency_sockets" : "dependencies",
@@ -3627,7 +4197,7 @@ static void topology_v1_emit_actor_type(
                             "server_ip",
                             "server_port",
                             detailed,
-                            1);
+                            dependency_order);
                         topology_v1_emit_network_connection_modal_section(
                             wb,
                             detailed ? "dependant_sockets" : "dependants",
@@ -3638,7 +4208,7 @@ static void topology_v1_emit_actor_type(
                             "client_ip",
                             "client_port",
                             detailed,
-                            2);
+                            dependency_order + 1);
                     }
                 }
                 buffer_json_array_close(wb);
@@ -3768,8 +4338,122 @@ static void topology_v1_emit_type_registry(
                 detailed,
                 "display_name", "process");
             topology_v1_emit_actor_type(
+                wb, "process_group", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "Process", "primary", "process", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
                 wb, "container", "container_name", NULL, container_scopes, _countof(container_scopes),
                 "Container", "primary", "container", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "user", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "User", "primary", "user", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "docker_container", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "Docker container", "primary", "docker", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "k8s_container", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "Kubernetes container", "primary", "kubernetes", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "podman_container", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "Podman container", "primary", "podman", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "lxc_container", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "LXC container", "primary", "lxc", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "nspawn_container", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "systemd-nspawn container", "primary", "nspawn", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "vm", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "Virtual machine", "primary", "vm", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "systemd_service", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "Systemd service", "primary", "systemd", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "systemd_scope", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "Systemd scope", "primary", "systemd", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "systemd_slice", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "Systemd slice", "primary", "systemd", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "systemd_socket", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "Systemd socket", "primary", "systemd", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "systemd_target", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "Systemd target", "primary", "systemd", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "systemd_timer", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "Systemd timer", "primary", "systemd", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "systemd_mount", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "Systemd mount", "primary", "storage", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "systemd_path", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "Systemd path", "primary", "systemd", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "systemd_swap", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "Systemd swap", "primary", "storage", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "systemd_device", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "Systemd device", "primary", "device", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
+                group_by,
+                detailed,
+                "display_name", "container_name");
+            topology_v1_emit_actor_type(
+                wb, "systemd_unit", "container_name", NULL, container_scopes, _countof(container_scopes),
+                "Systemd unit", "primary", "systemd", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
                 group_by,
                 detailed,
                 "display_name", "container_name");
@@ -3874,6 +4558,58 @@ static void topology_v1_emit_type_registry(
                 buffer_json_member_add_array(wb, "columns");
                 topology_v1_emit_connection_columns(wb);
                 buffer_json_array_close(wb);
+            }
+            buffer_json_object_close(wb);
+
+            buffer_json_member_add_object(wb, "processes");
+            {
+                buffer_json_member_add_string(wb, "role", "actor_detail");
+                buffer_json_member_add_string(wb, "owner", "actor");
+                buffer_json_member_add_string(wb, "aggregation", "set");
+                buffer_json_member_add_array(wb, "columns");
+                topology_v1_emit_process_detail_columns(wb);
+                buffer_json_array_close(wb);
+                buffer_json_member_add_object(wb, "presentation");
+                {
+                    buffer_json_member_add_string(wb, "label", "Processes");
+                    buffer_json_member_add_uint64(wb, "order", 1);
+                    buffer_json_member_add_array(wb, "columns");
+                    {
+                        topology_v1_emit_modal_direct_column(wb, "pid", "PID", "pid", "number");
+                        topology_v1_emit_modal_direct_column(wb, "process", "Process", "process", "text");
+                        topology_v1_emit_modal_direct_column(wb, "user", "User", "username", "text");
+                        topology_v1_emit_modal_direct_column_with_visibility(wb, "cmdline", "Command", "cmdline", "text", "expanded");
+                    }
+                    buffer_json_array_close(wb);
+                }
+                buffer_json_object_close(wb);
+            }
+            buffer_json_object_close(wb);
+
+            buffer_json_member_add_object(wb, "cgroups");
+            {
+                buffer_json_member_add_string(wb, "role", "actor_detail");
+                buffer_json_member_add_string(wb, "owner", "actor");
+                buffer_json_member_add_string(wb, "aggregation", "set");
+                buffer_json_member_add_array(wb, "columns");
+                topology_v1_emit_cgroup_detail_columns(wb);
+                buffer_json_array_close(wb);
+                buffer_json_member_add_object(wb, "presentation");
+                {
+                    buffer_json_member_add_string(wb, "label", "CGroups");
+                    buffer_json_member_add_uint64(wb, "order", 2);
+                    buffer_json_member_add_array(wb, "columns");
+                    {
+                        topology_v1_emit_modal_direct_column(wb, "pid", "PID", "pid", "number");
+                        topology_v1_emit_modal_direct_column(wb, "status", "Status", "cgroup_status", "badge");
+                        topology_v1_emit_modal_direct_column(wb, "orchestrator", "Orchestrator", "orchestrator", "badge");
+                        topology_v1_emit_modal_direct_column(wb, "kind", "Kind", "actor_kind", "badge");
+                        topology_v1_emit_modal_direct_column(wb, "container", "Container", "container_name", "text");
+                        topology_v1_emit_modal_direct_column_with_visibility(wb, "cgroup_path", "Cgroup Path", "cgroup_path", "text", "expanded");
+                    }
+                    buffer_json_array_close(wb);
+                }
+                buffer_json_object_close(wb);
             }
             buffer_json_object_close(wb);
 
@@ -4088,6 +4824,7 @@ static void topology_v1_emit_actor_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOAD *pay
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(local_address_space);
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(ip);
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(address_space);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(cgroup_status);
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(cgroup_path);
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(cgroup_name);
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(container_name);
@@ -4098,6 +4835,8 @@ static void topology_v1_emit_actor_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOAD *pay
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(docker_container_name);
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(docker_image);
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(systemd_unit_name);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(systemd_unit_kind);
+        NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(actor_kind);
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(display_name);
 
         topology_v1_values_start(wb);
@@ -4204,6 +4943,104 @@ static void topology_v1_emit_socket_port_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOA
 
 #undef NV_TOPOLOGY_V1_PORT_UINT_VALUES
 #undef NV_TOPOLOGY_V1_PORT_STRING_VALUES
+
+                    buffer_json_array_close(wb);
+                }
+                buffer_json_object_close(wb);
+            }
+            buffer_json_object_close(wb);
+
+            buffer_json_member_add_object(wb, "processes");
+            {
+                buffer_json_member_add_string(wb, "type", "processes");
+                buffer_json_member_add_object(wb, "table");
+                {
+                    buffer_json_member_add_uint64(wb, "rows", payload->processes_used);
+                    buffer_json_member_add_array(wb, "columns");
+                    topology_v1_emit_process_detail_columns(wb);
+                    buffer_json_array_close(wb);
+                    buffer_json_member_add_array(wb, "values");
+
+#define NV_TOPOLOGY_V1_PROCESS_UINT_VALUES(member) do { \
+                    topology_v1_values_start(wb); \
+                    for(size_t i = 0; i < payload->processes_used; i++) \
+                        buffer_json_add_array_item_uint64(wb, payload->processes[i].member); \
+                    topology_v1_values_end(wb); \
+                } while(0)
+#define NV_TOPOLOGY_V1_PROCESS_STRING_VALUES(member) do { \
+                    NV_TOPOLOGY_V1_STRING_COLUMN column; \
+                    topology_v1_string_column_init(&column, payload->processes_used); \
+                    for(size_t i = 0; i < payload->processes_used; i++) \
+                        topology_v1_string_column_add(&column, payload->processes[i].member); \
+                    topology_v1_emit_auto_string_column(wb, &column); \
+                    topology_v1_string_column_free(&column); \
+                } while(0)
+
+                    NV_TOPOLOGY_V1_PROCESS_UINT_VALUES(actor);
+                    NV_TOPOLOGY_V1_PROCESS_UINT_VALUES(pid);
+                    NV_TOPOLOGY_V1_PROCESS_UINT_VALUES(ppid);
+                    NV_TOPOLOGY_V1_PROCESS_UINT_VALUES(uid);
+                    NV_TOPOLOGY_V1_PROCESS_UINT_VALUES(net_ns_inode);
+                    NV_TOPOLOGY_V1_PROCESS_STRING_VALUES(process);
+                    NV_TOPOLOGY_V1_PROCESS_STRING_VALUES(username);
+                    NV_TOPOLOGY_V1_PROCESS_STRING_VALUES(namespace_type);
+                    NV_TOPOLOGY_V1_PROCESS_STRING_VALUES(local_ip);
+                    NV_TOPOLOGY_V1_PROCESS_STRING_VALUES(local_address_space);
+                    NV_TOPOLOGY_V1_PROCESS_STRING_VALUES(cmdline);
+
+#undef NV_TOPOLOGY_V1_PROCESS_UINT_VALUES
+#undef NV_TOPOLOGY_V1_PROCESS_STRING_VALUES
+
+                    buffer_json_array_close(wb);
+                }
+                buffer_json_object_close(wb);
+            }
+            buffer_json_object_close(wb);
+
+            buffer_json_member_add_object(wb, "cgroups");
+            {
+                buffer_json_member_add_string(wb, "type", "cgroups");
+                buffer_json_member_add_object(wb, "table");
+                {
+                    buffer_json_member_add_uint64(wb, "rows", payload->cgroups_used);
+                    buffer_json_member_add_array(wb, "columns");
+                    topology_v1_emit_cgroup_detail_columns(wb);
+                    buffer_json_array_close(wb);
+                    buffer_json_member_add_array(wb, "values");
+
+#define NV_TOPOLOGY_V1_CGROUP_UINT_VALUES(member) do { \
+                    topology_v1_values_start(wb); \
+                    for(size_t i = 0; i < payload->cgroups_used; i++) \
+                        buffer_json_add_array_item_uint64(wb, payload->cgroups[i].member); \
+                    topology_v1_values_end(wb); \
+                } while(0)
+#define NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(member) do { \
+                    NV_TOPOLOGY_V1_STRING_COLUMN column; \
+                    topology_v1_string_column_init(&column, payload->cgroups_used); \
+                    for(size_t i = 0; i < payload->cgroups_used; i++) \
+                        topology_v1_string_column_add(&column, payload->cgroups[i].member); \
+                    topology_v1_emit_auto_string_column(wb, &column); \
+                    topology_v1_string_column_free(&column); \
+                } while(0)
+
+                    NV_TOPOLOGY_V1_CGROUP_UINT_VALUES(actor);
+                    NV_TOPOLOGY_V1_CGROUP_UINT_VALUES(pid);
+                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(cgroup_status);
+                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(cgroup_path);
+                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(cgroup_name);
+                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(container_name);
+                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(orchestrator);
+                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(actor_kind);
+                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(k8s_pod_name);
+                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(k8s_namespace);
+                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(k8s_workload);
+                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(docker_container_name);
+                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(docker_image);
+                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(systemd_unit_name);
+                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(systemd_unit_kind);
+
+#undef NV_TOPOLOGY_V1_CGROUP_UINT_VALUES
+#undef NV_TOPOLOGY_V1_CGROUP_STRING_VALUES
 
                     buffer_json_array_close(wb);
                 }
@@ -4530,16 +5367,26 @@ static void topology_write_data(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx) {
         .port_index = dictionary_create_advanced(
             DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
             NULL, sizeof(uint64_t)),
+        .process_index = dictionary_create_advanced(
+            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+            NULL, sizeof(uint64_t)),
+        .cgroup_index = dictionary_create_advanced(
+            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+            NULL, sizeof(uint64_t)),
         .correlation_point_index = dictionary_create_advanced(
             DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
             NULL, sizeof(bool)),
         .correlation_claim_index = dictionary_create_advanced(
             DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
             NULL, sizeof(bool)),
+        .label_index = dictionary_create_advanced(
+            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+            NULL, sizeof(bool)),
     };
 
     if(!topology.actor_index || !topology.graph_link_index || !topology.connection_index || !topology.port_index ||
-       !topology.correlation_point_index || !topology.correlation_claim_index) {
+       !topology.process_index || !topology.cgroup_index ||
+       !topology.correlation_point_index || !topology.correlation_claim_index || !topology.label_index) {
         topology_v1_free(&topology);
         return;
     }
@@ -4618,6 +5465,8 @@ static void topology_write_data(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx) {
             buffer_json_member_add_uint64(wb, "links", topology.links_used);
             buffer_json_member_add_uint64(wb, "socket_evidence_rows", topology.evidence_used);
             buffer_json_member_add_uint64(wb, "socket_port_rows", topology.ports_used);
+            buffer_json_member_add_uint64(wb, "process_rows", topology.processes_used);
+            buffer_json_member_add_uint64(wb, "cgroup_rows", topology.cgroups_used);
             buffer_json_member_add_uint64(wb, "correlation_points", topology.correlation_points_used);
             buffer_json_member_add_uint64(wb, "correlation_claims", topology.correlation_claims_used);
             buffer_json_member_add_uint64(wb, "ownership_links", state.ownership_link_count);
@@ -4805,6 +5654,11 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
 
         local_sockets_process(&ls);
 
+        if(!aggregated) {
+            st.pid_count = nv_pid_sort_unique(st.pids, st.pid_count);
+            nv_apps_lookup_warm_pids(st.pids, st.pid_count);
+        }
+
         if(aggregated) {
             size_t added = 0;
             uint64_t proc_self_net_ns_inode = ls.proc_self_net_ns_inode;
@@ -4834,6 +5688,8 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
 
             simple_hashtable_destroy_AGGREGATED_SOCKETS(&ht);
         }
+
+        freez(st.pids);
 
         buffer_json_array_close(wb);
         buffer_json_member_add_object(wb, "columns");
@@ -4910,6 +5766,97 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                                         0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                         RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                         RRDF_FIELD_OPTS_VISIBLE,
+                                        NULL);
+
+            buffer_rrdf_table_add_field(wb, field_id++, "CgroupStatus", "Cgroup Status",
+                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_NONE,
+                                        NULL);
+
+            buffer_rrdf_table_add_field(wb, field_id++, "CgroupPath", "Cgroup Path",
+                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_NONE | RRDF_FIELD_OPTS_FULL_WIDTH,
+                                        NULL);
+
+            buffer_rrdf_table_add_field(wb, field_id++, "CgroupName", "Cgroup Name",
+                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_NONE,
+                                        NULL);
+
+            buffer_rrdf_table_add_field(wb, field_id++, "ContainerName", "Container / Service Name",
+                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_VISIBLE,
+                                        NULL);
+
+            buffer_rrdf_table_add_field(wb, field_id++, "Orchestrator", "Orchestrator",
+                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_VISIBLE,
+                                        NULL);
+
+            buffer_rrdf_table_add_field(wb, field_id++, "K8sPodName", "Kubernetes Pod",
+                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_NONE,
+                                        NULL);
+
+            buffer_rrdf_table_add_field(wb, field_id++, "K8sNamespace", "Kubernetes Namespace",
+                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_NONE,
+                                        NULL);
+
+            buffer_rrdf_table_add_field(wb, field_id++, "K8sWorkload", "Kubernetes Workload",
+                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_NONE,
+                                        NULL);
+
+            buffer_rrdf_table_add_field(wb, field_id++, "DockerContainerName", "Container Name",
+                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_NONE,
+                                        NULL);
+
+            buffer_rrdf_table_add_field(wb, field_id++, "DockerImage", "Container Image",
+                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_NONE | RRDF_FIELD_OPTS_FULL_WIDTH,
+                                        NULL);
+
+            buffer_rrdf_table_add_field(wb, field_id++, "SystemdUnitName", "Systemd Unit",
+                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_NONE,
+                                        NULL);
+
+            buffer_rrdf_table_add_field(wb, field_id++, "SystemdUnitKind", "Systemd Unit Kind",
+                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_NONE,
+                                        NULL);
+
+            buffer_rrdf_table_add_field(wb, field_id++, "ActorKind", "Actor Kind",
+                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                        RRDF_FIELD_OPTS_NONE,
                                         NULL);
 
             // Portname

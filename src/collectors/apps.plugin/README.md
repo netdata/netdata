@@ -256,6 +256,7 @@ You can use the Netdata `processes` function to verify that your `apps_groups.co
 2. **Review the output** to see:
     - Current running processes with their `comm`, `cmdline`, and (on Windows) `name` fields
     - The **Category** column shows which group from `apps_groups.conf` each process has been assigned to
+    - On Linux, cgroup/container/service enrichment columns show the cgroup status, container or service name, orchestrator, and Kubernetes/Docker/systemd details when available
     - Resource utilization for each process
 
 3. **Troubleshooting tips**:
@@ -338,4 +339,4 @@ If this fails (i.e., `setcap` fails), `apps.plugin` is setuid to `root`.
 
 Although `apps.plugin` can function without escalated privileges, it may not be able to collect all the necessary information. To ensure comprehensive data collection, it's recommended to grant the required privileges.
 
-The increased privileges are primarily used for building the process tree in memory, iterating over running processes, collecting metrics, enriching local cgroup metadata, and sending data to Netdata. APPS_LOOKUP requests are local-only, size-bounded by the netipc payload limit, and limited to 8192 PIDs per request.
+The increased privileges are primarily used for building the process tree in memory, iterating over running processes, collecting metrics, enriching local cgroup metadata, and sending data to Netdata. APPS_LOOKUP requests are local-only, size-bounded by the netipc payload limit, and limited to 8192 PIDs per request. On Linux, the `processes` Function exposes the same per-PID cgroup/container/service fields used by network connections, including cgroup status/path/name, container name, orchestrator, systemd unit kind, and actor kind.

@@ -241,7 +241,7 @@ Which systemd services are monitored by Netdata is determined by the following p
 
 ```text
 [plugin:cgroups]
-	cgroups to match as systemd services =  !/system.slice/*/*.service  /system.slice/*.service
+	cgroups to match as systemd services =  !/system.slice/*.service/*.service  /system.slice/*.service
 ```
 
 - - -
