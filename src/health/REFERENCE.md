@@ -1393,7 +1393,11 @@ lookup: average -10s of health_status
 
 Use when the metric acts as a failure indicator — the value is 0 normally and 1 when a failure occurs. `average` over a short window naturally reflects any non-zero sample: if the metric was 1 at any point, the average will be greater than 0. This is the same pattern used by Netdata's Docker container health monitoring (`average -10s of unhealthy`, `warn: $this > 0`).
 
-> **Note:** Do not use `sum` for boolean 0/1 gauges. While `sum -5m unaligned absolute` would technically detect failures (any non-zero sample makes the sum positive), `sum` produces a count of seconds in state 1 rather than an intuitive threshold. Use `sum` only for counter/cumulative metrics like packet drops or error totals — see [Example 4: Network Packet Drops](#example-4-network-packet-drops) for a correct `sum` use case.
+:::note 
+
+Do not use `sum` for boolean 0/1 gauges. While `sum -5m unaligned absolute` would technically detect failures (any non-zero sample makes the sum positive), `sum` produces a count of seconds in state 1 rather than an intuitive threshold. Use `sum` only for counter/cumulative metrics like packet drops or error totals — see [Example 4: Network Packet Drops](#example-4-network-packet-drops) for a correct `sum` use case.
+
+:::
 
 **Approach 2: Detect Any Downtime (min) or Continuous Outage (max)**
 
