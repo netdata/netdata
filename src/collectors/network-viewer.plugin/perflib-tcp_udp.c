@@ -2,12 +2,19 @@
 
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/os/windows-perflib/perflib.h"
+#include "libnetdata/os/system-maps/system-services.h"
+#include "libnetdata/os/system-maps/cached-sid-username.h"
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <iphlpapi.h>
 
 #define PLUGIN_NETWORK_VIEWER_NAME   "network-viewer.plugin"
 #define NV_WIN_FUNCTION_PROTO        "network-protocols"
 #define NV_WIN_FUNCTION_PROTO_HELP   "Windows TCP and UDP statistics by transport and IP family"
 #define NV_WIN_FUNCTION_UPDATE_EVERY 5
 #define NV_WIN_FUNCTION_PRIORITY     100
+#define NV_WIN_FUNCTION_CONN         "network-connections"
+#define NV_WIN_FUNCTION_CONN_HELP    "Shows active network connections with protocol details, states, addresses, ports, and process information."
 
 netdata_mutex_t stdout_mutex;
 static bool plugin_should_exit = false;
@@ -226,6 +233,7 @@ static UDP_FAMILY udp_ipv6 = {
 };
 
 static netdata_mutex_t nv_collect_mutex;
+static SERVICENAMES_CACHE *sc = NULL;
 
 static void initialize_udp_keys(UDP_FAMILY *udp)
 {
@@ -427,6 +435,556 @@ cleanup:
 }
 
 // ============================================================
+// Network Connections — per-socket view via IP Helper API
+// ============================================================
+
+// --- Address space classification -----------------------------------------------
+
+static const char *nv_ipv4_address_space(DWORD ip_nbo)
+{
+    uint32_t ip = ntohl(ip_nbo);
+    if (!ip) return "zero";
+    if ((ip >> 24) == 127) return "loopback";
+    if ((ip >> 28) == 0xEU) return "multicast";  // 224.0.0.0/4
+    uint32_t o1 = ip >> 24;
+    uint32_t o2 = (ip >> 16) & 0xFF;
+    if (o1 == 10 ||
+        (o1 == 172 && o2 >= 16 && o2 <= 31) ||
+        (o1 == 192 && o2 == 168) ||
+        (o1 == 169 && o2 == 254))
+        return "private";
+    return "public";
+}
+
+static const char *nv_ipv6_address_space(const UCHAR *b)
+{
+    static const uint8_t zero[16]   = {0};
+    static const uint8_t loop[16]   = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
+    static const uint8_t v4map[12]  = {0,0,0,0,0,0,0,0,0,0,0xFF,0xFF};
+
+    if (!memcmp(b, zero, 16)) return "zero";
+    if (!memcmp(b, loop, 16)) return "loopback";
+    if (!memcmp(b, v4map, 12)) {
+        DWORD v4;
+        memcpy(&v4, b + 12, 4);
+        return nv_ipv4_address_space(v4);
+    }
+    if (b[0] == 0xFF) return "multicast";
+    if ((b[0] & 0xFE) == 0xFC) return "private";              // ULA fc00::/7
+    if (b[0] == 0xFE && (b[1] & 0xC0) == 0x80) return "private"; // link-local fe80::/10
+    return "public";
+}
+
+// --- Loopback checks for direction detection ------------------------------------
+
+static bool nv_is_ipv4_loopback(DWORD ip_nbo)
+{
+    return (ntohl(ip_nbo) >> 24) == 127;
+}
+
+static bool nv_is_ipv6_loopback(const UCHAR *b)
+{
+    static const uint8_t loop[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
+    return !memcmp(b, loop, 16);
+}
+
+// --- TCP state number → string --------------------------------------------------
+
+static const char *nv_tcp_state_str(DWORD state)
+{
+    switch (state) {
+        case MIB_TCP_STATE_CLOSED:     return "closed";
+        case MIB_TCP_STATE_LISTEN:     return "listen";
+        case MIB_TCP_STATE_SYN_SENT:   return "syn-sent";
+        case MIB_TCP_STATE_SYN_RCVD:   return "syn-received";
+        case MIB_TCP_STATE_ESTAB:      return "established";
+        case MIB_TCP_STATE_FIN_WAIT1:  return "fin-wait-1";
+        case MIB_TCP_STATE_FIN_WAIT2:  return "fin-wait-2";
+        case MIB_TCP_STATE_CLOSE_WAIT: return "close-wait";
+        case MIB_TCP_STATE_CLOSING:    return "closing";
+        case MIB_TCP_STATE_LAST_ACK:   return "last-ack";
+        case MIB_TCP_STATE_TIME_WAIT:  return "time-wait";
+        case MIB_TCP_STATE_DELETE_TCB: return "delete";
+        default:                       return "unknown";
+    }
+}
+
+// --- Process info ---------------------------------------------------------------
+
+static void nv_get_comm(DWORD pid, char *comm, size_t comm_size)
+{
+    comm[0] = '\0';
+    HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!h) return;
+
+    char path[MAX_PATH];
+    DWORD sz = (DWORD)sizeof(path);
+    if (QueryFullProcessImageNameA(h, 0, path, &sz)) {
+        const char *base = strrchr(path, '\\');
+        base = base ? base + 1 : path;
+        strncpyz(comm, base, comm_size - 1);
+    }
+    CloseHandle(h);
+}
+
+static STRING *nv_get_username(DWORD pid)
+{
+    HANDLE hp = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!hp) return NULL;
+
+    STRING *result = NULL;
+    HANDLE ht = NULL;
+    if (OpenProcessToken(hp, TOKEN_QUERY, &ht)) {
+        DWORD sz = 0;
+        GetTokenInformation(ht, TokenUser, NULL, 0, &sz);
+        if (sz) {
+            TOKEN_USER *tu = mallocz(sz);
+            if (GetTokenInformation(ht, TokenUser, tu, sz, &sz))
+                result = cached_sid_fullname_or_sid_str(tu->User.Sid);
+            freez(tu);
+        }
+        CloseHandle(ht);
+    }
+    CloseHandle(hp);
+    return result;
+}
+
+// --- Listening-port set for direction classification ----------------------------
+
+typedef struct {
+    DWORD  *ports;
+    size_t  used;
+    size_t  capacity;
+} NV_LISTEN_SET;
+
+static void nv_listen_set_init(NV_LISTEN_SET *s)
+{
+    s->ports    = NULL;
+    s->used     = 0;
+    s->capacity = 0;
+}
+
+static void nv_listen_set_add(NV_LISTEN_SET *s, DWORD port_hbo)
+{
+    if (s->used >= s->capacity) {
+        s->capacity = s->capacity ? s->capacity * 2 : 64;
+        s->ports = reallocz(s->ports, s->capacity * sizeof(DWORD));
+    }
+    s->ports[s->used++] = port_hbo;
+}
+
+static int nv_dword_compar(const void *a, const void *b)
+{
+    DWORD da = *(const DWORD *)a, db = *(const DWORD *)b;
+    return (da > db) - (da < db);
+}
+
+static void nv_listen_set_sort(NV_LISTEN_SET *s)
+{
+    if (s->used > 1)
+        qsort(s->ports, s->used, sizeof(DWORD), nv_dword_compar);
+}
+
+static bool nv_listen_set_contains(const NV_LISTEN_SET *s, DWORD port_hbo)
+{
+    if (!s->used) return false;
+    return bsearch(&port_hbo, s->ports, s->used, sizeof(DWORD), nv_dword_compar) != NULL;
+}
+
+static void nv_listen_set_free(NV_LISTEN_SET *s)
+{
+    freez(s->ports);
+    s->ports    = NULL;
+    s->used     = 0;
+    s->capacity = 0;
+}
+
+// --- Table fetch helpers --------------------------------------------------------
+
+static void *nv_fetch_tcp_table(ULONG af)
+{
+    ULONG size = 0;
+    GetExtendedTcpTable(NULL, &size, FALSE, af, TCP_TABLE_OWNER_PID_ALL, 0);
+    if (!size) return NULL;
+
+    // Add headroom to tolerate connections added between size-probe and actual fetch.
+    size += 4096;
+    void *buf = mallocz(size);
+    ULONG ret = GetExtendedTcpTable(buf, &size, FALSE, af, TCP_TABLE_OWNER_PID_ALL, 0);
+    if (ret == ERROR_INSUFFICIENT_BUFFER) {
+        buf = reallocz(buf, size);
+        ret = GetExtendedTcpTable(buf, &size, FALSE, af, TCP_TABLE_OWNER_PID_ALL, 0);
+    }
+    if (ret != NO_ERROR) {
+        freez(buf);
+        return NULL;
+    }
+    return buf;
+}
+
+static void *nv_fetch_udp_table(ULONG af)
+{
+    ULONG size = 0;
+    GetExtendedUdpTable(NULL, &size, FALSE, af, UDP_TABLE_OWNER_PID, 0);
+    if (!size) return NULL;
+
+    size += 4096;
+    void *buf = mallocz(size);
+    ULONG ret = GetExtendedUdpTable(buf, &size, FALSE, af, UDP_TABLE_OWNER_PID, 0);
+    if (ret == ERROR_INSUFFICIENT_BUFFER) {
+        buf = reallocz(buf, size);
+        ret = GetExtendedUdpTable(buf, &size, FALSE, af, UDP_TABLE_OWNER_PID, 0);
+    }
+    if (ret != NO_ERROR) {
+        freez(buf);
+        return NULL;
+    }
+    return buf;
+}
+
+// --- Row emitter ----------------------------------------------------------------
+
+// Column order (matches the columns declared in function_network_connections):
+//   Direction, Protocol, State, PID, Process, User, Portname,
+//   LocalIP, LocalPort, LocalAddressSpace,
+//   RemoteIP, RemotePort, RemoteAddressSpace,
+//   ServerPort, Count
+
+static void nv_emit_row(BUFFER *wb,
+                        const char *direction,
+                        const char *protocol,
+                        const char *state,
+                        DWORD pid,
+                        const char *local_ip,  DWORD local_port_hbo,  const char *local_as,
+                        const char *remote_ip, DWORD remote_port_hbo, const char *remote_as)
+{
+    DWORD server_port = (strcmp(direction, "outbound") == 0) ? remote_port_hbo : local_port_hbo;
+
+    IPPROTO ipproto = (strncmp(protocol, "tcp", 3) == 0) ? IPPROTO_TCP : IPPROTO_UDP;
+    STRING *portname = system_servicenames_cache_lookup(sc, (uint16_t)server_port, (uint16_t)ipproto);
+
+    char comm[256] = "";
+    nv_get_comm(pid, comm, sizeof(comm));
+    STRING *username = nv_get_username(pid);
+
+    buffer_json_add_array_item_array(wb);
+    {
+        buffer_json_add_array_item_string(wb, direction);
+        buffer_json_add_array_item_string(wb, protocol);
+        buffer_json_add_array_item_string(wb, state);
+        buffer_json_add_array_item_uint64(wb, pid);
+        buffer_json_add_array_item_string(wb, comm[0] ? comm : "[unknown]");
+        buffer_json_add_array_item_string(wb, username ? string2str(username) : "[unknown]");
+        buffer_json_add_array_item_string(wb, string2str(portname));
+        buffer_json_add_array_item_string(wb, local_ip);
+        buffer_json_add_array_item_uint64(wb, local_port_hbo);
+        buffer_json_add_array_item_string(wb, local_as);
+        buffer_json_add_array_item_string(wb, remote_ip);
+        buffer_json_add_array_item_uint64(wb, remote_port_hbo);
+        buffer_json_add_array_item_string(wb, remote_as);
+        buffer_json_add_array_item_uint64(wb, server_port);
+        buffer_json_add_array_item_uint64(wb, 1); // Count — always 1 (detailed view)
+    }
+    buffer_json_array_close(wb);
+
+    string_freez(portname);
+    string_freez(username);
+}
+
+// --- Main function handler -------------------------------------------------------
+
+void function_network_connections(
+    const char *transaction, char *function __maybe_unused,
+    usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled,
+    BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
+    const char *source __maybe_unused, void *data __maybe_unused)
+{
+    if (unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
+        nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
+        return;
+    }
+
+    // Fetch all four tables upfront to minimise the enumeration window.
+    MIB_TCPTABLE_OWNER_PID  *tcp4 = nv_fetch_tcp_table(AF_INET);
+    MIB_TCP6TABLE_OWNER_PID *tcp6 = nv_fetch_tcp_table(AF_INET6);
+    MIB_UDPTABLE_OWNER_PID  *udp4 = nv_fetch_udp_table(AF_INET);
+    MIB_UDP6TABLE_OWNER_PID *udp6 = nv_fetch_udp_table(AF_INET6);
+
+    // --- First pass: collect all TCP LISTEN ports for direction classification ---
+    NV_LISTEN_SET listen_set;
+    nv_listen_set_init(&listen_set);
+
+    if (tcp4) {
+        for (DWORD i = 0; i < tcp4->dwNumEntries; i++) {
+            if (tcp4->table[i].dwState == MIB_TCP_STATE_LISTEN)
+                nv_listen_set_add(&listen_set, ntohs((uint16_t)tcp4->table[i].dwLocalPort));
+        }
+    }
+    if (tcp6) {
+        for (DWORD i = 0; i < tcp6->dwNumEntries; i++) {
+            if (tcp6->table[i].dwState == MIB_TCP_STATE_LISTEN)
+                nv_listen_set_add(&listen_set, ntohs((uint16_t)tcp6->table[i].dwLocalPort));
+        }
+    }
+    nv_listen_set_sort(&listen_set);
+
+    // --- Second pass: emit rows --------------------------------------------------
+    time_t now_s = now_realtime_sec();
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    nv_table_begin(wb, NV_WIN_FUNCTION_CONN_HELP);
+
+    buffer_json_member_add_array(wb, "data");
+    {
+        char local_ip [INET6_ADDRSTRLEN];
+        char remote_ip[INET6_ADDRSTRLEN];
+
+        // TCP IPv4
+        if (tcp4) {
+            for (DWORD i = 0; i < tcp4->dwNumEntries; i++) {
+                MIB_TCPROW_OWNER_PID *r = &tcp4->table[i];
+
+                struct in_addr la = { .s_addr = r->dwLocalAddr };
+                inet_ntop(AF_INET, &la, local_ip, sizeof(local_ip));
+
+                DWORD local_port = ntohs((uint16_t)r->dwLocalPort);
+                const char *local_as = nv_ipv4_address_space(r->dwLocalAddr);
+
+                const char *direction;
+                if (r->dwState == MIB_TCP_STATE_LISTEN) {
+                    direction = "listen";
+                } else if (nv_is_ipv4_loopback(r->dwLocalAddr) || nv_is_ipv4_loopback(r->dwRemoteAddr)) {
+                    direction = nv_listen_set_contains(&listen_set, local_port) ? "inbound" : "outbound";
+                } else if (nv_listen_set_contains(&listen_set, local_port)) {
+                    direction = "inbound";
+                } else {
+                    direction = "outbound";
+                }
+
+                // LISTEN rows have no remote endpoint.
+                const char *remote_ip_s;
+                const char *remote_as;
+                DWORD remote_port_emit;
+                if (r->dwState == MIB_TCP_STATE_LISTEN || !r->dwRemoteAddr) {
+                    remote_ip_s      = "";
+                    remote_as        = "";
+                    remote_port_emit = 0;
+                } else {
+                    struct in_addr ra = { .s_addr = r->dwRemoteAddr };
+                    inet_ntop(AF_INET, &ra, remote_ip, sizeof(remote_ip));
+                    remote_ip_s      = remote_ip;
+                    remote_as        = nv_ipv4_address_space(r->dwRemoteAddr);
+                    remote_port_emit = ntohs((uint16_t)r->dwRemotePort);
+                }
+
+                nv_emit_row(wb, direction, "tcp4", nv_tcp_state_str(r->dwState), r->dwOwningPid,
+                            local_ip, local_port, local_as,
+                            remote_ip_s, remote_port_emit, remote_as);
+            }
+        }
+
+        // TCP IPv6
+        if (tcp6) {
+            for (DWORD i = 0; i < tcp6->dwNumEntries; i++) {
+                MIB_TCP6ROW_OWNER_PID *r = &tcp6->table[i];
+
+                inet_ntop(AF_INET6, r->ucLocalAddr, local_ip, sizeof(local_ip));
+                DWORD local_port = ntohs((uint16_t)r->dwLocalPort);
+                const char *local_as = nv_ipv6_address_space(r->ucLocalAddr);
+
+                const char *direction;
+                if (r->dwState == MIB_TCP_STATE_LISTEN) {
+                    direction = "listen";
+                } else if (nv_is_ipv6_loopback(r->ucLocalAddr) || nv_is_ipv6_loopback(r->ucRemoteAddr)) {
+                    direction = nv_listen_set_contains(&listen_set, local_port) ? "inbound" : "outbound";
+                } else if (nv_listen_set_contains(&listen_set, local_port)) {
+                    direction = "inbound";
+                } else {
+                    direction = "outbound";
+                }
+
+                static const uint8_t zero6[16] = {0};
+                bool remote_zero = !memcmp(r->ucRemoteAddr, zero6, 16) && !r->dwRemotePort;
+
+                const char *remote_ip_s;
+                const char *remote_as;
+                DWORD remote_port_emit;
+                if (r->dwState == MIB_TCP_STATE_LISTEN || remote_zero) {
+                    remote_ip_s      = "";
+                    remote_as        = "";
+                    remote_port_emit = 0;
+                } else {
+                    inet_ntop(AF_INET6, r->ucRemoteAddr, remote_ip, sizeof(remote_ip));
+                    remote_ip_s      = remote_ip;
+                    remote_as        = nv_ipv6_address_space(r->ucRemoteAddr);
+                    remote_port_emit = ntohs((uint16_t)r->dwRemotePort);
+                }
+
+                nv_emit_row(wb, direction, "tcp6", nv_tcp_state_str(r->dwState), r->dwOwningPid,
+                            local_ip, local_port, local_as,
+                            remote_ip_s, remote_port_emit, remote_as);
+            }
+        }
+
+        // UDP IPv4 — endpoints have no remote address; direction is always "listen".
+        if (udp4) {
+            for (DWORD i = 0; i < udp4->dwNumEntries; i++) {
+                MIB_UDPROW_OWNER_PID *r = &udp4->table[i];
+
+                struct in_addr la = { .s_addr = r->dwLocalAddr };
+                inet_ntop(AF_INET, &la, local_ip, sizeof(local_ip));
+                DWORD local_port = ntohs((uint16_t)r->dwLocalPort);
+                const char *local_as = nv_ipv4_address_space(r->dwLocalAddr);
+
+                nv_emit_row(wb, "listen", "udp4", "stateless", r->dwOwningPid,
+                            local_ip, local_port, local_as,
+                            "", 0, "");
+            }
+        }
+
+        // UDP IPv6
+        if (udp6) {
+            for (DWORD i = 0; i < udp6->dwNumEntries; i++) {
+                MIB_UDP6ROW_OWNER_PID *r = &udp6->table[i];
+
+                inet_ntop(AF_INET6, r->ucLocalAddr, local_ip, sizeof(local_ip));
+                DWORD local_port = ntohs((uint16_t)r->dwLocalPort);
+                const char *local_as = nv_ipv6_address_space(r->ucLocalAddr);
+
+                nv_emit_row(wb, "listen", "udp6", "stateless", r->dwOwningPid,
+                            local_ip, local_port, local_as,
+                            "", 0, "");
+            }
+        }
+    }
+    buffer_json_array_close(wb); // data
+
+    nv_listen_set_free(&listen_set);
+    freez(tcp4);
+    freez(tcp6);
+    freez(udp4);
+    freez(udp6);
+
+    // --- Column definitions ---
+    size_t field_id = 0;
+    buffer_json_member_add_object(wb, "columns");
+    {
+        buffer_rrdf_table_add_field(wb, field_id++, "Direction", "Socket Direction",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Protocol", "Socket Protocol",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "State", "Socket State",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "PID", "Process ID",
+            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Process", "Process Name",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "User", "Username",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Portname", "Server Port Name",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "LocalIP", "Local IP Address",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "LocalPort", "Local Port",
+            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "LocalAddressSpace", "Local IP Address Space",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_NONE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "RemoteIP", "Remote IP Address",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "RemotePort", "Remote Port",
+            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "RemoteAddressSpace", "Remote IP Address Space",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_NONE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "ServerPort", "Server Port",
+            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_NONE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Count", "Number of sockets",
+            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, "sockets", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+            RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+            RRDF_FIELD_OPTS_NONE, NULL);
+    }
+    buffer_json_object_close(wb); // columns
+
+    buffer_json_member_add_string(wb, "default_sort_column", "Direction");
+
+    buffer_json_member_add_object(wb, "custom_charts");
+    {
+        buffer_json_member_add_object(wb, "Network Map");
+        {
+            buffer_json_member_add_string(wb, "type", "network-viewer");
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // custom_charts
+
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        nv_add_group_by(wb, "Direction");
+        nv_add_group_by(wb, "Protocol");
+        nv_add_group_by(wb, "State");
+        nv_add_group_by(wb, "Process");
+    }
+    buffer_json_object_close(wb); // group_by
+
+    nv_send_result(transaction, wb, now_s);
+}
+
+// ============================================================
 // main
 // ============================================================
 
@@ -451,17 +1009,30 @@ int main(int argc, char **argv)
     udp_collect_family(&udp_ipv6);
     perflibFreePerformanceData();
 
+    cached_sid_username_init();
+    sc = system_servicenames_cache_init();
+
     fprintf(stdout,
             PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" " HTTP_ACCESS_FORMAT " %d\n",
             NV_WIN_FUNCTION_PROTO, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NV_WIN_FUNCTION_PROTO_HELP,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE),
             NV_WIN_FUNCTION_PRIORITY);
+
+    fprintf(stdout,
+            PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" " HTTP_ACCESS_FORMAT " %d\n",
+            NV_WIN_FUNCTION_CONN, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NV_WIN_FUNCTION_CONN_HELP,
+            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
+            NV_WIN_FUNCTION_PRIORITY);
+
     fflush(stdout);
 
     struct functions_evloop_globals *wg =
         functions_evloop_init(5, "NV-WIN", &stdout_mutex, &plugin_should_exit, NULL);
 
     functions_evloop_add_function(wg, NV_WIN_FUNCTION_PROTO, function_network_protocols,
+                                  PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
+
+    functions_evloop_add_function(wg, NV_WIN_FUNCTION_CONN, function_network_connections,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
 
     usec_t send_newline_ut = 0;
