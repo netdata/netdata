@@ -27,7 +27,7 @@ modules:
         metrics_description: |
           This collector monitors Cato Networks accounts through the Cato GraphQL API.
 
-          It discovers sites, collects site and interface status, traffic and quality metrics, collects BGP peer status, and exposes Cato site/PoP/BGP topology data.
+          It discovers sites, collects site, device, and interface status, traffic and quality metrics, collects BGP peer status, and exposes Cato site/device/PoP/BGP topology data.
         method_description: |
           The collector uses the Cato GraphQL API endpoint with an account ID and API key.
       supported_platforms:
@@ -228,6 +228,25 @@ modules:
               chart_type: line
               dimensions:
                 - name: loss
+        - name: device
+          description: These metrics refer to a Cato Socket or vSocket attached to a site.
+          labels:
+            - name: site_id
+              description: Cato site ID.
+            - name: site_name
+              description: Cato site name.
+            - name: device_id
+              description: Cato device ID.
+            - name: device_name
+              description: Cato device name.
+          metrics:
+            - name: cato_networks.device_connection_status
+              description: Device connection status.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: connected
+                - name: disconnected
         - name: interface
           description: These metrics refer to a Cato site interface.
           labels:
@@ -235,6 +254,10 @@ modules:
               description: Cato site ID.
             - name: site_name
               description: Cato site name.
+            - name: device_id
+              description: Cato device ID when the interface owner is known.
+            - name: device_name
+              description: Cato device name when the interface owner is known.
             - name: interface_id
               description: Cato interface ID.
             - name: interface_name

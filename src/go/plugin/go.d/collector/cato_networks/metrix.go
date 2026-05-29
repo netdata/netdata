@@ -5,9 +5,10 @@ package cato_networks
 import "github.com/netdata/netdata/go/plugins/pkg/metrix"
 
 type collectorMetrics struct {
-	site  siteMetricInstruments
-	iface interfaceMetricInstruments
-	bgp   bgpMetricInstruments
+	site   siteMetricInstruments
+	device deviceMetricInstruments
+	iface  interfaceMetricInstruments
+	bgp    bgpMetricInstruments
 }
 
 type siteMetricInstruments struct {
@@ -15,6 +16,10 @@ type siteMetricInstruments struct {
 	operationalStatus  metrix.SnapshotStateSetVec
 	hosts              metrix.SnapshotGaugeVec
 	traffic            trafficMetricWriters
+}
+
+type deviceMetricInstruments struct {
+	connectionStatus metrix.SnapshotStateSetVec
 }
 
 type interfaceMetricInstruments struct {
@@ -47,6 +52,7 @@ type trafficMetricWriters struct {
 
 var siteConnectivityStates = []string{"connected", "disconnected", "degraded", "unknown"}
 var siteOperationalStates = []string{"active", "disabled", "locked", "unknown"}
+var deviceConnectionStates = []string{"connected", "disconnected"}
 var interfaceConnectionStates = []string{"connected", "disconnected"}
 var bgpSessionStates = []string{"up", "down", "unknown"}
 var bgpRoutesLimitStates = []string{"ok", "exceeded"}
@@ -55,7 +61,8 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 	meter := store.Write().SnapshotMeter("")
 
 	siteVec := meter.Vec("site_id", "site_name", "pop_name")
-	ifaceVec := meter.Vec("site_id", "site_name", "interface_id", "interface_name")
+	deviceVec := meter.Vec("site_id", "site_name", "device_id", "device_name")
+	ifaceVec := meter.Vec("site_id", "site_name", "device_id", "device_name", "interface_id", "interface_name")
 	bgpVec := meter.Vec("site_id", "site_name", "peer_ip", "peer_asn")
 
 	return &collectorMetrics{
@@ -76,6 +83,9 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 				lastMileLatency: siteVec.Gauge("site_last_mile_latency_ms"),
 				lastMileLoss:    siteVec.Gauge("site_last_mile_packet_loss_percent"),
 			},
+		},
+		device: deviceMetricInstruments{
+			connectionStatus: newStateSetVec(deviceVec, "device_connection_status", deviceConnectionStates),
 		},
 		iface: interfaceMetricInstruments{
 			connectionStatus: newStateSetVec(ifaceVec, "interface_connection_status", interfaceConnectionStates),

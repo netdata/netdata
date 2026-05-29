@@ -65,3 +65,59 @@ func interfaceKey(id, name string) string {
 	}
 	return "all"
 }
+
+func snapshotInterfaceKey(deviceID, id, name string) string {
+	key := interfaceKey(id, name)
+	if strings.TrimSpace(id) != "" || strings.TrimSpace(deviceID) == "" {
+		return key
+	}
+	return strings.TrimSpace(deviceID) + "/" + key
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v = strings.TrimSpace(v); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func stableDeviceID(dev deviceState) string {
+	return firstNonEmpty(dev.ID, dev.Identifier, dev.SocketID, dev.SocketSerial)
+}
+
+func deviceDisplayName(dev deviceState) string {
+	return firstNonEmpty(dev.Name, dev.SocketSerial, dev.Identifier, dev.ID, dev.SocketID)
+}
+
+func resolveMetricInterfaceDevice(site *siteState, iface *interfaceState) {
+	if site == nil || iface == nil {
+		return
+	}
+
+	metricDeviceID := firstNonEmpty(iface.DeviceSocketID, iface.DeviceSocketSerial)
+	if metricDeviceID == "" {
+		return
+	}
+	for _, dev := range site.Devices {
+		if deviceMatchesMetricInterface(dev, iface.DeviceSocketID, iface.DeviceSocketSerial) {
+			iface.DeviceID = stableDeviceID(dev)
+			iface.DeviceName = deviceDisplayName(dev)
+			return
+		}
+	}
+	iface.DeviceID = metricDeviceID
+}
+
+func deviceMatchesMetricInterface(dev deviceState, socketID, socketSerial string) bool {
+	if socketID = strings.TrimSpace(socketID); socketID != "" {
+		if socketID == strings.TrimSpace(dev.SocketID) || socketID == strings.TrimSpace(dev.ID) || socketID == strings.TrimSpace(dev.Identifier) {
+			return true
+		}
+	}
+	if socketSerial = strings.TrimSpace(socketSerial); socketSerial != "" && socketSerial == strings.TrimSpace(dev.SocketSerial) {
+		return true
+	}
+	return false
+}

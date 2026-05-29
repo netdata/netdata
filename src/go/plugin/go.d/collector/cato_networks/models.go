@@ -26,11 +26,13 @@ type siteState struct {
 
 type deviceState struct {
 	ID             string
+	Identifier     string
 	Name           string
 	Type           string
 	Connected      bool
 	HaRole         string
 	SocketID       string
+	SocketPlatform string
 	SocketSerial   string
 	SocketVersion  string
 	InternalIP     string
@@ -41,6 +43,10 @@ type deviceState struct {
 type interfaceState struct {
 	ID                  string
 	Name                string
+	DeviceID            string
+	DeviceName          string
+	DeviceSocketID      string
+	DeviceSocketSerial  string
 	Type                string
 	DestType            string
 	Connected           bool

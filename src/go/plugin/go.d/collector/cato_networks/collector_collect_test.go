@@ -38,23 +38,24 @@ func TestCollector_Collect(t *testing.T) {
 			steps: []collectStep{{
 				name: "collects metrics and topology",
 				wantMetrics: map[string]metrix.SampleValue{
-					stateMetricKey("site_connectivity_status", "connected", siteLabels("1001", "Paris Office", "POP-Paris")):      1,
-					stateMetricKey("site_connectivity_status", "degraded", siteLabels("1002", "Toulouse Office", "POP-Toulouse")): 1,
-					metricKey("interface_bytes_upstream_max", interfaceLabels("1001", "Paris Office", "", "all")):                 7168,
-					metricKey("site_bytes_upstream_max", siteLabels("1001", "Paris Office", "POP-Paris")):                         7168,
-					metricKey("site_packets_discarded_upstream", siteLabels("1001", "Paris Office", "POP-Paris")):                 2,
-					metricKey("interface_packets_discarded_upstream", interfaceLabels("1001", "Paris Office", "", "all")):         2,
-					stateMetricKey("bgp_session_status", "up", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):          1,
-					stateMetricKey("bgp_routes_limit_status", "ok", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):     1,
-					metricKey("bgp_routes", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):                             12,
-					metricKey("bgp_routes_limit", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):                       100,
-					metricKey("bgp_rib_out_routes", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):                     1,
+					stateMetricKey("site_connectivity_status", "connected", siteLabels("1001", "Paris Office", "POP-Paris")):           1,
+					stateMetricKey("site_connectivity_status", "degraded", siteLabels("1002", "Toulouse Office", "POP-Toulouse")):      1,
+					stateMetricKey("device_connection_status", "connected", deviceLabels("1001", "Paris Office", "dev-1", "Socket 1")): 1,
+					metricKey("interface_bytes_upstream_max", interfaceLabels("1001", "Paris Office", "", "", "", "all")):              7168,
+					metricKey("site_bytes_upstream_max", siteLabels("1001", "Paris Office", "POP-Paris")):                              7168,
+					metricKey("site_packets_discarded_upstream", siteLabels("1001", "Paris Office", "POP-Paris")):                      2,
+					metricKey("interface_packets_discarded_upstream", interfaceLabels("1001", "Paris Office", "", "", "", "all")):      2,
+					stateMetricKey("bgp_session_status", "up", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):               1,
+					stateMetricKey("bgp_routes_limit_status", "ok", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):          1,
+					metricKey("bgp_routes", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):                                  12,
+					metricKey("bgp_routes_limit", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):                            100,
+					metricKey("bgp_rib_out_routes", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):                          1,
 				},
 				check: func(t *testing.T, c *Collector, _ *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
 					topo, ok := c.topology.CurrentTopology()
 					require.True(t, ok)
 					require.Equal(t, topologySource, topo.Producer.Source)
-					require.Equal(t, 5, topo.Actors.Rows)
+					require.Equal(t, 6, topo.Actors.Rows)
 					require.Equal(t, 3, topo.Links.Rows)
 					collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 				},
@@ -263,10 +264,10 @@ func TestCollector_Collect(t *testing.T) {
 			steps: []collectStep{{
 				name: "emits all entity label sets",
 				wantMetrics: map[string]metrix.SampleValue{
-					stateMetricKey("interface_connection_status", "connected", interfaceLabels("1001", "Paris Office", "wan1", "WAN 1")): 1,
-					stateMetricKey("interface_connection_status", "connected", interfaceLabels("1001", "Paris Office", "wan2", "WAN 2")): 1,
-					stateMetricKey("bgp_session_status", "up", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):                 1,
-					stateMetricKey("bgp_session_status", "up", bgpLabels("1001", "Paris Office", "192.0.2.11", "64513")):                 1,
+					stateMetricKey("interface_connection_status", "connected", interfaceLabels("1001", "Paris Office", "dev-1", "Socket 1", "wan1", "WAN 1")): 1,
+					stateMetricKey("interface_connection_status", "connected", interfaceLabels("1001", "Paris Office", "dev-1", "Socket 1", "wan2", "WAN 2")): 1,
+					stateMetricKey("bgp_session_status", "up", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):                                      1,
+					stateMetricKey("bgp_session_status", "up", bgpLabels("1001", "Paris Office", "192.0.2.11", "64513")):                                      1,
 				},
 			}},
 		},
@@ -569,8 +570,8 @@ func TestCollector_WriteMetrics(t *testing.T) {
 			},
 			order: []string{"1001"},
 			want: map[string]metrix.SampleValue{
-				metricKey("interface_bytes_upstream_max", interfaceLabels("1001", "Paris Office", "wan1", "WAN")): 100,
-				metricKey("interface_bytes_upstream_max", interfaceLabels("1001", "Paris Office", "wan2", "WAN")): 200,
+				metricKey("interface_bytes_upstream_max", interfaceLabels("1001", "Paris Office", "", "", "wan1", "WAN")): 100,
+				metricKey("interface_bytes_upstream_max", interfaceLabels("1001", "Paris Office", "", "", "wan2", "WAN")): 200,
 			},
 		},
 	}
@@ -662,8 +663,19 @@ func siteLabels(siteID, siteName, popName string) metrix.Labels {
 	return metrix.Labels{"site_id": siteID, "site_name": siteName, "pop_name": popName}
 }
 
-func interfaceLabels(siteID, siteName, interfaceID, interfaceName string) metrix.Labels {
-	return metrix.Labels{"site_id": siteID, "site_name": siteName, "interface_id": interfaceID, "interface_name": interfaceName}
+func interfaceLabels(siteID, siteName, deviceID, deviceName, interfaceID, interfaceName string) metrix.Labels {
+	return metrix.Labels{
+		"site_id":        siteID,
+		"site_name":      siteName,
+		"device_id":      deviceID,
+		"device_name":    deviceName,
+		"interface_id":   interfaceID,
+		"interface_name": interfaceName,
+	}
+}
+
+func deviceLabels(siteID, siteName, deviceID, deviceName string) metrix.Labels {
+	return metrix.Labels{"site_id": siteID, "site_name": siteName, "device_id": deviceID, "device_name": deviceName}
 }
 
 func bgpLabels(siteID, siteName, peerIP, peerASN string) metrix.Labels {

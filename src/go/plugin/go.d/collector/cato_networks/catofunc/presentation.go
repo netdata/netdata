@@ -13,7 +13,7 @@ func topologyMethodConfig(updateEvery int) funcapi.MethodConfig {
 		Aliases:      []string{TopologyMethodID},
 		Name:         "Topology (Cato Networks)",
 		UpdateEvery:  updateEvery,
-		Help:         "Cato Networks site, PoP, tunnel, and BGP topology data",
+		Help:         "Cato Networks site, device, PoP, tunnel, and BGP topology data",
 		RequireCloud: true,
 		ResponseType: topologyv1.ResponseType,
 	}.WithPresentation(TopologyPresentation())
@@ -42,6 +42,29 @@ func TopologyActorTypes() map[string]topologyv1.ActorType {
 					Array:     "reject",
 				},
 				Modal: catoSiteModal(),
+			},
+		},
+		ActorTypeDevice: {
+			Layer:             "network",
+			Identity:          []string{"id"},
+			MergeIdentity:     []string{"account_id", "site_id", "device_id"},
+			ParentIdentity:    []string{"site_id"},
+			AggregationScopes: []string{"site", "network"},
+			Search:            &topologyv1.ActorSearchPolicy{Columns: []string{"display_name", "device_id", "socket_serial"}},
+			Presentation: &topologyv1.ActorPresentation{
+				Label:     "Cato device",
+				Role:      "actor",
+				Icon:      "device",
+				ColorSlot: "green",
+				Border:    &topologyv1.BorderPresentation{Enabled: new(true)},
+				Size:      &topologyv1.ActorSizePresentation{Mode: "link_count", Scale: "normal"},
+				LabelPolicy: &topologyv1.LabelPolicy{
+					Columns:   []string{"display_name", "device_id"},
+					Fallback:  "type_label",
+					MaxLength: 80,
+					Array:     "reject",
+				},
+				Modal: catoDeviceModal(),
 			},
 		},
 		ActorTypePop: {
@@ -150,6 +173,7 @@ func TopologyPresentation() *topologyv1.Presentation {
 		Legend: &topologyv1.PresentationLegend{
 			Actors: []topologyv1.LegendEntry{
 				{Type: ActorTypeSite, Label: "Cato site"},
+				{Type: ActorTypeDevice, Label: "Cato device"},
 				{Type: ActorTypePop, Label: "Cato PoP"},
 				{Type: ActorTypeBGPPeer, Label: "BGP peer"},
 			},
@@ -162,6 +186,12 @@ func TopologyPresentation() *topologyv1.Presentation {
 }
 
 func catoSiteModal() *topologyv1.ModalPresentation {
+	return &topologyv1.ModalPresentation{
+		MiniTopology: &topologyv1.ModalMiniTopologyPresentation{Depth: 1},
+	}
+}
+
+func catoDeviceModal() *topologyv1.ModalPresentation {
 	return &topologyv1.ModalPresentation{
 		MiniTopology: &topologyv1.ModalMiniTopologyPresentation{Depth: 1},
 		Sections: []topologyv1.ModalSection{
@@ -186,29 +216,6 @@ func catoSiteModal() *topologyv1.ModalPresentation {
 					modalDirectColumn("tunnel_uptime", "Uptime", "tunnel_uptime", "duration"),
 					modalDirectColumn("upstream_bandwidth", "Upstream bandwidth", "upstream_bandwidth", "number"),
 					modalDirectColumn("downstream_bandwidth", "Downstream bandwidth", "downstream_bandwidth", "number"),
-				},
-				Sort: &topologyv1.ModalSort{Column: "name", Direction: "asc"},
-			},
-			{
-				ID:    ActorTableDevices,
-				Label: "Devices",
-				Order: 2,
-				Source: topologyv1.ModalSource{
-					Kind:  "actor_table",
-					Table: ActorTableDevices,
-				},
-				OwnerFilter: &topologyv1.ModalOwnerFilter{
-					Mode:        "actor_column",
-					ActorColumn: "actor",
-				},
-				Columns: []topologyv1.ModalColumn{
-					modalDirectColumn("name", "Name", "name", "text"),
-					modalDirectColumn("type", "Type", "type", "badge"),
-					modalDirectColumn("connected", "Connected", "connected", "badge"),
-					modalDirectColumn("ha_role", "HA role", "ha_role", "badge"),
-					modalDirectColumn("socket_serial", "Serial", "socket_serial", "text"),
-					modalDirectColumn("socket_version", "Version", "socket_version", "text"),
-					modalDirectColumn("internal_ip", "Internal IP", "internal_ip", "text"),
 				},
 				Sort: &topologyv1.ModalSort{Column: "name", Direction: "asc"},
 			},

@@ -23,7 +23,7 @@ Module: cato_networks
 
 This collector monitors Cato Networks accounts through the Cato GraphQL API.
 
-It discovers sites, collects site and interface status, traffic and quality metrics, collects BGP peer status, and exposes Cato site/PoP/BGP topology data.
+It discovers sites, collects site, device, and interface status, traffic and quality metrics, collects BGP peer status, and exposes Cato site/device/PoP/BGP topology data.
 
 
 The collector uses the Cato GraphQL API endpoint with an account ID and API key.
@@ -206,6 +206,25 @@ Metrics:
 | cato_networks.site_latency | rtt, last_mile | milliseconds |
 | cato_networks.site_last_mile_packet_loss | loss | percentage |
 
+### Per device
+
+These metrics refer to a Cato Socket or vSocket attached to a site.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| site_id | Cato site ID. |
+| site_name | Cato site name. |
+| device_id | Cato device ID. |
+| device_name | Cato device name. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| cato_networks.device_connection_status | connected, disconnected | status |
+
 ### Per interface
 
 These metrics refer to a Cato site interface.
@@ -216,6 +235,8 @@ Labels:
 |:-----------|:----------------|
 | site_id | Cato site ID. |
 | site_name | Cato site name. |
+| device_id | Cato device ID when the interface owner is known. |
+| device_name | Cato device name when the interface owner is known. |
 | interface_id | Cato interface ID. |
 | interface_name | Interface name. |
 

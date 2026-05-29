@@ -24,7 +24,8 @@ groups:
         units: hosts
         type: line
         instances:
-          by_labels: [site_id, site_name, pop_name]
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
         dimensions:
           - selector: site_hosts
             name: hosts
@@ -34,7 +35,8 @@ groups:
         units: status
         type: line
         instances:
-          by_labels: [site_id, site_name, pop_name]
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
         dimensions:
           - selector: site_connectivity_status
       - id: site_operational_status
@@ -43,7 +45,8 @@ groups:
         units: status
         type: line
         instances:
-          by_labels: [site_id, site_name, pop_name]
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
         dimensions:
           - selector: site_operational_status
       - id: site_traffic
@@ -52,7 +55,8 @@ groups:
         units: bytes
         type: area
         instances:
-          by_labels: [site_id, site_name, pop_name]
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
         dimensions:
           - selector: site_bytes_upstream_max
             name: upstream
@@ -64,7 +68,8 @@ groups:
         units: percentage
         type: line
         instances:
-          by_labels: [site_id, site_name, pop_name]
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
         dimensions:
           - selector: site_lost_upstream_percent
             name: upstream
@@ -76,7 +81,8 @@ groups:
         units: packets
         type: line
         instances:
-          by_labels: [site_id, site_name, pop_name]
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
         dimensions:
           - selector: site_packets_discarded_upstream
             name: upstream
@@ -88,7 +94,8 @@ groups:
         units: milliseconds
         type: line
         instances:
-          by_labels: [site_id, site_name, pop_name]
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
         dimensions:
           - selector: site_jitter_upstream_ms
             name: upstream
@@ -100,7 +107,8 @@ groups:
         units: milliseconds
         type: line
         instances:
-          by_labels: [site_id, site_name, pop_name]
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
         dimensions:
           - selector: site_rtt_ms
             name: rtt
@@ -112,10 +120,25 @@ groups:
         units: percentage
         type: line
         instances:
-          by_labels: [site_id, site_name, pop_name]
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
         dimensions:
           - selector: site_last_mile_packet_loss_percent
             name: loss
+  - family: devices
+    metrics:
+      - device_connection_status
+    charts:
+      - id: device_connection_status
+        title: Cato device connection status
+        context: device_connection_status
+        units: status
+        type: line
+        instances:
+          by_labels: [site_id, device_id]
+        label_promotion: [site_name, device_name]
+        dimensions:
+          - selector: device_connection_status
   - family: interfaces
     metrics:
       - interface_connection_status
@@ -136,7 +159,8 @@ groups:
         units: status
         type: line
         instances:
-          by_labels: [site_id, site_name, interface_id, interface_name]
+          by_labels: [site_id, device_id, interface_id, interface_name]
+        label_promotion: [site_name, device_name]
         dimensions:
           - selector: interface_connection_status
       - id: interface_tunnel_uptime
@@ -145,7 +169,8 @@ groups:
         units: seconds
         type: line
         instances:
-          by_labels: [site_id, site_name, interface_id, interface_name]
+          by_labels: [site_id, device_id, interface_id, interface_name]
+        label_promotion: [site_name, device_name]
         dimensions:
           - selector: interface_tunnel_uptime_seconds
             name: uptime
@@ -155,7 +180,8 @@ groups:
         units: bytes
         type: area
         instances:
-          by_labels: [site_id, site_name, interface_id, interface_name]
+          by_labels: [site_id, device_id, interface_id, interface_name]
+        label_promotion: [site_name, device_name]
         dimensions:
           - selector: interface_bytes_upstream_max
             name: upstream
@@ -167,7 +193,8 @@ groups:
         units: percentage
         type: line
         instances:
-          by_labels: [site_id, site_name, interface_id, interface_name]
+          by_labels: [site_id, device_id, interface_id, interface_name]
+        label_promotion: [site_name, device_name]
         dimensions:
           - selector: interface_lost_upstream_percent
             name: upstream
@@ -179,7 +206,8 @@ groups:
         units: packets
         type: line
         instances:
-          by_labels: [site_id, site_name, interface_id, interface_name]
+          by_labels: [site_id, device_id, interface_id, interface_name]
+        label_promotion: [site_name, device_name]
         dimensions:
           - selector: interface_packets_discarded_upstream
             name: upstream
@@ -191,7 +219,8 @@ groups:
         units: milliseconds
         type: line
         instances:
-          by_labels: [site_id, site_name, interface_id, interface_name]
+          by_labels: [site_id, device_id, interface_id, interface_name]
+        label_promotion: [site_name, device_name]
         dimensions:
           - selector: interface_jitter_upstream_ms
             name: upstream
@@ -203,7 +232,8 @@ groups:
         units: milliseconds
         type: line
         instances:
-          by_labels: [site_id, site_name, interface_id, interface_name]
+          by_labels: [site_id, device_id, interface_id, interface_name]
+        label_promotion: [site_name, device_name]
         dimensions:
           - selector: interface_rtt_ms
             name: rtt
@@ -221,7 +251,8 @@ groups:
         units: status
         type: line
         instances:
-          by_labels: [site_id, site_name, peer_ip, peer_asn]
+          by_labels: [site_id, peer_ip, peer_asn]
+        label_promotion: [site_name]
         dimensions:
           - selector: bgp_session_status
       - id: bgp_routes
@@ -230,7 +261,8 @@ groups:
         units: routes
         type: line
         instances:
-          by_labels: [site_id, site_name, peer_ip, peer_asn]
+          by_labels: [site_id, peer_ip, peer_asn]
+        label_promotion: [site_name]
         dimensions:
           - selector: bgp_routes
             name: accepted
@@ -244,6 +276,7 @@ groups:
         units: status
         type: line
         instances:
-          by_labels: [site_id, site_name, peer_ip, peer_asn]
+          by_labels: [site_id, peer_ip, peer_asn]
+        label_promotion: [site_name]
         dimensions:
           - selector: bgp_routes_limit_status

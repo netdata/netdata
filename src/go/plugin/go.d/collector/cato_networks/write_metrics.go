@@ -21,8 +21,21 @@ func (c *Collector) writeMetrics(sites map[string]*siteState, order []string) {
 		c.metrics.site.hosts.WithLabelValues(labels...).Observe(float64(site.HostCount))
 		writeTrafficMetrics(site.Metrics, labels, c.metrics.site.traffic)
 
+		for _, dev := range site.Devices {
+			deviceID := stableDeviceID(dev)
+			if deviceID == "" {
+				continue
+			}
+			deviceName := deviceDisplayName(dev)
+			if deviceName == "" {
+				deviceName = deviceID
+			}
+			deviceLabels := []string{site.ID, site.Name, deviceID, deviceName}
+			observeStateSetVec(c.metrics.device.connectionStatus, boolState(dev.Connected, "connected", "disconnected"), deviceLabels...)
+		}
+
 		for _, iface := range site.Interfaces {
-			ifaceLabels := []string{site.ID, site.Name, iface.ID, iface.Name}
+			ifaceLabels := []string{site.ID, site.Name, iface.DeviceID, iface.DeviceName, iface.ID, iface.Name}
 			observeStateSetVec(c.metrics.iface.connectionStatus, boolState(iface.Connected || iface.LinkUp, "connected", "disconnected"), ifaceLabels...)
 			writeTrafficMetrics(iface.Metrics, ifaceLabels, c.metrics.iface.traffic)
 			c.metrics.iface.tunnelUptime.WithLabelValues(ifaceLabels...).Observe(float64(iface.TunnelUptime))

@@ -22,6 +22,11 @@ placements:
           - cato_networks.site_latency
           - cato_networks.site_last_mile_packet_loss
       - type: group
+        id: devices
+        title: Devices
+        items:
+          - cato_networks.device_connection_status
+      - type: group
         id: interfaces
         title: Interfaces
         items:

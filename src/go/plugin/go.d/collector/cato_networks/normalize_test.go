@@ -72,6 +72,37 @@ func TestNormalizeSnapshot(t *testing.T) {
 				require.Equal(t, "unknown", sites["1001"].OperationalStatus)
 			},
 		},
+		"keeps same-named empty-id interfaces per device": {
+			snapshot: &catosdk.AccountSnapshot{AccountSnapshot: &catosdk.AccountSnapshot_AccountSnapshot{
+				Sites: []*catosdk.AccountSnapshot_AccountSnapshot_Sites{
+					{
+						ID: new("1001"),
+						Devices: []*catosdk.AccountSnapshot_AccountSnapshot_Sites_Devices{
+							{
+								ID:   new("socket-a"),
+								Name: new("Socket A"),
+								Interfaces: []*catosdk.AccountSnapshot_AccountSnapshot_Sites_Devices_Interfaces{
+									{Name: new("WAN 1"), Connected: new(true)},
+								},
+							},
+							{
+								ID:   new("socket-b"),
+								Name: new("Socket B"),
+								Interfaces: []*catosdk.AccountSnapshot_AccountSnapshot_Sites_Devices_Interfaces{
+									{Name: new("WAN 1"), Connected: new(false)},
+								},
+							},
+						},
+					},
+				},
+			}},
+			check: func(t *testing.T, sites map[string]*siteState, _ []string) {
+				site := sites["1001"]
+				require.Len(t, site.Interfaces, 2)
+				require.Equal(t, "socket-a", site.Interfaces[snapshotInterfaceKey("socket-a", "", "WAN 1")].DeviceID)
+				require.Equal(t, "socket-b", site.Interfaces[snapshotInterfaceKey("socket-b", "", "WAN 1")].DeviceID)
+			},
+		},
 	}
 
 	for name, tc := range tests {
@@ -120,6 +151,49 @@ func TestMergeMetrics(t *testing.T) {
 				require.Equal(t, float64(100), sites["1001"].Metrics.BytesUpstreamMax)
 				require.Equal(t, float64(200), sites["1001"].Metrics.BytesDownstreamMax)
 				require.Equal(t, float64(42), sites["1001"].Metrics.RTTMS)
+			},
+		},
+		"matches metrics interfaces to snapshot devices by socket info": {
+			metrics: &catosdk.AccountMetrics{AccountMetrics: &catosdk.AccountMetrics_AccountMetrics{
+				Sites: []*catosdk.AccountMetrics_AccountMetrics_Sites{
+					{
+						ID: new("1001"),
+						Interfaces: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces{
+							{
+								Name: new("WAN 1"),
+								SocketInfo: &catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_SocketInfo{
+									ID: new("socket-a"),
+								},
+								Metrics: &catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_Metrics{
+									BytesUpstream: new(float64(100)),
+								},
+							},
+						},
+					},
+				},
+			}},
+			sites: map[string]*siteState{
+				"1001": {
+					ID:   "1001",
+					Name: "Paris Office",
+					Devices: []deviceState{
+						{ID: "dev-a", SocketID: "socket-a", Name: "Socket A"},
+					},
+					Interfaces: map[string]*interfaceState{
+						snapshotInterfaceKey("dev-a", "", "WAN 1"): {
+							Name:     "WAN 1",
+							DeviceID: "dev-a",
+						},
+					},
+				},
+			},
+			check: func(t *testing.T, sites map[string]*siteState, issues []string) {
+				require.Empty(t, issues)
+				require.Len(t, sites["1001"].Interfaces, 1)
+				iface := sites["1001"].Interfaces[snapshotInterfaceKey("dev-a", "", "WAN 1")]
+				require.Equal(t, "dev-a", iface.DeviceID)
+				require.Equal(t, "Socket A", iface.DeviceName)
+				require.Equal(t, float64(100), iface.Metrics.BytesUpstreamMax)
 			},
 		},
 	}

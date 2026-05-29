@@ -13,6 +13,7 @@ const (
 	TopologyMethodID = "topology:cato_networks"
 
 	ActorTypeSite    = "cato_site"
+	ActorTypeDevice  = "cato_device"
 	ActorTypePop     = "cato_pop"
 	ActorTypeBGPPeer = "bgp_peer"
 
@@ -20,7 +21,6 @@ const (
 	LinkTypeBGP    = "bgp_session"
 
 	ActorTableInterfaces = "interfaces"
-	ActorTableDevices    = "devices"
 )
 
 const topologyUnavailable = "Cato Networks topology data is not available yet"
@@ -54,7 +54,7 @@ func (f *funcTopology) Handle(_ context.Context, method string, _ funcapi.Resolv
 
 	return &funcapi.FunctionResponse{
 		Status:       200,
-		Help:         "Cato Networks site, PoP, tunnel, and BGP topology data",
+		Help:         "Cato Networks site, device, PoP, tunnel, and BGP topology data",
 		ResponseType: topologyv1.ResponseType,
 		Data:         data,
 	}

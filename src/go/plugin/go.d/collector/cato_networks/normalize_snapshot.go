@@ -61,6 +61,7 @@ func normalizeSnapshot(snapshot *catosdk.AccountSnapshot, siteNames map[string]s
 		for _, dev := range raw.GetDevices() {
 			device := deviceState{
 				ID:             derefZero(dev.GetID()),
+				Identifier:     derefZero(dev.GetIdentifier()),
 				Name:           derefZero(dev.GetName()),
 				Type:           derefZero(dev.GetType()),
 				Connected:      derefZero(dev.GetConnected()),
@@ -71,10 +72,18 @@ func normalizeSnapshot(snapshot *catosdk.AccountSnapshot, siteNames map[string]s
 			}
 			if socket := dev.GetSocketInfo(); socket != nil {
 				device.SocketID = derefZero(socket.GetID())
+				if platform := socket.GetPlatformSocketInfo(); platform != nil {
+					device.SocketPlatform = fmt.Sprint(*platform)
+					if device.Type == "" {
+						device.Type = device.SocketPlatform
+					}
+				}
 				device.SocketSerial = derefZero(socket.GetSerial())
 				device.SocketVersion = derefZero(socket.GetVersion())
 			}
 			site.Devices = append(site.Devices, device)
+			deviceID := stableDeviceID(device)
+			deviceName := deviceDisplayName(device)
 
 			linkStateByID := make(map[string]*catosdk.AccountSnapshot_AccountSnapshot_Sites_Devices_InterfacesLinkState)
 			for _, linkState := range dev.GetInterfacesLinkState() {
@@ -87,10 +96,14 @@ func normalizeSnapshot(snapshot *catosdk.AccountSnapshot, siteNames map[string]s
 				if iface.ID == "" && iface.Name == "" {
 					continue
 				}
+				iface.DeviceID = deviceID
+				iface.DeviceName = deviceName
+				iface.DeviceSocketID = device.SocketID
+				iface.DeviceSocketSerial = device.SocketSerial
 				if linkState := linkStateByID[iface.ID]; linkState != nil {
 					iface.LinkUp = derefZero(linkState.GetUp())
 				}
-				key := interfaceKey(iface.ID, iface.Name)
+				key := snapshotInterfaceKey(iface.DeviceID, iface.ID, iface.Name)
 				site.Interfaces[key] = &iface
 			}
 		}

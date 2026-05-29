@@ -133,18 +133,19 @@ func TestBuildTopology(t *testing.T) {
 				require.Equal(t, 1, countTopologyRows(links, "type", catofunc.LinkTypeBGP))
 			},
 		},
-		"site topology tables are deterministic": {
+		"device actors own their interfaces": {
 			build: func(t *testing.T) *topologyv1.Data {
 				site := &siteState{
-					ID:   "1001",
-					Name: "Paris Office",
+					ID:      "1001",
+					Name:    "Paris Office",
+					PopName: "POP-Paris",
 					Interfaces: map[string]*interfaceState{
-						"z": {Name: "WAN 2"},
-						"a": {Name: "WAN 1"},
+						"z": {Name: "WAN 2", DeviceID: "socket-z"},
+						"a": {Name: "WAN 1", DeviceID: "socket-a"},
 					},
 					Devices: []deviceState{
-						{ID: "z", Name: "Socket 2"},
-						{ID: "a", Name: "Socket 1"},
+						{ID: "socket-z", Name: "Socket 2", Connected: true, LastPopName: "POP-Paris"},
+						{ID: "socket-a", Name: "Socket 1", Connected: true, LastPopName: "POP-Paris"},
 					},
 				}
 				return mustBuildTopology(t, "12345", map[string]*siteState{site.ID: site}, []string{site.ID}, time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC))
@@ -152,11 +153,14 @@ func TestBuildTopology(t *testing.T) {
 			check: func(t *testing.T, data *topologyv1.Data) {
 				require.NotNil(t, data.Tables)
 				interfaces := topologyTableRows(t, data.Tables.Actor[catofunc.ActorTableInterfaces].Table, data.Dictionaries)
-				devices := topologyTableRows(t, data.Tables.Actor[catofunc.ActorTableDevices].Table, data.Dictionaries)
+				actors := topologyTableRows(t, data.Actors, data.Dictionaries)
+				device1 := requireTopologyRow(t, actors, "display_name", "Socket 1")
+				device2 := requireTopologyRow(t, actors, "display_name", "Socket 2")
 				require.Equal(t, "WAN 1", interfaces[0]["name"])
 				require.Equal(t, "WAN 2", interfaces[1]["name"])
-				require.Equal(t, "Socket 1", devices[0]["name"])
-				require.Equal(t, "Socket 2", devices[1]["name"])
+				require.Equal(t, device1["_row"], interfaces[0]["actor"])
+				require.Equal(t, device2["_row"], interfaces[1]["actor"])
+				require.Equal(t, 2, countTopologyRows(actors, "type", catofunc.ActorTypeDevice))
 			},
 		},
 	}

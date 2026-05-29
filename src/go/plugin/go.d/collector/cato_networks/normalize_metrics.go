@@ -41,12 +41,26 @@ func mergeMetrics(metrics *catosdk.AccountMetrics, sites map[string]*siteState) 
 				site.Metrics, _ = mergeRawInterfaceTrafficMetrics(site.Metrics, rawIface)
 			}
 			key := interfaceKey(iface.ID, iface.Name)
+			resolveMetricInterfaceDevice(site, &iface)
+			if iface.ID == "" && iface.DeviceID != "" {
+				key = snapshotInterfaceKey(iface.DeviceID, iface.ID, iface.Name)
+			}
 			existing := site.Interfaces[key]
 			if existing == nil {
 				site.Interfaces[key] = &iface
 				continue
 			}
+			if iface.DeviceID == "" {
+				iface.DeviceID = existing.DeviceID
+			}
+			if iface.DeviceName == "" {
+				iface.DeviceName = existing.DeviceName
+			}
 			existing.Metrics = iface.Metrics
+			existing.DeviceID = iface.DeviceID
+			existing.DeviceName = iface.DeviceName
+			existing.DeviceSocketID = iface.DeviceSocketID
+			existing.DeviceSocketSerial = iface.DeviceSocketSerial
 			if existing.PopName == "" {
 				existing.PopName = iface.PopName
 			}
@@ -76,8 +90,12 @@ func normalizeMetricsInterface(raw *catosdk.AccountMetrics_AccountMetrics_Sites_
 		iface.UpstreamBandwidth = derefZero(info.GetUpstreamBandwidth())
 		iface.DownstreamBandwidth = derefZero(info.GetDownstreamBandwidth())
 	}
-	if socket := raw.GetSocketInfo(); socket != nil && iface.Type == "" && socket.GetPlatform() != nil {
-		iface.Type = fmt.Sprint(*socket.GetPlatform())
+	if socket := raw.GetSocketInfo(); socket != nil {
+		iface.DeviceSocketID = derefZero(socket.GetID())
+		iface.DeviceSocketSerial = derefZero(socket.GetSerial())
+		if iface.Type == "" && socket.GetPlatform() != nil {
+			iface.Type = fmt.Sprint(*socket.GetPlatform())
+		}
 	}
 	if remote := raw.GetRemoteIPInfo(); remote != nil && iface.TunnelRemoteIP == "" {
 		iface.TunnelRemoteIP = derefZero(remote.GetIP())
