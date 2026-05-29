@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,6 +29,8 @@ import (
 )
 
 type fakeAPIClient struct {
+	mu sync.Mutex
+
 	lookup          *catosdk.EntityLookup
 	lookupErr       error
 	lookupPages     map[int64]*catosdk.EntityLookup
@@ -38,6 +41,7 @@ type fakeAPIClient struct {
 	metricsErrSites map[string]error
 	bgpErrSites     map[string]error
 	groupInterfaces []*bool
+	metricsSiteIDs  [][]string
 	probeErr        error
 	probeCalls      int
 	lookupCalls     int
@@ -71,7 +75,11 @@ func (f *fakeAPIClient) AccountSnapshot(context.Context, string, []string) (*cat
 }
 
 func (f *fakeAPIClient) AccountMetrics(_ context.Context, _ string, siteIDs []string, _ string, _ int64, groupInterfaces *bool) (*catosdk.AccountMetrics, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	f.metricsCalls++
+	f.metricsSiteIDs = append(f.metricsSiteIDs, append([]string(nil), siteIDs...))
 	if groupInterfaces == nil {
 		f.groupInterfaces = append(f.groupInterfaces, nil)
 	} else {

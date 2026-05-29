@@ -45,7 +45,7 @@ This collector does not auto-detect Cato accounts. Configure at least one job wi
 
 #### Limits
 
-Site discovery is paginated and refreshed hourly. The optional `site_selector` filters sites before snapshot, metrics, BGP, and topology collection. Account metrics are batched internally. BGP status uses one per-site API request for each selected site that is not currently cached as having no BGP peers.
+Site discovery is paginated and refreshed hourly. The optional `site_selector` filters sites before snapshot, metrics, BGP, and topology collection. Account metrics use bounded concurrent one-site API requests to preserve per-Socket device and interface attribution. BGP status uses one per-site API request for each selected site that is not currently cached as having no BGP peers.
 
 
 #### Performance Impact

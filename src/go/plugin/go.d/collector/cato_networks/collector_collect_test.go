@@ -85,10 +85,26 @@ func TestCollector_Collect(t *testing.T) {
 		},
 		"default accountMetrics SDK arguments": {
 			steps: []collectStep{{
-				name: "groupInterfaces is nil",
+				name: "one ungrouped query per site",
 				check: func(t *testing.T, _ *Collector, fake *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
-					require.Len(t, fake.groupInterfaces, 1)
+					require.ElementsMatch(t, [][]string{{"1001"}, {"1002"}}, fake.metricsSiteIDs)
+					require.Len(t, fake.groupInterfaces, 2)
 					require.Nil(t, fake.groupInterfaces[0])
+					require.Nil(t, fake.groupInterfaces[1])
+				},
+			}},
+		},
+		"partial accountMetrics failure is fail-soft": {
+			setup: func(_ *testing.T, _ *Collector, fake *fakeAPIClient) {
+				fake.metricsErrSites = map[string]error{"1002": errors.New("rate limit exceeded")}
+			},
+			steps: []collectStep{{
+				name: "keeps successful site metrics",
+				wantMetrics: map[string]metrix.SampleValue{
+					metricKey("site_bytes_upstream_max", siteLabels("1001", "Paris Office", "POP-Paris")): 7168,
+				},
+				check: func(t *testing.T, _ *Collector, fake *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
+					require.ElementsMatch(t, [][]string{{"1001"}, {"1002"}}, fake.metricsSiteIDs)
 				},
 			}},
 		},

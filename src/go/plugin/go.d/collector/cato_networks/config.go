@@ -20,7 +20,7 @@ const (
 	defaultDiscoveryLimit   = 100
 	defaultMetricsTimeFrame = "last.PT5M"
 	defaultMetricsBuckets   = 5
-	defaultMaxSitesPerQuery = 50
+	defaultMetricsParallel  = 4
 	defaultNoBGPCacheTTL    = 3600
 	defaultEntitySelector   = "*"
 	maxDiscoveryPages       = 1000
