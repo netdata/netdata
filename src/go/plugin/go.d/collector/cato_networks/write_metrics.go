@@ -3,7 +3,6 @@
 package cato_networks
 
 import (
-	"sort"
 	"strings"
 )
 
@@ -45,9 +44,6 @@ func (c *Collector) writeMetrics(sites map[string]*siteState, order []string) {
 		}
 	}
 
-	if c.client != nil {
-		writeAPIStats(c.metrics.api, c.client.APIStats())
-	}
 }
 
 func writeTrafficMetrics(m trafficMetrics, labels []string, writers trafficMetricWriters) {
@@ -93,110 +89,6 @@ func boolFloat(v bool) float64 {
 	return 0
 }
 
-func writeAPIStats(metrics apiMetricInstruments, stats apiStats) {
-	if len(stats.Retries) == 0 {
-		return
-	}
-
-	for query, retries := range stats.Retries {
-		metrics.rateLimitRetries.WithLabelValues(query).ObserveTotal(float64(retries.RateLimit))
-		metrics.transientRetries.WithLabelValues(query).ObserveTotal(float64(retries.Transient))
-	}
-}
-
-func (c *Collector) writeCollectorHealth() {
-	c.ensureHealth()
-
-	c.metrics.health.collectionSuccess.Observe(boolFloat(c.health.CollectionSuccess))
-	c.metrics.health.discoveredSites.Observe(float64(c.health.DiscoveredSites))
-	writeEntitySelectionHealth(c.metrics.health, c.health)
-	c.metrics.health.bgpSitesPerCollection.Observe(float64(c.health.BGPSitesPerCollection))
-	c.metrics.health.bgpFullScanSeconds.Observe(float64(c.health.BGPFullScanSeconds))
-	c.metrics.health.bgpCachedSites.Observe(float64(c.health.BGPCachedSites))
-
-	if len(c.health.LastOperations) > 0 {
-		for _, operation := range sortedOperationNames(c.health.LastOperations) {
-			status := c.health.LastOperations[operation]
-			c.metrics.health.operationSuccess.WithLabelValues(operation).Observe(boolFloat(status.Success))
-		}
-	}
-
-	if len(c.health.OperationFailures) > 0 {
-		for _, key := range sortedOperationFailureKeys(c.health.OperationFailures) {
-			c.metrics.health.operationFailures.WithLabelValues(key.Operation, key.ErrorClass).ObserveTotal(float64(c.health.OperationFailures[key]))
-		}
-	}
-
-	if len(c.health.OperationAffectedSites) > 0 {
-		for _, key := range sortedOperationFailureKeys(c.health.OperationAffectedSites) {
-			c.metrics.health.operationAffectedSites.WithLabelValues(key.Operation, key.ErrorClass).ObserveTotal(float64(c.health.OperationAffectedSites[key]))
-		}
-	}
-
-	if len(c.health.CollectionFailureTotals) > 0 {
-		for _, class := range sortedStringKeys(c.health.CollectionFailureTotals) {
-			c.metrics.health.collectionFailures.WithLabelValues(class).ObserveTotal(float64(c.health.CollectionFailureTotals[class]))
-		}
-	}
-
-	if len(c.health.NormalizationIssues) > 0 {
-		for _, key := range sortedNormalizationIssueKeys(c.health.NormalizationIssues) {
-			c.metrics.health.normalizationIssues.WithLabelValues(key.Surface, key.Issue).ObserveTotal(float64(c.health.NormalizationIssues[key]))
-		}
-	}
-}
-
-func writeEntitySelectionHealth(metrics collectorHealthMetricInstruments, health collectorHealth) {
-	metrics.selectedEntities.WithLabelValues(selectionEntitySite).Observe(float64(health.SelectedEntities[selectionEntitySite]))
-	metrics.skippedEntities.WithLabelValues(selectionEntitySite, selectionSkipSelector).Observe(float64(health.SkippedEntities[entitySkipKey{Entity: selectionEntitySite, Reason: selectionSkipSelector}]))
-}
-
-func sortedOperationNames(values map[string]operationHealth) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
-func sortedOperationFailureKeys(values map[operationFailureKey]int64) []operationFailureKey {
-	keys := make([]operationFailureKey, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		if keys[i].Operation != keys[j].Operation {
-			return keys[i].Operation < keys[j].Operation
-		}
-		return keys[i].ErrorClass < keys[j].ErrorClass
-	})
-	return keys
-}
-
-func sortedNormalizationIssueKeys(values map[normalizationIssueKey]int64) []normalizationIssueKey {
-	keys := make([]normalizationIssueKey, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		if keys[i].Surface != keys[j].Surface {
-			return keys[i].Surface < keys[j].Surface
-		}
-		return keys[i].Issue < keys[j].Issue
-	})
-	return keys
-}
-
-func sortedStringKeys(values map[string]int64) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
 func isBGPSessionUp(status string) bool {
 	status = strings.ToLower(strings.TrimSpace(status))
 	return status == "up" || status == "established"
@@ -213,7 +105,7 @@ func (c *Collector) siteConnectivityValues(status string) (connected, disconnect
 	case "", "unknown":
 		return 0, 0, 0, 1
 	default:
-		c.markNormalizationIssue(normalizationSurfaceSiteConnectivity, normalizationIssueUnknownStatus)
+		c.logNormalizationIssue(normalizationSurfaceSiteConnectivity, normalizationIssueUnknownStatus)
 		return 0, 0, 0, 1
 	}
 }
@@ -229,7 +121,7 @@ func (c *Collector) siteOperationalValues(status string) (active, disabled, lock
 	case "", "unknown":
 		return 0, 0, 0, 1
 	default:
-		c.markNormalizationIssue(normalizationSurfaceSiteOperational, normalizationIssueUnknownStatus)
+		c.logNormalizationIssue(normalizationSurfaceSiteOperational, normalizationIssueUnknownStatus)
 		return 0, 0, 0, 1
 	}
 }

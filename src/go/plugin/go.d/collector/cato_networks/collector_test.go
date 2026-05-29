@@ -100,10 +100,6 @@ func (f *fakeAPIClient) SiteBgpStatus(_ context.Context, _ string, siteID string
 	return f.bgp[siteID], nil
 }
 
-func (f *fakeAPIClient) APIStats() apiStats {
-	return apiStats{}
-}
-
 func fixedCatoTestNow() time.Time {
 	return time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
 }
@@ -116,23 +112,6 @@ func collectOnce(t *testing.T, c *Collector) {
 	cc.BeginCycle()
 	require.NoError(t, c.Collect(context.Background()))
 	cc.CommitCycleSuccess()
-}
-
-func useSingleAttemptSDKClient(c *Collector) {
-	c.newClient = func(cfg Config, httpClient *http.Client) (apiClient, error) {
-		client, err := newSDKAPIClient(cfg, httpClient)
-		if err != nil {
-			return nil, err
-		}
-		sdkClient, ok := client.(*sdkAPIClient)
-		if !ok {
-			return client, nil
-		}
-		sdkClient.retry.Attempts = 1
-		sdkClient.retry.WaitMin = confopt.Duration(time.Millisecond)
-		sdkClient.retry.WaitMax = confopt.Duration(time.Millisecond)
-		return sdkClient, nil
-	}
 }
 
 func TestCollectorCollectsMetricsAndTopology(t *testing.T) {
@@ -248,13 +227,6 @@ func TestCollectorDecodesRawCentreonFixtureThroughSDK(t *testing.T) {
 	collectOnce(t, c)
 
 	reader := c.store.Read()
-	requireValue(t, reader, "collector_collection_success", nil, 1)
-	requireValue(t, reader, "collector_discovered_sites", nil, 3)
-	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationDiscovery}, 1)
-	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationSnapshot}, 1)
-	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationMetrics}, 1)
-	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationBGP}, 1)
-
 	requireValue(t, reader, "site_connectivity_connected", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
@@ -396,8 +368,6 @@ func TestCheckUsesOnlyCheapProbe(t *testing.T) {
 	require.Empty(t, c.bgp.bySite)
 	_, ok := c.topology.CurrentTopology()
 	require.False(t, ok)
-	require.Empty(t, c.health.OperationFailures)
-	require.Empty(t, c.health.CollectionFailureTotals)
 }
 
 func TestCheckDoesNotPopulateBGPCache(t *testing.T) {
@@ -445,10 +415,11 @@ func TestCollectorReportsUnknownTimeseriesLabels(t *testing.T) {
 	collectOnce(t, c)
 
 	reader := c.store.Read()
-	requireValue(t, reader, "collector_normalization_issues_total", metrix.Labels{
-		"surface": normalizationSurfaceMetrics,
-		"issue":   normalizationIssueUnknownTimeseriesLabel,
-	}, 1)
+	requireValue(t, reader, "site_bytes_upstream_max", metrix.Labels{
+		"site_id":   "1001",
+		"site_name": "Paris Office",
+		"pop_name":  "POP-Paris",
+	}, 7168)
 }
 
 func TestCollectorContinuesOnPartialBGPFailures(t *testing.T) {
@@ -472,17 +443,6 @@ func TestCollectorContinuesOnPartialBGPFailures(t *testing.T) {
 		"site_name": "Paris Office",
 		"peer_ip":   "192.0.2.10",
 		"peer_asn":  "64512",
-	}, 1)
-	requireValue(t, reader, "collector_collection_success", nil, 1)
-	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationMetrics}, 1)
-	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationBGP}, 0)
-	requireValue(t, reader, "collector_operation_failures_total", metrix.Labels{
-		"operation":   operationBGP,
-		"error_class": "error",
-	}, 1)
-	requireValue(t, reader, "collector_operation_affected_sites_total", metrix.Labels{
-		"operation":   operationBGP,
-		"error_class": "error",
 	}, 1)
 }
 
@@ -519,14 +479,6 @@ func TestCollectorMapsUnrecognizedStatusesToUnknown(t *testing.T) {
 		"site_name": "Paris Office",
 		"pop_name":  "POP-Paris",
 	}, 1)
-	requireValue(t, reader, "collector_normalization_issues_total", metrix.Labels{
-		"surface": normalizationSurfaceSiteConnectivity,
-		"issue":   normalizationIssueUnknownStatus,
-	}, 1)
-	requireValue(t, reader, "collector_normalization_issues_total", metrix.Labels{
-		"surface": normalizationSurfaceSiteOperational,
-		"issue":   normalizationIssueUnknownStatus,
-	}, 1)
 }
 
 func TestCollectorReportsEmptyDiscovery(t *testing.T) {
@@ -542,12 +494,11 @@ func TestCollectorReportsEmptyDiscovery(t *testing.T) {
 	require.NoError(t, c.Init(context.Background()))
 	cc := mustCycleController(t, c.store)
 	cc.BeginCycle()
-	require.NoError(t, c.Collect(context.Background()))
-	cc.CommitCycleSuccess()
+	err := c.Collect(context.Background())
+	cc.AbortCycle()
 
-	reader := c.store.Read()
-	requireValue(t, reader, "collector_collection_success", nil, 0)
-	requireValue(t, reader, "collector_collection_failures_total", metrix.Labels{"error_class": "empty"}, 1)
+	require.Error(t, err)
+	require.Equal(t, "empty", classifyCatoError(err))
 }
 
 func TestCollectorDiscoversMultiplePages(t *testing.T) {
@@ -568,8 +519,6 @@ func TestCollectorDiscoversMultiplePages(t *testing.T) {
 	require.Len(t, c.discovery.siteIDs, 205)
 	require.Equal(t, "1001", c.discovery.siteIDs[0])
 	require.Equal(t, "1205", c.discovery.siteIDs[len(c.discovery.siteIDs)-1])
-	reader := c.store.Read()
-	requireValue(t, reader, "collector_discovered_sites", nil, 205)
 }
 
 func TestCollectorAppliesSiteSelector(t *testing.T) {
@@ -594,9 +543,6 @@ func TestCollectorAppliesSiteSelector(t *testing.T) {
 
 	require.Equal(t, []string{"1001"}, c.discovery.siteIDs)
 	reader := c.store.Read()
-	requireValue(t, reader, "collector_discovered_sites", nil, 3)
-	requireValue(t, reader, "collector_selected_entities", metrix.Labels{"entity": selectionEntitySite}, 1)
-	requireValue(t, reader, "collector_skipped_entities", metrix.Labels{"entity": selectionEntitySite, "reason": selectionSkipSelector}, 2)
 	requireValue(t, reader, "site_connectivity_connected", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
@@ -686,11 +632,10 @@ func TestCollectorUsesCachedDiscoveryWhenRefreshFailsAfterBootstrap(t *testing.T
 	require.Equal(t, []string{"1001", "1002"}, c.discovery.siteIDs)
 	require.Equal(t, now, c.discovery.fetchedAt)
 	reader := c.store.Read()
-	requireValue(t, reader, "collector_collection_success", nil, 1)
-	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationDiscovery}, 0)
-	requireValue(t, reader, "collector_operation_failures_total", metrix.Labels{
-		"operation":   operationDiscovery,
-		"error_class": "network",
+	requireValue(t, reader, "site_connectivity_connected", metrix.Labels{
+		"site_id":   "1001",
+		"site_name": "Paris Office",
+		"pop_name":  "POP-Paris",
 	}, 1)
 }
 
@@ -715,15 +660,6 @@ func TestCollectorDoesNotAdvanceBGPRotationWhenAllRequestsFail(t *testing.T) {
 
 	require.Zero(t, c.bgp.nextIndex)
 	require.True(t, c.bgp.nextRefresh.IsZero())
-	reader := c.store.Read()
-	requireValue(t, reader, "collector_operation_failures_total", metrix.Labels{
-		"operation":   operationBGP,
-		"error_class": "rate_limit",
-	}, 2)
-	requireValue(t, reader, "collector_operation_affected_sites_total", metrix.Labels{
-		"operation":   operationBGP,
-		"error_class": "rate_limit",
-	}, 2)
 }
 
 func TestCollectorFiltersEmptyBGPPeers(t *testing.T) {
@@ -737,10 +673,6 @@ func TestCollectorFiltersEmptyBGPPeers(t *testing.T) {
 	collectOnce(t, c)
 
 	reader := c.store.Read()
-	requireValue(t, reader, "collector_normalization_issues_total", metrix.Labels{
-		"surface": normalizationSurfaceBGP,
-		"issue":   normalizationIssueEmptyPeer,
-	}, 1)
 	_, ok := reader.Value("bgp_session_up", metrix.Labels{
 		"site_id":   "1001",
 		"site_name": "Paris Office",
@@ -770,23 +702,7 @@ func TestNormalizeBGPDeduplicatesPeerMetricLabels(t *testing.T) {
 	require.Equal(t, int64(2), peers[0].RoutesCount)
 }
 
-func TestRecoverableWarningGateTracksErrorClass(t *testing.T) {
-	c := New()
-
-	c.warnRecoverable(warningKeyCollection, "network", "network failure")
-	require.Equal(t, "network", c.warningStates[warningKeyCollection])
-
-	c.warnRecoverable(warningKeyCollection, "network", "network failure")
-	require.Equal(t, "network", c.warningStates[warningKeyCollection])
-
-	c.warnRecoverable(warningKeyCollection, "auth", "auth failure")
-	require.Equal(t, "auth", c.warningStates[warningKeyCollection])
-
-	c.clearRecoverableWarning(warningKeyCollection)
-	require.NotContains(t, c.warningStates, warningKeyCollection)
-}
-
-func TestCollectorKeepsLastOperationStatusForSkippedOperations(t *testing.T) {
+func TestCollectorUsesCachedDiscoveryAndBGPStateWithinRefreshWindow(t *testing.T) {
 	c := New()
 	c.AccountID = "12345"
 	c.APIKey = "secret"
@@ -802,10 +718,16 @@ func TestCollectorKeepsLastOperationStatusForSkippedOperations(t *testing.T) {
 	cc.CommitCycleSuccess()
 
 	reader := c.store.Read()
-	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationDiscovery}, 1)
-	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationBGP}, 1)
+	requireValue(t, reader, "bgp_session_up", metrix.Labels{
+		"site_id":   "1001",
+		"site_name": "Paris Office",
+		"peer_ip":   "192.0.2.10",
+		"peer_asn":  "64512",
+	}, 1)
 
 	now = now.Add(time.Second)
+	lookupCalls := fake.lookupCalls
+	bgpCalls := fake.bgpCalls
 	fake.lookupErr = errors.New("unexpected discovery refresh")
 	fake.bgpErrSites = map[string]error{
 		"1001": errors.New("unexpected bgp refresh"),
@@ -817,13 +739,14 @@ func TestCollectorKeepsLastOperationStatusForSkippedOperations(t *testing.T) {
 	cc.CommitCycleSuccess()
 
 	reader = c.store.Read()
-	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationDiscovery}, 1)
-	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationBGP}, 1)
-	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationSnapshot}, 1)
-	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationMetrics}, 1)
-	requireValue(t, reader, "collector_bgp_sites_per_collection", nil, 2)
-	requireValue(t, reader, "collector_bgp_full_scan_seconds", nil, 300)
-	requireValue(t, reader, "collector_bgp_cached_sites", nil, 2)
+	require.Equal(t, lookupCalls, fake.lookupCalls)
+	require.Equal(t, bgpCalls, fake.bgpCalls)
+	requireValue(t, reader, "bgp_session_up", metrix.Labels{
+		"site_id":   "1001",
+		"site_name": "Paris Office",
+		"peer_ip":   "192.0.2.10",
+		"peer_asn":  "64512",
+	}, 1)
 }
 
 func TestMergeMetricsMergesAllInterfaceIntoSiteMetrics(t *testing.T) {
@@ -902,13 +825,9 @@ func TestBGPPollingRotatesAcrossSites(t *testing.T) {
 	cc.CommitCycleSuccess()
 	require.Len(t, c.bgp.bySite, 26)
 	require.Contains(t, c.bgp.bySite, "1026")
-	reader := c.store.Read()
-	requireValue(t, reader, "collector_bgp_sites_per_collection", nil, defaultBGPMaxSites)
-	requireValue(t, reader, "collector_bgp_full_scan_seconds", nil, 600)
-	requireValue(t, reader, "collector_bgp_cached_sites", nil, 26)
 }
 
-func TestCollectorResetsBGPHealthWhenCollectionFailsBeforeBGP(t *testing.T) {
+func TestCollectReturnsErrorWhenCollectionFailsBeforeBGP(t *testing.T) {
 	c := New()
 	c.AccountID = "12345"
 	c.APIKey = "secret"
@@ -934,29 +853,16 @@ func TestCollectorResetsBGPHealthWhenCollectionFailsBeforeBGP(t *testing.T) {
 	cc.BeginCycle()
 	require.NoError(t, c.Collect(context.Background()))
 	cc.CommitCycleSuccess()
-	reader := c.store.Read()
-	requireValue(t, reader, "collector_bgp_sites_per_collection", nil, 2)
-	requireValue(t, reader, "collector_bgp_full_scan_seconds", nil, 300)
-	requireValue(t, reader, "collector_bgp_cached_sites", nil, 2)
+	require.Len(t, c.bgp.bySite, 2)
 
 	fake.snapshotErr = errors.New("snapshot unavailable")
 	now = now.Add(seconds(defaultBGPRefreshEvery) + time.Second)
 	cc.BeginCycle()
 	err := c.Collect(context.Background())
-	cc.CommitCycleSuccess()
+	cc.AbortCycle()
 
-	require.NoError(t, err)
-	reader = c.store.Read()
-	requireValue(t, reader, "collector_collection_success", nil, 0)
-	requireValue(t, reader, "collector_collection_failures_total", metrix.Labels{"error_class": "error"}, 1)
-	requireValue(t, reader, "collector_operation_success", metrix.Labels{"operation": operationSnapshot}, 0)
-	requireValue(t, reader, "collector_operation_failures_total", metrix.Labels{
-		"operation":   operationSnapshot,
-		"error_class": "error",
-	}, 1)
-	requireValue(t, reader, "collector_bgp_sites_per_collection", nil, 0)
-	requireValue(t, reader, "collector_bgp_full_scan_seconds", nil, 0)
-	requireValue(t, reader, "collector_bgp_cached_sites", nil, 0)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "account snapshot failed")
 }
 
 func TestPruneBGPStateRemovesMissingSites(t *testing.T) {
@@ -1103,19 +1009,6 @@ func TestSiteTopologyTablesAreDeterministic(t *testing.T) {
 	require.Equal(t, "Socket 2", tables["devices"][1]["name"])
 }
 
-func TestRetryableCatoErrors(t *testing.T) {
-	require.True(t, isRetryableCatoError(context.Background(), errors.New("GraphQL rate limit exceeded")))
-	require.True(t, isRetryableCatoError(context.Background(), errors.New("HTTP 429 Too Many Requests")))
-	require.True(t, isRetryableCatoError(context.Background(), errors.New("HTTP 503 Service Unavailable")))
-	require.True(t, isRetryableCatoError(context.Background(), fmt.Errorf("client timeout: %w", context.DeadlineExceeded)))
-	require.False(t, isRetryableCatoError(context.Background(), errors.New("invalid API key")))
-	require.False(t, isRetryableCatoError(context.Background(), context.Canceled))
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	require.False(t, isRetryableCatoError(ctx, fmt.Errorf("caller timeout: %w", context.DeadlineExceeded)))
-}
-
 func TestClassifyCatoErrors(t *testing.T) {
 	require.Equal(t, "auth", classifyCatoError(errors.New("HTTP 403 forbidden")))
 	require.Equal(t, "rate_limit", classifyCatoError(errors.New("GraphQL rate limit exceeded")))
@@ -1131,22 +1024,19 @@ func TestClassifyCatoErrors(t *testing.T) {
 
 func TestSDKClientClassifiesHTTPAndGraphQLErrors(t *testing.T) {
 	tests := map[string]struct {
-		operation     string
-		response      rawCatoResponse
-		wantOperation string
-		wantClass     string
+		operation string
+		response  rawCatoResponse
+		wantClass string
 	}{
 		"auth failure during discovery": {
-			operation:     operationDiscovery,
-			response:      rawCatoResponse{status: http.StatusUnauthorized, body: `{"errors":[{"message":"Unauthorized"}]}`},
-			wantOperation: operationDiscovery,
-			wantClass:     "auth",
+			operation: operationDiscovery,
+			response:  rawCatoResponse{status: http.StatusUnauthorized, body: `{"errors":[{"message":"Unauthorized"}]}`},
+			wantClass: "auth",
 		},
-		"rate limit during metrics": {
-			operation:     operationMetrics,
-			response:      rawCatoResponse{status: http.StatusTooManyRequests, body: `{"errors":[{"message":"rate limit exceeded"}]}`},
-			wantOperation: operationMetrics,
-			wantClass:     "rate_limit",
+		"rate limit during snapshot": {
+			operation: operationSnapshot,
+			response:  rawCatoResponse{status: http.StatusTooManyRequests, body: `{"errors":[{"message":"rate limit exceeded"}]}`},
+			wantClass: "rate_limit",
 		},
 	}
 
@@ -1159,21 +1049,16 @@ func TestSDKClientClassifiesHTTPAndGraphQLErrors(t *testing.T) {
 			c.URL = server.URL
 			c.AccountID = "12345"
 			c.APIKey = "secret"
-			useSingleAttemptSDKClient(c)
 			c.now = func() time.Time { return time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC) }
 
 			require.NoError(t, c.Init(context.Background()))
 			cc := mustCycleController(t, c.store)
 			cc.BeginCycle()
 			err := c.Collect(context.Background())
-			require.NoError(t, err)
-			cc.CommitCycleSuccess()
+			cc.AbortCycle()
 
-			reader := c.store.Read()
-			requireValue(t, reader, "collector_operation_failures_total", metrix.Labels{
-				"operation":   tt.wantOperation,
-				"error_class": tt.wantClass,
-			}, 1)
+			require.Error(t, err)
+			require.Equal(t, tt.wantClass, classifyCatoError(err))
 		})
 	}
 }
@@ -1259,22 +1144,15 @@ func TestSDKClientClassifiesHTTPClientTimeout(t *testing.T) {
 	c.AccountID = "12345"
 	c.APIKey = "secret"
 	c.Timeout = confopt.Duration(time.Millisecond)
-	useSingleAttemptSDKClient(c)
 
 	require.NoError(t, c.Init(context.Background()))
 	cc := mustCycleController(t, c.store)
 	cc.BeginCycle()
 	err := c.Collect(context.Background())
-	cc.CommitCycleSuccess()
+	cc.AbortCycle()
 
-	require.NoError(t, err)
-	reader := c.store.Read()
-	requireValue(t, reader, "collector_collection_success", nil, 0)
-	requireValue(t, reader, "collector_collection_failures_total", metrix.Labels{"error_class": "timeout"}, 1)
-	requireValue(t, reader, "collector_operation_failures_total", metrix.Labels{
-		"operation":   operationDiscovery,
-		"error_class": "timeout",
-	}, 1)
+	require.Error(t, err)
+	require.Equal(t, "timeout", classifyCatoError(err))
 }
 
 func TestCollectReturnsContextCancellationWithoutHealthFailure(t *testing.T) {
@@ -1295,9 +1173,6 @@ func TestCollectReturnsContextCancellationWithoutHealthFailure(t *testing.T) {
 	cc.AbortCycle()
 
 	require.ErrorIs(t, err, context.Canceled)
-	require.Empty(t, c.health.CollectionFailureTotals)
-	reader := c.store.Read()
-	requireMetricMissing(t, reader, "collector_collection_success", nil)
 }
 
 func TestCollectorSanitizesReturnedProviderErrors(t *testing.T) {
@@ -1313,7 +1188,6 @@ func TestCollectorSanitizesReturnedProviderErrors(t *testing.T) {
 	c.URL = server.URL
 	c.AccountID = "12345"
 	c.APIKey = "secret"
-	useSingleAttemptSDKClient(c)
 
 	require.NoError(t, c.Init(context.Background()))
 	cc := mustCycleController(t, c.store)
@@ -1355,92 +1229,11 @@ func TestSDKClientAccountSnapshotFallsBackOnEnumDecodeError(t *testing.T) {
 	require.Equal(t, "degraded", connectivityStatusString(snapshot.GetAccountSnapshot().GetSites()[0].GetConnectivityStatusSiteSnapshot()))
 }
 
-func TestRetryWaitCapsAtMaximum(t *testing.T) {
-	require.Equal(t, 2*time.Second, retryWait(1*time.Second, 2*time.Second, 4))
-}
-
 func TestBGPSessionUpRequiresExactEstablishedStatus(t *testing.T) {
 	require.True(t, isBGPSessionUp("Established"))
 	require.True(t, isBGPSessionUp("up"))
 	require.False(t, isBGPSessionUp("not_established"))
 	require.False(t, isBGPSessionUp("idle"))
-}
-
-func TestSDKClientRecordsRetryStats(t *testing.T) {
-	client := &sdkAPIClient{
-		retry: retryConfig{
-			Attempts: 2,
-			WaitMin:  confopt.Duration(time.Millisecond),
-			WaitMax:  confopt.Duration(time.Millisecond),
-		},
-		sleep: func(context.Context, time.Duration) error { return nil },
-	}
-
-	var calls int
-	err := client.withRetry(context.Background(), "accountMetrics", func() error {
-		calls++
-		if calls == 1 {
-			return errors.New("GraphQL Rate Limit Exceeded")
-		}
-		return nil
-	})
-
-	require.NoError(t, err)
-	require.Equal(t, 2, calls)
-	require.Equal(t, int64(1), client.APIStats().Retries["accountMetrics"].RateLimit)
-	require.Zero(t, client.APIStats().Retries["accountMetrics"].Transient)
-}
-
-func TestWriteAPIStatsWritesRetryCounterTotalsAndDeltas(t *testing.T) {
-	c := New()
-	cc := mustCycleController(t, c.store)
-	labels := metrix.Labels{"query": operationMetrics}
-
-	cc.BeginCycle()
-	writeAPIStats(c.metrics.api, apiStats{Retries: map[string]apiRetryStats{
-		operationMetrics: {RateLimit: 2, Transient: 3},
-	}})
-	cc.CommitCycleSuccess()
-	reader := c.store.Read()
-	requireValue(t, reader, "api_rate_limit_retries_total", labels, 2)
-	requireValue(t, reader, "api_transient_retries_total", labels, 3)
-	requireNoDelta(t, reader, "api_rate_limit_retries_total", labels)
-	requireNoDelta(t, reader, "api_transient_retries_total", labels)
-
-	cc.BeginCycle()
-	writeAPIStats(c.metrics.api, apiStats{Retries: map[string]apiRetryStats{
-		operationMetrics: {RateLimit: 5, Transient: 7},
-	}})
-	cc.CommitCycleSuccess()
-	reader = c.store.Read()
-	requireValue(t, reader, "api_rate_limit_retries_total", labels, 5)
-	requireValue(t, reader, "api_transient_retries_total", labels, 7)
-	requireDelta(t, reader, "api_rate_limit_retries_total", labels, 3)
-	requireDelta(t, reader, "api_transient_retries_total", labels, 4)
-}
-
-func TestSDKClientRetriesClientDeadlineExceeded(t *testing.T) {
-	client := &sdkAPIClient{
-		retry: retryConfig{
-			Attempts: 2,
-			WaitMin:  confopt.Duration(time.Millisecond),
-			WaitMax:  confopt.Duration(time.Millisecond),
-		},
-		sleep: func(context.Context, time.Duration) error { return nil },
-	}
-
-	var calls int
-	err := client.withRetry(context.Background(), "accountSnapshot", func() error {
-		calls++
-		if calls == 1 {
-			return fmt.Errorf("http client timeout: %w", context.DeadlineExceeded)
-		}
-		return nil
-	})
-
-	require.NoError(t, err)
-	require.Equal(t, 2, calls)
-	require.Equal(t, int64(1), client.APIStats().Retries["accountSnapshot"].Transient)
 }
 
 func TestNormalizeSnapshotDefaultsNilInfoAndStatuses(t *testing.T) {

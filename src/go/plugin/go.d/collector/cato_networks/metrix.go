@@ -5,11 +5,9 @@ package cato_networks
 import "github.com/netdata/netdata/go/plugins/pkg/metrix"
 
 type collectorMetrics struct {
-	site   siteMetricInstruments
-	iface  interfaceMetricInstruments
-	bgp    bgpMetricInstruments
-	api    apiMetricInstruments
-	health collectorHealthMetricInstruments
+	site  siteMetricInstruments
+	iface interfaceMetricInstruments
+	bgp   bgpMetricInstruments
 }
 
 type siteMetricInstruments struct {
@@ -53,39 +51,12 @@ type trafficMetricWriters struct {
 	lastMileLoss    metrix.SnapshotGaugeVec
 }
 
-type apiMetricInstruments struct {
-	rateLimitRetries metrix.SnapshotCounterVec
-	transientRetries metrix.SnapshotCounterVec
-}
-
-type collectorHealthMetricInstruments struct {
-	collectionSuccess      metrix.SnapshotGauge
-	discoveredSites        metrix.SnapshotGauge
-	selectedEntities       metrix.SnapshotGaugeVec
-	skippedEntities        metrix.SnapshotGaugeVec
-	bgpSitesPerCollection  metrix.SnapshotGauge
-	bgpFullScanSeconds     metrix.SnapshotGauge
-	bgpCachedSites         metrix.SnapshotGauge
-	operationSuccess       metrix.SnapshotGaugeVec
-	operationFailures      metrix.SnapshotCounterVec
-	operationAffectedSites metrix.SnapshotCounterVec
-	collectionFailures     metrix.SnapshotCounterVec
-	normalizationIssues    metrix.SnapshotCounterVec
-}
-
 func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 	meter := store.Write().SnapshotMeter("")
 
 	siteVec := meter.Vec("site_id", "site_name", "pop_name")
 	ifaceVec := meter.Vec("site_id", "site_name", "interface_id", "interface_name")
 	bgpVec := meter.Vec("site_id", "site_name", "peer_ip", "peer_asn")
-	apiVec := meter.Vec("query")
-	entityVec := meter.Vec("entity")
-	entityReasonVec := meter.Vec("entity", "reason")
-	operationVec := meter.Vec("operation")
-	operationErrorVec := meter.Vec("operation", "error_class")
-	errorClassVec := meter.Vec("error_class")
-	surfaceIssueVec := meter.Vec("surface", "issue")
 
 	return &collectorMetrics{
 		site: siteMetricInstruments{
@@ -133,24 +104,6 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 			routesLimit:         bgpVec.Gauge("bgp_routes_limit"),
 			routesLimitExceeded: bgpVec.Gauge("bgp_routes_limit_exceeded"),
 			ribOutRoutes:        bgpVec.Gauge("bgp_rib_out_routes"),
-		},
-		api: apiMetricInstruments{
-			rateLimitRetries: apiVec.Counter("api_rate_limit_retries_total"),
-			transientRetries: apiVec.Counter("api_transient_retries_total"),
-		},
-		health: collectorHealthMetricInstruments{
-			collectionSuccess:      meter.Gauge("collector_collection_success"),
-			discoveredSites:        meter.Gauge("collector_discovered_sites"),
-			selectedEntities:       entityVec.Gauge("collector_selected_entities"),
-			skippedEntities:        entityReasonVec.Gauge("collector_skipped_entities"),
-			bgpSitesPerCollection:  meter.Gauge("collector_bgp_sites_per_collection"),
-			bgpFullScanSeconds:     meter.Gauge("collector_bgp_full_scan_seconds"),
-			bgpCachedSites:         meter.Gauge("collector_bgp_cached_sites"),
-			operationSuccess:       operationVec.Gauge("collector_operation_success"),
-			operationFailures:      operationErrorVec.Counter("collector_operation_failures_total"),
-			operationAffectedSites: operationErrorVec.Counter("collector_operation_affected_sites_total"),
-			collectionFailures:     errorClassVec.Counter("collector_collection_failures_total"),
-			normalizationIssues:    surfaceIssueVec.Counter("collector_normalization_issues_total"),
 		},
 	}
 }

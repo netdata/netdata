@@ -9,12 +9,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
 
-const (
-	selectionEntitySite = "site"
-
-	selectionSkipSelector = "selector"
-)
-
 type entitySelector struct {
 	include []matcher.Matcher
 	exclude []matcher.Matcher

@@ -78,10 +78,8 @@ type Collector struct {
 
 	discovery discoveryState
 	bgp       bgpState
-	health    collectorHealth
 
-	siteMatcher   *entitySelector
-	warningStates map[string]string
+	siteMatcher *entitySelector
 
 	now func() time.Time
 }
@@ -132,9 +130,7 @@ func (c *Collector) Collect(ctx context.Context) error {
 		if ctxErr := contextErr(ctx); ctxErr != nil {
 			return ctxErr
 		}
-		c.warnRecoverable(warningKeyCollection, classifyCatoError(err), "collection failed, error_class=%s: %v", classifyCatoError(err), err)
-	} else {
-		c.clearRecoverableWarning(warningKeyCollection)
+		return err
 	}
 	return nil
 }

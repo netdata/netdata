@@ -23,16 +23,11 @@ const (
 	defaultMaxSitesPerQuery = 50
 	defaultBGPRefreshEvery  = 300
 	defaultBGPMaxSites      = 25
-	defaultRetryAttempts    = 5
 	defaultEntitySelector   = "*"
 	maxDiscoveryPages       = 1000
 )
 
-var (
-	defaultTimeout      = confopt.Duration(30 * time.Second)
-	defaultRetryWaitMin = confopt.Duration(5 * time.Second)
-	defaultRetryWaitMax = confopt.Duration(30 * time.Second)
-)
+var defaultTimeout = confopt.Duration(30 * time.Second)
 
 type Config struct {
 	Vnode              string `yaml:"vnode,omitempty" json:"vnode,omitempty"`
@@ -45,12 +40,6 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 
 	SiteSelector string `yaml:"site_selector,omitempty" json:"site_selector,omitempty"`
-}
-
-type retryConfig struct {
-	Attempts int              `yaml:"attempts,omitempty" json:"attempts,omitempty"`
-	WaitMin  confopt.Duration `yaml:"wait_min,omitempty" json:"wait_min,omitempty"`
-	WaitMax  confopt.Duration `yaml:"wait_max,omitempty" json:"wait_max,omitempty"`
 }
 
 func (c *Config) applyDefaults() {
@@ -94,14 +83,6 @@ func (c Config) validate() error {
 	}
 
 	return errors.Join(errs...)
-}
-
-func defaultRetryConfig() retryConfig {
-	return retryConfig{
-		Attempts: defaultRetryAttempts,
-		WaitMin:  defaultRetryWaitMin,
-		WaitMax:  defaultRetryWaitMax,
-	}
 }
 
 func isLoopbackHost(host string) bool {

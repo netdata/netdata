@@ -26,20 +26,15 @@ func (c *Collector) collectMetrics(ctx context.Context, sites map[string]*siteSt
 		res, err := c.client.AccountMetrics(ctx, c.AccountID, batch, defaultMetricsTimeFrame, defaultMetricsBuckets, nil)
 		if err != nil {
 			errCount++
-			c.markOperationFailure(operationMetrics, err)
-			c.markOperationAffectedSites(operationMetrics, err, len(batch))
 			c.Debugf("accountMetrics batch failed for %d site(s), error_class=%s", len(batch), classifyCatoError(err))
 			continue
 		}
 		successCount++
 		for _, issue := range mergeMetrics(res, sites) {
-			c.markNormalizationIssue(normalizationSurfaceMetrics, issue)
+			c.logNormalizationIssue(normalizationSurfaceMetrics, issue)
 		}
 	}
 
-	if errCount == 0 && successCount > 0 {
-		c.markOperationSuccess(operationMetrics)
-	}
 	if errCount > 0 && errCount == batchCount {
 		return fmt.Errorf("all accountMetrics batches failed")
 	}

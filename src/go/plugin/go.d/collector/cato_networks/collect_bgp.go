@@ -18,7 +18,6 @@ func (c *Collector) collectBGP(ctx context.Context, sites map[string]*siteState,
 	now := c.now()
 	pruneBGPState(c.bgp.bySite, order)
 	if now.Before(c.bgp.nextRefresh) && len(c.bgp.bySite) > 0 {
-		c.updateBGPPollingHealth(len(order), c.bgpSitesPerCollectionLimit(len(order)))
 		mergeBGPState(sites, c.bgp.bySite)
 		return nil
 	}
@@ -31,7 +30,6 @@ func (c *Collector) collectBGP(ctx context.Context, sites map[string]*siteState,
 	if limit == 0 {
 		return nil
 	}
-	c.updateBGPPollingHealth(len(order), limit)
 
 	var errCount int
 	var successCount int
@@ -41,19 +39,16 @@ func (c *Collector) collectBGP(ctx context.Context, sites map[string]*siteState,
 		raw, err := c.client.SiteBgpStatus(ctx, c.AccountID, siteID)
 		if err != nil {
 			errCount++
-			c.markOperationFailure(operationBGP, err)
-			c.markOperationAffectedSites(operationBGP, err, 1)
 			c.Debugf("siteBgpStatus failed for one site, error_class=%s", classifyCatoError(err))
 			continue
 		}
 		successCount++
 		peers, issues := normalizeBGP(raw)
 		for _, issue := range issues {
-			c.markNormalizationIssue(normalizationSurfaceBGP, issue)
+			c.logNormalizationIssue(normalizationSurfaceBGP, issue)
 		}
 		c.bgp.bySite[siteID] = peers
 	}
-	c.health.BGPCachedSites = int64(len(c.bgp.bySite))
 
 	if errCount == limit {
 		mergeBGPState(sites, c.bgp.bySite)
@@ -63,9 +58,6 @@ func (c *Collector) collectBGP(ctx context.Context, sites map[string]*siteState,
 	c.bgp.nextRefresh = now.Add(seconds(defaultBGPRefreshEvery))
 	mergeBGPState(sites, c.bgp.bySite)
 
-	if errCount == 0 && successCount > 0 {
-		c.markOperationSuccess(operationBGP)
-	}
 	if errCount > 0 {
 		return fmt.Errorf("%d of %d siteBgpStatus requests failed", errCount, limit)
 	}
@@ -101,15 +93,4 @@ func mergeBGPState(sites map[string]*siteState, bySite map[string][]bgpPeerState
 			site.BGPPeers = append([]bgpPeerState(nil), peers...)
 		}
 	}
-}
-
-func (c *Collector) updateBGPPollingHealth(siteCount, sitesPerCollection int) {
-	if siteCount <= 0 || sitesPerCollection <= 0 {
-		return
-	}
-	c.ensureHealth()
-	cycles := (siteCount + sitesPerCollection - 1) / sitesPerCollection
-	c.health.BGPSitesPerCollection = int64(sitesPerCollection)
-	c.health.BGPFullScanSeconds = int64(cycles * defaultBGPRefreshEvery)
-	c.health.BGPCachedSites = int64(len(c.bgp.bySite))
 }

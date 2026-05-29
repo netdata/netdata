@@ -18,20 +18,7 @@ type discoveryState struct {
 	skippedBySelector int
 }
 
-func (c *Collector) collect(ctx context.Context) (err error) {
-	c.beginHealthCycle()
-	defer func() {
-		if contextErr(ctx) != nil {
-			return
-		}
-		c.health.CollectionSuccess = err == nil
-		c.updateSiteSelectionHealth()
-		if err != nil {
-			c.markCollectionFailure(err)
-		}
-		c.writeCollectorHealth()
-	}()
-
+func (c *Collector) collect(ctx context.Context) error {
 	if c.client == nil {
 		return errors.New("Cato client is not initialized")
 	}
@@ -54,18 +41,13 @@ func (c *Collector) collect(ctx context.Context) (err error) {
 
 	if err := c.collectMetrics(ctx, sites); err != nil {
 		c.warnRecoverable(warningKeyMetrics, classifyCatoError(err), "account metrics collection incomplete, error_class=%s", classifyCatoError(err))
-	} else {
-		c.clearRecoverableWarning(warningKeyMetrics)
 	}
 
 	if err := c.collectBGP(ctx, sites, order); err != nil {
 		c.warnRecoverable(warningKeyBGP, classifyCatoError(err), "BGP status collection incomplete, error_class=%s", classifyCatoError(err))
-	} else {
-		c.clearRecoverableWarning(warningKeyBGP)
 	}
 
 	c.pruneUnselectedSites(sites, &order)
-	c.updateSiteSelectionHealth()
 
 	now := c.now()
 	topo := buildTopology(c.AccountID, sites, order, now)
@@ -92,7 +74,6 @@ func (c *Collector) refreshDiscovery(ctx context.Context, force bool) error {
 	for {
 		if from/limit >= maxDiscoveryPages {
 			err := fmt.Errorf("entityLookup pagination exceeded %d pages", maxDiscoveryPages)
-			c.markOperationFailure(operationDiscovery, err)
 			if c.useCachedDiscoveryAfterRefreshFailure(now, force, err) {
 				return nil
 			}
@@ -101,7 +82,6 @@ func (c *Collector) refreshDiscovery(ctx context.Context, force bool) error {
 
 		res, err := c.client.LookupSites(ctx, c.AccountID, limit, from)
 		if err != nil {
-			c.markOperationFailure(operationDiscovery, err)
 			if c.useCachedDiscoveryAfterRefreshFailure(now, force, err) {
 				return nil
 			}
@@ -136,8 +116,10 @@ func (c *Collector) refreshDiscovery(ctx context.Context, force bool) error {
 		totalSites:        len(siteIDs),
 		skippedBySelector: skippedBySelector,
 	}
-	c.markOperationSuccess(operationDiscovery)
-	c.clearRecoverableWarning(warningKeyDiscoveryCache)
+	if skippedBySelector > 0 {
+		c.Limit("cato:site_selector", 1, recurringLogEvery).
+			Infof("selected %d of %d Cato site(s) after applying site_selector", len(selectedSiteIDs), len(siteIDs))
+	}
 	return nil
 }
 
@@ -154,10 +136,8 @@ func (c *Collector) useCachedDiscoveryAfterRefreshFailure(now time.Time, force b
 func (c *Collector) collectSnapshot(ctx context.Context) (map[string]*siteState, []string, error) {
 	res, err := c.client.AccountSnapshot(ctx, c.AccountID, c.discovery.siteIDs)
 	if err != nil {
-		c.markOperationFailure(operationSnapshot, err)
 		return nil, nil, err
 	}
-	c.markOperationSuccess(operationSnapshot)
 
 	sites, order := normalizeSnapshot(res, c.discovery.siteNames)
 	if len(order) == 0 {

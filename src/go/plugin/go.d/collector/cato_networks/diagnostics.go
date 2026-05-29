@@ -32,43 +32,6 @@ const (
 	normalizationIssuePageCap                = "page_cap"
 )
 
-type collectorHealth struct {
-	CollectionSuccess bool
-	DiscoveredSites   int64
-
-	BGPSitesPerCollection int64
-	BGPFullScanSeconds    int64
-	BGPCachedSites        int64
-
-	SelectedEntities        map[string]int64
-	SkippedEntities         map[entitySkipKey]int64
-	LastOperations          map[string]operationHealth
-	OperationFailures       map[operationFailureKey]int64
-	OperationAffectedSites  map[operationFailureKey]int64
-	CollectionFailureTotals map[string]int64
-	NormalizationIssues     map[normalizationIssueKey]int64
-}
-
-type operationHealth struct {
-	Success    bool
-	ErrorClass string
-}
-
-type operationFailureKey struct {
-	Operation  string
-	ErrorClass string
-}
-
-type entitySkipKey struct {
-	Entity string
-	Reason string
-}
-
-type normalizationIssueKey struct {
-	Surface string
-	Issue   string
-}
-
 type errorClasser interface {
 	ErrorClass() string
 }
@@ -100,91 +63,6 @@ func (e classifiedError) Unwrap() error {
 
 func (e classifiedError) ErrorClass() string {
 	return e.class
-}
-
-func (c *Collector) beginHealthCycle() {
-	c.ensureHealth()
-	c.health.CollectionSuccess = false
-	c.health.BGPSitesPerCollection = 0
-	c.health.BGPFullScanSeconds = 0
-	c.health.BGPCachedSites = 0
-	c.health.SelectedEntities = make(map[string]int64)
-	c.health.SkippedEntities = make(map[entitySkipKey]int64)
-	c.updateSiteSelectionHealth()
-	// LastOperations is stateful because the chart reports last observed status.
-}
-
-func (c *Collector) markOperationSuccess(operation string) {
-	c.ensureHealth()
-	c.health.LastOperations[operation] = operationHealth{Success: true, ErrorClass: "none"}
-}
-
-func (c *Collector) markOperationFailure(operation string, err error) {
-	c.ensureHealth()
-	class := classifyCatoError(err)
-	c.health.LastOperations[operation] = operationHealth{ErrorClass: class}
-	c.health.OperationFailures[operationFailureKey{Operation: operation, ErrorClass: class}]++
-}
-
-func (c *Collector) markOperationAffectedSites(operation string, err error, count int) {
-	if count <= 0 {
-		return
-	}
-	c.ensureHealth()
-	class := classifyCatoError(err)
-	c.health.OperationAffectedSites[operationFailureKey{Operation: operation, ErrorClass: class}] += int64(count)
-}
-
-func (c *Collector) markCollectionFailure(err error) {
-	c.ensureHealth()
-	c.health.CollectionFailureTotals[classifyCatoError(err)]++
-}
-
-func (c *Collector) markNormalizationIssue(surface, issue string) {
-	c.ensureHealth()
-	c.health.NormalizationIssues[normalizationIssueKey{Surface: surface, Issue: issue}]++
-}
-
-func (c *Collector) markEntitySelection(entity string, selected, skippedSelector int) {
-	c.ensureHealth()
-	c.health.SelectedEntities[entity] = int64(selected)
-	if skippedSelector > 0 {
-		c.health.SkippedEntities[entitySkipKey{Entity: entity, Reason: selectionSkipSelector}] = int64(skippedSelector)
-	}
-}
-
-func (c *Collector) updateSiteSelectionHealth() {
-	c.ensureHealth()
-	total := c.discovery.totalSites
-	if total == 0 && len(c.discovery.siteIDs) > 0 {
-		total = len(c.discovery.siteIDs) + c.discovery.skippedBySelector
-	}
-	c.health.DiscoveredSites = int64(total)
-	c.markEntitySelection(selectionEntitySite, len(c.discovery.siteIDs), c.discovery.skippedBySelector)
-}
-
-func (c *Collector) ensureHealth() {
-	if c.health.SelectedEntities == nil {
-		c.health.SelectedEntities = make(map[string]int64)
-	}
-	if c.health.SkippedEntities == nil {
-		c.health.SkippedEntities = make(map[entitySkipKey]int64)
-	}
-	if c.health.LastOperations == nil {
-		c.health.LastOperations = make(map[string]operationHealth)
-	}
-	if c.health.OperationFailures == nil {
-		c.health.OperationFailures = make(map[operationFailureKey]int64)
-	}
-	if c.health.OperationAffectedSites == nil {
-		c.health.OperationAffectedSites = make(map[operationFailureKey]int64)
-	}
-	if c.health.CollectionFailureTotals == nil {
-		c.health.CollectionFailureTotals = make(map[string]int64)
-	}
-	if c.health.NormalizationIssues == nil {
-		c.health.NormalizationIssues = make(map[normalizationIssueKey]int64)
-	}
 }
 
 func classifyCatoError(err error) string {

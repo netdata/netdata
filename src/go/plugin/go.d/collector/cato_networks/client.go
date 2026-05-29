@@ -9,11 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"net/http"
 	"strings"
-	"sync"
-	"time"
 
 	catosdk "github.com/catonetworks/cato-go-sdk"
 	catomodels "github.com/catonetworks/cato-go-sdk/models"
@@ -25,16 +22,11 @@ type apiClient interface {
 	AccountSnapshot(ctx context.Context, accountID string, siteIDs []string) (*catosdk.AccountSnapshot, error)
 	AccountMetrics(ctx context.Context, accountID string, siteIDs []string, timeFrame string, buckets int64, groupInterfaces *bool) (*catosdk.AccountMetrics, error)
 	SiteBgpStatus(ctx context.Context, accountID, siteID string) ([]*catosdk.SiteBgpStatusResult, error)
-	APIStats() apiStats
 }
 
 type sdkAPIClient struct {
-	client  *catosdk.Client
-	raw     rawGraphQLClient
-	retry   retryConfig
-	sleep   func(context.Context, time.Duration) error
-	statsMu sync.Mutex
-	stats   apiStats
+	client *catosdk.Client
+	raw    rawGraphQLClient
 }
 
 type rawGraphQLClient struct {
@@ -42,15 +34,6 @@ type rawGraphQLClient struct {
 	apiKey     string
 	headers    map[string]string
 	httpClient *http.Client
-}
-
-type apiStats struct {
-	Retries map[string]apiRetryStats
-}
-
-type apiRetryStats struct {
-	RateLimit int64
-	Transient int64
 }
 
 func newSDKAPIClient(cfg Config, httpClient *http.Client) (apiClient, error) {
@@ -69,9 +52,6 @@ func newSDKAPIClient(cfg Config, httpClient *http.Client) (apiClient, error) {
 			headers:    headers,
 			httpClient: httpClient,
 		},
-		retry: defaultRetryConfig(),
-		sleep: sleepContext,
-		stats: apiStats{Retries: make(map[string]apiRetryStats)},
 	}, nil
 }
 
@@ -110,26 +90,22 @@ func (c *sdkAPIClient) Probe(ctx context.Context, accountID string) error {
 }
 
 func (c *sdkAPIClient) LookupSites(ctx context.Context, accountID string, limit, from int64) (*catosdk.EntityLookup, error) {
-	var res *catosdk.EntityLookup
-	err := c.withRetry(ctx, "entityLookup", func() error {
-		v, err := c.client.EntityLookup(ctx, accountID, catomodels.EntityTypeSite, &limit, &from, nil, nil, nil, nil, nil, nil)
-		res = v
-		return err
-	})
-	return res, err
+	res, err := c.client.EntityLookup(ctx, accountID, catomodels.EntityTypeSite, &limit, &from, nil, nil, nil, nil, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("entityLookup: %w", err)
+	}
+	return res, nil
 }
 
 func (c *sdkAPIClient) AccountSnapshot(ctx context.Context, accountID string, siteIDs []string) (*catosdk.AccountSnapshot, error) {
-	var res *catosdk.AccountSnapshot
-	err := c.withRetry(ctx, "accountSnapshot", func() error {
-		v, err := c.client.AccountSnapshot(ctx, siteIDs, nil, &accountID)
-		if err != nil && isAccountSnapshotEnumDecodeError(err) {
-			v, err = c.raw.AccountSnapshot(ctx, accountID, siteIDs)
-		}
-		res = v
-		return err
-	})
-	return res, err
+	res, err := c.client.AccountSnapshot(ctx, siteIDs, nil, &accountID)
+	if err != nil && isAccountSnapshotEnumDecodeError(err) {
+		res, err = c.raw.AccountSnapshot(ctx, accountID, siteIDs)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("accountSnapshot: %w", err)
+	}
+	return res, nil
 }
 
 func (c *sdkAPIClient) AccountMetrics(ctx context.Context, accountID string, siteIDs []string, timeFrame string, buckets int64, groupInterfaces *bool) (*catosdk.AccountMetrics, error) {
@@ -147,20 +123,18 @@ func (c *sdkAPIClient) AccountMetrics(ctx context.Context, accountID string, sit
 		catomodels.TimeseriesMetricTypeLastMilePacketLoss,
 	}
 
-	var res *catosdk.AccountMetrics
-	err := c.withRetry(ctx, "accountMetrics", func() error {
-		v, err := c.client.AccountMetrics(ctx,
-			nil, nil, nil, &buckets,
-			labels,
-			nil, nil, nil, nil, nil, nil, nil, nil,
-			siteIDs,
-			nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-			nil, nil, &accountID, nil, timeFrame, groupInterfaces, nil,
-		)
-		res = v
-		return err
-	})
-	return res, err
+	res, err := c.client.AccountMetrics(ctx,
+		nil, nil, nil, &buckets,
+		labels,
+		nil, nil, nil, nil, nil, nil, nil, nil,
+		siteIDs,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, &accountID, nil, timeFrame, groupInterfaces, nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("accountMetrics: %w", err)
+	}
+	return res, nil
 }
 
 func (c *sdkAPIClient) SiteBgpStatus(ctx context.Context, accountID, siteID string) ([]*catosdk.SiteBgpStatusResult, error) {
@@ -171,67 +145,11 @@ func (c *sdkAPIClient) SiteBgpStatus(ctx context.Context, accountID, siteID stri
 		},
 	}
 
-	var res []*catosdk.SiteBgpStatusResult
-	err := c.withRetry(ctx, "siteBgpStatus", func() error {
-		_, v, err := c.client.SiteBgpStatus(ctx, input, accountID)
-		res = v
-		return err
-	})
-	return res, err
-}
-
-func (c *sdkAPIClient) withRetry(ctx context.Context, name string, fn func() error) error {
-	attempts := c.retry.Attempts
-	if attempts <= 0 {
-		attempts = 1
+	_, res, err := c.client.SiteBgpStatus(ctx, input, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("siteBgpStatus: %w", err)
 	}
-
-	var err error
-	for attempt := 1; attempt <= attempts; attempt++ {
-		if err = fn(); err == nil {
-			return nil
-		}
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		if attempt == attempts || !isRetryableCatoError(ctx, err) {
-			return fmt.Errorf("%s: %w", name, err)
-		}
-
-		c.recordRetry(name, err)
-		wait := retryWait(c.retry.WaitMin.Duration(), c.retry.WaitMax.Duration(), attempt)
-		if sleepErr := c.sleep(ctx, wait); sleepErr != nil {
-			return sleepErr
-		}
-	}
-
-	return err
-}
-
-func (c *sdkAPIClient) recordRetry(name string, err error) {
-	c.statsMu.Lock()
-	defer c.statsMu.Unlock()
-
-	if c.stats.Retries == nil {
-		c.stats.Retries = make(map[string]apiRetryStats)
-	}
-
-	stats := c.stats.Retries[name]
-	if isRateLimitCatoError(err) {
-		stats.RateLimit++
-	} else {
-		stats.Transient++
-	}
-	c.stats.Retries[name] = stats
-}
-
-func (c *sdkAPIClient) APIStats() apiStats {
-	c.statsMu.Lock()
-	defer c.statsMu.Unlock()
-
-	out := apiStats{Retries: make(map[string]apiRetryStats, len(c.stats.Retries))}
-	maps.Copy(out.Retries, c.stats.Retries)
-	return out
+	return res, nil
 }
 
 type rawGraphQLRequest struct {
@@ -332,86 +250,4 @@ func isAccountSnapshotEnumDecodeError(err error) bool {
 	}
 	msg := err.Error()
 	return strings.Contains(msg, "ConnectivityStatus") && strings.Contains(msg, "not a valid")
-}
-
-func retryWait(minWait, maxWait time.Duration, attempt int) time.Duration {
-	if minWait <= 0 {
-		minWait = time.Second
-	}
-	if maxWait <= 0 {
-		maxWait = minWait
-	}
-
-	wait := minWait
-	for range max(0, attempt-1) {
-		wait *= 2
-		if wait >= maxWait {
-			return maxWait
-		}
-	}
-	return wait
-}
-
-func sleepContext(ctx context.Context, d time.Duration) error {
-	timer := time.NewTimer(d)
-	defer timer.Stop()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
-}
-
-func isRetryableCatoError(ctx context.Context, err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, context.Canceled) {
-		return false
-	}
-	if errors.Is(err, context.DeadlineExceeded) {
-		return ctx == nil || ctx.Err() == nil
-	}
-	if ctx != nil && ctx.Err() != nil {
-		return false
-	}
-
-	return isRateLimitCatoError(err) || isTransientCatoError(err)
-}
-
-func isRateLimitCatoError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := strings.ToLower(err.Error())
-	return containsHTTPStatus(msg, "429") ||
-		strings.Contains(msg, "too many requests") ||
-		strings.Contains(msg, "rate limit") ||
-		strings.Contains(msg, "rate-limit") ||
-		strings.Contains(msg, "ratelimit")
-}
-
-func isTransientCatoError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := strings.ToLower(err.Error())
-	return containsHTTPStatusRange(msg, 500, 599) ||
-		strings.Contains(msg, "temporarily unavailable") ||
-		strings.Contains(msg, "connection reset") ||
-		strings.Contains(msg, "connection refused") ||
-		strings.Contains(msg, "i/o timeout") ||
-		strings.Contains(msg, "server misbehaving") ||
-		strings.Contains(msg, "eof")
-}
-
-func containsHTTPStatusRange(msg string, first, last int) bool {
-	for code := first; code <= last; code++ {
-		if containsHTTPStatus(msg, fmt.Sprint(code)) {
-			return true
-		}
-	}
-	return false
 }
