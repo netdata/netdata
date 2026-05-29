@@ -1426,7 +1426,7 @@ lookup: max -5m unaligned
 ```text
  alarm: service_failure_rate
     on: my_service.health_status
-lookup: average -5m unaligned of status
+lookup: average -5m unaligned percentage of status
   units: %
  every: 1m
   warn: $this > 10
@@ -1435,14 +1435,14 @@ lookup: average -5m unaligned of status
     to: sysadmin
 ```
 
-When the metric is 0 = healthy and 1 = failure, `average` returns the fraction of time spent in failure (0.0 to 1.0). With `units: %`, Netdata multiplies by 100, so `warn: $this > 10` fires when the service was failing more than 10% of the time, and `crit: $this > 50` fires when failures exceeded half the window. This is useful for SLO-style alerting where occasional failures are acceptable.
+When the metric is 0 = healthy and 1 = failure, `average` with the `percentage` option returns the fraction of time spent in failure scaled to 0–100. `units: %` is a display label only and does not affect the value. `warn: $this > 10` fires when the service was failing more than 10% of the time, and `crit: $this > 50` fires when failures exceeded half the window. This is useful for SLO-style alerting where occasional failures are acceptable.
 
 **Approach 4: Instant State Check (calc, no lookup)**
 
 ```text
  alarm: service_current_state
     on: my_service.health_status
-  calc: $status
+  calc: $health_status
  every: 10s
   crit: $this == 0
    info: service is currently down
@@ -1450,7 +1450,7 @@ When the metric is 0 = healthy and 1 = failure, `average` returns the fraction o
  delay: down 5m
 ```
 
-Use to check only the current value without time-window aggregation. The `calc: $status` references the chart dimension directly — no `lookup` needed. The `delay: down 5m` debounces recovery notifications, requiring the alert to stay clear for 5 minutes before sending recovery. This is the same pattern used in `health.d/timex.conf` for clock sync state monitoring.
+Use to check only the current value without time-window aggregation. The `calc: $health_status` references the chart dimension directly — no `lookup` needed. Note that `$status` is a built-in alert variable (the alert's own status code, −2 to 3) and must not be used here; use the dimension name instead (e.g. `$health_status` for a dimension named `health_status`). The `delay: down 5m` debounces recovery notifications, requiring the alert to stay clear for 5 minutes before sending recovery. This is the same pattern used in `health.d/timex.conf` for clock sync state monitoring (`calc: $state`).
 
 **Comparison: Which Method to Use**
 
@@ -1459,8 +1459,8 @@ Use to check only the current value without time-window aggregation. The `calc: 
 | Any failure event (metric is 0 normally, 1 on failure)  | `sum`  | `sum -5m unaligned absolute` | `$this > 0` | Metric was non-zero at any point          |
 | Any downtime (metric is 1=healthy, 0=down)              | `min`  | `min -5m unaligned`        | `$this == 0` | Metric hit 0 at any point in the window   |
 | Continuous outage (metric is 1=healthy, 0=down)         | `max`  | `max -5m unaligned`        | `$this == 0` | Metric was 0 for the entire window        |
-| Failure rate over time                                  | `average` | `average -5m unaligned` | `$this > N`  | Failure percentage exceeds threshold      |
-| Current state only                                      | `calc` | `calc: $var` (no lookup)   | `$this == 0` | Current value is 0 (debounce with delay)  |
+| Failure rate over time                                  | `average` | `average -5m unaligned percentage of status` | `$this > N`  | Failure percentage exceeds threshold      |
+| Current state only                                      | `calc` | `calc: $health_status` (no lookup)   | `$this == 0` | Current value is 0 (debounce with delay)  |
 
 For a full list of available lookup methods and processing options (`average`, `min`, `max`, `sum`, `percentage`, `absolute`, etc.), see the [Alert Line `lookup`](#alert-line-lookup) section.
 
@@ -1475,7 +1475,7 @@ For a full list of available lookup methods and processing options (`average`, `
 **Variables Used:**
 
 - `$this` — Result of the `lookup` or `calc` expression
-- `$status` — Dimension value from the chart (used in the `calc` approach)
+- `$health_status` — Dimension value from the chart (used in the `calc` approach; the variable name matches the dimension name, e.g. `health_status`)
 
 <br/>
 </details><br/>
