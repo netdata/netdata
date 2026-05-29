@@ -76,25 +76,31 @@ func (f *fakeAPIClient) AccountSnapshot(context.Context, string, []string) (*cat
 
 func (f *fakeAPIClient) AccountMetrics(ctx context.Context, _ string, siteIDs []string, _ string, _ int64, groupInterfaces *bool) (*catosdk.AccountMetrics, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 
 	f.metricsCalls++
-	f.metricsSiteIDs = append(f.metricsSiteIDs, append([]string(nil), siteIDs...))
+	siteIDs = append([]string(nil), siteIDs...)
+	f.metricsSiteIDs = append(f.metricsSiteIDs, siteIDs)
 	if groupInterfaces == nil {
 		f.groupInterfaces = append(f.groupInterfaces, nil)
 	} else {
 		v := *groupInterfaces
 		f.groupInterfaces = append(f.groupInterfaces, &v)
 	}
-	if f.metricsHook != nil {
-		f.metricsHook(ctx, siteIDs)
-	}
+	hook := f.metricsHook
+	metrics := f.metrics
+	var err error
 	if len(siteIDs) > 0 && f.metricsErrSites != nil {
-		if err := f.metricsErrSites[siteIDs[0]]; err != nil {
-			return nil, err
-		}
+		err = f.metricsErrSites[siteIDs[0]]
 	}
-	return f.metrics, nil
+	f.mu.Unlock()
+
+	if hook != nil {
+		hook(ctx, siteIDs)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return metrics, nil
 }
 
 func (f *fakeAPIClient) SiteBgpStatus(_ context.Context, _ string, siteID string) ([]*catosdk.SiteBgpStatusResult, error) {

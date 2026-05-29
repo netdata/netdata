@@ -25,6 +25,11 @@ type chartCoverage struct {
 	ExpectedByContext map[string][]string
 }
 
+type scopedChartCoverage struct {
+	ScopeKey string
+	Coverage chartCoverage
+}
+
 // ChartCoverageExpectation defines per-scenario chart coverage assertions.
 type ChartCoverageExpectation struct {
 	// ExcludeContextPatterns are glob patterns for contexts ignored from
@@ -58,68 +63,48 @@ func AssertChartCoverage(
 	}
 	templateYAML := collector.ChartTemplateYAML()
 
-	coverage, err := buildChartCoverageFromStore(templateYAML, 1, store, exp.ExcludeContextPatterns)
+	coverages, err := buildChartCoveragesFromStore(templateYAML, 1, store, exp.ExcludeContextPatterns)
 	if err != nil {
 		t.Fatalf("collecttest: build chart coverage: %v", err)
 		return
 	}
 
-	for contextName, dims := range coverage.ExpectedByContext {
-		requireContextDims(t, coverage.ActualByContext, contextName, dims)
-	}
-	for contextName, dims := range exp.RequiredContexts {
-		requireContextDims(t, coverage.ActualByContext, contextName, dims)
+	for _, scoped := range coverages {
+		for contextName, dims := range scoped.Coverage.ExpectedByContext {
+			requireContextDims(t, scoped.Coverage.ActualByContext, contextName, dims, scoped.ScopeKey)
+		}
+		for contextName, dims := range exp.RequiredContexts {
+			requireContextDims(t, scoped.Coverage.ActualByContext, contextName, dims, scoped.ScopeKey)
+		}
 	}
 }
 
-func buildChartCoverageFromStore(
+func buildChartCoveragesFromStore(
 	templateYAML string,
 	revision uint64,
 	store metrix.CollectorStore,
 	excludeContextPatterns []string,
-) (chartCoverage, error) {
+) ([]scopedChartCoverage, error) {
 	reader := store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
 	scopes := reader.HostScopes()
 	if len(scopes) == 0 {
-		return buildChartCoverage(templateYAML, revision, reader, excludeContextPatterns)
+		coverage, err := buildChartCoverage(templateYAML, revision, reader, excludeContextPatterns)
+		if err != nil {
+			return nil, err
+		}
+		return []scopedChartCoverage{{Coverage: coverage}}, nil
 	}
 
-	var out chartCoverage
+	out := make([]scopedChartCoverage, 0, len(scopes))
 	for _, scope := range scopes {
 		reader := store.Read(metrix.ReadRaw(), metrix.ReadFlatten(), metrix.ReadHostScope(scope.ScopeKey))
 		coverage, err := buildChartCoverage(templateYAML, revision, reader, excludeContextPatterns)
 		if err != nil {
-			return chartCoverage{}, err
+			return nil, err
 		}
-		mergeChartCoverage(&out, coverage)
+		out = append(out, scopedChartCoverage{ScopeKey: scope.ScopeKey, Coverage: coverage})
 	}
 	return out, nil
-}
-
-func mergeChartCoverage(dst *chartCoverage, src chartCoverage) {
-	if dst.ActualByContext == nil {
-		dst.ActualByContext = make(map[string]map[string]struct{})
-	}
-	if dst.ExpectedByContext == nil {
-		dst.ExpectedByContext = make(map[string][]string)
-	}
-	for contextName, dims := range src.ActualByContext {
-		existing := dst.ActualByContext[contextName]
-		if existing == nil {
-			existing = make(map[string]struct{})
-			dst.ActualByContext[contextName] = existing
-		}
-		for dimName := range dims {
-			existing[dimName] = struct{}{}
-		}
-	}
-	for contextName, dims := range src.ExpectedByContext {
-		existing := stringSetFromSlice(dst.ExpectedByContext[contextName])
-		for _, dimName := range dims {
-			existing[dimName] = struct{}{}
-		}
-		dst.ExpectedByContext[contextName] = sortedStringSet(existing)
-	}
 }
 
 func buildChartCoverage(
@@ -307,23 +292,6 @@ func collectTemplateContexts(
 	return nil
 }
 
-func stringSetFromSlice(values []string) map[string]struct{} {
-	out := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		out[value] = struct{}{}
-	}
-	return out
-}
-
-func sortedStringSet(values map[string]struct{}) []string {
-	out := make([]string, 0, len(values))
-	for value := range values {
-		out = append(out, value)
-	}
-	sort.Strings(out)
-	return out
-}
-
 func collectExpectedDimensionNames(
 	reader metrix.Reader,
 	dim charttpl.Dimension,
@@ -455,16 +423,24 @@ func filterEmptyString(values []string) []string {
 	return out
 }
 
-func requireContextDims(t *testing.T, byContext map[string]map[string]struct{}, contextName string, dimNames []string) {
+func requireContextDims(t *testing.T, byContext map[string]map[string]struct{}, contextName string, dimNames []string, scopeKey string) {
 	t.Helper()
 
 	dims, ok := byContext[contextName]
 	if !ok {
+		if scopeKey != "" {
+			t.Fatalf("collecttest: missing chart context %q in host scope %q", contextName, scopeKey)
+			return
+		}
 		t.Fatalf("collecttest: missing chart context %q", contextName)
 		return
 	}
 	for _, name := range dimNames {
 		if _, exists := dims[name]; !exists {
+			if scopeKey != "" {
+				t.Fatalf("collecttest: missing dimension %q in context %q in host scope %q", name, contextName, scopeKey)
+				return
+			}
 			t.Fatalf("collecttest: missing dimension %q in context %q", name, contextName)
 			return
 		}
