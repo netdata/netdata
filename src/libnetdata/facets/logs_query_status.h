@@ -544,7 +544,7 @@ static inline bool lqs_request_parse_GET(LOGS_QUERY_STATUS *lqs, BUFFER *wb, cha
                 rq->slice = true;
         }
         else if(strncmp(keyword, LQS_PARAMETER_SOURCE ":", sizeof(LQS_PARAMETER_SOURCE ":") - 1) == 0) {
-            const char *value = &keyword[sizeof(LQS_PARAMETER_SOURCE ":") - 1];
+            char *value = &keyword[sizeof(LQS_PARAMETER_SOURCE ":") - 1];
 
             buffer_json_member_add_array(wb, LQS_PARAMETER_SOURCE);
 
