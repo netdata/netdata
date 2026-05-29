@@ -38,6 +38,7 @@ type fakeAPIClient struct {
 	metrics         *catosdk.AccountMetrics
 	bgp             map[string][]*catosdk.SiteBgpStatusResult
 	metricsErrSites map[string]error
+	metricsHook     func(context.Context, []string)
 	bgpErrSites     map[string]error
 	groupInterfaces []*bool
 	metricsSiteIDs  [][]string
@@ -73,7 +74,7 @@ func (f *fakeAPIClient) AccountSnapshot(context.Context, string, []string) (*cat
 	return f.snapshot, nil
 }
 
-func (f *fakeAPIClient) AccountMetrics(_ context.Context, _ string, siteIDs []string, _ string, _ int64, groupInterfaces *bool) (*catosdk.AccountMetrics, error) {
+func (f *fakeAPIClient) AccountMetrics(ctx context.Context, _ string, siteIDs []string, _ string, _ int64, groupInterfaces *bool) (*catosdk.AccountMetrics, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -84,6 +85,9 @@ func (f *fakeAPIClient) AccountMetrics(_ context.Context, _ string, siteIDs []st
 	} else {
 		v := *groupInterfaces
 		f.groupInterfaces = append(f.groupInterfaces, &v)
+	}
+	if f.metricsHook != nil {
+		f.metricsHook(ctx, siteIDs)
 	}
 	if len(siteIDs) > 0 && f.metricsErrSites != nil {
 		if err := f.metricsErrSites[siteIDs[0]]; err != nil {

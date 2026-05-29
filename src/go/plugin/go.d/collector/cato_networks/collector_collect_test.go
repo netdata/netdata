@@ -121,6 +121,41 @@ func TestCollector_Collect(t *testing.T) {
 				},
 			}},
 		},
+		"late cancellation during fail-soft metrics returns cancellation": func() struct {
+			setup    func(*testing.T, *Collector, *fakeAPIClient)
+			skipInit bool
+			steps    []collectStep
+		} {
+			ctx, cancel := context.WithCancel(context.Background())
+			return struct {
+				setup    func(*testing.T, *Collector, *fakeAPIClient)
+				skipInit bool
+				steps    []collectStep
+			}{
+				setup: func(_ *testing.T, _ *Collector, fake *fakeAPIClient) {
+					fake.metricsErrSites = map[string]error{"1002": errors.New("rate limit exceeded")}
+					fake.metricsHook = func(_ context.Context, siteIDs []string) {
+						if len(siteIDs) == 1 && siteIDs[0] == "1002" {
+							cancel()
+						}
+					}
+				},
+				steps: []collectStep{{
+					name:      "returns cancellation after metrics fan-out",
+					wantErrIs: context.Canceled,
+					collect: func(t *testing.T, c *Collector) (map[string]metrix.SampleValue, error) {
+						t.Helper()
+						t.Cleanup(cancel)
+
+						cc := mustCycleController(t, c.store)
+						cc.BeginCycle()
+						err := c.Collect(ctx)
+						cc.AbortCycle()
+						return nil, err
+					},
+				}},
+			}
+		}(),
 		"unknown timeseries labels do not fail collection": {
 			setup: func(_ *testing.T, _ *Collector, fake *fakeAPIClient) {
 				iface := fake.metrics.GetAccountMetrics().GetSites()[0].GetInterfaces()[0]

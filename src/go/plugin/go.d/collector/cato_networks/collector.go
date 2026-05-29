@@ -123,7 +123,7 @@ func (c *Collector) Collect(ctx context.Context) error {
 		}
 		return err
 	}
-	return nil
+	return contextErr(ctx)
 }
 
 func (c *Collector) Cleanup(ctx context.Context) {
