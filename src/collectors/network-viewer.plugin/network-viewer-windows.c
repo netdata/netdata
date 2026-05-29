@@ -698,11 +698,20 @@ static void nv_pid_cache_free(NV_PID_CACHE *c)
 }
 
 // --- Listening-port set for direction classification ----------------------------
+// Key is {family, port} so that a TCP6 listener on port N does not cause TCP4
+// connections whose ephemeral port happens to be N to be misclassified as inbound.
+// Mirrors the Linux approach (local-sockets.h:772-774) where family and protocol
+// are both part of the listening-port key.
 
 typedef struct {
-    DWORD  *ports;
-    size_t  used;
-    size_t  capacity;
+    ULONG  family;   // NV_WIN_AF_INET or NV_WIN_AF_INET6
+    DWORD  port;     // host byte order
+} NV_LISTEN_PORT;
+
+typedef struct {
+    NV_LISTEN_PORT *ports;
+    size_t          used;
+    size_t          capacity;
 } NV_LISTEN_SET;
 
 static void nv_listen_set_init(NV_LISTEN_SET *s)
@@ -712,31 +721,36 @@ static void nv_listen_set_init(NV_LISTEN_SET *s)
     s->capacity = 0;
 }
 
-static void nv_listen_set_add(NV_LISTEN_SET *s, DWORD port_hbo)
+static void nv_listen_set_add(NV_LISTEN_SET *s, DWORD port_hbo, ULONG family)
 {
     if (s->used >= s->capacity) {
         s->capacity = s->capacity ? s->capacity * 2 : 64;
-        s->ports = reallocz(s->ports, s->capacity * sizeof(DWORD));
+        s->ports = reallocz(s->ports, s->capacity * sizeof(NV_LISTEN_PORT));
     }
-    s->ports[s->used++] = port_hbo;
+    s->ports[s->used].port   = port_hbo;
+    s->ports[s->used].family = family;
+    s->used++;
 }
 
-static int nv_dword_compar(const void *a, const void *b)
+static int nv_listen_port_compar(const void *a, const void *b)
 {
-    DWORD da = *(const DWORD *)a, db = *(const DWORD *)b;
-    return (da > db) - (da < db);
+    const NV_LISTEN_PORT *pa = a, *pb = b;
+    if (pa->family != pb->family)
+        return (pa->family > pb->family) - (pa->family < pb->family);
+    return (pa->port > pb->port) - (pa->port < pb->port);
 }
 
 static void nv_listen_set_sort(NV_LISTEN_SET *s)
 {
     if (s->used > 1)
-        qsort(s->ports, s->used, sizeof(DWORD), nv_dword_compar);
+        qsort(s->ports, s->used, sizeof(NV_LISTEN_PORT), nv_listen_port_compar);
 }
 
-static bool nv_listen_set_contains(const NV_LISTEN_SET *s, DWORD port_hbo)
+static bool nv_listen_set_contains(const NV_LISTEN_SET *s, DWORD port_hbo, ULONG family)
 {
     if (!s->used) return false;
-    return bsearch(&port_hbo, s->ports, s->used, sizeof(DWORD), nv_dword_compar) != NULL;
+    NV_LISTEN_PORT key = { .family = family, .port = port_hbo };
+    return bsearch(&key, s->ports, s->used, sizeof(NV_LISTEN_PORT), nv_listen_port_compar) != NULL;
 }
 
 static void nv_listen_set_free(NV_LISTEN_SET *s)
@@ -878,13 +892,13 @@ void function_network_connections(
     if (tcp4) {
         for (DWORD i = 0; i < tcp4->dwNumEntries; i++) {
             if (tcp4->table[i].dwState == MIB_TCP_STATE_LISTEN)
-                nv_listen_set_add(&listen_set, ntohs((uint16_t)tcp4->table[i].dwLocalPort));
+                nv_listen_set_add(&listen_set, ntohs((uint16_t)tcp4->table[i].dwLocalPort), NV_WIN_AF_INET);
         }
     }
     if (tcp6) {
         for (DWORD i = 0; i < tcp6->dwNumEntries; i++) {
             if (tcp6->table[i].dwState == MIB_TCP_STATE_LISTEN)
-                nv_listen_set_add(&listen_set, ntohs((uint16_t)tcp6->table[i].dwLocalPort));
+                nv_listen_set_add(&listen_set, ntohs((uint16_t)tcp6->table[i].dwLocalPort), NV_WIN_AF_INET6);
         }
     }
     nv_listen_set_sort(&listen_set);
@@ -914,8 +928,8 @@ void function_network_connections(
                 if (r->dwState == MIB_TCP_STATE_LISTEN) {
                     direction = "listen";
                 } else if (nv_is_ipv4_loopback(r->dwLocalAddr) || nv_is_ipv4_loopback(r->dwRemoteAddr)) {
-                    direction = nv_listen_set_contains(&listen_set, local_port) ? "inbound" : "outbound";
-                } else if (nv_listen_set_contains(&listen_set, local_port)) {
+                    direction = nv_listen_set_contains(&listen_set, local_port, NV_WIN_AF_INET) ? "inbound" : "outbound";
+                } else if (nv_listen_set_contains(&listen_set, local_port, NV_WIN_AF_INET)) {
                     direction = "inbound";
                 } else {
                     direction = "outbound";
@@ -956,8 +970,8 @@ void function_network_connections(
                 if (r->dwState == MIB_TCP_STATE_LISTEN) {
                     direction = "listen";
                 } else if (nv_is_ipv6_loopback(r->ucLocalAddr) || nv_is_ipv6_loopback(r->ucRemoteAddr)) {
-                    direction = nv_listen_set_contains(&listen_set, local_port) ? "inbound" : "outbound";
-                } else if (nv_listen_set_contains(&listen_set, local_port)) {
+                    direction = nv_listen_set_contains(&listen_set, local_port, NV_WIN_AF_INET6) ? "inbound" : "outbound";
+                } else if (nv_listen_set_contains(&listen_set, local_port, NV_WIN_AF_INET6)) {
                     direction = "inbound";
                 } else {
                     direction = "outbound";
