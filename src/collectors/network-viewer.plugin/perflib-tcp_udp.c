@@ -635,6 +635,68 @@ static STRING *nv_get_username(DWORD pid)
     return result;
 }
 
+// --- Per-request PID cache ------------------------------------------------------
+// Resolving process name and username requires OpenProcess + kernel work.
+// Many sockets share the same PID (e.g. svchost.exe), so caching per request
+// eliminates redundant syscalls for every repeated PID.
+
+typedef struct {
+    DWORD   pid;
+    char    comm[256];
+    STRING *username; // ref-counted; freed by nv_pid_cache_free
+} NV_PID_CACHE_ENTRY;
+
+typedef struct {
+    NV_PID_CACHE_ENTRY *entries;
+    size_t              used;
+    size_t              capacity;
+} NV_PID_CACHE;
+
+static void nv_pid_cache_init(NV_PID_CACHE *c)
+{
+    c->entries  = NULL;
+    c->used     = 0;
+    c->capacity = 0;
+}
+
+static void nv_pid_cache_lookup(NV_PID_CACHE *c, DWORD pid,
+                                const char **comm_out, const char **username_out)
+{
+    for (size_t i = 0; i < c->used; i++) {
+        if (c->entries[i].pid == pid) {
+            *comm_out     = c->entries[i].comm;
+            *username_out = string2str(c->entries[i].username);
+            return;
+        }
+    }
+
+    if (c->used >= c->capacity) {
+        c->capacity = c->capacity ? c->capacity * 2 : 32;
+        c->entries  = reallocz(c->entries, c->capacity * sizeof(*c->entries));
+    }
+
+    NV_PID_CACHE_ENTRY *e = &c->entries[c->used++];
+    e->pid     = pid;
+    e->comm[0] = '\0';
+    e->username = NULL;
+
+    nv_get_comm(pid, e->comm, sizeof(e->comm));
+    e->username = nv_get_username(pid);
+
+    *comm_out     = e->comm;
+    *username_out = string2str(e->username);
+}
+
+static void nv_pid_cache_free(NV_PID_CACHE *c)
+{
+    for (size_t i = 0; i < c->used; i++)
+        string_freez(c->entries[i].username);
+    freez(c->entries);
+    c->entries  = NULL;
+    c->used     = 0;
+    c->capacity = 0;
+}
+
 // --- Listening-port set for direction classification ----------------------------
 
 typedef struct {
@@ -737,6 +799,7 @@ static void *nv_fetch_udp_table(ULONG af)
 //   ServerPort, Count
 
 static void nv_emit_row(BUFFER *wb,
+                        NV_PID_CACHE *pid_cache,
                         const char *direction,
                         const char *protocol,
                         const char *state,
@@ -749,9 +812,8 @@ static void nv_emit_row(BUFFER *wb,
     uint16_t ipproto = (strncmp(protocol, "tcp", 3) == 0) ? IPPROTO_TCP : IPPROTO_UDP;
     STRING *portname = system_servicenames_cache_lookup(sc, (uint16_t)server_port, (uint16_t)ipproto);
 
-    char comm[256] = "";
-    nv_get_comm(pid, comm, sizeof(comm));
-    STRING *username = nv_get_username(pid);
+    const char *comm, *username;
+    nv_pid_cache_lookup(pid_cache, pid, &comm, &username);
 
     buffer_json_add_array_item_array(wb);
     {
@@ -760,7 +822,7 @@ static void nv_emit_row(BUFFER *wb,
         buffer_json_add_array_item_string(wb, state);
         buffer_json_add_array_item_uint64(wb, pid);
         buffer_json_add_array_item_string(wb, comm[0] ? comm : "[unknown]");
-        buffer_json_add_array_item_string(wb, username ? string2str(username) : "[unknown]");
+        buffer_json_add_array_item_string(wb, username ? username : "[unknown]");
         buffer_json_add_array_item_string(wb, string2str(portname));
         buffer_json_add_array_item_string(wb, local_ip);
         buffer_json_add_array_item_uint64(wb, local_port_hbo);
@@ -774,7 +836,7 @@ static void nv_emit_row(BUFFER *wb,
     buffer_json_array_close(wb);
 
     string_freez(portname);
-    string_freez(username);
+    // comm and username are owned by pid_cache; not freed here
 }
 
 // --- Main function handler -------------------------------------------------------
@@ -795,6 +857,9 @@ void function_network_connections(
     MIB_TCP6TABLE_OWNER_PID *tcp6 = nv_fetch_tcp_table(NV_WIN_AF_INET6);
     MIB_UDPTABLE_OWNER_PID  *udp4 = nv_fetch_udp_table(NV_WIN_AF_INET);
     MIB_UDP6TABLE_OWNER_PID *udp6 = nv_fetch_udp_table(NV_WIN_AF_INET6);
+
+    NV_PID_CACHE pid_cache;
+    nv_pid_cache_init(&pid_cache);
 
     // --- First pass: collect all TCP LISTEN ports for direction classification ---
     NV_LISTEN_SET listen_set;
@@ -862,7 +927,7 @@ void function_network_connections(
                     remote_port_emit = ntohs((uint16_t)r->dwRemotePort);
                 }
 
-                nv_emit_row(wb, direction, "tcp4", nv_tcp_state_str(r->dwState), r->dwOwningPid,
+                nv_emit_row(wb, &pid_cache, direction, "tcp4", nv_tcp_state_str(r->dwState), r->dwOwningPid,
                             local_ip, local_port, local_as,
                             remote_ip_s, remote_port_emit, remote_as);
             }
@@ -905,7 +970,7 @@ void function_network_connections(
                     remote_port_emit = ntohs((uint16_t)r->dwRemotePort);
                 }
 
-                nv_emit_row(wb, direction, "tcp6", nv_tcp_state_str(r->dwState), r->dwOwningPid,
+                nv_emit_row(wb, &pid_cache, direction, "tcp6", nv_tcp_state_str(r->dwState), r->dwOwningPid,
                             local_ip, local_port, local_as,
                             remote_ip_s, remote_port_emit, remote_as);
             }
@@ -921,7 +986,7 @@ void function_network_connections(
                 DWORD local_port = ntohs((uint16_t)r->dwLocalPort);
                 const char *local_as = nv_ipv4_address_space(r->dwLocalAddr);
 
-                nv_emit_row(wb, "listen", "udp4", "stateless", r->dwOwningPid,
+                nv_emit_row(wb, &pid_cache, "listen", "udp4", "stateless", r->dwOwningPid,
                             local_ip, local_port, local_as,
                             "", 0, "");
             }
@@ -936,7 +1001,7 @@ void function_network_connections(
                 DWORD local_port = ntohs((uint16_t)r->dwLocalPort);
                 const char *local_as = nv_ipv6_address_space(r->ucLocalAddr);
 
-                nv_emit_row(wb, "listen", "udp6", "stateless", r->dwOwningPid,
+                nv_emit_row(wb, &pid_cache, "listen", "udp6", "stateless", r->dwOwningPid,
                             local_ip, local_port, local_as,
                             "", 0, "");
             }
@@ -945,6 +1010,7 @@ void function_network_connections(
     buffer_json_array_close(wb); // data
 
     nv_listen_set_free(&listen_set);
+    nv_pid_cache_free(&pid_cache);
     freez(tcp4);
     freez(tcp6);
     freez(udp4);
