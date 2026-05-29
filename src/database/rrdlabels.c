@@ -1719,6 +1719,45 @@ static int rrdlabels_unittest_change_detection(void) {
     rrdlabels_destroy(dst);
     rrdlabels_destroy(src);
 
+    // ---- rrdlabels_copy: same-key cleanup path ----
+    // Value change via copy: dst ends with a single entry for the key,
+    // carrying the new value from src. Exercises the same-key cleanup loop
+    // that mirrors the migrate path.
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    rrdlabels_add(dst, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(src, "k1", "v2", RRDLABEL_SRC_CONFIG);
+    rrdlabels_copy(dst, src);
+    UT_EXPECT(rrdlabels_entries(dst) == 1,
+              "copy with a value change should leave one entry per key");
+    {
+        char *v = NULL;
+        rrdlabels_get_value_strdup_or_null(dst, &v, "k1");
+        UT_EXPECT(v != NULL && strcmp(v, "v2") == 0,
+                  "copy with a value change should leave the new value in dst");
+        freez(v);
+    }
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
+    // Value change via copy where dst pinned the old value with DONT_DELETE.
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    rrdlabels_add(dst, "k1", "v1", RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE);
+    rrdlabels_add(src, "k1", "v2", RRDLABEL_SRC_CONFIG);
+    rrdlabels_copy(dst, src);
+    UT_EXPECT(rrdlabels_entries(dst) == 1,
+              "copy must not leave a duplicate (key,old-value) when DONT_DELETE was set");
+    {
+        char *v = NULL;
+        rrdlabels_get_value_strdup_or_null(dst, &v, "k1");
+        UT_EXPECT(v != NULL && strcmp(v, "v2") == 0,
+                  "copy with a DONT_DELETE value change should leave the new value in dst");
+        freez(v);
+    }
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
     // ---- rrdlabels_remove_all_unmarked_and_changed: CLABEL-commit semantics ----
     // (1) unmark + re-add identical set => no change => false
     l = rrdlabels_create();
