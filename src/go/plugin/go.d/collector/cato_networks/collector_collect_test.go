@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
@@ -143,15 +142,14 @@ func TestCollector_Collect(t *testing.T) {
 				},
 				steps: []collectStep{
 					{
-						name: "cache initial peer",
+						name: "emit initial peer",
 						wantMetrics: map[string]metrix.SampleValue{
 							stateMetricKey("bgp_session_status", "up", stalePeerLabels): 1,
 						},
 					},
 					{
-						name: "drop failed site peer on refresh",
+						name: "omit failed site peer next cycle",
 						setup: func(_ *testing.T, _ *Collector, fake *fakeAPIClient) {
-							now = now.Add(seconds(defaultBGPRefreshEvery) + time.Second)
 							fake.bgpErrSites = map[string]error{"1002": errors.New("site bgp failed")}
 						},
 						wantMetrics: map[string]metrix.SampleValue{
@@ -282,7 +280,7 @@ func TestCollector_Collect(t *testing.T) {
 				{
 					name: "uses cache after refresh failure",
 					setup: func(_ *testing.T, c *Collector, fake *fakeAPIClient) {
-						now := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC).Add(301 * time.Second)
+						now := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC).Add(seconds(defaultDiscoveryEvery) + time.Second)
 						c.now = func() time.Time { return now }
 						fake.lookupErr = errors.New("connection refused")
 					},
@@ -291,27 +289,37 @@ func TestCollector_Collect(t *testing.T) {
 					},
 					check: func(t *testing.T, c *Collector, _ *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
 						require.Equal(t, []string{"1001", "1002"}, c.discovery.siteIDs)
-						require.Equal(t, time.Date(2026, 5, 1, 12, 5, 1, 0, time.UTC), c.discovery.fetchedAt)
+						require.Equal(t, time.Date(2026, 5, 1, 13, 0, 1, 0, time.UTC), c.discovery.fetchedAt)
 					},
 				},
 			},
 		},
-		"does not advance BGP rotation when all requests fail": {
-			setup: func(_ *testing.T, c *Collector, fake *fakeAPIClient) {
+		"BGP failures are not cached": {
+			setup: func(_ *testing.T, _ *Collector, fake *fakeAPIClient) {
 				fake.bgpErrSites = map[string]error{
 					"1001": errors.New("rate limit exceeded"),
 					"1002": errors.New("rate limit exceeded"),
 				}
-				now := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
-				c.now = func() time.Time { return now }
 			},
-			steps: []collectStep{{
-				name: "keeps rotation state unchanged",
-				check: func(t *testing.T, c *Collector, _ *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
-					require.Zero(t, c.bgp.nextIndex)
-					require.True(t, c.bgp.nextRefresh.IsZero())
+			steps: []collectStep{
+				{
+					name: "first failed BGP cycle",
+					wantMissing: []string{
+						stateMetricKey("bgp_session_status", "up", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")),
+					},
+					check: func(t *testing.T, c *Collector, fake *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
+						require.Equal(t, 2, fake.bgpCalls)
+						require.Empty(t, c.bgp.noBGPUntil)
+					},
 				},
-			}},
+				{
+					name: "failed BGP sites are retried next cycle",
+					check: func(t *testing.T, c *Collector, fake *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
+						require.Equal(t, 4, fake.bgpCalls)
+						require.Empty(t, c.bgp.noBGPUntil)
+					},
+				},
+			},
 		},
 		"filters empty BGP peers": {
 			setup: func(_ *testing.T, _ *Collector, fake *fakeAPIClient) {
@@ -322,86 +330,71 @@ func TestCollector_Collect(t *testing.T) {
 				wantMissing: []string{
 					stateMetricKey("bgp_session_status", "up", bgpLabels("1001", "Paris Office", "", "")),
 				},
+				check: func(t *testing.T, c *Collector, _ *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
+					require.NotContains(t, c.bgp.noBGPUntil, "1001")
+				},
 			}},
 		},
-		"uses cached discovery and BGP state within refresh window": {
+		"caches sites without BGP peers for one hour with jitter": {
 			setup: func(_ *testing.T, c *Collector, _ *fakeAPIClient) {
 				now := fixedCatoTestNow()
 				c.now = func() time.Time { return now }
 			},
 			steps: []collectStep{
 				{
-					name: "initial refresh",
+					name: "initial collection caches no-peer site",
 					wantMetrics: map[string]metrix.SampleValue{
 						stateMetricKey("bgp_session_status", "up", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")): 1,
 					},
+					check: func(t *testing.T, c *Collector, fake *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
+						require.Equal(t, 2, fake.bgpCalls)
+						require.NotContains(t, c.bgp.noBGPUntil, "1001")
+						require.Equal(t, c.noBGPCacheUntil("1002", fixedCatoTestNow()), c.bgp.noBGPUntil["1002"])
+					},
 				},
 				{
-					name: "cached state reused",
+					name: "no-peer site is skipped within TTL",
 					setup: func(_ *testing.T, c *Collector, fake *fakeAPIClient) {
-						now := fixedCatoTestNow().Add(time.Second)
+						now := fixedCatoTestNow().Add(time.Minute)
 						c.now = func() time.Time { return now }
 						fake.lookupErr = errors.New("unexpected discovery refresh")
 						fake.bgpErrSites = map[string]error{
-							"1001": errors.New("unexpected bgp refresh"),
 							"1002": errors.New("unexpected bgp refresh"),
-							"1003": errors.New("unexpected bgp refresh"),
 						}
 					},
 					wantMetrics: map[string]metrix.SampleValue{
 						stateMetricKey("bgp_session_status", "up", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")): 1,
 					},
-				},
-			},
-		},
-		"BGP polling rotates across sites": {
-			setup: func(_ *testing.T, c *Collector, fake *fakeAPIClient) {
-				ids := numberedSiteIDs(1001, 26)
-				fake.lookup = fixtureLookupPage(26, ids...)
-				fake.snapshot = fixtureSnapshotForSiteIDs(ids...)
-				fake.bgp = make(map[string][]*catosdk.SiteBgpStatusResult, len(ids))
-				for _, siteID := range ids {
-					fake.bgp[siteID] = []*catosdk.SiteBgpStatusResult{
-						{
-							RemoteIP:   "192.0.2." + strings.TrimPrefix(siteID, "10"),
-							RemoteASN:  "64512",
-							BGPSession: "Established",
-						},
-					}
-				}
-				fake.bgp["1026"] = []*catosdk.SiteBgpStatusResult{
-					{
-						RemoteIP:   "192.0.2.126",
-						RemoteASN:  "64513",
-						BGPSession: "Established",
-					},
-				}
-				now := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
-				c.now = func() time.Time { return now }
-			},
-			steps: []collectStep{
-				{
-					name: "first window",
-					check: func(t *testing.T, c *Collector, _ *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
-						require.Len(t, c.bgp.bySite, defaultBGPMaxSites)
-						require.Contains(t, c.bgp.bySite, "1001")
-						require.NotContains(t, c.bgp.bySite, "1026")
+					check: func(t *testing.T, _ *Collector, fake *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
+						require.Equal(t, 3, fake.bgpCalls)
 					},
 				},
 				{
-					name: "second window completes site set",
-					setup: func(_ *testing.T, c *Collector, _ *fakeAPIClient) {
-						now := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC).Add(seconds(defaultBGPRefreshEvery) + time.Second)
+					name: "expired no-peer site is polled again",
+					setup: func(_ *testing.T, c *Collector, fake *fakeAPIClient) {
+						now := c.noBGPCacheUntil("1002", fixedCatoTestNow()).Add(time.Second)
 						c.now = func() time.Time { return now }
+						fake.lookupErr = nil
+						fake.bgpErrSites = nil
+						fake.bgp["1002"] = []*catosdk.SiteBgpStatusResult{
+							{
+								RemoteIP:   "192.0.2.20",
+								RemoteASN:  "64513",
+								BGPSession: "Established",
+							},
+						}
 					},
-					check: func(t *testing.T, c *Collector, _ *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
-						require.Len(t, c.bgp.bySite, 26)
-						require.Contains(t, c.bgp.bySite, "1026")
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_session_status", "up", bgpLabels("1002", "Toulouse Office", "192.0.2.20", "64513")): 1,
+					},
+					check: func(t *testing.T, c *Collector, fake *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
+						require.Equal(t, 5, fake.bgpCalls)
+						require.NotContains(t, c.bgp.noBGPUntil, "1002")
 					},
 				},
 			},
 		},
-		"collection fails before BGP refresh": {
+		"collection fails before BGP polling": {
 			setup: func(_ *testing.T, c *Collector, fake *fakeAPIClient) {
 				fake.bgp["1002"] = []*catosdk.SiteBgpStatusResult{
 					{
@@ -414,25 +407,20 @@ func TestCollector_Collect(t *testing.T) {
 				c.now = func() time.Time { return now }
 			},
 			steps: []collectStep{
-				{name: "first BGP window"},
+				{name: "first collection"},
 				{
-					name: "second BGP window",
-					setup: func(_ *testing.T, c *Collector, _ *fakeAPIClient) {
-						now := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC).Add(seconds(defaultBGPRefreshEvery) + time.Second)
-						c.now = func() time.Time { return now }
-					},
-					check: func(t *testing.T, c *Collector, _ *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
-						require.Len(t, c.bgp.bySite, 2)
-					},
-				},
-				{
-					name: "snapshot failure aborts",
+					name: "snapshot failure aborts before BGP polling",
 					setup: func(_ *testing.T, c *Collector, fake *fakeAPIClient) {
+						bgpCalls := fake.bgpCalls
 						fake.snapshotErr = errors.New("snapshot unavailable")
-						now := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC).Add(2 * (seconds(defaultBGPRefreshEvery) + time.Second))
+						now := time.Date(2026, 5, 1, 12, 1, 0, 0, time.UTC)
 						c.now = func() time.Time { return now }
+						fake.bgpCalls = bgpCalls
 					},
 					wantErr: "account snapshot failed",
+					check: func(t *testing.T, _ *Collector, fake *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
+						require.Equal(t, 2, fake.bgpCalls)
+					},
 				},
 			},
 		},
@@ -621,16 +609,53 @@ func TestCollector_WriteMetrics(t *testing.T) {
 	}
 }
 
-func TestPruneBGPState(t *testing.T) {
-	bySite := map[string][]bgpPeerState{
-		"1001": {{RemoteIP: "192.0.2.10"}},
-		"1002": {{RemoteIP: "192.0.2.20"}},
+func TestNoBGPCache(t *testing.T) {
+	tests := map[string]struct {
+		setup func(map[string]time.Time, time.Time)
+		want  []string
+	}{
+		"keeps active unexpired sites": {
+			setup: func(noBGPUntil map[string]time.Time, now time.Time) {
+				noBGPUntil["1002"] = now.Add(time.Hour)
+			},
+			want: []string{"1002"},
+		},
+		"prunes inactive sites": {
+			setup: func(noBGPUntil map[string]time.Time, now time.Time) {
+				noBGPUntil["1001"] = now.Add(time.Hour)
+				noBGPUntil["1002"] = now.Add(time.Hour)
+			},
+			want: []string{"1002"},
+		},
+		"prunes expired sites": {
+			setup: func(noBGPUntil map[string]time.Time, now time.Time) {
+				noBGPUntil["1002"] = now.Add(-time.Second)
+			},
+		},
 	}
 
-	pruneBGPState(bySite, []string{"1002"})
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			now := fixedCatoTestNow()
+			noBGPUntil := map[string]time.Time{}
+			tc.setup(noBGPUntil, now)
 
-	require.NotContains(t, bySite, "1001")
-	require.Contains(t, bySite, "1002")
+			pruneNoBGPCache(noBGPUntil, []string{"1002"}, now)
+
+			require.ElementsMatch(t, tc.want, mapKeys(noBGPUntil))
+		})
+	}
+}
+
+func TestNoBGPCacheJitter(t *testing.T) {
+	c := New()
+	c.UpdateEvery = defaultUpdateEvery
+
+	first := c.noBGPCacheJitter("1001")
+	require.Equal(t, first, c.noBGPCacheJitter("1001"))
+	require.GreaterOrEqual(t, first, time.Duration(0))
+	require.Less(t, first, seconds(defaultUpdateEvery)*5)
+	require.Greater(t, seconds(defaultUpdateEvery)*5, seconds(defaultUpdateEvery))
 }
 
 func siteLabels(siteID, siteName, popName string) metrix.Labels {
@@ -643,6 +668,14 @@ func interfaceLabels(siteID, siteName, interfaceID, interfaceName string) metrix
 
 func bgpLabels(siteID, siteName, peerIP, peerASN string) metrix.Labels {
 	return metrix.Labels{"site_id": siteID, "site_name": siteName, "peer_ip": peerIP, "peer_asn": peerASN}
+}
+
+func mapKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	return keys
 }
 
 func metricKeyFromLabelView(name string, labels metrix.LabelView) string {

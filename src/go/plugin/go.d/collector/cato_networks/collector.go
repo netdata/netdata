@@ -101,7 +101,7 @@ func (c *Collector) Init(context.Context) error {
 	}
 
 	c.discovery = discoveryState{}
-	c.bgp = bgpState{bySite: make(map[string][]bgpPeerState)}
+	c.bgp = bgpState{noBGPUntil: make(map[string]time.Time)}
 
 	return nil
 }

@@ -25,7 +25,7 @@ func TestCollector_Init(t *testing.T) {
 				require.Equal(t, defaultEntitySelector, c.SiteSelector)
 				require.NotNil(t, c.siteMatcher)
 				require.True(t, c.siteMatcher.MatchString("any-site"))
-				require.NotNil(t, c.bgp.bySite)
+				require.NotNil(t, c.bgp.noBGPUntil)
 			},
 		},
 		"missing account id": {
@@ -92,15 +92,14 @@ func TestCollector_Check(t *testing.T) {
 				require.Zero(t, fake.metricsCalls)
 				require.Zero(t, fake.bgpCalls)
 				require.Empty(t, c.discovery.siteIDs)
-				require.Empty(t, c.bgp.bySite)
+				require.Empty(t, c.bgp.noBGPUntil)
 				_, ok := c.topology.CurrentTopology()
 				require.False(t, ok)
 			},
 		},
-		"does not populate BGP cache": {
+		"does not populate no-BGP cache": {
 			check: func(t *testing.T, c *Collector, _ *fakeAPIClient) {
-				require.Empty(t, c.bgp.bySite)
-				require.True(t, c.bgp.nextRefresh.IsZero())
+				require.Empty(t, c.bgp.noBGPUntil)
 			},
 		},
 		"preserves probe error cause": {

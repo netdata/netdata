@@ -16,13 +16,12 @@ import (
 const (
 	defaultUpdateEvery      = 60
 	defaultEndpoint         = "https://api.catonetworks.com/api/v1/graphql2"
-	defaultDiscoveryEvery   = 300
+	defaultDiscoveryEvery   = 3600
 	defaultDiscoveryLimit   = 100
 	defaultMetricsTimeFrame = "last.PT5M"
 	defaultMetricsBuckets   = 5
 	defaultMaxSitesPerQuery = 50
-	defaultBGPRefreshEvery  = 300
-	defaultBGPMaxSites      = 25
+	defaultNoBGPCacheTTL    = 3600
 	defaultEntitySelector   = "*"
 	maxDiscoveryPages       = 1000
 )

@@ -5,83 +5,95 @@ package cato_networks
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"time"
 )
 
 type bgpState struct {
-	bySite      map[string][]bgpPeerState
-	nextRefresh time.Time
-	nextIndex   int
+	noBGPUntil map[string]time.Time
 }
 
 func (c *Collector) collectBGP(ctx context.Context, sites map[string]*siteState, order []string) error {
 	now := c.now()
-	pruneBGPState(c.bgp.bySite, order)
-	if now.Before(c.bgp.nextRefresh) && len(c.bgp.bySite) > 0 {
-		mergeBGPState(sites, c.bgp.bySite)
-		return nil
-	}
+	pruneNoBGPCache(c.bgp.noBGPUntil, order, now)
 
-	limit := c.bgpSitesPerCollectionLimit(len(order))
-	if limit == 0 {
-		return nil
-	}
-
+	var requestCount int
 	var errCount int
-	for i := range limit {
-		idx := (c.bgp.nextIndex + i) % len(order)
-		siteID := order[idx]
+	for _, siteID := range order {
+		if c.isNoBGPCached(siteID, now) {
+			continue
+		}
+
+		requestCount++
 		raw, err := c.client.SiteBgpStatus(ctx, c.AccountID, siteID)
 		if err != nil {
 			errCount++
-			delete(c.bgp.bySite, siteID)
 			c.Debugf("siteBgpStatus failed for one site, error_class=%s", classifyCatoError(err))
 			continue
 		}
+
 		peers, issues := normalizeBGP(raw)
 		for _, issue := range issues {
 			c.logNormalizationIssue(normalizationSurfaceBGP, issue)
 		}
-		c.bgp.bySite[siteID] = peers
+
+		if len(peers) == 0 {
+			if len(issues) > 0 {
+				continue
+			}
+			c.bgp.noBGPUntil[siteID] = c.noBGPCacheUntil(siteID, now)
+			continue
+		}
+		delete(c.bgp.noBGPUntil, siteID)
+		if site := sites[siteID]; site != nil {
+			site.BGPPeers = peers
+		}
 	}
 
-	if errCount == limit {
-		mergeBGPState(sites, c.bgp.bySite)
+	if requestCount == 0 {
+		return nil
+	}
+	if errCount == requestCount {
 		return fmt.Errorf("all siteBgpStatus requests failed")
 	}
-	c.bgp.nextIndex = (c.bgp.nextIndex + limit) % len(order)
-	c.bgp.nextRefresh = now.Add(seconds(defaultBGPRefreshEvery))
-	mergeBGPState(sites, c.bgp.bySite)
-
 	if errCount > 0 {
-		return fmt.Errorf("%d of %d siteBgpStatus requests failed", errCount, limit)
+		return fmt.Errorf("%d of %d siteBgpStatus requests failed", errCount, requestCount)
 	}
 	return nil
 }
 
-func (c *Collector) bgpSitesPerCollectionLimit(siteCount int) int {
-	return min(defaultBGPMaxSites, siteCount)
+func (c *Collector) isNoBGPCached(siteID string, now time.Time) bool {
+	until, ok := c.bgp.noBGPUntil[siteID]
+	return ok && now.Before(until)
 }
 
-func pruneBGPState(bySite map[string][]bgpPeerState, order []string) {
-	if len(bySite) == 0 {
+func (c *Collector) noBGPCacheUntil(siteID string, now time.Time) time.Time {
+	return now.Add(seconds(defaultNoBGPCacheTTL) + c.noBGPCacheJitter(siteID))
+}
+
+func (c *Collector) noBGPCacheJitter(siteID string) time.Duration {
+	interval := seconds(c.UpdateEvery)
+	if interval <= 0 {
+		interval = seconds(defaultUpdateEvery)
+	}
+
+	window := interval * 5
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(siteID))
+	return time.Duration(h.Sum64() % uint64(window))
+}
+
+func pruneNoBGPCache(noBGPUntil map[string]time.Time, order []string, now time.Time) {
+	if len(noBGPUntil) == 0 {
 		return
 	}
 	active := make(map[string]bool, len(order))
 	for _, siteID := range order {
 		active[siteID] = true
 	}
-	for siteID := range bySite {
-		if !active[siteID] {
-			delete(bySite, siteID)
-		}
-	}
-}
-
-func mergeBGPState(sites map[string]*siteState, bySite map[string][]bgpPeerState) {
-	for siteID, peers := range bySite {
-		if site := sites[siteID]; site != nil {
-			site.BGPPeers = append([]bgpPeerState(nil), peers...)
+	for siteID, until := range noBGPUntil {
+		if !active[siteID] || !now.Before(until) {
+			delete(noBGPUntil, siteID)
 		}
 	}
 }

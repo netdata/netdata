@@ -45,12 +45,12 @@ This collector does not auto-detect Cato accounts. Configure at least one job wi
 
 #### Limits
 
-Site discovery is paginated. The optional `site_selector` filters sites before snapshot, metrics, BGP, and topology collection. Account metrics are batched internally, and BGP status collection uses an internal rolling scan to avoid querying every site on every collection cycle.
+Site discovery is paginated and refreshed hourly. The optional `site_selector` filters sites before snapshot, metrics, BGP, and topology collection. Account metrics are batched internally. BGP status uses one per-site API request for each selected site that is not currently cached as having no BGP peers.
 
 
 #### Performance Impact
 
-The default interval is 60 seconds. BGP status is refreshed every 300 seconds by default because it requires per-site API requests. Large accounts may need multiple BGP refresh windows before every site's BGP state is updated.
+The default interval is 60 seconds. Sites that return a successful BGP response with no peers are cached as non-BGP sites for about one hour, with deterministic per-site jitter across multiple collection cycles to avoid synchronized refresh bursts. If BGP is enabled on such a site, BGP metrics can appear after that cache expires.
 
 
 ## Setup
