@@ -734,26 +734,28 @@ bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
             int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
             RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
             added++;
-
-            // Ensure at most one entry per key. The remove-unmarked sweep below
-            // preserves RRDLABEL_FLAG_DONT_DELETE, so a same-key replacement
-            // for a pinned entry would otherwise leave a stale duplicate
-            // (key, old-value) next to the fresh (key, new-value). Loop in
-            // case dst arrived with multiple same-key entries from prior
-            // buggy paths -- the find helper returns the first match only.
-            for (;;) {
-                RRDLABEL *old_label_with_same_key = rrdlabels_find_label_with_key_unsafe(dst, label, false);
-                if (!old_label_with_same_key)
-                    break;
-                int del_result = JudyLDel(&dst->JudyL, (Word_t)old_label_with_same_key, PJE0);
-                (void)del_result;
-                int64_t old_judy_mem = JudyAllocThreadPulseGetAndReset();
-                RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, old_judy_mem, 0);
-                delete_label(old_label_with_same_key);
-            }
         }
         else
             *((RRDLABEL_SRC *)PValue) |= RRDLABEL_FLAG_OLD;
+
+        // Ensure at most one entry per key. The remove-unmarked sweep below
+        // preserves RRDLABEL_FLAG_DONT_DELETE, so a stale (key, *) entry
+        // would otherwise survive next to the desired (key, value) entry.
+        // Runs in BOTH branches because the stale entry may pre-date this
+        // iteration (e.g. a duplicate left by a prior buggy path) and is
+        // independent of whether the current src label is a fresh insert
+        // or an already-present (key, value). The find helper skips the
+        // just-inserted/just-found entry via same_value=false.
+        for (;;) {
+            RRDLABEL *old_label_with_same_key = rrdlabels_find_label_with_key_unsafe(dst, label, false);
+            if (!old_label_with_same_key)
+                break;
+            int del_result = JudyLDel(&dst->JudyL, (Word_t)old_label_with_same_key, PJE0);
+            (void)del_result;
+            int64_t old_judy_mem = JudyAllocThreadPulseGetAndReset();
+            RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, old_judy_mem, 0);
+            delete_label(old_label_with_same_key);
+        }
     }
     lfe_done_nolock();
 
@@ -827,22 +829,25 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
             dup_label(label);
             dst->version++;
             update_statistics = true;
-
-            // Drop any other entry sharing this key. Loop in case dst arrived
-            // with multiple same-key entries from prior buggy paths -- the
-            // find helper returns the first match only.
-            for (;;) {
-                RRDLABEL *old_label_with_key = rrdlabels_find_label_with_key_unsafe(dst, label, false);
-                if (!old_label_with_key)
-                    break;
-                int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
-                (void)JudyLDel(&dst->JudyL, (Word_t)old_label_with_key, PJE0);
-                RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
-                delete_label((RRDLABEL *)old_label_with_key);
-            }
         }
         else
             *((RRDLABEL_SRC *)PValue) = (ls & ~(RRDLABEL_FLAG_NEW)) | RRDLABEL_FLAG_OLD;
+
+        // Drop any other entry sharing this key. Runs in BOTH branches so
+        // pre-existing same-key duplicates (e.g. left behind by a prior
+        // buggy path) get cleaned up even when the current src label is
+        // already present in dst. Loop because the find helper returns
+        // the first match only. The find skips the just-inserted /
+        // just-updated entry via same_value=false.
+        for (;;) {
+            RRDLABEL *old_label_with_key = rrdlabels_find_label_with_key_unsafe(dst, label, false);
+            if (!old_label_with_key)
+                break;
+            int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
+            (void)JudyLDel(&dst->JudyL, (Word_t)old_label_with_key, PJE0);
+            RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
+            delete_label((RRDLABEL *)old_label_with_key);
+        }
     }
     lfe_done_nolock();
     if (update_statistics) {
