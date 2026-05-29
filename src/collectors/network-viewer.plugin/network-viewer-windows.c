@@ -858,6 +858,16 @@ void function_network_connections(
     MIB_UDPTABLE_OWNER_PID  *udp4 = nv_fetch_udp_table(NV_WIN_AF_INET);
     MIB_UDP6TABLE_OWNER_PID *udp6 = nv_fetch_udp_table(NV_WIN_AF_INET6);
 
+    // A NULL return from nv_fetch_*_table means the API call failed entirely
+    // (not merely an empty table — zero-entry tables return a non-NULL buffer).
+    // If every fetch failed we cannot distinguish "no sockets" from a broken
+    // driver, so report an error instead of silently returning an empty table.
+    if (unlikely(!tcp4 && !tcp6 && !udp4 && !udp6)) {
+        nv_send_error(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR,
+                      "failed to collect Windows network connections");
+        return;
+    }
+
     NV_PID_CACHE pid_cache;
     nv_pid_cache_init(&pid_cache);
 
