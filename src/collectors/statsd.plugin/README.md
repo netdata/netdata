@@ -352,22 +352,29 @@ When querying StatsD metrics via the Netdata API, you must use the chart identif
 - **Chart id** = `<remaining>_<metric_type>` — where `<remaining>` is the portion after the first `.` or `_`, and `<metric_type>` is one of: `gauge`, `counter`, `meter`, `timer`, `histogram`, `set`, or `dictionary`. If the metric name has no `.` or `_`, the chart id is just the `<metric_type>`.
 - **Full chart reference** = `<chart_type>.<chart_id>` — use this as the `chart` parameter in API queries.
 
-| Metric sent | Metric type | Chart type | Chart ID | Full chart reference |
-|---|---|---|---|---|
-| `test.metric:100\|c` | counter | `statsd_test` | `metric_counter` | `statsd_test.metric_counter` |
-| `myapp.used_memory:12345\|g` | gauge | `statsd_myapp` | `used_memory_gauge` | `statsd_myapp.used_memory_gauge` |
-| `myapp.requests:50\|ms` | timer | `statsd_myapp` | `requests_timer` | `statsd_myapp.requests_timer` |
+| Metric sent                  | Metric type | Chart type      | Chart ID            | Full chart reference                |
+|------------------------------|-------------|-----------------|---------------------|-------------------------------------|
+| `test.metric:100\|c`         | counter     | `statsd_test`   | `metric_counter`    | `statsd_test.metric_counter`       |
+| `myapp.used_memory:12345\|g` | gauge       | `statsd_myapp`  | `used_memory_gauge` | `statsd_myapp.used_memory_gauge`   |
+| `myapp.requests:50\|ms`      | timer       | `statsd_myapp`  | `requests_timer`    | `statsd_myapp.requests_timer`      |
 
-> **Tip:** To discover the exact chart names available on your agent, run:
->
-> ```bash
-> curl http://localhost:19999/api/v1/charts
-> ```
->
-> Filter the results for IDs starting with `statsd_`. Use the returned chart `id` field (in `type.id` format) as the `chart` parameter in data queries.
+:::tip
 
-> **Troubleshooting "No metrics were matched to query":**
-> This error typically occurs when you use the raw StatsD metric name (e.g., `statsd.test.metric`) as the `chart` parameter instead of the constructed chart reference (e.g., `statsd_test.metric_counter`). To resolve this, verify the correct chart name using `/api/v1/charts` before querying metric data.
+To discover the exact chart names available on your agent, run:
+
+```bash
+curl http://localhost:19999/api/v1/charts
+```
+
+Filter the results for IDs starting with `statsd_`. Use the returned chart `id` field (in `type.id` format) as the `chart` parameter in data queries.
+
+:::
+
+:::info
+
+**Troubleshooting "No metrics were matched to query":** This error typically occurs when you use the raw StatsD metric name (e.g., `statsd.test.metric`) as the `chart` parameter instead of the constructed chart reference (e.g., `statsd_test.metric_counter`). To resolve this, verify the correct chart name using `/api/v1/charts` before querying metric data.
+
+:::
 
 Example: To create charts for all `myapp.*` metrics except `myapp.*.badmetric`:
 
