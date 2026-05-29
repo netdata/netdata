@@ -1783,16 +1783,21 @@ static int rrdlabels_unittest_change_detection(void) {
     // public add/migrate/copy paths so the pathological starting state can
     // be constructed for the test.
 
-    // Migrate: dst seeded with 3 pinned DONT_DELETE entries sharing "k1";
-    // src carries (k1, vc). After migrate, dst must have exactly one entry,
-    // value "vc", and the function must return true (cleanup counts as a
-    // mutation).
+    // Migrate (cleanup-only path): dst seeded with 3 pinned DONT_DELETE
+    // entries sharing "k1"; src carries (k1, vc) whose dedup pointer is
+    // ALREADY one of the planted entries, so JudyLIns lands on an existing
+    // slot, takes the else-branch (added stays 0), and the cleanup loop is
+    // the only mutation. Asserts that:
+    //   - the loop drains the OTHER two stale entries (not just the first);
+    //   - the function returns true even though added==0 and removed==0
+    //     (regression on the `cleaned` term in the return would fail here);
+    //   - dst ends with the single source entry.
     dst = rrdlabels_create();
     src = rrdlabels_create();
     {
         RRDLABEL *stale_a = add_label_name_value("k1", "va");
         RRDLABEL *stale_b = add_label_name_value("k1", "vb");
-        RRDLABEL *stale_c = add_label_name_value("k1", "vstale");
+        RRDLABEL *stale_c = add_label_name_value("k1", "vc");
         Pvoid_t *p;
         p = JudyLIns(&dst->JudyL, (Word_t)stale_a, PJE0);
         *((RRDLABEL_SRC *)p) = RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE;
@@ -1805,7 +1810,7 @@ static int rrdlabels_unittest_change_detection(void) {
               "test setup: dst should start with 3 manually-planted same-key entries");
     rrdlabels_add(src, "k1", "vc", RRDLABEL_SRC_CONFIG);
     UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == true,
-              "migrate must return true when cleanup drains multi-duplicate state");
+              "migrate must return true when cleanup is the only mutation (added=0, removed=0, cleaned>0)");
     UT_EXPECT(rrdlabels_entries(dst) == 1,
               "migrate must drain all stale same-key duplicates, not just the first");
     {
@@ -1818,11 +1823,11 @@ static int rrdlabels_unittest_change_detection(void) {
     rrdlabels_destroy(dst);
     rrdlabels_destroy(src);
 
-    // Copy: same setup, exercise the copy loop's drain behavior. The src
-    // label's (key, value) is one of the planted duplicates here, so the
-    // copy hits the else-branch (already-present) and the cleanup is the
-    // ONLY mutation -- exercises both the loop drain AND the else-branch
-    // cleanup added in this PR.
+    // Copy (cleanup-only path): same setup; src's (k1, vc) matches one of
+    // the planted entries so the copy takes the else-branch and the cleanup
+    // is the ONLY mutation. Asserts dst entries+value AND that
+    // dst->version advances despite no insert -- regression on the
+    // version bump inside the cleanup loop would fail this check.
     dst = rrdlabels_create();
     src = rrdlabels_create();
     {
@@ -1840,9 +1845,12 @@ static int rrdlabels_unittest_change_detection(void) {
     UT_EXPECT(rrdlabels_entries(dst) == 3,
               "test setup: dst should start with 3 manually-planted same-key entries (copy)");
     rrdlabels_add(src, "k1", "vc", RRDLABEL_SRC_CONFIG);
+    uint32_t copy_version_before = rrdlabels_version(dst);
     rrdlabels_copy(dst, src);
     UT_EXPECT(rrdlabels_entries(dst) == 1,
               "copy must drain all stale same-key duplicates, not just the first");
+    UT_EXPECT(rrdlabels_version(dst) > copy_version_before,
+              "copy must advance dst->version when cleanup is the only mutation");
     {
         char *v = NULL;
         rrdlabels_get_value_strdup_or_null(dst, &v, "k1");
