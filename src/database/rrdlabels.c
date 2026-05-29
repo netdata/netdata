@@ -717,22 +717,39 @@ bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     {
         JudyAllocThreadPulseGetAndReset();
 
+        // labels->JudyL is keyed by the deduplicated RRDLABEL pointer produced by
+        // add_label_name_value(), which encodes BOTH key and value. A same-key
+        // value change in src therefore yields a different pointer than the one
+        // dst already has, so JudyLIns lands on an empty slot.
         PValue = JudyLIns(&dst->JudyL, (Word_t)label, PJE0);
         if(unlikely(!PValue || PValue == PJERR))
             fatal("RRDLABELS migrate: corrupted labels array");
 
-        RRDLABEL_SRC flag;
         if (!*PValue) {
-            flag = (ls & ~(RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW)) | RRDLABEL_FLAG_NEW;
+            // Write through PValue BEFORE any subsequent JudyLDel: Judy
+            // invalidates previously-returned PValue pointers when the array
+            // is modified. Same ordering as labels_add_already_sanitized().
+            *((RRDLABEL_SRC *)PValue) = (ls & ~(RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW)) | RRDLABEL_FLAG_NEW;
             dup_label(label);
             int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
             RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
             added++;
+
+            // Ensure at most one entry per key. The remove-unmarked sweep below
+            // preserves RRDLABEL_FLAG_DONT_DELETE, so a same-key replacement
+            // for a pinned entry would otherwise leave a stale duplicate
+            // (key, old-value) next to the fresh (key, new-value).
+            RRDLABEL *old_label_with_same_key = rrdlabels_find_label_with_key_unsafe(dst, label, false);
+            if (old_label_with_same_key) {
+                int del_result = JudyLDel(&dst->JudyL, (Word_t)old_label_with_same_key, PJE0);
+                (void)del_result;
+                int64_t old_judy_mem = JudyAllocThreadPulseGetAndReset();
+                RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, old_judy_mem, 0);
+                delete_label(old_label_with_same_key);
+            }
         }
         else
-            flag = RRDLABEL_FLAG_OLD;
-
-        *((RRDLABEL_SRC *)PValue) |= flag;
+            *((RRDLABEL_SRC *)PValue) |= RRDLABEL_FLAG_OLD;
     }
     lfe_done_nolock();
 
@@ -800,8 +817,11 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
             fatal("RRDLABELS: corrupted labels array");
 
         if (!*PValue) {
+            // Write through PValue BEFORE the subsequent JudyLDel: Judy
+            // invalidates previously-returned PValue pointers when the array
+            // is modified. Same ordering as labels_add_already_sanitized().
+            *((RRDLABEL_SRC *)PValue) = (ls & ~(RRDLABEL_FLAG_OLD)) | RRDLABEL_FLAG_NEW;
             dup_label(label);
-            ls = (ls & ~(RRDLABEL_FLAG_OLD)) | RRDLABEL_FLAG_NEW;
             dst->version++;
             update_statistics = true;
             if (old_label_with_key) {
@@ -812,9 +832,7 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
             }
         }
         else
-            ls = (ls & ~(RRDLABEL_FLAG_NEW)) | RRDLABEL_FLAG_OLD;
-
-        *((RRDLABEL_SRC *)PValue) = ls;
+            *((RRDLABEL_SRC *)PValue) = (ls & ~(RRDLABEL_FLAG_NEW)) | RRDLABEL_FLAG_OLD;
     }
     lfe_done_nolock();
     if (update_statistics) {
@@ -1647,6 +1665,47 @@ static int rrdlabels_unittest_change_detection(void) {
               "migrate where the only diff is a DONT_DELETE label should return false");
     UT_EXPECT(rrdlabels_entries(dst) == 1,
               "DONT_DELETE label should be preserved after migrate");
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
+    // Value change via migrate (no DONT_DELETE): dst ends with a single entry
+    // for the key, carrying the new value.
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    rrdlabels_add(dst, "k1", "v1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(src, "k1", "v2", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == true,
+              "migrate with a value change should return true");
+    UT_EXPECT(rrdlabels_entries(dst) == 1,
+              "migrate with a value change should leave one entry per key");
+    {
+        char *v = NULL;
+        rrdlabels_get_value_strdup_or_null(dst, &v, "k1");
+        UT_EXPECT(v != NULL && strcmp(v, "v2") == 0,
+                  "migrate with a value change should leave the new value in dst");
+        freez(v);
+    }
+    rrdlabels_destroy(dst);
+    rrdlabels_destroy(src);
+
+    // Value change via migrate where dst pinned the old value with DONT_DELETE:
+    // the stale (key, old-value) must not survive, even though DONT_DELETE
+    // would otherwise protect it from the remove-unmarked sweep.
+    dst = rrdlabels_create();
+    src = rrdlabels_create();
+    rrdlabels_add(dst, "k1", "v1", RRDLABEL_SRC_CONFIG | RRDLABEL_FLAG_DONT_DELETE);
+    rrdlabels_add(src, "k1", "v2", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_migrate_to_these(dst, src) == true,
+              "migrate with a value change for a DONT_DELETE key should return true");
+    UT_EXPECT(rrdlabels_entries(dst) == 1,
+              "migrate must not leave a duplicate (key,old-value) when DONT_DELETE was set");
+    {
+        char *v = NULL;
+        rrdlabels_get_value_strdup_or_null(dst, &v, "k1");
+        UT_EXPECT(v != NULL && strcmp(v, "v2") == 0,
+                  "migrate with a DONT_DELETE value change should leave the new value in dst");
+        freez(v);
+    }
     rrdlabels_destroy(dst);
     rrdlabels_destroy(src);
 
