@@ -1379,19 +1379,21 @@ template: ml_5min_node
 
 **Why This Matters:** Boolean metrics require different aggregation strategies depending on whether you need to detect any single failure, confirm a sustained outage, or check the current state. Choosing the wrong method leads to missed alerts or alert noise.
 
-**Approach 1: Detect Any Failure Event (sum)**
+**Approach 1: Detect Any Failure Event (average)**
 
 ```text
  alarm: service_failure_event
     on: my_service.health_status
-lookup: sum -5m unaligned absolute
+lookup: average -10s of unhealthy
  every: 10s
-  crit: $this > 0
-   info: any failure detected in the last 5 minutes
+  warn: $this > 0
+   info: any failure detected in the last 10 seconds
     to: sysadmin
 ```
 
-Use when the metric acts as a failure indicator — the value is 0 normally and 1 when a failure occurs. `sum` adds every sample in the window, so any single non-zero value produces a positive result. This is the same pattern used in [Example 4: Network Packet Drops](#example-4-network-packet-drops).
+Use when the metric acts as a failure indicator — the value is 0 normally and 1 when a failure occurs. `average` over a short window naturally reflects any non-zero sample: if the metric was 1 at any point, the average will be greater than 0. This is the same pattern used by Netdata's Docker container health monitoring (`average -10s of unhealthy`, `warn: $this > 0`).
+
+> **Note:** Do not use `sum` for boolean 0/1 gauges. While `sum -5m unaligned absolute` would technically detect failures (any non-zero sample makes the sum positive), `sum` produces a count of seconds in state 1 rather than an intuitive threshold. Use `sum` only for counter/cumulative metrics like packet drops or error totals — see [Example 4: Network Packet Drops](#example-4-network-packet-drops) for a correct `sum` use case.
 
 **Approach 2: Detect Any Downtime (min) or Continuous Outage (max)**
 
@@ -1456,7 +1458,7 @@ Use to check only the current value without time-window aggregation. The `calc: 
 
 | Intent                                                  | Method | Lookup / Calc              | Condition    | Fires When                                |
 | ------------------------------------------------------- | ------ | -------------------------- | ------------ | ----------------------------------------- |
-| Any failure event (metric is 0 normally, 1 on failure)  | `sum`  | `sum -5m unaligned absolute` | `$this > 0` | Metric was non-zero at any point          |
+| Any failure event (metric is 0 normally, 1 on failure)  | `average`  | `average -10s of unhealthy` | `$this > 0` | Metric was non-zero at any point in the window |
 | Any downtime (metric is 1=healthy, 0=down)              | `min`  | `min -5m unaligned`        | `$this == 0` | Metric hit 0 at any point in the window   |
 | Continuous outage (metric is 1=healthy, 0=down)         | `max`  | `max -5m unaligned`        | `$this == 0` | Metric was 0 for the entire window        |
 | Failure rate over time                                  | `average` | `average -5m unaligned percentage of status` | `$this > N`  | Failure percentage exceeds threshold      |
@@ -1467,10 +1469,11 @@ For a full list of available lookup methods and processing options (`average`, `
 **Key Points:**
 
 - Boolean 0/1 metrics work with all standard lookup methods — the choice depends on your alerting intent
-- Use `sum` with `absolute` for event/failure detection (same pattern as [Example 4: Network Packet Drops](#example-4-network-packet-drops))
+- Use `average` over a short window for failure detection (`average -10s of <dimension>`, `warn: $this > 0`) — the same pattern Netdata uses in its own health configs (e.g., `health.d/docker.conf`)
 - Use `min` for "was it ever down?" and `max` for "was it continuously down?"
-- Use `average` for SLO-style failure-rate alerting (fraction of time in failure state)
+- Use `average` with `percentage` for SLO-style failure-rate alerting (fraction of time in failure state)
 - Use `calc` without `lookup` for instant state checks, combined with `delay` for debouncing
+- Avoid `sum` on boolean gauges — it produces a count of seconds in state 1, not an intuitive threshold. Use `sum` only for counter/cumulative metrics (e.g., total packet drops in a time window)
 
 **Variables Used:**
 
