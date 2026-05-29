@@ -4,9 +4,95 @@
 #include "libnetdata/os/windows-perflib/perflib.h"
 #include "libnetdata/os/system-maps/system-services.h"
 #include "libnetdata/os/system-maps/cached-sid-username.h"
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <iphlpapi.h>
+
+// Minimal IP Helper API forward declarations.
+// <winsock2.h> and <ws2tcpip.h> cannot be included here: libnetdata.h already
+// pulls in POSIX socket headers (via uv.h), and the Windows headers redefine
+// hostent, sockaddr, pollfd etc. causing compile errors on Cygwin/MSYS2.
+// Base types (DWORD, ULONG, UCHAR, BOOL, PVOID, PDWORD) come from <windows.h>
+// which is included for OS_WINDOWS by libnetdata/common.h.
+// inet_ntop / struct in_addr / AF_INET* / INET6_ADDRSTRLEN come from the
+// POSIX headers already included by libnetdata.h.
+
+#define MIB_TCP_STATE_CLOSED     1
+#define MIB_TCP_STATE_LISTEN     2
+#define MIB_TCP_STATE_SYN_SENT   3
+#define MIB_TCP_STATE_SYN_RCVD   4
+#define MIB_TCP_STATE_ESTAB      5
+#define MIB_TCP_STATE_FIN_WAIT1  6
+#define MIB_TCP_STATE_FIN_WAIT2  7
+#define MIB_TCP_STATE_CLOSE_WAIT 8
+#define MIB_TCP_STATE_CLOSING    9
+#define MIB_TCP_STATE_LAST_ACK  10
+#define MIB_TCP_STATE_TIME_WAIT 11
+#define MIB_TCP_STATE_DELETE_TCB 12
+
+typedef enum { TCP_TABLE_OWNER_PID_ALL = 5 } TCP_TABLE_CLASS;
+typedef enum { UDP_TABLE_OWNER_PID = 1 }    UDP_TABLE_CLASS;
+
+typedef struct {
+    DWORD dwState;
+    DWORD dwLocalAddr;
+    DWORD dwLocalPort;
+    DWORD dwRemoteAddr;
+    DWORD dwRemotePort;
+    DWORD dwOwningPid;
+} MIB_TCPROW_OWNER_PID;
+
+typedef struct {
+    UCHAR ucLocalAddr[16];
+    DWORD dwLocalScopeId;
+    DWORD dwLocalPort;
+    UCHAR ucRemoteAddr[16];
+    DWORD dwRemoteScopeId;
+    DWORD dwRemotePort;
+    DWORD dwState;
+    DWORD dwOwningPid;
+} MIB_TCP6ROW_OWNER_PID;
+
+typedef struct {
+    DWORD dwNumEntries;
+    MIB_TCPROW_OWNER_PID table[1];
+} MIB_TCPTABLE_OWNER_PID;
+
+typedef struct {
+    DWORD dwNumEntries;
+    MIB_TCP6ROW_OWNER_PID table[1];
+} MIB_TCP6TABLE_OWNER_PID;
+
+typedef struct {
+    DWORD dwLocalAddr;
+    DWORD dwLocalPort;
+    DWORD dwOwningPid;
+} MIB_UDPROW_OWNER_PID;
+
+typedef struct {
+    UCHAR ucLocalAddr[16];
+    DWORD dwLocalScopeId;
+    DWORD dwLocalPort;
+    DWORD dwOwningPid;
+} MIB_UDP6ROW_OWNER_PID;
+
+typedef struct {
+    DWORD dwNumEntries;
+    MIB_UDPROW_OWNER_PID table[1];
+} MIB_UDPTABLE_OWNER_PID;
+
+typedef struct {
+    DWORD dwNumEntries;
+    MIB_UDP6ROW_OWNER_PID table[1];
+} MIB_UDP6TABLE_OWNER_PID;
+
+DWORD GetExtendedTcpTable(PVOID pTcpTable, PDWORD pdwSize, BOOL bOrder,
+                          ULONG ulAf, TCP_TABLE_CLASS TableClass, ULONG Reserved);
+DWORD GetExtendedUdpTable(PVOID pUdpTable, PDWORD pdwSize, BOOL bOrder,
+                          ULONG ulAf, UDP_TABLE_CLASS TableClass, ULONG Reserved);
+
+// Windows-native AF_ values for IP Helper API calls.
+// Cygwin POSIX headers define AF_INET6=10; Windows APIs expect 23.
+// AF_INET=2 happens to be the same on both.
+#define NV_WIN_AF_INET  2
+#define NV_WIN_AF_INET6 23
 
 #define PLUGIN_NETWORK_VIEWER_NAME   "network-viewer.plugin"
 #define NV_WIN_FUNCTION_PROTO        "network-protocols"
@@ -660,7 +746,7 @@ static void nv_emit_row(BUFFER *wb,
 {
     DWORD server_port = (strcmp(direction, "outbound") == 0) ? remote_port_hbo : local_port_hbo;
 
-    IPPROTO ipproto = (strncmp(protocol, "tcp", 3) == 0) ? IPPROTO_TCP : IPPROTO_UDP;
+    uint16_t ipproto = (strncmp(protocol, "tcp", 3) == 0) ? IPPROTO_TCP : IPPROTO_UDP;
     STRING *portname = system_servicenames_cache_lookup(sc, (uint16_t)server_port, (uint16_t)ipproto);
 
     char comm[256] = "";
@@ -705,10 +791,10 @@ void function_network_connections(
     }
 
     // Fetch all four tables upfront to minimise the enumeration window.
-    MIB_TCPTABLE_OWNER_PID  *tcp4 = nv_fetch_tcp_table(AF_INET);
-    MIB_TCP6TABLE_OWNER_PID *tcp6 = nv_fetch_tcp_table(AF_INET6);
-    MIB_UDPTABLE_OWNER_PID  *udp4 = nv_fetch_udp_table(AF_INET);
-    MIB_UDP6TABLE_OWNER_PID *udp6 = nv_fetch_udp_table(AF_INET6);
+    MIB_TCPTABLE_OWNER_PID  *tcp4 = nv_fetch_tcp_table(NV_WIN_AF_INET);
+    MIB_TCP6TABLE_OWNER_PID *tcp6 = nv_fetch_tcp_table(NV_WIN_AF_INET6);
+    MIB_UDPTABLE_OWNER_PID  *udp4 = nv_fetch_udp_table(NV_WIN_AF_INET);
+    MIB_UDP6TABLE_OWNER_PID *udp6 = nv_fetch_udp_table(NV_WIN_AF_INET6);
 
     // --- First pass: collect all TCP LISTEN ports for direction classification ---
     NV_LISTEN_SET listen_set;
