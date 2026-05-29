@@ -579,13 +579,13 @@ static bool nv_is_ipv6_loopback(const UCHAR *b)
 static const char *nv_tcp_state_str(DWORD state)
 {
     switch (state) {
-        case MIB_TCP_STATE_CLOSED:     return "closed";
+        case MIB_TCP_STATE_CLOSED:     return "close";
         case MIB_TCP_STATE_LISTEN:     return "listen";
         case MIB_TCP_STATE_SYN_SENT:   return "syn-sent";
         case MIB_TCP_STATE_SYN_RCVD:   return "syn-received";
         case MIB_TCP_STATE_ESTAB:      return "established";
-        case MIB_TCP_STATE_FIN_WAIT1:  return "fin-wait-1";
-        case MIB_TCP_STATE_FIN_WAIT2:  return "fin-wait-2";
+        case MIB_TCP_STATE_FIN_WAIT1:  return "fin-wait1";
+        case MIB_TCP_STATE_FIN_WAIT2:  return "fin-wait2";
         case MIB_TCP_STATE_CLOSE_WAIT: return "close-wait";
         case MIB_TCP_STATE_CLOSING:    return "closing";
         case MIB_TCP_STATE_LAST_ACK:   return "last-ack";
