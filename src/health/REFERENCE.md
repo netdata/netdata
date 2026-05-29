@@ -1387,6 +1387,8 @@ template: ml_5min_node
 lookup: sum -5m unaligned absolute
  every: 10s
   crit: $this > 0
+   info: any failure detected in the last 5 minutes
+    to: sysadmin
 ```
 
 Use when the metric acts as a failure indicator — the value is 0 normally and 1 when a failure occurs. `sum` adds every sample in the window, so any single non-zero value produces a positive result. This is the same pattern used in [Example 4: Network Packet Drops](#example-4-network-packet-drops).
@@ -1399,6 +1401,8 @@ Use when the metric acts as a failure indicator — the value is 0 normally and 
 lookup: min -5m unaligned
  every: 10s
   crit: $this == 0
+   info: metric dropped to 0 at some point in the last 5 minutes
+    to: sysadmin
 ```
 
 Use when the metric is 1 = healthy and 0 = unhealthy. `min` returns the lowest value in the window — if the metric dropped to 0 at any point, the alert fires. This catches even brief outages.
@@ -1411,11 +1415,29 @@ For the stricter check of **continuous outage** (metric was never 1), use `max`:
 lookup: max -5m unaligned
  every: 10s
   crit: $this == 0
+   info: service was down for the entire last 5 minutes
+    to: sysadmin
 ```
 
 `max` returns the highest value in the window. If `max == 0`, the metric never reached 1 — the service was down the entire time.
 
-**Approach 3: Instant State Check (calc, no lookup)**
+**Approach 3: Measure Failure Rate (average)**
+
+```text
+ alarm: service_failure_rate
+    on: my_service.health_status
+lookup: average -5m unaligned of status
+  units: %
+ every: 1m
+  warn: $this > 10
+   crit: $this > 50
+   info: failure rate exceeded threshold over the last 5 minutes
+    to: sysadmin
+```
+
+When the metric is 0 = healthy and 1 = failure, `average` returns the fraction of time spent in failure (0.0 to 1.0). With `units: %`, Netdata multiplies by 100, so `warn: $this > 10` fires when the service was failing more than 10% of the time, and `crit: $this > 50` fires when failures exceeded half the window. This is useful for SLO-style alerting where occasional failures are acceptable.
+
+**Approach 4: Instant State Check (calc, no lookup)**
 
 ```text
  alarm: service_current_state
@@ -1423,6 +1445,8 @@ lookup: max -5m unaligned
   calc: $status
  every: 10s
   crit: $this == 0
+   info: service is currently down
+    to: sysadmin
  delay: down 5m
 ```
 
@@ -1430,12 +1454,13 @@ Use to check only the current value without time-window aggregation. The `calc: 
 
 **Comparison: Which Method to Use**
 
-| Intent                                                  | Method | Lookup / Calc              | Condition   | Fires When                                |
-| ------------------------------------------------------- | ------ | -------------------------- | ----------- | ----------------------------------------- |
+| Intent                                                  | Method | Lookup / Calc              | Condition    | Fires When                                |
+| ------------------------------------------------------- | ------ | -------------------------- | ------------ | ----------------------------------------- |
 | Any failure event (metric is 0 normally, 1 on failure)  | `sum`  | `sum -5m unaligned absolute` | `$this > 0` | Metric was non-zero at any point          |
-| Any downtime (metric is 1=healthy, 0=down)              | `min`  | `min -5m unaligned`        | `$this == 0` | Metric hit 0 at any point in the window  |
-| Continuous outage (metric is 1=healthy, 0=down)         | `max`  | `max -5m unaligned`        | `$this == 0` | Metric was 0 for the entire window       |
-| Current state only                                      | `calc` | `calc: $var` (no lookup)   | `$this == 0` | Current value is 0 (debounce with delay) |
+| Any downtime (metric is 1=healthy, 0=down)              | `min`  | `min -5m unaligned`        | `$this == 0` | Metric hit 0 at any point in the window   |
+| Continuous outage (metric is 1=healthy, 0=down)         | `max`  | `max -5m unaligned`        | `$this == 0` | Metric was 0 for the entire window        |
+| Failure rate over time                                  | `average` | `average -5m unaligned` | `$this > N`  | Failure percentage exceeds threshold      |
+| Current state only                                      | `calc` | `calc: $var` (no lookup)   | `$this == 0` | Current value is 0 (debounce with delay)  |
 
 For a full list of available lookup methods and processing options (`average`, `min`, `max`, `sum`, `percentage`, `absolute`, etc.), see the [Alert Line `lookup`](#alert-line-lookup) section.
 
@@ -1444,6 +1469,7 @@ For a full list of available lookup methods and processing options (`average`, `
 - Boolean 0/1 metrics work with all standard lookup methods — the choice depends on your alerting intent
 - Use `sum` with `absolute` for event/failure detection (same pattern as [Example 4: Network Packet Drops](#example-4-network-packet-drops))
 - Use `min` for "was it ever down?" and `max` for "was it continuously down?"
+- Use `average` for SLO-style failure-rate alerting (fraction of time in failure state)
 - Use `calc` without `lookup` for instant state checks, combined with `delay` for debouncing
 
 **Variables Used:**
