@@ -27,6 +27,27 @@ func setTestProfileIndex(t *testing.T, traps map[string]*TrapDef) {
 	t.Cleanup(func() { globalProfileCache.current.Store(nil) })
 }
 
+func assertSeverityCounters(t *testing.T, metrics *perJobMetrics, want map[string]uint64) {
+	t.Helper()
+
+	got := map[string]uint64{
+		"emerg":   atomic.LoadUint64(&metrics.severities.emerg),
+		"alert":   atomic.LoadUint64(&metrics.severities.alert),
+		"crit":    atomic.LoadUint64(&metrics.severities.crit),
+		"err":     atomic.LoadUint64(&metrics.severities.err),
+		"warning": atomic.LoadUint64(&metrics.severities.warning),
+		"notice":  atomic.LoadUint64(&metrics.severities.notice),
+		"info":    atomic.LoadUint64(&metrics.severities.info),
+		"debug":   atomic.LoadUint64(&metrics.severities.debug),
+	}
+
+	for name, value := range got {
+		if value != want[name] {
+			t.Errorf("%s severity = %d, want %d", name, value, want[name])
+		}
+	}
+}
+
 func TestCollectorHandlePacketWritesProfileResolvedTrapEntry(t *testing.T) {
 	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
 	if len(packets) != 1 {
@@ -247,6 +268,7 @@ func TestCollectorHandlePacketDedupSuppressesDuplicates(t *testing.T) {
 	if got := atomic.LoadUint64(&metrics.events.security); got != 1 {
 		t.Fatalf("security events = %d, want 1", got)
 	}
+	assertSeverityCounters(t, metrics, map[string]uint64{"warning": 1})
 	if got := atomic.LoadUint64(&metrics.errors.unknownOID); got != 0 {
 		t.Fatalf("unknown OID errors = %d, want 0", got)
 	}
@@ -298,6 +320,7 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 		if got := atomic.LoadUint64(&metrics.events.unknown); got != 1 {
 			t.Fatalf("unknown events = %d, want 1", got)
 		}
+		assertSeverityCounters(t, metrics, map[string]uint64{"notice": 1})
 	})
 
 	t.Run("template unresolved", func(t *testing.T) {
@@ -341,6 +364,7 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 		if got := atomic.LoadUint64(&metrics.events.security); got != 1 {
 			t.Fatalf("security events = %d, want 1", got)
 		}
+		assertSeverityCounters(t, metrics, map[string]uint64{"warning": 1})
 	})
 }
 
@@ -395,6 +419,7 @@ func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *test
 	if got := atomic.LoadUint64(&metrics.events.security); got != 1 {
 		t.Fatalf("security events = %d, want 1", got)
 	}
+	assertSeverityCounters(t, metrics, map[string]uint64{"warning": 1})
 }
 
 func TestCollectorHandlePacketDropsDisallowedVersion(t *testing.T) {
@@ -507,6 +532,88 @@ func TestCollectorHandlePacketIncrementsEventsMetric(t *testing.T) {
 		t.Errorf("expected 1 state_change event, got %d", ev)
 	}
 	removeJobMetrics("test")
+}
+
+func TestCollectorHandlePacketIncrementsSeverityMetric(t *testing.T) {
+	const jobName = "test-severity-event"
+	removeJobMetrics(jobName)
+	defer removeJobMetrics(jobName)
+
+	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
+	if len(packets) != 1 {
+		t.Fatalf("expected one packet, got %d", len(packets))
+	}
+
+	trap := &TrapDef{
+		OID:         "1.3.6.1.6.3.1.1.5.1",
+		Name:        "TEST-MIB::coldStartSecurity",
+		Category:    "state_change",
+		Severity:    "warning",
+		Description: "coldStart from {TRAP_SOURCE_IP}",
+	}
+	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	writer := &mockTrapWriter{}
+	c := &Collector{
+		jobName:    jobName,
+		trapWriter: writer,
+		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:  NewAllowlist(nil, []string{"public"}),
+	}
+
+	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+
+	m := getJobMetrics(jobName)
+	assertSeverityCounters(t, m, map[string]uint64{"warning": 1})
+}
+
+func TestPerJobMetricsIncSeverityFallsBackToNotice(t *testing.T) {
+	m := &perJobMetrics{}
+	m.incSeverity("")
+	m.incSeverity("not_a_severity")
+
+	if v := atomic.LoadUint64(&m.severities.notice); v != 2 {
+		t.Fatalf("notice severity = %d, want 2", v)
+	}
+	assertSeverityCounters(t, m, map[string]uint64{"notice": 2})
+}
+
+func TestCollectMetricsEmitsSeverityCounters(t *testing.T) {
+	const jobName = "test-severity-metrics"
+	removeJobMetrics(jobName)
+	defer removeJobMetrics(jobName)
+
+	getJobMetrics(jobName).incSeverity("crit")
+	getJobMetrics(jobName).incSeverity("warning")
+	getJobMetrics(jobName).incSeverity("info")
+
+	store := metrix.NewCollectorStore()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	if !ok {
+		t.Fatal("collector store does not expose cycle control")
+	}
+
+	managed.CycleController().BeginCycle()
+	collectMetrics(store, jobName)
+	if err := managed.CycleController().CommitCycleSuccess(); err != nil {
+		t.Fatalf("commit collect cycle: %v", err)
+	}
+
+	labels := metrix.Labels{"job_name": jobName}
+	want := map[string]float64{
+		"snmp_trap_severity_emerg":   0,
+		"snmp_trap_severity_alert":   0,
+		"snmp_trap_severity_crit":    1,
+		"snmp_trap_severity_err":     0,
+		"snmp_trap_severity_warning": 1,
+		"snmp_trap_severity_notice":  0,
+		"snmp_trap_severity_info":    1,
+		"snmp_trap_severity_debug":   0,
+	}
+	for name, expected := range want {
+		if v, ok := store.Read().Value(name, labels); !ok || v != expected {
+			t.Fatalf("%s value = %v/%v, want %v/true", name, v, ok, expected)
+		}
+	}
 }
 
 func TestCollectorHandlePacketIncrementsTemplateUnresolved(t *testing.T) {

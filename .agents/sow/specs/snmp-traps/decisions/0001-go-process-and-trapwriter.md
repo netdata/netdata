@@ -1,6 +1,6 @@
 # ADR-0001: Go Process Model, Journal Writer Backend, and TrapWriter Contract
 
-**Status**: Accepted for SOW-0035 implementation after reviewer round 5; amended on 2026-05-26 to use the published Go journal SDK `go/v0.1.0`
+**Status**: Accepted for SOW-0035 implementation after reviewer round 5; amended on 2026-05-26 to use the published Go journal SDK `go/v0.1.0`; amended on 2026-05-28 to use SDK `go/v0.3.0`
 **Date**: 2026-05-25
 **SOW**: SOW-0035 M1
 
@@ -31,7 +31,7 @@ The implementation language is **Go** (user decision, 2026-05-25). The journal w
 - Registered through the standard `collectorapi.Register(...)` path in the existing `collector/init.go` import registry as `snmp_traps`, mirroring the existing `snmp_topology` naming style. A scan found no existing go.d collector registration name containing a dot, so the module name must not use `snmp.traps`.
 - Uses V2 collector interface (`collectorapi.CollectorV2`), mirroring the `ping/` collector pattern
 - Job lifecycle managed by the existing go.d framework (`src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go`)
-- Journal writing via a thin adapter around `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.1.0`, keeping the local `TrapWriter` abstraction and delegating journal file format, active-file indexing, rotation, retention, and writer locking to the SDK.
+- Journal writing via a thin adapter around `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.3.0`, keeping the local `TrapWriter` abstraction and delegating journal file format, active-file indexing, rotation, retention, and writer locking to the SDK.
 - Shared profile cache: in-process Go package-level state, loaded on first runnable job creation
 
 ### Option B: Separate Go process (external plugin) via PLUGINSD
@@ -140,7 +140,7 @@ The local package provides a small `JournalWriter` adapter in
 implement the systemd journal binary format locally. The adapter delegates file
 format, active-file indexing, writer locks, rotation, retention, and chain
 validation/reopen behavior to `github.com/netdata/systemd-journal-sdk/go/journal`
-`go/v0.1.0`.
+`go/v0.3.0`.
 
 The public local API remains:
 
@@ -427,7 +427,7 @@ On `Update()`, current jobmgr behavior stops the old running job before creating
 | Shared profile cache refcount leak leaves memory allocated | `ReleaseProfileCache()` is called in `Cleanup()` which the framework guarantees on shutdown; add refcount-leak and underflow detection tests |
 | Framework coded-error change breaks other collectors | Preserve existing behavior for plain errors; only `CodedError` suppresses retry and controls HTTP code; add Start and Update tests |
 | Direct journal writer cannot sustain target trap volume | M4 must include `go test -benchmem` / throughput benchmarks for `TrapWriter.Write()`, queue drain, and SDK-backed journal `WriteEntry()`; if allocation or throughput misses the tens-of-thousands/sec target, reopen batching or backend design before accepting M4 |
-| SDK dependency API drifts | Pin to `github.com/netdata/systemd-journal-sdk/go v0.1.0`; re-vendor through the module tag and review API changes before updating |
+| SDK dependency API drifts | Pin to `github.com/netdata/systemd-journal-sdk/go v0.3.0`; re-vendor through the module tag and review API changes before updating |
 | SDK chain handling has an upstream defect | Keep `TrapWriter` and local adapter boundaries narrow so the SDK can be updated or replaced without changing ingestion semantics |
 
 ## Validation Requirements

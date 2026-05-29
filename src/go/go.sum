@@ -340,6 +340,8 @@ github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f h1:KUppIJq7/+
 github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
 github.com/netdata/systemd-journal-sdk/go v0.1.0 h1:OmpttOa6r4h1IVXs6YiO4nFQltVmqf8GmCGZr4C5E8o=
 github.com/netdata/systemd-journal-sdk/go v0.1.0/go.mod h1:2n1eOsdTJ6v5xszIOH/xsvmtZXlMnNhWCSEaW4liGNk=
+github.com/netdata/systemd-journal-sdk/go v0.3.0 h1:oXg7nLBCdkhg4E/FHEqiVrKPSaXiWoeSK6/WKzHSyKo=
+github.com/netdata/systemd-journal-sdk/go v0.3.0/go.mod h1:2n1eOsdTJ6v5xszIOH/xsvmtZXlMnNhWCSEaW4liGNk=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.12.0/go.mod h1:oUhWkIvk5aDxtKvDDuw8gItl8pKl42LzjC9KZE0HfGg=

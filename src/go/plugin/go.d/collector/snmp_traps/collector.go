@@ -541,6 +541,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		cat = Category(td.Category)
 	}
 	c.incTrapEvents(cat)
+	c.incTrapSeverity(entry.Severity)
 }
 
 func udpPeerAddr(peer *net.UDPAddr) (netip.Addr, bool) {

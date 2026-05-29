@@ -69,6 +69,36 @@ The helper also writes review artifacts under `--out-dir`: `traps.jsonl`,
 `extraction-report.json`, `conflicts.json` for duplicate trap OIDs, and
 `source-conflicts.json` when multiple MIB files define the same module name.
 
+Recommended operator workflow:
+
+1. Keep the vendor MIB files in a local working directory, outside the Netdata
+   config directory.
+2. Run one named module first with `--mib <MODULE>` and inspect the generated
+   YAML and `profiles/catalogue.json`.
+3. Run the full directory with `--all` only after the single-module test works.
+4. Install selected YAML files into `/etc/netdata/go.d/snmp.trap-profiles/`.
+5. If a trap job is already active, run the `snmp_traps:reload-profiles`
+   Function.
+   If no trap job is active, re-apply the job through DynCfg or restart the
+   Netdata Agent so job creation validates and loads the new files.
+
+Example with the Nagios MIB package's `NAGIOS-NOTIFY-MIB`, which is not in the
+stock catalogue:
+
+```sh
+/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen generate \
+  --source-dir ./nagios-mibs \
+  --mib NAGIOS-NOTIFY-MIB \
+  --out-dir ./snmp-trap-profile-gen-output
+
+jq . ./snmp-trap-profile-gen-output/profiles/catalogue.json
+sed -n '1,160p' ./snmp-trap-profile-gen-output/profiles/nagios.yaml
+```
+
+A validation run of that MIB emits `nagios.yaml` with four traps and
+25 varbinds. Review the generated `category`, `severity`, and `description`
+fields before installing the profile.
+
 Stock regeneration from the source tree:
 
 ```sh

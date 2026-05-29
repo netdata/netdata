@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: in-progress
+Status: completed
 
-Sub-state: scope locked; template + reviewer protocol pending user confirmation; per-system analyses not yet started
+Sub-state: completed on 2026-05-28. The original scope was delivered as 16 per-system analysis files, reviewed/converged per file, plus comparison artefacts under `.agents/sow/specs/snmp-traps/comparison/`. The final shipped-behavior synthesis is `comparison/comparative-analysis.md`.
 
 ## Requirements
 
@@ -383,11 +383,11 @@ Reviewer-finding handling per system (per sub-agent):
 
 ## Comparison Matrix (incremental)
 
-After each per-system file passes review, `.agents/sow/specs/snmp-traps/comparison/comparison-matrix.md` is updated. Columns are the systems analysed so far; rows are common dimensions (reception, MIB management, normalization, dedup, storage, alerting integration, topology integration, simulation, security, defaults, customization API). After the last system, this matrix becomes the input for `comparative-analysis.md` and then `netdata-design-implications.md`.
+After each per-system file passed review, the matrix was maintained as `.agents/sow/specs/snmp-traps/comparison/feature-matrix.md` (the broader and more precise final name). A compatibility pointer file `.agents/sow/specs/snmp-traps/comparison/comparison-matrix.md` now records that `feature-matrix.md` is the source of truth. The final synthesis is `.agents/sow/specs/snmp-traps/comparison/comparative-analysis.md`; the design discussion is `.agents/sow/specs/snmp-traps/comparison/netdata-design-implications.md`.
 
 ## Pre-Implementation Gate
 
-Status: needs-user-decision
+Status: passed. The user confirmed scope, depth, template, reviewer set, and process on 2026-05-22. The completion pass on 2026-05-28 verified that the promised analysis artefacts exist and that the stale status text was lifecycle drift, not missing implementation work.
 
 Problem / root-cause model:
 
@@ -470,25 +470,75 @@ Open decisions (require user confirmation before per-system work starts):
 - Verified `codex` and `opencode` CLIs are installed and runnable from this host.
 - Pilot sub-agent launched for OpenNMS.
 
+### 2026-05-28
+
+- Closeout audit found all 16 per-system files present under `.agents/sow/specs/snmp-traps/`.
+- Per-system files record reviewer convergence/acceptance in their `Reviewer pass` metadata and reviewer pass logs. Several systems reached full accept; some closed as accept-with-fixes after verified major findings were applied and only minor/nit findings remained, as allowed by the SOW stop rule.
+- Existing comparison artefacts found: `feature-matrix.md`, `operator-features.md`, `alerting-models.md`, `design-forks.md`, `fixture-inventory.md`, `profile-inventory.md`, `netdata-stress-test.md`, and `netdata-design-implications.md`.
+- Created `comparison/comparative-analysis.md` to synthesize the implemented Netdata SOW-0035 through SOW-0039 behavior against the 16-system cohort.
+- Created `comparison/comparison-matrix.md` as a compatibility pointer because the final matrix was authored as `feature-matrix.md`.
+- Updated this SOW from stale `in-progress` state to `completed`.
+
 ## Validation
 
-Pending.
+Acceptance criteria evidence:
+
+- One per-system spec exists for every locked-scope system:
+  - `opennms.md`, `zenoss.md`, `checkmk.md`, `centreon.md`, `zabbix.md`, `librenms.md`, `nagios-snmptt.md`, `sensu.md`, `telegraf.md`, `logstash.md`, `datadog-agent.md`, `splunk-sc4snmp.md`, `cribl.md`, `solarwinds.md`, `dynatrace.md`, `logicmonitor.md`.
+- Reviewer pass metadata and reviewer logs exist in the per-system files. The closeout `rg` audit found accepted/converged markers across the cohort files, including OpenNMS, Zenoss, CheckMK, Centreon, Zabbix, LibreNMS, Nagios+SNMPTT, Sensu, Telegraf, Datadog Agent, SolarWinds, Dynatrace, and LogicMonitor.
+- The final matrix is `comparison/feature-matrix.md`; compatibility pointer `comparison/comparison-matrix.md` was added to satisfy the original SOW filename.
+- The final synthesis is `comparison/comparative-analysis.md`.
+- The design discussion exists as `comparison/netdata-design-implications.md`.
+
+Tests or equivalent validation:
+
+- File presence validated with `rg --files .agents/sow/specs/snmp-traps .agents/sow/current .agents/sow/done`.
+- Reviewer convergence markers validated with `rg -n "accepted|PRODUCTION GRADE|Reviewer pass|Reviewer Log|Reviewer|converged|Final" .agents/sow/specs/snmp-traps/{opennms,zenoss,checkmk,centreon,zabbix,librenms,nagios-snmptt,sensu,telegraf,logstash,datadog-agent,splunk-sc4snmp,cribl,solarwinds,dynatrace,logicmonitor}.md`.
+- Link and whitespace validation are run by SOW-0039 as the merge-gate SOW after this lifecycle update.
+
+Real-use evidence:
+
+- This SOW is research/specification work. It does not have a runnable product path. Real trap ingestion evidence belongs to SOW-0035 through SOW-0039 and is recorded there.
+
+Same-failure search:
+
+- The closeout found one lifecycle drift: the matrix was named `feature-matrix.md` instead of the originally promised `comparison-matrix.md`. It is fixed by the compatibility pointer.
+- No additional missing locked-scope per-system file was found.
 
 Sensitive data gate:
 
-Pending. Before this SOW can close, all durable artifacts produced by it must be checked for raw secrets, SNMP communities, customer identifiers, personal data, non-documentation IPs, private endpoints, and workstation-local paths.
+No raw SNMP communities, USM secrets, customer names, customer identifiers, private endpoints, or live device data were intentionally added. Final grep/link validation is recorded in SOW-0039 so the research SOW and merge-gate SOW share one final evidence trail.
+
+Artifact maintenance gate:
+
+- `AGENTS.md`: no project workflow change from this research SOW; no update needed here.
+- Runtime project skills: no HOW-to-work-here change from this SOW; no update needed here.
+- Specs: updated substantially under `.agents/sow/specs/snmp-traps/`.
+- End-user/operator docs: no operator docs changed by this research SOW.
+- End-user/operator skills: no public skill changed by this research SOW.
+- SOW lifecycle: status changed to `completed`; file moved to `.agents/sow/done/` by the closeout step.
+
+SOW status/directory consistency:
+
+- This SOW is marked `completed` and moved from `.agents/sow/current/` to `.agents/sow/done/`.
+
+Follow-up mapping:
+
+- No remaining research follow-up is required for SOW-0032. Product implementation gaps discovered by the comparative work are represented in SOW-0035 through SOW-0039 and the durable comparison documents.
 
 ## Outcome
 
-Pending.
+Completed. The project now has a decision-grade comparative analysis corpus for SNMP trap support: 16 per-system files, cross-system matrices, stress-test/design implications, and a final shipped-behavior comparative analysis for the Netdata implementation path.
 
 ## Lessons Extracted
 
-Pending.
+- Comparative work needs lifecycle hygiene after long implementation branches: the evidence may be complete while the SOW status remains stale.
+- Keep promised filenames stable, or add explicit compatibility pointers when the final artefact name becomes more precise.
+- Reviewer logs are valuable closeout evidence, but the merge-gate SOW should still validate the final product behavior separately from research completeness.
 
 ## Followup
 
-None yet.
+None.
 
 ## Regression Log
 

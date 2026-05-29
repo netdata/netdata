@@ -821,6 +821,11 @@ Public skills (canonical under `docs/netdata-ai/skills/<name>/`; relative symlin
   Symlink: `.agents/skills/query-netdata-agents` -> `../../docs/netdata-ai/skills/query-netdata-agents`.
   Status: live. SKILL.md plus `scripts/_lib.sh` helpers (`agents_resolve_bearer`, `agents_call_function`, `agents_netdata_prefix`).
 
+- `docs/netdata-ai/skills/query-snmp-traps/`
+  Trigger: querying SNMP trap logs through Netdata Cloud or directly from a Netdata Agent; use for trap journal entries, severities, categories, senders, deduplication summaries, `TRAP_*` fields, and `TRAP_JSON` varbind searches.
+  Symlink: `.agents/skills/query-snmp-traps` -> `../../docs/netdata-ai/skills/query-snmp-traps`.
+  Status: live. SKILL.md plus `how-tos/INDEX.md` and seeded operator how-tos.
+
 Output/reference skills:
 
 - `docs/netdata-ai/skills/`

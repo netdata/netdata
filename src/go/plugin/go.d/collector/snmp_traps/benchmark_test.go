@@ -3,8 +3,10 @@
 package snmp_traps
 
 import (
+	"bytes"
 	"fmt"
 	"net"
+	"os/exec"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -331,6 +333,72 @@ func BenchmarkJournalWriterWriteEntry(b *testing.B) {
 	b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "entries/s")
 }
 
+// BenchmarkFullPacketToJournal measures the combined path:
+// synthetic SNMPv2c packet -> handlePacket -> journalTrapWriter queue ->
+// SDK-backed journal append/sync. journalctl row counting runs after the timed
+// section so the throughput metric reflects ingestion and persistence only.
+func BenchmarkFullPacketToJournal(b *testing.B) {
+	requireJournalctlBenchmark(b)
+
+	data := buildBenchV2cTrap(b, "public", "1.3.6.1.6.3.1.1.5.1",
+		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.1.1.0", Type: gosnmp.OctetString, Value: "test-device"},
+		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.1.3.0", Type: gosnmp.TimeTicks, Value: uint32(123456)},
+		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.2.2.1.1.1", Type: gosnmp.Integer, Value: 1},
+		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.2.2.1.1.2", Type: gosnmp.Integer, Value: 2},
+		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.2.2.1.2.1", Type: gosnmp.OctetString, Value: "Gi0/1"},
+	)
+	peer := net.ParseIP("10.1.2.3")
+	trap := &TrapDef{
+		OID:         "1.3.6.1.6.3.1.1.5.1",
+		Name:        "TEST-MIB::coldStartSecurity",
+		Category:    "security",
+		Severity:    "warning",
+		Description: "coldStart from {TRAP_SOURCE_IP}",
+	}
+	setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
+
+	dir := b.TempDir()
+	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	if err != nil {
+		b.Fatalf("NewJournalWriter: %v", err)
+	}
+	tw := newJournalTrapWriter(w, 1<<20)
+	c := &Collector{
+		jobName:    "bench-full",
+		trapWriter: tw,
+		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:  NewAllowlist(nil, []string{"public"}),
+		metrics:    &perJobMetrics{},
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pkt := make([]byte, len(data))
+		copy(pkt, data)
+		c.handlePacket(pkt, peer, nil, nil)
+	}
+	if err := tw.Flush(); err != nil {
+		b.Fatalf("Flush: %v", err)
+	}
+	b.StopTimer()
+
+	journalDir := w.JournalDirectory()
+	if err := tw.Close(); err != nil {
+		b.Fatalf("Close: %v", err)
+	}
+	rows := countJournalRowsBenchmark(b, journalDir, "TRAP_CATEGORY=security")
+	if rows == 0 {
+		b.Fatal("expected queryable journal rows, got 0")
+	}
+	reportDrops(b, int64(b.N), rows)
+	elapsed := b.Elapsed().Seconds()
+	if elapsed > 0 {
+		b.ReportMetric(float64(rows)/elapsed, "persisted_entries/s")
+		b.ReportMetric(float64(b.N)/elapsed, "packets/s")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // 5. Malformed BER / limit rejection benchmark
 // ---------------------------------------------------------------------------
@@ -384,6 +452,28 @@ func requireLinuxJournalBenchmark(b *testing.B) {
 	if runtime.GOOS != "linux" {
 		b.Skip("SNMP trap journal backend requires Linux")
 	}
+}
+
+func requireJournalctlBenchmark(b *testing.B) {
+	b.Helper()
+	requireLinuxJournalBenchmark(b)
+	if _, err := exec.LookPath("journalctl"); err != nil {
+		b.Skip("journalctl not found")
+	}
+}
+
+func countJournalRowsBenchmark(b *testing.B, dir, match string) int64 {
+	b.Helper()
+	cmd := exec.Command("journalctl", "--directory="+dir, match, "-o", "cat", "--no-pager")
+	out, err := cmd.CombinedOutput()
+	trimmed := bytes.TrimSpace(out)
+	if err != nil && len(trimmed) != 0 {
+		b.Fatalf("journalctl failed: %v\n%s", err, string(out))
+	}
+	if len(trimmed) == 0 {
+		return 0
+	}
+	return int64(bytes.Count(trimmed, []byte{'\n'}) + 1)
 }
 
 func benchmarkTrapEntry() *TrapEntry {

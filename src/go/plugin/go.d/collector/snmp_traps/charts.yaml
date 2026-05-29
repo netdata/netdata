@@ -12,6 +12,14 @@ groups:
       - snmp_trap_events_mobility
       - snmp_trap_events_diagnostic
       - snmp_trap_events_unknown
+      - snmp_trap_severity_emerg
+      - snmp_trap_severity_alert
+      - snmp_trap_severity_crit
+      - snmp_trap_severity_err
+      - snmp_trap_severity_warning
+      - snmp_trap_severity_notice
+      - snmp_trap_severity_info
+      - snmp_trap_severity_debug
       - snmp_trap_errors_unknown_oid
       - snmp_trap_errors_decode_failed
       - snmp_trap_errors_template_unresolved
@@ -52,6 +60,30 @@ groups:
             name: diagnostic
           - selector: snmp_trap_events_unknown
             name: unknown
+      - id: severity
+        title: SNMP trap events by severity
+        context: severity
+        units: events/s
+        type: stacked
+        instances:
+          by_labels: [job_name]
+        dimensions:
+          - selector: snmp_trap_severity_emerg
+            name: emerg
+          - selector: snmp_trap_severity_alert
+            name: alert
+          - selector: snmp_trap_severity_crit
+            name: crit
+          - selector: snmp_trap_severity_err
+            name: err
+          - selector: snmp_trap_severity_warning
+            name: warning
+          - selector: snmp_trap_severity_notice
+            name: notice
+          - selector: snmp_trap_severity_info
+            name: info
+          - selector: snmp_trap_severity_debug
+            name: debug
       - id: errors
         title: SNMP trap processing errors
         context: errors

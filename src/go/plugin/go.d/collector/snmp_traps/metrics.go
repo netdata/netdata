@@ -37,6 +37,17 @@ type trapEvents struct {
 	unknown      uint64
 }
 
+type trapSeverities struct {
+	emerg   uint64
+	alert   uint64
+	crit    uint64
+	err     uint64
+	warning uint64
+	notice  uint64
+	info    uint64
+	debug   uint64
+}
+
 type trapDedupMetrics struct {
 	enabled    atomic.Bool
 	suppressed uint64
@@ -48,9 +59,10 @@ type trapMetrics struct {
 }
 
 type perJobMetrics struct {
-	events trapEvents
-	errors trapErrors
-	dedup  trapDedupMetrics
+	events     trapEvents
+	errors     trapErrors
+	severities trapSeverities
+	dedup      trapDedupMetrics
 }
 
 var globalMetrics = &trapMetrics{
@@ -78,12 +90,20 @@ func incTrapEvents(jobName string, category Category) {
 	getJobMetrics(jobName).incEvent(category)
 }
 
+func incTrapSeverity(jobName string, severity Severity) {
+	getJobMetrics(jobName).incSeverity(severity)
+}
+
 func incTrapError(jobName, dim string) {
 	getJobMetrics(jobName).incError(dim)
 }
 
 func (c *Collector) incTrapEvents(category Category) {
 	c.trapMetrics().incEvent(category)
+}
+
+func (c *Collector) incTrapSeverity(severity Severity) {
+	c.trapMetrics().incSeverity(severity)
 }
 
 func (c *Collector) incTrapError(dim string) {
@@ -118,37 +138,31 @@ func (m *perJobMetrics) incEvent(category Category) {
 	}
 }
 
-func (m *perJobMetrics) incError(dim string) {
-	switch dim {
-	case "unknown_oid":
-		atomic.AddUint64(&m.errors.unknownOID, 1)
-	case "decode_failed":
-		atomic.AddUint64(&m.errors.decodeFailed, 1)
-	case "template_unresolved":
-		atomic.AddUint64(&m.errors.templateUnresolved, 1)
-	case "malformed_pdu":
-		atomic.AddUint64(&m.errors.malformedPDU, 1)
-	case "dropped_allowlist":
-		atomic.AddUint64(&m.errors.droppedAllowlist, 1)
-	case "rate_limited":
-		atomic.AddUint64(&m.errors.rateLimited, 1)
-	case "auth_failures":
-		atomic.AddUint64(&m.errors.authFailures, 1)
-	case "usm_failures":
-		atomic.AddUint64(&m.errors.usmFailures, 1)
-	case "unknown_engine_id":
-		atomic.AddUint64(&m.errors.unknownEngineID, 1)
-	case "inform_response_failed":
-		atomic.AddUint64(&m.errors.informResponseFail, 1)
-	case "sanitized":
-		atomic.AddUint64(&m.errors.sanitized, 1)
-	case "profile_load_failed":
-		atomic.AddUint64(&m.errors.profileLoadFailed, 1)
-	case "journal_write_failed":
-		atomic.AddUint64(&m.errors.journalWriteFailed, 1)
-	case "otlp_export_failed":
-		atomic.AddUint64(&m.errors.otlpExportFailed, 1)
+func (m *perJobMetrics) incSeverity(severity Severity) {
+	switch severity {
+	case "emerg":
+		atomic.AddUint64(&m.severities.emerg, 1)
+	case "alert":
+		atomic.AddUint64(&m.severities.alert, 1)
+	case "crit":
+		atomic.AddUint64(&m.severities.crit, 1)
+	case "err":
+		atomic.AddUint64(&m.severities.err, 1)
+	case "warning":
+		atomic.AddUint64(&m.severities.warning, 1)
+	case "notice":
+		atomic.AddUint64(&m.severities.notice, 1)
+	case "info":
+		atomic.AddUint64(&m.severities.info, 1)
+	case "debug":
+		atomic.AddUint64(&m.severities.debug, 1)
+	default:
+		atomic.AddUint64(&m.severities.notice, 1)
 	}
+}
+
+func (m *perJobMetrics) incError(dim string) {
+	m.addError(dim, 1)
 }
 
 func (m *perJobMetrics) addError(dim string, n uint64) {
@@ -156,12 +170,34 @@ func (m *perJobMetrics) addError(dim string, n uint64) {
 		return
 	}
 	switch dim {
+	case "unknown_oid":
+		atomic.AddUint64(&m.errors.unknownOID, n)
+	case "decode_failed":
+		atomic.AddUint64(&m.errors.decodeFailed, n)
+	case "template_unresolved":
+		atomic.AddUint64(&m.errors.templateUnresolved, n)
+	case "malformed_pdu":
+		atomic.AddUint64(&m.errors.malformedPDU, n)
+	case "dropped_allowlist":
+		atomic.AddUint64(&m.errors.droppedAllowlist, n)
+	case "rate_limited":
+		atomic.AddUint64(&m.errors.rateLimited, n)
+	case "auth_failures":
+		atomic.AddUint64(&m.errors.authFailures, n)
+	case "usm_failures":
+		atomic.AddUint64(&m.errors.usmFailures, n)
+	case "unknown_engine_id":
+		atomic.AddUint64(&m.errors.unknownEngineID, n)
+	case "inform_response_failed":
+		atomic.AddUint64(&m.errors.informResponseFail, n)
+	case "sanitized":
+		atomic.AddUint64(&m.errors.sanitized, n)
+	case "profile_load_failed":
+		atomic.AddUint64(&m.errors.profileLoadFailed, n)
+	case "journal_write_failed":
+		atomic.AddUint64(&m.errors.journalWriteFailed, n)
 	case "otlp_export_failed":
 		atomic.AddUint64(&m.errors.otlpExportFailed, n)
-	default:
-		for i := uint64(0); i < n; i++ {
-			m.incError(dim)
-		}
 	}
 }
 
@@ -194,6 +230,7 @@ func collectMetrics(store metrix.CollectorStore, jobName string) {
 		return
 	}
 	collectEvents(store, jobName, m)
+	collectSeverities(store, jobName, m)
 	collectErrors(store, jobName, m)
 	collectDedup(store, jobName, m)
 }
@@ -209,6 +246,19 @@ func collectEvents(store metrix.CollectorStore, jobName string, m *perJobMetrics
 	meter.Counter("snmp_trap_events_mobility").ObserveTotal(float64(atomic.LoadUint64(&m.events.mobility)))
 	meter.Counter("snmp_trap_events_diagnostic").ObserveTotal(float64(atomic.LoadUint64(&m.events.diagnostic)))
 	meter.Counter("snmp_trap_events_unknown").ObserveTotal(float64(atomic.LoadUint64(&m.events.unknown)))
+}
+
+func collectSeverities(store metrix.CollectorStore, jobName string, m *perJobMetrics) {
+	meter := store.Write().SnapshotMeter("").WithLabels(metrix.Label{Key: "job_name", Value: jobName})
+
+	meter.Counter("snmp_trap_severity_emerg").ObserveTotal(float64(atomic.LoadUint64(&m.severities.emerg)))
+	meter.Counter("snmp_trap_severity_alert").ObserveTotal(float64(atomic.LoadUint64(&m.severities.alert)))
+	meter.Counter("snmp_trap_severity_crit").ObserveTotal(float64(atomic.LoadUint64(&m.severities.crit)))
+	meter.Counter("snmp_trap_severity_err").ObserveTotal(float64(atomic.LoadUint64(&m.severities.err)))
+	meter.Counter("snmp_trap_severity_warning").ObserveTotal(float64(atomic.LoadUint64(&m.severities.warning)))
+	meter.Counter("snmp_trap_severity_notice").ObserveTotal(float64(atomic.LoadUint64(&m.severities.notice)))
+	meter.Counter("snmp_trap_severity_info").ObserveTotal(float64(atomic.LoadUint64(&m.severities.info)))
+	meter.Counter("snmp_trap_severity_debug").ObserveTotal(float64(atomic.LoadUint64(&m.severities.debug)))
 }
 
 func collectErrors(store metrix.CollectorStore, jobName string, m *perJobMetrics) {

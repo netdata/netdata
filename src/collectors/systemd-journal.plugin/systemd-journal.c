@@ -149,6 +149,21 @@ static __always_inline SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(cons
     "|ND_ALERT_TYPE"                                                                                                           \
     "|ND_ALERT_STATUS"                                                                                                         \
                                                                                                                                \
+    /* --- NETDATA SNMP TRAPS --- */                                                                                           \
+                                                                                                                               \
+    "|TRAP_REPORT_TYPE"                                                                                                        \
+    "|TRAP_OID"                                                                                                                \
+    "|TRAP_NAME"                                                                                                               \
+    "|TRAP_CATEGORY"                                                                                                           \
+    "|TRAP_SEVERITY"                                                                                                           \
+    "|TRAP_PDU_TYPE"                                                                                                           \
+    "|TRAP_VERSION"                                                                                                            \
+    "|TRAP_SOURCE_IP"                                                                                                          \
+    "|TRAP_SOURCE_UDP_PEER"                                                                                                    \
+    "|TRAP_DEVICE_VENDOR"                                                                                                      \
+    "|TRAP_INTERFACE"                                                                                                          \
+    "|TRAP_NEIGHBORS"                                                                                                          \
+                                                                                                                               \
     ""
 
 #include "systemd-journal-execute.h"

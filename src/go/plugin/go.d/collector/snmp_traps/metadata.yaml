@@ -1,0 +1,612 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-snmp_traps
+      plugin_name: go.d.plugin
+      module_name: snmp_traps
+      monitored_instance:
+        name: SNMP trap listener
+        link: ""
+        icon_filename: SNMP.png
+        categories:
+          - data-collection.networking
+      keywords:
+        - snmp
+        - trap
+        - inform
+        - snmpv3
+        - usm
+        - syslog
+        - network events
+        - event monitoring
+        - notifications
+        - fault management
+        - network management
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector listens for incoming SNMP Trap and INFORM notifications from network devices and persists them as enriched, structured log entries.
+
+          - **Multi-protocol**: Accepts SNMPv1 Trap, SNMPv2c Trap/INFORM, and SNMPv3 Trap/INFORM with USM (user-based security model) authentication and privacy.
+          - **Per-job listeners**: Each job binds UDP endpoints independently, enabling per-site or per-segment trap receivers.
+          - **OOB profile pack**: Netdata ships with a library of pre-built trap profiles that resolve numeric OIDs to names, categories, severities, and varbind labels without manual MIB work for common equipment.
+          - **Dynamic engine ID discovery**: Optional runtime discovery of SNMPv3 sender engine IDs for environments where the engine ID is not known in advance.
+          - **Deduplication**: Optional configurable per-job dedup that suppresses repeated identical traps within a window. The first matching trap is journaled immediately; subsequent matches increment a summary counter and a periodic summary entry is written.
+          - **Per-OID overrides**: Operators can override the profile-assigned category, severity, and labels for specific OIDs without editing profiles.
+          - **Per-OID metric opt-in**: Operators can promote selected trap OIDs to dedicated Netdata metric charts for finer-grained alerting and dashboards. Each metric entry selects an OID, a context name under `snmp.trap.`, and optionally a bounded-cardinality varbind for multi-dimensional counting.
+          - **OTLP/gRPC export**: Optional second backend that exports traps as OTLP LogRecords in addition to the journal-direct path.
+          - **Self-metrics**: Per-job counters for trap events (by category and severity), processing errors (by type), and dedup suppression (when enabled).
+
+          Trap entries are written as structured systemd-journal log messages with plugin-controlled fields (`TRAP_REPORT_TYPE`, `TRAP_OID`, `TRAP_NAME`, `TRAP_CATEGORY`, `TRAP_SEVERITY`, `TRAP_PDU_TYPE`, `TRAP_VERSION`, `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, `TRAP_DEVICE_VENDOR`, `TRAP_INTERFACE`, `TRAP_NEIGHBORS`, `TRAP_SUPPRESSED_COUNT`, `TRAP_SUPPRESSED_FINGERPRINTS`, `TRAP_REPORT_PERIOD_SEC`, `TRAP_JSON`) plus profile-defined labels (`TRAP_TAG_*`). Query traps with the `systemd-journal` plugin Function through Netdata Cloud or directly via the Agent HTTP API.
+
+          **Closed 8-category / 8-severity taxonomy** (from the OOB profile pack):
+
+          | Category | Description |
+          |----------|-------------|
+          | `state_change` | Link up/down, operational state transitions |
+          | `config_change` | Configuration modifications |
+          | `security` | Security events (intrusion, ACL, etc.) |
+          | `auth` | Authentication and authorization events |
+          | `license` | License-state events |
+          | `mobility` | Roaming, handoff, wireless client events |
+          | `diagnostic` | Tests, health checks, probes |
+          | `unknown` | Unmatched or unclassified traps |
+
+          | Severity | Description |
+          |----------|-------------|
+          | `emerg` | System unusable |
+          | `alert` | Immediate action required |
+          | `crit` | Critical condition |
+          | `err` | Error condition |
+          | `warning` | Warning condition |
+          | `notice` | Normal but significant condition |
+          | `info` | Informational |
+          | `debug` | Debug-level message |
+        method_description: |
+          **Profile locations**
+
+          | Type | Default path | Notes |
+          |------|--------------|-------|
+          | **Stock profiles** | `/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default/` | Shipped with Netdata |
+          | **User profiles** | `/etc/netdata/go.d/snmp.trap-profiles/` | Place custom or converted profiles here |
+
+          > Depending on installation, paths may be prefixed with `/opt/netdata`.
+
+          A **trap profile** defines per-OID mappings:
+          - Category and severity
+          - Trap name and description
+          - Varbind labels for structured enrichment
+
+          **At runtime, the collector**:
+          1. Receives a trap PDU on a bound UDP endpoint
+          2. Validates the SNMP version, community/USM, and source against the job configuration
+          3. Resolves the trap OID against loaded profiles to get a name, category, severity, and varbind labels
+          4. Enriches the entry with optional reverse DNS (`_HOSTNAME`) and dedup logic (if enabled)
+          5. Writes the structured entry to the per-job systemd-journal namespace (and optionally exports via OTLP)
+          6. Increments the per-job self-metrics (events by category and severity, errors by type)
+
+          **Custom MIB workflow**: Operators with device-specific MIBs not covered by the OOB profiles can use the installed `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` helper to convert MIBs into trap profile YAMLs offline. The helper writes profiles under `snmp-trap-profile-gen-output/profiles/`; copy the needed YAML files to `/etc/netdata/go.d/snmp.trap-profiles/`, then run the `snmp_traps:reload-profiles` Function or re-apply/restart the trap job so job creation validates and loads the new files. See [SNMP trap profile format](/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md) for the YAML schema.
+
+          Example conversion for a MIB module not shipped in the OOB pack:
+          ```sh
+          /usr/libexec/netdata/plugins.d/snmp-trap-profile-gen generate \
+            --source-dir /path/to/vendor-mibs \
+            --mib NAGIOS-NOTIFY-MIB \
+            --out-dir ./snmp-trap-profile-gen-output
+          ```
+      supported_platforms:
+        include: [linux]
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          Binding to the standard SNMP trap port (UDP/162) requires `CAP_NET_BIND_SERVICE` or root.
+          Netdata packages grant this capability to `go.d.plugin` and allow it in `netdata.service`.
+      default_behavior:
+        auto_detection:
+          description: |
+            SNMP trap collection is not auto-detected. The collector must be explicitly configured as a job under `go.d/snmp_traps.conf`.
+        limits:
+          description: |
+            BER decode limits protect the UDP-exposed parser: datagrams are capped at 8 KiB, varbinds at 256 per PDU, BER nesting depth at 8, encoded OID length at 128 bytes, OctetString values at 1024 bytes, and decode time at 1 ms per PDU.
+            Deduplication, when enabled, uses a per-job fingerprint cache capped by `dedup.cache_max_entries` (default 100000).
+        performance_impact:
+          description: |
+            The collector is event-driven and does not poll devices. CPU cost is proportional to the received trap rate.
+            Profile OID lookups use hash tables. Deduplication, when enabled, adds a configurable fingerprint cache.
+            For high-volume environments, size the dedup cache and journal rotation according to sustained trap volume and retention requirements.
+    setup:
+      prerequisites:
+        list:
+          - title: "Prepare SNMP trap sources"
+            description: |
+              Configure the network devices sending traps:
+              - Set the trap destination to the Netdata host's IP address and the UDP port bound by the listener job.
+              - Ensure the SNMP community (v1/v2c) or USM credentials (v3) match the job configuration.
+              - For v3 traps, configure the device's engine ID and USM user with the matching auth and privacy protocols.
+          - title: "Add custom trap profiles (optional)"
+            description: |
+              If the stock trap profiles do not cover a device, convert vendor MIBs with the installed `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` helper and place the resulting YAML profiles under `/etc/netdata/go.d/snmp.trap-profiles/`.
+              The installed helper is a Go binary and does not require Python or `pysmi`; the legacy Python scripts under `tools/snmp-traps-profile-gen/` are source-tree reference tooling only.
+              Profile YAML syntax is documented in [SNMP trap profile format](/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md).
+      configuration:
+        file:
+          name: go.d/snmp_traps.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              group: Collection
+              description: Framework collection interval for self-metrics. Trap packet reception is event-driven and does not depend on this interval.
+              default_value: 1
+              required: false
+
+            - name: listen
+              group: Listener
+              description: Network endpoints this listener binds during job creation.
+              default_value: ""
+              required: true
+              detailed_description: |
+                Each endpoint has:
+                - `protocol`: Transport protocol (`udp` only).
+                - `address`: Local IP address to bind (e.g., `0.0.0.0` for all interfaces).
+                - `port`: UDP port number (default 162). Port 162 requires `CAP_NET_BIND_SERVICE` or root.
+
+            - name: versions
+              group: SNMP
+              description: Accepted trap protocol versions.
+              default_value: "[v1, v2c]"
+              required: false
+              detailed_description: |
+                Supported values: `v1`, `v2c`, `v3`. All three can be combined.
+
+            - name: communities
+              group: SNMPv1/2c
+              description: SNMPv1/v2c community allowlist. Empty accepts all communities.
+              default_value: "[]"
+              required: false
+
+            - name: usm_users
+              group: SNMPv3
+              description: SNMPv3 USM users with auth and privacy protocols.
+              default_value: "[]"
+              required: false
+              detailed_description: |
+                Each user has:
+                - `username`: SNMPv3 USM security name (required).
+                - `engine_id`: Authoritative engine ID in hex (e.g., `80001f8880e5a5c0d6c7b8a9`). Required for static v3 jobs. May be omitted when `dynamic_engine_id_discovery` is enabled.
+                - `auth_proto`: Authentication protocol (`none`, `md5`, `sha`, `sha224`, `sha256`, `sha384`, `sha512`).
+                - `auth_key`: Authentication passphrase (use a Netdata secret reference). Required when `auth_proto` is not `none`; minimum 8 characters.
+                - `priv_proto`: Privacy protocol (`none`, `des`, `aes`, `aes192`, `aes256`, `aes192c`, `aes256c`).
+                - `priv_key`: Privacy passphrase (use a Netdata secret reference). Required when `priv_proto` is not `none`; minimum 8 characters.
+
+            - name: engine_id_whitelist
+              group: SNMPv3
+              description: Static SNMPv3 engine IDs accepted for v3 Trap PDUs (hex strings). Required when v3 is enabled and `dynamic_engine_id_discovery` is disabled.
+              default_value: "[]"
+              required: false
+
+            - name: local_engine_id
+              group: SNMPv3
+              description: Receiver-local SNMPv3 engine ID for v3 INFORM authentication (hex string, 5-32 bytes). When omitted, Netdata generates and persists a stable per-job value.
+              default_value: ""
+              required: false
+
+            - name: dynamic_engine_id_discovery
+              group: SNMPv3
+              description: When enabled, the listener discovers v3 Trap sender engine IDs at runtime and hot-registers new (engineID, username) pairs after the retry authenticates and decodes a v3 Trap. Static `engine_id_whitelist` must be empty.
+              default_value: false
+              required: false
+
+            - name: dynamic_engine_id_max_pairs
+              group: SNMPv3
+              description: Maximum in-memory dynamic (engineID, username) pairs per job. 0 or unset uses the default of 4096.
+              default_value: 4096
+              required: false
+
+            - name: reverse_dns
+              group: Enrichment
+              description: Optional source-IP PTR enrichment for `_HOSTNAME`. Disabled by default.
+              default_value: "enabled: false"
+              required: false
+
+            - name: allowlist
+              group: Security
+              description: Pre-decode source-IP CIDR allowlist. Empty accepts IPv4 and IPv6 from all sources.
+              default_value: 'source_cidrs: ["0.0.0.0/0", "::/0"]'
+              required: false
+
+            - name: rate_limit
+              group: Rate limiting
+              description: Per-source token-bucket rate limiting. Default off.
+              default_value: ""
+              required: false
+              detailed_description: |
+                - `enabled`: Enable per-source rate limiting (default `false`).
+                - `per_source_pps`: Maximum traps per second from a single source IP (default 1000).
+                - `mode`: Action when exceeded — `drop` (discard trap) or `sample` (allow but count as `rate_limited`).
+
+            - name: dedup
+              group: Deduplication
+              description: Optional per-job trap deduplication. Disabled by default.
+              default_value: ""
+              required: false
+              detailed_description: |
+                - `enabled`: Enable dedup (default `false`).
+                - `window_sec`: Dedup window in seconds (default 5).
+                - `cache_max_entries`: Maximum fingerprints kept in memory (default 100000).
+                - `key_varbinds`: Additional varbind names to include in the dedup fingerprint (default `[]`, fingerprint is source device + trap OID only).
+
+            - name: otlp
+              group: OTLP export
+              description: Optional second backend that exports traps as OTLP/gRPC LogRecords. Disabled by default.
+              default_value: ""
+              required: false
+              detailed_description: |
+                - `enabled`: Enable OTLP/gRPC Logs export.
+                - `endpoint`: OTLP/gRPC endpoint. `http://host:port` uses plaintext gRPC; `https://host:port` uses TLS (default `http://127.0.0.1:4317`).
+                - `headers`: Optional OTLP metadata headers (values may use Netdata secret references).
+                - `request_timeout`: Timeout for connection preflight and export calls (default `5s`).
+                - `flush_interval`: Maximum time to buffer records before export (default `200ms`).
+                - `batch_size`: Maximum LogRecords per export request (default 512).
+                - `queue_capacity`: Maximum records buffered per job (default 10000).
+
+            - name: retention
+              group: Retention
+              description: Per-job journal retention and rotation policy.
+              default_value: ""
+              required: false
+              detailed_description: |
+                - `max_size`: Maximum total bytes across all journal files (default `10GB`). Set `null` to disable size-based eviction.
+                - `max_duration`: Maximum age of the oldest journal file before deletion (default `null`, age-based eviction disabled).
+                - `rotation_size`: Maximum size of a single journal file before rotation (default `null` = auto, `max_size/20` clamped 5MB-200MB).
+                - `rotation_duration`: Maximum age of a single journal file before rotation (default `1h`). Set `null` or `0` to disable time-based rotation.
+
+            - name: overrides
+              group: Overrides
+              description: Per-OID category, severity, and label overrides on top of profile defaults.
+              default_value: "[]"
+              required: false
+              detailed_description: |
+                Each override entry requires an `oid` (numeric OID). Optional fields: `category` (one of the 8 categories), `severity` (one of the 8 severities), `labels` (free-form key-value pairs).
+
+            - name: metrics
+              group: Per-OID metrics
+              description: Promote selected trap OIDs to dedicated metric charts for finer-grained alerting.
+              default_value: "[]"
+              required: false
+              detailed_description: |
+                Each entry requires:
+                - `oid`: Numeric trap OID to emit as a metric.
+                - `context`: Metric context name (must start with `snmp.trap.`).
+                - `dimension_from_varbind` (optional): Symbolic varbind name used as dimension value. Must reference an enum-backed varbind with <= 64 values, a boolean/truthvalue, or a numeric range with <= 64 values.
+
+            - name: vnode
+              group: Virtual node
+              description: Associates this trap listener job with a Virtual Node.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic (SNMPv1/v2c)
+              description: |
+                A single job listening on the standard trap port. Accepts any SNMPv1/v2c community.
+                The allowlist is left open (`0.0.0.0/0` and `::/0`) — restrict it for production.
+              config: |
+                jobs:
+                  - name: local
+                    listen:
+                      endpoints:
+                        - protocol: udp
+                          address: 0.0.0.0
+                          port: 162
+                    versions:
+                      - v1
+                      - v2c
+            - name: SNMPv3 with static USM
+              description: |
+                A job accepting v3 traps from a known device. The USM user has a static engine ID,
+                and the engine ID whitelist is explicitly set. Auth and privacy keys use Netdata secret references.
+              config: |
+                jobs:
+                  - name: core-router
+                    listen:
+                      endpoints:
+                        - protocol: udp
+                          address: 0.0.0.0
+                          port: 162
+                    versions:
+                      - v3
+                    usm_users:
+                      - username: trapmon
+                        engine_id: 80001f8880e5a5c0d6c7b8a9
+                        auth_proto: sha256
+                        auth_key: "${env:SNMP_V3_AUTH_KEY}"
+                        priv_proto: aes
+                        priv_key: "${env:SNMP_V3_PRIV_KEY}"
+                    engine_id_whitelist:
+                      - 80001f8880e5a5c0d6c7b8a9
+            - name: Dynamic engine ID discovery
+              description: |
+                For environments where v3 sender engine IDs are not known in advance.
+                The listener discovers them at runtime from raw SNMPv3 context and hot-registers
+                new (engineID, username) pairs after the first successful authentication and decode.
+                The USM user omits `engine_id`; the whitelist must be empty.
+              config: |
+                jobs:
+                  - name: dynamic-v3
+                    listen:
+                      endpoints:
+                        - protocol: udp
+                          address: 0.0.0.0
+                          port: 162
+                    versions:
+                      - v3
+                    usm_users:
+                      - username: trapmon
+                        auth_proto: sha256
+                        auth_key: "${env:SNMP_V3_AUTH_KEY}"
+                        priv_proto: aes
+                        priv_key: "${env:SNMP_V3_PRIV_KEY}"
+                    dynamic_engine_id_discovery: true
+                    dynamic_engine_id_max_pairs: 4096
+            - name: With dedup and per-OID metrics
+              description: |
+                A job with dedup enabled (window 10 seconds) and two per-OID metric opt-ins.
+                The first metric counts trap events for OID `1.3.6.1.4.1.9.9.43.2.0.1` under the context
+                `snmp.trap.cisco_config_changes`. The second breaks down a linkDown trap by the
+                `ccmHistoryEventTerminalType` varbind dimension.
+              config: |
+                jobs:
+                  - name: campus-core
+                    listen:
+                      endpoints:
+                        - protocol: udp
+                          address: 0.0.0.0
+                          port: 162
+                    dedup:
+                      enabled: true
+                      window_sec: 10
+                    metrics:
+                      - oid: 1.3.6.1.4.1.9.9.43.2.0.1
+                        context: snmp.trap.cisco_config_changes
+                      - oid: 1.3.6.1.4.1.9.9.43.2.0.2
+                        context: snmp.trap.cisco_config_change_terminal
+                        dimension_from_varbind: ccmHistoryEventTerminalType
+    alerts:
+      - name: snmp_trap_emergency_events
+        metric: snmp.trap.severity
+        info: The SNMP trap listener is receiving emergency-severity traps.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_alert_events
+        metric: snmp.trap.severity
+        info: The SNMP trap listener is receiving alert-severity traps that require immediate attention on the sending device.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_critical_events
+        metric: snmp.trap.severity
+        info: The SNMP trap listener is receiving critical-severity traps.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_error_events
+        metric: snmp.trap.severity
+        info: The SNMP trap listener is receiving error-severity traps at high rate.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_warning_event_storm
+        metric: snmp.trap.severity
+        info: The SNMP trap listener is receiving warning-severity traps at storm-level rate.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_unknown_oids
+        metric: snmp.trap.errors
+        info: The SNMP trap listener is receiving traps for OIDs not found in any loaded profile.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_decode_errors
+        metric: snmp.trap.errors
+        info: The SNMP trap listener has decode errors.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_template_unresolved
+        metric: snmp.trap.errors
+        info: The SNMP trap listener received traps whose profile templates referenced missing varbinds or fields.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_malformed_pdus
+        metric: snmp.trap.errors
+        info: The SNMP trap listener is receiving structurally invalid trap PDUs.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_allowlist_drops
+        metric: snmp.trap.errors
+        info: The SNMP trap listener is dropping traps because the sender IP is outside the configured allowlist.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_rate_limited
+        metric: snmp.trap.errors
+        info: The SNMP trap listener is receiving traps above the configured per-source rate limit.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_auth_failures
+        metric: snmp.trap.errors
+        info: The SNMP trap listener has authentication failures.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_usm_failures
+        metric: snmp.trap.errors
+        info: The SNMP trap listener has USM failures.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_unknown_engine_id
+        metric: snmp.trap.errors
+        info: The SNMP trap listener is receiving v3 traps from engine IDs outside the static whitelist, or first-time dynamic engine ID registrations when dynamic discovery is enabled.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_inform_response_failures
+        metric: snmp.trap.errors
+        info: The SNMP trap listener failed to send INFORM acknowledgements back to senders.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_sanitized_fields
+        metric: snmp.trap.errors
+        info: The SNMP trap listener sanitized fields before writing to the journal.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_profile_load_failures
+        metric: snmp.trap.errors
+        info: The SNMP trap listener failed to load or reload trap profiles.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_journal_write_failures
+        metric: snmp.trap.errors
+        info: The SNMP trap listener failed to write traps to the systemd-journal.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_otlp_export_failures
+        metric: snmp.trap.errors
+        info: The SNMP trap listener failed to export traps through OTLP.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_high_dedup_suppression
+        metric: snmp.trap.dedup_suppressed
+        info: The SNMP trap listener is suppressing a high volume of duplicate traps.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Metrics are grouped per job and scoped by `job_name`. The collector emits four static metric contexts plus optional operator-opted-in per-OID metric contexts.
+
+        **Static contexts:**
+
+        - `snmp.trap.events`: Trap events received, split by category. The `stacked` chart type gives a visual burst profile across categories.
+        - `snmp.trap.severity`: Trap events received, split by severity. The `stacked` chart type gives a visual burst profile across the closed 8-severity taxonomy (`emerg`, `alert`, `crit`, `err`, `warning`, `notice`, `info`, `debug`).
+        - `snmp.trap.errors`: Processing errors by type. Stacked chart for quick identification of dominant error categories.
+        - `snmp.trap.dedup_suppressed`: Per-second rate of traps suppressed by dedup (only emitted when dedup is enabled on the job).
+
+        **Dynamic contexts** (operator opt-in):
+
+        Operators can promote selected trap OIDs to dedicated metric charts via the `metrics` configuration section.
+        Each entry emits under a `snmp.trap.<context>` context (e.g., `snmp.trap.cisco_config_changes`).
+        When `dimension_from_varbind` is specified, the chart has one dimension per distinct varbind value.
+        When omitted, a single `count` dimension is emitted.
+
+        The `dynamic_context_prefixes` entry below covers all operator-created contexts under the `snmp.trap.` prefix.
+      availability: []
+      dynamic_context_prefixes:
+        - prefix: snmp.trap.
+          reason: Operator-opted-in per-OID metric charts are emitted at runtime under the snmp.trap prefix via the `metrics` configuration section.
+      scopes:
+        - name: job
+          description: Per-job self-metrics for a SNMP trap listener job.
+          labels:
+            - name: job_name
+              description: The job name as defined in `go.d/snmp_traps.conf`.
+          metrics:
+            - name: snmp.trap.events
+              description: SNMP trap events received, categorized by type
+              unit: events/s
+              chart_type: stacked
+              dimensions:
+                - name: state_change
+                  description: Link up/down, operational state transitions
+                - name: config_change
+                  description: Configuration modifications
+                - name: security
+                  description: Security events (intrusion, ACL violations, etc.)
+                - name: auth
+                  description: Authentication and authorization events
+                - name: license
+                  description: License-state events
+                - name: mobility
+                  description: Roaming, handoff, wireless client events
+                - name: diagnostic
+                  description: Tests, health checks, probes
+                - name: unknown
+                  description: Unmatched or unclassified traps
+            - name: snmp.trap.severity
+              description: SNMP trap events received, categorized by severity
+              unit: events/s
+              chart_type: stacked
+              dimensions:
+                - name: emerg
+                  description: System unusable
+                - name: alert
+                  description: Immediate action required
+                - name: crit
+                  description: Critical condition
+                - name: err
+                  description: Error condition
+                - name: warning
+                  description: Warning condition
+                - name: notice
+                  description: Normal but significant condition
+                - name: info
+                  description: Informational
+                - name: debug
+                  description: Debug-level message
+            - name: snmp.trap.errors
+              description: SNMP trap processing errors by type
+              unit: errors/s
+              chart_type: stacked
+              dimensions:
+                - name: unknown_oid
+                  description: Trap OID not found in any loaded profile
+                - name: decode_failed
+                  description: SNMP BER decode errors
+                - name: template_unresolved
+                  description: Varbind template resolution failures
+                - name: malformed_pdu
+                  description: Structurally invalid PDU
+                - name: dropped_allowlist
+                  description: Traps dropped by source-IP CIDR allowlist
+                - name: rate_limited
+                  description: Traps dropped or sampled by per-source rate limit
+                - name: auth_failures
+                  description: SNMPv1/v2c community mismatch
+                - name: usm_failures
+                  description: SNMPv3 USM authentication or decryption failures
+                - name: unknown_engine_id
+                  description: SNMPv3 trap from an unknown or unregistered engine ID
+                - name: inform_response_failed
+                  description: Failed to send INFORM response to sender
+                - name: sanitized
+                  description: Field values sanitized by CWE-117 log-injection filter
+                - name: profile_load_failed
+                  description: Trap profile YAML load or parse errors
+                - name: journal_write_failed
+                  description: Systemd-journal write errors
+                - name: otlp_export_failed
+                  description: OTLP export errors (only when OTLP is enabled)
+            - name: snmp.trap.dedup_suppressed
+              description: Per-second rate of traps suppressed by deduplication (only emitted when dedup is enabled)
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: suppressed
+                  description: Traps suppressed during the current collection interval
+    troubleshooting:
+      problems:
+        list:
+          - name: Port binding fails (permission denied)
+            description: |
+              Standard SNMP trap port (UDP/162) requires `CAP_NET_BIND_SERVICE`.
+
+              Netdata packages grant this capability to `go.d.plugin` automatically. If running from source
+              or in a custom deployment, grant it manually:
+              ```bash
+              sudo setcap CAP_NET_BIND_SERVICE=eip /usr/libexec/netdata/plugins.d/go.d.plugin
+              ```
+              Alternatively, use a port >= 1024 (e.g., `1062`) and redirect traffic through a firewall.
+          - name: SNMPv3 traps not decoded (unknown_engine_id)
+            description: |
+              In static mode, the sender engine ID is not in `engine_id_whitelist`. Add the sender engine ID
+              to the whitelist, or switch to `dynamic_engine_id_discovery: true` with an empty whitelist.
+
+              In dynamic mode, the first accepted `(engineID, username)` pair increments this once as
+              operator visibility. Repeated or rejected increments usually indicate cap exhaustion,
+              invalid sender state, or an unauthorized sender.
+          - name: USM authentication failures
+            description: |
+              Check that the USM user's `auth_proto`, `auth_key`, `priv_proto`, and `priv_key` match the
+              sender device's configuration. Verify engine ID matches. Use Netdata secret references for keys.
+          - name: journal retention eating disk space
+            description: |
+              The default retention uses size-based eviction (`max_size: 10GB`) with no time-based age limit.
+              For high-trap environments, reduce `max_size` or enable `max_duration` to age-out old entries.
