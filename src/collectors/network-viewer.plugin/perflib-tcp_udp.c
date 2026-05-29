@@ -83,10 +83,10 @@ typedef struct {
     MIB_UDP6ROW_OWNER_PID table[1];
 } MIB_UDP6TABLE_OWNER_PID;
 
-DWORD GetExtendedTcpTable(PVOID pTcpTable, PDWORD pdwSize, BOOL bOrder,
-                          ULONG ulAf, TCP_TABLE_CLASS TableClass, ULONG Reserved);
-DWORD GetExtendedUdpTable(PVOID pUdpTable, PDWORD pdwSize, BOOL bOrder,
-                          ULONG ulAf, UDP_TABLE_CLASS TableClass, ULONG Reserved);
+DWORD WINAPI GetExtendedTcpTable(PVOID pTcpTable, PDWORD pdwSize, BOOL bOrder,
+                                 ULONG ulAf, TCP_TABLE_CLASS TableClass, ULONG Reserved);
+DWORD WINAPI GetExtendedUdpTable(PVOID pUdpTable, PDWORD pdwSize, BOOL bOrder,
+                                 ULONG ulAf, UDP_TABLE_CLASS TableClass, ULONG Reserved);
 
 // Windows-native AF_ values for IP Helper API calls.
 // Cygwin POSIX headers define AF_INET6=10; Windows APIs expect 23.
