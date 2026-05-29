@@ -711,6 +711,7 @@ bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     RRDLABEL *label;
     Pvoid_t *PValue;
     size_t added = 0;
+    size_t cleaned = 0;
 
     RRDLABEL_SRC ls;
     lfe_start_nolock(src, label, ls)
@@ -755,6 +756,7 @@ bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
             int64_t old_judy_mem = JudyAllocThreadPulseGetAndReset();
             RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, old_judy_mem, 0);
             delete_label(old_label_with_same_key);
+            cleaned++;
         }
     }
     lfe_done_nolock();
@@ -765,7 +767,12 @@ bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     spinlock_unlock(&src->spinlock);
     spinlock_unlock(&dst->spinlock);
 
-    return (added > 0) || (removed > 0);
+    // cleaned counts duplicates dropped by the same-key cleanup loop above.
+    // Without it, a stale (key,*) duplicate removed while the desired
+    // (key,value) was already present would mutate dst silently -- callers
+    // gating on this return (e.g. rrdset_update_rrdlabels setting
+    // RRDSET_FLAG_PENDING_LABEL_RECHECK) would miss the change.
+    return (added > 0) || (removed > 0) || (cleaned > 0);
 }
 
 //
@@ -843,10 +850,15 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
             RRDLABEL *old_label_with_key = rrdlabels_find_label_with_key_unsafe(dst, label, false);
             if (!old_label_with_key)
                 break;
-            int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
             (void)JudyLDel(&dst->JudyL, (Word_t)old_label_with_key, PJE0);
+            int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
             RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
             delete_label((RRDLABEL *)old_label_with_key);
+            // Cleanup is itself a state mutation: bump version and request
+            // tail-stats accounting so version-based consumers and the
+            // memory pulse stay correct even when no new insert happened.
+            dst->version++;
+            update_statistics = true;
         }
     }
     lfe_done_nolock();
