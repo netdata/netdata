@@ -374,6 +374,14 @@ Filter the results for IDs starting with `statsd_`. Use the returned chart `id` 
 
 **Troubleshooting "No metrics were matched to query":** This error typically occurs when you use the raw StatsD metric name (e.g., `statsd.test.metric`) as the `chart` parameter instead of the constructed chart reference (e.g., `statsd_test.metric_counter`). To resolve this, verify the correct chart name using `/api/v1/charts` before querying metric data.
 
+For example, after sending `test.metric:100|c` via StatsD, the correct query is:
+
+```bash
+curl "http://localhost:19999/api/v1/data?chart=statsd_test.metric_counter&after=-10&before=now"
+```
+
+The chart name `statsd_test.metric_counter` follows the `type.id` convention: type `statsd_test` (prefix + first dot-delimited word) and id `metric_counter` (remaining words + metric type).
+
 :::
 
 Example: To create charts for all `myapp.*` metrics except `myapp.*.badmetric`:
