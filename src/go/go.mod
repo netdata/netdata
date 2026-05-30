@@ -50,7 +50,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/gjson v1.19.0
 	github.com/valyala/fastjson v1.6.10
-	github.com/vmware/govmomi v0.54.0
+	github.com/vmware/govmomi v0.54.1
 	go.mongodb.org/mongo-driver v1.17.9
 	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
 	go.uber.org/automaxprocs v1.6.0
