@@ -247,6 +247,11 @@
 - Cleanup ARAL code when NETDATA_ARAL_INTERNAL_CHECKS is enabled ([#22581](https://github.com/netdata/netdata/issues/22581))
 - Reapply alert prototypes when host or chart labels change ([#22570](https://github.com/netdata/netdata/issues/22570))
 - Windows Network Viewer ([#22470](https://github.com/netdata/netdata/issues/22470))
+- Remove Fedora 42 from CI and package builds ([#22240](https://github.com/netdata/netdata/issues/22240))
+- Docs: task class: improve_docs — add private chart naming convention ([#22577](https://github.com/netdata/netdata/issues/22577))
+- Docs: task class: improve_docs — add a boolean/binary metric alerting ([#22579](https://github.com/netdata/netdata/issues/22579))
+- Fix label migration logic to handle key-value changes and duplicate removal ([#22586](https://github.com/netdata/netdata/issues/22586))
+- Add Cato Networks collector ([#22373](https://github.com/netdata/netdata/issues/22373))
 
 ## [2.10.0] - 2026-04-09
 
