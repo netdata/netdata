@@ -12,6 +12,7 @@
 struct shared_pid_memory {
     struct ebpf_pid_stat *entries;
     size_t total;
+    size_t prev_count; /* entries written in the previous publish cycle */
     int shm_fd;
     sem_t *sem;
 };
@@ -90,10 +91,17 @@ int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_p
         locked = true;
     }
 
-    size_t length = shared_pid_memory_nbytes(ctx);
-    memset(ctx->entries, 0, length);
     if (entries && count)
         memcpy(ctx->entries, entries, count * sizeof(struct ebpf_pid_stat));
+
+    /* Zero only the slots vacated since the previous cycle.  The initial
+     * memset in shared_pid_memory_open already zeroed the entire segment, so
+     * on the first call prev_count==0 and this is a no-op. */
+    if (ctx->prev_count > count)
+        memset(ctx->entries + count, 0,
+               (ctx->prev_count - count) * sizeof(struct ebpf_pid_stat));
+
+    ctx->prev_count = count;
 
     if (locked)
         sem_post(ctx->sem);

@@ -51,12 +51,11 @@ func (s *cachestatSharedMemoryStore) Snapshot() []ebpfPidStat {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	// s.entries is already sorted ascending by pid: the C layer qsorts its
+	// output, SnapshotApps preserves that order, and UpdateApps iterates in
+	// order while only skipping (not reordering) stale entries.
 	copied := make([]ebpfPidStat, len(s.entries))
 	copy(copied, s.entries)
-	sort.Slice(copied, func(i, j int) bool {
-		return copied[i].pid < copied[j].pid
-	})
-
 	return copied
 }
 
@@ -159,6 +158,13 @@ func (s *cachestatSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatApp
 		nextEntries = append(nextEntries, stat)
 		nextPrev[app.Pid] = current
 	}
+
+	// Ensure entries are sorted by pid so Snapshot() callers always see a
+	// consistent ordering.  The C layer pre-sorts its output, so this is a
+	// no-op (O(N) pass) in the normal production path.
+	sort.Slice(nextEntries, func(i, j int) bool {
+		return nextEntries[i].pid < nextEntries[j].pid
+	})
 
 	s.Replace(nextEntries, nextPrev, nextPrevCt, nextMiss)
 	return stalePIDs
