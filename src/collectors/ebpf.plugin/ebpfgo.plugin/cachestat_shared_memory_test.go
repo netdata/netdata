@@ -36,6 +36,70 @@ func TestBuildCachestatPublish(t *testing.T) {
 	}
 }
 
+func TestCachestatSharedMemoryStoreEvictsAfterStaleCycles(t *testing.T) {
+	store := NewCachestatSharedMemoryStore()
+	app := libbpfloader.CachestatAppSnapshot{Pid: 42, Ppid: 1, Ct: 100, MarkPageAccessed: 10}
+
+	// First call establishes the ct baseline — no stale PIDs yet.
+	if stale := store.UpdateApps([]libbpfloader.CachestatAppSnapshot{app}); len(stale) != 0 {
+		t.Fatalf("cycle 0 (baseline): unexpected stale %v", stale)
+	}
+
+	// Each subsequent call with the same ct accumulates a miss.
+	// The PID must survive the first cachestatStaleCycles-1 stale cycles.
+	for i := 1; i < cachestatStaleCycles; i++ {
+		stale := store.UpdateApps([]libbpfloader.CachestatAppSnapshot{app})
+		if len(stale) != 0 {
+			t.Fatalf("cycle %d: unexpected stale %v (threshold not yet reached)", i, stale)
+		}
+		if len(store.Snapshot()) != 1 {
+			t.Fatalf("cycle %d: PID 42 should still be present", i)
+		}
+	}
+
+	// One more call with unchanged ct — miss count reaches cachestatStaleCycles → evict.
+	stale := store.UpdateApps([]libbpfloader.CachestatAppSnapshot{app})
+	if len(stale) != 1 || stale[0] != 42 {
+		t.Fatalf("expected eviction of PID 42, got stale=%v", stale)
+	}
+	if len(store.Snapshot()) != 0 {
+		t.Fatalf("expected empty snapshot after eviction")
+	}
+}
+
+func TestCachestatSharedMemoryStoreNoEvictionWhenCtAdvances(t *testing.T) {
+	store := NewCachestatSharedMemoryStore()
+	app := libbpfloader.CachestatAppSnapshot{Pid: 7, Ct: 100}
+
+	// Drive the miss count to cachestatStaleCycles-1 (one cycle before eviction).
+	for i := 0; i <= cachestatStaleCycles-1; i++ {
+		store.UpdateApps([]libbpfloader.CachestatAppSnapshot{app})
+	}
+	if len(store.Snapshot()) != 1 {
+		t.Fatal("PID 7 should still be present before ct advance")
+	}
+
+	// Advance ct — miss count must reset to zero.
+	app.Ct = 200
+	if stale := store.UpdateApps([]libbpfloader.CachestatAppSnapshot{app}); len(stale) != 0 {
+		t.Fatalf("expected no eviction after ct advance, got stale=%v", stale)
+	}
+
+	// Now drive another cachestatStaleCycles-1 stale cycles — still below threshold.
+	for i := 0; i < cachestatStaleCycles-1; i++ {
+		stale := store.UpdateApps([]libbpfloader.CachestatAppSnapshot{app})
+		if len(stale) != 0 {
+			t.Fatalf("cycle %d after ct advance: unexpected eviction", i)
+		}
+	}
+
+	// The cachestatStaleCycles-th stale cycle triggers eviction.
+	stale := store.UpdateApps([]libbpfloader.CachestatAppSnapshot{app})
+	if len(stale) != 1 || stale[0] != 7 {
+		t.Fatalf("expected eviction of PID 7 after second stale run, got stale=%v", stale)
+	}
+}
+
 func TestCachestatSharedMemoryStoreUpdateApps(t *testing.T) {
 	store := NewCachestatSharedMemoryStore()
 	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{

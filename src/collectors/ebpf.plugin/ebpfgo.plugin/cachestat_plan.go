@@ -10,6 +10,7 @@ import (
 
 const cachestatKernelMask uint32 = (1 << 12) - 1
 const cachestatDefaultPIDTableSize uint32 = 32768
+const cachestatMaxPIDTableSize uint32 = 32768
 const cachestatDefaultBTFFile = "vmlinux"
 
 type CachestatLegacyConfig struct {
@@ -104,7 +105,7 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 		cfg.CgroupsEnabled = *fileCfg.Cgroups
 	}
 	if fileCfg.PidTable != nil && *fileCfg.PidTable > 0 {
-		cfg.PidTableSize = *fileCfg.PidTable
+		cfg.PidTableSize = applyPidTableSizeClamp(*fileCfg.PidTable)
 	}
 	if fileCfg.MapsPerCore != nil {
 		cfg.MapsPerCore = *fileCfg.MapsPerCore
@@ -173,4 +174,11 @@ func selectCachestatObjectFlavor(requested string, kver uint32, isDebian bool) O
 func kernelBTFSupported(btfPath string) bool {
 	_, err := os.Stat(filepath.Join(btfPath, cachestatDefaultBTFFile))
 	return err == nil
+}
+
+func applyPidTableSizeClamp(n uint32) uint32 {
+	if n > cachestatMaxPIDTableSize {
+		return cachestatMaxPIDTableSize
+	}
+	return n
 }

@@ -51,6 +51,7 @@ int netdata_cachestat_runtime_snapshot_apps(
     int maps_per_core,
     struct netdata_ebpf_cachestat_pid_snapshot_list *out);
 void netdata_cachestat_runtime_free_apps_snapshot(struct netdata_ebpf_cachestat_pid_snapshot_list *out);
+int netdata_cachestat_runtime_delete_pid(struct netdata_ebpf_cachestat_runtime *rt, unsigned int pid);
 void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt);
 */
 import "C"
@@ -221,6 +222,18 @@ func (r *CachestatRuntime) SnapshotApps(mapsPerCore bool) ([]CachestatAppSnapsho
 	}
 
 	return out, nil
+}
+
+func (r *CachestatRuntime) DeletePid(pid uint32) error {
+	if r == nil || r.ptr == nil {
+		return ErrDisabled
+	}
+
+	if ret := C.netdata_cachestat_runtime_delete_pid(r.ptr, C.uint(pid)); ret != 0 {
+		return fmt.Errorf("delete pid %d from cstat_pid failed: %d", pid, int(ret))
+	}
+
+	return nil
 }
 
 func (r *CachestatRuntime) Close() {

@@ -6,6 +6,27 @@ import (
 	"testing"
 )
 
+func TestApplyPidTableSizeClamp(t *testing.T) {
+	tests := map[string]struct {
+		in   uint32
+		want uint32
+	}{
+		"zero stays zero":       {0, 0},
+		"small value unchanged": {100, 100},
+		"at cap unchanged":      {cachestatMaxPIDTableSize, cachestatMaxPIDTableSize},
+		"above cap clamped":     {cachestatMaxPIDTableSize + 1, cachestatMaxPIDTableSize},
+		"far above cap clamped": {4194304, cachestatMaxPIDTableSize},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := applyPidTableSizeClamp(tc.in)
+			if got != tc.want {
+				t.Fatalf("applyPidTableSizeClamp(%d) = %d, want %d", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestParseCachestatConfigFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ebpf.d.conf")

@@ -71,6 +71,11 @@ func (r *CachestatRuntime) SnapshotApps(mapsPerCore bool) ([]CachestatAppSnapsho
 	return nil, ErrDisabled
 }
 
+func (r *CachestatRuntime) DeletePid(pid uint32) error {
+	_ = pid
+	return ErrDisabled
+}
+
 func (r *CachestatRuntime) Close() {
 	// No-op in the disabled build because the runtime never acquired native resources.
 }

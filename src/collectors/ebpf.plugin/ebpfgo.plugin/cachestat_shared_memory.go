@@ -10,31 +10,41 @@ import (
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
 
+// cachestatStaleCycles is the number of consecutive collection cycles with no
+// ct advance before a PID entry is evicted from both the BPF map and the SHM.
+const cachestatStaleCycles = 3
+
 type cachestatSharedMemoryStore struct {
-	mu      sync.RWMutex
-	entries []ebpfPidStat
-	prev    map[uint32]netdataCachestat
+	mu        sync.RWMutex
+	entries   []ebpfPidStat
+	prev      map[uint32]netdataCachestat
+	prevCt    map[uint32]uint64 // last observed BPF timestamp per PID
+	missCount map[uint32]int    // consecutive cycles where ct did not advance
 }
 
 func NewCachestatSharedMemoryStore() *cachestatSharedMemoryStore {
 	return &cachestatSharedMemoryStore{
-		prev: make(map[uint32]netdataCachestat),
+		prev:      make(map[uint32]netdataCachestat),
+		prevCt:    make(map[uint32]uint64),
+		missCount: make(map[uint32]int),
 	}
 }
 
-func (s *cachestatSharedMemoryStore) Replace(snapshot []ebpfPidStat, prev map[uint32]netdataCachestat) {
+func (s *cachestatSharedMemoryStore) Replace(
+	snapshot []ebpfPidStat,
+	prev map[uint32]netdataCachestat,
+	prevCt map[uint32]uint64,
+	missCount map[uint32]int,
+) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	copied := make([]ebpfPidStat, len(snapshot))
 	copy(copied, snapshot)
 	s.entries = copied
-
-	nextPrev := make(map[uint32]netdataCachestat, len(prev))
-	for pid, counters := range prev {
-		nextPrev[pid] = counters
-	}
-	s.prev = nextPrev
+	s.prev = prev
+	s.prevCt = prevCt
+	s.missCount = missCount
 }
 
 func (s *cachestatSharedMemoryStore) Snapshot() []ebpfPidStat {
@@ -118,18 +128,40 @@ func buildCachestatPidStat(app libbpfloader.CachestatAppSnapshot, previous netda
 	}, current
 }
 
-func (s *cachestatSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatAppSnapshot) {
+// UpdateApps updates the in-memory snapshot from the latest BPF snapshot.
+// It returns the PIDs that should be deleted from the kernel BPF map because
+// their ct has not advanced for cachestatStaleCycles consecutive cycles.
+func (s *cachestatSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatAppSnapshot) []uint32 {
 	nextEntries := make([]ebpfPidStat, 0, len(apps))
 	nextPrev := make(map[uint32]netdataCachestat, len(apps))
+	nextPrevCt := make(map[uint32]uint64, len(apps))
+	nextMiss := make(map[uint32]int)
+	var stalePIDs []uint32
 
 	for _, app := range apps {
+		lastCt, seen := s.prevCt[app.Pid]
+		if seen && app.Ct == lastCt {
+			miss := s.missCount[app.Pid] + 1
+			if miss >= cachestatStaleCycles {
+				// ct has not advanced for cachestatStaleCycles cycles:
+				// treat the PID as exited and evict it.
+				stalePIDs = append(stalePIDs, app.Pid)
+				continue
+			}
+			nextMiss[app.Pid] = miss
+		}
+		// New PID or ct advanced: miss count stays 0 (Go zero-value).
+
+		nextPrevCt[app.Pid] = app.Ct
+
 		previous, hasPrevious := s.prev[app.Pid]
 		stat, current := buildCachestatPidStat(app, previous, hasPrevious)
 		nextEntries = append(nextEntries, stat)
 		nextPrev[app.Pid] = current
 	}
 
-	s.Replace(nextEntries, nextPrev)
+	s.Replace(nextEntries, nextPrev, nextPrevCt, nextMiss)
+	return stalePIDs
 }
 
 func runCachestatSharedMemoryCollector(handle *CachestatLegacyHandle, stop <-chan struct{}, store *cachestatSharedMemoryStore, updateEvery int) {
@@ -156,7 +188,12 @@ func runCachestatSharedMemoryCollector(handle *CachestatLegacyHandle, stop <-cha
 			continue
 		}
 
-		store.UpdateApps(apps)
+		stalePIDs := store.UpdateApps(apps)
+		for _, pid := range stalePIDs {
+			if err := handle.Runtime.DeletePid(pid); err != nil {
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: failed to delete stale PID %d from cstat_pid: %v\n", pid, err)
+			}
+		}
 		if handle.SharedMemory != nil {
 			if err := handle.SharedMemory.Publish(store.Snapshot()); err != nil {
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat shared memory publish failed: %v\n", err)

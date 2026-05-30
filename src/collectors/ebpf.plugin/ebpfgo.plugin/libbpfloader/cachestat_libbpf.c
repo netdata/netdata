@@ -892,15 +892,32 @@ int netdata_cachestat_runtime_snapshot_apps(
     if (count < 1)
         count = 1;
 
-    size_t max_entries = bpf_map__max_entries(map);
-    if (max_entries == 0)
-        max_entries = 1;
-
     struct netdata_ebpf_cachestat_pid_entry *values = calloc((size_t)count, sizeof(*values));
     if (!values)
         return -1;
 
-    struct netdata_ebpf_cachestat_pid_snapshot *items = calloc(max_entries, sizeof(*items));
+    /* Pass 1: count active entries so we allocate for actual PID count rather
+     * than the full map capacity (which can be 32 768 × 128 B = 4 MB even
+     * when only a handful of PIDs are active). */
+    size_t active_count = 0;
+    {
+        uint32_t pass1_key = 0, pass1_next = 0;
+        while (bpf_map_get_next_key(fd, &pass1_key, &pass1_next) == 0) {
+            active_count++;
+            pass1_key = pass1_next;
+        }
+    }
+
+    if (active_count == 0) {
+        free(values);
+        out->items = NULL;
+        out->count = 0;
+        return 0;
+    }
+
+    /* Small headroom absorbs PIDs inserted between the two passes. */
+    size_t alloc_count = active_count + 16;
+    struct netdata_ebpf_cachestat_pid_snapshot *items = calloc(alloc_count, sizeof(*items));
     if (!items) {
         free(values);
         return -1;
@@ -916,7 +933,7 @@ int netdata_cachestat_runtime_snapshot_apps(
             continue;
         }
 
-        if (out_count >= max_entries)
+        if (out_count >= alloc_count)
             goto next_key_iter;
 
         /*
@@ -1005,6 +1022,23 @@ void netdata_cachestat_runtime_free_apps_snapshot(struct netdata_ebpf_cachestat_
     free(out->items);
     out->items = NULL;
     out->count = 0;
+}
+
+int netdata_cachestat_runtime_delete_pid(struct netdata_ebpf_cachestat_runtime *rt, uint32_t pid)
+{
+    struct bpf_object *obj = cachestat_runtime_object(rt);
+    if (!rt || !obj)
+        return -1;
+
+    struct bpf_map *map = bpf_object__find_map_by_name(obj, "cstat_pid");
+    if (!map)
+        return 0; /* buffer/arena flavor: no cstat_pid map, nothing to delete */
+
+    int fd = bpf_map__fd(map);
+    if (fd < 0)
+        return -1;
+
+    return bpf_map_delete_elem(fd, &pid);
 }
 
 void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt)
