@@ -252,6 +252,13 @@
 - Docs: task class: improve_docs — add a boolean/binary metric alerting ([#22579](https://github.com/netdata/netdata/issues/22579))
 - Fix label migration logic to handle key-value changes and duplicate removal ([#22586](https://github.com/netdata/netdata/issues/22586))
 - Add Cato Networks collector ([#22373](https://github.com/netdata/netdata/issues/22373))
+- Build(deps): bump github.com/redis/go-redis/v9 from 9.19.0 to 9.20.0 in /src/go ([#22589](https://github.com/netdata/netdata/issues/22589))
+- Build(deps): bump github.com/prometheus/common from 0.67.5 to 0.68.0 in /src/go ([#22588](https://github.com/netdata/netdata/issues/22588))
+- Build(deps): bump github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph from 0.9.0 to 0.10.0 in /src/go ([#22592](https://github.com/netdata/netdata/issues/22592))
+- Build(deps): bump github.com/catonetworks/cato-go-sdk from 0.2.5 to 0.2.6 in /src/go ([#22591](https://github.com/netdata/netdata/issues/22591))
+- Build(deps): bump github.com/vmware/govmomi from 0.54.0 to 0.54.1 in /src/go ([#22590](https://github.com/netdata/netdata/issues/22590))
+- Fix: upgrade google.golang.org/grpc to 1.79.3 (CVE-2026-33186) ([#22587](https://github.com/netdata/netdata/issues/22587))
+- Chore: go mod tidy ([#22593](https://github.com/netdata/netdata/issues/22593))
 
 ## [2.10.0] - 2026-04-09
 
