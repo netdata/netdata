@@ -19,14 +19,15 @@ const (
 )
 
 type cachestatConfigFile struct {
-	UpdateEvery  *int
-	AppsEnabled  *bool
-	Cgroups      *bool
-	PidTable     *uint32
-	MapsPerCore  *bool
-	BTFPath      *string
-	Lifetime     *int
-	ObjectFlavor *string
+	UpdateEvery     *int
+	AppsEnabled     *bool
+	Cgroups         *bool
+	PidTable        *uint32
+	MapsPerCore     *bool
+	BTFPath         *string
+	Lifetime        *int
+	ObjectFlavor    *string
+	CollectPidLevel *int // "collect pid" key → BPF apps collection level (0=real parent, 1=parent, 2=all)
 }
 
 func loadCachestatConfigFiles() (cachestatConfigFile, bool, error) {
@@ -158,6 +159,30 @@ func parseCachestatConfigFile(path string) (cachestatConfigFile, bool, error) {
 			}
 			cfg.ObjectFlavor = stringPtr(flavor)
 			found = true
+		case "ebpf type format":
+			// Legacy key from the old ebpf.plugin; maps to ebpf object flavor.
+			// "legacy" forces the kprobe-based tracing path; "co-re" and "auto"
+			// leave flavor selection to auto-detection.
+			if strings.EqualFold(value, "legacy") {
+				cfg.ObjectFlavor = stringPtr("tracing")
+			}
+			found = true
+		case "ebpf co-re tracing":
+			// Legacy key from the old ebpf.plugin.  "probe" means kprobe
+			// attachment, which is equivalent to the tracing (legacy) object
+			// flavor.  "trampoline" is the default and needs no override.
+			if strings.EqualFold(value, "probe") {
+				cfg.ObjectFlavor = stringPtr("tracing")
+			}
+			found = true
+		case "collect pid":
+			// Legacy key from the old ebpf.plugin; controls the BPF apps
+			// collection level written to the cstat_ctrl map.
+			level := parseCollectPidLevel(value)
+			if level >= 0 {
+				cfg.CollectPidLevel = intPtr(level)
+			}
+			found = true
 		}
 	}
 
@@ -193,6 +218,9 @@ func (c *cachestatConfigFile) apply(other cachestatConfigFile) {
 	if other.ObjectFlavor != nil {
 		c.ObjectFlavor = other.ObjectFlavor
 	}
+	if other.CollectPidLevel != nil {
+		c.CollectPidLevel = other.CollectPidLevel
+	}
 }
 
 func intPtr(v int) *int {
@@ -219,6 +247,21 @@ func parseConfigBool(value string) (bool, bool) {
 		return false, true
 	default:
 		return false, false
+	}
+}
+
+// parseCollectPidLevel maps the "collect pid" legacy key to a numeric BPF
+// apps-level value (0=real parent, 1=parent, 2=all).  Returns -1 on unknown.
+func parseCollectPidLevel(value string) int {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "real parent":
+		return 0
+	case "parent":
+		return 1
+	case "all":
+		return 2
+	default:
+		return -1
 	}
 }
 

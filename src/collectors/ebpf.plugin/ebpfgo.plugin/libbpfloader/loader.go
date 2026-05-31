@@ -46,7 +46,7 @@ func NewCachestatRuntime(path string, useCore bool) (*CachestatRuntime, error) {
 	return nil, ErrDisabled
 }
 
-func (r *CachestatRuntime) Prepare(pidTableSize uint32, mapsPerCore bool) error {
+func (r *CachestatRuntime) Prepare(pidTableSize uint32, mapsPerCore bool, accountFunction string) error {
 	_ = pidTableSize
 	_ = mapsPerCore
 	return ErrDisabled
@@ -58,6 +58,12 @@ func (r *CachestatRuntime) Load() error {
 
 func (r *CachestatRuntime) Attach(accountFunction string) error {
 	_ = accountFunction
+	return ErrDisabled
+}
+
+func (r *CachestatRuntime) UpdateController(appsEnabled bool, appsLevel int) error {
+	_ = appsEnabled
+	_ = appsLevel
 	return ErrDisabled
 }
 

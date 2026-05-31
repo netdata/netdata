@@ -33,7 +33,7 @@ func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, err
 		return nil, err
 	}
 
-	if err := rt.UpdateController(cfg.AppsEnabled || cfg.CgroupsEnabled); err != nil {
+	if err := rt.UpdateController(cfg.AppsEnabled || cfg.CgroupsEnabled, cfg.AppsLevel); err != nil {
 		rt.Close()
 		return nil, err
 	}
@@ -54,6 +54,7 @@ func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, err
 		MapsPerCore:    cfg.MapsPerCore,
 		AppsEnabled:    cfg.AppsEnabled,
 		CgroupsEnabled: cfg.CgroupsEnabled,
+		AppsLevel:      cfg.AppsLevel,
 	}, nil
 }
 

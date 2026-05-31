@@ -29,6 +29,7 @@ type CachestatLegacyConfig struct {
 	MapsPerCore     bool
 	ObjectFlavor    string
 	AccountFunction string
+	AppsLevel       int // BPF apps collection level: 0=real parent, 1=parent, 2=all
 	Targets         CachestatTargets
 }
 
@@ -42,6 +43,7 @@ type CachestatLegacyHandle struct {
 	MapsPerCore    bool
 	AppsEnabled    bool
 	CgroupsEnabled bool
+	AppsLevel      int
 }
 
 func (h *CachestatLegacyHandle) Close() {
@@ -83,6 +85,7 @@ func defaultCachestatLegacyConfig() CachestatLegacyConfig {
 		ObjectFlavor:   cachestatDefaultObjectFlavor,
 		AppsEnabled:    false,
 		CgroupsEnabled: false,
+		AppsLevel:      0, // NETDATA_APPS_LEVEL_REAL_PARENT — matches stock cachestat.conf default
 		Targets:        defaultCachestatTargets(),
 	}
 }
@@ -115,8 +118,13 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 		cfg.HasBTF = kernelBTFSupported(cfg.BTFPath)
 	}
 	if fileCfg.Lifetime != nil && *fileCfg.Lifetime > 0 {
-		// Keep the legacy lifetime value available for future runtime wiring.
-		// The current cachestat migration does not consume it yet.
+		// lifetime controls how long the thread runs when activated by a cloud
+		// Function call in the old ebpf.plugin.  The Go plugin runs until
+		// signalled and has no equivalent lifecycle, so this value is parsed
+		// for compatibility but not consumed.
+	}
+	if fileCfg.CollectPidLevel != nil {
+		cfg.AppsLevel = *fileCfg.CollectPidLevel
 	}
 	if fileCfg.ObjectFlavor != nil && *fileCfg.ObjectFlavor != "" {
 		cfg.ObjectFlavor = *fileCfg.ObjectFlavor

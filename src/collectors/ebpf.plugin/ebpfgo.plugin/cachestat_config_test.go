@@ -6,6 +6,91 @@ import (
 	"testing"
 )
 
+func TestParseLegacyConfigKeys(t *testing.T) {
+	// Keys present in the stock cachestat.conf (old C plugin format) must be
+	// recognised and mapped to Go-plugin equivalents.
+	tests := map[string]struct {
+		content      string
+		wantFlavor   string // "" means "don't care / unchanged"
+		wantPidLevel int    // -1 means "not set"
+	}{
+		"ebpf type format legacy forces tracing flavor": {
+			content:      "[global]\nebpf type format = legacy\n",
+			wantFlavor:   "tracing",
+			wantPidLevel: -1,
+		},
+		"ebpf type format auto leaves flavor unchanged": {
+			content:      "[global]\nebpf type format = auto\n",
+			wantFlavor:   "",
+			wantPidLevel: -1,
+		},
+		"ebpf type format co-re leaves flavor unchanged": {
+			content:      "[global]\nebpf type format = co-re\n",
+			wantFlavor:   "",
+			wantPidLevel: -1,
+		},
+		"ebpf co-re tracing probe forces tracing flavor": {
+			content:      "[global]\nebpf co-re tracing = probe\n",
+			wantFlavor:   "tracing",
+			wantPidLevel: -1,
+		},
+		"ebpf co-re tracing trampoline leaves flavor unchanged": {
+			content:      "[global]\nebpf co-re tracing = trampoline\n",
+			wantFlavor:   "",
+			wantPidLevel: -1,
+		},
+		"collect pid real parent sets level 0": {
+			content:      "[global]\ncollect pid = real parent\n",
+			wantFlavor:   "",
+			wantPidLevel: 0,
+		},
+		"collect pid parent sets level 1": {
+			content:      "[global]\ncollect pid = parent\n",
+			wantFlavor:   "",
+			wantPidLevel: 1,
+		},
+		"collect pid all sets level 2": {
+			content:      "[global]\ncollect pid = all\n",
+			wantFlavor:   "",
+			wantPidLevel: 2,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "cachestat.conf")
+			if err := os.WriteFile(path, []byte(tc.content), 0o600); err != nil {
+				t.Fatalf("write config: %v", err)
+			}
+
+			cfg, ok, err := parseCachestatConfigFile(path)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+			if !ok {
+				t.Fatal("expected file to be detected as found")
+			}
+
+			if tc.wantFlavor != "" {
+				if cfg.ObjectFlavor == nil || *cfg.ObjectFlavor != tc.wantFlavor {
+					t.Fatalf("ObjectFlavor = %v, want %q", cfg.ObjectFlavor, tc.wantFlavor)
+				}
+			} else if cfg.ObjectFlavor != nil {
+				t.Fatalf("ObjectFlavor should be nil, got %q", *cfg.ObjectFlavor)
+			}
+
+			if tc.wantPidLevel >= 0 {
+				if cfg.CollectPidLevel == nil || *cfg.CollectPidLevel != tc.wantPidLevel {
+					t.Fatalf("CollectPidLevel = %v, want %d", cfg.CollectPidLevel, tc.wantPidLevel)
+				}
+			} else if cfg.CollectPidLevel != nil {
+				t.Fatalf("CollectPidLevel should be nil, got %d", *cfg.CollectPidLevel)
+			}
+		})
+	}
+}
+
 func TestApplyPidTableSizeClamp(t *testing.T) {
 	tests := map[string]struct {
 		in   uint32

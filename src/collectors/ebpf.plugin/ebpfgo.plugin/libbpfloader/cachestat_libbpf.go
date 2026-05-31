@@ -144,7 +144,7 @@ func (r *CachestatRuntime) Attach(accountFunction string) error {
 	return nil
 }
 
-func (r *CachestatRuntime) UpdateController(appsEnabled bool) error {
+func (r *CachestatRuntime) UpdateController(appsEnabled bool, appsLevel int) error {
 	if r == nil || r.ptr == nil {
 		return ErrDisabled
 	}
@@ -154,7 +154,7 @@ func (r *CachestatRuntime) UpdateController(appsEnabled bool) error {
 		cAppsEnabled = 1
 	}
 
-	if ret := C.netdata_cachestat_runtime_update_controller(r.ptr, cAppsEnabled, C.int(cachestatAppsLevelAll)); ret != 0 {
+	if ret := C.netdata_cachestat_runtime_update_controller(r.ptr, cAppsEnabled, C.int(appsLevel)); ret != 0 {
 		return fmt.Errorf("update cachestat controller failed: %d", int(ret))
 	}
 
