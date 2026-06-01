@@ -3,10 +3,19 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
 )
 
 func main() {
+	// Cap the Go scheduler to 2 OS threads.  This plugin has exactly two
+	// active goroutines (global metric collector and SHM publisher) plus a
+	// blocked signal-handler goroutine.  The default GOMAXPROCS = NumCPU
+	// allocates O(ncpus) scheduler threads, and CGO calls on blocked
+	// goroutines cause the runtime to create up to O(ncpus) additional
+	// threads — each carrying an 8 MB Linux stack.  On a 64-core host that
+	// is ~130 threads and ~1 GB of stack RSS for no benefit.
+	runtime.GOMAXPROCS(2)
 	updateEvery := 0
 	if len(os.Args) > 1 {
 		if parsed, err := strconv.Atoi(os.Args[1]); err == nil && parsed > 0 {
