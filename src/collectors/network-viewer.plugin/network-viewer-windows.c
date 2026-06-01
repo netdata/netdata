@@ -526,6 +526,7 @@ cleanup:
 
 // --- Address space classification -----------------------------------------------
 
+static const uint8_t nv_ipv6_zero_addr[16]    = {0};
 static const uint8_t nv_ipv6_loopback_addr[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
 
 static const char *nv_ipv4_address_space(DWORD ip_nbo)
@@ -546,10 +547,9 @@ static const char *nv_ipv4_address_space(DWORD ip_nbo)
 
 static const char *nv_ipv6_address_space(const UCHAR *b)
 {
-    static const uint8_t zero[16]   = {0};
     static const uint8_t v4map[12]  = {0,0,0,0,0,0,0,0,0,0,0xFF,0xFF};
 
-    if (!memcmp(b, zero, 16)) return "zero";
+    if (!memcmp(b, nv_ipv6_zero_addr, 16)) return "zero";
     if (!memcmp(b, nv_ipv6_loopback_addr, 16)) return "loopback";
     if (!memcmp(b, v4map, 12)) {
         DWORD v4;
@@ -983,8 +983,7 @@ void function_network_connections(
                     direction = "outbound";
                 }
 
-                static const uint8_t zero6[16] = {0};
-                bool remote_zero = !memcmp(r->ucRemoteAddr, zero6, 16) && !r->dwRemotePort;
+                bool remote_zero = !memcmp(r->ucRemoteAddr, nv_ipv6_zero_addr, 16) && !r->dwRemotePort;
 
                 const char *remote_ip_s;
                 const char *remote_as;
