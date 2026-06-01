@@ -20,7 +20,9 @@ rm -rf "${extract_path}"
 mkdir -p "${tmp_dir}" "${cache_dir}" "${extract_path}"
 
 fetch_url() {
-    success=0
+    local success=0
+    local ret
+    local status
 
     for i in $(seq "${max_tries}") ; do
         echo "Download attempt ${i}"
@@ -53,6 +55,9 @@ fetch_url() {
                     *) echo "Download failed, got ${status} from remote server, retrying in ${retry_delay} seconds." ;;
                 esac
                 ;;
+            28) echo "Operation timed out, retrying in ${retry_delay} seconds." ;;
+            18|52) echo "Incorrect amount of data returned, retrying in ${retry_delay} seconds." ;;
+            56|92|95) echo "Network communications error, retrying in ${retry_delay} seconds." ;;
             5|6|7) echo "Failed to connect to remote server, retrying in ${retry_delay} seconds." ;;
             35|60|83) echo "TLS error connecting to remote server, retrying in ${retry_delay} seconds." ;;
             *)
