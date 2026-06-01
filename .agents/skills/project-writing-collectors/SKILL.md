@@ -66,7 +66,11 @@ This is how you avoid shipping a parser that fails on the first real device. If 
 
 ### 1.8 Mirror an existing Netdata collector
 
-The repo holds 132 go.d modules and 24 internal C plugins. Maintainer patterns live there, not in any prose doc. After you've reality-checked the upstream protocol, pick the closest existing Netdata collector by domain and mirror its structure. Caveat: only 5 go.d modules use V2 — see §5.3.
+The repo holds many go.d modules and internal C plugins. Maintainer patterns
+live there, not in any prose doc. After you've reality-checked the upstream
+protocol, pick the closest existing Netdata collector by domain and mirror its
+structure. For new go.d modules, use framework V2 and start from the current
+V2 authoring guide — see §5.3.
 
 ### 1.9 Remote-monitored systems are vnodes
 
@@ -111,7 +115,10 @@ order-independent.
 
 `Collect()` runs every `update_every` seconds. It must:
 
-- Allocate buffers, maps, slices, parsed regexes once at `Init()` and reuse them. Reset at the top of `Collect()` if needed; see `ping/collect.go` for a V2 reference.
+- Allocate buffers, maps, slices, parsed regexes, matchers, and metric
+  instruments once at `Init()` / `New()` and reuse them. Reset at the top of
+  `Collect()` only when needed; see `cato_networks/metrix.go` for the typed
+  V2 metric-instrument pattern.
 - Hold persistent connections; reconnect only on failure with backoff.
 - Cache anything stable between iterations: schema, capabilities, profile selections.
 - Finish well under one cycle even on a slow target.
@@ -321,7 +328,7 @@ Reference section. Use it after the mental model and best practices have framed 
 | `statsd.plugin` | C | All | `src/collectors/statsd.plugin/` | StatsD ingestion + synthetic_charts |
 | `log2journal` | C | Linux | `src/collectors/log2journal/` | Parse application logs into the systemd journal |
 | Niche C plugins | C | various | `src/collectors/<name>.plugin/` | freeipmi, nfacct, tc, xenstat, debugfs, diskspace, slabinfo, idlejitter, timex, cups, ioping, perf |
-| `go.d.plugin` | Go (no CGO) | All | `src/go/plugin/go.d/` | 132 application integrations |
+| `go.d.plugin` | Go (no CGO) | All | `src/go/plugin/go.d/` | Application integrations |
 | `ibm.d.plugin` | Go + CGO | Linux, IBM i | `src/go/plugin/ibm.d/modules/` | IBM workloads (DB2, IBM i / AS-400, IBM MQ, WebSphere) |
 | `netflow-plugin` | Rust | Linux | `src/crates/netflow-plugin/` | NetFlow v5/v9, IPFIX, sFlow |
 | `netdata-otel` | Rust | Linux | `src/crates/netdata-otel/otel-plugin/` | OpenTelemetry ingestion |
@@ -334,12 +341,12 @@ Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orc
 
 | If you are doing… | Start with |
 |---|---|
-| New off-the-shelf application integration (no CGO) | `src/go/plugin/go.d/docs/how-to-write-a-collector.md`; V2 reference: `src/go/plugin/go.d/collector/ping/` |
+| New off-the-shelf application integration (no CGO) | `src/go/plugin/go.d/docs/how-to-write-a-collector.md`; primary V2 reference: `src/go/plugin/go.d/collector/cato_networks/` |
 | New IBM workload integration (CGO) | `src/go/plugin/ibm.d/AGENTS.md`, `src/go/plugin/ibm.d/framework/README.md` |
 | New Rust plugin | SDK at `src/crates/netdata-plugin/`; reference: `src/crates/netflow-plugin/` |
 | New SNMP profile (no code change) | `src/go/plugin/go.d/collector/snmp/profile-format.md` |
 | New interactive Function | `src/go/plugin/framework/functions/README.md`, `src/plugins.d/FUNCTION_UI_SCHEMA.json`, `src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md` |
-| Topology work | `src/go/pkg/topology/`, `src/go/plugin/go.d/collector/snmp_topology/`, `src/collectors/network-viewer.plugin/` |
+| Topology work | `.agents/skills/project-create-topology/SKILL.md`, `src/go/pkg/topology/v1`, `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` |
 | Auto-discovery for a new go.d module | rules under `src/go/plugin/go.d/config/go.d/sd/`; engine: `src/go/plugin/agent/discovery/` |
 | OTEL ingestion | `src/crates/netdata-otel/otel-plugin/` |
 | Log ingestion (parse → journal) | `src/collectors/log2journal/` and `log2journal.d/` rules |
@@ -351,9 +358,15 @@ Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orc
 
 ### 5.3 go.d V1 / V2 reality check
 
-Only **5 of 132** go.d collectors use V2: `ping`, `mysql`, `azure_monitor`, `powerstore`, `powervault`. The big reference docs (`src/go/BEST-PRACTICES.md`, `src/go/COLLECTOR-LIFECYCLE.md`) describe V1. V2 building blocks have framework READMEs (`src/go/plugin/framework/charttpl/README.md`, `src/go/plugin/framework/chartengine/README.md`, `src/go/pkg/metrix/README.md`); there is no end-to-end V2 tutorial beyond `how-to-write-a-collector.md` plus the `ping/` source.
+Most go.d collectors are still V1. The older broad reference docs
+(`src/go/BEST-PRACTICES.md`, `src/go/COLLECTOR-LIFECYCLE.md`) describe V1
+patterns and are not the source for new go.d collector shape.
 
-**For new go.d modules: use V2.** Mirror `src/go/plugin/go.d/collector/ping/` (or `mysql/` for V2 + Functions). Copying any other module mirrors V1 and the maintainers will ask you to migrate.
+**For new go.d modules: use V2.** Start with
+`src/go/plugin/go.d/docs/how-to-write-a-collector.md`. Use
+`src/go/plugin/go.d/collector/cato_networks/` as the primary modern reference,
+but copy focused responsibilities rather than the entire collector. Copying a V1
+module mirrors legacy patterns and the maintainers will ask you to migrate.
 
 V2 imports: `github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi` and `.../pkg/metrix`. The `CollectorV2` interface lives at `src/go/plugin/framework/collectorapi/collector.go`.
 
@@ -516,7 +529,7 @@ Internal C plugins under `src/collectors/`. Reuse shared metric definitions from
 | Prometheus mapping | generic exposition scrape | `src/go/plugin/go.d/collector/prometheus/README.md` |
 | log2journal | parsing application logs into the journal | `src/collectors/log2journal/log2journal.d/` |
 | Auto-discovery rules | adding service-detection rules | `src/go/plugin/go.d/config/go.d/sd/{net_listeners,docker,snmp,http}.conf` |
-| Topology library | topology providers in Go | `src/go/pkg/topology/` |
+| Topology library | topology producers in Go | `src/go/pkg/topology/v1`, `src/go/pkg/topology/` |
 | netipc cross-plugin enrichment | C / Go / Rust | `src/libnetdata/netipc/`, `src/go/pkg/netipc/`, `src/crates/netipc/` |
 | DYNCFG protocol | dynamic configuration | `src/plugins.d/DYNCFG.md`, `docs/developer-and-contributor-corner/dyncfg.md` |
 | Health alerts reference | alert template authoring | `src/health/REFERENCE.md`, `src/health/alert-configuration-ordering.md` |

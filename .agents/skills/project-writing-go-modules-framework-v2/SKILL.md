@@ -11,15 +11,15 @@ source files for evidence.
 ## Read First
 
 - Contract: `src/go/plugin/framework/collectorapi/collector.go`
+- Canonical new-collector guide:
+  `src/go/plugin/go.d/docs/how-to-write-a-collector.md`
 - Runtime/chart lifecycle: `src/go/plugin/framework/chartengine/README.md`
 - Template format: `src/go/plugin/framework/charttpl/README.md`
 - Host scopes/vnodes: `.agents/sow/specs/go-v2-host-scope.md`
-- Closest examples:
-  - `src/go/plugin/go.d/collector/azure_monitor/` for dynamic scopes/profiles.
-  - `src/go/plugin/go.d/collector/ping/` for the smallest V2 shape.
-  - `src/go/plugin/go.d/collector/mysql/` for migration compatibility.
-  - `src/go/plugin/go.d/collector/powervault/` and `powerstore/` for remote
-    discovery, labels, and chart templates.
+- Primary modern example: `src/go/plugin/go.d/collector/cato_networks/`.
+  Use focused pieces from it, not the whole collector shape.
+- Older V2 collectors can still be useful for local patterns, but review them
+  for stale style before treating them as examples.
 
 ## Core Style
 
@@ -29,8 +29,15 @@ source files for evidence.
 - Implement `ChartTemplateYAML()`; prefer embedded `charts.yaml`.
 - `Collect(ctx)` returns `error` and writes metrics to `metrix`; it does not
   return a V1 `map[string]int64`.
-- Keep files boring: `collector.go`, `collect.go`, `metrics.go`,
-  `charts.yaml`, focused domain helpers, focused tests.
+- Keep files boring: public lifecycle methods in `collector.go`, setup helpers
+  in `init.go` when needed, orchestration in `collect.go`, distinct upstream
+  operations in `collect_<operation>.go`, metrics in `metrix.go` /
+  `write_metrics.go`, focused tests.
+- If Functions exist, isolate them in a `<name>func/` subpackage with a narrow
+  `Deps` interface declared there. The Function package must not import the
+  collector package or hold `*Collector`.
+- Keep public config options small and justified. Use constants for internal
+  tuning unless the operator has a real decision to make.
 
 ## Metrics And Charts
 
@@ -41,7 +48,8 @@ source files for evidence.
   one-active-state values.
 - Use stable metric names that `charts.yaml` selects.
 - In `charts.yaml`: use `version: v1`, `context_namespace`, `instances.by_labels`,
-  `algorithm: incremental` for counters, and `absolute` for gauges.
+  `label_promotion`, `algorithm: incremental` for counters, and `absolute` for
+  gauges.
 - Put multipliers, divisors, hidden flags, and float formatting in the chart
   template, not ad hoc chart-emission code.
 
@@ -79,6 +87,8 @@ source files for evidence.
 - Add `_vnode_type=<source>` on collector-generated vnodes.
 - Bound and document cardinality. Do not create VM/disk/NIC/path/sensor scopes
   by default.
+- Use stable IDs for scope identity and human-readable names only as hostnames
+  or promoted labels.
 
 ## Tests
 

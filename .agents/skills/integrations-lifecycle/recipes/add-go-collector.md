@@ -9,23 +9,32 @@ called `<name>`. For modifying an existing collector, see
 - `<repo>/.agents/skills/project-writing-collectors/SKILL.md`
   -- the broader "how to write a collector" context (NIDL
   contexts, dashboard shaping, plugin landscape).
+- `<repo>/src/go/plugin/go.d/docs/how-to-write-a-collector.md`
+  -- the canonical framework V2 code/layout guide for new go.d collectors.
 - `../SKILL.md` -- this skill's overview.
 - `../schema-reference.md` -- the `collector.json` schema
   fields you will be filling in.
 
 ## 1. Create the module skeleton
 
-Standard go.d layout:
+New go.d collectors use framework V2. Code layout details live in
+`src/go/plugin/go.d/docs/how-to-write-a-collector.md`; this recipe covers the
+integration artifact side. A normal V2 collector directory includes:
 
 ```
 src/go/plugin/go.d/collector/<name>/
-├── <name>.go          # Module entrypoint, Init/Check/Collect
-├── config.go          # Config struct
-├── config_schema.json # DYNCFG schema
-├── metadata.yaml      # Integration metadata (this skill's territory)
-├── README.md          # Will become a symlink to integrations/<slug>.md once gen runs
-├── testdata/          # Fixtures
-└── ...other .go files
+|-- collector.go       # Register/CreateV2/New/public lifecycle
+|-- config.go          # Config struct
+|-- collect.go         # Collect orchestration
+|-- metrix.go          # Typed metrix instruments
+|-- write_metrics.go   # Metric writes
+|-- charts.yaml        # V2 chart template
+|-- config_schema.json # DYNCFG schema
+|-- metadata.yaml      # Integration metadata (this skill's territory)
+|-- taxonomy.yaml      # Dashboard TOC placement
+|-- README.md          # Will become a symlink to integrations/<slug>.md once gen runs
+|-- testdata/          # Fixtures
+`-- ...other .go files
 ```
 
 Plus stock conf:
@@ -170,9 +179,9 @@ These files are the rest of the collector consistency rule:
 	  ```bash
 	  python3 integrations/gen_taxonomy_seed.py src/go/plugin/go.d/collector/<name>/metadata.yaml --module-name <name> --section-id <section.id> --placement-id <name> --icon <icon>
 	  ```
-	  For a rich example with summary grids, table widgets, nested
-	  groups, and ownership leaves, read
-	  `src/go/plugin/go.d/collector/mysql/taxonomy.yaml`.
+	  For a rich recent example with groups, context ownership, and
+	  generated integration docs, read
+	  `src/go/plugin/go.d/collector/cato_networks/taxonomy.yaml`.
 - `src/go/plugin/go.d/config/go.d/<name>.conf` -- the stock
   config users will see at
   `/etc/netdata/go.d/<name>.conf`. Keep it minimal but
