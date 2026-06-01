@@ -4,6 +4,10 @@ This is the canonical starting point for new go.d collectors. New collectors
 MUST use framework V2. V1 collectors remain in the tree for compatibility and
 maintenance only.
 
+For migrating an existing V1 collector, use
+`src/go/plugin/go.d/docs/migrate-v1-to-v2.md` instead. Migration is
+compatibility work and has different rules from new collector authoring.
+
 Use `src/go/plugin/go.d/collector/cato_networks/` as the primary modern example.
 It is large, so copy the pattern, not the whole shape. The useful references are
 called out below by responsibility.

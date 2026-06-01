@@ -353,6 +353,7 @@ Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orc
 | If you are doing… | Start with |
 |---|---|
 | New off-the-shelf application integration (no CGO) | `src/go/plugin/go.d/docs/how-to-write-a-collector.md`; primary V2 reference: `src/go/plugin/go.d/collector/cato_networks/` |
+| Migrating existing go.d collector to V2 | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`; V2 mechanics: `.agents/skills/project-writing-go-modules-framework-v2/SKILL.md` |
 | New IBM workload integration (CGO) | `src/go/plugin/ibm.d/AGENTS.md`, `src/go/plugin/ibm.d/framework/README.md` |
 | New Rust plugin | SDK at `src/crates/netdata-plugin/`; reference: `src/crates/netflow-plugin/` |
 | New SNMP profile (no code change) | `src/go/plugin/go.d/collector/snmp/profile-format.md` |
@@ -378,6 +379,12 @@ patterns and are not the source for new go.d collector shape.
 `src/go/plugin/go.d/collector/cato_networks/` as the primary modern reference,
 but copy focused responsibilities rather than the entire collector. Copying a V1
 module mirrors legacy patterns and the maintainers will ask you to migrate.
+
+For migrating an existing V1 collector, start with
+`src/go/plugin/go.d/docs/migrate-v1-to-v2.md`. Migration is compatibility work;
+do not use the new-collector guide to justify chart, config, or lifecycle
+contract changes. Temporary V1 parity bridges can help during development, but
+the finished collector MUST NOT run through a V1-to-V2 bridge.
 
 V2 imports: `github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi` and `.../pkg/metrix`. The `CollectorV2` interface lives at `src/go/plugin/framework/collectorapi/collector.go`.
 
@@ -546,6 +553,7 @@ Internal C plugins under `src/collectors/`. Reuse shared metric definitions from
 | Health alerts reference | alert template authoring | `src/health/REFERENCE.md`, `src/health/alert-configuration-ordering.md` |
 | Integrations pipeline | doc generation from `metadata.yaml` | `integrations/README.md` |
 | Go framework changes | changing shared Go collector/runtime framework code | `src/go/plugin/framework/docs/changing-framework-code.md` |
+| go.d V1-to-V2 migration | migrating existing go.d collectors | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` |
 | Credentials in config | `${env:}/${file:}/${cmd:}/${store:}` | `src/collectors/SECRETS.md` |
 | Privileged operations | restricted setuid helper | `src/collectors/utils/ndsudo.c` |
 

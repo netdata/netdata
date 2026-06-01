@@ -15,6 +15,8 @@ source files for evidence.
   `src/go/plugin/framework/docs/changing-framework-code.md`
 - Canonical new-collector guide:
   `src/go/plugin/go.d/docs/how-to-write-a-collector.md`
+- V1-to-V2 migration guide:
+  `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`
 - Runtime/chart lifecycle: `src/go/plugin/framework/chartengine/README.md`
 - Template format: `src/go/plugin/framework/charttpl/README.md`
 - Host scopes/vnodes: `.agents/sow/specs/go-v2-host-scope.md`
@@ -70,6 +72,10 @@ source files for evidence.
 
 ## Compatibility Rules
 
+- For V1-to-V2 migrations, start with
+  `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`.
+- Temporary V1-to-V2 parity bridges MAY be used during development, but the
+  finished collector MUST NOT keep a runtime V1 map-to-`metrix` bridge.
 - For migrations, first create a compatibility manifest covering chart IDs,
   contexts, dimension IDs/names, labels, config keys, DynCfg schema keys,
   stock config, alerts, docs, and lifecycle behavior.
@@ -120,8 +126,8 @@ At minimum, V2 work SHOULD include:
 
 ## Pre-PR Check
 
-- A V1 `map[string]int64` collection path SHOULD NOT remain unless intentionally
-  kept for a compatibility bridge.
+- A finished V1-to-V2 migration MUST NOT keep a runtime
+  `map[string]int64` collection path or V1 map-to-`metrix` bridge.
 - Existing public chart/metric/config identity MUST be preserved unless the SOW
   records an explicit breaking decision.
 - New labels and scopes MUST be bounded and documented.

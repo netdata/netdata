@@ -30,6 +30,7 @@ topology, tests, specs, or skills.
 | Work area | Start here | Notes |
 |---|---|---|
 | New go.d collector | `src/go/plugin/go.d/docs/how-to-write-a-collector.md` | New go.d collectors use framework V2. |
+| Migrating go.d V1 collector to V2 | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` | Preserve public contracts unless a breaking change is explicitly approved. |
 | go.d V2 implementation details | `.agents/skills/project-writing-go-modules-framework-v2/SKILL.md`, `src/go/pkg/metrix/README.md`, `src/go/plugin/framework/charttpl/README.md`, `src/go/plugin/framework/chartengine/README.md` | Use the skill for maintainer style and the READMEs for framework API contracts. |
 | Collector design across plugins | `.agents/skills/project-writing-collectors/SKILL.md` | Use for NIDL, cardinality, obsoletion, missing data, logging, and config discipline. |
 | Integration metadata, taxonomy, generated docs | `.agents/skills/integrations-lifecycle/SKILL.md`, `.agents/skills/integrations-lifecycle/consistency.md` | Source artifacts and generated artifacts MUST stay synchronized. |
@@ -69,6 +70,19 @@ topology, tests, specs, or skills.
   legacy topology payloads.
 - If one job emits metrics for multiple remote resources that SHOULD appear as
   separate Netdata nodes, it MUST use V2 host scopes/vnodes.
+
+## go.d V1-to-V2 Migration Rules
+
+- V1-to-V2 migrations MUST start with
+  `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`.
+- Migrations MUST preserve chart IDs, contexts, dimensions, config keys,
+  defaults, health lookups, metadata, taxonomy, stock config, and service
+  discovery behavior unless the user explicitly approves a breaking change.
+- Compatibility migration SHOULD be separate from enrichment such as new labels,
+  host scopes, topology, Functions, or config expansion.
+- Completed migrations MUST NOT keep a runtime V1-to-V2 bridge. Temporary V1
+  logic can be used during development for parity checks, but it MUST be
+  removed from the final migrated collector.
 
 ## Core Framework Change Gate
 
