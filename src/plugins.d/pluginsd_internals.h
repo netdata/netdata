@@ -391,8 +391,10 @@ static ALWAYS_INLINE ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_wo
                          "PLUGINSD: ignoring invalid SLOT value '%s' above the supported maximum %zu",
                          &id[5], max_slot);
             // slot 0 means: the SLOT word was present (so the caller still advances its
-            // word index), but the value is unusable as a cache index. Downstream cache
-            // paths treat slot < 1 as "uncached" and fall back to lookup by id.
+            // word index), but the value is unusable as a cache index. Each caller
+            // handles slot < 1 per its own path -- chart lookups fall back to finding
+            // the chart by id, and dimension caching switches to the non-slotted
+            // (by-position) path (pluginsd_rrddim_put_to_slot sets dims_with_slots=false).
             slot = 0;
         }
         else
