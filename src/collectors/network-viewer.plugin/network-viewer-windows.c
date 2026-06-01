@@ -836,7 +836,7 @@ static void nv_emit_row(BUFFER *wb,
         buffer_json_add_array_item_string(wb, state);
         buffer_json_add_array_item_uint64(wb, pid);
         buffer_json_add_array_item_string(wb, comm[0] ? comm : "[unknown]");
-        buffer_json_add_array_item_string(wb, username ? username : "[unknown]");
+        buffer_json_add_array_item_string(wb, (username && username[0]) ? username : "[unknown]");
         buffer_json_add_array_item_string(wb, string2str(portname));
         buffer_json_add_array_item_string(wb, local_ip);
         buffer_json_add_array_item_uint64(wb, local_port_hbo);
