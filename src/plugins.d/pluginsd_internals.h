@@ -369,17 +369,17 @@ static inline RRDSET *pluginsd_find_chart(RRDHOST *host, const char *chart, cons
     return st;
 }
 
-static ALWAYS_INLINE ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_words) {
+static ALWAYS_INLINE ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_words, size_t max_slot) {
     ssize_t slot = -1;
     char *id = get_word(words, num_words, 1);
     if(id && id[0] == PLUGINSD_KEYWORD_SLOT[0] && id[1] == PLUGINSD_KEYWORD_SLOT[1] &&
        id[2] == PLUGINSD_KEYWORD_SLOT[2] && id[3] == PLUGINSD_KEYWORD_SLOT[3] && id[4] == ':') {
         unsigned long long parsed_slot = str2ull_encoded(&id[5]);
-        if(unlikely(parsed_slot > PLUGINSD_SLOT_MAX)) {
+        if(unlikely(parsed_slot > max_slot)) {
             nd_log_limit_static_global_var(erl_slot, 1, 0);
             nd_log_limit(&erl_slot, NDLS_COLLECTORS, NDLP_WARNING,
-                         "PLUGINSD: ignoring invalid SLOT value '%s' above the supported maximum %d",
-                         &id[5], PLUGINSD_SLOT_MAX);
+                         "PLUGINSD: ignoring invalid SLOT value '%s' above the supported maximum %zu",
+                         &id[5], max_slot);
             slot = 0;
         }
         else

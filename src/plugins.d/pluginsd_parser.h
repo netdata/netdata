@@ -19,7 +19,8 @@
 
 #define PLUGINSD_MIN_RRDSET_POINTERS_CACHE 1024
 // Slots are cache indexes. Larger values are treated as uncached input to avoid sparse cache allocations.
-#define PLUGINSD_SLOT_MAX 65535
+#define PLUGINSD_CHART_SLOT_MAX 1000000
+#define PLUGINSD_DIMENSION_SLOT_MAX 65535
 
 // PARSER return codes
 typedef enum __attribute__ ((__packed__)) parser_rc {

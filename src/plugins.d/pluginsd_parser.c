@@ -6,7 +6,7 @@
 
 static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;
-    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words, PLUGINSD_DIMENSION_SLOT_MAX);
     if(slot >= 0) idx++;
 
     char *dimension = get_word(words, num_words, idx++);
@@ -39,7 +39,7 @@ static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *par
 
 static inline PARSER_RC pluginsd_begin(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;
-    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words, PLUGINSD_CHART_SLOT_MAX);
     if(slot >= 0) idx++;
 
     char *id = get_word(words, num_words, idx++);
@@ -356,7 +356,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     int idx = 1;
-    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words, PLUGINSD_CHART_SLOT_MAX);
     if(slot >= 0) idx++;
 
     char *type = get_word(words, num_words, idx++);
@@ -473,7 +473,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
 
 static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;
-    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words, PLUGINSD_DIMENSION_SLOT_MAX);
     if(slot >= 0) idx++;
 
     char *id = get_word(words, num_words, idx++);
@@ -804,7 +804,7 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
     timing_init();
 
     int idx = 1;
-    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words, PLUGINSD_CHART_SLOT_MAX);
     if(slot >= 0) idx++;
 
     char *id = get_word(words, num_words, idx++);
@@ -949,7 +949,7 @@ static ALWAYS_INLINE PARSER_RC pluginsd_set_v2(char **words, size_t num_words, P
     timing_init();
 
     int idx = 1;
-    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words, PLUGINSD_DIMENSION_SLOT_MAX);
     if(slot >= 0) idx++;
 
     char *dimension = get_word(words, num_words, idx++);
@@ -1513,7 +1513,7 @@ void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire) {
     }
 }
 
-static int pluginsd_parser_unittest_slot_bounds(void) {
+static int pluginsd_parser_unittest_slot_bounds(size_t max_slot) {
     struct slot_test_case {
         char slot_word[64];
         ssize_t expected;
@@ -1528,11 +1528,11 @@ static int pluginsd_parser_unittest_slot_bounds(void) {
     };
 
     snprintfz(cases[5].slot_word, sizeof(cases[5].slot_word) - 1,
-              PLUGINSD_KEYWORD_SLOT ":%d", PLUGINSD_SLOT_MAX);
-    cases[5].expected = PLUGINSD_SLOT_MAX;
+              PLUGINSD_KEYWORD_SLOT ":%zu", max_slot);
+    cases[5].expected = (ssize_t)max_slot;
 
     snprintfz(cases[6].slot_word, sizeof(cases[6].slot_word) - 1,
-              PLUGINSD_KEYWORD_SLOT ":%d", PLUGINSD_SLOT_MAX + 1);
+              PLUGINSD_KEYWORD_SLOT ":%zu", max_slot + 1);
     cases[6].expected = 0;
 
     for(size_t i = 0; i < _countof(cases); i++) {
@@ -1540,7 +1540,7 @@ static int pluginsd_parser_unittest_slot_bounds(void) {
         char *words[] = { command, cases[i].slot_word[0] ? cases[i].slot_word : NULL };
         size_t num_words = words[1] ? 2 : 1;
 
-        ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+        ssize_t slot = pluginsd_parse_rrd_slot(words, num_words, max_slot);
         if(slot != cases[i].expected) {
             netdata_log_error("PLUGINSD: slot parser unittest failed for '%s': expected %zd, got %zd",
                               words[1] ? words[1] : "(unset)", cases[i].expected, slot);
@@ -1552,7 +1552,10 @@ static int pluginsd_parser_unittest_slot_bounds(void) {
 }
 
 int pluginsd_parser_unittest(void) {
-    if(pluginsd_parser_unittest_slot_bounds())
+    if(pluginsd_parser_unittest_slot_bounds(PLUGINSD_DIMENSION_SLOT_MAX))
+        return 1;
+
+    if(pluginsd_parser_unittest_slot_bounds(PLUGINSD_CHART_SLOT_MAX))
         return 1;
 
     PARSER *p = parser_init(NULL, -1, -1, PARSER_INPUT_SPLIT, NULL);
