@@ -52,12 +52,12 @@ typedef struct {
 
 typedef struct {
     DWORD dwNumEntries;
-    MIB_TCPROW_OWNER_PID table[1];
+    MIB_TCPROW_OWNER_PID table[];
 } MIB_TCPTABLE_OWNER_PID;
 
 typedef struct {
     DWORD dwNumEntries;
-    MIB_TCP6ROW_OWNER_PID table[1];
+    MIB_TCP6ROW_OWNER_PID table[];
 } MIB_TCP6TABLE_OWNER_PID;
 
 typedef struct {
@@ -75,12 +75,12 @@ typedef struct {
 
 typedef struct {
     DWORD dwNumEntries;
-    MIB_UDPROW_OWNER_PID table[1];
+    MIB_UDPROW_OWNER_PID table[];
 } MIB_UDPTABLE_OWNER_PID;
 
 typedef struct {
     DWORD dwNumEntries;
-    MIB_UDP6ROW_OWNER_PID table[1];
+    MIB_UDP6ROW_OWNER_PID table[];
 } MIB_UDP6TABLE_OWNER_PID;
 
 DWORD WINAPI GetExtendedTcpTable(PVOID pTcpTable, PDWORD pdwSize, BOOL bOrder,
@@ -919,7 +919,8 @@ void function_network_connections(
                 MIB_TCPROW_OWNER_PID *r = &tcp4->table[i];
 
                 struct in_addr la = { .s_addr = r->dwLocalAddr };
-                inet_ntop(AF_INET, &la, local_ip, sizeof(local_ip));
+                if (!inet_ntop(AF_INET, &la, local_ip, sizeof(local_ip)))
+                    continue;
 
                 DWORD local_port = ntohs((uint16_t)r->dwLocalPort);
                 const char *local_as = nv_ipv4_address_space(r->dwLocalAddr);
@@ -945,10 +946,11 @@ void function_network_connections(
                     remote_port_emit = 0;
                 } else {
                     struct in_addr ra = { .s_addr = r->dwRemoteAddr };
-                    inet_ntop(AF_INET, &ra, remote_ip, sizeof(remote_ip));
-                    remote_ip_s      = remote_ip;
-                    remote_as        = nv_ipv4_address_space(r->dwRemoteAddr);
-                    remote_port_emit = ntohs((uint16_t)r->dwRemotePort);
+                    if (inet_ntop(AF_INET, &ra, remote_ip, sizeof(remote_ip))) {
+                        remote_ip_s      = remote_ip;
+                        remote_as        = nv_ipv4_address_space(r->dwRemoteAddr);
+                        remote_port_emit = ntohs((uint16_t)r->dwRemotePort);
+                    }
                 }
 
                 nv_emit_row(wb, &pid_cache, direction, "tcp4", nv_tcp_state_str(r->dwState), r->dwOwningPid,
@@ -957,12 +959,16 @@ void function_network_connections(
             }
         }
 
+        if (unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED)))
+            goto emit_done;
+
         // TCP IPv6
         if (tcp6) {
             for (DWORD i = 0; i < tcp6->dwNumEntries; i++) {
                 MIB_TCP6ROW_OWNER_PID *r = &tcp6->table[i];
 
-                inet_ntop(AF_INET6, r->ucLocalAddr, local_ip, sizeof(local_ip));
+                if (!inet_ntop(AF_INET6, r->ucLocalAddr, local_ip, sizeof(local_ip)))
+                    continue;
                 DWORD local_port = ntohs((uint16_t)r->dwLocalPort);
                 const char *local_as = nv_ipv6_address_space(r->ucLocalAddr);
 
@@ -988,10 +994,11 @@ void function_network_connections(
                     remote_as        = "";
                     remote_port_emit = 0;
                 } else {
-                    inet_ntop(AF_INET6, r->ucRemoteAddr, remote_ip, sizeof(remote_ip));
-                    remote_ip_s      = remote_ip;
-                    remote_as        = nv_ipv6_address_space(r->ucRemoteAddr);
-                    remote_port_emit = ntohs((uint16_t)r->dwRemotePort);
+                    if (inet_ntop(AF_INET6, r->ucRemoteAddr, remote_ip, sizeof(remote_ip))) {
+                        remote_ip_s      = remote_ip;
+                        remote_as        = nv_ipv6_address_space(r->ucRemoteAddr);
+                        remote_port_emit = ntohs((uint16_t)r->dwRemotePort);
+                    }
                 }
 
                 nv_emit_row(wb, &pid_cache, direction, "tcp6", nv_tcp_state_str(r->dwState), r->dwOwningPid,
@@ -1000,13 +1007,17 @@ void function_network_connections(
             }
         }
 
+        if (unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED)))
+            goto emit_done;
+
         // UDP IPv4 — endpoints have no remote address; direction is always "listen".
         if (udp4) {
             for (DWORD i = 0; i < udp4->dwNumEntries; i++) {
                 MIB_UDPROW_OWNER_PID *r = &udp4->table[i];
 
                 struct in_addr la = { .s_addr = r->dwLocalAddr };
-                inet_ntop(AF_INET, &la, local_ip, sizeof(local_ip));
+                if (!inet_ntop(AF_INET, &la, local_ip, sizeof(local_ip)))
+                    continue;
                 DWORD local_port = ntohs((uint16_t)r->dwLocalPort);
                 const char *local_as = nv_ipv4_address_space(r->dwLocalAddr);
 
@@ -1016,12 +1027,16 @@ void function_network_connections(
             }
         }
 
+        if (unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED)))
+            goto emit_done;
+
         // UDP IPv6
         if (udp6) {
             for (DWORD i = 0; i < udp6->dwNumEntries; i++) {
                 MIB_UDP6ROW_OWNER_PID *r = &udp6->table[i];
 
-                inet_ntop(AF_INET6, r->ucLocalAddr, local_ip, sizeof(local_ip));
+                if (!inet_ntop(AF_INET6, r->ucLocalAddr, local_ip, sizeof(local_ip)))
+                    continue;
                 DWORD local_port = ntohs((uint16_t)r->dwLocalPort);
                 const char *local_as = nv_ipv6_address_space(r->ucLocalAddr);
 
@@ -1030,6 +1045,8 @@ void function_network_connections(
                             "", 0, "");
             }
         }
+
+emit_done:;
     }
     buffer_json_array_close(wb); // data
 
@@ -1039,6 +1056,11 @@ void function_network_connections(
     freez(tcp6);
     freez(udp4);
     freez(udp6);
+
+    if (unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
+        nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
+        return;
+    }
 
     // --- Column definitions ---
     size_t field_id = 0;
@@ -1231,6 +1253,7 @@ int main(int argc, char **argv)
 
     functions_evloop_cancel_threads(wg);
     PerflibNamesRegistryCleanup();
+    system_servicenames_cache_destroy(sc);
 
     return 0;
 }
