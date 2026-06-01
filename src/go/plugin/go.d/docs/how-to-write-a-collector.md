@@ -16,7 +16,9 @@ Do the design work first:
    memory or from generated SDK types alone.
 2. You MUST aim for the clean end state, not the smallest initial diff. If the
    clean collector design requires a framework improvement, surface that as a
-   design decision instead of hiding it behind collector-local glue.
+   design decision and follow
+   `src/go/plugin/framework/docs/changing-framework-code.md` instead of hiding
+   it behind collector-local glue.
 3. Decide the monitored entities and cardinality bounds. If one job collects
    remote resources that SHOULD be separate Netdata nodes, design V2 host scopes
    from the start.
@@ -63,6 +65,7 @@ Read these files by responsibility:
 Framework/API references:
 
 - `src/go/plugin/framework/collectorapi/collector.go`
+- `src/go/plugin/framework/docs/changing-framework-code.md`
 - `src/go/pkg/metrix/README.md`
 - `src/go/plugin/framework/charttpl/README.md`
 - `src/go/plugin/framework/chartengine/README.md`

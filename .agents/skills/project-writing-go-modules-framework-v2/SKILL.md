@@ -11,6 +11,8 @@ source files for evidence.
 ## Read First
 
 - Contract: `src/go/plugin/framework/collectorapi/collector.go`
+- Framework-change workflow:
+  `src/go/plugin/framework/docs/changing-framework-code.md`
 - Canonical new-collector guide:
   `src/go/plugin/go.d/docs/how-to-write-a-collector.md`
 - Runtime/chart lifecycle: `src/go/plugin/framework/chartengine/README.md`

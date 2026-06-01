@@ -38,7 +38,7 @@ topology, tests, specs, or skills.
 | Topology payloads | `.agents/skills/project-create-topology/SKILL.md`, `.agents/sow/specs/topology-function-schema.md`, `src/go/pkg/topology/v1` | New topology producers MUST use the production `netdata.topology.v1` schema. |
 | Host scopes / vnodes | `.agents/sow/specs/go-v2-host-scope.md`, `src/go/plugin/go.d/collector/azure_monitor/` | Use host scopes when one job emits metrics for resources that SHOULD appear as separate Netdata nodes. |
 | Matchers/selectors | `src/go/pkg/matcher/README.md` | Prefer existing matcher APIs over custom selector grammars. |
-| Core framework changes | See `Core Framework Change Gate` below | Human approval is REQUIRED before implementation. |
+| Core framework changes | `src/go/plugin/framework/docs/changing-framework-code.md` and `Core Framework Change Gate` below | The applicable approval tier MUST be satisfied before implementation. |
 
 ## New go.d Collector Rules
 
@@ -72,33 +72,15 @@ topology, tests, specs, or skills.
 
 ## Core Framework Change Gate
 
-Changes to shared Go framework code are high blast-radius. This includes, but is
-not limited to, `src/go/plugin/framework/`,
-`src/go/plugin/go.d/pkg/collecttest`, `src/go/pkg/metrix`,
-`src/go/pkg/funcapi`, `src/go/pkg/topology`, `src/go/pkg/matcher`, and shared
-runtime or chart-template code.
+Changes to shared Go framework code are high-blast-radius work. Before changing
+these areas, read `src/go/plugin/framework/docs/changing-framework-code.md`.
+That guide is the canonical owner of the framework-change scope list, required
+design note, validation expectations, and artifact checks.
 
-Before implementation, you MUST prepare the design and get explicit human
-approval. The design MUST cover:
-
-1. Root cause and why a collector-local fix is insufficient.
-2. Affected public contracts: collector API, metrix behavior, chart templates,
-   Functions, host scopes/vnodes, topology schema, generated docs, tests, or
-   existing collector behavior.
-3. Existing patterns to reuse and representative collectors to check.
-4. Compatibility impact and whether a clean breaking change was explicitly
-   accepted.
-5. Implementation plan split into reviewable batches.
-6. Validation plan with framework tests and affected-collector tests.
-7. Documentation/spec/skill updates required by the behavior change.
-8. Mandatory clean-end-state check: the intended final framework shape and why it is
-   better than a local workaround or smaller diff.
-9. Mandatory scope check: what belongs in this change, what is explicitly
-   deferred, and whether any independent prerequisite should land first.
-
-You SHOULD prefer a clean framework extension over collector-local glue, global
-variables, or private package coupling when the problem is general. Clean end
-state is more important than minimizing churn.
+Framework-change implementation MUST NOT begin until the applicable approval
+tier in that guide is satisfied. You SHOULD prefer a clean framework extension
+over collector-local glue, global variables, or private package coupling when
+the problem is general.
 
 ## Batching And Review
 

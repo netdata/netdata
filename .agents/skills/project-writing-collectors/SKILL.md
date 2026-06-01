@@ -545,6 +545,7 @@ Internal C plugins under `src/collectors/`. Reuse shared metric definitions from
 | DYNCFG protocol | dynamic configuration | `src/plugins.d/DYNCFG.md`, `docs/developer-and-contributor-corner/dyncfg.md` |
 | Health alerts reference | alert template authoring | `src/health/REFERENCE.md`, `src/health/alert-configuration-ordering.md` |
 | Integrations pipeline | doc generation from `metadata.yaml` | `integrations/README.md` |
+| Go framework changes | changing shared Go collector/runtime framework code | `src/go/plugin/framework/docs/changing-framework-code.md` |
 | Credentials in config | `${env:}/${file:}/${cmd:}/${store:}` | `src/collectors/SECRETS.md` |
 | Privileged operations | restricted setuid helper | `src/collectors/utils/ndsudo.c` |
 
