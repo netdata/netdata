@@ -200,6 +200,27 @@ static void nv_add_group_by(BUFFER *wb, const char *name)
     buffer_json_object_close(wb);
 }
 
+// Helpers for network-connections column definitions (all use SORT_ASCENDING, SUMMARY_COUNT).
+static void nv_conn_str_field(BUFFER *wb, size_t *field_id,
+                               const char *id, const char *label,
+                               RRDF_FIELD_FILTER filter, RRDF_FIELD_OPTIONS opts)
+{
+    buffer_rrdf_table_add_field(wb, (*field_id)++, id, label,
+        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+        RRDF_FIELD_SUMMARY_COUNT, filter, opts, NULL);
+}
+
+static void nv_conn_int_field(BUFFER *wb, size_t *field_id,
+                               const char *id, const char *label,
+                               RRDF_FIELD_FILTER filter, RRDF_FIELD_OPTIONS opts)
+{
+    buffer_rrdf_table_add_field(wb, (*field_id)++, id, label,
+        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+        RRDF_FIELD_SUMMARY_COUNT, filter, opts, NULL);
+}
+
 // Convert Perflib rate counters to per-second values and keep raw gauges unchanged.
 static uint64_t nv_perflib_value(const COUNTER_DATA *cd)
 {
@@ -1054,90 +1075,20 @@ emit_done:;
     size_t field_id = 0;
     buffer_json_member_add_object(wb, "columns");
     {
-        buffer_rrdf_table_add_field(wb, field_id++, "Direction", "Socket Direction",
-            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "Protocol", "Socket Protocol",
-            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "State", "Socket State",
-            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "PID", "Process ID",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-            RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "Process", "Process Name",
-            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "User", "Username",
-            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "Portname", "Server Port Name",
-            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "LocalIP", "Local IP Address",
-            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "LocalPort", "Local Port",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-            RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "LocalAddressSpace", "Local IP Address Space",
-            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_NONE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "RemoteIP", "Remote IP Address",
-            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "RemotePort", "Remote Port",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-            RRDF_FIELD_OPTS_VISIBLE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "RemoteAddressSpace", "Remote IP Address Space",
-            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_NONE, NULL);
-
-        buffer_rrdf_table_add_field(wb, field_id++, "ServerPort", "Server Port",
-            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_NONE, NULL);
-
+        nv_conn_str_field(wb, &field_id, "Direction",          "Socket Direction",          RRDF_FIELD_FILTER_MULTISELECT, RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY);
+        nv_conn_str_field(wb, &field_id, "Protocol",           "Socket Protocol",           RRDF_FIELD_FILTER_MULTISELECT, RRDF_FIELD_OPTS_VISIBLE);
+        nv_conn_str_field(wb, &field_id, "State",              "Socket State",              RRDF_FIELD_FILTER_MULTISELECT, RRDF_FIELD_OPTS_VISIBLE);
+        nv_conn_int_field(wb, &field_id, "PID",                "Process ID",                RRDF_FIELD_FILTER_NONE,        RRDF_FIELD_OPTS_VISIBLE);
+        nv_conn_str_field(wb, &field_id, "Process",            "Process Name",              RRDF_FIELD_FILTER_MULTISELECT, RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH);
+        nv_conn_str_field(wb, &field_id, "User",               "Username",                  RRDF_FIELD_FILTER_MULTISELECT, RRDF_FIELD_OPTS_VISIBLE);
+        nv_conn_str_field(wb, &field_id, "Portname",           "Server Port Name",          RRDF_FIELD_FILTER_MULTISELECT, RRDF_FIELD_OPTS_VISIBLE);
+        nv_conn_str_field(wb, &field_id, "LocalIP",            "Local IP Address",          RRDF_FIELD_FILTER_NONE,        RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH);
+        nv_conn_int_field(wb, &field_id, "LocalPort",          "Local Port",                RRDF_FIELD_FILTER_NONE,        RRDF_FIELD_OPTS_VISIBLE);
+        nv_conn_str_field(wb, &field_id, "LocalAddressSpace",  "Local IP Address Space",    RRDF_FIELD_FILTER_MULTISELECT, RRDF_FIELD_OPTS_NONE);
+        nv_conn_str_field(wb, &field_id, "RemoteIP",           "Remote IP Address",         RRDF_FIELD_FILTER_NONE,        RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH);
+        nv_conn_int_field(wb, &field_id, "RemotePort",         "Remote Port",               RRDF_FIELD_FILTER_NONE,        RRDF_FIELD_OPTS_VISIBLE);
+        nv_conn_str_field(wb, &field_id, "RemoteAddressSpace", "Remote IP Address Space",   RRDF_FIELD_FILTER_MULTISELECT, RRDF_FIELD_OPTS_NONE);
+        nv_conn_int_field(wb, &field_id, "ServerPort",         "Server Port",               RRDF_FIELD_FILTER_MULTISELECT, RRDF_FIELD_OPTS_NONE);
         buffer_rrdf_table_add_field(wb, field_id++, "Count", "Number of sockets",
             RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
             0, "sockets", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
