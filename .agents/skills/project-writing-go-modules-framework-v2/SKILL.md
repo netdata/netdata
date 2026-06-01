@@ -32,6 +32,8 @@ source files for evidence.
 - You MUST aim for the clean end state, not the smallest collector diff. If a
   framework capability is missing and the problem is general, design the
   framework change instead of hiding the issue in collector-local glue.
+- If any framework-scope package changes, stop and satisfy
+  `src/go/plugin/framework/docs/changing-framework-code.md` before writing code.
 - You MUST re-check scope after each coherent batch. If the work reveals an
   independent collector cleanup, framework fix, or integration-doc change,
   either defer it explicitly or land it separately before continuing.
@@ -58,8 +60,10 @@ source files for evidence.
 - If Functions exist, isolate them in a `<name>func/` subpackage with a narrow
   `Deps` interface declared there. The Function package MUST NOT import the
   collector package or hold `*Collector`.
-- Public config options SHOULD stay small and justified. Internal tuning SHOULD
-  use constants unless the operator has a real decision to make.
+- Public config options SHOULD stay small and justified. A proposed config
+  option MUST name the concrete operator decision it enables; "operators may
+  want to tune it" is not enough. Internal tuning SHOULD use constants unless
+  the operator has a real decision to make.
 
 ## Metrics And Charts
 
@@ -79,6 +83,17 @@ source files for evidence.
 
 - For V1-to-V2 migrations, start with
   `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`.
+
+### Migration Hard Stops
+
+- A collector using V1 chart `Vars` is blocked until framework support, an
+  approved equivalent design, or explicit breaking-alert approval exists.
+- `collecttest.AssertChartCoverage` is not chart-identity parity; it cannot
+  prove old chart IDs, family, priority, lifecycle, labels, or alert variables.
+- A finished migration MUST pass an import/runtime-path audit proving no V1
+  collection path or V1 map-to-`metrix` bridge remains reachable from normal
+  execution.
+
 - Temporary V1-to-V2 parity bridges MAY be used during development, but the
   finished collector MUST NOT keep a runtime V1 map-to-`metrix` bridge.
 - For migrations, first create a compatibility manifest covering chart IDs,
@@ -120,7 +135,8 @@ source files for evidence.
 
 ## Tests
 
-At minimum, V2 work SHOULD include:
+At minimum, V2 work MUST include these tests, or the PR/SOW MUST justify why a
+specific item does not apply:
 
 - config YAML/JSON serialization compatibility;
 - `Init`, `Check`, `Collect`, and `Cleanup` lifecycle coverage;
@@ -134,6 +150,9 @@ At minimum, V2 work SHOULD include:
 
 - A finished V1-to-V2 migration MUST NOT keep a runtime
   `map[string]int64` collection path or V1 map-to-`metrix` bridge.
+- The PR description or design note MUST enumerate affected collector
+  consistency artifacts and justify every artifact that did not need a matching
+  change. SHOULD-level exceptions and escape hatches MUST be reviewer-visible.
 - Existing public chart/metric/config identity MUST be preserved unless the SOW
   records an explicit breaking decision.
 - New labels and scopes MUST be bounded and documented.

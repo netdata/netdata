@@ -19,6 +19,7 @@ these roots for an existing package that already owns the behavior.
 | Need | Start with |
 |---|---|
 | V2 metrics, metric stores, host scopes | `src/go/pkg/metrix` |
+| Duration and tri-state config option types | `src/go/pkg/confopt` |
 | HTTP request/client config | `src/go/pkg/web` |
 | TLS config outside HTTP | `src/go/pkg/tlscfg` |
 | Prometheus exposition parsing | `src/go/pkg/prometheus` |
@@ -27,6 +28,7 @@ these roots for an existing package that already owns the behavior.
 | Function request/response helpers | `src/go/pkg/funcapi` |
 | Topology payloads | `src/go/pkg/topology/v1` |
 | Agent API / chart emission payloads | `src/go/pkg/netdataapi` |
+| TCP/UDP/Unix line-protocol clients | `src/go/plugin/go.d/pkg/socket` |
 | Command execution | `src/go/plugin/go.d/pkg/ndexec` |
 | Log-file readers/parsers | `src/go/plugin/go.d/pkg/logs` |
 | IP range parsing | `src/go/plugin/go.d/pkg/iprange` |
@@ -38,6 +40,26 @@ these roots for an existing package that already owns the behavior.
 | Docker host helpers | `src/go/plugin/go.d/pkg/dockerhost` |
 | Test helpers for collectors | `src/go/plugin/go.d/pkg/collecttest` |
 | Legacy V1 metric helpers | `src/go/pkg/stm`, `src/go/plugin/go.d/pkg/oldmetrix` |
+
+## Config Option Types
+
+Use `src/go/pkg/confopt` for common configuration value types.
+
+When:
+
+- users configure durations that should accept strings such as `5s`, `30m`, or
+  numeric seconds;
+- users need explicit `auto` / `enabled` / `disabled` behavior instead of a
+  plain boolean;
+- a migration needs to preserve legacy pointer-boolean semantics without
+  keeping pointer plumbing in new code.
+
+Why:
+
+- `confopt.Duration` and `confopt.LongDuration` centralize YAML/JSON duration
+  parsing and formatting;
+- `confopt.AutoBool` makes tri-state behavior explicit and schema-friendly;
+- collectors avoid ad hoc parsers and inconsistent boolean defaults.
 
 ## HTTP Collectors
 
@@ -129,9 +151,11 @@ When:
 
 Why:
 
-- `c.Once(key).Warningf(...)` logs once per key;
+- in go.d jobs, `c.Once(key).Warningf(...)` is cycle-local because the runtime
+  resets `Once` state each `runOnce`; it is useful for suppressing duplicate
+  messages inside one cycle only;
 - `c.Limit(key, n, window).Warningf(...)` logs at most `n` messages per key per
-  window;
+  window and is the right default for cross-cycle spam control;
 - the limiter is shared through the collector logger and already used by modern
   collectors such as Cato Networks, PAN-OS, and vSphere.
 
@@ -148,7 +172,29 @@ messages in the key.
 
 Custom warning gates are justified only when the built-in count-per-window
 semantics are not the right behavior, for example when logging only on state
-transitions. Document that reason in code.
+transitions. Document that reason in the PR description or design note so
+reviewers can see why the built-in limiter was not enough.
+
+## Socket Clients
+
+Use `src/go/plugin/go.d/pkg/socket` for simple TCP, UDP, or Unix-socket
+line-protocol collectors.
+
+When:
+
+- the collector connects to a local or remote socket and sends text commands;
+- the response is processed line by line;
+- the collector needs shared timeout, TLS, and max-read-line behavior.
+
+Why:
+
+- socket address parsing is shared across collectors;
+- connect, command, read, disconnect, deadline, and line-limit behavior stay
+  consistent;
+- tests can use the helper's fake TCP/UDP/Unix servers instead of custom socket
+  harnesses.
+
+Do not hand-roll socket dial/read loops for common line-oriented protocols.
 
 ## External Commands
 
@@ -264,10 +310,10 @@ Why:
 ## Legacy V1 Helpers
 
 `src/go/pkg/stm` converts structs into `map[string]int64`.
-`src/go/plugin/go.d/pkg/oldmetrix` provides V1 metric helper types such as
-counters, summaries, histograms, and boolean conversions used by existing V1
-collectors. Both are V1-shaped. New V2 collectors MUST NOT use them as their
-metric path.
+`src/go/plugin/go.d/pkg/oldmetrix` provides V1 metric vector helper types such
+as counters, summaries, histograms, and boolean conversions used by existing V1
+collectors. Both helpers are V1-shaped. New V2 collectors MUST NOT use them as
+their metric path.
 
 Acceptable uses:
 

@@ -26,10 +26,12 @@ If an existing V1 collector is being migrated, use
 - `iprange` parses and checks IP ranges.
 - `logs` helps parse application log files.
 - `src/go/pkg/matcher` provides selector/matcher implementations.
+- `src/go/pkg/confopt` provides duration and tri-state config option types.
 - `web` provides HTTP client configuration helpers.
 - `prometheus` parses Prometheus endpoints; use it with `web`.
 - `tlscfg` provides TLS support.
 - `sqlquery` provides reusable SQL row/query helpers.
+- `socket` provides TCP/UDP/Unix line-protocol clients.
 - `cloudauth` provides shared cloud authentication config/credential helpers.
 - `pinger` provides shared ping probing and latency/jitter calculations.
 
@@ -39,5 +41,5 @@ If an existing V1 collector is being migrated, use
   NOT be used as the metric path for new V2 collectors. It MAY be useful while
   maintaining legacy V1 collectors or building temporary migration parity tests
   that are removed from the final runtime path.
-- `oldmetrix` provides V1 metric helper types used by existing V1 collectors.
+- `oldmetrix` provides V1 metric vector helper types used by existing V1 collectors.
   New V2 collectors SHOULD use `src/go/pkg/metrix` instead.

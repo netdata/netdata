@@ -31,7 +31,8 @@ topology, tests, specs, or skills.
 |---|---|---|
 | New go.d collector | `src/go/plugin/go.d/docs/how-to-write-a-collector.md` | New go.d collectors use framework V2. |
 | Migrating go.d V1 collector to V2 | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` | Preserve public contracts unless a breaking change is explicitly approved. |
-| go.d V2 implementation details | `.agents/skills/project-writing-go-modules-framework-v2/SKILL.md`, `src/go/pkg/metrix/README.md`, `src/go/plugin/framework/charttpl/README.md`, `src/go/plugin/framework/chartengine/README.md` | Use the skill for maintainer style and the READMEs for framework API contracts. |
+| go.d V2 implementation details | `.agents/skills/project-writing-go-modules-framework-v2/SKILL.md`, `src/go/pkg/metrix/README.md`, `src/go/plugin/framework/charttpl/README.md`, `src/go/plugin/framework/chartengine/README.md` | Use the skill for maintainer style and the READMEs for framework API contracts. Editing `metrix` or framework packages is framework-gated work. |
+| go.d helper packages | `src/go/plugin/go.d/docs/helper-packages.md` | Check existing HTTP, config-option, matcher, logger, socket, command, SQL, ping, log-file, and cloud-auth helpers before adding custom plumbing. |
 | Collector design across plugins | `.agents/skills/project-writing-collectors/SKILL.md` | Use for NIDL, cardinality, obsoletion, missing data, logging, and config discipline. |
 | Integration metadata, taxonomy, generated docs | `.agents/skills/integrations-lifecycle/SKILL.md`, `.agents/skills/integrations-lifecycle/consistency.md` | Source artifacts and generated artifacts MUST stay synchronized. |
 | IBM.d work | `src/go/plugin/ibm.d/AGENTS.md` | IBM.d has a generator-driven workflow; go.d V2 layout rules MUST NOT be applied there. |
@@ -59,6 +60,11 @@ topology, tests, specs, or skills.
   clearly justified.
 - New collectors MUST NOT inherit unsupported config knobs from adjacent
   collectors or generic templates.
+- Collector-local globals, singletons, adapters, caches, or glue layers that
+  substitute for missing shared framework/helper capabilities are
+  framework-scope work and MUST follow
+  `src/go/plugin/framework/docs/changing-framework-code.md` before
+  implementation.
 - If the collector exposes Functions, put Function code in a dedicated
   `<name>func/` package behind a narrow `Deps` interface declared in that
   package. The Function package MUST NOT import the collector package or hold

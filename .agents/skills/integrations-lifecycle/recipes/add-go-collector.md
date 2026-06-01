@@ -207,9 +207,13 @@ From the repo root:
 ./integrations/pip.sh   # once
 python3 integrations/gen_integrations.py
 python3 integrations/gen_taxonomy.py --check-only
-python3 integrations/gen_docs_integrations.py -c go.d/<name>
+python3 integrations/check_collector_taxonomy.py --pr-diff master...HEAD
+python3 -m unittest integrations.tests.test_taxonomy
+python3 integrations/gen_docs_integrations.py -c go.d.plugin/<name>
 python3 integrations/gen_doc_collector_page.py
 python3 integrations/gen_doc_secrets_page.py
+# If service-discovery rules or sdext metadata changed:
+python3 integrations/gen_doc_service_discovery_page.py
 ```
 
 Expected outputs:
@@ -219,6 +223,9 @@ Expected outputs:
 - Collector taxonomy validated. If `gen_taxonomy.py` fails, fix
   `taxonomy.yaml` or the matching `metadata.yaml.metrics.dynamic_*`
   declaration before continuing.
+- Touched-collector taxonomy coverage validated in the same `--pr-diff` mode
+  used by CI. If your local base branch is not `master`, adjust the diff range
+  to the PR base.
 - `src/go/plugin/go.d/collector/<name>/integrations/<slug>.md`
   CREATED. Inspect: it SHOULD contain the `<!--startmeta`
   banner with your `sidebar_label` and `learn_rel_path`, then
@@ -229,6 +236,8 @@ Expected outputs:
   exactly one integration in this directory).
 - `src/collectors/COLLECTORS.md` updated to include your new
   collector in its category section.
+- If service-discovery rules or `sdext` metadata changed,
+  `src/collectors/SERVICE-DISCOVERY.md` updated.
 
 If `gen_integrations.py` exits non-zero, read the warning
 output -- a schema validation failed. Fix `metadata.yaml` and
@@ -240,22 +249,40 @@ re-run.
   every section reads correctly.
 - Open `src/collectors/COLLECTORS.md` and find your collector
   in the table.
-- Run `python3 integrations/check_collector_taxonomy.py` before
-  opening the PR. In CI this also runs with `--pr-diff` to enforce
-  touched-collector taxonomy coverage.
+- Run `python3 integrations/check_collector_taxonomy.py --pr-diff master...HEAD`
+  before opening the PR. If your local base branch is not `master`, adjust the
+  diff range to the PR base.
+- From `src/go`, run `timeout 15s go run ./cmd/godplugin -m <name> -d` to
+  confirm go.d can load the module after the `init.go`, `go.d.conf`, stock
+  config, and README wiring changes. Success means the module is registered, a
+  job starts, and the command keeps running until timeout stops it; `unknown
+  module`, `no jobs started`, config-load errors, or immediate exit are
+  failures. Use `-c <config-dir>` when testing a non-standard config path.
+- If service-discovery rules or `sdext` metadata changed, run
+  `python3 integrations/gen_doc_service_discovery_page.py` and commit
+  `src/collectors/SERVICE-DISCOVERY.md`.
+- Run
+  `git status --porcelain | rg '^(\?\?|!!| M|M |A |AM) integrations/(integrations\.(js|json)|taxonomy\.json)$' || true`
+  and make sure it prints no output; these generated runtime catalogs are
+  gitignored and MUST NOT be committed.
 - Run `git diff` and confirm the only changes are in:
   - `src/go/plugin/go.d/collector/<name>/...` (your new module
     files).
+  - `src/go/plugin/go.d/collector/init.go` (registration import).
+  - `src/go/plugin/go.d/config/go.d.conf` (module toggle).
+  - `src/go/plugin/go.d/config/go.d/<name>.conf` (stock config).
+  - `src/go/plugin/go.d/README.md` (collector list).
   - `src/go/plugin/go.d/collector/<name>/integrations/<slug>.md`
     (the generated integration page).
   - `src/go/plugin/go.d/collector/<name>/README.md` (now a
     symlink).
   - `src/collectors/COLLECTORS.md` (umbrella page updated).
   - `src/health/health.d/<name>.conf` (alerts file).
+  - `src/collectors/SERVICE-DISCOVERY.md` if service-discovery changed.
   - Possibly `integrations/categories.yaml` if you added a
     category.
   - NOT `integrations/integrations.js` or
-    `integrations.json` (gitignored).
+    `integrations/integrations.json` (gitignored).
   - NOT `integrations/taxonomy.json` (gitignored).
 
 ## 7. Commit and push

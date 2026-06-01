@@ -331,7 +331,7 @@ edit the Python script and commit.
 regen:
 
 ```bash
-python3 integrations/gen_docs_integrations.py -c go.d/snmp
+python3 integrations/gen_docs_integrations.py -c go.d.plugin/snmp
 ```
 
 NOT used by CI (CI always does full regen). Useful for fast

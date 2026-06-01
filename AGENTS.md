@@ -365,7 +365,7 @@ Runtime input skills:
   Purpose: mirror maintainer-preferred framework V2 patterns from accepted collectors so new or migrated modules blend with repository style.
 
 - `.agents/skills/integrations-lifecycle/`
-  Trigger: editing any `metadata.yaml` or collector `taxonomy.yaml`; modifying `integrations/` generators, schemas, taxonomy registries, or templates; working with `integrations.js` / `integrations.json` / `integrations/taxonomy.json` / per-integration `.md` files / `COLLECTORS.md` / `SECRETS.md` / `SERVICE-DISCOVERY.md`; ibm.d module generation (`contexts.yaml` -> `metadata.yaml`); CI workflows `generate-integrations.yml` and `check-markdown.yml`; the collector-consistency rule.
+  Trigger: editing any `metadata.yaml` or collector `taxonomy.yaml`; modifying `integrations/` generators, schemas, taxonomy registries, or templates; debugging generated gitignored integration outputs (`integrations.js`, `integrations.json`, `integrations/taxonomy.json`); working with committed per-integration `.md` files / `COLLECTORS.md` / `SECRETS.md` / `SERVICE-DISCOVERY.md`; ibm.d module generation (`contexts.yaml` -> `metadata.yaml`); CI workflows `generate-integrations.yml` and `check-markdown.yml`; the collector-consistency rule.
   Status: live. SKILL.md plus per-domain guides (`pipeline.md`, `schema-reference.md`, `per-type-matrix.md`, `artifacts-and-banners.md`, `ibm-d.md`, `consistency.md`, `in-app-contract.md`, `gotchas.md`) and `recipes/`, `how-tos/` directories.
 
 - `.agents/skills/learn-site-structure/`
@@ -446,31 +446,10 @@ All existing project-specific instructions in this file remain active. The SOW f
 
 ## Collector Consistency Requirements
 
-When working on collectors (especially Go collectors), ALL of the following files MUST be kept in sync before creating a PR:
-
-1. **The code** - All .go files implementing the collector
-2. **metadata.yaml** - Proper information for the Netdata integrations page, including:
-   - Metric descriptions with correct units
-   - Alert definitions
-   - Setup instructions
-   - Configuration examples
-3. **config_schema.json** - Schema for dynamic configuration in the dashboard
-4. **Stock config file** (.conf file) - Example configuration users edit manually
-5. **Health alerts** (health.d/*.conf) - Alert definitions for the collector metrics
-6. **README.md** - Comprehensive documentation describing:
-   - What the collector monitors
-   - How it works
-   - Configuration options
-   - Troubleshooting
-7. **taxonomy.yaml** - Dashboard table-of-contents placement for the collector's chart contexts
-
-These files MUST be consistent with each other. For example:
-- If units change in code, they MUST be updated in metadata.yaml
-- If new metrics are added, they MUST be documented in metadata.yaml and README.md
-- If configuration options change, they MUST be updated in config_schema.json, stock config, and documentation
-- If chart contexts are added, removed, or renamed, taxonomy.yaml MUST still resolve to real metadata.yaml contexts or declared dynamic selectors
-
-Unlike the other consistency artifacts, taxonomy.yaml coverage is enforced fatally in CI by `integrations/check_collector_taxonomy.py` running in `.github/workflows/check-markdown.yml`.
+When working on collectors, runtime behavior, metrics, charts, configuration,
+alerts, taxonomy, and generated documentation MUST stay consistent in one PR.
+The detailed collector consistency checklist and CI enforcement notes live in
+`.agents/skills/integrations-lifecycle/consistency.md`.
 
 ## C code
 - gcc, clang, glibc and muslc

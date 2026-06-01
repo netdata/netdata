@@ -10,7 +10,28 @@ type: project
 
 You are about to add or modify data collection in the Netdata Agent. This skill is a manifesto and a routing map. It tells you the mindset to apply, the principles you cannot violate, the ways the dashboard gets shaped from upstream data, the quality bar that separates a draft from a shippable collector, and where to look for depth. It is not a tutorial — the deep references already exist in the repo. Your job is to know they exist, pick the right one, and produce work that blends with the patterns the maintainers already accept.
 
-The skill is organized as: mental model → best practices → dashboard shaping → quality bar → environment reference → applied per data type → applied per domain. Read top to bottom on your first pass; come back to specific sections as the task narrows.
+The skill is organized as: AI fast path → mental model → best practices → dashboard shaping → quality bar → environment reference → applied per data type → applied per domain. For go.d work, follow the fast path first; for other collector families, read top to bottom on your first pass and come back to specific sections as the task narrows.
+
+## AI Fast Path
+
+For implementation agents, route to the concrete workflow first and use the
+rest of this skill as background:
+
+- New go.d collector: read `src/go/AGENTS.md`, then
+  `src/go/plugin/go.d/docs/how-to-write-a-collector.md`,
+  `.agents/skills/project-writing-go-modules-framework-v2/SKILL.md`, and
+  `.agents/skills/integrations-lifecycle/recipes/add-go-collector.md`.
+- Existing go.d collector update: read `src/go/AGENTS.md`, the collector's
+  local files, `.agents/skills/integrations-lifecycle/consistency.md`, and
+  `.agents/skills/integrations-lifecycle/recipes/update-collector.md`.
+- V1-to-V2 migration: read `src/go/AGENTS.md`,
+  `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`, and the V2 skill before
+  changing code.
+- Framework or shared-helper change: stop and satisfy
+  `src/go/plugin/framework/docs/changing-framework-code.md` before writing
+  code.
+
+Do not use this broad skill as the only implementation guide for go.d work.
 
 ## 1. Mental model
 
@@ -315,7 +336,7 @@ A collector is *production-quality* when it satisfies all of:
 12. For cross-plugin enrichment: am I using netipc?
 13. For Functions: does the response conform to one of the six shapes? Non-blocking with respect to the collection loop? Schema-validated?
 14. For ibm.d only: did I run `go generate` after touching `contexts.yaml`?
-15. For new go.d modules: are all four wiring steps done (init.go, go.d.conf, stock conf, README)?
+15. For new go.d modules: are all four runtime-load wiring steps done (`collector/init.go` import, `go.d.conf`, stock conf, README)?
 16. Tests: real fixtures or real instances? Would they catch the bug I just fixed?
 17. High-cardinality labels / instances: bounded by `max_*` + selectors? Aggregated "Other" bucket or upstream-supplied aggregation present where applicable?
 18. Entities that can go away: obsoleted when the collector knows they're gone? Anti-flip-flop window applied where churn is expected?
@@ -392,7 +413,7 @@ V2 imports: `github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi
 
 Lifecycle semantics: `Init()` is one-time setup (failure disables permanently); `Check()` is auto-detection probe (failure disables, retried later); `Collect()` is the hot path (every `update_every` seconds); `Cleanup()` is guaranteed on shutdown.
 
-**Silent-failure trap (go.d).** A new go.d module compiles and tests pass even when it is *not loaded* by the plugin at runtime. Loading requires four wiring steps: import in `src/go/plugin/go.d/collector/init.go`, `modules:` toggle in `src/go/plugin/go.d/config/go.d.conf`, stock job config at `src/go/plugin/go.d/config/go.d/<name>.conf`, and entry in `src/go/plugin/go.d/README.md`. Same trap applies to `ibm.d`.
+**Silent-failure trap (go.d).** A new go.d module compiles and tests pass even when it is *not loaded* by the plugin at runtime. Runtime loading requires four wiring steps: import in `src/go/plugin/go.d/collector/init.go`, `modules:` toggle in `src/go/plugin/go.d/config/go.d.conf`, stock job config at `src/go/plugin/go.d/config/go.d/<name>.conf`, and entry in `src/go/plugin/go.d/README.md`. Same trap applies to `ibm.d`.
 
 ### 5.4 ibm.d, Rust SDK, internal C, PLUGINSD
 
@@ -410,7 +431,9 @@ Lifecycle semantics: `Init()` is one-time setup (failure disables permanently); 
 ### 5.5 Build / dev loop
 
 - go.d unit tests: `cd src/go && go test ./plugin/go.d/collector/<name>/...`
-- Single-module dev run: `go run ./cmd/godplugin -m <name> -d`
+- Single-module dev run: `timeout 15s go run ./cmd/godplugin -m <name> -d`
+  from `src/go`; success means the module registers, starts a job, and keeps
+  running until the timeout stops it.
 - Rust: `cargo test -p <crate>`
 - Whole-project install: `./netdata-installer.sh`
 
@@ -454,7 +477,9 @@ Topology is its own data type — directed/undirected graphs of nodes and links.
 - **SNMP-discovered topology** (`src/go/plugin/go.d/collector/snmp_topology/`) — LLDP/CDP neighbors, BRIDGE-MIB FDB, Q-BRIDGE FDB, ARP tables, STP. Builds on SNMP profiles; extending profiles is usually the right starting point.
 - **Live socket topology** (`src/collectors/network-viewer.plugin/`) — local L3/L4 sockets and their inferred connections.
 - **Streaming graph** (`src/streaming/`) — Netdata parent/child topology.
-- **Topology library** at `src/go/pkg/topology/` — shared types and providers consumed by the topology collectors.
+- **Topology library** at `src/go/pkg/topology/v1` — production Go payload
+  helpers for new topology producers. The non-v1 `src/go/pkg/topology/` payload
+  model is legacy and must not be used for new topology work.
 
 Topology is consumed via Functions (`topology:*` family), not via metrics. The cardinality of network edges is too high for time-series storage and the use case is interactive lookup.
 
@@ -476,13 +501,17 @@ These are descriptive patterns — what existing Netdata collectors do. Use them
 
 ### 7.1 Database collectors
 
-DB collectors typically pair metrics (uptime, connections, query rates, replication lag, lock counts, cache hit ratios) with **Functions for live query analysis**: top queries, slow queries, currently-running queries, locks. Real examples:
+DB collectors often pair metrics (uptime, connections, query rates, replication lag, lock counts, cache hit ratios) with **Functions for live query analysis**: top queries, slow queries, currently-running queries, locks. Real examples:
 
 - **MySQL** (`src/go/plugin/go.d/collector/mysql/`) — metrics + `mysqlfunc/top_queries.go` + processlist via `collect_process_list.go`.
 - **PostgreSQL** (`src/go/plugin/go.d/collector/postgres/`) — metrics + `func_top_queries.go` + `func_running_queries.go`, dispatched through `func_router.go`.
 - MongoDB / Redis are metrics-only today, but the same Function pattern fits if the use case demands it.
 
-If you build a DB collector with metrics only, expect the maintainers to ask why you didn't add a query Function — the operator value of seeing "what's slow right now" is high and the pattern is established.
+Before adding a query Function, decide whether it is in scope for the current
+work and record the product/design decision. The operator value of seeing
+"what's slow right now" is high and the pattern is established, but Functions
+are still a feature surface, not something to add accidentally during unrelated
+metric work.
 
 ### 7.2 Network and SNMP collectors
 
@@ -549,7 +578,7 @@ Internal C plugins under `src/collectors/`. Reuse shared metric definitions from
 | Prometheus mapping | generic exposition scrape | `src/go/plugin/go.d/collector/prometheus/README.md` |
 | log2journal | parsing application logs into the journal | `src/collectors/log2journal/log2journal.d/` |
 | Auto-discovery rules | adding service-detection rules | `src/go/plugin/go.d/config/go.d/sd/{net_listeners,docker,snmp,http}.conf` |
-| Topology library | topology producers in Go | `src/go/pkg/topology/v1`, `src/go/pkg/topology/` |
+| Topology library | topology producers in Go | `src/go/pkg/topology/v1` |
 | netipc cross-plugin enrichment | C / Go / Rust | `src/libnetdata/netipc/`, `src/go/pkg/netipc/`, `src/crates/netipc/` |
 | DYNCFG protocol | dynamic configuration | `src/plugins.d/DYNCFG.md`, `docs/developer-and-contributor-corner/dyncfg.md` |
 | Health alerts reference | alert template authoring | `src/health/REFERENCE.md`, `src/health/alert-configuration-ordering.md` |

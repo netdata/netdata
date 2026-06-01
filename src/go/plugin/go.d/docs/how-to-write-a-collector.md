@@ -32,7 +32,8 @@ Do the design work first:
 5. Decide the minimal public config surface. Public config is a compatibility
    contract. Use constants for internal tuning such as page limits, scan cadence,
    retry limits, fan-out concurrency, and cache TTLs unless the operator has a
-   real decision to make.
+   real decision to make. A proposed config option MUST name that concrete
+   operator decision; "operators may want to tune it" is not enough.
 6. Decide whether the collector needs Functions or topology. Functions are
    interactive live/snapshot views; metrics are time series. New topology
    producers MUST use `src/go/pkg/topology/v1` and validate against
@@ -60,7 +61,8 @@ Read these files by responsibility:
   orchestration and split domain operations.
 - `metrix.go`, `write_metrics.go`, `charts.yaml`: typed instruments, metric
   writes, chart template, `StateSet`, `instances.by_labels`, and
-  `label_promotion`.
+  `label_promotion`. Audit every `instances.by_labels` identity choice instead
+  of copying labels from the example blindly.
 - `host_scope.go`: deterministic per-site V2 host scopes/vnodes.
 - `func_deps.go`, `catofunc/`: Function subpackage boundary behind a narrow
   dependency interface.
@@ -108,6 +110,11 @@ src/go/plugin/go.d/collector/<name>/
 ```
 
 Common optional splits:
+
+Most collectors need none of these optional files. Add one only when the
+collector has the corresponding product surface or state boundary; do not create
+empty `host_scope.go`, `topology.go`, or `<name>func/` files just because Cato
+has them.
 
 - `init.go` when `Init()` needs helper setup for clients, matchers, caches, or
   other persistent state. Keep the public `Init()` method itself in
@@ -182,6 +189,14 @@ Implementation tuning SHOULD use constants:
 You MUST NOT add a config option just because it is easy to expose. Once
 shipped, it is hard to remove and MUST stay synchronized across `Config`,
 `config_schema.json`, stock `.conf`, metadata, generated docs, and tests.
+A proposed config option MUST name the concrete operator decision it enables;
+"operators may want to tune it" is not enough.
+
+For SaaS/API credentials, examples SHOULD prefer secret indirection such as
+`${env:COLLECTOR_API_KEY}` or `${file:/run/secrets/collector_api_key}` instead
+of realistic-looking inline credentials. Schema fields that carry secrets MUST
+be marked sensitive and use password-style UI handling where the schema
+supports it.
 
 Selectors SHOULD use existing matcher packages such as `src/go/pkg/matcher`
 unless the upstream API forces a different grammar. Document the exact matching
@@ -241,6 +256,9 @@ exists to override it.
 
 Metric labels and chart instance labels MUST be bounded and stable. Use IDs for
 identity. Mutable display names SHOULD be promoted with `label_promotion`.
+Do not blindly copy `instances.by_labels` from Cato or any other example; audit
+every label used for chart identity and record why it is stable enough for that
+collector.
 
 ## Host Scopes And Vnodes
 
@@ -265,12 +283,20 @@ Functions MUST NOT freely access collector internals. Put Function code in a
 dedicated subpackage, for example `<name>func/`, with a narrow `Deps` interface
 declared by that subpackage.
 
+Non-topology Function responses MUST conform to
+`src/plugins.d/FUNCTION_UI_SCHEMA.json`; topology Function responses MUST
+conform to `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`. Function payloads
+MUST be validated with `src/go/tools/functions-validation/` or an equivalent
+schema-validation test, and the validation method must be recorded.
+
 Pattern:
 
 - collector package owns state and implements a small adapter in `func_deps.go`;
 - Function package owns method IDs, router, handlers, presentation, and tests;
 - Function package MUST import only framework/function types and other allowed
   dependencies, not the collector package;
+- the Function package `Deps` interface MUST expose only the methods the
+  Function needs and MUST NOT expose, return, or embed `*Collector`;
 - `Collector.Cleanup()` forwards cleanup to the Function router.
 
 Use `catofunc/` as the primary example. Test the Function package with fake
@@ -279,7 +305,8 @@ deps so the boundary is compile-enforced.
 ## Topology
 
 New topology producers MUST use `src/go/pkg/topology/v1`, not legacy topology
-payloads.
+payloads. New producers MUST NOT import the non-v1 `src/go/pkg/topology`
+payload model.
 
 Rules:
 
@@ -287,8 +314,13 @@ Rules:
   payloads;
 - publish immutable snapshots for Function readers;
 - MUST NOT mutate a published topology value;
-- MUST validate topology payloads in tests with `topologyv1.ValidateDecodedData` and
-  `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`;
+- use `src/go/plugin/go.d/collector/cato_networks/topology.go` as the concrete
+  construction reference for actors, links, detail tables, and telemetry fields;
+- MUST validate topology payloads in tests with both
+  `topologyv1.ValidateDecodedData` and
+  `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`; see
+  `src/go/plugin/go.d/collector/cato_networks/topology_test.go`
+  `validateCatoTopologyV1Data` for the full marshal/decode/schema check shape;
 - follow `.agents/skills/project-create-topology/SKILL.md` for actor/link/table
   design.
 
@@ -304,11 +336,21 @@ For a new collector `<name>`:
 5. Add or update `src/go/plugin/go.d/README.md`.
 6. Add health alerts under `src/health/health.d/<name>.conf` only when alerts
    are useful and backed by emitted chart contexts.
-7. Generate `integrations/<slug>.md` and the README symlink from
+7. If adding or changing service-discovery rules under
+   `src/go/plugin/go.d/config/go.d/sd/` or `sdext`, update generated
+   service-discovery documentation through the integrations lifecycle recipe.
+8. Generate `integrations/<slug>.md` and the README symlink from
    `metadata.yaml`.
+   Single-integration collector directories normally use the symlinked README.
+   Multi-integration plugin directories may keep a hand-authored umbrella
+   README; follow `.agents/skills/integrations-lifecycle/consistency.md`.
 
 Use `.agents/skills/integrations-lifecycle/recipes/add-go-collector.md` for the
 integration-generation commands and taxonomy pipeline details.
+
+The PR description or design note MUST enumerate the relevant collector
+consistency artifacts and justify every artifact that did not need a matching
+change. Most of this is not CI-enforced; it must be reviewer-visible.
 
 ## Tests
 
@@ -321,7 +363,9 @@ Recommended test coverage:
 - config validation, including required credentials and unsafe URLs;
 - `Init`, cheap `Check`, `Collect`, `Cleanup`, `MetricStore`;
 - hard failure, partial failure, context cancellation, and recovery behavior;
-- chart-template schema/compile validation;
+- chart-template schema validation with `collecttest.AssertChartTemplateSchema`
+  and chart-template compile validation through the chartengine path used by
+  nearby V2 collectors;
 - post-collect chart coverage with `collecttest.AssertChartCoverage`;
 - state-set values for every known state and unknown fallback;
 - host-scope routing when scopes/vnodes are used;
@@ -340,6 +384,18 @@ From `src/go`, run the narrow collector tests:
 ```bash
 go test -count=1 ./plugin/go.d/collector/<name>/...
 ```
+
+Verify that go.d can load the module:
+
+```bash
+timeout 15s go run ./cmd/godplugin -m <name> -d
+```
+
+Success means the module is registered, a job starts, and the command keeps
+running until the timeout stops it. Treat `unknown module`, `no jobs started`,
+config-load errors, or an immediate exit before the timeout as failures. Use
+`-c <config-dir>` when the test config lives outside the normal go.d config
+search path.
 
 When the collector uses concurrency or Functions, also run:
 
@@ -361,6 +417,8 @@ exactly what was run.
 - Public config knobs for internal implementation details.
 - Custom selector or retry framework when existing package/framework behavior is
   enough.
+- Collector-local singleton, adapter, or glue code that substitutes for a
+  missing shared framework capability.
 - Per-cycle warning/error logs for recoverable partial failures.
 - Metric charts for collector internals when logs are enough.
 - Mutable names used as chart or vnode identity.

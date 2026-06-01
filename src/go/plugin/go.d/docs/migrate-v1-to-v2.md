@@ -56,7 +56,8 @@ the active TODO or SOW. It MUST cover:
    - title, family, type, priority, multiplier, divisor, hidden, and float
      flags;
    - labels;
-   - chart variables (`Vars`);
+   - chart variables (`Vars`) -- STOP if present; see `Chart Variables`
+     before implementation;
    - dynamic chart/instance generation rules;
    - chart lifecycle and obsoletion timing.
 5. Integration artifacts.
@@ -85,6 +86,8 @@ A V2 migration MUST replace the V1 collection path:
   one;
 - `MetricStore()` returns the store;
 - `ChartTemplateYAML()` returns embedded `charts.yaml`;
+- if the compatibility manifest contains V1 chart `Vars`, the migration stops
+  until the `Chart Variables` decision path is resolved;
 - `Collect(ctx)` returns `error` and writes observations to `metrix`;
 - the completed migration removes the V1 `Collect() map[string]int64` output
   path and any runtime bridge from V1 maps into V2 `metrix`.
@@ -98,7 +101,14 @@ for the interface.
 
 Temporary V1 logic can be useful while developing the migration. For example,
 tests can compare V1 map output against V2 `metrix` observations after mapping
-both sides through the V1 chart manifest and the V2 chart identity snapshot.
+both sides through the V1 chart manifest and any V2 chart-identity tooling that
+exists for the migration.
+
+Do not invent an unreviewed local snapshot format when the comparison needs
+compiled chart identity that the framework does not expose. If the migration
+needs reusable chart-identity or alert-variable comparison helpers, treat that
+as a framework/test-helper prerequisite and follow
+`src/go/plugin/framework/docs/changing-framework-code.md` before relying on it.
 
 That parity bridge is a development tool only. It MUST NOT remain in the final
 migrated collector runtime path. A finished migration that runs as
@@ -109,9 +119,25 @@ Runtime path means any code reachable from `Init(ctx)`, `Check(ctx)`,
 MUST NOT remain reachable from that runtime path, regardless of function names
 or return types.
 
-If parity helpers are useful long term, keep only `_test.go` helpers, test-only
-packages, or fixtures that do not compile into or participate in runtime
-collection.
+If parity helpers are useful long term, keep only `_test.go` helpers or
+fixtures under `testdata/`. Before finishing, audit imports and prove no
+non-test file imports the old V1 path or parity bridge.
+
+From `src/go`, run an import audit for the migrated collector:
+
+```bash
+go list -deps -test=false ./plugin/go.d/collector/<collector>/... |
+  rg 'plugin/go\.d/agent/module|pkg/stm|plugin/go\.d/pkg/oldmetrix'
+rg -n 'Collect\(.*map\[string\]int64|map\[string\]int64|collectorapi\.Charts|func .*Charts\(' \
+  plugin/go.d/collector/<collector> -g '*.go'
+```
+
+The dependency command MUST return no runtime dependencies on old V1-only
+helpers such as `stm`, `oldmetrix`, or any collector-local parity bridge
+package. The source grep MUST NOT find a remaining runtime V1 map output,
+runtime `collectorapi.Charts` mutation, or `Charts()` path. If the old path is
+hard to identify, delete the temporary bridge and build/test the collector; the
+final runtime must still compile without it.
 
 ## What Must Stay Stable
 
@@ -137,7 +163,8 @@ Unless the user approves a breaking change, the migration MUST preserve:
 If an existing collector has an accidental bug or inconsistent artifact, record
 it separately. Fix it in the migration only when preserving the bug would make
 the V2 collector incorrect or untestable; otherwise split the fix into its own
-tracked batch or TODO item.
+tracked batch in the active TODO/SOW with owner-approved disposition. Do not
+close a migration with vague deferred items.
 
 ## Implementation Shape
 
@@ -204,6 +231,11 @@ Choose one of these paths before implementation:
 - get explicit user approval for a breaking alert change and update health,
   metadata, generated docs, and release notes accordingly.
 
+Until one of those paths is approved, migrating a collector that uses chart
+variables is blocked. Known V1 go.d collectors using chart variables at the
+time of writing include `postgres`, `cockroachdb`, `hdfs`, `puppet`, `scaleio`,
+`whoisquery`, and `zookeeper`.
+
 ### Obsoletion Timing
 
 V1 collectors often obsolete dynamic charts immediately with `MarkRemove()` /
@@ -230,9 +262,10 @@ Migrations MUST keep existing YAML and JSON field names. Do not rename config
 keys to match new code style.
 
 Do not add public config options as part of a migration unless they are required
-to preserve existing behavior. Internal tuning SHOULD use constants. New user
-choices belong in a later feature batch with schema, stock config, metadata,
-and docs updated together.
+to preserve existing behavior. A proposed config option MUST name the concrete
+operator decision it enables; "operators may want to tune it" is not enough.
+Internal tuning SHOULD use constants. New user choices belong in a later
+feature batch with schema, stock config, metadata, and docs updated together.
 
 `autodetection_retry`, `update_every`, and `vnode` are job/runtime fields in
 many existing collectors. Preserve the migrated collector's current YAML/JSON
@@ -249,7 +282,8 @@ migration side effects.
 - If adding host scopes would be useful but is not required for compatibility,
   split it into a later product decision.
 - If the collector exposes Functions, isolate Function code in a dedicated
-  `<name>func/` package behind a narrow `Deps` interface.
+  `<name>func/` package behind a narrow `Deps` interface. That interface MUST
+  NOT expose, return, or embed `*Collector`.
 - New topology producers MUST use `src/go/pkg/topology/v1` and validate against
   `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`.
 
@@ -257,15 +291,33 @@ migration side effects.
 
 Migration tests MUST prove compatibility and V2 behavior.
 
+Current shared helpers can prove schema validation, template compilation, and
+fixture chart coverage. They do not prove full V1-to-V2 chart identity parity,
+and they do not prove alert variables unless the migration records the variable
+source explicitly.
+
+The non-negotiable minimum is alert-observable parity. The migration MUST prove
+that health alert `on:` contexts, referenced dimensions, referenced variables,
+and dimension algorithms/units used by alerts still resolve after migration.
+This is provable today with chart-template checks plus manual alert-variable
+review.
+
+Exhaustive compiled chart-identity parity is broader: title, family, type,
+priority, multiplier, divisor, hidden, float flags, label promotion, and
+lifecycle policy. If existing exported helpers cannot observe those fields,
+either add a framework `collecttest` helper under
+`src/go/plugin/framework/docs/changing-framework-code.md`, or record a manual
+comparison recipe with exact fields and evidence. Do not claim exhaustive chart
+identity parity without one of those paths.
+
 At minimum:
 
 - config YAML/JSON serialization compatibility;
 - `Init`, `Check`, `Collect`, and `Cleanup` lifecycle coverage;
 - metric-store cycle behavior, including `BeginCycle`, successful commit, and
   abort on expected hard collection errors;
-- golden chart-identity snapshot coverage for chart IDs, contexts, dimension
-  IDs/names, algorithms, units, type, family, priority, multiplier, divisor,
-  hidden, float flags, label promotion, and lifecycle policy;
+- alert-observable parity for chart contexts, dimension IDs/names, algorithms,
+  units, and variables used by health alerts;
 - chart template schema/decode/validate/compile coverage;
 - chart coverage for fixture data expected to materialize all dimensions;
 - health alert compatibility when alerts exist: each alert `on:` context must
@@ -276,9 +328,25 @@ At minimum:
 - taxonomy coverage checks when chart contexts change;
 - host-scope tests if scopes/vnodes are preserved or introduced.
 
-`collecttest.AssertChartCoverage` is not a replacement for the golden
-chart-identity snapshot. It verifies that emitted series and the template agree;
-it can still pass when both writer and template were renamed consistently.
+`collecttest.AssertChartCoverage` is not a replacement for chart-identity
+parity. It verifies that emitted series and the template agree; it can still
+pass when both writer and template were renamed consistently.
+
+Exhaustive chart-identity parity is required before claiming full compatibility.
+If the migration lacks a shared helper or recorded manual comparison recipe for
+the compiled fields listed above, claim only the narrower compatibility that was
+actually proven.
+
+Until a shared alert-variable helper exists, use a manual grep/review pass for
+alert variables:
+
+```bash
+rg -n "\\$[A-Za-z_][A-Za-z0-9_]*" src/health/health.d/<collector>.conf
+rg -n "Vars:" src/go/plugin/go.d/collector/<collector> -g '*.go'
+```
+
+Every referenced variable must still be supplied by a dimension,
+variable-equivalent design, or approved alert change.
 
 Prefer table-driven tests using `map[string]struct{}` keyed by case name when
 cases share setup and assertion shape.
@@ -292,7 +360,14 @@ validation includes:
 cd src/go
 go test -count=1 ./plugin/go.d/collector/<name>/...
 go test -race -count=1 ./plugin/go.d/collector/<name>/...
+timeout 15s go run ./cmd/godplugin -m <name> -d
 ```
+
+For the load-verification command, success means the module is registered, a
+job starts, and the command keeps running until the timeout stops it. Treat
+`unknown module`, `no jobs started`, config-load errors, or an immediate exit
+before the timeout as failures. Use `-c <config-dir>` when the migrated test
+config lives outside the normal go.d config search path.
 
 Also run framework or integration checks when the migration touches those
 contracts:

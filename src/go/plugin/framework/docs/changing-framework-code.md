@@ -28,6 +28,12 @@ This guide applies when changing or extending any of these areas:
 - `src/go/pkg/topology`
 - `src/go/pkg/matcher`
 - `src/go/pkg/stm`
+- shared collector/runtime helpers under `src/go/pkg/` when their semantics are
+  used by go.d collectors or framework runtime code, such as `web`,
+  `prometheus`, `tlscfg`, `netdataapi`, and `netipc`
+- shared go.d helper packages under `src/go/plugin/go.d/pkg/`, such as
+  `collecttest`, `ndexec`, `logs`, `sqlquery`, `cloudauth`, `pinger`,
+  `snmputils`, `k8sclient`, and `dockerhost`
 
 It also applies when a collector change requires a new shared framework
 capability instead of collector-local code.
@@ -54,6 +60,10 @@ Use this split before designing:
 - Framework code is appropriate when the behavior affects lifecycle,
   chart/template semantics, metric storage, host scopes, Functions, topology,
   dynamic config, shared tests, shared matchers, or multiple collectors.
+- The test is the generality of the behavior, not only the directory touched.
+  Collector-local globals, singletons, adapters, duplicated helpers, or package
+  glue that substitute for a missing general framework capability are framework
+  work for approval purposes.
 - A framework extension is usually appropriate when two collectors would
   otherwise need the same helper or workaround.
 - A collector-local workaround MUST NOT be used only because it is less churn.
@@ -96,11 +106,19 @@ record MUST include:
 2. Why collector-local code is the wrong place.
 3. Why the change is additive and backward-compatible.
 4. Why this is the clean framework shape rather than a tier-reducing hack.
-5. Validation that will prove no existing behavior changed.
+5. Approval source: either the exact user request that already approved this
+   framework addition or the explicit approval response after presenting this
+   short-gate note.
+6. Affected packages and callers searched.
+7. Representative collectors selected for validation, or why none apply.
+8. Tests that will prove no existing behavior changed.
+9. Documentation, spec, skill, and integration-artifact update decision.
 
 Ask for explicit user approval when the request does not already cover the
 decision, when compatibility is uncertain, or when another package or collector
 needs changes to consume the new framework capability.
+If the task began as collector work, the short gate still requires explicit
+user approval before implementation.
 
 ## Required Design Note
 
@@ -268,10 +286,20 @@ Examples:
 - Framework package tests:
   - `go test -count=1 ./plugin/framework/...`
   - `go test -count=1 ./pkg/metrix/...`
+  - `go test -count=1 ./pkg/matcher/...`
+  - `go test -count=1 ./pkg/topology/...`
+  - `go test -count=1 ./plugin/go.d/pkg/collecttest`
+  - `go test -count=1 ./plugin/go.d/pkg/...` when shared go.d helper semantics
+    change.
 - Collector representatives:
   - `go test -count=1 ./plugin/go.d/collector/<name>/...`
   - `go test -race -count=1 ./plugin/go.d/collector/<name>/...` when
     concurrency, Functions, host scopes, or topology are involved.
+  - HTTP/web helper changes: include at least one HTTP collector and its config
+    serialization tests.
+  - Matcher changes: include selector-using collectors.
+  - `collecttest` changes: include several representative V2 collectors that use
+    chart coverage, config serialization, and host scopes where relevant.
 - Runtime components:
   - `go test -count=1 ./plugin/framework/jobruntime ./plugin/framework/runtimecomp`
 - Runtime wiring and dyncfg lifecycle:
