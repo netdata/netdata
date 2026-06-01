@@ -259,6 +259,7 @@
 - Build(deps): bump github.com/vmware/govmomi from 0.54.0 to 0.54.1 in /src/go ([#22590](https://github.com/netdata/netdata/issues/22590))
 - Fix: upgrade google.golang.org/grpc to 1.79.3 (CVE-2026-33186) ([#22587](https://github.com/netdata/netdata/issues/22587))
 - Chore: go mod tidy ([#22593](https://github.com/netdata/netdata/issues/22593))
+- Preparation for virtual logs functions ([#22584](https://github.com/netdata/netdata/issues/22584))
 
 ## [2.10.0] - 2026-04-09
 
