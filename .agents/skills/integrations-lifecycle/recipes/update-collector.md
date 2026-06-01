@@ -63,7 +63,9 @@ Rules of thumb:
   `context_prefix:` or `collect_plugin:`;
 - pick section IDs from `integrations/taxonomy/sections.yaml`.
 
-For a rich reference, compare against
+For a modern go.d V2 ownership reference, compare against
+`src/go/plugin/go.d/collector/cato_networks/taxonomy.yaml`. If the change needs
+grid or table widget examples, compare against
 `src/go/plugin/go.d/collector/mysql/taxonomy.yaml`.
 
 ## 4. Update the remaining collector artifacts
