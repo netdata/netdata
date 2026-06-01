@@ -934,6 +934,8 @@ void function_network_connections(
         // TCP IPv4
         if (tcp4) {
             for (DWORD i = 0; i < tcp4->dwNumEntries; i++) {
+                if (unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED)))
+                    goto emit_done;
                 MIB_TCPROW_OWNER_PID *r = &tcp4->table[i];
 
                 struct in_addr la = { .s_addr = r->dwLocalAddr };
@@ -979,6 +981,8 @@ void function_network_connections(
         // TCP IPv6
         if (tcp6) {
             for (DWORD i = 0; i < tcp6->dwNumEntries; i++) {
+                if (unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED)))
+                    goto emit_done;
                 MIB_TCP6ROW_OWNER_PID *r = &tcp6->table[i];
 
                 if (!inet_ntop(AF_INET6, r->ucLocalAddr, local_ip, sizeof(local_ip)))
@@ -1022,6 +1026,8 @@ void function_network_connections(
         // UDP IPv4 — endpoints have no remote address; direction is always "listen".
         if (udp4) {
             for (DWORD i = 0; i < udp4->dwNumEntries; i++) {
+                if (unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED)))
+                    goto emit_done;
                 MIB_UDPROW_OWNER_PID *r = &udp4->table[i];
 
                 struct in_addr la = { .s_addr = r->dwLocalAddr };
@@ -1042,6 +1048,8 @@ void function_network_connections(
         // UDP IPv6
         if (udp6) {
             for (DWORD i = 0; i < udp6->dwNumEntries; i++) {
+                if (unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED)))
+                    goto emit_done;
                 MIB_UDP6ROW_OWNER_PID *r = &udp6->table[i];
 
                 if (!inet_ntop(AF_INET6, r->ucLocalAddr, local_ip, sizeof(local_ip)))
