@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: in-progress
+Status: completed
 
-Sub-state: active repair for topology/process/container enrichment consistency.
+Sub-state: implemented, validated, committed, and ready to close.
 
 ## Requirements
 
@@ -581,6 +581,11 @@ Real-use evidence:
   - raw `.scope` names remain only in evidence fields such as `cgroup_path` and
     `systemd_unit_name`, so actor details can explain where the grouped user
     actor came from without promoting each transient scope as a graph actor.
+- Final installed-Agent validation after reinstall resolved the PID-zero
+  attribution symptom. Root cause was the installed plugin missing the required
+  runtime permissions, not a `local-sockets` parser failure. With permissions
+  restored by reinstall, process attribution, container grouping, and user-slice
+  grouping worked as designed.
 
 Reviewer findings:
 
@@ -647,12 +652,12 @@ End-user/operator skills update:
 
 ## Outcome
 
-Implementation, focused local validation, install validation, and live
-direct-Agent payload validation are complete for the current scope. The
-remaining runtime behavior to watch is the intended first-response partial state
-when APPS_LOOKUP has not connected or a PID is still being enriched; it must
-stay as `[pending]` / `retry_later` and must not fall back to process-name
-actors.
+Implementation, focused local validation, install validation, live direct-Agent
+payload validation, and final user validation are complete for the current
+scope. First-response partial enrichment remains an intentional state when
+APPS_LOOKUP has not connected or a PID is still being enriched; steady-state
+container grouping must resolve to enriched process/container/service/user
+actors once plugin permissions and lookup services are available.
 
 ## Lessons Extracted
 
@@ -664,10 +669,10 @@ actors.
 
 ## Followup
 
-- Keep watching user-side UI refresh behavior for the partial-data case. If a
-  future refresh shows process-name actors floating in `group_by=container`, the
-  next repair should use the live payload from that exact refresh and compare
-  actor ids, link refs, and `cgroup_status` rows.
+- None. The previous runtime watch item was resolved by final installed-Agent
+  validation after plugin permissions were restored. Future regressions should
+  reopen this SOW or create a new regression SOW with the exact live payload and
+  journal evidence.
 
 ## Regression Log
 
