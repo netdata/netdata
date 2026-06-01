@@ -1514,6 +1514,13 @@ void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire) {
 }
 
 static int pluginsd_parser_unittest_slot_bounds(size_t max_slot) {
+    // The boundary cases below build "max_slot - 1", so a zero cap would underflow.
+    // All real callers pass nonzero compile-time caps; guard against misuse anyway.
+    if(max_slot < 1) {
+        netdata_log_error("PLUGINSD: slot bounds unittest requires max_slot >= 1, got %zu", max_slot);
+        return 1;
+    }
+
     // Note on initialization: every element below is given an explicit
     // initializer, so C zero-fills the remainder of each slot_word array. The
     // trailing three entries start empty and are filled from max_slot at runtime.
@@ -1537,15 +1544,15 @@ static int pluginsd_parser_unittest_slot_bounds(size_t max_slot) {
 
     const size_t n = _countof(cases);
 
-    snprintfz(cases[n - 3].slot_word, sizeof(cases[n - 3].slot_word) - 1,
+    snprintfz(cases[n - 3].slot_word, sizeof(cases[n - 3].slot_word),
               PLUGINSD_KEYWORD_SLOT ":%zu", max_slot - 1);
     cases[n - 3].expected = (ssize_t)(max_slot - 1);
 
-    snprintfz(cases[n - 2].slot_word, sizeof(cases[n - 2].slot_word) - 1,
+    snprintfz(cases[n - 2].slot_word, sizeof(cases[n - 2].slot_word),
               PLUGINSD_KEYWORD_SLOT ":%zu", max_slot);
     cases[n - 2].expected = (ssize_t)max_slot;
 
-    snprintfz(cases[n - 1].slot_word, sizeof(cases[n - 1].slot_word) - 1,
+    snprintfz(cases[n - 1].slot_word, sizeof(cases[n - 1].slot_word),
               PLUGINSD_KEYWORD_SLOT ":%zu", max_slot + 1);
     cases[n - 1].expected = 0;
 
