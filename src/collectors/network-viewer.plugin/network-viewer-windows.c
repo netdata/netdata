@@ -765,14 +765,14 @@ static void nv_listen_set_free(NV_LISTEN_SET *s)
 
 static void *nv_fetch_tcp_table(ULONG af)
 {
-    ULONG size = 0;
+    DWORD size = 0;
     GetExtendedTcpTable(NULL, &size, FALSE, af, TCP_TABLE_OWNER_PID_ALL, 0);
     if (!size) return NULL;
 
     // Add headroom to tolerate connections added between size-probe and actual fetch.
     size += 4096;
     void *buf = mallocz(size);
-    ULONG ret = GetExtendedTcpTable(buf, &size, FALSE, af, TCP_TABLE_OWNER_PID_ALL, 0);
+    DWORD ret = GetExtendedTcpTable(buf, &size, FALSE, af, TCP_TABLE_OWNER_PID_ALL, 0);
     if (ret == ERROR_INSUFFICIENT_BUFFER) {
         buf = reallocz(buf, size);
         ret = GetExtendedTcpTable(buf, &size, FALSE, af, TCP_TABLE_OWNER_PID_ALL, 0);
@@ -786,13 +786,13 @@ static void *nv_fetch_tcp_table(ULONG af)
 
 static void *nv_fetch_udp_table(ULONG af)
 {
-    ULONG size = 0;
+    DWORD size = 0;
     GetExtendedUdpTable(NULL, &size, FALSE, af, UDP_TABLE_OWNER_PID, 0);
     if (!size) return NULL;
 
     size += 4096;
     void *buf = mallocz(size);
-    ULONG ret = GetExtendedUdpTable(buf, &size, FALSE, af, UDP_TABLE_OWNER_PID, 0);
+    DWORD ret = GetExtendedUdpTable(buf, &size, FALSE, af, UDP_TABLE_OWNER_PID, 0);
     if (ret == ERROR_INSUFFICIENT_BUFFER) {
         buf = reallocz(buf, size);
         ret = GetExtendedUdpTable(buf, &size, FALSE, af, UDP_TABLE_OWNER_PID, 0);
