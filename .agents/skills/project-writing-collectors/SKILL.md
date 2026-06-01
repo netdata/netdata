@@ -40,7 +40,7 @@ This is a truthfulness principle, not a cardinality one. It applies at any cardi
 
 Mechanics:
 - C: `rrdset_is_obsolete___safe_from_collector_thread()` in `src/database/rrdset.c:116` flags `RRDSET_FLAG_OBSOLETE`. Reverse with `rrdset_isnot_obsolete()` (line 140) when the entity reappears.
-- go.d: `c.Obsolete = true` on the chart struct; the framework appends `obsolete` to the CHART command. Documented at `src/go/BEST-PRACTICES.md:94-108`.
+- go.d V1: `c.Obsolete = true` or `MarkRemove()` on the chart marks it obsolete. go.d V2: chart lifetime is controlled by `charts.yaml` lifecycle policy and `chartengine`; start from `src/go/plugin/go.d/docs/how-to-write-a-collector.md` for new collectors and `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` for migrations.
 - Anti-flip-flop: if an entity may disappear and reappear quickly, wait roughly 1 minute of absence before obsoleting. Thrashing charts hurt streaming and ML.
 
 ### 1.6 Your knowledge is stale — research the current spec
@@ -170,7 +170,9 @@ When a collector emits one chart per discovered entity (process, connection, pro
 - Histogram / percentile splits with high-cardinality labels (per-IP, per-tenant, per-trace) → multiplicative blow-up.
 - Per-PID charts with no obsolete handler → growth at process churn rate (the bound is here in §2.5; the obsolete handler is the §1.5 concern).
 
-Pattern reference: `src/go/BEST-PRACTICES.md` (search `max`).
+For go.d V2 collectors, keep selector/cap behavior in the collector design and
+document the public config only when the operator has a real decision to make.
+Start from `src/go/plugin/go.d/docs/how-to-write-a-collector.md`.
 
 ### 2.6 Configuration discipline
 
@@ -220,7 +222,12 @@ Both clients (consume) and servers (offer) exist in all three languages. Real ex
 
 ### 2.10 Vnodes for remote targets
 
-Set `Vnode` in job config; respect it in `Init()` and DYNCFG handlers. See `src/go/plugin/framework/vnodes/` and `src/go/BEST-PRACTICES.md` (search `Vnode`). Past pain: an older refactor had to retroactively split job-name validation per vnode/domain because earlier collectors hadn't accounted for it.
+Set `Vnode` in job config when the collector has one remote target. For Go V2
+collectors that emit multiple remote nodes from one job, use
+`metrix.HostScope`; see `.agents/sow/specs/go-v2-host-scope.md` and
+`src/go/plugin/go.d/docs/how-to-write-a-collector.md`. Past pain: an older
+refactor had to retroactively split job-name validation per vnode/domain because
+earlier collectors had not accounted for it.
 
 ## 3. Structuring dashboards
 
@@ -370,9 +377,9 @@ Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orc
 
 ### 5.3 go.d V1 / V2 reality check
 
-Most go.d collectors are still V1. The older broad reference docs
-(`src/go/BEST-PRACTICES.md`, `src/go/COLLECTOR-LIFECYCLE.md`) describe V1
-patterns and are not the source for new go.d collector shape.
+Most go.d collectors are still V1, but the broad V1 authoring docs have been
+retired because they taught stale patterns from general Go paths. Do not use
+existing V1 collectors as the shape for new work.
 
 **New go.d modules MUST use V2.** Start with
 `src/go/plugin/go.d/docs/how-to-write-a-collector.md`. Use
@@ -532,7 +539,7 @@ Internal C plugins under `src/collectors/`. Reuse shared metric definitions from
 | Plugin types and privileges | choosing where to add a collector | `src/collectors/README.md` |
 | External plugin protocol | non-Go external plugin | `src/plugins.d/README.md` |
 | go.d V2 authoring | adding a `go.d` module | `src/go/plugin/go.d/docs/how-to-write-a-collector.md` |
-| go.d V1 best practices / lifecycle | working in legacy V1 module | `src/go/BEST-PRACTICES.md`, `src/go/COLLECTOR-LIFECYCLE.md` |
+| go.d V1-to-V2 migration | migrating existing go.d collector | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` |
 | Functions backend (Go / Rust) | implementing a Function | `src/go/plugin/framework/functions/README.md`, `src/crates/netdata-plugin/rt/src/lib.rs` |
 | Functions UI schema & guides | response shapes and patterns | `src/plugins.d/FUNCTION_UI_SCHEMA.json`, `src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md`, `src/plugins.d/FUNCTION_UI_REFERENCE.md` |
 | Topology Function schema & guide | topology actors, links, evidence, overlays | `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`, `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`, `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md` |
