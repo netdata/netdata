@@ -47,6 +47,11 @@ void apps_ebpf_accumulate_cachestat(void)
         if (p->ebpf.cachestat.ct > w->cachestat.ct)
             w->cachestat.ct = p->ebpf.cachestat.ct;
 
+        // Reset the ct gate on regression (Go plugin restart, map reset, SHM
+        // inode swap, PID reuse) so deltas are not permanently suppressed.
+        if (p->ebpf.cachestat.ct < p->ebpf_cachestat_ct)
+            p->ebpf_cachestat_ct = 0;
+
         // Only add this PID's Go-computed delta when the Go plugin has published
         // fresh data (ct advanced).  This keeps dirty/hit/miss strictly
         // monotonic even when PIDs exit or are reclassified between cycles.
@@ -96,6 +101,7 @@ bool apps_ebpf_sync_pid_stat(struct pid_stat *p)
     if (!item) {
         p->has_ebpf = false;
         memset(&p->ebpf, 0, sizeof(p->ebpf));
+        p->ebpf_cachestat_ct = 0;
         return false;
     }
 
