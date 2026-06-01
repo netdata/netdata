@@ -763,19 +763,24 @@ static void nv_listen_set_free(NV_LISTEN_SET *s)
 
 // --- Table fetch helpers --------------------------------------------------------
 
-static void *nv_fetch_tcp_table(ULONG af)
+// Common Windows API signature for GetExtended{Tcp,Udp}Table.
+// Both functions have identical prototypes except for the TableClass enum type;
+// since all Windows enum types are int-sized, a single typedef covers both.
+typedef DWORD (WINAPI *NV_GET_TABLE_FN)(PVOID, PDWORD, BOOL, ULONG, int, ULONG);
+
+static void *nv_fetch_ip_table(NV_GET_TABLE_FN get_fn, ULONG af, int table_class)
 {
     DWORD size = 0;
-    GetExtendedTcpTable(NULL, &size, FALSE, af, TCP_TABLE_OWNER_PID_ALL, 0);
+    get_fn(NULL, &size, FALSE, af, table_class, 0);
     if (!size) return NULL;
 
     // Add headroom to tolerate connections added between size-probe and actual fetch.
     size += 4096;
     void *buf = mallocz(size);
-    DWORD ret = GetExtendedTcpTable(buf, &size, FALSE, af, TCP_TABLE_OWNER_PID_ALL, 0);
+    DWORD ret = get_fn(buf, &size, FALSE, af, table_class, 0);
     if (ret == ERROR_INSUFFICIENT_BUFFER) {
         buf = reallocz(buf, size);
-        ret = GetExtendedTcpTable(buf, &size, FALSE, af, TCP_TABLE_OWNER_PID_ALL, 0);
+        ret = get_fn(buf, &size, FALSE, af, table_class, 0);
     }
     if (ret != NO_ERROR) {
         freez(buf);
@@ -784,24 +789,14 @@ static void *nv_fetch_tcp_table(ULONG af)
     return buf;
 }
 
+static void *nv_fetch_tcp_table(ULONG af)
+{
+    return nv_fetch_ip_table((NV_GET_TABLE_FN)GetExtendedTcpTable, af, TCP_TABLE_OWNER_PID_ALL);
+}
+
 static void *nv_fetch_udp_table(ULONG af)
 {
-    DWORD size = 0;
-    GetExtendedUdpTable(NULL, &size, FALSE, af, UDP_TABLE_OWNER_PID, 0);
-    if (!size) return NULL;
-
-    size += 4096;
-    void *buf = mallocz(size);
-    DWORD ret = GetExtendedUdpTable(buf, &size, FALSE, af, UDP_TABLE_OWNER_PID, 0);
-    if (ret == ERROR_INSUFFICIENT_BUFFER) {
-        buf = reallocz(buf, size);
-        ret = GetExtendedUdpTable(buf, &size, FALSE, af, UDP_TABLE_OWNER_PID, 0);
-    }
-    if (ret != NO_ERROR) {
-        freez(buf);
-        return NULL;
-    }
-    return buf;
+    return nv_fetch_ip_table((NV_GET_TABLE_FN)GetExtendedUdpTable, af, UDP_TABLE_OWNER_PID);
 }
 
 // --- Row emitter ----------------------------------------------------------------
@@ -889,18 +884,20 @@ void function_network_connections(
     NV_LISTEN_SET listen_set;
     nv_listen_set_init(&listen_set);
 
-    if (tcp4) {
-        for (DWORD i = 0; i < tcp4->dwNumEntries; i++) {
-            if (tcp4->table[i].dwState == MIB_TCP_STATE_LISTEN)
-                nv_listen_set_add(&listen_set, ntohs((uint16_t)tcp4->table[i].dwLocalPort), NV_WIN_AF_INET);
-        }
-    }
-    if (tcp6) {
-        for (DWORD i = 0; i < tcp6->dwNumEntries; i++) {
-            if (tcp6->table[i].dwState == MIB_TCP_STATE_LISTEN)
-                nv_listen_set_add(&listen_set, ntohs((uint16_t)tcp6->table[i].dwLocalPort), NV_WIN_AF_INET6);
-        }
-    }
+// Collect all LISTEN ports from a TCP table into the listen set.
+// Works for both MIB_TCPTABLE_OWNER_PID and MIB_TCP6TABLE_OWNER_PID because
+// the macro expands with the concrete type at each call site.
+#define NV_COLLECT_TCP_LISTEN(tbl, family, set)                                         \
+    do {                                                                                 \
+        for (DWORD _i = 0; _i < (tbl)->dwNumEntries; _i++) {                            \
+            if ((tbl)->table[_i].dwState == MIB_TCP_STATE_LISTEN)                       \
+                nv_listen_set_add((set), ntohs((uint16_t)(tbl)->table[_i].dwLocalPort), \
+                                  (family));                                             \
+        }                                                                                \
+    } while (0)
+
+    if (tcp4) NV_COLLECT_TCP_LISTEN(tcp4, NV_WIN_AF_INET,  &listen_set);
+    if (tcp6) NV_COLLECT_TCP_LISTEN(tcp6, NV_WIN_AF_INET6, &listen_set);
     nv_listen_set_sort(&listen_set);
 
     // --- Second pass: emit rows --------------------------------------------------
