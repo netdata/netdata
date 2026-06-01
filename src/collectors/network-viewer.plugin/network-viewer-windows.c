@@ -936,15 +936,11 @@ void function_network_connections(
                     direction = "outbound";
                 }
 
-                // LISTEN rows have no remote endpoint.
-                const char *remote_ip_s;
-                const char *remote_as;
-                DWORD remote_port_emit;
-                if (r->dwState == MIB_TCP_STATE_LISTEN || !r->dwRemoteAddr) {
-                    remote_ip_s      = "";
-                    remote_as        = "";
-                    remote_port_emit = 0;
-                } else {
+                // LISTEN rows have no remote endpoint; defaults cover inet_ntop failure too.
+                const char *remote_ip_s      = "";
+                const char *remote_as        = "";
+                DWORD remote_port_emit       = 0;
+                if (r->dwState != MIB_TCP_STATE_LISTEN && r->dwRemoteAddr) {
                     struct in_addr ra = { .s_addr = r->dwRemoteAddr };
                     if (inet_ntop(AF_INET, &ra, remote_ip, sizeof(remote_ip))) {
                         remote_ip_s      = remote_ip;
@@ -985,14 +981,10 @@ void function_network_connections(
 
                 bool remote_zero = !memcmp(r->ucRemoteAddr, nv_ipv6_zero_addr, 16) && !r->dwRemotePort;
 
-                const char *remote_ip_s;
-                const char *remote_as;
-                DWORD remote_port_emit;
-                if (r->dwState == MIB_TCP_STATE_LISTEN || remote_zero) {
-                    remote_ip_s      = "";
-                    remote_as        = "";
-                    remote_port_emit = 0;
-                } else {
+                const char *remote_ip_s      = "";
+                const char *remote_as        = "";
+                DWORD remote_port_emit       = 0;
+                if (r->dwState != MIB_TCP_STATE_LISTEN && !remote_zero) {
                     if (inet_ntop(AF_INET6, r->ucRemoteAddr, remote_ip, sizeof(remote_ip))) {
                         remote_ip_s      = remote_ip;
                         remote_as        = nv_ipv6_address_space(r->ucRemoteAddr);
