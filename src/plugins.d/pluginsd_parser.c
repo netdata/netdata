@@ -1513,7 +1513,48 @@ void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire) {
     }
 }
 
+static int pluginsd_parser_unittest_slot_bounds(void) {
+    struct slot_test_case {
+        char slot_word[64];
+        ssize_t expected;
+    } cases[] = {
+        { "", -1 },
+        { PLUGINSD_KEYWORD_SLOT ":0", 0 },
+        { PLUGINSD_KEYWORD_SLOT ":1", 1 },
+        { PLUGINSD_KEYWORD_SLOT ":0x0AAAAAAAAAAAAAAB", 0 },
+        { PLUGINSD_KEYWORD_SLOT ":0x40000000", 0 },
+        { "", 0 },
+        { "", 0 },
+    };
+
+    snprintfz(cases[5].slot_word, sizeof(cases[5].slot_word) - 1,
+              PLUGINSD_KEYWORD_SLOT ":%d", PLUGINSD_SLOT_MAX);
+    cases[5].expected = PLUGINSD_SLOT_MAX;
+
+    snprintfz(cases[6].slot_word, sizeof(cases[6].slot_word) - 1,
+              PLUGINSD_KEYWORD_SLOT ":%d", PLUGINSD_SLOT_MAX + 1);
+    cases[6].expected = 0;
+
+    for(size_t i = 0; i < _countof(cases); i++) {
+        char command[] = "DIMENSION";
+        char *words[] = { command, cases[i].slot_word[0] ? cases[i].slot_word : NULL };
+        size_t num_words = words[1] ? 2 : 1;
+
+        ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+        if(slot != cases[i].expected) {
+            netdata_log_error("PLUGINSD: slot parser unittest failed for '%s': expected %zd, got %zd",
+                              words[1] ? words[1] : "(unset)", cases[i].expected, slot);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 int pluginsd_parser_unittest(void) {
+    if(pluginsd_parser_unittest_slot_bounds())
+        return 1;
+
     PARSER *p = parser_init(NULL, -1, -1, PARSER_INPUT_SPLIT, NULL);
     pluginsd_keywords_init(p, PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING);
 

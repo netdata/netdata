@@ -374,8 +374,16 @@ static ALWAYS_INLINE ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_wo
     char *id = get_word(words, num_words, 1);
     if(id && id[0] == PLUGINSD_KEYWORD_SLOT[0] && id[1] == PLUGINSD_KEYWORD_SLOT[1] &&
        id[2] == PLUGINSD_KEYWORD_SLOT[2] && id[3] == PLUGINSD_KEYWORD_SLOT[3] && id[4] == ':') {
-        slot = (ssize_t) str2ull_encoded(&id[5]);
-        if(slot < 0) slot = 0; // to make the caller increment its idx of the words
+        unsigned long long parsed_slot = str2ull_encoded(&id[5]);
+        if(unlikely(parsed_slot > PLUGINSD_SLOT_MAX)) {
+            nd_log_limit_static_global_var(erl_slot, 1, 0);
+            nd_log_limit(&erl_slot, NDLS_COLLECTORS, NDLP_WARNING,
+                         "PLUGINSD: ignoring invalid SLOT value '%s' above the supported maximum %d",
+                         &id[5], PLUGINSD_SLOT_MAX);
+            slot = 0;
+        }
+        else
+            slot = (ssize_t)parsed_slot;
     }
 
     return slot;
