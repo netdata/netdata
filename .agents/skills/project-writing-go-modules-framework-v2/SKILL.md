@@ -15,6 +15,8 @@ source files for evidence.
   `src/go/plugin/framework/docs/changing-framework-code.md`
 - Canonical new-collector guide:
   `src/go/plugin/go.d/docs/how-to-write-a-collector.md`
+- Helper-package guide:
+  `src/go/plugin/go.d/docs/helper-packages.md`
 - V1-to-V2 migration guide:
   `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`
 - Runtime/chart lifecycle: `src/go/plugin/framework/chartengine/README.md`
@@ -50,6 +52,9 @@ source files for evidence.
   helpers in `init.go` when needed, orchestration in `collect.go`, distinct
   upstream operations in `collect_<operation>.go`, metrics in `metrix.go` /
   `write_metrics.go`, focused tests.
+- Before adding custom HTTP, selector, logging, command-execution, SQL, ping,
+  or log-file plumbing, check `src/go/plugin/go.d/docs/helper-packages.md` and
+  reuse an existing helper when it fits.
 - If Functions exist, isolate them in a `<name>func/` subpackage with a narrow
   `Deps` interface declared there. The Function package MUST NOT import the
   collector package or hold `*Collector`.

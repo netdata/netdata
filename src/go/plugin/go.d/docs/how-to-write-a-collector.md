@@ -18,26 +18,29 @@ Do the design work first:
 
 1. Read the upstream API or protocol docs. Do not infer current behavior from
    memory or from generated SDK types alone.
-2. You MUST aim for the clean end state, not the smallest initial diff. If the
+2. Check existing helper packages before implementing parser, HTTP, selector,
+   command-execution, SQL, ping, log-reading, or log-limiting plumbing. Start
+   with `src/go/plugin/go.d/docs/helper-packages.md`.
+3. You MUST aim for the clean end state, not the smallest initial diff. If the
    clean collector design requires a framework improvement, surface that as a
    design decision and follow
    `src/go/plugin/framework/docs/changing-framework-code.md` instead of hiding
    it behind collector-local glue.
-3. Decide the monitored entities and cardinality bounds. If one job collects
+4. Decide the monitored entities and cardinality bounds. If one job collects
    remote resources that SHOULD be separate Netdata nodes, design V2 host scopes
    from the start.
-4. Decide the minimal public config surface. Public config is a compatibility
+5. Decide the minimal public config surface. Public config is a compatibility
    contract. Use constants for internal tuning such as page limits, scan cadence,
    retry limits, fan-out concurrency, and cache TTLs unless the operator has a
    real decision to make.
-5. Decide whether the collector needs Functions or topology. Functions are
+6. Decide whether the collector needs Functions or topology. Functions are
    interactive live/snapshot views; metrics are time series. New topology
    producers MUST use `src/go/pkg/topology/v1` and validate against
    `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`.
-6. Plan the full integration artifact set: code, `metadata.yaml`,
+7. Plan the full integration artifact set: code, `metadata.yaml`,
    `taxonomy.yaml`, `config_schema.json`, stock `.conf`, health alerts when
    needed, generated integration page, and README symlink.
-7. Plan the first coherent batch and its boundaries. At each boundary, you MUST
+8. Plan the first coherent batch and its boundaries. At each boundary, you MUST
    re-check whether new work has drifted out of scope; defer it or land it
    independently before continuing.
 
@@ -70,6 +73,7 @@ Framework/API references:
 
 - `src/go/plugin/framework/collectorapi/collector.go`
 - `src/go/plugin/framework/docs/changing-framework-code.md`
+- `src/go/plugin/go.d/docs/helper-packages.md`
 - `src/go/pkg/metrix/README.md`
 - `src/go/plugin/framework/charttpl/README.md`
 - `src/go/plugin/framework/chartengine/README.md`
