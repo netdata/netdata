@@ -370,6 +370,12 @@ static inline RRDSET *pluginsd_find_chart(RRDHOST *host, const char *chart, cons
 }
 
 static ALWAYS_INLINE ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_words, size_t max_slot) {
+    // Contract: max_slot must fit in ssize_t so the (ssize_t) cast below stays
+    // non-negative. All callers pass small compile-time caps (PLUGINSD_*_SLOT_MAX),
+    // so for the inlined constant this check is folded away by the compiler.
+    internal_fatal(max_slot > (size_t)SSIZE_MAX,
+                   "PLUGINSD: max_slot %zu exceeds SSIZE_MAX", max_slot);
+
     ssize_t slot = -1;
     char *id = get_word(words, num_words, 1);
     // Words are NUL-terminated and && short-circuits left-to-right, so each id[k]
