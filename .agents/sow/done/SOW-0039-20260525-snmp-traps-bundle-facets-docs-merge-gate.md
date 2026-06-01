@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: in-progress
+Status: completed
 
-Sub-state: activated on 2026-05-28 after SOW-0035, SOW-0036, SOW-0037, and SOW-0038 reached implementation-complete state on the feature branch. **This SOW is the merge gate** — SOW-0035 through SOW-0038 land on a feature branch; the single PR sequence that becomes mergeable to `master` ends here.
+Sub-state: completed on 2026-06-01 after SOW-0035, SOW-0036, SOW-0037, SOW-0038, and SOW-0045 reached implementation-complete state on the feature branch. This SOW closed the collector consistency, facets, docs, validation, performance, reviewer, and lifecycle gates for the SNMP traps PR sequence.
 
 ## Requirements
 
@@ -690,6 +690,16 @@ Tests or equivalent validation:
 - `go mod tidy -diff` — clean after applying the tidy module graph.
 - `git diff --check` — clean.
 - `./.agents/sow/audit.sh` — exit 0; existing non-project skill classification warnings remain unrelated to this SDK bump.
+- `go vet ./plugin/go.d/collector/snmp_traps/...` — passed on 2026-06-01 close gate.
+- `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 120s` — passed on 2026-06-01 close gate.
+- `go test ./plugin/go.d/collector/snmp/... ./plugin/go.d/collector/snmp_topology/... ./plugin/go.d/collector/snmp_traps/... -count=1 -timeout 180s` — passed on 2026-06-01 close gate.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^Benchmark(TrapWriterWrite|JournalTrapWriterDrain|JournalWriterWriteEntry|FullPacketToJournal)$' -benchmem -benchtime=30000x -count=3 -timeout 120s` — passed on 2026-06-01 close gate; full packet-to-journal 91.1K-105.1K persisted entries/sec.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^BenchmarkFullPacketToJournal$' -benchmem -benchtime=100000x -count=3 -timeout 180s` — passed on 2026-06-01 close gate; 87.0K-96.6K persisted entries/sec.
+- Markdown link validation over the comparison docs, public skill docs, tool README, and generated integration doc — passed on 2026-06-01 close gate (`20` files).
+- Shell syntax extraction over the public skill docs, tool README, and generated integration doc — passed on 2026-06-01 close gate (`49` shell blocks).
+- `go mod tidy -diff` — clean on 2026-06-01 close gate.
+- `git diff --check` — clean on 2026-06-01 close gate after normalizing a generated-doc EOF whitespace artifact.
+- `./.agents/sow/audit.sh` — exit 0 on 2026-06-01 close gate; existing non-project skill classification warnings remain unrelated.
 - `python3 integrations/gen_integrations.py` — passed.
 - `python3 integrations/gen_docs_integrations.py -c go.d.plugin/snmp_traps` — passed.
 - `python3 integrations/check_collector_taxonomy.py` — passed.
@@ -716,6 +726,11 @@ Reviewer findings:
   - `qwen`: `PRODUCTION GRADE`. Verified alert/template consistency, config-schema/metadata consistency, taxonomy, generated docs, tests, and installed-Agent evidence. It treated the remaining SOW lifecycle moves and this final review recording as merge-commit actions, not implementation blockers.
   - `glm`: `NOT PRODUCTION GRADE`, lifecycle-only. It found M1-M6 implementation, tests, docs, generated artifacts, installed-Agent validation, and sensitive-data handling acceptable, but blocked on SOW-0035/0036/0037/0039 still not being marked `completed` and moved to `done/`, and on this SOW still saying M6 review was pending before this paragraph was added.
   - `minimax`: `NOT PRODUCTION GRADE`, lifecycle-only. It found the implementation production-grade and blocked only on SOW-0035/0036/0037 still being `current/paused`, SOW-0039 still `in-progress`, and `Outcome`/`Lessons Extracted` still pending.
+- 2026-06-01 final close-gate review after rebase, SDK v0.4.0, SOW-0045, and local close-gate validation:
+  - `glm`: found one real blocker: RPM `%files plugin-go` did not list the new `snmp-trap-profile-gen` binary even though CMake installs it into `plugins.d`. Fixed in `netdata.spec.in` by adding `%{_libexecdir}/%{name}/plugins.d/snmp-trap-profile-gen`. Also noted listener read errors are silently swallowed; tracked as `.agents/sow/pending/SOW-0051-20260601-snmp-traps-listener-read-error-observability.md`.
+  - `qwen`: `PRODUCTION GRADE`. Found no blockers; listed only residual non-blocking risks already documented or tracked.
+  - `kimi`: `PRODUCTION GRADE`. Found no blockers; listed only cosmetic code-quality notes and accepted automated validation, packaging, service, docs, security, and performance evidence.
+  - `minimax`: no usable final review output; it started a read-only review but stopped with an incomplete status summary, so no findings are accepted from that run.
 
 Same-failure scan:
 
@@ -737,24 +752,31 @@ Artifact maintenance gate:
 - Specs: `netdata.md`, ADR-0001, SOW-0032 closeout, comparative analysis, and comparison pointer updated.
 - End-user/operator docs: collector generated docs/README and `tools/snmp-traps-profile-gen/README.md` updated for trap listener and custom MIB workflow.
 - End-user/operator skills: new `docs/netdata-ai/skills/query-snmp-traps/` plus `.agents/skills/query-snmp-traps` symlink.
-- SOW lifecycle: SOW-0039 moved from pending to current; SOW-0032 moved current to done; SOW-0035 remains current/paused until final installed-path validation and final close.
+- SOW lifecycle: SOW-0039 moved from pending to current; SOW-0032 moved current to done earlier; SOW-0035, SOW-0036, SOW-0037, SOW-0039, and SOW-0045 are completed and moved to `.agents/sow/done/` in the final closeout commit. Follow-up work is represented by pending SOW-0046 through SOW-0051.
 
 ## Outcome
 
-Pending.
+Completed.
+
+The SNMP traps feature branch is merge-ready from the SOW perspective after the final close-gate repair. The branch now includes profile-backed trap ingestion in Go, creation-time failure surfacing for bind/journal/profile/config failures, shared lazy profile loading across listeners, SNMPv1/v2c/v3 and INFORM support, journal persistence through SDK `go/v0.4.0`, optional enrichment/dedup/profile reload/operator metrics, health alerts, packaging/service capability support for UDP/162, generated integration docs, default systemd-journal trap facets, a public query skill, and performance validation from packet decode through journal persistence.
 
 ## Lessons Extracted
 
-Pending.
+- Collector consistency has to close as a bundle. Runtime code, config schema, stock config, health alerts, metadata, taxonomy, generated docs, public skills, packaging, and SOW lifecycle all have to be checked together for a collector this large.
+- The final meaningful risk was packaging, not collector logic: CMake installed `snmp-trap-profile-gen`, but RPM packaging needed an explicit `%files` entry.
+- Full packet-to-journal benchmarks are the right performance evidence for this feature. Direct SDK writer benchmarks are useful for attribution, but they are not ingestion throughput.
+- Real-use validation gaps that require external environment state should be tracked as explicit lab follow-up SOWs, not hidden in completed SOW text.
 
 ## Followup
 
-Tracked items to schedule after SOW-0039 closes:
+Tracked follow-up SOWs:
 
-- **Align NetFlow plugin retention default with the trap plugin's intentional deviation** (spec §11): NetFlow currently defaults `duration_of_journal_files` to `7d`; the trap plugin uses `null` (size-only eviction) because trap forensic data should not age out by time alone. Create a follow-up SOW to update NetFlow's `default_retention_duration_of_journal_files()` in `src/crates/netflow-plugin/src/plugin_config/defaults.rs` to `null` so the two plugins agree on the size-only default. Coordinate with NetFlow maintainers.
-- **`display_hint` rendering for varbinds**: the field is documented as reserved-future in `profile-format.md`. When the plugin renderer is taught to honor `display_hint` (MAC, IPv4, custom formatters), the extractor must learn to pull `DISPLAY-HINT` from TEXTUAL-CONVENTION definitions in the same regeneration cycle. Track as a post-0039 enhancement.
-- **`decode_error_summary` report type**: `TRAP_REPORT_TYPE` enum reserves this slot per §11 but no SOW in the 5-SOW lineup implements it. When decode-error rates become operator-visible enough to warrant batched summary entries (analogous to the dedup summary), open a follow-up SOW.
-- **`dimension_from_varbind` cardinality table**: SOW-0037 M4 rejects unbounded-cardinality varbinds at config load. The reference cardinality table (which varbind types are bounded vs unbounded) needs an authoritative source — likely embedded in the profile schema or shipped as a separate `varbind-cardinality.yaml`. Open a follow-up SOW.
+- `.agents/sow/pending/SOW-0046-20260601-snmp-traps-real-use-validation-lab.md`: real-device/protocol-simulator v3 INFORM restart validation, signed-in Logs UI facet validation, and co-located SNMP polling enrichment validation.
+- `.agents/sow/pending/SOW-0047-20260601-netflow-retention-default-alignment.md`: align NetFlow plugin retention default with the trap plugin's size-only default.
+- `.agents/sow/pending/SOW-0048-20260601-snmp-traps-display-hint-rendering.md`: implement `display_hint` rendering for varbinds and extractor support for `DISPLAY-HINT`.
+- `.agents/sow/pending/SOW-0049-20260601-snmp-traps-decode-error-summary.md`: implement `decode_error_summary` report entries if decode-error rates justify summary journal rows.
+- `.agents/sow/pending/SOW-0050-20260601-snmp-traps-varbind-cardinality-table.md`: define the authoritative bounded/unbounded varbind cardinality table for `dimension_from_varbind`.
+- `.agents/sow/pending/SOW-0051-20260601-snmp-traps-listener-read-error-observability.md`: add listener read-error visibility for persistent UDP read failures.
 
 ## Regression Log
 

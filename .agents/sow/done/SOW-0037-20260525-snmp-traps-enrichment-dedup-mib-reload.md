@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: paused
+Status: completed
 
-Sub-state: implementation-complete / paused as of 2026-05-27 after M1-M4 landed on the feature branch. Reverse-DNS decision resolved on 2026-05-26: disabled by default, enabled explicitly in job configuration, never a mandatory hot-path dependency. NOT independently mergeable - merge gate is SOW-0039.
+Sub-state: completed on 2026-06-01 as part of the SOW-0039 final close gate. M1-M4 landed on the feature branch, reverse DNS remains disabled by default and explicitly enabled per job, and final collector consistency/merge readiness was closed through SOW-0039.
 
 ## Requirements
 
@@ -341,7 +341,7 @@ Acceptance criteria evidence: M1 enrichment implemented and tested. `_HOSTNAME` 
 
 Tests or equivalent validation: 24 focused trap enrichment tests, 12 focused dedup tests, 4 device-registry tests, 5 topology trap-enrichment tests, enriched packet-template rendering coverage, SNMP-over-topology-over-reverse-DNS priority coverage, topology-before-reverse-DNS packet-path coverage, listener-vnode omission coverage, dedup packet-path suppression/health-counter/write-rollback coverage, and template `_HOSTNAME` SourceUDPPeer fallback coverage pass. Full snmp_traps, snmp_topology, snmp, and ddsnmp suites pass. Race detector clean on snmp_traps and snmp_topology. go vet clean. go build clean. git diff --check clean. SOW audit clean except pre-existing skill-classification warnings.
 
-Real-use evidence: pending (requires co-located SNMP polling collector to populate DeviceRegistry).
+Real-use evidence: enrichment priority and topology fallback are covered by focused unit tests across SNMP registry, topology IP state, optional reverse DNS, and source-IP fallback. Co-located SNMP polling plus trap receipt on a live node remains useful lab evidence and is tracked in `.agents/sow/pending/SOW-0046-20260601-snmp-traps-real-use-validation-lab.md`.
 
 Reviewer findings:
 - First review round received from glm, kimi, and qwen. Minimax session was no longer attached before completion; the next review round will rerun minimax with the same full scope.
@@ -554,7 +554,7 @@ Implementation completed. Changes:
 
 ## Outcome
 
-M1-M4 implementation is complete on the feature branch. SOW-0037 remains current/paused instead of moved to `done/` because the branch is explicitly not independently mergeable until SOW-0039 finishes the collector consistency bundle.
+M1-M4 implementation is complete and the collector consistency bundle has finished in SOW-0039. SOW-0037 is completed and moved to `.agents/sow/done/` with the final closeout.
 
 ## Lessons Extracted
 

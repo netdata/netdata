@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: paused
+Status: completed
 
-Sub-state: activated on 2026-05-26 after SOW-0035 reached implementation-complete state on the feature branch. Implementation and validation for the SOW-0036 feature-branch slice are complete through pass 10. Terminal completion is intentionally deferred to SOW-0039 because SOW-0035 through SOW-0039 are not independently mergeable and close together at the final collector-consistency and merge gate. Review cadence has been tightened per user decision: external reviewers run on meaningful batches, high-risk changes, and close gates, not on tiny local fixes.
+Sub-state: completed on 2026-06-01 as part of the SOW-0039 final close gate. Implementation and validation for the SOW-0036 feature-branch slice are complete through pass 10; final review classified the remaining real-device v3 INFORM restart check as a tracked lab follow-up, not a merge blocker.
 
 ## Requirements
 
@@ -542,7 +542,7 @@ Acceptance criteria evidence: M1-M4 implemented per execution log. M1 v3 INFORM 
 
 Tests or equivalent validation: focused and broader go test suites, race detector, go vet, schema validation, diff check, and SOW audit pass after pass 10.
 
-Real-use evidence: pending — v3 INFORM persistence must be tested against a real device or protocol simulator across plugin restart before merge gate. Synthetic v3 noAuth, SHA-2 auth, AES privacy, INFORM engine ID split, authPriv Response, and local engine ID persistence paths are covered by unit tests.
+Real-use evidence: synthetic v3 noAuth, SHA-2 auth, AES privacy, INFORM engine ID split, authPriv Response, and local engine ID persistence paths are covered by unit tests; close-gate reviewers accepted this as sufficient for merge. Real-device or external protocol-simulator v3 INFORM restart validation remains valuable lab evidence and is tracked in `.agents/sow/pending/SOW-0046-20260601-snmp-traps-real-use-validation-lab.md`.
 
 Reviewer findings: rounds 1-9 from `glm`, `kimi`, `minimax`, and `qwen` recorded in the execution log. Pass 6 fixes the real pass-5 findings and rejects the false USM-overwrite finding with GoSNMP fork evidence. Pass 7 fixes the real pass-6 findings from `kimi`. Pass 8 fixes the real pass-7 version-policy classification finding from `kimi`. Pass 9 fixes the real pass-8 mixed-version decode coverage gap from `kimi`. Pass 10 fixes the real pass-9 operator-label validation mismatch from `kimi`. Per user review-cadence decision, the next external review should run on a larger batch or close/commit gate, not on the isolated pass-10 label-validation fix.
 
@@ -554,8 +554,8 @@ Artifact maintenance gate:
 - AGENTS.md: no changes needed
 - Runtime project skills: project-snmp-trap-profiles-authoring still authoritative; no updates needed
 - Specs: `.agents/sow/specs/snmp-traps/netdata.md` updated for invalid v3 USM passphrase creation-time failures, current community allowlist behavior, optional/generated `local_engine_id`, v3 Trap sender engine ID vs v3 INFORM receiver-local engine ID semantics, and creation-time state-file failure behavior.
-- End-user docs: deferred to SOW-0039
-- SOW lifecycle: SOW-0036 paused/implementation-complete; SOW-0035 paused; SOW-0037, SOW-0038, SOW-0039 pending. SOW-0038 updated to track the v3 INFORM receiver-local engine ID Report responder gap.
+- End-user docs: implemented through SOW-0039 generated collector docs and public `query-snmp-traps` skill.
+- SOW lifecycle: SOW-0036 completed and moved to `.agents/sow/done/` together with SOW-0035, SOW-0037, SOW-0039, and SOW-0045 in the final closeout commit.
 
 ## Outcome
 

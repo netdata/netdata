@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: in-progress
+Status: completed
 
-Sub-state: Implementation and local validation complete; pending final review/commit.
+Sub-state: completed on 2026-06-01. Implementation, local validation, commit, push, and final SOW-0039 close-gate review are complete.
 
 ## Requirements
 
@@ -208,7 +208,11 @@ Real-use evidence:
 
 Reviewer findings:
 
-- External reviewers were not run for this local optimization pass. The user previously asked to stop stalling on reviewer rounds and work alone until a whole SOW is ready.
+- Final SOW-0039 close-gate review covered this SOW together with SOW-0035, SOW-0036, SOW-0037, and SOW-0039.
+- `qwen` found no blockers and accepted the SOW-0045 performance evidence as sufficient.
+- `glm` found no SOW-0045 performance blocker; its only close blocker was an RPM file-list gap for `snmp-trap-profile-gen`, fixed in the SOW-0039 closeout.
+- `kimi` found no blockers and listed only cosmetic code-quality notes.
+- `minimax` did not produce a usable final review after starting a read-only review, so it is recorded as no final output.
 
 Same-failure scan:
 
@@ -225,7 +229,7 @@ Artifact maintenance gate:
 - Specs: updated SNMP trap design/spec evidence and ADR notes to record the new measured performance and hot writer boundary.
 - End-user/operator docs: no update needed; no configuration, workflow, field, or operator-visible behavior changed.
 - End-user/operator skills: no update needed; trap query workflow and fields are unchanged.
-- SOW lifecycle: this SOW remains current/in-progress until final review/commit; no deferred work is hidden.
+- SOW lifecycle: this SOW is completed and moved to `.agents/sow/done/` with the final closeout. No required deferred work is hidden.
 
 Specs update:
 

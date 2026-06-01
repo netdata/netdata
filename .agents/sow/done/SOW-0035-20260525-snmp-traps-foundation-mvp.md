@@ -2,9 +2,9 @@
 
 ## Status
 
-Status: paused
+Status: completed
 
-Sub-state: activated on 2026-05-25. Implementation and validation for the SOW-0035 feature-branch slice are complete and pushed in commit `38964171435f`. Terminal completion is intentionally deferred to SOW-0039 because SOW-0035 through SOW-0039 are not independently mergeable and close together at the final collector-consistency and merge gate. Reopened on 2026-05-27 for a test-isolation repair after local runtime inspection found trap test artifacts under `/var/cache/netdata/traps/`; the repair is implemented and validated, and the SOW is paused again pending SOW-0039. The user has fixed the implementation language to Go and clarified the listener/profile lifecycle contract. Implementation is delegated primarily to `deepseek/deepseek-v4-pro`; remaining reviews are delegated to `glm`, `kimi`, `minimax`, and `qwen` after `mimo` was removed from the reviewer pool due to quota exhaustion. The coordinating assistant remains responsible for architecture, direct edits, unblocking, integration, validation, and final quality.
+Sub-state: completed on 2026-06-01 as part of the SOW-0039 final close gate. The foundation/MVP feature-branch slice is implemented, validated, and no longer independently paused; final collector consistency, docs, facets, performance, and follow-up mapping were closed through SOW-0039 and SOW-0045.
 
 ## Requirements
 
@@ -873,10 +873,10 @@ Implementation slice complete on the feature branch, including creation-time pre
 
 ## Followup
 
-- SOW-0036: self-metrics and full error-counter universe, including decode failures, community/version drops, listener read errors, writer queue pressure, unknown OIDs, and sanitized-field counters.
-- SOW-0037: hot reload / per-generation profile holder accounting beyond the single-generation SOW-0035 cache.
-- SOW-0039: final merge gate must re-check SDK append/drain throughput and decide whether the SDK SOW-0009 optimization is required before merge.
-- SDK repository pending SOW-0009 (`systemd-journal-sdk/.agents/sow/pending/SOW-0009-20260523-benchmark-profile-optimize.md`): benchmark/profile/optimize the SDK writers using the deterministic ingestion corpus.
+- Implemented in SOW-0036: self-metrics and the full error-counter universe for decode failures, community/version drops, writer queue pressure, unknown OIDs, sanitized-field counters, and related operational counters.
+- Implemented in SOW-0037: hot reload and per-generation shared profile holder accounting.
+- Implemented in SOW-0039/SOW-0045: final merge-gate validation, SDK `go/v0.4.0` integration, and full packet-to-journal re-benchmarking.
+- Tracked in `.agents/sow/pending/SOW-0051-20260601-snmp-traps-listener-read-error-observability.md`: listener read-error observability, the remaining reviewer-noted runtime visibility gap.
 
 ## Test Isolation Repair - 2026-05-27
 
