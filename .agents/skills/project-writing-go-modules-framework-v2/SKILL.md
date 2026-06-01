@@ -88,8 +88,9 @@ source files for evidence.
   explicit breaking decision.
 - Migrations MUST keep old YAML/JSON field names. Add new config as opt-in when
   cardinality, cost, or user-visible identity could surprise existing users.
-- `metadata.yaml`, `config_schema.json`, stock config, health alerts, and
-  README MUST stay synchronized with code.
+- Collector integration artifacts MUST follow
+  `.agents/skills/integrations-lifecycle/consistency.md`; do not preserve a
+  partial local artifact checklist in V2 collector work.
 - MUST NOT log raw secrets, DSNs, bearer tokens, or URLs with embedded
   credentials.
 

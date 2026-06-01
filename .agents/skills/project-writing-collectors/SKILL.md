@@ -176,7 +176,11 @@ Start from `src/go/plugin/go.d/docs/how-to-write-a-collector.md`.
 
 ### 2.6 Configuration discipline
 
-Tunables live in `config_schema.json` (DYNCFG schema rendered by the dashboard) and `metadata.yaml` (integration page) — both MUST be complete and mutually consistent. The stock `.conf` shows safe, representative examples — not necessarily every tunable.
+Public tunables are part of the collector consistency contract. When a config
+option is added, removed, renamed, or given a new default, you MUST follow
+`.agents/skills/integrations-lifecycle/consistency.md`; you MUST NOT update
+only the Go struct or only the docs. The stock `.conf` shows safe,
+representative examples -- not necessarily every tunable.
 
 Collectors MUST NOT hardcode timeouts, paths, ports, or credentials. Stock
 config and schema MUST NOT contradict each other.
@@ -195,20 +199,14 @@ When a generated file looks wrong, fix the source of truth (`metadata.yaml`, `co
 
 ### 2.8 Documentation/configuration consistency
 
-A new or modified collector ships these in sync:
+Collector consistency has one detailed checklist:
+`.agents/skills/integrations-lifecycle/consistency.md`. Treat code,
+integration metadata, taxonomy, config, stock examples, alerts, and generated
+documentation as one unit, but do not maintain a second artifact matrix here.
 
-- the code
-- `metadata.yaml` — drives integration pages, in-app help, alert references
-- `taxonomy.yaml` — places emitted chart contexts in the dashboard TOC
-  with an ordered `items:` tree; structural strings/`owned_context`
-  entries own contexts, widgets reference them
-- `config_schema.json` — DYNCFG schema rendered by the dashboard
-- stock `.conf` — safe, representative example
-- `health.d/*.conf` — alert templates bound to chart `context`
-- `README.md` — concise narrative
-- if exposing a Function: response shape conforming to `src/plugins.d/FUNCTION_UI_SCHEMA.json`
-
-Treat them as one unit. Change a unit in code → update `metadata.yaml` in the same commit. Add or rename a chart context → update `taxonomy.yaml` or a declared dynamic selector. Add a config knob → update schema, stock conf, and metadata together.
+If a collector exposes a Function, its response shape MUST also conform to the
+relevant Function schema, such as `src/plugins.d/FUNCTION_UI_SCHEMA.json` or
+`src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`.
 
 ### 2.9 Cross-plugin enrichment via netipc
 
@@ -309,22 +307,19 @@ A collector is *production-quality* when it satisfies all of:
 4. Are gaps preserved (no zero defaults for missing values)?
 5. Does the collection cycle allocate, log per iteration, or reconnect every cycle?
 6. Do error logs answer *what operation, what target, what was expected vs observed*?
-7. Are config knobs in `config_schema.json` and `metadata.yaml`? Does the stock `.conf` show a representative example?
-8. Does `taxonomy.yaml` cover every emitted chart context, or are dynamic contexts declared with `metrics.dynamic_context_prefixes` / `metrics.dynamic_collect_plugins`?
-9. Are alerts present in `health.d/`?
-10. Is `README.md` updated? (Not the generated `integrations/<name>.md`.)
-11. For remote targets: is vnode wiring done?
-12. For SNMP: did I extend a profile rather than hardcode OIDs?
-13. For statsd / OTEL: did I document and ship the operator-side config (synthetic_charts file or OTEL mapping YAML)?
-14. For Prometheus scraping: are selectors correct? Are untyped metrics handled?
-15. For cross-plugin enrichment: am I using netipc?
-16. For Functions: does the response conform to one of the six shapes? Non-blocking with respect to the collection loop? Schema-validated?
-17. For ibm.d only: did I run `go generate` after touching `contexts.yaml`?
-18. For new go.d modules: are all four wiring steps done (init.go, go.d.conf, stock conf, README)?
-19. Tests: real fixtures or real instances? Would they catch the bug I just fixed?
-20. High-cardinality labels / instances: bounded by `max_*` + selectors? Aggregated "Other" bucket or upstream-supplied aggregation present where applicable?
-21. Entities that can go away: obsoleted when the collector knows they're gone? Anti-flip-flop window applied where churn is expected?
-22. Production-quality criteria above — would this collector survive hours of target outage without leaks or log floods?
+7. Did I run the collector consistency checklist in `.agents/skills/integrations-lifecycle/consistency.md`, including the rule that generated integration pages are not hand-authored sources?
+8. For remote targets: is vnode wiring done?
+9. For SNMP: did I extend a profile rather than hardcode OIDs?
+10. For statsd / OTEL: did I document and ship the operator-side config (synthetic_charts file or OTEL mapping YAML)?
+11. For Prometheus scraping: are selectors correct? Are untyped metrics handled?
+12. For cross-plugin enrichment: am I using netipc?
+13. For Functions: does the response conform to one of the six shapes? Non-blocking with respect to the collection loop? Schema-validated?
+14. For ibm.d only: did I run `go generate` after touching `contexts.yaml`?
+15. For new go.d modules: are all four wiring steps done (init.go, go.d.conf, stock conf, README)?
+16. Tests: real fixtures or real instances? Would they catch the bug I just fixed?
+17. High-cardinality labels / instances: bounded by `max_*` + selectors? Aggregated "Other" bucket or upstream-supplied aggregation present where applicable?
+18. Entities that can go away: obsoleted when the collector knows they're gone? Anti-flip-flop window applied where churn is expected?
+19. Production-quality criteria above — would this collector survive hours of target outage without leaks or log floods?
 
 ## 5. Plugins and frameworks — what's available and where
 

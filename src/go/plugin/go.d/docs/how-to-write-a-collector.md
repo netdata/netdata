@@ -37,9 +37,9 @@ Do the design work first:
    interactive live/snapshot views; metrics are time series. New topology
    producers MUST use `src/go/pkg/topology/v1` and validate against
    `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`.
-7. Plan the full integration artifact set: code, `metadata.yaml`,
-   `taxonomy.yaml`, `config_schema.json`, stock `.conf`, health alerts when
-   needed, generated integration page, and README symlink.
+7. Plan collector consistency using
+   `.agents/skills/integrations-lifecycle/consistency.md`. Generated
+   integration pages and README symlinks are outputs, not hand-authored sources.
 8. Plan the first coherent batch and its boundaries. At each boundary, you MUST
    re-check whether new work has drifted out of scope; defer it or land it
    independently before continuing.

@@ -50,10 +50,9 @@ topology, tests, specs, or skills.
 - New go.d collector guidance MUST NOT teach or copy the V1
   `Collect() map[string]int64` pattern for new
   collectors.
-- The full collector artifact set MUST stay synchronized: code, `metadata.yaml`,
-  `taxonomy.yaml`, `config_schema.json`, stock `.conf`, health alerts, and
-  generated/symlinked README content. The detailed checklist lives in
-  `.agents/skills/integrations-lifecycle/consistency.md`.
+- Collector runtime, metric, chart, config, alert, taxonomy, and documentation
+  changes MUST follow the repository collector consistency policy. The detailed
+  checklist lives in `.agents/skills/integrations-lifecycle/consistency.md`.
 - Public config options SHOULD be added only when they represent a real
   operator decision. Implementation tuning such as page sizes, scan windows,
   retry limits, and cadence SHOULD use internal constants unless user control is
