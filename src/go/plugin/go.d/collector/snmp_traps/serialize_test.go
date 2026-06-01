@@ -3,6 +3,7 @@
 package snmp_traps
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -335,6 +336,100 @@ func TestSerializeToJournalFieldsLabelsSorted(t *testing.T) {
 	}
 }
 
+func TestJournalHotSerializerMatchesSerializeToJournalFields(t *testing.T) {
+	cases := map[string]*TrapEntry{
+		"Trap": {
+			JobName:               "local",
+			ReportType:            ReportTypeTrap,
+			ReceivedRealtimeUsec:  1000000,
+			ReceivedMonotonicUsec: 1000,
+			TrapOID:               "1.3.6.1.6.3.1.1.5.3",
+			TrapName:              "IF-MIB::linkDown",
+			Category:              "state_change",
+			Severity:              "warning",
+			Message:               "linkDown on interface eth0",
+			SourceIP:              "10.0.0.1",
+			SourceUDPPeer:         "10.0.0.1",
+			DeviceHostname:        "core-sw-01",
+			DeviceVendor:          "cisco",
+			PduType:               PduTypeTrap,
+			SnmpVersion:           SnmpVersionV2c,
+			Labels:                map[string]string{"z_key": "z_val", "a_key": "a_val"},
+			Varbinds: []VarbindValue{
+				{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
+				{OID: "1.3.6.1.2.1.2.2.1.2", Name: "ifIndex", Type: "OctetString", Value: "eth0"},
+			},
+		},
+		"DedupSummary": {
+			JobName:               "local",
+			ReportType:            ReportTypeDedupSummary,
+			ReceivedRealtimeUsec:  1000000,
+			ReceivedMonotonicUsec: 1000,
+			Severity:              "notice",
+			Message:               "summary",
+			SummaryCounts: &DedupSummary{
+				TotalSuppressed: 12,
+				Fingerprints:    2,
+				PeriodSec:       60,
+				ByTrap:          map[string]int64{"1.3.6.1.6.3.1.1.5.3": 12},
+			},
+		},
+		"Sanitized": {
+			JobName:               "local",
+			ReportType:            ReportTypeTrap,
+			ReceivedRealtimeUsec:  1000000,
+			ReceivedMonotonicUsec: 1000,
+			TrapOID:               "1.3.6.1.6.3.1.1.5.3",
+			Severity:              "warning",
+			Message:               "line1\nline2",
+			SourceIP:              "10.0.0.1",
+			PduType:               PduTypeTrap,
+			SnmpVersion:           SnmpVersionV2c,
+		},
+		"JSONEscapingAndValueTypes": {
+			JobName:               "local",
+			ReportType:            ReportTypeTrap,
+			ReceivedRealtimeUsec:  1000000,
+			ReceivedMonotonicUsec: 1000,
+			TrapOID:               "1.3.6.1.6.3.1.1.5.3",
+			Severity:              "warning",
+			Message:               "json values",
+			SourceIP:              "10.0.0.1",
+			PduType:               PduTypeTrap,
+			SnmpVersion:           SnmpVersionV2c,
+			Varbinds: []VarbindValue{
+				{OID: "1.3.6.1.2.1.2.2.1.1", Name: `quote"\control`, Type: "OctetString", Value: "a<b>&\"\n\u2028\u2029" + string([]byte{0xff})},
+				{OID: "1.3.6.1.2.1.2.2.1.2", Name: "bytes", Type: "OctetString", Value: []byte{0, 15, 255}},
+				{OID: "1.3.6.1.2.1.2.2.1.3", Name: "float", Type: "OpaqueFloat", Value: float64(1.25)},
+				{OID: "1.3.6.1.2.1.2.2.1.4", Name: "bool", Type: "BOOLEAN", Value: true},
+				{OID: "1.3.6.1.2.1.2.2.1.5", Name: "nil", Type: "Null", Value: nil},
+			},
+		},
+	}
+
+	for name, entry := range cases {
+		t.Run(name, func(t *testing.T) {
+			fields, err := serializeToJournalFields(entry)
+			if err != nil {
+				t.Fatalf("serializeToJournalFields: %v", err)
+			}
+
+			var s journalHotSerializer
+			payloads, sanitizedFields, err := s.serialize(entry)
+			if err != nil {
+				t.Fatalf("journalHotSerializer.serialize: %v", err)
+			}
+
+			if sanitizedFields != sanitizedFieldCount(fields) {
+				t.Fatalf("sanitized fields = %d, want %d", sanitizedFields, sanitizedFieldCount(fields))
+			}
+			if got, want := rawPayloadsToMap(payloads), fieldsToMap(fields); !mapsEqual(got, want) {
+				t.Fatalf("hot payload map mismatch\ngot:  %#v\nwant: %#v", got, want)
+			}
+		})
+	}
+}
+
 func assertField(t *testing.T, fieldMap map[string]string, name, expected string) {
 	t.Helper()
 	if got, ok := fieldMap[name]; !ok {
@@ -357,4 +452,28 @@ func fieldsToMap(fields []JournalField) map[string]string {
 		m[f.Name] = string(f.Value)
 	}
 	return m
+}
+
+func rawPayloadsToMap(payloads [][]byte) map[string]string {
+	m := make(map[string]string, len(payloads))
+	for _, p := range payloads {
+		name, value, ok := bytes.Cut(p, []byte{'='})
+		if !ok {
+			continue
+		}
+		m[string(name)] = string(value)
+	}
+	return m
+}
+
+func mapsEqual(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, av := range a {
+		if b[k] != av {
+			return false
+		}
+	}
+	return true
 }

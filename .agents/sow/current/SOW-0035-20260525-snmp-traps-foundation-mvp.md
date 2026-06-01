@@ -177,7 +177,7 @@ Reviewers: 3 or more rotating from `glm`, `kimi`, `minimax`, and `qwen` for rema
   - One Go writer/backend adapter per job, configured with root `/var/cache/netdata/traps/{job_name}/`; SDK appends the machine-id child directory, so `journalctl --directory` validation uses `/var/cache/netdata/traps/{job_name}/{machine_id}/`.
   - Journal directory creation/open/writability and writer initialization happen during job creation, before DynCfg apply succeeds.
   - Boot ID and machine ID are read and validated at writer creation; any missing/malformed value is a coded job-creation failure, not a runtime warning.
-  - Journal format, writer lock acquisition, rotation, retention, active-file indexing, and existing-chain validation/reopen are delegated to `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.3.0` via `journal.NewLog`.
+  - Journal format, writer lock acquisition, rotation, retention, active-file indexing, and existing-chain validation/reopen are delegated to `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.4.0` via `journal.NewLog`.
   - The adapter uses `LogOpenEager` and `LogIdentityStrict` so resource and identity failures are detected at job creation time.
   - Field universe per spec §11: standard systemd fields (`MESSAGE`, `PRIORITY`, `SYSLOG_IDENTIFIER`=job_name, `_HOSTNAME`=source device hostname from enrichment or `SourceIP` fallback, `_MACHINE_ID`=agent/system machine identity exposed by the journal file); existing Netdata fields (`ND_LOG_SOURCE`=snmp-trap, `ND_NIDL_NODE`=source-device vnode); plugin-controlled `TRAP_*` fields (`TRAP_REPORT_TYPE`, `TRAP_OID`, `TRAP_NAME`, `TRAP_CATEGORY`, `TRAP_SEVERITY`, `TRAP_PDU_TYPE`, `TRAP_VERSION`, `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, `TRAP_DEVICE_VENDOR`, `TRAP_INTERFACE`/`TRAP_NEIGHBORS` may be empty pre-SOW-0037 enrichment, `TRAP_JSON`); profile-defined and operator-defined labels under `TRAP_TAG_*` namespace.
 - Per-field CWE-117 accounting: fields containing newlines, NUL, DEL, unsafe control bytes, or invalid UTF-8 increment the future `snmp.trap.errors.sanitized` counter. The SDK stores field values as journal DATA objects, so embedded newlines cannot inject additional journal fields.
@@ -929,18 +929,50 @@ Current performance interpretation:
 
 - Raw SDK journal append is not the full pipeline.
 - Queued journal output from prebuilt `TrapEntry` is not the full pipeline.
-- The current full packet-to-journal path on this workstation is approximately 55K-75K persisted traps/sec for the synthetic v2c profile-hit case, depending on run length and local I/O variability.
-- The hot-path allocation cost is dominated by full ingestion work, not only the SDK writer, and needs a separate optimization pass if the merge target is materially above this range.
+- After the SDK v0.4.0 update and SOW-0045 local hot-path optimization, the current full packet-to-journal path on this workstation is approximately 62.5K-72.6K persisted traps/sec for the synthetic v2c profile-hit case in the 30,000-packet runs. A longer 100,000-packet run measured 63.3K-66.0K persisted traps/sec.
+- The earlier SDK v0.3.0 full-pipeline evidence measured approximately 55K-75K persisted traps/sec, depending on run length and local I/O variability.
+- The SDK v0.4.0 direct `JournalWriter.WriteEntry()` benchmark, without the trap writer queue/full packet path, measured approximately 166K-184K entries/sec in the latest SOW-0045 validation pass.
+- The previous per-entry journal-field/JSON allocation pattern was optimized in SOW-0045. Remaining allocation cost is dominated by packet decode, varbind conversion, and SDK metadata append.
 
-Committed v0.3.0 re-check in SOW-0039:
+Historical committed v0.3.0 re-check in SOW-0039:
 
-- The branch now pins `github.com/netdata/systemd-journal-sdk/go v0.3.0` in `src/go/go.mod`.
+- At the time of this re-check, the branch pinned `github.com/netdata/systemd-journal-sdk/go v0.3.0` in `src/go/go.mod`.
 - The full-pipeline benchmark is committed as `BenchmarkFullPacketToJournal` in `src/go/plugin/go.d/collector/snmp_traps/benchmark_test.go`.
 - `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^BenchmarkFullPacketToJournal$' -benchmem -benchtime=30000x -count=3 -timeout 120s`
   - 30,000 packets/run: 16.97-18.54 us/op, 53.9K-58.9K packets/sec, 53.9K-58.9K persisted entries/sec, 1-5 dropped packets/run, 12,624-12,625 B/op, 206 allocs/op.
 - `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^BenchmarkFullPacketToJournal$' -benchmem -benchtime=100000x -count=3 -timeout 180s`
   - 100,000 packets/run: 16.18-16.55 us/op, 60.4K-61.8K packets/sec, 60.4K-61.8K persisted entries/sec, 1 dropped packet/run, 12,580-12,581 B/op, 206 allocs/op.
-- Current release-gate interpretation: the committed full packet-to-journal synthetic v2c profile-hit path is about 54K-62K persisted traps/sec on the workstation. This is acceptable for first-release merge if documented as measured local evidence, not a portable hardware guarantee.
+- Historical release-gate interpretation at SDK v0.3.0: the committed full packet-to-journal synthetic v2c profile-hit path was about 54K-62K persisted traps/sec on the workstation.
+
+Committed v0.4.0 update:
+
+- On 2026-05-31, the branch was updated to pin `github.com/netdata/systemd-journal-sdk/go v0.4.0` in `src/go/go.mod`.
+- The `go/v0.3.0..go/v0.4.0` SDK diff touches writer and reader internals, but the Netdata adapter's used public writer surface still compiles: `journal.NewLog`, `journal.LogConfig`, `journal.Options`, `journal.LogOpenEager`, `journal.LogIdentityStrict`, `journal.RotationPolicy`, `journal.RetentionPolicy`, `(*journal.Log).Append`, `Sync`, `Close`, `EnforceRetention`, `JournalDirectory`, and `ActivePath`.
+- `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 120s` passed.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^BenchmarkFullPacketToJournal$' -benchmem -benchtime=30000x -count=3 -timeout 120s`
+  - Final repeated 30,000-packet runs: 20.18-24.41 us/op, 41.0K-49.5K packets/sec, 41.0K-49.5K persisted entries/sec, 0-6 dropped packets/run, 11,587-11,590 B/op, 191-192 allocs/op.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^Benchmark(JournalTrapWriterDrain|JournalWriterWriteEntry)$' -benchmem -benchtime=30000x -count=3 -timeout 120s`
+  - Queued `JournalTrapWriterDrain`: 22.89-25.85 us/op, 38.7K-43.7K entries/sec, 3,242 B/op, 42 allocs/op.
+  - Direct `JournalWriterWriteEntry`: 5.25-5.62 us/op, 178K-191K entries/sec, 825 B/op, 5 allocs/op.
+- `go mod tidy -diff` — clean after applying the tidy module graph.
+- `git diff --check` — clean.
+- `./.agents/sow/audit.sh` — exit 0; existing non-project skill classification warnings remain unrelated to this SDK bump.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^BenchmarkFullPacketToJournal$' -benchmem -benchtime=30000x -count=3 -timeout 120s` repeated on 2026-06-01
+  - Pass 1: 26.29-32.75 us/op, 30.5K-38.0K persisted entries/sec, 0-2 dropped packets/run, 11,588-11,590 B/op, 192 allocs/op.
+  - Pass 2: 26.77-28.64 us/op, 34.9K-37.4K persisted entries/sec, 1-3 dropped packets/run, 11,588-11,589 B/op, 192 allocs/op.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^Benchmark(JournalTrapWriterDrain|JournalWriterWriteEntry)$' -benchmem -benchtime=30000x -count=3 -timeout 120s` repeated on 2026-06-01
+  - Queued `JournalTrapWriterDrain`: 15.48-19.20 us/op, 52.1K-64.6K entries/sec, 3,242 B/op, 42 allocs/op.
+  - Direct `JournalWriterWriteEntry`: 5.58-6.81 us/op, 147K-179K entries/sec, 825 B/op, 5 allocs/op.
+
+SOW-0045 local hot-path optimization:
+
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^Benchmark(TrapWriterWrite|JournalTrapWriterDrain|JournalWriterWriteEntry|FullPacketToJournal)$' -benchmem -benchtime=30000x -count=3 -timeout 120s`
+  - Queued `JournalTrapWriterDrain`: 13.47-16.15 us/op, 61.9K-74.2K entries/sec, 577 B/op, 7 allocs/op.
+  - Direct `JournalWriterWriteEntry`: 5.45-6.01 us/op, 166K-184K entries/sec, 825 B/op, 5 allocs/op.
+  - Full packet-to-journal: 13.78-16.01 us/op, 62.5K-72.6K persisted entries/sec, 0 drops, 5,202 B/op, 128 allocs/op.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^BenchmarkFullPacketToJournal$' -benchmem -benchtime=100000x -count=3 -timeout 180s`
+  - 100,000 packets/run: 15.16-15.81 us/op, 63.3K-66.0K persisted entries/sec, 0-1 drops/run, 5,200-5,201 B/op, 128 allocs/op.
+- Current release-gate interpretation after SOW-0045: the committed full packet-to-journal synthetic v2c profile-hit path is about 62K-73K persisted traps/sec on the workstation for repeated 30,000-packet runs and about 63K-66K on the longer 100,000-packet runs. This remains local benchmark evidence, not a portable hardware guarantee.
 
 ## Regression Log
 

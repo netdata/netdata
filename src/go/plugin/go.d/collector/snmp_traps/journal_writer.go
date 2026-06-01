@@ -161,6 +161,33 @@ func (w *JournalWriter) WriteEntry(fields []JournalField, realtimeUsec, monotoni
 	return nil
 }
 
+func (w *JournalWriter) WriteRawEntry(payloads [][]byte, sanitizedFields int, realtimeUsec, monotonicUsec int64) error {
+	if realtimeUsec < 0 || monotonicUsec < 0 {
+		return errNegativeTimestamp
+	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.log == nil {
+		return sdkjournal.ErrWriterClosed
+	}
+	err := w.log.AppendRaw(payloads, sdkjournal.EntryOptions{
+		RealtimeUsec:  uint64(realtimeUsec),
+		MonotonicUsec: uint64(monotonicUsec),
+	})
+	if err != nil {
+		return err
+	}
+	if sanitizedFields > 0 {
+		atomic.AddUint64(&w.sanitizedFields, uint64(sanitizedFields))
+	}
+	if activePath := w.log.ActivePath(); activePath != "" {
+		w.activePath = activePath
+	}
+	return nil
+}
+
 func (w *JournalWriter) SanitizedFields() uint64 {
 	return atomic.LoadUint64(&w.sanitizedFields)
 }

@@ -136,7 +136,7 @@ Reviewers: 3 rotating (group A: kimi/qwen/minimax).
 ### M6 — SOW-0032 closeout + final merge gate
 
 - Write `.agents/sow/specs/snmp-traps/comparison/comparative-analysis.md` synthesizing shipped behavior across SOW-0035–0039 vs the 16 Phase A cohort systems. Cite spec §16 cohort-win audit + each cohort system's spec doc.
-- Re-run the SNMP trap full packet-to-journal benchmark after the SDK benchmark/profile/optimize work is either completed or explicitly accepted as a tracked risk. SOW-0035's 2026-05-28 re-check with SDK `go/v0.3.0` measured about 55K-75K persisted traps/sec for the synthetic v2c profile-hit path on the workstation. The final merge gate must decide whether that full-ingestion throughput is acceptable for release, needs local hot-path optimization, or must wait for another SDK optimization.
+- Re-run the SNMP trap full packet-to-journal benchmark after each SDK bump or local hot-path change that can affect writer performance. SOW-0035's 2026-05-28 re-check with SDK `go/v0.3.0` measured about 55K-75K persisted traps/sec for the synthetic v2c profile-hit path on the workstation. The early 2026-06-01 `go/v0.4.0` repeat measured 30.5K-38.0K persisted traps/sec before local optimization. SOW-0045 then optimized the Netdata writer hot path and measured 62.5K-72.6K persisted traps/sec for 30,000-packet runs and 63.3K-66.0K for 100,000-packet runs.
 - Update SOW-0032 (`.agents/sow/current/SOW-0032-20260522-snmp-trap-comparative-analysis.md`) `Status: completed`; move to `.agents/sow/done/`.
 - Mark all five SOWs (0035-0039) `Status: completed`; move to `.agents/sow/done/`.
 - Final merge: single commit (or commit sequence per AGENTS.md "one-commit close" rule) lands all of SOW-0035–0039's work to `master` with the consistency bundle satisfying the CI gate.
@@ -555,7 +555,7 @@ Implementation:
 - Updated SOW-0032 to `Status: completed` and moved it from `.agents/sow/current/` to `.agents/sow/done/`.
 - Bumped the committed Go dependency to `github.com/netdata/systemd-journal-sdk/go v0.3.0` in `src/go/go.mod` and `src/go/go.sum`.
 - Added committed `BenchmarkFullPacketToJournal` to `src/go/plugin/go.d/collector/snmp_traps/benchmark_test.go`.
-- Updated `.agents/sow/specs/snmp-traps/netdata.md`, ADR-0001, and SOW-0035 to record SDK `go/v0.3.0` as the current integration version.
+- Updated `.agents/sow/specs/snmp-traps/netdata.md`, ADR-0001, and SOW-0035 to record SDK `go/v0.3.0` as the then-current integration version.
 
 Current OOB profile catalogue evidence:
 
@@ -572,10 +572,56 @@ Validation executed:
 - `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^BenchmarkFullPacketToJournal$' -benchmem -benchtime=100000x -count=3 -timeout 180s`
   - 100,000 packets/run: 16.18-16.55 us/op, 60.4K-61.8K packets/sec, 60.4K-61.8K persisted entries/sec, 1 dropped packet/run, 12,580-12,581 B/op, 206 allocs/op.
 
+### 2026-05-31 — SDK v0.4.0 alignment
+
+Implementation:
+
+- Bumped the committed Go dependency to `github.com/netdata/systemd-journal-sdk/go v0.4.0` in `src/go/go.mod` and `src/go/go.sum`.
+- Checked the SDK tag list (`go list -m -versions github.com/netdata/systemd-journal-sdk/go`) and confirmed `v0.4.0` is published.
+- Scanned the local SDK tag diff from `go/v0.3.0` to `go/v0.4.0`; writer/reader internals changed, but the adapter's used writer API surface remained source-compatible.
+- Updated `.agents/sow/specs/snmp-traps/netdata.md`, ADR-0001, the comparative analysis, and SOW-0035 to record SDK `go/v0.4.0` as the current integration version.
+
+Validation executed:
+
+- `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 120s` — passed.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^BenchmarkFullPacketToJournal$' -benchmem -benchtime=30000x -count=3 -timeout 120s`
+  - Final repeated 30,000-packet runs: 20.18-24.41 us/op, 41.0K-49.5K packets/sec, 41.0K-49.5K persisted entries/sec, 0-6 dropped packets/run, 11,587-11,590 B/op, 191-192 allocs/op.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^Benchmark(JournalTrapWriterDrain|JournalWriterWriteEntry)$' -benchmem -benchtime=30000x -count=3 -timeout 120s`
+  - Queued `JournalTrapWriterDrain`: 22.89-25.85 us/op, 38.7K-43.7K entries/sec, 3,242 B/op, 42 allocs/op.
+  - Direct `JournalWriterWriteEntry`: 5.25-5.62 us/op, 178K-191K entries/sec, 825 B/op, 5 allocs/op.
+- `go mod tidy -diff` — clean after applying the tidy module graph.
+- `git diff --check` — clean.
+- `./.agents/sow/audit.sh` — exit 0; existing non-project skill classification warnings remain unrelated to this SDK bump.
+
+### 2026-06-01 — SDK v0.4.0 benchmark repeat
+
+Validation executed:
+
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^BenchmarkFullPacketToJournal$' -benchmem -benchtime=30000x -count=3 -timeout 120s`
+  - Pass 1: 26.29-32.75 us/op, 30.5K-38.0K persisted entries/sec, 0-2 dropped packets/run, 11,588-11,590 B/op, 192 allocs/op.
+  - Pass 2: 26.77-28.64 us/op, 34.9K-37.4K persisted entries/sec, 1-3 dropped packets/run, 11,588-11,589 B/op, 192 allocs/op.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^Benchmark(JournalTrapWriterDrain|JournalWriterWriteEntry)$' -benchmem -benchtime=30000x -count=3 -timeout 120s`
+  - Queued `JournalTrapWriterDrain`: 15.48-19.20 us/op, 52.1K-64.6K entries/sec, 3,242 B/op, 42 allocs/op.
+  - Direct `JournalWriterWriteEntry`: 5.58-6.81 us/op, 147K-179K entries/sec, 825 B/op, 5 allocs/op.
+
 Throughput gate decision:
 
-- The committed branch now measures about 54K-62K persisted traps/sec for the synthetic v2c profile-hit packet-to-journal path on the workstation.
-- This satisfies the first-release merge gate as local measured evidence, not as a portable hardware guarantee. Further throughput optimization can be post-merge unless a real-device or production-like workload exposes a lower bottleneck.
+- The early SDK v0.4.0 repeat exposed a local Netdata hot-path bottleneck and led to SOW-0045.
+- After SOW-0045, the committed branch measures about 62K-73K persisted traps/sec for the synthetic v2c profile-hit packet-to-journal path on the workstation for 30,000-packet runs, and about 63K-66K persisted traps/sec for 100,000-packet runs.
+- This satisfies the first-release merge gate as local measured evidence, not as a portable hardware guarantee. The remaining gap to direct SDK append is mostly SDK append/live publication plus packet decode/varbind conversion, not the previous per-entry journal-field/JSON allocation pattern.
+
+### 2026-06-01 — SOW-0045 local hot-path optimization
+
+Validation executed:
+
+- `go test ./plugin/go.d/collector/snmp_traps -run '^TestJournalHotSerializerMatchesSerializeToJournalFields$|^TestSerializeToJournalFields' -count=1 -timeout 120s` — passed.
+- `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 120s` — passed.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^Benchmark(TrapWriterWrite|JournalTrapWriterDrain|JournalWriterWriteEntry|FullPacketToJournal)$' -benchmem -benchtime=30000x -count=3 -timeout 120s`
+  - Queued `JournalTrapWriterDrain`: 13.47-16.15 us/op, 61.9K-74.2K entries/sec, 577 B/op, 7 allocs/op.
+  - Direct `JournalWriterWriteEntry`: 5.45-6.01 us/op, 166K-184K entries/sec, 825 B/op, 5 allocs/op.
+  - Full packet-to-journal: 13.78-16.01 us/op, 62.5K-72.6K persisted entries/sec, 0 drops, 5,202 B/op, 128 allocs/op.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^BenchmarkFullPacketToJournal$' -benchmem -benchtime=100000x -count=3 -timeout 180s`
+  - 100,000 packets/run: 15.16-15.81 us/op, 63.3K-66.0K persisted entries/sec, 0-1 drops/run, 5,200-5,201 B/op, 128 allocs/op.
 
 Installed-Agent validation:
 
@@ -623,7 +669,7 @@ Acceptance criteria evidence:
 - M4 public skill implemented at `docs/netdata-ai/skills/query-snmp-traps/` with `.agents/skills/query-snmp-traps` symlink and seeded how-tos.
 - M5 installed-helper custom-MIB workflow documented in generated collector docs, public skill how-to, and `tools/snmp-traps-profile-gen/README.md`.
 - M6 comparative closeout implemented: SOW-0032 is completed and moved to `.agents/sow/done/`; `comparison/comparative-analysis.md` and `comparison/comparison-matrix.md` exist.
-- SDK dependency truth corrected: `src/go/go.mod` pins `github.com/netdata/systemd-journal-sdk/go v0.3.0`.
+- SDK dependency truth corrected: `src/go/go.mod` pins `github.com/netdata/systemd-journal-sdk/go v0.4.0`.
 - Full packet-to-journal benchmark is committed and rerun against the committed dependency.
 
 Tests or equivalent validation:
@@ -632,6 +678,18 @@ Tests or equivalent validation:
 - `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 120s` — passed after SDK v0.3.0 bump and committed benchmark addition.
 - `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^BenchmarkFullPacketToJournal$' -benchmem -benchtime=30000x -count=3 -timeout 120s` — passed; 53.9K-58.9K persisted entries/sec.
 - `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^BenchmarkFullPacketToJournal$' -benchmem -benchtime=100000x -count=3 -timeout 180s` — passed; 60.4K-61.8K persisted entries/sec.
+- `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 120s` — passed after SDK v0.4.0 bump.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^BenchmarkFullPacketToJournal$' -benchmem -benchtime=30000x -count=3 -timeout 120s` — passed after SDK v0.4.0 bump and final repeated validation; 41.0K-49.5K persisted entries/sec.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^Benchmark(JournalTrapWriterDrain|JournalWriterWriteEntry)$' -benchmem -benchtime=30000x -count=3 -timeout 120s` — passed after SDK v0.4.0 bump; queued writer 38.7K-43.7K entries/sec, direct writer 178K-191K entries/sec.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^BenchmarkFullPacketToJournal$' -benchmem -benchtime=30000x -count=3 -timeout 120s` — passed on 2026-06-01 repeat; 30.5K-38.0K persisted entries/sec in pass 1 and 34.9K-37.4K in pass 2.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^Benchmark(JournalTrapWriterDrain|JournalWriterWriteEntry)$' -benchmem -benchtime=30000x -count=3 -timeout 120s` — passed on 2026-06-01 repeat; queued writer 52.1K-64.6K entries/sec, direct writer 147K-179K entries/sec.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^TestJournalHotSerializerMatchesSerializeToJournalFields$|^TestSerializeToJournalFields' -count=1 -timeout 120s` — passed after SOW-0045.
+- `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 120s` — passed after SOW-0045.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^Benchmark(TrapWriterWrite|JournalTrapWriterDrain|JournalWriterWriteEntry|FullPacketToJournal)$' -benchmem -benchtime=30000x -count=3 -timeout 120s` — passed after SOW-0045; full packet-to-journal 62.5K-72.6K persisted entries/sec, queued writer 61.9K-74.2K entries/sec.
+- `go test ./plugin/go.d/collector/snmp_traps -run '^$' -bench '^BenchmarkFullPacketToJournal$' -benchmem -benchtime=100000x -count=3 -timeout 180s` — passed after SOW-0045; 63.3K-66.0K persisted entries/sec.
+- `go mod tidy -diff` — clean after applying the tidy module graph.
+- `git diff --check` — clean.
+- `./.agents/sow/audit.sh` — exit 0; existing non-project skill classification warnings remain unrelated to this SDK bump.
 - `python3 integrations/gen_integrations.py` — passed.
 - `python3 integrations/gen_docs_integrations.py -c go.d.plugin/snmp_traps` — passed.
 - `python3 integrations/check_collector_taxonomy.py` — passed.
@@ -661,7 +719,7 @@ Reviewer findings:
 
 Same-failure scan:
 
-- Stale SDK-version scan found old `go/v0.1.0` references in `netdata.md`, ADR-0001, and SOW-0035; these were updated to `go/v0.3.0`.
+- Stale SDK-version scan found old current-version references in `netdata.md`, ADR-0001, SOW-0035, and comparative docs; these were updated to `go/v0.4.0` where they describe the current integration. Historical `go/v0.1.0` and `go/v0.3.0` evidence remains explicitly labeled as historical.
 - Stale invalid reload-command scan found no `{"method":"reload-profiles"}` docs; current docs use `snmp_traps:reload-profiles`.
 - SOW lifecycle audit found SOW-0032 stale in `current/`; it is now completed and moved to `done/`.
 - Profile catalogue count was recomputed from committed `catalogue.json`; comparative docs use the current 437 profile files / 3,131 MIB modules / 71,787 traps / 44,462 varbinds figures.

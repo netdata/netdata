@@ -17,17 +17,17 @@ func trapEntryFromPDU(jobName string, pdu *TrapPDU, td *TrapDef, realtimeUsec, m
 		SourceUDPPeer:         pdu.PeerIP,
 		PduType:               pdu.PduType,
 		SnmpVersion:           pdu.Version,
-		Varbinds:              make([]VarbindValue, 0, len(pdu.Varbinds)),
+		Varbinds:              pdu.Varbinds,
 	}
 
 	if td != nil {
 		entry.TrapName = td.Name
 		entry.Category = Category(td.Category)
 		entry.Severity = Severity(td.Severity)
-	}
 
-	for _, vb := range pdu.Varbinds {
-		entry.Varbinds = append(entry.Varbinds, resolve2TierVarbind(vb.OID, vb, td))
+		for i, vb := range entry.Varbinds {
+			entry.Varbinds[i] = resolve2TierVarbind(vb.OID, vb, td)
+		}
 	}
 
 	return entry

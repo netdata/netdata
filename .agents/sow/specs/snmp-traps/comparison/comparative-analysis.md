@@ -238,9 +238,14 @@ full topology-aware suppression engine.
 Current evidence:
 
 - In-memory packet path is much faster than the journal output path.
-- The committed full packet-to-journal benchmark with SDK `go/v0.3.0` measured
-  about 54K to 62K persisted traps/sec for synthetic v2c profile-hit traffic
-  on the workstation (`SOW-0035` execution log around benchmark evidence).
+- The committed full packet-to-journal benchmark with SDK `go/v0.4.0` and
+  SOW-0045 local writer hot-path optimization measured about 62.5K to 72.6K
+  persisted traps/sec for synthetic v2c profile-hit traffic on the workstation
+  for repeated 30,000-packet runs. The longer 100,000-packet run measured
+  about 63.3K to 66.0K persisted traps/sec. Historical `go/v0.3.0` evidence
+  measured about 54K to 62K persisted traps/sec for the committed benchmark;
+  the early `go/v0.4.0` pre-optimization repeat measured about 30.5K to
+  38.0K persisted traps/sec.
 - Narrow benchmark names in the committed tree include decode, packet path,
   multi-job, BER rejection, queued writer drain, and direct journal write.
 
@@ -248,8 +253,9 @@ Release interpretation:
 
 - The old unsupported claim "30K rows/sec per writer thread" is no longer the
   decision basis.
-- The final gate should cite the committed v0.3.0 dependency and committed
-  benchmark, not the earlier temporary overlay benchmark.
+- The final gate should cite the committed v0.4.0 dependency and committed
+  SOW-0045 benchmark, not the earlier temporary overlay benchmark or the
+  pre-optimization v0.4.0 repeat.
 - The benchmark is synthetic; real device mixes with many varbinds, v3 privacy,
   OTLP export, dedup, and slower storage can be lower.
 
@@ -292,8 +298,8 @@ These are not regressions. They are conscious first-release boundaries:
 Before closing SOW-0039 and the implementation SOWs, the branch must satisfy:
 
 1. **Dependency truth:** the committed Go dependency must be
-   `github.com/netdata/systemd-journal-sdk/go v0.3.0` or newer if the final
-   throughput evidence depends on v0.3.0 behavior.
+   `github.com/netdata/systemd-journal-sdk/go v0.4.0` or newer if the final
+   throughput evidence depends on newer SDK behavior.
 2. **Benchmark truth:** run a fresh trap benchmark batch against the committed
    dependency and record the result in SOW-0039. Do not cite temporary-module
    numbers as final branch evidence.

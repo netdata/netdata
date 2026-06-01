@@ -3,10 +3,14 @@
 package snmp_traps
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 var severityToPriority = map[Severity]string{
@@ -289,4 +293,332 @@ func sortedMapKeys(m map[string]string) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+type journalHotSerializer struct {
+	payloads        [][]byte
+	buf             []byte
+	labelKeys       []string
+	jsonEntries     []rawJSONVarbindEntry
+	seenJSONKeys    map[string]int
+	sanitizedFields int
+}
+
+func (s *journalHotSerializer) serialize(entry *TrapEntry) ([][]byte, int, error) {
+	s.reset()
+
+	if entry == nil {
+		return nil, 0, errNilEntry
+	}
+	if entry.JobName == "" {
+		return nil, 0, errMissingJobName
+	}
+	if entry.ReceivedRealtimeUsec < 0 || entry.ReceivedMonotonicUsec < 0 {
+		return nil, 0, errNegativeTimestamp
+	}
+
+	isDedupSummary := entry.ReportType == ReportTypeDedupSummary
+	isDecodeSummary := entry.ReportType == ReportTypeDecodeErrorSummary
+	isSummary := isDedupSummary || isDecodeSummary
+
+	if !isSummary {
+		if entry.TrapOID == "" {
+			return nil, 0, errMissingTrapOID
+		}
+		if entry.SourceIP == "" && entry.SourceUDPPeer == "" && entry.DeviceHostname == "" {
+			return nil, 0, errMissingSourceIP
+		}
+	}
+
+	hostname := entry.DeviceHostname
+	if hostname == "" {
+		if entry.SourceIP != "" {
+			hostname = entry.SourceIP
+		} else if entry.SourceUDPPeer != "" {
+			hostname = entry.SourceUDPPeer
+		}
+	}
+
+	s.addStringField("MESSAGE", entry.Message)
+	s.addStringField("PRIORITY", severityPriority(entry.Severity))
+	s.addStringField("SYSLOG_IDENTIFIER", entry.JobName)
+
+	if !isSummary && hostname != "" {
+		s.addStringField("_HOSTNAME", hostname)
+	}
+
+	s.addStringField("ND_LOG_SOURCE", "snmp-trap")
+
+	if !isSummary && entry.SourceVnodeID != "" {
+		s.addStringField("ND_NIDL_NODE", entry.SourceVnodeID)
+	}
+
+	reportType := string(entry.ReportType)
+	if reportType == "" {
+		reportType = "trap"
+	}
+	s.addStringField("TRAP_REPORT_TYPE", reportType)
+
+	if !isSummary {
+		s.addStringField("TRAP_OID", entry.TrapOID)
+		if entry.TrapName != "" {
+			s.addStringField("TRAP_NAME", entry.TrapName)
+		}
+		if entry.Category != "" {
+			s.addStringField("TRAP_CATEGORY", string(entry.Category))
+		}
+		if entry.Severity != "" {
+			s.addStringField("TRAP_SEVERITY", string(entry.Severity))
+		}
+		if entry.PduType != "" {
+			s.addStringField("TRAP_PDU_TYPE", string(entry.PduType))
+		}
+		if entry.SnmpVersion != "" {
+			s.addStringField("TRAP_VERSION", string(entry.SnmpVersion))
+		}
+		if entry.SourceIP != "" {
+			s.addStringField("TRAP_SOURCE_IP", entry.SourceIP)
+		}
+		if entry.SourceUDPPeer != "" {
+			s.addStringField("TRAP_SOURCE_UDP_PEER", entry.SourceUDPPeer)
+		}
+		if entry.DeviceVendor != "" {
+			s.addStringField("TRAP_DEVICE_VENDOR", entry.DeviceVendor)
+		}
+		if entry.TopologyInterface != "" {
+			s.addStringField("TRAP_INTERFACE", entry.TopologyInterface)
+		}
+		if entry.TopologyNeighbors != "" {
+			s.addStringField("TRAP_NEIGHBORS", entry.TopologyNeighbors)
+		}
+	}
+
+	if err := s.addTrapJSONField(entry); err != nil {
+		return nil, 0, fmt.Errorf("TRAP_JSON: %w", err)
+	}
+
+	if isDedupSummary && entry.SummaryCounts != nil {
+		sc := entry.SummaryCounts
+		s.addIntField("TRAP_SUPPRESSED_COUNT", sc.TotalSuppressed)
+		s.addIntField("TRAP_SUPPRESSED_FINGERPRINTS", sc.Fingerprints)
+		s.addIntField("TRAP_REPORT_PERIOD_SEC", sc.PeriodSec)
+	}
+
+	for _, key := range s.sortedLabelKeys(entry.Labels) {
+		val := entry.Labels[key]
+		upperKey := strings.ToUpper(key)
+		if !isValidTrapTagKey(upperKey) {
+			return nil, 0, fmt.Errorf("invalid label key for TRAP_TAG: %q", key)
+		}
+		s.addStringField("TRAP_TAG_"+upperKey, val)
+	}
+
+	return s.payloads, s.sanitizedFields, nil
+}
+
+func (s *journalHotSerializer) reset() {
+	s.payloads = s.payloads[:0]
+	s.buf = s.buf[:0]
+	s.labelKeys = s.labelKeys[:0]
+	s.sanitizedFields = 0
+}
+
+func (s *journalHotSerializer) addStringField(name, value string) {
+	start := len(s.buf)
+	s.buf = append(s.buf, name...)
+	s.buf = append(s.buf, '=')
+	valueStart := len(s.buf)
+	s.buf = append(s.buf, value...)
+	s.addPayload(start, valueStart)
+}
+
+func (s *journalHotSerializer) addIntField(name string, value int64) {
+	start := len(s.buf)
+	s.buf = append(s.buf, name...)
+	s.buf = append(s.buf, '=')
+	valueStart := len(s.buf)
+	s.buf = strconv.AppendInt(s.buf, value, 10)
+	s.addPayload(start, valueStart)
+}
+
+func (s *journalHotSerializer) addPayload(start, valueStart int) {
+	if journalFieldNeedsBinary(s.buf[valueStart:]) {
+		s.sanitizedFields++
+	}
+	s.payloads = append(s.payloads, s.buf[start:])
+}
+
+func (s *journalHotSerializer) sortedLabelKeys(labels map[string]string) []string {
+	s.labelKeys = s.labelKeys[:0]
+	for key := range labels {
+		s.labelKeys = append(s.labelKeys, key)
+	}
+	sort.Strings(s.labelKeys)
+	return s.labelKeys
+}
+
+func (s *journalHotSerializer) addTrapJSONField(entry *TrapEntry) error {
+	start := len(s.buf)
+	s.buf = append(s.buf, "TRAP_JSON"...)
+	s.buf = append(s.buf, '=')
+	valueStart := len(s.buf)
+
+	if entry.SummaryCounts != nil {
+		trapJSON, err := buildTrapJSON(entry)
+		if err != nil {
+			return err
+		}
+		s.buf = append(s.buf, trapJSON...)
+		s.addPayload(start, valueStart)
+		return nil
+	}
+
+	if err := s.appendTrapJSONObject(entry); err != nil {
+		return err
+	}
+	s.addPayload(start, valueStart)
+	return nil
+}
+
+type rawJSONVarbindEntry struct {
+	key string
+	vb  VarbindValue
+}
+
+func (s *journalHotSerializer) appendTrapJSONObject(entry *TrapEntry) error {
+	s.jsonEntries = s.jsonEntries[:0]
+	if s.seenJSONKeys == nil {
+		s.seenJSONKeys = make(map[string]int, len(entry.Varbinds))
+	} else {
+		for key := range s.seenJSONKeys {
+			delete(s.seenJSONKeys, key)
+		}
+	}
+
+	for _, vb := range entry.Varbinds {
+		key := vb.Name
+		if key == "" {
+			key = vb.OID
+		}
+		if key == "" {
+			continue
+		}
+		s.seenJSONKeys[key]++
+		if s.seenJSONKeys[key] > 1 {
+			key = fmt.Sprintf("%s#%d", key, s.seenJSONKeys[key])
+		}
+		s.jsonEntries = append(s.jsonEntries, rawJSONVarbindEntry{key: key, vb: vb})
+	}
+
+	slices.SortFunc(s.jsonEntries, func(a, b rawJSONVarbindEntry) int {
+		return strings.Compare(a.key, b.key)
+	})
+
+	s.buf = append(s.buf, '{')
+	for i, entry := range s.jsonEntries {
+		if i > 0 {
+			s.buf = append(s.buf, ',')
+		}
+		s.appendJSONString(entry.key)
+		s.buf = append(s.buf, ':')
+		s.appendJSONVarbind(entry.vb)
+	}
+	s.buf = append(s.buf, '}')
+	return nil
+}
+
+func (s *journalHotSerializer) appendJSONVarbind(vb VarbindValue) {
+	s.buf = append(s.buf, `{"oid":`...)
+	s.appendJSONString(vb.OID)
+	s.buf = append(s.buf, `,"type":`...)
+	s.appendJSONString(string(vb.Type))
+	s.buf = append(s.buf, `,"value":`...)
+	s.appendJSONVarbindValue(vb.Value)
+	if vb.Enum != "" {
+		s.buf = append(s.buf, `,"enum":`...)
+		s.appendJSONString(vb.Enum)
+	}
+	s.buf = append(s.buf, '}')
+}
+
+func (s *journalHotSerializer) appendJSONVarbindValue(value any) {
+	switch v := value.(type) {
+	case nil:
+		s.buf = append(s.buf, "null"...)
+	case string:
+		s.appendJSONString(v)
+	case int64:
+		s.buf = strconv.AppendInt(s.buf, v, 10)
+	case uint64:
+		s.buf = strconv.AppendUint(s.buf, v, 10)
+	case float64:
+		s.buf = strconv.AppendFloat(s.buf, v, 'f', -1, 64)
+	case bool:
+		s.buf = strconv.AppendBool(s.buf, v)
+	case []byte:
+		s.buf = append(s.buf, '"')
+		dstLen := hex.EncodedLen(len(v))
+		oldLen := len(s.buf)
+		for range dstLen {
+			s.buf = append(s.buf, 0)
+		}
+		hex.Encode(s.buf[oldLen:oldLen+dstLen], v)
+		s.buf = append(s.buf, '"')
+	default:
+		s.appendJSONString(fmt.Sprintf("%v", v))
+	}
+}
+
+func (s *journalHotSerializer) appendJSONString(value string) {
+	const hexDigits = "0123456789abcdef"
+
+	s.buf = append(s.buf, '"')
+	start := 0
+	for i := 0; i < len(value); {
+		if c := value[i]; c < utf8.RuneSelf {
+			if c >= 0x20 && c != '\\' && c != '"' && c != '<' && c != '>' && c != '&' {
+				i++
+				continue
+			}
+			s.buf = append(s.buf, value[start:i]...)
+			switch c {
+			case '\\', '"':
+				s.buf = append(s.buf, '\\', c)
+			case '\b':
+				s.buf = append(s.buf, '\\', 'b')
+			case '\f':
+				s.buf = append(s.buf, '\\', 'f')
+			case '\n':
+				s.buf = append(s.buf, '\\', 'n')
+			case '\r':
+				s.buf = append(s.buf, '\\', 'r')
+			case '\t':
+				s.buf = append(s.buf, '\\', 't')
+			default:
+				s.buf = append(s.buf, '\\', 'u', '0', '0', hexDigits[c>>4], hexDigits[c&0xf])
+			}
+			i++
+			start = i
+			continue
+		}
+
+		r, size := utf8.DecodeRuneInString(value[i:])
+		if r == utf8.RuneError && size == 1 {
+			s.buf = append(s.buf, value[start:i]...)
+			s.buf = append(s.buf, `\ufffd`...)
+			i++
+			start = i
+			continue
+		}
+		if r == '\u2028' || r == '\u2029' {
+			s.buf = append(s.buf, value[start:i]...)
+			s.buf = append(s.buf, '\\', 'u', '2', '0', '2', hexDigits[r&0xf])
+			i += size
+			start = i
+			continue
+		}
+		i += size
+	}
+	s.buf = append(s.buf, value[start:]...)
+	s.buf = append(s.buf, '"')
 }

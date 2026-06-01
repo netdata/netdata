@@ -24,10 +24,11 @@ var (
 )
 
 type journalTrapWriter struct {
-	journal *JournalWriter
-	queue   chan *TrapEntry
-	flushCh chan chan error
-	doneCh  chan struct{}
+	journal    *JournalWriter
+	queue      chan *TrapEntry
+	flushCh    chan chan error
+	doneCh     chan struct{}
+	serializer journalHotSerializer
 
 	closed    int32
 	failedErr error
@@ -145,11 +146,11 @@ func (tw *journalTrapWriter) writeOne(entry *TrapEntry) error {
 		// Test/benchmark sink mode; production Init always supplies a journal.
 		return nil
 	}
-	fields, err := serializeToJournalFields(entry)
+	payloads, sanitizedFields, err := tw.serializer.serialize(entry)
 	if err != nil {
 		return err
 	}
-	return tw.journal.WriteEntry(fields, entry.ReceivedRealtimeUsec, entry.ReceivedMonotonicUsec)
+	return tw.journal.WriteRawEntry(payloads, sanitizedFields, entry.ReceivedRealtimeUsec, entry.ReceivedMonotonicUsec)
 }
 
 func (tw *journalTrapWriter) sync() error {

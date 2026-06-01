@@ -1,6 +1,6 @@
 # ADR-0001: Go Process Model, Journal Writer Backend, and TrapWriter Contract
 
-**Status**: Accepted for SOW-0035 implementation after reviewer round 5; amended on 2026-05-26 to use the published Go journal SDK `go/v0.1.0`; amended on 2026-05-28 to use SDK `go/v0.3.0`
+**Status**: Accepted for SOW-0035 implementation after reviewer round 5; amended on 2026-05-26 to use the published Go journal SDK `go/v0.1.0`; amended on 2026-05-28 to use SDK `go/v0.3.0`; amended on 2026-05-31 to use SDK `go/v0.4.0`; amended on 2026-06-01 by SOW-0045 to route the trap writer hot path through reusable raw journal payload serialization
 **Date**: 2026-05-25
 **SOW**: SOW-0035 M1
 
@@ -31,7 +31,7 @@ The implementation language is **Go** (user decision, 2026-05-25). The journal w
 - Registered through the standard `collectorapi.Register(...)` path in the existing `collector/init.go` import registry as `snmp_traps`, mirroring the existing `snmp_topology` naming style. A scan found no existing go.d collector registration name containing a dot, so the module name must not use `snmp.traps`.
 - Uses V2 collector interface (`collectorapi.CollectorV2`), mirroring the `ping/` collector pattern
 - Job lifecycle managed by the existing go.d framework (`src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go`)
-- Journal writing via a thin adapter around `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.3.0`, keeping the local `TrapWriter` abstraction and delegating journal file format, active-file indexing, rotation, retention, and writer locking to the SDK.
+- Journal writing via a thin adapter around `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.4.0`, keeping the local `TrapWriter` abstraction and delegating journal file format, active-file indexing, rotation, retention, and writer locking to the SDK.
 - Shared profile cache: in-process Go package-level state, loaded on first runnable job creation
 
 ### Option B: Separate Go process (external plugin) via PLUGINSD
@@ -140,7 +140,7 @@ The local package provides a small `JournalWriter` adapter in
 implement the systemd journal binary format locally. The adapter delegates file
 format, active-file indexing, writer locks, rotation, retention, and chain
 validation/reopen behavior to `github.com/netdata/systemd-journal-sdk/go/journal`
-`go/v0.3.0`.
+`go/v0.4.0`.
 
 The public local API remains:
 
@@ -164,6 +164,11 @@ type JournalField struct {
 // the journal TrapWriter's single queue worker goroutine, not by the decode hot
 // path. WriteEntry is not concurrency-safe.
 func (w *JournalWriter) WriteEntry(fields []JournalField, realtimeUsec, monotonicUsec int64) error
+
+// WriteRawEntry writes one journal entry from prebuilt KEY=value payloads.
+// It is an internal hot-path API used by the journal TrapWriter's single worker
+// after SOW-0045. The SDK consumes the payloads synchronously during AppendRaw.
+func (w *JournalWriter) WriteRawEntry(payloads [][]byte, sanitizedFields int, realtimeUsec, monotonicUsec int64) error
 
 // Sync flushes pending writes to disk.
 func (w *JournalWriter) Sync() error
@@ -200,7 +205,7 @@ type JournalConfig struct {
   trap package validates this through SDK-backed `journalctl --directory`
   tests, not by maintaining local DATA/FIELD hash-table code.
 
-The journal-direct TrapWriter owns the concurrency boundary: multiple endpoint receive loops may call `TrapWriter.Write()` concurrently, but they fan into one concurrency-safe bounded queue per job. A single worker goroutine drains that queue and is the only caller of `JournalWriter.WriteEntry()`.
+The journal-direct TrapWriter owns the concurrency boundary: multiple endpoint receive loops may call `TrapWriter.Write()` concurrently, but they fan into one concurrency-safe bounded queue per job. A single worker goroutine drains that queue and is the only caller of `JournalWriter.WriteRawEntry()` in the hot path.
 
 The serialization boundary is explicit:
 
@@ -209,7 +214,7 @@ The serialization boundary is explicit:
 func serializeToJournalFields(entry *TrapEntry) ([]JournalField, error)
 ```
 
-This function is called only by the journal TrapWriter's single queue worker goroutine, immediately before `JournalWriter.WriteEntry()`. It owns `TrapEntry` to journal naming, including `PRIORITY`, `SYSLOG_IDENTIFIER`, `ND_LOG_SOURCE`, `ND_NIDL_NODE`, `_HOSTNAME` fallback, `TRAP_TAG_<KEY_UPPERCASE>`, `TRAP_JSON`, and omission of empty optional enrichment fields. It returns an error for structurally invalid entries (for example nil entry or missing required fields). Unsupported `VarbindValue.Value` concrete types use the guarded fallback path in production and are rejected by tests.
+This function remains the simple allocation-returning reference API and test contract for `TrapEntry` to journal naming, including `PRIORITY`, `SYSLOG_IDENTIFIER`, `ND_LOG_SOURCE`, `ND_NIDL_NODE`, `_HOSTNAME` fallback, `TRAP_TAG_<KEY_UPPERCASE>`, `TRAP_JSON`, and omission of empty optional enrichment fields. The hot path uses an equivalent reusable serializer owned by the single worker and passes raw `KEY=value` payloads to `WriteRawEntry()`. It returns an error for structurally invalid entries (for example nil entry or missing required fields). Unsupported `VarbindValue.Value` concrete types use the guarded fallback path in production and are rejected by tests.
 
 **Config parsing**: `JournalConfig` receives parsed byte/duration values. The config/DynCfg layer parses human-readable operator values such as `10GB` and `1h`.
 
@@ -427,7 +432,7 @@ On `Update()`, current jobmgr behavior stops the old running job before creating
 | Shared profile cache refcount leak leaves memory allocated | `ReleaseProfileCache()` is called in `Cleanup()` which the framework guarantees on shutdown; add refcount-leak and underflow detection tests |
 | Framework coded-error change breaks other collectors | Preserve existing behavior for plain errors; only `CodedError` suppresses retry and controls HTTP code; add Start and Update tests |
 | Direct journal writer cannot sustain target trap volume | M4 must include `go test -benchmem` / throughput benchmarks for `TrapWriter.Write()`, queue drain, and SDK-backed journal `WriteEntry()`; if allocation or throughput misses the tens-of-thousands/sec target, reopen batching or backend design before accepting M4 |
-| SDK dependency API drifts | Pin to `github.com/netdata/systemd-journal-sdk/go v0.3.0`; re-vendor through the module tag and review API changes before updating |
+| SDK dependency API drifts | Pin to `github.com/netdata/systemd-journal-sdk/go v0.4.0`; re-vendor through the module tag and review API changes before updating |
 | SDK chain handling has an upstream defect | Keep `TrapWriter` and local adapter boundaries narrow so the SDK can be updated or replaced without changing ingestion semantics |
 
 ## Validation Requirements

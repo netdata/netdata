@@ -140,7 +140,7 @@ The implementation language is **Go** (user decision recorded on 2026-05-25). Th
 
 **Process model** (accepted by SOW-0035 M1 ADR-0001): The trap plugin is a **standard in-process go.d collector V2 module** at `src/go/plugin/go.d/collector/snmp_traps/`, registered as `snmp_traps`. No separate process, no CGo, no subprocess bridge.
 
-**Journal writer backend**: The trap collector uses the Go systemd journal SDK module `github.com/netdata/systemd-journal-sdk/go/journal` at `go/v0.3.0` behind the local `TrapWriter` abstraction. `NewJournalWriter()` constructs `journal.NewLog()` with `LogOpenEager` and `LogIdentityStrict`, so journal directory creation/open, active file creation, writer lock acquisition, machine ID parsing, boot ID parsing, rotation policy validation, and retention policy validation are proven during job creation before DynCfg apply succeeds.
+**Journal writer backend**: The trap collector uses the Go systemd journal SDK module `github.com/netdata/systemd-journal-sdk/go/journal` at `go/v0.4.0` behind the local `TrapWriter` abstraction. `NewJournalWriter()` constructs `journal.NewLog()` with `LogOpenEager` and `LogIdentityStrict`, so journal directory creation/open, active file creation, writer lock acquisition, machine ID parsing, boot ID parsing, rotation policy validation, and retention policy validation are proven during job creation before DynCfg apply succeeds.
 
 The configured per-job root remains `/var/cache/netdata/traps/{job_name}/`. The SDK appends the machine-id child directory, so the effective query directory is `/var/cache/netdata/traps/{job_name}/{machine_id}/`. Use the SDK-backed writer's effective `JournalDirectory()` for `journalctl --directory` validation.
 
@@ -151,7 +151,7 @@ The configured per-job root remains `/var/cache/netdata/traps/{job_name}/`. The 
 ### Concurrency model
 
 - **Hot path** (per-packet decode + enrich + counter increment): one receive loop per endpoint with reusable buffers; no per-packet heap allocation target; shared per-listener decoder/resolver/writer pipeline. One job = one listener = one or more endpoints = one writer. Multiple endpoint receive loops in the same job fan into one concurrency-safe bounded writer queue; one worker drains that queue and writes journal entries sequentially.
-- **Journal write**: per-job writer thread, one journal file family per job (under `/var/cache/netdata/traps/{job_name}/`). Cap is ~30k rows/sec per writer. To exceed that for a single high-volume listener, operators add more jobs for scaling/isolation. Multi-writer partitioning **within a single listener** is out of scope for SOW-0035–SOW-0038; if it becomes necessary it joins a future SOW.
+- **Journal write**: per-job writer thread, one journal file family per job (under `/var/cache/netdata/traps/{job_name}/`). SOW-0045 measured about 62K-73K persisted traps/sec for the full synthetic packet-to-journal path on the workstation, but this is local benchmark evidence, not a portable hardware guarantee. To exceed one writer's ceiling for a single high-volume listener, operators add more jobs for scaling/isolation. Multi-writer partitioning **within a single listener** is out of scope for SOW-0035–SOW-0038; if it becomes necessary it joins a future SOW.
 
 ### Process model
 
@@ -545,11 +545,11 @@ Aim for the LibreNMS-to-Datadog band: ~2,000-12,000 OID families across major ve
 ### Per-thread targets
 
 - **Single trap listener + decoder thread**: design target 10s of thousands of decode operations/sec, limited by BER decode + counter increment + dedup-cache check (in-memory). **The exact ceiling is to be measured during implementation** — this number is a design rule, not a benchmarked claim.
-- **Single journal writer thread**: ~30k entries/sec. This figure comes from existing benchmarks of the Netdata journal-writer behavior used in the **NetFlow plugin**. Cited here as a reference point for partitioning thresholds; the Go trap implementation will validate the selected backend during implementation.
+- **Single journal writer thread**: current SOW-0045 evidence with SDK `go/v0.4.0` measures about 61.9K-74.2K entries/sec for queued `TrapEntry` journal output on the workstation, and about 62.5K-72.6K persisted traps/sec for the full synthetic v2c profile-hit packet-to-journal path in 30,000-packet runs. A longer 100,000-packet full-path run measured about 63.3K-66.0K persisted traps/sec. These are local benchmark ranges, not portable hardware guarantees.
 
 ### Scaling beyond one thread
 
-To exceed ~30k entries/sec total, scale **horizontally with per-job isolation** (§5 listener-as-job model):
+To exceed one writer's measured ceiling, scale **horizontally with per-job isolation** (§5 listener-as-job model):
 
 - Each listener job is its own writer thread and its own journal directory at `/var/cache/netdata/traps/{job_name}/`.
 - Operators scale by adding more jobs (each bound to a different port and/or with different community/USM/source-IP allowlists), partitioning the trap stream at the listener layer.
@@ -997,7 +997,7 @@ In addition to the two plugin-self contexts, operator-selected OIDs (via §7.5) 
 
 Phase B resolved most of the original questions. What remains:
 
-1. **Go process / writer backend** — **ACCEPTED (SOW-0035 M1, ADR-0001; amended 2026-05-26 for the SDK integration and 2026-05-28 for SDK `go/v0.3.0`)**: Standard in-process go.d collector V2 module with a thin SDK-backed Go journal adapter over `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.3.0`. No separate process, no CGo, no subprocess bridge. See `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md`.
+1. **Go process / writer backend** — **ACCEPTED (SOW-0035 M1, ADR-0001; amended 2026-05-26 for the SDK integration, 2026-05-28 for SDK `go/v0.3.0`, and 2026-05-31 for SDK `go/v0.4.0`)**: Standard in-process go.d collector V2 module with a thin SDK-backed Go journal adapter over `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.4.0`. No separate process, no CGo, no subprocess bridge. See `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md`.
 
 2. **Profile YAML hot-reload mechanism — ACCEPTED (SOW-0037 M3)**: operators add or edit YAML files under `/etc/netdata/go.d/snmp.trap-profiles/` and trigger the agent-wide `reload-profiles` Function through the Functions/DynCfg surface. The plugin parses and validates all profile files, builds a full replacement OID index, and atomically swaps it into the shared cache only after the new index is complete. Failed reloads keep the previous index active, return an operator-visible error, log the profile loader error with file/path detail, and increment `snmp.trap.errors.profile_load_failed`. Reload without an active `snmp_traps` job returns unavailable because profile memory is intentionally not retained while idle. The current Function framework still dispatches agent-wide methods through one running job instance, but this method does not expose a job selector and the reload applies to the shared profile cache used by all listeners. Profile memory is still loaded on first runnable trap job creation and released after the last runnable trap job stops. Runtime MIB compilation remains out of scope.
 
