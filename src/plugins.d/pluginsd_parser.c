@@ -1514,26 +1514,40 @@ void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire) {
 }
 
 static int pluginsd_parser_unittest_slot_bounds(size_t max_slot) {
+    // Note on initialization: every element below is given an explicit
+    // initializer, so C zero-fills the remainder of each slot_word array. The
+    // trailing three entries start empty and are filled from max_slot at runtime.
     struct slot_test_case {
         char slot_word[64];
         ssize_t expected;
     } cases[] = {
-        { "", -1 },
-        { PLUGINSD_KEYWORD_SLOT ":0", 0 },
-        { PLUGINSD_KEYWORD_SLOT ":1", 1 },
-        { PLUGINSD_KEYWORD_SLOT ":0x0AAAAAAAAAAAAAAB", 0 },
-        { PLUGINSD_KEYWORD_SLOT ":0x40000000", 0 },
-        { "", 0 },
-        { "", 0 },
+        { "", -1 },                                          // no SLOT word -> -1 (caller must not advance idx)
+        { PLUGINSD_KEYWORD_SLOT ":0", 0 },                   // explicit zero -> uncached
+        { PLUGINSD_KEYWORD_SLOT ":1", 1 },                   // smallest cached slot
+        { PLUGINSD_KEYWORD_SLOT ":-1", 0 },                  // negative parses as unsigned 0 -> uncached
+        { PLUGINSD_KEYWORD_SLOT ":abc", 0 },                 // malformed decimal -> 0 -> uncached
+        { PLUGINSD_KEYWORD_SLOT ":0xZZ", 0 },                // malformed hex -> 0 -> uncached
+        { PLUGINSD_KEYWORD_SLOT ":0x0AAAAAAAAAAAAAAB", 0 },  // over cap; cast stays positive, would wrap allocation
+        { PLUGINSD_KEYWORD_SLOT ":0xFFFFFFFFFFFFFFFF", 0 },  // u64 max -> over cap -> uncached
+        { PLUGINSD_KEYWORD_SLOT ":0x40000000", 0 },          // over both caps -> uncached (the reported OOM value)
+        { "", 0 },                                           // filled below: max_slot - 1 (accepted)
+        { "", 0 },                                           // filled below: max_slot     (accepted, boundary)
+        { "", 0 },                                           // filled below: max_slot + 1 (rejected, boundary)
     };
 
-    snprintfz(cases[5].slot_word, sizeof(cases[5].slot_word) - 1,
-              PLUGINSD_KEYWORD_SLOT ":%zu", max_slot);
-    cases[5].expected = (ssize_t)max_slot;
+    const size_t n = _countof(cases);
 
-    snprintfz(cases[6].slot_word, sizeof(cases[6].slot_word) - 1,
+    snprintfz(cases[n - 3].slot_word, sizeof(cases[n - 3].slot_word) - 1,
+              PLUGINSD_KEYWORD_SLOT ":%zu", max_slot - 1);
+    cases[n - 3].expected = (ssize_t)(max_slot - 1);
+
+    snprintfz(cases[n - 2].slot_word, sizeof(cases[n - 2].slot_word) - 1,
+              PLUGINSD_KEYWORD_SLOT ":%zu", max_slot);
+    cases[n - 2].expected = (ssize_t)max_slot;
+
+    snprintfz(cases[n - 1].slot_word, sizeof(cases[n - 1].slot_word) - 1,
               PLUGINSD_KEYWORD_SLOT ":%zu", max_slot + 1);
-    cases[6].expected = 0;
+    cases[n - 1].expected = 0;
 
     for(size_t i = 0; i < _countof(cases); i++) {
         char command[] = "DIMENSION";

@@ -372,6 +372,10 @@ static inline RRDSET *pluginsd_find_chart(RRDHOST *host, const char *chart, cons
 static ALWAYS_INLINE ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_words, size_t max_slot) {
     ssize_t slot = -1;
     char *id = get_word(words, num_words, 1);
+    // Words are NUL-terminated and && short-circuits left-to-right, so each id[k]
+    // is read only after id[0..k-1] matched the non-NUL "SLOT" chars. A shorter word
+    // (e.g. "X" or "SLOT") fails an earlier comparison or hits the terminator at id[4],
+    // so these fixed-index reads never go past the token's NUL. No bounds check needed.
     if(id && id[0] == PLUGINSD_KEYWORD_SLOT[0] && id[1] == PLUGINSD_KEYWORD_SLOT[1] &&
        id[2] == PLUGINSD_KEYWORD_SLOT[2] && id[3] == PLUGINSD_KEYWORD_SLOT[3] && id[4] == ':') {
         unsigned long long parsed_slot = str2ull_encoded(&id[5]);
@@ -380,6 +384,9 @@ static ALWAYS_INLINE ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_wo
             nd_log_limit(&erl_slot, NDLS_COLLECTORS, NDLP_WARNING,
                          "PLUGINSD: ignoring invalid SLOT value '%s' above the supported maximum %zu",
                          &id[5], max_slot);
+            // slot 0 means: the SLOT word was present (so the caller still advances its
+            // word index), but the value is unusable as a cache index. Downstream cache
+            // paths treat slot < 1 as "uncached" and fall back to lookup by id.
             slot = 0;
         }
         else
