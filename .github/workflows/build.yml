@@ -649,8 +649,9 @@ jobs:
         id: prepare
         if: needs.file-check.outputs.run == 'true'
         run: |
-          mkdir -p download/latest
+          mkdir -p download/latest latest
           mv artifacts/* download/latest
+          cp -a download/latest/* latest
           ls -al download/latest
       - name: Verify that artifacts work with installer
         id: verify
@@ -718,8 +719,9 @@ jobs:
         id: prepare
         if: needs.file-check.outputs.run == 'true'
         run: |
-          mkdir -p download/latest
+          mkdir -p download/latest latest
           mv artifacts/* download/latest
+          cp -a download/latest/* latest
           ls -al download/latest
       - name: Verify that artifacts work with installer
         id: verify
@@ -787,8 +789,9 @@ jobs:
         id: prepare
         if: needs.file-check.outputs.run == 'true'
         run: |
-          mkdir -p download/latest
+          mkdir -p download/latest latest
           mv artifacts/* download/latest
+          cp -a download/latest/* latest
           ls -al download/latest
       - name: Run Updater Check
         id: check
