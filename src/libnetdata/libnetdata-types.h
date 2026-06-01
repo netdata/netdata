@@ -3,6 +3,8 @@
 #ifndef LIBNETDATA_TYPES_H
 #define LIBNETDATA_TYPES_H
 
+#include "config.h"
+
 #if defined(HAVE_INTTYPES_H)
 #include <inttypes.h>
 #elif defined(HAVE_STDINT_H)
