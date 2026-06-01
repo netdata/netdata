@@ -17,7 +17,7 @@ called `<name>`. For modifying an existing collector, see
 
 ## 1. Create the module skeleton
 
-New go.d collectors use framework V2. Code layout details live in
+New go.d collectors MUST use framework V2. Code layout details live in
 `src/go/plugin/go.d/docs/how-to-write-a-collector.md`; this recipe covers the
 integration artifact side. A normal V2 collector directory includes:
 
@@ -142,13 +142,13 @@ modules:
 
 The first sentence of `metrics_description` is also used as the
 description in generated catalog-style pages such as
-`src/collectors/COLLECTORS.md`. Keep it product-facing and stable:
-start with an action phrase, describe the integration, and do not
+`src/collectors/COLLECTORS.md`. It SHOULD stay product-facing and stable:
+start with an action phrase, describe the integration, and MUST NOT
 describe configuration variables, defaults, limits, or setup steps.
 Put those details in the setup, default-behavior, examples, or
 troubleshooting fields.
 
-Hit every required field. The validator is strict (fatal on
+Hit every REQUIRED field. The validator is strict (fatal on
 warnings). Refer to `../schema-reference.md` for the
 exhaustive field list.
 
@@ -162,7 +162,8 @@ or add a new one under the appropriate parent (typically
 
 ## 4. Taxonomy, stock `.conf`, `config_schema.json`, alerts, README
 
-These files are the rest of the collector consistency rule:
+These files are the rest of the collector consistency rule and MUST stay
+synchronized with the collector code:
 
 - `src/go/plugin/go.d/collector/<name>/taxonomy.yaml` --
   dashboard TOC placement for chart contexts. Static collectors
@@ -171,7 +172,7 @@ These files are the rest of the collector consistency rule:
   `context_prefix:` or `collect_plugin:` and matching
 	  `metadata.yaml.metrics.dynamic_*` declarations. Display widgets
 	  use `type: context` with `contexts:` and `chart_library`; those
-	  referenced contexts must also be owned by structural items.
+	  referenced contexts MUST also be owned by structural items.
 	  Pick `--section-id` from
 	  `integrations/taxonomy/sections.yaml`; `section_id` is a stable
 	  registry ID, not a path to invent in the collector file.
@@ -184,18 +185,18 @@ These files are the rest of the collector consistency rule:
 	  `src/go/plugin/go.d/collector/cato_networks/taxonomy.yaml`.
 - `src/go/plugin/go.d/config/go.d/<name>.conf` -- the stock
   config users will see at
-  `/etc/netdata/go.d/<name>.conf`. Keep it minimal but
+  `/etc/netdata/go.d/<name>.conf`. It SHOULD stay minimal but
   representative. Show every common option with a comment.
 - `src/go/plugin/go.d/collector/<name>/config_schema.json` --
-  the DYNCFG schema. Each option in the stock `.conf` should
+  the DYNCFG schema. Each option in the stock `.conf` SHOULD
   have a corresponding entry here, with the same default.
 - `src/health/health.d/<name>.conf` -- alerts on the metrics
-  declared in `metadata.yaml`. Each alert in this file should
+  declared in `metadata.yaml`. Each alert in this file SHOULD
   have a matching entry under `metadata.yaml.modules[0].alerts[]`.
 - `src/go/plugin/go.d/collector/<name>/README.md` -- this is the
   USER-FACING documentation. After step 5, this file will be
   REPLACED with a symlink to
-  `integrations/<slug>.md`. So you do NOT hand-write the
+  `integrations/<slug>.md`. You MUST NOT hand-write the
   README; the generator does. Stub it as empty initially.
 
 ## 5. Run the pipeline locally
@@ -214,12 +215,12 @@ python3 integrations/gen_doc_secrets_page.py
 Expected outputs:
 
 - `integrations/integrations.js` and `integrations/integrations.json`
-  regenerated (gitignored, do NOT commit them).
+  regenerated (gitignored, MUST NOT be committed).
 - Collector taxonomy validated. If `gen_taxonomy.py` fails, fix
   `taxonomy.yaml` or the matching `metadata.yaml.metrics.dynamic_*`
   declaration before continuing.
 - `src/go/plugin/go.d/collector/<name>/integrations/<slug>.md`
-  CREATED. Inspect: it should contain the `<!--startmeta`
+  CREATED. Inspect: it SHOULD contain the `<!--startmeta`
   banner with your `sidebar_label` and `learn_rel_path`, then
   the rendered overview / setup / metrics / alerts /
   troubleshooting sections.
@@ -271,7 +272,7 @@ artifacts were updated together.
   committed integration page diverges from CI's regen, the
   workflow fails -- fix locally and re-push.
 - After merge, `generate-integrations.yml` triggers on master.
-  Since you already committed the regen, this should not
+  Since you already committed the regen, this SHOULD NOT
   produce changes. If it does, the auto-PR
   (`Regenerate integrations docs`) catches the drift -- merge
   it.

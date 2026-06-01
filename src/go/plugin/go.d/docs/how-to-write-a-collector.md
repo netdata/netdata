@@ -1,8 +1,8 @@
 # How to Write a go.d Collector (V2)
 
-This is the canonical starting point for new go.d collectors. New collectors use
-framework V2. V1 collectors remain in the tree for compatibility and maintenance
-only.
+This is the canonical starting point for new go.d collectors. New collectors
+MUST use framework V2. V1 collectors remain in the tree for compatibility and
+maintenance only.
 
 Use `src/go/plugin/go.d/collector/cato_networks/` as the primary modern example.
 It is large, so copy the pattern, not the whole shape. The useful references are
@@ -14,20 +14,26 @@ Do the design work first:
 
 1. Read the upstream API or protocol docs. Do not infer current behavior from
    memory or from generated SDK types alone.
-2. Decide the monitored entities and cardinality bounds. If one job collects
-   remote resources that should be separate Netdata nodes, design V2 host scopes
+2. You MUST aim for the clean end state, not the smallest initial diff. If the
+   clean collector design requires a framework improvement, surface that as a
+   design decision instead of hiding it behind collector-local glue.
+3. Decide the monitored entities and cardinality bounds. If one job collects
+   remote resources that SHOULD be separate Netdata nodes, design V2 host scopes
    from the start.
-3. Decide the minimal public config surface. Public config is a compatibility
+4. Decide the minimal public config surface. Public config is a compatibility
    contract. Use constants for internal tuning such as page limits, scan cadence,
    retry limits, fan-out concurrency, and cache TTLs unless the operator has a
    real decision to make.
-4. Decide whether the collector needs Functions or topology. Functions are
+5. Decide whether the collector needs Functions or topology. Functions are
    interactive live/snapshot views; metrics are time series. New topology
-   producers use `src/go/pkg/topology/v1` and must validate against
+   producers MUST use `src/go/pkg/topology/v1` and validate against
    `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`.
-5. Plan the full integration artifact set: code, `metadata.yaml`,
+6. Plan the full integration artifact set: code, `metadata.yaml`,
    `taxonomy.yaml`, `config_schema.json`, stock `.conf`, health alerts when
    needed, generated integration page, and README symlink.
+7. Plan the first coherent batch and its boundaries. At each boundary, you MUST
+   re-check whether new work has drifted out of scope; defer it or land it
+   independently before continuing.
 
 ## Source References
 
@@ -105,11 +111,13 @@ Common optional splits:
 - `topology.go` and `topology_store.go` when the collector emits topology.
 
 Avoid files whose names hide their responsibility. For example, a file named
-`diagnostics.go` should not contain only error classification.
+`diagnostics.go` SHOULD NOT contain only error classification.
 
 ## Registration And Lifecycle
 
-Register in `collector.go` with `CreateV2`:
+New collectors MUST implement `collectorapi.CollectorV2` from
+`src/go/plugin/framework/collectorapi/collector.go` and register via `CreateV2`.
+In practice, `collector.go` should:
 
 - embed `config_schema.json` for `JobConfigSchema`;
 - embed `charts.yaml` for `ChartTemplateYAML()`;
@@ -117,7 +125,7 @@ Register in `collector.go` with `CreateV2`:
 - return a new collector from `CreateV2`;
 - add `Methods` and `MethodHandler` only when the collector has Functions.
 
-`New()` owns defaults and test seams:
+`New()` SHOULD own defaults and test seams:
 
 - create `metrix.NewCollectorStore()`;
 - build typed instruments once from that store;
@@ -125,7 +133,7 @@ Register in `collector.go` with `CreateV2`:
 - set injected seams such as client factories or clocks;
 - create the Function router when Functions exist.
 
-Keep public methods in `collector.go`:
+Public lifecycle and framework-contract methods MUST stay in `collector.go`:
 
 - `Configuration() any`
 - `Init(context.Context) error`
@@ -136,22 +144,22 @@ Keep public methods in `collector.go`:
 - `ChartTemplateYAML() string`
 
 `Init()` validates config, prepares matchers/clients, and initializes persistent
-state. Keep explicit setup details in helper methods, preferably in `init.go`,
-so the public method reads as the lifecycle sequence. `Check()` should be a
-cheap auth/connectivity probe, not a full collection. `Collect()` runs the real
-write path through `metrix`. `Cleanup()` closes idle connections and forwards
-Function cleanup.
+state. Explicit setup details SHOULD live in helper methods, preferably in
+`init.go`, so the public method reads as the lifecycle sequence. `Check()` MUST
+be a cheap auth/connectivity probe, not a full collection. `Collect()` MUST run
+the real write path through `metrix`. `Cleanup()` closes idle connections and
+forwards Function cleanup.
 
 ## Config
 
-Keep config small and operator-oriented:
+Config SHOULD stay small and operator-oriented:
 
 - connection identity and credentials;
 - endpoint and standard HTTP/TLS/proxy fields when applicable;
 - `update_every`, `timeout`, and `vnode` when relevant;
 - selectors that let users intentionally scope cardinality.
 
-Prefer constants for implementation tuning:
+Implementation tuning SHOULD use constants:
 
 - discovery refresh cadence;
 - page sizes and maximum pages;
@@ -160,17 +168,17 @@ Prefer constants for implementation tuning:
 - retry/backoff internals;
 - API batching constraints.
 
-Do not add a config option because it is easy to expose. Once shipped, it is hard
-to remove and must stay synchronized across `Config`, `config_schema.json`,
-stock `.conf`, metadata, generated docs, and tests.
+You MUST NOT add a config option just because it is easy to expose. Once
+shipped, it is hard to remove and MUST stay synchronized across `Config`,
+`config_schema.json`, stock `.conf`, metadata, generated docs, and tests.
 
-Selectors should use existing matcher packages such as `src/go/pkg/matcher`
+Selectors SHOULD use existing matcher packages such as `src/go/pkg/matcher`
 unless the upstream API forces a different grammar. Document the exact matching
 input, for example "site name when present, otherwise site ID."
 
 ## Collect Flow
 
-Keep `Collect()` as orchestration, not a large parser. A typical flow is:
+`Collect()` SHOULD stay orchestration, not a large parser. A typical flow is:
 
 1. ensure the client is initialized;
 2. refresh stable discovery only when needed;
@@ -181,48 +189,51 @@ Keep `Collect()` as orchestration, not a large parser. A typical flow is:
 7. write metrics to `metrix`.
 
 When the collector performs several upstream calls or collection operations,
-split them into focused files named by operation, for example
-`collect_metrics.go` or `collect_bgp.go`. `collect.go` should explain the
-cycle; the operation files should own the operation-specific API calls,
+those operations SHOULD be split into focused files named by operation, for
+example `collect_metrics.go` or `collect_bgp.go`. `collect.go` SHOULD explain
+the cycle; the operation files SHOULD own the operation-specific API calls,
 fail-soft behavior, and merge rules.
 
-Use fail-soft behavior only when partial data is still truthful. If one optional
-operation fails, log a rate-limited warning and omit or preserve only values that
-remain honest. If the core operation fails, return an error with context.
+Fail-soft behavior MUST be used only when partial data is still truthful. If one
+optional operation fails, log a rate-limited warning and omit or preserve only
+values that remain honest. If the core operation fails, return an error with
+context.
 
-Always preserve context cancellation. If the context is canceled during a
-partial path, `Collect()` must return the context error so the runtime aborts the
-cycle instead of committing a stale or partial frame.
+`Collect()` MUST preserve context cancellation. If the context is canceled
+during a partial path, `Collect()` MUST return the context error so the runtime
+aborts the cycle instead of committing a stale or partial frame.
 
 ## Metrics And Charts
 
-Build instruments once in `New()` when the metric surface is known. Use a typed
-collector metrics struct so write code is a value mapping, not repeated dynamic
-instrument lookup.
+Metric instruments SHOULD be built once in `New()` when the metric surface is
+known. Use a typed collector metrics struct so write code is a value mapping,
+not repeated dynamic instrument lookup.
 
 Use the right instrument:
 
 - `SnapshotGaugeVec` for labeled current values; use scalar
   `SnapshotMeter.Gauge` only when the metric is intentionally unlabeled;
 - `Counter.ObserveTotal()` for source counters;
-- `StateSet` for fixed mutually exclusive states, such as connected vs
-  disconnected or up vs down.
+- `StateSet` SHOULD be used for fixed mutually exclusive states, such as
+  connected vs disconnected or up vs down.
 
-`charts.yaml` is the chart contract:
+`charts.yaml` is the chart contract. Every template MUST define:
 
 - `version: v1`;
 - `context_namespace`;
-- groups by operational area;
-- `instances.by_labels` for stable instance identity;
-- `label_promotion` for descriptive labels that should not define uniqueness;
-- default lifecycle unless a concrete reason exists to override it.
 
-Metric labels and chart instance labels must be bounded and stable. Use IDs for
-identity. Promote mutable display names with `label_promotion`.
+Templates SHOULD also group charts by operational area, use
+`instances.by_labels` for stable instance identity when charts are
+entity-scoped, use `label_promotion` for descriptive labels that should not
+define uniqueness, and keep the default lifecycle unless a concrete reason
+exists to override it.
+
+Metric labels and chart instance labels MUST be bounded and stable. Use IDs for
+identity. Mutable display names SHOULD be promoted with `label_promotion`.
 
 ## Host Scopes And Vnodes
 
-Use `metrix.HostScope` when one job emits data for remote entities that should
+Use `metrix.HostScope` when one job emits data for remote entities that SHOULD
 appear as separate Netdata nodes. Labels alone are not enough for that product
 semantics.
 
@@ -239,7 +250,7 @@ Use `.agents/sow/specs/go-v2-host-scope.md` for the framework contract.
 
 ## Functions
 
-Functions must not freely access collector internals. Put Function code in a
+Functions MUST NOT freely access collector internals. Put Function code in a
 dedicated subpackage, for example `<name>func/`, with a narrow `Deps` interface
 declared by that subpackage.
 
@@ -247,7 +258,8 @@ Pattern:
 
 - collector package owns state and implements a small adapter in `func_deps.go`;
 - Function package owns method IDs, router, handlers, presentation, and tests;
-- Function package imports framework/function types, not the collector package;
+- Function package MUST import only framework/function types and other allowed
+  dependencies, not the collector package;
 - `Collector.Cleanup()` forwards cleanup to the Function router.
 
 Use `catofunc/` as the primary example. Test the Function package with fake
@@ -255,7 +267,7 @@ deps so the boundary is compile-enforced.
 
 ## Topology
 
-New topology producers use `src/go/pkg/topology/v1`, not legacy topology
+New topology producers MUST use `src/go/pkg/topology/v1`, not legacy topology
 payloads.
 
 Rules:
@@ -263,8 +275,8 @@ Rules:
 - build topology from normalized collector state, not directly from raw API
   payloads;
 - publish immutable snapshots for Function readers;
-- do not mutate a published topology value;
-- validate topology payloads in tests with `topologyv1.ValidateDecodedData` and
+- MUST NOT mutate a published topology value;
+- MUST validate topology payloads in tests with `topologyv1.ValidateDecodedData` and
   `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`;
 - follow `.agents/skills/project-create-topology/SKILL.md` for actor/link/table
   design.
@@ -289,10 +301,10 @@ integration-generation commands and taxonomy pipeline details.
 
 ## Tests
 
-Use table-driven tests with `map[string]struct{}` when cases share setup and
+Tests SHOULD be table-driven with `map[string]struct{}` when cases share setup and
 assertion shape.
 
-Minimum test coverage:
+Recommended test coverage:
 
 - config JSON/YAML serialization with `collecttest.TestConfigurationSerialize`;
 - config validation, including required credentials and unsafe URLs;

@@ -6,6 +6,17 @@ This repository is the Netdata Agent codebase. It is a large, multi-language, mu
 
 Work in this repository must prioritize root-cause understanding, correctness, performance, maintainability, portability, security, and consistency with existing project conventions.
 
+## Requirement Language
+
+This repository uses RFC-style requirement language:
+
+- **MUST** / **REQUIRED**: mandatory. Work that violates it is not acceptable
+  unless the user explicitly changes the requirement.
+- **MUST NOT**: prohibited.
+- **SHOULD** / **RECOMMENDED**: expected default. Deviate only with evidence
+  and explain the trade-off.
+- **MAY** / **OPTIONAL**: allowed, not required.
+
 CRITICAL RULES:
 
 1. You MUST ALWAYS find the root cause of a problem, before offering/giving a solution.
@@ -16,6 +27,24 @@ CRITICAL RULES:
 
 3. Do not duplicate code.
    First check if similar code already exists and reuse it.
+
+## Mandatory Development Principles
+
+These principles are mandatory for every task in this repository:
+
+1. **Clean end state over less churn.**
+   You MUST always aim for the clean end state, not the smallest diff. While
+   designing and implementing, actively search for the structure that should
+   exist after the work is complete. You MUST periodically re-evaluate
+   already-written changes against that target; do not keep a compromise only
+   because it already exists in the branch.
+
+2. **Scope discipline at every step.**
+   At each milestone, you MUST check whether the work has drifted outside the
+   approved scope. If the new work is valid but independent, you MUST defer it
+   to a later step or pause and submit the independent work first, then rebase
+   the current branch after it merges. Complex features MUST be delivered in
+   coherent steps where each step builds on the previous one.
 
 USER COMMUNICATION:
 
