@@ -5,6 +5,10 @@
 
 #if defined(OS_LINUX)
 
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 static bool cgroup_ebpfgo_cachestat_snapshot_ready = false;
 
 static procfile *cgroup_ebpfgo_open_procfile_fd(const char *path);
