@@ -77,7 +77,7 @@ Netdata does not automatically change retention targets based on free disk space
 
 **Will adding a time-based retention limit trigger immediate cleanup?**
 
-Yes. Once a `dbengine tier N retention time` is configured, the retention check — which runs approximately every 60 seconds — will detect datafiles whose oldest data exceeds the time threshold and rotate them out. Cleanup begins on the next retention check cycle after the configuration change takes effect; it is not instantaneous.
+It can. Once a `dbengine tier N retention time` is configured, the retention check — which runs approximately every 60 seconds — will rotate out eligible datafiles when there is data older than the configured time window. Cleanup begins on the next retention check cycle after the change takes effect; it is not instantaneous.
 
 **Is there a per-Child disk space limit?**
 
