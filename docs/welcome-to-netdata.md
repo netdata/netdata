@@ -248,7 +248,7 @@ For Netdata, scalability is inherent to the architecture, not an add-on. Designe
 - **Consistent performance**: Query response times remain the same whether you have 10 or 10,000 nodes.
 - **Resource predictability**: Resource usage scales linearly with infrastructure size.
 - **High availability**: Streaming and replication provide high-availability to Netdata deployments.
-- **Clustering**: Netdata Parents can be clustered to replicate all their data localy, or cross region for disaster recovery.
+- **Clustering**: Netdata Parents can be clustered to replicate all their data locally, or cross region for disaster recovery.
 - **Fail-over**: Netdata Cloud dynamically routes queries to Netdata Parents and Agents based on their availability.
 
 ### Open Ecosystem

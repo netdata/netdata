@@ -192,7 +192,7 @@ Two files are written (`gen_integrations.py:1311-1325`):
 - `integrations/integrations.json` -- pure JSON with the
   `clean` variant of `{categories, integrations}`. No banner.
 
-Both are gitignored (`.gitignore:159-160`). They are produced
+Both are gitignored (`.gitignore:162-163`). They are produced
 fresh on every run; in CI, the workflow `rm`s them after the
 downstream scripts read them so they are NOT included in the
 auto-PR.
@@ -319,7 +319,7 @@ The script accepts `-c plugin/module` to scope cleanup and
 regen to one collector (`:578-583`). Useful locally:
 
 ```bash
-python3 integrations/gen_docs_integrations.py -c go.d/snmp
+python3 integrations/gen_docs_integrations.py -c go.d.plugin/snmp
 ```
 
 NOT used by CI; CI always runs without `-c` (full regen).
@@ -495,7 +495,9 @@ scripts directly during active development.
    ./integrations/pip.sh
    python3 integrations/gen_integrations.py
    python3 integrations/gen_taxonomy.py --check-only
-   python3 integrations/gen_docs_integrations.py -c go.d/foo
+   python3 integrations/check_collector_taxonomy.py --pr-diff master...HEAD
+   python3 -m unittest integrations.tests.test_taxonomy
+   python3 integrations/gen_docs_integrations.py -c go.d.plugin/foo
    python3 integrations/gen_doc_collector_page.py
    python3 integrations/gen_doc_secrets_page.py
    ```

@@ -11,78 +11,132 @@ source files for evidence.
 ## Read First
 
 - Contract: `src/go/plugin/framework/collectorapi/collector.go`
+- Framework-change workflow:
+  `src/go/plugin/framework/docs/changing-framework-code.md`
+- Canonical new-collector guide:
+  `src/go/plugin/go.d/docs/how-to-write-a-collector.md`
+- Helper-package guide:
+  `src/go/plugin/go.d/docs/helper-packages.md`
+- V1-to-V2 migration guide:
+  `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`
 - Runtime/chart lifecycle: `src/go/plugin/framework/chartengine/README.md`
 - Template format: `src/go/plugin/framework/charttpl/README.md`
 - Host scopes/vnodes: `.agents/sow/specs/go-v2-host-scope.md`
-- Closest examples:
-  - `src/go/plugin/go.d/collector/azure_monitor/` for dynamic scopes/profiles.
-  - `src/go/plugin/go.d/collector/ping/` for the smallest V2 shape.
-  - `src/go/plugin/go.d/collector/mysql/` for migration compatibility.
-  - `src/go/plugin/go.d/collector/powervault/` and `powerstore/` for remote
-    discovery, labels, and chart templates.
+- Primary modern example: `src/go/plugin/go.d/collector/cato_networks/`.
+  Use focused pieces from it, not the whole collector shape.
+- Older V2 collectors can still be useful for local patterns, but review them
+  for stale style before treating them as examples.
+
+## Decision Discipline
+
+- You MUST aim for the clean end state, not the smallest collector diff. If a
+  framework capability is missing and the problem is general, design the
+  framework change instead of hiding the issue in collector-local glue.
+- If any framework-scope package changes, stop and satisfy
+  `src/go/plugin/framework/docs/changing-framework-code.md` before writing code.
+- You MUST re-check scope after each coherent batch. If the work reveals an
+  independent collector cleanup, framework fix, or integration-doc change,
+  either defer it explicitly or land it separately before continuing.
 
 ## Core Style
 
-- Register with `CreateV2`; expose `Config: func() any { return &Config{} }`.
-- `New()` owns defaults, `metrix.NewCollectorStore()`, and test seams.
-- Store `metrix.CollectorStore`; implement `MetricStore()`.
-- Implement `ChartTemplateYAML()`; prefer embedded `charts.yaml`.
-- `Collect(ctx)` returns `error` and writes metrics to `metrix`; it does not
+- New collectors MUST implement `collectorapi.CollectorV2` from
+  `src/go/plugin/framework/collectorapi/collector.go` and register via
+  `CreateV2`.
+- `New()` SHOULD own defaults, `metrix.NewCollectorStore()`, typed metric
+  instruments, and test seams.
+- V2 collectors MUST write metrics through `metrix.CollectorStore` during
+  `Collect()` and provide chart template YAML through `ChartTemplateYAML()`;
+  embedded `charts.yaml` is RECOMMENDED.
+- `Collect(ctx)` MUST return `error` and write metrics to `metrix`; it MUST NOT
   return a V1 `map[string]int64`.
-- Keep files boring: `collector.go`, `collect.go`, `metrics.go`,
-  `charts.yaml`, focused domain helpers, focused tests.
+- Files SHOULD stay boring: public lifecycle methods in `collector.go`, setup
+  helpers in `init.go` when needed, orchestration in `collect.go`, distinct
+  upstream operations in `collect_<operation>.go`, metrics in `metrix.go` /
+  `write_metrics.go`, focused tests.
+- Before adding custom HTTP, selector, logging, command-execution, SQL, ping,
+  or log-file plumbing, check `src/go/plugin/go.d/docs/helper-packages.md` and
+  reuse an existing helper when it fits.
+- If Functions exist, isolate them in a `<name>func/` subpackage with a narrow
+  `Deps` interface declared there. The Function package MUST NOT import the
+  collector package or hold `*Collector`.
+- Public config options SHOULD stay small and justified. A proposed config
+  option MUST name the concrete operator decision it enables; "operators may
+  want to tune it" is not enough. Internal tuning SHOULD use constants unless
+  the operator has a real decision to make.
 
 ## Metrics And Charts
 
-- Create instruments once when the metric surface is known.
+- Instruments SHOULD be created once when the metric surface is known.
 - Use `store.Write().SnapshotMeter("")` for normal metrics.
 - Use `Vec(...)` for labels, `Gauge` for current values,
   `Counter.ObserveTotal()` for source counters, and `StateSet` for fixed
   one-active-state values.
-- Use stable metric names that `charts.yaml` selects.
+- Metric names MUST be stable and selected by `charts.yaml`.
 - In `charts.yaml`: use `version: v1`, `context_namespace`, `instances.by_labels`,
-  `algorithm: incremental` for counters, and `absolute` for gauges.
+  `label_promotion`, `algorithm: incremental` for counters, and `absolute` for
+  gauges.
 - Put multipliers, divisors, hidden flags, and float formatting in the chart
   template, not ad hoc chart-emission code.
 
 ## Compatibility Rules
 
+- For V1-to-V2 migrations, start with
+  `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`.
+
+### Migration Hard Stops
+
+- A collector using V1 chart `Vars` is blocked until framework support, an
+  approved equivalent design, or explicit breaking-alert approval exists.
+- `collecttest.AssertChartCoverage` is not chart-identity parity; it cannot
+  prove old chart IDs, family, priority, lifecycle, labels, or alert variables.
+- A finished migration MUST pass an import/runtime-path audit proving no V1
+  collection path or V1 map-to-`metrix` bridge remains reachable from normal
+  execution.
+
+- Temporary V1-to-V2 parity bridges MAY be used during development, but the
+  finished collector MUST NOT keep a runtime V1 map-to-`metrix` bridge.
 - For migrations, first create a compatibility manifest covering chart IDs,
   contexts, dimension IDs/names, labels, config keys, DynCfg schema keys,
   stock config, alerts, docs, and lifecycle behavior.
-- Preserve existing public contracts unless the SOW records an explicit breaking
-  decision.
-- Keep old YAML/JSON field names. Add new config as opt-in when cardinality,
-  cost, or user-visible identity could surprise existing users.
-- Keep `metadata.yaml`, `config_schema.json`, stock config, health alerts, and
-  README synchronized with code.
-- Never log raw secrets, DSNs, bearer tokens, or URLs with embedded credentials.
+- Migrations MUST preserve existing public contracts unless the SOW records an
+  explicit breaking decision.
+- Migrations MUST keep old YAML/JSON field names. Add new config as opt-in when
+  cardinality, cost, or user-visible identity could surprise existing users.
+- Collector integration artifacts MUST follow
+  `.agents/skills/integrations-lifecycle/consistency.md`; do not preserve a
+  partial local artifact checklist in V2 collector work.
+- MUST NOT log raw secrets, DSNs, bearer tokens, or URLs with embedded
+  credentials.
 
 ## Hot-Path Logging
 
-- Do not emit `Warningf`/`Errorf` every collection cycle for a recoverable
-  partial failure. Use the built-in logger limiter:
+- Collectors MUST NOT emit `Warningf`/`Errorf` every collection cycle for a
+  recoverable partial failure. Use the built-in logger limiter:
   `c.Limit("collector:stable-operation-key", 1, time.Hour).Warningf(...)`.
-- Keep limiter keys stable and low-cardinality. Use operation names, not entity
-  IDs, labels, URLs, raw errors, or user-controlled values.
+- Limiter keys MUST be stable and low-cardinality. Use operation names, not
+  entity IDs, labels, URLs, raw errors, or user-controlled values.
 - `Once()` is reset by `JobV2.runOnce()`, so it is useful inside one cycle only;
   it is not cross-cycle spam protection.
-- Full collection failure should still return an error with context so the job
+- Full collection failure SHOULD still return an error with context so the job
   retry path handles it. Limit only fail-soft warnings/errors where collection
   continues with partial or stale data.
 
 ## Host Scopes
 
-- Use host scopes only after a product decision says the data belongs on a
-  generated vnode.
-- Keep `ScopeKey` and `GUID` deterministic.
-- Add `_vnode_type=<source>` on collector-generated vnodes.
-- Bound and document cardinality. Do not create VM/disk/NIC/path/sensor scopes
-  by default.
+- Host scopes SHOULD be used only after a product decision says the data belongs
+  on a generated vnode.
+- `ScopeKey` and `GUID` MUST be deterministic.
+- Collector-generated vnodes MUST set `_vnode_type=<source>`.
+- Host-scope cardinality MUST be bounded and documented. Collectors SHOULD NOT
+  create VM/disk/NIC/path/sensor scopes by default.
+- Scope identity MUST use stable IDs. Human-readable names SHOULD be hostnames
+  or promoted labels only.
 
 ## Tests
 
-At minimum, V2 work needs:
+At minimum, V2 work MUST include these tests, or the PR/SOW MUST justify why a
+specific item does not apply:
 
 - config YAML/JSON serialization compatibility;
 - `Init`, `Check`, `Collect`, and `Cleanup` lifecycle coverage;
@@ -94,8 +148,12 @@ At minimum, V2 work needs:
 
 ## Pre-PR Check
 
-- No V1 `map[string]int64` collection path remains unless intentionally kept for
-  a compatibility bridge.
-- Existing public chart/metric/config identity is preserved.
-- New labels and scopes are bounded and documented.
-- Enrichment is split from the V2 compatibility migration when possible.
+- A finished V1-to-V2 migration MUST NOT keep a runtime
+  `map[string]int64` collection path or V1 map-to-`metrix` bridge.
+- The PR description or design note MUST enumerate affected collector
+  consistency artifacts and justify every artifact that did not need a matching
+  change. SHOULD-level exceptions and escape hatches MUST be reviewer-visible.
+- Existing public chart/metric/config identity MUST be preserved unless the SOW
+  records an explicit breaking decision.
+- New labels and scopes MUST be bounded and documented.
+- Enrichment SHOULD be split from the V2 compatibility migration when possible.

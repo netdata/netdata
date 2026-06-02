@@ -64,8 +64,8 @@ Our [static builds](#static-builds) are expected to work on these platforms if a
 
 | Platform                 | Version        | Official Native Packages      | Notes                                                                                                          |
 |--------------------------|----------------|-------------------------------|----------------------------------------------------------------------------------------------------------------|
-| Alpine Linux             | 3.23           | No                            | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images |
-| Alpine Linux             | 3.22           | No                            |                                                                                                                |
+| Alpine Linux             | 3.23           | No                            | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images. Alpine uses OpenRC and does not include systemd, so the systemd-journal plugin and local systemd integrations are unavailable. Logs can be forwarded to a remote `systemd-journal-remote` endpoint using `systemd-cat-native --url=URL`. |
+| Alpine Linux             | 3.22           | No                            | Alpine uses OpenRC and does not include systemd, so the systemd-journal plugin and local systemd integrations are unavailable. Logs can be forwarded to a remote `systemd-journal-remote` endpoint using `systemd-cat-native --url=URL`. |
 | Alma Linux               | 9.x            | x86\_64, AArch64              | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                |
 | Alma Linux               | 8.x            | x86\_64, AArch64              | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                |
 | Amazon Linux             | 2023           | x86\_64, AArch64              |                                                                                                                |
@@ -211,6 +211,14 @@ When you use static builds, you'll miss certain features that require specific o
 ### Systemd
 
 Many of our systemd integrations are not supported in our static builds. This is due to a general refusal by the systemd developers to support static linking (or any C runtime other than glibc), and is not something we can resolve.
+
+Beyond static builds, some operating systems (notably Alpine Linux) do not include systemd at all — they use OpenRC as their init system. This OS-level absence of systemd affects:
+
+- The **systemd-journal plugin** for log viewing, which requires a local `systemd-journald` installation.
+- **log2journal** output delivery — while log2journal itself is a standalone text processor with no systemd dependencies, its Journal Export Format output must be piped through `systemd-cat-native` to reach a journal. Without a local `systemd-journald`, use `systemd-cat-native --url=URL` to forward logs to a remote `systemd-journal-remote` endpoint instead.
+- Local systemd service management integrations.
+
+The `systemd-cat-native --url` mode is the supported workaround: it sends logs directly to a remote systemd-journal-remote and does not require any local systemd components.
 
 ### Impact of Platform End-of-Life (EOL)
 

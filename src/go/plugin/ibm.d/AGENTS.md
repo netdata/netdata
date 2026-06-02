@@ -132,7 +132,7 @@ The flag implicitly enables dump mode and exits once every job has produced at l
 ## Contributing Guidelines
 
 1. Review [`framework/README.md`](framework/README.md) for IBM.D framework details.
-2. Follow [General collector best practices](../BEST-PRACTICES.md).
+2. Follow the Go-area rules in [`../../AGENTS.md`](../../AGENTS.md).
 3. **Never edit auto-generated files** – see [Auto-Generated Files](#auto-generated-files) section.
 4. Always regenerate code after modifying `contexts.yaml`, `config.go`, or `module.yaml`.
 5. Run `gofmt` on generated Go files before committing.
