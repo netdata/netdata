@@ -668,7 +668,7 @@ check_for_remote_file() {
   fi
 
   if [ -n "${WGET}" ]; then
-    "${WGET}" -S --spider "${url}" > "${dl_log}" 2>&1
+    "${WGET}" -S -o "${dl_log}" --spider "${url}"
 
     case "$?" in
       0)
@@ -752,7 +752,7 @@ download() {
   fi
 
   if [ -n "${WGET}" ]; then
-    run "${WGET}" -T 15 -O "${dest}" "${url}"
+    run "${WGET}" -T 15 -o "${dl_log}" -O "${dest}" "${url}"
 
     case "$?" in
       0) return 0 ;;
@@ -812,9 +812,11 @@ get_actual_version() {
 
 get_redirect() {
   url="${1}"
+  set_tmpdir
+  output="${tmpdir}/download.log"
+  rm -f "${output}"
 
   if [ -n "${CURL}" ]; then
-    output="$(mktemp)"
     run "${CURL}" "${url}" -s -L -I -o /dev/null -w '%{url_effective}' > "${output}"
 
     case "$?" in
@@ -843,8 +845,7 @@ get_redirect() {
   fi
 
   if [ -n "${WGET}" ]; then
-    output="$(mktemp)"
-    run sh -c "${WGET}" -S -O /dev/null "${url}" > "${output}" 2>&1
+    run "${WGET}" -S -o "${dl_log}" -O /dev/null "${url}"
 
     case "$?" in
       0)
@@ -1099,7 +1100,7 @@ uninstall() {
       return 0
     else
       progress "Downloading netdata-uninstaller ..."
-      if download "${uninstaller_url}" "${tmpdir}/netdata-uninstaller.sh"
+      if download "${uninstaller_url}" "${tmpdir}/netdata-uninstaller.sh"; then
         chmod +x "${tmpdir}/netdata-uninstaller.sh"
         # shellcheck disable=SC2086
         if ! run_script "${tmpdir}/netdata-uninstaller.sh" ${FLAGS}; then
