@@ -3698,7 +3698,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            The collector automatically detects all of the metrics, no further configuration is required.
+            Once enabled, the collector automatically discovers and monitors **all** Windows services (`SERVICE_WIN32` type) on the host. There is no per-service selection or filtering — every service is included.
         limits:
           description: ""
         performance_impact:
@@ -3730,7 +3730,8 @@ modules:
           section_name: "[plugin:windows:PerflibServices]"
           description: "The Netdata main configuration file"
         options:
-          description: ""
+          description: |
+            This collector uses **file-based configuration only** via `netdata.conf`. Dynamic configuration (dyncfg) through the Netdata UI or `/api/v3/config` is **not available** for this collector — the `windows.plugin` does not implement dyncfg handlers.
           folding:
             title: "Config option"
             enabled: false
