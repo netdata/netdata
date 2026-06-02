@@ -10,8 +10,8 @@ struct cgroup *cgroup_root = NULL;
 netdata_mutex_t cgroup_root_mutex;
 struct discovery_thread discovery_thread = { 0 };
 int cgroup_lookup_reaped_set_size = 4;
-_Atomic bool discovery_signal_pending = false;
-_Atomic uint64_t cgroup_discovery_generation = 0;
+bool discovery_signal_pending = false;
+uint64_t cgroup_discovery_generation = 0;
 
 int rrdlabels_walkthrough_read(
     RRDLABELS *labels,

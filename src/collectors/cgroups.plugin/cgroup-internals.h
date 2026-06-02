@@ -352,10 +352,10 @@ extern int cgroup_root_count;
 extern int cgroup_root_max;
 extern int cgroup_max_depth;
 extern int cgroup_lookup_reaped_set_size;
-extern _Atomic bool discovery_signal_pending;
-extern _Atomic uint64_t cgroup_discovery_generation;
-extern _Atomic uint64_t cgroup_discovery_scans_natural;
-extern _Atomic uint64_t cgroup_discovery_scans_opportunistic;
+extern bool discovery_signal_pending;
+extern uint64_t cgroup_discovery_generation;
+extern uint64_t cgroup_discovery_scans_natural;
+extern uint64_t cgroup_discovery_scans_opportunistic;
 
 extern SIMPLE_PATTERN *enabled_cgroup_paths;
 extern SIMPLE_PATTERN *enabled_cgroup_names;

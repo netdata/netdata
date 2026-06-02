@@ -26,32 +26,32 @@ static struct cgroup_lookup_queue_entry *cgroups_lookup_queue_tail = NULL;
 static size_t cgroups_lookup_queue_count = 0;
 static ND_THREAD *cgroups_lookup_worker_thread = NULL;
 
-static _Atomic uint64_t cgroups_lookup_requests_sent = 0;
-static _Atomic uint64_t cgroups_lookup_requests_responded = 0;
-static _Atomic uint64_t cgroups_lookup_requests_timeout = 0;
-static _Atomic uint64_t cgroups_lookup_requests_error = 0;
-static _Atomic uint64_t cgroups_lookup_cache_hits = 0;
-static _Atomic uint64_t cgroups_lookup_cache_misses_retry = 0;
-static _Atomic uint64_t cgroups_lookup_cache_misses_permanent = 0;
-static _Atomic uint64_t cgroups_lookup_cache_evictions = 0;
-static _Atomic uint64_t cgroups_lookup_peer_connect_attempts = 0;
-static _Atomic uint64_t cgroups_lookup_peer_disconnects = 0;
-static _Atomic uint64_t cgroups_lookup_queue_depth = 0;
-static _Atomic uint64_t cgroups_lookup_duration_le_1ms = 0;
-static _Atomic uint64_t cgroups_lookup_duration_le_5ms = 0;
-static _Atomic uint64_t cgroups_lookup_duration_le_10ms = 0;
-static _Atomic uint64_t cgroups_lookup_duration_le_50ms = 0;
-static _Atomic uint64_t cgroups_lookup_duration_le_100ms = 0;
-static _Atomic uint64_t cgroups_lookup_duration_le_500ms = 0;
-static _Atomic uint64_t cgroups_lookup_duration_le_1000ms = 0;
-static _Atomic uint64_t cgroups_lookup_duration_gt_1000ms = 0;
+static uint64_t cgroups_lookup_requests_sent = 0;
+static uint64_t cgroups_lookup_requests_responded = 0;
+static uint64_t cgroups_lookup_requests_timeout = 0;
+static uint64_t cgroups_lookup_requests_error = 0;
+static uint64_t cgroups_lookup_cache_hits = 0;
+static uint64_t cgroups_lookup_cache_misses_retry = 0;
+static uint64_t cgroups_lookup_cache_misses_permanent = 0;
+static uint64_t cgroups_lookup_cache_evictions = 0;
+static uint64_t cgroups_lookup_peer_connect_attempts = 0;
+static uint64_t cgroups_lookup_peer_disconnects = 0;
+static uint64_t cgroups_lookup_queue_depth = 0;
+static uint64_t cgroups_lookup_duration_le_1ms = 0;
+static uint64_t cgroups_lookup_duration_le_5ms = 0;
+static uint64_t cgroups_lookup_duration_le_10ms = 0;
+static uint64_t cgroups_lookup_duration_le_50ms = 0;
+static uint64_t cgroups_lookup_duration_le_100ms = 0;
+static uint64_t cgroups_lookup_duration_le_500ms = 0;
+static uint64_t cgroups_lookup_duration_le_1000ms = 0;
+static uint64_t cgroups_lookup_duration_gt_1000ms = 0;
 
-static void cgroups_lookup_counter_inc(_Atomic uint64_t *counter)
+static void cgroups_lookup_counter_inc(uint64_t *counter)
 {
     __atomic_add_fetch(counter, 1, __ATOMIC_RELAXED);
 }
 
-static uint64_t cgroups_lookup_counter_get(_Atomic uint64_t *counter)
+static uint64_t cgroups_lookup_counter_get(uint64_t *counter)
 {
     return __atomic_load_n(counter, __ATOMIC_RELAXED);
 }

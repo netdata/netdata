@@ -232,7 +232,7 @@ extern size_t pagesize;
 
 extern netdata_mutex_t apps_and_stdout_mutex;
 extern netdata_mutex_t apps_pids_mutex;
-extern _Atomic uint64_t apps_collection_generation;
+extern uint64_t apps_collection_generation;
 
 // --------------------------------------------------------------------------------------------------------------------
 // string lengths

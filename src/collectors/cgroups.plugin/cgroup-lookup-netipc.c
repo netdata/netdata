@@ -337,7 +337,7 @@ bool cgroup_discovery_signal_if_unknown(void)
 
 static void cgroup_lookup_log_overflow_once(uint64_t generation)
 {
-    static _Atomic uint64_t last_logged_overflow_generation = 0;
+    static uint64_t last_logged_overflow_generation = 0;
     uint64_t last = __atomic_load_n(&last_logged_overflow_generation, __ATOMIC_RELAXED);
 
     if (last == generation)

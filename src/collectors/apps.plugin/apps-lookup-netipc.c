@@ -14,23 +14,23 @@ struct apps_lookup_label_view_ctx {
 static nipc_managed_server_t apps_lookup_server;
 static ND_THREAD *apps_lookup_netipc_thread = NULL;
 
-static _Atomic uint64_t apps_lookup_requests_responded = 0;
-static _Atomic uint64_t apps_lookup_requests_error = 0;
-static _Atomic uint64_t apps_lookup_duration_le_1ms = 0;
-static _Atomic uint64_t apps_lookup_duration_le_5ms = 0;
-static _Atomic uint64_t apps_lookup_duration_le_10ms = 0;
-static _Atomic uint64_t apps_lookup_duration_le_50ms = 0;
-static _Atomic uint64_t apps_lookup_duration_le_100ms = 0;
-static _Atomic uint64_t apps_lookup_duration_le_500ms = 0;
-static _Atomic uint64_t apps_lookup_duration_le_1000ms = 0;
-static _Atomic uint64_t apps_lookup_duration_gt_1000ms = 0;
+static uint64_t apps_lookup_requests_responded = 0;
+static uint64_t apps_lookup_requests_error = 0;
+static uint64_t apps_lookup_duration_le_1ms = 0;
+static uint64_t apps_lookup_duration_le_5ms = 0;
+static uint64_t apps_lookup_duration_le_10ms = 0;
+static uint64_t apps_lookup_duration_le_50ms = 0;
+static uint64_t apps_lookup_duration_le_100ms = 0;
+static uint64_t apps_lookup_duration_le_500ms = 0;
+static uint64_t apps_lookup_duration_le_1000ms = 0;
+static uint64_t apps_lookup_duration_gt_1000ms = 0;
 
-static void apps_lookup_counter_inc(_Atomic uint64_t *counter)
+static void apps_lookup_counter_inc(uint64_t *counter)
 {
     __atomic_add_fetch(counter, 1, __ATOMIC_RELAXED);
 }
 
-static uint64_t apps_lookup_counter_get(_Atomic uint64_t *counter)
+static uint64_t apps_lookup_counter_get(uint64_t *counter)
 {
     return __atomic_load_n(counter, __ATOMIC_RELAXED);
 }

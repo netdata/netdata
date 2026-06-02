@@ -13,7 +13,7 @@ static const char *test_os_run_dir(bool rw __maybe_unused)
 #include "../network-viewer-apps-lookup-client.c"
 #undef os_run_dir
 
-static _Atomic uint64_t mock_requests = 0;
+static uint64_t mock_requests = 0;
 
 static bool expect_ok(bool condition, const char *message)
 {
@@ -24,7 +24,7 @@ static bool expect_ok(bool condition, const char *message)
     return false;
 }
 
-static bool wait_for_counter(_Atomic uint64_t *counter, uint64_t value)
+static bool wait_for_counter(uint64_t *counter, uint64_t value)
 {
     for (size_t i = 0; i < 500; i++) {
         if (__atomic_load_n(counter, __ATOMIC_ACQUIRE) >= value)
@@ -51,7 +51,7 @@ static bool wait_for_cache_entries(uint32_t value)
     return false;
 }
 
-static uint64_t counter_value(_Atomic uint64_t *counter)
+static uint64_t counter_value(uint64_t *counter)
 {
     return __atomic_load_n(counter, __ATOMIC_ACQUIRE);
 }

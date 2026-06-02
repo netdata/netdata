@@ -62,50 +62,50 @@ static bool apps_lookup_client_initialized = false;
 static bool apps_lookup_peer_was_ready = false;
 static usec_t apps_lookup_next_retry_ut = 0;
 
-static _Atomic bool apps_lookup_worker_stop = false;
-static _Atomic bool apps_lookup_worker_thread_exited = false;
-static _Atomic int apps_lookup_active_client_fd = -1;
+static bool apps_lookup_worker_stop = false;
+static bool apps_lookup_worker_thread_exited = false;
+static int apps_lookup_active_client_fd = -1;
 
-static _Atomic uint64_t apps_lookup_requests_sent = 0;
-static _Atomic uint64_t apps_lookup_requests_responded = 0;
-static _Atomic uint64_t apps_lookup_requests_failed = 0;
-static _Atomic uint64_t apps_lookup_cache_hits = 0;
-static _Atomic uint64_t apps_lookup_cache_misses_unknown = 0;
-static _Atomic uint64_t apps_lookup_cache_misses_intake_dropped = 0;
-static _Atomic uint64_t apps_lookup_cache_evictions_pid_reuse = 0;
-static _Atomic uint64_t apps_lookup_cache_evictions_lru = 0;
-static _Atomic uint64_t apps_lookup_cache_evictions_unknown_permanent = 0;
-static _Atomic uint64_t apps_lookup_peer_connect_attempts = 0;
-static _Atomic uint64_t apps_lookup_peer_disconnects = 0;
-static _Atomic uint64_t apps_lookup_intake_depth = 0;
-static _Atomic uint64_t apps_lookup_worker_duration_le_1ms = 0;
-static _Atomic uint64_t apps_lookup_worker_duration_le_5ms = 0;
-static _Atomic uint64_t apps_lookup_worker_duration_le_10ms = 0;
-static _Atomic uint64_t apps_lookup_worker_duration_le_50ms = 0;
-static _Atomic uint64_t apps_lookup_worker_duration_le_100ms = 0;
-static _Atomic uint64_t apps_lookup_worker_duration_le_500ms = 0;
-static _Atomic uint64_t apps_lookup_worker_duration_le_1000ms = 0;
-static _Atomic uint64_t apps_lookup_worker_duration_gt_1000ms = 0;
-static _Atomic uint64_t apps_lookup_handler_overhead_le_1ms = 0;
-static _Atomic uint64_t apps_lookup_handler_overhead_le_5ms = 0;
-static _Atomic uint64_t apps_lookup_handler_overhead_le_10ms = 0;
-static _Atomic uint64_t apps_lookup_handler_overhead_le_50ms = 0;
-static _Atomic uint64_t apps_lookup_handler_overhead_le_100ms = 0;
-static _Atomic uint64_t apps_lookup_handler_overhead_le_500ms = 0;
-static _Atomic uint64_t apps_lookup_handler_overhead_le_1000ms = 0;
-static _Atomic uint64_t apps_lookup_handler_overhead_gt_1000ms = 0;
+static uint64_t apps_lookup_requests_sent = 0;
+static uint64_t apps_lookup_requests_responded = 0;
+static uint64_t apps_lookup_requests_failed = 0;
+static uint64_t apps_lookup_cache_hits = 0;
+static uint64_t apps_lookup_cache_misses_unknown = 0;
+static uint64_t apps_lookup_cache_misses_intake_dropped = 0;
+static uint64_t apps_lookup_cache_evictions_pid_reuse = 0;
+static uint64_t apps_lookup_cache_evictions_lru = 0;
+static uint64_t apps_lookup_cache_evictions_unknown_permanent = 0;
+static uint64_t apps_lookup_peer_connect_attempts = 0;
+static uint64_t apps_lookup_peer_disconnects = 0;
+static uint64_t apps_lookup_intake_depth = 0;
+static uint64_t apps_lookup_worker_duration_le_1ms = 0;
+static uint64_t apps_lookup_worker_duration_le_5ms = 0;
+static uint64_t apps_lookup_worker_duration_le_10ms = 0;
+static uint64_t apps_lookup_worker_duration_le_50ms = 0;
+static uint64_t apps_lookup_worker_duration_le_100ms = 0;
+static uint64_t apps_lookup_worker_duration_le_500ms = 0;
+static uint64_t apps_lookup_worker_duration_le_1000ms = 0;
+static uint64_t apps_lookup_worker_duration_gt_1000ms = 0;
+static uint64_t apps_lookup_handler_overhead_le_1ms = 0;
+static uint64_t apps_lookup_handler_overhead_le_5ms = 0;
+static uint64_t apps_lookup_handler_overhead_le_10ms = 0;
+static uint64_t apps_lookup_handler_overhead_le_50ms = 0;
+static uint64_t apps_lookup_handler_overhead_le_100ms = 0;
+static uint64_t apps_lookup_handler_overhead_le_500ms = 0;
+static uint64_t apps_lookup_handler_overhead_le_1000ms = 0;
+static uint64_t apps_lookup_handler_overhead_gt_1000ms = 0;
 
-static void nv_apps_lookup_counter_inc(_Atomic uint64_t *counter)
+static void nv_apps_lookup_counter_inc(uint64_t *counter)
 {
     __atomic_add_fetch(counter, 1, __ATOMIC_RELAXED);
 }
 
-static uint64_t nv_apps_lookup_counter_get(_Atomic uint64_t *counter)
+static uint64_t nv_apps_lookup_counter_get(uint64_t *counter)
 {
     return __atomic_load_n(counter, __ATOMIC_RELAXED);
 }
 
-static void nv_apps_lookup_duration_observe(usec_t duration_ut, _Atomic uint64_t *buckets[8])
+static void nv_apps_lookup_duration_observe(usec_t duration_ut, uint64_t *buckets[8])
 {
     uint64_t duration_ms = duration_ut / USEC_PER_MS;
 
@@ -129,7 +129,7 @@ static void nv_apps_lookup_duration_observe(usec_t duration_ut, _Atomic uint64_t
 
 static void nv_apps_lookup_worker_duration_observe(usec_t duration_ut)
 {
-    _Atomic uint64_t *buckets[8] = {
+    uint64_t *buckets[8] = {
         &apps_lookup_worker_duration_le_1ms,
         &apps_lookup_worker_duration_le_5ms,
         &apps_lookup_worker_duration_le_10ms,
@@ -145,7 +145,7 @@ static void nv_apps_lookup_worker_duration_observe(usec_t duration_ut)
 
 static void nv_apps_lookup_handler_overhead_observe(usec_t duration_ut)
 {
-    _Atomic uint64_t *buckets[8] = {
+    uint64_t *buckets[8] = {
         &apps_lookup_handler_overhead_le_1ms,
         &apps_lookup_handler_overhead_le_5ms,
         &apps_lookup_handler_overhead_le_10ms,

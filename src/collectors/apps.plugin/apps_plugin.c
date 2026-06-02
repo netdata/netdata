@@ -710,7 +710,7 @@ static inline int check_capabilities() {
  */
 netdata_mutex_t apps_and_stdout_mutex;
 netdata_mutex_t apps_pids_mutex;
-_Atomic uint64_t apps_collection_generation = 0;
+uint64_t apps_collection_generation = 0;
 
 static void __attribute__((constructor)) init_mutex(void) {
     netdata_mutex_init(&apps_and_stdout_mutex);
