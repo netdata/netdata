@@ -30,6 +30,7 @@ bool stacktrace_available(void);
 
 // Capture a stacktrace to a buffer
 struct web_buffer;
+typedef struct web_buffer BUFFER;
 void stacktrace_capture(BUFFER *wb);
 
 // Return a string describing the backend used for capturing stacktraces
