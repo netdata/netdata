@@ -22,6 +22,8 @@ scan_sensitive_file() {
     chomp;
     my $line = $_;
     my @hits;
+    next if $ARGV =~ m{(^|/)\.agents/sow/scan-sensitive\.sh$}
+      && $line =~ /^\s*(?:push \@hits, "[^"]+"\s+(?:if|unless)\s+\$line =~|if \(\$line =~)/;
 
     sub is_public_customer_ip {
       my ($ip) = @_;
