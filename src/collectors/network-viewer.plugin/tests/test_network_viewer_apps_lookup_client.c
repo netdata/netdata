@@ -153,7 +153,7 @@ static void mock_server_thread(void *arg)
 
 int main(void)
 {
-    char temp_dir[] = "/tmp/network-viewer-apps-lookup-test.XXXXXX";
+    char temp_dir[] = "./network-viewer-apps-lookup-test.XXXXXX";
     int rc = 1;
     bool plugin_should_exit = false;
     nipc_managed_server_t server;

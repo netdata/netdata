@@ -9,7 +9,27 @@ set -euo pipefail
 wrapper_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 shell_resolver="${wrapper_dir}/cgroup-name.sh.real"
 go_resolver="${wrapper_dir}/cgroup-name"
-capture_file="${TMPDIR:-/tmp}/cgroup-name-capture.jsonl"
+
+capture_file_create() {
+  local base_dir="${CGROUP_NAME_CAPTURE_DIR:-}"
+
+  if [ -z "$base_dir" ]; then
+    if [ -n "${XDG_STATE_HOME:-}" ]; then
+      base_dir="${XDG_STATE_HOME}/netdata/cgroup-name-capture"
+    elif [ -n "${HOME:-}" ]; then
+      base_dir="${HOME}/.local/state/netdata/cgroup-name-capture"
+    else
+      base_dir="$(mktemp -d "${TMPDIR:-/tmp}/cgroup-name-capture.XXXXXX")"
+    fi
+  fi
+
+  mkdir -p "$base_dir"
+  chmod 700 "$base_dir" 2>/dev/null || true
+  mktemp "${base_dir%/}/capture.XXXXXX.jsonl"
+}
+
+capture_file="$(capture_file_create)"
+chmod 600 "$capture_file" 2>/dev/null || true
 
 json_escape() {
   local s="${1-}"
@@ -32,19 +52,6 @@ json_array() {
     printf '"%s"' "$(json_escape "$item")"
   done
   printf ']'
-}
-
-json_env() {
-  local first=1 name value
-  printf '{'
-  while IFS='=' read -r name value; do
-    if [ "$first" -eq 0 ]; then
-      printf ','
-    fi
-    first=0
-    printf '"%s":"%s"' "$(json_escape "$name")" "$(json_escape "$value")"
-  done < <(env)
-  printf '}'
 }
 
 run_one() {
@@ -76,7 +83,6 @@ trap 'rm -rf "$tmpdir"' EXIT
 
 ts_ns_before="$(date +%s%N)"
 argv_json="$(json_array "$0" "$@")"
-env_json="$(json_env)"
 
 run_one "$shell_resolver" "$tmpdir/shell.out" "$tmpdir/shell.err" "$tmpdir/shell.code" "$tmpdir/shell.ms" "$@"
 run_one "$go_resolver" "$tmpdir/go.out" "$tmpdir/go.err" "$tmpdir/go.code" "$tmpdir/go.ms" "$@"
@@ -96,7 +102,6 @@ fi
   printf '"ts_ns_before":%s,' "$ts_ns_before"
   printf '"pid":%s,' "$$"
   printf '"argv":%s,' "$argv_json"
-  printf '"env":%s,' "$env_json"
   printf '"shell":{"stdout":"%s","stderr":"%s","exit_code":%s,"duration_ms":%s},' \
     "$(json_escape "$(cat "$tmpdir/shell.out")")" \
     "$(json_escape "$(cat "$tmpdir/shell.err")")" \

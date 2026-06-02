@@ -101,7 +101,7 @@ pod names into durable artifacts.
 - The wrapper resolves and caches the per-agent bearer under
   `.local/audits/query-netdata-agents/bearers/`. That directory is
   gitignored and must remain local.
-- - Canonical Kubernetes columns do not require `labels:<pattern>`.
+- Canonical Kubernetes columns do not require `labels:<pattern>`.
 - Use the same `NODE_UUID`, `MACHINE_GUID`, and `AGENT_HOST` tuple from
   the same Agent identity response.
 

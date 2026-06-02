@@ -11,13 +11,13 @@
 #define APPS_NETIPC_LOOKUP_WORKER_COUNT 2
 #define APPS_LOOKUP_MAX_PIDS_PER_REQUEST 8192U
 
-void apps_lookup_netipc_init(void);
+bool apps_lookup_netipc_init(void);
 void apps_lookup_netipc_cleanup(void);
 void apps_lookup_netipc_send_charts_to_netdata(usec_t dt);
 
 #else
 
-static inline void apps_lookup_netipc_init(void) {}
+static inline bool apps_lookup_netipc_init(void) { return true; }
 static inline void apps_lookup_netipc_cleanup(void) {}
 static inline void apps_lookup_netipc_send_charts_to_netdata(usec_t dt __maybe_unused) {}
 

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,6 +32,8 @@ const (
 	exitRetry   = 2
 	exitDisable = 3
 )
+
+const k8sServiceAccountCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
 var (
 	sbindirPost string
@@ -301,7 +304,7 @@ func firstConfigValue(path string, sedRE *regexp.Regexp, grepPrefix string) stri
 	if err != nil {
 		return ""
 	}
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		if !strings.HasPrefix(line, strings.TrimPrefix(grepPrefix, "^")) {
 			continue
 		}
@@ -323,7 +326,7 @@ func (r *resolver) parseDockerLikeInspectOutput(output string) {
 		"CONT_NAME":            true,
 		"IMAGE_NAME":           true,
 	}
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		name, value, ok := strings.Cut(line, "=")
 		if ok && wanted[name] {
 			vars[name] = value
@@ -341,7 +344,7 @@ func (r *resolver) parseDockerLikeInspectOutput(output string) {
 		r.labels = `image="` + vars["IMAGE_NAME"] + `"`
 	}
 
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		if !strings.HasPrefix(line, "LABEL_netdata.cloud/") {
 			continue
 		}
@@ -433,14 +436,14 @@ func httpUnixGet(socketPath, url string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-func httpGet(url string, headers map[string]string, insecure, noProxy, fail bool, timeout time.Duration) ([]byte, error) {
-	return httpGetWithContext(context.Background(), url, headers, insecure, noProxy, fail, timeout)
+func httpGet(url string, headers map[string]string, useServiceAccountCA, noProxy, fail bool, timeout time.Duration) ([]byte, error) {
+	return httpGetWithContext(context.Background(), url, headers, useServiceAccountCA, noProxy, fail, timeout)
 }
 
-func httpGetWithContext(ctx context.Context, url string, headers map[string]string, insecure, noProxy, fail bool, timeout time.Duration) ([]byte, error) {
+func httpGetWithContext(ctx context.Context, url string, headers map[string]string, useServiceAccountCA, noProxy, fail bool, timeout time.Duration) ([]byte, error) {
 	tr := &http.Transport{}
-	if insecure {
-		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // Mirrors curl -k in the legacy resolver.
+	if useServiceAccountCA {
+		tr.TLSClientConfig = k8sServiceAccountTLSConfig()
 	}
 	if noProxy {
 		tr.Proxy = nil
@@ -471,6 +474,22 @@ func httpGetWithContext(ctx context.Context, url string, headers map[string]stri
 		return body, fmt.Errorf("http status %d", resp.StatusCode)
 	}
 	return body, nil
+}
+
+func k8sServiceAccountTLSConfig() *tls.Config {
+	roots, err := x509.SystemCertPool()
+	if err != nil || roots == nil {
+		roots = x509.NewCertPool()
+	}
+
+	if ca, err := os.ReadFile(k8sServiceAccountCAFile); err == nil {
+		roots.AppendCertsFromPEM(ca)
+	}
+
+	return &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    roots,
+	}
 }
 
 type dockerInspect struct {
@@ -698,8 +717,8 @@ func (r *resolver) k8sGetKubePodName(cgroupPath, id string) (string, int) {
 		name = cleanID
 	case reK8sQOS.MatchString(cleanID):
 		name = strings.ReplaceAll(cleanID, "-", "_")
-		if strings.HasPrefix(name, "kubepods_kubepods") {
-			name = "kubepods" + strings.TrimPrefix(name, "kubepods_kubepods")
+		if after, ok := strings.CutPrefix(name, "kubepods_kubepods"); ok {
+			name = "kubepods" + after
 		}
 	case reK8sCRIID.MatchString(cleanID):
 		cntrID = reK8sCRIID.FindStringSubmatch(cleanID)[2]
@@ -870,8 +889,8 @@ func firstLineFile(path string) string {
 }
 
 func firstLine(s string) string {
-	if i := strings.IndexByte(s, '\n'); i >= 0 {
-		return s[:i]
+	if before, _, ok := strings.Cut(s, "\n"); ok {
+		return before
 	}
 	return s
 }
@@ -886,7 +905,7 @@ func grepFile(path, pattern string, max int) (string, bool) {
 
 func grepString(s, pattern string, max int) (string, bool) {
 	var matches []string
-	for _, line := range strings.Split(strings.TrimRight(s, "\n"), "\n") {
+	for line := range strings.SplitSeq(strings.TrimRight(s, "\n"), "\n") {
 		if strings.Contains(line, pattern) {
 			matches = append(matches, line)
 			if max > 0 && len(matches) >= max {
@@ -1017,9 +1036,10 @@ func podsToContainerLines(raw string) (string, error) {
 	}
 	var lines []string
 	for _, item := range doc.Items {
-		base := `namespace="` + ptrString(item.Metadata.Namespace) + `",`
-		base += `pod_name="` + ptrString(item.Metadata.Name) + `",`
-		base += `pod_uid="` + ptrString(item.Metadata.UID) + `",`
+		var base strings.Builder
+		base.WriteString(`namespace="` + ptrString(item.Metadata.Namespace) + `",`)
+		base.WriteString(`pod_name="` + ptrString(item.Metadata.Name) + `",`)
+		base.WriteString(`pod_uid="` + ptrString(item.Metadata.UID) + `",`)
 
 		annotations, err := orderedStringEntries(item.Metadata.Annotations)
 		if err != nil {
@@ -1027,19 +1047,19 @@ func podsToContainerLines(raw string) (string, error) {
 		}
 		for _, ann := range annotations {
 			if strings.HasPrefix(ann.key, "netdata.cloud/") {
-				base += ann.key + `="` + ann.value + `",`
+				base.WriteString(ann.key + `="` + ann.value + `",`)
 			}
 		}
 		for _, owner := range item.Metadata.OwnerReferences {
 			if owner.Controller != nil && *owner.Controller {
-				base += `controller_kind="` + ptrString(owner.Kind) + `",`
-				base += `controller_name="` + ptrString(owner.Name) + `",`
+				base.WriteString(`controller_kind="` + ptrString(owner.Kind) + `",`)
+				base.WriteString(`controller_name="` + ptrString(owner.Name) + `",`)
 				break
 			}
 		}
-		base += `node_name="` + ptrString(item.Spec.NodeName) + `",`
+		base.WriteString(`node_name="` + ptrString(item.Spec.NodeName) + `",`)
 		for _, st := range item.Status.ContainerStatuses {
-			line := base
+			line := base.String()
 			line += `container_name="` + ptrString(st.Name) + `",`
 			line += `container_id="` + strings.NewReplacer("docker://", "", "cri-o://", "", "containerd://", "").Replace(ptrString(st.ContainerID)) + `"`
 			lines = append(lines, line)
@@ -1059,7 +1079,7 @@ func getLblVal(labels, wantName string) string {
 	if labels == "" {
 		return "null"
 	}
-	for _, label := range strings.Split(labels, ",") {
+	for label := range strings.SplitSeq(labels, ",") {
 		lname, lval, ok := strings.Cut(label, "=")
 		if ok && lname == wantName && lval != "" {
 			if len(lval) >= 2 {
@@ -1087,7 +1107,7 @@ func removeLbl(labels, lblName string) string {
 		return ""
 	}
 	var out []string
-	for _, label := range strings.Split(labels, ",") {
+	for label := range strings.SplitSeq(labels, ",") {
 		lname, _, _ := strings.Cut(label, "=")
 		if lname != lblName {
 			out = append(out, label)
@@ -1127,8 +1147,8 @@ func (r *resolver) k8sGetName(cgroupPath, id string) {
 }
 
 func splitNameLabels(s string) (string, string) {
-	if i := strings.IndexByte(s, ' '); i >= 0 {
-		return s[:i], s[i+1:]
+	if before, after, ok := strings.Cut(s, " "); ok {
+		return before, after
 	}
 	return s, s
 }

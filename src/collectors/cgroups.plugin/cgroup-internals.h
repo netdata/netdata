@@ -164,14 +164,14 @@ enum cgroups_container_orchestrator {
     CGROUPS_ORCHESTRATOR_NSPAWN  = 7,
 };
 
-_Static_assert(CGROUPS_ORCHESTRATOR_UNKNOWN == NIPC_ORCHESTRATOR_UNKNOWN, "cgroups UNKNOWN enum must match netipc");
-_Static_assert(CGROUPS_ORCHESTRATOR_SYSTEMD == NIPC_ORCHESTRATOR_SYSTEMD, "cgroups SYSTEMD enum must match netipc");
-_Static_assert(CGROUPS_ORCHESTRATOR_DOCKER == NIPC_ORCHESTRATOR_DOCKER, "cgroups DOCKER enum must match netipc");
-_Static_assert(CGROUPS_ORCHESTRATOR_K8S == NIPC_ORCHESTRATOR_K8S, "cgroups K8S enum must match netipc");
-_Static_assert(CGROUPS_ORCHESTRATOR_KVM == NIPC_ORCHESTRATOR_KVM, "cgroups KVM enum must match netipc");
-_Static_assert(CGROUPS_ORCHESTRATOR_LXC == NIPC_ORCHESTRATOR_LXC, "cgroups LXC enum must match netipc");
-_Static_assert(CGROUPS_ORCHESTRATOR_PODMAN == NIPC_ORCHESTRATOR_PODMAN, "cgroups PODMAN enum must match netipc");
-_Static_assert(CGROUPS_ORCHESTRATOR_NSPAWN == NIPC_ORCHESTRATOR_NSPAWN, "cgroups NSPAWN enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_UNKNOWN == (int)NIPC_ORCHESTRATOR_UNKNOWN, "cgroups UNKNOWN enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_SYSTEMD == (int)NIPC_ORCHESTRATOR_SYSTEMD, "cgroups SYSTEMD enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_DOCKER == (int)NIPC_ORCHESTRATOR_DOCKER, "cgroups DOCKER enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_K8S == (int)NIPC_ORCHESTRATOR_K8S, "cgroups K8S enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_KVM == (int)NIPC_ORCHESTRATOR_KVM, "cgroups KVM enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_LXC == (int)NIPC_ORCHESTRATOR_LXC, "cgroups LXC enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_PODMAN == (int)NIPC_ORCHESTRATOR_PODMAN, "cgroups PODMAN enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_NSPAWN == (int)NIPC_ORCHESTRATOR_NSPAWN, "cgroups NSPAWN enum must match netipc");
 
 
 // *** WARNING *** The fields are not thread safe. Take care of safe usage.

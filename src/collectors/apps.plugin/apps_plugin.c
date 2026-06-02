@@ -873,10 +873,8 @@ int main(int argc, char **argv) {
 
         __atomic_add_fetch(&apps_collection_generation, 1, __ATOMIC_RELEASE);
 
-        if (!apps_lookup_server_started) {
-            apps_lookup_netipc_init();
-            apps_lookup_server_started = true;
-        }
+        if (!apps_lookup_server_started)
+            apps_lookup_server_started = apps_lookup_netipc_init();
 
         apps_cgroups_lookup_scan_pids();
         netdata_mutex_unlock(&apps_pids_mutex);

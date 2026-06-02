@@ -149,7 +149,12 @@ static bool cgroups_lookup_cache_evict_one(void)
         if (entry->refcount != 0)
             continue;
 
-        if (!victim || entry->last_used_iteration < victim->last_used_iteration)
+        if (!victim) {
+            victim = entry;
+            continue;
+        }
+
+        if (entry->last_used_iteration < victim->last_used_iteration)
             victim = entry;
     }
     dfe_done(entry);

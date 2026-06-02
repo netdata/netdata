@@ -260,7 +260,12 @@ static bool nv_apps_lookup_pid_set_evict_oldest(DICTIONARY *dict, uint32_t *size
     NV_APPS_LOOKUP_PID_ENTRY *victim = NULL;
     NV_APPS_LOOKUP_PID_ENTRY *entry;
     dfe_start_read(dict, entry) {
-        if (!victim || entry->sequence < victim->sequence)
+        if (!victim) {
+            victim = entry;
+            continue;
+        }
+
+        if (entry->sequence < victim->sequence)
             victim = entry;
     }
     dfe_done(entry);
@@ -273,6 +278,21 @@ static bool nv_apps_lookup_pid_set_evict_oldest(DICTIONARY *dict, uint32_t *size
     dictionary_del(dict, key);
     (*size)--;
     return true;
+}
+
+static void nv_apps_lookup_cache_victim_append(
+    uint32_t **victims,
+    size_t *victims_count,
+    size_t *victims_capacity,
+    uint32_t pid)
+{
+    if (*victims_count == *victims_capacity) {
+        size_t new_capacity = *victims_capacity ? *victims_capacity * 2 : 64;
+        *victims = reallocz(*victims, new_capacity * sizeof(**victims));
+        *victims_capacity = new_capacity;
+    }
+
+    (*victims)[(*victims_count)++] = pid;
 }
 
 static bool nv_apps_lookup_pid_set_add(
@@ -417,11 +437,7 @@ static void nv_apps_lookup_cache_prune_to_pids(const uint32_t *pids, size_t coun
         if (nv_apps_lookup_pid_in_sorted(pids, count, entry->pid))
             continue;
 
-        if (victims_count == victims_capacity) {
-            victims_capacity = victims_capacity ? victims_capacity * 2 : 64;
-            victims = reallocz(victims, victims_capacity * sizeof(*victims));
-        }
-        victims[victims_count++] = entry->pid;
+        nv_apps_lookup_cache_victim_append(&victims, &victims_count, &victims_capacity, entry->pid);
     }
     dfe_done(entry);
 
@@ -444,7 +460,12 @@ static bool nv_apps_lookup_cache_evict_lru(void)
     NV_APPS_LOOKUP_CACHE_ENTRY *victim = NULL;
     NV_APPS_LOOKUP_CACHE_ENTRY *entry;
     dfe_start_read(apps_lookup_cache, entry) {
-        if (!victim || entry->last_used_usec < victim->last_used_usec)
+        if (!victim) {
+            victim = entry;
+            continue;
+        }
+
+        if (entry->last_used_usec < victim->last_used_usec)
             victim = entry;
     }
     dfe_done(entry);

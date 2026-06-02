@@ -821,16 +821,56 @@ bool apps_os_read_pid_cgroup_linux(struct pid_stat *p, void *ptr __maybe_unused)
         return false;
 
     char content[FILENAME_MAX + 1];
-    ssize_t bytes = read(fd, content, sizeof(content) - 1);
-    int saved_errno = errno;
-    close(fd);
+    size_t used = 0;
+    bool truncated = false;
 
-    if (bytes <= 0) {
-        errno = bytes == 0 ? EINVAL : saved_errno;
+    while (used < sizeof(content) - 1) {
+        ssize_t bytes = read(fd, content + used, sizeof(content) - 1 - used);
+        if (bytes > 0) {
+            used += (size_t)bytes;
+            continue;
+        }
+
+        if (bytes == 0)
+            break;
+
+        if (errno == EINTR)
+            continue;
+
+        int saved_errno = errno;
+        close(fd);
+        errno = saved_errno;
         return false;
     }
 
-    content[bytes] = '\0';
+    if (used == sizeof(content) - 1) {
+        char extra;
+        for (;;) {
+            ssize_t bytes = read(fd, &extra, 1);
+            if (bytes > 0) {
+                truncated = true;
+                break;
+            }
+            if (bytes == 0)
+                break;
+            if (errno == EINTR)
+                continue;
+
+            int saved_errno = errno;
+            close(fd);
+            errno = saved_errno;
+            return false;
+        }
+    }
+
+    close(fd);
+
+    if (used == 0 || truncated) {
+        errno = truncated ? ENAMETOOLONG : EINVAL;
+        return false;
+    }
+
+    content[used] = '\0';
 
     char path[FILENAME_MAX + 1];
     if (!apps_cgroup_parse_proc_pid_cgroup_content(content, path, sizeof(path))) {

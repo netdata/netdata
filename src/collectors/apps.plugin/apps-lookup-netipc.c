@@ -272,10 +272,10 @@ static void apps_lookup_netipc_server_thread(void *arg)
     nipc_server_run((nipc_managed_server_t *)arg);
 }
 
-void apps_lookup_netipc_init(void)
+bool apps_lookup_netipc_init(void)
 {
     if (apps_lookup_netipc_thread)
-        return;
+        return true;
 
     nipc_server_config_t config = {
         .supported_profiles = NIPC_PROFILE_BASELINE | NIPC_PROFILE_SHM_HYBRID | NIPC_PROFILE_SHM_FUTEX,
@@ -298,7 +298,7 @@ void apps_lookup_netipc_init(void)
 
     if (err != NIPC_OK) {
         netdata_log_error("apps.plugin APPS_LOOKUP server init failed (error %u)", (unsigned int)err);
-        return;
+        return false;
     }
 
     apps_lookup_netipc_thread = nd_thread_create(
@@ -310,11 +310,12 @@ void apps_lookup_netipc_init(void)
     if (!apps_lookup_netipc_thread) {
         netdata_log_error("apps.plugin failed to create APPS_LOOKUP server thread");
         nipc_server_destroy(&apps_lookup_server);
-        return;
+        return false;
     }
 
     netdata_log_info("apps.plugin APPS_LOOKUP server started on '%s/%s.sock'",
                      os_run_dir(true), APPS_NETIPC_LOOKUP_SERVICE_NAME);
+    return true;
 }
 
 void apps_lookup_netipc_cleanup(void)

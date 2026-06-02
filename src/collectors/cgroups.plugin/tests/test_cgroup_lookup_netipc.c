@@ -153,7 +153,7 @@ static bool expect_item(
 
 int main(void)
 {
-    char temp_dir[] = "/tmp/cgroup-lookup-netipc-test.XXXXXX";
+    char temp_dir[] = "./cgroup-lookup-netipc-test.XXXXXX";
     char service_name[64];
     const char *known_path = "/docker/0123456789abcdef";
     const char *retry_path = "/docker/aaaaaaaaaaaaaaaa";
