@@ -110,6 +110,11 @@ struct netdata_ebpf_cachestat_runtime {
     struct netdata_ebpf_cachestat_pid_entry *acc;
     size_t acc_cap;
     size_t acc_count;
+    /* Hash table for O(1) acc lookup: slot stores (acc_index + 1), 0 = empty.
+     * Rebuilt from scratch on every eviction (evictions are rare, ~once per
+     * evicted TGID per ~30 s), so no tombstones are needed. */
+    uint32_t *acc_htable;
+    size_t    acc_htable_sz; /* power-of-2 capacity */
 #endif
 };
 
@@ -515,27 +520,105 @@ enum {
     CACHESTAT_RB_EVENT_BUFFER_DIRTY   = 3,
 };
 
+/* Knuth multiplicative hash — good dispersion for sequential PID values. */
+static inline size_t acc_htable_slot(uint32_t tgid, size_t sz)
+{
+    return (size_t)(((uint64_t)tgid * UINT64_C(2654435761)) >> 32) & (sz - 1);
+}
+
+/* Rebuild the hash table from the current acc[] contents.
+ * Called after every structural change (growth or eviction).
+ * O(acc_count) — acceptable because evictions are rare and growth is amortised. */
+static bool acc_htable_rebuild(struct netdata_ebpf_cachestat_runtime *rt)
+{
+    /* capacity = next power-of-2 >= 4 × acc_count (load factor ≤ 0.25 after rebuild) */
+    size_t need = rt->acc_count < 16 ? 64 : rt->acc_count * 4;
+    size_t cap = 64;
+    while (cap < need) cap <<= 1;
+
+    if (cap != rt->acc_htable_sz) {
+        uint32_t *p = realloc(rt->acc_htable, cap * sizeof(*p));
+        if (!p) return false;
+        rt->acc_htable    = p;
+        rt->acc_htable_sz = cap;
+    }
+    memset(rt->acc_htable, 0, cap * sizeof(*rt->acc_htable));
+
+    for (size_t i = 0; i < rt->acc_count; i++) {
+        size_t h = acc_htable_slot(rt->acc[i].tgid, cap);
+        while (rt->acc_htable[h])
+            h = (h + 1) & (cap - 1);
+        rt->acc_htable[h] = (uint32_t)(i + 1);
+    }
+    return true;
+}
+
+/* O(1) amortised: hash-table lookup, falls back to linear insert on new TGID. */
 static struct netdata_ebpf_cachestat_pid_entry *cachestat_acc_find_or_add(
     struct netdata_ebpf_cachestat_runtime *rt, uint32_t tgid)
 {
-    for (size_t i = 0; i < rt->acc_count; i++) {
-        if (rt->acc[i].tgid == tgid)
-            return &rt->acc[i];
+    /* Rebuild or initialise the table when load exceeds 0.5. */
+    if (!rt->acc_htable || rt->acc_count + 1 > rt->acc_htable_sz / 2) {
+        if (!acc_htable_rebuild(rt))
+            return NULL;
     }
 
+    size_t cap = rt->acc_htable_sz;
+    size_t h   = acc_htable_slot(tgid, cap);
+
+    while (rt->acc_htable[h]) {
+        if (rt->acc[rt->acc_htable[h] - 1].tgid == tgid)
+            return &rt->acc[rt->acc_htable[h] - 1];
+        h = (h + 1) & (cap - 1);
+    }
+
+    /* New TGID — grow acc[] if needed then insert. */
     if (rt->acc_count >= rt->acc_cap) {
         size_t new_cap = rt->acc_cap ? rt->acc_cap * 2 : 64;
         struct netdata_ebpf_cachestat_pid_entry *p = realloc(rt->acc, new_cap * sizeof(*p));
-        if (!p)
-            return NULL;
-        rt->acc = p;
+        if (!p) return NULL;
+        rt->acc     = p;
         rt->acc_cap = new_cap;
+        /* acc[] base address may have changed — rebuild and re-probe. */
+        if (!acc_htable_rebuild(rt)) return NULL;
+        cap = rt->acc_htable_sz;
+        h   = acc_htable_slot(tgid, cap);
+        while (rt->acc_htable[h]) h = (h + 1) & (cap - 1);
     }
 
-    struct netdata_ebpf_cachestat_pid_entry *entry = &rt->acc[rt->acc_count++];
+    struct netdata_ebpf_cachestat_pid_entry *entry = &rt->acc[rt->acc_count];
     memset(entry, 0, sizeof(*entry));
     entry->tgid = tgid;
+    rt->acc_htable[h] = (uint32_t)(rt->acc_count + 1);
+    rt->acc_count++;
     return entry;
+}
+
+/* Remove a TGID from acc[] so dead processes don't inflate the accumulator.
+ * Uses swap-with-last for O(1) removal from the dense array, then rebuilds
+ * the hash table (O(acc_count)) since evictions are rare. */
+static void cachestat_acc_evict_tgid(struct netdata_ebpf_cachestat_runtime *rt, uint32_t tgid)
+{
+    if (!rt->acc_htable || rt->acc_count == 0)
+        return;
+
+    size_t cap = rt->acc_htable_sz;
+    size_t h   = acc_htable_slot(tgid, cap);
+
+    while (rt->acc_htable[h]) {
+        uint32_t idx = rt->acc_htable[h] - 1;
+        if (rt->acc[idx].tgid == tgid) {
+            /* Swap with the last entry so the dense array stays compact. */
+            size_t last = rt->acc_count - 1;
+            if (idx != last)
+                rt->acc[idx] = rt->acc[last];
+            rt->acc_count--;
+            /* Full rebuild: clears the deleted slot and fixes the moved entry. */
+            acc_htable_rebuild(rt);
+            return;
+        }
+        h = (h + 1) & (cap - 1);
+    }
 }
 
 static int cachestat_rb_callback(void *ctx, void *data, size_t data_sz)
@@ -599,9 +682,12 @@ static void cachestat_destroy_ring_buffer(struct netdata_ebpf_cachestat_runtime 
         rt->rb = NULL;
     }
     free(rt->acc);
-    rt->acc     = NULL;
-    rt->acc_cap   = 0;
-    rt->acc_count = 0;
+    free(rt->acc_htable);
+    rt->acc          = NULL;
+    rt->acc_htable   = NULL;
+    rt->acc_cap      = 0;
+    rt->acc_count    = 0;
+    rt->acc_htable_sz = 0;
 }
 
 /*
@@ -1044,8 +1130,15 @@ int netdata_cachestat_runtime_delete_pid(struct netdata_ebpf_cachestat_runtime *
         return -1;
 
     struct bpf_map *map = bpf_object__find_map_by_name(obj, "cstat_pid");
-    if (!map)
-        return 0; /* buffer/arena flavor: no cstat_pid map, nothing to delete */
+    if (!map) {
+        /* Buffer/arena flavor: no cstat_pid map.  Evict from the userspace acc
+         * accumulator so dead TGIDs do not permanently inflate it and cause
+         * the O(N) scan to grow unboundedly over time. */
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
+        cachestat_acc_evict_tgid(rt, pid);
+#endif
+        return 0;
+    }
 
     int fd = bpf_map__fd(map);
     if (fd < 0)
