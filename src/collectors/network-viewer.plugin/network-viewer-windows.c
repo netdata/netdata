@@ -368,10 +368,106 @@ static bool udp_collect_family(UDP_FAMILY *udp)
 }
 
 // ============================================================
-// Network Protocols (combined TCP + UDP function)
+// SMB Server Shares — per-share traffic and connection metrics
 // ============================================================
 
-// Column order for all rows: Transport, Family, Received, Sent, Errors,
+typedef struct {
+    usec_t       last_collected;
+    COUNTER_DATA receivedBytes;
+    COUNTER_DATA sentBytes;
+    COUNTER_DATA treeConnectCount;
+} NV_SMB_SHARE;
+
+static DICTIONARY *nv_smb_shares = NULL;
+
+static void nv_smb_share_insert_cb(const DICTIONARY_ITEM *item __maybe_unused,
+                                   void *value, void *data __maybe_unused)
+{
+    NV_SMB_SHARE *s = value;
+    s->receivedBytes.key    = "Received Bytes/sec";
+    s->sentBytes.key        = "Sent Bytes/sec";
+    s->treeConnectCount.key = "Tree Connect Count";
+}
+
+// Enumerate "SMB Server Shares" instances and update per-share COUNTER_DATA.
+// Must be called under nv_collect_mutex.
+static void nv_smb_collect(void)
+{
+    PERF_DATA_BLOCK  *pDataBlock;
+    PERF_OBJECT_TYPE *pObjectType;
+    if (!perflib_get_object("SMB Server Shares", &pDataBlock, &pObjectType))
+        return;
+
+    char name[1024];
+    usec_t now_ut = now_monotonic_usec();
+
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        if (!getInstanceName(pDataBlock, pObjectType, pi, name, sizeof(name)))
+            strncpyz(name, "[unknown]", sizeof(name) - 1);
+
+        NV_SMB_SHARE *s = dictionary_set(nv_smb_shares, name, NULL, sizeof(*s));
+        s->last_collected = now_ut;
+
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &s->receivedBytes);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &s->sentBytes);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &s->treeConnectCount);
+    }
+
+    // Remove shares that were not seen in this collection pass.
+    {
+        NV_SMB_SHARE *s;
+        dfe_start_write(nv_smb_shares, s)
+        {
+            if (s->last_collected < now_ut)
+                dictionary_del(nv_smb_shares, s_dfe.name);
+        }
+        dfe_done(s);
+        dictionary_garbage_collect(nv_smb_shares);
+    }
+}
+
+// Emit one network-protocols table row per SMB share.
+// Must be called under nv_collect_mutex, after nv_smb_collect().
+// Column order matches function_network_protocols:
+//   Transport, Family, Share, Received, Sent, Errors,
+//   ConnActive, ConnEstablished, ConnPassive, ConnReset,
+//   SegsTotal, SegsRetransmitted, DatagramsNoPort.
+static void proto_emit_smb_rows(BUFFER *wb)
+{
+    NV_SMB_SHARE *s;
+    dfe_start_read(nv_smb_shares, s)
+    {
+        buffer_json_add_array_item_array(wb);
+        {
+            buffer_json_add_array_item_string(wb, "SMB");
+            buffer_json_add_array_item_string(wb, "");      // Family — not applicable
+            buffer_json_add_array_item_string(wb, s_dfe.name); // Share name
+            buffer_json_add_array_item_uint64(wb, nv_perflib_value(&s->receivedBytes));
+            buffer_json_add_array_item_uint64(wb, nv_perflib_value(&s->sentBytes));
+            buffer_json_add_array_item_uint64(wb, 0); // Errors
+            buffer_json_add_array_item_uint64(wb, 0); // ConnActive
+            buffer_json_add_array_item_uint64(wb, nv_perflib_value(&s->treeConnectCount));
+            buffer_json_add_array_item_uint64(wb, 0); // ConnPassive
+            buffer_json_add_array_item_uint64(wb, 0); // ConnReset
+            buffer_json_add_array_item_uint64(wb, 0); // SegsTotal
+            buffer_json_add_array_item_uint64(wb, 0); // SegsRetransmitted
+            buffer_json_add_array_item_uint64(wb, 0); // DatagramsNoPort
+        }
+        buffer_json_array_close(wb);
+    }
+    dfe_done(s);
+}
+
+// ============================================================
+// Network Protocols (combined TCP + UDP + SMB function)
+// ============================================================
+
+// Column order for all rows: Transport, Family, Share, Received, Sent, Errors,
 //   ConnActive, ConnEstablished, ConnPassive, ConnReset, SegsTotal, SegsRetransmitted,
 //   DatagramsNoPort.
 
@@ -381,6 +477,7 @@ static void proto_emit_tcp_row(BUFFER *wb, const TCP_FAMILY *tcp)
     {
         buffer_json_add_array_item_string(wb, "TCP");
         buffer_json_add_array_item_string(wb, tcp->af);
+        buffer_json_add_array_item_string(wb, ""); // Share — N/A for TCP
         buffer_json_add_array_item_uint64(wb, nv_perflib_value(&tcp->segments_received));
         buffer_json_add_array_item_uint64(wb, nv_perflib_value(&tcp->segments_sent));
         buffer_json_add_array_item_uint64(wb, nv_perflib_value(&tcp->connection_failures));
@@ -401,6 +498,7 @@ static void proto_emit_udp_row(BUFFER *wb, const UDP_FAMILY *udp)
     {
         buffer_json_add_array_item_string(wb, "UDP");
         buffer_json_add_array_item_string(wb, udp->af);
+        buffer_json_add_array_item_string(wb, ""); // Share — N/A for UDP
         buffer_json_add_array_item_uint64(wb, nv_perflib_value(&udp->datagrams_received));
         buffer_json_add_array_item_uint64(wb, nv_perflib_value(&udp->datagrams_sent));
         buffer_json_add_array_item_uint64(wb, nv_perflib_value(&udp->datagrams_received_errors));
@@ -441,6 +539,7 @@ void function_network_protocols(
     have_tcp_ipv6 = tcp_collect_family(&tcp_ipv6);
     have_udp_ipv4 = udp_collect_family(&udp_ipv4);
     have_udp_ipv6 = udp_collect_family(&udp_ipv6);
+    nv_smb_collect();
 
     if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
         netdata_mutex_unlock(&nv_collect_mutex);
@@ -469,6 +568,7 @@ void function_network_protocols(
             proto_emit_udp_row(wb, &udp_ipv4);
         if(have_udp_ipv6)
             proto_emit_udp_row(wb, &udp_ipv6);
+        proto_emit_smb_rows(wb);
     }
     buffer_json_array_close(wb); // data
     netdata_mutex_unlock(&nv_collect_mutex);
@@ -478,10 +578,11 @@ void function_network_protocols(
     {
         nv_add_key_field(wb, &field_id, "Transport", "Transport Protocol");
         nv_add_key_field(wb, &field_id, "Family",    "IP Protocol Family");
+        nv_add_key_field(wb, &field_id, "Share",     "SMB Share Name");
 
-        // Normalized columns — TCP: segments, UDP: datagrams
-        nv_add_int_field(wb, &field_id, "Received", "Received (Segments/Datagrams)", "segments/datagrams/s");
-        nv_add_int_field(wb, &field_id, "Sent",     "Sent (Segments/Datagrams)",     "segments/datagrams/s");
+        // Normalized columns — TCP: segments, UDP: datagrams, SMB: bytes
+        nv_add_int_field(wb, &field_id, "Received", "Received (Segments/Datagrams/Bytes)", "count/s");
+        nv_add_int_field(wb, &field_id, "Sent",     "Sent (Segments/Datagrams/Bytes)",     "count/s");
         nv_add_int_field(wb, &field_id, "Errors",   "Errors (Failures/Rx Errors)",   "errors");
 
         // TCP-only columns (UDP rows carry 0)
@@ -518,11 +619,12 @@ void function_network_protocols(
     }
     buffer_json_object_close(wb); // charts
 
-    // default_charts: [chart_key, groupby_column] — same chart, two grouping axes
+    // default_charts: [chart_key, groupby_column] — same chart, multiple grouping axes
     buffer_json_member_add_array(wb, "default_charts");
     {
         nv_add_default_chart(wb, "Traffic", "Transport");
         nv_add_default_chart(wb, "Traffic", "Family");
+        nv_add_default_chart(wb, "Traffic", "Share");
     }
     buffer_json_array_close(wb); // default_charts
 
@@ -530,6 +632,7 @@ void function_network_protocols(
     {
         nv_add_group_by(wb, "Transport");
         nv_add_group_by(wb, "Family");
+        nv_add_group_by(wb, "Share");
     }
     buffer_json_object_close(wb); // group_by
 
@@ -1142,6 +1245,10 @@ int main(int argc, char **argv)
     PerflibNamesRegistryInitialize();
     netdata_mutex_init(&nv_collect_mutex);
 
+    nv_smb_shares = dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_SMB_SHARE));
+    dictionary_register_insert_callback(nv_smb_shares, nv_smb_share_insert_cb, NULL);
+
     // Prime each family's COUNTER_DATA so the first real request has a valid
     // previous baseline and rate counters return non-zero values immediately.
     initialize_tcp_keys(&tcp_ipv4);
@@ -1152,6 +1259,7 @@ int main(int argc, char **argv)
     tcp_collect_family(&tcp_ipv6);
     udp_collect_family(&udp_ipv4);
     udp_collect_family(&udp_ipv6);
+    nv_smb_collect();
     perflibFreePerformanceData();
 
     cached_sid_username_init();
@@ -1201,6 +1309,7 @@ int main(int argc, char **argv)
     functions_evloop_cancel_threads(wg);
     PerflibNamesRegistryCleanup();
     system_servicenames_cache_destroy(sc);
+    dictionary_destroy(nv_smb_shares);
 
     return 0;
 }
