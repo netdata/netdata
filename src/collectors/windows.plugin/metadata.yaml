@@ -3698,7 +3698,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            Once enabled, the collector automatically discovers and monitors **all** Windows services (`SERVICE_WIN32` type) on the host. There is no per-service selection or filtering — every service is included.
+            The collector automatically discovers and monitors **all** Windows services (`SERVICE_WIN32` type) on the host. There is no per-service selection or filtering — every service is included.
         limits:
           description: ""
         performance_impact:
@@ -3708,7 +3708,7 @@ modules:
         list:
           - title: "Enable the PerflibServices collector"
             description: |
-              To collect Windows Services metrics, ensure the PerflibServices collector is enabled:
+              If Windows Services metrics are missing, ensure the PerflibServices collector is enabled:
 
               1. Open `netdata.conf` using `edit-config` from the MSYS2 shell (`C:\Program Files\Netdata\msys2.exe`):
 
