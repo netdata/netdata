@@ -65,6 +65,12 @@ Virtual nodes let you split multi-component systems into distinct, monitorable u
 
 To create a virtual node for your Windows server:
 
+:::tip
+
+The recommended way to create and manage virtual nodes is through the [Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md) in the Netdata UI. Navigate to **Space Settings > Configurations** or use the **Integrations** section to configure vnodes without editing files manually.
+
+:::
+
 1. Define the virtual node in `/etc/netdata/vnodes/vnodes.conf`:
 
     ```yaml
