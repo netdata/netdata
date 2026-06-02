@@ -170,6 +170,30 @@ Create new SOW files from `.agents/sow/SOW.template.md`. The template is project
 
 Empty SOW directories must contain `.gitkeep` or `.keep` so the committed repository preserves the full SOW layout after clone/checkout.
 
+### Local SOW Parking
+
+Users may keep private paused, abandoned, or not-yet-public SOW drafts under
+`<repo-root>/.local/sow/`. This directory is gitignored and outside the project
+SOW lifecycle.
+
+Use `<repo-root>/.local/sow/` when the user wants to preserve work locally
+without creating a public or team-visible GitHub issue yet.
+
+Local parked SOWs are private memory only:
+
+- they are not durable project memory;
+- they are not visible to other contributors;
+- they are not acceptable as the only tracking for work that must coordinate a
+  team, block a merge, or survive across machines.
+
+Deferred work has two valid tracking paths:
+
+- public or team-visible follow-up: GitHub issue;
+- private or local follow-up: `<repo-root>/.local/sow/`.
+
+Active implementation work still MUST use `.agents/sow/active/`, and active SOW
+files still MUST be deleted before merge.
+
 Filename:
 
 ```text
