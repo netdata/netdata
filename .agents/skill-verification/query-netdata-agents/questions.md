@@ -4,7 +4,8 @@ This file is the **seed input** consumed by the verification
 harness introduced by PR #22423 for direct-agent queries. The harness spawns
 a Sonnet-class assistant with `../SKILL.md` + `../how-tos/INDEX.md`
 + the canonical reference docs as context, asks each question
-below, captures the transcript, and grades against `grader.md`.
+below, captures the transcript, and grades it against the
+verification harness rubric.
 
 When the assistant cannot answer or has to perform analysis not
 already documented under `../how-tos/`, the assistant must author

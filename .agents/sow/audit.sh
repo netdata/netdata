@@ -240,7 +240,7 @@ fi
 section "sensitive data"
 scan_files=()
 
-for path in AGENTS.md CLAUDE.md GEMINI.md .agents/sow/SOW.template.md .agents/sow/specs/README.md; do
+for path in AGENTS.md CLAUDE.md GEMINI.md .agents/ENV.md .agents/sow/SOW.template.md .agents/sow/specs/README.md; do
   [ -f "$path" ] && scan_files+=("$path")
 done
 
@@ -260,6 +260,12 @@ if [ -d .agents/skills ]; then
   while IFS= read -r file; do
     scan_files+=("$file")
   done < <(find .agents/skills -type f \( -name '*.md' -o -name 'SKILL.md' -o -name '*.yaml' -o -name '*.yml' \) 2>/dev/null | sort)
+fi
+
+if [ -d .agents/skill-verification ]; then
+  while IFS= read -r file; do
+    scan_files+=("$file")
+  done < <(find .agents/skill-verification -type f \( -name '*.md' -o -name '*.yaml' -o -name '*.yml' \) 2>/dev/null | sort)
 fi
 
 if [ "${#scan_files[@]}" -eq 0 ]; then

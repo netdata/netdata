@@ -6,6 +6,9 @@ on:
       - master
     paths:
       - ".agents/sow/**"
+      - ".agents/skills/**"
+      - ".agents/skill-verification/**"
+      - ".agents/ENV.md"
       - "AGENTS.md"
       - "CLAUDE.md"
       - "GEMINI.md"
@@ -45,7 +48,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Scan changed SOW artifacts for sensitive data
+      - name: Scan changed durable artifacts for sensitive data
         run: |
           set -euo pipefail
 
@@ -54,14 +57,15 @@ jobs:
 
           mapfile -t files < <(
             git diff --name-only --diff-filter=ACMR "$base...$head" -- \
-              .agents/sow AGENTS.md CLAUDE.md GEMINI.md \
+              .agents/sow .agents/skills .agents/skill-verification .agents/ENV.md \
+              AGENTS.md CLAUDE.md GEMINI.md \
               | while IFS= read -r file; do
                   [ -f "$file" ] && printf '%s\n' "$file"
                 done
           )
 
           if [ "${#files[@]}" -eq 0 ]; then
-            echo "No changed SOW artifacts to scan."
+            echo "No changed durable artifacts to scan."
             exit 0
           fi
 

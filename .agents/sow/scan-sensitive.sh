@@ -11,6 +11,11 @@ fi
 
 failures=0
 
+if ! command -v perl >/dev/null 2>&1; then
+  echo "perl is required for sensitive-data scanning" >&2
+  exit 2
+fi
+
 scan_sensitive_file() {
   local file="$1"
   perl -ne '
@@ -45,7 +50,7 @@ scan_sensitive_file() {
     push @hits, "google-api-key" if $line =~ /\bAIza[0-9A-Za-z_-]{20,}\b/;
     push @hits, "jwt" if $line =~ /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/;
     push @hits, "credentialed-url" if $line =~ m{[a-z][a-z0-9+.-]*://[^/\s:@]+:[^/\s:@]+@}i;
-    push @hits, "bearer-token" if $line =~ /\bBearer\s+[A-Za-z0-9._~+\/=-]{16,}\b/i && $line !~ /\b(REDACTED|EXAMPLE|PLACEHOLDER|YOUR[_-]?TOKEN|TOKEN|API[_-]?KEY|ACCESS[_-]?TOKEN)\b/i;
+    push @hits, "bearer-token" if $line =~ /\bBearer\s+[A-Za-z0-9._~+\/=-]{16,}\b/i && $line !~ /\b(REDACTED|EXAMPLE|PLACEHOLDER|YOUR[_-]?(?:TOKEN|ACCESS[_-]?TOKEN|BEARER[_-]?TOKEN))\b/i;
 
     if ($line =~ /\b(?:pass(?:word)?|passwd|pwd|api[_-]?key|secret|token|client[_-]?secret|private[_-]?key|access[_-]?key)\b\s*[:=]\s*["'\''`]?([^"'\''`\s<>{}\[\]&,]{8,})/i) {
       my $value = lc $1;
@@ -76,7 +81,7 @@ scan_sensitive_file() {
     for my $hit (@hits) {
       print "$ARGV:$.:$hit\n";
     }
-  ' "$file" 2>/dev/null
+  ' "$file"
 }
 
 for file in "$@"; do
@@ -86,7 +91,13 @@ for file in "$@"; do
     continue
   fi
 
-  if hits=$(scan_sensitive_file "$file") && [ -n "$hits" ]; then
+  if ! hits=$(scan_sensitive_file "$file"); then
+    echo "failed to scan file: $file" >&2
+    failures=$((failures + 1))
+    continue
+  fi
+
+  if [ -n "$hits" ]; then
     printf '%s\n' "$hits"
     failures=$((failures + 1))
   fi
