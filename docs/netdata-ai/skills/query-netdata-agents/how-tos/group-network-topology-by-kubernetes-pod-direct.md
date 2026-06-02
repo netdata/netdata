@@ -11,8 +11,8 @@ GUIDs, pod labels, or cgroup paths?
 
 - `NODE_UUID`: the target node id.
 - `MACHINE_GUID`: the target agent machine GUID.
-- `AGENT_HOST`: the direct agent host and port, for example
-  `127.0.0.1:19999`.
+- `AGENT_URL`: the direct Agent URL, for example
+  `http://127.0.0.1:19999`.
 - `NAMESPACE`: the Kubernetes namespace to inspect.
 - `NETDATA_CLOUD_TOKEN` and `NETDATA_CLOUD_HOSTNAME` in `<repo>/.env`.
 - The node must expose `topology:network-connections`.
@@ -30,11 +30,14 @@ GUIDs, pod labels, or cgroup paths?
 
    ```bash
    mkdir -p .local/audits/query-netdata-agents
+   AGENT_TARGET="${AGENT_URL#http://}"
+   AGENT_TARGET="${AGENT_TARGET#https://}"
+   AGENT_TARGET="${AGENT_TARGET%%/*}"
 
    agents_call_function \
      --via agent \
      --node "$NODE_UUID" \
-     --host "$AGENT_HOST" \
+     --host "$AGENT_TARGET" \
      --machine-guid "$MACHINE_GUID" \
      --function 'topology:network-connections' \
      --body '{"selections":{"group_by":["pid"]}}' \
@@ -102,7 +105,7 @@ pod names into durable artifacts.
   `.local/audits/query-netdata-agents/bearers/`. That directory is
   gitignored and must remain local.
 - Canonical Kubernetes columns do not require `labels:<pattern>`.
-- Use the same `NODE_UUID`, `MACHINE_GUID`, and `AGENT_HOST` tuple from
+- Use the same `NODE_UUID`, `MACHINE_GUID`, and `AGENT_URL` tuple from
   the same Agent identity response.
 
 ## Source guides

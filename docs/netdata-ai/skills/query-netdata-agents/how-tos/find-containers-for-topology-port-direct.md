@@ -11,8 +11,8 @@ raw labels, cgroup paths, or private IPs?
 
 - `NODE_UUID`: the target node id.
 - `MACHINE_GUID`: the target agent machine GUID.
-- `AGENT_HOST`: the direct agent host and port, for example
-  `127.0.0.1:19999`.
+- `AGENT_URL`: the direct Agent URL, for example
+  `http://127.0.0.1:19999`.
 - `PORT`: the TCP port to inspect.
 - `NETDATA_CLOUD_TOKEN` and `NETDATA_CLOUD_HOSTNAME` in `<repo>/.env`.
 - The node must expose `topology:network-connections`.
@@ -30,11 +30,14 @@ raw labels, cgroup paths, or private IPs?
 
    ```bash
    mkdir -p .local/audits/query-netdata-agents
+   AGENT_TARGET="${AGENT_URL#http://}"
+   AGENT_TARGET="${AGENT_TARGET#https://}"
+   AGENT_TARGET="${AGENT_TARGET%%/*}"
 
    agents_call_function \
      --via agent \
      --node "$NODE_UUID" \
-     --host "$AGENT_HOST" \
+     --host "$AGENT_TARGET" \
      --machine-guid "$MACHINE_GUID" \
      --function 'topology:network-connections' \
      --body '{"selections":{"group_by":["pid"]}}' \

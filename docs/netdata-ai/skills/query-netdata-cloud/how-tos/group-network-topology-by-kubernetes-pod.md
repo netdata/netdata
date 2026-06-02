@@ -91,7 +91,7 @@ IP addresses, or customer-identifying pod names into durable artifacts.
 
 ## Notes / gotchas
 
-- - Canonical Kubernetes columns (`k8s_namespace`, `k8s_pod_name`,
+- Canonical Kubernetes columns (`k8s_namespace`, `k8s_pod_name`,
   `k8s_workload`) do not require `labels:<pattern>`.
 - `labels:<pattern>` controls only free-form actor labels. Its separator
   is `|`; commas are literal.
