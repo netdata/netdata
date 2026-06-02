@@ -257,24 +257,24 @@ static bool nv_apps_lookup_pid_set_evict_oldest(DICTIONARY *dict, uint32_t *size
     if (!dict || !size || *size == 0)
         return false;
 
-    NV_APPS_LOOKUP_PID_ENTRY *victim = NULL;
+    uint32_t victim_pid = 0;
+    uint64_t victim_sequence = UINT64_MAX;
+    size_t victim_candidates = 0;
     NV_APPS_LOOKUP_PID_ENTRY *entry;
     dfe_start_read(dict, entry) {
-        if (!victim) {
-            victim = entry;
-            continue;
+        if (entry->sequence <= victim_sequence) {
+            victim_sequence = entry->sequence;
+            victim_pid = entry->pid;
+            victim_candidates++;
         }
-
-        if (entry->sequence < victim->sequence)
-            victim = entry;
     }
     dfe_done(entry);
 
-    if (!victim)
+    if (victim_candidates == 0)
         return false;
 
     char key[16];
-    nv_apps_lookup_pid_key(victim->pid, key);
+    nv_apps_lookup_pid_key(victim_pid, key);
     dictionary_del(dict, key);
     (*size)--;
     return true;

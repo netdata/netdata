@@ -143,23 +143,22 @@ static bool cgroups_lookup_cache_evict_one(void)
     if (!cgroups_lookup_cache || cgroups_lookup_cache_entries < APPS_CGROUPS_LOOKUP_CACHE_MAX)
         return true;
 
-    struct cgroup_lookup_entry *victim = NULL;
+    STRING *victim_key = NULL;
+    uint64_t victim_last_used_iteration = UINT64_MAX;
     struct cgroup_lookup_entry *entry;
     dfe_start_read(cgroups_lookup_cache, entry) {
         if (entry->refcount != 0)
             continue;
 
-        if (!victim) {
-            victim = entry;
-            continue;
+        if (entry->last_used_iteration <= victim_last_used_iteration) {
+            victim_last_used_iteration = entry->last_used_iteration;
+            string_freez(victim_key);
+            victim_key = string_dup(entry->key);
         }
-
-        if (entry->last_used_iteration < victim->last_used_iteration)
-            victim = entry;
     }
     dfe_done(entry);
 
-    if (!victim) {
+    if (!victim_key) {
         static uint64_t last_logged_iteration = 0;
         if (last_logged_iteration != global_iterations_counter) {
             last_logged_iteration = global_iterations_counter;
@@ -170,7 +169,6 @@ static bool cgroups_lookup_cache_evict_one(void)
         return false;
     }
 
-    STRING *victim_key = string_dup(victim->key);
     dictionary_del(cgroups_lookup_cache, string2str(victim_key));
     string_freez(victim_key);
     cgroups_lookup_counter_inc(&cgroups_lookup_cache_evictions);
