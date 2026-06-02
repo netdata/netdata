@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F052A
+# Next unused error code: F052D
 
 # ======================================================================
 # Constants
@@ -631,6 +631,10 @@ set_tmpdir() {
 check_for_remote_file() {
   url="${1}"
 
+  set_tmpdir
+  dl_log="${tmpdir}/download.log"
+  rm -f "${dl_log}"
+
   if echo "${url}" | grep -Eq "^file:///"; then
     [ -e "${url#file://}" ] || return 1
     return 0
@@ -639,11 +643,18 @@ check_for_remote_file() {
   fi
 
   if [ -n "${CURL}" ]; then
-    "${CURL}" --output /dev/null --silent --head --fail "${url}"
+    "${CURL}" --write-out "%{http_code}" --output /dev/null --silent --head --fail "${url}" > "${dl_log}"
 
     case "$?" in
         0) return 0 ;;
-        22|78) return 1 ;;
+        22|78)
+            case "$(tail -n 1 "${dl_log}")" in
+              403|404) return 1 ;;
+              4*) return 5 ;;
+              5*) return 6 ;;
+              *) return 4 ;;
+            esac
+            ;;
         5|6|7)
             error "Failed to connect to remote host when checking for remote file at ${url}"
             return 2
@@ -657,31 +668,28 @@ check_for_remote_file() {
   fi
 
   if [ -n "${WGET}" ]; then
-    output="$(mktemp)"
-    "${WGET}" -S --spider "${url}" > "${output}" 2>&1
+    "${WGET}" -S --spider "${url}" > "${dl_log}" 2>&1
 
     case "$?" in
       0)
-        if grep -q 'HTTP/1.1 200 OK' "${output}"; then
-          rm "${output}"
-          return 0
-        else
-          rm "${output}"
-          return 1
-        fi
+        case "$(grep "HTTP/" "${dl_log}" | tail -n 1 | awk '{ print $2 }')" in
+          200) return 0 ;;
+          404) return 1 ;;
+          4*) return 5 ;;
+          5*) return 6 ;;
+          *) return 4 ;;
+        esac
         ;;
       8)
-        rm "${output}"
-        return 1
+        case "$(grep "HTTP/" "${dl_log}" | tail -n 1 | awk '{ print $2 }')" in
+          404) return 1 ;;
+          4*) return 5 ;;
+          5*) return 6 ;;
+          *) return 4 ;;
+        esac
         ;;
-      4)
-        rm "${output}"
-        return 2
-        ;;
-      5)
-        rm "${output}"
-        return 3
-        ;;
+      4) return 2 ;;
+      5) return 3 ;;
       *) fatal "Unknown error when checking for remote file at ${url}" F0520 ;;
     esac
   fi
@@ -693,20 +701,41 @@ download() {
   url="${1}"
   dest="${2}"
 
+  set_tmpdir
+  dl_log="${tmpdir}/download.log"
+  rm -f "${dl_log}"
+
   if echo "${url}" | grep -Eq "^file:///"; then
     run cp "${url#file://}" "${dest}" || return 1
     return 0
   fi
 
   if [ -n "${CURL}" ]; then
-    run "${CURL}" --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"
+    run "${CURL}" --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}" > "${dl_log}"
 
     case "$?" in
       0) return 0 ;;
       22|78)
-        error "Remote server reported error when downloading ${url}" F0522
         rm -f "${dest}"
-        return 1
+
+        case "$(tail -n 1 "${dl_log}")" in
+          404)
+            error "Remote file not found when downloading ${url}" F0522
+            return 1
+            ;;
+          4*)
+            error "Remote server reported client error when downloading ${url}" F052A
+            return 5
+            ;;
+          5*)
+            error "Remote server reported internal error when downloading ${url}" F052B
+            return 6
+            ;;
+          *)
+            error "Remote server reported error when downloading ${url}" F052C
+            return 4
+            ;;
+        esac
         ;;
       5|6|7)
         error "Failed to connect to remote server to download ${url}" F0523
@@ -728,9 +757,25 @@ download() {
     case "$?" in
       0) return 0 ;;
       8)
-        error "Remote server reported error when downloading ${url}" F0522
         rm -f "${dest}"
-        return 1
+        case "$(grep "HTTP/" "${dl_log}" | tail -n 1 | awk '{ print $2 }')" in
+          404)
+            error "Remote file not found when downloading ${url}" F0522
+            return 1
+            ;;
+          4*)
+            error "Remote server reported client error when downloading ${url}" F052A
+            return 5
+            ;;
+          5*)
+            error "Remote server reported internal error when downloading ${url}" F052B
+            return 6
+            ;;
+          *)
+            error "Remote server reported error when downloading ${url}" F052C
+            return 4
+            ;;
+        esac
         ;;
       4)
         error "Failed to connect to remote server to download ${url}" F0523
