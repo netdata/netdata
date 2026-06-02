@@ -457,25 +457,25 @@ static bool nv_apps_lookup_cache_evict_lru(void)
     if (!apps_lookup_cache || apps_lookup_cache_size < apps_lookup_max_cache_size)
         return true;
 
-    NV_APPS_LOOKUP_CACHE_ENTRY *victim = NULL;
+    uint32_t victim_pid = 0;
+    usec_t victim_last_used_usec = UINT64_MAX;
+    size_t victim_candidates = 0;
     NV_APPS_LOOKUP_CACHE_ENTRY *entry;
     dfe_start_read(apps_lookup_cache, entry) {
-        if (!victim) {
-            victim = entry;
-            continue;
+        if (entry->last_used_usec <= victim_last_used_usec) {
+            victim_last_used_usec = entry->last_used_usec;
+            victim_pid = entry->pid;
+            victim_candidates++;
         }
-
-        if (entry->last_used_usec < victim->last_used_usec)
-            victim = entry;
     }
     dfe_done(entry);
 
-    if (!victim)
+    if (victim_candidates == 0)
         return false;
 
     // cache_size is worker-private; if a future SOW adds another cache writer, re-evaluate this scan.
     char key[16];
-    nv_apps_lookup_pid_key(victim->pid, key);
+    nv_apps_lookup_pid_key(victim_pid, key);
     dictionary_del(apps_lookup_cache, key);
     if (apps_lookup_cache_size > 0)
         apps_lookup_cache_size--;
