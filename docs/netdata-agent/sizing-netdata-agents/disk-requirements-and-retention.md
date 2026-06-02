@@ -51,12 +51,12 @@ These limits are fully configurable. See [Changing how long Netdata stores metri
 
 ### Understanding Actual Disk Usage vs Configured Retention Size
 
-The configured `dbengine tier N retention size` sets the total disk quota for that tier. Netdata counts **all** per-tier files toward that quota — data files and their associated journal files — not just compressed metric data alone. A tier's actual disk usage is the sum of:
+The configured `dbengine tier N retention size` sets the total disk quota for that tier. Netdata enforces this cap based on estimated per-tier disk usage, which includes data files, their journal/index files, and a tier-specific share of global database metadata (accounted proportionally via an internal `disk_percentage` factor) — not just compressed metric samples alone. A tier's actual disk usage is the sum of:
 
 - **Data files** (`.ndf`): Compressed metric samples stored in extents.
 - **Journal v1 files** (`.njf`): Write-ahead log entries used for crash recovery of each datafile.
 - **Journal v2 files** (`.njfv2`): Page and extent indexes that map metric UUIDs to their locations within data files.
-
+- **Shared database metadata** (tier-attributed): SQLite DBs, alert/health state, and other metadata not stored inside the tier’s data/journal files.
 Journal file sizes depend on metric cardinality — the number of unique metrics stored in each datafile. The more distinct metrics per datafile, the larger the journal indexes. On a Netdata Parent receiving streams from many Children, each datafile contains metrics from **all** connected Children, resulting in higher cardinality per datafile and proportionally larger journal files compared to a standalone Agent.
 
 #### Retention Size is Per-Tier, Not Per-Host
