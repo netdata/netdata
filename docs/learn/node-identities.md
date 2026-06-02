@@ -138,7 +138,9 @@ This is normal for Parent nodes receiving data from Children, and for Agents usi
 
 :::tip
 
-The recommended way to create and manage virtual nodes is through the [Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md) in the Netdata UI. Navigate to **Space Settings > Configurations** or use the **Integrations** section to configure vnodes without editing files manually. SNMP devices discovered by Netdata can also be assigned to vnodes through the Dynamic Configuration Manager — this is the preferred workflow for integrating SNMP device metrics with additional collectors.
+The recommended way to create and manage virtual nodes is through the [Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md) in the Netdata UI. Navigate to **Space Settings > Configurations** or use the **Integrations** section to configure vnodes without editing files manually.
+
+Note that SNMP devices are handled differently: each SNMP device is automatically created as its own independent vnode by the SNMP collector. An SNMP device can only be its own vnode — it cannot be joined to another vnode, and metrics from other collectors cannot be merged into it. To correlate SNMP metrics with data from other sources, use Netdata Cloud's dashboard features (composite charts, cross-node views).
 
 :::
 

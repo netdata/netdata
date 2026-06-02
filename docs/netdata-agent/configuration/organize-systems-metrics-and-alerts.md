@@ -91,67 +91,21 @@ The recommended way to create and manage virtual nodes is through the [Dynamic C
         url: http://203.0.113.10:9182/metrics
     ```
 
-### Add metrics from other collectors to an SNMP device node
+### SNMP devices and virtual nodes
 
 The SNMP collector automatically creates a virtual node for every SNMP device (`create_vnode: true` by default). The device appears as a separate Node in Netdata Cloud without any manual vnode configuration.
 
-The auto-generated virtual node uses a deterministic GUID derived from the device's hostname or IP address. Because this vnode is created internally by the SNMP collector, other collectors cannot reference it directly. To merge metrics from other collectors (for example, `ping` or `httpcheck`) onto the same SNMP device node, you need to create an explicit vnode definition that both the SNMP job and the other collector's job can share.
+The recommended way to view and manage SNMP device vnode settings is through the [Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md) in the Netdata UI.
 
-:::note
+:::warning
 
-You only need this procedure if you want metrics from **multiple collectors** on the same SNMP device node. If the SNMP collector is the only source of metrics for the device, no additional configuration is needed.
+**SNMP devices cannot join other vnodes**
+
+An SNMP device can only be its own vnode — it cannot be added as part of another vnode, and metrics from other collectors (for example, `ping` or `httpcheck`) cannot be attached to an SNMP device's vnode. This is an architectural constraint of how the SNMP collector manages vnode identity: it creates the vnode internally rather than referencing a shared vnode definition.
 
 :::
 
-**Step 1: Determine the vnode GUID**
-
-Choose one of these approaches:
-
-- **Set an explicit GUID in the SNMP job** (recommended): Edit the SNMP job's `vnode.guid` field to a known value. This overrides the auto-generated GUID.
-
-    ```yaml
-    # go.d/snmp.conf
-    jobs:
-      - name: my_switch
-        hostname: 192.168.1.1
-        community: public
-        vnode:
-          guid: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-          hostname: my_switch
-    ```
-
-- **Use the auto-generated GUID**: If you did not set `vnode.guid`, the SNMP collector computes it as `uuid.NewSHA1(uuid.NameSpaceDNS, <hostname>)`. You can retrieve the GUID from the node's identity in Netdata Cloud.
-
-**Step 2: Create a vnode definition file**
-
-Create a YAML file in `/etc/netdata/vnodes/` using the same GUID:
-
-```yaml
-# /etc/netdata/vnodes/my_switch.yaml
-- hostname: my_switch
-  guid: a1b2c3d4-e5f6-7890-abcd-ef1234567890
-```
-
-**Step 3: Reference the vnode in other collectors**
-
-Use the `vnode` field (set to the hostname from the vnode definition) in any other go.d collector job:
-
-```yaml
-# go.d/ping.conf
-jobs:
-  - name: my_switch_ping
-    hosts:
-      - 192.168.1.1
-    vnode: my_switch
-
-# go.d/httpcheck.conf
-jobs:
-  - name: my_switch_webui
-    url: http://192.168.1.1
-    vnode: my_switch
-```
-
-Both the SNMP collector and the additional collectors now send metrics to the same virtual node, which appears as a single Node in Netdata Cloud.
+To visualize SNMP device metrics alongside metrics from other nodes, use Netdata Cloud's dashboard features such as composite charts and correlated views across nodes in your Space.
 
 ## Host labels
 
