@@ -71,25 +71,27 @@ bool apps_cgroup_parse_proc_pid_cgroup_content(const char *content, char *dst, s
         if (!line_end)
             line_end = line + strlen(line);
 
-        if (line_end > line && line_end[-1] == '\r')
-            line_end--;
+        const char *next_line = (*line_end == '\n') ? line_end + 1 : line_end;
+        const char *field_end = line_end;
+        if (field_end > line && field_end[-1] == '\r')
+            field_end--;
 
-        const char *first_colon = memchr(line, ':', (size_t)(line_end - line));
+        const char *first_colon = memchr(line, ':', (size_t)(field_end - line));
         if (!first_colon) {
-            line = (*line_end == '\n') ? line_end + 1 : line_end;
+            line = next_line;
             continue;
         }
 
-        const char *second_colon = memchr(first_colon + 1, ':', (size_t)(line_end - first_colon - 1));
+        const char *second_colon = memchr(first_colon + 1, ':', (size_t)(field_end - first_colon - 1));
         if (!second_colon) {
-            line = (*line_end == '\n') ? line_end + 1 : line_end;
+            line = next_line;
             continue;
         }
 
         const char *path = second_colon + 1;
-        size_t path_len = (size_t)(line_end - path);
+        size_t path_len = (size_t)(field_end - path);
         if (path_len == 0 || path[0] != '/') {
-            line = (*line_end == '\n') ? line_end + 1 : line_end;
+            line = next_line;
             continue;
         }
 
@@ -107,7 +109,7 @@ bool apps_cgroup_parse_proc_pid_cgroup_content(const char *content, char *dst, s
             best_path_len = path_len;
         }
 
-        line = (*line_end == '\n') ? line_end + 1 : line_end;
+        line = next_line;
     }
 
     return cgroup_copy_path(best_path, best_path_len, dst, dst_size);

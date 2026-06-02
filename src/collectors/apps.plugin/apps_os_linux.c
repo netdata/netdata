@@ -808,6 +808,15 @@ bool apps_os_read_pid_status_linux(struct pid_stat *p, void *ptr __maybe_unused)
 }
 
 /* REQUIRES apps_pids_mutex held by caller; MUST NOT lock apps_pids_mutex itself. */
+static bool apps_os_pid_cgroup_fail(struct pid_stat *p, int error)
+{
+    apps_cgroups_lookup_unlink_pid(p);
+    string_freez(p->cgroup_path);
+    p->cgroup_path = NULL;
+    errno = error;
+    return false;
+}
+
 bool apps_os_read_pid_cgroup_linux(struct pid_stat *p, void *ptr __maybe_unused)
 {
     if (unlikely(!p->cgroup_filename)) {
@@ -818,7 +827,7 @@ bool apps_os_read_pid_cgroup_linux(struct pid_stat *p, void *ptr __maybe_unused)
 
     int fd = open(p->cgroup_filename, procfile_open_flags);
     if (fd == -1)
-        return false;
+        return apps_os_pid_cgroup_fail(p, errno);
 
     char content[FILENAME_MAX + 1];
     size_t used = 0;
@@ -839,8 +848,7 @@ bool apps_os_read_pid_cgroup_linux(struct pid_stat *p, void *ptr __maybe_unused)
 
         int saved_errno = errno;
         close(fd);
-        errno = saved_errno;
-        return false;
+        return apps_os_pid_cgroup_fail(p, saved_errno);
     }
 
     if (used == sizeof(content) - 1) {
@@ -858,25 +866,20 @@ bool apps_os_read_pid_cgroup_linux(struct pid_stat *p, void *ptr __maybe_unused)
 
             int saved_errno = errno;
             close(fd);
-            errno = saved_errno;
-            return false;
+            return apps_os_pid_cgroup_fail(p, saved_errno);
         }
     }
 
     close(fd);
 
-    if (used == 0 || truncated) {
-        errno = truncated ? ENAMETOOLONG : EINVAL;
-        return false;
-    }
+    if (used == 0 || truncated)
+        return apps_os_pid_cgroup_fail(p, truncated ? ENAMETOOLONG : EINVAL);
 
     content[used] = '\0';
 
     char path[FILENAME_MAX + 1];
-    if (!apps_cgroup_parse_proc_pid_cgroup_content(content, path, sizeof(path))) {
-        errno = EINVAL;
-        return false;
-    }
+    if (!apps_cgroup_parse_proc_pid_cgroup_content(content, path, sizeof(path)))
+        return apps_os_pid_cgroup_fail(p, EINVAL);
 
     apps_cgroups_lookup_set_pid_cgroup_path(p, path);
     return true;

@@ -2528,9 +2528,9 @@ var (
 		"router", "switch", "firewall", "access_point", "server", "storage", "load_balancer",
 		"printer", "phone", "ups", "camera", "process", "agent", "netdata-agent", "parent",
 		"remote-endpoint", "local-endpoint", "segment", "self", "ip", "cloud", "container",
-		"vm", "database", "service", "datacenter", "cluster", "host", "network", "datastore",
-		"datastore_cluster", "resource_pool", "device", "endpoint", "correlation", "interface",
-		"group", "unknown",
+		"docker", "kubernetes", "lxc", "nspawn", "podman", "systemd", "user", "vm", "database",
+		"service", "datacenter", "cluster", "host", "network", "datastore", "datastore_cluster",
+		"resource_pool", "device", "endpoint", "correlation", "interface", "group", "unknown",
 	}
 )
 

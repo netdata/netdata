@@ -173,7 +173,7 @@ typedef struct {
 typedef struct {
     char cgroup_path[NV_TOPOLOGY_CGROUP_PATH_MAX];
     char cgroup_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
-    char container_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
+    char container_name[NV_TOPOLOGY_CONTAINER_NAME_MAX];
     char cgroup_status[32];
     char orchestrator[NV_TOPOLOGY_ORCHESTRATOR_MAX];
     char k8s_pod_name[NV_TOPOLOGY_K8S_NAME_MAX];
@@ -974,7 +974,7 @@ static void topology_actor_id_for_process(
     const char *node_identity = (ctx && ctx->machine_guid[0]) ? ctx->machine_guid : (ctx && ctx->hostname[0] ? ctx->hostname : "unknown");
     const char *safe_process = (process && *process) ? process : "[unknown]";
     if(ctx && ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER) {
-        char encoded_container[(NV_TOPOLOGY_CGROUP_NAME_MAX * 3) + 1];
+        char encoded_container[(NV_TOPOLOGY_CONTAINER_NAME_MAX * 3) + 1];
         topology_encode_identifier_component(
             encoded_container, sizeof(encoded_container),
             (container_name && *container_name) ? container_name : safe_process);
@@ -2217,7 +2217,7 @@ typedef struct {
     char address_space[16];
     char cgroup_path[NV_TOPOLOGY_CGROUP_PATH_MAX];
     char cgroup_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
-    char container_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
+    char container_name[NV_TOPOLOGY_CONTAINER_NAME_MAX];
     char cgroup_status[32];
     char orchestrator[NV_TOPOLOGY_ORCHESTRATOR_MAX];
     char k8s_pod_name[NV_TOPOLOGY_K8S_NAME_MAX];
@@ -2303,7 +2303,7 @@ typedef struct {
     char cgroup_status[32];
     char cgroup_path[NV_TOPOLOGY_CGROUP_PATH_MAX];
     char cgroup_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
-    char container_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
+    char container_name[NV_TOPOLOGY_CONTAINER_NAME_MAX];
     char orchestrator[NV_TOPOLOGY_ORCHESTRATOR_MAX];
     char actor_kind[NV_TOPOLOGY_ACTOR_KIND_MAX];
     char k8s_pod_name[NV_TOPOLOGY_K8S_NAME_MAX];
@@ -2556,7 +2556,7 @@ static void topology_v1_add_process_row(
 
     char key[NV_TOPOLOGY_KEY_MAX];
     snprintfz(key, sizeof(key), "%"PRIu64"|%"PRIu64"|%"PRIu64,
-              actor, source->pid, source->net_ns_inode);
+              actor, (uint64_t)source->pid, source->net_ns_inode);
 
     if(dictionary_get(payload->process_index, key))
         return;
@@ -2721,7 +2721,7 @@ static void topology_v1_enrich_process_actor_from_cache(
     char cgroup_status[32] = "retry_later";
     char cgroup_path[NV_TOPOLOGY_CGROUP_PATH_MAX] = "";
     char cgroup_name[NV_TOPOLOGY_CGROUP_NAME_MAX] = "";
-    char container_name[NV_TOPOLOGY_CGROUP_NAME_MAX] = NV_TOPOLOGY_PENDING_CONTAINER_NAME;
+    char container_name[NV_TOPOLOGY_CONTAINER_NAME_MAX] = NV_TOPOLOGY_PENDING_CONTAINER_NAME;
     char orchestrator_value[NV_TOPOLOGY_ORCHESTRATOR_MAX] = "";
     char k8s_pod_name[NV_TOPOLOGY_K8S_NAME_MAX] = "";
     char k8s_namespace[NV_TOPOLOGY_K8S_NAME_MAX] = "";

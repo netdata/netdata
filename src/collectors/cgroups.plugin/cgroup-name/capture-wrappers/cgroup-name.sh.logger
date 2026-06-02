@@ -54,17 +54,35 @@ json_array() {
   printf ']'
 }
 
+timestamp_ns() {
+  local value seconds
+
+  value="$(date +%s%N 2>/dev/null || true)"
+  if [[ "$value" =~ ^[0-9]+$ ]]; then
+    printf '%s' "$value"
+    return
+  fi
+
+  seconds="$(date +%s 2>/dev/null || true)"
+  if [[ "$seconds" =~ ^[0-9]+$ ]]; then
+    printf '%s000000000' "$seconds"
+    return
+  fi
+
+  printf '0'
+}
+
 run_one() {
   local resolver="$1" stdout_file="$2" stderr_file="$3" code_file="$4" duration_file="$5"
   local start_ns end_ns code
   shift 5
 
-  start_ns="$(date +%s%N)"
+  start_ns="$(timestamp_ns)"
   set +e
   "$resolver" "$@" >"$stdout_file" 2>"$stderr_file"
   code=$?
   set -e
-  end_ns="$(date +%s%N)"
+  end_ns="$(timestamp_ns)"
 
   printf '%s' "$code" >"$code_file"
   printf '%s' "$(((end_ns - start_ns) / 1000000))" >"$duration_file"
@@ -81,7 +99,7 @@ normalize_for_diff() {
 tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/cgroup-name-wrapper.XXXXXX")"
 trap 'rm -rf "$tmpdir"' EXIT
 
-ts_ns_before="$(date +%s%N)"
+ts_ns_before="$(timestamp_ns)"
 argv_json="$(json_array "$0" "$@")"
 
 run_one "$shell_resolver" "$tmpdir/shell.out" "$tmpdir/shell.err" "$tmpdir/shell.code" "$tmpdir/shell.ms" "$@"

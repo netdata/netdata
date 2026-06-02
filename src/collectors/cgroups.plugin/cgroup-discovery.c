@@ -31,11 +31,6 @@ static size_t discovery_walkdir_open_errors_count = 0;
 
 // Legacy SHM globals removed; cgroup-netipc.c serves metadata via netipc.
 
-static DICTIONARY *discovery_walkdir_open_errors = NULL;
-static size_t discovery_walkdir_open_errors_count = 0;
-
-#define DISCOVERY_WALKDIR_OPEN_ERRORS_MAX 256
-
 static RRDSET *cgroup_discovery_scans_st = NULL;
 static RRDDIM *cgroup_discovery_scans_natural_rd = NULL;
 static RRDDIM *cgroup_discovery_scans_opportunistic_rd = NULL;

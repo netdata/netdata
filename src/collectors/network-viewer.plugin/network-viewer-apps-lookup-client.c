@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// cppcheck-suppress-file missingIncludeSystem
 
 #include "network-viewer-apps-lookup-client.h"
 #include "libnetdata/netipc/netipc_netdata.h"

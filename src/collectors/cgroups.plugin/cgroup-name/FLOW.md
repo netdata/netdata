@@ -1,3 +1,5 @@
+<!-- markdownlint-disable-file -->
+
 # cgroup-name flow
 
 This document is the implementation binding for the Go `cgroup-name` binary.

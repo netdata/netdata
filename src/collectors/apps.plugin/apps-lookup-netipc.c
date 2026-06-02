@@ -231,12 +231,11 @@ static bool apps_lookup_handler(
         return false;
     }
 
+    bool ok = true;
+    netdata_mutex_lock(&apps_pids_mutex);
     nipc_apps_lookup_builder_set_generation(
         builder,
         __atomic_load_n(&apps_collection_generation, __ATOMIC_ACQUIRE));
-
-    bool ok = true;
-    netdata_mutex_lock(&apps_pids_mutex);
 
     for (uint32_t i = 0; i < request->item_count; i++) {
         nipc_apps_lookup_req_item_t item;

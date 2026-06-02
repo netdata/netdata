@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// cppcheck-suppress-file unusedStructMember
 
 #ifndef NETDATA_CGROUP_TOPOLOGY_RULES_H
 #define NETDATA_CGROUP_TOPOLOGY_RULES_H 1

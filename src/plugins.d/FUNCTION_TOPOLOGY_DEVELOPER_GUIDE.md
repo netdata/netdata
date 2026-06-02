@@ -1,4 +1,4 @@
-<!-- markdownlint-disable-file MD043 -->
+<!-- markdownlint-disable-file MD013 MD043 -->
 
 # Netdata Topology Function Schema
 

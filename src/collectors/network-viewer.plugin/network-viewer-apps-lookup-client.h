@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// cppcheck-suppress-file unusedStructMember
 
 #ifndef NETDATA_NETWORK_VIEWER_APPS_LOOKUP_CLIENT_H
 #define NETDATA_NETWORK_VIEWER_APPS_LOOKUP_CLIENT_H

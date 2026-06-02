@@ -1,3 +1,5 @@
+<!-- markdownlint-disable-file -->
+
 # Monitor Cgroups (cgroups.plugin)
 
 You can monitor containers and virtual machines using **cgroups**.

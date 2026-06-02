@@ -63,7 +63,7 @@ Risks:
 
 ## Pre-Implementation Gate
 
-Status: blocked
+Historical status at implementation start: blocked.
 
 Problem / root-cause model:
 

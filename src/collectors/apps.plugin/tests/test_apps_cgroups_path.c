@@ -43,6 +43,12 @@ int main(void)
         return 1;
 
     if (!expect_path(
+            "crlf malformed line advances",
+            "malformed\r\n0::/unified\r\n",
+            "/unified"))
+        return 1;
+
+    if (!expect_path(
             "v1 cpuacct precedence",
             "3:memory:/memory-path\n2:blkio:/blkio-path\n1:cpu,cpuacct:/cpuacct-path\n",
             "/cpuacct-path"))
