@@ -609,7 +609,7 @@ def main():
     parser.add_argument(
         "-c",
         "--collector",
-        help="Generate docs only for this collector (plugin/module), e.g. 'go.d/snmp' or 'apps.plugin/groups'",
+        help="Generate docs only for this collector (plugin/module), e.g. 'go.d.plugin/snmp' or 'apps.plugin/groups'",
         default=None,
     )
     args = parser.parse_args()

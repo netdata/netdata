@@ -9,23 +9,32 @@ called `<name>`. For modifying an existing collector, see
 - `<repo>/.agents/skills/project-writing-collectors/SKILL.md`
   -- the broader "how to write a collector" context (NIDL
   contexts, dashboard shaping, plugin landscape).
+- `<repo>/src/go/plugin/go.d/docs/how-to-write-a-collector.md`
+  -- the canonical framework V2 code/layout guide for new go.d collectors.
 - `../SKILL.md` -- this skill's overview.
 - `../schema-reference.md` -- the `collector.json` schema
   fields you will be filling in.
 
 ## 1. Create the module skeleton
 
-Standard go.d layout:
+New go.d collectors MUST use framework V2. Code layout details live in
+`src/go/plugin/go.d/docs/how-to-write-a-collector.md`; this recipe covers the
+integration artifact side. A normal V2 collector directory includes:
 
 ```
 src/go/plugin/go.d/collector/<name>/
-├── <name>.go          # Module entrypoint, Init/Check/Collect
-├── config.go          # Config struct
-├── config_schema.json # DYNCFG schema
-├── metadata.yaml      # Integration metadata (this skill's territory)
-├── README.md          # Will become a symlink to integrations/<slug>.md once gen runs
-├── testdata/          # Fixtures
-└── ...other .go files
+|-- collector.go       # Register/CreateV2/New/public lifecycle
+|-- config.go          # Config struct
+|-- collect.go         # Collect orchestration
+|-- metrix.go          # Typed metrix instruments
+|-- write_metrics.go   # Metric writes
+|-- charts.yaml        # V2 chart template
+|-- config_schema.json # DYNCFG schema
+|-- metadata.yaml      # Integration metadata (this skill's territory)
+|-- taxonomy.yaml      # Dashboard TOC placement
+|-- README.md          # Will become a symlink to integrations/<slug>.md once gen runs
+|-- testdata/          # Fixtures
+`-- ...other .go files
 ```
 
 Plus stock conf:
@@ -133,13 +142,13 @@ modules:
 
 The first sentence of `metrics_description` is also used as the
 description in generated catalog-style pages such as
-`src/collectors/COLLECTORS.md`. Keep it product-facing and stable:
-start with an action phrase, describe the integration, and do not
+`src/collectors/COLLECTORS.md`. It SHOULD stay product-facing and stable:
+start with an action phrase, describe the integration, and MUST NOT
 describe configuration variables, defaults, limits, or setup steps.
 Put those details in the setup, default-behavior, examples, or
 troubleshooting fields.
 
-Hit every required field. The validator is strict (fatal on
+Hit every REQUIRED field. The validator is strict (fatal on
 warnings). Refer to `../schema-reference.md` for the
 exhaustive field list.
 
@@ -153,7 +162,8 @@ or add a new one under the appropriate parent (typically
 
 ## 4. Taxonomy, stock `.conf`, `config_schema.json`, alerts, README
 
-These files are the rest of the collector consistency rule:
+These files are the rest of the collector consistency rule and MUST stay
+synchronized with the collector code:
 
 - `src/go/plugin/go.d/collector/<name>/taxonomy.yaml` --
   dashboard TOC placement for chart contexts. Static collectors
@@ -162,7 +172,7 @@ These files are the rest of the collector consistency rule:
   `context_prefix:` or `collect_plugin:` and matching
 	  `metadata.yaml.metrics.dynamic_*` declarations. Display widgets
 	  use `type: context` with `contexts:` and `chart_library`; those
-	  referenced contexts must also be owned by structural items.
+	  referenced contexts MUST also be owned by structural items.
 	  Pick `--section-id` from
 	  `integrations/taxonomy/sections.yaml`; `section_id` is a stable
 	  registry ID, not a path to invent in the collector file.
@@ -170,23 +180,23 @@ These files are the rest of the collector consistency rule:
 	  ```bash
 	  python3 integrations/gen_taxonomy_seed.py src/go/plugin/go.d/collector/<name>/metadata.yaml --module-name <name> --section-id <section.id> --placement-id <name> --icon <icon>
 	  ```
-	  For a rich example with summary grids, table widgets, nested
-	  groups, and ownership leaves, read
-	  `src/go/plugin/go.d/collector/mysql/taxonomy.yaml`.
+	  For a rich recent example with groups, context ownership, and
+	  generated integration docs, read
+	  `src/go/plugin/go.d/collector/cato_networks/taxonomy.yaml`.
 - `src/go/plugin/go.d/config/go.d/<name>.conf` -- the stock
   config users will see at
-  `/etc/netdata/go.d/<name>.conf`. Keep it minimal but
+  `/etc/netdata/go.d/<name>.conf`. It SHOULD stay minimal but
   representative. Show every common option with a comment.
 - `src/go/plugin/go.d/collector/<name>/config_schema.json` --
-  the DYNCFG schema. Each option in the stock `.conf` should
+  the DYNCFG schema. Each option in the stock `.conf` SHOULD
   have a corresponding entry here, with the same default.
 - `src/health/health.d/<name>.conf` -- alerts on the metrics
-  declared in `metadata.yaml`. Each alert in this file should
+  declared in `metadata.yaml`. Each alert in this file SHOULD
   have a matching entry under `metadata.yaml.modules[0].alerts[]`.
 - `src/go/plugin/go.d/collector/<name>/README.md` -- this is the
   USER-FACING documentation. After step 5, this file will be
   REPLACED with a symlink to
-  `integrations/<slug>.md`. So you do NOT hand-write the
+  `integrations/<slug>.md`. You MUST NOT hand-write the
   README; the generator does. Stub it as empty initially.
 
 ## 5. Run the pipeline locally
@@ -197,20 +207,27 @@ From the repo root:
 ./integrations/pip.sh   # once
 python3 integrations/gen_integrations.py
 python3 integrations/gen_taxonomy.py --check-only
-python3 integrations/gen_docs_integrations.py -c go.d/<name>
+python3 integrations/check_collector_taxonomy.py --pr-diff master...HEAD
+python3 -m unittest integrations.tests.test_taxonomy
+python3 integrations/gen_docs_integrations.py -c go.d.plugin/<name>
 python3 integrations/gen_doc_collector_page.py
 python3 integrations/gen_doc_secrets_page.py
+# If service-discovery rules or sdext metadata changed:
+python3 integrations/gen_doc_service_discovery_page.py
 ```
 
 Expected outputs:
 
 - `integrations/integrations.js` and `integrations/integrations.json`
-  regenerated (gitignored, do NOT commit them).
+  regenerated (gitignored, MUST NOT be committed).
 - Collector taxonomy validated. If `gen_taxonomy.py` fails, fix
   `taxonomy.yaml` or the matching `metadata.yaml.metrics.dynamic_*`
   declaration before continuing.
+- Touched-collector taxonomy coverage validated in the same `--pr-diff` mode
+  used by CI. If your local base branch is not `master`, adjust the diff range
+  to the PR base.
 - `src/go/plugin/go.d/collector/<name>/integrations/<slug>.md`
-  CREATED. Inspect: it should contain the `<!--startmeta`
+  CREATED. Inspect: it SHOULD contain the `<!--startmeta`
   banner with your `sidebar_label` and `learn_rel_path`, then
   the rendered overview / setup / metrics / alerts /
   troubleshooting sections.
@@ -219,6 +236,8 @@ Expected outputs:
   exactly one integration in this directory).
 - `src/collectors/COLLECTORS.md` updated to include your new
   collector in its category section.
+- If service-discovery rules or `sdext` metadata changed,
+  `src/collectors/SERVICE-DISCOVERY.md` updated.
 
 If `gen_integrations.py` exits non-zero, read the warning
 output -- a schema validation failed. Fix `metadata.yaml` and
@@ -230,22 +249,40 @@ re-run.
   every section reads correctly.
 - Open `src/collectors/COLLECTORS.md` and find your collector
   in the table.
-- Run `python3 integrations/check_collector_taxonomy.py` before
-  opening the PR. In CI this also runs with `--pr-diff` to enforce
-  touched-collector taxonomy coverage.
+- Run `python3 integrations/check_collector_taxonomy.py --pr-diff master...HEAD`
+  before opening the PR. If your local base branch is not `master`, adjust the
+  diff range to the PR base.
+- From `src/go`, run `timeout 15s go run ./cmd/godplugin -m <name> -d` to
+  confirm go.d can load the module after the `init.go`, `go.d.conf`, stock
+  config, and README wiring changes. Success means the module is registered, a
+  job starts, and the command keeps running until timeout stops it; `unknown
+  module`, `no jobs started`, config-load errors, or immediate exit are
+  failures. Use `-c <config-dir>` when testing a non-standard config path.
+- If service-discovery rules or `sdext` metadata changed, run
+  `python3 integrations/gen_doc_service_discovery_page.py` and commit
+  `src/collectors/SERVICE-DISCOVERY.md`.
+- Run
+  `git status --porcelain | rg '^(\?\?|!!| M|M |A |AM) integrations/(integrations\.(js|json)|taxonomy\.json)$' || true`
+  and make sure it prints no output; these generated runtime catalogs are
+  gitignored and MUST NOT be committed.
 - Run `git diff` and confirm the only changes are in:
   - `src/go/plugin/go.d/collector/<name>/...` (your new module
     files).
+  - `src/go/plugin/go.d/collector/init.go` (registration import).
+  - `src/go/plugin/go.d/config/go.d.conf` (module toggle).
+  - `src/go/plugin/go.d/config/go.d/<name>.conf` (stock config).
+  - `src/go/plugin/go.d/README.md` (collector list).
   - `src/go/plugin/go.d/collector/<name>/integrations/<slug>.md`
     (the generated integration page).
   - `src/go/plugin/go.d/collector/<name>/README.md` (now a
     symlink).
   - `src/collectors/COLLECTORS.md` (umbrella page updated).
   - `src/health/health.d/<name>.conf` (alerts file).
+  - `src/collectors/SERVICE-DISCOVERY.md` if service-discovery changed.
   - Possibly `integrations/categories.yaml` if you added a
     category.
   - NOT `integrations/integrations.js` or
-    `integrations.json` (gitignored).
+    `integrations/integrations.json` (gitignored).
   - NOT `integrations/taxonomy.json` (gitignored).
 
 ## 7. Commit and push
@@ -262,7 +299,7 @@ artifacts were updated together.
   committed integration page diverges from CI's regen, the
   workflow fails -- fix locally and re-push.
 - After merge, `generate-integrations.yml` triggers on master.
-  Since you already committed the regen, this should not
+  Since you already committed the regen, this SHOULD NOT
   produce changes. If it does, the auto-PR
   (`Regenerate integrations docs`) catches the drift -- merge
   it.
