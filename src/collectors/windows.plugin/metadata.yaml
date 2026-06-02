@@ -3730,8 +3730,7 @@ modules:
           section_name: "[plugin:windows:PerflibServices]"
           description: "The Netdata main configuration file"
         options:
-          description: |
-            This collector uses **file-based configuration only** via `netdata.conf`. Dynamic configuration (dyncfg) through the Netdata UI or `/api/v3/config` is **not available** for this collector — the `windows.plugin` does not implement dyncfg handlers.
+          description: ""
           folding:
             title: "Config option"
             enabled: false
