@@ -22,3 +22,5 @@ exclude_paths:
   - src/go/plugin/go.d/config/go.d/snmp.profiles/metadata/iana-enterprise-numbers.txt
   - .agents/**
   - docs/netdata-ai/skills/**
+  - src/collectors/apps.plugin/apps-cgroups-lookup-client.h
+  - src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h

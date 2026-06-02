@@ -9,6 +9,8 @@
 #if defined(OS_LINUX)
 
 #define MAX_PROC_PID_LIMITS 8192
+#define PROC_PID_CGROUP_INITIAL_SIZE 4096
+#define PROC_PID_CGROUP_CONTENT_MAX (64 * 1024)
 #define PROC_PID_LIMITS_MAX_OPEN_FILES_KEY "\nMax open files "
 
 int max_fds_cache_seconds = 60;
@@ -829,12 +831,40 @@ bool apps_os_read_pid_cgroup_linux(struct pid_stat *p, void *ptr __maybe_unused)
     if (fd == -1)
         return apps_os_pid_cgroup_fail(p, errno);
 
-    char content[FILENAME_MAX + 1];
+    size_t content_capacity = PROC_PID_CGROUP_INITIAL_SIZE;
+    char *content = mallocz(content_capacity + 1);
     size_t used = 0;
     bool truncated = false;
 
-    while (used < sizeof(content) - 1) {
-        ssize_t bytes = read(fd, content + used, sizeof(content) - 1 - used);
+    for (;;) {
+        if (used == content_capacity) {
+            if (content_capacity < PROC_PID_CGROUP_CONTENT_MAX) {
+                content_capacity *= 2;
+                if (content_capacity > PROC_PID_CGROUP_CONTENT_MAX)
+                    content_capacity = PROC_PID_CGROUP_CONTENT_MAX;
+
+                content = reallocz(content, content_capacity + 1);
+                continue;
+            }
+
+            char extra;
+            ssize_t bytes = read(fd, &extra, 1);
+            if (bytes > 0) {
+                truncated = true;
+                break;
+            }
+            if (bytes == 0)
+                break;
+            if (errno == EINTR)
+                continue;
+
+            int saved_errno = errno;
+            close(fd);
+            freez(content);
+            return apps_os_pid_cgroup_fail(p, saved_errno);
+        }
+
+        ssize_t bytes = read(fd, content + used, content_capacity - used);
         if (bytes > 0) {
             used += (size_t)bytes;
             continue;
@@ -848,37 +878,23 @@ bool apps_os_read_pid_cgroup_linux(struct pid_stat *p, void *ptr __maybe_unused)
 
         int saved_errno = errno;
         close(fd);
+        freez(content);
         return apps_os_pid_cgroup_fail(p, saved_errno);
-    }
-
-    if (used == sizeof(content) - 1) {
-        char extra;
-        for (;;) {
-            ssize_t bytes = read(fd, &extra, 1);
-            if (bytes > 0) {
-                truncated = true;
-                break;
-            }
-            if (bytes == 0)
-                break;
-            if (errno == EINTR)
-                continue;
-
-            int saved_errno = errno;
-            close(fd);
-            return apps_os_pid_cgroup_fail(p, saved_errno);
-        }
     }
 
     close(fd);
 
-    if (used == 0 || truncated)
+    if (used == 0 || truncated) {
+        freez(content);
         return apps_os_pid_cgroup_fail(p, truncated ? ENAMETOOLONG : EINVAL);
+    }
 
     content[used] = '\0';
 
     char path[FILENAME_MAX + 1];
-    if (!apps_cgroup_parse_proc_pid_cgroup_content(content, path, sizeof(path)))
+    bool parsed = apps_cgroup_parse_proc_pid_cgroup_content(content, path, sizeof(path));
+    freez(content);
+    if (!parsed)
         return apps_os_pid_cgroup_fail(p, EINVAL);
 
     apps_cgroups_lookup_set_pid_cgroup_path(p, path);

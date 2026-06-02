@@ -109,13 +109,15 @@ Renaming is configured with the following options:
 	script to get cgroup names = /usr/libexec/netdata/plugins.d/cgroup-name
 ```
 
-The whole point for the additional pattern list, is to limit the number of times the resolver will be called. Without this
-pattern list, the resolver might be called thousands of times, depending on the number of cgroups available in the system.
+The whole point for the additional pattern list, is to limit the number of
+times the resolver will be called. Without this pattern list, the resolver
+might be called thousands of times, depending on the number of cgroups
+available in the system.
 
-The above pattern list is matched against the path of the cgroup. For matched cgroups, Netdata calls the
-`cgroup-name` helper
-to get its name. This helper queries `docker`, `kubectl`, `podman`, or applies heuristics to find a name for the
-cgroup.
+The above pattern list is matched against the path of the cgroup. For matched
+cgroups, Netdata calls the `cgroup-name` helper to get its name. This helper
+queries `docker`, `kubectl`, `podman`, or applies heuristics to find a name for
+the cgroup.
 
 #### Note on Podman container names
 
