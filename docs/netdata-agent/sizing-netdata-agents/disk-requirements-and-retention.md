@@ -73,9 +73,7 @@ On Parent nodes with many streaming Children (100+), journal files can be signif
 
 ### Disk Retention FAQ
 
-**Does available disk space affect retention behavior?**
-
-No. Retention is governed by configured size and time limits only. Netdata does not change retention behavior based on how much free disk space is available.
+Netdata does not automatically change retention targets based on free disk space; retention is governed by your configured size/time limits. If you disable both limits (size = 0 and time = 0), disk usage can grow until the filesystem fills.
 
 **Will adding a time-based retention limit trigger immediate cleanup?**
 
