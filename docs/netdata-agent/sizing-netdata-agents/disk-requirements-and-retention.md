@@ -83,7 +83,7 @@ Yes. Once a `dbengine tier N retention time` is configured, the retention check 
 
 **Is there a per-Child disk space limit?**
 
-No. All retention size settings are per-tier and shared across all hosts. There is no configuration to limit how much disk space an individual streaming Child can consume on the Parent. To control per-Child impact, reduce the Child's collection scope or use `ram` mode on Children so the Parent handles all persistence.
+No. All retention size settings are per-tier and shared across all hosts. There is no configuration to limit how much disk space an individual streaming Child can consume on the Parent. To control per-Child impact, reduce the Child's collection scope or otherwise reduce the volume and cardinality of the metrics it streams to the Parent.
 
 **Configuring dbengine mode and retention**:
 
