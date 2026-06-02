@@ -19,6 +19,7 @@ struct cgroup_lookup_label {
 };
 
 struct cgroup_lookup_entry {
+    // cppcheck-suppress unusedStructMember
     STRING *key;
     // cppcheck-suppress unusedStructMember
     uint16_t cgroup_status;
