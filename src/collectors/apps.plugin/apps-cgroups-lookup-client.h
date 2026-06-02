@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// cppcheck-suppress-file unusedStructMember
 
 #ifndef NETDATA_APPS_CGROUPS_LOOKUP_CLIENT_H
 #define NETDATA_APPS_CGROUPS_LOOKUP_CLIENT_H 1
@@ -13,20 +12,31 @@
 #define APPS_CGROUPS_LOOKUP_CACHE_MAX 4096U
 
 struct cgroup_lookup_label {
+    // cppcheck-suppress unusedStructMember
     STRING *key;
+    // cppcheck-suppress unusedStructMember
     STRING *value;
 };
 
 struct cgroup_lookup_entry {
     STRING *key;
+    // cppcheck-suppress unusedStructMember
     uint16_t cgroup_status;
+    // cppcheck-suppress unusedStructMember
     uint16_t orchestrator;
+    // cppcheck-suppress unusedStructMember
     STRING *cgroup_name;
+    // cppcheck-suppress unusedStructMember
     struct cgroup_lookup_label *cgroup_labels;
+    // cppcheck-suppress unusedStructMember
     uint16_t cgroup_label_count;
+    // cppcheck-suppress unusedStructMember
     uint64_t generation;
+    // cppcheck-suppress unusedStructMember
     uint64_t last_used_iteration;
+    // cppcheck-suppress unusedStructMember
     uint32_t refcount;
+    // cppcheck-suppress unusedStructMember
     bool pending;
 };
 

@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// cppcheck-suppress-file unusedStructMember
 
 #ifndef NETDATA_NETWORK_VIEWER_APPS_LOOKUP_CLIENT_H
 #define NETDATA_NETWORK_VIEWER_APPS_LOOKUP_CLIENT_H
@@ -8,18 +7,28 @@
 #include "libnetdata/netipc/netipc_netdata.h"
 
 typedef struct {
+    // cppcheck-suppress unusedStructMember
     char *key;
+    // cppcheck-suppress unusedStructMember
     char *value;
 } NV_APPS_LOOKUP_LABEL;
 
 typedef struct {
+    // cppcheck-suppress unusedStructMember
     uint16_t cgroup_status;
+    // cppcheck-suppress unusedStructMember
     uint16_t orchestrator;
+    // cppcheck-suppress unusedStructMember
     uint64_t starttime;
+    // cppcheck-suppress unusedStructMember
     uint64_t apps_lookup_generation_observed;
+    // cppcheck-suppress unusedStructMember
     char *cgroup_path;
+    // cppcheck-suppress unusedStructMember
     char *cgroup_name;
+    // cppcheck-suppress unusedStructMember
     NV_APPS_LOOKUP_LABEL *cgroup_labels;
+    // cppcheck-suppress unusedStructMember
     uint16_t cgroup_label_count;
 } NV_APPS_LOOKUP_FIELDS;
 
