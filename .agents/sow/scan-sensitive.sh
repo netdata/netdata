@@ -49,12 +49,12 @@ scan_sensitive_file() {
     push @hits, "openai-key" if $line =~ /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b/;
     push @hits, "google-api-key" if $line =~ /\bAIza[0-9A-Za-z_-]{20,}\b/;
     push @hits, "jwt" if $line =~ /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/;
-    push @hits, "credentialed-url" if $line =~ m{[a-z][a-z0-9+.-]*://[^/\s:@]+:[^/\s:@]+@}i;
+    push @hits, "credentialed-url" if $line =~ m{[a-z][a-z0-9+.-]*://[^/\s:@]+:[^/\s:@]+@}i && $line !~ m{x-access-token:(?:TOK|TOKEN|REDACTED|EXAMPLE|PLACEHOLDER|YOUR[_-]?TOKEN)\@github\.com}i;
     push @hits, "bearer-token" if $line =~ /\bBearer\s+[A-Za-z0-9._~+\/=-]{16,}\b/i && $line !~ /\b(REDACTED|EXAMPLE|PLACEHOLDER|YOUR[_-]?(?:TOKEN|ACCESS[_-]?TOKEN|BEARER[_-]?TOKEN))\b/i;
 
     if ($line =~ /\b(?:pass(?:word)?|passwd|pwd|api[_-]?key|secret|token|client[_-]?secret|private[_-]?key|access[_-]?key)\b\s*[:=]\s*["'\''`]?([^"'\''`\s<>{}\[\]&,]{8,})/i) {
       my $value = lc $1;
-      push @hits, "credential-assignment" unless $value =~ /^(redacted|example|placeholder|changeme|change-me|xxx|xxxx|null|none|your[_-]?|dummy|sample|fake|test)/ || $value =~ /^\$/ || $value =~ /^(config|settings|options|opts|env|process\.env|os\.environ)\./ || $value =~ /^[a-z_][a-z0-9_.]*(token|secret|key|password)[a-z0-9_.]*$/;
+      push @hits, "credential-assignment" unless $value =~ /^(redacted|example|placeholder|changeme|change-me|xxx|xxxx|null|none|your[_-]?|dummy|sample|fake|test)/ || $value =~ /^\$/ || $value =~ /^(config|settings|options|opts|env|process\.env|os\.environ)\./ || $value =~ /^[a-z_][a-z0-9_.]*(token|secret|key|password)[a-z0-9_.]*$/ || $value =~ /^(tok|token)\@github\.com\b/;
     }
 
     if ($line =~ /\b(?:snmp[_-]?)?(?:community|community[_-]?string|rocommunity|rwcommunity)\b\s*[:=]\s*["'\''`]?([^"'\''`\s<>{}\[\]]{3,})/i) {
@@ -69,7 +69,7 @@ scan_sensitive_file() {
     }
 
     if ($line =~ /\b[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}\b/i) {
-      push @hits, "email-address" unless $line =~ /\b(example\.com|example\.org|example\.net|localhost)\b/i || $line =~ /\bgit\@github\.com:/i;
+      push @hits, "email-address" unless $line =~ /\b(example\.com|example\.org|example\.net|localhost)\b/i || $line =~ /\bgit\@github\.com[:\/]/i || $line =~ /x-access-token:(?:TOK|TOKEN|REDACTED|EXAMPLE|PLACEHOLDER|YOUR[_-]?TOKEN)\@github\.com/i;
     }
 
     if ($line =~ /\b(customer|client|tenant|account|community member|support|production|prod|log|trace|request|source ip|remote ip|x-forwarded-for|host ip)\b/i) {
