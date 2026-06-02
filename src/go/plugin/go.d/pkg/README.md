@@ -22,24 +22,28 @@ If an existing V1 collector is being migrated, use
 
 ## Common Collector Helpers
 
-- `ndexec` runs external commands.
-- `iprange` parses and checks IP ranges.
-- `logs` helps parse application log files.
+- `src/go/plugin/go.d/pkg/ndexec` runs external commands.
+- `src/go/plugin/go.d/pkg/iprange` parses and checks IP ranges.
+- `src/go/plugin/go.d/pkg/logs` helps parse application log files.
 - `src/go/pkg/matcher` provides selector/matcher implementations.
 - `src/go/pkg/confopt` provides duration and tri-state config option types.
-- `web` provides HTTP client configuration helpers.
-- `prometheus` parses Prometheus endpoints; use it with `web`.
-- `tlscfg` provides TLS support.
-- `sqlquery` provides reusable SQL row/query helpers.
-- `socket` provides TCP/UDP/Unix line-protocol clients.
-- `cloudauth` provides shared cloud authentication config/credential helpers.
-- `pinger` provides shared ping probing and latency/jitter calculations.
+- `src/go/pkg/web` provides HTTP client configuration helpers.
+- `src/go/pkg/prometheus` parses Prometheus endpoints; use it with
+  `src/go/pkg/web`.
+- `src/go/pkg/tlscfg` provides TLS support.
+- `src/go/plugin/go.d/pkg/sqlquery` provides reusable SQL row/query helpers.
+- `src/go/plugin/go.d/pkg/socket` provides TCP/UDP/Unix line-protocol clients.
+- `src/go/plugin/go.d/pkg/cloudauth` provides shared cloud authentication
+  config/credential helpers.
+- `src/go/plugin/go.d/pkg/pinger` provides shared ping probing and
+  latency/jitter calculations.
 
 ## Legacy V1 Helpers
 
-- `stm` converts structs into `map[string]int64`. This is V1-shaped and MUST
-  NOT be used as the metric path for new V2 collectors. It MAY be useful while
-  maintaining legacy V1 collectors or building temporary migration parity tests
-  that are removed from the final runtime path.
-- `oldmetrix` provides V1 metric vector helper types used by existing V1 collectors.
-  New V2 collectors SHOULD use `src/go/pkg/metrix` instead.
+- `src/go/pkg/stm` converts structs into `map[string]int64`. This is V1-shaped
+  and MUST NOT be used as the metric path for new V2 collectors. It MAY be
+  useful while maintaining legacy V1 collectors or building temporary migration
+  parity tests that are removed from the final runtime path.
+- `src/go/plugin/go.d/pkg/oldmetrix` provides V1 metric vector helper types
+  used by existing V1 collectors. New V2 collectors SHOULD use
+  `src/go/pkg/metrix` instead.

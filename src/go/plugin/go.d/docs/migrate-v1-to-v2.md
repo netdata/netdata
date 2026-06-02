@@ -127,7 +127,7 @@ From `src/go`, run an import audit for the migrated collector:
 
 ```bash
 go list -deps -test=false ./plugin/go.d/collector/<collector>/... |
-  rg 'plugin/go\.d/agent/module|pkg/stm|plugin/go\.d/pkg/oldmetrix'
+  rg 'pkg/stm|plugin/go\.d/pkg/oldmetrix'
 rg -n 'Collect\(.*map\[string\]int64|map\[string\]int64|collectorapi\.Charts|func .*Charts\(' \
   plugin/go.d/collector/<collector> -g '*.go'
 ```
