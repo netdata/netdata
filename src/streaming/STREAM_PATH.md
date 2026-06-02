@@ -23,8 +23,9 @@ Helper for read access by index: `rrdhost_stream_path_get_host_ids(host,
 from, host_ids, max)` (returns just the UUIDs starting at `from`).
 
 For full per-entry data with a callback: `rrdhost_stream_path_visit(host,
-from, cb, userdata)` (added by SOW-0012; mirrors the get_host_ids locking
-pattern but exposes hostname, hops, since, capabilities, flags, etc.).
+from, cb, userdata)` (added by PR #22432 / commit `cc50307bc`; mirrors the
+get_host_ids locking pattern but exposes hostname, hops, since, capabilities,
+flags, etc.).
 
 ## 3. Storage rule (received vs emitted)
 
@@ -132,17 +133,18 @@ Known consumers of `host->stream.path.array` in this tree:
 - `src/web/api/functions/function-topology-streaming.c` — the
   `topology:streaming` Function. Uses both `streaming_topology_get_path_ids`
   (paths for actor/link emission) and `rrdhost_stream_path_visit` (Bug C
-  synthesis from SOW-0012). Reads stored data, falls back to the
+  synthesis from PR #22432). Reads stored data, falls back to the
   rrdhost-derived live data via `rrdhost_status()` for the localhost
-  classification (Bug A in SOW-0012).
+  classification (Bug A in PR #22432).
 - `src/database/contexts/api_v2_contexts.c:425, :510` — emits
   `streaming_path` per host via `rrdhost_stream_path_to_json` (so the
   emit-time self-append fires). No direct array access.
 - `src/streaming/stream-path.c:145-158` — `rrdhost_stream_path_total_reboot_time_ms`
   walks the stored array looking for localhost's own entry. **This shares
   Bug A's blind assumption**: on the apex parent, the localhost entry is
-  not in storage, so this function returns 0 silently. Tracked as a
-  same-failure follow-up in SOW-0012.
+  not in storage, so this function returns 0 silently. This is the same
+  failure class as the PR #22432 streaming topology fix and needs a separate
+  GitHub issue before implementation starts.
 
 ## 8. vnode special case
 
@@ -160,7 +162,7 @@ visits via `rrdhost_stream_path_visit` return zero entries.
 
 The `topology:streaming` Function classifies each entry in
 `rrdhost_root_index` as `parent`, `child`, `vnode`, or `stale`. The intended
-rule (project-owner confirmed in SOW-0012):
+rule was confirmed during PR #22432:
 
 1. **Source of truth = `rrdhost_root_index`.** Every actor on the
    topology graph corresponds to either an entry in this index OR a
@@ -177,7 +179,7 @@ rule (project-owner confirmed in SOW-0012):
 For the localhost itself, classification reads live state via
 `rrdhost_status()` (count of non-virtual children with `s.ingest.type ==
 CHILD` and `s.ingest.status` ∈ `{ONLINE, REPLICATING}`). This was Bug A in
-SOW-0012 — the path-based check was unreliable on apex agents because
+PR #22432 — the path-based check was unreliable on apex agents because
 storage hadn't converged yet.
 
 For the cross-agent merge (Cloud combines topology responses from multiple
@@ -187,7 +189,7 @@ actor_id form (`netdata-machine-guid:<agent_id>`) and uses that to identify
 which actor in `actors[]` is the response's "self" — that response is the
 authoritative source for that actor's attributes.
 
-For the bug history, decisions, and design rationale, see
-[`SOW-0012`](../../.agents/sow/done/SOW-0012-20260505-streaming-topology-classification-bugs.md)
-once it lands in `done/`. While the SOW is in progress it lives at
-`.agents/sow/current/`.
+For bug history, decisions, and design rationale, use PR #22432 / commit
+`cc50307bc6ca180285a0e0cda16d73ab7a42cd86`. Completed SOW working files are
+not retained on `master`; durable behavior belongs in this maintenance
+reference.

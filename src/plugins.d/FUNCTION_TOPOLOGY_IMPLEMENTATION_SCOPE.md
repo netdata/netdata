@@ -220,7 +220,7 @@ Current state:
   not as actor-owned duplicated modal data;
 - link and evidence string columns choose dictionary encoding only when it
   reduces raw payload size;
-- SOW-0023 semantic-link split and correlation endpoint/point/claim emission
+- PR #22496 semantic-link split and correlation endpoint/point/claim emission
   are implemented in the Agent producer;
 - remaining network-connections work is corpus-scale validation with captured
   Cloud payloads and Cloud/frontend integration once the parallel workers are

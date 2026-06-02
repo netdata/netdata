@@ -2,13 +2,14 @@
 
 ## Status
 
-Implementation contract introduced by SOW-0028.
+Implementation contract introduced by topology v1 producer work in PR #22496 /
+commit `8afe52d8b`.
 
-SOW-0028 completed the cross-repo compatibility layer for modes, modal
+PR #22496 completed the cross-repo compatibility layer for modes, modal
 identification, correlation classes, and table merge policy. The stronger
-detailed network-connections loose-side graph model remains the target
-behavior and is tracked by SOW-0029 because it requires a separate
-Agent/UI/aggregator execution pass.
+detailed network-connections loose-side graph model remains target behavior,
+but requires a separate Agent/UI/aggregator execution pass before it becomes
+current contract.
 
 ## Purpose
 
