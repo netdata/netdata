@@ -8,7 +8,7 @@ For structured logs, Netdata provides tools like [log2journal](/src/collectors/l
 
 ## Non-systemd Linux systems
 
-Linux distributions without systemd, such as Alpine Linux, cannot use the [systemd journal plugin](/src/collectors/systemd-journal.plugin) or [log2journal](/src/collectors/log2journal/README.md) locally, because both require a local `systemd-journald` installation.
+Linux distributions without systemd, such as Alpine Linux, cannot use the [systemd journal plugin](/src/collectors/systemd-journal.plugin) locally because it requires a local `systemd-journald` installation. Note that [log2journal](/src/collectors/log2journal/README.md) itself does not require systemd — it is a standalone text processor that can run on any Linux system to convert log files to Journal Export Format. The converted output can then be piped to `systemd-cat-native --url` for remote forwarding (see option 1 below).
 
 You can still make logs available in Netdata using these alternatives:
 
