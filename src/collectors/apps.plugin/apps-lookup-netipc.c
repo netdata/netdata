@@ -2,9 +2,10 @@
 
 #include "apps-lookup-netipc.h"
 #include "apps-cgroups-lookup-client.h"
-#include "libnetdata/netipc/netipc_netdata.h"
 
 #ifdef OS_LINUX
+
+#include "libnetdata/netipc/netipc_netdata.h"
 
 struct apps_lookup_label_view_ctx {
     nipc_lookup_label_view_t *views;

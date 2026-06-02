@@ -5,9 +5,10 @@
 #define NETDATA_APPS_CGROUPS_ENRICHMENT_H 1
 
 #include "apps_plugin.h"
-#include "collectors/common-cgroups/cgroup-topology-rules.h"
 
 #if defined(OS_LINUX)
+
+#include "collectors/common-cgroups/cgroup-topology-rules.h"
 
 #define APPS_ENRICHMENT_CGROUP_PATH_MAX CGROUP_TOPOLOGY_CGROUP_PATH_MAX
 #define APPS_ENRICHMENT_CGROUP_NAME_MAX CGROUP_TOPOLOGY_CGROUP_NAME_MAX

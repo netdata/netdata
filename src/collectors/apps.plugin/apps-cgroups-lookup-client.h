@@ -4,7 +4,6 @@
 #define NETDATA_APPS_CGROUPS_LOOKUP_CLIENT_H 1
 
 #include "apps_plugin.h"
-#include "libnetdata/netipc/netipc_netdata.h"
 
 #ifdef OS_LINUX
 

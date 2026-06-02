@@ -4,6 +4,8 @@
 
 #ifdef OS_LINUX
 
+#include "libnetdata/netipc/netipc_netdata.h"
+
 #define APPS_CGROUPS_LOOKUP_SERVICE_NAME "cgroups-lookup"
 #define APPS_CGROUPS_LOOKUP_BATCH_MAX 256U
 #define APPS_CGROUPS_LOOKUP_CONNECT_RETRY_SEC 30ULL

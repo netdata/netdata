@@ -4,7 +4,6 @@
 #define NETDATA_NETWORK_VIEWER_APPS_LOOKUP_CLIENT_H
 
 #include "libnetdata/libnetdata.h"
-#include "libnetdata/netipc/netipc_netdata.h"
 
 typedef struct {
     // cppcheck-suppress unusedStructMember

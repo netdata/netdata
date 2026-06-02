@@ -2806,16 +2806,6 @@ if(ENABLE_PLUGIN_APPS)
     set(APPS_PLUGIN_FILES
             src/collectors/apps.plugin/apps_plugin.c
             src/collectors/apps.plugin/apps_plugin.h
-            src/collectors/common-cgroups/cgroup-topology-rules.c
-            src/collectors/common-cgroups/cgroup-topology-rules.h
-            src/collectors/apps.plugin/apps-cgroups-path.c
-            src/collectors/apps.plugin/apps-cgroups-path.h
-            src/collectors/apps.plugin/apps-cgroups-enrichment.c
-            src/collectors/apps.plugin/apps-cgroups-enrichment.h
-            src/collectors/apps.plugin/apps-cgroups-lookup-client.c
-            src/collectors/apps.plugin/apps-cgroups-lookup-client.h
-            src/collectors/apps.plugin/apps-lookup-netipc.c
-            src/collectors/apps.plugin/apps-lookup-netipc.h
             src/collectors/apps.plugin/apps_functions.c
             src/collectors/apps.plugin/apps_targets.c
             src/collectors/apps.plugin/apps_output.c
@@ -2835,7 +2825,18 @@ if(ENABLE_PLUGIN_APPS)
         list(APPEND APPS_PLUGIN_FILES
                 src/collectors/collectors-ipc/ebpfgo_shared_memory.h
                 src/collectors/collectors-ipc/ebpfgo_shared_memory.c
-                src/collectors/apps.plugin/apps_ebpf_shared_memory.c)
+                src/collectors/apps.plugin/apps_ebpf_shared_memory.c
+                src/collectors/common-cgroups/cgroup-topology-rules.c
+                src/collectors/common-cgroups/cgroup-topology-rules.h
+                src/collectors/apps.plugin/apps-cgroups-path.c
+                src/collectors/apps.plugin/apps-cgroups-path.h
+                src/collectors/apps.plugin/apps-cgroups-enrichment.c
+                src/collectors/apps.plugin/apps-cgroups-enrichment.h
+                src/collectors/apps.plugin/apps-cgroups-lookup-client.c
+                src/collectors/apps.plugin/apps-cgroups-lookup-client.h
+                src/collectors/apps.plugin/apps-lookup-netipc.c
+                src/collectors/apps.plugin/apps-lookup-netipc.h
+        )
     endif()
 
     add_executable(apps.plugin ${APPS_PLUGIN_FILES})
