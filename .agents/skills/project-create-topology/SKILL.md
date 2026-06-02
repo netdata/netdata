@@ -24,6 +24,7 @@ Read these before designing or changing topology payloads:
 | `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md` | Backend/frontend/aggregator migration scope |
 | `.agents/sow/specs/topology-function-schema.md` | Durable project spec for topology semantics |
 | `.agents/sow/specs/topology-modes-correlation-aggregation.md` | Mode, correlation, aggregation, and actor modal identification contract |
+| `src/go/pkg/topology/v1` | Go production topology payload builders and compact-table helpers |
 | `.agents/skills/project-writing-collectors/SKILL.md` | Collector quality, Function, validation, and cardinality rules |
 
 For transport-level Function behavior, also read:
@@ -40,6 +41,8 @@ developer-facing and must stay in this project skill, not under
 ## Core Rules
 
 - Production payloads carry canonical topology facts for the aggregator and UI.
+- Go producers MUST use `src/go/pkg/topology/v1`. The non-v1
+  `src/go/pkg/topology` payload model is legacy for new producers.
 - Test-only projection code may reconstruct compatibility payload shapes to
   prove parity.
 - Never add compatibility reconstruction fields, old-schema adapter names, or

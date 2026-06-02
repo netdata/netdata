@@ -31,7 +31,7 @@ scoping on `gen_docs_integrations.py` to skip cleaning/
 regenerating other directories:
 
 ```bash
-python3 integrations/gen_docs_integrations.py -c go.d/<your-module>
+python3 integrations/gen_docs_integrations.py -c go.d.plugin/<your-module>
 ```
 
 ## When in doubt
