@@ -472,6 +472,7 @@ static inline void topology_pid_lookup_key(char *dst, size_t dst_size, uint64_t 
     snprintf(dst, dst_size, "pid=%llu", (unsigned long long)pid);
 }
 
+#if defined(OS_LINUX)
 static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
     if(!pid || !ppid)
         return false;
@@ -503,6 +504,29 @@ static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
     *ppid = parent;
     return true;
 }
+#elif defined(OS_FREEBSD)
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include <sys/user.h>
+static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
+    if(!pid || !ppid)
+        return false;
+
+    struct kinfo_proc kp;
+    size_t size = sizeof(kp);
+    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, (int)pid };
+
+    if(sysctl(mib, 4, &kp, &size, NULL, 0) != 0 || size == 0)
+        return false;
+
+    uint64_t parent = (uint64_t)kp.ki_ppid;
+    if(parent == pid)
+        parent = 0;
+
+    *ppid = parent;
+    return true;
+}
+#endif
 
 static uint64_t topology_ppid_cache_get_or_load(DICTIONARY *ppid_cache, uint64_t pid) {
     if(!ppid_cache || !pid)
@@ -4564,7 +4588,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
                                     NULL, HTTP_ACCESS_ALL, NULL, NULL);
 //        }
 
+#if defined(LOCAL_SOCKETS_USE_SETNS)
         spawn_server_destroy(spawn_srv);
+#endif
         exit(1);
     }
 
@@ -4615,8 +4641,10 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         }
     }
 
+#if defined(LOCAL_SOCKETS_USE_SETNS)
     spawn_server_destroy(spawn_srv);
     spawn_srv = NULL;
+#endif
 
     return 0;
 }

@@ -9,8 +9,11 @@
 #define _countof(x) (sizeof(x) / sizeof(*(x)))
 #endif
 
+// Network-namespace switching via setns() is Linux-only.
+#if defined(OS_LINUX)
 #define LOCAL_SOCKETS_USE_SETNS
 #define USE_LIBMNL_AFTER_SETNS
+#endif
 
 #if defined(HAVE_LIBMNL)
 #include <linux/rtnetlink.h>
@@ -22,6 +25,25 @@
 #endif
 
 #define UID_UNSET (uid_t)(UINT32_MAX)
+
+// FreeBSD uses TCPS_* values from tcp_fsm.h (different numbering from Linux).
+// Define Linux-compatible TCP_* constants here so the rest of the code —
+// direction detection (TCP_LISTEN check) and TCP_STATE_2str display — works
+// unchanged on FreeBSD.  The FreeBSD backend converts TCPS_* → TCP_* before
+// storing the state in LOCAL_SOCKET.state.
+#if defined(OS_FREEBSD)
+#define TCP_ESTABLISHED  1
+#define TCP_SYN_SENT     2
+#define TCP_SYN_RECV     3
+#define TCP_FIN_WAIT1    4
+#define TCP_FIN_WAIT2    5
+#define TCP_TIME_WAIT    6
+#define TCP_CLOSE        7
+#define TCP_CLOSE_WAIT   8
+#define TCP_LAST_ACK     9
+#define TCP_LISTEN       10
+#define TCP_CLOSING      11
+#endif
 
 // max cmdline bytes read from /proc/<pid>/cmdline — reader-side guard must match
 #define LOCAL_SOCKETS_CMDLINE_MAX 8192
@@ -570,6 +592,8 @@ local_sockets_read_proc_inode_link(LS_STATE *ls, const char *filename, uint64_t 
     }
 }
 
+#if !defined(OS_FREEBSD) // /proc-based PID + FD walking is Linux-only
+
 static inline bool local_sockets_is_path_a_pid(const char *s) {
     if(!s || !*s) return false;
 
@@ -735,6 +759,8 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
     closedir(proc_dir);
     return true;
 }
+
+#endif // !OS_FREEBSD
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -979,6 +1005,8 @@ static inline bool local_sockets_libmnl_get_sockets(LS_STATE *ls, uint16_t famil
     return rc;
 }
 #endif // HAVE_LIBMNL
+
+#if !defined(OS_FREEBSD) // /proc-based socket tables and pcblist reading is Linux-only
 
 static inline bool local_sockets_process_proc_line(LS_STATE *ls, const char *filename, uint16_t family, uint16_t protocol, size_t line, char **words, size_t num_words) {
     // char *sl_txt = get_word(words, num_words, 0);
@@ -1410,8 +1438,13 @@ static inline void local_sockets_read_all_system_sockets(LS_STATE *ls) {
     }
 }
 
+#elif defined(OS_FREEBSD)
+// FreeBSD: local_sockets_read_all_system_sockets() is provided by the FreeBSD backend.
+#include "local-sockets-freebsd.h"
+#endif // !OS_FREEBSD
+
 // --------------------------------------------------------------------------------------------------------------------
-// switch namespaces to read namespace sockets
+// switch namespaces to read namespace sockets (Linux/setns only)
 
 #if defined(LOCAL_SOCKETS_USE_SETNS)
 
@@ -1726,9 +1759,9 @@ static inline void local_sockets_namespaces(LS_STATE *ls) {
 #endif // LOCAL_SOCKETS_USE_SETNS
 
 // --------------------------------------------------------------------------------------------------------------------
-// read namespace sockets from the host's /proc
+// read namespace sockets from the host's /proc (Linux without setns only)
 
-#if !defined(LOCAL_SOCKETS_USE_SETNS)
+#if !defined(LOCAL_SOCKETS_USE_SETNS) && !defined(OS_FREEBSD)
 
 static inline bool local_sockets_namespaces_from_proc_with_pid(LS_STATE *ls, struct pid_socket *ps) {
     char filename[1024];
@@ -1836,9 +1869,10 @@ static inline void local_sockets_process(LS_STATE *ls) {
         local_sockets_track_time(ls, "switch_namespaces");
 #if defined(LOCAL_SOCKETS_USE_SETNS)
         local_sockets_namespaces(ls);
-#else
+#elif !defined(OS_FREEBSD)
         local_sockets_namespaces_from_proc(ls);
 #endif
+        // FreeBSD: jails are a different isolation model; namespace switching not supported.
     }
 
     // detect the directions of the sockets
