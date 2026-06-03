@@ -391,15 +391,17 @@ static void nv_smb_share_insert_cb(const DICTIONARY_ITEM *item __maybe_unused,
 
 // Enumerate "SMB Server Shares" instances and update per-share COUNTER_DATA.
 // Must be called under nv_collect_mutex.
-static void nv_smb_collect(void)
+// Returns true if at least one share was collected in this pass.
+static bool nv_smb_collect(void)
 {
     PERF_DATA_BLOCK  *pDataBlock;
     PERF_OBJECT_TYPE *pObjectType;
     if (!perflib_get_object("SMB Server Shares", &pDataBlock, &pObjectType))
-        return;
+        return false;
 
     char name[1024];
     usec_t now_ut = now_monotonic_usec();
+    LONG collected = 0;
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
@@ -416,6 +418,7 @@ static void nv_smb_collect(void)
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &s->receivedBytes);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &s->sentBytes);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &s->treeConnectCount);
+        collected++;
     }
 
     // Remove shares that were not seen in this collection pass.
@@ -429,6 +432,8 @@ static void nv_smb_collect(void)
         dfe_done(s);
         dictionary_garbage_collect(nv_smb_shares);
     }
+
+    return collected > 0;
 }
 
 // Emit one network-protocols table row per SMB share.
@@ -523,6 +528,7 @@ void function_network_protocols(
     bool have_tcp_ipv6 = false;
     bool have_udp_ipv4 = false;
     bool have_udp_ipv6 = false;
+    bool have_smb      = false;
 
     if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
         nv_send_error(transaction, HTTP_RESP_CLIENT_CLOSED_REQUEST, "Request cancelled.");
@@ -539,7 +545,7 @@ void function_network_protocols(
     have_tcp_ipv6 = tcp_collect_family(&tcp_ipv6);
     have_udp_ipv4 = udp_collect_family(&udp_ipv4);
     have_udp_ipv6 = udp_collect_family(&udp_ipv6);
-    nv_smb_collect();
+    have_smb      = nv_smb_collect();
 
     if(unlikely(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))) {
         netdata_mutex_unlock(&nv_collect_mutex);
@@ -547,10 +553,10 @@ void function_network_protocols(
         goto cleanup;
     }
 
-    if(unlikely(!have_tcp_ipv4 && !have_tcp_ipv6 && !have_udp_ipv4 && !have_udp_ipv6)) {
+    if(unlikely(!have_tcp_ipv4 && !have_tcp_ipv6 && !have_udp_ipv4 && !have_udp_ipv6 && !have_smb)) {
         netdata_mutex_unlock(&nv_collect_mutex);
         nv_send_error(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR,
-                      "failed to collect Windows TCP/UDP stack statistics");
+                      "failed to collect Windows network stack statistics");
         goto cleanup;
     }
 
@@ -568,7 +574,8 @@ void function_network_protocols(
             proto_emit_udp_row(wb, &udp_ipv4);
         if(have_udp_ipv6)
             proto_emit_udp_row(wb, &udp_ipv6);
-        proto_emit_smb_rows(wb);
+        if(have_smb)
+            proto_emit_smb_rows(wb);
     }
     buffer_json_array_close(wb); // data
     netdata_mutex_unlock(&nv_collect_mutex);
