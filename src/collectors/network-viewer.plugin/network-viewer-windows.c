@@ -415,10 +415,12 @@ static bool nv_smb_collect(void)
         NV_SMB_SHARE *s = dictionary_set(nv_smb_shares, name, NULL, sizeof(*s));
         s->last_collected = now_ut;
 
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &s->receivedBytes);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &s->sentBytes);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &s->treeConnectCount);
-        collected++;
+        bool share_ok = false;
+        share_ok |= perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &s->receivedBytes);
+        share_ok |= perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &s->sentBytes);
+        share_ok |= perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &s->treeConnectCount);
+        if (share_ok)
+            collected++;
     }
 
     // Remove shares that were not seen in this collection pass.
