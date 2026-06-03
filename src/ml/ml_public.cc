@@ -92,6 +92,7 @@ void ml_host_new(RRDHOST *rh)
     host->queue = Cfg.workers[times_called++ % Cfg.num_worker_threads].queue;
 
     netdata_mutex_init(&host->mutex);
+    netdata_mutex_init(&host->start_stop_mutex);
     spinlock_init(&host->context_anomaly_rate_spinlock);
 
     host->ml_running = false;
@@ -121,6 +122,7 @@ void ml_host_delete(RRDHOST *rh)
 
     ml_host_clear_context_anomaly_rate(host);
     netdata_mutex_destroy(&host->mutex);
+    netdata_mutex_destroy(&host->start_stop_mutex);
 
     delete host;
 }
@@ -130,16 +132,19 @@ void ml_host_start(RRDHOST *rh) {
     if (!host)
         return;
 
-    // Set ml_running and run the sweep under host->mutex so concurrent
-    // ml_host_start() calls are serialized and the visibility window of the
-    // flag flip is bounded by the same critical section that performs the
-    // sweep.
-    netdata_mutex_lock(&host->mutex);
+    // Serialize against ml_host_stop(): we must not re-enable ml_running
+    // while a stop is still resetting chart/dim state (see ml_host_stop),
+    // and concurrent ml_host_start() calls must not run the sweep twice.
+    netdata_mutex_lock(&host->start_stop_mutex);
 
     if (host->ml_running) {
-        netdata_mutex_unlock(&host->mutex);
+        netdata_mutex_unlock(&host->start_stop_mutex);
         return;
     }
+
+    // Run the sweep under host->mutex so the visibility window of the flag
+    // flip is bounded by the same critical section that performs the sweep.
+    netdata_mutex_lock(&host->mutex);
 
     host->ml_running = true;
 
@@ -157,12 +162,25 @@ void ml_host_start(RRDHOST *rh) {
     rrdset_foreach_done(rsp);
 
     netdata_mutex_unlock(&host->mutex);
+    netdata_mutex_unlock(&host->start_stop_mutex);
 }
 
 void ml_host_stop(RRDHOST *rh) {
     ml_host_t *host = (ml_host_t *) __atomic_load_n(&rh->ml_host, __ATOMIC_ACQUIRE);
-    if (!host || !host->ml_running)
+    if (!host)
         return;
+
+    // Serialize with ml_host_start() for the WHOLE stop sequence, including
+    // the unlocked chart/dim reset walk and the final generation bump. If a
+    // racing start could flip ml_running back to true mid-reset, a concurrent
+    // ml_host_detect_once would observe ml_running==true with an unchanged
+    // stop generation and publish a snapshot torn by our in-flight resets.
+    netdata_mutex_lock(&host->start_stop_mutex);
+
+    if (!host->ml_running) {
+        netdata_mutex_unlock(&host->start_stop_mutex);
+        return;
+    }
 
     // Prevent new ML activity from publishing while we reset host/dimension
     // state. The ml_running flag gates collectors and the detect loop; the
@@ -172,11 +190,6 @@ void ml_host_stop(RRDHOST *rh) {
     host->ml_running = false;
 
     netdata_mutex_lock(&host->mutex);
-
-    // Re-assert under the mutex so stop deterministically wins over a racing
-    // ml_host_start() that may have flipped the flag back to true after our
-    // early write but before we acquired the mutex.
-    host->ml_running = false;
 
     // reset host stats
     host->mls = ml_machine_learning_stats_t();
@@ -233,6 +246,8 @@ void ml_host_stop(RRDHOST *rh) {
     // either also observe the new generation or have already published before
     // any of our resets started.
     host->ml_stop_generation.fetch_add(1);
+
+    netdata_mutex_unlock(&host->start_stop_mutex);
 }
 
 void ml_host_get_info(RRDHOST *rh, BUFFER *wb)

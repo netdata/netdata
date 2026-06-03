@@ -54,6 +54,14 @@ typedef struct {
 
     netdata_mutex_t mutex;
 
+    // Serializes ml_host_start() against ml_host_stop(). Stop holds it across
+    // its full chart/dim reset walk and the final stop-generation bump (it
+    // cannot carry host->mutex into that walk), so a racing start cannot
+    // re-enable ml_running while stop is mid-reset. Without it, a detect walk
+    // could observe ml_running==true with an unchanged stop generation and
+    // publish a snapshot torn by stop's in-flight chart->mls resets.
+    netdata_mutex_t start_stop_mutex;
+
     ml_queue_t *queue;
 
     /*
