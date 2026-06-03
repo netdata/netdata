@@ -12,7 +12,7 @@ This method:
 
 :::note
 
-Local package tools like `apt-offline` may work for DEB/RPM installs — but we don’t officially support them.
+Local package tools like `apt-offline` may work for DEB/RPM installs — but we don't officially support them.
 
 :::
 
@@ -32,17 +32,23 @@ On your internet-connected machine, you'll need::
 | `sha256sum` or `shasum` | Verify script downloads    |
 | POSIX-compliant shell   | Required to run the script |
 
+:::note
+
+The preparation step requires root privileges because the script needs to verify system capabilities before packaging. The commands below use `sudo`; if `sudo` is not available on your system, see the [Troubleshooting](#troubleshooting) section below.
+
+:::
+
 Run the following command:
 
 - using `wget`
   ```bash
   wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh
-  sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
+  sudo sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
   ```
 - or using `curl`
   ```bash
   curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh
-  sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
+  sudo sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
   ```
 
 :::note
@@ -139,6 +145,34 @@ The `install.sh` script accepts the [same parameters](/packaging/installer/metho
 
 :::note
 
-Automatic updates are *disabled* by default for offline installations — since there’s no network connection.
+Automatic updates are *disabled* by default for offline installations — since there's no network connection.
 
 :::
+
+## Troubleshooting
+
+### "This script needs root privileges" (F0201)
+
+If you see the following error when running the preparation command:
+
+```
+ABORTED This script needs root privileges to install Netdata, but cannot find a way to gain them (we support sudo, doas, and pkexec). Either re-run this script as root, or set $ROOTCMD to a command that can be used to gain root privileges.
+```
+
+This means none of the supported privilege escalation tools (`sudo`, `doas`, or `pkexec`) were found on your system, or you are running the script as an unprivileged user without access to any of them.
+
+To resolve this:
+
+1. **Re-run with a privilege escalation tool:** Prefix the command with `sudo`, `doas`, or `pkexec`:
+
+   ```bash
+   sudo sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
+   ```
+
+2. **Set the `ROOTCMD` environment variable:** If your system uses a non-standard privilege escalation tool, set `ROOTCMD` to point to it:
+
+   ```bash
+   ROOTCMD=/usr/bin/doas sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
+   ```
+
+See the [Environment Variables](/packaging/installer/methods/kickstart.md#environment-variables) section in the kickstart documentation for full details on `ROOTCMD` and other options.
