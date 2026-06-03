@@ -61,6 +61,8 @@ bool apps_os_read_pid_fds_freebsd(struct pid_stat *p, void *ptr) {
     // at the end, to free them
     make_all_pid_fds_negative(p);
 
+    uint32_t fds_max = 0;
+
     mib[0] = CTL_KERN;
     mib[1] = KERN_PROC;
     mib[2] = KERN_PROC_FILEDESC;
@@ -93,6 +95,9 @@ bool apps_os_read_pid_fds_freebsd(struct pid_stat *p, void *ptr) {
 
         // get file descriptors array index
         size_t fdid = fds->kf_fd;
+
+        if(likely((uint32_t)(fdid + 1) > fds_max))
+            fds_max = (uint32_t)(fdid + 1);
 
         // check if the fds array is small
         if (unlikely(fdid >= p->fds_size)) {
@@ -180,6 +185,13 @@ bool apps_os_read_pid_fds_freebsd(struct pid_stat *p, void *ptr) {
 
         bfdsbuf += fds->kf_structsize;
     }
+
+    // expand fds_max to cover any newly seen higher fds,
+    // but do not shrink it yet - cleanup_negative_pid_fds()
+    // needs the old range to find and release negated entries
+    // from fds that were closed since the last iteration.
+    if(fds_max > p->fds_max)
+        p->fds_max = fds_max;
 
     return true;
 }

@@ -85,6 +85,7 @@ struct pid_stat *get_or_allocate_pid_entry(pid_t pid) {
 #if (PROCESSES_HAVE_FDS == 1)
     p->fds = mallocz(sizeof(struct pid_fd) * 3); // stdin, stdout, stderr
     p->fds_size = 3;
+    p->fds_max = 0;
     init_pid_fds(p, 0, p->fds_size);
 #endif
 
