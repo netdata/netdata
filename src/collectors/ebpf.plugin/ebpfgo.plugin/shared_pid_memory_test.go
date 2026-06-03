@@ -1,4 +1,4 @@
-//go:build unix && cgo
+//go:build linux && cgo
 
 package main
 
