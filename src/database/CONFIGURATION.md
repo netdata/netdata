@@ -24,7 +24,7 @@ Child and Parent storage are independent:
 - A Child can keep local history based on its own `[db].mode`.
 - Streamed metrics can also be persisted on the Parent, in the Parent's own dbengine files.
 
-Retention size is enforced **per-tier**, not per host, so all streaming Children share the Parent's tier quota. On Parents with many Children, journal overhead per datafile is higher because each datafile indexes metrics from all connected hosts. For details, see [Understanding Actual Disk Usage vs Configured Retention Size](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md#understanding-actual-disk-usage-vs-configured-retention-size).
+Retention size is enforced **per-tier**, not per host, so all streaming Children share the Parent's tier quota. On Parents with many Children, per-tier journal/index overhead is higher because aggregate metric cardinality across hosts is higher. For details, see [Understanding Actual Disk Usage vs Configured Retention Size](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md#understanding-actual-disk-usage-vs-configured-retention-size).
 
 :::
 
