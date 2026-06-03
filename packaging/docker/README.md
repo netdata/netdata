@@ -518,6 +518,42 @@ docker run -d --name=netdata \
 
 :::
 
+## Docker Swarm
+
+### Recommended: Host installation on each Swarm node
+
+For production Docker Swarm clusters, install Netdata directly on each node using the [kickstart script](/docs/deployment-guides/standalone-deployment.md) rather than running Netdata as a Swarm service. Host installation provides full **cgroups-based container monitoring** — every container's CPU, memory, disk I/O, and network metrics are collected automatically with zero additional configuration.
+
+To monitor the entire cluster from a single dashboard, set up [Parent-Child streaming](/docs/deployment-guides/deployment-with-centralization-points.md) between the nodes. Install Netdata on each of the manager and worker nodes, then configure one node as the Parent and stream the rest as Children.
+
+### Optional: Running as a Docker Swarm service
+
+If you want to test Netdata as a Swarm service, use `docker service create` with the required privileges and mounts:
+
+```bash
+docker service create \
+  --name netdata \
+  --mode global \
+  --mount type=bind,source=/proc,target=/host/proc,readonly=true \
+  --mount type=bind,source=/sys,target=/host/sys,readonly=true \
+  --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock,readonly=true \
+  --cap-add SYS_PTRACE \
+  --cap-add SYS_ADMIN \
+  netdata/netdata
+```
+
+:::warning Swarm service limitations
+
+- **`container_name` is ignored**: Docker Swarm's `docker stack deploy` does not support `container_name`. Netdata identifies itself by hostname or GUID instead.
+- **`network_mode: host` behavior**: Swarm may handle host networking differently than standalone Docker. Metrics that depend on host network mode (proc.plugin network monitoring, local-listeners service discovery) may not work as expected in a Swarm service.
+- **Reduced container visibility**: Running Netdata as a container inside Swarm provides less visibility into other containers compared to a host installation. For full per-container monitoring, use the host installation approach described above.
+
+:::
+
+### Centralized monitoring across Swarm nodes
+
+To view metrics from all Swarm nodes in one place, use [Parent-Child streaming](/docs/deployment-guides/deployment-with-centralization-points.md). This works regardless of whether you use host installation or the Swarm service approach — configure one node as the Parent and stream the remaining nodes to it as Children.
+
 ## Docker tags
 
 See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
