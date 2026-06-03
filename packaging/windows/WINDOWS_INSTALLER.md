@@ -184,3 +184,57 @@ Instead of daily updates, you might prefer:
 - Only on specific days of the week
 
 :::
+
+## Working with Netdata on Windows
+
+Netdata on Windows includes a bundled MSYS2 environment for working with Netdata configuration files and other internals.
+
+### Open the MSYS2 environment
+
+Launch the bundled MSYS2 shell using one of these methods:
+
+- **Windows Run dialog**: Press `Win + R`, enter `"C:\Program Files\Netdata\msys2.exe"`, and press `Enter`.
+- **PowerShell**: `& "C:\Program Files\Netdata\msys2.exe"`
+- **Command Prompt**: `"C:\Program Files\Netdata\msys2.exe"`
+
+When `msys2.exe` starts, it opens a shell environment for working with the Netdata files installed on your system.
+
+### Writing Windows paths in MSYS format
+
+Netdata configuration files consumed from the MSYS side require MSYS-style paths instead of native Windows drive-letter format.
+
+Conversion pattern:
+
+- Replace the drive letter `C:` with `/c`
+- Replace backslashes `\` with forward slashes `/`
+- Keep spaces as they are
+
+Examples:
+
+| Windows path | MSYS-style path |
+|---|---|
+| `C:\Program Files\Netdata\etc\netdata` | `/c/Program Files/Netdata/etc/netdata/` |
+| `C:\Program Files\Netdata\usr\bin\netdata.exe` | `/c/Program Files/Netdata/usr/bin/netdata.exe` |
+
+### Editing configuration files
+
+Inside the MSYS2 environment, use the `edit-config` helper to edit Netdata configuration files:
+
+```bash
+cd /etc/netdata
+./edit-config netdata.conf
+```
+
+For the complete `edit-config` workflow and configuration directory layout, see [Netdata Agent Configuration](/docs/netdata-agent/configuration/README.md#edit-configuration-files).
+
+On Windows, `edit-config` opens files with the `nano` editor.
+
+### Basic nano commands
+
+| Action | Keybinding |
+|---|---|
+| Edit text | Type normally, use arrow keys to navigate |
+| Search | `Ctrl + W`, type search text, `Enter` |
+| Save | `Ctrl + O`, `Enter` to confirm filename |
+| Exit | `Ctrl + X` |
+| Exit with save prompt | `Ctrl + X`, then `Y` to save or `N` to discard |
