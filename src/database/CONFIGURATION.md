@@ -18,7 +18,7 @@ Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configurati
 
 :::note
 
-In a Parent-Child setup, these settings manage the entire storage space used by the Parent for storing metrics collected both by itself and its Children. Metrics streamed by Children are persisted on the Parent in the Parent's own dbengine files. Retention size is enforced **per-tier**, not per-host — all streaming Children share the Parent's tier quota. On Parents with many Children, journal file overhead per datafile is higher because each datafile indexes metrics from all connected hosts. See [Understanding Actual Disk Usage vs Configured Retention Size](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md#understanding-actual-disk-usage-vs-configured-retention-size) for details.
+In a Parent-Child setup, these settings manage the entire storage space used by the Parent for storing metrics collected both by itself and its Children. Child and Parent storage are independent: a Child can keep local history based on its own `[db].mode`, while streamed metrics are also persisted on the Parent in the Parent's own dbengine files. Retention size is enforced **per-tier**, not per-host — all streaming Children share the Parent's tier quota. On Parents with many Children, journal file overhead per datafile is higher because each datafile indexes metrics from all connected hosts. See [Understanding Actual Disk Usage vs Configured Retention Size](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md#understanding-actual-disk-usage-vs-configured-retention-size) for details.
 
 :::
 

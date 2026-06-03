@@ -83,6 +83,13 @@ It can. Once a `dbengine tier N retention time` is configured, the retention che
 
 No. All retention size settings are per-tier and shared across all hosts. There is no configuration to limit how much disk space an individual streaming Child can consume on the Parent. To control per-Child impact, reduce the Child's collection scope or otherwise reduce the volume and cardinality of the metrics it streams to the Parent.
 
+**When a Child streams to a Parent, where are metrics stored?**
+
+There are two independent storage behaviors:
+
+- **On the Child (local):** Controlled by the Child's `[db].mode` (`dbengine` keeps local disk history, `ram` keeps in-memory history only, `none` keeps no local metric history).
+- **On the Parent (received stream):** Controlled by the Parent's settings. Metrics streamed from Children can be persisted on the Parent and count against the Parent's per-tier retention limits.
+
 **Configuring dbengine mode and retention**:
 
 - Enable dbengine mode: The dbengine mode is already the default, so no configuration change is necessary. For reference, the dbengine mode can be configured by setting `[db].mode` to `dbengine` in `netdata.conf`.
