@@ -1178,9 +1178,9 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
             host_anomaly_rate = 0.0;
 
             spinlock_lock(&host->context_anomaly_rate_spinlock);
-            for (auto &[key, entry] : host->context_anomaly_rate) {
-                entry.anomalous_dimensions = 0;
-                entry.normal_dimensions = 0;
+            for (auto &p : host->context_anomaly_rate) {
+                p.second.anomalous_dimensions = 0;
+                p.second.normal_dimensions = 0;
             }
             spinlock_unlock(&host->context_anomaly_rate_spinlock);
         }
