@@ -107,6 +107,25 @@ If you prefer to manage the Agent through the GUI, you can start-stop and restar
 - To **stop** Netdata, run `Stop-Service Netdata`.
 - To **restart** Netdata, run `Restart-Service Netdata`.
 
+### Using `netdatacli`
+
+The `netdatacli` tool is available on Windows at the Netdata installation path (default `C:\Program Files\Netdata\usr\bin\netdatacli.exe`). It sends management commands to the running Agent without restarting it. Run PowerShell as Administrator and use the full path, or add the Netdata bin directory to `PATH`.
+
+```powershell
+& "C:\Program Files\Netdata\usr\bin\netdatacli.exe" reload-health
+```
+
+| Command                 | Description                                      |
+|-------------------------|--------------------------------------------------|
+| `netdatacli reload-health`         | Reload health/alert configuration without restarting           |
+| `netdatacli reload-labels`         | Reload host labels from netdata.conf                          |
+| `netdatacli reload-claiming-state` | Reload the Agent's claiming state from disk                   |
+| `netdatacli reopen-logs`           | Close and reopen log files                                    |
+| `netdatacli ping`                  | Verify the Agent is ready (outputs `pong` if reachable)       |
+| `netdatacli shutdown-agent`        | Gracefully shut down the Agent                                |
+| `netdatacli aclk-state`            | Show current ACLK/Cloud connection state                      |
+| `netdatacli version`               | Display the Agent version                                     |
+
 ## Quick Reference
 
 ### UNIX Commands Summary
@@ -122,8 +141,10 @@ If you prefer to manage the Agent through the GUI, you can start-stop and restar
 
 ### Windows Commands Summary
 
-| Task        | PowerShell Command        | GUI Location                      |
-|-------------|---------------------------|-----------------------------------|
-| **Start**   | `Start-Service Netdata`   | Task Manager > Services > Netdata |
-| **Stop**    | `Stop-Service Netdata`    | Task Manager > Services > Netdata |
-| **Restart** | `Restart-Service Netdata` | Task Manager > Services > Netdata |
+| Task              | PowerShell Command        | GUI Location                      | netdatacli                         |
+|-------------------|---------------------------|-----------------------------------|------------------------------------|
+| **Start**         | `Start-Service Netdata`   | Task Manager > Services > Netdata | —                                  |
+| **Stop**          | `Stop-Service Netdata`    | Task Manager > Services > Netdata | —                                  |
+| **Restart**       | `Restart-Service Netdata` | Task Manager > Services > Netdata | —                                  |
+| **Reload Health** | —                         | —                                 | `netdatacli reload-health`         |
+| **Shutdown**      | —                         | —                                 | `netdatacli shutdown-agent`        |
