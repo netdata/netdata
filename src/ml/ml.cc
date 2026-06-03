@@ -5,7 +5,7 @@
 #include <array>
 
 #include "ad_charts.h"
-#include "database/sqlite/vendored/sqlite3.h"
+#include "sqlite3.h"
 #include "streaming/stream-control.h"
 
 #define WORKER_TRAIN_QUEUE_POP         0
