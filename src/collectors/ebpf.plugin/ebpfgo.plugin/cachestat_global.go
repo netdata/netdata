@@ -209,7 +209,11 @@ func (p cachestatGlobalPublish) write(api *netdataapi.API, usecSince int) {
 	}
 }
 
-func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHandle, stop <-chan struct{}, updateEvery int) {
+// runCachestatGlobalCollector is the single collection loop for the plugin.
+// Both the global metric snapshot and the per-PID SHM publish run here
+// sequentially so that only one OS thread is needed for CGO calls.
+// store may be nil when apps/cgroups integration is disabled.
+func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHandle, stop <-chan struct{}, store *cachestatSharedMemoryStore, updateEvery int) {
 	if handle == nil || handle.Runtime == nil {
 		return
 	}
@@ -223,23 +227,39 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 	state := &cachestatGlobalState{}
 	lastCollection := time.Now()
 	collectAndPublish := func(usecSince int) {
+		// Global snapshot — one CGO call.
 		snapshot, err := handle.Runtime.Snapshot(handle.MapsPerCore)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat snapshot failed: %v\n", err)
-			return
+		} else {
+			publish, ok := state.Update(cachestatGlobalCounters{
+				MarkPageAccessed:   snapshot.MarkPageAccessed,
+				MarkBufferDirty:    snapshot.MarkBufferDirty,
+				AddToPageCacheLru:  snapshot.AddToPageCacheLru,
+				AccountPageDirtied: snapshot.AccountPageDirtied,
+			})
+			if ok {
+				publish.write(api, usecSince)
+			}
 		}
 
-		publish, ok := state.Update(cachestatGlobalCounters{
-			MarkPageAccessed:   snapshot.MarkPageAccessed,
-			MarkBufferDirty:    snapshot.MarkBufferDirty,
-			AddToPageCacheLru:  snapshot.AddToPageCacheLru,
-			AccountPageDirtied: snapshot.AccountPageDirtied,
-		})
-		if !ok {
-			return
+		// Per-PID snapshot — second CGO call, same goroutine, no extra thread.
+		if store != nil {
+			apps, err := handle.Runtime.SnapshotApps(handle.MapsPerCore)
+			if err == nil {
+				stalePIDs := store.UpdateApps(apps)
+				for _, pid := range stalePIDs {
+					if err := handle.Runtime.DeletePid(pid); err != nil {
+						fmt.Fprintf(os.Stderr, "ebpf-go.plugin: failed to delete stale PID %d from cstat_pid: %v\n", pid, err)
+					}
+				}
+				if handle.SharedMemory != nil {
+					if err := handle.SharedMemory.Publish(store.Snapshot()); err != nil {
+						fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat shared memory publish failed: %v\n", err)
+					}
+				}
+			}
 		}
-
-		publish.write(api, usecSince)
 	}
 
 	collectAndPublish(0)
@@ -282,27 +302,23 @@ func runCachestatPlugin(handle *CachestatLegacyHandle, updateEveryArg int) {
 
 	stop := make(chan struct{})
 
-	var wg sync.WaitGroup
-	if handle.AppsEnabled || handle.CgroupsEnabled {
-		store := NewCachestatSharedMemoryStore()
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			runCachestatSharedMemoryCollector(handle, stop, store, updateEvery)
-		}()
-	}
-
+	// Lightweight signal handler: no CGO, stays on an existing M.
 	go func() {
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 		<-sigCh
 		signal.Stop(sigCh)
-
 		close(stop)
 	}()
 
-	runCachestatGlobalCollector(api, handle, stop, updateEvery)
+	// Both global metrics and per-PID SHM run in a single goroutine so that
+	// sequential CGO calls share one OS thread instead of requiring two.
+	var store *cachestatSharedMemoryStore
+	if handle.AppsEnabled || handle.CgroupsEnabled {
+		store = NewCachestatSharedMemoryStore()
+	}
 
-	wg.Wait()
+	runCachestatGlobalCollector(api, handle, stop, store, updateEvery)
+
 	handle.Close()
 }

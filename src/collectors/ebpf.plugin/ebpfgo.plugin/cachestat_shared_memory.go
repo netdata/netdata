@@ -1,11 +1,8 @@
 package main
 
 import (
-	"fmt"
-	"os"
 	"sort"
 	"sync"
-	"time"
 
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
@@ -170,40 +167,3 @@ func (s *cachestatSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatApp
 	return stalePIDs
 }
 
-func runCachestatSharedMemoryCollector(handle *CachestatLegacyHandle, stop <-chan struct{}, store *cachestatSharedMemoryStore, updateEvery int) {
-	if handle == nil || handle.Runtime == nil || store == nil {
-		return
-	}
-
-	if updateEvery <= 0 {
-		updateEvery = cachestatDefaultUpdateEvery
-	}
-
-	ticker := time.NewTicker(time.Duration(updateEvery) * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-stop:
-			return
-		case <-ticker.C:
-		}
-
-		apps, err := handle.Runtime.SnapshotApps(handle.MapsPerCore)
-		if err != nil {
-			continue
-		}
-
-		stalePIDs := store.UpdateApps(apps)
-		for _, pid := range stalePIDs {
-			if err := handle.Runtime.DeletePid(pid); err != nil {
-				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: failed to delete stale PID %d from cstat_pid: %v\n", pid, err)
-			}
-		}
-		if handle.SharedMemory != nil {
-			if err := handle.SharedMemory.Publish(store.Snapshot()); err != nil {
-				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat shared memory publish failed: %v\n", err)
-			}
-		}
-	}
-}
