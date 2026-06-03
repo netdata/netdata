@@ -38,6 +38,24 @@ These limits are fully configurable. See [Changing how long Netdata stores metri
 
 Netdata provides a visual representation of storage utilization for both the time and space limits across all Tiers under "Netdata" -> "dbengine retention" on the dashboard. This chart shows exactly how your storage space (disk space limits) and time (time limits) are used for metric retention.
 
+### Retention Size Enforcement
+
+Retention size limits are **soft caps**, not hard caps. Netdata writes data unconditionally and checks limits afterwards — it does not block or reject writes when a cap is approaching.
+
+The enforcement mechanism works as follows:
+
+1. **Reactive timer-based enforcement**: The retention timer (`retention_timer_cb` in `src/database/engine/rrdengine.c`) fires every 60 seconds. Each tick calls `rrdeng_ctx_tier_cap_exceeded` which estimates total disk space used by summing datafile sizes via `rrdeng_get_used_disk_space`. This means up to 60 seconds of writes can accumulate before a cap violation is detected.
+
+2. **Datafile-granular deletion**: When a cap is exceeded, Netdata deletes the oldest **entire** datafile via `datafile_delete` (in `src/database/engine/rrdengine.c`). Datafiles range from 4 MB to 512 MB (see [Database Engine](/src/database/engine/README.md)). Deletion cannot be partial — a single datafile is always removed wholesale. This means actual disk usage can exceed the configured limit by up to one full datafile (4–512 MB depending on tier configuration).
+
+3. **Why tier 0 overshoots more than tier 1/2**: Tier 0 has the highest write volume (per-second granularity), so more data arrives per timer interval. Combined with compression ratio variance in compressed extents, tier 0 datafiles can grow faster between enforcement cycles. Tier 1 and tier 2 aggregate fewer points per interval and their datafiles fill more predictably.
+
+**Practical guidance**:
+
+- To minimize overshoot, configure your retention size with a buffer margin. For example, if you need 30 GiB of actual disk usage, configure approximately 27 GiB.
+- Setting retention days together with retention size uses **whichever limit is hit first**. This does not create a stricter cap, but provides a secondary bound on disk usage.
+- There is currently no mechanism to enforce a true hard cap on dbengine disk usage.
+
 ## Cache sizes
 
 There are two cache sizes that can be used to optimize the Database:
