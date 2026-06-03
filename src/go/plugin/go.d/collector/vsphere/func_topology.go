@@ -4,23 +4,29 @@ package vsphere
 
 import (
 	"context"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
-	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
+	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 )
 
 const (
 	topologyMethodID   = "topology:vsphere"
 	topologyMethodHelp = "Reports cached vSphere inventory topology for datacenters, clusters, hosts, VMs, datastores, networks, datastore clusters, and resource pools."
 
-	vsphereTopologySchemaVersion = "2.0"
-	vsphereTopologySource        = "vsphere"
-	vsphereTopologyLayer         = "virtualization"
-	vsphereTopologyView          = "inventory"
+	vsphereTopologySource = "vsphere"
+	vsphereTopologyLayer  = "virtualization"
+	vsphereTopologyView   = "vsphere-inventory"
+
+	vsphereTopologyDetailTable       = "vsphere_object_detail"
+	vsphereTopologyLabelsTable       = "actor_labels"
+	vsphereTopologyOwnershipLink     = "vsphere_ownership"
+	vsphereTopologyRunsOnLink        = "vsphere_runs_on"
+	vsphereTopologyNetworkLink       = "vsphere_connected_to"
+	vsphereOwnershipEvidenceType     = "vsphere_ownership_evidence"
+	vsphereRunsOnEvidenceType        = "vsphere_runs_on_evidence"
+	vsphereNetworkConnectionEvidence = "vsphere_network_connection_evidence"
 )
 
 type funcTopology struct {
@@ -39,7 +45,7 @@ func vsphereTopologyMethodConfig() funcapi.MethodConfig {
 		Help:         topologyMethodHelp,
 		RequireCloud: true,
 		ResponseType: "topology",
-	}.WithPresentation(vsphereTopologyPresentation())
+	}
 }
 
 func (f *funcTopology) MethodParams(context.Context, string) ([]funcapi.ParamConfig, error) {
@@ -71,250 +77,201 @@ func (f *funcTopology) Cleanup(context.Context) {
 	// No per-invocation resources are allocated by the topology function.
 }
 
-func (c *Collector) topologyData(agentID string) (topology.Data, bool) {
+func (c *Collector) topologyData(agentID string) (topologyv1.Data, bool) {
 	c.collectionLock.RLock()
 	defer c.collectionLock.RUnlock()
 
 	if c.resources == nil {
-		return topology.Data{}, false
+		return topologyv1.Data{}, false
 	}
 
-	actors := make([]topology.Actor, 0, topologyActorCount(c.resources))
-	links := make([]topology.Link, 0, topologyLinkCount(c.resources))
+	builder := newVSphereTopologyBuilder()
 
 	for _, dc := range sortedDatacenters(c.resources.DataCenters) {
-		actors = append(actors, vsphereTopologyActor("vsphere_datacenter", dc.ID, dc.Name, nil, nil))
+		builder.addActor("vsphere_datacenter", dc.ID, dc.Name, "", vsphereActorDetail{
+			objectType: "datacenter",
+		}, nil)
 	}
 	for _, cluster := range sortedClusters(c.resources.Clusters) {
-		actors = append(actors, vsphereTopologyActor("vsphere_cluster", cluster.ID, cluster.Name, map[string]any{
-			"overall_status": cluster.OverallStatus,
-			"drs_enabled":    cluster.DrsEnabled,
-			"ha_enabled":     cluster.HaEnabled,
-			"vsan_enabled":   cluster.VSANEnabled,
-		}, map[string]string{
+		builder.addActor("vsphere_cluster", cluster.ID, cluster.Name, cluster.Hier.DC.ID, vsphereActorDetail{
+			objectType:        "cluster",
+			datacenter:        cluster.Hier.DC.Name,
+			overallStatus:     cluster.OverallStatus,
+			drsEnabled:        cluster.DrsEnabled,
+			haEnabled:         cluster.HaEnabled,
+			vsanEnabled:       cluster.VSANEnabled,
+			cpuCapacityMHz:    int64(cluster.TotalCpu),
+			memoryCapacityMiB: cluster.TotalMemory / 1024 / 1024,
+		}, mergeStringMaps(cluster.Labels, map[string]string{
 			"datacenter": cluster.Hier.DC.Name,
 		}))
 		if c.resources.DataCenters.Get(cluster.Hier.DC.ID) != nil {
-			links = append(links, vsphereTopologyLink(cluster.Hier.DC.ID, cluster.ID, "contains", "Datacenter contains cluster"))
+			builder.addLink(cluster.Hier.DC.ID, cluster.ID, vsphereTopologyOwnershipLink, "contains")
 		}
 	}
 	for _, host := range sortedHosts(c.resources.Hosts) {
-		actors = append(actors, vsphereTopologyActor("vsphere_host", host.ID, host.Name, map[string]any{
-			"connection_state":    host.ConnectionState,
-			"power_state":         host.PowerState,
-			"in_maintenance_mode": host.InMaintenanceMode,
-			"overall_status":      host.OverallStatus,
-		}, map[string]string{
+		parentID := firstExistingResourceID(func(id string) bool {
+			if id == host.Hier.Cluster.ID {
+				return c.resources.Clusters.Get(id) != nil
+			}
+			return c.resources.DataCenters.Get(id) != nil
+		}, host.Hier.Cluster.ID, host.Hier.DC.ID)
+		builder.addActor("vsphere_host", host.ID, host.Name, parentID, vsphereActorDetail{
+			objectType:        "host",
+			datacenter:        host.Hier.DC.Name,
+			cluster:           host.Hier.Cluster.Name,
+			connectionState:   host.ConnectionState,
+			powerState:        host.PowerState,
+			inMaintenanceMode: host.InMaintenanceMode,
+			overallStatus:     host.OverallStatus,
+		}, mergeStringMaps(host.Labels, map[string]string{
 			"datacenter": host.Hier.DC.Name,
 			"cluster":    host.Hier.Cluster.Name,
 		}))
 		if c.resources.Clusters.Get(host.Hier.Cluster.ID) != nil {
-			links = append(links, vsphereTopologyLink(host.Hier.Cluster.ID, host.ID, "contains", "Cluster contains ESXi host"))
+			builder.addLink(host.Hier.Cluster.ID, host.ID, vsphereTopologyOwnershipLink, "contains")
 		} else if c.resources.DataCenters.Get(host.Hier.DC.ID) != nil {
-			links = append(links, vsphereTopologyLink(host.Hier.DC.ID, host.ID, "contains", "Datacenter contains ESXi host"))
+			builder.addLink(host.Hier.DC.ID, host.ID, vsphereTopologyOwnershipLink, "contains")
 		}
 	}
 	for _, vm := range sortedVMs(c.resources.VMs) {
-		actors = append(actors, vsphereTopologyActor("vsphere_vm", vm.ID, vm.Name, map[string]any{
-			"connection_state":      vm.ConnectionState,
-			"power_state":           vm.PowerState,
-			"overall_status":        vm.OverallStatus,
-			"tools_running_status":  vm.ToolsRunningStatus,
-			"tools_version_status":  vm.ToolsVersionStatus,
-			"consolidation_needed":  vm.ConsolidationNeeded,
-			"snapshot_count":        vm.SnapshotCount,
-			"snapshot_chain_depth":  vm.SnapshotMaxChainDepth,
-			"configured_vcpus":      vm.ConfigCPU,
-			"configured_memory_mib": vm.ConfigMemory,
-		}, map[string]string{
+		parentID := firstExistingResourceID(func(id string) bool {
+			switch id {
+			case vm.Hier.Host.ID:
+				return c.resources.Hosts.Get(id) != nil
+			case vm.Hier.Cluster.ID:
+				return c.resources.Clusters.Get(id) != nil
+			default:
+				return c.resources.DataCenters.Get(id) != nil
+			}
+		}, vm.Hier.Host.ID, vm.Hier.Cluster.ID, vm.Hier.DC.ID)
+		builder.addActor("vsphere_vm", vm.ID, vm.Name, parentID, vsphereActorDetail{
+			objectType:          "vm",
+			datacenter:          vm.Hier.DC.Name,
+			cluster:             vm.Hier.Cluster.Name,
+			host:                vm.Hier.Host.Name,
+			connectionState:     vm.ConnectionState,
+			powerState:          vm.PowerState,
+			overallStatus:       vm.OverallStatus,
+			toolsRunningStatus:  vm.ToolsRunningStatus,
+			toolsVersionStatus:  vm.ToolsVersionStatus,
+			consolidationNeeded: vm.ConsolidationNeeded,
+			snapshotCount:       vm.SnapshotCount,
+			snapshotChainDepth:  vm.SnapshotMaxChainDepth,
+			configuredVCPUs:     vm.ConfigCPU,
+			configuredMemoryMiB: vm.ConfigMemory,
+		}, mergeStringMaps(vm.Labels, map[string]string{
 			"datacenter": vm.Hier.DC.Name,
 			"cluster":    vm.Hier.Cluster.Name,
 			"host":       vm.Hier.Host.Name,
 		}))
 		switch {
 		case c.resources.Hosts.Get(vm.Hier.Host.ID) != nil:
-			links = append(links, vsphereTopologyLink(vm.Hier.Host.ID, vm.ID, "runs", "ESXi host runs VM"))
+			builder.addLink(vm.ID, vm.Hier.Host.ID, vsphereTopologyRunsOnLink, "runs_on")
 		case c.resources.Clusters.Get(vm.Hier.Cluster.ID) != nil:
-			links = append(links, vsphereTopologyLink(vm.Hier.Cluster.ID, vm.ID, "contains", "Cluster contains VM"))
+			builder.addLink(vm.Hier.Cluster.ID, vm.ID, vsphereTopologyOwnershipLink, "contains")
 		case c.resources.DataCenters.Get(vm.Hier.DC.ID) != nil:
-			links = append(links, vsphereTopologyLink(vm.Hier.DC.ID, vm.ID, "contains", "Datacenter contains VM"))
+			builder.addLink(vm.Hier.DC.ID, vm.ID, vsphereTopologyOwnershipLink, "contains")
 		}
 	}
 	for _, datastore := range sortedDatastores(c.resources.Datastores) {
-		attrs := map[string]any{
-			"type":                 datastore.Type,
-			"overall_status":       datastore.OverallStatus,
-			"accessible":           datastore.Accessible,
-			"maintenance_mode":     datastore.MaintenanceMode,
-			"capacity_bytes":       datastore.Capacity,
-			"free_space_bytes":     datastore.FreeSpace,
-			"uncommitted_bytes":    datastore.Uncommitted,
-			"multiple_host_access": datastore.MultipleHostAccess,
-		}
-		actors = append(actors, vsphereTopologyActor("vsphere_datastore", datastore.ID, datastore.Name, attrs, map[string]string{
+		builder.addActor("vsphere_datastore", datastore.ID, datastore.Name, datastore.Hier.DC.ID, vsphereActorDetail{
+			objectType:         "datastore",
+			datacenter:         datastore.Hier.DC.Name,
+			overallStatus:      datastore.OverallStatus,
+			datastoreType:      datastore.Type,
+			accessible:         datastore.Accessible,
+			maintenanceMode:    datastore.MaintenanceMode,
+			capacityBytes:      datastore.Capacity,
+			freeSpaceBytes:     datastore.FreeSpace,
+			uncommittedBytes:   datastore.Uncommitted,
+			multipleHostAccess: optionalBool(datastore.MultipleHostAccess),
+		}, mergeStringMaps(datastore.Labels, map[string]string{
 			"datacenter": datastore.Hier.DC.Name,
 			"type":       datastore.Type,
 		}))
 		if c.resources.DataCenters.Get(datastore.Hier.DC.ID) != nil {
-			links = append(links, vsphereTopologyLink(datastore.Hier.DC.ID, datastore.ID, "contains", "Datacenter contains datastore"))
+			builder.addLink(datastore.Hier.DC.ID, datastore.ID, vsphereTopologyOwnershipLink, "contains")
 		}
 	}
 	for _, network := range sortedNetworks(c.resources.Networks) {
-		actors = append(actors, vsphereTopologyActor("vsphere_network", network.ID, network.Name, map[string]any{
-			"type":           network.Type,
-			"accessible":     network.Accessible,
-			"ip_pool_name":   network.IPPoolName,
-			"overall_status": network.OverallStatus,
-			"hosts":          len(network.HostIDs),
-			"vms":            len(network.VMIDs),
-		}, map[string]string{
+		builder.addActor("vsphere_network", network.ID, network.Name, network.Hier.DC.ID, vsphereActorDetail{
+			objectType:    "network",
+			datacenter:    network.Hier.DC.Name,
+			networkType:   network.Type,
+			accessible:    network.Accessible,
+			ipPoolName:    network.IPPoolName,
+			overallStatus: network.OverallStatus,
+			networkHosts:  len(network.HostIDs),
+			networkVMs:    len(network.VMIDs),
+		}, mergeStringMaps(network.Labels, map[string]string{
 			"datacenter": network.Hier.DC.Name,
 			"type":       network.Type,
 		}))
 		if c.resources.DataCenters.Get(network.Hier.DC.ID) != nil {
-			links = append(links, vsphereTopologyLink(network.Hier.DC.ID, network.ID, "contains", "Datacenter contains network"))
+			builder.addLink(network.Hier.DC.ID, network.ID, vsphereTopologyOwnershipLink, "contains")
 		}
-		for _, hostID := range network.HostIDs {
+		for _, hostID := range sortedStrings(network.HostIDs) {
 			if c.resources.Hosts.Get(hostID) != nil {
-				links = append(links, vsphereTopologyLink(hostID, network.ID, "connects", "ESXi host connects to network"))
+				builder.addLink(hostID, network.ID, vsphereTopologyNetworkLink, "connected_to")
 			}
 		}
-		for _, vmID := range network.VMIDs {
+		for _, vmID := range sortedStrings(network.VMIDs) {
 			if c.resources.VMs.Get(vmID) != nil {
-				links = append(links, vsphereTopologyLink(vmID, network.ID, "connects", "VM connects to network"))
+				builder.addLink(vmID, network.ID, vsphereTopologyNetworkLink, "connected_to")
 			}
 		}
 	}
 	for _, pod := range sortedStoragePods(c.resources.StoragePods) {
-		actors = append(actors, vsphereTopologyActor("vsphere_datastore_cluster", pod.ID, pod.Name, map[string]any{
-			"capacity_bytes":      pod.Capacity,
-			"free_space_bytes":    pod.FreeSpace,
-			"storage_drs_enabled": optionalBool(pod.StorageDRSEnabled),
-		}, map[string]string{
+		builder.addActor("vsphere_datastore_cluster", pod.ID, pod.Name, pod.Hier.DC.ID, vsphereActorDetail{
+			objectType:        "datastore_cluster",
+			datacenter:        pod.Hier.DC.Name,
+			overallStatus:     pod.OverallStatus,
+			capacityBytes:     pod.Capacity,
+			freeSpaceBytes:    pod.FreeSpace,
+			storageDRSEnabled: optionalBool(pod.StorageDRSEnabled),
+		}, mergeStringMaps(pod.Labels, map[string]string{
 			"datacenter": pod.Hier.DC.Name,
 		}))
 		if c.resources.DataCenters.Get(pod.Hier.DC.ID) != nil {
-			links = append(links, vsphereTopologyLink(pod.Hier.DC.ID, pod.ID, "contains", "Datacenter contains datastore cluster"))
+			builder.addLink(pod.Hier.DC.ID, pod.ID, vsphereTopologyOwnershipLink, "contains")
 		}
 	}
 	for _, pool := range sortedResourcePools(c.resources.ResourcePools) {
-		actors = append(actors, vsphereTopologyActor("vsphere_resource_pool", pool.ID, pool.Name, map[string]any{
-			"overall_status": pool.OverallStatus,
-			"cpu_limit_mhz":  pool.CpuLimit,
-			"mem_limit_mb":   pool.MemLimit,
-		}, map[string]string{
+		builder.addActor("vsphere_resource_pool", pool.ID, pool.Name, pool.Hier.Cluster.ID, vsphereActorDetail{
+			objectType:     "resource_pool",
+			datacenter:     pool.Hier.DC.Name,
+			cluster:        pool.Hier.Cluster.Name,
+			resourcePool:   pool.Name,
+			overallStatus:  pool.OverallStatus,
+			cpuLimitMHz:    pool.CpuLimit,
+			memoryLimitMiB: pool.MemLimit,
+			cpuReservation: pool.CpuReservation,
+			memReservation: pool.MemReservation,
+		}, mergeStringMaps(pool.Labels, map[string]string{
 			"datacenter":    pool.Hier.DC.Name,
 			"cluster":       pool.Hier.Cluster.Name,
 			"resource_pool": pool.Name,
 		}))
 		if c.resources.Clusters.Get(pool.Hier.Cluster.ID) != nil {
-			links = append(links, vsphereTopologyLink(pool.Hier.Cluster.ID, pool.ID, "contains", "Cluster contains resource pool"))
+			builder.addLink(pool.Hier.Cluster.ID, pool.ID, vsphereTopologyOwnershipLink, "contains")
 		}
 	}
 
-	sort.SliceStable(actors, func(i, j int) bool { return actors[i].ActorID < actors[j].ActorID })
-	sort.SliceStable(links, func(i, j int) bool {
-		if links[i].SrcActorID != links[j].SrcActorID {
-			return links[i].SrcActorID < links[j].SrcActorID
-		}
-		if links[i].DstActorID != links[j].DstActorID {
-			return links[i].DstActorID < links[j].DstActorID
-		}
-		return links[i].LinkType < links[j].LinkType
+	data, err := builder.data(strings.TrimSpace(agentID), time.Now().UTC(), map[string]any{
+		"datacenters":        len(c.resources.DataCenters),
+		"clusters":           len(c.resources.Clusters),
+		"hosts":              len(c.resources.Hosts),
+		"vms":                len(c.resources.VMs),
+		"datastores":         len(c.resources.Datastores),
+		"networks":           len(c.resources.Networks),
+		"datastore_clusters": len(c.resources.StoragePods),
+		"resource_pools":     len(c.resources.ResourcePools),
 	})
-
-	return topology.Data{
-		SchemaVersion: vsphereTopologySchemaVersion,
-		Source:        vsphereTopologySource,
-		Layer:         vsphereTopologyLayer,
-		AgentID:       strings.TrimSpace(agentID),
-		CollectedAt:   time.Now().UTC(),
-		View:          vsphereTopologyView,
-		Actors:        actors,
-		Links:         links,
-		Stats: map[string]any{
-			"datacenters":        len(c.resources.DataCenters),
-			"clusters":           len(c.resources.Clusters),
-			"hosts":              len(c.resources.Hosts),
-			"vms":                len(c.resources.VMs),
-			"datastores":         len(c.resources.Datastores),
-			"networks":           len(c.resources.Networks),
-			"datastore_clusters": len(c.resources.StoragePods),
-			"resource_pools":     len(c.resources.ResourcePools),
-			"actors":             len(actors),
-			"links":              len(links),
-		},
-	}, true
-}
-
-func vsphereTopologyActor(actorType, id, name string, attrs map[string]any, labels map[string]string) topology.Actor {
-	attrs = cleanTopologyAnyMap(attrs)
-	attrs["name"] = name
-	attrs["vsphere_id"] = id
-
-	return topology.Actor{
-		ActorID:    vsphereTopologyActorID(actorType, id),
-		ActorType:  actorType,
-		Layer:      vsphereTopologyLayer,
-		Source:     vsphereTopologySource,
-		Match:      topology.Match{},
-		Attributes: attrs,
-		Labels:     cleanTopologyStringMap(labels),
+	if err != nil {
+		return topologyv1.Data{}, false
 	}
-}
-
-func vsphereTopologyLink(srcID, dstID, linkType, label string) topology.Link {
-	srcActorID := vsphereTopologyActorIDForResource(srcID)
-	dstActorID := vsphereTopologyActorIDForResource(dstID)
-	return topology.Link{
-		Layer:      vsphereTopologyLayer,
-		Protocol:   vsphereTopologySource,
-		LinkType:   linkType,
-		Direction:  "parent_to_child",
-		SrcActorID: srcActorID,
-		DstActorID: dstActorID,
-		Src:        vsphereTopologyEndpoint(srcActorID),
-		Dst:        vsphereTopologyEndpoint(dstActorID),
-		Metrics: map[string]any{
-			"label": label,
-		},
-	}
-}
-
-func vsphereTopologyEndpoint(actorID string) topology.LinkEndpoint {
-	return topology.LinkEndpoint{
-		Match: topology.Match{},
-		Attributes: map[string]any{
-			"actor_id": actorID,
-		},
-	}
-}
-
-func vsphereTopologyActorID(actorType, id string) string {
-	return actorType + ":" + id
-}
-
-func vsphereTopologyActorIDForResource(id string) string {
-	switch {
-	case strings.HasPrefix(id, "datacenter-"):
-		return vsphereTopologyActorID("vsphere_datacenter", id)
-	case strings.HasPrefix(id, "domain-"):
-		return vsphereTopologyActorID("vsphere_cluster", id)
-	case strings.HasPrefix(id, "host-"):
-		return vsphereTopologyActorID("vsphere_host", id)
-	case strings.HasPrefix(id, "vm-"):
-		return vsphereTopologyActorID("vsphere_vm", id)
-	case strings.HasPrefix(id, "datastore-"):
-		return vsphereTopologyActorID("vsphere_datastore", id)
-	case strings.HasPrefix(id, "network-"), strings.HasPrefix(id, "dvportgroup-"), strings.HasPrefix(id, "opaqueNetwork-"):
-		return vsphereTopologyActorID("vsphere_network", id)
-	case strings.HasPrefix(id, "group-p"):
-		return vsphereTopologyActorID("vsphere_datastore_cluster", id)
-	case strings.HasPrefix(id, "resgroup-"):
-		return vsphereTopologyActorID("vsphere_resource_pool", id)
-	default:
-		return id
-	}
+	return data, true
 }
 
 func optionalBool(value *bool) any {
@@ -322,53 +279,4 @@ func optionalBool(value *bool) any {
 		return nil
 	}
 	return *value
-}
-
-func cleanTopologyStringMap(in map[string]string) map[string]string {
-	out := make(map[string]string, len(in))
-	for k, v := range in {
-		k = strings.TrimSpace(k)
-		v = strings.TrimSpace(v)
-		if k != "" && v != "" {
-			out[k] = v
-		}
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
-func cleanTopologyAnyMap(in map[string]any) map[string]any {
-	out := make(map[string]any, len(in)+2)
-	for k, v := range in {
-		k = strings.TrimSpace(k)
-		if k == "" || v == nil {
-			continue
-		}
-		if s, ok := v.(string); ok {
-			s = strings.TrimSpace(s)
-			if s == "" {
-				continue
-			}
-			out[k] = s
-			continue
-		}
-		out[k] = v
-	}
-	return out
-}
-
-func topologyActorCount(resources *rs.Resources) int {
-	return len(resources.DataCenters) + len(resources.Clusters) + len(resources.Hosts) + len(resources.VMs) +
-		len(resources.Datastores) + len(resources.Networks) + len(resources.StoragePods) + len(resources.ResourcePools)
-}
-
-func topologyLinkCount(resources *rs.Resources) int {
-	count := len(resources.Clusters) + len(resources.Hosts) + len(resources.VMs) +
-		len(resources.Datastores) + len(resources.Networks) + len(resources.StoragePods) + len(resources.ResourcePools)
-	for _, network := range resources.Networks {
-		count += len(network.HostIDs) + len(network.VMIDs)
-	}
-	return count
 }

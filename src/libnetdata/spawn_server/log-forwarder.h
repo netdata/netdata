@@ -3,7 +3,7 @@
 #ifndef NETDATA_LOG_FORWARDER_H
 #define NETDATA_LOG_FORWARDER_H
 
-#include "../libnetdata.h"
+#include "../common.h"
 
 typedef struct LOG_FORWARDER LOG_FORWARDER;
 

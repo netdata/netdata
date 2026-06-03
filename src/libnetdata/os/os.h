@@ -56,6 +56,9 @@ extern const char *os_type;
 extern unsigned int system_hz;
 void os_get_system_HZ(void);
 
+// Forward declaration needed because this header uses strncpyz() before inlined.h is included.
+static char *strncpyz(char *dst, const char *src, size_t dst_size_minus_1);
+
 #if defined(OS_WINDOWS)
 char *os_translate_path(char *dst, const char *src, size_t dst_size);
 char *os_translate_msys_to_windows_path(const char *src);

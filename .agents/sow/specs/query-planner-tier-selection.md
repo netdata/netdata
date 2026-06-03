@@ -2,7 +2,7 @@
 
 ## Status
 
-Active. Added by SOW-0017.
+Active. Added by PR #22495 / commit `2c44acdef`.
 
 ## Scope
 
@@ -75,4 +75,3 @@ target metrics.
   selection and planner gap-fill.
 - `src/web/api/queries/query-window.c` - selected-tier natural-points
   update-every calculation.
-

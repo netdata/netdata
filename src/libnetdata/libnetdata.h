@@ -65,6 +65,11 @@ struct web_buffer *run_command_and_get_output_to_buffer(const char *command, int
 #include "string/string.h"
 #include "buffer/buffer.h"
 
+#include "socket/security.h"    // must be before windows.h
+
+// this may include windows.h
+#include "os/os.h"
+
 #include "uuid/uuid.h"
 #include "uuid/uuidmap.h"
 #include "http/content_type.h"

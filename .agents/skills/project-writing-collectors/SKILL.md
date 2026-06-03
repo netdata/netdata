@@ -478,8 +478,9 @@ Topology is its own data type — directed/undirected graphs of nodes and links.
 - **Live socket topology** (`src/collectors/network-viewer.plugin/`) — local L3/L4 sockets and their inferred connections.
 - **Streaming graph** (`src/streaming/`) — Netdata parent/child topology.
 - **Topology library** at `src/go/pkg/topology/v1` — production Go payload
-  helpers for new topology producers. The non-v1 `src/go/pkg/topology/` payload
-  model is legacy and must not be used for new topology work.
+  helpers for new topology producers. The non-v1 root
+  `src/go/pkg/topology/` payload model has been retired and must not be
+  reintroduced for topology work.
 
 Topology is consumed via Functions (`topology:*` family), not via metrics. The cardinality of network edges is too high for time-series storage and the use case is interactive lookup.
 

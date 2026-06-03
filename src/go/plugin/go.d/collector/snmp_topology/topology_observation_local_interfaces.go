@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/engine"
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
 func (c *topologyCache) appendObservedInterfaces(observation *topologyengine.L2Observation) {

@@ -36,7 +36,6 @@ func TestVSphereMethods(t *testing.T) {
 			wantName:     "vSphere Topology",
 			responseType: "topology",
 			alias:        "topology:vsphere",
-			presentation: true,
 		},
 	}
 
