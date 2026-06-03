@@ -42,19 +42,19 @@ Netdata provides a visual representation of storage utilization for both the tim
 
 Retention size limits are **soft caps**, not hard caps. Netdata writes data unconditionally and checks limits afterwards — it does not block or reject writes when a cap is approaching.
 
-The enforcement mechanism works as follows:
+How enforcement works:
 
-1. **Reactive timer-based enforcement**: The retention timer (`retention_timer_cb` in `src/database/engine/rrdengine.c`) fires every 60 seconds. Each tick calls `check_and_schedule_db_rotation()`, which calls `rrdeng_ctx_tier_cap_exceeded()` to decide whether to schedule a rotation job. The disk usage estimate used by `rrdeng_ctx_tier_cap_exceeded()` is a heuristic: `rrdeng_get_used_disk_space()` returns `ctx_current_disk_space_get()` plus `rrdeng_target_data_file_size()` minus the active datafile's current size, plus a tier-percentage share of any global database space — it is not a simple sum of datafile sizes and may differ from what `du` reports. This means up to 60 seconds of writes can accumulate before a cap violation is detected.
+1. **Periodic checks**: Netdata checks whether a tier has exceeded its configured size limit approximately every 60 seconds. Between checks, data continues to be written to disk without restriction.
 
-2. **Datafile-granular deletion**: When a cap is exceeded, Netdata schedules a rotation job that deletes the oldest **entire** datafile via `datafile_delete` (in `src/database/engine/rrdengine.c`). Datafiles range from 4 MB to 512 MB (see [Database Engine](/src/database/engine/README.md)). Deletion cannot be partial — a single datafile is always removed wholesale. After each rotation completes, `after_database_rotate()` calls `check_and_schedule_db_rotation()` again, so rotation jobs can chain until usage drops below the limit. Depending on ingestion rate and how quickly each rotation job completes, actual disk usage can exceed the configured limit by more than a single datafile before enforcement catches up.
+2. **Whole-file deletion**: When the configured size limit is exceeded, Netdata deletes the oldest complete data file to bring usage back under the limit. Data files range from 4 MB to 512 MB (see [Database Engine](/src/database/engine/README.md)). Because entire files are removed and cannot be partially deleted, actual disk usage can overshoot the configured limit before enforcement catches up.
 
-3. **Why tier 0 overshoots more than tier 1/2**: Tier 0 has the highest write volume (per-second granularity), so more data arrives per timer interval. Combined with compression ratio variance in compressed extents, tier 0 datafiles can grow faster between enforcement cycles. Tier 1 and tier 2 aggregate fewer points per interval and their datafiles fill more predictably.
+3. **Why tier 0 overshoots more**: Tier 0 collects per-second data, producing the highest write volume. More data accumulates between enforcement checks, and data files fill faster. Tier 1 and tier 2 have lower write volumes and their disk usage grows more predictably.
 
 **Practical guidance**:
 
-- To minimize overshoot, configure your retention size with a buffer margin. For example, if you need 30 GiB of actual disk usage, configure approximately 27 GiB.
-- Setting retention days together with retention size uses **whichever limit is hit first**. This does not create a stricter cap, but provides a secondary bound on disk usage.
-- There is currently no mechanism to enforce a true hard cap on dbengine disk usage.
+- Provision storage to accommodate 2–3× your configured tier 0 retention size, especially on parent nodes streaming from many children.
+- Setting both **retention size** and **retention time** for the same tier provides a dual bound — data is deleted when either threshold is reached.
+- There is currently no mechanism to enforce a true hard cap on dbengine disk usage. To minimize overshoot, set both size and time limits and ensure adequate storage headroom.
 
 ## Cache sizes
 
