@@ -103,7 +103,7 @@ By using silent installation, you agree to:
 When Netdata is installed on Windows, it automatically registers as a Windows Service and appears in
 **Add or remove programs** (also known as **Programs and Features** or **Apps & features** in newer Windows versions).
 The service can be monitored through the [Netdata Dashboard](http://localhost:19999).
-To start, stop, or restart the service, use Windows Services (services.msc) or the [PowerShell commands described in Service Control](/docs/netdata-agent/start-stop-restart.md#windows).
+To start, stop, or restart the service, use the [PowerShell commands described in Service Control](/docs/netdata-agent/start-stop-restart.md#windows).
 
 ## Automatic Updates
 
@@ -193,7 +193,7 @@ Netdata on Windows includes a bundled MSYS2 environment for working with Netdata
 
 ### Open the MSYS2 environment
 
-Launch the bundled MSYS2 shell using one of these methods:
+Launch the bundled MSYS2 shell using one of these methods (the paths below assume Netdata is installed in the default location):
 
 - **Windows Run dialog**: Press `Win + R`, enter `"C:\Program Files\Netdata\msys2.exe"`, and press `Enter`.
 - **PowerShell**: `& "C:\Program Files\Netdata\msys2.exe"`
@@ -207,7 +207,7 @@ Netdata configuration files consumed from the MSYS side require MSYS-style paths
 
 Conversion pattern:
 
-- Replace the drive letter `C:` with `/c`
+- Replace the drive letter with its lowercase equivalent preceded by `/` (e.g., `C:` → `/c`, `D:` → `/d`)
 - Replace backslashes `\` with forward slashes `/`
 - Keep spaces as they are
 
