@@ -881,18 +881,21 @@ No additional configuration is required.
 
 #### Returns
 
-Cached vSphere inventory topology payload. Actors represent discovered inventory objects and links represent parent-child, host-runs-VM, or host/VM-connects-network relationships.
+Cached vSphere inventory topology payload using the netdata.topology.v1 schema. Actors represent discovered inventory objects and links represent inventory ownership, VM-to-host runtime placement, and host/VM network attachment relationships.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
 | schema_version | string |  |  | Topology payload schema version. |
-| source | string |  |  | Topology source identifier. |
-| layer | string |  |  | Topology layer identifier. |
-| agent_id | string |  |  | Netdata Agent identifier for the node serving the function. |
+| producer | object |  |  | Producer metadata identifying the vSphere topology source, selected collector job, plugin, and local node when available. |
 | collected_at | datetime |  |  | Time when the cached topology response was built. |
-| view | string |  |  | Topology view identifier. |
-| actors | array |  |  | vSphere inventory actors, including datacenters, clusters, ESXi hosts, VMs, datastores, optional networks, datastore clusters, and resource pools. |
-| links | array |  |  | Topology links between vSphere inventory actors. |
+| view | object |  |  | Topology view metadata. |
+| dictionaries | object |  |  | Compact-table dictionaries used by actors, links, evidence, and detail tables. |
+| types | object |  |  | Actor, link, evidence, table, and presentation type registry. |
+| presentation | object |  |  | Graph-level presentation metadata. |
+| actors | object |  |  | Compact actor table for vSphere inventory objects, including datacenters, clusters, ESXi hosts, VMs, datastores, optional networks, datastore clusters, and resource pools. |
+| links | object |  |  | Compact link table for relationships between vSphere inventory actors. |
+| evidence | object |  |  | Relationship evidence tables backing the rendered links. |
+| tables | object |  |  | Actor detail and label tables used by topology modals. |
 | stats | object |  |  | Counts of discovered inventory objects, actors, and links included in the response. |
 
 

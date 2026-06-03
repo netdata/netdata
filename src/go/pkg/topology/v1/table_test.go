@@ -152,6 +152,48 @@ func TestNewTableAllowsNullableNull(t *testing.T) {
 	assert.Equal(t, 1, table.Rows)
 }
 
+func TestTableBuilderBuildsValuesTable(t *testing.T) {
+	builder := NewTableBuilder(
+		NewColumn("id", "string"),
+		NewColumn("connected", "bool"),
+	)
+
+	row := builder.Add("actor-1", true)
+	builder.Add("actor-2", false)
+	table, err := builder.Table()
+
+	require.NoError(t, err)
+	assert.Equal(t, 0, row)
+	assert.Equal(t, 2, builder.Rows())
+	assert.Equal(t, 2, table.Rows)
+	require.Len(t, table.Values, 2)
+	assert.Equal(t, Values("actor-1", "actor-2"), table.Values[0])
+	assert.Equal(t, Values(true, false), table.Values[1])
+}
+
+func TestTableBuilderRejectsRowWidthMismatch(t *testing.T) {
+	builder := NewTableBuilder(
+		NewColumn("id", "string"),
+		NewColumn("name", "string"),
+	)
+
+	row := builder.Add("actor-1")
+	_, err := builder.Table()
+
+	require.Error(t, err)
+	assert.Equal(t, 0, row)
+	assert.Contains(t, err.Error(), "row has 1 values for 2 columns")
+}
+
+func TestTableBuilderBuildsEmptyZeroColumnTable(t *testing.T) {
+	builder := NewTableBuilder()
+
+	table, err := builder.Table()
+
+	require.NoError(t, err)
+	assert.Equal(t, EmptyTable(), table)
+}
+
 func TestStringDictionaryDeduplicatesValues(t *testing.T) {
 	dict := NewStringDictionary()
 

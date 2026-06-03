@@ -2,12 +2,10 @@
 
 package l2topology
 
-import "github.com/netdata/netdata/go/plugins/pkg/topology"
-
 type builtAdjacencyLink struct {
 	adj      Adjacency
 	protocol string
-	link     topology.Link
+	link     Link
 }
 
 type pairedLinkAccumulator struct {
@@ -15,7 +13,7 @@ type pairedLinkAccumulator struct {
 }
 
 type projectedLinks struct {
-	links               []topology.Link
+	links               []Link
 	lldp                int
 	cdp                 int
 	bidirectionalCount  int

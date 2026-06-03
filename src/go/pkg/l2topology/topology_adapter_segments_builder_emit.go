@@ -5,8 +5,6 @@ package l2topology
 import (
 	"sort"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 )
 
 func (b *segmentProjectionBuilder) emitLinks() {
@@ -19,7 +17,7 @@ func (b *segmentProjectionBuilder) emitLinks() {
 		if segment == nil {
 			continue
 		}
-		segmentEndpoint := topology.LinkEndpoint{
+		segmentEndpoint := LinkEndpoint{
 			Match: b.segmentMatchByID[segmentID],
 			Attributes: map[string]any{
 				"segment_id": segmentID,
@@ -57,7 +55,7 @@ func (b *segmentProjectionBuilder) emitLinks() {
 			if segment.portIdentityKey(port) == segment.portIdentityKey(segment.designatedPort) {
 				metrics["designated"] = true
 			}
-			b.out.links = append(b.out.links, topology.Link{
+			b.out.links = append(b.out.links, Link{
 				Layer:        b.layer,
 				Protocol:     "bridge",
 				LinkType:     "bridge",
@@ -120,7 +118,7 @@ func (b *segmentProjectionBuilder) emitLinks() {
 							edgeKey := segmentID + "|managed-device|" + matchedDeviceID
 							if _, seen := b.endpointSegmentEdgeSeen[edgeKey]; !seen {
 								b.endpointSegmentEdgeSeen[edgeKey] = struct{}{}
-								b.out.links = append(b.out.links, topology.Link{
+								b.out.links = append(b.out.links, Link{
 									Layer:        b.layer,
 									Protocol:     "fdb",
 									LinkType:     "fdb",
@@ -181,13 +179,13 @@ func (b *segmentProjectionBuilder) emitLinks() {
 									linkState = "probable"
 								}
 							}
-							b.out.links = append(b.out.links, topology.Link{
+							b.out.links = append(b.out.links, Link{
 								Layer:        b.layer,
 								Protocol:     "fdb",
 								LinkType:     "fdb",
 								Direction:    "bidirectional",
 								Src:          adjacencySideToEndpoint(device, localPort, b.ifIndexByDeviceName, b.ifaceByDeviceIndex),
-								Dst:          topology.LinkEndpoint{Match: endpointMatch},
+								Dst:          LinkEndpoint{Match: endpointMatch},
 								DiscoveredAt: topologyTimePtr(b.collectedAt),
 								LastSeen:     topologyTimePtr(b.collectedAt),
 								State:        linkState,
@@ -228,13 +226,13 @@ func (b *segmentProjectionBuilder) emitLinks() {
 				}
 			}
 
-			b.out.links = append(b.out.links, topology.Link{
+			b.out.links = append(b.out.links, Link{
 				Layer:        b.layer,
 				Protocol:     "fdb",
 				LinkType:     "fdb",
 				Direction:    "bidirectional",
 				Src:          segmentEndpoint,
-				Dst:          topology.LinkEndpoint{Match: endpointMatch},
+				Dst:          LinkEndpoint{Match: endpointMatch},
 				DiscoveredAt: topologyTimePtr(b.collectedAt),
 				LastSeen:     topologyTimePtr(b.collectedAt),
 				State:        linkState,
@@ -255,7 +253,7 @@ func (b *segmentProjectionBuilder) pruneSegmentsWithoutLinks(segmentsWithAnyLink
 		return
 	}
 
-	filteredActors := make([]topology.Actor, 0, len(b.out.actors))
+	filteredActors := make([]Actor, 0, len(b.out.actors))
 	for _, actor := range b.out.actors {
 		segmentID := topologyAttrString(actor.Attributes, "segment_id")
 		if segmentID == "" {
@@ -267,7 +265,7 @@ func (b *segmentProjectionBuilder) pruneSegmentsWithoutLinks(segmentsWithAnyLink
 	}
 	b.out.actors = filteredActors
 
-	filteredLinks := make([]topology.Link, 0, len(b.out.links))
+	filteredLinks := make([]Link, 0, len(b.out.links))
 	b.out.linksFdb = 0
 	b.out.bidirectionalCount = 0
 	b.out.endpointLinksEmitted = 0

@@ -100,7 +100,7 @@ func buildSNMPL2TopologyData(
 		return topologyData{}, false
 	}
 
-	data := topologyengine.ToTopologyData(result, topologyengine.TopologyDataOptions{
+	data := topologyengine.ToGraph(result, topologyengine.GraphOptions{
 		SchemaVersion:             topologySchemaVersion,
 		Source:                    "snmp",
 		Layer:                     "2",

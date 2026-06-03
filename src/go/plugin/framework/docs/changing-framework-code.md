@@ -25,7 +25,7 @@ This guide applies when changing or extending any of these areas:
 - `src/go/pkg/netdataapi`
 - `src/go/pkg/metrix`
 - `src/go/pkg/funcapi`
-- `src/go/pkg/topology`
+- `src/go/pkg/topology/v1`
 - `src/go/pkg/matcher`
 - `src/go/pkg/stm`
 - shared collector/runtime helpers under `src/go/pkg/` when their semantics are

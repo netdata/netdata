@@ -2,19 +2,17 @@
 
 package l2topology
 
-import "github.com/netdata/netdata/go/plugins/pkg/topology"
-
 func deviceToTopologyActor(
 	dev Device,
 	source, layer, localDeviceID string,
 	ifaceSummary topologyDeviceInterfaceSummary,
 	reporterAliases []string,
-) topology.Actor {
+) Actor {
 	match := buildDeviceActorMatch(dev, reporterAliases)
 	attrs := buildDeviceActorAttributes(dev, localDeviceID, ifaceSummary, match)
 	tables := buildDeviceActorTables(ifaceSummary)
 
-	return topology.Actor{
+	return Actor{
 		ActorType:  resolveDeviceActorType(dev.Labels),
 		Layer:      layer,
 		Source:     source,

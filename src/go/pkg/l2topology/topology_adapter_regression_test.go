@@ -3,10 +3,8 @@
 package l2topology
 
 import (
-	"testing"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 func TestBackfillPairGroupMissingEndpointPortsCopiesPeerInterfaceAttributes(t *testing.T) {
@@ -16,9 +14,9 @@ func TestBackfillPairGroupMissingEndpointPortsCopiesPeerInterfaceAttributes(t *t
 				SourceID: "device-a",
 				TargetID: "device-b",
 			},
-			link: topology.Link{
-				Src: topology.LinkEndpoint{Attributes: map[string]any{}},
-				Dst: topology.LinkEndpoint{Attributes: map[string]any{}},
+			link: Link{
+				Src: LinkEndpoint{Attributes: map[string]any{}},
+				Dst: LinkEndpoint{Attributes: map[string]any{}},
 			},
 		},
 		{
@@ -26,13 +24,13 @@ func TestBackfillPairGroupMissingEndpointPortsCopiesPeerInterfaceAttributes(t *t
 				SourceID: "device-b",
 				TargetID: "device-a",
 			},
-			link: topology.Link{
-				Src: topology.LinkEndpoint{Attributes: map[string]any{
+			link: Link{
+				Src: LinkEndpoint{Attributes: map[string]any{
 					"if_index": 2,
 					"if_name":  "Gi0/2",
 					"port_id":  "Gi0/2",
 				}},
-				Dst: topology.LinkEndpoint{Attributes: map[string]any{
+				Dst: LinkEndpoint{Attributes: map[string]any{
 					"if_index": 1,
 					"if_name":  "Gi0/1",
 					"port_id":  "Gi0/1",
@@ -58,9 +56,9 @@ func TestBackfillPairGroupMissingEndpointPortsSkipsAmbiguousReverseCandidates(t 
 				SourceID: "device-a",
 				TargetID: "device-b",
 			},
-			link: topology.Link{
-				Src: topology.LinkEndpoint{Attributes: map[string]any{}},
-				Dst: topology.LinkEndpoint{Attributes: map[string]any{}},
+			link: Link{
+				Src: LinkEndpoint{Attributes: map[string]any{}},
+				Dst: LinkEndpoint{Attributes: map[string]any{}},
 			},
 		},
 		{
@@ -68,11 +66,11 @@ func TestBackfillPairGroupMissingEndpointPortsSkipsAmbiguousReverseCandidates(t 
 				SourceID: "device-b",
 				TargetID: "device-a",
 			},
-			link: topology.Link{
-				Src: topology.LinkEndpoint{Attributes: map[string]any{
+			link: Link{
+				Src: LinkEndpoint{Attributes: map[string]any{
 					"if_name": "Gi0/2",
 				}},
-				Dst: topology.LinkEndpoint{Attributes: map[string]any{
+				Dst: LinkEndpoint{Attributes: map[string]any{
 					"if_name": "Gi0/1",
 				}},
 			},
@@ -82,11 +80,11 @@ func TestBackfillPairGroupMissingEndpointPortsSkipsAmbiguousReverseCandidates(t 
 				SourceID: "device-b",
 				TargetID: "device-a",
 			},
-			link: topology.Link{
-				Src: topology.LinkEndpoint{Attributes: map[string]any{
+			link: Link{
+				Src: LinkEndpoint{Attributes: map[string]any{
 					"if_name": "Gi0/22",
 				}},
-				Dst: topology.LinkEndpoint{Attributes: map[string]any{
+				Dst: LinkEndpoint{Attributes: map[string]any{
 					"if_name": "Gi0/11",
 				}},
 			},
@@ -100,12 +98,12 @@ func TestBackfillPairGroupMissingEndpointPortsSkipsAmbiguousReverseCandidates(t 
 }
 
 func TestBackfillEndpointPortFromPeerPreservesExistingCanonicalPort(t *testing.T) {
-	endpoint := topology.LinkEndpoint{
+	endpoint := LinkEndpoint{
 		Attributes: map[string]any{
 			"if_name": "Gi0/10",
 		},
 	}
-	peer := topology.LinkEndpoint{
+	peer := LinkEndpoint{
 		Attributes: map[string]any{
 			"if_index": 7,
 			"if_name":  "Gi0/7",
@@ -124,7 +122,7 @@ func TestSegmentProjectionBuilderPruneSegmentsWithoutLinksRemovesEmptySegments(t
 	builder := &segmentProjectionBuilder{
 		segmentIDs: []string{"segment-a", "segment-b"},
 		out: projectedSegments{
-			actors: []topology.Actor{
+			actors: []Actor{
 				{
 					ActorID:   "segment-a",
 					ActorType: "segment",
@@ -140,7 +138,7 @@ func TestSegmentProjectionBuilderPruneSegmentsWithoutLinksRemovesEmptySegments(t
 					},
 				},
 			},
-			links: []topology.Link{
+			links: []Link{
 				{
 					Protocol:  "fdb",
 					Direction: "bidirectional",
