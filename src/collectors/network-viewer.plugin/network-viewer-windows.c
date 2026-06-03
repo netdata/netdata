@@ -178,6 +178,24 @@ static void nv_add_int_field(BUFFER *wb, size_t *field_id,
         RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL);
 }
 
+// Add a two-column stacked-bar chart entry to the charts object.
+static void nv_add_stacked_bar_chart(BUFFER *wb, const char *key,
+                                     const char *col1, const char *col2)
+{
+    buffer_json_member_add_object(wb, key);
+    {
+        buffer_json_member_add_string(wb, "name", key);
+        buffer_json_member_add_string(wb, "type", "stacked-bar");
+        buffer_json_member_add_array(wb, "columns");
+        {
+            buffer_json_add_array_item_string(wb, col1);
+            buffer_json_add_array_item_string(wb, col2);
+        }
+        buffer_json_array_close(wb);
+    }
+    buffer_json_object_close(wb);
+}
+
 // Add one entry to the default_charts array: [chart_key, groupby_column].
 static void nv_add_default_chart(BUFFER *wb, const char *chart_key, const char *groupby)
 {
@@ -626,35 +644,12 @@ void function_network_protocols(
     buffer_json_member_add_string(wb, "default_sort_column", "Received");
 
     // charts.columns = metric columns for the Y axis (NOT the groupby column)
+    // Traffic: TCP/UDP segment/datagram counts — incompatible unit with SMB bytes.
+    // SMB Traffic: per-share byte throughput — incompatible unit with segment counts.
     buffer_json_member_add_object(wb, "charts");
     {
-        // TCP/UDP segment and datagram counts — do not mix with SMB byte values
-        buffer_json_member_add_object(wb, "Traffic");
-        {
-            buffer_json_member_add_string(wb, "name", "Traffic");
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Received");
-                buffer_json_add_array_item_string(wb, "Sent");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // SMB share byte throughput — separate chart, incompatible unit with Traffic
-        buffer_json_member_add_object(wb, "SMB Traffic");
-        {
-            buffer_json_member_add_string(wb, "name", "SMB Traffic");
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "ReceivedBytes");
-                buffer_json_add_array_item_string(wb, "SentBytes");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
+        nv_add_stacked_bar_chart(wb, "Traffic",     "Received",      "Sent");
+        nv_add_stacked_bar_chart(wb, "SMB Traffic", "ReceivedBytes", "SentBytes");
     }
     buffer_json_object_close(wb); // charts
 
