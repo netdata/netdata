@@ -83,11 +83,13 @@ $ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest https://github.com/n
 
 ## Access Netdata Dashboard
 
-After installation, open your browser and go to:
+After installation, check that the Netdata service is running (see [Service Control](/docs/netdata-agent/start-stop-restart.md#windows) for instructions on checking status), then open your browser and go to:
 
 ```
 http://localhost:19999
 ```
+
+You should see the Netdata Dashboard — a real-time metrics overview with system CPU, memory, disk, and network charts updating every second.
 
 ## License Information
 
@@ -101,7 +103,7 @@ By using silent installation, you agree to:
 When Netdata is installed on Windows, it automatically registers as a Windows Service and appears in
 **Add or remove programs** (also known as **Programs and Features** or **Apps & features** in newer Windows versions).
 The service can be monitored through the [Netdata Dashboard](http://localhost:19999).
-To start, stop, or restart the service, use Windows Services (services.msc) or command-line tools
+To start, stop, or restart the service, use Windows Services (services.msc) or the [PowerShell commands described in Service Control](/docs/netdata-agent/start-stop-restart.md#windows).
 
 ## Automatic Updates
 
@@ -211,10 +213,10 @@ Conversion pattern:
 
 Examples:
 
-| Windows path | MSYS-style path |
-|---|---|
-| `C:\Program Files\Netdata\etc\netdata` | `/c/Program Files/Netdata/etc/netdata/` |
-| `C:\Program Files\Netdata\usr\bin\netdata.exe` | `/c/Program Files/Netdata/usr/bin/netdata.exe` |
+| Windows path                                   | MSYS-style path                                    |
+|------------------------------------------------|----------------------------------------------------|
+| `C:\Program Files\Netdata\etc\netdata`         | `/c/Program Files/Netdata/etc/netdata/`            |
+| `C:\Program Files\Netdata\usr\bin\netdata.exe` | `/c/Program Files/Netdata/usr/bin/netdata.exe`     |
 
 ### Editing configuration files
 
@@ -231,10 +233,15 @@ On Windows, `edit-config` opens files with the `nano` editor.
 
 ### Basic nano commands
 
-| Action | Keybinding |
-|---|---|
-| Edit text | Type normally, use arrow keys to navigate |
-| Search | `Ctrl + W`, type search text, `Enter` |
-| Save | `Ctrl + O`, `Enter` to confirm filename |
-| Exit | `Ctrl + X` |
+| Action                | Keybinding                                       |
+|----------------------|--------------------------------------------------|
+| Edit text            | Type normally, use arrow keys to navigate        |
+| Search               | `Ctrl + W`, type search text, `Enter`            |
+| Save                 | `Ctrl + O`, `Enter` to confirm filename          |
+| Exit                 | `Ctrl + X`                                       |
 | Exit with save prompt | `Ctrl + X`, then `Y` to save or `N` to discard |
+
+## Related Windows documentation
+
+- [Service Control](/docs/netdata-agent/start-stop-restart.md#windows) — Start, stop, restart, and check status of the Netdata Agent
+- [Switching Install Types and Release Channels on Windows](/docs/install/windows-release-channels.md)
