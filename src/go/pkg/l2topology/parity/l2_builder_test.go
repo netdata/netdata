@@ -17,7 +17,7 @@ import (
 )
 
 func TestBuildL2ResultFromWalks_LLDP_NMS8003(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms8003/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms8003/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -54,7 +54,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS8003(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_CDP_NMS8000(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms8000/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms8000/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -125,7 +125,7 @@ func TestBuildL2ResultFromWalks_CDP_NMS8000(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS8000(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms8000/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms8000/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -186,7 +186,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS8000(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS13637(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms13637/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms13637/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -239,7 +239,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS13637(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS10205B(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms10205b/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms10205b/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -337,7 +337,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS10205B(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS17216(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms17216/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms17216/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -401,7 +401,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS17216(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_CDP_NMS17216(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms17216/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms17216/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -478,7 +478,7 @@ func TestBuildL2ResultFromWalks_CDP_NMS17216(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_CDP_NMS17216_TopologyProjection(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms17216/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms17216/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -519,7 +519,7 @@ func TestBuildL2ResultFromWalks_CDP_NMS17216_TopologyProjection(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS17216_TopologyProjection(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms17216/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms17216/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -574,7 +574,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS17216_TopologyProjection(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS0123(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms0123/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms0123/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -651,7 +651,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0123(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS0002_CISCO_JUNIPER(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms0002/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms0002/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -706,7 +706,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0002_CISCO_JUNIPER(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS0002_CISCO_ALCATEL(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms0002/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms0002/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -764,7 +764,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0002_CISCO_ALCATEL(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS0000_NETWORK_ALL(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms0000/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms0000/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -894,7 +894,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0000_NETWORK_ALL(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS0000_NETWORK_TWO_CONNECTED(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms0000/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms0000/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -955,7 +955,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0000_NETWORK_TWO_CONNECTED(t *testing.T)
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS0000_NETWORK_THREE_CONNECTED(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms0000/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms0000/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1018,7 +1018,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0000_NETWORK_THREE_CONNECTED(t *testing.
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS0000_MICROSENSE(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms0000/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms0000/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1078,7 +1078,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0000_MICROSENSE(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS0000_MS16(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms0000/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms0000/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1138,7 +1138,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0000_MS16(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS0000_PLANET(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms0000/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms0000/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1219,7 +1219,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS0000_PLANET(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS18541_NETWORK_ALL(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1328,7 +1328,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_NETWORK_ALL(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW01_SW02_SW03(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1390,7 +1390,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW01_SW02_SW03(t *testing
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW01(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1440,7 +1440,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW01(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW02(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1490,7 +1490,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW02(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW03(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1540,7 +1540,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW03(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW04(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1590,7 +1590,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW04(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW08(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1640,7 +1640,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW08(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW09(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1688,7 +1688,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_TOPO_QFX_SW09(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS18541_QFX(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1747,7 +1747,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_QFX(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW01(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1788,7 +1788,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW01(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW02(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1829,7 +1829,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW02(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW03(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1869,7 +1869,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW03(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW04(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1912,7 +1912,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW04(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW08(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -1954,7 +1954,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW08(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW09(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -2000,7 +2000,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS18541_MICROSENS_SW09(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_CDP_NMS7467(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms7467/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms7467/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -2058,7 +2058,7 @@ func TestBuildL2ResultFromWalks_CDP_NMS7467(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_MIXED_NMS7563_CISCO01(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms7563/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms7563/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -2118,7 +2118,7 @@ func TestBuildL2ResultFromWalks_MIXED_NMS7563_CISCO01(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS7563_HOMESERVER(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms7563/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms7563/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -2173,7 +2173,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS7563_HOMESERVER(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_CDP_NMS7563_SWITCH02(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms7563/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms7563/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -2253,7 +2253,7 @@ func TestBuildL2ResultFromWalks_CDP_NMS7563_SWITCH02(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS7777DW_NO_LINKS(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms7777dw/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms7777dw/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -2304,7 +2304,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS7777DW_NO_LINKS(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS13923(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms13923/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms13923/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -2367,7 +2367,7 @@ func TestBuildL2ResultFromWalks_LLDP_NMS13923(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_LLDP_NMS13593(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms13593/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms13593/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -2611,7 +2611,7 @@ func TestBuildL2ResultFromWalks_ARPEnrichment(t *testing.T) {
 }
 
 func TestParseCDPInterfaceGetter_NMS0002_RPICT001(t *testing.T) {
-	ds, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms0002UkRoFakeLink/r-ro-suce-pict-001.txt")
+	ds, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms0002UkRoFakeLink/r-ro-suce-pict-001.txt")
 	require.NoError(t, err)
 
 	require.Equal(t, "FastEthernet0", mustLookupWalkValue(t, ds, "1.3.6.1.4.1.9.9.23.1.1.1.1.6.1"))
@@ -2632,7 +2632,7 @@ func TestParseCDPInterfaceGetter_NMS0002_RPICT001(t *testing.T) {
 }
 
 func TestParseCDPGlobalGroup_NMS0002_RPICT001(t *testing.T) {
-	ds, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms0002UkRoFakeLink/r-ro-suce-pict-001.txt")
+	ds, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms0002UkRoFakeLink/r-ro-suce-pict-001.txt")
 	require.NoError(t, err)
 
 	require.Equal(t, "r-ro-suce-pict-001.infra.u-ssi.net", mustLookupWalkValue(t, ds, "1.3.6.1.4.1.9.9.23.1.3.4.0"))
@@ -2642,7 +2642,7 @@ func TestParseCDPGlobalGroup_NMS0002_RPICT001(t *testing.T) {
 }
 
 func TestParseCDPGlobalGroupWithDeviceFormat_NMS7467_CISCO_SWITCH(t *testing.T) {
-	ds, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms7467/192.0.2.7-walk.txt")
+	ds, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms7467/192.0.2.7-walk.txt")
 	require.NoError(t, err)
 
 	require.Equal(t, "JAB043408B7", mustLookupWalkValue(t, ds, "1.3.6.1.4.1.9.9.23.1.3.4.0"))
@@ -2651,14 +2651,14 @@ func TestParseCDPGlobalGroupWithDeviceFormat_NMS7467_CISCO_SWITCH(t *testing.T) 
 }
 
 func TestParseCDPCacheTable_NMS0002_RPICT001(t *testing.T) {
-	ds, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms0002UkRoFakeLink/r-ro-suce-pict-001.txt")
+	ds, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms0002UkRoFakeLink/r-ro-suce-pict-001.txt")
 	require.NoError(t, err)
 
 	require.Equal(t, 14, countCDPCacheRows(ds))
 }
 
 func TestParseLLDPLocalGroup_NMS17216_SWITCH1(t *testing.T) {
-	ds, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms17216/switch1-walk.txt")
+	ds, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms17216/switch1-walk.txt")
 	require.NoError(t, err)
 
 	require.Equal(t, "0016c8bd4d80", compactHexToken(mustLookupWalkValue(t, ds, "1.0.8802.1.1.2.1.3.2.0")))
@@ -2667,7 +2667,7 @@ func TestParseLLDPLocalGroup_NMS17216_SWITCH1(t *testing.T) {
 }
 
 func TestParseLLDPLocGetter_NMS17216_SWITCH1(t *testing.T) {
-	ds, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms17216/switch1-walk.txt")
+	ds, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms17216/switch1-walk.txt")
 	require.NoError(t, err)
 
 	val9 := lldpLocPortTriplet(t, ds, "9")
@@ -2684,7 +2684,7 @@ func TestParseLLDPLocGetter_NMS17216_SWITCH1(t *testing.T) {
 }
 
 func TestParseLLDPLocGetter_NMS17216_SWITCH2(t *testing.T) {
-	ds, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms17216/switch2-walk.txt")
+	ds, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms17216/switch2-walk.txt")
 	require.NoError(t, err)
 
 	val1 := lldpLocPortTriplet(t, ds, "1")
@@ -2701,7 +2701,7 @@ func TestParseLLDPLocGetter_NMS17216_SWITCH2(t *testing.T) {
 }
 
 func TestParseLLDPRemTable_NMS17216_SWITCH1(t *testing.T) {
-	ds, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms17216/switch1-walk.txt")
+	ds, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms17216/switch1-walk.txt")
 	require.NoError(t, err)
 
 	rows := collectLLDPRemoteRows(ds)
@@ -2715,7 +2715,7 @@ func TestParseLLDPRemTable_NMS17216_SWITCH1(t *testing.T) {
 }
 
 func TestParseLLDPRemoteTableWithLocLookup_NMS17216_SWITCH2(t *testing.T) {
-	ds, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms17216/switch2-walk.txt")
+	ds, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms17216/switch2-walk.txt")
 	require.NoError(t, err)
 
 	rows := collectLLDPRemoteRows(ds)
@@ -2747,10 +2747,10 @@ func TestParseLLDPRemoteTableWithLocLookup_NMS17216_SWITCH2(t *testing.T) {
 }
 
 func TestParseTimeTetraLLDPVendorRows_NMS13593(t *testing.T) {
-	ds1, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms13593/srv001-walk.txt")
+	ds1, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms13593/srv001-walk.txt")
 	require.NoError(t, err)
 
-	ds2, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms13593/srv002-walk.txt")
+	ds2, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms13593/srv002-walk.txt")
 	require.NoError(t, err)
 
 	require.Equal(t, "24:21:24:ec:e2:3f", normalizeHexToken(mustLookupWalkValue(t, ds1, "1.0.8802.1.1.2.1.3.2.0")))
@@ -2795,7 +2795,7 @@ func TestParseTimeTetraLLDPVendorRows_NMS13593(t *testing.T) {
 }
 
 func TestParseTimeTetraLLDPVendorRows_NMS13923_SRV005(t *testing.T) {
-	ds, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms13923/srv005.txt")
+	ds, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms13923/srv005.txt")
 	require.NoError(t, err)
 
 	require.Equal(t, "00:16:4d:dd:d5:5b", normalizeHexToken(mustLookupWalkValue(t, ds, "1.0.8802.1.1.2.1.3.2.0")))
@@ -2825,7 +2825,7 @@ func TestParseTimeTetraLLDPVendorRows_NMS13923_SRV005(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_ARP_NMS102(t *testing.T) {
-	ds, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms102/mikrotik-192.168.0.1-walk.txt")
+	ds, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms102/mikrotik-192.168.0.1-walk.txt")
 	require.NoError(t, err)
 
 	result, err := BuildL2ResultFromWalks([]FixtureWalk{
@@ -2908,7 +2908,7 @@ func TestBuildL2ResultFromWalks_ARP_NMS102(t *testing.T) {
 }
 
 func TestParseBridgeBaseWalk_NMS4930(t *testing.T) {
-	ds, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms4930/dlink_DES-3026.properties")
+	ds, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms4930/dlink_DES-3026.properties")
 	require.NoError(t, err)
 
 	require.Equal(t, "00:1e:58:a3:2f:cd", normalizeHexToken(mustLookupWalkValue(t, ds, "1.3.6.1.2.1.17.1.1.0")))
@@ -2922,7 +2922,7 @@ func TestParseBridgeBaseWalk_NMS4930(t *testing.T) {
 }
 
 func TestParseBridgeBasePortTable_NMS4930(t *testing.T) {
-	ds, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms4930/dlink_DES-3026.properties")
+	ds, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms4930/dlink_DES-3026.properties")
 	require.NoError(t, err)
 
 	rows := ds.Prefix("1.3.6.1.2.1.17.1.4.1.2.")
@@ -2939,7 +2939,7 @@ func TestParseBridgeBasePortTable_NMS4930(t *testing.T) {
 }
 
 func TestParseBridgeStpPortTable_NMS4930(t *testing.T) {
-	ds, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms4930/dlink_DES-3026.properties")
+	ds, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms4930/dlink_DES-3026.properties")
 	require.NoError(t, err)
 	require.Len(t, ds.Prefix("1.3.6.1.2.1.17.2.15.1.3."), 26)
 
@@ -2963,7 +2963,7 @@ func TestParseBridgeStpPortTable_NMS4930(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_FDB_NMS4930(t *testing.T) {
-	ds, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms4930/dlink_DES-3026.properties")
+	ds, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms4930/dlink_DES-3026.properties")
 	require.NoError(t, err)
 
 	result, err := BuildL2ResultFromWalks([]FixtureWalk{
@@ -3013,7 +3013,7 @@ func TestBuildL2ResultFromWalks_FDB_NMS4930(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_BRIDGE_NMS4930_DLINK1(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms4930/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms4930/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -3047,7 +3047,7 @@ func TestBuildL2ResultFromWalks_BRIDGE_NMS4930_DLINK1(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_BRIDGE_NMS4930_DLINK2(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms4930/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms4930/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -3081,10 +3081,10 @@ func TestBuildL2ResultFromWalks_BRIDGE_NMS4930_DLINK2(t *testing.T) {
 }
 
 func TestParseBridgeDot1qTpFdbTable_NMS4930(t *testing.T) {
-	ds1, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms4930/dlink_DES-3026.properties")
+	ds1, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms4930/dlink_DES-3026.properties")
 	require.NoError(t, err)
 
-	ds2, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/upstream/linkd/nms4930/dlink_DGS-3612G.properties")
+	ds2, err := LoadWalkFile("../../../testdata/snmp/enlinkd/upstream/linkd/nms4930/dlink_DGS-3612G.properties")
 	require.NoError(t, err)
 
 	macs1 := buildDot1qMacPortMap(ds1)
@@ -3097,7 +3097,7 @@ func TestParseBridgeDot1qTpFdbTable_NMS4930(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_BRIDGE_NMS7918_ASW01(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms7918/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms7918/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -3153,7 +3153,7 @@ func TestBuildL2ResultFromWalks_BRIDGE_NMS7918_ASW01(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_BRIDGE_NMS7918_SAMASW01(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms7918/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms7918/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -3209,7 +3209,7 @@ func TestBuildL2ResultFromWalks_BRIDGE_NMS7918_SAMASW01(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_BRIDGE_NMS7918_STCASW01(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms7918/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms7918/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -3265,7 +3265,7 @@ func TestBuildL2ResultFromWalks_BRIDGE_NMS7918_STCASW01(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_ARP_NMS7918_OSPWL01(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms7918/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms7918/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -3316,7 +3316,7 @@ func TestBuildL2ResultFromWalks_ARP_NMS7918_OSPWL01(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_ARP_NMS7918_OSPESS01(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms7918/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms7918/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -3381,7 +3381,7 @@ func TestBuildL2ResultFromWalks_ARP_NMS7918_OSPESS01(t *testing.T) {
 }
 
 func TestBuildL2ResultFromWalks_ARP_NMS7918_PE01(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms7918/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms7918/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 

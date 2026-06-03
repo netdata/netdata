@@ -88,7 +88,7 @@ type nodeTopologyCIDRExpectation struct {
 
 func loadNodeTopologyFixtureDocument(t *testing.T) nodeTopologyFixtureDocument {
 	t.Helper()
-	path := filepath.Join("../../../../testdata/snmp/enlinkd", "node_topology", "scenarios.json")
+	path := filepath.Join("../../../testdata/snmp/enlinkd", "node_topology", "scenarios.json")
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 

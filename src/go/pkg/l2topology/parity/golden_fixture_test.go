@@ -11,20 +11,20 @@ import (
 )
 
 func TestValidateGoldenCache(t *testing.T) {
-	manifest, err := LoadManifest("../../../../testdata/snmp/enlinkd/nms8003/manifest.yaml")
+	manifest, err := LoadManifest("../../../testdata/snmp/enlinkd/nms8003/manifest.yaml")
 	require.NoError(t, err)
 
 	scenario, ok := manifest.FindScenario("nms8003_lldp")
 	require.True(t, ok)
 
-	resolved, err := ResolveScenario("../../../../testdata/snmp/enlinkd/nms8003/manifest.yaml", scenario)
+	resolved, err := ResolveScenario("../../../testdata/snmp/enlinkd/nms8003/manifest.yaml", scenario)
 	require.NoError(t, err)
 
 	require.NoError(t, ValidateCache(resolved.GoldenYAML, resolved.GoldenJSON))
 }
 
 func TestValidateGoldenCache_NMS8000(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms8000/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms8000/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -40,7 +40,7 @@ func TestValidateGoldenCache_NMS8000(t *testing.T) {
 }
 
 func TestValidateGoldenCache_NMS13637(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms13637/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms13637/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -53,7 +53,7 @@ func TestValidateGoldenCache_NMS13637(t *testing.T) {
 }
 
 func TestValidateGoldenCache_NMS10205B(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms10205b/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms10205b/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -66,7 +66,7 @@ func TestValidateGoldenCache_NMS10205B(t *testing.T) {
 }
 
 func TestValidateGoldenCache_NMS17216(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms17216/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms17216/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -82,7 +82,7 @@ func TestValidateGoldenCache_NMS17216(t *testing.T) {
 }
 
 func TestValidateGoldenCache_NMS0123(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms0123/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms0123/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -95,7 +95,7 @@ func TestValidateGoldenCache_NMS0123(t *testing.T) {
 }
 
 func TestValidateGoldenCache_NMS0002(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms0002/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms0002/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -111,7 +111,7 @@ func TestValidateGoldenCache_NMS0002(t *testing.T) {
 }
 
 func TestValidateGoldenCache_NMS0000(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms0000/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms0000/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -135,7 +135,7 @@ func TestValidateGoldenCache_NMS0000(t *testing.T) {
 }
 
 func TestValidateGoldenCache_NMS7467(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms7467/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms7467/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -148,7 +148,7 @@ func TestValidateGoldenCache_NMS7467(t *testing.T) {
 }
 
 func TestValidateGoldenCache_NMS7563(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms7563/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms7563/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -164,7 +164,7 @@ func TestValidateGoldenCache_NMS7563(t *testing.T) {
 }
 
 func TestValidateGoldenCache_NMS4930(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms4930/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms4930/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -184,7 +184,7 @@ func TestValidateGoldenCache_NMS4930(t *testing.T) {
 }
 
 func TestValidateGoldenCache_NMS7777DW(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms7777dw/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms7777dw/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -197,7 +197,7 @@ func TestValidateGoldenCache_NMS7777DW(t *testing.T) {
 }
 
 func TestValidateGoldenCache_NMS13923(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms13923/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms13923/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -210,7 +210,7 @@ func TestValidateGoldenCache_NMS13923(t *testing.T) {
 }
 
 func TestValidateGoldenCache_NMS13593(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms13593/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms13593/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -223,7 +223,7 @@ func TestValidateGoldenCache_NMS13593(t *testing.T) {
 }
 
 func TestValidateGoldenCache_NMS7918(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms7918/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms7918/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -247,7 +247,7 @@ func TestValidateGoldenCache_NMS7918(t *testing.T) {
 }
 
 func TestValidateGoldenCache_NMS18541(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms18541/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
 
@@ -280,7 +280,7 @@ func TestValidateGoldenCache_NMS18541(t *testing.T) {
 }
 
 func TestGoldenYAMLValidation(t *testing.T) {
-	doc, err := LoadGoldenYAML("../../../../testdata/snmp/enlinkd/nms8003/golden/nms8003_lldp.yaml")
+	doc, err := LoadGoldenYAML("../../../testdata/snmp/enlinkd/nms8003/golden/nms8003_lldp.yaml")
 	require.NoError(t, err)
 
 	require.Equal(t, GoldenVersion, doc.Version)

@@ -11,7 +11,7 @@ import (
 )
 
 func TestLoadWalkFile_NMS8003Fixture(t *testing.T) {
-	ds, err := LoadWalkFile("../../../../testdata/snmp/enlinkd/nms8003/fixtures/NMM-R1.snmpwalk.txt")
+	ds, err := LoadWalkFile("../../../testdata/snmp/enlinkd/nms8003/fixtures/NMM-R1.snmpwalk.txt")
 	require.NoError(t, err)
 	require.NotEmpty(t, ds.Records)
 

@@ -12,7 +12,7 @@ import (
 )
 
 func TestLoadAndResolveManifest(t *testing.T) {
-	manifestPath := "../../../../testdata/snmp/enlinkd/nms8003/manifest.yaml"
+	manifestPath := "../../../testdata/snmp/enlinkd/nms8003/manifest.yaml"
 
 	manifest, err := LoadManifest(manifestPath)
 	require.NoError(t, err)
