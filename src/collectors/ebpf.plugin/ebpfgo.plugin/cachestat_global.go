@@ -63,7 +63,7 @@ var cachestatGlobalCharts = []cachestatGlobalChart{
 	{
 		id:        "cachestat_dirties",
 		title:     "Number of dirty pages",
-		units:     "pages/s",
+		units:     "page/s",
 		context:   "mem.cachestat_dirties",
 		order:     21101,
 		dimension: "dirty",
