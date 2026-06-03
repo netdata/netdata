@@ -5,11 +5,9 @@ package snmptopology
 import (
 	"sort"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 )
 
-func topologyMatchIdentityKeys(match topology.Match) []string {
+func topologyMatchIdentityKeys(match topologyMatch) []string {
 	seen := make(map[string]struct{}, 8)
 	add := func(kind, value string) {
 		value = strings.TrimSpace(value)

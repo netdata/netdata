@@ -15,7 +15,7 @@ exclude_paths:
   - src/aclk/mqtt_websockets/**
   - TODO-netflow-code-organization.md
   - TODO-netflow-plugin-refactor.md
-  - src/go/pkg/topology/engine/parity/README.md
-  - src/go/pkg/topology/engine/parity/evidence/**
+  - src/go/pkg/l2topology/parity/README.md
+  - src/go/pkg/l2topology/parity/evidence/**
   - .agents/**
   - docs/netdata-ai/skills/**

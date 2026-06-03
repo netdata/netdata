@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package topology
+package l2topology
 
 import "time"
 
@@ -54,88 +54,6 @@ type Link struct {
 	Metrics      map[string]any `json:"metrics,omitempty"`
 }
 
-// Presentation defines how the UI should render this topology.
-// Sent in the info response, not in data responses.
-
-type PresentationSummaryField struct {
-	Key     string   `json:"key"`
-	Label   string   `json:"label"`
-	Sources []string `json:"sources"`
-}
-
-type PresentationTableColumn struct {
-	Key   string `json:"key"`
-	Label string `json:"label"`
-	Type  string `json:"type,omitempty"`
-}
-
-type PresentationTable struct {
-	Label        string                    `json:"label"`
-	Source       string                    `json:"source"`
-	BulletSource bool                      `json:"bullet_source,omitempty"`
-	Order        int                       `json:"order,omitempty"`
-	Columns      []PresentationTableColumn `json:"columns"`
-}
-
-type PresentationModalTab struct {
-	ID    string `json:"id"`
-	Label string `json:"label"`
-	Type  string `json:"type,omitempty"`
-}
-
-type PresentationActorType struct {
-	Label           string                       `json:"label"`
-	ColorSlot       string                       `json:"color_slot"`
-	Opacity         float64                      `json:"opacity,omitempty"`
-	Border          bool                         `json:"border"`
-	Role            string                       `json:"role,omitempty"`
-	SizeByLinks     bool                         `json:"size_by_links,omitempty"`
-	ShowPortBullets bool                         `json:"show_port_bullets,omitempty"`
-	IconSVG         string                       `json:"icon_svg,omitempty"`
-	SummaryFields   []PresentationSummaryField   `json:"summary_fields"`
-	Tables          map[string]PresentationTable `json:"tables"`
-	ModalTabs       []PresentationModalTab       `json:"modal_tabs"`
-}
-
-type PresentationLinkType struct {
-	Label     string  `json:"label"`
-	ColorSlot string  `json:"color_slot"`
-	Opacity   float64 `json:"opacity,omitempty"`
-	Width     float64 `json:"width,omitempty"`
-	Dash      bool    `json:"dash,omitempty"`
-}
-
-type PresentationPortType struct {
-	Label     string  `json:"label"`
-	ColorSlot string  `json:"color_slot"`
-	Opacity   float64 `json:"opacity,omitempty"`
-}
-
-type PresentationPortField struct {
-	Key   string `json:"key"`
-	Label string `json:"label"`
-}
-
-type PresentationLegendEntry struct {
-	Type  string `json:"type"`
-	Label string `json:"label"`
-}
-
-type PresentationLegend struct {
-	Actors []PresentationLegendEntry `json:"actors"`
-	Links  []PresentationLegendEntry `json:"links"`
-	Ports  []PresentationLegendEntry `json:"ports,omitempty"`
-}
-
-type Presentation struct {
-	ActorTypes         map[string]PresentationActorType `json:"actor_types"`
-	LinkTypes          map[string]PresentationLinkType  `json:"link_types"`
-	PortTypes          map[string]PresentationPortType  `json:"port_types,omitempty"`
-	PortFields         []PresentationPortField          `json:"port_fields,omitempty"`
-	Legend             PresentationLegend               `json:"legend"`
-	ActorClickBehavior string                           `json:"actor_click_behavior"`
-}
-
 type FlowExporter struct {
 	IP           string `json:"ip,omitempty"`
 	Name         string `json:"name,omitempty"`
@@ -164,7 +82,7 @@ type IPPolicy struct {
 	LiveTopN        *LiveTopN `json:"live_top_n,omitempty"`
 }
 
-type Data struct {
+type Graph struct {
 	SchemaVersion string         `json:"schema_version"`
 	Source        string         `json:"source,omitempty"`
 	Layer         string         `json:"layer,omitempty"`

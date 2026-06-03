@@ -5,13 +5,11 @@ package l2topology
 import (
 	"strings"
 	"time"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 )
 
-type topologyDataBuilder struct {
+type graphBuilder struct {
 	result Result
-	opts   TopologyDataOptions
+	opts   GraphOptions
 
 	schemaVersion string
 	source        string
@@ -28,7 +26,7 @@ type topologyDataBuilder struct {
 	reporterAliases      map[string][]string
 	ifaceSummaryByDevice map[string]topologyDeviceInterfaceSummary
 
-	actors        []topology.Actor
+	actors        []Actor
 	actorIndex    map[string]struct{}
 	actorMACIndex map[string]struct{}
 
@@ -36,7 +34,7 @@ type topologyDataBuilder struct {
 	endpointActors       builtEndpointActors
 	segmentProjection    projectedSegments
 
-	links              []topology.Link
+	links              []Link
 	segmentSuppressed  int
 	unlinkedSuppressed int
 	linkCounts         topologyLinkCounts
@@ -44,8 +42,8 @@ type topologyDataBuilder struct {
 	stats              map[string]any
 }
 
-func newTopologyDataBuilder(result Result, opts TopologyDataOptions) *topologyDataBuilder {
-	builder := &topologyDataBuilder{
+func newGraphBuilder(result Result, opts GraphOptions) *graphBuilder {
+	builder := &graphBuilder{
 		result: result,
 		opts:   opts,
 	}
@@ -82,7 +80,7 @@ func newTopologyDataBuilder(result Result, opts TopologyDataOptions) *topologyDa
 	return builder
 }
 
-func (b *topologyDataBuilder) prepareIndexes() {
+func (b *graphBuilder) prepareIndexes() {
 	b.deviceByID = make(map[string]Device, len(b.result.Devices))
 	b.ifaceByDeviceIndex = make(map[string]Interface, len(b.result.Interfaces))
 	b.ifIndexByDeviceName = make(map[string]int, len(b.result.Interfaces))
@@ -102,7 +100,7 @@ func (b *topologyDataBuilder) prepareIndexes() {
 	}
 }
 
-func (b *topologyDataBuilder) collectBridgeTopologyInputs() {
+func (b *graphBuilder) collectBridgeTopologyInputs() {
 	b.bridgeLinks = collectBridgeLinkRecords(b.result.Adjacencies, b.ifIndexByDeviceName, b.strategyConfig)
 	b.reporterAliases = buildFDBReporterAliases(b.deviceByID, b.ifaceByDeviceIndex)
 	if b.strategyConfig.enableFDBPairwiseLinks {
@@ -131,8 +129,8 @@ func (b *topologyDataBuilder) collectBridgeTopologyInputs() {
 	)
 }
 
-func (b *topologyDataBuilder) buildDeviceActors() {
-	b.actors = make([]topology.Actor, 0, len(b.result.Devices))
+func (b *graphBuilder) buildDeviceActors() {
+	b.actors = make([]Actor, 0, len(b.result.Devices))
 	b.actorIndex = make(map[string]struct{}, len(b.result.Devices)*2)
 	b.actorMACIndex = make(map[string]struct{}, len(b.result.Devices))
 
@@ -163,7 +161,7 @@ func (b *topologyDataBuilder) buildDeviceActors() {
 	}
 }
 
-func (b *topologyDataBuilder) projectAdjacencyTopology() {
+func (b *graphBuilder) projectAdjacencyTopology() {
 	b.projectedAdjacencies = projectAdjacencyLinks(
 		b.result.Adjacencies,
 		b.layer,
@@ -174,7 +172,7 @@ func (b *topologyDataBuilder) projectAdjacencyTopology() {
 	)
 }
 
-func (b *topologyDataBuilder) buildEndpointTopology() {
+func (b *graphBuilder) buildEndpointTopology() {
 	b.endpointActors = buildEndpointActors(
 		b.result.Attachments,
 		b.result.Enrichments,
@@ -187,7 +185,7 @@ func (b *topologyDataBuilder) buildEndpointTopology() {
 	b.actors = append(b.actors, b.endpointActors.actors...)
 }
 
-func (b *topologyDataBuilder) buildSegmentTopology() {
+func (b *graphBuilder) buildSegmentTopology() {
 	b.segmentProjection = projectSegmentTopology(
 		b.result.Attachments,
 		b.result.Adjacencies,
@@ -214,10 +212,10 @@ func (b *topologyDataBuilder) buildSegmentTopology() {
 	b.actors = append(b.actors, b.segmentProjection.actors...)
 }
 
-func (b *topologyDataBuilder) finalizeGraph() {
+func (b *graphBuilder) finalizeGraph() {
 	sortTopologyActors(b.actors)
 
-	b.links = make([]topology.Link, 0, len(b.projectedAdjacencies.links)+len(b.segmentProjection.links))
+	b.links = make([]Link, 0, len(b.projectedAdjacencies.links)+len(b.segmentProjection.links))
 	b.links = append(b.links, b.projectedAdjacencies.links...)
 	b.links = append(b.links, b.segmentProjection.links...)
 	sortTopologyLinks(b.links)
@@ -258,7 +256,7 @@ func (b *topologyDataBuilder) finalizeGraph() {
 	}
 }
 
-func (b *topologyDataBuilder) buildStats() {
+func (b *graphBuilder) buildStats() {
 	b.stats = cloneAnyMap(b.result.Stats)
 	if b.stats == nil {
 		b.stats = make(map[string]any)
@@ -285,8 +283,8 @@ func (b *topologyDataBuilder) buildStats() {
 	b.stats["inference_strategy"] = b.strategyConfig.id
 }
 
-func (b *topologyDataBuilder) data() topology.Data {
-	return topology.Data{
+func (b *graphBuilder) graph() Graph {
+	return Graph{
 		SchemaVersion: b.schemaVersion,
 		Source:        b.source,
 		Layer:         b.layer,

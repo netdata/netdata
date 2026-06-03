@@ -875,7 +875,7 @@ modules:
           description: |
             Provides the agent-wide SNMP topology view built from all currently running topology-enabled SNMP jobs.
 
-            This function reads cached LLDP/CDP data collected by the independent topology refresh loop and returns a topology schema (devices, links, and stats). No additional SNMP requests are triggered when calling this function.
+            This function reads cached LLDP/CDP, bridge, FDB, ARP, and STP data collected by the independent topology refresh loop and returns a netdata.topology.v1 payload with compact actor, link, evidence, and detail tables. No additional SNMP requests are triggered when calling this function.
 
             Use cases:
             - Discover Layer 2 neighbors and link mapping
@@ -969,32 +969,56 @@ modules:
                 - id: "10"
                   name: "10"
           returns:
-            description: Agent-wide topology data in a JSON schema suitable for cross-agent aggregation.
+            description: Agent-wide SNMP topology data using the netdata.topology.v1 schema, suitable for cross-agent aggregation.
             columns:
               - name: schema_version
-                type: integer
+                type: string
                 unit: ""
                 description: Topology schema version.
-              - name: agent_id
-                type: string
+              - name: producer
+                type: object
                 unit: ""
-                description: Netdata Agent or vnode identifier that collected the data.
+                description: Producer metadata identifying the SNMP L2 topology source, plugin, and local node when available.
               - name: collected_at
-                type: string
+                type: datetime
                 unit: ""
                 description: Collection timestamp in RFC 3339 format.
-              - name: devices
-                type: array
+              - name: view
+                type: object
                 unit: ""
-                description: List of devices (local and discovered).
+                description: Topology view metadata, including selected mode and focus parameters when present.
+              - name: dictionaries
+                type: object
+                unit: ""
+                description: Compact-table dictionaries used by actors, links, evidence, and detail tables.
+              - name: types
+                type: object
+                unit: ""
+                description: Actor, link, evidence, table, and presentation type registry.
+              - name: presentation
+                type: object
+                unit: ""
+                description: Graph-level presentation metadata.
+              - name: actors
+                type: object
+                unit: ""
+                description: Compact actor table for managed devices, discovered devices, inferred endpoints, and network segments.
               - name: links
-                type: array
+                type: object
                 unit: ""
-                description: List of discovered links (LLDP/CDP).
+                description: Compact link table for LLDP, CDP, bridge, FDB, STP, ARP, SNMP, and inferred L2 relationships.
+              - name: evidence
+                type: object
+                unit: ""
+                description: Relationship evidence tables backing the rendered links.
+              - name: tables
+                type: object
+                unit: ""
+                description: Actor detail, port, path, and label tables used by topology modals.
               - name: stats
                 type: object
                 unit: ""
-                description: Summary stats (device/link counts).
+                description: Summary stats for collected observations, actors, links, and pruning/filtering decisions.
           performance: |
             Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many discovered neighbors may return many rows
           security: |

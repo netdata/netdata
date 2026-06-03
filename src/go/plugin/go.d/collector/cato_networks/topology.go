@@ -18,9 +18,9 @@ const (
 
 func buildTopology(accountID string, sites map[string]*siteState, order []string, collectedAt time.Time) (*topologyv1.Data, error) {
 	stringsDict := topologyv1.NewStringDictionary()
-	actors := newTopologyTableBuilder(catoTopologyActorColumns()...)
-	links := newTopologyTableBuilder(catoTopologyLinkColumns()...)
-	interfaces := newTopologyTableBuilder(catoTopologyInterfaceColumns()...)
+	actors := topologyv1.NewTableBuilder(catoTopologyActorColumns()...)
+	links := topologyv1.NewTableBuilder(catoTopologyLinkColumns()...)
+	interfaces := topologyv1.NewTableBuilder(catoTopologyInterfaceColumns()...)
 
 	actorIndexes := make(map[string]int, len(order)*2)
 	popSeen := make(map[string]bool)
@@ -49,15 +49,15 @@ func buildTopology(accountID string, sites map[string]*siteState, order []string
 		addBGPPeerTopology(actors, links, stringsDict, actorIndexes, site, siteActorIndex)
 	}
 
-	actorTable, err := actors.table()
+	actorTable, err := actors.Table()
 	if err != nil {
 		return nil, fmt.Errorf("actors table: %w", err)
 	}
-	linkTable, err := links.table()
+	linkTable, err := links.Table()
 	if err != nil {
 		return nil, fmt.Errorf("links table: %w", err)
 	}
-	interfaceTable, err := interfaces.table()
+	interfaceTable, err := interfaces.Table()
 	if err != nil {
 		return nil, fmt.Errorf("interfaces table: %w", err)
 	}
@@ -93,14 +93,14 @@ func buildTopology(accountID string, sites map[string]*siteState, order []string
 		},
 		Stats: map[string]any{
 			"sites": len(order),
-			"links": links.rows(),
+			"links": links.Rows(),
 		},
 	}
 	return data, nil
 }
 
-func addSiteActor(table *topologyTableBuilder, dict *topologyv1.StringDictionary, accountID string, site *siteState, siteActorID string) int {
-	return table.add(
+func addSiteActor(table *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, accountID string, site *siteState, siteActorID string) int {
+	return table.Add(
 		dict.Ref(catofunc.ActorTypeSite),
 		dict.Ref(topologyLayer),
 		siteActorID,
@@ -127,8 +127,8 @@ func addSiteActor(table *topologyTableBuilder, dict *topologyv1.StringDictionary
 	)
 }
 
-func addPopActor(table *topologyTableBuilder, dict *topologyv1.StringDictionary, accountID, popName, popActorID string) int {
-	return table.add(
+func addPopActor(table *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, accountID, popName, popActorID string) int {
+	return table.Add(
 		dict.Ref(catofunc.ActorTypePop),
 		dict.Ref(topologyLayer),
 		popActorID,
@@ -155,8 +155,8 @@ func addPopActor(table *topologyTableBuilder, dict *topologyv1.StringDictionary,
 	)
 }
 
-func addSitePopLink(table *topologyTableBuilder, dict *topologyv1.StringDictionary, site *siteState, siteActor, popActor int) {
-	table.add(
+func addSitePopLink(table *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, site *siteState, siteActor, popActor int) {
+	table.Add(
 		dict.Ref(catofunc.LinkTypeTunnel),
 		siteActor,
 		popActor,
@@ -177,7 +177,7 @@ func addSitePopLink(table *topologyTableBuilder, dict *topologyv1.StringDictiona
 	)
 }
 
-func addDeviceTopology(actors, links *topologyTableBuilder, dict *topologyv1.StringDictionary, actorIndexes map[string]int, popSeen map[string]bool, accountID string, site *siteState) map[string]int {
+func addDeviceTopology(actors, links *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, actorIndexes map[string]int, popSeen map[string]bool, accountID string, site *siteState) map[string]int {
 	deviceActors := make(map[string]int, len(site.Devices))
 
 	sortedDevices := append([]deviceState(nil), site.Devices...)
@@ -218,7 +218,7 @@ func addDeviceTopology(actors, links *topologyTableBuilder, dict *topologyv1.Str
 	return deviceActors
 }
 
-func addDeviceActor(table *topologyTableBuilder, dict *topologyv1.StringDictionary, accountID string, site *siteState, dev deviceState, deviceID, deviceActorID string) int {
+func addDeviceActor(table *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, accountID string, site *siteState, dev deviceState, deviceID, deviceActorID string) int {
 	displayName := deviceDisplayName(dev)
 	if displayName == "" {
 		displayName = deviceID
@@ -227,7 +227,7 @@ func addDeviceActor(table *topologyTableBuilder, dict *topologyv1.StringDictiona
 	if popName == "" {
 		popName = site.PopName
 	}
-	return table.add(
+	return table.Add(
 		dict.Ref(catofunc.ActorTypeDevice),
 		dict.Ref(topologyLayer),
 		deviceActorID,
@@ -254,8 +254,8 @@ func addDeviceActor(table *topologyTableBuilder, dict *topologyv1.StringDictiona
 	)
 }
 
-func addDevicePopLink(table *topologyTableBuilder, dict *topologyv1.StringDictionary, dev deviceState, deviceActor, popActor int) {
-	table.add(
+func addDevicePopLink(table *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, dev deviceState, deviceActor, popActor int) {
+	table.Add(
 		dict.Ref(catofunc.LinkTypeTunnel),
 		deviceActor,
 		popActor,
@@ -276,7 +276,7 @@ func addDevicePopLink(table *topologyTableBuilder, dict *topologyv1.StringDictio
 	)
 }
 
-func addBGPPeerTopology(actors, links *topologyTableBuilder, dict *topologyv1.StringDictionary, actorIndexes map[string]int, site *siteState, siteActor int) {
+func addBGPPeerTopology(actors, links *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, actorIndexes map[string]int, site *siteState, siteActor int) {
 	seen := make(map[string]bool)
 
 	for _, peer := range site.BGPPeers {
@@ -294,12 +294,12 @@ func addBGPPeerTopology(actors, links *topologyTableBuilder, dict *topologyv1.St
 	}
 }
 
-func addBGPPeerActor(table *topologyTableBuilder, dict *topologyv1.StringDictionary, site *siteState, peer bgpPeerState, peerActorID string) int {
+func addBGPPeerActor(table *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, site *siteState, peer bgpPeerState, peerActorID string) int {
 	displayName := peer.RemoteIP
 	if displayName == "" {
 		displayName = peer.RemoteASN
 	}
-	return table.add(
+	return table.Add(
 		dict.Ref(catofunc.ActorTypeBGPPeer),
 		dict.Ref(topologyLayer),
 		peerActorID,
@@ -326,8 +326,8 @@ func addBGPPeerActor(table *topologyTableBuilder, dict *topologyv1.StringDiction
 	)
 }
 
-func addBGPLink(table *topologyTableBuilder, dict *topologyv1.StringDictionary, siteActor, peerActor int, peer bgpPeerState) {
-	table.add(
+func addBGPLink(table *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, siteActor, peerActor int, peer bgpPeerState) {
+	table.Add(
 		dict.Ref(catofunc.LinkTypeBGP),
 		siteActor,
 		peerActor,
@@ -348,7 +348,7 @@ func addBGPLink(table *topologyTableBuilder, dict *topologyv1.StringDictionary, 
 	)
 }
 
-func addInterfaceTopologyTable(interfaces *topologyTableBuilder, siteActor int, deviceActors map[string]int, site *siteState) {
+func addInterfaceTopologyTable(interfaces *topologyv1.TableBuilder, siteActor int, deviceActors map[string]int, site *siteState) {
 	ifaceKeys := make([]string, 0, len(site.Interfaces))
 	for key := range site.Interfaces {
 		ifaceKeys = append(ifaceKeys, key)
@@ -379,7 +379,7 @@ func addInterfaceTopologyTable(interfaces *topologyTableBuilder, siteActor int, 
 				actor = devActor
 			}
 		}
-		interfaces.add(
+		interfaces.Add(
 			actor,
 			iface.ID,
 			iface.Name,
@@ -509,51 +509,4 @@ func catoTopologyInterfaceColumns() []topologyv1.Column {
 		topologyv1.NewColumn("upstream_bandwidth", "int"),
 		topologyv1.NewColumn("downstream_bandwidth", "int"),
 	}
-}
-
-type topologyTableBuilder struct {
-	columns []topologyv1.Column
-	values  [][]any
-	rowsErr error
-}
-
-func newTopologyTableBuilder(columns ...topologyv1.Column) *topologyTableBuilder {
-	return &topologyTableBuilder{
-		columns: append([]topologyv1.Column(nil), columns...),
-		values:  make([][]any, len(columns)),
-	}
-}
-
-func (b *topologyTableBuilder) add(values ...any) int {
-	row := b.rows()
-	if len(values) != len(b.columns) {
-		b.rowsErr = fmt.Errorf("row has %d values for %d columns", len(values), len(b.columns))
-		return row
-	}
-	for i, value := range values {
-		b.values[i] = append(b.values[i], value)
-	}
-	return row
-}
-
-func (b *topologyTableBuilder) rows() int {
-	if len(b.values) == 0 {
-		return 0
-	}
-	return len(b.values[0])
-}
-
-func (b *topologyTableBuilder) table() (topologyv1.Table, error) {
-	if b.rowsErr != nil {
-		return topologyv1.Table{}, b.rowsErr
-	}
-	encodings := make([]topologyv1.ColumnEncoding, len(b.values))
-	for i, values := range b.values {
-		encoding := topologyv1.Values(values...)
-		if encoding.Values == nil {
-			encoding.Values = []any{}
-		}
-		encodings[i] = encoding
-	}
-	return topologyv1.NewTable(b.rows(), b.columns, encodings)
 }

@@ -6,8 +6,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 )
 
 func (b *segmentProjectionBuilder) initializeSegments() bool {
@@ -27,7 +25,7 @@ func (b *segmentProjectionBuilder) initializeSegments() bool {
 		return false
 	}
 
-	b.segmentMatchByID = make(map[string]topology.Match)
+	b.segmentMatchByID = make(map[string]Match)
 	b.segmentByID = make(map[string]*bridgeDomainSegment)
 	for _, domain := range model.domains {
 		if domain == nil {

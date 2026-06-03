@@ -960,7 +960,7 @@ func runPhase2(opts options) error {
 		{
 			name: "lldp",
 			selections: []testSelection{{
-				packagePath: "./pkg/topology/engine",
+				packagePath: "./pkg/l2topology",
 				tests: []string{
 					"TestMatchLLDPLinksEnlinkdPassOrder_Precedence",
 					"TestMatchLLDPLinksEnlinkdPassOrder_FallbackPasses/port-description",
@@ -974,7 +974,7 @@ func runPhase2(opts options) error {
 		{
 			name: "cdp",
 			selections: []testSelection{{
-				packagePath: "./pkg/topology/engine",
+				packagePath: "./pkg/l2topology",
 				tests: []string{
 					"TestMatchCDPLinksEnlinkdPassOrder_DefaultAndParsedTarget",
 					"TestMatchCDPLinksEnlinkdPassOrder_SkipsSelfTarget",
@@ -984,7 +984,7 @@ func runPhase2(opts options) error {
 		{
 			name: "bridge_fdb_arp",
 			selections: []testSelection{{
-				packagePath: "./pkg/topology/engine",
+				packagePath: "./pkg/l2topology",
 				tests: []string{
 					"TestBuildL2ResultFromObservations_FDBAttachments",
 					"TestBuildL2ResultFromObservations_FDBDropsDuplicateMACAcrossPorts",
@@ -997,15 +997,15 @@ func runPhase2(opts options) error {
 			name: "updater",
 			selections: []testSelection{
 				{
-					packagePath: "./pkg/topology/engine",
+					packagePath: "./pkg/l2topology",
 					tests: []string{
 						"TestBuildL2ResultFromObservations_AnnotatesPairMetadata",
 					},
 				},
 				{
-					packagePath: "./pkg/topology/engine",
+					packagePath: "./pkg/l2topology",
 					tests: []string{
-						"TestToTopologyData_MergesPairedAdjacenciesIntoBidirectionalLink",
+						"TestToGraph_MergesPairedAdjacenciesIntoBidirectionalLink",
 					},
 				},
 			},
@@ -1541,12 +1541,12 @@ func runRequiredGoTests() []goTestSummary {
 
 	commands := []testCmd{
 		{
-			packageLabel: "./pkg/topology/engine/parity",
-			args:         []string{"test", "./pkg/topology/engine/parity"},
+			packageLabel: "./pkg/l2topology/parity",
+			args:         []string{"test", "./pkg/l2topology/parity"},
 		},
 		{
-			packageLabel: "./pkg/topology/engine",
-			args:         []string{"test", "./pkg/topology/engine"},
+			packageLabel: "./pkg/l2topology",
+			args:         []string{"test", "./pkg/l2topology"},
 		},
 		{
 			packageLabel: "./tools/topology-parity-evidence",

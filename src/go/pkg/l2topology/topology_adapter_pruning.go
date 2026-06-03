@@ -5,11 +5,9 @@ package l2topology
 import (
 	"sort"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 )
 
-func pruneSegmentArtifacts(actors []topology.Actor, links []topology.Link) ([]topology.Actor, []topology.Link, int) {
+func pruneSegmentArtifacts(actors []Actor, links []Link) ([]Actor, []Link, int) {
 	if len(actors) == 0 || len(links) == 0 {
 		return actors, links, 0
 	}
@@ -132,7 +130,7 @@ func pruneSegmentArtifacts(actors []topology.Actor, links []topology.Link) ([]to
 		return actors, links, 0
 	}
 
-	filteredActors := make([]topology.Actor, 0, len(actors))
+	filteredActors := make([]Actor, 0, len(actors))
 	for _, actor := range actors {
 		key := canonicalTopologyMatchKey(actor.Match)
 		if key == "" {
@@ -145,7 +143,7 @@ func pruneSegmentArtifacts(actors []topology.Actor, links []topology.Link) ([]to
 		filteredActors = append(filteredActors, actor)
 	}
 
-	filteredLinks := make([]topology.Link, 0, len(links))
+	filteredLinks := make([]Link, 0, len(links))
 	for _, link := range links {
 		src := canonicalTopologyMatchKey(link.Src.Match)
 		dst := canonicalTopologyMatchKey(link.Dst.Match)
@@ -186,7 +184,7 @@ type topologyLinkCounts struct {
 	unidirectional int
 }
 
-func summarizeTopologyLinks(links []topology.Link) topologyLinkCounts {
+func summarizeTopologyLinks(links []Link) topologyLinkCounts {
 	var counts topologyLinkCounts
 	for _, link := range links {
 		switch strings.ToLower(strings.TrimSpace(link.Protocol)) {
@@ -211,10 +209,10 @@ func summarizeTopologyLinks(links []topology.Link) topologyLinkCounts {
 }
 
 func pruneManagedOverlapUnlinkedEndpointActors(
-	actors []topology.Actor,
-	links []topology.Link,
+	actors []Actor,
+	links []Link,
 	suppressedEndpointIDs map[string]struct{},
-) ([]topology.Actor, int) {
+) ([]Actor, int) {
 	if len(actors) == 0 || len(suppressedEndpointIDs) == 0 {
 		return actors, 0
 	}
@@ -256,7 +254,7 @@ func pruneManagedOverlapUnlinkedEndpointActors(
 		}
 	}
 
-	filtered := make([]topology.Actor, 0, len(actors))
+	filtered := make([]Actor, 0, len(actors))
 	suppressedCount := 0
 	for _, actor := range actors {
 		if !strings.EqualFold(strings.TrimSpace(actor.ActorType), "endpoint") {

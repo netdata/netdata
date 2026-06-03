@@ -6,8 +6,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 )
 
 var interfaceNameLookupSanitizer = strings.NewReplacer(
@@ -173,7 +171,7 @@ func buildDeviceIdentityKeySetByID(
 	return out
 }
 
-func topologyMatchIdentityKeys(match topology.Match) []string {
+func topologyMatchIdentityKeys(match Match) []string {
 	seen := make(map[string]struct{}, 8)
 	add := func(kind, value string) {
 		value = strings.TrimSpace(value)
@@ -234,7 +232,7 @@ func topologyMatchIdentityKeys(match topology.Match) []string {
 	return keys
 }
 
-func topologyMatchHardwareIdentityKeys(match topology.Match) []string {
+func topologyMatchHardwareIdentityKeys(match Match) []string {
 	seen := make(map[string]struct{}, len(match.MacAddresses)+len(match.ChassisIDs))
 	add := func(value string) {
 		if mac := normalizeMAC(value); mac != "" {
@@ -261,7 +259,7 @@ func topologyMatchHardwareIdentityKeys(match topology.Match) []string {
 }
 
 func endpointMatchOverlappingKnownDeviceIDs(
-	endpointMatch topology.Match,
+	endpointMatch Match,
 	deviceIdentityByID map[string]topologyIdentityKeySet,
 ) []string {
 	if len(deviceIdentityByID) == 0 {

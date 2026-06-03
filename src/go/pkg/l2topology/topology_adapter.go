@@ -6,12 +6,10 @@ import (
 	"net/netip"
 	"strings"
 	"time"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 )
 
-// TopologyDataOptions controls conversion from Result to topology.Data.
-type TopologyDataOptions struct {
+// GraphOptions controls conversion from Result to the internal graph projection.
+type GraphOptions struct {
 	SchemaVersion             string
 	Source                    string
 	Layer                     string
@@ -56,8 +54,8 @@ type endpointActorAccumulator struct {
 }
 
 type projectedSegments struct {
-	actors                        []topology.Actor
-	links                         []topology.Link
+	actors                        []Actor
+	links                         []Link
 	linksFdb                      int
 	bidirectionalCount            int
 	endpointLinksCandidates       int
@@ -221,9 +219,9 @@ func topologyInferenceStrategyConfigFor(strategy string) topologyInferenceStrate
 	}
 }
 
-// ToTopologyData converts an engine result to the shared topology schema.
-func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
-	builder := newTopologyDataBuilder(result, opts)
+// ToGraph converts an engine result to the internal graph projection.
+func ToGraph(result Result, opts GraphOptions) Graph {
+	builder := newGraphBuilder(result, opts)
 	builder.prepareIndexes()
 	builder.collectBridgeTopologyInputs()
 	builder.buildDeviceActors()
@@ -232,5 +230,5 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 	builder.buildSegmentTopology()
 	builder.finalizeGraph()
 	builder.buildStats()
-	return builder.data()
+	return builder.graph()
 }

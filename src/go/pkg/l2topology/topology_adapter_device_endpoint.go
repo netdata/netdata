@@ -5,11 +5,9 @@ package l2topology
 import (
 	"strconv"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 )
 
-func adjacencySideToEndpoint(dev Device, port string, ifIndexByDeviceName map[string]int, ifaceByDeviceIndex map[string]Interface) topology.LinkEndpoint {
+func adjacencySideToEndpoint(dev Device, port string, ifIndexByDeviceName map[string]int, ifaceByDeviceIndex map[string]Interface) LinkEndpoint {
 	match := buildDeviceActorMatch(dev, nil)
 
 	port = strings.TrimSpace(port)
@@ -58,7 +56,7 @@ func adjacencySideToEndpoint(dev Device, port string, ifIndexByDeviceName map[st
 		}
 	}
 
-	return topology.LinkEndpoint{
+	return LinkEndpoint{
 		Match:      match,
 		Attributes: pruneTopologyAttributes(attrs),
 	}

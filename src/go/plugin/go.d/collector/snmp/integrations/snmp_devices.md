@@ -652,7 +652,7 @@ Current BGP peer and peer-family details from cached normalized SNMP data. Each 
 
 Provides the agent-wide SNMP topology view built from all currently running topology-enabled SNMP jobs.
 
-This function reads cached LLDP/CDP data collected by the independent topology refresh loop and returns a topology schema (devices, links, and stats). No additional SNMP requests are triggered when calling this function.
+This function reads cached LLDP/CDP, bridge, FDB, ARP, and STP data collected by the independent topology refresh loop and returns a netdata.topology.v1 payload with compact actor, link, evidence, and detail tables. No additional SNMP requests are triggered when calling this function.
 
 Use cases:
 - Discover Layer 2 neighbors and link mapping
@@ -684,16 +684,22 @@ No additional configuration is required.
 
 #### Returns
 
-Agent-wide topology data in a JSON schema suitable for cross-agent aggregation.
+Agent-wide SNMP topology data using the netdata.topology.v1 schema, suitable for cross-agent aggregation.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
-| schema_version | integer |  |  | Topology schema version. |
-| agent_id | string |  |  | Netdata Agent or vnode identifier that collected the data. |
-| collected_at | string |  |  | Collection timestamp in RFC 3339 format. |
-| devices | array |  |  | List of devices (local and discovered). |
-| links | array |  |  | List of discovered links (LLDP/CDP). |
-| stats | object |  |  | Summary stats (device/link counts). |
+| schema_version | string |  |  | Topology schema version. |
+| producer | object |  |  | Producer metadata identifying the SNMP L2 topology source, plugin, and local node when available. |
+| collected_at | datetime |  |  | Collection timestamp in RFC 3339 format. |
+| view | object |  |  | Topology view metadata, including selected mode and focus parameters when present. |
+| dictionaries | object |  |  | Compact-table dictionaries used by actors, links, evidence, and detail tables. |
+| types | object |  |  | Actor, link, evidence, table, and presentation type registry. |
+| presentation | object |  |  | Graph-level presentation metadata. |
+| actors | object |  |  | Compact actor table for managed devices, discovered devices, inferred endpoints, and network segments. |
+| links | object |  |  | Compact link table for LLDP, CDP, bridge, FDB, STP, ARP, SNMP, and inferred L2 relationships. |
+| evidence | object |  |  | Relationship evidence tables backing the rendered links. |
+| tables | object |  |  | Actor detail, port, path, and label tables used by topology modals. |
+| stats | object |  |  | Summary stats for collected observations, actors, links, and pruning/filtering decisions. |
 
 ### Licenses
 

@@ -2,7 +2,7 @@
 
 ## Scope
 - Validate topology engine parity against imported Enlinkd fixtures and assertion inventories.
-- Evidence files live in `src/go/pkg/topology/engine/parity/evidence`.
+- Evidence files live in `src/go/pkg/l2topology/parity/evidence`.
 
 ## Prerequisites
 - Upstream checkout available at `/tmp/topology-library-repos/enlinkd`.
@@ -54,7 +54,7 @@ Outputs:
 
 ## Run Go Test Gates
 ```bash
-go test ./pkg/topology/engine/... ./plugin/go.d/collector/snmp ./tools/topology-parity-evidence -count=1
+go test ./pkg/l2topology/... ./plugin/go.d/collector/snmp ./tools/topology-parity-evidence -count=1
 ```
 
 Expected:
@@ -67,7 +67,7 @@ Expected:
 2. `suite` has failed scenarios:
    - Open `parity-summary.json`.
    - Inspect failing scenario IDs and manifests.
-   - Re-run targeted tests in `./pkg/topology/engine/parity`.
+   - Re-run targeted tests in `./pkg/l2topology/parity`.
 3. Coverage totals regress:
    - Check `assertion-mapping.csv` uniqueness and status values.
    - Reconcile `not-applicable-approved.csv` with mapping rows using `not-applicable-approved`.

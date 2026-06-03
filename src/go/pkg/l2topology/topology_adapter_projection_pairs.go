@@ -5,8 +5,6 @@ package l2topology
 import (
 	"strings"
 	"time"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 )
 
 func projectAdjacencyLinks(
@@ -18,7 +16,7 @@ func projectAdjacencyLinks(
 	ifaceByDeviceIndex map[string]Interface,
 ) projectedLinks {
 	out := projectedLinks{
-		links: make([]topology.Link, 0, len(adjacencies)),
+		links: make([]Link, 0, len(adjacencies)),
 	}
 	if len(adjacencies) == 0 {
 		return out
@@ -166,11 +164,11 @@ func backfillPairGroupMissingEndpointPorts(entries []*builtAdjacencyLink) {
 	}
 }
 
-func endpointHasKnownCanonicalPort(endpoint topology.LinkEndpoint) bool {
+func endpointHasKnownCanonicalPort(endpoint LinkEndpoint) bool {
 	return strings.TrimSpace(topologyCanonicalPortName(endpoint.Attributes)) != ""
 }
 
-func backfillEndpointPortFromPeer(endpoint topology.LinkEndpoint, peer topology.LinkEndpoint) topology.LinkEndpoint {
+func backfillEndpointPortFromPeer(endpoint LinkEndpoint, peer LinkEndpoint) LinkEndpoint {
 	if endpointHasKnownCanonicalPort(endpoint) || !endpointHasKnownCanonicalPort(peer) {
 		return endpoint
 	}
@@ -220,14 +218,14 @@ func adjacencyToTopologyLink(
 	deviceByID map[string]Device,
 	ifIndexByDeviceName map[string]int,
 	ifaceByDeviceIndex map[string]Interface,
-) topology.Link {
+) Link {
 	src := adjacencySideToEndpoint(deviceByID[adj.SourceID], adj.SourcePort, ifIndexByDeviceName, ifaceByDeviceIndex)
 	dst := adjacencySideToEndpoint(deviceByID[adj.TargetID], adj.TargetPort, ifIndexByDeviceName, ifaceByDeviceIndex)
 	if rawAddress := strings.TrimSpace(adj.Labels["remote_address_raw"]); rawAddress != "" {
 		dst.Match.IPAddresses = uniqueTopologyStrings(append(dst.Match.IPAddresses, rawAddress))
 	}
 
-	link := topology.Link{
+	link := Link{
 		Layer:        layer,
 		Protocol:     protocol,
 		LinkType:     protocol,
@@ -286,7 +284,7 @@ func buildPairedLinkMetrics(sourceLabels, targetLabels map[string]string) map[st
 	return metrics
 }
 
-func mergeEndpointIPHints(base, extra topology.LinkEndpoint) topology.LinkEndpoint {
+func mergeEndpointIPHints(base, extra LinkEndpoint) LinkEndpoint {
 	if len(extra.Match.IPAddresses) == 0 {
 		return base
 	}

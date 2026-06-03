@@ -3,10 +3,8 @@
 package l2topology
 
 import (
-	"testing"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 func TestCanonicalTopologyKeyHelpers_NormalizeDeterministically(t *testing.T) {
@@ -21,12 +19,12 @@ func TestCanonicalTopologyKeyHelpers_NormalizeDeterministically(t *testing.T) {
 }
 
 func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
-	actors := []topology.Actor{
+	actors := []Actor{
 		{
 			ActorType: "device",
 			Layer:     "l2",
 			Source:    "snmp",
-			Match: topology.Match{
+			Match: Match{
 				MacAddresses: []string{"00:11:22:33:44:55"},
 				Hostnames:    []string{"switch-a"},
 			},
@@ -35,7 +33,7 @@ func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
 			ActorType: "device",
 			Layer:     "l2",
 			Source:    "snmp",
-			Match: topology.Match{
+			Match: Match{
 				MacAddresses: []string{"00-11-22-33-44-55"},
 				Hostnames:    []string{"switch-a-duplicate"},
 			},
@@ -44,7 +42,7 @@ func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
 			ActorType: "endpoint",
 			Layer:     "l2",
 			Source:    "derived",
-			Match: topology.Match{
+			Match: Match{
 				IPAddresses: []string{"10.0.0.2"},
 			},
 		},
@@ -52,22 +50,22 @@ func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
 			ActorType: "segment",
 			Layer:     "l2",
 			Source:    "derived",
-			Match:     topology.Match{},
+			Match:     Match{},
 		},
 	}
-	links := []topology.Link{
+	links := []Link{
 		{
 			Protocol:  "lldp",
 			Direction: "outbound",
 			State:     "up",
-			Src: topology.LinkEndpoint{
-				Match: topology.Match{MacAddresses: []string{"00:11:22:33:44:55"}},
+			Src: LinkEndpoint{
+				Match: Match{MacAddresses: []string{"00:11:22:33:44:55"}},
 				Attributes: map[string]any{
 					"if_name": "eth0",
 				},
 			},
-			Dst: topology.LinkEndpoint{
-				Match: topology.Match{IPAddresses: []string{"10.0.0.2"}},
+			Dst: LinkEndpoint{
+				Match: Match{IPAddresses: []string{"10.0.0.2"}},
 				Attributes: map[string]any{
 					"if_name": "eth9",
 				},
@@ -77,14 +75,14 @@ func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
 			Protocol:  "lldp",
 			Direction: "outbound",
 			State:     "up",
-			Src: topology.LinkEndpoint{
-				Match: topology.Match{IPAddresses: []string{"10.0.0.2"}},
+			Src: LinkEndpoint{
+				Match: Match{IPAddresses: []string{"10.0.0.2"}},
 				Attributes: map[string]any{
 					"if_name": "eth9",
 				},
 			},
-			Dst: topology.LinkEndpoint{
-				Match: topology.Match{MacAddresses: []string{"00:11:22:33:44:55"}},
+			Dst: LinkEndpoint{
+				Match: Match{MacAddresses: []string{"00:11:22:33:44:55"}},
 				Attributes: map[string]any{
 					"if_name": "eth0",
 				},
@@ -119,7 +117,7 @@ func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
 }
 
 func TestEnrichTopologyPortTablesWithLinkCounts_AddsCountsToMatchingPorts(t *testing.T) {
-	actors := []topology.Actor{
+	actors := []Actor{
 		{
 			ActorID: "device-a",
 			Tables: map[string][]map[string]any{
@@ -138,18 +136,18 @@ func TestEnrichTopologyPortTablesWithLinkCounts_AddsCountsToMatchingPorts(t *tes
 			},
 		},
 	}
-	links := []topology.Link{
+	links := []Link{
 		{
 			SrcActorID: "device-a",
 			DstActorID: "device-b",
-			Src:        topology.LinkEndpoint{Attributes: map[string]any{"if_name": "eth0"}},
-			Dst:        topology.LinkEndpoint{Attributes: map[string]any{"if_name": "xe-0/0/0"}},
+			Src:        LinkEndpoint{Attributes: map[string]any{"if_name": "eth0"}},
+			Dst:        LinkEndpoint{Attributes: map[string]any{"if_name": "xe-0/0/0"}},
 		},
 		{
 			SrcActorID: "device-a",
 			DstActorID: "device-b",
-			Src:        topology.LinkEndpoint{Attributes: map[string]any{"if_name": "eth0"}},
-			Dst:        topology.LinkEndpoint{Attributes: map[string]any{"if_name": "xe-0/0/0"}},
+			Src:        LinkEndpoint{Attributes: map[string]any{"if_name": "eth0"}},
+			Dst:        LinkEndpoint{Attributes: map[string]any{"if_name": "xe-0/0/0"}},
 		},
 	}
 

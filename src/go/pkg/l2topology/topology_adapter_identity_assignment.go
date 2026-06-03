@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 )
 
 type topologyMatchLookup struct {
@@ -16,16 +14,16 @@ type topologyMatchLookup struct {
 }
 
 type topologyActorSortEntry struct {
-	actor topology.Actor
+	actor Actor
 	key   string
 }
 
 type topologyLinkSortEntry struct {
-	link topology.Link
+	link Link
 	key  string
 }
 
-func canonicalTopologyMatchKey(match topology.Match) string {
+func canonicalTopologyMatchKey(match Match) string {
 	if key := canonicalTopologyPrimaryMACKey(match); key != "" {
 		return "mac:" + key
 	}
@@ -50,7 +48,7 @@ func canonicalTopologyMatchKey(match topology.Match) string {
 	return ""
 }
 
-func assignTopologyActorIDsAndLinkEndpoints(actors []topology.Actor, links []topology.Link) {
+func assignTopologyActorIDsAndLinkEndpoints(actors []Actor, links []Link) {
 	if len(actors) == 0 {
 		return
 	}
@@ -95,7 +93,7 @@ func assignTopologyActorIDsAndLinkEndpoints(actors []topology.Actor, links []top
 	}
 }
 
-func newTopologyMatchLookup(match topology.Match) topologyMatchLookup {
+func newTopologyMatchLookup(match Match) topologyMatchLookup {
 	return topologyMatchLookup{
 		canonical:    canonicalTopologyMatchKey(match),
 		identityKeys: topologyMatchIdentityKeys(match),
@@ -131,7 +129,7 @@ func resolveTopologyEndpointActorID(lookup topologyMatchLookup, byCanonicalMatch
 	return ""
 }
 
-func enrichTopologyPortTablesWithLinkCounts(actors []topology.Actor, links []topology.Link) {
+func enrichTopologyPortTablesWithLinkCounts(actors []Actor, links []Link) {
 	type actorPort struct {
 		actorID  string
 		portName string
@@ -174,7 +172,7 @@ func enrichTopologyPortTablesWithLinkCounts(actors []topology.Actor, links []top
 	}
 }
 
-func canonicalTopologyPrimaryMACKey(match topology.Match) string {
+func canonicalTopologyPrimaryMACKey(match Match) string {
 	set := make(map[string]struct{}, len(match.MacAddresses)+len(match.ChassisIDs))
 	for _, value := range match.MacAddresses {
 		if mac := normalizeMAC(value); mac != "" {
@@ -268,7 +266,7 @@ func canonicalTopologyStringListKey(values []string) string {
 	return strings.Join(out, ",")
 }
 
-func topologyLinkSortKey(link topology.Link) string {
+func topologyLinkSortKey(link Link) string {
 	return strings.Join([]string{
 		link.Protocol,
 		link.Direction,
@@ -284,7 +282,7 @@ func topologyLinkSortKey(link topology.Link) string {
 	}, keySep)
 }
 
-func topologyActorSortKey(actor topology.Actor) string {
+func topologyActorSortKey(actor Actor) string {
 	return strings.Join([]string{
 		actor.ActorType,
 		canonicalTopologyMatchKey(actor.Match),
@@ -304,7 +302,7 @@ func topologyAttrKey(attrs map[string]any, key string) string {
 	return fmt.Sprint(value)
 }
 
-func sortTopologyActors(actors []topology.Actor) {
+func sortTopologyActors(actors []Actor) {
 	if len(actors) < 2 {
 		return
 	}
@@ -326,7 +324,7 @@ func sortTopologyActors(actors []topology.Actor) {
 	}
 }
 
-func sortTopologyLinks(links []topology.Link) {
+func sortTopologyLinks(links []Link) {
 	if len(links) < 2 {
 		return
 	}

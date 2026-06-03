@@ -6,12 +6,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 )
 
 func collectTopologyEndpointIDs(
-	endpointMatchByID map[string]topology.Match,
+	endpointMatchByID map[string]Match,
 	endpointLabelsByID map[string]map[string]string,
 	endpointSegmentCandidates map[string][]string,
 	rawFDBObservations fdbReporterObservation,

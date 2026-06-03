@@ -63,7 +63,7 @@ Required helpers:
 
 Likely homes:
 
-- Go: `src/go/pkg/topology/` or `src/go/pkg/funcapi/`
+- Go: `src/go/pkg/topology/v1` or `src/go/pkg/funcapi/`
 - C: small helper module for network-viewer, or a local builder until a shared
   C helper is justified
 - Rust: SDK helper if a Rust topology producer is added
@@ -121,23 +121,17 @@ Likely homes:
 `topology:snmp`:
 
 - producer paths: `src/go/plugin/go.d/collector/snmp_topology/` and
-  `src/go/pkg/topology/`;
-- the Function handler now adapts the current SNMP topology snapshot to
+  `src/go/pkg/l2topology/`;
+- the L2 engine builds an internal, non-payload `l2topology.Graph` projection
+  from `l2topology.Result`;
+- the Function handler adapts the current SNMP topology snapshot to
   `netdata.topology.v1` through
-  `src/go/plugin/go.d/collector/snmp_topology/func_topology_v1.go`, while the
-  deeper engine still builds the older shared Go topology model;
-- the older shared Go topology data model stores top-level actor/link arrays at
-  `src/go/pkg/topology/types.go:167`;
-- older actor tables are nested under actor rows at
-  `src/go/pkg/topology/types.go:24`;
-- the older link model carries `Direction`, `Src`, `Dst`, and metrics at
-  `src/go/pkg/topology/types.go:42`;
-- the older presentation table metadata still uses `Source` only at
-  `src/go/pkg/topology/types.go:72`, with SNMP ports/links examples at
-  `src/go/plugin/go.d/collector/snmp_topology/func_topology_presentation_schema.go:29`;
+  `src/go/plugin/go.d/collector/snmp_topology/func_topology_v1.go`;
+- the old method-level Go presentation adapter has been retired; presentation
+  metadata is emitted in the v1 payload type registry and `data.presentation`;
 - current L2 emission uses directions such as `bidirectional` and
-  `unidirectional` at `src/go/pkg/topology/engine/topology_adapter_segments_builder_emit.go:60`
-  and `src/go/pkg/topology/engine/topology_adapter_projection_pairs.go:230`;
+  `unidirectional` at `src/go/pkg/l2topology/topology_adapter_segments_builder_emit.go:60`
+  and `src/go/pkg/l2topology/topology_adapter_projection_pairs.go:230`;
 - migration target: use `observed_bidirectional` or unordered aggregation policy
   where discovery direction is noise, preserve LLDP/CDP/FDB/ARP/STP evidence,
   keep interface inventory as actor detail/inventory, and move metric query
@@ -145,12 +139,12 @@ Likely homes:
 
 vSphere:
 
-- producer path is in a separate PR worktree and must be updated in place only
-  after telling the user;
-- migration target: use stable managed object ids for actor identity, model
-  containment as hierarchical/ownership links, model VM-host/network/datastore
-  relationships as graph links plus evidence where needed, and expose
-  utilization/state through overlay templates/refs.
+- producer path: `src/go/plugin/go.d/collector/vsphere/`;
+- the Function emits `netdata.topology.v1` directly from the Go collector;
+- actor identity uses the vSphere managed-object type plus managed-object id;
+- inventory containment is modeled as hierarchical ownership links;
+- VM-to-host and host/VM-to-network relationships are graph links with typed
+  evidence.
 
 ### Cloud Frontend
 
@@ -266,7 +260,7 @@ Current state:
 Producer paths:
 
 - `src/go/plugin/go.d/collector/snmp_topology/`
-- `src/go/pkg/topology/engine/`
+- `src/go/pkg/l2topology/`
 
 Required behavior:
 
@@ -290,20 +284,23 @@ Current state:
 
 - initial Function payload migration is implemented through a v1 adapter in
   `src/go/plugin/go.d/collector/snmp_topology/func_topology_v1.go`;
+- L2 graph synthesis is internal to `src/go/pkg/l2topology` and uses
+  `l2topology.Graph`, not the legacy Go topology payload package;
 - the adapter emits compact actor, link, evidence, actor metadata, and
   actor-detail tables and preserves nested custom actor cells with `json`
   columns where needed;
 - modal-composition producer work now emits `actor_labels`, promoted
   scalar/count actor fields, stable `actor_ports` rows, structured endpoint
-  evidence, and modal recipes. Remaining SNMP work is to migrate metric lookup
-  fragments into first-class overlay templates/refs instead of only preserving
-  them in actor/detail data, plus integrated UI/aggregator QA.
+  evidence, modal recipes, and payload-level presentation metadata. Remaining
+  SNMP work is to migrate metric lookup fragments into first-class overlay
+  templates/refs instead of only preserving them in actor/detail data, plus
+  integrated UI/aggregator QA.
 
 ### vSphere Topology
 
-Producer worktree:
+Producer path:
 
-- the separate vSphere topology worktree used for that PR
+- `src/go/plugin/go.d/collector/vsphere/`
 
 Required behavior:
 
@@ -314,10 +311,17 @@ Required behavior:
   as graph links plus typed evidence where needed;
 - use overlay templates for refreshable utilization/state metrics.
 
-Coordination constraint:
+Current state:
 
-- do not edit the vSphere worktree before telling the user, because another
-  agent is working in that directory.
+- vSphere emits `netdata.topology.v1` directly from
+  `src/go/plugin/go.d/collector/vsphere/func_topology.go`;
+- the producer builds compact actor, link, evidence, actor-detail, and
+  `actor_labels` tables with `src/go/pkg/topology/v1`;
+- actor identity uses vSphere managed-object type plus managed-object id;
+- containment, VM-to-host, and network relationships have explicit link types,
+  direction roles, and evidence types;
+- the old method-level Go presentation adapter is retired. Presentation
+  metadata lives in the v1 type registry and `data.presentation`.
 
 ## Cloud Frontend Scope
 

@@ -7,14 +7,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 )
 
 type builtEndpointActors struct {
-	actors             []topology.Actor
+	actors             []Actor
 	count              int
-	matchByEndpointID  map[string]topology.Match
+	matchByEndpointID  map[string]Match
 	labelsByEndpointID map[string]map[string]string
 }
 
@@ -92,7 +90,7 @@ func buildEndpointActors(
 
 	if len(accumulators) == 0 {
 		return builtEndpointActors{
-			matchByEndpointID:  map[string]topology.Match{},
+			matchByEndpointID:  map[string]Match{},
 			labelsByEndpointID: map[string]map[string]string{},
 		}
 	}
@@ -103,9 +101,9 @@ func buildEndpointActors(
 	}
 	sort.Strings(keys)
 
-	actors := make([]topology.Actor, 0, len(keys))
+	actors := make([]Actor, 0, len(keys))
 	endpointCount := 0
-	matchByEndpointID := make(map[string]topology.Match, len(keys))
+	matchByEndpointID := make(map[string]Match, len(keys))
 	labelsByEndpointID := make(map[string]map[string]string, len(keys))
 	for _, endpointID := range keys {
 		acc := accumulators[endpointID]
@@ -113,7 +111,7 @@ func buildEndpointActors(
 			continue
 		}
 
-		match := topology.Match{}
+		match := Match{}
 		if acc.mac != "" {
 			match.ChassisIDs = []string{acc.mac}
 			match.MacAddresses = []string{acc.mac}
@@ -145,7 +143,7 @@ func buildEndpointActors(
 			attrs["vendor_derived_confidence"] = "low"
 			attrs["vendor_derived_match_prefix"] = derivedPrefix
 		}
-		actor := topology.Actor{
+		actor := Actor{
 			ActorType:  "endpoint",
 			Layer:      layer,
 			Source:     source,

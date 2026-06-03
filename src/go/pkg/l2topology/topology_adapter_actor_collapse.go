@@ -5,11 +5,9 @@ package l2topology
 import (
 	"sort"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 )
 
-func collapseActorsByIP(actors []topology.Actor) []topology.Actor {
+func collapseActorsByIP(actors []Actor) []Actor {
 	if len(actors) <= 1 {
 		return actors
 	}
@@ -98,7 +96,7 @@ func collapseActorsByIP(actors []topology.Actor) []topology.Actor {
 		actors[rep] = merged
 	}
 
-	out := make([]topology.Actor, 0, len(actors))
+	out := make([]Actor, 0, len(actors))
 	for idx, actor := range actors {
 		if !keep[idx] {
 			continue
@@ -108,12 +106,12 @@ func collapseActorsByIP(actors []topology.Actor) []topology.Actor {
 	return out
 }
 
-func eliminateNonIPInferredActors(actors []topology.Actor, links []topology.Link) ([]topology.Actor, []topology.Link) {
+func eliminateNonIPInferredActors(actors []Actor, links []Link) ([]Actor, []Link) {
 	if len(actors) == 0 {
 		return actors, links
 	}
 	removedIdentityKeys := make(map[string]struct{})
-	filteredActors := make([]topology.Actor, 0, len(actors))
+	filteredActors := make([]Actor, 0, len(actors))
 	for _, actor := range actors {
 		if topologyActorIsInferred(actor) && len(normalizedTopologyActorIPs(actor)) == 0 {
 			for _, key := range topologyMatchIdentityKeys(actor.Match) {
@@ -127,7 +125,7 @@ func eliminateNonIPInferredActors(actors []topology.Actor, links []topology.Link
 		return actors, links
 	}
 
-	filteredLinks := make([]topology.Link, 0, len(links))
+	filteredLinks := make([]Link, 0, len(links))
 	for _, link := range links {
 		srcKeys := topologyMatchIdentityKeys(link.Src.Match)
 		dstKeys := topologyMatchIdentityKeys(link.Dst.Match)
@@ -154,7 +152,7 @@ func topologyIdentityKeysOverlap(keys []string, set map[string]struct{}) bool {
 	return false
 }
 
-func normalizedTopologyActorIPs(actor topology.Actor) []string {
+func normalizedTopologyActorIPs(actor Actor) []string {
 	if len(actor.Match.IPAddresses) == 0 {
 		return nil
 	}
@@ -175,7 +173,7 @@ func normalizedTopologyActorIPs(actor topology.Actor) []string {
 	return out
 }
 
-func compareTopologyActorCollapsePriority(left, right topology.Actor) int {
+func compareTopologyActorCollapsePriority(left, right Actor) int {
 	leftDevice := IsDeviceActorType(left.ActorType)
 	rightDevice := IsDeviceActorType(right.ActorType)
 	if leftDevice != rightDevice {
@@ -197,7 +195,7 @@ func compareTopologyActorCollapsePriority(left, right topology.Actor) int {
 	return strings.Compare(leftKey, rightKey)
 }
 
-func mergeTopologyActorMatch(base, other topology.Match) topology.Match {
+func mergeTopologyActorMatch(base, other Match) Match {
 	base.ChassisIDs = mergeTopologyStringLists(base.ChassisIDs, other.ChassisIDs)
 	base.MacAddresses = mergeTopologyStringLists(base.MacAddresses, other.MacAddresses)
 	base.IPAddresses = mergeTopologyStringLists(base.IPAddresses, other.IPAddresses)
@@ -274,7 +272,7 @@ func mergeTopologyActorAttributes(base, extra map[string]any) map[string]any {
 	return base
 }
 
-func topologyActorIsInferred(actor topology.Actor) bool {
+func topologyActorIsInferred(actor Actor) bool {
 	if strings.EqualFold(strings.TrimSpace(actor.ActorType), "endpoint") {
 		return true
 	}

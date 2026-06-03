@@ -6,11 +6,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 )
 
-func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, layer string, source string) (topology.Match, topology.Actor) {
+func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, layer string, source string) (Match, Actor) {
 	parentDevices := make(map[string]struct{})
 	ifNames := make(map[string]struct{})
 	ifIndexes := make(map[string]struct{})
@@ -36,7 +34,7 @@ func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, lay
 		}
 	}
 
-	match := topology.Match{
+	match := Match{
 		Hostnames: []string{"segment:" + segmentID},
 	}
 
@@ -60,7 +58,7 @@ func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, lay
 		}
 	}
 
-	actor := topology.Actor{
+	actor := Actor{
 		ActorType:  "segment",
 		Layer:      layer,
 		Source:     source,
@@ -74,36 +72,36 @@ func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, lay
 	return match, actor
 }
 
-func endpointMatchFromID(endpointID string) topology.Match {
+func endpointMatchFromID(endpointID string) Match {
 	kind, value, ok := strings.Cut(strings.TrimSpace(endpointID), ":")
 	if !ok {
-		return topology.Match{}
+		return Match{}
 	}
 	switch strings.ToLower(strings.TrimSpace(kind)) {
 	case "mac":
 		mac := normalizeMAC(value)
 		if mac == "" {
-			return topology.Match{}
+			return Match{}
 		}
-		return topology.Match{
+		return Match{
 			ChassisIDs:   []string{mac},
 			MacAddresses: []string{mac},
 		}
 	case "ip":
 		addr := normalizeTopologyIP(value)
 		if addr == "" {
-			return topology.Match{}
+			return Match{}
 		}
-		return topology.Match{
+		return Match{
 			IPAddresses: []string{addr},
 		}
 	}
-	return topology.Match{}
+	return Match{}
 }
 
 func annotateEndpointActorsWithDirectOwners(
-	actors []topology.Actor,
-	endpointMatchByID map[string]topology.Match,
+	actors []Actor,
+	endpointMatchByID map[string]Match,
 	owners map[string]fdbEndpointOwner,
 	deviceByID map[string]Device,
 ) {

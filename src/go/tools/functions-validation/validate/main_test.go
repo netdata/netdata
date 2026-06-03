@@ -19,7 +19,7 @@ func TestTopologyV1FixturesValidate(t *testing.T) {
 		t.Fatalf("glob fixtures: %v", err)
 	}
 	if len(fixtures) != 4 {
-		t.Fatalf("expected 4 topology fixtures, got %d: %v", len(fixtures), fixtures)
+		t.Fatalf("expected 4 topology fixtures, got %d", len(fixtures))
 	}
 
 	for _, fixture := range fixtures {
