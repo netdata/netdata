@@ -952,8 +952,15 @@ underlying canonical table.
 Topology should be refreshable without recomputing topology. Overlay templates
 define how the UI or Cloud can query metrics for an actor or link.
 
-Templates live once in the type registry. Overlay refs carry only template ids
-and parameters.
+Templates live once in the type registry. Overlay refs carry only template ids,
+one owner reference, and selector parameters.
+
+For `provider: "netdata.metrics"`, selector params are interpreted by the
+consumer:
+
+- `node_id` scopes the metric query to a node;
+- `collect_job` maps to the chart label `_collect_job`;
+- other params map to same-named chart labels.
 
 Example:
 
@@ -965,7 +972,7 @@ Example:
         "provider": "netdata.metrics",
         "contexts": ["snmp.interface_traffic"],
         "dimensions": ["received", "sent"],
-        "selector_params": ["node_id", "interface_id"],
+        "selector_params": ["node_id", "if_name"],
         "merge": {
           "refs": "set",
           "values": "sum"
@@ -977,17 +984,37 @@ Example:
     "refs": {
       "rows": 1,
       "columns": [
-        {"id": "owner_kind", "type": "string_ref", "dictionary": "strings"},
-        {"id": "owner", "type": "link_ref"},
         {"id": "template", "type": "string_ref", "dictionary": "strings"},
+        {"id": "link", "type": "link_ref", "role": "reference"},
         {"id": "node_id", "type": "string_ref", "dictionary": "strings"},
-        {"id": "interface_id", "type": "string_ref", "dictionary": "strings"}
+        {"id": "if_name", "type": "string_ref", "dictionary": "strings"}
       ],
-      "values": []
+      "values": [
+        {"codec": "const", "value": 0},
+        {"codec": "const", "value": 0},
+        {"codec": "const", "value": 1},
+        {"codec": "const", "value": 2}
+      ]
     }
   }
 }
 ```
+
+Overlay refs use schema ids for column names, so selector params and ref column
+ids must start with a letter and contain only letters, digits, `_`, `.`, `:`,
+or `-`. The `template` column identifies the template by name. Exactly one
+convention owner column must be present: `actor` with type `actor_ref` or `link`
+with type `link_ref`. No other `actor_ref` or `link_ref` columns are valid in
+overlay refs. Every row must have a non-null value in the owner column. Each
+selector param used by a referenced template must have a same-named refs-table
+column.
+Selector params must not use the reserved refs-table convention column names
+`template`, `actor`, or `link`.
+
+The `template` column and selector-param columns required by a row's resolved
+template must be `string` or `string_ref`. Required selector-param values must
+resolve to non-empty strings. Selector-param columns used by other templates may
+be nullable and null on rows whose template does not require them.
 
 Overlay refs are optional. Do not fabricate per-link bandwidth if the producer
 does not have it. For network sockets, current evidence may include snapshot

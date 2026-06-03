@@ -58,6 +58,7 @@ type vsphereActorDetail struct {
 
 type vsphereTopologyBuilder struct {
 	strings          *topologyv1.StringDictionary
+	collectJob       string
 	actorIndexes     map[string]int
 	actorObjectTypes map[string]string
 	actors           *topologyv1.TableBuilder
@@ -65,11 +66,14 @@ type vsphereTopologyBuilder struct {
 	evidence         map[string]*topologyv1.TableBuilder
 	details          *topologyv1.TableBuilder
 	labels           *topologyv1.TableBuilder
+	overlays         *topologyv1.OverlayRefsBuilder
 }
 
-func newVSphereTopologyBuilder() *vsphereTopologyBuilder {
+func newVSphereTopologyBuilder(jobName string) *vsphereTopologyBuilder {
+	strings := topologyv1.NewStringDictionary()
 	return &vsphereTopologyBuilder{
-		strings:          topologyv1.NewStringDictionary(),
+		strings:          strings,
+		collectJob:       sanitizeTopologyLabelValue(cleanTopologyString(jobName)),
 		actorIndexes:     make(map[string]int),
 		actorObjectTypes: make(map[string]string),
 		actors:           topologyv1.NewTableBuilder(vsphereTopologyActorColumns()...),
@@ -79,8 +83,9 @@ func newVSphereTopologyBuilder() *vsphereTopologyBuilder {
 			vsphereRunsOnEvidenceType:        topologyv1.NewTableBuilder(vsphereTopologyEvidenceColumns()...),
 			vsphereNetworkConnectionEvidence: topologyv1.NewTableBuilder(vsphereTopologyEvidenceColumns()...),
 		},
-		details: topologyv1.NewTableBuilder(vsphereTopologyDetailColumns()...),
-		labels:  topologyv1.NewTableBuilder(vsphereTopologyLabelColumns()...),
+		details:  topologyv1.NewTableBuilder(vsphereTopologyDetailColumns()...),
+		labels:   topologyv1.NewTableBuilder(vsphereTopologyLabelColumns()...),
+		overlays: topologyv1.NewActorOverlayRefsBuilder(strings, vsphereOverlaySelectorCollectJob, vsphereOverlaySelectorID),
 	}
 }
 
@@ -194,6 +199,10 @@ func (b *vsphereTopologyBuilder) data(agentID string, collectedAt time.Time, res
 	if err != nil {
 		return topologyv1.Data{}, fmt.Errorf("build vSphere topology labels table: %w", err)
 	}
+	overlays, err := b.overlays.OverlayRefs()
+	if err != nil {
+		return topologyv1.Data{}, fmt.Errorf("build vSphere topology overlay refs: %w", err)
+	}
 
 	evidence, evidenceRows, err := b.evidenceMap()
 	if err != nil {
@@ -213,6 +222,10 @@ func (b *vsphereTopologyBuilder) data(agentID string, collectedAt time.Time, res
 	stats["evidence_rows"] = evidenceRows
 	stats["detail_rows"] = detailTable.Rows
 	stats["label_rows"] = labelTable.Rows
+	stats["overlay_refs"] = 0
+	if overlays != nil && overlays.Refs != nil {
+		stats["overlay_refs"] = overlays.Refs.Rows
+	}
 
 	return topologyv1.Data{
 		SchemaVersion: topologyv1.SchemaVersion,
@@ -250,7 +263,8 @@ func (b *vsphereTopologyBuilder) data(agentID string, collectedAt time.Time, res
 				},
 			},
 		},
-		Stats: stats,
+		Stats:    stats,
+		Overlays: overlays,
 	}, nil
 }
 
@@ -354,6 +368,14 @@ func (b *vsphereTopologyBuilder) addActorLabel(actor int, key, value, source, ki
 		b.nullableStringRef(kind),
 		nullableUint(valueIndex),
 	)
+}
+
+func (b *vsphereTopologyBuilder) addDatastoreUtilizationOverlay(actor int, moid string) {
+	moid = cleanTopologyString(moid)
+	if actor < 0 || b.collectJob == "" || moid == "" {
+		return
+	}
+	b.overlays.Add(vsphereDatastoreUtilizationOverlay, actor, b.collectJob, moid)
 }
 
 func (b *vsphereTopologyBuilder) stringRef(value string) int {
@@ -507,6 +529,15 @@ func vsphereTopologyTypes() topologyv1.TypeRegistry {
 			vsphereTopologyDetailTable: vsphereDetailTableType(),
 			vsphereTopologyLabelsTable: vsphereLabelsTableType(),
 		},
+		OverlayTemplates: map[string]topologyv1.OverlayTemplate{
+			vsphereDatastoreUtilizationOverlay: topologyv1.NewOverlayTemplate(
+				topologyv1.OverlayProviderNetdataMetrics,
+				topologyv1.NewOverlayMerge(topologyv1.OverlayMergeRefsSet, topologyv1.OverlayMergeValuesLast),
+				topologyv1.WithOverlayContexts("vsphere.datastore_space_utilization"),
+				topologyv1.WithOverlayDimensions("used"),
+				topologyv1.WithOverlaySelectorParams(vsphereOverlaySelectorCollectJob, vsphereOverlaySelectorID),
+			),
+		},
 	}
 }
 
@@ -644,6 +675,18 @@ func sortedStrings(values []string) []string {
 
 func cleanTopologyString(value string) string {
 	return strings.TrimSpace(value)
+}
+
+// Keep in sync with chartemit.wireValueReplacer so overlay refs match chart labels.
+var topologyLabelValueReplacer = strings.NewReplacer(
+	"'", "",
+	"\n", " ",
+	"\r", " ",
+	"\x00", "",
+)
+
+func sanitizeTopologyLabelValue(value string) string {
+	return topologyLabelValueReplacer.Replace(value)
 }
 
 func nullableBool(value any) any {
