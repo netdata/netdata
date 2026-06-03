@@ -6,19 +6,7 @@ This section introduces Windows-specific workflows for working with a local Netd
 
 After installing Netdata on Windows, confirm the service is running and open the local dashboard.
 
-**Check that the service is running.** Open PowerShell and run:
-
-```powershell
-Get-Service Netdata
-```
-
-If the status shows `Running`, Netdata is active. If it shows `Stopped`, start it with:
-
-```powershell
-Start-Service Netdata
-```
-
-For more service management options, see [Service Control](/docs/netdata-agent/start-stop-restart.md).
+**Check that the service is running.** See [Service Control](/docs/netdata-agent/start-stop-restart.md#windows) for instructions on checking status and managing the Netdata service.
 
 **Open the dashboard.** In your browser, navigate to:
 
