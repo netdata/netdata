@@ -5,11 +5,9 @@ package snmptopology
 import (
 	"sort"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 )
 
-func canonicalPrimaryMACListKey(match topology.Match) string {
+func canonicalPrimaryMACListKey(match topologyMatch) string {
 	seen := make(map[string]struct{}, len(match.MacAddresses)+len(match.ChassisIDs))
 	for _, value := range match.MacAddresses {
 		if mac := normalizeMAC(value); mac != "" {

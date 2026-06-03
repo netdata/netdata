@@ -98,7 +98,7 @@ before assuming the code does the obvious thing.
   prefix is missing, so the literal `{ check_path }` would be
   printed even if the imports worked.
 - **Treat this file as dead code.** Do NOT rely on it.
-  Followup: SOW will track repair-or-delete.
+  Follow-up must be tracked by a GitHub issue before implementation starts.
 
 ### `gen_doc_service_discovery_page.py` is NOT in CI
 
@@ -112,8 +112,7 @@ before assuming the code does the obvious thing.
 - Consequence: `src/collectors/SERVICE-DISCOVERY.md` drifts
   from source `metadata.yaml` until a developer manually
   runs `python3 integrations/gen_doc_service_discovery_page.py`.
-- Followup: SOW will track adding the script to both
-  workflows.
+- Follow-up must be tracked by a GitHub issue before implementation starts.
 
 ### `integrations/schemas/distros.json` is unused
 
@@ -124,8 +123,7 @@ before assuming the code does the obvious thing.
   `distros.yml`.
 - Garbage in `.github/data/distros.yml` produces broken
   `platform_info` tables silently.
-- Followup: SOW will track wiring `distros.json` into
-  `gen_integrations.py:1330`.
+- Follow-up must be tracked by a GitHub issue before implementation starts.
 
 ## Custom Jinja delimiters
 
@@ -331,7 +329,7 @@ edit the Python script and commit.
 regen:
 
 ```bash
-python3 integrations/gen_docs_integrations.py -c go.d/snmp
+python3 integrations/gen_docs_integrations.py -c go.d.plugin/snmp
 ```
 
 NOT used by CI (CI always does full regen). Useful for fast

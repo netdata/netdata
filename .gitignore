@@ -238,3 +238,6 @@ install.sh
 .mcpregistry_github_token
 .mcpregistry_registry_token
 .playwright-mcp/
+
+# Local AI/agent planning notes. Durable SOW/spec work lives under .agents/.
+TODO-*.md

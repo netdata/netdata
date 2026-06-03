@@ -2,33 +2,7 @@
 
 package snmptopology
 
-import (
-	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
-)
-
-func snmpTopologyPresentation() *topology.Presentation {
-	deviceSummaryFields := topologyDeviceSummaryFields()
-	deviceTables := topologyDeviceTables()
-	linkOnlyTables := topologyLinkOnlyTables(deviceTables["links"])
-	infoOnlyTabs := topologyInfoOnlyTabs()
-
-	return &topology.Presentation{
-		ActorTypes: topologyPresentationActorTypes(
-			deviceSummaryFields,
-			deviceTables,
-			linkOnlyTables,
-			infoOnlyTabs,
-			topologySegmentSummaryFields(),
-			topologyEndpointSummaryFields(),
-		),
-		LinkTypes:          topologyPresentationLinkTypes(),
-		PortFields:         topologyPresentationPortFields(),
-		PortTypes:          topologyPresentationPortTypes(),
-		Legend:             topologyPresentationLegend(),
-		ActorClickBehavior: "highlight_connections",
-	}
-}
+import "github.com/netdata/netdata/go/plugins/pkg/funcapi"
 
 func topologyMethodConfig() funcapi.MethodConfig {
 	return funcapi.MethodConfig{
@@ -47,5 +21,5 @@ func topologyMethodConfig() funcapi.MethodConfig {
 			topologyManagedFocusParamConfig(nil),
 			topologyDepthParamConfig(),
 		},
-	}.WithPresentation(snmpTopologyPresentation())
+	}
 }

@@ -63,7 +63,9 @@ Rules of thumb:
   `context_prefix:` or `collect_plugin:`;
 - pick section IDs from `integrations/taxonomy/sections.yaml`.
 
-For a rich reference, compare against
+For a modern go.d V2 ownership reference, compare against
+`src/go/plugin/go.d/collector/cato_networks/taxonomy.yaml`. If the change needs
+grid or table widget examples, compare against
 `src/go/plugin/go.d/collector/mysql/taxonomy.yaml`.
 
 ## 4. Update the remaining collector artifacts
@@ -84,13 +86,22 @@ From the repo root:
 ```bash
 python3 integrations/gen_integrations.py
 python3 integrations/gen_taxonomy.py --check-only
-python3 integrations/check_collector_taxonomy.py
+python3 integrations/check_collector_taxonomy.py --pr-diff master...HEAD
 python3 -m unittest integrations.tests.test_taxonomy
 python3 integrations/gen_docs_integrations.py -c go.d.plugin/<module>
+python3 integrations/gen_doc_collector_page.py
+python3 integrations/gen_doc_secrets_page.py
+# If service-discovery rules or sdext metadata changed:
+python3 integrations/gen_doc_service_discovery_page.py
 ```
 
 Use the repo-local `.venv/bin/python` when one exists for the current
-worktree.
+worktree. If your local base branch is not `master`, adjust the `--pr-diff`
+range to the PR base.
+
+If service-discovery rules or `sdext` metadata changed, run
+`python3 integrations/gen_doc_service_discovery_page.py` and commit
+`src/collectors/SERVICE-DISCOVERY.md`; this is not handled by CI for you.
 
 ## 6. Before opening the PR
 
@@ -98,9 +109,15 @@ Run:
 
 ```bash
 git status --short
+git status --porcelain |
+  rg '^(\?\?|!!| M|M |A |AM) integrations/(integrations\.(js|json)|taxonomy\.json)$' || true
 ```
 
 Commit source changes, generated docs, and taxonomy updates together.
 Do not commit gitignored runtime artifacts such as
 `integrations/integrations.js`, `integrations/integrations.json`, or
 `integrations/taxonomy.json`.
+
+The generated-artifact status grep MUST return no output before the PR is
+opened. If it reports one of those files, remove the local generated artifact
+from the commit/worktree state rather than committing it.

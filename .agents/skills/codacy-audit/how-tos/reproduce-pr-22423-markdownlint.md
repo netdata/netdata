@@ -2,7 +2,7 @@
 
 ## When to use
 
-You want to confirm `analyze-local.sh` matches what Codacy CI reported on a known fixture. PR #22423 is the canonical fixture for this skill: its first CI run reported **864 markdownlint findings** (recorded in the SOW that built this skill, SOW-0011); commit `3a54c9afbc` cleared them by adding `.agents/**` and `docs/netdata-ai/skills/**` to `.codacy.yml`.
+You want to confirm `analyze-local.sh` matches what Codacy CI reported on a known fixture. PR #22423 is the canonical fixture for this skill: its first CI run reported **864 markdownlint findings**; commit `3a54c9afbc` cleared them by adding `.agents/**` and `docs/netdata-ai/skills/**` to `.codacy.yml`.
 
 This how-to walks through reproducing those 864 findings on the pre-exclusion state, then confirming the post-exclusion state shows zero on the affected files.
 
@@ -63,7 +63,7 @@ Expected: zero rows in the excluded trees.
 ## What this validates
 
 - `analyze-local.sh` runs end-to-end against the configured runner (docker or local binary).
-- The CLI honours `.codacy.yml` exclude_paths (or, if it doesn't, we have empirical evidence to handle that gap in a future SOW).
+- The CLI honours `.codacy.yml` exclude_paths (or, if it doesn't, we have empirical evidence to handle that gap in a GitHub issue or branch-local SOW).
 - The bundled markdownlint version produces a count consistent with what Codacy CI reports.
 
 ## Troubleshooting

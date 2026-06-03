@@ -1,5 +1,5 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/network-viewer.plugin/README.md"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/network-viewer.plugin/integrations/network_connections.md"
 meta_yaml: "https://github.com/netdata/netdata/edit/master/src/collectors/network-viewer.plugin/metadata.yaml"
 sidebar_label: "Network Connections"
 learn_status: "Published"
@@ -95,7 +95,7 @@ This plugin exposes a real-time function for viewing active network connections.
 Shows active network connections with protocol details, states, addresses, ports, and performance metrics.
 
 Provides both aggregated and detailed views of TCP and UDP connections for IPv4 and IPv6,
-including connection direction (listen, inbound, outbound), process information,
+including connection direction (listen, inbound, outbound, local), process information,
 and TCP performance metrics (RTT, retransmissions).
 
 Connections are classified as system or container based on network namespace.

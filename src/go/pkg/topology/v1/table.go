@@ -32,6 +32,56 @@ func EmptyTable() Table {
 	}
 }
 
+type TableBuilder struct {
+	columns []Column
+	values  [][]any
+	rowsErr error
+}
+
+func NewTableBuilder(columns ...Column) *TableBuilder {
+	return &TableBuilder{
+		columns: append([]Column(nil), columns...),
+		values:  make([][]any, len(columns)),
+	}
+}
+
+func (b *TableBuilder) Add(values ...any) int {
+	row := b.Rows()
+	if len(values) != len(b.columns) {
+		b.rowsErr = fmt.Errorf("row has %d values for %d columns", len(values), len(b.columns))
+		return row
+	}
+	for i, value := range values {
+		b.values[i] = append(b.values[i], value)
+	}
+	return row
+}
+
+func (b *TableBuilder) Rows() int {
+	if len(b.values) == 0 {
+		return 0
+	}
+	return len(b.values[0])
+}
+
+func (b *TableBuilder) Table() (Table, error) {
+	if b.rowsErr != nil {
+		return Table{}, b.rowsErr
+	}
+	if len(b.columns) == 0 {
+		return EmptyTable(), nil
+	}
+	encodings := make([]ColumnEncoding, len(b.values))
+	for i, values := range b.values {
+		encoding := Values(values...)
+		if encoding.Values == nil {
+			encoding.Values = []any{}
+		}
+		encodings[i] = encoding
+	}
+	return NewTable(b.Rows(), b.columns, encodings)
+}
+
 func (table Table) Validate() error {
 	if table.Rows < 0 {
 		return fmt.Errorf("rows is negative: %d", table.Rows)

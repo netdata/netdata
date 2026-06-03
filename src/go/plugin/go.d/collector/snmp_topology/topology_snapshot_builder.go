@@ -5,7 +5,7 @@ package snmptopology
 import (
 	"time"
 
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/engine"
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
@@ -96,7 +96,7 @@ func (c *topologyCache) snapshot() (topologyData, bool) {
 		return topologyData{}, false
 	}
 
-	data := topologyengine.ToTopologyData(result, topologyengine.TopologyDataOptions{
+	data := topologyengine.ToGraph(result, topologyengine.GraphOptions{
 		SchemaVersion:  topologySchemaVersion,
 		Source:         "snmp",
 		Layer:          "2",

@@ -2,17 +2,17 @@
 
 package snmptopology
 
-import "github.com/netdata/netdata/go/plugins/pkg/topology"
+import topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 
 const topologySchemaVersion = "2.0"
 
-type topologyData = topology.Data
-type topologyActor = topology.Actor
-type topologyMatch = topology.Match
-type topologyLink = topology.Link
-type topologyLinkEndpoint = topology.LinkEndpoint
-type topologyFlow = topology.Flow
-type topologyIPPolicy = topology.IPPolicy
+type topologyData = topologyengine.Graph
+type topologyActor = topologyengine.Actor
+type topologyMatch = topologyengine.Match
+type topologyLink = topologyengine.Link
+type topologyLinkEndpoint = topologyengine.LinkEndpoint
+type topologyFlow = topologyengine.Flow
+type topologyIPPolicy = topologyengine.IPPolicy
 
 type topologyManagementAddress struct {
 	Address     string `json:"address"`

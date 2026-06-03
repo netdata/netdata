@@ -10,7 +10,28 @@ type: project
 
 You are about to add or modify data collection in the Netdata Agent. This skill is a manifesto and a routing map. It tells you the mindset to apply, the principles you cannot violate, the ways the dashboard gets shaped from upstream data, the quality bar that separates a draft from a shippable collector, and where to look for depth. It is not a tutorial — the deep references already exist in the repo. Your job is to know they exist, pick the right one, and produce work that blends with the patterns the maintainers already accept.
 
-The skill is organized as: mental model → best practices → dashboard shaping → quality bar → environment reference → applied per data type → applied per domain. Read top to bottom on your first pass; come back to specific sections as the task narrows.
+The skill is organized as: AI fast path → mental model → best practices → dashboard shaping → quality bar → environment reference → applied per data type → applied per domain. For go.d work, follow the fast path first; for other collector families, read top to bottom on your first pass and come back to specific sections as the task narrows.
+
+## AI Fast Path
+
+For implementation agents, route to the concrete workflow first and use the
+rest of this skill as background:
+
+- New go.d collector: read `src/go/AGENTS.md`, then
+  `src/go/plugin/go.d/docs/how-to-write-a-collector.md`,
+  `.agents/skills/project-writing-go-modules-framework-v2/SKILL.md`, and
+  `.agents/skills/integrations-lifecycle/recipes/add-go-collector.md`.
+- Existing go.d collector update: read `src/go/AGENTS.md`, the collector's
+  local files, `.agents/skills/integrations-lifecycle/consistency.md`, and
+  `.agents/skills/integrations-lifecycle/recipes/update-collector.md`.
+- V1-to-V2 migration: read `src/go/AGENTS.md`,
+  `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`, and the V2 skill before
+  changing code.
+- Framework or shared-helper change: stop and satisfy
+  `src/go/plugin/framework/docs/changing-framework-code.md` before writing
+  code.
+
+Do not use this broad skill as the only implementation guide for go.d work.
 
 ## 1. Mental model
 
@@ -40,7 +61,7 @@ This is a truthfulness principle, not a cardinality one. It applies at any cardi
 
 Mechanics:
 - C: `rrdset_is_obsolete___safe_from_collector_thread()` in `src/database/rrdset.c:116` flags `RRDSET_FLAG_OBSOLETE`. Reverse with `rrdset_isnot_obsolete()` (line 140) when the entity reappears.
-- go.d: `c.Obsolete = true` on the chart struct; the framework appends `obsolete` to the CHART command. Documented at `src/go/BEST-PRACTICES.md:94-108`.
+- go.d V1: `c.Obsolete = true` or `MarkRemove()` on the chart marks it obsolete. go.d V2: chart lifetime is controlled by `charts.yaml` lifecycle policy and `chartengine`; start from `src/go/plugin/go.d/docs/how-to-write-a-collector.md` for new collectors and `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` for migrations.
 - Anti-flip-flop: if an entity may disappear and reappear quickly, wait roughly 1 minute of absence before obsoleting. Thrashing charts hurt streaming and ML.
 
 ### 1.6 Your knowledge is stale — research the current spec
@@ -66,7 +87,11 @@ This is how you avoid shipping a parser that fails on the first real device. If 
 
 ### 1.8 Mirror an existing Netdata collector
 
-The repo holds 132 go.d modules and 24 internal C plugins. Maintainer patterns live there, not in any prose doc. After you've reality-checked the upstream protocol, pick the closest existing Netdata collector by domain and mirror its structure. Caveat: only 5 go.d modules use V2 — see §5.3.
+The repo holds many go.d modules and internal C plugins. Maintainer patterns
+live there, not in any prose doc. After you've reality-checked the upstream
+protocol, pick the closest existing Netdata collector by domain and mirror its
+structure. New go.d modules MUST use framework V2 and start from the current
+V2 authoring guide — see §5.3.
 
 ### 1.9 Remote-monitored systems are vnodes
 
@@ -90,6 +115,16 @@ Per-job source priority: `stock < discovered < user < dyncfg`, matched by job id
 
 Framework-agnostic, ordered by impact.
 
+### 2.0 Mandatory clean end state and scope discipline
+
+You MUST aim for the clean end state, not the smallest diff. While
+implementing, keep checking whether the design still looks like the structure
+maintainers should want after the work is complete.
+
+At each coherent batch, you MUST check for scope drift. If the work exposes an
+independent collector cleanup, framework change, docs correction, or migration,
+either defer it explicitly or submit it as its own step before continuing.
+
 ### 2.1 Test against reality
 
 Source test data based on what you're collecting:
@@ -109,9 +144,12 @@ order-independent.
 
 ### 2.2 Hot-path discipline
 
-`Collect()` runs every `update_every` seconds. It must:
+`Collect()` runs every `update_every` seconds. It MUST:
 
-- Allocate buffers, maps, slices, parsed regexes once at `Init()` and reuse them. Reset at the top of `Collect()` if needed; see `ping/collect.go` for a V2 reference.
+- Allocate buffers, maps, slices, parsed regexes, matchers, and metric
+  instruments once at `Init()` / `New()` and reuse them. Reset at the top of
+  `Collect()` only when needed; see `cato_networks/metrix.go` for the typed
+  V2 metric-instrument pattern.
 - Hold persistent connections; reconnect only on failure with backoff.
 - Cache anything stable between iterations: schema, capabilities, profile selections.
 - Finish well under one cycle even on a slow target.
@@ -137,9 +175,9 @@ Past pain: an `ebpf.plugin` regression flooded logs because the collection loop 
 
 When a collector emits one chart per discovered entity (process, connection, profile target, container, schema, queue, route), bound the count and let the operator scope it. (Obsoletion of entities the collector knows have gone is a separate concern — see §1.5.)
 
-**`max_*` is mandatory for entities that may grow without bounds.** Without a cap, a single misbehaving target (a runaway log rotator, a container churn loop, a vendor-specific deep table) can produce thousands of charts.
+**`max_*` is REQUIRED for entities that may grow without bounds.** Without a cap, a single misbehaving target (a runaway log rotator, a container churn loop, a vendor-specific deep table) can produce thousands of charts.
 
-**`max_*` must be coupled with selectors.** A cap alone silently truncates whatever happens to land in the first N entries — the operator has no say in *which* entities survive. A selector lets the operator pick what's actually important. Cap and selector together: cap protects the system, selector lets the operator drive.
+**`max_*` MUST be coupled with selectors.** A cap alone silently truncates whatever happens to land in the first N entries — the operator has no say in *which* entities survive. A selector lets the operator pick what's actually important. Cap and selector together: cap protects the system, selector lets the operator drive.
 
 **Where to filter — depends on what the monitored application exposes:**
 
@@ -153,19 +191,26 @@ When a collector emits one chart per discovered entity (process, connection, pro
 - Histogram / percentile splits with high-cardinality labels (per-IP, per-tenant, per-trace) → multiplicative blow-up.
 - Per-PID charts with no obsolete handler → growth at process churn rate (the bound is here in §2.5; the obsolete handler is the §1.5 concern).
 
-Pattern reference: `src/go/BEST-PRACTICES.md` (search `max`).
+For go.d V2 collectors, keep selector/cap behavior in the collector design and
+document the public config only when the operator has a real decision to make.
+Start from `src/go/plugin/go.d/docs/how-to-write-a-collector.md`.
 
 ### 2.6 Configuration discipline
 
-Tunables live in `config_schema.json` (DYNCFG schema rendered by the dashboard) and `metadata.yaml` (integration page) — both must be complete and mutually consistent. The stock `.conf` shows safe, representative examples — not necessarily every tunable.
+Public tunables are part of the collector consistency contract. When a config
+option is added, removed, renamed, or given a new default, you MUST follow
+`.agents/skills/integrations-lifecycle/consistency.md`; you MUST NOT update
+only the Go struct or only the docs. The stock `.conf` shows safe,
+representative examples -- not necessarily every tunable.
 
-Don't hardcode timeouts, paths, ports, or credentials. Don't let stock conf and schema contradict each other.
+Collectors MUST NOT hardcode timeouts, paths, ports, or credentials. Stock
+config and schema MUST NOT contradict each other.
 
 Credentials use the `${env:}/${file:}/${cmd:}/${store:}` indirection — see `src/collectors/SECRETS.md`. Privileged operations route through `src/collectors/utils/ndsudo.c`.
 
 ### 2.7 Generated artifacts are not source
 
-Several artifacts are produced from upstream definitions and must never be hand-edited:
+Several artifacts are produced from upstream definitions and MUST NOT be hand-edited:
 
 - `integrations/<name>.md` — generated from `metadata.yaml` (banner: `DO NOT EDIT THIS FILE DIRECTLY`).
 - `ibm.d` modules — generated `README.md`, `metadata.yaml`, `config.go`, `zz_generated_*.go` from `contexts.yaml` via `go generate`.
@@ -175,20 +220,14 @@ When a generated file looks wrong, fix the source of truth (`metadata.yaml`, `co
 
 ### 2.8 Documentation/configuration consistency
 
-A new or modified collector ships these in sync:
+Collector consistency has one detailed checklist:
+`.agents/skills/integrations-lifecycle/consistency.md`. Treat code,
+integration metadata, taxonomy, config, stock examples, alerts, and generated
+documentation as one unit, but do not maintain a second artifact matrix here.
 
-- the code
-- `metadata.yaml` — drives integration pages, in-app help, alert references
-- `taxonomy.yaml` — places emitted chart contexts in the dashboard TOC
-  with an ordered `items:` tree; structural strings/`owned_context`
-  entries own contexts, widgets reference them
-- `config_schema.json` — DYNCFG schema rendered by the dashboard
-- stock `.conf` — safe, representative example
-- `health.d/*.conf` — alert templates bound to chart `context`
-- `README.md` — concise narrative
-- if exposing a Function: response shape conforming to `src/plugins.d/FUNCTION_UI_SCHEMA.json`
-
-Treat them as one unit. Change a unit in code → update `metadata.yaml` in the same commit. Add or rename a chart context → update `taxonomy.yaml` or a declared dynamic selector. Add a config knob → update schema, stock conf, and metadata together.
+If a collector exposes a Function, its response shape MUST also conform to the
+relevant Function schema, such as `src/plugins.d/FUNCTION_UI_SCHEMA.json` or
+`src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`.
 
 ### 2.9 Cross-plugin enrichment via netipc
 
@@ -202,7 +241,12 @@ Both clients (consume) and servers (offer) exist in all three languages. Real ex
 
 ### 2.10 Vnodes for remote targets
 
-Set `Vnode` in job config; respect it in `Init()` and DYNCFG handlers. See `src/go/plugin/framework/vnodes/` and `src/go/BEST-PRACTICES.md` (search `Vnode`). Past pain: an older refactor had to retroactively split job-name validation per vnode/domain because earlier collectors hadn't accounted for it.
+Set `Vnode` in job config when the collector has one remote target. For Go V2
+collectors that emit multiple remote nodes from one job, use
+`metrix.HostScope`; see `.agents/sow/specs/go-v2-host-scope.md` and
+`src/go/plugin/go.d/docs/how-to-write-a-collector.md`. Past pain: an older
+refactor had to retroactively split job-name validation per vnode/domain because
+earlier collectors had not accounted for it.
 
 ## 3. Structuring dashboards
 
@@ -284,22 +328,19 @@ A collector is *production-quality* when it satisfies all of:
 4. Are gaps preserved (no zero defaults for missing values)?
 5. Does the collection cycle allocate, log per iteration, or reconnect every cycle?
 6. Do error logs answer *what operation, what target, what was expected vs observed*?
-7. Are config knobs in `config_schema.json` and `metadata.yaml`? Does the stock `.conf` show a representative example?
-8. Does `taxonomy.yaml` cover every emitted chart context, or are dynamic contexts declared with `metrics.dynamic_context_prefixes` / `metrics.dynamic_collect_plugins`?
-9. Are alerts present in `health.d/`?
-10. Is `README.md` updated? (Not the generated `integrations/<name>.md`.)
-11. For remote targets: is vnode wiring done?
-12. For SNMP: did I extend a profile rather than hardcode OIDs?
-13. For statsd / OTEL: did I document and ship the operator-side config (synthetic_charts file or OTEL mapping YAML)?
-14. For Prometheus scraping: are selectors correct? Are untyped metrics handled?
-15. For cross-plugin enrichment: am I using netipc?
-16. For Functions: does the response conform to one of the six shapes? Non-blocking with respect to the collection loop? Schema-validated?
-17. For ibm.d only: did I run `go generate` after touching `contexts.yaml`?
-18. For new go.d modules: are all four wiring steps done (init.go, go.d.conf, stock conf, README)?
-19. Tests: real fixtures or real instances? Would they catch the bug I just fixed?
-20. High-cardinality labels / instances: bounded by `max_*` + selectors? Aggregated "Other" bucket or upstream-supplied aggregation present where applicable?
-21. Entities that can go away: obsoleted when the collector knows they're gone? Anti-flip-flop window applied where churn is expected?
-22. Production-quality criteria above — would this collector survive hours of target outage without leaks or log floods?
+7. Did I run the collector consistency checklist in `.agents/skills/integrations-lifecycle/consistency.md`, including the rule that generated integration pages are not hand-authored sources?
+8. For remote targets: is vnode wiring done?
+9. For SNMP: did I extend a profile rather than hardcode OIDs?
+10. For statsd / OTEL: did I document and ship the operator-side config (synthetic_charts file or OTEL mapping YAML)?
+11. For Prometheus scraping: are selectors correct? Are untyped metrics handled?
+12. For cross-plugin enrichment: am I using netipc?
+13. For Functions: does the response conform to one of the six shapes? Non-blocking with respect to the collection loop? Schema-validated?
+14. For ibm.d only: did I run `go generate` after touching `contexts.yaml`?
+15. For new go.d modules: are all four runtime-load wiring steps done (`collector/init.go` import, `go.d.conf`, stock conf, README)?
+16. Tests: real fixtures or real instances? Would they catch the bug I just fixed?
+17. High-cardinality labels / instances: bounded by `max_*` + selectors? Aggregated "Other" bucket or upstream-supplied aggregation present where applicable?
+18. Entities that can go away: obsoleted when the collector knows they're gone? Anti-flip-flop window applied where churn is expected?
+19. Production-quality criteria above — would this collector survive hours of target outage without leaks or log floods?
 
 ## 5. Plugins and frameworks — what's available and where
 
@@ -321,7 +362,7 @@ Reference section. Use it after the mental model and best practices have framed 
 | `statsd.plugin` | C | All | `src/collectors/statsd.plugin/` | StatsD ingestion + synthetic_charts |
 | `log2journal` | C | Linux | `src/collectors/log2journal/` | Parse application logs into the systemd journal |
 | Niche C plugins | C | various | `src/collectors/<name>.plugin/` | freeipmi, nfacct, tc, xenstat, debugfs, diskspace, slabinfo, idlejitter, timex, cups, ioping, perf |
-| `go.d.plugin` | Go (no CGO) | All | `src/go/plugin/go.d/` | 132 application integrations |
+| `go.d.plugin` | Go (no CGO) | All | `src/go/plugin/go.d/` | Application integrations |
 | `ibm.d.plugin` | Go + CGO | Linux, IBM i | `src/go/plugin/ibm.d/modules/` | IBM workloads (DB2, IBM i / AS-400, IBM MQ, WebSphere) |
 | `netflow-plugin` | Rust | Linux | `src/crates/netflow-plugin/` | NetFlow v5/v9, IPFIX, sFlow |
 | `netdata-otel` | Rust | Linux | `src/crates/netdata-otel/otel-plugin/` | OpenTelemetry ingestion |
@@ -334,12 +375,13 @@ Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orc
 
 | If you are doing… | Start with |
 |---|---|
-| New off-the-shelf application integration (no CGO) | `src/go/plugin/go.d/docs/how-to-write-a-collector.md`; V2 reference: `src/go/plugin/go.d/collector/ping/` |
+| New off-the-shelf application integration (no CGO) | `src/go/plugin/go.d/docs/how-to-write-a-collector.md`; primary V2 reference: `src/go/plugin/go.d/collector/cato_networks/` |
+| Migrating existing go.d collector to V2 | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`; V2 mechanics: `.agents/skills/project-writing-go-modules-framework-v2/SKILL.md` |
 | New IBM workload integration (CGO) | `src/go/plugin/ibm.d/AGENTS.md`, `src/go/plugin/ibm.d/framework/README.md` |
 | New Rust plugin | SDK at `src/crates/netdata-plugin/`; reference: `src/crates/netflow-plugin/` |
 | New SNMP profile (no code change) | `src/go/plugin/go.d/collector/snmp/profile-format.md` |
 | New interactive Function | `src/go/plugin/framework/functions/README.md`, `src/plugins.d/FUNCTION_UI_SCHEMA.json`, `src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md` |
-| Topology work | `src/go/pkg/topology/`, `src/go/plugin/go.d/collector/snmp_topology/`, `src/collectors/network-viewer.plugin/` |
+| Topology work | `.agents/skills/project-create-topology/SKILL.md`, `src/go/pkg/topology/v1`, `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` |
 | Auto-discovery for a new go.d module | rules under `src/go/plugin/go.d/config/go.d/sd/`; engine: `src/go/plugin/agent/discovery/` |
 | OTEL ingestion | `src/crates/netdata-otel/otel-plugin/` |
 | Log ingestion (parse → journal) | `src/collectors/log2journal/` and `log2journal.d/` rules |
@@ -351,15 +393,27 @@ Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orc
 
 ### 5.3 go.d V1 / V2 reality check
 
-Only **5 of 132** go.d collectors use V2: `ping`, `mysql`, `azure_monitor`, `powerstore`, `powervault`. The big reference docs (`src/go/BEST-PRACTICES.md`, `src/go/COLLECTOR-LIFECYCLE.md`) describe V1. V2 building blocks have framework READMEs (`src/go/plugin/framework/charttpl/README.md`, `src/go/plugin/framework/chartengine/README.md`, `src/go/pkg/metrix/README.md`); there is no end-to-end V2 tutorial beyond `how-to-write-a-collector.md` plus the `ping/` source.
+Most go.d collectors are still V1, but the broad V1 authoring docs have been
+retired because they taught stale patterns from general Go paths. Do not use
+existing V1 collectors as the shape for new work.
 
-**For new go.d modules: use V2.** Mirror `src/go/plugin/go.d/collector/ping/` (or `mysql/` for V2 + Functions). Copying any other module mirrors V1 and the maintainers will ask you to migrate.
+**New go.d modules MUST use V2.** Start with
+`src/go/plugin/go.d/docs/how-to-write-a-collector.md`. Use
+`src/go/plugin/go.d/collector/cato_networks/` as the primary modern reference,
+but copy focused responsibilities rather than the entire collector. Copying a V1
+module mirrors legacy patterns and the maintainers will ask you to migrate.
+
+For migrating an existing V1 collector, start with
+`src/go/plugin/go.d/docs/migrate-v1-to-v2.md`. Migration is compatibility work;
+do not use the new-collector guide to justify chart, config, or lifecycle
+contract changes. Temporary V1 parity bridges can help during development, but
+the finished collector MUST NOT run through a V1-to-V2 bridge.
 
 V2 imports: `github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi` and `.../pkg/metrix`. The `CollectorV2` interface lives at `src/go/plugin/framework/collectorapi/collector.go`.
 
 Lifecycle semantics: `Init()` is one-time setup (failure disables permanently); `Check()` is auto-detection probe (failure disables, retried later); `Collect()` is the hot path (every `update_every` seconds); `Cleanup()` is guaranteed on shutdown.
 
-**Silent-failure trap (go.d).** A new go.d module compiles and tests pass even when it is *not loaded* by the plugin at runtime. Loading requires four wiring steps: import in `src/go/plugin/go.d/collector/init.go`, `modules:` toggle in `src/go/plugin/go.d/config/go.d.conf`, stock job config at `src/go/plugin/go.d/config/go.d/<name>.conf`, and entry in `src/go/plugin/go.d/README.md`. Same trap applies to `ibm.d`.
+**Silent-failure trap (go.d).** A new go.d module compiles and tests pass even when it is *not loaded* by the plugin at runtime. Runtime loading requires four wiring steps: import in `src/go/plugin/go.d/collector/init.go`, `modules:` toggle in `src/go/plugin/go.d/config/go.d.conf`, stock job config at `src/go/plugin/go.d/config/go.d/<name>.conf`, and entry in `src/go/plugin/go.d/README.md`. Same trap applies to `ibm.d`.
 
 ### 5.4 ibm.d, Rust SDK, internal C, PLUGINSD
 
@@ -377,7 +431,9 @@ Lifecycle semantics: `Init()` is one-time setup (failure disables permanently); 
 ### 5.5 Build / dev loop
 
 - go.d unit tests: `cd src/go && go test ./plugin/go.d/collector/<name>/...`
-- Single-module dev run: `go run ./cmd/godplugin -m <name> -d`
+- Single-module dev run: `timeout 15s go run ./cmd/godplugin -m <name> -d`
+  from `src/go`; success means the module registers, starts a job, and keeps
+  running until the timeout stops it.
 - Rust: `cargo test -p <crate>`
 - Whole-project install: `./netdata-installer.sh`
 
@@ -421,7 +477,10 @@ Topology is its own data type — directed/undirected graphs of nodes and links.
 - **SNMP-discovered topology** (`src/go/plugin/go.d/collector/snmp_topology/`) — LLDP/CDP neighbors, BRIDGE-MIB FDB, Q-BRIDGE FDB, ARP tables, STP. Builds on SNMP profiles; extending profiles is usually the right starting point.
 - **Live socket topology** (`src/collectors/network-viewer.plugin/`) — local L3/L4 sockets and their inferred connections.
 - **Streaming graph** (`src/streaming/`) — Netdata parent/child topology.
-- **Topology library** at `src/go/pkg/topology/` — shared types and providers consumed by the topology collectors.
+- **Topology library** at `src/go/pkg/topology/v1` — production Go payload
+  helpers for new topology producers. The non-v1 root
+  `src/go/pkg/topology/` payload model has been retired and must not be
+  reintroduced for topology work.
 
 Topology is consumed via Functions (`topology:*` family), not via metrics. The cardinality of network edges is too high for time-series storage and the use case is interactive lookup.
 
@@ -443,13 +502,17 @@ These are descriptive patterns — what existing Netdata collectors do. Use them
 
 ### 7.1 Database collectors
 
-DB collectors typically pair metrics (uptime, connections, query rates, replication lag, lock counts, cache hit ratios) with **Functions for live query analysis**: top queries, slow queries, currently-running queries, locks. Real examples:
+DB collectors often pair metrics (uptime, connections, query rates, replication lag, lock counts, cache hit ratios) with **Functions for live query analysis**: top queries, slow queries, currently-running queries, locks. Real examples:
 
 - **MySQL** (`src/go/plugin/go.d/collector/mysql/`) — metrics + `mysqlfunc/top_queries.go` + processlist via `collect_process_list.go`.
 - **PostgreSQL** (`src/go/plugin/go.d/collector/postgres/`) — metrics + `func_top_queries.go` + `func_running_queries.go`, dispatched through `func_router.go`.
 - MongoDB / Redis are metrics-only today, but the same Function pattern fits if the use case demands it.
 
-If you build a DB collector with metrics only, expect the maintainers to ask why you didn't add a query Function — the operator value of seeing "what's slow right now" is high and the pattern is established.
+Before adding a query Function, decide whether it is in scope for the current
+work and record the product/design decision. The operator value of seeing
+"what's slow right now" is high and the pattern is established, but Functions
+are still a feature surface, not something to add accidentally during unrelated
+metric work.
 
 ### 7.2 Network and SNMP collectors
 
@@ -501,7 +564,7 @@ Internal C plugins under `src/collectors/`. Reuse shared metric definitions from
 | Plugin types and privileges | choosing where to add a collector | `src/collectors/README.md` |
 | External plugin protocol | non-Go external plugin | `src/plugins.d/README.md` |
 | go.d V2 authoring | adding a `go.d` module | `src/go/plugin/go.d/docs/how-to-write-a-collector.md` |
-| go.d V1 best practices / lifecycle | working in legacy V1 module | `src/go/BEST-PRACTICES.md`, `src/go/COLLECTOR-LIFECYCLE.md` |
+| go.d V1-to-V2 migration | migrating existing go.d collector | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` |
 | Functions backend (Go / Rust) | implementing a Function | `src/go/plugin/framework/functions/README.md`, `src/crates/netdata-plugin/rt/src/lib.rs` |
 | Functions UI schema & guides | response shapes and patterns | `src/plugins.d/FUNCTION_UI_SCHEMA.json`, `src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md`, `src/plugins.d/FUNCTION_UI_REFERENCE.md` |
 | Topology Function schema & guide | topology actors, links, evidence, overlays | `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`, `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`, `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md` |
@@ -516,11 +579,13 @@ Internal C plugins under `src/collectors/`. Reuse shared metric definitions from
 | Prometheus mapping | generic exposition scrape | `src/go/plugin/go.d/collector/prometheus/README.md` |
 | log2journal | parsing application logs into the journal | `src/collectors/log2journal/log2journal.d/` |
 | Auto-discovery rules | adding service-detection rules | `src/go/plugin/go.d/config/go.d/sd/{net_listeners,docker,snmp,http}.conf` |
-| Topology library | topology providers in Go | `src/go/pkg/topology/` |
+| Topology library | topology producers in Go | `src/go/pkg/topology/v1` |
 | netipc cross-plugin enrichment | C / Go / Rust | `src/libnetdata/netipc/`, `src/go/pkg/netipc/`, `src/crates/netipc/` |
 | DYNCFG protocol | dynamic configuration | `src/plugins.d/DYNCFG.md`, `docs/developer-and-contributor-corner/dyncfg.md` |
 | Health alerts reference | alert template authoring | `src/health/REFERENCE.md`, `src/health/alert-configuration-ordering.md` |
 | Integrations pipeline | doc generation from `metadata.yaml` | `integrations/README.md` |
+| Go framework changes | changing shared Go collector/runtime framework code | `src/go/plugin/framework/docs/changing-framework-code.md` |
+| go.d V1-to-V2 migration | migrating existing go.d collectors | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` |
 | Credentials in config | `${env:}/${file:}/${cmd:}/${store:}` | `src/collectors/SECRETS.md` |
 | Privileged operations | restricted setuid helper | `src/collectors/utils/ndsudo.c` |
 

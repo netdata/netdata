@@ -2,13 +2,9 @@
 
 package snmptopology
 
-import (
-	"strings"
+import "strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
-)
-
-func matchLocalTopologyActor(match topology.Match, local topologyDevice) bool {
+func matchLocalTopologyActor(match topologyMatch, local topologyDevice) bool {
 	localChassisID := strings.TrimSpace(local.ChassisID)
 	if localChassisID != "" {
 		for _, chassisID := range match.ChassisIDs {

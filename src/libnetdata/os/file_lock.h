@@ -3,7 +3,11 @@
 #ifndef NETDATA_FILE_LOCK_H
 #define NETDATA_FILE_LOCK_H
 
-#include "libnetdata/libnetdata.h"
+#include "libnetdata/libnetdata-platform-fwd.h"
+
+#if defined(OS_WINDOWS)
+#include <windows.h>
+#endif
 
 typedef struct file_lock {
 #if defined(OS_LINUX) || defined(OS_FREEBSD) || defined(OS_MACOS)
@@ -31,7 +35,7 @@ typedef struct file_lock {
  * when the process exits or if the process crashes. Only one process can hold the lock
  * at a time.
  *
- * @param filename UTF-8 encoded filename (MSYS2 path format on Windows)
+ * @param filename UTF-8 encoded filename (MSYS2/Cygwin path format or native Windows path on Windows)
  * @return FILE_LOCK The lock handle. Use FILE_LOCK_OK() to check if lock was acquired
  */
 FILE_LOCK file_lock_get(const char *filename);

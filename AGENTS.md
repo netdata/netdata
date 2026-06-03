@@ -6,6 +6,17 @@ This repository is the Netdata Agent codebase. It is a large, multi-language, mu
 
 Work in this repository must prioritize root-cause understanding, correctness, performance, maintainability, portability, security, and consistency with existing project conventions.
 
+## Requirement Language
+
+This repository uses RFC-style requirement language:
+
+- **MUST** / **REQUIRED**: mandatory. Work that violates it is not acceptable
+  unless the user explicitly changes the requirement.
+- **MUST NOT**: prohibited.
+- **SHOULD** / **RECOMMENDED**: expected default. Deviate only with evidence
+  and explain the trade-off.
+- **MAY** / **OPTIONAL**: allowed, not required.
+
 CRITICAL RULES:
 
 1. You MUST ALWAYS find the root cause of a problem, before offering/giving a solution.
@@ -16,6 +27,24 @@ CRITICAL RULES:
 
 3. Do not duplicate code.
    First check if similar code already exists and reuse it.
+
+## Mandatory Development Principles
+
+These principles are mandatory for every task in this repository:
+
+1. **Clean end state over less churn.**
+   You MUST always aim for the clean end state, not the smallest diff. While
+   designing and implementing, actively search for the structure that should
+   exist after the work is complete. You MUST periodically re-evaluate
+   already-written changes against that target; do not keep a compromise only
+   because it already exists in the branch.
+
+2. **Scope discipline at every step.**
+   At each milestone, you MUST check whether the work has drifted outside the
+   approved scope. If the new work is valid but independent, you MUST defer it
+   to a later step or pause and submit the independent work first, then rebase
+   the current branch after it merges. Complex features MUST be delivered in
+   coherent steps where each step builds on the previous one.
 
 USER COMMUNICATION:
 
@@ -36,7 +65,13 @@ Project SOW status: initialized
 
 This project uses a local Statement of Work system.
 
-The SOW system is self-contained in this repository. Normal SOW work must not depend on `~/.agents`, `~/.AGENTS.md`, global skills, global templates, or global scripts. Use this `AGENTS.md`, project-local SOW files, project-local specs, project-local skills, and the active SOW.
+SOWs are branch-local working memory, not product artifacts. A SOW lives on the
+feature branch for the duration of the work so it preserves the root-cause
+model, decisions, evidence, and validation for PR takeover. It is removed before
+the branch merges. `master` MUST contain no SOW working files; durable memory
+belongs in `.agents/sow/specs/`, project skills, docs, code, and tests.
+
+The SOW system is self-contained in this repository. Normal SOW work must not depend on `~/.agents`, `~/.AGENTS.md`, global skills, global templates, or global scripts. Use this `AGENTS.md`, the branch-local SOW, project-local specs, and project-local skills.
 
 ### Roles
 
@@ -47,7 +82,7 @@ The SOW system is self-contained in this repository. Normal SOW work must not de
 
 Before non-trivial work:
 
-1. Read pending/current SOWs for overlap, contradictions, and existing decisions.
+1. Read the current branch's SOW under `.agents/sow/active/` if one exists. Since SOWs are branch-local, discover other in-flight work through open PRs and issues, not through `master`.
 2. Read relevant specs under `.agents/sow/specs/`.
 3. Inspect `.agents/skills/*/SKILL.md` if any exist, and load every runtime project skill whose trigger matches the work.
 4. Inspect legacy runtime skills listed below when the user request matches their frontmatter trigger.
@@ -88,7 +123,7 @@ Resolve `owner/repo` from the repository remote, record the checked commit, and 
 
 ### Pre-Implementation Gate
 
-Implementation must not begin until the active SOW contains a concrete `## Pre-Implementation Gate` section. Before moving a SOW from `pending/open` to `current/in-progress`, or before continuing implementation in an existing current SOW that lacks this section, fill the gate.
+Implementation must not begin until the branch-local SOW contains a concrete `## Pre-Implementation Gate` section with `Status: ready` or `Status: in-progress`. Before changing implementation files, or before continuing implementation in an existing SOW that lacks this section, fill the gate.
 
 The gate must record the problem/root-cause model, evidence reviewed, affected contracts and surfaces, existing patterns to reuse, risk and blast radius, sensitive data handling plan, implementation plan, validation plan, artifact impact plan, and open decisions. The sensitive data plan must cover SOWs, specs, documentation, project skills, agent instructions, and code comments. Generic placeholders such as `TBD`, `N/A`, or "to be checked later" are invalid unless the SOW explains why the item truly does not apply. If the gate exposes an unknown that cannot be resolved by investigation, stop and ask the user before implementation.
 
@@ -120,45 +155,92 @@ Trivial work does not need a SOW:
 
 When unsure, treat the work as non-trivial.
 
-### SOW Locations
+### SOW Locations And Naming
 
-- Pending: `.agents/sow/pending/`
-- Current: `.agents/sow/current/`
-- Done: `.agents/sow/done/`
+- Active branch-local SOWs: `.agents/sow/active/`
 - Specs: `.agents/sow/specs/`
 - Template for new SOWs: `.agents/sow/SOW.template.md`
 - Local audit: `.agents/sow/audit.sh`
+
+There is no `done/` directory and no committed pending queue. On `master`,
+`.agents/sow/active/` is empty except for `.gitkeep`; real SOW files exist only
+on feature branches and are deleted before merge.
 
 Create new SOW files from `.agents/sow/SOW.template.md`. The template is project-local and may be customized for this repository.
 
 Empty SOW directories must contain `.gitkeep` or `.keep` so the committed repository preserves the full SOW layout after clone/checkout.
 
+### Local SOW Parking
+
+Users may keep private paused, abandoned, or not-yet-public SOW drafts under
+`<repo-root>/.local/sow/`. This directory is gitignored and outside the project
+SOW lifecycle.
+
+Use `<repo-root>/.local/sow/` when the user wants to preserve work locally
+without creating a public or team-visible GitHub issue yet.
+
+Local parked SOWs are private memory only:
+
+- they are not durable project memory;
+- they are not visible to other contributors;
+- they are not acceptable as the only tracking for work that must coordinate a
+  team, block a merge, or survive across machines.
+
+Deferred work has two valid tracking paths:
+
+- public or team-visible follow-up: GitHub issue;
+- private or local follow-up: `<repo-root>/.local/sow/`.
+
+Active implementation work still MUST use `.agents/sow/active/`, and active SOW
+files still MUST be deleted before merge.
+
 Filename:
 
 ```text
-SOW-NNNN-YYYYMMDD-{slug}.md
+SOW-YYYYMMDD-{slug}.md
 ```
 
-Status and directory must agree:
+Use the creation date plus a descriptive slug. There is no sequential `NNNN`
+counter because it cannot be allocated safely across parallel branches.
 
-- `open` lives in `pending/`
-- `in-progress` lives in `current/`
-- `paused` lives in `current/`
-- `completed` lives in `done/`
-- `closed` lives in `done/`
+SOW state lives in the file's `Status:` field:
 
-### SOW Completion And Commit
+- `planning` - analysis or decisions are incomplete; implementation is blocked.
+- `ready` - the Pre-Implementation Gate is complete and implementation can start.
+- `in-progress` - implementation is underway.
+- `paused` - work is intentionally stopped but may resume on the branch.
+- `completed` - work is validated and durable memory has been transferred; this is a transient state before deleting the SOW file.
 
-The successful terminal SOW status is `completed`. `done` is a directory name, not a status value. Never write `Status: done` or `Status: complete`.
+### SOW Completion And Merge
 
-When a SOW's work is ready to close:
+The successful terminal SOW status is `completed`.
+
+When a SOW's work is ready to merge:
 
 1. Finish implementation, docs, specs, skills, validation, and follow-up mapping.
-2. Update the SOW to `Status: completed`.
-3. Move the SOW file to `.agents/sow/done/`.
-4. Commit the work, artifact updates, SOW status change, and SOW move together as one commit, unless the user explicitly requested a different commit split.
+2. Transfer all durable knowledge into `.agents/sow/specs/`, project skills, docs, code, and tests. After this step, the SOW body MUST hold nothing durable that is not captured elsewhere.
+3. Update the SOW to `Status: completed`.
+4. Delete the SOW working file before merge.
 
-Do not create a separate commit just to mark or move the SOW. Do not claim a SOW is completed while the implementation and the SOW lifecycle change live in separate uncommitted or separately committed states.
+The branch HEAD that merges MUST contain no `.agents/sow/active/SOW-*.md` file. CI enforces this.
+
+### Enforcement
+
+The SOW system is enforced by local audit tooling and CI:
+
+- `.agents/sow/audit.sh` is the local consistency audit for SOW rules, specs,
+  references, and sensitive-data scanning.
+- `.agents/sow/scan-sensitive.sh` is the shared sensitive-data scanner used by
+  local audit and CI.
+- `.github/workflows/sow.yml` rejects pull requests that contain branch-local
+  SOW working files under `.agents/sow/active/SOW-*.md` or legacy SOW working
+  files under `.agents/sow/{pending,current,done}/SOW-*.md`.
+- The same workflow scans changed SOW, spec, instruction, and cross-tool
+  bridge files for raw sensitive data.
+
+These checks are guards, not substitutes for the SOW Validation Gate. The
+assistant still owns transferring durable knowledge out of the SOW before
+merge.
 
 ### One SOW At A Time
 
@@ -166,7 +248,8 @@ Never execute multiple SOWs as one batch.
 
 If work overlaps:
 
-- merge or consolidate before implementation; or
+- coordinate through the relevant open PRs and issues;
+- merge or consolidate branches before implementation; or
 - split into separate SOWs and complete one before starting the next.
 
 Progress reports are not stop points. Once a SOW is in progress, continue until it is delivered, failed with evidence, blocked on a real user decision/approval, or superseded by newer user instructions.
@@ -189,7 +272,7 @@ Before a SOW can close, every valid deferred item must be:
 
 - implemented in the current SOW; or
 - explicitly rejected as not worth doing, with evidence; or
-- represented by a real pending/current SOW file.
+- represented by a GitHub issue linked from the current SOW or PR.
 
 Pre-close, search the SOW for:
 
@@ -201,19 +284,20 @@ Map every remaining item to implemented, rejected, or tracked.
 
 ### Regressions
 
-A regression is discovered after a SOW was considered completed or closed, later testing or use finds broken behavior, and the original SOW's claimed outcome is no longer true.
+A regression is broken behavior discovered after a SOW's work merged, where the
+original claimed outcome is no longer true.
 
-When behavior that a completed SOW claimed working stops working:
+Because completed SOWs are not retained on `master`, a regression is handled as
+new work:
 
-1. Find the original SOW in `done/`.
-2. Move it back to `current/`.
-3. Mark it `in-progress` with a regression note in `## Status`.
-4. Append a new dated `## Regression - YYYY-MM-DD` section at the end of the file, after the original outcome, lessons, and follow-up content.
-5. In that appended section, record what broke, evidence, why previous validation missed it, the repair plan, validation, and updates needed to specs, skills, docs, audits, or follow-up SOWs.
-6. Fix and validate there.
+1. Open a new branch-local SOW under `.agents/sow/active/`.
+2. In `## Requirements`, link the prior work: `Regresses: PR #NNNNN` and cite
+   any known commit, spec, issue, or test evidence.
+3. Run the normal Pre-Implementation Gate and Validation for the new SOW.
+4. Update the relevant spec, skill, doc, code, or test so durable memory reflects
+   current reality.
 
-Never prepend regression content above the original SOW narrative. The original requirements, analysis, plan, validation, outcome, lessons, and follow-up must remain readable first.
-Do not create a new SOW for a true regression.
+Do not attempt to resurrect or mutate a prior SOW.
 
 ### Validation Gate
 
@@ -225,7 +309,7 @@ A SOW cannot be completed until Validation records:
 - reviewer findings and how they were handled;
 - same-failure search results;
 - artifact maintenance gate for `AGENTS.md`, runtime project skills, specs, end-user/operator docs, end-user/operator skills, and SOW lifecycle;
-- SOW status/directory consistency;
+- SOW working file removed before merge;
 - spec update or specific reason no spec update was needed;
 - project skill update or specific reason no skill update was needed;
 - end-user/operator docs update or evidence-backed reason none were affected;
@@ -244,7 +328,7 @@ Every SOW close must explicitly record whether each durable artifact class was u
 - Specs - `.agents/sow/specs/` for WHAT the project does.
 - End-user/operator docs - README, docs site, runbooks, published guides, help text, or other human-facing documentation.
 - End-user/operator skills - output/reference skills copied or consumed outside normal repo work.
-- SOW lifecycle - split, merge, status, directory, deferred work, regression reopening, and follow-up mapping.
+- SOW lifecycle - branch-local active SOW, durable memory transfer, SOW deletion before merge, deferred work tracked as GitHub issues, and regressions handled as new linked SOWs.
 
 This is an assistant responsibility. If a SOW changes behavior, docs, specs, commands, schemas, defaults, workflows, examples, or operating procedure, the assistant must update every affected artifact in the same SOW, or record the evidence-backed reason an artifact is unaffected.
 
@@ -253,6 +337,12 @@ This is an assistant responsibility. If a SOW changes behavior, docs, specs, com
 Specs are memory of WHAT this project does.
 
 This repository is bootstrapped incrementally. The existing source tree and public documentation remain the primary ground truth. SOW specs under `.agents/sow/specs/` should capture durable project decisions, cross-cutting behavioral rules, and area-specific contracts as they are worked.
+
+`.agents/sow/specs/` stays flat until scale proves hierarchy is needed. Use
+`<domain>-<topic>.md` names, one durable contract or cross-cutting rule per file,
+and update `.agents/sow/specs/README.md` in the same change. Do not split specs
+by repository path; specs are organized by contract ownership, not source-file
+location.
 
 Update specs when shipped work changes:
 
@@ -336,7 +426,7 @@ Runtime input skills:
   Purpose: mirror maintainer-preferred framework V2 patterns from accepted collectors so new or migrated modules blend with repository style.
 
 - `.agents/skills/integrations-lifecycle/`
-  Trigger: editing any `metadata.yaml` or collector `taxonomy.yaml`; modifying `integrations/` generators, schemas, taxonomy registries, or templates; working with `integrations.js` / `integrations.json` / `integrations/taxonomy.json` / per-integration `.md` files / `COLLECTORS.md` / `SECRETS.md` / `SERVICE-DISCOVERY.md`; ibm.d module generation (`contexts.yaml` -> `metadata.yaml`); CI workflows `generate-integrations.yml` and `check-markdown.yml`; the collector-consistency rule.
+  Trigger: editing any `metadata.yaml` or collector `taxonomy.yaml`; modifying `integrations/` generators, schemas, taxonomy registries, or templates; debugging generated gitignored integration outputs (`integrations.js`, `integrations.json`, `integrations/taxonomy.json`); working with committed per-integration `.md` files / `COLLECTORS.md` / `SECRETS.md` / `SERVICE-DISCOVERY.md`; ibm.d module generation (`contexts.yaml` -> `metadata.yaml`); CI workflows `generate-integrations.yml` and `check-markdown.yml`; the collector-consistency rule.
   Status: live. SKILL.md plus per-domain guides (`pipeline.md`, `schema-reference.md`, `per-type-matrix.md`, `artifacts-and-banners.md`, `ibm-d.md`, `consistency.md`, `in-app-contract.md`, `gotchas.md`) and `recipes/`, `how-tos/` directories.
 
 - `.agents/skills/learn-site-structure/`
@@ -371,7 +461,7 @@ Runtime input skills:
 
 - `.agents/skills/codacy-audit/`
   Trigger: Codacy Cloud workflow for this repository -- pre-push local analysis (`codacy-analysis-cli` via docker or local binary) and read-only PR-issue fetching via the v3 API.
-  Status: live. SKILL.md plus `scripts/_lib.sh` (token-safe wrappers + sentinel no-leak self-test), `scripts/analyze-local.sh`, `scripts/pr-issues.sh`, and a live `how-tos/INDEX.md` catalog. Read-only by design; write actions deferred to a future SOW.
+  Status: live. SKILL.md plus `scripts/_lib.sh` (token-safe wrappers + sentinel no-leak self-test), `scripts/analyze-local.sh`, `scripts/pr-issues.sh`, and a live `how-tos/INDEX.md` catalog. Read-only by design; write actions require a GitHub issue or branch-local SOW.
 
 Public skills (canonical under `docs/netdata-ai/skills/<name>/`; relative symlinks at `.agents/skills/<name>`):
 
@@ -417,31 +507,10 @@ All existing project-specific instructions in this file remain active. The SOW f
 
 ## Collector Consistency Requirements
 
-When working on collectors (especially Go collectors), ALL of the following files MUST be kept in sync before creating a PR:
-
-1. **The code** - All .go files implementing the collector
-2. **metadata.yaml** - Proper information for the Netdata integrations page, including:
-   - Metric descriptions with correct units
-   - Alert definitions
-   - Setup instructions
-   - Configuration examples
-3. **config_schema.json** - Schema for dynamic configuration in the dashboard
-4. **Stock config file** (.conf file) - Example configuration users edit manually
-5. **Health alerts** (health.d/*.conf) - Alert definitions for the collector metrics
-6. **README.md** - Comprehensive documentation describing:
-   - What the collector monitors
-   - How it works
-   - Configuration options
-   - Troubleshooting
-7. **taxonomy.yaml** - Dashboard table-of-contents placement for the collector's chart contexts
-
-These files MUST be consistent with each other. For example:
-- If units change in code, they MUST be updated in metadata.yaml
-- If new metrics are added, they MUST be documented in metadata.yaml and README.md
-- If configuration options change, they MUST be updated in config_schema.json, stock config, and documentation
-- If chart contexts are added, removed, or renamed, taxonomy.yaml MUST still resolve to real metadata.yaml contexts or declared dynamic selectors
-
-Unlike the other consistency artifacts, taxonomy.yaml coverage is enforced fatally in CI by `integrations/check_collector_taxonomy.py` running in `.github/workflows/check-markdown.yml`.
+When working on collectors, runtime behavior, metrics, charts, configuration,
+alerts, taxonomy, and generated documentation MUST stay consistent in one PR.
+The detailed collector consistency checklist and CI enforcement notes live in
+`.agents/skills/integrations-lifecycle/consistency.md`.
 
 ## C code
 - gcc, clang, glibc and muslc

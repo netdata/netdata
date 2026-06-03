@@ -1,10 +1,14 @@
-# SOW-NNNN - <Title>
+# SOW-YYYYMMDD-<slug> - <Title>
 
 ## Status
 
-Status: open | in-progress | paused | completed | closed
+Status: planning | ready | in-progress | paused | completed
 
-`completed` is the successful terminal status. `done` is a directory name, not a status value. Do not use `Status: done` or `Status: complete`.
+`planning` means analysis or decisions are incomplete. `ready` means the
+Pre-Implementation Gate is complete and implementation can start. `completed`
+is a transient branch-local state before deleting this SOW working file before
+merge. SOW files live only under `.agents/sow/active/` on feature branches and
+MUST NOT be merged to `master`.
 
 Sub-state: <short current truth>
 
@@ -17,6 +21,8 @@ Sub-state: <short current truth>
 ### User Request
 
 <Concise quote or faithful summary. Do not lose constraints.>
+
+Regresses (optional): PR #NNNNN
 
 ### Assistant Understanding
 
@@ -61,7 +67,7 @@ Problem / root-cause model:
 
 Evidence reviewed:
 
-- <Specs, code, docs, tests, logs, traces, prior SOWs, issues, external references.>
+- <Specs, code, docs, tests, logs, traces, prior PRs/issues, external references.>
 - <For mirrored open-source repositories: cite `owner/repo @ commit` and repository-relative paths; never paste `/opt/baddisk/monitoring/repos/...` absolute paths.>
 
 Affected contracts and surfaces:
@@ -96,7 +102,7 @@ Artifact impact plan:
 - Specs: <expected update or reason likely unaffected>
 - End-user/operator docs: <expected update or reason likely unaffected>
 - End-user/operator skills: <expected update or reason likely unaffected>
-- SOW lifecycle: <split/merge/status/follow-up/regression handling>
+- SOW lifecycle: <branch-local working file; durable-knowledge targets (specs/skills/docs/code/tests); delete-before-merge; regression = new linked SOW; follow-up issues>
 
 Open-source reference evidence:
 
@@ -154,7 +160,7 @@ Artifact maintenance gate:
 - Specs: <updated .agents/sow/specs/ path or evidence-backed reason no update was needed>
 - End-user/operator docs: <updated docs/runbooks/help paths or evidence-backed reason none were affected>
 - End-user/operator skills: <updated output/reference skill paths or evidence-backed reason none were affected>
-- SOW lifecycle: <status/directory checked; if successful close, `Status: completed` and move to `.agents/sow/done/` are committed together with the work in one commit unless user explicitly requested a different split; split/merge/follow-up/regression handling recorded>
+- SOW lifecycle: <durable knowledge transferred to specs/skills/docs/code/tests; follow-ups moved to GitHub issues or rejected; `Status: completed` set; SOW working file deleted from the branch before merge so no SOW file reaches `master`; regression-as-new-SOW handling recorded>
 
 Specs update:
 
@@ -178,7 +184,7 @@ Lessons:
 
 Follow-up mapping:
 
-- <implemented/rejected/tracked>
+- <implemented/rejected/GitHub issue link>
 
 ## Outcome
 
@@ -188,12 +194,6 @@ Pending.
 
 Pending.
 
-## Followup
+## Follow-up Issues
 
 None yet.
-
-## Regression Log
-
-None yet.
-
-Append regression entries here only after this SOW was completed or closed and later testing or use found broken behavior. Use a dated `## Regression - YYYY-MM-DD` heading at the end of the file. Never prepend regression content above the original SOW narrative.
