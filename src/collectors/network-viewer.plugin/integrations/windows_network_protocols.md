@@ -88,8 +88,45 @@ There are no alerts configured by default for this integration.
 
 ## Live Data
 
-This collector exposes a real-time function for viewing Windows TCP and UDP stack statistics.
+This collector exposes real-time functions for viewing Windows network connections and TCP/UDP stack statistics.
 
+
+### Network Connections
+
+Shows active network connections on Windows with protocol details, states, addresses,
+ports, and process information.
+
+Each row represents one TCP connection or UDP endpoint and includes the socket direction
+(listen/inbound/outbound), protocol (tcp4/tcp6/udp4/udp6), TCP state, owning process
+(PID and name), username, server port name, local and remote addresses and ports,
+address space classification (loopback/private/public/multicast/zero), and server port number.
+
+Data is collected using the Windows IP Helper API (GetExtendedTcpTable,
+GetExtendedUdpTable) with process and user resolution via standard Windows APIs.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Perflibnetworkprotocols:network-connections` |
+| Require Cloud | no |
+| Performance |  |
+| Security |  |
+| Availability |  |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+This function has no parameters.
+
+#### Returns
+
+
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
 
 ### Network Protocols
 
