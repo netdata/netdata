@@ -16,6 +16,8 @@ Free users will have limited functionality.
 | Standalone Agent | UI is locked — No local monitoring                                                    |
 | Child Agent      | No monitoring data in parent dashboard when streaming to a Linux-based Netdata parent |
 
+**What does "UI is locked" mean?** When running the Standalone Agent as a free user, the local dashboard at `http://localhost:19999` is not accessible — the Agent collects metrics but cannot display them locally. To view your Windows monitoring data, you must [connect the Agent to Netdata Cloud](https://app.netdata.cloud). Upgrading to a paid Netdata subscription unlocks the local dashboard for full monitoring without Cloud dependency.
+
 ## Download the Windows Installer (MSI)
 
 Choose the version that suits your needs:
