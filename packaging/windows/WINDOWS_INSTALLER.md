@@ -83,6 +83,12 @@ $ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest https://github.com/n
 
 ## Access Netdata Dashboard
 
+After installation, verify the Netdata service is running:
+
+```powershell
+Get-Service Netdata
+```
+
 After installation, open your browser and go to:
 
 ```
@@ -209,7 +215,7 @@ Conversion pattern:
 
 - Replace the drive letter with its lowercase equivalent preceded by `/` (e.g., `C:` → `/c`, `D:` → `/d`)
 - Replace backslashes `\` with forward slashes `/`
-- Keep spaces as they are
+- Keep spaces in the path, but quote or escape the full path when using it in shell commands
 
 Examples:
 
