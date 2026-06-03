@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/l2topology"
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/stretchr/testify/require"
 )

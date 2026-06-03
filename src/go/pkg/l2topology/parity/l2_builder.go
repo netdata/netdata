@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/topology/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
 // BuildOptions configures protocol extraction when converting walk fixtures

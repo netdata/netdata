@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/pkg/topology/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/stretchr/testify/require"
 )
 

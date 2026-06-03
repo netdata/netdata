@@ -10,7 +10,7 @@ import (
 
 	"github.com/gosnmp/gosnmp"
 
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/l2topology"
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"

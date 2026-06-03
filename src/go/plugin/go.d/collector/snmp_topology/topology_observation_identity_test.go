@@ -5,7 +5,7 @@ package snmptopology
 import (
 	"testing"
 
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/l2topology"
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/stretchr/testify/require"
 )
 

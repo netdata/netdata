@@ -24,8 +24,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/topology/l2topology"
-	"github.com/netdata/netdata/go/plugins/pkg/topology/l2topology/parity"
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/parity"
 )
 
 const (

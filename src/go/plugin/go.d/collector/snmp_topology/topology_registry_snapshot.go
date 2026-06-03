@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/l2topology"
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
 type topologyObservationSnapshot struct {

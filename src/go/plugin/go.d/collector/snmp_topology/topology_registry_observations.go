@@ -5,7 +5,7 @@ package snmptopology
 import (
 	"sort"
 
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/l2topology"
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
 func (r *topologyRegistry) activeCaches() []*topologyCache {
