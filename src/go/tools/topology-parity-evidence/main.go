@@ -24,8 +24,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/topology/engine"
-	"github.com/netdata/netdata/go/plugins/pkg/topology/engine/parity"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/l2topology/parity"
 )
 
 const (
@@ -723,7 +723,7 @@ func expectedBehaviorSnapshot(golden parity.GoldenDocument) behaviorOracleSnapsh
 	}
 }
 
-func actualBehaviorSnapshot(result engine.Result) behaviorOracleSnapshot {
+func actualBehaviorSnapshot(result l2topology.Result) behaviorOracleSnapshot {
 	devices := make([]parity.GoldenDevice, 0, len(result.Devices))
 	for _, dev := range result.Devices {
 		devices = append(devices, parity.GoldenDevice{
@@ -1713,7 +1713,7 @@ func enabledProtocols(protocols parity.ManifestProtocols) []string {
 	return out
 }
 
-func resultAdjacencyKeySet(adjacencies []engine.Adjacency) map[string]struct{} {
+func resultAdjacencyKeySet(adjacencies []l2topology.Adjacency) map[string]struct{} {
 	out := make(map[string]struct{}, len(adjacencies))
 	for _, adj := range adjacencies {
 		out[fmt.Sprintf("%s|%s|%s|%s|%s", adj.Protocol, adj.SourceID, adj.SourcePort, adj.TargetID, adj.TargetPort)] = struct{}{}

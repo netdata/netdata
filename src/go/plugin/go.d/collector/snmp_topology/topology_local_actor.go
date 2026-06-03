@@ -2,7 +2,7 @@
 
 package snmptopology
 
-import topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/engine"
+import topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/l2topology"
 
 func augmentLocalActorFromCache(data *topologyData, local topologyDevice) {
 	if data == nil || len(data.Actors) == 0 {

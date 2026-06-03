@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/engine"
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/l2topology"
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 )
 

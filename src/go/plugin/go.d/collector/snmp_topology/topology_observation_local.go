@@ -5,7 +5,7 @@ package snmptopology
 import (
 	"strings"
 
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/engine"
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/l2topology"
 )
 
 func (c *topologyCache) buildEngineObservation(local topologyDevice) topologyengine.L2Observation {
