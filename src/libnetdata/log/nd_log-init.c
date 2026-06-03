@@ -321,11 +321,18 @@ void nd_log_reopen_log_files_for_spawn_server(const char *name) {
     stacktrace_forked();
 #endif
 
+#if !defined(OS_WINDOWS)
+    // closelog() is a libc syslog API that does not exist on Windows.
+    // The syslog channel is never initialised on Windows (the
+    // nd_log_init_syslog() stub in nd_log-to-syslog.c leaves
+    // nd_log.syslog.initialized = false), so this block is unreachable
+    // there at runtime; the #if avoids referencing the symbol at link time.
     if(nd_log.syslog.initialized) {
         closelog();
         nd_log.syslog.initialized = false;
         nd_log_init_syslog();
     }
+#endif
 
     if(nd_log.journal_direct.initialized) {
         close(nd_log.journal_direct.fd);

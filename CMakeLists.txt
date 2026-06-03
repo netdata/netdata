@@ -126,6 +126,17 @@ function(netdata_windows_path_to_runtime_path output_var input_path)
 endfunction()
 
 if(OS_WINDOWS)
+  # UCRT exposes Microsoft's rand_s() in <stdlib.h> but only when
+  # _CRT_RAND_S is defined before <stdlib.h> is first parsed. Setting
+  # it via a directory-level compile definition guarantees it's in
+  # effect before ANY translation unit touches <stdlib.h>, regardless
+  # of which include orders other headers walk. Defining it inside
+  # common.h was insufficient because the macro must be set before
+  # <stdlib.h>'s `#ifdef _CRT_RAND_S` block runs, and the include
+  # graph in some translation units pulls <stdlib.h> via paths that
+  # don't visit common.h's preamble first.
+  add_compile_definitions(_CRT_RAND_S)
+
   set(NETDATA_WINDOWS_PATH_PREFIX "C:\\Program Files\\Netdata" CACHE STRING
       "Native Windows install prefix used to derive runtime paths")
   string(REGEX REPLACE "[/\\\\]+$" "" NETDATA_WINDOWS_PATH_PREFIX "${NETDATA_WINDOWS_PATH_PREFIX}")
@@ -241,8 +252,22 @@ mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
 cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's journal file reader implementation" False "ENABLE_PLUGIN_SYSTEMD_JOURNAL" False)
 
-# Setup Rust/Corrosion for plugins that need it
-if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER OR ENABLE_PLUGIN_NETFLOW)
+# Build a tiny Rust staticlib and link it into the main `netdata` binary so
+# that hosts actually exercise the Rust toolchain. The crate is self-contained
+# and has no runtime dependencies.
+#
+# Default is OFF so source-tarball builds and CI environments that do not
+# pre-install a Rust toolchain are not silently forced to. Opt in with
+# -DENABLE_RUST_DEMO=On per build. The Windows build flips this to On at the
+# end of SOW-0033 (Phase 7) to validate Rust-on-Windows end-to-end.
+option(ENABLE_RUST_DEMO "Build the rust-demo smoke crate and link it into netdata" False)
+
+# Setup Rust/Corrosion for plugins (and the Windows wevt-builder build tool) that need it.
+# The Windows build always pulls in wevt-builder because the wevt resource pipeline is the
+# Rust toolchain's first production-path job under MSYSTEM=UCRT64 (replaces the old
+# wevt_netdata_compile.sh/.bat chain that depended on the MSYS POSIX cmake routing
+# COMMAND through /bin/sh).
+if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER OR ENABLE_PLUGIN_NETFLOW OR ENABLE_RUST_DEMO OR OS_WINDOWS)
     include(FetchContent)
     FetchContent_Declare(
         Corrosion
@@ -260,6 +285,22 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
     if(ENABLE_NETDATA_JOURNAL_FILE_READER)
         corrosion_import_crate(MANIFEST_PATH src/crates/jf/Cargo.toml
                                CRATES journal_reader_ffi)
+    endif()
+
+    if(ENABLE_RUST_DEMO)
+        corrosion_import_crate(MANIFEST_PATH src/crates/rust-demo/Cargo.toml
+                               CRATES rust_demo)
+    endif()
+
+    if(OS_WINDOWS)
+        # wevt-builder is a build-time orchestrator for mc.exe / rc.exe /
+        # link.exe (the Windows Event Log resource pipeline). It replaces
+        # the old wevt_netdata_compile.{sh,bat} + find-sdk-path.sh chain
+        # that worked only when cmake routed COMMAND through /bin/sh -- a
+        # property of the MSYS-runtime cmake at /usr/bin/cmake, not the
+        # UCRT64 cmake at /ucrt64/bin/cmake.exe that we now use.
+        corrosion_import_crate(MANIFEST_PATH src/crates/wevt-builder/Cargo.toml
+                               CRATES wevt-builder)
     endif()
 
     # Import crates from the main cargo workspace
@@ -429,7 +470,11 @@ if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUG
     find_package(Go "${MIN_GO_VERSION}" REQUIRED)
 endif()
 
-if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS)
+if((ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS) AND NOT OS_WINDOWS)
+    # ndsudo is a setuid privilege-drop helper that plugins use to drop
+    # to the netdata user before running. POSIX-only (setuid/setgid/setegid);
+    # Windows has no equivalent and netdata.exe runs under a configured
+    # service account instead.
     set(NEED_NDSUDO TRUE)
 else()
     set(NEED_NDSUDO FALSE)
@@ -619,7 +664,14 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     # -funwind-tables = generate unwind tables for all functions
     # -fasynchronous-unwind-tables = the unwind table generated is precise at instruction boundary, instead of function boundary
     add_compile_options(-fno-omit-frame-pointer -funwind-tables -fasynchronous-unwind-tables)
-    add_link_options(-rdynamic)
+    # -rdynamic exports all dynamic symbols so backtrace can resolve them
+    # at runtime. ELF/Mach-O linkers support it; the mingw-w64 binutils
+    # ld variant on Windows doesn't (PE/COFF exports work through
+    # __declspec(dllexport) or .def files instead). Skip on Windows
+    # so NetdataClaim / windows-events.plugin / etc. can link.
+    if(NOT OS_WINDOWS)
+        add_link_options(-rdynamic)
+    endif()
     message(STATUS "Added compiler and linker flags for better stack trace support")
 endif()
 
@@ -1239,6 +1291,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/process_memory.h
         src/libnetdata/os/dir_size.c
         src/libnetdata/os/dir_size.h
+        src/libnetdata/os/os_dirent.c
+        src/libnetdata/os/os_dirent.h
         src/libnetdata/signals/signal-code.c
         src/libnetdata/signals/signal-code.h
 )
@@ -1247,6 +1301,8 @@ if(OS_WINDOWS)
     set(LIBNETDATA_WIN_FILES
             src/libnetdata/os/windows-api/windows_api.c
             src/libnetdata/os/windows-api/windows_api.h
+            src/libnetdata/memory/mman-win32.c
+            src/libnetdata/memory/mman-win32.h
     )
 
     list(APPEND LIBNETDATA_FILES ${LIBNETDATA_WIN_FILES})
@@ -2428,8 +2484,6 @@ if(OS_WINDOWS)
                 set(WEVT_GEN_SRC_C_FILE "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_mc_generate.c")
                 set(WEVT_GEN_BIN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_mc_generate")
 
-                set(WEVT_BUILD_SCRIPT "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_compile.sh")
-
                 set(WEVT_MC_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.mc")
                 set(WEVT_MAN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_manifest.xml")
                 set(WEVT_RC_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.rc")
@@ -2444,15 +2498,20 @@ if(OS_WINDOWS)
                 # and the headers required for compiling libnetdata/logs
 
                 if(HAVE_ETW)
-                        # ETW method also supports WEL
-                        # but it requires Microsoft tools mc, rc, and link
+                        # ETW method also supports WEL.
+                        # Resource compilation requires the Microsoft mc/rc/link
+                        # toolchain, orchestrated by the wevt-builder Rust crate
+                        # (src/crates/wevt-builder). The previous bash+cmd.exe
+                        # wrapper worked only under MSYS-runtime cmake routing
+                        # COMMAND through /bin/sh -- a property the UCRT64 cmake
+                        # we now use does not share.
                         add_custom_command(
                                 OUTPUT "${WEVT_MC_H_FILE}" "${WEVT_MAN_H_FILE}" "${WEVT_DLL_FILE}"
                                 COMMAND "${CMAKE_C_COMPILER}" -o "${WEVT_GEN_BIN_FILE}" "${WEVT_GEN_SRC_C_FILE}"
                                 COMMAND "${WEVT_GEN_BIN_FILE}" >"${WEVT_MC_FILE}"
                                 COMMAND "${WEVT_GEN_BIN_FILE}" --manifest >"${WEVT_MAN_FILE}"
-                                COMMAND "${WEVT_BUILD_SCRIPT}" "${CMAKE_SOURCE_DIR}/src/libnetdata/log" "${CMAKE_BINARY_DIR}"
-                                DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}"
+                                COMMAND $<TARGET_FILE:wevt-builder> "${CMAKE_BINARY_DIR}"
+                                DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}" wevt-builder
                                 COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_MC_H_FILE} and ${WEVT_DLL_FILE}"
                         )
                 else()
@@ -2655,6 +2714,7 @@ if(CAP_FOUND)
   set(HAVE_CAPABILITY True)
 endif()
 
+if(NOT OS_WINDOWS)
 set(NDRUN_FILES src/collectors/utils/nd-run.c)
 add_executable(nd-run ${NDRUN_FILES})
 if(CAP_FOUND)
@@ -2664,6 +2724,7 @@ target_include_directories(nd-run PRIVATE ${CONFIG_H_DIR})
 install(TARGETS nd-run
         COMPONENT netdata
         DESTINATION "${BINDIR}")
+endif() # NOT OS_WINDOWS (nd-run is a POSIX privilege-drop helper)
 
 #
 # build plugins
@@ -2721,8 +2782,14 @@ if(ENABLE_PLUGIN_DEBUGFS)
     endif()
 endif()
 
-add_executable(spawn-tester src/libnetdata/spawn_server/spawn-tester.c)
-target_link_libraries(spawn-tester libnetdata)
+if(NOT OS_WINDOWS)
+    # spawn-tester exercises the SPAWN_SERVER_VERSION_NOFORK (POSIX
+    # fork+exec) path via raw fcntl/pipe/socket primitives. The Windows
+    # spawn-server is a separate implementation (SPAWN_SERVER_VERSION_WINDOWS)
+    # and is exercised through netdata.exe directly.
+    add_executable(spawn-tester src/libnetdata/spawn_server/spawn-tester.c)
+    target_link_libraries(spawn-tester libnetdata)
+endif()
 
 if(ENABLE_PLUGIN_APPS)
     set(APPS_PLUGIN_FILES
@@ -3261,7 +3328,24 @@ if(OS_WINDOWS)
         set_target_properties(netdata_driver PROPERTIES LIBRARY_OUTPUT_NAME "netdata_driver")
         set_target_properties(netdata_driver PROPERTIES PREFIX "")
         set_target_properties(netdata_driver PROPERTIES SUFFIX ".sys")
-        target_include_directories(netdata_driver PRIVATE BEFORE "/mingw64/include/ddk" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/driver")
+        # The mingw-w64 DDK headers live under <prefix>/include/ddk for
+        # whichever MSYSTEM the toolchain belongs to. Under the old MSYS
+        # cmake (a Cygwin binary), the literal path "/mingw64/include/ddk"
+        # got POSIX-translated transparently. Under the UCRT64 cmake we
+        # now use (a native Windows binary), there is no POSIX translation:
+        # "/mingw64/..." gets interpreted as a Windows root-relative path
+        # and resolves to <build-drive>:\mingw64\..., which doesn't exist.
+        #
+        # Use $ENV{MINGW_PREFIX} (set by MSYSTEM=UCRT64 to /ucrt64) and
+        # let cmake's path machinery resolve it to a real Windows path.
+        # The DDK headers ship in the same package on both MINGW64 and
+        # UCRT64 -- only the install prefix differs.
+        #
+        # NOTE: BEFORE must precede the scope keyword (PRIVATE) in the
+        # target_include_directories signature -- otherwise cmake parses
+        # it as another include-path component and silently emits
+        # `-IBEFORE`.
+        target_include_directories(netdata_driver BEFORE PRIVATE "$ENV{MINGW_PREFIX}/include/ddk" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/driver")
         target_compile_options(netdata_driver PRIVATE
                 -Wall
                 -Wextra
@@ -3313,6 +3397,11 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
         "$<$<BOOL:${OS_WINDOWS}>:odbc32;setupapi>"
 )
+
+if(ENABLE_RUST_DEMO)
+        target_compile_definitions(netdata PRIVATE HAVE_RUST_DEMO)
+        target_link_libraries(netdata PRIVATE rust_demo)
+endif()
 
 netdata_add_protobuf(netdata)
 
@@ -4271,16 +4360,66 @@ install(CODE "
 #
 
 if(OS_WINDOWS)
-        install(FILES /usr/bin/msys-protobuf-32.dll
-                      /usr/bin/msys-yaml-0-2.dll
-                      /usr/bin/msys-uv-1.dll
-                      DESTINATION "${BINDIR}")
+        # Bundle the UCRT64 runtime DLLs our binaries link against.
+        # Master shipped the MSYS-runtime variants (msys-protobuf-32.dll,
+        # msys-yaml-0-2.dll, msys-uv-1.dll) hard-coded by name from
+        # /usr/bin, because the MSYS shell build linked everything
+        # against the Cygwin-style msys-2.0.dll. Under MSYSTEM=UCRT64
+        # we link against native Windows libs from $MINGW_PREFIX/bin,
+        # with different names (libprotobuf-33.X.dll, libyaml-0-2.dll,
+        # libuv-1.dll, plus libabsl_*.dll for the abseil deps that
+        # protobuf 22+ pulls in).
+        #
+        # Glob the patterns rather than hard-listing the abseil files:
+        # there are 40+ libabsl_*.dll files and the set changes with
+        # each upstream release. Plus the gcc/stdc++ runtime, plus the
+        # OpenSSL/libcurl chain. CONFIGURE_DEPENDS makes cmake re-eval
+        # if the MSYS2 package set changes between configure and build.
+        set(_NETDATA_MINGW_BIN "$ENV{MINGW_PREFIX}/bin")
+        file(GLOB _NETDATA_RUNTIME_DLLS CONFIGURE_DEPENDS
+            "${_NETDATA_MINGW_BIN}/libprotobuf-*.dll"
+            "${_NETDATA_MINGW_BIN}/libabsl_*.dll"
+            "${_NETDATA_MINGW_BIN}/libyaml-*.dll"
+            "${_NETDATA_MINGW_BIN}/libuv-*.dll"
+            "${_NETDATA_MINGW_BIN}/libwinpthread-*.dll"
+            "${_NETDATA_MINGW_BIN}/libgcc_s_*.dll"
+            "${_NETDATA_MINGW_BIN}/libstdc++*.dll"
+            "${_NETDATA_MINGW_BIN}/libssl-*.dll"
+            "${_NETDATA_MINGW_BIN}/libcrypto-*.dll"
+            "${_NETDATA_MINGW_BIN}/libcurl-*.dll"
+            "${_NETDATA_MINGW_BIN}/zlib*.dll"
+            "${_NETDATA_MINGW_BIN}/liblz4-*.dll"
+            "${_NETDATA_MINGW_BIN}/libzstd-*.dll"
+            "${_NETDATA_MINGW_BIN}/libbrotli*.dll"
+            "${_NETDATA_MINGW_BIN}/libpcre2-*.dll"
+            "${_NETDATA_MINGW_BIN}/libiconv-*.dll"
+            "${_NETDATA_MINGW_BIN}/libidn2-*.dll"
+            "${_NETDATA_MINGW_BIN}/libssh2-*.dll"
+            "${_NETDATA_MINGW_BIN}/libnghttp*-*.dll"
+            "${_NETDATA_MINGW_BIN}/libpsl-*.dll"
+            "${_NETDATA_MINGW_BIN}/libcares-*.dll"
+            "${_NETDATA_MINGW_BIN}/libgnutls-*.dll"
+            "${_NETDATA_MINGW_BIN}/libnettle-*.dll"
+            "${_NETDATA_MINGW_BIN}/libgmp-*.dll"
+            "${_NETDATA_MINGW_BIN}/libhogweed-*.dll"
+            "${_NETDATA_MINGW_BIN}/libtasn1-*.dll"
+            "${_NETDATA_MINGW_BIN}/libunistring-*.dll"
+            "${_NETDATA_MINGW_BIN}/libp11-kit-*.dll"
+            "${_NETDATA_MINGW_BIN}/libffi-*.dll"
+        )
+        if(_NETDATA_RUNTIME_DLLS)
+            install(FILES ${_NETDATA_RUNTIME_DLLS} DESTINATION "${BINDIR}")
+        endif()
 
         # Make bash & netdata happy
         install(DIRECTORY DESTINATION tmp)
 
-        # Make curl work with ssl
-        install(DIRECTORY /usr/ssl DESTINATION usr)
+        # Make curl work with ssl. The MSYS cmake installed /usr/ssl
+        # (Cygwin-style); under UCRT64 the OpenSSL package lives at
+        # $MINGW_PREFIX/etc/ssl with the same role.
+        if(IS_DIRECTORY "$ENV{MINGW_PREFIX}/etc/ssl")
+            install(DIRECTORY "$ENV{MINGW_PREFIX}/etc/ssl" DESTINATION usr/etc)
+        endif()
 endif()
 
 #

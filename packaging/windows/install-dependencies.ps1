@@ -70,6 +70,7 @@ if (-Not ($msysprefix)) {
 
 $msysbash = Get-MSYS2Bash "$msysprefix"
 $env:CHERE_INVOKING = 'yes'
+$env:MSYSTEM = 'UCRT64'
 
 & $msysbash -l "$PSScriptRoot\msys2-dependencies.sh"
 

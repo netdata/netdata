@@ -3,6 +3,39 @@
 #include "signal-code.h"
 #include "libnetdata/libnetdata.h"
 
+#if defined(OS_WINDOWS)
+
+// UCRT64 has none of the POSIX SIGUSR1/SIGCHLD/SIGCONT/.../SIGRTMIN
+// signal numbers, the SI_USER/SI_TIMER/.../SI_DETHREAD si_code values,
+// or the per-signal sub-codes (ILL_*, FPE_*, SEGV_*, BUS_*, TRAP_*).
+// They are all Linux/POSIX kernel-API constants that never appear on a
+// native Windows process -- the signal model is fundamentally different
+// (SEH for memory faults, SetConsoleCtrlHandler for Ctrl+C, etc.).
+//
+// Rather than mirror 50+ macro defines that exist purely to give
+// signal-handler diagnostics a string name, stub the three public
+// functions with the hex-fallback behaviour the full implementation
+// already uses for unknown values. Logs on Windows will show codes as
+// "0xNNNN" instead of "SIGFOO/SI_BAR" -- acceptable because the
+// underlying signals never actually fire there. Restore the full
+// table-driven path on POSIX.
+
+SIGNAL_CODE signal_code(int signo, int si_code) {
+    return ((SIGNAL_CODE)signo << 32) | (uint32_t)si_code;
+}
+
+void SIGNAL_CODE_2str_h(SIGNAL_CODE code, char *buf, size_t size) {
+    if(!buf || !size) return;
+    snprintfz(buf, size, "0x%" PRIx64, (uint64_t)code);
+}
+
+SIGNAL_CODE SIGNAL_CODE_2id_h(const char *str) {
+    if(!str || !*str) return 0;
+    return (SIGNAL_CODE)strtoull(str, NULL, 0);
+}
+
+#else // !OS_WINDOWS
+
 #define SIG_NOT_FOUND 0xFFFFFFF
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -265,3 +298,5 @@ SIGNAL_CODE SIGNAL_CODE_2id_h(const char *str) {
 SIGNAL_CODE signal_code(int signo, int si_code) {
     return SIGNAL_CODE_CREATE(signo, si_code);
 }
+
+#endif // !OS_WINDOWS

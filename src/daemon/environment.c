@@ -15,7 +15,7 @@ void verify_required_directory(const char *env, const char *dir, bool create_it,
     }
 
     if(create_it) {
-        if(mkdir(dir, perms) == 0) {
+        if(nd_mkdir(dir, perms) == 0) {
             if(env)
                 nd_setenv(env, dir, 1);
             return;

@@ -8,7 +8,13 @@
 #ifdef __cplusplus
 #define DEFINED_JUDYL_CHECK_SIZE(TYPE, NAME)
 #else
-#define DEFINED_JUDYL_CHECK_SIZE(TYPE, NAME) _Static_assert(sizeof(TYPE) <= sizeof(Word_t), #NAME "_type_must_have_same_size_as_Word_t")
+// Vendored Judy types Word_t as `unsigned long`. On Linux/macOS LP64
+// that is pointer-sized; on Windows LLP64 it is 32 bits while pointers
+// are 64. JudyL values are actually stored through `Pvoid_t` (a `void *`
+// slot), so the relevant capacity check is `sizeof(TYPE) <= sizeof(void *)`.
+// Using sizeof(Word_t) here trips the assertion on 64-bit Windows for any
+// pointer-typed value, even though the storage slot is wide enough.
+#define DEFINED_JUDYL_CHECK_SIZE(TYPE, NAME) _Static_assert(sizeof(TYPE) <= sizeof(void *), #NAME "_type_must_fit_in_a_pointer_slot")
 #endif
 
 

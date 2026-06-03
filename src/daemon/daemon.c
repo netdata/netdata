@@ -17,16 +17,17 @@ static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t
     struct dirent *de = NULL;
 
     while ((de = readdir(dir))) {
-        if (de->d_type == DT_DIR && (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")))
+        unsigned char dtype = os_dirent_type(dirname, de);
+        if (dtype == DT_DIR && (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")))
             continue;
 
         (void) snprintfz(filename, FILENAME_MAX, "%s/%s", dirname, de->d_name);
-        if (de->d_type == DT_REG || recursive) {
+        if (dtype == DT_REG || recursive) {
             if (chown(filename, uid, gid) == -1)
-                netdata_log_error("Cannot chown %s '%s' to %u:%u", de->d_type == DT_DIR ? "directory" : "file", filename, (unsigned int)uid, (unsigned int)gid);
+                netdata_log_error("Cannot chown %s '%s' to %u:%u", dtype == DT_DIR ? "directory" : "file", filename, (unsigned int)uid, (unsigned int)gid);
         }
 
-        if (de->d_type == DT_DIR && recursive)
+        if (dtype == DT_DIR && recursive)
             fix_directory_file_permissions(filename, uid, gid, recursive);
     }
 
@@ -51,7 +52,7 @@ static inline void clean_directory(const char *dirname)
     struct dirent *de = NULL;
 
     while((de = readdir(dir)))
-        if(de->d_type == DT_REG)
+        if(os_dirent_type(dirname, de) == DT_REG)
             if (unlinkat(dir_fd, de->d_name, 0))
                 netdata_log_error("Cannot delete %s/%s", dirname, de->d_name);
 

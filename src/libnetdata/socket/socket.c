@@ -225,6 +225,14 @@ int sock_setcork(int fd __maybe_unused, bool cork __maybe_unused) {
 
 // Returns -1 for errors, 0 if O_NONBLOCK is unset, 1 if O_NONBLOCK is set
 int sock_setnonblock(int fd, bool nonblock) {
+#if defined(OS_WINDOWS)
+    // Winsock sockets are toggled non-blocking via ioctlsocket(FIONBIO).
+    // fcntl(F_SETFL, O_NONBLOCK) does not work for SOCKETs on Windows.
+    u_long mode = nonblock ? 1UL : 0UL;
+    if (ioctlsocket((SOCKET)fd, FIONBIO, &mode) == 0)
+        return nonblock ? 1 : 0;
+    return -1;
+#else
     int rc = -1;
     int flags = fcntl(fd, F_GETFL);
 
@@ -246,6 +254,7 @@ int sock_setnonblock(int fd, bool nonblock) {
     }
 
     return rc;
+#endif
 }
 
 // Returns -1 for errors, 0 if SO_REUSEADDR is unset, 1 if SO_REUSEADDR is set
@@ -298,6 +307,20 @@ int sock_setreuse_port(int fd __maybe_unused, bool reuse __maybe_unused) {
 
 // Returns -1 for errors, 0 if FD_CLOEXEC is unset, 1 if FD_CLOEXEC is set
 int sock_setcloexec(int fd, bool cloexec) {
+#if defined(OS_WINDOWS)
+    // Windows has no FD_CLOEXEC; close-on-exec maps to the Win32
+    // handle-inherit flag. Sockets created via socket()/WSASocket()
+    // are inheritable by default unless WSA_FLAG_NO_HANDLE_INHERIT was
+    // passed. Clearing HANDLE_FLAG_INHERIT achieves the same effect
+    // as setting FD_CLOEXEC on POSIX: the handle is not duplicated
+    // into child processes spawned by CreateProcess.
+    HANDLE h = (HANDLE)(uintptr_t)fd; // socket fd IS the SOCKET handle on Windows
+    DWORD mask = HANDLE_FLAG_INHERIT;
+    DWORD desired = cloexec ? 0 : HANDLE_FLAG_INHERIT;
+    if (!SetHandleInformation(h, mask, desired))
+        return -1;
+    return cloexec ? 1 : 0;
+#else
     int rc = -1;
 
     // Get current file descriptor flags
@@ -320,6 +343,7 @@ int sock_setcloexec(int fd, bool cloexec) {
     }
 
     return rc;
+#endif
 }
 
 // Returns -1 for errors, 0 if TCP_DEFER_ACCEPT is unset, 1 if TCP_DEFER_ACCEPT is set
@@ -522,9 +546,24 @@ ssize_t send_timeout(NETDATA_SSL *ssl, int sockfd, void *buf, size_t len, int fl
 #ifndef HAVE_ACCEPT4
 int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
     int fd = accept(sock, addr, addrlen);
-    int newflags = 0;
-
     if (fd < 0) return fd;
+
+#if defined(OS_WINDOWS)
+    // Winsock has plain accept() but no Linux SOCK_CLOEXEC /
+    // SOCK_NONBLOCK accept-flag mechanism. DEFAULT_SOCKET_FLAGS
+    // expands to 0 on Windows (SOCK_CLOEXEC undefined), and the only
+    // poll-events caller routes non-blocking through
+    // sock_setnonblock() post-accept, so the only valid flags value
+    // we can ever see here is 0. Reject anything else loudly rather
+    // than silently dropping a requested flag.
+    if (flags) {
+        closesocket((SOCKET)fd);
+        errno = EINVAL;
+        return -1;
+    }
+    return fd;
+#else
+    int newflags = 0;
 
 #ifdef SOCK_CLOEXEC
 #ifdef O_CLOEXEC
@@ -549,6 +588,7 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
     }
 
     return fd;
+#endif
 }
 #endif
 

@@ -4,6 +4,14 @@
 #include "../libnetdata.h"
 
 bool is_path_unix_socket(const char *path) {
+#if defined(OS_WINDOWS)
+    // systemd-journald is Linux-only; Windows has no Unix-domain
+    // socket on disk to recognise. S_ISSOCK and <sys/un.h> aren't
+    // available on UCRT64 either. Short-circuiting here makes the
+    // higher-level journal callers fall through to Event Log / ETW.
+    (void)path;
+    return false;
+#else
     // Check if the path is valid
     if(!path || !*path)
         return false;
@@ -20,9 +28,18 @@ bool is_path_unix_socket(const char *path) {
         return true;
 
     return false;
+#endif
 }
 
 bool is_stderr_connected_to_journal(void) {
+#if defined(OS_WINDOWS)
+    // The JOURNAL_STREAM env var is set by systemd when launching a
+    // service so the service can recognise its own stderr connection.
+    // It is never set on Windows; short-circuit and avoid the dev_t /
+    // ino_t comparisons (their UCRT widths differ from the Linux ones
+    // anyway).
+    return false;
+#else
     const char *journal_stream = getenv("JOURNAL_STREAM");
     if (!journal_stream)
         return false; // JOURNAL_STREAM is not set
@@ -40,9 +57,17 @@ bool is_stderr_connected_to_journal(void) {
     long journal_ino = strtol(endptr + 1, NULL, 10);
 
     return (stderr_stat.st_dev == (dev_t)journal_dev) && (stderr_stat.st_ino == (ino_t)journal_ino);
+#endif
 }
 
 int journal_direct_fd(const char *path) {
+#if defined(OS_WINDOWS)
+    // No <sys/un.h> on UCRT64, and systemd-journald has no presence
+    // on Windows to talk to anyway. Callers gate on this returning
+    // -1 and fall through to Event Log / ETW.
+    (void)path;
+    return -1;
+#else
     if(!path || !*path)
         path = JOURNAL_DIRECT_SOCKET;
 
@@ -66,6 +91,7 @@ int journal_direct_fd(const char *path) {
     }
 
     return fd;
+#endif
 }
 
 static inline bool journal_send_with_memfd(int fd __maybe_unused, const char *msg __maybe_unused, size_t msg_len __maybe_unused) {

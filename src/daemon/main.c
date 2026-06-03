@@ -16,6 +16,10 @@
 #include "win_system-info.h"
 #endif
 
+#ifdef HAVE_RUST_DEMO
+#include "crates/rust-demo/rust_demo.h"
+#endif
+
 #ifdef ENABLE_SENTRY
 #include "sentry-native/sentry-native.h"
 #endif
@@ -1211,6 +1215,15 @@ int netdata_main(int argc, char **argv) {
         "Enjoy X-Ray Vision for your infrastructure!",
         NETDATA_VERSION, sqlite3_libversion(),
         (ready_ut - started_ut) / USEC_PER_MS, median_start_time / USEC_PER_MS);
+
+#ifdef HAVE_RUST_DEMO
+    {
+        int32_t rust_sum = nd_rust_add(2, 3);
+        const char *rust_ver = nd_rust_version();
+        netdata_log_info("RUST FFI smoke: %s reports nd_rust_add(2, 3) = %d",
+                         rust_ver ? rust_ver : "(null)", rust_sum);
+    }
+#endif
 
     cleanup_agent_event_log();
     netdata_ready_store(true);

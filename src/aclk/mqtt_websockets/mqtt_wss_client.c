@@ -160,7 +160,12 @@ mqtt_wss_client mqtt_wss_new(
         goto fail_1;
     }
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(OS_WINDOWS)
+    // macOS has no pipe2(); Windows has no pipe2() either, and our
+    // pipe() macro already routes to UCRT's _pipe(..., _O_BINARY).
+    // The O_CLOEXEC bit on Linux pipe2 is just a convenience -- these
+    // notification pipes are for thread signalling inside the agent,
+    // not handed off to a child process, so close-on-exec is moot here.
     if (pipe(client->write_notif_pipe)) {
 #else
     if (pipe2(client->write_notif_pipe, O_CLOEXEC /*| O_DIRECT*/)) {
@@ -364,9 +369,9 @@ int mqtt_wss_connect(
     client->sockfd = fd;
 
 #ifndef SOCK_CLOEXEC
-    int flags = fcntl(client->sockfd, F_GETFD);
-    if (flags != -1)
-        (void) fcntl(client->sockfd, F_SETFD, flags| FD_CLOEXEC);
+    // sock_setcloexec routes to fcntl(F_SETFD, FD_CLOEXEC) on POSIX
+    // and SetHandleInformation(HANDLE_FLAG_INHERIT, 0) on Windows.
+    (void) sock_setcloexec(client->sockfd, true);
 #endif
 
     int flag = 1;
@@ -376,7 +381,7 @@ int mqtt_wss_connect(
 
     client->poll_fds[POLLFD_SOCKET].fd = client->sockfd;
 
-    if (fcntl(client->sockfd, F_SETFL, fcntl(client->sockfd, F_GETFL, 0) | O_NONBLOCK) == -1) {
+    if (sock_setnonblock(client->sockfd, true) < 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Error setting O_NONBLOCK to TCP socket. \"%s\"", strerror(errno));
         return -8;
     }

@@ -3,7 +3,10 @@
 #include "paths.h"
 
 static int is_procfs(const char *path, char **reason) {
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(OS_WINDOWS)
+    // No procfs concept (and no <sys/vfs.h> on UCRT64 anyway) -- treat
+    // the path as valid so verify_netdata_host_prefix() doesn't reject
+    // the configured prefix on these platforms.
     (void)path;
     (void)reason;
 #else
@@ -29,7 +32,8 @@ static int is_procfs(const char *path, char **reason) {
 }
 
 static int is_sysfs(const char *path, char **reason) {
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(OS_WINDOWS)
+    // No sysfs concept here either -- same rationale as is_procfs.
     (void)path;
     (void)reason;
 #else
@@ -166,7 +170,7 @@ bool filename_is_dir(const char *filename, bool create_it) {
         break;
     }
 
-    if(!is_dir && create_it && max_links == 100 && mkdir(filename, 0750) == 0)
+    if(!is_dir && create_it && max_links == 100 && nd_mkdir(filename, 0750) == 0)
         is_dir = true;
 
     return is_dir;
@@ -238,7 +242,8 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
     else {
         struct dirent *de = NULL;
         while((de = readdir(dir))) {
-            if(de->d_type == DT_DIR || de->d_type == DT_LNK) {
+            unsigned char dtype = os_dirent_type(udir, de);
+            if(dtype == DT_DIR || dtype == DT_LNK) {
                 if( !de->d_name[0] ||
                     (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
                     (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
@@ -253,7 +258,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                 }
             }
 
-            if(de->d_type == DT_UNKNOWN || de->d_type == DT_REG || de->d_type == DT_LNK) {
+            if(dtype == DT_UNKNOWN || dtype == DT_REG || dtype == DT_LNK) {
                 size_t len = strlen(de->d_name);
                 if(path_entry_is_file(udir, de->d_name) &&
                     len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
@@ -265,7 +270,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                 }
             }
 
-            netdata_log_debug(D_HEALTH, "CONFIG ignoring user-config file '%s/%s' of type %d", udir, de->d_name, (int)de->d_type);
+            netdata_log_debug(D_HEALTH, "CONFIG ignoring user-config file '%s/%s' of type %d", udir, de->d_name, (int)dtype);
         }
 
         closedir(dir);
@@ -281,7 +286,8 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
         if (strcmp(udir, sdir)) {
             struct dirent *de = NULL;
             while((de = readdir(dir))) {
-                if(de->d_type == DT_DIR || de->d_type == DT_LNK) {
+                unsigned char dtype = os_dirent_type(sdir, de);
+                if(dtype == DT_DIR || dtype == DT_LNK) {
                     if( !de->d_name[0] ||
                         (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
                         (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
@@ -301,7 +307,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                     }
                 }
 
-                if(de->d_type == DT_UNKNOWN || de->d_type == DT_REG || de->d_type == DT_LNK) {
+                if(dtype == DT_UNKNOWN || dtype == DT_REG || dtype == DT_LNK) {
                     size_t len = strlen(de->d_name);
                     if(path_entry_is_file(sdir, de->d_name) && !path_entry_is_file(udir, de->d_name) &&
                         len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
@@ -314,7 +320,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
 
                 }
 
-                netdata_log_debug(D_HEALTH, "CONFIG ignoring stock-config file '%s/%s' of type %d", udir, de->d_name, (int)de->d_type);
+                netdata_log_debug(D_HEALTH, "CONFIG ignoring stock-config file '%s/%s' of type %d", udir, de->d_name, (int)dtype);
             }
         }
         closedir(dir);

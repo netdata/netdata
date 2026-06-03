@@ -400,7 +400,7 @@ static void aral_delete_leftover_files(const char *name, const char *path, const
 
     struct dirent *de = NULL;
     while((de = readdir(dir))) {
-        if(de->d_type == DT_DIR)
+        if(os_dirent_type(path, de) == DT_DIR)
             continue;
 
         if(strncmp(de->d_name, required_prefix, len) != 0)
@@ -1465,7 +1465,7 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
     if(ar->config.mmap.enabled) {
         char directory_name[FILENAME_MAX + 1];
         snprintfz(directory_name, FILENAME_MAX, "%s/array_alloc.mmap", *ar->config.mmap.cache_dir);
-        int r = mkdir(directory_name, 0775);
+        int r = nd_mkdir(directory_name, 0775);
         if (r != 0 && errno != EEXIST)
             fatal("Cannot create directory '%s'", directory_name);
 

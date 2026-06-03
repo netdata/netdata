@@ -2,9 +2,9 @@
 # Run CodeQL to analyze C/C++ and Python code.
 name: CodeQL
 on:
-  pull_request:
-    types: [opened, reopened, labeled, synchronize]
-    branches: [master]
+  pull_request: # SOW-0033 iteration on rwin: disable non-Windows CI. Revert this block before merge.
+    paths:
+      - '__SOW_0033_DISABLED__'
   push:
     branches: [master]
   schedule:

@@ -117,12 +117,55 @@ extern "C" {
 #include <grp.h>
 #else
 typedef uint32_t gid_t;
+// Windows has no POSIX group database (NTFS / SIDs / ACLs instead).
+// Provide a struct group + getgrgid/getgrnam/getgrgid_r stubs so
+// cross-platform callers compile. All stubs report "not found" so
+// the existing fallback paths (numeric gid formatting, default
+// group, etc.) take over.
+struct group {
+    char  *gr_name;
+    char  *gr_passwd;
+    gid_t  gr_gid;
+    char **gr_mem;
+};
+static inline struct group *getgrgid(gid_t gid) { (void)gid; return NULL; }
+static inline struct group *getgrnam(const char *name) { (void)name; return NULL; }
+static inline int getgrgid_r(gid_t gid, struct group *grp, char *buf, size_t buflen, struct group **result) {
+    (void)gid; (void)grp; (void)buf; (void)buflen;
+    if (result) *result = NULL;
+    return ENOENT;
+}
 #endif
 
 #ifdef HAVE_PWD_H
 #include <pwd.h>
 #else
 typedef uint32_t uid_t;
+// Windows has no POSIX user database. Same stub strategy as struct
+// group above: provide just enough surface so call sites compile, and
+// signal "no entry" at runtime so the existing pw == NULL / non-zero
+// return fallbacks run.
+struct passwd {
+    char  *pw_name;
+    char  *pw_passwd;
+    uid_t  pw_uid;
+    gid_t  pw_gid;
+    char  *pw_gecos;
+    char  *pw_dir;
+    char  *pw_shell;
+};
+static inline struct passwd *getpwuid(uid_t uid) { (void)uid; return NULL; }
+static inline struct passwd *getpwnam(const char *name) { (void)name; return NULL; }
+static inline int getpwuid_r(uid_t uid, struct passwd *pwd, char *buf, size_t buflen, struct passwd **result) {
+    (void)uid; (void)pwd; (void)buf; (void)buflen;
+    if (result) *result = NULL;
+    return ENOENT;
+}
+static inline int getpwnam_r(const char *name, struct passwd *pwd, char *buf, size_t buflen, struct passwd **result) {
+    (void)name; (void)pwd; (void)buf; (void)buflen;
+    if (result) *result = NULL;
+    return ENOENT;
+}
 #endif
 
 #ifdef HAVE_NET_IF_H
@@ -171,7 +214,12 @@ typedef uint32_t uid_t;
 #define	LOG_LOCAL7	(23<<3)	/* reserved for local use */
 #endif
 
-#ifdef HAVE_SYS_MMAN_H
+#if defined(OS_WINDOWS)
+// UCRT64 ships no <sys/mman.h>; provide a POSIX-shaped shim built on
+// top of CreateFileMappingW/MapViewOfFile and VirtualAlloc. See
+// memory/mman-win32.h for the supported subset and the rationale.
+#include "memory/mman-win32.h"
+#elif defined(HAVE_SYS_MMAN_H)
 #include <sys/mman.h>
 #endif
 
@@ -460,8 +508,774 @@ typedef uint32_t uid_t;
 #include <fcntl.h>
 #include <process.h>
 #include <tlhelp32.h>
-#include <sys/cygwin.h>
 #include <winevt.h>
+// if_nametoindex() lives in <net/if.h> on POSIX. Windows has had it
+// since Vista in <iphlpapi.h>; pull it in here so socket/connect-to.c
+// and socket/listen-sockets.c get the declaration for free.
+#include <iphlpapi.h>
+
+// getrusage() / struct rusage have no UCRT equivalent. Used in
+// apps.plugin, daemon/pulse, exporting, and unit_test.c -- mostly to
+// report the agent's own user/system CPU consumption to its self-stats
+// charts. Provide the type and function on Windows, with a non-trivial
+// implementation: GetProcessTimes() gives us user and kernel CPU time
+// in FILETIME 100-ns ticks, which we convert to the POSIX timeval
+// shape. Other rusage fields (maxrss, page faults, IO blocks, etc.)
+// stay zero -- those have no direct Win32 equivalent reachable as
+// cheaply, and the charts that read them just show zero on Windows.
+#ifndef RUSAGE_SELF
+#define RUSAGE_SELF    0
+#endif
+#ifndef RUSAGE_THREAD
+#define RUSAGE_THREAD  1
+#endif
+#ifndef RUSAGE_CHILDREN
+#define RUSAGE_CHILDREN (-1)
+#endif
+
+struct rusage {
+    struct timeval ru_utime;   /* user CPU time used */
+    struct timeval ru_stime;   /* system CPU time used */
+    long ru_maxrss;            /* maximum resident set size */
+    long ru_ixrss;             /* integral shared memory size */
+    long ru_idrss;             /* integral unshared data size */
+    long ru_isrss;             /* integral unshared stack size */
+    long ru_minflt;            /* page reclaims (soft page faults) */
+    long ru_majflt;            /* page faults (hard page faults) */
+    long ru_nswap;             /* swaps */
+    long ru_inblock;           /* block input operations */
+    long ru_oublock;           /* block output operations */
+    long ru_msgsnd;            /* IPC messages sent */
+    long ru_msgrcv;            /* IPC messages received */
+    long ru_nsignals;          /* signals received */
+    long ru_nvcsw;             /* voluntary context switches */
+    long ru_nivcsw;            /* involuntary context switches */
+};
+
+static inline int getrusage(int who, struct rusage *r) {
+    (void)who;
+    if (!r) { errno = EFAULT; return -1; }
+    memset(r, 0, sizeof(*r));
+    FILETIME creation, exit_t, kernel, user;
+    if (GetProcessTimes(GetCurrentProcess(), &creation, &exit_t, &kernel, &user)) {
+        // FILETIME is in 100-ns intervals; split into seconds + microseconds.
+        ULARGE_INTEGER k = { .LowPart = kernel.dwLowDateTime, .HighPart = kernel.dwHighDateTime };
+        ULARGE_INTEGER u = { .LowPart = user.dwLowDateTime,   .HighPart = user.dwHighDateTime   };
+        r->ru_stime.tv_sec  = (long)(k.QuadPart / 10000000);
+        r->ru_stime.tv_usec = (long)((k.QuadPart % 10000000) / 10);
+        r->ru_utime.tv_sec  = (long)(u.QuadPart / 10000000);
+        r->ru_utime.tv_usec = (long)((u.QuadPart % 10000000) / 10);
+    }
+    return 0;
+}
+
+// posix_memalign() has no UCRT equivalent. UCRT exposes
+// _aligned_malloc(size, alignment) -- args swapped vs POSIX, returns
+// pointer-or-NULL instead of int-errno, and memory allocated this way
+// MUST be released with _aligned_free, NOT free(). Provide a POSIX
+// adapter so nd-mallocz.c's posix_memalignz() compiles unchanged.
+// nd-mallocz.c's matching posix_memalign_freez() is patched separately
+// to route through _aligned_free on Windows.
+#include <malloc.h>
+static inline int posix_memalign(void **memptr, size_t alignment, size_t size) {
+    if (!memptr) return EINVAL;
+    void *p = _aligned_malloc(size, alignment);
+    if (!p) {
+        *memptr = NULL;
+        return ENOMEM;
+    }
+    *memptr = p;
+    return 0;
+}
+
+// UCRT has the C-standard signal() / SIG_DFL / SIG_IGN / SIGINT etc.
+// but none of POSIX's sigaction / siginfo_t / sigset_t / sigsetjmp
+// API. signal-handler.c and protected-access.{h,c} use those types
+// freely. Master compiled this code under MSYS-gcc only because the
+// Cygwin runtime emulates POSIX signals.
+//
+// Provide the type and function surface as no-op stubs so the files
+// compile. Signal handling on Windows degrades to "C-standard
+// signal()" behaviour: SIGINT/SIGTERM still work for clean shutdown
+// via the default handler, but no chained handlers, no
+// SIGBUS/SIGSEGV mmap-fault recovery, no signal masking. This
+// matches master's effective behaviour (the POSIX-shaped calls there
+// were translated by Cygwin into best-effort SEH).
+//
+// Proper Windows signal handling -- SEH-based mmap fault recovery,
+// CTRL+C handler via SetConsoleCtrlHandler, structured exception
+// translation -- is a separate workstream.
+typedef unsigned long sigset_t;
+
+typedef struct {
+    int   si_signo;
+    int   si_errno;
+    int   si_code;
+    void *si_addr;
+} siginfo_t;
+
+struct sigaction {
+    union {
+        void (*sa_handler)(int);
+        void (*sa_sigaction)(int, siginfo_t *, void *);
+    };
+    sigset_t sa_mask;
+    int      sa_flags;
+};
+
+#ifndef SA_SIGINFO
+#define SA_SIGINFO    0x0004
+#endif
+#ifndef SA_NODEFER
+#define SA_NODEFER    0x0040
+#endif
+#ifndef SA_RESETHAND
+#define SA_RESETHAND  0x0080
+#endif
+#ifndef SA_RESTART
+#define SA_RESTART    0x0010
+#endif
+#ifndef SIG_BLOCK
+#define SIG_BLOCK     0
+#endif
+#ifndef SIG_UNBLOCK
+#define SIG_UNBLOCK   1
+#endif
+#ifndef SIG_SETMASK
+#define SIG_SETMASK   2
+#endif
+#ifndef SI_USER
+#define SI_USER       0
+#endif
+#ifndef SEGV_MAPERR
+#define SEGV_MAPERR   1
+#endif
+#ifndef SEGV_ACCERR
+#define SEGV_ACCERR   2
+#endif
+#ifndef BUS_ADRALN
+#define BUS_ADRALN    1
+#endif
+#ifndef BUS_ADRERR
+#define BUS_ADRERR    2
+#endif
+#ifndef BUS_OBJERR
+#define BUS_OBJERR    3
+#endif
+
+static inline int sigemptyset(sigset_t *set)            { if (set) *set = 0; return 0; }
+static inline int sigfillset(sigset_t *set)             { if (set) *set = (sigset_t)-1; return 0; }
+static inline int sigaddset(sigset_t *set, int signo)   { (void)signo; if (set) *set |= 1u; return 0; }
+static inline int sigdelset(sigset_t *set, int signo)   { (void)signo; (void)set; return 0; }
+static inline int sigismember(const sigset_t *set, int signo) { (void)set; (void)signo; return 0; }
+static inline int sigprocmask(int how, const sigset_t *set, sigset_t *oset) {
+    (void)how; (void)set; (void)oset; return 0;
+}
+static inline int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact) {
+    (void)signum; (void)act;
+    if (oldact) {
+        oldact->sa_handler = (void (*)(int))0;
+        oldact->sa_mask = 0;
+        oldact->sa_flags = 0;
+    }
+    return 0;
+}
+
+// sigsetjmp / siglongjmp degrade to plain setjmp / longjmp. The
+// "savemask" argument is irrelevant -- signal masks aren't a thing
+// here -- so we discard it. This is what mingw-w64's _setjmp/_longjmp
+// already are under the hood.
+#include <setjmp.h>
+typedef jmp_buf sigjmp_buf;
+#ifndef sigsetjmp
+#define sigsetjmp(env, savemask) setjmp(env)
+#endif
+#ifndef siglongjmp
+#define siglongjmp(env, val) longjmp((env), (val))
+#endif
+
+// ffs() (find-first-set, 1-based, returns 0 if no bits set) is a POSIX
+// function from <strings.h>. UCRT64 doesn't have it. gcc has
+// __builtin_ffs always available, and rrdenginelib.h calls ffs() in
+// the cache-bitmap helpers. Forward via macro on Windows; the builtin
+// emits the same single `bsf`/`tzcnt` instruction as glibc.
+#ifndef ffs
+#define ffs(x) __builtin_ffs(x)
+#endif
+
+// Winsock has no per-call MSG_DONTWAIT flag (POSIX recv/send/recvmsg/sendmsg
+// flag for "non-blocking just this once"). Cygwin's fhandler_socket layer
+// emulated it via internal events; under UCRT64 there is no emulation, so
+// existing call sites must rely on the socket being in non-blocking mode
+// (set via sock_setnonblock(fd, true) at creation). Defining the flag to 0
+// here lets those call sites compile unchanged.
+#ifndef MSG_DONTWAIT
+#define MSG_DONTWAIT 0
+#endif
+
+// UCRT64's <sys/types.h> declares `useconds_t` but not POSIX's
+// `suseconds_t`. struct timeval::tv_usec is plain `long` on this
+// platform (mingw-w64's <sys/time.h>), so map the type accordingly --
+// keeping all the (suseconds_t) casts in collectors and clocks code
+// compiling unchanged.
+typedef long suseconds_t;
+
+// UCRT64 has Microsoft's gmtime_s / localtime_s (errno_t return,
+// reversed argument order) but no POSIX gmtime_r / localtime_r.
+// Provide thin inline adapters so call sites compile unchanged. Both
+// shims populate *result and return it on success, NULL on failure --
+// matching the POSIX contract exactly.
+static inline struct tm *gmtime_r(const time_t *timep, struct tm *result) {
+    return (gmtime_s(result, timep) == 0) ? result : NULL;
+}
+static inline struct tm *localtime_r(const time_t *timep, struct tm *result) {
+    return (localtime_s(result, timep) == 0) ? result : NULL;
+}
+
+// UCRT64 has no POSIX fchown(). Windows uses ACLs/SIDs, not POSIX
+// uid/gid ownership. nd_log-to-file.c uses fchown() to re-chown an
+// already-opened log file after a privilege drop; that whole code
+// path is meaningless on Windows. Stub to return 0 so the caller's
+// "==-1" error check never trips.
+static inline int fchown(int fd, uid_t owner, gid_t group) {
+    (void)fd; (void)owner; (void)group;
+    return 0;
+}
+
+// random() / srandom() are POSIX (XSI). UCRT64 has only rand() /
+// srand(). dbengine-stresstest.c uses random() for chart/dim
+// selection during stress runs -- a stress-test helper, so the
+// reduced randomness range (rand returns up to RAND_MAX = 0x7FFF
+// vs random's 0x7FFFFFFF) is acceptable. Alias the names.
+#ifndef random
+#define random()    rand()
+#endif
+#ifndef srandom
+#define srandom(seed) srand((unsigned)(seed))
+#endif
+
+// link() (create a hard link) is POSIX; UCRT64 has no equivalent in
+// the standard C library. Windows exposes CreateHardLinkA() in
+// <windows.h> (NTFS supports hard links). Map the POSIX signature on
+// top of it: returns 0 on success, -1 with errno on failure. The
+// registry rotation in registry_db.c calls link(current, ".old") and
+// then unlink(current) to do an atomic backup.
+static inline int link(const char *oldpath, const char *newpath) {
+    if (!oldpath || !newpath) { errno = EINVAL; return -1; }
+    if (CreateHardLinkA(newpath, oldpath, NULL))
+        return 0;
+    DWORD err = GetLastError();
+    switch (err) {
+        case ERROR_FILE_NOT_FOUND:
+        case ERROR_PATH_NOT_FOUND:
+            errno = ENOENT; break;
+        case ERROR_ACCESS_DENIED:
+            errno = EACCES; break;
+        case ERROR_ALREADY_EXISTS:
+            errno = EEXIST; break;
+        default:
+            errno = EIO; break;
+    }
+    return -1;
+}
+
+// unsetenv() is POSIX; UCRT64 has no direct equivalent. _putenv("X=")
+// removes variable X from the process environment (empty value
+// triggers the delete path). Wrap with the POSIX signature.
+static inline int unsetenv(const char *name) {
+    if (!name || !*name || strchr(name, '=')) { errno = EINVAL; return -1; }
+    size_t len = strlen(name);
+    char *buf = (char *)malloc(len + 2);
+    if (!buf) { errno = ENOMEM; return -1; }
+    memcpy(buf, name, len);
+    buf[len]     = '=';
+    buf[len + 1] = '\0';
+    int rc = _putenv(buf);
+    free(buf);
+    return rc;
+}
+
+// fchmod() (by fd) is POSIX; UCRT64 has only chmod() (by path).
+// status-file-io.c uses fchmod() to set 0664 on the temp file after
+// writing it but before rename. On Windows file permissions are
+// ACL-based, not POSIX mode bits, so the chmod request is
+// effectively informational -- stub to success.
+static inline int fchmod(int fd, mode_t mode) {
+    (void)fd; (void)mode; return 0;
+}
+
+// fsync() is POSIX; UCRT's equivalent is _commit(int fd) with the
+// same signature and semantics (flush all buffered modifications
+// for the open file to disk).
+#ifndef fsync
+#define fsync(fd) _commit(fd)
+#endif
+
+// utimensat() is the POSIX *at-family timestamp updater with
+// nanosecond precision. UCRT has utime() / _utime64() (second
+// precision, path-based, no dir-fd). machine-guid.c calls
+// utimensat(AT_FDCWD, path, times[2], 0). Provide AT_FDCWD as a
+// sentinel the stub ignores, then route the call through _utime64
+// with second-precision truncation. The persisted timestamp is used
+// for diagnostics, not correctness, so the nsec truncation is fine.
+#ifndef AT_FDCWD
+#define AT_FDCWD (-100)
+#endif
+#include <sys/utime.h>
+static inline int utimensat(int dirfd, const char *path, const struct timespec times[2], int flags) {
+    (void)dirfd; (void)flags;
+    if (!path || !times) { errno = EINVAL; return -1; }
+    struct __utimbuf64 ub;
+    ub.actime  = times[0].tv_sec;
+    ub.modtime = times[1].tv_sec;
+    return _utime64(path, &ub);
+}
+
+// daemon.c performs POSIX daemonization (fork + setsid + setuid +
+// chown of run/log directories). On Windows the agent runs as a
+// service hosted by the SCM; none of fork/setsid/setuid apply, and
+// privilege management is done via ACLs configured at install time,
+// not by the process at runtime. Stub the full POSIX surface so the
+// file compiles -- all stubs return 0 (success), making the
+// daemonization code path a no-op on Windows.
+static inline int chown(const char *path, uid_t owner, gid_t group) {
+    (void)path; (void)owner; (void)group; return 0;
+}
+static inline int dirfd(DIR *dir) {
+    (void)dir; return -1;
+}
+static inline int unlinkat(int dfd, const char *path, int flags) {
+    (void)dfd; (void)flags;
+    return unlink(path);  // dfd ignored; relative paths resolve to CWD
+}
+static inline uid_t getuid(void)  { return 0; }
+static inline uid_t geteuid(void) { return 0; }
+static inline gid_t getgid(void)  { return 0; }
+static inline gid_t getegid(void) { return 0; }
+static inline int setuid(uid_t uid)   { (void)uid; return 0; }
+static inline int seteuid(uid_t uid)  { (void)uid; return 0; }
+static inline int setgid(gid_t gid)   { (void)gid; return 0; }
+static inline int setegid(gid_t gid)  { (void)gid; return 0; }
+static inline int setgroups(int n, const gid_t *list) {
+    (void)n; (void)list; return 0;
+}
+
+// fork() and setsid() are POSIX daemonization primitives with no
+// Windows equivalent (services are launched by the SCM, not forked).
+// Stubs return -1 so any caller that expects "child branch on 0"
+// always sees the parent branch -- daemon.c gates these calls behind
+// flags that don't fire when running as a service.
+// (pid_t is already provided by mingw-w64's <sys/types.h>.)
+static inline pid_t fork(void)   { errno = ENOSYS; return -1; }
+static inline pid_t setsid(void) { errno = ENOSYS; return -1; }
+
+// winpthreads (already pulled in via <pthread.h>) provides struct
+// sched_param, SCHED_OTHER/SCHED_FIFO/SCHED_RR, and sched_setscheduler.
+// It does NOT provide sched_getparam (the read-side counterpart that
+// daemon.c uses to inspect the current priority before applying
+// SCHED_BATCH/SCHED_IDLE) or the SCHED_BATCH/SCHED_IDLE constants.
+// Provide just those gaps.
+#include <sched.h>
+static inline int sched_getparam(pid_t pid, struct sched_param *p) {
+    (void)pid;
+    if (p) p->sched_priority = 0;
+    return 0;
+}
+#ifndef SCHED_BATCH
+#define SCHED_BATCH 3
+#endif
+#ifndef SCHED_IDLE
+#define SCHED_IDLE  5
+#endif
+
+// POSIX poll's "number of fds" type. mingw-w64 declares WSAPoll using
+// ULONG; provide the POSIX-shaped typedef so log-forwarder.c's
+// (nfds_t)-1 casts compile. ULONG is 32-bit under LLP64, matching
+// glibc's nfds_t.
+typedef ULONG nfds_t;
+
+// POSIX pipe(int[2]) on UCRT64 is _pipe(int[2], unsigned size, int mode).
+// Adapt with a macro: 64 KiB buffer (Cygwin's historical default) +
+// binary mode (no CRLF translation) for log forwarder pipes and any
+// other unblocked-pipe consumers.
+#ifndef pipe
+#define pipe(fds) _pipe((fds), 65536, _O_BINARY)
+#endif
+
+// UCRT64 has no <endian.h> -- no htole16/32/64, htobe16/32/64,
+// le16toh/le32toh/le64toh, be16toh/be32toh/be64toh. Windows x86_64
+// is always little-endian (LLP64 host), so htole*() is identity and
+// htobe*()/be*toh() reduce to a byte-swap via UCRT's builtin
+// _byteswap_*() functions (single-instruction `bswap` on x86).
+#ifndef htole16
+#define htole16(x) ((uint16_t)(x))
+#endif
+#ifndef htole32
+#define htole32(x) ((uint32_t)(x))
+#endif
+#ifndef htole64
+#define htole64(x) ((uint64_t)(x))
+#endif
+#ifndef le16toh
+#define le16toh(x) ((uint16_t)(x))
+#endif
+#ifndef le32toh
+#define le32toh(x) ((uint32_t)(x))
+#endif
+#ifndef le64toh
+#define le64toh(x) ((uint64_t)(x))
+#endif
+#ifndef htobe16
+#define htobe16(x) _byteswap_ushort((uint16_t)(x))
+#endif
+#ifndef htobe32
+#define htobe32(x) _byteswap_ulong((uint32_t)(x))
+#endif
+#ifndef htobe64
+#define htobe64(x) _byteswap_uint64((uint64_t)(x))
+#endif
+#ifndef be16toh
+#define be16toh(x) _byteswap_ushort((uint16_t)(x))
+#endif
+#ifndef be32toh
+#define be32toh(x) _byteswap_ulong((uint32_t)(x))
+#endif
+#ifndef be64toh
+#define be64toh(x) _byteswap_uint64((uint64_t)(x))
+#endif
+
+// strerror_r() has the same shape: UCRT exposes strerror_s() with
+// reversed argument order (buf first, errnum last). nd_log-internals.c
+// auto-detects via _Generic on the return type; the XSI POSIX form
+// returns int, which matches strerror_s and what we forward here.
+static inline int strerror_r(int errnum, char *buf, size_t buflen) {
+    return (int)strerror_s(buf, buflen, errnum);
+}
+
+// UCRT64 has no <sys/resource.h>: no struct rlimit, no getrlimit /
+// setrlimit, no RLIMIT_NOFILE / RLIMIT_CORE / RLIM_INFINITY. Provide a
+// minimal POSIX-shaped shim covering the two resources netdata actually
+// touches:
+//
+//   * RLIMIT_NOFILE -> map to the Windows CRT's per-process stdio cache
+//     limit via _getmaxstdio() / _setmaxstdio(). UCRT documents a
+//     hard ceiling of 8192 on the latter. POSIX RLIMIT_NOFILE governs
+//     a different concept (kernel file-descriptor table) but on
+//     Windows the CRT's cache is the operative limit for code that
+//     uses fopen / open / etc., so the mapping is semantically the
+//     right one for callers that size buffers off rlim_cur / N.
+//   * RLIMIT_CORE -> no-op. Windows produces minidumps through
+//     SetUnhandledExceptionFilter / WER, not POSIX core dumps; there
+//     is nothing rlimit-shaped to set.
+typedef unsigned long rlim_t;
+
+#ifndef RLIM_INFINITY
+#define RLIM_INFINITY ((rlim_t)-1)
+#endif
+#ifndef RLIMIT_CORE
+#define RLIMIT_CORE   4
+#endif
+#ifndef RLIMIT_NOFILE
+#define RLIMIT_NOFILE 7
+#endif
+
+struct rlimit {
+    rlim_t rlim_cur;
+    rlim_t rlim_max;
+};
+
+static inline int getrlimit(int resource, struct rlimit *rl) {
+    if (!rl) return -1;
+    switch (resource) {
+        case RLIMIT_NOFILE: {
+            int n = _getmaxstdio();
+            rl->rlim_cur = (rlim_t)((n > 0) ? n : 512);
+            rl->rlim_max = 8192; // UCRT's documented ceiling for _setmaxstdio
+            return 0;
+        }
+        case RLIMIT_CORE:
+            rl->rlim_cur = 0;
+            rl->rlim_max = RLIM_INFINITY;
+            return 0;
+        default:
+            return -1;
+    }
+}
+
+static inline int setrlimit(int resource, const struct rlimit *rl) {
+    if (!rl) return -1;
+    switch (resource) {
+        case RLIMIT_NOFILE: {
+            rlim_t want = rl->rlim_cur;
+            if (want == RLIM_INFINITY || want > 8192) want = 8192;
+            return (_setmaxstdio((int)want) == (int)want) ? 0 : -1;
+        }
+        case RLIMIT_CORE:
+            return 0; // no-op; see getrlimit() comment above
+        default:
+            return -1;
+    }
+}
+
+// UCRT64 has no <unistd.h> POSIX sysconf() interface. Provide a shim
+// that handles the _SC_* keys netdata actually queries. Each mapping
+// uses the closest Windows-native primitive:
+//
+//   * _SC_CLK_TCK -- Linux exposes kernel-jiffy rate (typically 100 or
+//     1000). netdata only consumes this through system_hz for /proc CPU
+//     accounting, which Windows builds never touch. Returning 100 keeps
+//     the global initialized to its compile-time default.
+//   * _SC_PAGESIZE / _SC_PAGE_SIZE -> GetSystemInfo().dwPageSize.
+//   * _SC_NPROCESSORS_ONLN / _SC_NPROCESSORS_CONF
+//       -> GetSystemInfo().dwNumberOfProcessors.
+//   * _SC_NGROUPS_MAX -- Windows uses SIDs / ACLs, not POSIX
+//     supplementary groups; the value just sizes a buffer in
+//     become_user(). Return the Linux default of 32 so the buffer
+//     allocates correctly on the unlikely path it is ever entered.
+//   * _SC_OPEN_MAX -> 8192 (matches the rlimit shim cap).
+#ifndef _SC_CLK_TCK
+#define _SC_CLK_TCK             1
+#endif
+#ifndef _SC_PAGESIZE
+#define _SC_PAGESIZE            2
+#endif
+#ifndef _SC_PAGE_SIZE
+#define _SC_PAGE_SIZE           _SC_PAGESIZE
+#endif
+#ifndef _SC_NPROCESSORS_ONLN
+#define _SC_NPROCESSORS_ONLN    3
+#endif
+#ifndef _SC_NPROCESSORS_CONF
+#define _SC_NPROCESSORS_CONF    4
+#endif
+#ifndef _SC_NGROUPS_MAX
+#define _SC_NGROUPS_MAX         5
+#endif
+#ifndef _SC_OPEN_MAX
+#define _SC_OPEN_MAX            6
+#endif
+
+// UCRT64 has no <sys/wait.h>: no WIFEXITED / WEXITSTATUS / WIFSIGNALED
+// / WTERMSIG, and no SIGPIPE. spawn_popen.c needs these to decode the
+// status word that spawn_server_exec_wait() returns. The Windows
+// spawn-server side already encodes results in POSIX format -- normal
+// exits as ((exit_code & 0xFF) << 8), abnormal exits as POSIX signal
+// numbers -- so the standard glibc-shaped macros DTRT here.
+#ifndef WIFEXITED
+#define WIFEXITED(status)    (((status) & 0x7F) == 0)
+#endif
+#ifndef WEXITSTATUS
+#define WEXITSTATUS(status)  (((status) >> 8) & 0xFF)
+#endif
+#ifndef WIFSIGNALED
+#define WIFSIGNALED(status)  (((status) & 0x7F) != 0 && ((status) & 0x7F) != 0x7F)
+#endif
+#ifndef WTERMSIG
+#define WTERMSIG(status)     ((status) & 0x7F)
+#endif
+#ifndef SIGPIPE
+// UCRT has no SIGPIPE -- there is no POSIX "write to closed pipe"
+// signal on Windows; the underlying write returns EPIPE / ERROR_BROKEN_PIPE
+// instead. Define the macro so switch cases over signal numbers
+// compile; it never matches a real spawned-process termination.
+#define SIGPIPE 13
+#endif
+#ifndef SIGTRAP
+// UCRT has no SIGTRAP. spawn_server_windows.c uses it as the target
+// of STATUS_BREAKPOINT / STATUS_SINGLE_STEP in its NTSTATUS-to-signal
+// mapper. Use the POSIX value (5) so the case compiles and any
+// consumer reading the resulting status can recognise it.
+#define SIGTRAP 5
+#endif
+// Remaining POSIX signal numbers that mingw-w64's <signal.h> gates on
+// _POSIX (which we don't define) or doesn't define at all. signals.c
+// names them in the deadly-signal unblock list; signal-handler.c
+// names them in its signal-action table.
+//
+// Values: glibc/Linux numbering, chosen so each macro is distinct
+// from each other AND from the C-standard signals UCRT actually
+// raises (SIGINT=2, SIGILL=4, SIGFPE=8, SIGSEGV=11, SIGTERM=15,
+// SIGBREAK=21, SIGABRT=22). On a clean UCRT64 Windows process none
+// of these are ever raised; the macros exist only so the signal_code
+// diagnostic tables compile and never silently alias one logical
+// signal to another.
+#ifndef SIGHUP
+#define SIGHUP    1
+#endif
+#ifndef SIGQUIT
+#define SIGQUIT   3
+#endif
+#ifndef SIGBUS
+#define SIGBUS    7
+#endif
+#ifndef SIGUSR1
+#define SIGUSR1   10
+#endif
+#ifndef SIGUSR2
+#define SIGUSR2   12
+#endif
+#ifndef SIGCHLD
+#define SIGCHLD   17
+#endif
+#ifndef SIGXCPU
+#define SIGXCPU   24
+#endif
+#ifndef SIGXFSZ
+#define SIGXFSZ   25
+#endif
+#ifndef SIGSYS
+#define SIGSYS    31
+#endif
+
+// Winsock's WSAPoll() is the documented Windows equivalent of POSIX
+// poll() since Vista, with identical signature for struct pollfd and
+// the POLLIN/POLLOUT/POLLHUP/POLLERR constants. Macro-rename so call
+// sites compile unchanged. The macro is self-referencing -- C99 6.10.3
+// guarantees the inner identifier resolves to the function, not the
+// macro -- so no infinite expansion.
+#ifndef poll
+#define poll(fds, nfds, timeout) WSAPoll((fds), (nfds), (timeout))
+#endif
+
+// Winsock declares getsockopt() and setsockopt() with `char *` as the
+// option-value argument, while POSIX uses `void *`. Existing call
+// sites pass typed buffers (int *, struct timeval *, struct linger *,
+// ...) -- compilation succeeds on Linux/macOS/FreeBSD via the
+// implicit void * conversion and fails on Windows with
+// -Wincompatible-pointer-types (and in C++ rejected outright).
+//
+// Wrap with self-referencing macros that cast the option-value
+// argument to `char *`. C99 6.10.3 guarantees no infinite expansion:
+// the inner getsockopt/setsockopt resolve to the Winsock functions.
+// The double cast (`void *` then `char *`) is intentional -- it strips
+// `const` qualifiers callers might pass into setsockopt without
+// triggering -Wcast-qual.
+#ifndef getsockopt
+#define getsockopt(s, level, optname, optval, optlen) \
+    getsockopt((s), (level), (optname), (char *)(void *)(optval), (optlen))
+#endif
+#ifndef setsockopt
+#define setsockopt(s, level, optname, optval, optlen) \
+    setsockopt((s), (level), (optname), (const char *)(const void *)(optval), (optlen))
+#endif
+
+// shutdown() takes SHUT_RD/SHUT_WR/SHUT_RDWR on POSIX; Winsock uses
+// SD_RECEIVE/SD_SEND/SD_BOTH (same numeric values). Alias the POSIX
+// names so call sites compile unchanged.
+#ifndef SHUT_RD
+#define SHUT_RD   SD_RECEIVE
+#endif
+#ifndef SHUT_WR
+#define SHUT_WR   SD_SEND
+#endif
+#ifndef SHUT_RDWR
+#define SHUT_RDWR SD_BOTH
+#endif
+
+// Winsock recv()/send() use `char *` / `const char *` for the buffer
+// argument; POSIX uses `void *` / `const void *`. nd-sock.h's static
+// inlines pass `void *` directly -- builds fine in C (implicit
+// conversion) but fails in C++ (e.g. ml/ad_charts.cc which includes
+// nd-sock.h transitively). Same macro pattern as get/setsockopt:
+// cast the buffer arg to char * / const char * for Winsock.
+#ifndef recv
+#define recv(s, buf, len, flags) \
+    recv((s), (char *)(void *)(buf), (len), (flags))
+#endif
+#ifndef send
+#define send(s, buf, len, flags) \
+    send((s), (const char *)(const void *)(buf), (len), (flags))
+#endif
+
+// wcscasecmp() is the POSIX wide-string case-insensitive compare.
+// UCRT exposes Microsoft's _wcsicmp() with the same signature and
+// semantics. Alias so windows-events.plugin compiles unchanged.
+#ifndef wcscasecmp
+#define wcscasecmp _wcsicmp
+#endif
+
+// strcasestr() is a GNU/BSD extension, not POSIX, and UCRT64 omits it.
+// Provide a portable inline implementation. Behaviour matches glibc:
+// returns a pointer into haystack at the first case-insensitive match
+// of needle, NULL if not found, haystack itself if needle is empty.
+static inline char *strcasestr(const char *haystack, const char *needle) {
+    if (!*needle)
+        return (char *)haystack;
+    size_t nlen = strlen(needle);
+    for (; *haystack; haystack++) {
+        if (strncasecmp(haystack, needle, nlen) == 0)
+            return (char *)haystack;
+    }
+    return NULL;
+}
+
+// O_NOFOLLOW is a POSIX <fcntl.h> open flag that fails the call when
+// the trailing path component is a symlink. UCRT64 omits it because
+// POSIX symlinks don't exist on Windows (NTFS reparse points are
+// reached through entirely different APIs). Define it to 0 so callers
+// that OR it into open() flags get a no-op -- the open proceeds
+// without symlink protection, which is what we'd do anyway given the
+// file-mode model has no S_IFLNK here either.
+#ifndef O_NOFOLLOW
+#define O_NOFOLLOW 0
+#endif
+
+// lstat() is a POSIX symlink-aware stat. UCRT has stat() but no lstat()
+// (Windows symlinks via reparse points are reachable through different
+// APIs, not the POSIX file-mode model). Since S_IFLNK is also missing,
+// readlink() is a stub, and we don't follow Windows symlinks elsewhere,
+// alias lstat -> stat. dir_size.c's inode-device loop detection still
+// works against the regular stat path.
+#ifndef lstat
+#define lstat(path, buf) stat((path), (buf))
+#endif
+
+// UCRT64 has no readlink() (POSIX) and no S_IFLNK in <sys/stat.h>:
+// Windows reparse points are reachable through GetFinalPathNameByHandle,
+// not through readlink semantics. Two Windows-built call sites
+// dereference these (paths/paths.c symlink-chain resolver, procfile
+// filename-for-error-message getter); both already handle "no symlink
+// here" gracefully -- paths.c gates the readlink call on the
+// S_IFLNK == st_mode & S_IFMT check (false on Windows since stat never
+// returns this bit), procfile.c falls through to "unknown filename for
+// fd %d" when readlink returns -1.
+//
+// Use the Linux value for S_IFLNK so the macro is non-zero (callers
+// that fold it into bitmasks don't silently match dirs/regular files)
+// and provide a readlink() that returns -1 / EINVAL.
+#ifndef S_IFLNK
+#define S_IFLNK 0xA000
+#endif
+
+static inline ssize_t readlink(const char *path, char *buf, size_t bufsiz) {
+    (void)path;
+    (void)buf;
+    (void)bufsiz;
+    errno = EINVAL;
+    return -1;
+}
+
+static inline long sysconf(int name) {
+    SYSTEM_INFO si;
+    switch (name) {
+        case _SC_CLK_TCK:
+            return 100;
+        case _SC_PAGESIZE:
+            GetSystemInfo(&si);
+            return (long)si.dwPageSize;
+        case _SC_NPROCESSORS_ONLN:
+        case _SC_NPROCESSORS_CONF:
+            GetSystemInfo(&si);
+            return (long)si.dwNumberOfProcessors;
+        case _SC_NGROUPS_MAX:
+            return 32;
+        case _SC_OPEN_MAX:
+            return 8192;
+        default:
+            return -1;
+    }
+}
+
 #include <evntprov.h>
 #include <wbemidl.h>
 #include <sddl.h>

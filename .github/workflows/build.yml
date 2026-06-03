@@ -21,6 +21,28 @@ concurrency: # This keeps multiple instances of the job from running concurrentl
   cancel-in-progress: true
 env:
   DISABLE_TELEMETRY: 1 # Disable telemetry reporting from the agent in our CI.
+# ---------------------------------------------------------------------------
+# SOW-0033 ITERATION ANCHOR -- TEMPORARY -- revert before merge
+#
+# Several jobs below carry `if: github.head_ref != 'rwin' && ...`. This
+# gates them off for the duration of the UCRT64 migration so only
+# `windows-build` and its `file-check` dependency run on rwin pushes.
+# Cascade-skip: jobs that `needs:` a gated entry-point (build-dist,
+# static-matrix, src-matrix, macos-build) -- e.g. build-static,
+# prepare-upload, artifact-verification-*, source-build -- inherit the
+# skip via GitHub Actions' default behaviour (skipped dependency =
+# skipped dependent).
+#
+# Predicate is safe in this workflow's trigger context:
+#   - pull_request events: `head_ref` is set to the source branch.
+#   - push events: only fire on `master` (see `on:` above); head_ref is
+#     empty, condition is true, jobs run normally.
+#   - workflow_dispatch: jobs that run on this event have their own
+#     `if: github.event_name != 'workflow_dispatch'` filter.
+#
+# Revert procedure: `git revert bfe4b28455` recovers the original state,
+# or grep `SOW-0033` in this file and remove each gated `if:` clause.
+# ---------------------------------------------------------------------------
 jobs:
   file-check: # Check what files changed if we’re being run in a PR or on a push.
     name: Check Modified Files
@@ -141,6 +163,7 @@ jobs:
 
   build-dist: # Build the distribution tarball and store it as an artifact.
     name: Build Distribution Tarball
+    if: github.head_ref != 'rwin' # SOW-0033 iteration; see anchor comment above `jobs:`. Revert before merge.
     runs-on: ubuntu-latest
     needs:
       - file-check
@@ -215,6 +238,7 @@ jobs:
 
   static-matrix: # Generate the static build matrix.
     name: Prepare Build Matrix
+    if: github.head_ref != 'rwin' # SOW-0033 iteration; see anchor comment above `jobs:`. Revert before merge.
     runs-on: ubuntu-latest
     needs:
       - file-check
@@ -455,6 +479,7 @@ jobs:
 
   windows-test: # Test the Windows installer
     name: Test Windows installer
+    if: github.head_ref != 'rwin' # SOW-0033 iteration; see anchor comment above `jobs:`. Revert before merge.
     runs-on: windows-latest
     needs:
       - windows-build
@@ -1029,10 +1054,10 @@ jobs:
 
   # Remaining jobs are only used for CI checks, and not as part of the release process
 
-  src-matrix: # Generate the shared build matrix for our Linux build tests.
+  src-matrix: # Generate the shared build matrix for our Linux build tests. SOW-0033: gated to skip on the rwin branch. Revert before merge.
     name: Prepare Build Matrix
     runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_dispatch'
+    if: github.head_ref != 'rwin' && github.event_name != 'workflow_dispatch'
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -1143,10 +1168,10 @@ jobs:
             && needs.file-check.outputs.run == 'true'
           }}
 
-  macos-build: # Test building on macOS
+  macos-build: # Test building on macOS. SOW-0033: gated to skip on the rwin branch. Revert before merge.
     name: Test building on macOS
     runs-on: ${{ matrix.runner }}
-    if: github.event_name != 'workflow_dispatch'
+    if: github.head_ref != 'rwin' && github.event_name != 'workflow_dispatch'
     needs:
       - file-check
     strategy:

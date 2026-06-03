@@ -20,6 +20,10 @@
     #define htole64(x) OSSwapHostToLittleInt64(x)
     #define be64toh(x) OSSwapBigToHostInt64(x)
     #define le64toh(x) OSSwapLittleToHostInt64(x)
+#elif defined(_WIN32) || defined(__MSYS__) || defined(OS_WINDOWS)
+    // Definitions come from libnetdata/common.h's OS_WINDOWS block,
+    // which is included transitively before this header is consumed.
+    // Nothing to do here -- the macros are already in scope.
 #else
 #ifdef __FreeBSD__
     #include <sys/endian.h>

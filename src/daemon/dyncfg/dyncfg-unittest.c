@@ -541,7 +541,8 @@ static void dyncfg_unittest_cleanup_files(void) {
     struct dirent *entry;
     char filename[FILENAME_MAX + sizeof(entry->d_name)];
     while ((entry = readdir(dir)) != NULL) {
-        if ((entry->d_type == DT_REG || entry->d_type == DT_LNK) && strstartswith(entry->d_name, "unittest:") && strendswith(entry->d_name, ".dyncfg")) {
+        unsigned char dtype = os_dirent_type(path, entry);
+        if ((dtype == DT_REG || dtype == DT_LNK) && strstartswith(entry->d_name, "unittest:") && strendswith(entry->d_name, ".dyncfg")) {
             snprintf(filename, sizeof(filename), "%s/%s", path, entry->d_name);
             nd_log(NDLS_DAEMON, NDLP_INFO, "DYNCFG UNITTEST: deleting file '%s'", filename);
             unlink(filename);

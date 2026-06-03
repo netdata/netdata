@@ -22,10 +22,10 @@ static void update_cygpath_env(void) {
     if(done) return;
     done = true;
 
-    char win_path[MAX_PATH];
-
-    // Convert Cygwin root path to Windows path
-    cygwin_conv_path(CCP_POSIX_TO_WIN_A, "/", win_path, sizeof(win_path));
+    // Resolve the MSYS2 install root in Windows form. Used to be a Cygwin
+    // runtime call against "/"; under UCRT64 we look it up through our
+    // own POSIX->Windows translator, which has a fixed MSYS install root.
+    CLEAN_CHAR_P *win_path = os_translate_msys_to_windows_path("/");
 
     nd_setenv("NETDATA_CYGWIN_BASE_PATH", win_path, 1);
 
@@ -60,10 +60,11 @@ void spawn_server_destroy(SPAWN_SERVER *server) {
 static BUFFER *argv_to_windows(const char **argv) {
     BUFFER *wb = buffer_create(0, NULL);
 
-    // argv[0] is the path
-    size_t b_size = strlen(argv[0]) * 2 + FILENAME_MAX;
-    CLEAN_CHAR_P *b = mallocz(b_size);
-    cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE, argv[0], b, b_size);
+    // argv[0] is the executable path; translate it to Windows form so
+    // CreateProcess can find the binary. The translator gives us an
+    // absolute Windows path when argv[0] is a root-relative POSIX
+    // path (e.g. "/opt/netdata/usr/libexec/...").
+    CLEAN_CHAR_P *b = os_translate_msys_to_windows_path(argv[0]);
 
     for(size_t i = 0; argv[i] ;i++) {
         const char *s = (i == 0) ? b : argv[i];
@@ -115,18 +116,11 @@ static BUFFER *argv_to_windows(const char **argv) {
 }
 
 int set_fd_blocking(int fd) {
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: fcntl(F_GETFL) failed");
-        return -1;
-    }
-
-    flags &= ~O_NONBLOCK;
-    if (fcntl(fd, F_SETFL, flags) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: fcntl(F_SETFL) failed");
-        return -1;
-    }
-
+    // UCRT's _pipe() returns blocking file descriptors by default; the
+    // POSIX fcntl(F_GETFL/F_SETFL, O_NONBLOCK) toggle has no equivalent
+    // here. Anonymous pipes never get put into non-blocking mode in
+    // this code path, so flipping back to blocking is a no-op.
+    (void)fd;
     return 0;
 }
 
@@ -163,21 +157,25 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     CLEAN_BUFFER *wb = argv_to_windows(argv);
     char *command = (char *)buffer_tostring(wb);
 
-    if (pipe(pipe_stdin) == -1) {
+    // UCRT exposes _pipe(int[2], size, mode) rather than POSIX pipe();
+    // pass a 64 KiB buffer (Cygwin's historical default) and request
+    // binary mode so the bytes flowing between netdata and the spawned
+    // plugin aren't subject to CRLF translation.
+    if (_pipe(pipe_stdin, 65536, _O_BINARY) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: Cannot create stdin pipe() for request No %zu, command: %s",
                instance->request_id, command);
         goto cleanup;
     }
 
-    if (pipe(pipe_stdout) == -1) {
+    if (_pipe(pipe_stdout, 65536, _O_BINARY) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: Cannot create stdout pipe() for request No %zu, command: %s",
                instance->request_id, command);
         goto cleanup;
     }
 
-    if (pipe(pipe_stderr) == -1) {
+    if (_pipe(pipe_stderr, 65536, _O_BINARY) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: Cannot create stderr pipe() for request No %zu, command: %s",
                instance->request_id, command);
@@ -269,9 +267,13 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     close(pipe_stdout[PIPE_WRITE]); pipe_stdout[PIPE_WRITE] = -1;
     close(pipe_stderr[PIPE_WRITE]); pipe_stderr[PIPE_WRITE] = -1;
 
-    // Store process information in instance
+    // Store process information in instance.
+    // child_pid used to be the Cygwin-translated POSIX pid; under UCRT64
+    // there is no Cygwin pid namespace, so leave it as -1 and let
+    // spawn_server_instance_pid() fall back to the raw Windows PID
+    // (dwProcessId).
     instance->dwProcessId = pi.dwProcessId;
-    instance->child_pid = cygwin_winpid_to_pid((pid_t)pi.dwProcessId);
+    instance->child_pid = -1;
     instance->process_handle = pi.hProcess;
 
     // Convert handles to POSIX file descriptors
@@ -407,7 +409,11 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
         WaitForSingleObject(si->process_handle, timeout_ms);
 
     errno_clear();
-    if(si->child_pid != -1 && kill(si->child_pid, SIGTERM) != 0)
+    // POSIX kill(pid, SIGTERM) maps to Win32 TerminateProcess() with
+    // a chosen exit-code marker. STATUS_CONTROL_C_EXIT is what
+    // map_status_code_to_signal() recognises and translates back to
+    // SIGTERM in the wait path, preserving the cross-platform contract.
+    if(si->process_handle && !TerminateProcess(si->process_handle, STATUS_CONTROL_C_EXIT))
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be killed",
                si->request_id, (int)si->child_pid, si->dwProcessId);

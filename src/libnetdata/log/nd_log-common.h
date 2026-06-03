@@ -3,7 +3,33 @@
 #ifndef NETDATA_ND_LOG_COMMON_H
 #define NETDATA_ND_LOG_COMMON_H
 
-#include <syslog.h>
+// The ND_LOG_FIELD_PRIORITY enum below uses the LOG_EMERG..LOG_DEBUG
+// integer constants. These come from <syslog.h> on POSIX platforms.
+// On Windows (no syslog daemon, no <syslog.h>) we provide the same
+// POSIX-standard numeric values directly so this header stays
+// self-contained -- including for build-time code generators such as
+// wevt_netdata_mc_generate.c that compile without netdata's autoconf
+// HAVE_SYSLOG_H gate.
+#if defined(__has_include)
+#  if __has_include(<syslog.h>)
+#    include <syslog.h>
+#    define ND_LOG_COMMON_HAVE_SYSLOG_H 1
+#  endif
+#elif defined(HAVE_SYSLOG_H)
+#  include <syslog.h>
+#  define ND_LOG_COMMON_HAVE_SYSLOG_H 1
+#endif
+
+#ifndef ND_LOG_COMMON_HAVE_SYSLOG_H
+#define LOG_EMERG   0
+#define LOG_ALERT   1
+#define LOG_CRIT    2
+#define LOG_ERR     3
+#define LOG_WARNING 4
+#define LOG_NOTICE  5
+#define LOG_INFO    6
+#define LOG_DEBUG   7
+#endif
 
 typedef enum  __attribute__((__packed__)) {
     NDLS_UNSET = 0,   // internal use only

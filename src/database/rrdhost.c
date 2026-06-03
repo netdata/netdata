@@ -218,7 +218,7 @@ void rrdhost_tz_free(RRDHOST_TZ *tz) {
 //
 static bool create_dbengine_directory(RRDHOST *host, const char *dbenginepath)
 {
-    int ret = mkdir(dbenginepath, 0775);
+    int ret = nd_mkdir(dbenginepath, 0775);
     if (ret != 0 && errno != EEXIST) {
         nd_log(NDLS_DAEMON, NDLP_CRIT, "Host '%s': cannot create directory '%s'", rrdhost_hostname(host), dbenginepath);
         return false;

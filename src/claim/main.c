@@ -9,6 +9,14 @@
 #include <string.h>
 #include <signal.h>
 
+// POSIX wcscasecmp() isn't declared by UCRT; Microsoft's _wcsicmp() is
+// the same function with the same signature. This file is standalone
+// Windows-only (the claim-token launcher .exe) and does not pull in
+// libnetdata's common.h, so the alias is repeated here.
+#ifndef wcscasecmp
+#define wcscasecmp _wcsicmp
+#endif
+
 #include "main.h"
 
 LPWSTR token = NULL;

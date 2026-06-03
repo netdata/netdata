@@ -91,11 +91,40 @@ macro(netdata_detect_protobuf)
         if(OS_WINDOWS)
                 set(PROTOBUF_PROTOC_EXECUTABLE "$ENV{PROTOBUF_PROTOC_EXECUTABLE}")
                 if(NOT PROTOBUF_PROTOC_EXECUTABLE)
-                        set(PROTOBUF_PROTOC_EXECUTABLE "/bin/protoc")
+                        # Under MSYSTEM=UCRT64 the UCRT64 cmake is a native Windows
+                        # binary; ninja cannot resolve POSIX-shaped paths like
+                        # /bin/protoc. The MSYS2 ucrt64 protobuf package installs
+                        # protoc.exe at $MINGW_PREFIX/bin/protoc.exe. Use a direct
+                        # set + EXISTS check instead of find_program(): the MSYS2
+                        # ucrt64 cmake toolchain configures CMAKE_FIND_ROOT_PATH_*
+                        # in ways that mask /ucrt64/bin from find_program even when
+                        # passed as HINTS.
+                        set(_nd_protoc "$ENV{MINGW_PREFIX}/bin/protoc.exe")
+                        if(EXISTS "${_nd_protoc}")
+                                set(PROTOBUF_PROTOC_EXECUTABLE "${_nd_protoc}")
+                        else()
+                                message(FATAL_ERROR
+                                        "Could not find protoc at '${_nd_protoc}'. "
+                                        "Install mingw-w64-ucrt-x86_64-protobuf, or "
+                                        "set PROTOBUF_PROTOC_EXECUTABLE explicitly. "
+                                        "(MINGW_PREFIX from env: '$ENV{MINGW_PREFIX}').")
+                        endif()
+                        unset(_nd_protoc)
                 endif()
                 set(PROTOBUF_CFLAGS_OTHER "")
                 set(PROTOBUF_INCLUDE_DIRS "")
-                set(PROTOBUF_LIBRARIES "-lprotobuf")
+
+                # MSYS2's mingw-w64-ucrt-x86_64-protobuf (v22+) ships a
+                # CMake Package Configuration module that pulls in the
+                # required Abseil deps through the protobuf::libprotobuf
+                # target. The bare "-lprotobuf" we used previously
+                # linked only protobuf itself and left Abseil symbols
+                # (absl::status_internal::*, absl::hash_internal::*,
+                # protobuf::internal::ThreadSafeArena::thread_cache_)
+                # undefined at netdata.exe link time. Use the CONFIG-
+                # mode find_package so the transitive deps come along.
+                find_package(Protobuf CONFIG REQUIRED)
+                set(PROTOBUF_LIBRARIES protobuf::libprotobuf)
 
                 set(ENABLE_PROTOBUF True)
                 set(HAVE_PROTOBUF True)

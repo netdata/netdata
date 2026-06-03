@@ -6,8 +6,8 @@
 #include "../libnetdata.h"
 
 #if defined(OS_WINDOWS)
-long netdata_registry_get_dword_from_open_key(unsigned int *out, void *lKey, char *name);
-bool netdata_registry_get_dword(unsigned int *out, void *hKey, char *subKey, char *name);
+long netdata_registry_get_dword_from_open_key(DWORD *out, void *lKey, char *name);
+bool netdata_registry_get_dword(DWORD *out, void *hKey, char *subKey, char *name);
 
 long netdata_registry_get_string_from_open_key(char *out, unsigned int length, void *lKey, char *name);
 bool netdata_registry_get_string(char *out, unsigned int length, void *hKey, char *subKey, char *name);

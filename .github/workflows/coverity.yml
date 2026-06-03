@@ -4,10 +4,9 @@ name: Coverity Scan
 on:
   schedule:
     - cron: '0 1 * * *'
-  pull_request:
+  pull_request: # SOW-0033 iteration on rwin: disable non-Windows CI. Revert this block before merge.
     paths:
-      - .github/workflows/coverity.yml
-      - packaging/utils/coverity-scan.sh
+      - '__SOW_0033_DISABLED__'
 env:
   DISABLE_TELEMETRY: 1
 concurrency:

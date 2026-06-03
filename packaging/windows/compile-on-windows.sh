@@ -68,8 +68,15 @@ else
 fi
 
 ${GITHUB_ACTIONS+echo "::group::Configuring"}
+# Use the UCRT64 cmake (resolved via PATH under MSYSTEM=UCRT64); the MSYS
+# cmake at /usr/bin/cmake reports CMAKE_SYSTEM_NAME=MSYS and is not what
+# we want.
+#
+# rustc / cargo are also resolved via PATH under MSYSTEM=UCRT64 (no
+# explicit -DRust_COMPILER needed). Corrosion's FindRust.cmake then
+# discovers cargo next to rustc in /ucrt64/bin/.
 # shellcheck disable=SC2086
-CFLAGS="${BUILD_CFLAGS}" /usr/bin/cmake \
+CFLAGS="${BUILD_CFLAGS}" cmake \
     -S "${REPO_ROOT}" \
     -B "${build}" \
     -G "${generator}" \
@@ -85,7 +92,7 @@ CFLAGS="${BUILD_CFLAGS}" /usr/bin/cmake \
     -DENABLE_PLUGIN_SYSTEMD_JOURNAL=Off \
     -DENABLE_BUNDLED_JSONC=On \
     -DENABLE_BUNDLED_PROTOBUF=Off \
-    -DRust_COMPILER=/ucrt64/bin/rustc \
+    -DENABLE_RUST_DEMO=Off \
     "${windows_path_prefix_arg[@]}" \
     ${EXTRA_CMAKE_OPTIONS:-}
 ${GITHUB_ACTIONS+echo "::endgroup::"}

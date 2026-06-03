@@ -183,7 +183,7 @@ void dyncfg_init_low_level(bool load_saved) {
         char path[PATH_MAX];
         snprintfz(path, sizeof(path), "%s/%s", netdata_configured_varlib_dir, "config");
 
-        if(mkdir(path, 0755) == -1) {
+        if(nd_mkdir(path, 0755) == -1) {
             if(errno != EEXIST)
                 nd_log(NDLS_DAEMON, NDLP_CRIT, "DYNCFG: failed to create dynamic configuration directory '%s'", path);
         }

@@ -43,6 +43,7 @@
 #include "machine_id.h"
 #include "process_memory.h"
 #include "dir_size.h"
+#include "os_dirent.h"
 
 // this includes windows.h to the whole of netdata
 // so various conflicts arise
@@ -59,8 +60,16 @@ void os_get_system_HZ(void);
 #if defined(OS_WINDOWS)
 char *os_translate_path(char *dst, const char *src, size_t dst_size);
 char *os_translate_msys_to_windows_path(const char *src);
+// Wide-string variant for the Win32 *W APIs (CreateFileW, GetDiskFreeSpaceExW, ...).
+// Caller frees with freez(); returns NULL on conversion failure.
+wchar_t *os_translate_msys_to_windows_pathW(const char *src);
 // Returns newly allocated POSIX-style storage; caller must free.
 char *os_translate_windows_to_msys_path(const char *src);
+
+// Portable mkdir() with a POSIX mode argument. UCRT's mkdir takes only
+// the path -- Windows uses ACLs rather than POSIX permission bits, and
+// `mode` is intentionally dropped on this platform.
+#define nd_mkdir(path, mode) mkdir(path)
 #else
 // No translation needed on non-Windows; copy src into dst for consistent semantics.
 static inline char *os_translate_path(char *dst, const char *src, size_t dst_size) {
@@ -76,6 +85,7 @@ static inline char *os_translate_path(char *dst, const char *src, size_t dst_siz
 static inline char *os_translate_windows_to_msys_path(const char *src) {
     return strdupz(src ? src : "");
 }
+#define nd_mkdir(path, mode) mkdir((path), (mode))
 #endif
 
 #endif //NETDATA_OS_H

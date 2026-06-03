@@ -10,6 +10,34 @@ include(ExternalProject)
 function(netdata_bundle_libbacktrace)
         message(STATUS "Preparing libbacktrace")
 
+        if(OS_WINDOWS)
+                # On Windows we use the system-packaged libbacktrace
+                # (mingw-w64-ucrt-x86_64-libbacktrace from MSYS2). The
+                # ExternalProject_Add fallback below relies on an autotools
+                # `configure` shell script that cannot be dispatched by the
+                # native-Windows cmake/ninja stack (cmd.exe has no concept
+                # of shebangs), so source-bundling is not viable here.
+                find_package(PkgConfig REQUIRED)
+                pkg_check_modules(LIBBACKTRACE REQUIRED libbacktrace)
+
+                find_library(libbacktrace_LIBRARY
+                        NAMES libbacktrace.a backtrace
+                        HINTS ${LIBBACKTRACE_LIBRARY_DIRS}
+                        REQUIRED
+                )
+
+                add_library(libbacktrace_library STATIC IMPORTED GLOBAL)
+                set_property(TARGET libbacktrace_library
+                        PROPERTY IMPORTED_LOCATION "${libbacktrace_LIBRARY}")
+
+                set(NETDATA_LIBBACKTRACE_INCLUDE_DIRS "${LIBBACKTRACE_INCLUDE_DIRS}" PARENT_SCOPE)
+                set(NETDATA_LIBBACKTRACE_LIBRARIES libbacktrace_library PARENT_SCOPE)
+                set(HAVE_LIBBACKTRACE TRUE PARENT_SCOPE)
+
+                message(STATUS "Using system libbacktrace from ${libbacktrace_LIBRARY}")
+                return()
+        endif()
+
         set(libbacktrace_SOURCE_DIR "${CMAKE_BINARY_DIR}/libbacktrace-src")
         set(libbacktrace_BINARY_DIR "${CMAKE_BINARY_DIR}/libbacktrace-build")
         set(libbacktrace_INSTALL_DIR "${CMAKE_BINARY_DIR}/libbacktrace-install")
@@ -48,5 +76,11 @@ endfunction()
 function(netdata_add_libbacktrace_to_target _target)
         target_include_directories(${_target} BEFORE PUBLIC "${NETDATA_LIBBACKTRACE_INCLUDE_DIRS}")
         target_link_libraries(${_target} PUBLIC ${NETDATA_LIBBACKTRACE_LIBRARIES})
-        add_dependencies(${_target} libbacktrace)
+
+        # The `libbacktrace` target only exists when we bundle from source
+        # via ExternalProject_Add (non-Windows path). On Windows we use the
+        # system package and there is no source build to depend on.
+        if(TARGET libbacktrace)
+                add_dependencies(${_target} libbacktrace)
+        endif()
 endfunction()
