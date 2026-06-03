@@ -233,13 +233,13 @@ On Windows, `edit-config` opens files with the `nano` editor.
 
 ### Basic nano commands
 
-| Action                | Keybinding                                       |
-|----------------------|--------------------------------------------------|
-| Edit text            | Type normally, use arrow keys to navigate        |
-| Search               | `Ctrl + W`, type search text, `Enter`            |
-| Save                 | `Ctrl + O`, `Enter` to confirm filename          |
-| Exit                 | `Ctrl + X`                                       |
-| Exit with save prompt | `Ctrl + X`, then `Y` to save or `N` to discard |
+| Action                 | Keybinding                                        |
+|------------------------|---------------------------------------------------|
+| Edit text              | Type normally, use arrow keys to navigate         |
+| Search                 | `Ctrl + W`, type search text, `Enter`             |
+| Save                   | `Ctrl + O`, `Enter` to confirm filename           |
+| Exit                   | `Ctrl + X`                                        |
+| Exit with save prompt  | `Ctrl + X`, then `Y` to save or `N` to discard    |
 
 ## Related Windows documentation
 
