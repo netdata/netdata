@@ -83,7 +83,7 @@ $ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest https://github.com/n
 
 ## Access Netdata Dashboard
 
-After installation, check that the Netdata service is running (see [Service Control](/docs/netdata-agent/start-stop-restart.md#windows) for instructions on checking status), then open your browser and go to:
+After installation, open your browser and go to:
 
 ```
 http://localhost:19999
