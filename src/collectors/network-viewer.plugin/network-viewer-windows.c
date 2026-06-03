@@ -590,8 +590,8 @@ void function_network_protocols(
         nv_add_key_field(wb, &field_id, "Share",     "SMB Share Name");
 
         // Normalized columns — TCP: segments, UDP: datagrams, SMB: bytes
-        nv_add_int_field(wb, &field_id, "Received", "Received (Segments/Datagrams/Bytes)", "count/s");
-        nv_add_int_field(wb, &field_id, "Sent",     "Sent (Segments/Datagrams/Bytes)",     "count/s");
+        nv_add_int_field(wb, &field_id, "Received", "Received (Segments/Datagrams/Bytes)", "units/s");
+        nv_add_int_field(wb, &field_id, "Sent",     "Sent (Segments/Datagrams/Bytes)",     "units/s");
         nv_add_int_field(wb, &field_id, "Errors",   "Errors (Failures/Rx Errors)",   "errors");
 
         // TCP-only columns (UDP rows carry 0)
