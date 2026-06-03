@@ -4,6 +4,7 @@ package vsphere
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 	"time"
@@ -206,9 +207,7 @@ func (b *vsphereTopologyBuilder) data(agentID string, collectedAt time.Time, res
 	}
 
 	stats := make(map[string]any, len(resourceStats)+5)
-	for key, value := range resourceStats {
-		stats[key] = value
-	}
+	maps.Copy(stats, resourceStats)
 	stats["actor_rows"] = actorTable.Rows
 	stats["link_rows"] = linkTable.Rows
 	stats["evidence_rows"] = evidenceRows

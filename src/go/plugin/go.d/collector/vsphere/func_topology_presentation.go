@@ -39,7 +39,7 @@ func vsphereActorPresentation(label, icon, colorSlot string) *topologyv1.ActorPr
 		Icon:      icon,
 		ColorSlot: colorSlot,
 		Border: &topologyv1.BorderPresentation{
-			Enabled: topologyBoolPtr(true),
+			Enabled: new(true),
 			Style:   "solid",
 		},
 		LabelPolicy: &topologyv1.LabelPolicy{
@@ -84,9 +84,9 @@ func vsphereLinkPresentation(label, colorSlot, arrow, distance string) *topology
 
 func vsphereActorModal() *topologyv1.ModalPresentation {
 	return &topologyv1.ModalPresentation{
-		Enabled: topologyBoolPtr(true),
+		Enabled: new(true),
 		Labels: &topologyv1.ModalLabelsPresentation{
-			Enabled:          topologyBoolPtr(true),
+			Enabled:          new(true),
 			Table:            vsphereTopologyLabelsTable,
 			ActorColumn:      "actor",
 			KeyColumn:        "key",
@@ -95,7 +95,7 @@ func vsphereActorModal() *topologyv1.ModalPresentation {
 			KindColumn:       "kind",
 			ValueIndexColumn: "value_index",
 			Identification: &topologyv1.ModalLabelIdentificationPresentation{
-				Enabled: topologyBoolPtr(true),
+				Enabled: new(true),
 				Fields: []topologyv1.ModalLabelIdentificationField{
 					{Key: "object_type", Label: "Type", MaxValues: 1},
 					{Key: "datacenter", Label: "Datacenter", MaxValues: 1},
@@ -106,7 +106,7 @@ func vsphereActorModal() *topologyv1.ModalPresentation {
 			},
 		},
 		MiniTopology: &topologyv1.ModalMiniTopologyPresentation{
-			Enabled: topologyBoolPtr(true),
+			Enabled: new(true),
 			Depth:   1,
 			IncludeLinkTypes: []string{
 				vsphereTopologyOwnershipLink,
@@ -225,8 +225,4 @@ func vsphereModalDirectColumnWithVisibility(id, label, sourceColumn, cell, visib
 		Cell:       cell,
 		Visibility: visibility,
 	}
-}
-
-func topologyBoolPtr(value bool) *bool {
-	return &value
 }
