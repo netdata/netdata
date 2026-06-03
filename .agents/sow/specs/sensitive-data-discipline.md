@@ -82,11 +82,10 @@ For every reference to a value covered above, use ONE of:
 
 ## Required env keys
 
-These keys MUST be defined in `<repo>/.env` (gitignored) for the
-SOW family from SOW-0010 onward to function. If a SOW or script
-references one and the key is unset, the script must error loudly
-and exit non-zero. Values live ONLY in `.env`; this spec lists
-names and roles only.
+These keys MUST be defined in `<repo>/.env` (gitignored) when a SOW,
+skill, or script references them. If a SOW or script references one and
+the key is unset, the script must error loudly and exit non-zero. Values
+live ONLY in `.env`; this spec lists names and roles only.
 
 | Key | Role |
 |---|---|
@@ -189,8 +188,8 @@ project reports its own data).
 
 ## Failure mode
 
-If a verification grep returns a hit on a committed file, the SOW
-that introduced it has failed its Sensitive Data Gate and must be
-treated as a regression. Re-open the SOW, redact, force-push only
-with explicit user approval (otherwise create a follow-up commit
-that scrubs).
+If verification returns a hit on a committed file, the work that introduced it
+failed its Sensitive Data Gate and must be treated as a regression. Create a new
+branch-local SOW that links the prior PR/commit, redact the durable artifact,
+and force-push only with explicit user approval. Otherwise, create a follow-up
+commit that scrubs the leak.

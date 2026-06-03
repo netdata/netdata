@@ -1,6 +1,6 @@
 ---
 name: codacy-audit
-description: Codacy Cloud workflow for this repository -- run Codacy's analyzers locally before `git push` (mirrors what Codacy CI runs), and fetch/cluster Codacy issues for any PR via the v3 API. Use when the user mentions Codacy, "codacy analysis", `codacy-analysis-cli`, "codacy issues on PR", "fix codacy CI", "codacy markdownlint findings", or any Codacy gate failing on a netdata-org PR. Ships scripts analyze-local.sh (docker/binary runner for codacy-analysis-cli) and pr-issues.sh (paginated v3 issue fetch + group-by tool/pattern/severity/file). Token-safe -- CODACY_TOKEN never reaches assistant-visible stdout. Read-only by design in the current SOW; write actions (mark FP, mark fixed) are deferred.
+description: Codacy Cloud workflow for this repository -- run Codacy's analyzers locally before `git push` (mirrors what Codacy CI runs), and fetch/cluster Codacy issues for any PR via the v3 API. Use when the user mentions Codacy, "codacy analysis", `codacy-analysis-cli`, "codacy issues on PR", "fix codacy CI", "codacy markdownlint findings", or any Codacy gate failing on a netdata-org PR. Ships scripts analyze-local.sh (docker/binary runner for codacy-analysis-cli) and pr-issues.sh (paginated v3 issue fetch + group-by tool/pattern/severity/file). Token-safe -- CODACY_TOKEN never reaches assistant-visible stdout. Read-only by design; write actions (mark FP, mark fixed) require a GitHub issue or branch-local SOW.
 ---
 
 # Codacy audit skill
@@ -28,7 +28,7 @@ Examples worth capturing:
 
 Each concrete question that requires non-trivial analysis (multiple wrapper calls, jq pipelines, cross-referencing other skills) MUST become a how-to under `how-tos/<slug>.md` AND get an entry in `how-tos/INDEX.md` BEFORE the task is reported complete. Skipping this means the next assistant repeats the analysis from scratch.
 
-## Scope (current SOW)
+## Scope
 
 In scope:
 
@@ -36,7 +36,7 @@ In scope:
 - Read-only PR-issue queries against the v3 API.
 - Token-safe wrappers (sentinel-driven no-leak self-test).
 
-Out of scope (deferred to a future SOW):
+Out of scope until a real use case creates a GitHub issue or branch-local SOW:
 
 - Write actions (mark issue as false-positive, mark as fixed, modify ignore-patterns).
 - Master-backlog triage on the 31,425+ open issues.
