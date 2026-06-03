@@ -457,13 +457,14 @@ static void proto_emit_smb_rows(BUFFER *wb)
             buffer_json_add_array_item_uint64(wb, nv_perflib_value(&s->receivedBytes));
             buffer_json_add_array_item_uint64(wb, nv_perflib_value(&s->sentBytes));
             buffer_json_add_array_item_uint64(wb, 0); // Errors
-            buffer_json_add_array_item_uint64(wb, 0); // ConnActive
+            buffer_json_add_array_item_uint64(wb, 0); // ConnActive        — TCP only
+            buffer_json_add_array_item_uint64(wb, 0); // ConnEstablished   — TCP only
+            buffer_json_add_array_item_uint64(wb, 0); // ConnPassive       — TCP only
+            buffer_json_add_array_item_uint64(wb, 0); // ConnReset         — TCP only
+            buffer_json_add_array_item_uint64(wb, 0); // SegsTotal         — TCP only
+            buffer_json_add_array_item_uint64(wb, 0); // SegsRetransmitted — TCP only
+            buffer_json_add_array_item_uint64(wb, 0); // DatagramsNoPort   — UDP only
             buffer_json_add_array_item_uint64(wb, nv_perflib_value(&s->treeConnectCount));
-            buffer_json_add_array_item_uint64(wb, 0); // ConnPassive
-            buffer_json_add_array_item_uint64(wb, 0); // ConnReset
-            buffer_json_add_array_item_uint64(wb, 0); // SegsTotal
-            buffer_json_add_array_item_uint64(wb, 0); // SegsRetransmitted
-            buffer_json_add_array_item_uint64(wb, 0); // DatagramsNoPort
         }
         buffer_json_array_close(wb);
     }
@@ -476,7 +477,7 @@ static void proto_emit_smb_rows(BUFFER *wb)
 
 // Column order for all rows: Transport, Family, Share, Received, Sent, Errors,
 //   ConnActive, ConnEstablished, ConnPassive, ConnReset, SegsTotal, SegsRetransmitted,
-//   DatagramsNoPort.
+//   DatagramsNoPort, TreeConnects.
 
 static void proto_emit_tcp_row(BUFFER *wb, const TCP_FAMILY *tcp)
 {
@@ -495,6 +496,7 @@ static void proto_emit_tcp_row(BUFFER *wb, const TCP_FAMILY *tcp)
         buffer_json_add_array_item_uint64(wb, nv_perflib_value(&tcp->segments_total));
         buffer_json_add_array_item_uint64(wb, nv_perflib_value(&tcp->segments_retransmitted));
         buffer_json_add_array_item_uint64(wb, 0); // DatagramsNoPort — UDP only
+        buffer_json_add_array_item_uint64(wb, 0); // TreeConnects    — SMB only
     }
     buffer_json_array_close(wb);
 }
@@ -516,6 +518,7 @@ static void proto_emit_udp_row(BUFFER *wb, const UDP_FAMILY *udp)
         buffer_json_add_array_item_uint64(wb, 0); // SegsTotal         — TCP only
         buffer_json_add_array_item_uint64(wb, 0); // SegsRetransmitted — TCP only
         buffer_json_add_array_item_uint64(wb, nv_perflib_value(&udp->datagrams_no_port));
+        buffer_json_add_array_item_uint64(wb, 0); // TreeConnects      — SMB only
     }
     buffer_json_array_close(wb);
 }
@@ -604,8 +607,11 @@ void function_network_protocols(
         nv_add_int_field(wb, &field_id, "SegsTotal",         "Total Segments",                     "segments/s");
         nv_add_int_field(wb, &field_id, "SegsRetransmitted", "Retransmitted Segments",             "segments/s");
 
-        // UDP-only column (TCP rows carry 0)
+        // UDP-only column (TCP/SMB rows carry 0)
         nv_add_int_field(wb, &field_id, "DatagramsNoPort", "Datagrams with No Port", "datagrams/s");
+
+        // SMB-only column (TCP/UDP rows carry 0)
+        nv_add_int_field(wb, &field_id, "TreeConnects", "Active SMB Tree Connections", "connections");
     }
     buffer_json_object_close(wb); // columns
     buffer_json_member_add_string(wb, "default_sort_column", "Received");
