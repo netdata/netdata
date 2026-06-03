@@ -1,6 +1,7 @@
 # vSphere Collector V1 Compatibility Manifest
 
-Status: superseded historical baseline for `SOW-0015`.
+Status: superseded historical baseline from the vSphere V2 migration in
+PR #22458 / commit `18991fd4e`.
 
 The executable V1 golden fixture
 `src/go/plugin/go.d/collector/vsphere/testdata/v1_compat_manifest.json` and
@@ -92,7 +93,7 @@ Removed executable golden scope:
 
 This table records the migration baseline before later cleanup decisions. It is
 not the authoritative current accepted surface after the 2026-05-20 and
-2026-05-22 removals documented in `SOW-0015`.
+2026-05-22 removals documented in PR #22458 / commit `18991fd4e`.
 
 | YAML key | JSON key | Required by schema | Notes |
 |---|---|---:|---|

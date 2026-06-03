@@ -10,6 +10,7 @@ on:
       - 'src/go/plugin/go.d/collector/snmp_topology/**'
       - 'src/go/plugin/go.d/config/go.d/snmp.profiles/**'
       - 'src/go/pkg/topology/**'
+      - 'src/go/pkg/l2topology/**'
   pull_request:
     paths:
       - '.github/workflows/snmp-topology-tests.yml'
@@ -17,6 +18,7 @@ on:
       - 'src/go/plugin/go.d/collector/snmp_topology/**'
       - 'src/go/plugin/go.d/config/go.d/snmp.profiles/**'
       - 'src/go/pkg/topology/**'
+      - 'src/go/pkg/l2topology/**'
 
 jobs:
   fixture-tests:
@@ -95,7 +97,7 @@ jobs:
           cd src/go
           go test -tags=snmp_topology_fixtures \
             ./plugin/go.d/collector/snmp_topology/... \
-            ./pkg/topology/engine/parity/...
+            ./pkg/l2topology/parity/...
 
       - name: Stop snmpsim
         if: always()

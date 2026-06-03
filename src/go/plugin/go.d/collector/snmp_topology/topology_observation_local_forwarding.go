@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/engine"
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
 func (c *topologyCache) appendObservedFDBEntries(observation *topologyengine.L2Observation) {

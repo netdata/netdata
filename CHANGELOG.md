@@ -262,6 +262,11 @@
 - Preparation for virtual logs functions ([#22584](https://github.com/netdata/netdata/issues/22584))
 - Improve error handling in netdata-updater when fetching files. ([#22422](https://github.com/netdata/netdata/issues/22422))
 - Assorted CI fixes for IBM MQ library handlign in packaging workflow. ([#22491](https://github.com/netdata/netdata/issues/22491))
+- Regenerate integrations docs ([#22583](https://github.com/netdata/netdata/issues/22583))
+- Docs: fix documentation typos ([#22599](https://github.com/netdata/netdata/issues/22599))
+- Docs: update Go area instructions ([#22600](https://github.com/netdata/netdata/issues/22600))
+- Docs: task class: improve_docs — add a non-systemd linux section to the logs ([#22518](https://github.com/netdata/netdata/issues/22518))
+- Network Viewer (Connections on Windows) ([#22585](https://github.com/netdata/netdata/issues/22585))
 
 ## [2.10.0] - 2026-04-09
 

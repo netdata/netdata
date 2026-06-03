@@ -1,0 +1,72 @@
+name: SOW
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - ".agents/sow/**"
+      - ".agents/skills/**"
+      - ".agents/skill-verification/**"
+      - ".agents/ENV.md"
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "GEMINI.md"
+
+permissions:
+  contents: read
+
+jobs:
+  no-working-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reject committed SOW working files
+        run: |
+          set -euo pipefail
+
+          found=0
+
+          while IFS= read -r file; do
+            [ -n "$file" ] || continue
+            echo "::error file=${file}::SOW working files are branch-local and must be deleted before merge."
+            found=1
+          done < <(
+            {
+              find .agents/sow/active -maxdepth 1 -type f -name 'SOW-*.md' 2>/dev/null || true
+              find .agents/sow/pending .agents/sow/current .agents/sow/done -type f -name 'SOW-*.md' 2>/dev/null || true
+            } | sort
+          )
+
+          exit "$found"
+
+  sensitive-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan changed durable artifacts for sensitive data
+        run: |
+          set -euo pipefail
+
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+
+          mapfile -t files < <(
+            git diff --name-only --diff-filter=ACMR "$base...$head" -- \
+              .agents/sow .agents/skills .agents/skill-verification .agents/ENV.md \
+              AGENTS.md CLAUDE.md GEMINI.md \
+              | while IFS= read -r file; do
+                  [ -f "$file" ] && printf '%s\n' "$file"
+                done
+          )
+
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No changed durable artifacts to scan."
+            exit 0
+          fi
+
+          bash .agents/sow/scan-sensitive.sh "${files[@]}"

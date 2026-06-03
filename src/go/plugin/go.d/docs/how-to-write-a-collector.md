@@ -304,9 +304,9 @@ deps so the boundary is compile-enforced.
 
 ## Topology
 
-New topology producers MUST use `src/go/pkg/topology/v1`, not legacy topology
-payloads. New producers MUST NOT import the non-v1 `src/go/pkg/topology`
-payload model.
+New topology producers MUST use `src/go/pkg/topology/v1`. The non-v1 root
+`src/go/pkg/topology` payload model has been retired and MUST NOT be
+reintroduced for topology payloads.
 
 Rules:
 

@@ -4,11 +4,15 @@ package vsphere
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
+	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/require"
 )
 
@@ -33,10 +37,11 @@ func TestFuncTopology_Handle(t *testing.T) {
 			},
 			want: 200,
 			check: func(t *testing.T, raw any) {
-				data, ok := raw.(topology.Data)
+				data, ok := raw.(topologyv1.Data)
 				require.True(t, ok)
-				require.Empty(t, data.Actors)
-				require.Empty(t, data.Links)
+				validateVSphereTopologyV1Data(t, data)
+				require.Equal(t, 0, data.Actors.Rows)
+				require.Equal(t, 0, data.Links.Rows)
 				require.EqualValues(t, 0, data.Stats["hosts"])
 				require.EqualValues(t, 0, data.Stats["vms"])
 			},
@@ -62,7 +67,7 @@ func TestFuncTopology_Handle(t *testing.T) {
 	}
 }
 
-func TestFuncTopology_HandleWithInventoryCache(t *testing.T) {
+func newVSphereTopologyTestCollector() *Collector {
 	collr := New()
 	collr.resources = &rs.Resources{
 		DataCenters: rs.DataCenters{
@@ -141,60 +146,60 @@ func TestFuncTopology_HandleWithInventoryCache(t *testing.T) {
 			},
 		},
 	}
+	return collr
+}
+
+func TestFuncTopology_HandleWithInventoryCache(t *testing.T) {
+	collr := newVSphereTopologyTestCollector()
 	handler := &funcTopology{collector: collr, agentID: "vsphere_vcenter1"}
 
 	resp := handler.Handle(context.Background(), "topology:vsphere", nil)
 
 	require.Equal(t, 200, resp.Status)
 	require.Equal(t, "topology", resp.ResponseType)
-	data, ok := resp.Data.(topology.Data)
+	data, ok := resp.Data.(topologyv1.Data)
 	require.True(t, ok)
-	require.Equal(t, "vsphere", data.Source)
-	require.Equal(t, "virtualization", data.Layer)
-	require.Equal(t, "inventory", data.View)
-	require.Equal(t, "vsphere_vcenter1", data.AgentID)
-	require.Len(t, data.Actors, 8)
-	require.Len(t, data.Links, 9)
+	validateVSphereTopologyV1Data(t, data)
+	require.Equal(t, topologyv1.SchemaVersion, data.SchemaVersion)
+	require.Equal(t, "vsphere", data.Producer.Source)
+	require.Equal(t, "go.d/vsphere", data.Producer.Plugin)
+	require.Equal(t, "vsphere_vcenter1", data.Producer.Instance)
+	require.Equal(t, "virtualization", data.Types.ActorTypes["vsphere_vm"].Layer)
+	require.Equal(t, 8, data.Actors.Rows)
+	require.Equal(t, 9, data.Links.Rows)
 
-	actors := topologyActorsByID(data.Actors)
-	require.Contains(t, actors, "vsphere_datacenter:datacenter-1")
-	require.Contains(t, actors, "vsphere_cluster:domain-c1")
-	require.Contains(t, actors, "vsphere_host:host-1")
-	require.Contains(t, actors, "vsphere_vm:vm-1")
-	require.Contains(t, actors, "vsphere_network:network-1")
-	require.Equal(t, "VM1", actors["vsphere_vm:vm-1"].Attributes["name"])
-	require.EqualValues(t, 2, actors["vsphere_vm:vm-1"].Attributes["snapshot_count"])
-	require.Equal(t, "VM Network", actors["vsphere_network:network-1"].Attributes["name"])
+	actors := topologyTableRows(t, data.Actors, data.Dictionaries)
+	requireTopologyRow(t, actors, "vsphere_moid", "datacenter-1")
+	requireTopologyRow(t, actors, "vsphere_moid", "domain-c1")
+	requireTopologyRow(t, actors, "vsphere_moid", "host-1")
+	vm := requireTopologyRow(t, actors, "vsphere_moid", "vm-1")
+	network := requireTopologyRow(t, actors, "vsphere_moid", "network-1")
+	require.Equal(t, "vsphere_vm", vm["type"])
+	require.Equal(t, "vm", vm["object_type"])
+	require.Equal(t, "VM1", vm["name"])
+	require.Equal(t, "network", network["object_type"])
+	require.Equal(t, "VM Network", network["name"])
 
-	require.Contains(t, topologyLinkKeys(data.Links), "vsphere_host:host-1->vsphere_vm:vm-1:runs")
-	require.Contains(t, topologyLinkKeys(data.Links), "vsphere_host:host-1->vsphere_network:network-1:connects")
-	require.Contains(t, topologyLinkKeys(data.Links), "vsphere_vm:vm-1->vsphere_network:network-1:connects")
-}
+	require.NotNil(t, data.Tables)
+	details := topologyTableRows(t, data.Tables.Actor[vsphereTopologyDetailTable].Table, data.Dictionaries)
+	vmDetail := requireTopologyRow(t, details, "vsphere_moid", "vm-1")
+	require.EqualValues(t, 2, vmDetail["snapshot_count"])
+	require.EqualValues(t, 3, vmDetail["snapshot_chain_depth"])
 
-func TestVSphereTopologyActorIDForResource(t *testing.T) {
-	tests := map[string]struct {
-		id   string
-		want string
-	}{
-		"opaque network": {
-			id:   "opaqueNetwork-1",
-			want: "vsphere_network:opaqueNetwork-1",
-		},
-		"standard network": {
-			id:   "network-1",
-			want: "vsphere_network:network-1",
-		},
-		"distributed port group": {
-			id:   "dvportgroup-1",
-			want: "vsphere_network:dvportgroup-1",
-		},
-	}
+	links := topologyTableRows(t, data.Links, data.Dictionaries)
+	keys := topologyLinkKeys(t, actors, links)
+	require.Contains(t, keys, "datacenter:datacenter-1->cluster:domain-c1:vsphere_ownership")
+	require.Contains(t, keys, "cluster:domain-c1->host:host-1:vsphere_ownership")
+	require.Contains(t, keys, "vm:vm-1->host:host-1:vsphere_runs_on")
+	require.Contains(t, keys, "host:host-1->network:network-1:vsphere_connected_to")
+	require.Contains(t, keys, "vm:vm-1->network:network-1:vsphere_connected_to")
 
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			require.Equal(t, tc.want, vsphereTopologyActorIDForResource(tc.id))
-		})
-	}
+	evidence := topologyTableRows(t, data.Evidence[vsphereRunsOnEvidenceType].Table, data.Dictionaries)
+	runEvidence := requireTopologyRow(t, evidence, "relationship", "runs_on")
+	require.Equal(t, "vm", runEvidence["source_type"])
+	require.Equal(t, "vm-1", runEvidence["source_moid"])
+	require.Equal(t, "host", runEvidence["target_type"])
+	require.Equal(t, "host-1", runEvidence["target_moid"])
 }
 
 func TestFuncTopology_DoesNotLinkToFilteredActors(t *testing.T) {
@@ -230,26 +235,148 @@ func TestFuncTopology_DoesNotLinkToFilteredActors(t *testing.T) {
 	data, ok := collr.topologyData("agent")
 
 	require.True(t, ok)
-	require.Len(t, data.Actors, 3)
-	keys := topologyLinkKeys(data.Links)
-	require.Contains(t, keys, "vsphere_datacenter:datacenter-1->vsphere_host:host-1:contains")
-	require.Contains(t, keys, "vsphere_datacenter:datacenter-1->vsphere_vm:vm-1:contains")
-	require.NotContains(t, keys, "vsphere_cluster:domain-c-filtered->vsphere_host:host-1:contains")
-	require.NotContains(t, keys, "vsphere_host:host-filtered->vsphere_vm:vm-1:runs")
+	validateVSphereTopologyV1Data(t, data)
+	require.Equal(t, 3, data.Actors.Rows)
+	actors := topologyTableRows(t, data.Actors, data.Dictionaries)
+	keys := topologyLinkKeys(t, actors, topologyTableRows(t, data.Links, data.Dictionaries))
+	require.Contains(t, keys, "datacenter:datacenter-1->host:host-1:vsphere_ownership")
+	require.Contains(t, keys, "datacenter:datacenter-1->vm:vm-1:vsphere_ownership")
+	require.NotContains(t, keys, "cluster:domain-c-filtered->host:host-1:vsphere_ownership")
+	require.NotContains(t, keys, "vm:vm-1->host:host-filtered:vsphere_runs_on")
 }
 
-func topologyActorsByID(actors []topology.Actor) map[string]topology.Actor {
-	out := make(map[string]topology.Actor, len(actors))
+func validateVSphereTopologyV1Data(t *testing.T, data topologyv1.Data) {
+	t.Helper()
+
+	payload, err := json.Marshal(data)
+	require.NoError(t, err)
+
+	var decodedData map[string]any
+	require.NoError(t, json.Unmarshal(payload, &decodedData))
+	require.NoError(t, topologyv1.ValidateDecodedData(decodedData))
+
+	schemaBytes, err := os.ReadFile(filepath.Clean(filepath.Join("..", "..", "..", "..", "..", "plugins.d", "FUNCTION_TOPOLOGY_SCHEMA.json")))
+	require.NoError(t, err)
+
+	var schemaDoc any
+	require.NoError(t, json.Unmarshal(schemaBytes, &schemaDoc))
+
+	compiler := jsonschema.NewCompiler()
+	require.NoError(t, compiler.AddResource("schema.json", schemaDoc))
+	schema, err := compiler.Compile("schema.json")
+	require.NoError(t, err)
+
+	response := map[string]any{
+		"status": 200,
+		"type":   topologyv1.ResponseType,
+		"data":   decodedData,
+	}
+	require.NoError(t, schema.Validate(response))
+}
+
+func topologyTableRows(t *testing.T, table topologyv1.Table, dictionaries topologyv1.Dictionaries) []map[string]any {
+	t.Helper()
+
+	rows := make([]map[string]any, table.Rows)
+	for row := range rows {
+		rows[row] = map[string]any{"_row": row}
+	}
+
+	for columnIndex, column := range table.Columns {
+		values := topologyColumnValues(t, table.Rows, table.Values[columnIndex])
+		for rowIndex, value := range values {
+			if column.Type == "string_ref" && value != nil {
+				value = resolveTopologyStringRef(t, dictionaries, column.Dictionary, value)
+			}
+			rows[rowIndex][column.ID] = value
+		}
+	}
+	return rows
+}
+
+func topologyColumnValues(t *testing.T, rows int, encoding topologyv1.ColumnEncoding) []any {
+	t.Helper()
+
+	switch value := encoding.(type) {
+	case topologyv1.ConstEncoding:
+		values := make([]any, rows)
+		for i := range values {
+			values[i] = value.Value
+		}
+		return values
+	case topologyv1.ValuesEncoding:
+		require.Len(t, value.Values, rows)
+		return value.Values
+	case topologyv1.DictEncoding:
+		require.Len(t, value.Indexes, rows)
+		values := make([]any, rows)
+		for i, index := range value.Indexes {
+			require.GreaterOrEqual(t, index, 0)
+			require.Less(t, index, len(value.Values))
+			values[i] = value.Values[index]
+		}
+		return values
+	default:
+		t.Fatalf("unsupported topology column encoding %T", encoding)
+		return nil
+	}
+}
+
+func resolveTopologyStringRef(t *testing.T, dictionaries topologyv1.Dictionaries, name string, value any) string {
+	t.Helper()
+
+	index, ok := value.(int)
+	require.True(t, ok)
+	values := dictionaries[name]
+	require.Less(t, index, len(values))
+	text, ok := values[index].(string)
+	require.True(t, ok)
+	return text
+}
+
+func requireTopologyRow(t *testing.T, rows []map[string]any, key string, value any) map[string]any {
+	t.Helper()
+
+	for _, row := range rows {
+		if row[key] == value {
+			return row
+		}
+	}
+	t.Fatalf("topology row with %s=%v not found", key, value)
+	return nil
+}
+
+func topologyLinkKeys(t *testing.T, actors, links []map[string]any) map[string]struct{} {
+	t.Helper()
+
+	actorNames := make(map[int]string, len(actors))
 	for _, actor := range actors {
-		out[actor.ActorID] = actor
+		row, ok := actor["_row"].(int)
+		require.True(t, ok)
+		actorNames[row] = actor["object_type"].(string) + ":" + actor["vsphere_moid"].(string)
 	}
-	return out
+
+	keys := make(map[string]struct{}, len(links))
+	for _, link := range links {
+		src := topologyIntValue(t, link["src_actor"])
+		dst := topologyIntValue(t, link["dst_actor"])
+		keys[actorNames[src]+"->"+actorNames[dst]+":"+link["type"].(string)] = struct{}{}
+	}
+	return keys
 }
 
-func topologyLinkKeys(links []topology.Link) map[string]struct{} {
-	out := make(map[string]struct{}, len(links))
-	for _, link := range links {
-		out[link.SrcActorID+"->"+link.DstActorID+":"+link.LinkType] = struct{}{}
+func topologyIntValue(t *testing.T, value any) int {
+	t.Helper()
+
+	switch v := value.(type) {
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case uint64:
+		return int(v)
+	default:
+		t.Fatalf("unexpected integer value %T", value)
+		return 0
 	}
-	return out
 }

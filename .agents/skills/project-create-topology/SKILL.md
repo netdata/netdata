@@ -41,8 +41,9 @@ developer-facing and must stay in this project skill, not under
 ## Core Rules
 
 - Production payloads carry canonical topology facts for the aggregator and UI.
-- Go producers MUST use `src/go/pkg/topology/v1`. The non-v1
-  `src/go/pkg/topology` payload model is legacy for new producers.
+- Go producers MUST use `src/go/pkg/topology/v1`. The non-v1 root
+  `src/go/pkg/topology` payload model has been retired and MUST NOT be
+  reintroduced for production topology payloads.
 - Test-only projection code may reconstruct compatibility payload shapes to
   prove parity.
 - Never add compatibility reconstruction fields, old-schema adapter names, or

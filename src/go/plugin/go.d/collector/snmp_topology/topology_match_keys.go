@@ -5,11 +5,9 @@ package snmptopology
 import (
 	"fmt"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/pkg/topology"
 )
 
-func canonicalMatchKey(match topology.Match) string {
+func canonicalMatchKey(match topologyMatch) string {
 	if key := canonicalPrimaryMACListKey(match); key != "" {
 		return "mac:" + key
 	}
@@ -34,7 +32,7 @@ func canonicalMatchKey(match topology.Match) string {
 	return ""
 }
 
-func topologyLinkSortKey(link topology.Link) string {
+func topologyLinkSortKey(link topologyLink) string {
 	return strings.Join([]string{
 		link.Protocol,
 		link.Direction,

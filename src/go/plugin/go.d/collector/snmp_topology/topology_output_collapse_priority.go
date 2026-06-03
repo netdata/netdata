@@ -5,7 +5,7 @@ package snmptopology
 import (
 	"strings"
 
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/engine"
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
 func compareCollapseActorPriority(left, right topologyActor) int {

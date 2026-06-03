@@ -3,7 +3,7 @@
 #ifndef NETDATA_ND_POLL_H
 #define NETDATA_ND_POLL_H
 
-#include "libnetdata/common.h"
+#include "libnetdata/libnetdata-base.h"
 
 typedef enum __attribute__((packed)) {
     ND_POLL_NONE            = 0,
@@ -40,7 +40,5 @@ bool nd_poll_upd(nd_poll_t *ndpl, int fd, nd_poll_event_t events);
 
 // returns -1 = error, 0 = timeout, 1 = event in result
 int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result);
-
-#include "libnetdata/libnetdata.h"
 
 #endif //NETDATA_ND_POLL_H

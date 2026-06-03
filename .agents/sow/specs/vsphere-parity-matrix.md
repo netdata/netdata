@@ -1,6 +1,7 @@
 # vSphere Collector Parity Matrix
 
-Status: draft baseline for `SOW-0015`.
+Status: draft baseline from the vSphere V2 migration in PR #22458 /
+commit `18991fd4e`.
 
 Purpose: normalize LogicMonitor, Datadog, and mirrored open-source vSphere
 coverage into Netdata implementation groups. Every row is classified; there are

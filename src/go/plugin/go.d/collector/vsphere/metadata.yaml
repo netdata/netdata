@@ -503,40 +503,52 @@ modules:
               default: ""
               options: []
           returns:
-            description: Cached vSphere inventory topology payload. Actors represent discovered inventory objects and links represent parent-child, host-runs-VM, or host/VM-connects-network relationships.
+            description: Cached vSphere inventory topology payload using the netdata.topology.v1 schema. Actors represent discovered inventory objects and links represent inventory ownership, VM-to-host runtime placement, and host/VM network attachment relationships.
             columns:
               - name: schema_version
                 type: string
                 unit: ""
                 description: Topology payload schema version.
-              - name: source
-                type: string
+              - name: producer
+                type: object
                 unit: ""
-                description: Topology source identifier.
-              - name: layer
-                type: string
-                unit: ""
-                description: Topology layer identifier.
-              - name: agent_id
-                type: string
-                unit: ""
-                description: Netdata Agent identifier for the node serving the function.
+                description: Producer metadata identifying the vSphere topology source, selected collector job, plugin, and local node when available.
               - name: collected_at
                 type: datetime
                 unit: ""
                 description: Time when the cached topology response was built.
               - name: view
-                type: string
+                type: object
                 unit: ""
-                description: Topology view identifier.
+                description: Topology view metadata.
+              - name: dictionaries
+                type: object
+                unit: ""
+                description: Compact-table dictionaries used by actors, links, evidence, and detail tables.
+              - name: types
+                type: object
+                unit: ""
+                description: Actor, link, evidence, table, and presentation type registry.
+              - name: presentation
+                type: object
+                unit: ""
+                description: Graph-level presentation metadata.
               - name: actors
-                type: array
+                type: object
                 unit: ""
-                description: vSphere inventory actors, including datacenters, clusters, ESXi hosts, VMs, datastores, optional networks, datastore clusters, and resource pools.
+                description: Compact actor table for vSphere inventory objects, including datacenters, clusters, ESXi hosts, VMs, datastores, optional networks, datastore clusters, and resource pools.
               - name: links
-                type: array
+                type: object
                 unit: ""
-                description: Topology links between vSphere inventory actors.
+                description: Compact link table for relationships between vSphere inventory actors.
+              - name: evidence
+                type: object
+                unit: ""
+                description: Relationship evidence tables backing the rendered links.
+              - name: tables
+                type: object
+                unit: ""
+                description: Actor detail and label tables used by topology modals.
               - name: stats
                 type: object
                 unit: ""
