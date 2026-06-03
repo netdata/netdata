@@ -711,7 +711,7 @@ download() {
   fi
 
   if [ -n "${CURL}" ]; then
-    run "${CURL}" --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}" > "${dl_log}"
+    run sh -c "${CURL} --fail -q -sSL --connect-timeout 10 --retry 3 --output ${dest} ${url} > ${dl_log}"
 
     case "$?" in
       0) return 0 ;;
@@ -817,7 +817,7 @@ get_redirect() {
   rm -f "${output}"
 
   if [ -n "${CURL}" ]; then
-    run "${CURL}" "${url}" -s -L -I -o /dev/null -w '%{url_effective}' > "${output}"
+    run sh -c "${CURL} ${url} -s -L -I -o /dev/null -w '%{url_effective}' > ${output}"
 
     case "$?" in
       0)
@@ -845,7 +845,7 @@ get_redirect() {
   fi
 
   if [ -n "${WGET}" ]; then
-    run "${WGET}" -S -o "${dl_log}" -O /dev/null "${url}"
+    run "${WGET}" -S -o "${output}" -O /dev/null "${url}"
 
     case "$?" in
       0)
