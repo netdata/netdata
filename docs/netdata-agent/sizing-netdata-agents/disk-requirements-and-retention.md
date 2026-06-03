@@ -51,17 +51,17 @@ These limits are fully configurable. See [Changing how long Netdata stores metri
 
 ### Understanding Actual Disk Usage vs Configured Retention Size
 
-The configured `dbengine tier N retention size` sets the total disk quota for that tier. Netdata enforces this cap based on estimated per-tier disk usage, which includes data files, their journal/index files, and a tier-specific share of global database metadata (accounted proportionally via an internal `disk_percentage` factor) — not just compressed metric samples alone. A tier's actual disk usage is the sum of:
+The configured `dbengine tier N retention size` sets the total disk quota for that tier. Netdata enforces this cap using estimated per-tier disk usage, not just compressed metric samples. The estimate includes data files, journal/index files, and a tier-specific share of global database metadata (accounted proportionally via an internal `disk_percentage` factor). A tier's actual disk usage is the sum of:
 
 - **Data files** (`.ndf`): Compressed metric samples stored in extents.
 - **Journal v1 files** (`.njf`): Write-ahead log entries used for crash recovery of each datafile.
 - **Journal v2 files** (`.njfv2`): Page and extent indexes that map metric UUIDs to their locations within data files.
 - **Shared database metadata** (tier-attributed): SQLite DBs, alert/health state, and other metadata not stored inside the tier’s data/journal files.
-Journal file sizes depend on metric cardinality — the number of unique metrics stored in each datafile. The more distinct metrics per datafile, the larger the journal indexes. On a Netdata Parent receiving streams from many Children, each datafile contains metrics from **all** connected Children, resulting in higher cardinality per datafile and proportionally larger journal files compared to a standalone Agent.
+Journal file sizes depend on metric cardinality — the number of unique metrics stored in each datafile. The more distinct metrics per datafile, the larger the journal indexes. On a Netdata Parent receiving streams from many Children, each datafile contains metrics from **all** connected Children. This increases cardinality per datafile and can make journal files proportionally larger than on a standalone Agent.
 
 #### Retention Size is Per-Tier, Not Per-Host
 
-The `dbengine tier N retention size` setting applies to the entire tier globally. All streaming Children share the Parent's tier quota. There is **no per-host or per-Child disk space limit**. When sizing retention for a Parent, base your calculation on the total metric count across all Children and allocate enough space for both data and journal overhead.
+The `dbengine tier N retention size` setting applies to the whole tier. All streaming Children share the Parent's tier quota. There is **no per-host or per-Child disk space limit**. When sizing retention for a Parent, use the total metric count across all Children and leave room for both data and journal overhead.
 
 #### Parent-Specific Sizing Guidance
 
@@ -77,7 +77,7 @@ Netdata does not automatically change retention targets based on free disk space
 
 **Will adding a time-based retention limit trigger immediate cleanup?**
 
-It can. Once a `dbengine tier N retention time` is configured, the retention check — which runs approximately every 60 seconds — will rotate out eligible datafiles when there is data older than the configured time window. Cleanup begins on the next retention check cycle after the change takes effect; it is not instantaneous.
+It can. After you configure `dbengine tier N retention time`, the retention check (about every 60 seconds) rotates out eligible datafiles when data older than the configured window exists. Cleanup starts on the next retention check cycle after the change takes effect; it is not instantaneous.
 
 **Is there a per-Child disk space limit?**
 
