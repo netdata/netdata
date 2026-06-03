@@ -95,6 +95,7 @@ void ml_host_new(RRDHOST *rh)
     spinlock_init(&host->context_anomaly_rate_spinlock);
 
     host->ml_running = false;
+    host->ml_stop_generation = 0;
 
     // Publish with release semantics so readers that load rh->ml_host with
     // acquire semantics observe the host's `rh`, `ml_running`, `mutex`,
@@ -104,7 +105,6 @@ void ml_host_new(RRDHOST *rh)
     // fields, producing SIGSEGV faults inside ml_dimension_is_anomalous and
     // similar readers.
     __atomic_store_n(&rh->ml_host, (rrd_ml_host_t *)host, __ATOMIC_RELEASE);
-    host->ml_stop_generation = 0;
 }
 
 void ml_host_delete(RRDHOST *rh)
