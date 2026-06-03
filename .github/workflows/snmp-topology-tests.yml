@@ -95,7 +95,7 @@ jobs:
           cd src/go
           go test -tags=snmp_topology_fixtures \
             ./plugin/go.d/collector/snmp_topology/... \
-            ./pkg/topology/engine/parity/...
+            ./pkg/l2topology/parity/...
 
       - name: Stop snmpsim
         if: always()
