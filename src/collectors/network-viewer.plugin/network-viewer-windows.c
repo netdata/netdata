@@ -443,7 +443,8 @@ static bool nv_smb_collect(void)
 // Column order matches function_network_protocols:
 //   Transport, Family, Share, Received, Sent, Errors,
 //   ConnActive, ConnEstablished, ConnPassive, ConnReset,
-//   SegsTotal, SegsRetransmitted, DatagramsNoPort.
+//   SegsTotal, SegsRetransmitted, DatagramsNoPort, TreeConnects,
+//   ReceivedBytes, SentBytes.
 static void proto_emit_smb_rows(BUFFER *wb)
 {
     NV_SMB_SHARE *s;
@@ -454,8 +455,8 @@ static void proto_emit_smb_rows(BUFFER *wb)
             buffer_json_add_array_item_string(wb, "SMB");
             buffer_json_add_array_item_string(wb, "");      // Family — not applicable
             buffer_json_add_array_item_string(wb, s_dfe.name); // Share name
-            buffer_json_add_array_item_uint64(wb, nv_perflib_value(&s->receivedBytes));
-            buffer_json_add_array_item_uint64(wb, nv_perflib_value(&s->sentBytes));
+            buffer_json_add_array_item_uint64(wb, 0); // Received          — TCP/UDP only
+            buffer_json_add_array_item_uint64(wb, 0); // Sent              — TCP/UDP only
             buffer_json_add_array_item_uint64(wb, 0); // Errors
             buffer_json_add_array_item_uint64(wb, 0); // ConnActive        — TCP only
             buffer_json_add_array_item_uint64(wb, 0); // ConnEstablished   — TCP only
@@ -465,6 +466,8 @@ static void proto_emit_smb_rows(BUFFER *wb)
             buffer_json_add_array_item_uint64(wb, 0); // SegsRetransmitted — TCP only
             buffer_json_add_array_item_uint64(wb, 0); // DatagramsNoPort   — UDP only
             buffer_json_add_array_item_uint64(wb, nv_perflib_value(&s->treeConnectCount));
+            buffer_json_add_array_item_uint64(wb, nv_perflib_value(&s->receivedBytes));
+            buffer_json_add_array_item_uint64(wb, nv_perflib_value(&s->sentBytes));
         }
         buffer_json_array_close(wb);
     }
@@ -477,7 +480,7 @@ static void proto_emit_smb_rows(BUFFER *wb)
 
 // Column order for all rows: Transport, Family, Share, Received, Sent, Errors,
 //   ConnActive, ConnEstablished, ConnPassive, ConnReset, SegsTotal, SegsRetransmitted,
-//   DatagramsNoPort, TreeConnects.
+//   DatagramsNoPort, TreeConnects, ReceivedBytes, SentBytes.
 
 static void proto_emit_tcp_row(BUFFER *wb, const TCP_FAMILY *tcp)
 {
@@ -497,6 +500,8 @@ static void proto_emit_tcp_row(BUFFER *wb, const TCP_FAMILY *tcp)
         buffer_json_add_array_item_uint64(wb, nv_perflib_value(&tcp->segments_retransmitted));
         buffer_json_add_array_item_uint64(wb, 0); // DatagramsNoPort — UDP only
         buffer_json_add_array_item_uint64(wb, 0); // TreeConnects    — SMB only
+        buffer_json_add_array_item_uint64(wb, 0); // ReceivedBytes   — SMB only
+        buffer_json_add_array_item_uint64(wb, 0); // SentBytes       — SMB only
     }
     buffer_json_array_close(wb);
 }
@@ -518,7 +523,9 @@ static void proto_emit_udp_row(BUFFER *wb, const UDP_FAMILY *udp)
         buffer_json_add_array_item_uint64(wb, 0); // SegsTotal         — TCP only
         buffer_json_add_array_item_uint64(wb, 0); // SegsRetransmitted — TCP only
         buffer_json_add_array_item_uint64(wb, nv_perflib_value(&udp->datagrams_no_port));
-        buffer_json_add_array_item_uint64(wb, 0); // TreeConnects      — SMB only
+        buffer_json_add_array_item_uint64(wb, 0); // TreeConnects  — SMB only
+        buffer_json_add_array_item_uint64(wb, 0); // ReceivedBytes — SMB only
+        buffer_json_add_array_item_uint64(wb, 0); // SentBytes     — SMB only
     }
     buffer_json_array_close(wb);
 }
@@ -592,9 +599,9 @@ void function_network_protocols(
         nv_add_key_field(wb, &field_id, "Family",    "IP Protocol Family");
         nv_add_key_field(wb, &field_id, "Share",     "SMB Share Name");
 
-        // Normalized columns — TCP: segments, UDP: datagrams, SMB: bytes
-        nv_add_int_field(wb, &field_id, "Received", "Received (Segments/Datagrams/Bytes)", "units/s");
-        nv_add_int_field(wb, &field_id, "Sent",     "Sent (Segments/Datagrams/Bytes)",     "units/s");
+        // TCP/UDP traffic columns — segments for TCP, datagrams for UDP; SMB rows carry 0
+        nv_add_int_field(wb, &field_id, "Received", "Received (Segments/Datagrams)", "segments/datagrams/s");
+        nv_add_int_field(wb, &field_id, "Sent",     "Sent (Segments/Datagrams)",     "segments/datagrams/s");
         nv_add_int_field(wb, &field_id, "Errors",   "Errors (Failures/Rx Errors)",   "errors");
 
         // TCP-only columns (UDP rows carry 0)
@@ -610,8 +617,10 @@ void function_network_protocols(
         // UDP-only column (TCP/SMB rows carry 0)
         nv_add_int_field(wb, &field_id, "DatagramsNoPort", "Datagrams with No Port", "datagrams/s");
 
-        // SMB-only column (TCP/UDP rows carry 0)
-        nv_add_int_field(wb, &field_id, "TreeConnects", "Active SMB Tree Connections", "connections");
+        // SMB-only columns (TCP/UDP rows carry 0)
+        nv_add_int_field(wb, &field_id, "TreeConnects",   "Active SMB Tree Connections", "connections");
+        nv_add_int_field(wb, &field_id, "ReceivedBytes",  "Received Bytes",              "bytes/s");
+        nv_add_int_field(wb, &field_id, "SentBytes",      "Sent Bytes",                  "bytes/s");
     }
     buffer_json_object_close(wb); // columns
     buffer_json_member_add_string(wb, "default_sort_column", "Received");
@@ -619,6 +628,7 @@ void function_network_protocols(
     // charts.columns = metric columns for the Y axis (NOT the groupby column)
     buffer_json_member_add_object(wb, "charts");
     {
+        // TCP/UDP segment and datagram counts — do not mix with SMB byte values
         buffer_json_member_add_object(wb, "Traffic");
         {
             buffer_json_member_add_string(wb, "name", "Traffic");
@@ -631,15 +641,30 @@ void function_network_protocols(
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
+
+        // SMB share byte throughput — separate chart, incompatible unit with Traffic
+        buffer_json_member_add_object(wb, "SMB Traffic");
+        {
+            buffer_json_member_add_string(wb, "name", "SMB Traffic");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "ReceivedBytes");
+                buffer_json_add_array_item_string(wb, "SentBytes");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb); // charts
 
-    // default_charts: [chart_key, groupby_column] — same chart, multiple grouping axes
+    // default_charts: [chart_key, groupby_column]
+    // Traffic groups TCP/UDP rows; SMB Traffic groups SMB rows.
     buffer_json_member_add_array(wb, "default_charts");
     {
-        nv_add_default_chart(wb, "Traffic", "Transport");
-        nv_add_default_chart(wb, "Traffic", "Family");
-        nv_add_default_chart(wb, "Traffic", "Share");
+        nv_add_default_chart(wb, "Traffic",     "Transport");
+        nv_add_default_chart(wb, "Traffic",     "Family");
+        nv_add_default_chart(wb, "SMB Traffic", "Share");
     }
     buffer_json_array_close(wb); // default_charts
 
