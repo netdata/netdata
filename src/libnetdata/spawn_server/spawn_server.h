@@ -3,6 +3,8 @@
 #ifndef SPAWN_SERVER_H
 #define SPAWN_SERVER_H
 
+#include "../common.h"
+
 #define SPAWN_SERVER_TRANSFER_FDS 4
 
 typedef enum __attribute__((packed)) {

@@ -3,7 +3,7 @@
 #ifndef NETDATA_OS_BOOT_ID_H
 #define NETDATA_OS_BOOT_ID_H
 
-#include "libnetdata/common.h"
+#include "libnetdata/libnetdata-base.h"
 #include "libnetdata/uuid/uuid.h"
 
 /**

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "../libnetdata.h"
 #include "spawn_library.h"
 
 BUFFER *argv_to_cmdline_buffer(const char **argv) {
