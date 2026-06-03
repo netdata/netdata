@@ -72,7 +72,7 @@ Netdata supports three retention strategies. Choose the one that best fits your 
 
 2. **Space-based retention** (recommended for predictable disk usage):
 
-   Targets keeping storage usage within defined limits, at the cost of variable retention duration. Retention size is enforced periodically (approximately every 60 seconds), not in real-time at write time, so actual disk usage may temporarily exceed the configured limit — especially on tier 0 with high ingestion rates from many streaming children. Provision at least 2× the configured limit as available disk space to accommodate temporary overshoot.
+   Targets keeping storage usage within defined limits, at the cost of variable retention duration. Retention size is enforced periodically (approximately every 60 seconds), not in real-time at write time, so actual disk usage may temporarily exceed the configured limit — especially on tier 0 with high ingestion rates from many streaming children. The amount of overshoot is workload-dependent (ingestion rate, compression variance, rotation throughput) and can exceed 2× the configured limit in practice; provision additional disk headroom beyond the configured limit to reduce the risk of disk-full conditions.
    ```ini
    [db]
    dbengine tier 0 retention size = 500GB
