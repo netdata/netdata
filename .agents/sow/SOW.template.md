@@ -153,7 +153,7 @@ Sensitive data gate:
 
 - <Confirm durable artifacts contain no raw secrets, credentials, bearer tokens, SNMP communities, community member names, customer names, personal data, non-private customer-identifying IPs, private endpoints, or proprietary incident details; note redactions used.>
 
-Artifact maintenance gate:
+## Artifact Maintenance Gate
 
 - AGENTS.md: <updated path or evidence-backed reason no update was needed>
 - Runtime project skills: <updated .agents/skills/project-*/ path or evidence-backed reason no update was needed>

@@ -33,11 +33,28 @@ CRITICAL RULES:
 These principles are mandatory for every task in this repository:
 
 1. **Clean end state over less churn.**
-   You MUST always aim for the clean end state, not the smallest diff. While
-   designing and implementing, actively search for the structure that should
-   exist after the work is complete. You MUST periodically re-evaluate
-   already-written changes against that target; do not keep a compromise only
-   because it already exists in the branch.
+   - Target: you MUST always aim for the clean end state, not the smallest diff.
+     While designing and implementing, actively search for the structure that
+     should exist after the work is complete.
+   - Re-evaluation: you MUST periodically re-evaluate already-written changes
+     against that target. Do not keep a compromise only because it already
+     exists in the branch.
+   - Recommendation default: when options include a clean end state and a
+     lower-churn partial state, you MUST recommend the clean end state unless it
+     is technically impossible, unsafe, or explicitly outside the approved
+     scope.
+   - Exception handling: technical impossibility, safety risk, or scope conflict
+     are pause conditions, not permission to choose the partial route
+     automatically. Present the evidence, interrupt the work, and get explicit
+     human approval before proceeding with a temporary non-clean state.
+   - Staged delivery: if recommending staged delivery, explain why the staged
+     plan still reaches the clean end state for the approved work, or explicitly
+     state that you are asking the user to accept a temporary non-clean state.
+   - Invalid justification: risk reduction, review convenience, or issue staging
+     is not enough justification for recommending a partial end state.
+   - Deferral check: before recommending deferral, check the issue, SOW,
+     acceptance criteria, and affected migration scope for evidence that the
+     deferred work is genuinely outside the approved clean end state.
 
 2. **Scope discipline at every step.**
    At each milestone, you MUST check whether the work has drifted outside the
@@ -65,11 +82,16 @@ Project SOW status: initialized
 
 This project uses a local Statement of Work system.
 
-SOWs are branch-local working memory, not product artifacts. A SOW lives on the
-feature branch for the duration of the work so it preserves the root-cause
-model, decisions, evidence, and validation for PR takeover. It is removed before
-the branch merges. `master` MUST contain no SOW working files; durable memory
-belongs in `.agents/sow/specs/`, project skills, docs, code, and tests.
+SOWs are branch-local working memory, not product artifacts. During active work,
+including draft PR and ready-for-review takeover work, a SOW may live on the
+feature branch so it preserves the root-cause model, decisions, evidence, and
+validation for PR takeover. Commit the active SOW on the feature branch when
+takeover or handoff is expected. When no takeover is expected, keeping the
+active SOW local and uncommitted is acceptable, but the SOW still MUST be used
+as working memory. Before merge, complete the SOW, transfer durable knowledge,
+and delete the active SOW file. `master` and the final merge head MUST contain
+no SOW working files; durable memory belongs in `.agents/sow/specs/`, project
+skills, docs, code, and tests.
 
 The SOW system is self-contained in this repository. Normal SOW work must not depend on `~/.agents`, `~/.AGENTS.md`, global skills, global templates, or global scripts. Use this `AGENTS.md`, the branch-local SOW, project-local specs, and project-local skills.
 
@@ -107,6 +129,34 @@ Write only sanitized evidence:
 - summarize logs and traces; include only minimal redacted snippets.
 
 If sensitive data is required to continue, stop and ask the user for a secure handling path. If sensitive data is found in a durable artifact, sanitize it before any commit. If sensitive data was already committed, tell the user and do not rewrite history without explicit approval.
+
+### Durable AI-Facing Artifact Formatting
+
+AI-facing durable artifacts include `AGENTS.md`, SOW specs, runtime project
+skills, public/operator skills, SOW templates, instruction bridge files, and
+other docs primarily written so future AI agents can execute repository rules
+correctly.
+
+When writing or updating these artifacts:
+
+- Structure for retrieval and scanning. Use headings, short sections, labeled
+  bullets, and numbered procedures so both humans and AI agents can find the
+  exact rule quickly.
+- Avoid dense multi-rule paragraphs. If a paragraph contains multiple
+  requirements, exceptions, or decision branches, split it into bullets or a
+  table.
+- Use tables only for matrices or comparisons where the cells stay short. Use
+  bullets for rules, workflows, checklists, and exception handling.
+- Put RFC-style requirement words (`MUST`, `MUST NOT`, `SHOULD`, `MAY`) close
+  to the action they govern. Do not hide mandatory behavior in explanatory
+  prose.
+- Prefer labeled bullets for operational guardrails, such as `Target`,
+  `Exception handling`, `Validation`, or `Failure mode`.
+- Keep one durable idea per bullet. If a bullet needs multiple sentences, the
+  first sentence states the rule and later sentences provide evidence,
+  rationale, or examples.
+- Preserve precision over brevity. Formatting is for readability, not for
+  weakening contracts or removing necessary evidence.
 
 ### Open-Source Reference Evidence
 
@@ -164,7 +214,8 @@ When unsure, treat the work as non-trivial.
 
 There is no `done/` directory and no committed pending queue. On `master`,
 `.agents/sow/active/` is empty except for `.gitkeep`; real SOW files exist only
-on feature branches and are deleted before merge.
+on feature branches. Feature branches and PRs may commit active SOW files when
+takeover or handoff is expected, but active SOW files are deleted before merge.
 
 Create new SOW files from `.agents/sow/SOW.template.md`. The template is project-local and may be customized for this repository.
 
@@ -191,8 +242,9 @@ Deferred work has two valid tracking paths:
 - public or team-visible follow-up: GitHub issue;
 - private or local follow-up: `<repo-root>/.local/sow/`.
 
-Active implementation work still MUST use `.agents/sow/active/`, and active SOW
-files still MUST be deleted before merge.
+Active implementation work still MUST use `.agents/sow/active/`. Active SOW
+files MAY be committed for takeover or handoff and still MUST be deleted before
+merge.
 
 Filename:
 
@@ -222,7 +274,11 @@ When a SOW's work is ready to merge:
 3. Update the SOW to `Status: completed`.
 4. Delete the SOW working file before merge.
 
-The branch HEAD that merges MUST contain no `.agents/sow/active/SOW-*.md` file. CI enforces this.
+Draft and ready-for-review PRs MAY temporarily contain
+`.agents/sow/active/SOW-*.md` files when takeover or handoff is expected. The
+SOW CI job still rejects committed active SOW files; that red check is an
+intentional merge guard, not a sign that handoff or takeover is forbidden. The
+branch HEAD that merges MUST contain no `.agents/sow/active/SOW-*.md` file.
 
 ### Enforcement
 
@@ -234,7 +290,9 @@ The SOW system is enforced by local audit tooling and CI:
   local audit and CI.
 - `.github/workflows/sow.yml` rejects pull requests that contain branch-local
   SOW working files under `.agents/sow/active/SOW-*.md` or legacy SOW working
-  files under `.agents/sow/{pending,current,done}/SOW-*.md`.
+  files under `.agents/sow/{pending,current,done}/SOW-*.md`. This failure is
+  expected when an active SOW is intentionally committed for takeover or
+  handoff; it MUST be cleared before merge.
 - The same workflow scans changed SOW, spec, instruction, and cross-tool
   bridge files for raw sensitive data.
 
