@@ -367,6 +367,29 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     return spawn_server_exec_wait(server, si);
 }
 
+SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si, int timeout_ms, int *status) {
+    if (!si) { *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
+
+    // close all pipe descriptors to force the child to exit
+    if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
+    if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
+
+    usec_t deadline_ut = now_monotonic_usec() + (usec_t)timeout_ms * USEC_PER_MS;
+
+    while(uv_sem_trywait(&si->sem) != 0) {
+        if(now_monotonic_usec() >= deadline_ut)
+            return SPAWN_TIMEDWAIT_RUNNING;
+
+        sleep_usec(10 * USEC_PER_MS);
+    }
+
+    // the semaphore is consumed - finish exactly like spawn_server_exec_wait()
+    *status = si->exit_code;
+    uv_sem_destroy(&si->sem);
+    freez(si);
+    return SPAWN_TIMEDWAIT_EXITED;
+}
+
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {
     if (!si) return -1;
 

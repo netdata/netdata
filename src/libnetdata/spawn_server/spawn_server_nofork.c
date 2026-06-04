@@ -1206,6 +1206,24 @@ static void log_invalid_magic(SPAWN_INSTANCE *instance, struct status_report *sr
            instance->child_pid, instance->request_id, sr->magic, buf);
 }
 
+SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms, int *status) {
+    // close the child pipes, to make it exit (same as spawn_server_exec_wait)
+    if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
+    if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
+
+    // the spawn server sends the final status report on instance->sock when the child exits
+    short revents = 0;
+    NETDATA_SSL ssl = { 0 };
+    int rc = wait_on_socket_or_cancel_with_timeout(&ssl, instance->sock, timeout_ms, POLLIN, &revents);
+    if(rc == -1 /* thread cancelled */ || rc == 1 /* timeout */)
+        return SPAWN_TIMEDWAIT_RUNNING;
+
+    // ready to read (0), or error on the socket (2):
+    // both are resolved by the blocking wait, which returns immediately now.
+    *status = spawn_server_exec_wait(server, instance);
+    return SPAWN_TIMEDWAIT_EXITED;
+}
+
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
     int rc = -1;
 

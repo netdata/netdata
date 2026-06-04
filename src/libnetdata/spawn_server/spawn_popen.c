@@ -183,6 +183,23 @@ int spawn_popen_wait(POPEN_INSTANCE *pi) {
     return spawn_popen_status_rc(status);
 }
 
+bool spawn_popen_timedwait(POPEN_INSTANCE *pi, int timeout_ms, int *code) {
+    if(!pi) {
+        *code = -1;
+        return true;
+    }
+
+    spawn_popen_close_files(pi);
+
+    int status = 0;
+    if(spawn_server_exec_timedwait(netdata_main_spawn_server, pi->si, timeout_ms, &status) == SPAWN_TIMEDWAIT_RUNNING)
+        return false;
+
+    freez(pi);
+    *code = spawn_popen_status_rc(status);
+    return true;
+}
+
 int spawn_popen_kill(POPEN_INSTANCE *pi, int timeout_ms) {
     if(!pi) return -1;
 

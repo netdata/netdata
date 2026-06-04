@@ -431,6 +431,19 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     return spawn_server_exec_wait(server, si);
 }
 
+SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, int *status) {
+    if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
+    if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
+
+    if(WaitForSingleObject(si->process_handle, timeout_ms) == WAIT_TIMEOUT)
+        return SPAWN_TIMEDWAIT_RUNNING;
+
+    // WAIT_OBJECT_0 (the process exited) or WAIT_FAILED (broken handle):
+    // both are resolved by the blocking wait, which returns immediately now.
+    *status = spawn_server_exec_wait(server, si);
+    return SPAWN_TIMEDWAIT_EXITED;
+}
+
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {
     if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
     if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }

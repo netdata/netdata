@@ -390,10 +390,86 @@ void test_popen_plugin_echo_and_exit(const char *argv0) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// timed wait
+
+int plugin_sleep_to_stop(void) {
+    child_check_fds();
+    child_check_environment();
+
+    // ignore the pipes - only a kill can stop us within the test's lifetime
+    sleep_usec(3600 * USEC_PER_SEC);
+    return 0;
+}
+
+void test_popen_plugin_timedwait_exits(const char *argv0) {
+    // a child that exits on its own must be reaped by spawn_popen_timedwait()
+    char cmd[FILENAME_MAX + 100];
+    snprintfz(cmd, sizeof(cmd), "exec %s plugin-echo-and-exit", argv0);
+    POPEN_INSTANCE *pi = spawn_popen_run(cmd);
+    if(!pi) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot run myself as plugin (popen)");
+        exit(1);
+    }
+
+    int code = -1;
+    size_t slices = 0;
+    while(!spawn_popen_timedwait(pi, 100, &code)) {
+        if(++slices > 100) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "spawn_popen_timedwait() did not reap a child that exits immediately");
+            exit(1);
+        }
+    }
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+           "child exited with code %d (after %zu timedwait slices)",
+           code, slices);
+
+    if(code != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING, "child should exit with code 0, but exited with code %d", code);
+        warnings++;
+    }
+}
+
+void test_popen_plugin_timedwait_kill(const char *argv0) {
+    // a child that never exits must be reported still-running on every slice, then killed
+    char cmd[FILENAME_MAX + 100];
+    snprintfz(cmd, sizeof(cmd), "exec %s plugin-sleep-to-stop", argv0);
+    POPEN_INSTANCE *pi = spawn_popen_run(cmd);
+    if(!pi) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot run myself as plugin (popen)");
+        exit(1);
+    }
+
+    int code = 0;
+    for(size_t i = 0; i < 5; i++) {
+        if(spawn_popen_timedwait(pi, 200, &code)) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "spawn_popen_timedwait() reported exit (code %d) for a sleeping child",
+                   code);
+            exit(1);
+        }
+    }
+
+    code = spawn_popen_kill(pi, 0);
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+           "child killed, exited with code %d",
+           code);
+
+    if(code != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING, "killed child should report code 0, but reported code %d", code);
+        warnings++;
+    }
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 
 int main(int argc, const char **argv) {
     if(argc > 1 && strcmp(argv[1], "plugin-kill-to-stop") == 0)
         return plugin_kill_to_stop();
+
+    if(argc > 1 && strcmp(argv[1], "plugin-sleep-to-stop") == 0)
+        return plugin_sleep_to_stop();
 
     if(argc > 1 && strcmp(argv[1], "plugin-echo-and-exit") == 0)
         return plugin_echo_and_exit();
@@ -441,6 +517,14 @@ int main(int argc, const char **argv) {
     for(size_t i = 0; i < 5; i++) {
         fprintf(stderr, "\n\nTESTING popen No %zu (close to stop)\n\n", i + 1);
         test_popen_plugin_close_to_stop(argv[0]);
+    }
+    for(size_t i = 0; i < 5; i++) {
+        fprintf(stderr, "\n\nTESTING popen No %zu (timedwait exits)\n\n", i + 1);
+        test_popen_plugin_timedwait_exits(argv[0]);
+    }
+    for(size_t i = 0; i < 5; i++) {
+        fprintf(stderr, "\n\nTESTING popen No %zu (timedwait kill)\n\n", i + 1);
+        test_popen_plugin_timedwait_kill(argv[0]);
     }
     netdata_main_spawn_server_cleanup();
 

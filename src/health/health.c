@@ -21,6 +21,7 @@ struct health_plugin_globals health_globals = {
 
         .run_at_least_every_seconds = 10,
         .postpone_alarms_during_hibernation_for_seconds = 60,
+        .notification_execution_timeout_seconds = 120,
     },
     .prototypes = {
         .dict = NULL,
@@ -89,6 +90,11 @@ void health_load_config_defaults(void) {
                                     "postpone alarms during hibernation for",
                                     health_globals.config.postpone_alarms_during_hibernation_for_seconds);
 
+    health_globals.config.notification_execution_timeout_seconds =
+        (int32_t)inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_HEALTH,
+                                             "notification execution timeout",
+                                             health_globals.config.notification_execution_timeout_seconds);
+
     health_globals.config.default_recipient =
         string_strdupz("root");
 
@@ -97,6 +103,9 @@ void health_load_config_defaults(void) {
 
     if(health_globals.config.run_at_least_every_seconds < 1)
         health_globals.config.run_at_least_every_seconds = 1;
+
+    if(health_globals.config.notification_execution_timeout_seconds < 0)
+        health_globals.config.notification_execution_timeout_seconds = 0;
 
     if(health_globals.config.health_log_entries_max < HEALTH_LOG_ENTRIES_MIN) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,

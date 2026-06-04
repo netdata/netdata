@@ -35,7 +35,25 @@ void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
         goto cleanup;
     }
 
-    code = spawn_popen_wait(ae->popen_instance);
+    // never wait unbounded: a notification process that hangs (seen on Windows,
+    // where msys children can wedge during startup) would otherwise block the
+    // single health thread - and with it all health evaluation - forever.
+    time_t timeout = (time_t)health_globals.config.notification_execution_timeout_seconds;
+    time_t deadline = ae->exec_run_timestamp + timeout;
+
+    while(!spawn_popen_timedwait(ae->popen_instance, MSEC_PER_SEC, &code)) {
+        // re-check shutdown every slice, so a slow notification cannot block agent exit
+        if(unlikely(!service_running(SERVICE_HEALTH)) || (timeout > 0 && now_realtime_sec() >= deadline)) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "HEALTH: alert notification '%s' (pid %d) is still running %ld seconds after spawning it - killing it",
+                   ae_name(ae), (int)spawn_popen_pid(ae->popen_instance),
+                   (long)(now_realtime_sec() - ae->exec_run_timestamp));
+
+            spawn_popen_kill(ae->popen_instance, 0);
+            code = 128;
+            break;
+        }
+    }
     ae->popen_instance = NULL;
     netdata_log_debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
 

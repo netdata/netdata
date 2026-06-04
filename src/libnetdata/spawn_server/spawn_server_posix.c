@@ -270,6 +270,34 @@ static int spawn_server_waitpid(SPAWN_INSTANCE *si) {
     return status;
 }
 
+SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, int *status) {
+    if (!si) { *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
+
+    usec_t deadline_ut = now_monotonic_usec() + (usec_t)timeout_ms * USEC_PER_MS;
+
+    while(!__atomic_load_n(&si->exited, __ATOMIC_RELAXED)) {
+        int wstatus = 0;
+        pid_t pid = waitpid(si->child_pid, &wstatus, WNOHANG);
+        if(pid == si->child_pid) {
+            __atomic_store_n(&si->waitpid_status, wstatus, __ATOMIC_RELAXED);
+            __atomic_store_n(&si->exited, true, __ATOMIC_RELAXED);
+            break;
+        }
+
+        if(pid < 0)
+            // reaped elsewhere or error - let the blocking wait resolve it
+            break;
+
+        if(now_monotonic_usec() >= deadline_ut)
+            return SPAWN_TIMEDWAIT_RUNNING;
+
+        sleep_usec(10 * USEC_PER_MS);
+    }
+
+    *status = spawn_server_exec_wait(server, si);
+    return SPAWN_TIMEDWAIT_EXITED;
+}
+
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {
     if (!si) return -1;
 

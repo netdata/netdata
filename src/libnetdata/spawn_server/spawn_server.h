@@ -47,6 +47,17 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms);
 int spawn_server_exec_wait(SPAWN_SERVER *server, SPAWN_INSTANCE *si);
 
+typedef enum __attribute__((packed)) {
+    SPAWN_TIMEDWAIT_EXITED = 0,     // the child exited; *status holds its status and si has been freed
+    SPAWN_TIMEDWAIT_RUNNING = 1,    // the timeout expired; the child is still running and si remains valid
+} SPAWN_TIMEDWAIT_RESULT;
+
+// Wait for the child for up to timeout_ms (which must be positive).
+// On SPAWN_TIMEDWAIT_EXITED the instance has been freed, exactly like spawn_server_exec_wait().
+// On SPAWN_TIMEDWAIT_RUNNING the caller keeps ownership and must eventually call
+// spawn_server_exec_timedwait(), spawn_server_exec_wait() or spawn_server_exec_kill().
+SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, int *status);
+
 int spawn_server_instance_read_fd(SPAWN_INSTANCE *si);
 int spawn_server_instance_write_fd(SPAWN_INSTANCE *si);
 pid_t spawn_server_instance_pid(SPAWN_INSTANCE *si);
