@@ -281,6 +281,12 @@ static int spawn_server_waitpid(SPAWN_INSTANCE *si) {
 SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, int *status) {
     if (!si) { *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
 
+    // close the child pipes to force it to exit, matching spawn_server_exec_wait and the
+    // other backends; otherwise a child blocked on stdin/stdout would never see EOF and
+    // would stay alive until the deadline forces a SIGKILL
+    if (si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
+    if (si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
+
     // a negative timeout would become a huge usec_t deadline (= unbounded wait); clamp to poll-once
     if(timeout_ms < 0) timeout_ms = 0;
     usec_t deadline_ut = now_monotonic_usec() + (usec_t)timeout_ms * USEC_PER_MS;
