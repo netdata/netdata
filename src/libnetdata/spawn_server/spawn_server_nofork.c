@@ -1284,7 +1284,11 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
         kill(instance->child_pid, SIGTERM);
 
         // escalate to SIGKILL if the child does not exit promptly after SIGTERM,
-        // so a SIGTERM-ignoring child cannot make the final wait block forever
+        // so a SIGTERM-ignoring child cannot make the final wait block forever.
+        // no PID-reuse race: the spawn server reaps the child and only then sends the status
+        // report that makes timedwait return EXITED. A RUNNING result after the full wait
+        // therefore means the child has not been reaped yet, so its PID is still held and
+        // cannot have been recycled by an unrelated process.
         int status;
         if(spawn_server_exec_timedwait(server, instance, 2000, &status) == SPAWN_TIMEDWAIT_RUNNING)
             kill(instance->child_pid, SIGKILL);

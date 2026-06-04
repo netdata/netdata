@@ -440,11 +440,21 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_I
     // a negative timeout would become a huge DWORD (~INFINITE) to WaitForSingleObject; clamp to poll-once
     if(timeout_ms < 0) timeout_ms = 0;
 
-    if(WaitForSingleObject(si->process_handle, (DWORD)timeout_ms) == WAIT_TIMEOUT)
+    DWORD wait_rc = WaitForSingleObject(si->process_handle, (DWORD)timeout_ms);
+    if(wait_rc == WAIT_TIMEOUT)
         return SPAWN_TIMEDWAIT_RUNNING;
 
-    // WAIT_OBJECT_0 (the process exited) or WAIT_FAILED (broken handle):
-    // both are resolved by the blocking wait, which returns immediately now.
+    if(wait_rc == WAIT_FAILED) {
+        // the handle is unusable, so we cannot conclude the process exited. report it as still
+        // running so the caller escalates to kill, instead of falsely reporting a clean exit
+        // and freeing the instance while the child may still be alive.
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: WaitForSingleObject() failed (err %lu) for request No %zu, pid %d (winpid %u)",
+               (unsigned long)GetLastError(), si->request_id, (int)si->child_pid, si->dwProcessId);
+        return SPAWN_TIMEDWAIT_RUNNING;
+    }
+
+    // WAIT_OBJECT_0: the process exited; the blocking wait returns immediately now.
     *status = spawn_server_exec_wait(server, si);
     return SPAWN_TIMEDWAIT_EXITED;
 }

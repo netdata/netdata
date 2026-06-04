@@ -52,8 +52,9 @@ typedef enum __attribute__((packed)) {
     SPAWN_TIMEDWAIT_RUNNING = 1,    // the timeout expired; the child is still running and si remains valid
 } SPAWN_TIMEDWAIT_RESULT;
 
-// Wait for the child for up to timeout_ms. A non-positive timeout_ms is treated as a single,
-// effectively non-blocking poll on every backend; the wait is always bounded (never infinite).
+// Wait for the child for up to timeout_ms. A non-positive timeout_ms performs a single, minimal
+// bounded poll (the nofork backend uses a ~1ms slice because its wait primitive treats 0 as
+// "wait forever"; the others poll once); the wait is always bounded, never infinite.
 // On SPAWN_TIMEDWAIT_EXITED the instance has been freed, exactly like spawn_server_exec_wait().
 // On SPAWN_TIMEDWAIT_RUNNING the caller keeps ownership and must eventually call
 // spawn_server_exec_timedwait(), spawn_server_exec_wait() or spawn_server_exec_kill().

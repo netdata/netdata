@@ -16,8 +16,8 @@ POPEN_INSTANCE *spawn_popen_run_argv(const char **argv);
 POPEN_INSTANCE *spawn_popen_run_variadic(const char *cmd, ...);
 int spawn_popen_wait(POPEN_INSTANCE *pi);
 
-// Wait for the child for up to timeout_ms. A non-positive timeout_ms is treated as a single,
-// effectively non-blocking poll; the wait is always bounded (never infinite).
+// Wait for the child for up to timeout_ms. A non-positive timeout_ms performs a single, minimal
+// bounded poll; the wait is always bounded, never infinite.
 // Returns true when the child exited: *code holds its spawn_popen_wait()-style
 // return code and pi has been freed.
 // Returns false when the child is still running after timeout_ms: pi remains

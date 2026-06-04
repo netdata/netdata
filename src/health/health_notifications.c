@@ -38,10 +38,11 @@ void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
         goto cleanup;
     }
 
-    // never wait unbounded: a notification process that hangs (seen on Windows,
-    // where msys children can wedge during startup) would otherwise block the
-    // single health thread - and with it all health evaluation - forever.
-    // the deadline is monotonic, so a wall-clock jump cannot extend it.
+    // bound the wait so a hung notification process (seen on Windows, where msys children can
+    // wedge during startup) cannot block the single health thread - and with it all health
+    // evaluation. Each slice is always bounded; the overall wait is bounded only when a non-zero
+    // timeout is configured. timeout == 0 means "wait forever" - the loop then breaks only on
+    // child exit or shutdown. The deadline is monotonic, so a wall-clock jump cannot extend it.
     int32_t timeout = health_globals.config.notification_execution_timeout_seconds;
     usec_t deadline_ut = now_monotonic_usec() + (usec_t)timeout * USEC_PER_SEC;
 
