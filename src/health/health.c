@@ -94,8 +94,9 @@ void health_load_config_defaults(void) {
         inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_HEALTH,
                                     "notification execution timeout",
                                     health_globals.config.notification_execution_timeout_seconds);
-    // clamp before narrowing to int32, so a huge value does not overflow into a negative
-    // (which the verify step below would then turn into 0 = wait forever)
+    // clamp to [0, INT32_MAX] before narrowing to int32: the upper clamp prevents a huge
+    // value from overflowing into a negative, the lower clamp normalizes negatives to 0.
+    // 0 means "wait forever".
     if(notification_execution_timeout < 0) notification_execution_timeout = 0;
     if(notification_execution_timeout > INT32_MAX) notification_execution_timeout = INT32_MAX;
     health_globals.config.notification_execution_timeout_seconds = (int32_t)notification_execution_timeout;
