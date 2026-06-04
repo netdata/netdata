@@ -30,38 +30,221 @@ CRITICAL RULES:
 
 ## Mandatory Development Principles
 
-These principles are mandatory for every task in this repository:
+These principles are mandatory for every task. Code is cheap to add and
+expensive to live with, so a larger diff that removes debt beats a smaller one
+that preserves it.
+
+**Core (read first; the bullets under each principle are the authority for forks
+and edge cases):**
+
+- Deliver the **clean end state** of the approved scope, not the smallest diff —
+  including removing what the change makes redundant; refactor low-risk mess in
+  code you touch.
+- **Record that target in the SOW first** (what you remove; any coupled item you
+  exclude, with its reason). When you replace a path or contract, record a
+  reference search proving the list is complete.
+- **You are not the scope authority.** Coupled cleanup is in scope: do the
+  low-risk part and disclose it; never silently drop it or relabel it
+  "independent."
+- Falling short of the recorded target — or any user-owned **fork** (competing
+  designs, a public-contract or destructive change, unclear scope) — triggers a
+  **Mandatory pause**: stop, state the trade-off, get explicit approval.
+- **Plan before non-trivial work:** establish the user-approved end state plus
+  acceptance criteria, then ordered steps; re-evaluate against the target at each
+  step, before any PR, and before completion.
+- **Default on doubt:** if unsure whether something is in scope, trivial, or a
+  user-owned fork, treat it as in-scope / non-trivial / user-owned and ask.
 
 1. **Clean end state over less churn.**
-   - Target: you MUST always aim for the clean end state, not the smallest diff.
-     While designing and implementing, actively search for the structure that
-     should exist after the work is complete.
-   - Re-evaluation: you MUST periodically re-evaluate already-written changes
-     against that target. Do not keep a compromise only because it already
-     exists in the branch.
-   - Recommendation default: when options include a clean end state and a
-     lower-churn partial state, you MUST recommend the clean end state unless it
-     is technically impossible, unsafe, or explicitly outside the approved
-     scope.
-   - Exception handling: technical impossibility, safety risk, or scope conflict
-     are pause conditions, not permission to choose the partial route
-     automatically. Present the evidence, interrupt the work, and get explicit
-     human approval before proceeding with a temporary non-clean state.
-   - Staged delivery: if recommending staged delivery, explain why the staged
-     plan still reaches the clean end state for the approved work, or explicitly
-     state that you are asking the user to accept a temporary non-clean state.
-   - Invalid justification: risk reduction, review convenience, or issue staging
-     is not enough justification for recommending a partial end state.
-   - Deferral check: before recommending deferral, check the issue, SOW,
-     acceptance criteria, and affected migration scope for evidence that the
-     deferred work is genuinely outside the approved clean end state.
+   - Binding rule (read first): you MUST recommend and deliver the clean end
+     state — the structure the codebase SHOULD have once the approved scope is
+     fully delivered, including removing the code, config, docs, and tests the
+     change makes redundant — not the smallest diff. You MUST NOT relabel the
+     smallest working diff as "the clean end state."
+   - Record the target: before generating options, record that clean end state in
+     the SOW. The recorded target is the clean end state of this SOW's approved
+     scope; for staged work, each stage's SOW records that stage's target and the
+     stages together MUST reach the full target. Any option that does not match
+     the recorded target is a non-clean state and triggers the Mandatory pause.
+   - Open design decision: when the clean end state is itself an open design
+     decision that is the user's to make, do not invent a fixed target; record a
+     provisional target plus the open design question and resolve it with the
+     user first.
+   - Approved scope: "the approved scope" is the union of (a) the issue or user
+     request, (b) the SOW Purpose and Acceptance Criteria, and (c) the
+     migration/contract surface they imply. If it is unclear whether work is in
+     scope, treat it as in-scope and raise it with the user; never silently
+     exclude it.
+   - You are not the scope authority:
+     - A "coupled item" is code, config, docs, or tests the current change makes
+       redundant or leaves inconsistent (for example a replaced path, its
+       callers, or its tests).
+     - You MUST NOT reclassify in-scope or coupled work as "independent" or "out
+       of scope" to avoid doing it, and you MUST NOT silently drop coupled work.
+     - When you only suspect something is coupled and including it is low-risk and
+       confined to what you are changing, include it and disclose it rather than
+       stopping to ask.
+     - Pause for the user only when including it would expand the blast radius,
+       change a user-visible contract, or the boundary is itself a genuine scope
+       fork.
+     - This overrides any reading of "Scope discipline" that would defer coupled
+       cleanup.
+   - Disclose exclusions: in the recorded target you MUST list (i) what you will
+     remove as redundant, and (ii) any coupled item you are treating as NOT part
+     of this clean end state, each with its reason and the scope source it rests
+     on. Excluding an in-scope or coupled item without recording it there is
+     silent scope-narrowing and is prohibited, so a reviewer or the next agent can
+     check your exclusions against those sources.
+   - Touch-the-mess-you-touch: when your change modifies code that already
+     contains adjacent duplication, dead code, or a clear pre-existing defect, you
+     SHOULD clean that adjacent mess as part of this work rather than build on top
+     of it, provided the cleanup is low-risk and confined to the code you are
+     already modifying. Cleanup that would reach into unrelated code is
+     independent work (Scope discipline) — track it, do not silently bundle it. If you
+     choose NOT to clean adjacent mess you touched, record why under the
+     disclosure list (ii).
+   - Reference search (when replacing a path or altering a contract):
+     - You MUST run and record in the SOW a reference search for remaining
+       references to the replaced path or contract.
+     - Search construction sites and prefixes too, not only literal final names —
+       identifiers here are often built dynamically (for example via
+       `fmt.Sprintf`).
+     - Every surviving reference MUST appear in (i) or (ii) with its scope source,
+       or the target is incomplete; an item you did not search for counts as
+       silent scope-narrowing.
+     - A repository-wide search cannot prove safety for consumers outside this
+       repo (Netdata Cloud, exporters, streaming, ML, the docs pipeline); treat
+       renaming a shipped public contract as a user-owned breaking decision (an
+       Allowed-exceptions pause), not something the search clears.
+   - Allowed exceptions (pause conditions, not auto-routes): recommend a
+     non-clean route ONLY for one of:
+     - (a) technically impossible — impossible to implement correctly at all, NOT
+       impossible within a preferred diff size;
+     - (b) a concrete, evidenced safety risk — a named hazard such as data loss
+       or a security/production-stability regression, NOT "a larger diff is
+       riskier";
+     - (c) confirmed by the user as outside the approved scope; or
+     - (d) accepted by the user, through the Mandatory pause, as an in-scope
+       partial to ship now.
 
-2. **Scope discipline at every step.**
-   At each milestone, you MUST check whether the work has drifted outside the
-   approved scope. If the new work is valid but independent, you MUST defer it
-   to a later step or pause and submit the independent work first, then rebase
-   the current branch after it merges. Complex features MUST be delivered in
-   coherent steps where each step builds on the previous one.
+     For (a)/(b) you MUST cite specific evidence (file/line, failure class, or
+     test) and route through the Mandatory pause — you do not self-certify
+     "unsafe." For (d) track the remainder per "Followup Discipline" with why
+     deferral is acceptable and when it lands; repeatedly shipping partials is
+     debt accumulation, not delivery. Risk reduction, review convenience, smaller
+     diff, and issue staging are NEVER valid and MUST NOT be relabeled "unsafe"
+     or "independent."
+   - Mandatory pause: if the delivered state will fall short of its recorded
+     target for any reason other than approved staged delivery, you MUST present
+     the evidence, STOP, and obtain explicit user approval (see Approval bar)
+     before proceeding, before requesting non-draft review, and before marking
+     the work complete.
+   - Approval bar (used by every gate): approval means the user explicitly
+     accepts a trade-off, goal, or plan that you stated in your own words (what
+     stays redundant or partial, and why). A bare "ok" or "sounds good" to a
+     one-sided pitch is not approval.
+   - Re-evaluation: at the completion of each planned step, before opening or
+     updating a PR, and before marking a SOW completed (the Re-evaluation
+     checkpoints), you MUST re-evaluate already-written changes against the
+     recorded target; you SHOULD also re-evaluate whenever you pause to report
+     progress. Do not keep a compromise only because it already exists in the
+     branch.
+   - Staged delivery: allowed ONLY when every stage is an in-scope decomposition
+     of one approved clean end state and the stages together reach it. The user
+     approval recorded for the staged plan covers the intermediate states, so an
+     approved stage does not re-trigger the Mandatory pause; every later stage
+     MUST be tracked per "Followup Discipline" (implemented here, rejected with
+     evidence, or a linked GitHub issue) before an earlier stage merges. A
+     self-certified "a later stage will finish it" with no tracked item is not
+     acceptable.
+   - Deferral check: before recommending deferral, check the issue, SOW,
+     acceptance criteria, and affected migration scope. Silence or ambiguity MUST
+     NOT be read as permission to defer; if those sources do not clearly place
+     the work outside the approved clean end state, treat it as in-scope and
+     either complete it or pause for a user decision.
+   - Trivial-work exemption: trivial work (per "When A SOW Is Required") has no
+     SOW and is exempt from the record-the-target, disclosure, and
+     reference-search bullets above; the clean-end-state preference still applies.
+     When unsure, treat the work as non-trivial.
+
+2. **Plan before non-trivial work.**
+   - Plan first: non-trivial work (see "When A SOW Is Required") MUST start with
+     a plan recorded in the SOW before any implementation-file change and before
+     any implementation-equivalent action — migrations, deletions, pushes,
+     non-draft PRs, or external-state mutations via tools. Trivial work is exempt;
+     when unsure, treat the work as non-trivial.
+   - Human-owned goal: the desired end state — the goal, or coherent goal set, the
+     work must reach — MUST be created with or approved by the user. You MUST NOT
+     finalize the goal unilaterally (same user-owned target as Clean end state).
+   - End state first: you MUST establish the desired end state — including its
+     acceptance criteria — before planning the steps; the goal drives the work,
+     not a first diff. If you cannot yet state the end state, keep investigating
+     until you can; do not start work against an unknown target. When the end
+     state is itself a user-owned design decision, record a provisional target
+     plus the open question and resolve it with the user first (Clean end state).
+     Then plan the steps to move from the current state toward that end state.
+   - Decompose into steps: split the work into ordered steps, each with its own
+     clean end state and acceptance criteria, each building on the previous one
+     toward the desired end state. A single coherent step is a valid decomposition
+     when the work is atomic; do not invent artificial sub-steps.
+   - Resolve huge or vague work: if the deliverable is large or vague, keep
+     refining the plan until every step has a clean end state and acceptance
+     criteria. Do not start implementation while steps are still unclear.
+   - Reachability: the plan MUST either reach the desired end state through its
+     steps, or produce evidence that it is not achievable; an unachievable goal
+     is a pause condition for a user decision, not a silent partial result.
+   - Human approval gate: when a goal-approval round is required (see "Approval is
+     for goal-decisions" below), the whole plan — the desired end state and the
+     step breakdown — MUST be explicitly approved by the user before
+     implementation. The assistant proposes and investigates; the user approves.
+     State the goal and step breakdown being accepted, and get confirmation that
+     meets the Approval bar (Clean end state). If the user rejects or edits the
+     plan, revise and re-seek approval; the SOW stays in `planning` until an
+     explicit approval is recorded, then reaches `Status: ready`. This gate is the
+     canonical statement of the approval requirement that the Pre-Implementation
+     Gate and Required First Checks reference.
+   - Approval is for goal-decisions, not work categories:
+     - The goal-approval round fires ONLY when the end state is a genuine
+       user-owned fork — competing designs, a public-contract change, a
+       destructive or irreversible step, or unclear scope.
+     - Other non-trivial work whose end state is already fixed by the triggering
+       request, an existing project skill, or an established repository pattern
+       (for example a clear bug fix, a metadata/docs edit with no contract change,
+       or a collector's skeleton and wiring fixed by its authoring skill — though
+       its Function surface, vnode/host-scope design, and new public config
+       options remain user-owned forks) still needs a recorded plan and the
+       Pre-Implementation Gate, but the triggering request IS the recorded goal
+       approval — no separate round, which also satisfies the resume re-check and
+       the progress rule.
+     - When it is unclear whether a real fork exists, treat it as user-owned and
+       seek approval.
+   - Approval persists; re-check on resume: before continuing an `in-progress` or
+     `paused` SOW you did not personally take through this gate — including
+     takeover or handoff — you MUST confirm the SOW records explicit approval of
+     the current goal and plan. If it does not, or the plan changed materially
+     since approval, treat the SOW as `planning` and re-obtain approval before
+     further implementation.
+
+3. **Scope discipline at every step.**
+   - Drift check: at each Re-evaluation checkpoint (Clean end state), you MUST
+     also check whether the work has drifted outside the approved scope, not only
+     whether the diff still matches the recorded target.
+   - Independence test: new work is "genuinely independent" only if ALL hold —
+     (a) the approved clean end state is still complete and correct without it,
+     (b) it is not a coupled item or a remaining reference recorded under Clean
+     end state, and (c) it has its own separable acceptance criteria. If any test
+     fails, or you are unsure, treat the work as coupled, not independent, and
+     handle it under Clean end state (do the low-risk part and disclose it; pause
+     only for a genuine fork) — you are not the scope authority.
+   - Disposition of independent work:
+     - Do NOT silently bundle it.
+     - Submit it as a separate PR first and rebase the current branch after it
+       merges, or track it as a GitHub issue per "Followup Discipline."
+     - Do NOT fold it into this SOW's steps — Clean-end-state staged-delivery
+       stages must be a decomposition of one clean end state.
+   - Governed elsewhere: coupled cleanup is in scope (Clean end state), and
+     non-trivial work is delivered in coherent incremental steps (Plan before
+     non-trivial work); this principle does not restate them.
 
 USER COMMUNICATION:
 
@@ -109,7 +292,7 @@ Before non-trivial work:
 3. Inspect `.agents/skills/*/SKILL.md` if any exist, and load every runtime project skill whose trigger matches the work.
 4. Inspect legacy runtime skills listed below when the user request matches their frontmatter trigger.
 5. Inspect code, docs, tests, and existing project instructions as ground truth.
-6. Ask the user only for irreducible product/design/risk decisions.
+6. Ask the user only for irreducible product/design/risk decisions. For non-trivial work, the goal and plan are user-owned decisions gated by the "Plan before non-trivial work" Human approval gate.
 
 ### Git Worktrees
 
@@ -155,6 +338,9 @@ When writing or updating these artifacts:
 - Keep one durable idea per bullet. If a bullet needs multiple sentences, the
   first sentence states the rule and later sentences provide evidence,
   rationale, or examples.
+- For a guardrail with several distinct requirements, use a labeled parent
+  bullet with an indented sub-list — one requirement per sub-bullet — rather than
+  a multi-requirement paragraph; keep a single rule-plus-rationale as one bullet.
 - Preserve precision over brevity. Formatting is for readability, not for
   weakening contracts or removing necessary evidence.
 
@@ -173,9 +359,9 @@ Resolve `owner/repo` from the repository remote, record the checked commit, and 
 
 ### Pre-Implementation Gate
 
-Implementation must not begin until the branch-local SOW contains a concrete `## Pre-Implementation Gate` section with `Status: ready` or `Status: in-progress`. Before changing implementation files, or before continuing implementation in an existing SOW that lacks this section, fill the gate.
+Implementation must not begin until the branch-local SOW contains a concrete `## Pre-Implementation Gate` section with `Status: ready` or `Status: in-progress`. Before changing implementation files, or before continuing implementation in an existing SOW that lacks this section, fill the gate. Reaching `Status: ready` additionally requires the "Plan before non-trivial work" Human approval gate (explicit user approval of the goal and plan).
 
-The gate must record the problem/root-cause model, evidence reviewed, affected contracts and surfaces, existing patterns to reuse, risk and blast radius, sensitive data handling plan, implementation plan, validation plan, artifact impact plan, and open decisions. The sensitive data plan must cover SOWs, specs, documentation, project skills, agent instructions, and code comments. Generic placeholders such as `TBD`, `N/A`, or "to be checked later" are invalid unless the SOW explains why the item truly does not apply. If the gate exposes an unknown that cannot be resolved by investigation, stop and ask the user before implementation.
+The gate must record the problem/root-cause model, evidence reviewed, affected contracts and surfaces, the clean-end-state target (its removed-redundant and excluded-coupled items, and the reference search where a path or contract is replaced), existing patterns to reuse, risk and blast radius, sensitive data handling plan, implementation plan, validation plan, artifact impact plan, and open decisions. The sensitive data plan must cover SOWs, specs, documentation, project skills, agent instructions, and code comments. Generic placeholders such as `TBD`, `N/A`, or "to be checked later" are invalid unless the SOW explains why the item truly does not apply. If the gate exposes an unknown that cannot be resolved by investigation, stop and ask the user before implementation.
 
 ### When A SOW Is Required
 
@@ -201,7 +387,7 @@ Trivial work does not need a SOW:
 - typo fixes;
 - formatting-only changes;
 - mechanical rename with no behavior change;
-- simple search/replace with low risk.
+- simple search/replace with low risk (still grep for the old token to confirm no call sites are missed).
 
 When unsure, treat the work as non-trivial.
 
@@ -258,7 +444,7 @@ counter because it cannot be allocated safely across parallel branches.
 SOW state lives in the file's `Status:` field:
 
 - `planning` - analysis or decisions are incomplete; implementation is blocked.
-- `ready` - the Pre-Implementation Gate is complete and implementation can start.
+- `ready` - the Pre-Implementation Gate is complete and, where the goal-approval round ("Plan before non-trivial work") applies, the user has approved the goal and plan; implementation can start.
 - `in-progress` - implementation is underway.
 - `paused` - work is intentionally stopped but may resume on the branch.
 - `completed` - work is validated and durable memory has been transferred; this is a transient state before deleting the SOW file.
@@ -310,7 +496,7 @@ If work overlaps:
 - merge or consolidate branches before implementation; or
 - split into separate SOWs and complete one before starting the next.
 
-Progress reports are not stop points. Once a SOW is in progress, continue until it is delivered, failed with evidence, blocked on a real user decision/approval, or superseded by newer user instructions.
+Progress reports are not stop points (re-evaluating against the target per the Clean-end-state rule is not itself a stop point). Once a SOW is in progress and its goal/plan approval is recorded ("Plan before non-trivial work"), continue until it is delivered, failed with evidence, blocked on a real user decision/approval, or superseded by newer user instructions.
 
 ### User Decisions
 
@@ -320,7 +506,7 @@ When user decisions are needed:
 2. Provide numbered options.
 3. Explain pros, cons, implications, and risks.
 4. Recommend one option with reasoning.
-5. Record the user's decision in the SOW before implementation.
+5. Record the user's decision in the SOW before implementation. For the goal/plan approval round, the bar is the "Plan before non-trivial work" Human approval gate.
 
 ### Followup Discipline
 
@@ -362,6 +548,8 @@ Do not attempt to resurrect or mutate a prior SOW.
 A SOW cannot be completed until Validation records:
 
 - acceptance criteria evidence;
+- clean-end-state evidence: the delivered state matches the clean end state recorded in the SOW, including its recorded list of removed-redundant and excluded coupled items (and, where a path or contract was replaced, the recorded reference search), or an explicit user approval for a non-clean state is recorded and linked;
+- deferred clean-end-state remainder: any clean-end-state work deferred under an approved partial (exception (d)) or otherwise tracked rather than done is listed with why deferral was acceptable and when (or under what condition) it lands;
 - tests or equivalent validation;
 - real-use evidence when a runnable path exists;
 - reviewer findings and how they were handled;

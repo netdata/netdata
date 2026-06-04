@@ -5,9 +5,9 @@
 Status: planning | ready | in-progress | paused | completed
 
 `planning` means analysis or decisions are incomplete. `ready` means the
-Pre-Implementation Gate is complete and implementation can start. `completed`
-is a transient branch-local state before deleting this SOW working file before
-merge. SOW files live only under `.agents/sow/active/` on feature branches and
+Pre-Implementation Gate is complete and, where the goal-approval round ("Plan
+before non-trivial work") applies, the user has approved the goal and plan. `completed` is a
+transient branch-local state before deleting this SOW working file before merge. SOW files live only under `.agents/sow/active/` on feature branches and
 MUST NOT be merged to `master`.
 
 Sub-state: <short current truth>
@@ -68,11 +68,18 @@ Problem / root-cause model:
 Evidence reviewed:
 
 - <Specs, code, docs, tests, logs, traces, prior PRs/issues, external references.>
-- <For mirrored open-source repositories: cite `owner/repo @ commit` and repository-relative paths; never paste `/opt/baddisk/monitoring/repos/...` absolute paths.>
+- <For mirrored open-source repositories: cite `owner/repo @ commit` and repository-relative paths; never paste machine-specific absolute mirror paths (the mirror lives at `${NETDATA_REPOS_DIR}`).>
 
 Affected contracts and surfaces:
 
 - <APIs, schemas, files, commands, UI, docs, specs, skills, tests, integrations, operators, users.>
+
+Clean-end-state target:
+
+- <The structure the codebase should have once the approved scope is fully delivered.>
+- Removed as redundant (i): <code/config/docs/tests this change makes redundant.>
+- Excluded coupled items (ii): <coupled items NOT part of this clean end state, each with reason + scope source.>
+- Reference search (when a path/contract is replaced): <command(s) run + result; every surviving reference mapped to (i)/(ii), or the target is incomplete.>
 
 Existing patterns to reuse:
 
@@ -106,7 +113,7 @@ Artifact impact plan:
 
 Open-source reference evidence:
 
-- <If local mirrored repositories under `/opt/baddisk/monitoring/repos/` were checked, list each as `owner/repo @ commit` plus repository-relative paths. If none were checked, record why external OSS references were not relevant.>
+- <If local mirrored repositories under `${NETDATA_REPOS_DIR}` were checked, list each as `owner/repo @ commit` plus repository-relative paths. If none were checked, record why external OSS references were not relevant.>
 
 Open decisions:
 
