@@ -46,7 +46,7 @@ How enforcement works:
 
 1. **Periodic checks**: Netdata checks whether a tier has exceeded its configured size limit approximately every 60 seconds. Between checks, data continues to be written to disk without restriction.
 
-2. **Whole-file deletion**: When the configured size limit is exceeded, Netdata deletes the oldest complete data file to bring usage back under the limit. Data files range from 4 MB to 512 MB (see [Database Engine](/src/database/engine/README.md)). Because entire files are removed and cannot be partially deleted, actual disk usage can overshoot the configured limit before enforcement catches up.
+2. **Whole-file deletion**: When the configured size limit is exceeded, Netdata deletes the oldest complete data file to bring usage back under the limit. Data files range from 4 MB to 512 MB (see [Database Engine](/src/database/engine/README.md#datafiles)). Because entire files are removed and cannot be partially deleted, actual disk usage can overshoot the configured limit before enforcement catches up.
 
 3. **Why tier 0 overshoots more**: Tier 0 collects per-second data, producing the highest write volume. More data accumulates between enforcement checks, and data files fill faster. Tier 1 and tier 2 have lower write volumes and their disk usage grows more predictably.
 
