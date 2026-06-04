@@ -159,6 +159,9 @@ typedef struct {
 #include "libnetdata/simple_hashtable/simple_hashtable.h"
 
 netdata_mutex_t stdout_mutex;
+#if defined(OS_FREEBSD)
+static netdata_mutex_t nv_proto_mutex;
+#endif
 
 static void __attribute__((constructor)) init_mutex(void) {
     netdata_mutex_init(&stdout_mutex);
@@ -4615,7 +4618,6 @@ typedef struct {
 } NV_PROTO_STATE;
 
 static NV_PROTO_STATE nv_proto_prev = { .initialized = false };
-static netdata_mutex_t nv_proto_mutex;
 
 static uint64_t nv_proto_delta(uint64_t cur, uint64_t prev, double elapsed_s) {
     if (elapsed_s <= 0.0 || cur < prev)
