@@ -32,7 +32,7 @@ You can fine-tune retention for each tier by setting a time limit or size limit.
 
 :::note
 
-Retention size limits are soft targets enforced periodically (approximately every 60 seconds), not hard caps enforced at write time. Actual disk usage can temporarily exceed the configured limit between enforcement cycles. This is most noticeable on tier 0 with high metric volumes, such as parent nodes receiving streams from many children. Provision more disk space than your configured limit to accommodate temporary overshoot.
+Retention size limits are soft targets enforced periodically and asynchronously — not hard caps enforced at write time. Quota checks and rotation scheduling occur both on a background timer and after normal dbengine activity (such as extent writes). Actual disk usage can temporarily exceed the configured limit. This is most noticeable on tier 0 with high metric volumes, such as parent nodes receiving streams from many children. Provision more disk space than your configured limit to accommodate temporary overshoot.
 
 :::
 
