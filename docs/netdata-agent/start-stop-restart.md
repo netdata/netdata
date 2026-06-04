@@ -103,10 +103,10 @@ If you prefer to manage the Agent through the GUI, you can start-stop and restar
 
 ### Using PowerShell Commands
 
-- To **check the status** of Netdata, run `Get-Service Netdata`.
-- To **start** Netdata, run `Start-Service Netdata`.
-- To **stop** Netdata, run `Stop-Service Netdata`.
-- To **restart** Netdata, run `Restart-Service Netdata`.
+- To **check the status** of Netdata, run `Get-Service netdata`.
+- To **start** Netdata, run `Start-Service netdata`.
+- To **stop** Netdata, run `Stop-Service netdata`.
+- To **restart** Netdata, run `Restart-Service netdata`.
 
 ## Quick Reference
 
@@ -125,7 +125,7 @@ If you prefer to manage the Agent through the GUI, you can start-stop and restar
 
 | Task        | PowerShell Command        | GUI Location                      |
 |-------------|---------------------------|-----------------------------------|
-| **Status**  | `Get-Service Netdata`     | Task Manager > Services > Netdata |
-| **Start**   | `Start-Service Netdata`   | Task Manager > Services > Netdata |
-| **Stop**    | `Stop-Service Netdata`    | Task Manager > Services > Netdata |
-| **Restart** | `Restart-Service Netdata` | Task Manager > Services > Netdata |
+| **Status**  | `Get-Service netdata`     | Task Manager > Services > Netdata |
+| **Start**   | `Start-Service netdata`   | Task Manager > Services > Netdata |
+| **Stop**    | `Stop-Service netdata`    | Task Manager > Services > Netdata |
+| **Restart** | `Restart-Service netdata` | Task Manager > Services > Netdata |

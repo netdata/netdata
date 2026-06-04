@@ -86,7 +86,7 @@ $ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest https://github.com/n
 After installation, verify the Netdata service is running:
 
 ```powershell
-Get-Service Netdata
+Get-Service netdata
 ```
 
 After installation, open your browser and go to:
