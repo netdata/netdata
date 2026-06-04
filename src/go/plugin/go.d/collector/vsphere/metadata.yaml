@@ -503,7 +503,7 @@ modules:
               default: ""
               options: []
           returns:
-            description: Cached vSphere inventory topology payload using the netdata.topology.v1 schema. Actors represent discovered inventory objects and links represent inventory ownership, VM-to-host runtime placement, and host/VM network attachment relationships.
+            description: Cached vSphere inventory topology payload using the netdata.topology.v1 schema. Actors represent discovered inventory objects, links represent inventory ownership, VM-to-host runtime placement, and host/VM network attachment relationships, and overlays expose refreshable datastore utilization metrics.
             columns:
               - name: schema_version
                 type: string
@@ -549,10 +549,14 @@ modules:
                 type: object
                 unit: ""
                 description: Actor detail and label tables used by topology modals.
+              - name: overlays
+                type: object
+                unit: ""
+                description: Telemetry overlay refs for refreshable metrics, including datastore used-space utilization selected by collector job and vSphere managed object ID.
               - name: stats
                 type: object
                 unit: ""
-                description: Counts of discovered inventory objects, actors, and links included in the response.
+                description: Counts of discovered inventory objects, actors, links, and overlay refs included in the response.
           performance: |
             Uses cached collector state only:<br/>• No additional vCenter or ESXi API requests are triggered by the function<br/>• Response size grows with discovered inventory object count<br/>• `collect_network_topology` adds Network discovery during normal collector discovery cycles when enabled
           security: |

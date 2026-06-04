@@ -27,11 +27,16 @@ const (
 	vsphereOwnershipEvidenceType     = "vsphere_ownership_evidence"
 	vsphereRunsOnEvidenceType        = "vsphere_runs_on_evidence"
 	vsphereNetworkConnectionEvidence = "vsphere_network_connection_evidence"
+
+	vsphereDatastoreUtilizationOverlay = "datastore_space_utilization"
+	vsphereOverlaySelectorCollectJob   = "collect_job"
+	vsphereOverlaySelectorID           = "id"
 )
 
 type funcTopology struct {
 	collector *Collector
 	agentID   string
+	jobName   string
 }
 
 var _ funcapi.MethodHandler = (*funcTopology)(nil)
@@ -60,7 +65,7 @@ func (f *funcTopology) Handle(_ context.Context, method string, _ funcapi.Resolv
 		return funcapi.UnavailableResponse("collector is not initialized")
 	}
 
-	data, ok := f.collector.topologyData(f.agentID)
+	data, ok := f.collector.topologyData(f.agentID, f.jobName)
 	if !ok {
 		return funcapi.UnavailableResponse("topology data not available yet, please retry after discovery")
 	}
@@ -77,7 +82,7 @@ func (f *funcTopology) Cleanup(context.Context) {
 	// No per-invocation resources are allocated by the topology function.
 }
 
-func (c *Collector) topologyData(agentID string) (topologyv1.Data, bool) {
+func (c *Collector) topologyData(agentID, jobName string) (topologyv1.Data, bool) {
 	c.collectionLock.RLock()
 	defer c.collectionLock.RUnlock()
 
@@ -85,7 +90,7 @@ func (c *Collector) topologyData(agentID string) (topologyv1.Data, bool) {
 		return topologyv1.Data{}, false
 	}
 
-	builder := newVSphereTopologyBuilder()
+	builder := newVSphereTopologyBuilder(jobName)
 
 	for _, dc := range sortedDatacenters(c.resources.DataCenters) {
 		builder.addActor("vsphere_datacenter", dc.ID, dc.Name, "", vsphereActorDetail{
@@ -175,7 +180,7 @@ func (c *Collector) topologyData(agentID string) (topologyv1.Data, bool) {
 		}
 	}
 	for _, datastore := range sortedDatastores(c.resources.Datastores) {
-		builder.addActor("vsphere_datastore", datastore.ID, datastore.Name, datastore.Hier.DC.ID, vsphereActorDetail{
+		actor := builder.addActor("vsphere_datastore", datastore.ID, datastore.Name, datastore.Hier.DC.ID, vsphereActorDetail{
 			objectType:         "datastore",
 			datacenter:         datastore.Hier.DC.Name,
 			overallStatus:      datastore.OverallStatus,
@@ -190,6 +195,7 @@ func (c *Collector) topologyData(agentID string) (topologyv1.Data, bool) {
 			"datacenter": datastore.Hier.DC.Name,
 			"type":       datastore.Type,
 		}))
+		builder.addDatastoreUtilizationOverlay(actor, datastore.ID)
 		if c.resources.DataCenters.Get(datastore.Hier.DC.ID) != nil {
 			builder.addLink(datastore.Hier.DC.ID, datastore.ID, vsphereTopologyOwnershipLink, "contains")
 		}

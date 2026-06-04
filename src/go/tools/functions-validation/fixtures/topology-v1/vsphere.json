@@ -64,6 +64,8 @@
         "normal",
         "VMFS",
         "type",
+        "datastore_space_utilization",
+        "vsphere_vcenter1",
         "vsphere_network",
         "network",
         "network-1",
@@ -5426,6 +5428,25 @@
             ]
           }
         }
+      },
+      "overlay_templates": {
+        "datastore_space_utilization": {
+          "provider": "netdata.metrics",
+          "contexts": [
+            "vsphere.datastore_space_utilization"
+          ],
+          "dimensions": [
+            "used"
+          ],
+          "selector_params": [
+            "collect_job",
+            "id"
+          ],
+          "merge": {
+            "refs": "set",
+            "values": "last"
+          }
+        }
       }
     },
     "presentation": {
@@ -5551,9 +5572,9 @@
             18,
             24,
             30,
-            37,
-            44,
-            48
+            39,
+            46,
+            50
           ]
         },
         {
@@ -5564,9 +5585,9 @@
             19,
             25,
             31,
-            38,
-            45,
-            49
+            40,
+            47,
+            51
           ]
         },
         {
@@ -5577,9 +5598,9 @@
             20,
             26,
             32,
-            39,
-            46,
-            50
+            41,
+            48,
+            52
           ]
         },
         {
@@ -5590,9 +5611,9 @@
             21,
             27,
             33,
-            40,
-            47,
-            51
+            42,
+            49,
+            53
           ]
         },
         {
@@ -5718,8 +5739,8 @@
             28,
             16,
             16,
-            42,
-            42,
+            44,
+            44,
             16,
             16
           ]
@@ -5732,8 +5753,8 @@
             29,
             17,
             17,
-            43,
-            43,
+            45,
+            45,
             17,
             17
           ]
@@ -5821,22 +5842,22 @@
             {
               "codec": "values",
               "values": [
-                38,
-                38
+                40,
+                40
               ]
             },
             {
               "codec": "values",
               "values": [
-                39,
-                39
+                41,
+                41
               ]
             },
             {
               "codec": "values",
               "values": [
-                43,
-                43
+                45,
+                45
               ]
             }
           ]
@@ -5923,9 +5944,9 @@
                 10,
                 19,
                 31,
-                38,
-                45,
-                49
+                40,
+                47,
+                51
               ]
             },
             {
@@ -5934,9 +5955,9 @@
                 11,
                 20,
                 32,
-                39,
-                46,
-                50
+                41,
+                48,
+                52
               ]
             },
             {
@@ -6185,10 +6206,10 @@
                   8,
                   1,
                   10,
-                  49,
+                  51,
                   10,
                   1,
-                  49
+                  51
                 ]
               },
               {
@@ -6224,26 +6245,26 @@
                   3,
                   3,
                   35,
+                  42,
                   40,
-                  38,
-                  39,
-                  3,
-                  3,
                   41,
-                  47,
-                  45,
-                  46,
                   3,
                   3,
-                  51,
+                  43,
                   49,
-                  50,
+                  47,
+                  48,
                   3,
-                  12,
+                  3,
+                  53,
                   51,
+                  52,
+                  3,
+                  12,
+                  53,
                   12,
                   3,
-                  51
+                  53
                 ]
               },
               {
@@ -6733,9 +6754,9 @@
                   19,
                   25,
                   31,
-                  38,
-                  45,
-                  49
+                  40,
+                  47,
+                  51
                 ]
               },
               {
@@ -6746,9 +6767,9 @@
                   20,
                   26,
                   32,
-                  39,
-                  46,
-                  50
+                  41,
+                  48,
+                  52
                 ]
               },
               {
@@ -6759,9 +6780,9 @@
                   21,
                   27,
                   33,
-                  40,
-                  47,
-                  51
+                  42,
+                  49,
+                  53
                 ]
               },
               {
@@ -6839,7 +6860,7 @@
                   null,
                   null,
                   null,
-                  51
+                  53
                 ]
               },
               {
@@ -6941,7 +6962,7 @@
                   null,
                   null,
                   null,
-                  41,
+                  43,
                   null,
                   null
                 ]
@@ -7263,6 +7284,59 @@
         }
       }
     },
+    "overlays": {
+      "refs": {
+        "rows": 1,
+        "columns": [
+          {
+            "id": "template",
+            "type": "string_ref",
+            "dictionary": "strings"
+          },
+          {
+            "id": "actor",
+            "type": "actor_ref",
+            "role": "reference"
+          },
+          {
+            "id": "collect_job",
+            "type": "string_ref",
+            "dictionary": "strings"
+          },
+          {
+            "id": "id",
+            "type": "string_ref",
+            "dictionary": "strings"
+          }
+        ],
+        "values": [
+          {
+            "codec": "values",
+            "values": [
+              37
+            ]
+          },
+          {
+            "codec": "values",
+            "values": [
+              4
+            ]
+          },
+          {
+            "codec": "values",
+            "values": [
+              38
+            ]
+          },
+          {
+            "codec": "values",
+            "values": [
+              32
+            ]
+          }
+        ]
+      }
+    },
     "stats": {
       "actor_rows": 8,
       "clusters": 1,
@@ -7275,6 +7349,7 @@
       "label_rows": 50,
       "link_rows": 9,
       "networks": 1,
+      "overlay_refs": 1,
       "resource_pools": 1,
       "vms": 1
     }
