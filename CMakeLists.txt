@@ -1191,6 +1191,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/locks/spinlock.h
         src/libnetdata/locks/rw-spinlock.c
         src/libnetdata/locks/rw-spinlock.h
+        src/libnetdata/locks/rcu.c
+        src/libnetdata/locks/rcu.h
         src/libnetdata/atomics/atomic_flags.h
         src/libnetdata/atomics/atomics.h
         src/libnetdata/locks/waitq.c
@@ -1205,6 +1207,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/locks/benchmark.h
         src/libnetdata/locks/benchmark-rw.c
         src/libnetdata/locks/benchmark-rw.h
+        src/libnetdata/locks/benchmark-rcu.c
+        src/libnetdata/locks/benchmark-rcu.h
         src/libnetdata/memory/nd-mallocz.c
         src/libnetdata/memory/nd-mallocz.h
         src/libnetdata/memory/nd-mmap.c

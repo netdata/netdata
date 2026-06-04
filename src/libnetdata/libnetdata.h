@@ -83,6 +83,7 @@ struct web_buffer *run_command_and_get_output_to_buffer(const char *command, int
 #include "locks/locks.h"
 #include "locks/spinlock.h"
 #include "locks/rw-spinlock.h"
+#include "locks/rcu.h"
 #include "completion/completion.h"
 #include "libnetdata/locks/waitq.h"
 #include "clocks/clocks.h"

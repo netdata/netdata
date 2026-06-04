@@ -178,6 +178,8 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
 
     DICTIONARY_STATS_GARBAGE_COLLECTIONS_PLUS1(dict);
 
+    bool needs_rcu = !is_dictionary_single_threaded(dict);
+
     size_t deleted = 0, pending = 0, examined = 0;
     DICTIONARY_ITEM *item = dict->items.list, *item_next;
     while(item) {
@@ -191,8 +193,16 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
             // we didn't get a reference
 
             if(item_is_not_referenced_and_can_be_removed(dict, item)) {
-                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
-                dict_item_free_with_hooks(dict, item);
+                if(needs_rcu) {
+                    // RCU-safe removal preserves item->next for concurrent readers.
+                    // The actual free is deferred until after a grace period.
+                    DOUBLE_LINKED_LIST_REMOVE_ITEM_RCU_SAFE(dict->items.list, item, prev, next);
+                    dict_rcu_pending_free_queue(dict, item);
+                }
+                else {
+                    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
+                    dict_item_free_with_hooks(dict, item);
+                }
                 deleted++;
 
                 pending = DICTIONARY_PENDING_DELETES_MINUS1(dict);
@@ -214,6 +224,9 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
 
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 
+    if(needs_rcu)
+        dict_rcu_pending_free_drain(dict);
+
     (void)deleted;
     (void)examined;
 
@@ -224,6 +237,7 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
 
 void dictionary_garbage_collect(DICTIONARY *dict) {
     if(!dict) return;
+    cleanup_destroyed_dictionaries(false);
     garbage_collect_pending_deletes(dict);
 }
 
@@ -255,6 +269,14 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     if(!force && dictionary_referenced_items(dict))
         return false;
 
+    if(!is_dictionary_single_threaded(dict)) {
+        // Readers no longer acquire item references in RCU traversal mode,
+        // so whole-dictionary teardown must wait for a grace period before
+        // freeing items, values, hooks, or the dictionary object itself.
+        if(rcu_thread_in_read_cs() || !rcu_synchronize())
+            return false;
+    }
+
     size_t dict_size = 0, counted_items = 0, item_size = 0, index_size = 0;
     (void)counted_items;
 
@@ -264,13 +286,21 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     long int pending_deletion_items = dict->pending_deletion_items;
 #endif
 
-    // destroy the index
+    // Detach the item list under the write lock.
+    ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
+    DICTIONARY_ITEM *item = dict->items.list;
+    dict->items.list = NULL;
+    ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+
+    // We already waited for a grace period above, so no pre-destroy RCU reader
+    // can still observe this dictionary, its items, or the payloads hanging off
+    // those items.
+
+    // Destroy the index.
     dictionary_index_lock_wrlock(dict);
     index_size += hashtable_destroy_unsafe(dict);
     dictionary_index_wrlock_unlock(dict);
 
-    ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
-    DICTIONARY_ITEM *item = dict->items.list;
     while (item) {
         // cache item->next
         // because we are going to free item
@@ -284,8 +314,12 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
 
         counted_items++;
     }
-    dict->items.list = NULL;
-    ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+
+    if(!is_dictionary_single_threaded(dict)) {
+        DICTIONARY_RCU_RETIRED_VALUE *retired_values = NULL;
+        item_size += dict_rcu_pending_free_free_list(dict, dict_rcu_pending_free_detach(dict, &retired_values));
+        item_size += dict_rcu_pending_value_free_list(dict, retired_values);
+    }
 
     dict_size += dictionary_locks_destroy(dict);
     dict_size += reference_counter_free(dict);
@@ -389,6 +423,7 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused)
             else dictionaries_waiting_to_be_destroyed = next;
         }
         else {
+            DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
 #ifdef FSANITIZE_ADDRESS
             size_t ref_items = dictionary_referenced_items(dict);
 
@@ -411,8 +446,6 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused)
                 }
             }
 #endif
-
-            DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
             last = dict;
             remaining++;
         }
@@ -712,7 +745,10 @@ size_t dictionary_destroy(DICTIONARY *dict) {
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 
     size_t freed;
-    dictionary_free_all_resources(dict, &freed, true);
+    if(!dictionary_free_all_resources(dict, &freed, true)) {
+        dictionary_queue_for_destruction(dict);
+        return 0;
+    }
 
     return freed;
 }
@@ -739,7 +775,7 @@ void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
     DICTIONARY_ITEM *item = dictionary_set_and_acquire_item_advanced(dict, name, name_len, value, value_len, constructor_data);
 
     if(likely(item)) {
-        void *v = item->shared->value;
+        void *v = dict_item_value_get(item);
         item_release(dict, item);
         return v;
     }
@@ -770,7 +806,7 @@ void *dictionary_view_set_advanced(DICTIONARY *dict, const char *name, ssize_t n
     DICTIONARY_ITEM *item = dictionary_view_set_and_acquire_item_advanced(dict, name, name_len, master_item);
 
     if(likely(item)) {
-        void *v = item->shared->value;
+        void *v = dict_item_value_get(item);
         item_release(dict, item);
         return v;
     }
@@ -795,7 +831,7 @@ void *dictionary_get_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
     DICTIONARY_ITEM *item = dictionary_get_and_acquire_item_advanced(dict, name, name_len);
 
     if(likely(item)) {
-        void *v = item->shared->value;
+        void *v = dict_item_value_get(item);
         item_release(dict, item);
         return v;
     }
@@ -843,7 +879,7 @@ const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item)
 ALWAYS_INLINE
 void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
     if(likely(item))
-        return item->shared->value;
+        return dict_item_value_get(item);
 
     return NULL;
 }

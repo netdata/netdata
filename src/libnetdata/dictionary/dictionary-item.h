@@ -107,6 +107,31 @@ static inline void dict_item_value_freez(DICTIONARY *dict, void *ptr) {
         freez(ptr);
 }
 
+static inline void *dict_item_value_get(const DICTIONARY_ITEM *item) {
+    return __atomic_load_n(&item->shared->value, __ATOMIC_ACQUIRE);
+}
+
+static inline void dict_item_value_set(DICTIONARY_ITEM *item, void *value) {
+    __atomic_store_n(&item->shared->value, value, __ATOMIC_RELEASE);
+}
+
+static inline size_t dict_item_value_bytes(DICTIONARY *dict, size_t value_len) {
+    if(dict->value_aral)
+        return aral_requested_element_size(dict->value_aral);
+
+    return value_len;
+}
+
+static inline void dict_item_retire_replaced_value(DICTIONARY *dict, void *value, size_t value_len) {
+    if(!value)
+        return;
+
+    if(unlikely(is_dictionary_single_threaded(dict)))
+        dict_item_value_freez(dict, value);
+    else
+        dict_rcu_pending_value_queue(dict, value, dict_item_value_bytes(dict, value_len));
+}
+
 static inline void *dict_item_value_create(DICTIONARY *dict, void *value, size_t value_len) {
     void *ptr = NULL;
 
@@ -158,9 +183,9 @@ static inline DICTIONARY_ITEM *dict_item_create_with_hooks(DICTIONARY *dict, con
         // we are on the master dictionary
 
         if(unlikely(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE))
-            item->shared->value = value;
+            dict_item_value_set(item, value);
         else
-            item->shared->value = dict_item_value_create(dict, value, value_len);
+            dict_item_value_set(item, dict_item_value_create(dict, value, value_len));
 
         item->shared->value_len = value_len;
         value_size += value_len;
@@ -191,24 +216,25 @@ static inline void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY
 
     if(likely(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE)) {
         netdata_log_debug(D_DICTIONARY, "Dictionary: linking value to '%s'", item_get_name(item));
-        item->shared->value = value;
         item->shared->value_len = value_len;
+        dict_item_value_set(item, value);
     }
     else {
         netdata_log_debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", item_get_name(item));
 
-        void *old_value = item->shared->value;
+        void *old_value = dict_item_value_get(item);
+        size_t old_value_len = item->shared->value_len;
         void *new_value = NULL;
         if(value_len) {
             new_value = dict_item_value_mallocz(dict, value_len);
             if(value) memcpy(new_value, value, value_len);
             else memset(new_value, 0, value_len);
         }
-        item->shared->value = new_value;
         item->shared->value_len = value_len;
+        dict_item_value_set(item, new_value);
 
-        netdata_log_debug(D_DICTIONARY, "Dictionary: freeing old value of '%s'", item_get_name(item));
-        dict_item_value_freez(dict, old_value);
+        netdata_log_debug(D_DICTIONARY, "Dictionary: retiring old value of '%s' after RCU grace period", item_get_name(item));
+        dict_item_retire_replaced_value(dict, old_value, old_value_len);
     }
 
     dictionary_execute_insert_callback(dict, item, constructor_data);
@@ -229,8 +255,8 @@ static inline size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM
 
         if(unlikely(!(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE))) {
             netdata_log_debug(D_DICTIONARY, "Dictionary freeing value of '%s'", item_get_name(item));
-            dict_item_value_freez(dict, item->shared->value);
-            item->shared->value = NULL;
+            dict_item_value_freez(dict, dict_item_value_get(item));
+            dict_item_value_set(item, NULL);
         }
         value_size += item->shared->value_len;
 
@@ -259,10 +285,20 @@ static inline size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM
 static inline void item_linked_list_add(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
-    if(dict->options & DICT_OPTION_ADD_IN_FRONT)
-        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(dict->items.list, item, prev, next);
-    else
-        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(dict->items.list, item, prev, next);
+    if(is_dictionary_single_threaded(dict)) {
+        if(dict->options & DICT_OPTION_ADD_IN_FRONT)
+            DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(dict->items.list, item, prev, next);
+        else
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(dict->items.list, item, prev, next);
+    }
+    else {
+        // RCU-safe insertion: uses atomic release stores on the publication
+        // pointers (head, prev->next) that RCU readers load with acquire.
+        if(dict->options & DICT_OPTION_ADD_IN_FRONT)
+            DOUBLE_LINKED_LIST_PREPEND_ITEM_RCU_SAFE(dict->items.list, item, prev, next);
+        else
+            DOUBLE_LINKED_LIST_APPEND_ITEM_RCU_SAFE(dict->items.list, item, prev, next);
+    }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     item->ll_adder_pid = gettid_cached();
@@ -279,7 +315,14 @@ static inline void item_linked_list_add(DICTIONARY *dict, DICTIONARY_ITEM *item)
 static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
-    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
+    if(is_dictionary_single_threaded(dict)) {
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
+    }
+    else {
+        // RCU-safe removal: preserve item->next so concurrent RCU readers
+        // at this item can still follow the chain forward.
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_RCU_SAFE(dict->items.list, item, prev, next);
+    }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     item->ll_remover_pid = gettid_cached();
@@ -287,6 +330,20 @@ static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *it
 
     garbage_collect_pending_deletes(dict);
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+}
+
+static inline void dict_item_retire(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+    if(is_dictionary_single_threaded(dict))
+        dict_item_free_with_hooks(dict, item);
+    else
+        dict_rcu_pending_free_queue(dict, item);
+}
+
+static inline void dict_item_retire_and_try_drain(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+    dict_item_retire(dict, item);
+
+    if(!is_dictionary_single_threaded(dict))
+        dict_rcu_pending_free_drain(dict);
 }
 
 // ----------------------------------------------------------------------------
@@ -324,10 +381,10 @@ static inline void dict_item_free_or_mark_deleted(DICTIONARY *dict, DICTIONARY_I
     int rc = item_is_not_referenced_and_can_be_removed_advanced(dict, item);
     switch(rc) {
         case RC_ITEM_OK:
-            // the item is ours, refcount set to -100
+            // the item is ours, refcount set to REFCOUNT_DELETED
             dict_item_shared_set_deleted(dict, item);
             item_linked_list_remove(dict, item);
-            dict_item_free_with_hooks(dict, item);
+            dict_item_retire_and_try_drain(dict, item);
             break;
 
         case RC_ITEM_IS_REFERENCED:
@@ -365,7 +422,7 @@ static inline void dict_item_release_and_check_if_it_is_deleted_and_can_be_remov
             DICTIONARY_PENDING_DELETES_MINUS1(dict);
 
             item_linked_list_remove(dict, item);
-            dict_item_free_with_hooks(dict, item);
+            dict_item_retire_and_try_drain(dict, item);
         }
     }
     else {
@@ -528,6 +585,9 @@ static inline DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONA
 
     if(unlikely(spins > 0))
         DICTIONARY_STATS_INSERT_SPINS_PLUS(dict, spins);
+
+    if(!is_dictionary_single_threaded(dict))
+        dict_rcu_pending_free_drain(dict);
 
     if(is_master_dictionary(dict) && added_or_updated)
         dictionary_execute_react_callback(dict, item, constructor_data);

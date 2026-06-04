@@ -283,6 +283,7 @@ typedef DICTFE_CONST struct dictionary_foreach {
 
     char rw;                    // the lock mode 'r' or 'w'
     bool locked;                // true when the dictionary is locked
+    bool rcu_mode;              // true when using RCU for read-side (no per-item refcount)
 } DICTFE;
 
 #define dfe_start_read(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_READ)
@@ -300,6 +301,7 @@ typedef DICTFE_CONST struct dictionary_foreach {
                 .counter = 0,                                                                       \
                 .rw = (mode),                                                                       \
                 .locked = false,                                                                    \
+                .rcu_mode = false,                                                                  \
             };                                                                                      \
             (void)(ptr); /* needed to avoid warning when looping without using this */              \
             for((ptr) = dictionary_foreach_start_rw(&ptr ## _dfe);                                  \

@@ -12,6 +12,7 @@ static inline size_t dictionary_locks_init(DICTIONARY *dict) {
     if(likely(!is_dictionary_single_threaded(dict))) {
         rw_spinlock_init(&dict->index.rw_spinlock);
         rw_spinlock_init(&dict->items.rw_spinlock);
+        spinlock_init(&dict->rcu_pending_free.spinlock);
     }
 
     return 0;
@@ -47,8 +48,14 @@ static inline void ll_recursive_lock(DICTIONARY *dict, char rw) {
         return;
     }
 
-    if(rw == DICTIONARY_LOCK_READ || rw == DICTIONARY_LOCK_REENTRANT || rw == 'R') {
-        // read lock
+    if(rw == DICTIONARY_LOCK_READ) {
+        // Use RCU for pure read traversals — zero shared-write overhead.
+        // The calling thread must be RCU-registered (rcu_read_lock auto-registers).
+        rcu_read_lock();
+    }
+    else if(rw == DICTIONARY_LOCK_REENTRANT || rw == 'R') {
+        // REENTRANT mode breaks/reacquires between iterations,
+        // so it cannot use RCU (which requires a continuous read-side CS).
         rw_spinlock_read_lock(&dict->items.rw_spinlock);
     }
     else {
@@ -67,9 +74,10 @@ static inline void ll_recursive_unlock(DICTIONARY *dict, char rw) {
         return;
     }
 
-    if(rw == DICTIONARY_LOCK_READ || rw == DICTIONARY_LOCK_REENTRANT || rw == 'R') {
-        // read unlock
-
+    if(rw == DICTIONARY_LOCK_READ) {
+        rcu_read_unlock();
+    }
+    else if(rw == DICTIONARY_LOCK_REENTRANT || rw == 'R') {
         rw_spinlock_read_unlock(&dict->items.rw_spinlock);
     }
     else {
@@ -79,6 +87,11 @@ static inline void ll_recursive_unlock(DICTIONARY *dict, char rw) {
 
         rw_spinlock_write_unlock(&dict->items.rw_spinlock);
     }
+}
+
+// Returns true if the given lock mode uses RCU (no per-item refcount needed).
+static inline bool ll_lock_is_rcu_mode(DICTIONARY *dict, char rw) {
+    return rw == DICTIONARY_LOCK_READ && !is_dictionary_single_threaded(dict);
 }
 
 static inline void dictionary_index_lock_rdlock(DICTIONARY *dict) {

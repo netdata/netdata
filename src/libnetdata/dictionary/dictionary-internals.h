@@ -132,6 +132,12 @@ struct dictionary_hooks {
     void *delelte_callback_data;
 };
 
+typedef struct dictionary_rcu_retired_value {
+    struct dictionary_rcu_retired_value *next;
+    void *value;
+    size_t bytes;
+} DICTIONARY_RCU_RETIRED_VALUE;
+
 struct dictionary {
 #ifdef FSANITIZE_ADDRESS
     STACKTRACE_ARRAY stacktraces;   // stack traces from all acquisition points
@@ -154,6 +160,12 @@ struct dictionary {
         pid_t writer_pid;               // the gettid() of the writer
         uint32_t writer_depth;          // nesting of write locks
     } items;
+
+    struct {
+        DICTIONARY_ITEM *head;          // items removed from linked list, pending rcu_synchronize + free
+        DICTIONARY_RCU_RETIRED_VALUE *values; // replaced values pending rcu_synchronize + free
+        SPINLOCK spinlock;              // protects the pending list (accessed outside write lock)
+    } rcu_pending_free;
 
     struct dictionary_hooks *hooks;     // pointer to external function callbacks to be called at certain points
     struct dictionary_stats *stats;     // statistics data, when DICT_OPTION_STATS is set
@@ -186,6 +198,9 @@ void garbage_collect_pending_deletes(DICTIONARY *dict);
 static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static inline const char *item_get_name(const DICTIONARY_ITEM *item);
+static inline void dict_item_value_freez(DICTIONARY *dict, void *ptr);
+static inline void *dict_item_value_get(const DICTIONARY_ITEM *item);
+static inline void dict_item_value_set(DICTIONARY_ITEM *item, void *value);
 static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, DICTIONARY_ITEM *item);
 static void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static bool dict_item_set_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item);
@@ -199,6 +214,145 @@ static bool dict_item_set_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *item, bool having_index_lock);
 #define item_is_not_referenced_and_can_be_removed(dict, item) (item_is_not_referenced_and_can_be_removed_advanced(dict, item) == RC_ITEM_OK)
 static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY *dict, DICTIONARY_ITEM *item);
+
+// Queue an item for deferred freeing after the next rcu_synchronize().
+// The item must already be removed from the linked list (RCU-safe removal).
+// Uses item->prev (cleared by RCU-safe removal) as the singly-linked list pointer.
+static inline void dict_rcu_pending_free_queue(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+    spinlock_lock(&dict->rcu_pending_free.spinlock);
+    item->prev = dict->rcu_pending_free.head;
+    dict->rcu_pending_free.head = item;
+    spinlock_unlock(&dict->rcu_pending_free.spinlock);
+}
+
+static inline void dict_rcu_pending_value_queue(DICTIONARY *dict, void *value, size_t bytes) {
+    if(!value)
+        return;
+
+    DICTIONARY_RCU_RETIRED_VALUE *retired = mallocz(sizeof(*retired));
+    retired->value = value;
+    retired->bytes = bytes;
+
+    spinlock_lock(&dict->rcu_pending_free.spinlock);
+    retired->next = dict->rcu_pending_free.values;
+    dict->rcu_pending_free.values = retired;
+    spinlock_unlock(&dict->rcu_pending_free.spinlock);
+}
+
+static inline DICTIONARY_ITEM *dict_rcu_pending_free_detach(DICTIONARY *dict, DICTIONARY_RCU_RETIRED_VALUE **values) {
+    spinlock_lock(&dict->rcu_pending_free.spinlock);
+    DICTIONARY_ITEM *list = dict->rcu_pending_free.head;
+    dict->rcu_pending_free.head = NULL;
+    if(values) {
+        *values = dict->rcu_pending_free.values;
+        dict->rcu_pending_free.values = NULL;
+    }
+    spinlock_unlock(&dict->rcu_pending_free.spinlock);
+
+    return list;
+}
+
+static inline size_t dict_rcu_pending_free_free_list(DICTIONARY *dict, DICTIONARY_ITEM *list) {
+    size_t bytes = 0;
+
+    while(list) {
+        DICTIONARY_ITEM *freeme = list;
+        list = freeme->prev;
+        freeme->prev = NULL;
+        freeme->next = NULL;
+        bytes += dict_item_free_with_hooks(dict, freeme);
+    }
+
+    return bytes;
+}
+
+static inline size_t dict_rcu_pending_value_free_list(DICTIONARY *dict, DICTIONARY_RCU_RETIRED_VALUE *list) {
+    size_t bytes = 0;
+
+    while(list) {
+        DICTIONARY_RCU_RETIRED_VALUE *freeme = list;
+        list = freeme->next;
+        dict_item_value_freez(dict, freeme->value);
+        bytes += freeme->bytes + sizeof(*freeme);
+        freez(freeme);
+    }
+
+    return bytes;
+}
+
+// Drain the deferred-free list: call rcu_synchronize() once, then free all items.
+// Returns the number of items freed.
+// If the calling thread is currently inside an RCU read-side CS (nesting > 0),
+// skip the drain — calling rcu_synchronize() would block on other threads'
+// read-side CSs, causing livelock during bulk deletions (e.g. startup with
+// 800+ nodes). The items stay queued and will be drained at the next
+// quiescent call point (dictionary_destroy, or a GC triggered outside a CS).
+static inline size_t dict_rcu_pending_free_drain(DICTIONARY *dict) {
+    if(is_dictionary_single_threaded(dict))
+        return 0;
+
+    // Don't drain while inside an RCU read-side CS — rcu_synchronize()
+    // would block on other threads' CSs, causing livelock during bulk
+    // deletions (e.g. 800+ nodes loading contexts at startup).
+    if(rcu_thread_in_read_cs())
+        return 0;
+
+    // Atomically detach the entire list under the spinlock.
+    DICTIONARY_RCU_RETIRED_VALUE *values = NULL;
+    DICTIONARY_ITEM *list = dict_rcu_pending_free_detach(dict, &values);
+
+    if(!list && !values)
+        return 0;
+
+    // Single grace period for all items in the batch
+    if(!rcu_synchronize()) {
+        // Timeout — readers still active. DO NOT free the items.
+        // Re-queue them so they can be retried later.
+        // This leaks memory if the stall is permanent, but prevents
+        // use-after-free which is worse.
+        spinlock_lock(&dict->rcu_pending_free.spinlock);
+        // Find the tail of our detached list and link it to current head
+        if(list) {
+            DICTIONARY_ITEM *tail = list;
+            while(tail->prev)
+                tail = tail->prev;
+            tail->prev = dict->rcu_pending_free.head;
+            dict->rcu_pending_free.head = list;
+        }
+        if(values) {
+            DICTIONARY_RCU_RETIRED_VALUE *tail = values;
+            while(tail->next)
+                tail = tail->next;
+            tail->next = dict->rcu_pending_free.values;
+            dict->rcu_pending_free.values = values;
+        }
+        spinlock_unlock(&dict->rcu_pending_free.spinlock);
+        return 0;
+    }
+
+    // Free all items — grace period confirmed complete
+    size_t count = 0;
+    for(DICTIONARY_ITEM *curr = list; curr; curr = curr->prev)
+        count++;
+
+    dict_rcu_pending_free_free_list(dict, list);
+    dict_rcu_pending_value_free_list(dict, values);
+    return count;
+}
+
+// RCU-safe item availability check for traversals.
+// Does NOT acquire a reference — only checks if the item is visible.
+// Safe to call only inside an RCU read-side critical section.
+static inline bool item_is_available_for_rcu_traversal(DICTIONARY_ITEM *item) {
+    if(item_flag_check(item, ITEM_FLAG_DELETED))
+        return false;
+    if(item_flag_check(item, ITEM_FLAG_BEING_CREATED))
+        return false;
+    // also skip items that are currently being deleted (refcount set to REFCOUNT_DELETED)
+    if(__atomic_load_n(&item->refcount, __ATOMIC_ACQUIRE) < 0)
+        return false;
+    return true;
+}
 
 // ----------------------------------------------------------------------------
 // validate each pointer is indexed once - internal checks only

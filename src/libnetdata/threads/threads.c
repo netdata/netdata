@@ -374,6 +374,7 @@ static void nd_thread_exit(ND_THREAD *nti) {
     nd_thread_run_cleanup_callbacks();
     thread_cache_destroy();
     worker_unregister();
+    rcu_unregister_thread();
 
     nd_thread_status_set(nti, NETDATA_THREAD_STATUS_FINISHED);
 
