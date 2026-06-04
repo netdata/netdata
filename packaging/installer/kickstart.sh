@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F052D
+# Next unused error code: F0522
 
 # ======================================================================
 # Constants
@@ -628,6 +628,95 @@ set_tmpdir() {
   fi
 }
 
+handle_http_status() {
+  status="${1}"
+  url="${2}"
+  action="${3}"
+
+  warn_msg="Server returned ${status} when ${action} ${url}"
+  case "${status}" in
+    404)
+      warning "File not found when ${action} ${url}"
+      return 1
+      ;;
+    4*)
+      warning "${warn_msg}"
+      return 5
+      ;;
+    5*)
+      warning "${warn_msg}"
+      return 6
+      ;;
+    *)
+      warning "${warn_msg}"
+      return 4
+      ;;
+  esac
+}
+
+handle_curl_result() {
+  ret="${1}"
+  url="${2}"
+  dl_log="${3}"
+  action="${4}"
+  dest="${5}"
+
+  case "${ret}" in
+    0) return 0 ;;
+    22|78)
+      status="$(tail -n 1 "${dl_log}")"
+      [ -n "${dest}" ] && rm -f "${dest}"
+      handle_http_status "${status}" "${url}" "${action}"
+      return "$?"
+      ;;
+    5|6|7)
+      [ -n "${dest}" ] && rm -f "${dest}"
+      warning "Failed to connect to remote host when ${action} ${url}"
+      return 2
+      ;;
+    35|60|83)
+      [ -n "${dest}" ] && rm -f "${dest}"
+      warning "TLS error while connecting to remote host when ${action} ${url}"
+      return 3
+      ;;
+    *)
+      [ -n "${dest}" ] && rm -f "${dest}"
+      fatal "Unknown error when ${action} ${url}" F0520
+      ;;
+  esac
+}
+
+handle_wget_result() {
+  ret="${1}"
+  url="${2}"
+  dl_log="${3}"
+  action="${4}"
+  dest="${5}"
+
+  case "${ret}" in
+    0) return 0 ;;
+    8)
+      status="$(grep "HTTP/" "${dl_log}" | tail -n 1 | awk '{ print $2 }')"
+      [ -n "${dest}" ] && rm -f "${dest}"
+      handle_http_status "${status}" "${url}" "${action}"
+      return "$?"
+      ;;
+    4)
+      warning "Failed to connect to remote host when ${action} ${url}"
+      return 2
+      ;;
+    5)
+      warning "TLS error while connecting to remote host when ${action} ${url}"
+      return 3
+      ;;
+    *) fatal "Unknown error when ${action} ${url}" F0520 ;;
+  esac
+}
+
+# It’s unlikely that any caller of this function will care why exactly it
+# wasn’t possible to retrieve the requested URL, but it’s still useful
+# to log the differentiated warnings based on the actual result, so we do
+# still have the full logic for inspecting the return codes of curl/wget.
 check_for_remote_file() {
   url="${1}"
 
@@ -645,53 +734,15 @@ check_for_remote_file() {
   if [ -n "${CURL}" ]; then
     "${CURL}" --write-out "%{http_code}" --output /dev/null --silent --head --fail "${url}" > "${dl_log}"
 
-    case "$?" in
-        0) return 0 ;;
-        22|78)
-            case "$(tail -n 1 "${dl_log}")" in
-              403|404) return 1 ;;
-              4*) return 5 ;;
-              5*) return 6 ;;
-              *) return 4 ;;
-            esac
-            ;;
-        5|6|7)
-            error "Failed to connect to remote host when checking for remote file at ${url}"
-            return 2
-            ;;
-        35|60|83)
-            error "TLS error while connecting to remote host when checking for remote file at ${url}"
-            return 3
-            ;;
-        *) fatal "Unknown error when checking for remote file at ${url}" F0520 ;;
-    esac
+    handle_curl_result "$?" "${url}" "${dl_log}" "checking for remote file at"
+    return "$?"
   fi
 
   if [ -n "${WGET}" ]; then
     "${WGET}" -S -o "${dl_log}" --spider "${url}"
 
-    case "$?" in
-      0)
-        case "$(grep "HTTP/" "${dl_log}" | tail -n 1 | awk '{ print $2 }')" in
-          200) return 0 ;;
-          404) return 1 ;;
-          4*) return 5 ;;
-          5*) return 6 ;;
-          *) return 4 ;;
-        esac
-        ;;
-      8)
-        case "$(grep "HTTP/" "${dl_log}" | tail -n 1 | awk '{ print $2 }')" in
-          404) return 1 ;;
-          4*) return 5 ;;
-          5*) return 6 ;;
-          *) return 4 ;;
-        esac
-        ;;
-      4) return 2 ;;
-      5) return 3 ;;
-      *) fatal "Unknown error when checking for remote file at ${url}" F0520 ;;
-    esac
+    handle_wget_result "$?" "${url}" "${dl_log}" "checking for remote file at"
+    return "$?"
   fi
 
   fatal "${ERROR_F0003}" F0003
@@ -711,84 +762,17 @@ download() {
   fi
 
   if [ -n "${CURL}" ]; then
-    run sh -c '"${1}" --fail -q -sSL --connect-timeout 10 --retry 3 --output "${2}" "${3}" > "${4}"' _ "${CURL}" "${dest}" "${url}" "${dl_log}"
+    run sh -c '"${1}" --fail -q -sSL --connect-timeout 10 --retry 3 --write-out "%{http_code}" --output "${2}" "${3}" > "${4}"' _ "${CURL}" "${dest}" "${url}" "${dl_log}"
 
-    case "$?" in
-      0) return 0 ;;
-      22|78)
-        rm -f "${dest}"
-
-        case "$(tail -n 1 "${dl_log}")" in
-          404)
-            error "Remote file not found when downloading ${url}" F0522
-            return 1
-            ;;
-          4*)
-            error "Remote server reported client error when downloading ${url}" F052A
-            return 5
-            ;;
-          5*)
-            error "Remote server reported internal error when downloading ${url}" F052B
-            return 6
-            ;;
-          *)
-            error "Remote server reported error when downloading ${url}" F052C
-            return 4
-            ;;
-        esac
-        ;;
-      5|6|7)
-        error "Failed to connect to remote server to download ${url}" F0523
-        rm -f "${dest}"
-        return 2
-        ;;
-      35|60|83)
-        error "TLS error while connecting to remote server to download ${url}" F0524
-        rm -f "${dest}"
-        return 3
-        ;;
-      *) fatal "Unknown error when downloading ${url}" F0521 ;;
-    esac
+    handle_curl_result "$?" "${url}" "${dl_log}" "downloading" "${dest}"
+    return "$?"
   fi
 
   if [ -n "${WGET}" ]; then
     run "${WGET}" -T 15 -o "${dl_log}" -O "${dest}" "${url}"
 
-    case "$?" in
-      0) return 0 ;;
-      8)
-        rm -f "${dest}"
-        case "$(grep "HTTP/" "${dl_log}" | tail -n 1 | awk '{ print $2 }')" in
-          404)
-            error "Remote file not found when downloading ${url}" F0522
-            return 1
-            ;;
-          4*)
-            error "Remote server reported client error when downloading ${url}" F052A
-            return 5
-            ;;
-          5*)
-            error "Remote server reported internal error when downloading ${url}" F052B
-            return 6
-            ;;
-          *)
-            error "Remote server reported error when downloading ${url}" F052C
-            return 4
-            ;;
-        esac
-        ;;
-      4)
-        error "Failed to connect to remote server to download ${url}" F0523
-        rm -f "${dest}"
-        return 2
-        ;;
-      5)
-        error "TLS error while connecting to remote server to download ${url}" F0524
-        rm -f "${dest}"
-        return 3
-        ;;
-      *) fatal "Unknown error when downloading ${url}" F0521 ;;
-    esac
+    handle_wget_result "$?" "${url}" "${dl_log}" "downloading" "${dest}"
+    return "$?"
   fi
 
   fatal "${ERROR_F0003}" F0003
@@ -819,28 +803,18 @@ get_redirect() {
   if [ -n "${CURL}" ]; then
     run sh -c '"${1}" "${2}" -s -L -I -o /dev/null -w "%{url_effective}" > "${3}"' _ "${CURL}" "${url}" "${output}"
 
-    case "$?" in
+    ret="$?"
+
+    case "${ret}" in
       0)
         grep -Eo '[^/]+/?$' "${output}" | grep -Eo '^[^/]+'
         rm -f "${output}"
         return 0
         ;;
-      22|78)
-        error "Remote server reported error when checking redirects for ${url}" F0525
-        rm -f "${output}"
-        return 1
+      *)
+        handle_curl_result "${ret}" "${url}" "${dl_log}" "checking redirects for" "${output}"
+        return "$?"
         ;;
-      5|6|7)
-        error "Failed to connect to remote server to check redirects for ${url}" F0526
-        rm -f "${output}"
-        return 2
-        ;;
-      35|60|83)
-        error "TLS error while connecting to remote server to check redirects for ${url}" F0527
-        rm -f "${output}"
-        return 3
-        ;;
-      *) fatal "Unknown error when checking redirect for ${url}" F0528 ;;
     esac
   fi
 
@@ -853,22 +827,10 @@ get_redirect() {
         rm -f "${output}"
         return 0
         ;;
-      8)
-        error "Remote server reported error when checking redirects for ${url}" F0525
-        rm -f "${output}"
-        return 1
+      *)
+        handle_wget_result "${ret}" "${url}" "${dl_log}" "checking redirects for" "${output}"
+        return "$?"
         ;;
-      4)
-        error "Failed to connect to remote server to check redirects for ${url}" F0526
-        rm -f "${output}"
-        return 2
-        ;;
-      5)
-        error "TLS error while connecting to remote server to check redirects for ${url}" F0527
-        rm -f "${output}"
-        return 3
-        ;;
-      *) fatal "Unknown error when checking redirect for ${url}" F0528 ;;
     esac
   fi
 
@@ -1898,6 +1860,8 @@ try_package_install() {
       ;;
   esac
 
+  # Due to the check above for pub_check_url, it’s safe to assume here
+  # that the only error we’re going to get is a missing file.
   if ! check_for_remote_file "${pkg_meta_url}"; then
     warning "Native packages have not yet been published for this system."
     return 4
@@ -2051,10 +2015,6 @@ try_static_install() {
       return 1
       ;;
   esac
-
-  if ! check_for_remote_file "${NETDATA_TARBALL_BASEURL}"; then
-    NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1
-  fi
 
   # Check status code first, so that we can provide nicer fallback for dry runs.
   if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
