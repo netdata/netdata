@@ -4,11 +4,11 @@ Netdata stores detailed metrics at one-second granularity using its Database eng
 
 ## Modes
 
-| Mode       | Description                                                                                                                                                                                                                                           |
-|------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Mode       | Description                                                                                                                                                                                                                                                                                                                                                             |
+|------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `dbengine` | The high performance multi-tiered time-series database of Netdata, providing superior storage efficiency (~0.5 bytes per sample on disk for high resolution per-second data), and fast long term data queries (typically 20+ times faster) by transparently utilizing all available database tiers. For details, see [Database Engine](/src/database/engine/README.md). |
-| `ram`      | Stores data entirely in memory without disk persistence. This is typically used in IoT deviced or children that stream their metrics to Netdata parents, to avoid having any disk dependency on Netdata                                                                                                                                                                |
-| `none`     | Operates without storage (metrics can only be streamed to a Netdata parent).                                                                                                                                                                             |
+| `ram`      | Stores data entirely in memory without disk persistence. This is typically used in IoT deviced or children that stream their metrics to Netdata parents, to avoid having any disk dependency on Netdata                                                                                                                                                                 |
+| `none`     | Operates without storage (metrics can only be streamed to a Netdata parent).                                                                                                                                                                                                                                                                                            |
 
 ## Tiers
 
@@ -46,15 +46,15 @@ How enforcement works:
 
 1. **Periodic and asynchronous checks**: Netdata checks whether a tier has exceeded its configured size limit periodically and also after normal database activity (such as extent writes and rotation completions). Data continues to be written to disk without restriction between these checks.
 
-2. **Whole-file deletion**: When the configured size limit is exceeded, Netdata deletes the oldest complete data files until usage is back under the limit. Multiple files may be deleted across one or more rotation passes. Data files range from 4 MB to 512 MB (see [Database Engine](/src/database/engine/README.md#datafiles)). Because entire files are removed and cannot be partially deleted, actual disk usage can overshoot the configured limit before enforcement catches up.
+2. **Whole-file deletion**: When the configured size limit is exceeded, Netdata schedules deletion of the oldest complete datafiles until the retention check no longer reports the tier over its limit. Multiple files may be deleted across one or more rotation passes. Datafile size is determined automatically (see [Database Engine datafiles](/src/database/engine/README.md#datafiles)). Because entire files are removed and cannot be partially deleted, actual disk usage can overshoot the configured limit before enforcement catches up.
 
 3. **Why tier 0 overshoots more**: Tier 0 collects per-second data, producing the highest write volume. More data accumulates between enforcement checks, and data files fill faster. Tier 1 and tier 2 have lower write volumes and their disk usage grows more predictably.
 
 **Practical guidance**:
 
-- Provision storage to accommodate 2–3× your configured tier 0 retention size, especially on parent nodes streaming from many children.
-- Setting both **retention size** and **retention time** for the same tier provides a dual bound — data is deleted when either threshold is reached.
-- There is currently no mechanism to enforce a true hard cap on dbengine disk usage. To minimize overshoot, set both size and time limits and ensure adequate storage headroom.
+- Provision storage with workload-specific headroom, especially on parent nodes streaming from many children. The required headroom depends on ingestion rate, compression, storage throughput, and how quickly rotation catches up.
+- Setting both **retention size** and **retention time** for the same tier can reduce retained history when either threshold is reached, but it does not create a hard disk cap.
+- There is currently no mechanism to enforce a true hard cap on dbengine disk usage. To reduce the risk of disk-full conditions, validate retention sizing under expected production load and ensure adequate storage headroom.
 
 ## Cache sizes
 
@@ -62,4 +62,3 @@ There are two cache sizes that can be used to optimize the Database:
 
 1. **Page cache size**: The main cache that keeps metrics data into memory. When data is not found in it, the extent cache is consulted, and if not found in that too, they are loaded from the disk.
 2. **Extent cache size**: The compressed extent cache. It keeps in memory compressed data blocks, as they appear on disk, to avoid reading them again. Data found in the extent cache but not in the main cache have to be uncompressed to be queried.
-

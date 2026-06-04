@@ -60,6 +60,7 @@ Netdata supports three retention strategies. Choose the one that best fits your 
 1. **Time-based retention** (recommended for predictable retention periods):
 
    Guarantees data is kept for a fixed time, regardless of disk usage (assuming you have enough disk space)
+
    ```ini
    [db]
    dbengine tier 0 retention time = 30d
@@ -72,7 +73,8 @@ Netdata supports three retention strategies. Choose the one that best fits your 
 
 2. **Space-based retention** (recommended for predictable disk usage):
 
-   Targets keeping storage usage within defined limits, at the cost of variable retention duration. Retention size is enforced asynchronously, not in real-time at write time — dbengine evaluates quotas and schedules rotation both on a background timer and after normal activity (such as extent writes), deleting whole datafiles until usage is back under the configured limit. Actual disk usage may temporarily exceed the configured limit — especially on tier 0 with high ingestion rates from many streaming children. The amount of overshoot is workload-dependent (ingestion rate, compression variance, rotation throughput); provision additional disk headroom beyond the configured limit to reduce the risk of disk-full conditions.
+   Targets keeping storage usage within defined limits, at the cost of variable retention duration. Retention size is enforced asynchronously, not in real-time at write time — dbengine evaluates quotas and schedules rotation both on a background timer and after normal activity (such as extent writes), deleting whole datafiles until the retention check no longer reports the tier over its limit. Actual disk usage may temporarily exceed the configured limit — especially on tier 0 with high ingestion rates from many streaming children. The amount of overshoot is workload-dependent (ingestion rate, compression variance, rotation throughput); provision additional disk headroom beyond the configured limit to reduce the risk of disk-full conditions.
+
    ```ini
    [db]
    dbengine tier 0 retention size = 500GB
@@ -86,6 +88,7 @@ Netdata supports three retention strategies. Choose the one that best fits your 
 3. **Combined retention** (use with caution):
 
    Uses both time and space limits. Data is dropped as soon as either limit is reached.
+
    ```ini
    [db]
    dbengine tier 0 retention time = 30d
@@ -124,9 +127,9 @@ Parent nodes are the central long-term storage layer in a Netdata infrastructure
 
 Assume a Parent configured with:
 
-* **Tier 0:** 30 days retention (per-second resolution)
-* **Tier 1:** 6 months retention (per-minute resolution)
-* **Tier 2:** 5 years retention (per-hour resolution)
+- **Tier 0:** 30 days retention (per-second resolution)
+- **Tier 1:** 6 months retention (per-minute resolution)
+- **Tier 2:** 5 years retention (per-hour resolution)
 
 One metric would consume approximately **3.7 MB** across tiers.
 For **1,000,000 metrics streamed to the Parent**, this equals **≈ 3.7 TB**.
