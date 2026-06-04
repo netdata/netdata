@@ -442,19 +442,19 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_I
 
     DWORD wait_rc = WaitForSingleObject(si->process_handle, (DWORD)timeout_ms);
     if(wait_rc == WAIT_TIMEOUT)
+        // the process is still running; the caller decides whether to keep waiting or kill it
         return SPAWN_TIMEDWAIT_RUNNING;
 
-    if(wait_rc == WAIT_FAILED) {
-        // the handle is unusable, so we cannot conclude the process exited. report it as still
-        // running so the caller escalates to kill, instead of falsely reporting a clean exit
-        // and freeing the instance while the child may still be alive.
+    // WAIT_OBJECT_0 (process exited) or WAIT_FAILED (handle unusable): resolve via the blocking
+    // wait, which returns immediately now (on a broken handle it too fails fast). WAIT_FAILED is
+    // terminal, NOT a transient "still running" state: returning RUNNING on an unusable handle
+    // would spin the wait forever when the configured timeout is 0 (= wait forever), re-introducing
+    // the very hang this timed wait exists to prevent.
+    if(wait_rc == WAIT_FAILED)
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN PARENT: WaitForSingleObject() failed (err %lu) for request No %zu, pid %d (winpid %u)",
+               "SPAWN PARENT: WaitForSingleObject() failed (err %lu) for request No %zu, pid %d (winpid %u) - resolving the wait",
                (unsigned long)GetLastError(), si->request_id, (int)si->child_pid, si->dwProcessId);
-        return SPAWN_TIMEDWAIT_RUNNING;
-    }
 
-    // WAIT_OBJECT_0: the process exited; the blocking wait returns immediately now.
     *status = spawn_server_exec_wait(server, si);
     return SPAWN_TIMEDWAIT_EXITED;
 }

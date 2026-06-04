@@ -1222,20 +1222,21 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_I
     NETDATA_SSL ssl = { 0 };
     int rc = wait_on_socket_or_cancel_with_timeout(&ssl, instance->sock, timeout_ms, POLLIN, &revents);
     if(rc == -1 /* thread cancelled */ || rc == 1 /* timeout */)
+        // the child is still running; the caller decides whether to keep waiting or kill it
         return SPAWN_TIMEDWAIT_RUNNING;
 
-    if(rc == 2 /* error on the socket */) {
-        // we cannot conclude the child exited (e.g. the spawn server connection broke), so report
-        // it as still running. The caller escalates to kill rather than falsely reporting a clean
-        // exit and freeing the instance while the child may still be alive. If the report was
-        // merely pending alongside a hangup, the next slice (or the kill path's final wait) reads it.
+    // rc == 0 (status report ready to read) or rc == 2 (socket error): resolve via the blocking
+    // wait, which returns immediately now. A socket error means the status channel to the spawn
+    // server is broken (the spawn server itself died) - that is terminal, NOT a transient "still
+    // running" state. We must resolve it here: returning RUNNING on a dead channel would spin the
+    // wait forever when the configured timeout is 0 (= wait forever), re-introducing the very hang
+    // this timed wait exists to prevent. Kill escalation for an ordinary hung child is driven by
+    // the timeout path (rc == 1) above, not by this error path, so nothing is lost.
+    if(rc == 2)
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN PARENT: status socket error for request No %zu, pid %d",
+               "SPAWN PARENT: status socket error for request No %zu, pid %d - resolving the wait",
                instance->request_id, instance->child_pid);
-        return SPAWN_TIMEDWAIT_RUNNING;
-    }
 
-    // rc == 0: the status report is ready to read; the blocking wait returns immediately now.
     *status = spawn_server_exec_wait(server, instance);
     return SPAWN_TIMEDWAIT_EXITED;
 }
