@@ -56,7 +56,10 @@
 // Normalize FreeBSD TCPS_* states to Linux-compatible TCP_* values.
 // This keeps the rest of the code (direction detection, TCP_STATE_2str display)
 // unchanged, since Linux and FreeBSD use different numbering for the same states.
+// Only used on FreeBSD 12/13; on 14+ the pcblist format changed and states are
+// not parsed from xinpgen/xtcpcb (those structs are no longer exported).
 
+#if __FreeBSD_version < 1400000
 static inline int local_sockets_freebsd_normalize_tcp_state(int tcps) {
     switch (tcps) {
         case TCPS_ESTABLISHED:  return TCP_ESTABLISHED;
@@ -73,6 +76,7 @@ static inline int local_sockets_freebsd_normalize_tcp_state(int tcps) {
         default:                return 0;
     }
 }
+#endif
 
 // --------------------------------------------------------------------------------------------------------------------
 // PCB state table entry: keyed by 4-tuple for matching against kinfo_file data.
@@ -123,6 +127,13 @@ static inline bool local_sockets_freebsd_fill_endpoint(
 
 static struct freebsd_tcp_state *local_sockets_freebsd_read_tcp_pcblist(size_t *out_count) {
     *out_count = 0;
+
+#if __FreeBSD_version < 1400000
+    // FreeBSD 12/13: net.inet.tcp.pcblist returns xinpgen/xtcpcb records.
+    // These structs were removed from the public headers in FreeBSD 14 when
+    // inpcb and tcpcb were merged; attempting to use them on 14+ would not
+    // compile.  On 14+ we return NULL and all TCP sockets are treated as
+    // ESTABLISHED (direction detection still works via zero-peer-address).
 
     size_t len = 0;
     if (sysctlbyname("net.inet.tcp.pcblist", NULL, &len, NULL, 0) < 0 || len == 0)
@@ -190,16 +201,7 @@ static struct freebsd_tcp_state *local_sockets_freebsd_read_tcp_pcblist(size_t *
         s->family      = family;
         s->local_port  = ntohs(inp->inp_lport);
         s->remote_port = ntohs(inp->inp_fport);
-
-#if __FreeBSD_version < 1400000
-        // FreeBSD 12/13: xt_tp.t_state is the TCP FSM state.
-        s->tcp_state = local_sockets_freebsd_normalize_tcp_state(tp->xt_tp.t_state);
-#else
-        // FreeBSD 14+: inpcb/tcpcb merged; set a safe placeholder.
-        // Direction detection still works via zero-peer-address check in
-        // local_sockets_add_socket().
-        s->tcp_state = TCP_ESTABLISHED;
-#endif
+        s->tcp_state   = local_sockets_freebsd_normalize_tcp_state(tp->xt_tp.t_state);
 
         if (family == AF_INET) {
             s->local_ip.ipv4  = inp->inp_laddr.s_addr;
@@ -215,6 +217,11 @@ static struct freebsd_tcp_state *local_sockets_freebsd_read_tcp_pcblist(size_t *
     freez(buf);
     *out_count = count;
     return states;
+#else
+    // FreeBSD 14+: xinpgen/xtcpcb no longer exported to userspace.
+    // Direction detection via zero-peer-address still works in enumerate_pids.
+    return NULL;
+#endif
 }
 
 // --------------------------------------------------------------------------------------------------------------------

@@ -1097,7 +1097,9 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, const L
 #endif
 
         // The time in milliseconds since the last data was sent.
+#if defined(OS_LINUX)
         KEEP_THE_SMALLER(t->info.tcp.tcpi_last_data_sent, n->info.tcp.tcpi_last_data_sent);
+#endif
 
         // The time in milliseconds since the last acknowledgment was sent (not tracked in Linux, hence often zero).
 #if defined(OS_LINUX)
@@ -1105,10 +1107,14 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, const L
 #endif
 
         // The time in milliseconds since the last data was received.
+#if defined(OS_LINUX)
         KEEP_THE_SMALLER(t->info.tcp.tcpi_last_data_recv, n->info.tcp.tcpi_last_data_recv);
+#endif
 
         // The time in milliseconds since the last acknowledgment was received.
+#if defined(OS_LINUX)
         KEEP_THE_SMALLER(t->info.tcp.tcpi_last_ack_recv, n->info.tcp.tcpi_last_ack_recv);
+#endif
 
         // The path MTU for this connection
 #if defined(OS_LINUX)
