@@ -267,6 +267,13 @@
 - Docs: update Go area instructions ([#22600](https://github.com/netdata/netdata/issues/22600))
 - Docs: task class: improve_docs — add a non-systemd linux section to the logs ([#22518](https://github.com/netdata/netdata/issues/22518))
 - Network Viewer (Connections on Windows) ([#22585](https://github.com/netdata/netdata/issues/22585))
+- Rework SOW lifecycle ([#22606](https://github.com/netdata/netdata/issues/22606))
+- Chore(go.d): rename topology engine package to l2topology ([#22611](https://github.com/netdata/netdata/issues/22611))
+- Regenerate integrations docs ([#22607](https://github.com/netdata/netdata/issues/22607))
+- Add engineering task issue template ([#22615](https://github.com/netdata/netdata/issues/22615))
+- Chore(go.d): retire legacy Go topology payloads ([#22614](https://github.com/netdata/netdata/issues/22614))
+- Fix(journal-index): avoid ValueGuardInUse when indexing otel journals ([#22621](https://github.com/netdata/netdata/issues/22621))
+- Windows compatibility (P1) ([#21972](https://github.com/netdata/netdata/issues/21972))
 
 ## [2.10.0] - 2026-04-09
 
