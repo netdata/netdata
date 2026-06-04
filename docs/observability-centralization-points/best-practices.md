@@ -98,7 +98,7 @@ Netdata supports three retention strategies. Choose the one that best fits your 
 
 :::warning
 
-Retention size limits are soft targets, not hard caps. Enforcement is periodic (approximately every 60 seconds) and operates at datafile granularity. Actual disk usage can exceed the configured limit between enforcement cycles. This is most noticeable on tier 0 with high metric volumes (e.g., parent nodes receiving streams from many children). Always provision more disk space than your configured limit to avoid unexpected disk-full conditions.
+Retention size limits are soft targets, not hard caps. Enforcement is periodic and asynchronous — quota checks and rotation scheduling occur both on a background timer and after normal dbengine activity (such as extent writes). Actual disk usage can exceed the configured limit between enforcement cycles. This is most noticeable on tier 0 with high metric volumes (e.g., parent nodes receiving streams from many children). Always provision more disk space than your configured limit to avoid unexpected disk-full conditions.
 
 :::
 
