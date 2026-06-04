@@ -6,6 +6,9 @@
 #include "database/rrd.h"
 #include "rrdcalc.h"
 
+// Forward declaration for statement set (defined in health_event_loop_uv.h)
+struct health_stmt_set;
+
 typedef enum __attribute__((packed)) {
     HEALTH_ENTRY_FLAG_PROCESSED             = 0x00000001, // notifications engine has processed this
     HEALTH_ENTRY_FLAG_UPDATED               = 0x00000002, // there is a more recent update about this transition
@@ -58,7 +61,7 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *wb);
 void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf);
 
 int health_alarm_log_open(RRDHOST *host);
-void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async);
+void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async, struct health_stmt_set *stmts);
 void health_alarm_log_load(RRDHOST *host);
 
 ALARM_ENTRY* health_create_alarm_entry(
@@ -73,7 +76,7 @@ ALARM_ENTRY* health_create_alarm_entry(
     int delay,
     HEALTH_ENTRY_FLAGS flags);
 
-void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool async);
+void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool async, struct health_stmt_set *stmts);
 
 const char *health_user_config_dir(void);
 const char *health_stock_config_dir(void);

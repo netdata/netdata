@@ -131,7 +131,7 @@ void watcher_main(void *arg)
     watcher_wait_for_step(
         WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD, shutdown_start_time);
-    watcher_wait_for_step(WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_EXPORTERS_AND_WEB_SERVERS_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_WEBSOCKET_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_REPLICATION_THREADS, shutdown_start_time);
@@ -171,7 +171,7 @@ void watcher_thread_start() {
     watcher_steps[WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS]
         .msg = "disable maintenance, new queries, new web requests, new streaming connections and aclk";
     watcher_steps[WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD].msg = "stop maintenance thread";
-    watcher_steps[WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS].msg =
+    watcher_steps[WATCHER_STEP_ID_STOP_EXPORTERS_AND_WEB_SERVERS_THREADS].msg =
         "stop exporters, health and web servers threads";
     watcher_steps[WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS].msg = "stop collectors and streaming threads";
     watcher_steps[WATCHER_STEP_ID_STOP_REPLICATION_THREADS].msg = "stop replication threads";
