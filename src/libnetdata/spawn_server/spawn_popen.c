@@ -185,7 +185,7 @@ int spawn_popen_wait(POPEN_INSTANCE *pi) {
 
 bool spawn_popen_timedwait(POPEN_INSTANCE *pi, int timeout_ms, int *code) {
     if(!pi) {
-        *code = -1;
+        if(code) *code = -1;
         return true;
     }
 
@@ -196,7 +196,7 @@ bool spawn_popen_timedwait(POPEN_INSTANCE *pi, int timeout_ms, int *code) {
         return false;
 
     freez(pi);
-    *code = spawn_popen_status_rc(status);
+    if(code) *code = spawn_popen_status_rc(status);
     return true;
 }
 

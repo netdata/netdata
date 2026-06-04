@@ -1224,8 +1224,18 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_I
     if(rc == -1 /* thread cancelled */ || rc == 1 /* timeout */)
         return SPAWN_TIMEDWAIT_RUNNING;
 
-    // ready to read (0), or error on the socket (2):
-    // both are resolved by the blocking wait, which returns immediately now.
+    if(rc == 2 /* error on the socket */) {
+        // we cannot conclude the child exited (e.g. the spawn server connection broke), so report
+        // it as still running. The caller escalates to kill rather than falsely reporting a clean
+        // exit and freeing the instance while the child may still be alive. If the report was
+        // merely pending alongside a hangup, the next slice (or the kill path's final wait) reads it.
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: status socket error for request No %zu, pid %d",
+               instance->request_id, instance->child_pid);
+        return SPAWN_TIMEDWAIT_RUNNING;
+    }
+
+    // rc == 0: the status report is ready to read; the blocking wait returns immediately now.
     *status = spawn_server_exec_wait(server, instance);
     return SPAWN_TIMEDWAIT_EXITED;
 }
