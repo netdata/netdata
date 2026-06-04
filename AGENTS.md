@@ -246,6 +246,102 @@ and edge cases):**
      non-trivial work is delivered in coherent incremental steps (Plan before
      non-trivial work); this principle does not restate them.
 
+**Flow diagrams (human reading aid, non-normative):** the bullets above are
+authoritative; the diagrams below summarize the flow for human readers and MUST
+be kept in sync when the principles change.
+
+<details>
+<summary>Show per-principle flow diagrams</summary>
+
+How the three principles connect (lifecycle order):
+
+```mermaid
+flowchart LR
+    A("1. Clean end state<br/>defines the target (what 'done' means)")
+    B("2. Plan before non-trivial work<br/>establish the target + steps; user approves real forks")
+    C("3. Scope discipline<br/>stay on the target while executing each step")
+    A --> B --> C
+    C -->|re-evaluate vs target| A
+```
+
+1. Clean end state over less churn:
+
+```mermaid
+flowchart TD
+    A("Approved scope = issue + SOW Purpose/Acceptance + implied surface")
+    B("Define the clean end state, incl. removing what the change makes redundant")
+    C("Record target in SOW: exclusions list + reference search if a path/contract is replaced")
+    D{"Matches recorded target?"}
+    E("Deliver the clean end state")
+    F{"Allowed exception?"}
+    Fx("Only: a) impossible, b) evidenced safety risk, c) out of scope, d) user-accepted partial")
+    G("NOT allowed: risk reduction, smaller diff, or staging")
+    H("Mandatory pause: present evidence, STOP")
+    I{"Explicit approval?"}
+    Ix("Approval bar: a bare 'ok' is not approval")
+    J("Proceed; track remainder per Followup Discipline")
+    K("Re-evaluate vs target: each step, before a PR, before complete")
+    A --> B --> C --> D
+    D -->|yes| E
+    D -->|no| F
+    F -->|no| G --> B
+    F -->|yes| H --> I
+    I -->|no| B
+    I -->|yes| J
+    F -.- Fx
+    I -.- Ix
+    E --> K
+    J --> K
+```
+
+2. Plan before non-trivial work:
+
+```mermaid
+flowchart TD
+    A("Task")
+    B{"Trivial?"}
+    C("Exempt: just do it (clean-end-state preference still applies)")
+    D("Establish the desired end state + acceptance criteria FIRST; keep investigating until you can")
+    E("Decompose into ordered steps, each with its own clean end state + criteria; move current toward desired")
+    F{"End state a user-owned fork?"}
+    Fk("Fork = competing designs, public-contract/destructive change, or unclear scope")
+    G("Fixed by request/skill/pattern: the request IS the approval (recorded plan + gate, no separate round)")
+    H("Goal-approval round: explicit user approval of the whole plan (Approval bar)")
+    I("Status: ready, implement")
+    J("Pause for a user decision (not a silent partial)")
+    A --> B
+    B -->|yes| C
+    B -->|no| D
+    D --> E --> F
+    F -->|no| G
+    F -->|yes| H
+    F -.- Fk
+    G --> I
+    H --> I
+    D -->|goal unreachable| J
+```
+
+3. Scope discipline at every step:
+
+```mermaid
+flowchart TD
+    A("At each Re-evaluation checkpoint")
+    B{"Drifted outside approved scope?"}
+    C("Continue")
+    D{"Genuinely independent?"}
+    Dx("Independent only if ALL: end state complete without it; not a coupled item/reference; separable acceptance criteria")
+    E("Treat as COUPLED: handle under Clean end state (do the low-risk part + disclose); pause only for a genuine fork")
+    F("Do NOT bundle silently: separate PR + rebase, or track as a GitHub issue; never fold into this SOW's steps")
+    A --> B
+    B -->|no| C
+    B -->|new work| D
+    D -->|no or unsure| E
+    D -->|yes| F
+    D -.- Dx
+```
+
+</details>
+
 USER COMMUNICATION:
 
 1. ALWAYS DO YOUR HOMEWORK BEFORE ASKING QUESTIONS OR REQUESTING USER DECISIONS.
