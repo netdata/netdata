@@ -13,6 +13,7 @@
 #include <sys/user.h>
 #include <sys/file.h>
 #include <netinet/in.h>
+#include <netinet/in_pcb.h>
 #include <netinet/tcp_var.h>
 #include <netinet/tcp_fsm.h>
 
