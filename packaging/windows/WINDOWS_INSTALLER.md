@@ -95,7 +95,7 @@ After installation, open your browser and go to:
 http://localhost:19999
 ```
 
-You should see the Netdata Dashboard — a real-time metrics overview with system CPU, memory, disk, and network charts updating every second.
+If your subscription and installation mode allow local monitoring, you should see the Netdata Dashboard — a real-time metrics overview with system CPU, memory, disk, and network charts updating every second.
 
 ## License Information
 
@@ -219,10 +219,10 @@ Conversion pattern:
 
 Examples:
 
-| Windows path                                   | MSYS-style path                                    |
-|------------------------------------------------|----------------------------------------------------|
-| `C:\Program Files\Netdata\etc\netdata`         | `/c/Program Files/Netdata/etc/netdata/`            |
-| `C:\Program Files\Netdata\usr\bin\netdata.exe` | `/c/Program Files/Netdata/usr/bin/netdata.exe`     |
+| Windows path                                   | MSYS-style path                                |
+|------------------------------------------------|------------------------------------------------|
+| `C:\Program Files\Netdata\etc\netdata`         | `/c/Program Files/Netdata/etc/netdata/`        |
+| `C:\Program Files\Netdata\usr\bin\netdata.exe` | `/c/Program Files/Netdata/usr/bin/netdata.exe` |
 
 ### Editing configuration files
 
@@ -239,13 +239,13 @@ On Windows, `edit-config` opens files with the `nano` editor.
 
 ### Basic nano commands
 
-| Action                 | Keybinding                                        |
-|------------------------|---------------------------------------------------|
-| Edit text              | Type normally, use arrow keys to navigate         |
-| Search                 | `Ctrl + W`, type search text, `Enter`             |
-| Save                   | `Ctrl + O`, `Enter` to confirm filename           |
-| Exit                   | `Ctrl + X`                                        |
-| Exit with save prompt  | `Ctrl + X`, then `Y` to save or `N` to discard    |
+| Action                | Keybinding                                     |
+|-----------------------|------------------------------------------------|
+| Edit text             | Type normally, use arrow keys to navigate      |
+| Search                | `Ctrl + W`, type search text, `Enter`          |
+| Save                  | `Ctrl + O`, `Enter` to confirm filename        |
+| Exit                  | `Ctrl + X`                                     |
+| Exit with save prompt | `Ctrl + X`, then `Y` to save or `N` to discard |
 
 ## Related Windows documentation
 
