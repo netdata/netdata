@@ -94,6 +94,7 @@ Netdata supports three retention strategies. Choose the one that best fits your 
    dbengine tier 1 retention size = 200GB  # Must be large enough to hold 6 months of data!
    dbengine tier 2 retention time = 5y
    dbengine tier 2 retention size = 100GB  # Must be large enough to hold 5 years of data!
+   ```
 
 :::warning
 
