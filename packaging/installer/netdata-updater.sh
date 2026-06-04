@@ -623,7 +623,7 @@ _safe_download() {
 
   if [ -n "${curl}" ]; then
     set +e
-    "${curl}" --fail --location --write-out "%{http_code}" --connect-timeout 10 --retry 3 "${url}" --output "${dest}" > "${dl_log}"
+    "${curl}" --silent --fail --location --write-out "%{http_code}" --connect-timeout 10 --retry 3 "${url}" --output "${dest}" > "${dl_log}"
     result="$?"
     set -e
 
@@ -653,7 +653,7 @@ _safe_download() {
     esac
   elif [ -n "${wget}" ]; then
     set +e
-    "${wget}" -T 15 -S -o "${dl_log}" -O "${dest}" "${url}"
+    "${wget}" --timeout=15 --server-response --output-file="${dl_log}" --output-document="${dest}" "${url}"
     result="$?"
     set -e
 
