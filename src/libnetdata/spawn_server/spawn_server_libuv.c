@@ -364,6 +364,14 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
         return -1;
     }
 
+    // escalate to SIGKILL if the child does not exit promptly after SIGTERM,
+    // so a SIGTERM-ignoring child cannot make the final wait block forever
+    int status;
+    if(spawn_server_exec_timedwait(server, si, 2000, &status) == SPAWN_TIMEDWAIT_RUNNING)
+        uv_process_kill(&si->process, SIGKILL);
+    else
+        return status;
+
     return spawn_server_exec_wait(server, si);
 }
 
@@ -374,6 +382,8 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server __maybe_
     if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
     if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
 
+    // a negative timeout would become a huge usec_t deadline (= unbounded wait); clamp to poll-once
+    if(timeout_ms < 0) timeout_ms = 0;
     usec_t deadline_ut = now_monotonic_usec() + (usec_t)timeout_ms * USEC_PER_MS;
 
     while(uv_sem_trywait(&si->sem) != 0) {

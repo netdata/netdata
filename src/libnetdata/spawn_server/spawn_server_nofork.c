@@ -1207,9 +1207,15 @@ static void log_invalid_magic(SPAWN_INSTANCE *instance, struct status_report *sr
 }
 
 SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms, int *status) {
+    if(!instance) { *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
+
     // close the child pipes, to make it exit (same as spawn_server_exec_wait)
     if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
     if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
+
+    // a non-positive timeout means "wait forever" to wait_on_socket_or_cancel_with_timeout();
+    // this primitive must always be bounded, so clamp to a minimal positive slice.
+    if(timeout_ms <= 0) timeout_ms = 1;
 
     // the spawn server sends the final status report on instance->sock when the child exits
     short revents = 0;
@@ -1274,8 +1280,17 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
     }
 
     // kill the child, if it is still running
-    if(instance->child_pid)
+    if(instance->child_pid) {
         kill(instance->child_pid, SIGTERM);
+
+        // escalate to SIGKILL if the child does not exit promptly after SIGTERM,
+        // so a SIGTERM-ignoring child cannot make the final wait block forever
+        int status;
+        if(spawn_server_exec_timedwait(server, instance, 2000, &status) == SPAWN_TIMEDWAIT_RUNNING)
+            kill(instance->child_pid, SIGKILL);
+        else
+            return status;
+    }
 
     return spawn_server_exec_wait(server, instance);
 }

@@ -90,10 +90,15 @@ void health_load_config_defaults(void) {
                                     "postpone alarms during hibernation for",
                                     health_globals.config.postpone_alarms_during_hibernation_for_seconds);
 
-    health_globals.config.notification_execution_timeout_seconds =
-        (int32_t)inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_HEALTH,
-                                             "notification execution timeout",
-                                             health_globals.config.notification_execution_timeout_seconds);
+    time_t notification_execution_timeout =
+        inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_HEALTH,
+                                    "notification execution timeout",
+                                    health_globals.config.notification_execution_timeout_seconds);
+    // clamp before narrowing to int32, so a huge value does not overflow into a negative
+    // (which the verify step below would then turn into 0 = wait forever)
+    if(notification_execution_timeout < 0) notification_execution_timeout = 0;
+    if(notification_execution_timeout > INT32_MAX) notification_execution_timeout = INT32_MAX;
+    health_globals.config.notification_execution_timeout_seconds = (int32_t)notification_execution_timeout;
 
     health_globals.config.default_recipient =
         string_strdupz("root");
@@ -103,9 +108,6 @@ void health_load_config_defaults(void) {
 
     if(health_globals.config.run_at_least_every_seconds < 1)
         health_globals.config.run_at_least_every_seconds = 1;
-
-    if(health_globals.config.notification_execution_timeout_seconds < 0)
-        health_globals.config.notification_execution_timeout_seconds = 0;
 
     if(health_globals.config.health_log_entries_max < HEALTH_LOG_ENTRIES_MIN) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,

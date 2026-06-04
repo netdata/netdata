@@ -216,6 +216,14 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout
                "SPAWN PARENT: kill() of pid %d failed: %s",
                si->child_pid, si->cmdline);
 
+    // escalate to SIGKILL if the child does not exit promptly after SIGTERM,
+    // so a SIGTERM-ignoring child cannot make the final wait block forever
+    int status;
+    if(spawn_server_exec_timedwait(server, si, 2000, &status) == SPAWN_TIMEDWAIT_RUNNING)
+        kill(si->child_pid, SIGKILL);
+    else
+        return status;
+
     return spawn_server_exec_wait(server, si);
 }
 
@@ -273,6 +281,8 @@ static int spawn_server_waitpid(SPAWN_INSTANCE *si) {
 SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, int *status) {
     if (!si) { *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
 
+    // a negative timeout would become a huge usec_t deadline (= unbounded wait); clamp to poll-once
+    if(timeout_ms < 0) timeout_ms = 0;
     usec_t deadline_ut = now_monotonic_usec() + (usec_t)timeout_ms * USEC_PER_MS;
 
     while(!__atomic_load_n(&si->exited, __ATOMIC_RELAXED)) {
@@ -284,10 +294,12 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_I
             break;
         }
 
-        if(pid < 0)
-            // reaped elsewhere or error - let the blocking wait resolve it
+        if(pid < 0 && errno != EINTR)
+            // child reaped elsewhere (e.g. ECHILD) - let the blocking wait resolve it immediately
             break;
 
+        // pid == 0 (still running) or EINTR (interrupted before any state change):
+        // keep waiting, but never past the deadline
         if(now_monotonic_usec() >= deadline_ut)
             return SPAWN_TIMEDWAIT_RUNNING;
 
