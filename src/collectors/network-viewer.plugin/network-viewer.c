@@ -30,6 +30,8 @@ static SPAWN_SERVER *spawn_srv = NULL;
 #define NETWORK_TOPOLOGY_VIEWER_FUNCTION "topology:network-connections"
 #define NETWORK_TOPOLOGY_VIEWER_HELP "Shows live network-connections topology with self/process/endpoint actors and ownership/socket links."
 #define NETWORK_VIEWER_RESPONSE_UPDATE_EVERY 5
+#define NETWORK_PROTOCOLS_FUNCTION      "network-protocols"
+#define NETWORK_PROTOCOLS_FUNCTION_HELP "FreeBSD TCP and UDP statistics (IPv4 and IPv6 combined)"
 // Keep in sync with the topology schema contract used across topology producers.
 #define NETWORK_TOPOLOGY_SCHEMA_VERSION "netdata.topology.v1"
 #define NETWORK_TOPOLOGY_SOURCE "network-connections"
@@ -508,6 +510,8 @@ static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <sys/user.h>
+#include <netinet/udp.h>
+#include <netinet/udp_var.h>
 static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
     if(!pid || !ppid)
         return false;
@@ -4596,6 +4600,239 @@ close_and_send:
 }
 
 // ----------------------------------------------------------------------------------------------------------------
+// FreeBSD: network-protocols function
+
+#if defined(OS_FREEBSD)
+
+typedef struct {
+    struct tcpstat tcp;
+    struct udpstat udp;
+    usec_t         last_ut;
+    bool           initialized;
+} NV_PROTO_STATE;
+
+static NV_PROTO_STATE nv_proto_prev = { .initialized = false };
+static netdata_mutex_t nv_proto_mutex = NETDATA_MUTEX_INITIALIZER;
+
+static uint64_t nv_proto_delta(uint64_t cur, uint64_t prev, double elapsed_s) {
+    if (elapsed_s <= 0.0 || cur < prev)
+        return 0;
+    return (uint64_t)((double)(cur - prev) / elapsed_s + 0.5);
+}
+
+void function_network_protocols(
+    const char *transaction, char *function __maybe_unused,
+    usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
+    BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
+    const char *source __maybe_unused, void *data __maybe_unused)
+{
+    struct tcpstat tcp_cur = { 0 };
+    struct udpstat udp_cur = { 0 };
+    uint64_t established = 0;
+    size_t len;
+
+    len = sizeof(tcp_cur);
+    if (sysctlbyname("net.inet.tcp.stats", &tcp_cur, &len, NULL, 0) < 0) {
+        netdata_mutex_lock(&stdout_mutex);
+        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR,
+                                               "failed to read net.inet.tcp.stats");
+        netdata_mutex_unlock(&stdout_mutex);
+        return;
+    }
+
+    uint64_t tcp_states[TCP_NSTATES] = { 0 };
+    len = sizeof(tcp_states);
+    if (sysctlbyname("net.inet.tcp.states", tcp_states, &len, NULL, 0) == 0)
+        established = tcp_states[TCPS_ESTABLISHED];
+
+    len = sizeof(udp_cur);
+    if (sysctlbyname("net.inet.udp.stats", &udp_cur, &len, NULL, 0) < 0) {
+        netdata_mutex_lock(&stdout_mutex);
+        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR,
+                                               "failed to read net.inet.udp.stats");
+        netdata_mutex_unlock(&stdout_mutex);
+        return;
+    }
+
+    usec_t now_ut = now_monotonic_usec();
+
+    netdata_mutex_lock(&nv_proto_mutex);
+
+    bool first = !nv_proto_prev.initialized;
+    double elapsed_s = first ? 0.0 : (double)(now_ut - nv_proto_prev.last_ut) / (double)USEC_PER_SEC;
+
+#define TCP_DELTA(f) nv_proto_delta((uint64_t)tcp_cur.f, (uint64_t)nv_proto_prev.tcp.f, elapsed_s)
+#define UDP_DELTA(f) nv_proto_delta((uint64_t)udp_cur.f, (uint64_t)nv_proto_prev.udp.f, elapsed_s)
+
+    uint64_t tcp_received   = first ? 0 : TCP_DELTA(tcps_rcvtotal);
+    uint64_t tcp_sent       = first ? 0 : TCP_DELTA(tcps_sndtotal);
+    uint64_t tcp_errors     = first ? 0 : TCP_DELTA(tcps_conndrops);
+    uint64_t tcp_active     = first ? 0 : TCP_DELTA(tcps_connattempt);
+    uint64_t tcp_passive    = first ? 0 : TCP_DELTA(tcps_accepts);
+    uint64_t tcp_resets     = first ? 0 : TCP_DELTA(tcps_drops);
+    uint64_t tcp_segs_total = first ? 0 : tcp_received + tcp_sent;
+    uint64_t tcp_retrans    = first ? 0 : TCP_DELTA(tcps_sndrexmitpack);
+
+    uint64_t udp_received   = first ? 0 : UDP_DELTA(udps_ipackets);
+    uint64_t udp_sent       = first ? 0 : UDP_DELTA(udps_opackets);
+    uint64_t udp_errors     = first ? 0 : (
+                                  UDP_DELTA(udps_hdrops) +
+                                  UDP_DELTA(udps_badlen) +
+                                  UDP_DELTA(udps_badsum) +
+                                  UDP_DELTA(udps_nosum));
+    uint64_t udp_no_port    = first ? 0 : UDP_DELTA(udps_noport);
+
+#undef TCP_DELTA
+#undef UDP_DELTA
+
+    nv_proto_prev.tcp         = tcp_cur;
+    nv_proto_prev.udp         = udp_cur;
+    nv_proto_prev.last_ut     = now_ut;
+    nv_proto_prev.initialized = true;
+
+    netdata_mutex_unlock(&nv_proto_mutex);
+
+    time_t now_s = now_realtime_sec();
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    wb->content_type = CT_APPLICATION_JSON;
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", NETWORK_VIEWER_RESPONSE_UPDATE_EVERY);
+    buffer_json_member_add_boolean(wb, "has_history", false);
+    buffer_json_member_add_string(wb, "help", NETWORK_PROTOCOLS_FUNCTION_HELP);
+
+    buffer_json_member_add_array(wb, "data");
+    {
+        // TCP row — FreeBSD stats cover both IPv4 and IPv6 in a single counter set
+        buffer_json_add_array_item_array(wb);
+        {
+            buffer_json_add_array_item_string(wb, "TCP");
+            buffer_json_add_array_item_string(wb, "IPv4+IPv6");
+            buffer_json_add_array_item_uint64(wb, tcp_received);
+            buffer_json_add_array_item_uint64(wb, tcp_sent);
+            buffer_json_add_array_item_uint64(wb, tcp_errors);
+            buffer_json_add_array_item_uint64(wb, tcp_active);
+            buffer_json_add_array_item_uint64(wb, established);
+            buffer_json_add_array_item_uint64(wb, tcp_passive);
+            buffer_json_add_array_item_uint64(wb, tcp_resets);
+            buffer_json_add_array_item_uint64(wb, tcp_segs_total);
+            buffer_json_add_array_item_uint64(wb, tcp_retrans);
+            buffer_json_add_array_item_uint64(wb, 0); // DatagramsNoPort — UDP only
+        }
+        buffer_json_array_close(wb);
+
+        // UDP row
+        buffer_json_add_array_item_array(wb);
+        {
+            buffer_json_add_array_item_string(wb, "UDP");
+            buffer_json_add_array_item_string(wb, "IPv4+IPv6");
+            buffer_json_add_array_item_uint64(wb, udp_received);
+            buffer_json_add_array_item_uint64(wb, udp_sent);
+            buffer_json_add_array_item_uint64(wb, udp_errors);
+            buffer_json_add_array_item_uint64(wb, 0); // ConnActive        — TCP only
+            buffer_json_add_array_item_uint64(wb, 0); // ConnEstablished   — TCP only
+            buffer_json_add_array_item_uint64(wb, 0); // ConnPassive       — TCP only
+            buffer_json_add_array_item_uint64(wb, 0); // ConnReset         — TCP only
+            buffer_json_add_array_item_uint64(wb, 0); // SegsTotal         — TCP only
+            buffer_json_add_array_item_uint64(wb, 0); // SegsRetransmitted — TCP only
+            buffer_json_add_array_item_uint64(wb, udp_no_port);
+        }
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb); // data
+
+    size_t field_id = 0;
+    buffer_json_member_add_object(wb, "columns");
+    {
+        buffer_rrdf_table_add_field(wb, field_id++, "Transport", "Transport Protocol",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Family", "IP Protocol Family",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+
+#define NV_INT_FIELD(id, label, unit)                                              \
+        buffer_rrdf_table_add_field(wb, field_id++, id, label,                    \
+            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE,                     \
+            RRDF_FIELD_TRANSFORM_NUMBER, 0, unit, NAN,                            \
+            RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,             \
+            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_VISIBLE, NULL)
+
+        NV_INT_FIELD("Received",          "Received (Segments/Datagrams)",     "segments/datagrams/s");
+        NV_INT_FIELD("Sent",              "Sent (Segments/Datagrams)",          "segments/datagrams/s");
+        NV_INT_FIELD("Errors",            "Errors (Failures/Rx Errors)",        "errors");
+        NV_INT_FIELD("ConnActive",        "Active Connections Opened",          "opens");
+        NV_INT_FIELD("ConnEstablished",   "Currently Established Connections",  "connections");
+        NV_INT_FIELD("ConnPassive",       "Passive Connections Opened",         "opens");
+        NV_INT_FIELD("ConnReset",         "Reset Connections",                  "resets");
+        NV_INT_FIELD("SegsTotal",         "Total Segments",                     "segments/s");
+        NV_INT_FIELD("SegsRetransmitted", "Retransmitted Segments",             "segments/s");
+        NV_INT_FIELD("DatagramsNoPort",   "Datagrams with No Port",             "datagrams/s");
+#undef NV_INT_FIELD
+    }
+    buffer_json_object_close(wb); // columns
+
+    buffer_json_member_add_string(wb, "default_sort_column", "Received");
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        buffer_json_member_add_object(wb, "Traffic");
+        {
+            buffer_json_member_add_string(wb, "name", "Traffic");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Received");
+                buffer_json_add_array_item_string(wb, "Sent");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Traffic");
+        buffer_json_add_array_item_string(wb, "Transport");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb); // default_charts
+
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        buffer_json_member_add_object(wb, "Transport");
+        {
+            buffer_json_member_add_string(wb, "name", "Transport");
+            buffer_json_member_add_array(wb, "columns");
+            buffer_json_add_array_item_string(wb, "Transport");
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // group_by
+
+    buffer_json_member_add_time_t(wb, "expires", now_s + NETWORK_VIEWER_RESPONSE_UPDATE_EVERY);
+    buffer_json_finalize(wb);
+
+    netdata_mutex_lock(&stdout_mutex);
+    wb->response_code = HTTP_RESP_OK;
+    wb->expires = now_s + NETWORK_VIEWER_RESPONSE_UPDATE_EVERY;
+    pluginsd_function_result_to_stdout(transaction, wb);
+    netdata_mutex_unlock(&stdout_mutex);
+}
+
+#endif // OS_FREEBSD
+
+// ----------------------------------------------------------------------------------------------------------------
 // main
 
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
@@ -4658,6 +4895,14 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
             RRDFUNCTIONS_PRIORITY_DEFAULT);
 
+#if defined(OS_FREEBSD)
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",
+            NETWORK_PROTOCOLS_FUNCTION, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT,
+            NETWORK_PROTOCOLS_FUNCTION_HELP,
+            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE),
+            RRDFUNCTIONS_PRIORITY_DEFAULT);
+#endif
+
     // ----------------------------------------------------------------------------------------------------------------
 
     struct functions_evloop_globals *wg =
@@ -4672,6 +4917,13 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
                                   network_viewer_topology_function,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT,
                                   NULL);
+
+#if defined(OS_FREEBSD)
+    functions_evloop_add_function(wg, NETWORK_PROTOCOLS_FUNCTION,
+                                  function_network_protocols,
+                                  PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT,
+                                  NULL);
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
 
