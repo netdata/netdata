@@ -726,6 +726,14 @@ bool ml_should_publish_model_update(bool host_running,
     return true;
 }
 
+void ml_dimension_finalize_constant_state(ml_dimension_t *dim)
+{
+    dim->mt = METRIC_TYPE_CONSTANT;
+    dim->ts = TRAINING_STATUS_TRAINED;
+    dim->suppression_anomaly_counter = 0;
+    dim->suppression_window_counter = 0;
+}
+
 static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim, uint32_t expected_generation, bool from_downstream)
 {
     worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
@@ -769,11 +777,7 @@ static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim,
         }
     }
 
-    dim->mt = METRIC_TYPE_CONSTANT;
-    dim->ts = TRAINING_STATUS_TRAINED;
-
-    dim->suppression_anomaly_counter = 0;
-    dim->suppression_window_counter = 0;
+    ml_dimension_finalize_constant_state(dim);
 
     // Add the latest model to the list of pending models to flush.
     ml_model_info_t model_info;
@@ -860,6 +864,17 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
 
         // Apply sampling during lag feature extraction
         ml_features_preprocess(&features, worker->training_samples, sampling_ratio);
+
+        // Preprocessing can leave fewer than 2 vectors after diff/smooth/lag/sampling.
+        // k-means cannot build 2 cluster centers from that input, so reuse the
+        // post-cycle state machine and bail out before kmeans_train.
+        if (worker->training_samples.size() < 2) {
+            spinlock_lock(&dim->slock);
+            ml_dimension_finalize_constant_state(dim);
+            dim->training_in_progress = false;
+            spinlock_unlock(&dim->slock);
+            return ML_WORKER_RESULT_NOT_ENOUGH_COLLECTED_VALUES;
+        }
 
         ml_kmeans_init(&dim->kmeans);
         ml_kmeans_train(&dim->kmeans, worker->training_samples, Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
@@ -1076,11 +1091,15 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
 {
     worker_is_busy(WORKER_JOB_DETECTION_COLLECT_STATS);
 
-    host->mls = {};
     ml_machine_learning_stats_t mls_copy = {};
+    ml_machine_learning_stats_t host_mls = {};
+    calculated_number_t host_anomaly_rate = 0.0;
 
     if (host->ml_running) {
-        netdata_mutex_lock(&host->mutex);
+        // Snapshot the stop generation before the unlocked walk. If it changes
+        // by the time we publish, a stop ran while we were reading chart->mls
+        // and the accumulated snapshot must be discarded.
+        uint64_t stop_gen_before = host->ml_stop_generation.load();
 
         /*
          * prediction/detection stats
@@ -1098,20 +1117,20 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
 
             ml_machine_learning_stats_t chart_mls = chart->mls;
 
-            host->mls.num_machine_learning_status_enabled += chart_mls.num_machine_learning_status_enabled;
-            host->mls.num_machine_learning_status_disabled_sp += chart_mls.num_machine_learning_status_disabled_sp;
+            host_mls.num_machine_learning_status_enabled += chart_mls.num_machine_learning_status_enabled;
+            host_mls.num_machine_learning_status_disabled_sp += chart_mls.num_machine_learning_status_disabled_sp;
 
-            host->mls.num_metric_type_constant += chart_mls.num_metric_type_constant;
-            host->mls.num_metric_type_variable += chart_mls.num_metric_type_variable;
+            host_mls.num_metric_type_constant += chart_mls.num_metric_type_constant;
+            host_mls.num_metric_type_variable += chart_mls.num_metric_type_variable;
 
-            host->mls.num_training_status_untrained += chart_mls.num_training_status_untrained;
-            host->mls.num_training_status_pending_without_model += chart_mls.num_training_status_pending_without_model;
-            host->mls.num_training_status_trained += chart_mls.num_training_status_trained;
-            host->mls.num_training_status_pending_with_model += chart_mls.num_training_status_pending_with_model;
-            host->mls.num_training_status_silenced += chart_mls.num_training_status_silenced;
+            host_mls.num_training_status_untrained += chart_mls.num_training_status_untrained;
+            host_mls.num_training_status_pending_without_model += chart_mls.num_training_status_pending_without_model;
+            host_mls.num_training_status_trained += chart_mls.num_training_status_trained;
+            host_mls.num_training_status_pending_with_model += chart_mls.num_training_status_pending_with_model;
+            host_mls.num_training_status_silenced += chart_mls.num_training_status_silenced;
 
-            host->mls.num_anomalous_dimensions += chart_mls.num_anomalous_dimensions;
-            host->mls.num_normal_dimensions += chart_mls.num_normal_dimensions;
+            host_mls.num_anomalous_dimensions += chart_mls.num_anomalous_dimensions;
+            host_mls.num_normal_dimensions += chart_mls.num_normal_dimensions;
 
             if (spinlock_trylock(&host->context_anomaly_rate_spinlock))
             {
@@ -1137,20 +1156,44 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
         }
         rrdset_foreach_done(rsp);
 
-        host->host_anomaly_rate = 0.0;
-        size_t NumActiveDimensions = host->mls.num_anomalous_dimensions + host->mls.num_normal_dimensions;
-        if (NumActiveDimensions)
-              host->host_anomaly_rate = static_cast<double>(host->mls.num_anomalous_dimensions) / NumActiveDimensions;
+        size_t num_active_dimensions = host_mls.num_anomalous_dimensions + host_mls.num_normal_dimensions;
+        if (num_active_dimensions)
+            host_anomaly_rate = static_cast<double>(host_mls.num_anomalous_dimensions) / num_active_dimensions;
 
-        mls_copy = host->mls;
+        // Publish the final host snapshot after chart traversal so chart
+        // deletion cannot block other host->mutex users for the full walk.
+        // Discard the snapshot if either (a) ml_running is now false, or
+        // (b) the stop generation changed since the walk started — the
+        // latter catches a stop+start that completed during the walk and
+        // would otherwise pass the boolean check. In either case our
+        // unlocked chart->mls reads may have raced ml_host_stop, so zero
+        // the snapshot and the per-context counts. The chart updates below
+        // run unconditionally: ml_update_dimensions_chart reads
+        // host->ml_running directly (so the ml_running chart records the
+        // stop), and the chart-update path resets and republishes the rest.
+        netdata_mutex_lock(&host->mutex);
+        uint64_t stop_gen_after = host->ml_stop_generation.load();
+        if (!host->ml_running || stop_gen_before != stop_gen_after) {
+            host_mls = {};
+            host_anomaly_rate = 0.0;
 
+            spinlock_lock(&host->context_anomaly_rate_spinlock);
+            for (auto &p : host->context_anomaly_rate) {
+                p.second.anomalous_dimensions = 0;
+                p.second.normal_dimensions = 0;
+            }
+            spinlock_unlock(&host->context_anomaly_rate_spinlock);
+        }
+        host->mls = host_mls;
+        host->host_anomaly_rate = host_anomaly_rate;
+        mls_copy = host_mls;
         netdata_mutex_unlock(&host->mutex);
 
         worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);
         ml_update_dimensions_chart(host, mls_copy);
 
         worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
-        ml_update_host_and_detection_rate_charts(host, host->host_anomaly_rate * 10000.0, owa);
+        ml_update_host_and_detection_rate_charts(host, host_anomaly_rate * 10000.0, owa);
     } else {
         host->host_anomaly_rate = 0.0;
     }
