@@ -16,7 +16,7 @@ Netdata lets you reference secret values in collector configs instead of storing
 | Environment variable | `${env:VAR_NAME}` | Secrets already injected into the Netdata service environment | Value is trimmed. The variable must exist. |
 | File | `${file:/absolute/path}` | Secrets stored in local files on disk | The path must be absolute. File contents are trimmed. |
 | Command | `${cmd:/absolute/path/to/command args}` | Secrets returned by a trusted local command | The command path must be absolute. Netdata uses a 10-second timeout. |
-| Secretstore | `${store:<kind>:<name>:<operand>}` | Secrets stored in remote backends such as Vault, AWS, Azure, or GCP | Configure the secretstore first, then reference it from collector configs. |
+| Secretstore | `${store:<kind>:<name>:<operand>[:escape]}` | Secrets stored in remote backends such as Vault, AWS, Azure, or GCP | Configure the secretstore first. Add `:escape` when embedding the value in a URI. |
 
 ## Choosing a Resolver
 
@@ -76,7 +76,7 @@ Use secretstores when you want Netdata collectors to fetch secrets from remote b
 Configure a secretstore first, then reference it from collector configs with:
 
 ```text
-${store:<kind>:<name>:<operand>}
+${store:<kind>:<name>:<operand>[:escape]}
 ```
 
 | Part | Description |
@@ -84,6 +84,7 @@ ${store:<kind>:<name>:<operand>}
 | `kind` | Secretstore backend kind, such as `vault` or `aws-sm`. |
 | `name` | The store name you configured in Netdata, such as `vault_prod`. |
 | `operand` | Backend-specific identifier for the secret you want to read. |
+| `escape` | Optional suffix that percent-encodes the resolved value for URI contexts. |
 
 Example:
 
@@ -147,7 +148,7 @@ jobs:
     dsn: "${env:MYSQL_USER}:${store:vault:vault_prod:secret/data/netdata/mysql#password}@tcp(127.0.0.1:3306)/"
 ```
 
-Different jobs within the same collector config file can also use different resolver types.
+Different jobs within the same collector config file can also use different resolver types. If you embed a secretstore value inside a URI, append `:escape` to percent-encode delimiter characters in the resolved value.
 
 ## Supported Secretstore Backends
 

@@ -57,9 +57,9 @@ SECRETS_PAGE = {
         },
         {
             "resolver": "Secretstore",
-            "syntax": "`${store:<kind>:<name>:<operand>}`",
+            "syntax": "`${store:<kind>:<name>:<operand>[:escape]}`",
             "best_for": "Secrets stored in remote backends such as Vault, AWS, Azure, or GCP",
-            "notes": "Configure the secretstore first, then reference it from collector configs.",
+            "notes": "Configure the secretstore first. Add `:escape` when embedding the value in a URI.",
         },
     ],
     "choosing_a_resolver": [
@@ -118,11 +118,12 @@ jobs:
         "heading": "## Secretstores",
         "body": "Use secretstores when you want Netdata collectors to fetch secrets from remote backends at runtime instead of storing them locally in collector configs.",
         "reference_intro": "Configure a secretstore first, then reference it from collector configs with:",
-        "reference_syntax": "${store:<kind>:<name>:<operand>}",
+        "reference_syntax": "${store:<kind>:<name>:<operand>[:escape]}",
         "reference_parts": [
             {"name": "`kind`", "description": "Secretstore backend kind, such as `vault` or `aws-sm`."},
             {"name": "`name`", "description": "The store name you configured in Netdata, such as `vault_prod`."},
             {"name": "`operand`", "description": "Backend-specific identifier for the secret you want to read."},
+            {"name": "`escape`", "description": "Optional suffix that percent-encodes the resolved value for URI contexts."},
         ],
         "example": """```yaml
 jobs:
@@ -157,7 +158,8 @@ jobs:
             "  - name: mysql_prod\n"
             '    dsn: "${env:MYSQL_USER}:${store:vault:vault_prod:secret/data/netdata/mysql#password}@tcp(127.0.0.1:3306)/"\n'
             "```\n\n"
-            "Different jobs within the same collector config file can also use different resolver types."
+            "Different jobs within the same collector config file can also use different resolver types. "
+            "If you embed a secretstore value inside a URI, append `:escape` to percent-encode delimiter characters in the resolved value."
         ),
         "multiple_stores": (
             "Each secretstore config file can contain multiple `jobs` entries, each with a unique store name. "
