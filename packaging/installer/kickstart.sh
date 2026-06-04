@@ -702,14 +702,19 @@ handle_wget_result() {
       return "$?"
       ;;
     4)
+      [ -n "${dest}" ] && rm -f "${dest}"
       warning "Failed to connect to remote host when ${action} ${url}"
       return 2
       ;;
     5)
+      [ -n "${dest}" ] && rm -f "${dest}"
       warning "TLS error while connecting to remote host when ${action} ${url}"
       return 3
       ;;
-    *) fatal "Unknown error when ${action} ${url}" F0520 ;;
+    *)
+      [ -n "${dest}" ] && rm -f "${dest}"
+      fatal "Unknown error when ${action} ${url}" F0520
+      ;;
   esac
 }
 
@@ -812,7 +817,7 @@ get_redirect() {
         return 0
         ;;
       *)
-        handle_curl_result "${ret}" "${url}" "${dl_log}" "checking redirects for" "${output}"
+        handle_curl_result "${ret}" "${url}" "${output}" "checking redirects for"
         return "$?"
         ;;
     esac
@@ -821,14 +826,16 @@ get_redirect() {
   if [ -n "${WGET}" ]; then
     run "${WGET}" -S -o "${output}" -O /dev/null "${url}"
 
-    case "$?" in
+    ret="$?"
+
+    case "${ret}" in
       0)
         grep -m 1 Location "${output}" | grep -Eo '[^/]+/?$' | grep -Eo '[^/]+$'
         rm -f "${output}"
         return 0
         ;;
       *)
-        handle_wget_result "${ret}" "${url}" "${dl_log}" "checking redirects for" "${output}"
+        handle_wget_result "${ret}" "${url}" "${output}" "checking redirects for"
         return "$?"
         ;;
     esac
