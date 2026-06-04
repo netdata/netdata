@@ -648,6 +648,94 @@ Alternatively, use the **host’s hostname** by mounting `/etc/hostname` in the 
   - /etc/hostname:/host/etc/hostname:ro
   ```
 
+### Configure email notifications
+
+:::important
+
+You **cannot** configure email notifications using Docker environment variables such as `SEND_EMAIL`, `DEFAULT_RECIPIENT_EMAIL`, or `EMAIL_SENDER`. The alarm notification script sources `health_alarm_notify.conf` at runtime, which overwrites any environment variable values. You must edit `health_alarm_notify.conf` inside the container using [`edit-config`](#configure-agent-containers).
+
+:::
+
+Docker containers use `msmtp` instead of `sendmail` for email delivery. You need to:
+
+1. **Mount an `msmtprc` configuration file** for SMTP transport. Create an `msmtprc` file in your Docker project directory (see the [msmtprc documentation](https://marlam.de/msmtp/msmtprc.txt) for all options):
+
+   ```text
+   account default
+   host smtp.example.com
+   port 587
+   auth on
+   user user@example.com
+   password your-password
+   from user@example.com
+   tls on
+   tls_trust_file /etc/ssl/certs/ca-certificates.crt
+   ```
+
+2. **Edit `health_alarm_notify.conf` inside the container**:
+
+   ```bash
+   docker exec -it netdata bash
+   cd /etc/netdata
+   ./edit-config health_alarm_notify.conf
+   ```
+
+   Set the following variables in the file:
+
+   ```text
+   EMAIL_SENDER="Netdata <user@example.com>"
+   SEND_EMAIL="YES"
+   DEFAULT_RECIPIENT_EMAIL="recipient@example.com"
+   ```
+
+3. **Restart the container** to apply changes:
+
+   ```bash
+   docker restart netdata
+   ```
+
+#### Docker Compose example with email notifications
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    container_name: netdata
+    pid: host
+    network_mode: host
+    restart: unless-stopped
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - netdataconfig:/etc/netdata
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
+      - /:/host/root:ro,rslave
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /var/log:/host/var/log:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /run/dbus:/run/dbus:ro
+      - ./msmtprc:/etc/msmtprc:ro
+
+volumes:
+  netdataconfig:
+  netdatalib:
+  netdatacache:
+```
+
+After starting the container, edit `health_alarm_notify.conf` as described in step 2 above.
+
+For more details on email notification configuration, see the [email notification documentation](https://github.com/netdata/netdata/blob/master/src/health/notifications/email/README.md).
+
 ## Adding extra packages at runtime
 
 By default, Netdata’s official container images exclude some optional runtime dependencies. You can install them at runtime by setting the `NETDATA_EXTRA_DEB_PACKAGES` environment variable.
