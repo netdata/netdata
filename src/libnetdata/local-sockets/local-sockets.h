@@ -1171,7 +1171,10 @@ static inline bool local_sockets_read_proc_net_x_procfile(LS_STATE *ls, const ch
     return true;
 }
 
+#endif // !OS_FREEBSD
+
 // --------------------------------------------------------------------------------------------------------------------
+// Generic helpers – compiled on all platforms.
 
 static inline void local_sockets_detect_directions(LS_STATE *ls) {
     for(SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_first_read_only_LOCAL_SOCKET(&ls->sockets_hashtable);
@@ -1382,6 +1385,8 @@ static void local_sockets_track_time_by_protocol(LS_STATE *ls, bool mnl, uint16_
             local_sockets_track_time(ls, "proc_read_unknown");
     }
 }
+
+#if !defined(OS_FREEBSD) // /proc-based socket reading is Linux-only
 
 static inline void local_sockets_do_family_protocol(LS_STATE *ls, const char *filename, uint16_t family, uint16_t protocol) {
 #if defined(HAVE_LIBMNL)
