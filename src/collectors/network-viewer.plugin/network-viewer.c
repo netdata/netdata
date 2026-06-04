@@ -947,14 +947,22 @@ static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOC
             st->max.tcpi_rtt = n->info.tcp.tcpi_rtt;
 
         // Receiver RTT
+#if defined(OS_LINUX)
         buffer_json_add_array_item_double(wb, (double)n->info.tcp.tcpi_rcv_rtt / (double)USEC_PER_MS);
         if(st->max.tcpi_rcv_rtt < n->info.tcp.tcpi_rcv_rtt)
             st->max.tcpi_rcv_rtt = n->info.tcp.tcpi_rcv_rtt;
+#else
+        buffer_json_add_array_item_double(wb, 0.0);
+#endif
 
         // Retransmissions
+#if defined(OS_LINUX)
         buffer_json_add_array_item_uint64(wb, n->info.tcp.tcpi_total_retrans);
         if(st->max.tcpi_total_retrans < n->info.tcp.tcpi_total_retrans)
             st->max.tcpi_total_retrans = n->info.tcp.tcpi_total_retrans;
+#else
+        buffer_json_add_array_item_uint64(wb, 0);
+#endif
 
         // count
         buffer_json_add_array_item_uint64(wb, n->network_viewer.count);
@@ -1021,19 +1029,29 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, const L
         KEEP_THE_BIGGER(t->wqueue, n->wqueue);
 
         // The current number of consecutive retransmissions that have occurred for the most recently transmitted segment.
+#if defined(OS_LINUX)
         SUM_THEM_ALL(t->info.tcp.tcpi_retransmits, n->info.tcp.tcpi_retransmits);
+#endif
 
         // The total number of retransmissions that have occurred for the entire connection since it was established.
+#if defined(OS_LINUX)
         SUM_THEM_ALL(t->info.tcp.tcpi_total_retrans, n->info.tcp.tcpi_total_retrans);
+#endif
 
         // The total number of segments that have been retransmitted since the connection was established.
+#if defined(OS_LINUX)
         SUM_THEM_ALL(t->info.tcp.tcpi_retrans, n->info.tcp.tcpi_retrans);
+#endif
 
         // The number of keepalive probes sent
+#if defined(OS_LINUX)
         SUM_THEM_ALL(t->info.tcp.tcpi_probes, n->info.tcp.tcpi_probes);
+#endif
 
         // The number of times the retransmission timeout has been backed off.
+#if defined(OS_LINUX)
         SUM_THEM_ALL(t->info.tcp.tcpi_backoff, n->info.tcp.tcpi_backoff);
+#endif
 
         // A bitmask representing the TCP options currently enabled for the connection, such as SACK and Timestamps.
         OR_THEM_ALL(t->info.tcp.tcpi_options, n->info.tcp.tcpi_options);
@@ -1048,7 +1066,9 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, const L
         KEEP_THE_SMALLER(t->info.tcp.tcpi_rto, n->info.tcp.tcpi_rto);
 
         // The delayed acknowledgement timeout in milliseconds.
+#if defined(OS_LINUX)
         KEEP_THE_SMALLER(t->info.tcp.tcpi_ato, n->info.tcp.tcpi_ato);
+#endif
 
         // The maximum segment size for sending.
         KEEP_THE_SMALLER(t->info.tcp.tcpi_snd_mss, n->info.tcp.tcpi_snd_mss);
@@ -1057,22 +1077,32 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, const L
         KEEP_THE_SMALLER(t->info.tcp.tcpi_rcv_mss, n->info.tcp.tcpi_rcv_mss);
 
         // The number of unacknowledged segments
+#if defined(OS_LINUX)
         SUM_THEM_ALL(t->info.tcp.tcpi_unacked, n->info.tcp.tcpi_unacked);
+#endif
 
         // The number of segments that have been selectively acknowledged
+#if defined(OS_LINUX)
         SUM_THEM_ALL(t->info.tcp.tcpi_sacked, n->info.tcp.tcpi_sacked);
+#endif
 
         // The number of lost segments.
+#if defined(OS_LINUX)
         SUM_THEM_ALL(t->info.tcp.tcpi_lost, n->info.tcp.tcpi_lost);
+#endif
 
         // The number of forward acknowledgment segments.
+#if defined(OS_LINUX)
         SUM_THEM_ALL(t->info.tcp.tcpi_fackets, n->info.tcp.tcpi_fackets);
+#endif
 
         // The time in milliseconds since the last data was sent.
         KEEP_THE_SMALLER(t->info.tcp.tcpi_last_data_sent, n->info.tcp.tcpi_last_data_sent);
 
         // The time in milliseconds since the last acknowledgment was sent (not tracked in Linux, hence often zero).
+#if defined(OS_LINUX)
         KEEP_THE_SMALLER(t->info.tcp.tcpi_last_ack_sent, n->info.tcp.tcpi_last_ack_sent);
+#endif
 
         // The time in milliseconds since the last data was received.
         KEEP_THE_SMALLER(t->info.tcp.tcpi_last_data_recv, n->info.tcp.tcpi_last_data_recv);
@@ -1081,10 +1111,14 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, const L
         KEEP_THE_SMALLER(t->info.tcp.tcpi_last_ack_recv, n->info.tcp.tcpi_last_ack_recv);
 
         // The path MTU for this connection
+#if defined(OS_LINUX)
         KEEP_THE_SMALLER(t->info.tcp.tcpi_pmtu, n->info.tcp.tcpi_pmtu);
+#endif
 
         // The slow start threshold for receiving
+#if defined(OS_LINUX)
         KEEP_THE_SMALLER(t->info.tcp.tcpi_rcv_ssthresh, n->info.tcp.tcpi_rcv_ssthresh);
+#endif
 
         // The slow start threshold for sending
         KEEP_THE_SMALLER(t->info.tcp.tcpi_snd_ssthresh, n->info.tcp.tcpi_snd_ssthresh);
@@ -1099,13 +1133,19 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, const L
         KEEP_THE_SMALLER(t->info.tcp.tcpi_snd_cwnd, n->info.tcp.tcpi_snd_cwnd);
 
         // The maximum segment size that could be advertised.
+#if defined(OS_LINUX)
         KEEP_THE_BIGGER(t->info.tcp.tcpi_advmss, n->info.tcp.tcpi_advmss);
+#endif
 
         // The reordering metric
+#if defined(OS_LINUX)
         KEEP_THE_SMALLER(t->info.tcp.tcpi_reordering, n->info.tcp.tcpi_reordering);
+#endif
 
         // The receive round trip time in milliseconds.
+#if defined(OS_LINUX)
         KEEP_THE_BIGGER(t->info.tcp.tcpi_rcv_rtt, n->info.tcp.tcpi_rcv_rtt);
+#endif
 
         // The available space in the receive buffer.
         KEEP_THE_SMALLER(t->info.tcp.tcpi_rcv_space, n->info.tcp.tcpi_rcv_space);
@@ -1346,11 +1386,15 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
     }
 
     link->sockets++;
+#if defined(OS_LINUX)
     link->retransmissions += n->info.tcp.tcpi_total_retrans;
+#endif
     if(link->max_rtt_usec < n->info.tcp.tcpi_rtt)
         link->max_rtt_usec = n->info.tcp.tcpi_rtt;
+#if defined(OS_LINUX)
     if(link->max_rcv_rtt_usec < n->info.tcp.tcpi_rcv_rtt)
         link->max_rcv_rtt_usec = n->info.tcp.tcpi_rcv_rtt;
+#endif
 }
 
 static void topology_context_destroy(NV_TOPOLOGY_CONTEXT *ctx) {

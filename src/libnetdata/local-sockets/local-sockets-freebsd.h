@@ -12,6 +12,15 @@
 #include <sys/sysctl.h>
 #include <sys/user.h>
 #include <sys/file.h>
+// FreeBSD 14+ guards struct inpcb, struct xinpgen, and struct xtcpcb
+// behind _KERNEL unless these macros are defined before the headers.
+#ifndef _WANT_INPCB
+#define _WANT_INPCB
+#endif
+#ifndef _WANT_TCPCB
+#define _WANT_TCPCB
+#endif
+
 #include <netinet/in.h>
 #include <netinet/in_pcb.h>
 #include <netinet/tcp_var.h>
