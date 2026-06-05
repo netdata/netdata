@@ -20,6 +20,13 @@ impl PluginConfig {
         Ok(cfg)
     }
 
+    pub(crate) fn for_test_backend_dir(journal_dir: &Path) -> Result<Self> {
+        let mut cfg = Self::default();
+        cfg.journal.journal_dir = journal_dir.to_string_lossy().to_string();
+        cfg.validate()?;
+        Ok(cfg)
+    }
+
     pub(super) fn auto_detect_geoip_databases(&mut self) {
         let intel_dirs = [
             self.inferred_cache_dir().join(TOPOLOGY_IP_INTEL_DIR),

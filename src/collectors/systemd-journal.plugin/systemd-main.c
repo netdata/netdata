@@ -16,6 +16,203 @@ static void __attribute__((destructor)) destroy_mutex(void) {
 
 static bool plugin_should_exit = false;
 
+struct systemd_journal_test_command {
+    bool enabled;
+    const char *function_name;
+    const char *backend_dir;
+    const char *request_path;
+};
+
+static void systemd_journal_test_usage(FILE *stream)
+{
+    fprintf(
+        stream,
+        "usage: systemd-journal.plugin --test systemd-journal --dir <journal-dir> --request <payload.json>\n");
+}
+
+static bool test_option_present(int argc, char **argv)
+{
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--test") == 0 || strncmp(argv[i], "--test=", strlen("--test=")) == 0)
+            return true;
+    }
+
+    return false;
+}
+
+static int set_required_option_once(const char **slot, const char *value, const char *option)
+{
+    if (*slot) {
+        fprintf(stderr, "duplicate %s\n", option);
+        systemd_journal_test_usage(stderr);
+        return 2;
+    }
+
+    if (!value || !*value) {
+        fprintf(stderr, "missing value for %s\n", option);
+        systemd_journal_test_usage(stderr);
+        return 2;
+    }
+
+    *slot = value;
+    return 0;
+}
+
+static int parse_systemd_journal_test_command(int argc, char **argv, struct systemd_journal_test_command *cmd)
+{
+    *cmd = (struct systemd_journal_test_command){0};
+    if (!test_option_present(argc, argv))
+        return 0;
+
+    cmd->enabled = true;
+
+    for (int i = 1; i < argc; i++) {
+        const char *arg = argv[i];
+
+        if (strcmp(arg, "--test") == 0) {
+            if (++i >= argc)
+                return set_required_option_once(&cmd->function_name, NULL, "--test");
+
+            int rc = set_required_option_once(&cmd->function_name, argv[i], "--test");
+            if (rc)
+                return rc;
+        }
+        else if (strncmp(arg, "--test=", strlen("--test=")) == 0) {
+            int rc = set_required_option_once(&cmd->function_name, arg + strlen("--test="), "--test");
+            if (rc)
+                return rc;
+        }
+        else if (strcmp(arg, "--dir") == 0) {
+            if (++i >= argc)
+                return set_required_option_once(&cmd->backend_dir, NULL, "--dir");
+
+            int rc = set_required_option_once(&cmd->backend_dir, argv[i], "--dir");
+            if (rc)
+                return rc;
+        }
+        else if (strncmp(arg, "--dir=", strlen("--dir=")) == 0) {
+            int rc = set_required_option_once(&cmd->backend_dir, arg + strlen("--dir="), "--dir");
+            if (rc)
+                return rc;
+        }
+        else if (strcmp(arg, "--request") == 0) {
+            if (++i >= argc)
+                return set_required_option_once(&cmd->request_path, NULL, "--request");
+
+            int rc = set_required_option_once(&cmd->request_path, argv[i], "--request");
+            if (rc)
+                return rc;
+        }
+        else if (strncmp(arg, "--request=", strlen("--request=")) == 0) {
+            int rc = set_required_option_once(&cmd->request_path, arg + strlen("--request="), "--request");
+            if (rc)
+                return rc;
+        }
+        else if (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
+            systemd_journal_test_usage(stderr);
+            return 2;
+        }
+        else {
+            fprintf(stderr, "unsupported systemd journal test option '%s'\n", arg);
+            systemd_journal_test_usage(stderr);
+            return 2;
+        }
+    }
+
+    if (!cmd->function_name) {
+        fprintf(stderr, "missing required --test\n");
+        systemd_journal_test_usage(stderr);
+        return 2;
+    }
+
+    if (!cmd->backend_dir) {
+        fprintf(stderr, "missing required --dir\n");
+        systemd_journal_test_usage(stderr);
+        return 2;
+    }
+
+    if (!cmd->request_path) {
+        fprintf(stderr, "missing required --request\n");
+        systemd_journal_test_usage(stderr);
+        return 2;
+    }
+
+    return 0;
+}
+
+static bool path_is_directory(const char *path)
+{
+    struct stat st;
+    return path && stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+static BUFFER *read_request_payload(const char *filename)
+{
+    long file_size = 0;
+    char *contents = read_by_filename(filename, &file_size);
+    if (!contents)
+        return NULL;
+
+    BUFFER *payload = buffer_create((size_t)file_size + 1, NULL);
+    buffer_memcat(payload, contents, (size_t)file_size);
+    payload->content_type = CT_APPLICATION_JSON;
+    freez(contents);
+
+    return payload;
+}
+
+static int run_systemd_journal_test_command(const struct systemd_journal_test_command *cmd)
+{
+    if (strcmp(cmd->function_name, ND_SD_JOURNAL_FUNCTION_NAME) != 0) {
+        fprintf(
+            stderr,
+            "unsupported systemd journal test function '%s' (expected '%s')\n",
+            cmd->function_name,
+            ND_SD_JOURNAL_FUNCTION_NAME);
+        return 2;
+    }
+
+    if (!path_is_directory(cmd->backend_dir)) {
+        fprintf(stderr, "systemd journal backend directory '%s' does not exist\n", cmd->backend_dir);
+        return 1;
+    }
+
+    CLEAN_BUFFER *payload = read_request_payload(cmd->request_path);
+    if (!payload) {
+        fprintf(stderr, "failed to read request payload '%s'\n", cmd->request_path);
+        return 1;
+    }
+
+    nd_journal_set_scan_progress_enabled(false);
+    nd_journal_use_single_directory(cmd->backend_dir);
+    nd_journal_files_registry_update();
+
+    bool cancelled = false;
+    usec_t stop_monotonic_ut = now_monotonic_usec() + ND_SD_JOURNAL_DEFAULT_TIMEOUT * USEC_PER_SEC;
+    char *function = strdupz(cmd->function_name);
+    BUFFER *result = function_systemd_journal_result(
+        "test", function, &stop_monotonic_ut, &cancelled, payload, HTTP_ACCESS_ALL, "test-cli", NULL);
+    freez(function);
+
+    int rc = 1;
+    if (result) {
+        if (buffer_strlen(result))
+            fwrite(buffer_tostring(result), buffer_strlen(result), 1, stdout);
+        fprintf(stdout, "\n");
+        fflush(stdout);
+
+        if (result->response_code >= HTTP_RESP_OK && result->response_code < 300)
+            rc = 0;
+
+        buffer_free(result);
+    }
+    else {
+        fprintf(stderr, "systemd journal test function returned no result\n");
+    }
+
+    return rc;
+}
+
 static bool journal_data_directories_exist()
 {
     struct stat st;
@@ -26,8 +223,13 @@ static bool journal_data_directories_exist()
     return false;
 }
 
-int main(int argc __maybe_unused, char **argv __maybe_unused)
+int main(int argc, char **argv)
 {
+    struct systemd_journal_test_command test_command = {0};
+    int test_parse_rc = parse_systemd_journal_test_command(argc, argv, &test_command);
+    if (test_parse_rc)
+        exit(test_parse_rc);
+
     nd_thread_tag_set("sd-jrnl.plugin");
     nd_log_initialize_for_external_plugins("systemd-journal.plugin");
     netdata_threads_init_for_external_plugins(0);
@@ -41,6 +243,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused)
 
     nd_sd_journal_annotations_init();
     nd_journal_init_files_and_directories();
+
+    if (test_command.enabled)
+        exit(run_systemd_journal_test_command(&test_command));
 
     if (!journal_data_directories_exist()) {
         nd_log_collector(NDLP_INFO, "unable to locate journal data directories. Exiting...");

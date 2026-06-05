@@ -3,6 +3,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 pub(crate) const FLOWS_SCHEMA_VERSION: &str = "2.0";
+pub(crate) const FLOWS_FUNCTION_NAME: &str = "flows:netflow";
 pub(crate) const FLOWS_FUNCTION_VERSION: u32 = 4;
 pub(crate) const FLOWS_UPDATE_EVERY_SECONDS: u32 = 60;
 

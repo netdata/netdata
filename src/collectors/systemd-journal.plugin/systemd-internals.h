@@ -97,6 +97,8 @@ void available_journal_file_sources_to_json_array(BUFFER *wb);
 bool nd_journal_files_completed_once(void);
 void nd_journal_files_registry_update(void);
 void nd_journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, const char *dirname, int depth);
+void nd_journal_set_scan_progress_enabled(bool enabled);
+void nd_journal_use_single_directory(const char *path);
 
 FACET_ROW_SEVERITY syslog_priority_to_facet_severity(FACETS *facets, FACET_ROW *row, void *data);
 
@@ -124,6 +126,15 @@ struct journal_directory {
 extern struct journal_directory journal_directories[MAX_JOURNAL_DIRECTORIES];
 
 void nd_journal_init_files_and_directories(void);
+BUFFER *function_systemd_journal_result(
+    const char *transaction,
+    char *function,
+    usec_t *stop_monotonic_ut,
+    bool *cancelled,
+    BUFFER *payload,
+    HTTP_ACCESS access,
+    const char *source,
+    void *data);
 void function_systemd_journal(
     const char *transaction,
     char *function,

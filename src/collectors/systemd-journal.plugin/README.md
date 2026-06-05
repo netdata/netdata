@@ -36,6 +36,31 @@ This plugin is a Netdata Function Plugin. A free Netdata Cloud account is requir
 
 The plugin is designed for native package installations, source installations, and Docker installations (Debian-based). If using Docker, make sure you're using the Debian-based containers.
 
+## Offline Function test mode
+
+Fixture harnesses can execute the Function query path directly against an existing
+journal directory:
+
+```sh
+systemd-journal.plugin --test systemd-journal --dir <journal-dir> --request <payload.json>
+```
+
+Requirements:
+
+- `<journal-dir>` is scanned recursively for systemd journal files.
+- `<payload.json>` is the JSON Function request body.
+- stdout contains only the raw JSON Function response.
+- errors are written to stderr and return non-zero.
+
+For example, an info request can use this payload:
+
+```json
+{"info":true}
+```
+
+Function output includes volatile fields such as versions and timing-derived values.
+Test harnesses should normalize those fields before comparing fixture outputs.
+
 ## Journal sources
 
 The plugin automatically detects available journal sources based on the journal files in `/var/log/journal` (persistent logs) and `/run/log/journal` (volatile logs).

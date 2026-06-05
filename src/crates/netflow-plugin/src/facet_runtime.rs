@@ -97,10 +97,31 @@ pub(crate) struct FacetRuntime {
     ready: AtomicBool,
     ready_notify: Notify,
     state_path: PathBuf,
+    persistence: FacetPersistence,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FacetPersistence {
+    Enabled,
+    ReadOnly,
+}
+
+impl FacetPersistence {
+    fn writes_enabled(self) -> bool {
+        matches!(self, Self::Enabled)
+    }
 }
 
 impl FacetRuntime {
     pub(crate) fn new(base_dir: &Path) -> Self {
+        Self::with_persistence(base_dir, FacetPersistence::Enabled)
+    }
+
+    pub(crate) fn new_read_only(base_dir: &Path) -> Self {
+        Self::with_persistence(base_dir, FacetPersistence::ReadOnly)
+    }
+
+    fn with_persistence(base_dir: &Path, persistence: FacetPersistence) -> Self {
         let state_path = base_dir.join(FACET_STATE_FILE_NAME);
         let loaded = load_persisted_state(&state_path);
         let ready = loaded.is_some();
@@ -115,6 +136,7 @@ impl FacetRuntime {
             ready: AtomicBool::new(ready),
             ready_notify: Notify::new(),
             state_path,
+            persistence,
         }
     }
 
@@ -221,7 +243,9 @@ impl FacetRuntime {
             .collect::<Vec<_>>();
         for path in removed_archived {
             state.indexed_archived_paths.remove(&path);
-            delete_sidecar_files(Path::new(&path));
+            if self.persistence.writes_enabled() {
+                delete_sidecar_files(Path::new(&path));
+            }
             state.rebuild_archived = true;
             state.dirty = true;
         }
@@ -233,7 +257,9 @@ impl FacetRuntime {
 
         for (path, contribution) in archived_scans {
             merge_global_contribution(&mut state.archived_fields, &contribution);
-            write_sidecar_files(Path::new(&path), &contribution)?;
+            if self.persistence.writes_enabled() {
+                write_sidecar_files(Path::new(&path), &contribution)?;
+            }
             if state.indexed_archived_paths.insert(path) {
                 state.dirty = true;
             }
@@ -248,7 +274,7 @@ impl FacetRuntime {
         state.rebuild_archived = false;
 
         publish_locked(&self.snapshot, &state);
-        persist_state_locked(&self.state_path, &mut state)?;
+        self.persist_state_locked(&mut state)?;
         drop(state);
         self.mark_ready();
         Ok(())
@@ -314,11 +340,13 @@ impl FacetRuntime {
         if let Some(contribution) = contribution {
             merge_global_contribution(&mut state.archived_fields, &contribution);
             rebuild_published_fields(&mut state);
-            write_sidecar_files(archived_path, &contribution)?;
+            if self.persistence.writes_enabled() {
+                write_sidecar_files(archived_path, &contribution)?;
+            }
             state.indexed_archived_paths.insert(archived_path_str);
             state.dirty = true;
             publish_locked(&self.snapshot, &state);
-            persist_state_locked(&self.state_path, &mut state)?;
+            self.persist_state_locked(&mut state)?;
         }
 
         Ok(())
@@ -342,7 +370,9 @@ impl FacetRuntime {
                 state.rebuild_archived = true;
                 changed = true;
             }
-            delete_sidecar_files(path);
+            if self.persistence.writes_enabled() {
+                delete_sidecar_files(path);
+            }
         }
 
         if changed {
@@ -351,7 +381,7 @@ impl FacetRuntime {
                 publish_locked(&self.snapshot, &state);
             }
             state.dirty = true;
-            persist_state_locked(&self.state_path, &mut state)?;
+            self.persist_state_locked(&mut state)?;
         }
 
         Ok(())
@@ -363,6 +393,7 @@ impl FacetRuntime {
             return Ok(Vec::new());
         };
         let match_kind = spec.autocomplete_match;
+        let sidecars_enabled = self.persistence.writes_enabled();
 
         let (promoted, mut matches, archived_paths) = {
             let state = self
@@ -378,17 +409,18 @@ impl FacetRuntime {
                 term,
                 match_kind,
             );
-            let archived_matches = if !spec.uses_sidecar || !published.autocomplete {
-                state
-                    .archived_fields
-                    .get(normalized.as_str())
-                    .map(|store| {
-                        store.autocomplete_matches(term, FACET_AUTOCOMPLETE_LIMIT, match_kind)
-                    })
-                    .unwrap_or_default()
-            } else {
-                Vec::new()
-            };
+            let archived_matches =
+                if !spec.uses_sidecar || !published.autocomplete || !sidecars_enabled {
+                    state
+                        .archived_fields
+                        .get(normalized.as_str())
+                        .map(|store| {
+                            store.autocomplete_matches(term, FACET_AUTOCOMPLETE_LIMIT, match_kind)
+                        })
+                        .unwrap_or_default()
+                } else {
+                    Vec::new()
+                };
             let archived_paths = state
                 .indexed_archived_paths
                 .iter()
@@ -401,7 +433,11 @@ impl FacetRuntime {
             )
         };
 
-        if spec.uses_sidecar && promoted && matches.len() < FACET_AUTOCOMPLETE_LIMIT {
+        if sidecars_enabled
+            && spec.uses_sidecar
+            && promoted
+            && matches.len() < FACET_AUTOCOMPLETE_LIMIT
+        {
             for path in archived_paths {
                 let needed = FACET_AUTOCOMPLETE_LIMIT.saturating_sub(matches.len());
                 if needed == 0 {
@@ -429,13 +465,22 @@ impl FacetRuntime {
             .state
             .lock()
             .map_err(|_| anyhow::anyhow!("facet runtime lock poisoned"))?;
-        persist_state_locked(&self.state_path, &mut state)
+        self.persist_state_locked(&mut state)
     }
 
     fn mark_ready(&self) {
         let was_ready = self.ready.swap(true, Ordering::AcqRel);
         if !was_ready {
             self.ready_notify.notify_waiters();
+        }
+    }
+
+    fn persist_state_locked(&self, state: &mut FacetState) -> Result<()> {
+        if self.persistence.writes_enabled() {
+            persist_state_locked(&self.state_path, state)
+        } else {
+            state.dirty = false;
+            Ok(())
         }
     }
 }
@@ -1214,6 +1259,47 @@ mod tests {
         assert!(
             results.iter().any(|value| value == "AS110 EXAMPLE"),
             "expected promoted sidecar autocomplete to return archived values"
+        );
+    }
+
+    #[test]
+    fn read_only_runtime_does_not_write_state_or_sidecars() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new_read_only(tmp.path());
+        let archived_path = tmp.path().join("flows-promoted.journal");
+
+        for value in 0..120 {
+            let mut fields = FlowFields::new();
+            fields.insert("SRC_AS_NAME", format!("AS{value:03} EXAMPLE"));
+            let contribution = facet_contribution_from_flow_fields(&fields);
+            runtime
+                .observe_active_contribution(&archived_path, &contribution)
+                .expect("observe contribution");
+        }
+
+        runtime
+            .observe_rotation(
+                &archived_path,
+                &tmp.path().join("flows-promoted-next.journal"),
+            )
+            .expect("rotate file");
+
+        assert!(
+            !tmp.path().join(FACET_STATE_FILE_NAME).exists(),
+            "read-only facet runtime must not write facet state"
+        );
+        assert!(
+            !super::sidecar::sidecar_path(&archived_path, "SRC_AS_NAME").exists(),
+            "read-only facet runtime must not write sidecars"
+        );
+
+        let results = runtime
+            .autocomplete("SRC_AS_NAME", "AS11")
+            .expect("autocomplete values");
+
+        assert!(
+            results.iter().any(|value| value == "AS110 EXAMPLE"),
+            "read-only mode should search promoted archived values from memory"
         );
     }
 

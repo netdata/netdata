@@ -257,7 +257,7 @@ void systemd_journal_register_transformations(LOGS_QUERY_STATUS *lqs) {
         NULL);
 }
 
-void function_systemd_journal(
+BUFFER *function_systemd_journal_result(
     const char *transaction,
     char *function,
     usec_t *stop_monotonic_ut,
@@ -292,7 +292,7 @@ void function_systemd_journal(
     };
     LOGS_QUERY_STATUS *lqs = &tmp_fqs;
 
-    CLEAN_BUFFER *wb = lqs_create_output_buffer();
+    BUFFER *wb = lqs_create_output_buffer();
 
     // ------------------------------------------------------------------------
     // parse the parameters
@@ -317,9 +317,27 @@ void function_systemd_journal(
         }
     }
 
+    lqs_cleanup(lqs);
+
+    return wb;
+}
+
+void function_systemd_journal(
+    const char *transaction,
+    char *function,
+    usec_t *stop_monotonic_ut,
+    bool *cancelled,
+    BUFFER *payload,
+    HTTP_ACCESS access,
+    const char *source,
+    void *data)
+{
+    BUFFER *wb =
+        function_systemd_journal_result(transaction, function, stop_monotonic_ut, cancelled, payload, access, source, data);
+
     netdata_mutex_lock(&stdout_mutex);
     pluginsd_function_result_to_stdout(transaction, wb);
     netdata_mutex_unlock(&stdout_mutex);
 
-    lqs_cleanup(lqs);
+    buffer_free(wb);
 }
