@@ -149,10 +149,13 @@ static struct freebsd_tcp_state *local_sockets_freebsd_read_tcp_pcblist(size_t *
             len = try_len;
             break;
         }
-        if (errno != ENOMEM) {
-            freez(buf);
+        // Free and null on any failure so the post-loop guard is meaningful.
+        // Without this, ENOMEM exhaustion leaves buf non-NULL but unfilled.
+        freez(buf);
+        buf = NULL;
+        if (errno != ENOMEM)
             return NULL;
-        }
+        // ENOMEM: retry with larger buffer
     }
     if (!buf) return NULL;
 
@@ -287,8 +290,9 @@ static inline void local_sockets_freebsd_enumerate_pids(
             nprocs = try_size / sizeof(struct kinfo_proc);
             break;
         }
+        freez(procs);
+        procs = NULL;
         if (errno != ENOMEM) {
-            freez(procs);
             local_sockets_log(ls, "sysctl KERN_PROC_ALL failed: %s", strerror(errno));
             return;
         }
@@ -318,11 +322,10 @@ static inline void local_sockets_freebsd_enumerate_pids(
                 fd_size = try_size;
                 break;
             }
-            if (errno != ENOMEM) {
-                freez(fdbuf);
-                fdbuf = NULL;
+            freez(fdbuf);
+            fdbuf = NULL;
+            if (errno != ENOMEM)
                 break;
-            }
         }
         if (!fdbuf) continue;
 
