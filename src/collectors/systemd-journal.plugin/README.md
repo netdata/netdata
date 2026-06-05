@@ -52,6 +52,8 @@ Requirements:
 - `--timeout <seconds>` controls the offline Function execution timeout. It
   defaults to `60`; use `--timeout 0` to map to a very large finite timeout for
   long-running fixture comparisons.
+- The plugin executable must not be world-executable. Test mode refuses to run
+  when the executable has the `others execute` permission bit set.
 - stdout contains only the raw JSON Function response.
 - errors are written to stderr and return non-zero.
 

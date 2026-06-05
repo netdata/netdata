@@ -223,6 +223,35 @@ static usec_t systemd_journal_test_stop_monotonic_usec(uint64_t timeout_seconds)
     return now_ut + effective_timeout_seconds * USEC_PER_SEC;
 }
 
+static int validate_systemd_journal_test_executable_permissions(void)
+{
+    CLEAN_CHAR_P *plugin_path = os_get_process_path();
+    if (!plugin_path || !*plugin_path) {
+        fprintf(stderr, "refusing systemd journal test mode: failed to resolve plugin executable path\n");
+        return 2;
+    }
+
+    struct stat st;
+    if (stat(plugin_path, &st) != 0) {
+        fprintf(
+            stderr,
+            "refusing systemd journal test mode: failed to inspect plugin executable '%s': %s\n",
+            plugin_path,
+            strerror(errno));
+        return 2;
+    }
+
+    if (st.st_mode & S_IXOTH) {
+        fprintf(
+            stderr,
+            "refusing systemd journal test mode: plugin executable '%s' is world-executable\n",
+            plugin_path);
+        return 2;
+    }
+
+    return 0;
+}
+
 static bool path_is_directory(const char *path)
 {
     struct stat st;
@@ -312,6 +341,12 @@ int main(int argc, char **argv)
     int test_parse_rc = parse_systemd_journal_test_command(argc, argv, &test_command);
     if (test_parse_rc)
         exit(test_parse_rc);
+
+    if (test_command.enabled) {
+        int permissions_rc = validate_systemd_journal_test_executable_permissions();
+        if (permissions_rc)
+            exit(permissions_rc);
+    }
 
     nd_thread_tag_set("sd-jrnl.plugin");
     nd_log_initialize_for_external_plugins("systemd-journal.plugin");
