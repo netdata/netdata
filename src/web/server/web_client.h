@@ -14,6 +14,7 @@ extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 
 extern int respect_web_browser_do_not_track_policy;
 extern const char *web_x_frame_options;
+extern const char *web_uri_prefix;
 
 typedef enum __attribute__((packed)) {
     HTTP_VALIDATION_OK,

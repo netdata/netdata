@@ -10,6 +10,7 @@
 
 int respect_web_browser_do_not_track_policy = 0;
 const char *web_x_frame_options = NULL;
+const char *web_uri_prefix = NULL;
 
 int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
 
@@ -1148,6 +1149,41 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
     return HTTP_RESP_NOT_FOUND;
 }
 
+/**
+ * Check whether a decoded URL path satisfies the configured URI prefix.
+ *
+ * Returns true when:
+ *   - no URI prefix is configured, OR
+ *   - the decoded path starts with /<prefix>/ (or exactly /<prefix> with no
+ *     further path or a query string starting with '?').
+ *
+ * Returns false when the prefix is configured but not present in the path.
+ *
+ * The check is exact at segment boundaries: for prefix "secret",
+ * "/secrethack/" returns false because decoded_path[prefix_len]=='h', not '/'.
+ */
+static inline bool web_client_uri_prefix_matches(const char *decoded_path) {
+    if(!web_uri_prefix || !*web_uri_prefix)
+        return true;
+
+    // Skip leading slashes in the request path
+    while(*decoded_path == '/') decoded_path++;
+
+    size_t prefix_len = strlen(web_uri_prefix);
+    return strncmp(decoded_path, web_uri_prefix, prefix_len) == 0 &&
+           (decoded_path[prefix_len] == '/' ||
+            decoded_path[prefix_len] == '?' ||
+            decoded_path[prefix_len] == '\0');
+}
+
+static inline int web_client_uri_prefix_not_found(struct web_client *w) {
+    buffer_flush(w->response.data);
+    buffer_strcat(w->response.data, "Not found.");
+    w->response.data->content_type = CT_TEXT_HTML;
+    w->response.code = HTTP_RESP_NOT_FOUND;
+    return HTTP_RESP_NOT_FOUND;
+}
+
 static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *decoded_url_path) {
     if(unlikely(!service_running(ABILITY_WEB_REQUESTS)))
         return web_client_service_unavailable(w);
@@ -1396,9 +1432,13 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                         web_client_permission_denied_acl(w);
                         return;
                     }
-                    
+
+                    if(!web_client_uri_prefix_matches(buffer_tostring(w->url_path_decoded))) {
+                        web_client_uri_prefix_not_found(w);
+                        break;
+                    }
+
                     // Handle WebSocket handshake - this will take over the socket
-                    // similar to how stream_receiver_accept_connection works
                     w->response.code = websocket_handle_handshake(w);
                     
                     // After this point the socket has been taken over
@@ -1444,7 +1484,28 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     // find if the URL path has a filename extension
                     char path[FILENAME_MAX + 1];
                     strncpyz(path, buffer_tostring(w->url_path_decoded), FILENAME_MAX);
-                    char *s = path, *e = path;
+
+                    // Strip URI prefix if configured.
+                    // url_to_process is a pointer into the path[] buffer, past the prefix
+                    // segment. downstream code (web_client_process_url) only reads from
+                    // this pointer and never writes back, so pointing into the middle of
+                    // path[] is safe for the lifetime of this request.
+                    char *url_to_process = path;
+                    if(web_uri_prefix && *web_uri_prefix) {
+                        if(!web_client_uri_prefix_matches(path)) {
+                            web_client_uri_prefix_not_found(w);
+                            break;
+                        }
+                        // Advance past leading slashes and the prefix segment.
+                        // Safe: web_client_uri_prefix_matches() already confirmed the
+                        // prefix is present in path, so p + prefix_len is within the
+                        // path[] buffer bounds.
+                        char *p = path;
+                        while(*p == '/') p++;
+                        url_to_process = p + strlen(web_uri_prefix);
+                    }
+
+                    char *s = url_to_process, *e = url_to_process;
 
                     // remove the query string and find the last char
                     for (; *e ; e++) {
@@ -1465,7 +1526,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                         }
                     }
 
-                    w->response.code = (short)web_client_process_url(localhost, w, path);
+                    w->response.code = (short)web_client_process_url(localhost, w, url_to_process);
                     break;
 
                 default:
