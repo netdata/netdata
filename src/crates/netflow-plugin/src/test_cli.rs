@@ -3,8 +3,8 @@ use crate::{facet_runtime, ingest, plugin_config, query};
 use anyhow::{Context, Result, bail};
 use rt::ProgressState;
 use std::fs;
-use std::io::{self, Write};
-use std::path::PathBuf;
+use std::io::{self, Read, Write};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
@@ -12,6 +12,7 @@ use tokio_util::sync::CancellationToken;
 const USAGE: &str = "usage: netflow-plugin --test flows:netflow --dir <flows-dir> --request <payload.json> [--timeout <seconds>] [--no-persist]";
 const DEFAULT_TIMEOUT_SECONDS: u64 = 30;
 const DISABLED_TIMEOUT_SECONDS: u64 = 100 * 365 * 24 * 60 * 60;
+const MAX_REQUEST_BYTES: u64 = 16 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TestCommand {
@@ -44,12 +45,7 @@ pub(crate) async fn execute(command: TestCommand) -> Result<FlowsFunctionRespons
         );
     }
 
-    let request_bytes = fs::read(&command.request_path).with_context(|| {
-        format!(
-            "failed to read request payload {}",
-            command.request_path.display()
-        )
-    })?;
+    let request_bytes = read_request_payload(&command.request_path)?;
     let request =
         serde_json::from_slice::<query::FlowsRequest>(&request_bytes).with_context(|| {
             format!(
@@ -133,6 +129,50 @@ fn effective_timeout_seconds(timeout_seconds: u64) -> u64 {
     } else {
         timeout_seconds
     }
+}
+
+fn read_request_payload(path: &Path) -> Result<Vec<u8>> {
+    let file = fs::File::open(path)
+        .with_context(|| format!("failed to open request payload {}", path.display()))?;
+    let metadata = file
+        .metadata()
+        .with_context(|| format!("failed to inspect request payload {}", path.display()))?;
+
+    if !metadata.is_file() {
+        bail!("request payload {} is not a regular file", path.display());
+    }
+
+    if metadata.len() == 0 {
+        bail!("request payload {} is empty", path.display());
+    }
+
+    if metadata.len() > MAX_REQUEST_BYTES {
+        bail!(
+            "request payload {} is too large: {} bytes, max {} bytes",
+            path.display(),
+            metadata.len(),
+            MAX_REQUEST_BYTES
+        );
+    }
+
+    let mut request_bytes = Vec::with_capacity(metadata.len() as usize);
+    file.take(MAX_REQUEST_BYTES + 1)
+        .read_to_end(&mut request_bytes)
+        .with_context(|| format!("failed to read request payload {}", path.display()))?;
+
+    if request_bytes.is_empty() {
+        bail!("request payload {} is empty", path.display());
+    }
+
+    if request_bytes.len() as u64 > MAX_REQUEST_BYTES {
+        bail!(
+            "request payload {} is too large: more than {} bytes",
+            path.display(),
+            MAX_REQUEST_BYTES
+        );
+    }
+
+    Ok(request_bytes)
 }
 
 fn parse_from(
@@ -392,6 +432,28 @@ mod tests {
         .expect_err("duplicate timeout should fail");
 
         assert!(err.contains("duplicate --timeout"));
+    }
+
+    #[test]
+    fn read_request_payload_rejects_empty_file() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let path = tmp.path().join("empty.json");
+        fs::write(&path, []).expect("write empty request");
+
+        let err = read_request_payload(&path).expect_err("empty request should fail");
+        assert!(err.to_string().contains("is empty"));
+    }
+
+    #[test]
+    fn read_request_payload_rejects_oversized_file() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let path = tmp.path().join("oversized.json");
+        let file = fs::File::create(&path).expect("create oversized request");
+        file.set_len(MAX_REQUEST_BYTES + 1)
+            .expect("size oversized request");
+
+        let err = read_request_payload(&path).expect_err("oversized request should fail");
+        assert!(err.to_string().contains("is too large"));
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

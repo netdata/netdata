@@ -261,38 +261,46 @@ static bool path_is_directory(const char *path)
 
 static BUFFER *read_request_payload(const char *filename)
 {
-    CLEAN_CHAR_P *resolved = realpath(filename, NULL);
-    if (!resolved) {
-        fprintf(stderr, "failed to resolve request payload '%s': %s\n", filename, strerror(errno));
-        return NULL;
-    }
-
     int flags = O_RDONLY | O_CLOEXEC;
 #ifdef O_NOFOLLOW
     flags |= O_NOFOLLOW;
-#endif
-
-    int fd = open(resolved, flags);
-    if (fd == -1) {
-        fprintf(stderr, "failed to open request payload '%s': %s\n", resolved, strerror(errno));
+#else
+    struct stat lst;
+    if (lstat(filename, &lst) == -1) {
+        fprintf(stderr, "failed to inspect request payload '%s': %s\n", filename, strerror(errno));
         return NULL;
     }
 
+    if (S_ISLNK(lst.st_mode)) {
+        fprintf(stderr, "request payload '%s' is a symbolic link\n", filename);
+        return NULL;
+    }
+#endif
+
+    int fd = open(filename, flags);
+    if (fd == -1) {
+        fprintf(stderr, "failed to open request payload '%s': %s\n", filename, strerror(errno));
+        return NULL;
+    }
+
+    CLEAN_CHAR_P *resolved = realpath(filename, NULL);
+    const char *display_path = resolved ? resolved : filename;
+
     struct stat st;
     if (fstat(fd, &st) == -1) {
-        fprintf(stderr, "failed to inspect request payload '%s': %s\n", resolved, strerror(errno));
+        fprintf(stderr, "failed to inspect request payload '%s': %s\n", display_path, strerror(errno));
         close(fd);
         return NULL;
     }
 
     if (!S_ISREG(st.st_mode)) {
-        fprintf(stderr, "request payload '%s' is not a regular file\n", resolved);
+        fprintf(stderr, "request payload '%s' is not a regular file\n", display_path);
         close(fd);
         return NULL;
     }
 
     if (st.st_size <= 0) {
-        fprintf(stderr, "request payload '%s' is empty\n", resolved);
+        fprintf(stderr, "request payload '%s' is empty\n", display_path);
         close(fd);
         return NULL;
     }
@@ -301,7 +309,7 @@ static BUFFER *read_request_payload(const char *filename)
         fprintf(
             stderr,
             "request payload '%s' is too large: %llu bytes, max %llu bytes\n",
-            resolved,
+            display_path,
             (unsigned long long)st.st_size,
             (unsigned long long)ND_SD_JOURNAL_TEST_MAX_REQUEST_BYTES);
         close(fd);
@@ -319,14 +327,14 @@ static BUFFER *read_request_payload(const char *filename)
             if (errno == EINTR)
                 continue;
 
-            fprintf(stderr, "failed to read request payload '%s': %s\n", resolved, strerror(errno));
+            fprintf(stderr, "failed to read request payload '%s': %s\n", display_path, strerror(errno));
             buffer_free(payload);
             close(fd);
             return NULL;
         }
 
         if (bytes_read == 0) {
-            fprintf(stderr, "request payload '%s' changed while reading\n", resolved);
+            fprintf(stderr, "request payload '%s' changed while reading\n", display_path);
             buffer_free(payload);
             close(fd);
             return NULL;
@@ -359,7 +367,8 @@ static int run_systemd_journal_test_command(const struct systemd_journal_test_co
     }
 
     // The request path is intentionally caller-selected for offline fixtures. Test mode refuses world-executable
-    // privileged plugin binaries, and the path is canonicalized, size-limited, and checked as a regular file.
+    // privileged plugin binaries, and the path is opened without following the final symlink, size-limited, and
+    // checked as a regular file.
     //
     // codeql[cpp/path-injection]
     CLEAN_BUFFER *payload = read_request_payload(cmd->request_path);
