@@ -431,15 +431,17 @@ static bool nv_smb_collect(void)
             strncpyz(name, "[unknown]", sizeof(name) - 1);
 
         NV_SMB_SHARE *s = dictionary_set(nv_smb_shares, name, NULL, sizeof(*s));
+        // Mark the share as seen in this pass regardless of counter success.
+        // GC only removes entries absent from the Perflib instance list; transient
+        // counter failures should not destroy the entry or its rate-calculation state.
+        s->last_collected = now_ut;
 
         bool share_ok = false;
         share_ok |= perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &s->receivedBytes);
         share_ok |= perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &s->sentBytes);
         share_ok |= perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &s->treeConnectCount);
-        if (share_ok) {
-            s->last_collected = now_ut;
+        if (share_ok)
             collected++;
-        }
     }
 
     // Remove shares that were not seen in this collection pass.
