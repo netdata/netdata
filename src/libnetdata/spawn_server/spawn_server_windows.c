@@ -432,7 +432,7 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
 }
 
 SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, int *status) {
-    if(!si) { *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
+    if(!si) { if(status) *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
 
     if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
     if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
@@ -457,7 +457,8 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_I
     }
 
     // WAIT_OBJECT_0: the process exited; the blocking wait returns immediately now.
-    *status = spawn_server_exec_wait(server, si);
+    int st = spawn_server_exec_wait(server, si);
+    if(status) *status = st;
     return SPAWN_TIMEDWAIT_EXITED;
 }
 

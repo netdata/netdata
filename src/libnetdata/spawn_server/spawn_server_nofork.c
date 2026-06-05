@@ -1207,7 +1207,7 @@ static void log_invalid_magic(SPAWN_INSTANCE *instance, struct status_report *sr
 }
 
 SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms, int *status) {
-    if(!instance) { *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
+    if(!instance) { if(status) *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
 
     // close the child pipes, to make it exit (same as spawn_server_exec_wait)
     if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
@@ -1239,7 +1239,8 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_I
     }
 
     // rc == 0: the status report is ready to read; the blocking wait returns immediately now.
-    *status = spawn_server_exec_wait(server, instance);
+    int st = spawn_server_exec_wait(server, instance);
+    if(status) *status = st;
     return SPAWN_TIMEDWAIT_EXITED;
 }
 

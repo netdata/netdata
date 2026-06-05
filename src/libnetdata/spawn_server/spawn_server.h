@@ -64,6 +64,7 @@ typedef enum __attribute__((packed)) {
 // ERROR is distinct from RUNNING on purpose: the wait could not progress (it is not merely "not yet"),
 // so callers must NOT loop on it (that would spin forever when timeout_ms == 0) - they must reclaim
 // the instance, typically by killing it.
+// status is optional (may be NULL): on EXITED the wait/cleanup still happens, the status is just not stored.
 SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, int *status);
 
 int spawn_server_instance_read_fd(SPAWN_INSTANCE *si);

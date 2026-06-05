@@ -413,7 +413,18 @@ void test_popen_plugin_timedwait_exits(const char *argv0) {
 
     int code = -1;
     size_t slices = 0;
-    while(spawn_popen_timedwait(pi, 100, &code) != SPAWN_TIMEDWAIT_EXITED) {
+    for(;;) {
+        SPAWN_TIMEDWAIT_RESULT r = spawn_popen_timedwait(pi, 100, &code);
+        if(r == SPAWN_TIMEDWAIT_EXITED)
+            break;
+
+        if(r == SPAWN_TIMEDWAIT_ERROR) {
+            // ERROR must never be looped over; for a cleanly-exiting child it should not happen at all
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "spawn_popen_timedwait() returned ERROR for a child that should exit cleanly");
+            exit(1);
+        }
+
+        // SPAWN_TIMEDWAIT_RUNNING
         if(++slices > 100) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "spawn_popen_timedwait() did not reap a child that exits immediately");
             exit(1);

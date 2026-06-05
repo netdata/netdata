@@ -279,7 +279,7 @@ static int spawn_server_waitpid(SPAWN_INSTANCE *si) {
 }
 
 SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, int *status) {
-    if (!si) { *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
+    if (!si) { if(status) *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
 
     // close the child pipes to force it to exit, matching spawn_server_exec_wait and the
     // other backends; otherwise a child blocked on stdin/stdout would never see EOF and
@@ -312,7 +312,8 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_I
         sleep_usec(10 * USEC_PER_MS);
     }
 
-    *status = spawn_server_exec_wait(server, si);
+    int st = spawn_server_exec_wait(server, si);
+    if(status) *status = st;
     return SPAWN_TIMEDWAIT_EXITED;
 }
 
