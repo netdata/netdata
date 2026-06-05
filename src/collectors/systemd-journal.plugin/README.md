@@ -42,13 +42,16 @@ Fixture harnesses can execute the Function query path directly against an existi
 journal directory:
 
 ```sh
-systemd-journal.plugin --test systemd-journal --dir <journal-dir> --request <payload.json>
+systemd-journal.plugin --test systemd-journal --dir <journal-dir> --request <payload.json> [--timeout <seconds>]
 ```
 
 Requirements:
 
 - `<journal-dir>` is scanned recursively for systemd journal files.
 - `<payload.json>` is the JSON Function request body.
+- `--timeout <seconds>` controls the offline Function execution timeout. It
+  defaults to `60`; use `--timeout 0` to map to a very large finite timeout for
+  long-running fixture comparisons.
 - stdout contains only the raw JSON Function response.
 - errors are written to stderr and return non-zero.
 

@@ -13,13 +13,16 @@ Fixture harnesses can execute the Function query path directly against an existi
 NetFlow backend directory:
 
 ```sh
-netflow-plugin --test flows:netflow --dir <flows-dir> --request <payload.json> [--no-persist]
+netflow-plugin --test flows:netflow --dir <flows-dir> --request <payload.json> [--timeout <seconds>] [--no-persist]
 ```
 
 Requirements:
 
 - `<flows-dir>` is the NetFlow backend root containing the `raw`, `1m`, `5m`, and `1h` tier directories.
 - `<payload.json>` is the JSON Function request body.
+- `--timeout <seconds>` controls the offline Function execution timeout. It
+  defaults to `30`; use `--timeout 0` to map to a very large finite timeout for
+  long-running fixture comparisons.
 - stdout contains only the raw JSON Function response.
 - errors are written to stderr and return non-zero.
 

@@ -2,7 +2,11 @@
 
 #include "systemd-internals.h"
 
+#include <errno.h>
+#include <limits.h>
+
 #define ND_SD_JOURNAL_WORKER_THREADS 5
+#define ND_SD_JOURNAL_TEST_TIMEOUT_DISABLED_SECONDS (100ULL * 365ULL * 24ULL * 60ULL * 60ULL)
 
 netdata_mutex_t stdout_mutex;
 
@@ -21,13 +25,15 @@ struct systemd_journal_test_command {
     const char *function_name;
     const char *backend_dir;
     const char *request_path;
+    uint64_t timeout_seconds;
+    bool timeout_seconds_set;
 };
 
 static void systemd_journal_test_usage(FILE *stream)
 {
     fprintf(
         stream,
-        "usage: systemd-journal.plugin --test systemd-journal --dir <journal-dir> --request <payload.json>\n");
+        "usage: systemd-journal.plugin --test systemd-journal --dir <journal-dir> --request <payload.json> [--timeout <seconds>]\n");
 }
 
 static bool test_option_present(int argc, char **argv)
@@ -55,6 +61,49 @@ static int set_required_option_once(const char **slot, const char *value, const 
     }
 
     *slot = value;
+    return 0;
+}
+
+static int set_timeout_option_once(uint64_t *slot, bool *slot_set, const char *value)
+{
+    if (*slot_set) {
+        fprintf(stderr, "duplicate --timeout\n");
+        systemd_journal_test_usage(stderr);
+        return 2;
+    }
+
+    if (!value || !*value) {
+        fprintf(stderr, "missing value for --timeout\n");
+        systemd_journal_test_usage(stderr);
+        return 2;
+    }
+
+    for (const char *s = value; *s; s++) {
+        if (*s < '0' || *s > '9') {
+            fprintf(stderr, "invalid value for --timeout '%s'; expected seconds\n", value);
+            systemd_journal_test_usage(stderr);
+            return 2;
+        }
+    }
+
+    errno = 0;
+    unsigned long long parsed = strtoull(value, NULL, 10);
+    if (errno == ERANGE) {
+        fprintf(stderr, "invalid value for --timeout '%s'; expected seconds\n", value);
+        systemd_journal_test_usage(stderr);
+        return 2;
+    }
+
+#if ULLONG_MAX > UINT64_MAX
+    if (parsed > UINT64_MAX) {
+        fprintf(stderr, "invalid value for --timeout '%s'; expected seconds\n", value);
+        systemd_journal_test_usage(stderr);
+        return 2;
+    }
+#endif
+
+    *slot = (uint64_t)parsed;
+    *slot_set = true;
     return 0;
 }
 
@@ -108,6 +157,20 @@ static int parse_systemd_journal_test_command(int argc, char **argv, struct syst
             if (rc)
                 return rc;
         }
+        else if (strcmp(arg, "--timeout") == 0) {
+            if (++i >= argc)
+                return set_timeout_option_once(&cmd->timeout_seconds, &cmd->timeout_seconds_set, NULL);
+
+            int rc = set_timeout_option_once(&cmd->timeout_seconds, &cmd->timeout_seconds_set, argv[i]);
+            if (rc)
+                return rc;
+        }
+        else if (strncmp(arg, "--timeout=", strlen("--timeout=")) == 0) {
+            int rc = set_timeout_option_once(
+                &cmd->timeout_seconds, &cmd->timeout_seconds_set, arg + strlen("--timeout="));
+            if (rc)
+                return rc;
+        }
         else if (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
             systemd_journal_test_usage(stderr);
             return 2;
@@ -137,7 +200,27 @@ static int parse_systemd_journal_test_command(int argc, char **argv, struct syst
         return 2;
     }
 
+    if (!cmd->timeout_seconds_set)
+        cmd->timeout_seconds = ND_SD_JOURNAL_DEFAULT_TIMEOUT;
+
     return 0;
+}
+
+static uint64_t systemd_journal_effective_timeout_seconds(uint64_t timeout_seconds)
+{
+    return timeout_seconds ? timeout_seconds : ND_SD_JOURNAL_TEST_TIMEOUT_DISABLED_SECONDS;
+}
+
+static usec_t systemd_journal_test_stop_monotonic_usec(uint64_t timeout_seconds)
+{
+    usec_t now_ut = now_monotonic_usec();
+    uint64_t effective_timeout_seconds = systemd_journal_effective_timeout_seconds(timeout_seconds);
+    uint64_t max_timeout_seconds = (UINT64_MAX - now_ut) / USEC_PER_SEC;
+
+    if (effective_timeout_seconds > max_timeout_seconds)
+        return UINT64_MAX;
+
+    return now_ut + effective_timeout_seconds * USEC_PER_SEC;
 }
 
 static bool path_is_directory(const char *path)
@@ -188,7 +271,7 @@ static int run_systemd_journal_test_command(const struct systemd_journal_test_co
     nd_journal_files_registry_update();
 
     bool cancelled = false;
-    usec_t stop_monotonic_ut = now_monotonic_usec() + ND_SD_JOURNAL_DEFAULT_TIMEOUT * USEC_PER_SEC;
+    usec_t stop_monotonic_ut = systemd_journal_test_stop_monotonic_usec(cmd->timeout_seconds);
     char *function = strdupz(cmd->function_name);
     BUFFER *result = function_systemd_journal_result(
         "test", function, &stop_monotonic_ut, &cancelled, payload, HTTP_ACCESS_ALL, "test-cli", NULL);

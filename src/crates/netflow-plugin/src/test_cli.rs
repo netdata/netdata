@@ -1,18 +1,24 @@
 use crate::api::{FLOWS_FUNCTION_NAME, FlowsFunctionResponse, NetflowFlowsHandler};
 use crate::{facet_runtime, ingest, plugin_config, query};
 use anyhow::{Context, Result, bail};
+use rt::ProgressState;
 use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
+use tokio_util::sync::CancellationToken;
 
-const USAGE: &str = "usage: netflow-plugin --test flows:netflow --dir <flows-dir> --request <payload.json> [--no-persist]";
+const USAGE: &str = "usage: netflow-plugin --test flows:netflow --dir <flows-dir> --request <payload.json> [--timeout <seconds>] [--no-persist]";
+const DEFAULT_TIMEOUT_SECONDS: u64 = 30;
+const DISABLED_TIMEOUT_SECONDS: u64 = 100 * 365 * 24 * 60 * 60;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TestCommand {
     pub(crate) function_name: String,
     pub(crate) backend_dir: PathBuf,
     pub(crate) request_path: PathBuf,
+    pub(crate) timeout_seconds: u64,
     pub(crate) no_persist: bool,
 }
 
@@ -71,7 +77,31 @@ pub(crate) async fn execute(command: TestCommand) -> Result<FlowsFunctionRespons
         Arc::new(ingest::IngestMetrics::default()),
         Arc::clone(&query_service),
     );
-    handler.handle_request(request).await.map_err(Into::into)
+    let cancellation = CancellationToken::new();
+    let execution = if request.is_autocomplete_mode() {
+        None
+    } else {
+        Some(query::QueryExecutionContext::new(
+            ProgressState::default(),
+            cancellation.clone(),
+        ))
+    };
+
+    match tokio::time::timeout(
+        Duration::from_secs(effective_timeout_seconds(command.timeout_seconds)),
+        handler.handle_request_with_execution(execution, request),
+    )
+    .await
+    {
+        Ok(result) => result.map_err(Into::into),
+        Err(_) => {
+            cancellation.cancel();
+            bail!(
+                "netflow test function timed out after {} seconds",
+                command.timeout_seconds
+            );
+        }
+    }
 }
 
 pub(crate) fn write_json_response(
@@ -97,6 +127,14 @@ fn ensure_tier_directories_exist(config: &plugin_config::PluginConfig) -> Result
     Ok(())
 }
 
+fn effective_timeout_seconds(timeout_seconds: u64) -> u64 {
+    if timeout_seconds == 0 {
+        DISABLED_TIMEOUT_SECONDS
+    } else {
+        timeout_seconds
+    }
+}
+
 fn parse_from(
     args: impl IntoIterator<Item = String>,
 ) -> std::result::Result<Option<TestCommand>, String> {
@@ -111,6 +149,7 @@ fn parse_from(
     let mut function_name = None;
     let mut backend_dir = None;
     let mut request_path = None;
+    let mut timeout_seconds = None;
     let mut no_persist = false;
     let mut idx = 0;
 
@@ -137,6 +176,17 @@ fn parse_from(
                     .get(idx)
                     .ok_or_else(|| format!("missing value for --request\n{USAGE}"))?;
                 set_once(&mut request_path, PathBuf::from(value), "--request")?;
+            }
+            "--timeout" => {
+                idx += 1;
+                let value = args
+                    .get(idx)
+                    .ok_or_else(|| format!("missing value for --timeout\n{USAGE}"))?;
+                set_once(
+                    &mut timeout_seconds,
+                    parse_timeout_seconds(value)?,
+                    "--timeout",
+                )?;
             }
             "--no-persist" => {
                 if no_persist {
@@ -165,6 +215,13 @@ fn parse_from(
                     "--request",
                 )?;
             }
+            _ if arg.starts_with("--timeout=") => {
+                set_once(
+                    &mut timeout_seconds,
+                    parse_timeout_seconds(arg.trim_start_matches("--timeout="))?,
+                    "--timeout",
+                )?;
+            }
             "-h" | "--help" => {
                 return Err(USAGE.to_string());
             }
@@ -179,6 +236,7 @@ fn parse_from(
         function_name: required(function_name, "--test")?,
         backend_dir: required(backend_dir, "--dir")?,
         request_path: required(request_path, "--request")?,
+        timeout_seconds: timeout_seconds.unwrap_or(DEFAULT_TIMEOUT_SECONDS),
         no_persist,
     }))
 }
@@ -193,6 +251,12 @@ fn set_once<T>(slot: &mut Option<T>, value: T, option: &str) -> std::result::Res
 
 fn required<T>(slot: Option<T>, option: &str) -> std::result::Result<T, String> {
     slot.ok_or_else(|| format!("missing required {option}\n{USAGE}"))
+}
+
+fn parse_timeout_seconds(value: &str) -> std::result::Result<u64, String> {
+    value
+        .parse::<u64>()
+        .map_err(|_| format!("invalid value for --timeout `{value}`; expected seconds\n{USAGE}"))
 }
 
 #[cfg(test)]
@@ -226,6 +290,7 @@ mod tests {
         assert_eq!(command.function_name, "flows:netflow");
         assert_eq!(command.backend_dir, Path::new("flows"));
         assert_eq!(command.request_path, Path::new("payload.json"));
+        assert_eq!(command.timeout_seconds, DEFAULT_TIMEOUT_SECONDS);
         assert!(command.no_persist);
     }
 
@@ -235,6 +300,7 @@ mod tests {
             "--test=flows:netflow",
             "--dir=flows",
             "--request=payload.json",
+            "--timeout=0",
         ])
         .unwrap()
         .expect("test command");
@@ -242,7 +308,31 @@ mod tests {
         assert_eq!(command.function_name, "flows:netflow");
         assert_eq!(command.backend_dir, Path::new("flows"));
         assert_eq!(command.request_path, Path::new("payload.json"));
+        assert_eq!(command.timeout_seconds, 0);
+        assert_eq!(
+            effective_timeout_seconds(command.timeout_seconds),
+            DISABLED_TIMEOUT_SECONDS
+        );
         assert!(!command.no_persist);
+    }
+
+    #[test]
+    fn parser_accepts_spaced_timeout() {
+        let command = parse(&[
+            "--test",
+            "flows:netflow",
+            "--dir",
+            "flows",
+            "--request",
+            "payload.json",
+            "--timeout",
+            "120",
+        ])
+        .unwrap()
+        .expect("test command");
+
+        assert_eq!(command.timeout_seconds, 120);
+        assert_eq!(effective_timeout_seconds(command.timeout_seconds), 120);
     }
 
     #[test]
@@ -269,6 +359,41 @@ mod tests {
         assert!(err.contains("unsupported netflow test option"));
     }
 
+    #[test]
+    fn parser_rejects_invalid_timeout() {
+        let err = parse(&[
+            "--test",
+            "flows:netflow",
+            "--dir",
+            "flows",
+            "--request",
+            "payload.json",
+            "--timeout",
+            "-1",
+        ])
+        .expect_err("invalid timeout should fail");
+
+        assert!(err.contains("invalid value for --timeout"));
+    }
+
+    #[test]
+    fn parser_rejects_duplicate_timeout() {
+        let err = parse(&[
+            "--test",
+            "flows:netflow",
+            "--dir",
+            "flows",
+            "--request",
+            "payload.json",
+            "--timeout",
+            "30",
+            "--timeout=60",
+        ])
+        .expect_err("duplicate timeout should fail");
+
+        assert!(err.contains("duplicate --timeout"));
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn execute_empty_backend_writes_raw_json_without_persisting_facets() {
         let tmp = tempfile::tempdir().expect("create temp dir");
@@ -288,6 +413,7 @@ mod tests {
             function_name: FLOWS_FUNCTION_NAME.to_string(),
             backend_dir: backend_dir.clone(),
             request_path,
+            timeout_seconds: DEFAULT_TIMEOUT_SECONDS,
             no_persist: true,
         })
         .await
