@@ -31,7 +31,7 @@ pub(crate) use contribution::{
     FacetFileContribution, FacetValueSink, append_record_facet_values,
     facet_contribution_from_flow_fields,
 };
-use sidecar::{delete_sidecar_files, search_sidecar, write_sidecar_files};
+use sidecar::{delete_sidecar_files, search_sidecar, sidecar_path, write_sidecar_files};
 use store::{FacetStore, FacetStoreValueRef, PersistedFacetStore};
 
 const FACET_STATE_VERSION: u32 = 5;
@@ -393,9 +393,8 @@ impl FacetRuntime {
             return Ok(Vec::new());
         };
         let match_kind = spec.autocomplete_match;
-        let sidecars_enabled = self.persistence.writes_enabled();
 
-        let (promoted, mut matches, archived_paths) = {
+        let (use_sidecars, mut matches, archived_paths) = {
             let state = self
                 .state
                 .lock()
@@ -409,8 +408,57 @@ impl FacetRuntime {
                 term,
                 match_kind,
             );
-            let archived_matches =
-                if !spec.uses_sidecar || !published.autocomplete || !sidecars_enabled {
+            let use_sidecars = spec.uses_sidecar && published.autocomplete;
+            let archived_matches = if use_sidecars {
+                Vec::new()
+            } else {
+                state
+                    .archived_fields
+                    .get(normalized.as_str())
+                    .map(|store| {
+                        store.autocomplete_matches(term, FACET_AUTOCOMPLETE_LIMIT, match_kind)
+                    })
+                    .unwrap_or_default()
+            };
+            let archived_paths = state
+                .indexed_archived_paths
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>();
+            (
+                use_sidecars,
+                merge_autocomplete_values(active_matches, archived_matches),
+                archived_paths,
+            )
+        };
+
+        if use_sidecars && matches.len() < FACET_AUTOCOMPLETE_LIMIT {
+            let mut missing_sidecar = false;
+            for path in &archived_paths {
+                let journal_path = Path::new(path);
+                if !sidecar_path(journal_path, normalized.as_str()).exists() {
+                    missing_sidecar = true;
+                    continue;
+                }
+
+                let needed = FACET_AUTOCOMPLETE_LIMIT.saturating_sub(matches.len());
+                if needed == 0 {
+                    break;
+                }
+                let sidecar_matches =
+                    search_sidecar(journal_path, normalized.as_str(), term, needed, match_kind)?;
+                matches = merge_autocomplete_values(matches, sidecar_matches);
+                if matches.len() >= FACET_AUTOCOMPLETE_LIMIT {
+                    break;
+                }
+            }
+
+            if missing_sidecar && matches.len() < FACET_AUTOCOMPLETE_LIMIT {
+                let archived_matches = {
+                    let state = self
+                        .state
+                        .lock()
+                        .map_err(|_| anyhow::anyhow!("facet runtime lock poisoned"))?;
                     state
                         .archived_fields
                         .get(normalized.as_str())
@@ -418,42 +466,8 @@ impl FacetRuntime {
                             store.autocomplete_matches(term, FACET_AUTOCOMPLETE_LIMIT, match_kind)
                         })
                         .unwrap_or_default()
-                } else {
-                    Vec::new()
                 };
-            let archived_paths = state
-                .indexed_archived_paths
-                .iter()
-                .cloned()
-                .collect::<Vec<_>>();
-            (
-                published.autocomplete,
-                merge_autocomplete_values(active_matches, archived_matches),
-                archived_paths,
-            )
-        };
-
-        if sidecars_enabled
-            && spec.uses_sidecar
-            && promoted
-            && matches.len() < FACET_AUTOCOMPLETE_LIMIT
-        {
-            for path in archived_paths {
-                let needed = FACET_AUTOCOMPLETE_LIMIT.saturating_sub(matches.len());
-                if needed == 0 {
-                    break;
-                }
-                let sidecar_matches = search_sidecar(
-                    Path::new(&path),
-                    normalized.as_str(),
-                    term,
-                    needed,
-                    match_kind,
-                )?;
-                matches = merge_autocomplete_values(matches, sidecar_matches);
-                if matches.len() >= FACET_AUTOCOMPLETE_LIMIT {
-                    break;
-                }
+                matches = merge_autocomplete_values(matches, archived_matches);
             }
         }
 
@@ -1300,6 +1314,44 @@ mod tests {
         assert!(
             results.iter().any(|value| value == "AS110 EXAMPLE"),
             "read-only mode should search promoted archived values from memory"
+        );
+    }
+
+    #[test]
+    fn read_only_runtime_reads_existing_sidecar_files() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let archived_path = tmp.path().join("flows-promoted.journal");
+        let runtime = FacetRuntime::new(tmp.path());
+
+        for value in 0..120 {
+            let mut fields = FlowFields::new();
+            fields.insert("SRC_AS_NAME", format!("AS{value:03} EXAMPLE"));
+            let contribution = facet_contribution_from_flow_fields(&fields);
+            runtime
+                .observe_active_contribution(&archived_path, &contribution)
+                .expect("observe contribution");
+        }
+
+        runtime
+            .observe_rotation(
+                &archived_path,
+                &tmp.path().join("flows-promoted-next.journal"),
+            )
+            .expect("rotate file");
+
+        let runtime = FacetRuntime::new_read_only(tmp.path());
+        {
+            let mut state = runtime.state.lock().expect("lock facet state");
+            state.archived_fields.clear();
+        }
+
+        let results = runtime
+            .autocomplete("SRC_AS_NAME", "AS11")
+            .expect("autocomplete values");
+
+        assert!(
+            results.iter().any(|value| value == "AS110 EXAMPLE"),
+            "read-only mode should search existing sidecar files"
         );
     }
 

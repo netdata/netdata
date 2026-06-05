@@ -261,22 +261,15 @@ static bool path_is_directory(const char *path)
 
 static BUFFER *read_request_payload(const char *filename)
 {
-    int flags = O_RDONLY | O_CLOEXEC;
-#ifdef O_NOFOLLOW
-    flags |= O_NOFOLLOW;
+#if !defined(O_NOFOLLOW) || !defined(O_NONBLOCK)
+    fprintf(
+        stderr,
+        "refusing request payload '%s': platform does not support safe request payload open flags\n",
+        filename);
+    return NULL;
 #else
-    struct stat lst;
-    if (lstat(filename, &lst) == -1) {
-        fprintf(stderr, "failed to inspect request payload '%s': %s\n", filename, strerror(errno));
-        return NULL;
-    }
 
-    if (S_ISLNK(lst.st_mode)) {
-        fprintf(stderr, "request payload '%s' is a symbolic link\n", filename);
-        return NULL;
-    }
-#endif
-
+    int flags = O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK;
     int fd = open(filename, flags);
     if (fd == -1) {
         fprintf(stderr, "failed to open request payload '%s': %s\n", filename, strerror(errno));
@@ -348,6 +341,7 @@ static BUFFER *read_request_payload(const char *filename)
     payload->content_type = CT_APPLICATION_JSON;
 
     return payload;
+#endif
 }
 
 static int run_systemd_journal_test_command(const struct systemd_journal_test_command *cmd)
@@ -367,8 +361,8 @@ static int run_systemd_journal_test_command(const struct systemd_journal_test_co
     }
 
     // The request path is intentionally caller-selected for offline fixtures. Test mode refuses world-executable
-    // privileged plugin binaries, and the path is opened without following the final symlink, size-limited, and
-    // checked as a regular file.
+    // privileged plugin binaries, and the path is opened with no-final-symlink and nonblocking flags, size-limited,
+    // and checked as a regular file.
     //
     // codeql[cpp/path-injection]
     CLEAN_BUFFER *payload = read_request_payload(cmd->request_path);

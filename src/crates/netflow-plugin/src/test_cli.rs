@@ -132,28 +132,15 @@ fn effective_timeout_seconds(timeout_seconds: u64) -> u64 {
 }
 
 fn read_request_payload(path: &Path) -> Result<Vec<u8>> {
-    let file = fs::File::open(path)
-        .with_context(|| format!("failed to open request payload {}", path.display()))?;
+    let metadata = fs::metadata(path)
+        .with_context(|| format!("failed to inspect request payload {}", path.display()))?;
+    validate_request_payload_metadata(path, &metadata)?;
+
+    let file = open_request_payload_file(path)?;
     let metadata = file
         .metadata()
         .with_context(|| format!("failed to inspect request payload {}", path.display()))?;
-
-    if !metadata.is_file() {
-        bail!("request payload {} is not a regular file", path.display());
-    }
-
-    if metadata.len() == 0 {
-        bail!("request payload {} is empty", path.display());
-    }
-
-    if metadata.len() > MAX_REQUEST_BYTES {
-        bail!(
-            "request payload {} is too large: {} bytes, max {} bytes",
-            path.display(),
-            metadata.len(),
-            MAX_REQUEST_BYTES
-        );
-    }
+    validate_request_payload_metadata(path, &metadata)?;
 
     let mut request_bytes = Vec::with_capacity(metadata.len() as usize);
     file.take(MAX_REQUEST_BYTES + 1)
@@ -173,6 +160,43 @@ fn read_request_payload(path: &Path) -> Result<Vec<u8>> {
     }
 
     Ok(request_bytes)
+}
+
+fn open_request_payload_file(path: &Path) -> Result<fs::File> {
+    let mut options = fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+
+        // Avoid blocking if the path changes to a FIFO between metadata validation and open.
+        options.custom_flags(libc::O_NONBLOCK);
+    }
+
+    options
+        .open(path)
+        .with_context(|| format!("failed to open request payload {}", path.display()))
+}
+
+fn validate_request_payload_metadata(path: &Path, metadata: &fs::Metadata) -> Result<()> {
+    if !metadata.is_file() {
+        bail!("request payload {} is not a regular file", path.display());
+    }
+
+    if metadata.len() == 0 {
+        bail!("request payload {} is empty", path.display());
+    }
+
+    if metadata.len() > MAX_REQUEST_BYTES {
+        bail!(
+            "request payload {} is too large: {} bytes, max {} bytes",
+            path.display(),
+            metadata.len(),
+            MAX_REQUEST_BYTES
+        );
+    }
+
+    Ok(())
 }
 
 fn parse_from(
@@ -454,6 +478,22 @@ mod tests {
 
         let err = read_request_payload(&path).expect_err("oversized request should fail");
         assert!(err.to_string().contains("is too large"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn read_request_payload_rejects_fifo() {
+        use std::ffi::CString;
+        use std::os::unix::ffi::OsStrExt;
+
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let path = tmp.path().join("request.fifo");
+        let c_path = CString::new(path.as_os_str().as_bytes()).expect("fifo path has no nul byte");
+        let rc = unsafe { libc::mkfifo(c_path.as_ptr(), 0o600) };
+        assert_eq!(rc, 0, "mkfifo {} failed", path.display());
+
+        let err = read_request_payload(&path).expect_err("fifo request should fail");
+        assert!(err.to_string().contains("not a regular file"));
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

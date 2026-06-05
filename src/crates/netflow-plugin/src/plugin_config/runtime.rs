@@ -20,9 +20,9 @@ impl PluginConfig {
         Ok(cfg)
     }
 
-    pub(crate) fn for_test_backend_dir(journal_dir: &Path) -> Result<Self> {
+    pub(crate) fn for_test_backend_dir(backend_dir: &Path) -> Result<Self> {
         let mut cfg = Self::default();
-        cfg.journal.journal_dir = journal_dir.to_string_lossy().to_string();
+        cfg.journal.journal_dir = backend_dir.to_string_lossy().to_string();
         cfg.validate()?;
         Ok(cfg)
     }
