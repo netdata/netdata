@@ -46,13 +46,21 @@ void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
     int32_t timeout = health_globals.config.notification_execution_timeout_seconds;
     usec_t deadline_ut = now_monotonic_usec() + (usec_t)timeout * USEC_PER_SEC;
 
-    while(!spawn_popen_timedwait(ae->popen_instance, HEALTH_NOTIFICATION_WAIT_SLICE_MS, &code)) {
-        // re-check shutdown every slice, so a slow notification cannot block agent exit
-        if(unlikely(!service_running(SERVICE_HEALTH)) || (timeout > 0 && now_monotonic_usec() >= deadline_ut)) {
+    while(true) {
+        SPAWN_TIMEDWAIT_RESULT r = spawn_popen_timedwait(ae->popen_instance, HEALTH_NOTIFICATION_WAIT_SLICE_MS, &code);
+        if(r == SPAWN_TIMEDWAIT_EXITED)
+            break;
+
+        // RUNNING: keep waiting unless we should stop. ERROR: the wait broke and must never be
+        // looped on (it would spin forever at timeout == 0), so always fall through to the kill.
+        // re-check shutdown every slice, so a slow notification cannot block agent exit.
+        bool deadline_reached = (timeout > 0 && now_monotonic_usec() >= deadline_ut);
+        if(r == SPAWN_TIMEDWAIT_ERROR || unlikely(!service_running(SERVICE_HEALTH)) || deadline_reached) {
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "HEALTH: alert notification '%s' (pid %d) is still running %ld seconds after spawning it - killing it",
+                   "HEALTH: alert notification '%s' (pid %d) %s - killing it",
                    ae_name(ae), (int)spawn_popen_pid(ae->popen_instance),
-                   (long)(now_realtime_sec() - ae->exec_run_timestamp));
+                   (r == SPAWN_TIMEDWAIT_ERROR) ? "could not be waited for (status channel error)"
+                                                : "is still running past its execution timeout");
 
             spawn_popen_kill(ae->popen_instance, 0);
             code = 128;

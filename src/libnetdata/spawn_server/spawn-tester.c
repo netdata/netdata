@@ -413,7 +413,7 @@ void test_popen_plugin_timedwait_exits(const char *argv0) {
 
     int code = -1;
     size_t slices = 0;
-    while(!spawn_popen_timedwait(pi, 100, &code)) {
+    while(spawn_popen_timedwait(pi, 100, &code) != SPAWN_TIMEDWAIT_EXITED) {
         if(++slices > 100) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "spawn_popen_timedwait() did not reap a child that exits immediately");
             exit(1);
@@ -442,10 +442,9 @@ void test_popen_plugin_timedwait_kill(const char *argv0) {
 
     int code = 0;
     for(size_t i = 0; i < 5; i++) {
-        if(spawn_popen_timedwait(pi, 200, &code)) {
+        if(spawn_popen_timedwait(pi, 200, &code) != SPAWN_TIMEDWAIT_RUNNING) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "spawn_popen_timedwait() reported exit (code %d) for a sleeping child",
-                   code);
+                   "spawn_popen_timedwait() did not report RUNNING for a sleeping child");
             exit(1);
         }
     }

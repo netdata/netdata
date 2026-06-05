@@ -183,21 +183,24 @@ int spawn_popen_wait(POPEN_INSTANCE *pi) {
     return spawn_popen_status_rc(status);
 }
 
-bool spawn_popen_timedwait(POPEN_INSTANCE *pi, int timeout_ms, int *code) {
+SPAWN_TIMEDWAIT_RESULT spawn_popen_timedwait(POPEN_INSTANCE *pi, int timeout_ms, int *code) {
     if(!pi) {
         if(code) *code = -1;
-        return true;
+        return SPAWN_TIMEDWAIT_EXITED;
     }
 
     spawn_popen_close_files(pi);
 
     int status = 0;
-    if(spawn_server_exec_timedwait(netdata_main_spawn_server, pi->si, timeout_ms, &status) == SPAWN_TIMEDWAIT_RUNNING)
-        return false;
+    SPAWN_TIMEDWAIT_RESULT rc = spawn_server_exec_timedwait(netdata_main_spawn_server, pi->si, timeout_ms, &status);
+    if(rc != SPAWN_TIMEDWAIT_EXITED)
+        // RUNNING or ERROR: pi->si is still valid, so pi stays alive for the caller
+        return rc;
 
+    // EXITED: spawn_server_exec_timedwait() has freed pi->si; free the wrapper too
     freez(pi);
     if(code) *code = spawn_popen_status_rc(status);
-    return true;
+    return SPAWN_TIMEDWAIT_EXITED;
 }
 
 int spawn_popen_kill(POPEN_INSTANCE *pi, int timeout_ms) {

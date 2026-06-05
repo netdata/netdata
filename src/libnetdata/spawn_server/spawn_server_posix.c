@@ -216,10 +216,10 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout
                "SPAWN PARENT: kill() of pid %d failed: %s",
                si->child_pid, si->cmdline);
 
-    // escalate to SIGKILL if the child does not exit promptly after SIGTERM,
-    // so a SIGTERM-ignoring child cannot make the final wait block forever
+    // escalate to SIGKILL if the child does not exit promptly after SIGTERM (or if the wait could
+    // not be completed), so a SIGTERM-ignoring child cannot make the final wait block forever
     int status;
-    if(spawn_server_exec_timedwait(server, si, 2000, &status) == SPAWN_TIMEDWAIT_RUNNING)
+    if(spawn_server_exec_timedwait(server, si, 2000, &status) != SPAWN_TIMEDWAIT_EXITED)
         kill(si->child_pid, SIGKILL);
     else
         return status;

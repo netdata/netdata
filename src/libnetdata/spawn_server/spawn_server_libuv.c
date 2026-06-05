@@ -364,10 +364,10 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
         return -1;
     }
 
-    // escalate to SIGKILL if the child does not exit promptly after SIGTERM,
-    // so a SIGTERM-ignoring child cannot make the final wait block forever
+    // escalate to SIGKILL if the child does not exit promptly after SIGTERM (or if the wait could
+    // not be completed), so a SIGTERM-ignoring child cannot make the final wait block forever
     int status;
-    if(spawn_server_exec_timedwait(server, si, 2000, &status) == SPAWN_TIMEDWAIT_RUNNING)
+    if(spawn_server_exec_timedwait(server, si, 2000, &status) != SPAWN_TIMEDWAIT_EXITED)
         uv_process_kill(&si->process, SIGKILL);
     else
         return status;

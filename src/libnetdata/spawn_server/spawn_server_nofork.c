@@ -1225,18 +1225,20 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_I
         // the child is still running; the caller decides whether to keep waiting or kill it
         return SPAWN_TIMEDWAIT_RUNNING;
 
-    // rc == 0 (status report ready to read) or rc == 2 (socket error): resolve via the blocking
-    // wait, which returns immediately now. A socket error means the status channel to the spawn
-    // server is broken (the spawn server itself died) - that is terminal, NOT a transient "still
-    // running" state. We must resolve it here: returning RUNNING on a dead channel would spin the
-    // wait forever when the configured timeout is 0 (= wait forever), re-introducing the very hang
-    // this timed wait exists to prevent. Kill escalation for an ordinary hung child is driven by
-    // the timeout path (rc == 1) above, not by this error path, so nothing is lost.
-    if(rc == 2)
+    if(rc == 2 /* error on the socket */) {
+        // the status channel to the spawn server is broken (the spawn server itself died). We
+        // cannot confirm the child exited, so we must NOT resolve as EXITED and free the instance
+        // (that could leak a still-alive child). But this is terminal, not a transient "still
+        // running" state, so we must NOT report RUNNING either (a caller looping on RUNNING with a
+        // 0/"wait forever" timeout would spin forever). Report ERROR: the caller keeps the instance
+        // and reclaims it by killing it.
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN PARENT: status socket error for request No %zu, pid %d - resolving the wait",
+               "SPAWN PARENT: status socket error for request No %zu, pid %d",
                instance->request_id, instance->child_pid);
+        return SPAWN_TIMEDWAIT_ERROR;
+    }
 
+    // rc == 0: the status report is ready to read; the blocking wait returns immediately now.
     *status = spawn_server_exec_wait(server, instance);
     return SPAWN_TIMEDWAIT_EXITED;
 }
@@ -1294,14 +1296,13 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
     if(instance->child_pid) {
         kill(instance->child_pid, SIGTERM);
 
-        // escalate to SIGKILL if the child does not exit promptly after SIGTERM,
-        // so a SIGTERM-ignoring child cannot make the final wait block forever.
-        // no PID-reuse race: the spawn server reaps the child and only then sends the status
-        // report that makes timedwait return EXITED. A RUNNING result after the full wait
-        // therefore means the child has not been reaped yet, so its PID is still held and
-        // cannot have been recycled by an unrelated process.
+        // escalate to SIGKILL if the child does not exit promptly after SIGTERM, so a
+        // SIGTERM-ignoring child cannot make the final wait block forever. Escalate on a broken
+        // status channel (ERROR) too. No PID-reuse race on the RUNNING path: the spawn server reaps
+        // the child and only then sends the status report that makes timedwait return EXITED, so a
+        // RUNNING result means the child has not been reaped yet and its PID is still held.
         int status;
-        if(spawn_server_exec_timedwait(server, instance, 2000, &status) == SPAWN_TIMEDWAIT_RUNNING)
+        if(spawn_server_exec_timedwait(server, instance, 2000, &status) != SPAWN_TIMEDWAIT_EXITED)
             kill(instance->child_pid, SIGKILL);
         else
             return status;
