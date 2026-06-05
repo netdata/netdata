@@ -73,7 +73,7 @@ Netdata supports three retention strategies. Choose the one that best fits your 
 
 2. **Space-based retention** (recommended for predictable disk usage):
 
-   Targets keeping storage usage within defined limits, at the cost of variable retention duration. Retention size is enforced asynchronously, not in real-time at write time — dbengine evaluates quotas and schedules rotation both on a background timer and after normal activity (such as extent writes), deleting whole datafiles until the retention check no longer reports the tier over its limit. Actual disk usage may temporarily exceed the configured limit — especially on tier 0 with high ingestion rates from many streaming children. The amount of overshoot is workload-dependent (ingestion rate, compression variance, rotation throughput); provision additional disk headroom beyond the configured limit to reduce the risk of disk-full conditions.
+   Targets keeping storage usage within defined limits, at the cost of variable retention duration.
 
    ```ini
    [db]
@@ -101,7 +101,7 @@ Netdata supports three retention strategies. Choose the one that best fits your 
 
 :::warning
 
-Retention size limits are soft targets, not hard caps. Enforcement is periodic and asynchronous — quota checks and rotation scheduling occur both on a background timer and after normal dbengine activity (such as extent writes). Actual disk usage can exceed the configured limit between enforcement cycles. This is most noticeable on tier 0 with high metric volumes (e.g., parent nodes receiving streams from many children). Always provision more disk space than your configured limit to avoid unexpected disk-full conditions.
+Retention size limits are soft targets, not hard caps. Actual disk usage can exceed the configured limit, especially on tier 0 with high metric volumes from streaming Children. Always provision more disk space than your configured limit to avoid unexpected disk-full conditions. For the detailed enforcement behavior, see [Retention Size Enforcement](/src/database/README.md#retention-size-enforcement).
 
 :::
 
