@@ -21,7 +21,7 @@ Module: PerflibHyperV
 
 ## Overview
 
-This collector monitors website requests and logins.
+This collector monitors Hyper-V virtualization metrics including virtual machine health, CPU and memory usage, storage device I/O, network interface traffic, and virtual switch statistics.
 
 
 It queries the 'HyperV' object from Perflib in order to gather the metrics.
