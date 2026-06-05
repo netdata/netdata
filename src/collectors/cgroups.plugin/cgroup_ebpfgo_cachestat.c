@@ -196,13 +196,8 @@ static void cgroup_ebpfgo_cachestat_sum_pids(struct cgroup *cg)
     if (!ff)
         goto calculate;
 
-    procfile *read = procfile_readall(ff);
-    if (!read) {
-        procfile_close(ff);
-        ff = NULL;
-        goto calculate;
-    }
-    ff = read;
+    /* cgroup_ebpfgo_open_nonempty_procs_file() returns a procfile that has already
+     * been procfile_readall()'d while selecting the best mount point. */
 
     for (size_t l = 0; l < procfile_lines(ff); l++) {
         pid_t pid = (pid_t)str2l(procfile_lineword(ff, l, 0));
