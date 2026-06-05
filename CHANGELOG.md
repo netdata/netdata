@@ -274,6 +274,12 @@
 - Chore(go.d): retire legacy Go topology payloads ([#22614](https://github.com/netdata/netdata/issues/22614))
 - Fix(journal-index): avoid ValueGuardInUse when indexing otel journals ([#22621](https://github.com/netdata/netdata/issues/22621))
 - Windows compatibility (P1) ([#21972](https://github.com/netdata/netdata/issues/21972))
+- Chore(go.d): add topology overlay helpers for vSphere ([#22625](https://github.com/netdata/netdata/issues/22625))
+- Fix memory-safety and correctness bugs surfaced by Coverity audit (part 7) ([#22280](https://github.com/netdata/netdata/issues/22280))
+- Docs: consolidate windows docs and service status ([#22519](https://github.com/netdata/netdata/issues/22519))
+- Docs: clarify dbengine tier 0 retention size enforcement and disk usage overflow ([#22521](https://github.com/netdata/netdata/issues/22521))
+- Add Markdown copy of Windows package EULA. ([#22421](https://github.com/netdata/netdata/issues/22421))
+- Chore: clarify the SOW lifecycle and strengthen the Mandatory Development Principles ([#22630](https://github.com/netdata/netdata/issues/22630))
 
 ## [2.10.0] - 2026-04-09
 
