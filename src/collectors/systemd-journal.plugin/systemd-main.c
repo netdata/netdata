@@ -7,6 +7,7 @@
 
 #define ND_SD_JOURNAL_WORKER_THREADS 5
 #define ND_SD_JOURNAL_TEST_TIMEOUT_DISABLED_SECONDS (100ULL * 365ULL * 24ULL * 60ULL * 60ULL)
+#define ND_SD_JOURNAL_TEST_MAX_REQUEST_BYTES (16ULL * 1024ULL * 1024ULL)
 
 netdata_mutex_t stdout_mutex;
 
@@ -260,15 +261,83 @@ static bool path_is_directory(const char *path)
 
 static BUFFER *read_request_payload(const char *filename)
 {
-    long file_size = 0;
-    char *contents = read_by_filename(filename, &file_size);
-    if (!contents)
+    CLEAN_CHAR_P *resolved = realpath(filename, NULL);
+    if (!resolved) {
+        fprintf(stderr, "failed to resolve request payload '%s': %s\n", filename, strerror(errno));
         return NULL;
+    }
 
-    BUFFER *payload = buffer_create((size_t)file_size + 1, NULL);
-    buffer_memcat(payload, contents, (size_t)file_size);
+    int flags = O_RDONLY | O_CLOEXEC;
+#ifdef O_NOFOLLOW
+    flags |= O_NOFOLLOW;
+#endif
+
+    int fd = open(resolved, flags);
+    if (fd == -1) {
+        fprintf(stderr, "failed to open request payload '%s': %s\n", resolved, strerror(errno));
+        return NULL;
+    }
+
+    struct stat st;
+    if (fstat(fd, &st) == -1) {
+        fprintf(stderr, "failed to inspect request payload '%s': %s\n", resolved, strerror(errno));
+        close(fd);
+        return NULL;
+    }
+
+    if (!S_ISREG(st.st_mode)) {
+        fprintf(stderr, "request payload '%s' is not a regular file\n", resolved);
+        close(fd);
+        return NULL;
+    }
+
+    if (st.st_size <= 0) {
+        fprintf(stderr, "request payload '%s' is empty\n", resolved);
+        close(fd);
+        return NULL;
+    }
+
+    if ((uint64_t)st.st_size > ND_SD_JOURNAL_TEST_MAX_REQUEST_BYTES) {
+        fprintf(
+            stderr,
+            "request payload '%s' is too large: %llu bytes, max %llu bytes\n",
+            resolved,
+            (unsigned long long)st.st_size,
+            (unsigned long long)ND_SD_JOURNAL_TEST_MAX_REQUEST_BYTES);
+        close(fd);
+        return NULL;
+    }
+
+    BUFFER *payload = buffer_create((size_t)st.st_size + 1, NULL);
+    size_t total = 0;
+    while (total < (size_t)st.st_size) {
+        char buffer[8192];
+        size_t remaining = (size_t)st.st_size - total;
+        size_t wanted = MIN(remaining, sizeof(buffer));
+        ssize_t bytes_read = read(fd, buffer, wanted);
+        if (bytes_read == -1) {
+            if (errno == EINTR)
+                continue;
+
+            fprintf(stderr, "failed to read request payload '%s': %s\n", resolved, strerror(errno));
+            buffer_free(payload);
+            close(fd);
+            return NULL;
+        }
+
+        if (bytes_read == 0) {
+            fprintf(stderr, "request payload '%s' changed while reading\n", resolved);
+            buffer_free(payload);
+            close(fd);
+            return NULL;
+        }
+
+        buffer_memcat(payload, buffer, (size_t)bytes_read);
+        total += (size_t)bytes_read;
+    }
+
+    close(fd);
     payload->content_type = CT_APPLICATION_JSON;
-    freez(contents);
 
     return payload;
 }
@@ -289,11 +358,13 @@ static int run_systemd_journal_test_command(const struct systemd_journal_test_co
         return 1;
     }
 
+    // The request path is intentionally caller-selected for offline fixtures. Test mode refuses world-executable
+    // privileged plugin binaries, and the path is canonicalized, size-limited, and checked as a regular file.
+    //
+    // codeql[cpp/path-injection]
     CLEAN_BUFFER *payload = read_request_payload(cmd->request_path);
-    if (!payload) {
-        fprintf(stderr, "failed to read request payload '%s'\n", cmd->request_path);
+    if (!payload)
         return 1;
-    }
 
     nd_journal_set_scan_progress_enabled(false);
     nd_journal_use_single_directory(cmd->backend_dir);

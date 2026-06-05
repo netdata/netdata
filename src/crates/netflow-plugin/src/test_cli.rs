@@ -98,7 +98,7 @@ pub(crate) async fn execute(command: TestCommand) -> Result<FlowsFunctionRespons
             cancellation.cancel();
             bail!(
                 "netflow test function timed out after {} seconds",
-                command.timeout_seconds
+                effective_timeout_seconds(command.timeout_seconds)
             );
         }
     }
