@@ -1302,8 +1302,10 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
         // status channel (ERROR) too. No PID-reuse race on the RUNNING path: the spawn server reaps
         // the child and only then sends the status report that makes timedwait return EXITED, so a
         // RUNNING result means the child has not been reaped yet and its PID is still held.
+        // the caller's timeout_ms is the SIGTERM grace; fall back to a default when not specified.
+        int grace_ms = timeout_ms > 0 ? timeout_ms : SPAWN_KILL_DEFAULT_GRACE_MS;
         int status;
-        if(spawn_server_exec_timedwait(server, instance, 2000, &status) != SPAWN_TIMEDWAIT_EXITED)
+        if(spawn_server_exec_timedwait(server, instance, grace_ms, &status) != SPAWN_TIMEDWAIT_EXITED)
             kill(instance->child_pid, SIGKILL);
         else
             return status;

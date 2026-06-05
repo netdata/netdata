@@ -352,7 +352,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     return item.instance;
 }
 
-int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si, int timeout_ms __maybe_unused) {
+int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si, int timeout_ms) {
     if(!si) return -1;
 
     // close all pipe descriptors to force the child to exit
@@ -365,9 +365,11 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     }
 
     // escalate to SIGKILL if the child does not exit promptly after SIGTERM (or if the wait could
-    // not be completed), so a SIGTERM-ignoring child cannot make the final wait block forever
+    // not be completed), so a SIGTERM-ignoring child cannot make the final wait block forever.
+    // the caller's timeout_ms is the SIGTERM grace; fall back to a default when not specified.
+    int grace_ms = timeout_ms > 0 ? timeout_ms : SPAWN_KILL_DEFAULT_GRACE_MS;
     int status;
-    if(spawn_server_exec_timedwait(server, si, 2000, &status) != SPAWN_TIMEDWAIT_EXITED)
+    if(spawn_server_exec_timedwait(server, si, grace_ms, &status) != SPAWN_TIMEDWAIT_EXITED)
         uv_process_kill(&si->process, SIGKILL);
     else
         return status;

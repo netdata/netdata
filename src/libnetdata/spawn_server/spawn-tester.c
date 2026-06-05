@@ -419,14 +419,17 @@ void test_popen_plugin_timedwait_exits(const char *argv0) {
             break;
 
         if(r == SPAWN_TIMEDWAIT_ERROR) {
-            // ERROR must never be looped over; for a cleanly-exiting child it should not happen at all
+            // ERROR must never be looped over; for a cleanly-exiting child it should not happen at all.
+            // pi is still owned on ERROR, so reclaim it before bailing out.
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "spawn_popen_timedwait() returned ERROR for a child that should exit cleanly");
+            spawn_popen_kill(pi, 0);
             exit(1);
         }
 
-        // SPAWN_TIMEDWAIT_RUNNING
+        // SPAWN_TIMEDWAIT_RUNNING - pi is still owned
         if(++slices > 100) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "spawn_popen_timedwait() did not reap a child that exits immediately");
+            spawn_popen_kill(pi, 0);
             exit(1);
         }
     }
@@ -453,9 +456,12 @@ void test_popen_plugin_timedwait_kill(const char *argv0) {
 
     int code = 0;
     for(size_t i = 0; i < 5; i++) {
-        if(spawn_popen_timedwait(pi, 200, &code) != SPAWN_TIMEDWAIT_RUNNING) {
+        SPAWN_TIMEDWAIT_RESULT r = spawn_popen_timedwait(pi, 200, &code);
+        if(r != SPAWN_TIMEDWAIT_RUNNING) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
                    "spawn_popen_timedwait() did not report RUNNING for a sleeping child");
+            // on ERROR we still own pi and must reclaim it; on EXITED it was already freed
+            if(r == SPAWN_TIMEDWAIT_ERROR) spawn_popen_kill(pi, 0);
             exit(1);
         }
     }
