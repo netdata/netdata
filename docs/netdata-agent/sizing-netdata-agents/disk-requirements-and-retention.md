@@ -43,52 +43,23 @@ Netdata Agent metrics storage is limited to 3 GiB by default (configurable), usi
 | `tier1` | per-minute |   1 GiB    |  3 months  |
 | `tier2` |  per-hour  |   1 GiB    |  2 years   |
 
-Data is deleted when retention enforcement detects that **either** the size limit or the time limit has been reached, whichever comes first. Retention is enforced asynchronously — dbengine evaluates quotas and schedules rotation both on a background timer and after normal activity (such as extent writes), deleting whole datafiles until the retention check no longer reports the tier over its limit. Actual disk usage may temporarily exceed the configured size limit. The number of metrics collected determines how far back in time retention extends within the size limit.
+Data is deleted when retention enforcement detects that **either** the size limit or the time limit has been reached, whichever comes first. Actual disk usage may temporarily exceed the configured size limit because retention size is a soft target, not a hard cap. For the detailed enforcement behavior, see [Retention Size Enforcement](/src/database/README.md#retention-size-enforcement).
 
 In practice, with default settings and an ingestion rate of about 4,000 metrics per second, Netdata provides about 14 days of high resolution (per-second) data, 3 months of medium resolution (per-minute) data, and more than 1 year of low resolution (per-hour) data.
 
 These limits are fully configurable. See [Changing how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
 
-### Understanding Actual Disk Usage vs Configured Retention Size
+### Parent Retention Sizing
 
-The configured `dbengine tier N retention size` sets the target disk cap for that tier. Netdata enforces this cap using an *estimated* per-tier disk usage figure, not just compressed metric samples. The estimate includes the tier’s `.ndf/.njf/.njfv2` footprint, the expected final size of the currently-active datafile, and a per-tier share of global database metadata (tracked internally via `disk_percentage`). The estimate typically accounts for:
+On Netdata Parents, retention size is enforced per tier for all metrics stored by that Parent, not per Child. All streaming Children share the Parent's tier quota, so there is no per-Child disk space limit.
 
-- datafiles (`.ndf`)
-- journal/index files (`.njf`, `.njfv2`)
-- the expected final size of the currently-active datafile
-- a per-tier share of global database metadata
+When sizing a Parent, account for the total metric count across all Children and leave room for dbengine datafiles plus journal/index overhead (`.ndf`, `.njf`, and `.njfv2` files). Parent nodes with many Children can have higher aggregate metric cardinality, which can increase journal/index overhead compared to a standalone Agent.
 
-Journal file sizes depend on metric cardinality — the number of unique metrics stored in each datafile. The more distinct metrics per datafile, the larger the journal indexes. On a Netdata Parent receiving streams from many Children, datafiles and indexes can accumulate metrics from many hosts over time. This increases aggregate cardinality and can make journal files proportionally larger than on a standalone Agent.
+For details about how dbengine enforces retention size limits, see [Retention Size Enforcement](/src/database/README.md#retention-size-enforcement).
 
-#### Retention Size is Per-Tier, Not Per-Host
+Child and Parent storage are independent:
 
-The `dbengine tier N retention size` setting applies to the whole tier. All streaming Children share the Parent's tier quota. There is **no per-host or per-Child disk space limit**. When sizing retention for a Parent, use the total metric count across all Children and leave room for both data and journal overhead.
-
-#### Parent-Specific Sizing Guidance
-
-On Parent nodes with many streaming Children (100+), journal files can be significantly larger because per-tier journal/index overhead grows with aggregate metric cardinality across hosts. To effectively limit disk usage on a Parent:
-
-1. Calculate the expected data-only size based on total metrics from **all** Children combined.
-2. Account for journal file overhead, which grows with metric cardinality per datafile. On Parents with many Children, total disk usage per tier can be several times the data-only size.
-3. Consider adding a `dbengine tier N retention time` limit alongside the size limit. The time limit provides a secondary enforcement mechanism that rotates out datafiles whose data exceeds the configured time window.
-
-### Disk Retention FAQ
-
-Netdata does not automatically change retention targets based on free disk space; retention is governed by your configured size/time limits. If you disable both limits (size = 0 and time = 0), disk usage can grow until the filesystem fills.
-
-**Will adding a time-based retention limit trigger immediate cleanup?**
-
-It can. After you configure `dbengine tier N retention time`, the retention check (about every 60 seconds) rotates out eligible datafiles when data older than the configured window exists. Cleanup starts on the next retention check cycle after the change takes effect; it is not instantaneous.
-
-**Is there a per-Child disk space limit?**
-
-No. All retention size settings are per-tier and shared across all hosts. There is no configuration to limit how much disk space an individual streaming Child can consume on the Parent. To control per-Child impact, reduce the Child's collection scope or otherwise reduce the volume and cardinality of the metrics it streams to the Parent.
-
-**When a Child streams to a Parent, where are metrics stored?**
-
-There are two independent storage behaviors:
-
-- **On the Child (local):** Controlled by the Child's `[db].mode` (`dbengine` keeps local disk history, `ram` keeps in-memory history only, `none` keeps no local metric history).
+- **On the Child (local):** Controlled by the Child's `[db].mode`.
 - **On the Parent (received stream):** Controlled by the Parent's settings. Metrics streamed from Children can be persisted on the Parent and count against the Parent's per-tier retention limits.
 
 **Configuring dbengine mode and retention**:
