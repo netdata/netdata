@@ -408,7 +408,7 @@ static void nv_smb_share_insert_cb(const DICTIONARY_ITEM *item __maybe_unused,
 }
 
 // Enumerate "SMB Server Shares" instances and update per-share COUNTER_DATA.
-// Must be called with nv_collect_mutex held when worker threads may run concurrently..
+// Must be called with nv_collect_mutex held when worker threads may run concurrently.
 // Returns true if at least one share was collected in this pass.
 static bool nv_smb_collect(void)
 {
