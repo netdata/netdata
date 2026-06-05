@@ -4631,6 +4631,12 @@ void function_network_protocols(
     BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
     const char *source __maybe_unused, void *data __maybe_unused)
 {
+    // Sampling and delta computation must be atomic: acquiring the mutex first
+    // prevents two concurrent requests from each sampling stale counters and
+    // then computing deltas against the same nv_proto_prev with a near-zero
+    // elapsed time, which would produce wildly inflated per-second rates.
+    netdata_mutex_lock(&nv_proto_mutex);
+
     struct tcpstat tcp_cur = { 0 };
     struct udpstat udp_cur = { 0 };
     uint64_t established = 0;
@@ -4638,6 +4644,7 @@ void function_network_protocols(
 
     len = sizeof(tcp_cur);
     if (sysctlbyname("net.inet.tcp.stats", &tcp_cur, &len, NULL, 0) < 0) {
+        netdata_mutex_unlock(&nv_proto_mutex);
         netdata_mutex_lock(&stdout_mutex);
         pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR,
                                                "failed to read net.inet.tcp.stats");
@@ -4652,6 +4659,7 @@ void function_network_protocols(
 
     len = sizeof(udp_cur);
     if (sysctlbyname("net.inet.udp.stats", &udp_cur, &len, NULL, 0) < 0) {
+        netdata_mutex_unlock(&nv_proto_mutex);
         netdata_mutex_lock(&stdout_mutex);
         pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR,
                                                "failed to read net.inet.udp.stats");
@@ -4660,8 +4668,6 @@ void function_network_protocols(
     }
 
     usec_t now_ut = now_monotonic_usec();
-
-    netdata_mutex_lock(&nv_proto_mutex);
 
     bool first = !nv_proto_prev.initialized;
     double elapsed_s = first ? 0.0 : (double)(now_ut - nv_proto_prev.last_ut) / (double)USEC_PER_SEC;
