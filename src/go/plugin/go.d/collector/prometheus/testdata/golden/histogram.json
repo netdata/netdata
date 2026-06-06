@@ -1,0 +1,61 @@
+[
+  {
+    "context": "prometheus.test_histogram_duration_seconds",
+    "labels": {
+      "label1": "value1"
+    },
+    "dims": [
+      {
+        "name": "bucket_+Inf",
+        "algo": "incremental",
+        "value": 6
+      },
+      {
+        "name": "bucket_0.1",
+        "algo": "incremental",
+        "value": 4
+      }
+    ],
+    "soft": {
+      "units": "observations/s",
+      "family": "test_histogram",
+      "type": ""
+    }
+  },
+  {
+    "context": "prometheus.test_histogram_duration_seconds_count",
+    "labels": {
+      "label1": "value1"
+    },
+    "dims": [
+      {
+        "name": "test_histogram_duration_seconds_count",
+        "algo": "incremental",
+        "value": 6
+      }
+    ],
+    "soft": {
+      "units": "events/s",
+      "family": "test_histogram",
+      "type": ""
+    }
+  },
+  {
+    "context": "prometheus.test_histogram_duration_seconds_sum",
+    "labels": {
+      "label1": "value1"
+    },
+    "dims": [
+      {
+        "name": "test_histogram_duration_seconds_sum",
+        "algo": "incremental",
+        "value": 2.5
+      }
+    ],
+    "soft": {
+      "units": "seconds",
+      "family": "test_histogram",
+      "type": ""
+    }
+  }
+]
