@@ -2,8 +2,8 @@
 
 #include "systemd-internals.h"
 
+#include <dirent.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <limits.h>
 
 #define ND_SD_JOURNAL_WORKER_THREADS 5
@@ -218,40 +218,67 @@ static usec_t systemd_journal_test_stop_monotonic_usec(uint64_t timeout_seconds)
     return now_ut + effective_timeout_seconds * USEC_PER_SEC;
 }
 
-static int open_systemd_journal_test_backend_directory(const char *path, char *fd_path, size_t fd_path_size)
+static DIR *open_systemd_journal_test_backend_directory(const char *path, char *fd_path, size_t fd_path_size)
 {
-    struct stat st;
+    struct stat path_st, dir_st;
 
     if (!path || !*path) {
         errno = EINVAL;
-        return -1;
+        return NULL;
     }
 
-    int fd = open(path, O_RDONLY | O_CLOEXEC | O_DIRECTORY | O_NOFOLLOW);
-    if (fd == -1)
-        return -1;
+    if (lstat(path, &path_st) == -1)
+        return NULL;
 
-    if (fstat(fd, &st) == -1) {
-        int saved_errno = errno;
-        close(fd);
-        errno = saved_errno;
-        return -1;
+    if (S_ISLNK(path_st.st_mode)) {
+        errno = ELOOP;
+        return NULL;
     }
 
-    if (!S_ISDIR(st.st_mode)) {
-        close(fd);
+    if (!S_ISDIR(path_st.st_mode)) {
         errno = ENOTDIR;
-        return -1;
+        return NULL;
+    }
+
+    DIR *dir = opendir(path);
+    if (!dir)
+        return NULL;
+
+    int fd = dirfd(dir);
+    if (fd == -1) {
+        int saved_errno = errno;
+        closedir(dir);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    if (fstat(fd, &dir_st) == -1) {
+        int saved_errno = errno;
+        closedir(dir);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    if (!S_ISDIR(dir_st.st_mode)) {
+        closedir(dir);
+        errno = ENOTDIR;
+        return NULL;
+    }
+
+    if (path_st.st_dev != dir_st.st_dev || path_st.st_ino != dir_st.st_ino) {
+        closedir(dir);
+        errno = EAGAIN;
+        return NULL;
     }
 
     int written = snprintfz(fd_path, fd_path_size, "/proc/self/fd/%d", fd);
     if (written < 0 || (size_t)written >= fd_path_size) {
-        close(fd);
+        closedir(dir);
         errno = ENAMETOOLONG;
-        return -1;
+        return NULL;
     }
 
-    return fd;
+    return dir;
 }
 
 static BUFFER *read_request_payload_from_stdin(void)
@@ -309,9 +336,9 @@ static int run_systemd_journal_test_command(const struct systemd_journal_test_co
     }
 
     char backend_dir_path[FILENAME_MAX];
-    int backend_dir_fd =
+    DIR *backend_dir =
         open_systemd_journal_test_backend_directory(cmd->backend_dir, backend_dir_path, sizeof(backend_dir_path));
-    if (backend_dir_fd == -1) {
+    if (!backend_dir) {
         fprintf(
             stderr,
             "systemd journal backend directory '%s' cannot be opened: %s\n",
@@ -322,7 +349,7 @@ static int run_systemd_journal_test_command(const struct systemd_journal_test_co
 
     CLEAN_BUFFER *payload = read_request_payload_from_stdin();
     if (!payload) {
-        close(backend_dir_fd);
+        closedir(backend_dir);
         return 1;
     }
 
@@ -353,7 +380,7 @@ static int run_systemd_journal_test_command(const struct systemd_journal_test_co
         fprintf(stderr, "systemd journal test function returned no result\n");
     }
 
-    close(backend_dir_fd);
+    closedir(backend_dir);
     return rc;
 }
 
