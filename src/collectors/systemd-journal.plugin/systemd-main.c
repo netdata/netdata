@@ -2,6 +2,7 @@
 
 #include "systemd-internals.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <limits.h>
 
@@ -220,7 +221,15 @@ static usec_t systemd_journal_test_stop_monotonic_usec(uint64_t timeout_seconds)
 static bool path_is_directory(const char *path)
 {
     struct stat st;
-    return path && *path && stat(path, &st) == 0 && S_ISDIR(st.st_mode) && access(path, R_OK | X_OK) == 0;
+    if (!path || !*path || stat(path, &st) != 0 || !S_ISDIR(st.st_mode))
+        return false;
+
+    DIR *dir = opendir(path);
+    if (!dir)
+        return false;
+
+    closedir(dir);
+    return true;
 }
 
 static BUFFER *read_request_payload_from_stdin(void)
