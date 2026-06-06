@@ -2,6 +2,7 @@ use crate::api::{FLOWS_FUNCTION_NAME, FlowsFunctionResponse, NetflowFlowsHandler
 use crate::{facet_runtime, ingest, plugin_config, query};
 use anyhow::{Context, Result, bail};
 use rt::ProgressState;
+use std::ffi::{OsStr, OsString};
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -169,13 +170,20 @@ fn read_request_payload_from_stdin(reader: impl Read) -> Result<Vec<u8>> {
     Ok(request_bytes)
 }
 
+#[cfg(test)]
 fn parse_from(
     args: impl IntoIterator<Item = String>,
+) -> std::result::Result<Option<TestCommand>, String> {
+    parse_from_os(args.into_iter().map(OsString::from))
+}
+
+fn parse_from_os(
+    args: impl IntoIterator<Item = OsString>,
 ) -> std::result::Result<Option<TestCommand>, String> {
     let args = args.into_iter().collect::<Vec<_>>();
     if !args
         .iter()
-        .any(|arg| arg == "--test" || arg.starts_with("--test="))
+        .any(|arg| arg == OsStr::new("--test") || strip_os_prefix(arg, "--test=").is_some())
     {
         return Ok(None);
     }
@@ -188,86 +196,74 @@ fn parse_from(
 
     while idx < args.len() {
         let arg = &args[idx];
-        match arg.as_str() {
-            "--test" => {
-                idx += 1;
-                let value = args
-                    .get(idx)
-                    .ok_or_else(|| format!("missing value for --test\n{USAGE}"))?;
-                set_once(
-                    &mut function_name,
-                    required_option_value(value, "--test")?.to_string(),
-                    "--test",
-                )?;
+        if arg == OsStr::new("--test") {
+            idx += 1;
+            let value = args
+                .get(idx)
+                .ok_or_else(|| format!("missing value for --test\n{USAGE}"))?;
+            set_once(
+                &mut function_name,
+                required_os_string_value(value, "--test")?,
+                "--test",
+            )?;
+        } else if arg == OsStr::new("--dir") {
+            idx += 1;
+            let value = args
+                .get(idx)
+                .ok_or_else(|| format!("missing value for --dir\n{USAGE}"))?;
+            set_once(
+                &mut backend_dir,
+                PathBuf::from(required_os_string_value(value, "--dir")?),
+                "--dir",
+            )?;
+        } else if arg == OsStr::new("--request") {
+            return Err(format!(
+                "--request is no longer supported; pass the request payload on stdin\n{USAGE}"
+            ));
+        } else if arg == OsStr::new("--timeout") {
+            idx += 1;
+            let value = args
+                .get(idx)
+                .ok_or_else(|| format!("missing value for --timeout\n{USAGE}"))?;
+            set_once(
+                &mut timeout_seconds,
+                parse_timeout_seconds(&required_os_string_value(value, "--timeout")?)?,
+                "--timeout",
+            )?;
+        } else if arg == OsStr::new("--no-persist") {
+            if no_persist {
+                return Err(format!("duplicate --no-persist\n{USAGE}"));
             }
-            "--dir" => {
-                idx += 1;
-                let value = args
-                    .get(idx)
-                    .ok_or_else(|| format!("missing value for --dir\n{USAGE}"))?;
-                set_once(
-                    &mut backend_dir,
-                    PathBuf::from(required_option_value(value, "--dir")?),
-                    "--dir",
-                )?;
-            }
-            "--request" => {
-                return Err(format!(
-                    "--request is no longer supported; pass the request payload on stdin\n{USAGE}"
-                ));
-            }
-            "--timeout" => {
-                idx += 1;
-                let value = args
-                    .get(idx)
-                    .ok_or_else(|| format!("missing value for --timeout\n{USAGE}"))?;
-                set_once(
-                    &mut timeout_seconds,
-                    parse_timeout_seconds(value)?,
-                    "--timeout",
-                )?;
-            }
-            "--no-persist" => {
-                if no_persist {
-                    return Err(format!("duplicate --no-persist\n{USAGE}"));
-                }
-                no_persist = true;
-            }
-            _ if arg.starts_with("--test=") => {
-                set_once(
-                    &mut function_name,
-                    required_option_value(arg.trim_start_matches("--test="), "--test")?.to_string(),
-                    "--test",
-                )?;
-            }
-            _ if arg.starts_with("--dir=") => {
-                set_once(
-                    &mut backend_dir,
-                    PathBuf::from(required_option_value(
-                        arg.trim_start_matches("--dir="),
-                        "--dir",
-                    )?),
-                    "--dir",
-                )?;
-            }
-            _ if arg.starts_with("--request=") => {
-                return Err(format!(
-                    "--request is no longer supported; pass the request payload on stdin\n{USAGE}"
-                ));
-            }
-            _ if arg.starts_with("--timeout=") => {
-                set_once(
-                    &mut timeout_seconds,
-                    parse_timeout_seconds(arg.trim_start_matches("--timeout="))?,
-                    "--timeout",
-                )?;
-            }
-            "-h" | "--help" => {
-                return Err(USAGE.to_string());
-            }
-            _ => {
-                return Err(format!("unsupported netflow test option `{arg}`\n{USAGE}"));
-            }
+            no_persist = true;
+        } else if let Some(value) = strip_os_prefix(arg, "--test=") {
+            set_once(
+                &mut function_name,
+                required_os_string_value(&value, "--test")?,
+                "--test",
+            )?;
+        } else if let Some(value) = strip_os_prefix(arg, "--dir=") {
+            set_once(
+                &mut backend_dir,
+                PathBuf::from(required_os_string_value(&value, "--dir")?),
+                "--dir",
+            )?;
+        } else if strip_os_prefix(arg, "--request=").is_some() {
+            return Err(format!(
+                "--request is no longer supported; pass the request payload on stdin\n{USAGE}"
+            ));
+        } else if let Some(value) = strip_os_prefix(arg, "--timeout=") {
+            set_once(
+                &mut timeout_seconds,
+                parse_timeout_seconds(&required_os_string_value(&value, "--timeout")?)?,
+                "--timeout",
+            )?;
+        } else if arg == OsStr::new("-h") || arg == OsStr::new("--help") {
+            return Err(USAGE.to_string());
+        } else {
+            return Err(format!(
+                "unsupported netflow test option `{}`\n{USAGE}",
+                arg.to_string_lossy()
+            ));
         }
         idx += 1;
     }
@@ -280,15 +276,6 @@ fn parse_from(
     }))
 }
 
-fn parse_from_os(
-    args: impl IntoIterator<Item = std::ffi::OsString>,
-) -> std::result::Result<Option<TestCommand>, String> {
-    parse_from(
-        args.into_iter()
-            .map(|arg| arg.to_string_lossy().into_owned()),
-    )
-}
-
 fn set_once<T>(slot: &mut Option<T>, value: T, option: &str) -> std::result::Result<(), String> {
     if slot.is_some() {
         return Err(format!("duplicate {option}\n{USAGE}"));
@@ -297,12 +284,23 @@ fn set_once<T>(slot: &mut Option<T>, value: T, option: &str) -> std::result::Res
     Ok(())
 }
 
-fn required_option_value<'a>(value: &'a str, option: &str) -> std::result::Result<&'a str, String> {
+fn required_os_option_value<'a>(
+    value: &'a OsStr,
+    option: &str,
+) -> std::result::Result<&'a OsStr, String> {
     if value.is_empty() {
         return Err(format!("missing value for {option}\n{USAGE}"));
     }
 
     Ok(value)
+}
+
+fn required_os_string_value(value: &OsStr, option: &str) -> std::result::Result<String, String> {
+    let value = required_os_option_value(value, option)?;
+    value
+        .to_str()
+        .map(ToString::to_string)
+        .ok_or_else(|| format!("invalid value for {option}; expected UTF-8\n{USAGE}"))
 }
 
 fn required<T>(slot: Option<T>, option: &str) -> std::result::Result<T, String> {
@@ -313,6 +311,21 @@ fn parse_timeout_seconds(value: &str) -> std::result::Result<u64, String> {
     value
         .parse::<u64>()
         .map_err(|_| format!("invalid value for --timeout `{value}`; expected seconds\n{USAGE}"))
+}
+
+#[cfg(unix)]
+fn strip_os_prefix(value: &OsStr, prefix: &str) -> Option<OsString> {
+    use std::os::unix::ffi::{OsStrExt, OsStringExt};
+
+    value
+        .as_bytes()
+        .strip_prefix(prefix.as_bytes())
+        .map(|suffix| OsString::from_vec(suffix.to_vec()))
+}
+
+#[cfg(not(unix))]
+fn strip_os_prefix(value: &OsStr, prefix: &str) -> Option<OsString> {
+    value.to_str()?.strip_prefix(prefix).map(OsString::from)
 }
 
 #[cfg(test)]
@@ -341,6 +354,41 @@ mod tests {
         ];
 
         assert_eq!(parse_from_os(args).unwrap(), None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parser_rejects_non_utf8_spaced_backend_dir() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let err = parse_from_os([
+            OsString::from("--test"),
+            OsString::from("flows:netflow"),
+            OsString::from("--dir"),
+            OsString::from_vec(b"flows-\xff".to_vec()),
+        ])
+        .expect_err("non-UTF-8 backend directory should fail");
+
+        assert!(err.contains("invalid value for --dir; expected UTF-8"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parser_rejects_non_utf8_equals_backend_dir() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let mut dir_arg = b"--dir=".to_vec();
+        dir_arg.extend_from_slice(b"flows-\xff");
+
+        let err = parse_from_os([
+            OsString::from("--test=flows:netflow"),
+            OsString::from_vec(dir_arg),
+        ])
+        .expect_err("non-UTF-8 backend directory should fail");
+
+        assert!(err.contains("invalid value for --dir; expected UTF-8"));
     }
 
     #[test]
@@ -548,5 +596,26 @@ mod tests {
             !backend_dir.join("facet-state.bin").exists(),
             "--no-persist must not write facet state under the fixture backend"
         );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn execute_rejects_non_utf8_backend_dir() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let err = execute(
+            TestCommand {
+                function_name: FLOWS_FUNCTION_NAME.to_string(),
+                backend_dir: PathBuf::from(OsString::from_vec(b"flows-\xff".to_vec())),
+                timeout_seconds: DEFAULT_TIMEOUT_SECONDS,
+                no_persist: true,
+            },
+            br#"{"after":1,"before":2,"group_by":["PROTOCOL"],"top_n":"100"}"#,
+        )
+        .await
+        .expect_err("non-UTF-8 backend directory should fail");
+
+        assert!(err.to_string().contains("is not valid UTF-8"));
     }
 }

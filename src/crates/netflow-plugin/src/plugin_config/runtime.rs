@@ -22,7 +22,15 @@ impl PluginConfig {
 
     pub(crate) fn for_test_backend_dir(backend_dir: &Path) -> Result<Self> {
         let mut cfg = Self::default();
-        cfg.journal.journal_dir = backend_dir.to_string_lossy().to_string();
+        cfg.journal.journal_dir = backend_dir
+            .to_str()
+            .with_context(|| {
+                format!(
+                    "netflow test backend directory {} is not valid UTF-8",
+                    backend_dir.display()
+                )
+            })?
+            .to_string();
         cfg.validate()?;
         Ok(cfg)
     }

@@ -349,12 +349,13 @@ static int run_systemd_journal_test_command(const struct systemd_journal_test_co
         return 1;
     }
 
+    bool cancelled = false;
+    usec_t stop_monotonic_ut = systemd_journal_test_stop_monotonic_usec(cmd->timeout_seconds);
+
     nd_journal_set_scan_progress_enabled(false);
     nd_journal_use_single_directory(backend_dir_path);
     nd_journal_files_registry_update();
 
-    bool cancelled = false;
-    usec_t stop_monotonic_ut = systemd_journal_test_stop_monotonic_usec(cmd->timeout_seconds);
     char *function = strdupz(cmd->function_name);
     BUFFER *result = function_systemd_journal_result(
         "test", function, &stop_monotonic_ut, &cancelled, payload, HTTP_ACCESS_ALL, "test-cli", NULL);
