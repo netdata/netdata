@@ -2,10 +2,6 @@
 
 #include "systemd-internals.h"
 
-#include <dirent.h>
-#include <errno.h>
-#include <limits.h>
-
 #define ND_SD_JOURNAL_WORKER_THREADS 5
 #define ND_SD_JOURNAL_TEST_TIMEOUT_DISABLED_SECONDS (100ULL * 365ULL * 24ULL * 60ULL * 60ULL)
 #define ND_SD_JOURNAL_TEST_MAX_REQUEST_BYTES (16ULL * 1024ULL * 1024ULL)
