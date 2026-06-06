@@ -23,7 +23,7 @@ pub(crate) struct TestCommand {
 
 impl TestCommand {
     pub(crate) fn parse_from_env_args() -> std::result::Result<Option<Self>, String> {
-        parse_from(std::env::args().skip(1))
+        parse_from_os(std::env::args_os().skip(1))
     }
 }
 
@@ -280,6 +280,15 @@ fn parse_from(
     }))
 }
 
+fn parse_from_os(
+    args: impl IntoIterator<Item = std::ffi::OsString>,
+) -> std::result::Result<Option<TestCommand>, String> {
+    parse_from(
+        args.into_iter()
+            .map(|arg| arg.to_string_lossy().into_owned()),
+    )
+}
+
 fn set_once<T>(slot: &mut Option<T>, value: T, option: &str) -> std::result::Result<(), String> {
     if slot.is_some() {
         return Err(format!("duplicate {option}\n{USAGE}"));
@@ -318,6 +327,20 @@ mod tests {
     #[test]
     fn parser_ignores_normal_plugin_arguments_when_test_is_absent() {
         assert_eq!(parse(&["--netflow-enabled", "false"]).unwrap(), None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parser_ignores_non_utf8_normal_arguments_when_test_is_absent() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let args = [
+            OsString::from("--netflow-enabled"),
+            OsString::from_vec(vec![0xff]),
+        ];
+
+        assert_eq!(parse_from_os(args).unwrap(), None);
     }
 
     #[test]
