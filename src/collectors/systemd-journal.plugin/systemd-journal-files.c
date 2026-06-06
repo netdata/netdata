@@ -688,8 +688,8 @@ void nd_journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, 
             if (stat(full_path, &info) == -1)
                 continue;
 
+            // Journal discovery intentionally follows symlinked journal directories.
             if (S_ISDIR(info.st_mode)) {
-                // The symbolic link points to a directory
                 char resolved_path[FILENAME_MAX + 1];
                 if (realpath(full_path, resolved_path) != NULL) {
                     nd_journal_directory_scan_recursively(files, dirs, resolved_path, depth + 1);

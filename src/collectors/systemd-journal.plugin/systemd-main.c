@@ -218,6 +218,7 @@ static DIR *open_systemd_journal_test_backend_directory(const char *path, char *
 {
     struct stat path_st, dir_st;
 
+    // Pin the explicit --dir backend root; symlinked journal trees are handled by the shared scanner.
     if (!path || !*path) {
         errno = EINVAL;
         return NULL;
