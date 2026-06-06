@@ -48,6 +48,30 @@ pub(crate) async fn execute(
         );
     }
 
+    let effective_timeout = effective_timeout_seconds(command.timeout_seconds);
+    let cancellation = CancellationToken::new();
+    match tokio::time::timeout(
+        Duration::from_secs(effective_timeout),
+        execute_inner(command, request_bytes, cancellation.clone()),
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(_) => {
+            cancellation.cancel();
+            bail!(
+                "netflow test function timed out after {} seconds",
+                effective_timeout
+            );
+        }
+    }
+}
+
+async fn execute_inner(
+    command: TestCommand,
+    request_bytes: &[u8],
+    cancellation: CancellationToken,
+) -> Result<FlowsFunctionResponse> {
     let request = serde_json::from_slice::<query::FlowsRequest>(request_bytes)
         .context("failed to parse request payload from stdin")?;
 
@@ -70,7 +94,6 @@ pub(crate) async fn execute(
         Arc::new(ingest::IngestMetrics::default()),
         Arc::clone(&query_service),
     );
-    let cancellation = CancellationToken::new();
     let execution = if request.is_autocomplete_mode() {
         None
     } else {
@@ -80,21 +103,10 @@ pub(crate) async fn execute(
         ))
     };
 
-    match tokio::time::timeout(
-        Duration::from_secs(effective_timeout_seconds(command.timeout_seconds)),
-        handler.handle_request_with_execution(execution, request),
-    )
-    .await
-    {
-        Ok(result) => result.map_err(Into::into),
-        Err(_) => {
-            cancellation.cancel();
-            bail!(
-                "netflow test function timed out after {} seconds",
-                effective_timeout_seconds(command.timeout_seconds)
-            );
-        }
-    }
+    handler
+        .handle_request_with_execution(execution, request)
+        .await
+        .map_err(Into::into)
 }
 
 pub(crate) fn write_json_response(

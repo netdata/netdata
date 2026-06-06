@@ -19,7 +19,7 @@ netflow-plugin --test flows:netflow --dir <flows-dir> [--timeout <seconds>] [--n
 Requirements:
 
 - `<flows-dir>` is the NetFlow backend root containing the `raw`, `1m`, `5m`, and `1h` tier directories.
-- stdin is the JSON Function request body.
+- stdin is the JSON Function request body (non-empty, maximum 16 MiB).
 - `--request` is not supported and fails with usage output.
 - `--timeout <seconds>` controls the offline Function execution timeout. It
   defaults to `30`; use `--timeout 0` to map to a very large finite timeout for

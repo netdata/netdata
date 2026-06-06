@@ -48,7 +48,7 @@ systemd-journal.plugin --test systemd-journal --dir <journal-dir> [--timeout <se
 Requirements:
 
 - `<journal-dir>` is scanned recursively for systemd journal files.
-- stdin is the JSON Function request body.
+- stdin is the JSON Function request body (non-empty, maximum 16 MiB).
 - `--request` is not supported and fails with usage output.
 - `--timeout <seconds>` controls the offline Function execution timeout. It
   defaults to `60`; use `--timeout 0` to map to a very large finite timeout for

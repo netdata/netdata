@@ -107,6 +107,13 @@ static int set_timeout_option_once(uint64_t *slot, bool *slot_set, const char *v
     return 0;
 }
 
+static int reject_request_option(void)
+{
+    fprintf(stderr, "--request is no longer supported; pass the request payload on stdin\n");
+    systemd_journal_test_usage(stderr);
+    return 2;
+}
+
 static int parse_systemd_journal_test_command(int argc, char **argv, struct systemd_journal_test_command *cmd)
 {
     *cmd = (struct systemd_journal_test_command){0};
@@ -145,14 +152,10 @@ static int parse_systemd_journal_test_command(int argc, char **argv, struct syst
                 return rc;
         }
         else if (strcmp(arg, "--request") == 0) {
-            fprintf(stderr, "--request is no longer supported; pass the request payload on stdin\n");
-            systemd_journal_test_usage(stderr);
-            return 2;
+            return reject_request_option();
         }
         else if (strncmp(arg, "--request=", strlen("--request=")) == 0) {
-            fprintf(stderr, "--request is no longer supported; pass the request payload on stdin\n");
-            systemd_journal_test_usage(stderr);
-            return 2;
+            return reject_request_option();
         }
         else if (strcmp(arg, "--timeout") == 0) {
             if (++i >= argc)
@@ -217,7 +220,7 @@ static usec_t systemd_journal_test_stop_monotonic_usec(uint64_t timeout_seconds)
 static bool path_is_directory(const char *path)
 {
     struct stat st;
-    return path && stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+    return path && *path && stat(path, &st) == 0 && S_ISDIR(st.st_mode) && access(path, R_OK | X_OK) == 0;
 }
 
 static BUFFER *read_request_payload_from_stdin(void)
