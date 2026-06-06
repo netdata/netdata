@@ -2,8 +2,8 @@
 
 #include "systemd-internals.h"
 
-#include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 
 #define ND_SD_JOURNAL_WORKER_THREADS 5
@@ -218,18 +218,40 @@ static usec_t systemd_journal_test_stop_monotonic_usec(uint64_t timeout_seconds)
     return now_ut + effective_timeout_seconds * USEC_PER_SEC;
 }
 
-static bool path_is_directory(const char *path)
+static int open_systemd_journal_test_backend_directory(const char *path, char *fd_path, size_t fd_path_size)
 {
     struct stat st;
-    if (!path || !*path || stat(path, &st) != 0 || !S_ISDIR(st.st_mode))
-        return false;
 
-    DIR *dir = opendir(path);
-    if (!dir)
-        return false;
+    if (!path || !*path) {
+        errno = EINVAL;
+        return -1;
+    }
 
-    closedir(dir);
-    return true;
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_DIRECTORY | O_NOFOLLOW);
+    if (fd == -1)
+        return -1;
+
+    if (fstat(fd, &st) == -1) {
+        int saved_errno = errno;
+        close(fd);
+        errno = saved_errno;
+        return -1;
+    }
+
+    if (!S_ISDIR(st.st_mode)) {
+        close(fd);
+        errno = ENOTDIR;
+        return -1;
+    }
+
+    int written = snprintfz(fd_path, fd_path_size, "/proc/self/fd/%d", fd);
+    if (written < 0 || (size_t)written >= fd_path_size) {
+        close(fd);
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+
+    return fd;
 }
 
 static BUFFER *read_request_payload_from_stdin(void)
@@ -286,17 +308,26 @@ static int run_systemd_journal_test_command(const struct systemd_journal_test_co
         return 2;
     }
 
-    if (!path_is_directory(cmd->backend_dir)) {
-        fprintf(stderr, "systemd journal backend directory '%s' does not exist\n", cmd->backend_dir);
+    char backend_dir_path[FILENAME_MAX];
+    int backend_dir_fd =
+        open_systemd_journal_test_backend_directory(cmd->backend_dir, backend_dir_path, sizeof(backend_dir_path));
+    if (backend_dir_fd == -1) {
+        fprintf(
+            stderr,
+            "systemd journal backend directory '%s' cannot be opened: %s\n",
+            cmd->backend_dir,
+            strerror(errno));
         return 1;
     }
 
     CLEAN_BUFFER *payload = read_request_payload_from_stdin();
-    if (!payload)
+    if (!payload) {
+        close(backend_dir_fd);
         return 1;
+    }
 
     nd_journal_set_scan_progress_enabled(false);
-    nd_journal_use_single_directory(cmd->backend_dir);
+    nd_journal_use_single_directory(backend_dir_path);
     nd_journal_files_registry_update();
 
     bool cancelled = false;
@@ -322,6 +353,7 @@ static int run_systemd_journal_test_command(const struct systemd_journal_test_co
         fprintf(stderr, "systemd journal test function returned no result\n");
     }
 
+    close(backend_dir_fd);
     return rc;
 }
 
