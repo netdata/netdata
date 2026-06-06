@@ -168,6 +168,7 @@ Default lifecycle policy when template omits lifecycle:
 | Topic                 | Behavior                                                                                                                                       |
 |-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
 | Trigger               | Unmatched series only when autogen is enabled                                                                                                  |
+| Context namespace     | Autogen context = top-level `context_namespace` + the full metric name (which includes any `SnapshotMeter` prefix); empty namespace leaves the bare name. A non-empty meter prefix stacks after `context_namespace`, so pair `context_namespace` with `SnapshotMeter("")` to avoid a doubled prefix |
 | Structured families   | Autogen has dedicated source builders for flattened `Histogram`, `Summary`, `StateSet`, and `MeasureSet` families                              |
 | Metric metadata usage | Uses `metrix.MetricMeta` hints for title/family/unit where allowed                                                                             |
 | Type ID budget        | Enforced via `AutogenPolicy.MaxTypeIDLen` + effective emit type-id prefix (`WithEmitTypeIDBudgetPrefix(...)`)                                  |

@@ -372,6 +372,27 @@ func TestFitsTypeIDBudget(t *testing.T) {
 	}
 }
 
+func TestGetAutogenChartContext(t *testing.T) {
+	tests := map[string]struct {
+		namespace string
+		metric    string
+		want      string
+	}{
+		"empty namespace returns bare metric":        {namespace: "", metric: "foo", want: "foo"},
+		"single-segment namespace is prefixed":       {namespace: "prometheus", metric: "foo", want: "prometheus.foo"},
+		"multi-segment namespace composes with dot":  {namespace: "prometheus.app", metric: "foo", want: "prometheus.app.foo"},
+		"whitespace-only namespace is treated empty": {namespace: "  ", metric: "foo", want: "foo"},
+		"empty metric falls back to metric":          {namespace: "", metric: "", want: "metric"},
+		"namespace with empty metric":                {namespace: "prometheus", metric: "", want: "prometheus.metric"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, getAutogenChartContext(tc.namespace, tc.metric))
+		})
+	}
+}
+
 func sortedLabelView(labels map[string]string) metrix.LabelView {
 	items := make([]metrix.Label, 0, len(labels))
 	for key, value := range labels {

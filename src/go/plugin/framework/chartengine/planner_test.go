@@ -233,6 +233,8 @@ func TestBuildPlanLegacySingleScenarioCases(t *testing.T) {
 		"BuildPlanAutogenRemovalLifecycleExpiry":                       {run: runTestBuildPlanAutogenRemovalLifecycleExpiry},
 		"BuildPlanFirstWriterWinsAndAccumulatesRepeatedRoutes":         {run: runTestBuildPlanFirstWriterWinsAndAccumulatesRepeatedRoutes},
 		"BuildPlanEmptyEmissionAndScratchReusePruneAcrossCycles":       {run: runTestBuildPlanEmptyEmissionAndScratchReusePruneAcrossCycles},
+		"BuildPlanAutogenContextNamespacePrefixesContext":              {run: runTestBuildPlanAutogenContextNamespacePrefixesContext},
+		"BuildPlanAutogenContextNamespaceStubGroupOnly":                {run: runTestBuildPlanAutogenContextNamespaceStubGroupOnly},
 	}
 
 	for name, tc := range tests {
@@ -997,6 +999,80 @@ groups:
 	require.Len(t, update.Values, 1)
 	assert.Equal(t, "errors_total", update.Values[0].Name)
 	assert.Equal(t, float64(10), update.Values[0].Float64)
+}
+
+func runTestBuildPlanAutogenContextNamespacePrefixesContext(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
+	require.NoError(t, err)
+
+	// Root context_namespace must prefix autogen (unmatched-series) chart contexts,
+	// joined with "." like the template compiler ("prometheus" + "svc.errors_total").
+	yaml := `
+version: v1
+context_namespace: prometheus
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	unmatched := sm.Counter("errors_total")
+	methodGET := sm.LabelSet(metrix.Label{Key: "method", Value: "GET"})
+
+	cc.BeginCycle()
+	unmatched.ObserveTotal(10, methodGET)
+	cc.CommitCycleSuccess()
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, "prometheus.svc.errors_total", create.Meta.Context)
+}
+
+// Mirrors the autogen-only collector shape: a stub group satisfies the
+// required groups[] but declares no charts, so every series is unmatched and handled by autogen,
+// with contexts prefixed by the top-level context_namespace.
+func runTestBuildPlanAutogenContextNamespaceStubGroupOnly(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+context_namespace: prometheus
+groups:
+  - family: Prometheus
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("")
+	unmatched := sm.Counter("requests_total")
+	methodGET := sm.LabelSet(metrix.Label{Key: "method", Value: "GET"})
+
+	cc.BeginCycle()
+	unmatched.ObserveTotal(10, methodGET)
+	cc.CommitCycleSuccess()
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, "prometheus.requests_total", create.Meta.Context)
 }
 
 func runTestBuildPlanAutogenUsesMetricMetadataForScalar(t *testing.T) {
