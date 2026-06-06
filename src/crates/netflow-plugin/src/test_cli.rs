@@ -2,14 +2,13 @@ use crate::api::{FLOWS_FUNCTION_NAME, FlowsFunctionResponse, NetflowFlowsHandler
 use crate::{facet_runtime, ingest, plugin_config, query};
 use anyhow::{Context, Result, bail};
 use rt::ProgressState;
-use std::fs;
 use std::io::{self, Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
-const USAGE: &str = "usage: netflow-plugin --test flows:netflow --dir <flows-dir> --request <payload.json> [--timeout <seconds>] [--no-persist]";
+const USAGE: &str = "usage: netflow-plugin --test flows:netflow --dir <flows-dir> [--timeout <seconds>] [--no-persist] < payload.json";
 const DEFAULT_TIMEOUT_SECONDS: u64 = 30;
 const DISABLED_TIMEOUT_SECONDS: u64 = 100 * 365 * 24 * 60 * 60;
 const MAX_REQUEST_BYTES: u64 = 16 * 1024 * 1024;
@@ -18,7 +17,6 @@ const MAX_REQUEST_BYTES: u64 = 16 * 1024 * 1024;
 pub(crate) struct TestCommand {
     pub(crate) function_name: String,
     pub(crate) backend_dir: PathBuf,
-    pub(crate) request_path: PathBuf,
     pub(crate) timeout_seconds: u64,
     pub(crate) no_persist: bool,
 }
@@ -30,14 +28,18 @@ impl TestCommand {
 }
 
 pub(crate) async fn run(command: TestCommand) -> Result<()> {
-    let response = execute(command).await?;
+    let request_bytes = read_request_payload_from_stdin(io::stdin().lock())?;
+    let response = execute(command, &request_bytes).await?;
     let stdout = io::stdout();
     let mut handle = stdout.lock();
     write_json_response(&response, &mut handle)?;
     ensure_success_status(response.status())
 }
 
-pub(crate) async fn execute(command: TestCommand) -> Result<FlowsFunctionResponse> {
+pub(crate) async fn execute(
+    command: TestCommand,
+    request_bytes: &[u8],
+) -> Result<FlowsFunctionResponse> {
     if command.function_name != FLOWS_FUNCTION_NAME {
         bail!(
             "unsupported netflow test function `{}` (expected `{}`)",
@@ -46,14 +48,8 @@ pub(crate) async fn execute(command: TestCommand) -> Result<FlowsFunctionRespons
         );
     }
 
-    let request_bytes = read_request_payload(&command.request_path)?;
-    let request =
-        serde_json::from_slice::<query::FlowsRequest>(&request_bytes).with_context(|| {
-            format!(
-                "failed to parse request payload {}",
-                command.request_path.display()
-            )
-        })?;
+    let request = serde_json::from_slice::<query::FlowsRequest>(request_bytes)
+        .context("failed to parse request payload from stdin")?;
 
     let config = plugin_config::PluginConfig::for_test_backend_dir(&command.backend_dir)?;
     ensure_tier_directories_exist(&config)?;
@@ -140,78 +136,25 @@ fn ensure_success_status(status: u32) -> Result<()> {
     Ok(())
 }
 
-fn read_request_payload(path: &Path) -> Result<Vec<u8>> {
-    let metadata = fs::symlink_metadata(path)
-        .with_context(|| format!("failed to inspect request payload {}", path.display()))?;
-    validate_request_payload_metadata(path, &metadata)?;
-
-    let file = open_request_payload_file(path)?;
-    let metadata = file
-        .metadata()
-        .with_context(|| format!("failed to inspect request payload {}", path.display()))?;
-    validate_request_payload_metadata(path, &metadata)?;
-
-    let mut request_bytes = Vec::with_capacity(metadata.len() as usize);
-    file.take(MAX_REQUEST_BYTES + 1)
+fn read_request_payload_from_stdin(reader: impl Read) -> Result<Vec<u8>> {
+    let mut request_bytes = Vec::new();
+    reader
+        .take(MAX_REQUEST_BYTES + 1)
         .read_to_end(&mut request_bytes)
-        .with_context(|| format!("failed to read request payload {}", path.display()))?;
+        .context("failed to read request payload from stdin")?;
 
     if request_bytes.is_empty() {
-        bail!("request payload {} is empty", path.display());
+        bail!("request payload from stdin is empty");
     }
 
     if request_bytes.len() as u64 > MAX_REQUEST_BYTES {
         bail!(
-            "request payload {} is too large: more than {} bytes",
-            path.display(),
+            "request payload from stdin is too large: more than {} bytes",
             MAX_REQUEST_BYTES
         );
     }
 
     Ok(request_bytes)
-}
-
-fn open_request_payload_file(path: &Path) -> Result<fs::File> {
-    #[cfg(not(unix))]
-    {
-        bail!("netflow test request payloads require Unix safe-open flags");
-    }
-
-    #[cfg(unix)]
-    {
-        let mut options = fs::OpenOptions::new();
-        options.read(true);
-        use std::os::unix::fs::OpenOptionsExt;
-
-        // O_NOFOLLOW rejects a final symlink race. O_NONBLOCK avoids blocking if the path races to a FIFO before
-        // fstat() rejects it as non-regular.
-        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
-
-        options
-            .open(path)
-            .with_context(|| format!("failed to open request payload {}", path.display()))
-    }
-}
-
-fn validate_request_payload_metadata(path: &Path, metadata: &fs::Metadata) -> Result<()> {
-    if !metadata.is_file() {
-        bail!("request payload {} is not a regular file", path.display());
-    }
-
-    if metadata.len() == 0 {
-        bail!("request payload {} is empty", path.display());
-    }
-
-    if metadata.len() > MAX_REQUEST_BYTES {
-        bail!(
-            "request payload {} is too large: {} bytes, max {} bytes",
-            path.display(),
-            metadata.len(),
-            MAX_REQUEST_BYTES
-        );
-    }
-
-    Ok(())
 }
 
 fn parse_from(
@@ -227,7 +170,6 @@ fn parse_from(
 
     let mut function_name = None;
     let mut backend_dir = None;
-    let mut request_path = None;
     let mut timeout_seconds = None;
     let mut no_persist = false;
     let mut idx = 0;
@@ -258,15 +200,9 @@ fn parse_from(
                 )?;
             }
             "--request" => {
-                idx += 1;
-                let value = args
-                    .get(idx)
-                    .ok_or_else(|| format!("missing value for --request\n{USAGE}"))?;
-                set_once(
-                    &mut request_path,
-                    PathBuf::from(required_option_value(value, "--request")?),
-                    "--request",
-                )?;
+                return Err(format!(
+                    "--request is no longer supported; pass the request payload on stdin\n{USAGE}"
+                ));
             }
             "--timeout" => {
                 idx += 1;
@@ -303,14 +239,9 @@ fn parse_from(
                 )?;
             }
             _ if arg.starts_with("--request=") => {
-                set_once(
-                    &mut request_path,
-                    PathBuf::from(required_option_value(
-                        arg.trim_start_matches("--request="),
-                        "--request",
-                    )?),
-                    "--request",
-                )?;
+                return Err(format!(
+                    "--request is no longer supported; pass the request payload on stdin\n{USAGE}"
+                ));
             }
             _ if arg.starts_with("--timeout=") => {
                 set_once(
@@ -332,7 +263,6 @@ fn parse_from(
     Ok(Some(TestCommand {
         function_name: required(function_name, "--test")?,
         backend_dir: required(backend_dir, "--dir")?,
-        request_path: required(request_path, "--request")?,
         timeout_seconds: timeout_seconds.unwrap_or(DEFAULT_TIMEOUT_SECONDS),
         no_persist,
     }))
@@ -367,7 +297,7 @@ fn parse_timeout_seconds(value: &str) -> std::result::Result<u64, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
+    use std::fs;
 
     fn parse(args: &[&str]) -> std::result::Result<Option<TestCommand>, String> {
         parse_from(args.iter().map(|arg| (*arg).to_string()))
@@ -379,40 +309,25 @@ mod tests {
     }
 
     #[test]
-    fn parser_accepts_file_based_test_command() {
-        let command = parse(&[
-            "--test",
-            "flows:netflow",
-            "--dir",
-            "flows",
-            "--request",
-            "payload.json",
-            "--no-persist",
-        ])
-        .unwrap()
-        .expect("test command");
+    fn parser_accepts_stdin_test_command() {
+        let command = parse(&["--test", "flows:netflow", "--dir", "flows", "--no-persist"])
+            .unwrap()
+            .expect("test command");
 
         assert_eq!(command.function_name, "flows:netflow");
-        assert_eq!(command.backend_dir, Path::new("flows"));
-        assert_eq!(command.request_path, Path::new("payload.json"));
+        assert_eq!(command.backend_dir, PathBuf::from("flows"));
         assert_eq!(command.timeout_seconds, DEFAULT_TIMEOUT_SECONDS);
         assert!(command.no_persist);
     }
 
     #[test]
     fn parser_accepts_equals_form() {
-        let command = parse(&[
-            "--test=flows:netflow",
-            "--dir=flows",
-            "--request=payload.json",
-            "--timeout=0",
-        ])
-        .unwrap()
-        .expect("test command");
+        let command = parse(&["--test=flows:netflow", "--dir=flows", "--timeout=0"])
+            .unwrap()
+            .expect("test command");
 
         assert_eq!(command.function_name, "flows:netflow");
-        assert_eq!(command.backend_dir, Path::new("flows"));
-        assert_eq!(command.request_path, Path::new("payload.json"));
+        assert_eq!(command.backend_dir, PathBuf::from("flows"));
         assert_eq!(command.timeout_seconds, 0);
         assert_eq!(
             effective_timeout_seconds(command.timeout_seconds),
@@ -428,8 +343,6 @@ mod tests {
             "flows:netflow",
             "--dir",
             "flows",
-            "--request",
-            "payload.json",
             "--timeout",
             "120",
         ])
@@ -451,18 +364,10 @@ mod tests {
     #[test]
     fn parser_rejects_empty_required_values() {
         for args in [
-            ["--test=", "--dir=flows", "--request=payload.json"].as_slice(),
-            ["--test", "", "--dir=flows", "--request=payload.json"].as_slice(),
-            ["--test=flows:netflow", "--dir=", "--request=payload.json"].as_slice(),
-            [
-                "--test=flows:netflow",
-                "--dir",
-                "",
-                "--request=payload.json",
-            ]
-            .as_slice(),
-            ["--test=flows:netflow", "--dir=flows", "--request="].as_slice(),
-            ["--test=flows:netflow", "--dir=flows", "--request", ""].as_slice(),
+            ["--test=", "--dir=flows"].as_slice(),
+            ["--test", "", "--dir=flows"].as_slice(),
+            ["--test=flows:netflow", "--dir="].as_slice(),
+            ["--test=flows:netflow", "--dir", ""].as_slice(),
         ] {
             let err = parse(args).expect_err("empty required option should fail");
             assert!(err.contains("missing value for --"));
@@ -470,17 +375,31 @@ mod tests {
     }
 
     #[test]
+    fn parser_rejects_request_option() {
+        for args in [
+            [
+                "--test=flows:netflow",
+                "--dir=flows",
+                "--request=payload.json",
+            ]
+            .as_slice(),
+            [
+                "--test=flows:netflow",
+                "--dir=flows",
+                "--request",
+                "payload.json",
+            ]
+            .as_slice(),
+        ] {
+            let err = parse(args).expect_err("--request should fail");
+            assert!(err.contains("--request is no longer supported"));
+        }
+    }
+
+    #[test]
     fn parser_rejects_unknown_test_options() {
-        let err = parse(&[
-            "--test",
-            "flows:netflow",
-            "--dir",
-            "flows",
-            "--request",
-            "payload.json",
-            "--unknown",
-        ])
-        .expect_err("unknown option should fail");
+        let err = parse(&["--test", "flows:netflow", "--dir", "flows", "--unknown"])
+            .expect_err("unknown option should fail");
 
         assert!(err.contains("unsupported netflow test option"));
     }
@@ -492,8 +411,6 @@ mod tests {
             "flows:netflow",
             "--dir",
             "flows",
-            "--request",
-            "payload.json",
             "--timeout",
             "-1",
         ])
@@ -509,8 +426,6 @@ mod tests {
             "flows:netflow",
             "--dir",
             "flows",
-            "--request",
-            "payload.json",
             "--timeout",
             "30",
             "--timeout=60",
@@ -533,56 +448,25 @@ mod tests {
     }
 
     #[test]
-    fn read_request_payload_rejects_empty_file() {
-        let tmp = tempfile::tempdir().expect("create temp dir");
-        let path = tmp.path().join("empty.json");
-        fs::write(&path, []).expect("write empty request");
-
-        let err = read_request_payload(&path).expect_err("empty request should fail");
+    fn read_request_payload_from_stdin_rejects_empty_input() {
+        let err = read_request_payload_from_stdin(io::Cursor::new(Vec::new()))
+            .expect_err("empty request should fail");
         assert!(err.to_string().contains("is empty"));
     }
 
     #[test]
-    fn read_request_payload_rejects_oversized_file() {
-        let tmp = tempfile::tempdir().expect("create temp dir");
-        let path = tmp.path().join("oversized.json");
-        let file = fs::File::create(&path).expect("create oversized request");
-        file.set_len(MAX_REQUEST_BYTES + 1)
-            .expect("size oversized request");
-
-        let err = read_request_payload(&path).expect_err("oversized request should fail");
+    fn read_request_payload_from_stdin_rejects_oversized_input() {
+        let oversized = vec![b' '; (MAX_REQUEST_BYTES + 1) as usize];
+        let err = read_request_payload_from_stdin(io::Cursor::new(oversized))
+            .expect_err("oversized request should fail");
         assert!(err.to_string().contains("is too large"));
     }
 
-    #[cfg(unix)]
     #[test]
-    fn read_request_payload_rejects_fifo() {
-        use std::ffi::CString;
-        use std::os::unix::ffi::OsStrExt;
-
-        let tmp = tempfile::tempdir().expect("create temp dir");
-        let path = tmp.path().join("request.fifo");
-        let c_path = CString::new(path.as_os_str().as_bytes()).expect("fifo path has no nul byte");
-        let rc = unsafe { libc::mkfifo(c_path.as_ptr(), 0o600) };
-        assert_eq!(rc, 0, "mkfifo {} failed", path.display());
-
-        let err = read_request_payload(&path).expect_err("fifo request should fail");
-        assert!(err.to_string().contains("not a regular file"));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn read_request_payload_rejects_symlink() {
-        use std::os::unix::fs::symlink;
-
-        let tmp = tempfile::tempdir().expect("create temp dir");
-        let target_path = tmp.path().join("target.json");
-        fs::write(&target_path, "{}").expect("write request target");
-        let symlink_path = tmp.path().join("request.json");
-        symlink(&target_path, &symlink_path).expect("create request symlink");
-
-        let err = read_request_payload(&symlink_path).expect_err("symlink request should fail");
-        assert!(err.to_string().contains("not a regular file"));
+    fn read_request_payload_from_stdin_reads_payload() {
+        let request = read_request_payload_from_stdin(io::Cursor::new(br#"{"after":1}"#))
+            .expect("read request payload");
+        assert_eq!(request, br#"{"after":1}"#);
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -593,20 +477,15 @@ mod tests {
             fs::create_dir_all(backend_dir.join(tier)).expect("create tier dir");
         }
 
-        let request_path = tmp.path().join("flows-request.json");
-        fs::write(
-            &request_path,
-            r#"{"after":1,"before":2,"group_by":["PROTOCOL"],"top_n":"100"}"#,
+        let response = execute(
+            TestCommand {
+                function_name: FLOWS_FUNCTION_NAME.to_string(),
+                backend_dir: backend_dir.clone(),
+                timeout_seconds: DEFAULT_TIMEOUT_SECONDS,
+                no_persist: true,
+            },
+            br#"{"after":1,"before":2,"group_by":["PROTOCOL"],"top_n":"100"}"#,
         )
-        .expect("write request payload");
-
-        let response = execute(TestCommand {
-            function_name: FLOWS_FUNCTION_NAME.to_string(),
-            backend_dir: backend_dir.clone(),
-            request_path,
-            timeout_seconds: DEFAULT_TIMEOUT_SECONDS,
-            no_persist: true,
-        })
         .await
         .expect("execute test CLI request");
 

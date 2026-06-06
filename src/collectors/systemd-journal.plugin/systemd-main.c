@@ -25,7 +25,6 @@ struct systemd_journal_test_command {
     bool enabled;
     const char *function_name;
     const char *backend_dir;
-    const char *request_path;
     uint64_t timeout_seconds;
     bool timeout_seconds_set;
 };
@@ -34,7 +33,7 @@ static void systemd_journal_test_usage(FILE *stream)
 {
     fprintf(
         stream,
-        "usage: systemd-journal.plugin --test systemd-journal --dir <journal-dir> --request <payload.json> [--timeout <seconds>]\n");
+        "usage: systemd-journal.plugin --test systemd-journal --dir <journal-dir> [--timeout <seconds>] < payload.json\n");
 }
 
 static bool test_option_present(int argc, char **argv)
@@ -146,17 +145,14 @@ static int parse_systemd_journal_test_command(int argc, char **argv, struct syst
                 return rc;
         }
         else if (strcmp(arg, "--request") == 0) {
-            if (++i >= argc)
-                return set_required_option_once(&cmd->request_path, NULL, "--request");
-
-            int rc = set_required_option_once(&cmd->request_path, argv[i], "--request");
-            if (rc)
-                return rc;
+            fprintf(stderr, "--request is no longer supported; pass the request payload on stdin\n");
+            systemd_journal_test_usage(stderr);
+            return 2;
         }
         else if (strncmp(arg, "--request=", strlen("--request=")) == 0) {
-            int rc = set_required_option_once(&cmd->request_path, arg + strlen("--request="), "--request");
-            if (rc)
-                return rc;
+            fprintf(stderr, "--request is no longer supported; pass the request payload on stdin\n");
+            systemd_journal_test_usage(stderr);
+            return 2;
         }
         else if (strcmp(arg, "--timeout") == 0) {
             if (++i >= argc)
@@ -195,12 +191,6 @@ static int parse_systemd_journal_test_command(int argc, char **argv, struct syst
         return 2;
     }
 
-    if (!cmd->request_path) {
-        fprintf(stderr, "missing required --request\n");
-        systemd_journal_test_usage(stderr);
-        return 2;
-    }
-
     if (!cmd->timeout_seconds_set)
         cmd->timeout_seconds = ND_SD_JOURNAL_DEFAULT_TIMEOUT;
 
@@ -224,113 +214,37 @@ static usec_t systemd_journal_test_stop_monotonic_usec(uint64_t timeout_seconds)
     return now_ut + effective_timeout_seconds * USEC_PER_SEC;
 }
 
-static int validate_systemd_journal_test_executable_permissions(void)
-{
-    CLEAN_CHAR_P *plugin_path = os_get_process_path();
-    if (!plugin_path || !*plugin_path) {
-        fprintf(stderr, "refusing systemd journal test mode: failed to resolve plugin executable path\n");
-        return 2;
-    }
-
-    struct stat st;
-    if (stat(plugin_path, &st) != 0) {
-        fprintf(
-            stderr,
-            "refusing systemd journal test mode: failed to inspect plugin executable '%s': %s\n",
-            plugin_path,
-            strerror(errno));
-        return 2;
-    }
-
-    if (st.st_mode & S_IXOTH) {
-        fprintf(
-            stderr,
-            "refusing systemd journal test mode: plugin executable '%s' is world-executable\n",
-            plugin_path);
-        return 2;
-    }
-
-    return 0;
-}
-
 static bool path_is_directory(const char *path)
 {
     struct stat st;
     return path && stat(path, &st) == 0 && S_ISDIR(st.st_mode);
 }
 
-static BUFFER *read_request_payload(const char *filename)
+static BUFFER *read_request_payload_from_stdin(void)
 {
-#if !defined(O_NOFOLLOW) || !defined(O_NONBLOCK)
-    fprintf(
-        stderr,
-        "refusing request payload '%s': platform does not support safe request payload open flags\n",
-        filename);
-    return NULL;
-#else
-
-    // O_NONBLOCK protects the open/fstat boundary if the path races to a FIFO; regular-file reads still block.
-    int flags = O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK;
-    int fd = open(filename, flags);
-    if (fd == -1) {
-        fprintf(stderr, "failed to open request payload '%s': %s\n", filename, strerror(errno));
-        return NULL;
-    }
-
-    CLEAN_CHAR_P *resolved = realpath(filename, NULL);
-    const char *display_path = resolved ? resolved : filename;
-
-    struct stat st;
-    if (fstat(fd, &st) == -1) {
-        fprintf(stderr, "failed to inspect request payload '%s': %s\n", display_path, strerror(errno));
-        close(fd);
-        return NULL;
-    }
-
-    if (!S_ISREG(st.st_mode)) {
-        fprintf(stderr, "request payload '%s' is not a regular file\n", display_path);
-        close(fd);
-        return NULL;
-    }
-
-    if (st.st_size <= 0) {
-        fprintf(stderr, "request payload '%s' is empty\n", display_path);
-        close(fd);
-        return NULL;
-    }
-
-    if ((uint64_t)st.st_size > ND_SD_JOURNAL_TEST_MAX_REQUEST_BYTES) {
-        fprintf(
-            stderr,
-            "request payload '%s' is too large: %llu bytes, max %llu bytes\n",
-            display_path,
-            (unsigned long long)st.st_size,
-            (unsigned long long)ND_SD_JOURNAL_TEST_MAX_REQUEST_BYTES);
-        close(fd);
-        return NULL;
-    }
-
-    BUFFER *payload = buffer_create((size_t)st.st_size + 1, NULL);
+    BUFFER *payload = buffer_create(8192, NULL);
     size_t total = 0;
-    while (total < (size_t)st.st_size) {
+    while (true) {
         char buffer[8192];
-        size_t remaining = (size_t)st.st_size - total;
-        size_t wanted = MIN(remaining, sizeof(buffer));
-        ssize_t bytes_read = read(fd, buffer, wanted);
+        ssize_t bytes_read = read(STDIN_FILENO, buffer, sizeof(buffer));
         if (bytes_read == -1) {
             if (errno == EINTR)
                 continue;
 
-            fprintf(stderr, "failed to read request payload '%s': %s\n", display_path, strerror(errno));
+            fprintf(stderr, "failed to read request payload from stdin: %s\n", strerror(errno));
             buffer_free(payload);
-            close(fd);
             return NULL;
         }
 
-        if (bytes_read == 0) {
-            fprintf(stderr, "request payload '%s' changed while reading\n", display_path);
+        if (bytes_read == 0)
+            break;
+
+        if ((uint64_t)total + (uint64_t)bytes_read > ND_SD_JOURNAL_TEST_MAX_REQUEST_BYTES) {
+            fprintf(
+                stderr,
+                "request payload from stdin is too large: max %llu bytes\n",
+                (unsigned long long)ND_SD_JOURNAL_TEST_MAX_REQUEST_BYTES);
             buffer_free(payload);
-            close(fd);
             return NULL;
         }
 
@@ -338,11 +252,15 @@ static BUFFER *read_request_payload(const char *filename)
         total += (size_t)bytes_read;
     }
 
-    close(fd);
+    if (total == 0) {
+        fprintf(stderr, "request payload from stdin is empty\n");
+        buffer_free(payload);
+        return NULL;
+    }
+
     payload->content_type = CT_APPLICATION_JSON;
 
     return payload;
-#endif
 }
 
 static int run_systemd_journal_test_command(const struct systemd_journal_test_command *cmd)
@@ -361,12 +279,7 @@ static int run_systemd_journal_test_command(const struct systemd_journal_test_co
         return 1;
     }
 
-    // The request path is intentionally caller-selected for offline fixtures. Test mode refuses world-executable
-    // privileged plugin binaries, and the path is opened with no-final-symlink and nonblocking flags, size-limited,
-    // and checked as a regular file.
-    //
-    // codeql[cpp/path-injection]
-    CLEAN_BUFFER *payload = read_request_payload(cmd->request_path);
+    CLEAN_BUFFER *payload = read_request_payload_from_stdin();
     if (!payload)
         return 1;
 
@@ -416,12 +329,6 @@ int main(int argc, char **argv)
     int test_parse_rc = parse_systemd_journal_test_command(argc, argv, &test_command);
     if (test_parse_rc)
         exit(test_parse_rc);
-
-    if (test_command.enabled) {
-        int permissions_rc = validate_systemd_journal_test_executable_permissions();
-        if (permissions_rc)
-            exit(permissions_rc);
-    }
 
     nd_thread_tag_set("sd-jrnl.plugin");
     nd_log_initialize_for_external_plugins("systemd-journal.plugin");
