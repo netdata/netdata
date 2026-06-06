@@ -8,6 +8,11 @@ CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
 
 set -eu -o pipefail
 
+if [ "${MSYSTEM:-}" != "UCRT64" ]; then
+    echo "Expected MSYSTEM=UCRT64 for the Windows build." >&2
+    exit 1
+fi
+
 windows_path_prefix=
 windows_path_prefix_arg=()
 

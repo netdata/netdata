@@ -2,24 +2,29 @@
 
 RUN_AS_SERVICE=0
 
+if [ "${MSYSTEM:-}" != "UCRT64" ]; then
+    echo "Expected MSYSTEM=UCRT64 for the Windows compile-and-run helper." >&2
+    exit 1
+fi
+
 # On MSYS2, install these dependencies to build netdata:
 install_dependencies() {
     pacman -S \
         git cmake ninja clang base-devel msys2-devel \
         libyaml-devel libzstd-devel libutil-linux libutil-linux-devel \
-        mingw-w64-x86_64-toolchain mingw-w64-ucrt-x86_64-toolchain \
-        mingw64/mingw-w64-x86_64-mold ucrt64/mingw-w64-ucrt-x86_64-mold \
-        msys/gdb ucrt64/mingw-w64-ucrt-x86_64-gdb mingw64/mingw-w64-x86_64-gdb \
-        msys/zlib-devel mingw64/mingw-w64-x86_64-zlib ucrt64/mingw-w64-ucrt-x86_64-zlib \
-        msys/libuv-devel ucrt64/mingw-w64-ucrt-x86_64-libuv mingw64/mingw-w64-x86_64-libuv \
-        liblz4-devel mingw64/mingw-w64-x86_64-lz4 ucrt64/mingw-w64-ucrt-x86_64-lz4 \
-        openssl-devel mingw64/mingw-w64-x86_64-openssl ucrt64/mingw-w64-ucrt-x86_64-openssl \
-        protobuf-devel mingw64/mingw-w64-x86_64-protobuf ucrt64/mingw-w64-ucrt-x86_64-protobuf \
-        msys/pcre2-devel mingw64/mingw-w64-x86_64-pcre2 ucrt64/mingw-w64-ucrt-x86_64-pcre2 \
-        msys/brotli-devel mingw64/mingw-w64-x86_64-brotli ucrt64/mingw-w64-ucrt-x86_64-brotli \
-        msys/ccache ucrt64/mingw-w64-ucrt-x86_64-ccache mingw64/mingw-w64-x86_64-ccache \
-        mingw64/mingw-w64-x86_64-go ucrt64/mingw-w64-ucrt-x86_64-go \
-        mingw64/mingw-w64-x86_64-nsis \
+        mingw-w64-ucrt-x86_64-toolchain \
+        ucrt64/mingw-w64-ucrt-x86_64-mold \
+        msys/gdb ucrt64/mingw-w64-ucrt-x86_64-gdb \
+        msys/zlib-devel ucrt64/mingw-w64-ucrt-x86_64-zlib \
+        msys/libuv-devel ucrt64/mingw-w64-ucrt-x86_64-libuv \
+        liblz4-devel ucrt64/mingw-w64-ucrt-x86_64-lz4 \
+        openssl-devel ucrt64/mingw-w64-ucrt-x86_64-openssl \
+        protobuf-devel ucrt64/mingw-w64-ucrt-x86_64-protobuf \
+        msys/pcre2-devel ucrt64/mingw-w64-ucrt-x86_64-pcre2 \
+        msys/brotli-devel ucrt64/mingw-w64-ucrt-x86_64-brotli \
+        msys/ccache ucrt64/mingw-w64-ucrt-x86_64-ccache \
+        ucrt64/mingw-w64-ucrt-x86_64-go \
+        ucrt64/mingw-w64-ucrt-x86_64-nsis \
         msys/libcurl msys/libcurl-devel
 }
 
