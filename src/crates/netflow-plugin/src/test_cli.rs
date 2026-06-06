@@ -132,7 +132,7 @@ fn effective_timeout_seconds(timeout_seconds: u64) -> u64 {
 }
 
 fn read_request_payload(path: &Path) -> Result<Vec<u8>> {
-    let metadata = fs::metadata(path)
+    let metadata = fs::symlink_metadata(path)
         .with_context(|| format!("failed to inspect request payload {}", path.display()))?;
     validate_request_payload_metadata(path, &metadata)?;
 
@@ -163,19 +163,25 @@ fn read_request_payload(path: &Path) -> Result<Vec<u8>> {
 }
 
 fn open_request_payload_file(path: &Path) -> Result<fs::File> {
-    let mut options = fs::OpenOptions::new();
-    options.read(true);
-    #[cfg(unix)]
+    #[cfg(not(unix))]
     {
-        use std::os::unix::fs::OpenOptionsExt;
-
-        // Avoid blocking if the path changes to a FIFO between metadata validation and open.
-        options.custom_flags(libc::O_NONBLOCK);
+        bail!("netflow test request payloads require Unix safe-open flags");
     }
 
-    options
-        .open(path)
-        .with_context(|| format!("failed to open request payload {}", path.display()))
+    #[cfg(unix)]
+    {
+        let mut options = fs::OpenOptions::new();
+        options.read(true);
+        use std::os::unix::fs::OpenOptionsExt;
+
+        // O_NOFOLLOW rejects a final symlink race. O_NONBLOCK avoids blocking if the path races to a FIFO before
+        // fstat() rejects it as non-regular.
+        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+
+        options
+            .open(path)
+            .with_context(|| format!("failed to open request payload {}", path.display()))
+    }
 }
 
 fn validate_request_payload_metadata(path: &Path, metadata: &fs::Metadata) -> Result<()> {
@@ -493,6 +499,21 @@ mod tests {
         assert_eq!(rc, 0, "mkfifo {} failed", path.display());
 
         let err = read_request_payload(&path).expect_err("fifo request should fail");
+        assert!(err.to_string().contains("not a regular file"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn read_request_payload_rejects_symlink() {
+        use std::os::unix::fs::symlink;
+
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let target_path = tmp.path().join("target.json");
+        fs::write(&target_path, "{}").expect("write request target");
+        let symlink_path = tmp.path().join("request.json");
+        symlink(&target_path, &symlink_path).expect("create request symlink");
+
+        let err = read_request_payload(&symlink_path).expect_err("symlink request should fail");
         assert!(err.to_string().contains("not a regular file"));
     }
 

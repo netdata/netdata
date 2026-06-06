@@ -269,6 +269,7 @@ static BUFFER *read_request_payload(const char *filename)
     return NULL;
 #else
 
+    // O_NONBLOCK protects the open/fstat boundary if the path races to a FIFO; regular-file reads still block.
     int flags = O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK;
     int fd = open(filename, flags);
     if (fd == -1) {
