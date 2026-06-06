@@ -132,9 +132,9 @@ BUFFER *function_systemd_journal_result(
     usec_t *stop_monotonic_ut,
     bool *cancelled,
     BUFFER *payload,
-    HTTP_ACCESS access,
-    const char *source,
-    void *data);
+    HTTP_ACCESS access __maybe_unused,
+    const char *source __maybe_unused,
+    void *data __maybe_unused);
 void function_systemd_journal(
     const char *transaction,
     char *function,

@@ -129,3 +129,13 @@ pub(crate) enum FlowsFunctionResponse {
     Metrics(FlowMetricsResponse),
     Autocomplete(FlowAutocompleteResponse),
 }
+
+impl FlowsFunctionResponse {
+    pub(crate) fn status(&self) -> u32 {
+        match self {
+            Self::Table(response) => response.status,
+            Self::Metrics(response) => response.status,
+            Self::Autocomplete(response) => response.status,
+        }
+    }
+}

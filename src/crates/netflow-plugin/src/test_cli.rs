@@ -33,7 +33,8 @@ pub(crate) async fn run(command: TestCommand) -> Result<()> {
     let response = execute(command).await?;
     let stdout = io::stdout();
     let mut handle = stdout.lock();
-    write_json_response(&response, &mut handle)
+    write_json_response(&response, &mut handle)?;
+    ensure_success_status(response.status())
 }
 
 pub(crate) async fn execute(command: TestCommand) -> Result<FlowsFunctionResponse> {
@@ -129,6 +130,14 @@ fn effective_timeout_seconds(timeout_seconds: u64) -> u64 {
     } else {
         timeout_seconds
     }
+}
+
+fn ensure_success_status(status: u32) -> Result<()> {
+    if !(200..300).contains(&status) {
+        bail!("netflow test function returned status {status}");
+    }
+
+    Ok(())
 }
 
 fn read_request_payload(path: &Path) -> Result<Vec<u8>> {
@@ -231,21 +240,33 @@ fn parse_from(
                 let value = args
                     .get(idx)
                     .ok_or_else(|| format!("missing value for --test\n{USAGE}"))?;
-                set_once(&mut function_name, value.clone(), "--test")?;
+                set_once(
+                    &mut function_name,
+                    required_option_value(value, "--test")?.to_string(),
+                    "--test",
+                )?;
             }
             "--dir" => {
                 idx += 1;
                 let value = args
                     .get(idx)
                     .ok_or_else(|| format!("missing value for --dir\n{USAGE}"))?;
-                set_once(&mut backend_dir, PathBuf::from(value), "--dir")?;
+                set_once(
+                    &mut backend_dir,
+                    PathBuf::from(required_option_value(value, "--dir")?),
+                    "--dir",
+                )?;
             }
             "--request" => {
                 idx += 1;
                 let value = args
                     .get(idx)
                     .ok_or_else(|| format!("missing value for --request\n{USAGE}"))?;
-                set_once(&mut request_path, PathBuf::from(value), "--request")?;
+                set_once(
+                    &mut request_path,
+                    PathBuf::from(required_option_value(value, "--request")?),
+                    "--request",
+                )?;
             }
             "--timeout" => {
                 idx += 1;
@@ -267,21 +288,27 @@ fn parse_from(
             _ if arg.starts_with("--test=") => {
                 set_once(
                     &mut function_name,
-                    arg.trim_start_matches("--test=").to_string(),
+                    required_option_value(arg.trim_start_matches("--test="), "--test")?.to_string(),
                     "--test",
                 )?;
             }
             _ if arg.starts_with("--dir=") => {
                 set_once(
                     &mut backend_dir,
-                    PathBuf::from(arg.trim_start_matches("--dir=")),
+                    PathBuf::from(required_option_value(
+                        arg.trim_start_matches("--dir="),
+                        "--dir",
+                    )?),
                     "--dir",
                 )?;
             }
             _ if arg.starts_with("--request=") => {
                 set_once(
                     &mut request_path,
-                    PathBuf::from(arg.trim_start_matches("--request=")),
+                    PathBuf::from(required_option_value(
+                        arg.trim_start_matches("--request="),
+                        "--request",
+                    )?),
                     "--request",
                 )?;
             }
@@ -317,6 +344,14 @@ fn set_once<T>(slot: &mut Option<T>, value: T, option: &str) -> std::result::Res
     }
     *slot = Some(value);
     Ok(())
+}
+
+fn required_option_value<'a>(value: &'a str, option: &str) -> std::result::Result<&'a str, String> {
+    if value.is_empty() {
+        return Err(format!("missing value for {option}\n{USAGE}"));
+    }
+
+    Ok(value)
 }
 
 fn required<T>(slot: Option<T>, option: &str) -> std::result::Result<T, String> {
@@ -414,6 +449,27 @@ mod tests {
     }
 
     #[test]
+    fn parser_rejects_empty_required_values() {
+        for args in [
+            ["--test=", "--dir=flows", "--request=payload.json"].as_slice(),
+            ["--test", "", "--dir=flows", "--request=payload.json"].as_slice(),
+            ["--test=flows:netflow", "--dir=", "--request=payload.json"].as_slice(),
+            [
+                "--test=flows:netflow",
+                "--dir",
+                "",
+                "--request=payload.json",
+            ]
+            .as_slice(),
+            ["--test=flows:netflow", "--dir=flows", "--request="].as_slice(),
+            ["--test=flows:netflow", "--dir=flows", "--request", ""].as_slice(),
+        ] {
+            let err = parse(args).expect_err("empty required option should fail");
+            assert!(err.contains("missing value for --"));
+        }
+    }
+
+    #[test]
     fn parser_rejects_unknown_test_options() {
         let err = parse(&[
             "--test",
@@ -462,6 +518,18 @@ mod tests {
         .expect_err("duplicate timeout should fail");
 
         assert!(err.contains("duplicate --timeout"));
+    }
+
+    #[test]
+    fn success_status_accepts_2xx() {
+        ensure_success_status(200).expect("200 should pass");
+        ensure_success_status(299).expect("299 should pass");
+    }
+
+    #[test]
+    fn success_status_rejects_non_2xx() {
+        let err = ensure_success_status(400).expect_err("400 should fail");
+        assert!(err.to_string().contains("returned status 400"));
     }
 
     #[test]
