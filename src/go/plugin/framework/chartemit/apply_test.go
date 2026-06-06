@@ -4,6 +4,7 @@ package chartemit
 
 import (
 	"bytes"
+	"math"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
@@ -240,6 +241,47 @@ END
 
 `, out)
 	assert.NotContains(t, out, "SET 'total' = 7.9")
+}
+
+func TestApplyPlanGapsNonFiniteFloatUpdate(t *testing.T) {
+	var buf bytes.Buffer
+	api := netdataapi.New(&buf)
+
+	meta := chartengine.ChartMeta{
+		Title:     "Latency",
+		Family:    "Latency",
+		Context:   "svc.latency",
+		Units:     "ms",
+		Algorithm: chartengine.AlgorithmAbsolute,
+		Type:      chartengine.ChartTypeLine,
+	}
+
+	plan := Plan{
+		Actions: []EngineAction{
+			chartengine.CreateChartAction{ChartTemplateID: "g0c0", ChartID: "svc_latency", Meta: meta},
+			chartengine.CreateDimensionAction{
+				ChartID: "svc_latency", ChartMeta: meta, Name: "value",
+				Float: true, Algorithm: chartengine.AlgorithmAbsolute, Multiplier: 1, Divisor: 1,
+			},
+			chartengine.UpdateChartAction{
+				ChartID: "svc_latency",
+				Values: []chartengine.UpdateDimensionValue{
+					{Name: "value", IsFloat: true, Float64: math.NaN()},
+				},
+			},
+		},
+	}
+
+	require.NoError(t, ApplyPlan(api, plan, EmitEnv{
+		TypeID: "collector.job", UpdateEvery: 1, Plugin: "go.d.plugin", Module: "prometheus",
+		JobName: "job01", MSSinceLast: 1,
+	}))
+
+	out := buf.String()
+	// A non-finite float dimension is emitted as a gap (empty SET), never "SET = NaN" (which the C
+	// agent would render as 0).
+	assert.NotContains(t, out, "NaN")
+	assert.Contains(t, out, "SET 'value' = \n")
 }
 
 func TestApplyPlanDimensionOnlyCreateEmitsLabelsAndCommit(t *testing.T) {
