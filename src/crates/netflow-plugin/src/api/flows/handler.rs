@@ -9,9 +9,9 @@ use std::sync::Arc;
 use tokio::task;
 
 use super::model::{
-    FLOWS_FUNCTION_VERSION, FLOWS_SCHEMA_VERSION, FLOWS_UPDATE_EVERY_SECONDS, FlowAutocompleteData,
-    FlowAutocompleteResponse, FlowMetricsData, FlowMetricsResponse, FlowsData,
-    FlowsFunctionResponse, FlowsResponse,
+    FLOWS_FUNCTION_NAME, FLOWS_FUNCTION_VERSION, FLOWS_SCHEMA_VERSION, FLOWS_UPDATE_EVERY_SECONDS,
+    FlowAutocompleteData, FlowAutocompleteResponse, FlowMetricsData, FlowMetricsResponse,
+    FlowsData, FlowsFunctionResponse, FlowsResponse,
 };
 use super::params::{accepted_params, flows_required_params};
 
@@ -264,8 +264,10 @@ impl FunctionHandler for NetflowFlowsHandler {
     }
 
     fn declaration(&self) -> FunctionDeclaration {
-        let mut func_decl =
-            FunctionDeclaration::new("flows:netflow", "NetFlow/IPFIX/sFlow flow analysis data");
+        let mut func_decl = FunctionDeclaration::new(
+            FLOWS_FUNCTION_NAME,
+            "NetFlow/IPFIX/sFlow flow analysis data",
+        );
         func_decl.global = true;
         func_decl.tags = Some("flows".to_string());
         func_decl.access =

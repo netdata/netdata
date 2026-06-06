@@ -280,6 +280,8 @@
 - Docs: clarify dbengine tier 0 retention size enforcement and disk usage overflow ([#22521](https://github.com/netdata/netdata/issues/22521))
 - Add Markdown copy of Windows package EULA. ([#22421](https://github.com/netdata/netdata/issues/22421))
 - Chore: clarify the SOW lifecycle and strengthen the Mandatory Development Principles ([#22630](https://github.com/netdata/netdata/issues/22630))
+- Docs: consolidate dbengine retention sizing guidance ([#22517](https://github.com/netdata/netdata/issues/22517))
+- Chore(go/pkg/prometheus):  unified single-pass stream parser ([#22640](https://github.com/netdata/netdata/issues/22640))
 
 ## [2.10.0] - 2026-04-09
 

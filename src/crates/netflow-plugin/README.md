@@ -7,6 +7,35 @@ Rust NetFlow/IPFIX/sFlow ingestion and query plugin.
 It stores flow entries in journal tiers under the Netdata cache directory and exposes
 `flows:netflow`.
 
+## Offline Function test mode
+
+Fixture harnesses can execute the Function query path directly against an existing
+NetFlow backend directory:
+
+```sh
+netflow-plugin --test flows:netflow --dir <flows-dir> [--timeout <seconds>] [--no-persist] < payload.json
+```
+
+Requirements:
+
+- `<flows-dir>` is the NetFlow backend root containing the `raw`, `1m`, `5m`, and `1h` tier directories.
+- stdin is the JSON Function request body (non-empty, maximum 16 MiB).
+- `--request` is not supported and fails with usage output.
+- `--timeout <seconds>` controls the offline Function execution timeout. It
+  defaults to `30`; use `--timeout 0` to map to a very large finite timeout for
+  long-running fixture comparisons.
+- stdout contains only the raw JSON Function response.
+- errors are written to stderr and return non-zero.
+
+Use `--no-persist` for shared fixture datasets. It prevents the test run from writing
+facet state or sidecar files under `<flows-dir>` while keeping facet data in memory for
+the Function response. Without `--no-persist`, the plugin may refresh facet state under
+the backend directory, matching normal runtime behavior.
+
+Function output includes volatile fields such as collection timestamps and runtime
+statistics. Test harnesses should normalize those fields before comparing fixture
+outputs.
+
 ## Configuration
 
 When running under Netdata, config is loaded from `netflow.yaml` in:

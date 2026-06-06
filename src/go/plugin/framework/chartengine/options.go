@@ -12,17 +12,20 @@ import (
 )
 
 type engineConfig struct {
-	autogen          AutogenPolicy
-	autogenTypeID    string
-	selector         metrixselector.Selector
-	autogenOverride  policyOverride[AutogenPolicy]
-	selectorOverride policyOverride[metrixselector.Selector]
-	runtimeStore     metrix.RuntimeStore
-	runtimeStoreSet  bool
-	runtimeObserver  func(PlanRuntimeSample)
-	log              *logger.Logger
-	seriesSelection  seriesSelectionMode
-	runtimePlanner   bool
+	autogen       AutogenPolicy
+	autogenTypeID string
+	// autogenContextNamespace prefixes autogen chart contexts (the spec's root
+	// context_namespace), so autogen and template charts share one namespace.
+	autogenContextNamespace string
+	selector                metrixselector.Selector
+	autogenOverride         policyOverride[AutogenPolicy]
+	selectorOverride        policyOverride[metrixselector.Selector]
+	runtimeStore            metrix.RuntimeStore
+	runtimeStoreSet         bool
+	runtimeObserver         func(PlanRuntimeSample)
+	log                     *logger.Logger
+	seriesSelection         seriesSelectionMode
+	runtimePlanner          bool
 }
 
 type policyOverride[T any] struct {
