@@ -16,8 +16,8 @@
 #define JOURNAL_KEY_ND_JOURNAL_PROCESS "ND_JOURNAL_PROCESS"
 
 // functions needed by LQS
-static __always_inline
-SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(const char *value) {
+static __always_inline SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(const char *value)
+{
     if (strcmp(value, ND_SD_JF_SOURCE_ALL_NAME) == 0)
         return ND_SD_JF_ALL;
     else if (strcmp(value, ND_SD_JF_SOURCE_LOCAL_NAME) == 0)
@@ -87,8 +87,7 @@ SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(const char *value) {
     "|_UID"                                                                                                                    \
     "|_GID"                                                                                                                    \
     "|_COMM"                                                                                                                   \
-    "|_EXE"           /* "|_CMDLINE" */                                                                                        \
-    "|_CAP_EFFECTIVE" /* "|_AUDIT_SESSION" */                                                                                  \
+    "|_EXE" /* "|_CMDLINE" "|_CAP_EFFECTIVE" "|_AUDIT_SESSION" */                                                              \
     "|_AUDIT_LOGINUID"                                                                                                         \
     "|_SYSTEMD_CGROUP"                                                                                                         \
     "|_SYSTEMD_SLICE"                                                                                                          \
@@ -101,8 +100,7 @@ SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(const char *value) {
     "|_BOOT_ID"                                                                                                                \
     "|_MACHINE_ID" /* "|_SYSTEMD_INVOCATION_ID" */                                                                             \
     "|_HOSTNAME"                                                                                                               \
-    "|_TRANSPORT"                                                                                                              \
-    "|_STREAM_ID" /* "|LINE_BREAK" */                                                                                          \
+    "|_TRANSPORT" /* "|_STREAM_ID" "|LINE_BREAK" */                                                                            \
     "|_NAMESPACE"                                                                                                              \
     "|_RUNTIME_SCOPE"                                                                                                          \
                                                                                                                                \
@@ -155,8 +153,8 @@ SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(const char *value) {
 
 #include "systemd-journal-execute.h"
 
-static
-void systemd_journal_register_transformations(LOGS_QUERY_STATUS *lqs) {
+static void systemd_journal_register_transformations(LOGS_QUERY_STATUS *lqs)
+{
     FACETS *facets = lqs->facets;
     LOGS_QUERY_REQUEST *rq = &lqs->rq;
 
@@ -257,7 +255,7 @@ void systemd_journal_register_transformations(LOGS_QUERY_STATUS *lqs) {
         NULL);
 }
 
-void function_systemd_journal(
+BUFFER *function_systemd_journal_result(
     const char *transaction,
     char *function,
     usec_t *stop_monotonic_ut,
@@ -292,7 +290,7 @@ void function_systemd_journal(
     };
     LOGS_QUERY_STATUS *lqs = &tmp_fqs;
 
-    CLEAN_BUFFER *wb = lqs_create_output_buffer();
+    BUFFER *wb = lqs_create_output_buffer();
 
     // ------------------------------------------------------------------------
     // parse the parameters
@@ -317,9 +315,27 @@ void function_systemd_journal(
         }
     }
 
+    lqs_cleanup(lqs);
+
+    return wb;
+}
+
+void function_systemd_journal(
+    const char *transaction,
+    char *function,
+    usec_t *stop_monotonic_ut,
+    bool *cancelled,
+    BUFFER *payload,
+    HTTP_ACCESS access,
+    const char *source,
+    void *data)
+{
+    BUFFER *wb = function_systemd_journal_result(
+        transaction, function, stop_monotonic_ut, cancelled, payload, access, source, data);
+
     netdata_mutex_lock(&stdout_mutex);
     pluginsd_function_result_to_stdout(transaction, wb);
     netdata_mutex_unlock(&stdout_mutex);
 
-    lqs_cleanup(lqs);
+    buffer_free(wb);
 }
