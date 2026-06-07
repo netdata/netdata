@@ -4,6 +4,7 @@ package chartengine
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -598,6 +599,12 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 		for _, name := range updateNames {
 			entry, ok := cs.entries[name]
 			if ok && entry != nil && entry.seenSeq == cs.currentBuildSeq {
+				if math.IsNaN(entry.value) || math.IsInf(entry.value, 0) {
+					// A non-finite value (e.g. a summary quantile with no observations this
+					// cycle) must render as a gap, not 0: emit SETEMPTY rather than carry NaN.
+					values = append(values, UpdateDimensionValue{Name: name, IsEmpty: true})
+					continue
+				}
 				values = append(values, UpdateDimensionValue{
 					Name:    name,
 					IsFloat: entry.float,
