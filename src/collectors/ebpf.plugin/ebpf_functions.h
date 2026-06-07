@@ -22,6 +22,7 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC, int
 
 // function list
 #define EBPF_FUNCTION_SOCKET "network-sockets-tracing"
+#define EBPF_FUNCTION_DNS "network-dns-tracing"
 
 // socket constants
 #define EBPF_PLUGIN_SOCKET_FUNCTION_DESCRIPTION "Detailed information about open sockets."
@@ -32,6 +33,11 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC, int
 #define EBPF_FUNCTION_SOCKET_PORT "port:"
 #define EBPF_FUNCTION_SOCKET_RESET "reset"
 #define EBPF_FUNCTION_SOCKET_INTERFACES "interfaces"
+
+// dns constants
+#define EBPF_PLUGIN_DNS_FUNCTION_DESCRIPTION "On-demand DNS tracing using an eBPF socket filter."
+#define EBPF_FUNCTION_DNS_PORT "port:"
+#define EBPF_FUNCTION_DNS_ITERATION "iteration:"
 
 void ebpf_function_thread(void *ptr);
 
