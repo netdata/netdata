@@ -143,7 +143,6 @@ func diffCounters(current, previous uint64) int64 {
 	return int64(current - previous)
 }
 
-
 func createCachestatGlobalCharts(api *netdataapi.API, updateEvery int) {
 	cachestatGlobalChartsOnce.Do(func() {
 		cachestatStdoutMutex.Lock()
@@ -254,7 +253,7 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 					}
 				}
 				if handle.SharedMemory != nil {
-					if err := handle.SharedMemory.Publish(store.Snapshot()); err != nil {
+					if err := store.Publish(handle.SharedMemory); err != nil {
 						fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat shared memory publish failed: %v\n", err)
 					}
 				}

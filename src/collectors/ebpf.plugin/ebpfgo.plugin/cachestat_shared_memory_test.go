@@ -150,3 +150,33 @@ func TestCachestatSharedMemoryStoreUpdateApps(t *testing.T) {
 		t.Fatalf("Snapshot() previous counters on first update should be zero")
 	}
 }
+
+func BenchmarkCachestatSharedMemoryStoreUpdateAppsSorted(b *testing.B) {
+	const appsCount = 1024
+	apps := make([]libbpfloader.CachestatAppSnapshot, appsCount)
+	for i := range apps {
+		apps[i] = libbpfloader.CachestatAppSnapshot{
+			Pid:                uint32(i + 1),
+			Ppid:               1,
+			Ct:                 uint64(i + 1),
+			AddToPageCacheLru:  uint32(i),
+			MarkPageAccessed:   uint32(i * 2),
+			AccountPageDirtied: uint32(i / 2),
+			MarkBufferDirty:    uint32(i / 3),
+		}
+	}
+
+	store := NewCachestatSharedMemoryStore()
+	store.UpdateApps(apps)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for idx := range apps {
+			apps[idx].Ct++
+		}
+		if stale := store.UpdateApps(apps); len(stale) != 0 {
+			b.Fatalf("unexpected stale PIDs: %v", stale)
+		}
+	}
+}

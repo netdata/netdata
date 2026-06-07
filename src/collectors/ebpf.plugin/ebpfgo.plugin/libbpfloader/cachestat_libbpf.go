@@ -208,7 +208,7 @@ func (r *CachestatRuntime) SnapshotApps(mapsPerCore bool) ([]CachestatAppSnapsho
 	out := make([]CachestatAppSnapshot, 0, len(items))
 	for _, item := range items {
 		var comm [CachestatAppCommLen]byte
-		copy(comm[:], C.GoBytes(unsafe.Pointer(&item.comm[0]), C.int(CachestatAppCommLen)))
+		copy(comm[:], unsafe.Slice((*byte)(unsafe.Pointer(&item.comm[0])), CachestatAppCommLen))
 		out = append(out, CachestatAppSnapshot{
 			Pid:                uint32(item.pid),
 			Ppid:               uint32(item.ppid),

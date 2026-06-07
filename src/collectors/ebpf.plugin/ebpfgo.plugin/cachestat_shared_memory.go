@@ -12,36 +12,27 @@ import (
 const cachestatStaleCycles = 3
 
 type cachestatSharedMemoryStore struct {
-	mu        sync.RWMutex
-	entries   []ebpfPidStat
-	prev      map[uint32]netdataCachestat
-	prevCt    map[uint32]uint64 // last observed BPF timestamp per PID
-	missCount map[uint32]int    // consecutive cycles where ct did not advance
+	mu          sync.RWMutex
+	entries     []ebpfPidStat
+	nextEntries []ebpfPidStat
+	prev        map[uint32]netdataCachestat
+	prevCt      map[uint32]uint64 // last observed BPF timestamp per PID
+	missCount   map[uint32]int    // consecutive cycles where ct did not advance
+	nextPrev    map[uint32]netdataCachestat
+	nextPrevCt  map[uint32]uint64
+	nextMiss    map[uint32]int
+	stalePIDs   []uint32
 }
 
 func NewCachestatSharedMemoryStore() *cachestatSharedMemoryStore {
 	return &cachestatSharedMemoryStore{
-		prev:      make(map[uint32]netdataCachestat),
-		prevCt:    make(map[uint32]uint64),
-		missCount: make(map[uint32]int),
+		prev:       make(map[uint32]netdataCachestat),
+		prevCt:     make(map[uint32]uint64),
+		missCount:  make(map[uint32]int),
+		nextPrev:   make(map[uint32]netdataCachestat),
+		nextPrevCt: make(map[uint32]uint64),
+		nextMiss:   make(map[uint32]int),
 	}
-}
-
-func (s *cachestatSharedMemoryStore) Replace(
-	snapshot []ebpfPidStat,
-	prev map[uint32]netdataCachestat,
-	prevCt map[uint32]uint64,
-	missCount map[uint32]int,
-) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	copied := make([]ebpfPidStat, len(snapshot))
-	copy(copied, snapshot)
-	s.entries = copied
-	s.prev = prev
-	s.prevCt = prevCt
-	s.missCount = missCount
 }
 
 func (s *cachestatSharedMemoryStore) Snapshot() []ebpfPidStat {
@@ -54,6 +45,17 @@ func (s *cachestatSharedMemoryStore) Snapshot() []ebpfPidStat {
 	copied := make([]ebpfPidStat, len(s.entries))
 	copy(copied, s.entries)
 	return copied
+}
+
+func (s *cachestatSharedMemoryStore) Publish(publisher *SharedPidMemoryPublisher) error {
+	if publisher == nil {
+		return nil
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return publisher.Publish(s.entries)
 }
 
 func buildCachestatPublish(current, previous netdataCachestat, ct uint64, hasPrevious bool) netdataPublishCachestat {
@@ -128,13 +130,28 @@ func buildCachestatPidStat(app libbpfloader.CachestatAppSnapshot, previous netda
 // It returns the PIDs that should be deleted from the kernel BPF map because
 // their ct has not advanced for cachestatStaleCycles consecutive cycles.
 func (s *cachestatSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatAppSnapshot) []uint32 {
-	nextEntries := make([]ebpfPidStat, 0, len(apps))
-	nextPrev := make(map[uint32]netdataCachestat, len(apps))
-	nextPrevCt := make(map[uint32]uint64, len(apps))
-	nextMiss := make(map[uint32]int)
-	var stalePIDs []uint32
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	nextEntries := s.nextEntries[:0]
+	if cap(nextEntries) < len(apps) {
+		nextEntries = make([]ebpfPidStat, 0, len(apps))
+	}
+	clear(s.nextPrev)
+	clear(s.nextPrevCt)
+	clear(s.nextMiss)
+	stalePIDs := s.stalePIDs[:0]
+	ordered := true
+	seenPID := false
+	var previousPID uint32
 
 	for _, app := range apps {
+		if seenPID && app.Pid < previousPID {
+			ordered = false
+		}
+		seenPID = true
+		previousPID = app.Pid
+
 		lastCt, seen := s.prevCt[app.Pid]
 		if seen && app.Ct == lastCt {
 			miss := s.missCount[app.Pid] + 1
@@ -144,26 +161,31 @@ func (s *cachestatSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatApp
 				stalePIDs = append(stalePIDs, app.Pid)
 				continue
 			}
-			nextMiss[app.Pid] = miss
+			s.nextMiss[app.Pid] = miss
 		}
 		// New PID or ct advanced: miss count stays 0 (Go zero-value).
 
-		nextPrevCt[app.Pid] = app.Ct
+		s.nextPrevCt[app.Pid] = app.Ct
 
 		previous, hasPrevious := s.prev[app.Pid]
 		stat, current := buildCachestatPidStat(app, previous, hasPrevious)
 		nextEntries = append(nextEntries, stat)
-		nextPrev[app.Pid] = current
+		s.nextPrev[app.Pid] = current
 	}
 
 	// Ensure entries are sorted by pid so Snapshot() callers always see a
-	// consistent ordering.  The C layer pre-sorts its output, so this is a
-	// no-op (O(N) pass) in the normal production path.
-	sort.Slice(nextEntries, func(i, j int) bool {
-		return nextEntries[i].pid < nextEntries[j].pid
-	})
+	// consistent ordering. The native snapshot path already sorts by pid, so
+	// only pay for sort when a test or fallback caller provides unordered input.
+	if !ordered {
+		sort.Slice(nextEntries, func(i, j int) bool {
+			return nextEntries[i].pid < nextEntries[j].pid
+		})
+	}
 
-	s.Replace(nextEntries, nextPrev, nextPrevCt, nextMiss)
+	s.entries, s.nextEntries = nextEntries, s.entries
+	s.prev, s.nextPrev = s.nextPrev, s.prev
+	s.prevCt, s.nextPrevCt = s.nextPrevCt, s.prevCt
+	s.missCount, s.nextMiss = s.nextMiss, s.missCount
+	s.stalePIDs = stalePIDs
 	return stalePIDs
 }
-
