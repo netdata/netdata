@@ -1913,6 +1913,8 @@ modules:
         - hyperv
         - virtualization
         - vm
+        - azure-local
+        - azure-stack-hci
     overview:
       data_collection:
         metrics_description: |
