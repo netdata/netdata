@@ -61,7 +61,7 @@ app_latency_count 10
 				assert.InDelta(t, 10, value(t, fr, "app_latency_count", nil), 1e-9)
 			},
 		},
-		"summary empty window stores NaN quantiles (renders as a gap downstream)": {
+		"summary with all-NaN quantiles (empty window) is skipped": {
 			exposition: `
 # TYPE app_latency summary
 app_latency{quantile="0.5"} NaN
@@ -70,10 +70,25 @@ app_latency_sum 0
 app_latency_count 0
 `,
 			assert: func(t *testing.T, fr metrix.Reader, written int) {
-				assert.Equal(t, 1, written)
+				assert.Equal(t, 0, written, "an all-NaN summary is skipped so no chart is created until it has a value")
+				_, ok := fr.Value("app_latency", metrix.Labels{"quantile": "0.5"})
+				assert.False(t, ok, "no quantile series must be written for an all-NaN summary")
+			},
+		},
+		"summary with a mix of NaN and real quantiles is kept": {
+			exposition: `
+# TYPE app_latency summary
+app_latency{quantile="0.5"} NaN
+app_latency{quantile="0.9"} 0.4
+app_latency_sum 5
+app_latency_count 10
+`,
+			assert: func(t *testing.T, fr metrix.Reader, written int) {
+				assert.Equal(t, 1, written, "a summary with at least one observed quantile is written")
+				assert.InDelta(t, 0.4, value(t, fr, "app_latency", metrix.Labels{"quantile": "0.9"}), 1e-9)
 				v, ok := fr.Value("app_latency", metrix.Labels{"quantile": "0.5"})
-				require.True(t, ok, "NaN quantile series must be stored")
-				assert.True(t, math.IsNaN(float64(v)), "quantile value must be stored as NaN, got %v", v)
+				require.True(t, ok, "the unobserved quantile is still stored when the summary has a real value")
+				assert.True(t, math.IsNaN(float64(v)), "the unobserved quantile is stored as NaN (a gap), got %v", v)
 			},
 		},
 		"histogram with buckets": {

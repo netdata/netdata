@@ -112,15 +112,21 @@ func toSummaryPoint(summary *prompkg.Summary) (metrix.SummaryPoint, bool) {
 	if summary == nil || len(summary.Quantiles()) == 0 {
 		return metrix.SummaryPoint{}, false
 	}
+	// A Prometheus summary leaves every quantile NaN for an empty observation window. Skip the
+	// whole summary so a chart is not created until it has a real value (consistent with the
+	// scalar NaN-skip); writing resumes once any quantile is observed.
+	if summary.IsNaN() {
+		return metrix.SummaryPoint{}, false
+	}
 	if !isFinite(summary.Count()) || !isFinite(summary.Sum()) || summary.Count() < 0 {
 		return metrix.SummaryPoint{}, false
 	}
 
 	quantiles := make([]metrix.QuantilePoint, 0, len(summary.Quantiles()))
 	for _, q := range summary.Quantiles() {
-		// Prometheus summaries can emit NaN quantile values before observing samples.
-		// Keep them: metrix stores a NaN quantile value and chartengine renders it as a
-		// gap. Only an infinite quantile value is rejected.
+		// A partially-observed summary can still carry a NaN quantile (an all-NaN summary is
+		// skipped above). Keep the NaN: metrix stores it and chartengine renders that dimension
+		// as a gap. Only an infinite quantile value is rejected.
 		if !isFinite(q.Quantile()) || q.Quantile() < 0 || q.Quantile() > 1 || math.IsInf(q.Value(), 0) {
 			return metrix.SummaryPoint{}, false
 		}
