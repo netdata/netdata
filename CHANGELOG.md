@@ -282,6 +282,9 @@
 - Chore: clarify the SOW lifecycle and strengthen the Mandatory Development Principles ([#22630](https://github.com/netdata/netdata/issues/22630))
 - Docs: consolidate dbengine retention sizing guidance ([#22517](https://github.com/netdata/netdata/issues/22517))
 - Chore(go/pkg/prometheus):  unified single-pass stream parser ([#22640](https://github.com/netdata/netdata/issues/22640))
+- Test(go.d/prometheus): add V1 compatibility manifest golden tests ([#22641](https://github.com/netdata/netdata/issues/22641))
+- Feat(go.d/framework/chartengine): apply context_namespace to autogen chart contexts ([#22642](https://github.com/netdata/netdata/issues/22642))
+- Add offline Function test modes for NetFlow and systemd journal ([#22638](https://github.com/netdata/netdata/issues/22638))
 
 ## [2.10.0] - 2026-04-09
 
