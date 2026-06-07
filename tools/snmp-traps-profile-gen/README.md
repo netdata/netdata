@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD013 MD043 -->
+
 # snmp-traps-profile-gen
 
 Legacy Python pipeline that turned the locally mirrored MIB corpus into
@@ -29,7 +31,7 @@ fallback applies only to trap OIDs, not to varbind OIDs.
 
 ## Layout
 
-```
+```text
 tools/snmp-traps-profile-gen/
   extract.py                    # Phase 1 - SOW-0033, mechanical MIB extraction
   classify.py                   # Phase 2 - SOW-0034, LLM enrichment (dual-endpoint pool)
@@ -45,7 +47,7 @@ tools/snmp-traps-profile-gen/
 
 The active helper lives outside this directory:
 
-```
+```text
 src/go/cmd/snmptrapprofilegen/
   main.go                       # extract, classify, emit, generate
   main_test.go                  # focused helper tests
@@ -122,7 +124,7 @@ emission.
 
 The expected output sub-tree under `output/`:
 
-```
+```text
 output/
   extracted.jsonl           # one line per trap (extract.py)
   extraction-report.json    # counts + dirs scanned

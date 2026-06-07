@@ -169,19 +169,12 @@ func TestCollectorHandlePacketRendersTopologyEnrichmentBeforeReverseDNS(t *testi
 
 func TestCollectorHandlePacketDedupSuppressesDuplicates(t *testing.T) {
 	const jobName = "test-dedup-packet"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
 
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	metrics := getJobMetrics(jobName)
-	metrics.setDedupEnabled(true)
-	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
-	c.Config = Config{Dedup: DedupConfig{Enabled: true}}
-	c.metrics = metrics
-	c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics)
+	c, metrics := newDedupTestV2Collector(t, jobName, writer)
 	c.deduper.start()
 	defer c.deduper.Close()
 
@@ -214,17 +207,10 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 
 	t.Run("unknown OID", func(t *testing.T) {
 		const jobName = "test-dedup-unknown-oid"
-		removeJobMetrics(jobName)
-		defer removeJobMetrics(jobName)
 
 		setTestProfileIndex(t, map[string]*TrapDef{})
 		writer := &mockTrapWriter{}
-		metrics := getJobMetrics(jobName)
-		metrics.setDedupEnabled(true)
-		c := newTestV2Collector(jobName, writer, nil, []string{"public"})
-		c.Config = Config{Dedup: DedupConfig{Enabled: true}}
-		c.metrics = metrics
-		c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics)
+		c, metrics := newDedupTestV2Collector(t, jobName, writer)
 
 		c.handlePacket(packet.payload, packet.peer, nil, nil)
 		c.handlePacket(packet.payload, packet.peer, nil, nil)
@@ -246,19 +232,12 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 
 	t.Run("template unresolved", func(t *testing.T) {
 		const jobName = "test-dedup-template-unresolved"
-		removeJobMetrics(jobName)
-		defer removeJobMetrics(jobName)
 
 		trap := testColdStartTrap("security", "warning", "coldStart from {DOES_NOT_EXIST}")
 		trap.Name = "TEST-MIB::coldStartTemplate"
 		setSingleTestTrap(t, trap)
 		writer := &mockTrapWriter{}
-		metrics := getJobMetrics(jobName)
-		metrics.setDedupEnabled(true)
-		c := newTestV2Collector(jobName, writer, nil, []string{"public"})
-		c.Config = Config{Dedup: DedupConfig{Enabled: true}}
-		c.metrics = metrics
-		c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics)
+		c, metrics := newDedupTestV2Collector(t, jobName, writer)
 
 		c.handlePacket(packet.payload, packet.peer, nil, nil)
 		c.handlePacket(packet.payload, packet.peer, nil, nil)
@@ -281,19 +260,12 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 
 func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *testing.T) {
 	const jobName = "test-dedup-write-rollback"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
 
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{err: errors.New("write failed")}
-	metrics := getJobMetrics(jobName)
-	metrics.setDedupEnabled(true)
-	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
-	c.Config = Config{Dedup: DedupConfig{Enabled: true}}
-	c.metrics = metrics
-	c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics)
+	c, metrics := newDedupTestV2Collector(t, jobName, writer)
 
 	c.handlePacket(packet.payload, packet.peer, nil, nil)
 	if got := atomic.LoadUint64(&metrics.errors.journalWriteFailed); got != 1 {
@@ -391,7 +363,7 @@ func TestCollectorHandlePacketIncrementsEventsMetric(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
 
-	removeJobMetrics("test")
+	withCleanJobMetrics(t, "test")
 	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	m := getJobMetrics("test")
@@ -399,13 +371,11 @@ func TestCollectorHandlePacketIncrementsEventsMetric(t *testing.T) {
 	if ev != 1 {
 		t.Errorf("expected 1 state_change event, got %d", ev)
 	}
-	removeJobMetrics("test")
 }
 
 func TestCollectorHandlePacketIncrementsSeverityMetric(t *testing.T) {
 	const jobName = "test-severity-event"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
+	withCleanJobMetrics(t, jobName)
 
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("state_change", "warning", "coldStart from {TRAP_SOURCE_IP}")
@@ -432,8 +402,7 @@ func TestPerJobMetricsIncSeverityFallsBackToNotice(t *testing.T) {
 
 func TestCollectMetricsEmitsSeverityCounters(t *testing.T) {
 	const jobName = "test-severity-metrics"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
+	withCleanJobMetrics(t, jobName)
 
 	getJobMetrics(jobName).incSeverity("crit")
 	getJobMetrics(jobName).incSeverity("warning")
@@ -476,14 +445,13 @@ func TestCollectorHandlePacketIncrementsTemplateUnresolved(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newDefaultTestV2Collector(writer)
 
-	removeJobMetrics("test")
+	withCleanJobMetrics(t, "test")
 	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	m := getJobMetrics("test")
 	if v := atomic.LoadUint64(&m.errors.templateUnresolved); v != 1 {
 		t.Errorf("expected 1 template_unresolved, got %d", v)
 	}
-	removeJobMetrics("test")
 }
 
 func TestCollectorHandlePacketIncrementsAllowlistDrop(t *testing.T) {
@@ -491,7 +459,7 @@ func TestCollectorHandlePacketIncrementsAllowlistDrop(t *testing.T) {
 	writer := &mockTrapWriter{}
 	c := newTestV2Collector("test", writer, nil, []string{"secret"})
 
-	removeJobMetrics("test")
+	withCleanJobMetrics(t, "test")
 	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	m := getJobMetrics("test")
@@ -499,38 +467,21 @@ func TestCollectorHandlePacketIncrementsAllowlistDrop(t *testing.T) {
 	if dr != 1 {
 		t.Errorf("expected 1 dropped_allowlist, got %d", dr)
 	}
-	removeJobMetrics("test")
 }
 
 func TestCollectorHandlePacketRejectsUnknownV3EngineID(t *testing.T) {
 	const jobName = "test-v3-engine"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
+	withCleanJobMetrics(t, jobName)
 
 	data := buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
-	secTable, err := buildSnmpV3SecurityTable([]USMUserConfig{{
-		Username:  "testuser",
-		EngineID:  testEngineIDHex,
-		AuthProto: "none",
-		PrivProto: "none",
-	}})
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-	}
+	secTable := newTestV3SecurityTable(t, testNoAuthV3User(testEngineIDHex))
 	engineIDs, err := buildEngineIDWhitelist([]string{"80001f888077dfe44faa700259"})
 	if err != nil {
 		t.Fatalf("buildEngineIDWhitelist failed: %v", err)
 	}
 
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:    jobName,
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:  NewAllowlist(nil, nil),
-		v3SecTable: secTable,
-		engineIDs:  engineIDs,
-	}
+	c := newTestV3Collector(jobName, writer, secTable, engineIDs)
 
 	c.handlePacket(data, net.ParseIP("10.1.2.3"), nil, &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162})
 
@@ -545,8 +496,7 @@ func TestCollectorHandlePacketRejectsUnknownV3EngineID(t *testing.T) {
 
 func TestCollectorHandlePacketClassifiesAuthFailureUnknownV3EngineID(t *testing.T) {
 	const jobName = "test-v3-auth-failure-engine"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
+	withCleanJobMetrics(t, jobName)
 
 	otherEngineID := "80001f888077dfe44faa700259"
 	data := buildV3SecuredTrap(t, v3SecuredTrapSpec{
@@ -558,31 +508,21 @@ func TestCollectorHandlePacketClassifiesAuthFailureUnknownV3EngineID(t *testing.
 		privKey:     "privpassword",
 		trapOID:     "1.3.6.1.6.3.1.1.5.1",
 	})
-	secTable, err := buildSnmpV3SecurityTable([]USMUserConfig{{
+	secTable := newTestV3SecurityTable(t, USMUserConfig{
 		Username:  "testuser",
 		EngineID:  otherEngineID,
 		AuthProto: "sha256",
 		AuthKey:   "authpassword",
 		PrivProto: "aes",
 		PrivKey:   "privpassword",
-	}})
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-	}
+	})
 	engineIDs, err := buildEngineIDWhitelist([]string{otherEngineID})
 	if err != nil {
 		t.Fatalf("buildEngineIDWhitelist failed: %v", err)
 	}
 
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:    jobName,
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:  NewAllowlist(nil, nil),
-		v3SecTable: secTable,
-		engineIDs:  engineIDs,
-	}
+	c := newTestV3Collector(jobName, writer, secTable, engineIDs)
 
 	c.handlePacket(data, net.ParseIP("10.1.2.3"), nil, &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162})
 
@@ -631,8 +571,7 @@ func TestCollectorHandlePacketAllowsNativeIPv6SourceCIDR(t *testing.T) {
 func TestCollectorHandlePacketRateLimitSampleWritesTrap(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	const jobName = "test-rate-limit-sample"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
+	withCleanJobMetrics(t, jobName)
 
 	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
 	setSingleTestTrap(t, trap)
@@ -663,8 +602,7 @@ func TestCollectorHandlePacketRateLimitSampleWritesTrap(t *testing.T) {
 
 func TestCollectMetricsEmitsCounters(t *testing.T) {
 	const jobName = "test-metrics"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
+	withCleanJobMetrics(t, jobName)
 
 	incTrapEvents(jobName, "security")
 	incTrapError(jobName, "decode_failed")
@@ -696,8 +634,7 @@ func TestCollectMetricsEmitsCounters(t *testing.T) {
 
 func TestCollectorCollectPublishesSanitizedMetric(t *testing.T) {
 	const jobName = "test-sanitized"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
+	withCleanJobMetrics(t, jobName)
 
 	store := metrix.NewCollectorStore()
 	managed, ok := metrix.AsCycleManagedStore(store)

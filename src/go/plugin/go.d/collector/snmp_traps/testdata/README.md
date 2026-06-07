@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD043 -->
+
 # SNMP Trap Pcap Fixtures
 
 These fixtures are generated classic pcap frames, not customer or production captures.

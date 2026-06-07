@@ -1,5 +1,4 @@
-"""
-Parse the IANA Private Enterprise Numbers registry into a {pen: slug} dict.
+"""Parse the IANA Private Enterprise Numbers registry into a {pen: slug} dict.
 
 Source file (committed alongside this module):
     tools/snmp-traps-profile-gen/iana-enterprise-numbers.txt
@@ -114,8 +113,8 @@ def _slugify(s: str) -> str:
 
 
 def _split_camel(s: str) -> str:
-    """Insert spaces between camelCase boundaries (``ciscoSystems`` ->
-    ``cisco Systems``).
+    """
+    Insert spaces between camelCase boundaries.
 
     Only applied when the input has NO existing whitespace -- otherwise we'd
     break brand names like ``NetBotz`` whose author already chose CamelCase
@@ -155,7 +154,8 @@ def _strip_suffixes(org: str) -> str:
 
 
 def _domain_stem(email: str) -> Optional[str]:
-    """Pull a slugified second-level-domain stem from an IANA contact email.
+    """
+    Pull a slugified second-level-domain stem from an IANA contact email.
 
     IANA writes ``&`` for ``@`` to discourage scraping; we tolerate both.
     Returns ``None`` for empty / free-mail / placeholder addresses.
@@ -181,7 +181,8 @@ def _domain_stem(email: str) -> Optional[str]:
 
 
 def _slug_for(pen: str, org: str, email: str) -> str:
-    """Compute the final slug for a (PEN, organization, email) triple.
+    """
+    Compute the final slug for a PEN, organization, and email triple.
 
     Heuristic:
       1. Strip parenthetical aliases / history notes.

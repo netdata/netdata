@@ -201,8 +201,7 @@ func TestV3InformAcceptedWithLocalEngineID(t *testing.T) {
 	withEngineStateDir(t)
 
 	const jobName = "test-inform-local"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
+	withCleanJobMetrics(t, jobName)
 
 	lid, err := NewLocalEngineID(jobName, testLocalEngineIDHex)
 	if err != nil {
@@ -210,33 +209,13 @@ func TestV3InformAcceptedWithLocalEngineID(t *testing.T) {
 	}
 
 	data := buildV3InformWithEngineID(t, "testuser", testLocalEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
-	secTable, err := buildSnmpV3SecurityTable([]USMUserConfig{{
-		Username:  "testuser",
-		EngineID:  testEngineIDHex,
-		AuthProto: "none",
-		PrivProto: "none",
-	}})
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-	}
-	if err := registerUSMUsersWithLocalEngineID(secTable, []USMUserConfig{{
-		Username:  "testuser",
-		EngineID:  testEngineIDHex,
-		AuthProto: "none",
-		PrivProto: "none",
-	}}, lid.Bytes()); err != nil {
-		t.Fatalf("registerUSMUsersWithLocalEngineID failed: %v", err)
-	}
+	user := testNoAuthV3User(testEngineIDHex)
+	secTable := newTestV3SecurityTable(t, user)
+	registerTestLocalEngineID(t, secTable, lid, user)
 
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:       jobName,
-		trapWriter:    writer,
-		versions:      map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:     NewAllowlist(nil, nil),
-		v3SecTable:    secTable,
-		localEngineID: lid,
-	}
+	c := newTestV3Collector(jobName, writer, secTable, nil)
+	c.localEngineID = lid
 
 	c.handlePacket(data, net.ParseIP("10.1.2.3"), nil, &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162})
 
@@ -250,8 +229,7 @@ func TestV3InformRejectedWithNonLocalEngineID(t *testing.T) {
 	withEngineStateDir(t)
 
 	const jobName = "test-inform-nonlocal"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
+	withCleanJobMetrics(t, jobName)
 
 	lid, err := NewLocalEngineID(jobName, testLocalEngineIDHex)
 	if err != nil {
@@ -259,33 +237,13 @@ func TestV3InformRejectedWithNonLocalEngineID(t *testing.T) {
 	}
 
 	data := buildV3InformWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
-	secTable, err := buildSnmpV3SecurityTable([]USMUserConfig{{
-		Username:  "testuser",
-		EngineID:  testEngineIDHex,
-		AuthProto: "none",
-		PrivProto: "none",
-	}})
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-	}
-	if err := registerUSMUsersWithLocalEngineID(secTable, []USMUserConfig{{
-		Username:  "testuser",
-		EngineID:  testEngineIDHex,
-		AuthProto: "none",
-		PrivProto: "none",
-	}}, lid.Bytes()); err != nil {
-		t.Fatalf("registerUSMUsersWithLocalEngineID failed: %v", err)
-	}
+	user := testNoAuthV3User(testEngineIDHex)
+	secTable := newTestV3SecurityTable(t, user)
+	registerTestLocalEngineID(t, secTable, lid, user)
 
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:       jobName,
-		trapWriter:    writer,
-		versions:      map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:     NewAllowlist(nil, nil),
-		v3SecTable:    secTable,
-		localEngineID: lid,
-	}
+	c := newTestV3Collector(jobName, writer, secTable, nil)
+	c.localEngineID = lid
 
 	c.handlePacket(data, net.ParseIP("10.1.2.3"), nil, &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162})
 
@@ -302,8 +260,7 @@ func TestV3TrapStillRequiresSenderEngineWhitelist(t *testing.T) {
 	withEngineStateDir(t)
 
 	const jobName = "test-trap-sender-whitelist"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
+	withCleanJobMetrics(t, jobName)
 
 	lid, err := NewLocalEngineID(jobName, testLocalEngineIDHex)
 	if err != nil {
@@ -311,15 +268,7 @@ func TestV3TrapStillRequiresSenderEngineWhitelist(t *testing.T) {
 	}
 
 	data := buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
-	secTable, err := buildSnmpV3SecurityTable([]USMUserConfig{{
-		Username:  "testuser",
-		EngineID:  testEngineIDHex,
-		AuthProto: "none",
-		PrivProto: "none",
-	}})
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-	}
+	secTable := newTestV3SecurityTable(t, testNoAuthV3User(testEngineIDHex))
 
 	engineIDs, err := buildEngineIDWhitelist([]string{"80001f888077dfe44faa700259"})
 	if err != nil {
@@ -327,15 +276,8 @@ func TestV3TrapStillRequiresSenderEngineWhitelist(t *testing.T) {
 	}
 
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:       jobName,
-		trapWriter:    writer,
-		versions:      map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:     NewAllowlist(nil, nil),
-		v3SecTable:    secTable,
-		engineIDs:     engineIDs,
-		localEngineID: lid,
-	}
+	c := newTestV3Collector(jobName, writer, secTable, engineIDs)
+	c.localEngineID = lid
 
 	c.handlePacket(data, net.ParseIP("10.1.2.3"), nil, &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162})
 
@@ -429,13 +371,8 @@ func TestSendInformResponseV3AuthPriv(t *testing.T) {
 		PrivProto: "aes",
 		PrivKey:   "privpassword",
 	}
-	secTable, err := buildSnmpV3SecurityTable([]USMUserConfig{user})
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-	}
-	if err := registerUSMUsersWithLocalEngineID(secTable, []USMUserConfig{user}, lid.Bytes()); err != nil {
-		t.Fatalf("registerUSMUsersWithLocalEngineID failed: %v", err)
-	}
+	secTable := newTestV3SecurityTable(t, user)
+	registerTestLocalEngineID(t, secTable, lid, user)
 
 	reqData := buildV3SecuredInform(t, v3SecuredTrapSpec{
 		user:        "testuser",

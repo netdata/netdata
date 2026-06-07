@@ -17,6 +17,17 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
+const (
+	ciscoConfigTrapOID        = "1.3.6.1.4.1.9.9.43.2.0.1"
+	ciscoCommandSourceOID     = "1.3.6.1.4.1.9.9.43.1.1.1.1"
+	ciscoTerminalTypeOID      = "1.3.6.1.4.1.9.9.43.1.1.1.2"
+	ciscoTerminalUserOID      = "1.3.6.1.4.1.9.9.43.1.1.1.3"
+	ciscoEventEnabledOID      = "1.3.6.1.4.1.9.9.43.1.1.1.4"
+	ciscoLargeEnumOID         = "1.3.6.1.4.1.9.9.43.1.1.1.5"
+	ciscoTerminalTypeVarbind  = "ccmHistoryEventTerminalType"
+	ciscoCommandSourceVarbind = "ccmHistoryEventCommandSource"
+)
+
 func needCycleManagedStore(t *testing.T, store metrix.CollectorStore) metrix.CycleManagedStore {
 	t.Helper()
 	ms, ok := metrix.AsCycleManagedStore(store)
@@ -30,27 +41,27 @@ func makeTestProfileIndex(t *testing.T) *ProfileIndex {
 	t.Helper()
 	return &ProfileIndex{
 		trapsByOID: map[string]*TrapDef{
-			"1.3.6.1.4.1.9.9.43.2.0.1": {
-				OID:      "1.3.6.1.4.1.9.9.43.2.0.1",
+			ciscoConfigTrapOID: {
+				OID:      ciscoConfigTrapOID,
 				Name:     "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
 				Category: "config_change",
 				Severity: "notice",
 				VarbindRefs: []any{
-					"ccmHistoryEventCommandSource",
-					"ccmHistoryEventTerminalType",
+					ciscoCommandSourceVarbind,
+					ciscoTerminalTypeVarbind,
 					"ccmHistoryEventTerminalUser",
 				},
 				sharedVarbinds: map[string]*VarbindDef{
-					"1.3.6.1.4.1.9.9.43.1.1.1.1": {
-						OID:         "1.3.6.1.4.1.9.9.43.1.1.1.1",
+					ciscoCommandSourceOID: {
+						OID:         ciscoCommandSourceOID,
 						Type:        "INTEGER",
-						rawName:     "ccmHistoryEventCommandSource",
+						rawName:     ciscoCommandSourceVarbind,
 						Constraints: "(1..4)",
 					},
-					"1.3.6.1.4.1.9.9.43.1.1.1.2": {
-						OID:     "1.3.6.1.4.1.9.9.43.1.1.1.2",
+					ciscoTerminalTypeOID: {
+						OID:     ciscoTerminalTypeOID,
 						Type:    "INTEGER",
-						rawName: "ccmHistoryEventTerminalType",
+						rawName: ciscoTerminalTypeVarbind,
 						Enum: map[string]string{
 							"1": "none",
 							"2": "console",
@@ -58,18 +69,18 @@ func makeTestProfileIndex(t *testing.T) *ProfileIndex {
 							"4": "aux",
 						},
 					},
-					"1.3.6.1.4.1.9.9.43.1.1.1.3": {
-						OID:     "1.3.6.1.4.1.9.9.43.1.1.1.3",
+					ciscoTerminalUserOID: {
+						OID:     ciscoTerminalUserOID,
 						Type:    "OctetString",
 						rawName: "ccmHistoryEventTerminalUser",
 					},
-					"1.3.6.1.4.1.9.9.43.1.1.1.4": {
-						OID:     "1.3.6.1.4.1.9.9.43.1.1.1.4",
+					ciscoEventEnabledOID: {
+						OID:     ciscoEventEnabledOID,
 						Type:    "TruthValue",
 						rawName: "ccmHistoryEventEnabled",
 					},
-					"1.3.6.1.4.1.9.9.43.1.1.1.5": {
-						OID:     "1.3.6.1.4.1.9.9.43.1.1.1.5",
+					ciscoLargeEnumOID: {
+						OID:     ciscoLargeEnumOID,
 						Type:    "INTEGER",
 						rawName: "ccmHistoryEventLargeEnum",
 						Enum:    testEnum(maxBoundedVarbindValues + 1),
@@ -130,6 +141,31 @@ func testEnum(count int) map[string]string {
 func newTestOperatorMetrics(t *testing.T, cfg []MetricConfig) *operatorMetrics {
 	t.Helper()
 	return newOperatorMetrics(cfg, makeTestProfileIndex(t))
+}
+
+func ciscoConfigMetric(context, dimension string) MetricConfig {
+	cfg := MetricConfig{OID: ciscoConfigTrapOID, Context: context}
+	if dimension != "" {
+		cfg.DimensionFromVarbind = dimension
+	}
+	return cfg
+}
+
+func ciscoConfigEntry(varbindOID string, value any, name string) *TrapEntry {
+	return &TrapEntry{
+		TrapOID: ciscoConfigTrapOID,
+		Varbinds: []VarbindValue{
+			{OID: varbindOID, Value: value, Name: name},
+		},
+	}
+}
+
+func ciscoConfigReloadedTrap(varbinds map[string]*VarbindDef) *TrapDef {
+	return &TrapDef{
+		OID:            ciscoConfigTrapOID,
+		Name:           "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
+		sharedVarbinds: varbinds,
+	}
 }
 
 func assertMetricDimensionBucket(t *testing.T, om *operatorMetrics, rawValue, bucket, reason string) {
@@ -429,21 +465,16 @@ func TestOperatorMetricsIncRequiresCurrentTrapDefinition(t *testing.T) {
 
 func TestOperatorMetricsIncDimensionFromVarbind(t *testing.T) {
 	idx := makeTestProfileIndex(t)
-	td := idx.Lookup("1.3.6.1.4.1.9.9.43.2.0.1")
+	td := idx.Lookup(ciscoConfigTrapOID)
 
 	cfg := []MetricConfig{
-		{OID: "1.3.6.1.4.1.9.9.43.2.0.1", Context: "snmp.trap.cisco_config", DimensionFromVarbind: "ccmHistoryEventTerminalType"},
+		ciscoConfigMetric("snmp.trap.cisco_config", ciscoTerminalTypeVarbind),
 	}
 	om := newTestOperatorMetrics(t, cfg)
 
-	entry := &TrapEntry{
-		TrapOID: "1.3.6.1.4.1.9.9.43.2.0.1",
-		Varbinds: []VarbindValue{
-			{OID: "1.3.6.1.4.1.9.9.43.1.1.1.2", Value: int64(2), Name: "ccmHistoryEventTerminalType"},
-		},
-	}
+	entry := ciscoConfigEntry(ciscoTerminalTypeOID, int64(2), ciscoTerminalTypeVarbind)
 
-	om.inc("1.3.6.1.4.1.9.9.43.2.0.1", entry, td)
+	om.inc(ciscoConfigTrapOID, entry, td)
 
 	om.metrics[0].dimMu.Lock()
 	count := len(om.metrics[0].dimCounts)
@@ -460,7 +491,7 @@ func TestOperatorMetricsIncDimensionFromVarbind(t *testing.T) {
 		t.Fatalf("dim count = %d, want 1", ctr.Load())
 	}
 
-	om.inc("1.3.6.1.4.1.9.9.43.2.0.1", entry, td)
+	om.inc(ciscoConfigTrapOID, entry, td)
 	if ctr.Load() != 2 {
 		t.Fatalf("dim count after second inc = %d, want 2", ctr.Load())
 	}
@@ -471,16 +502,11 @@ func TestOperatorMetricsDimensionValuesStayBoundedAtRuntime(t *testing.T) {
 
 	t.Run("unknown enum value", func(t *testing.T) {
 		cfg := []MetricConfig{
-			{OID: "1.3.6.1.4.1.9.9.43.2.0.1", Context: "snmp.trap.cisco_config", DimensionFromVarbind: "ccmHistoryEventTerminalType"},
+			ciscoConfigMetric("snmp.trap.cisco_config", ciscoTerminalTypeVarbind),
 		}
 		td := idx.Lookup(cfg[0].OID)
 		om := newOperatorMetrics(cfg, idx)
-		entry := &TrapEntry{
-			TrapOID: cfg[0].OID,
-			Varbinds: []VarbindValue{
-				{OID: "1.3.6.1.4.1.9.9.43.1.1.1.2", Value: int64(99), Name: "ccmHistoryEventTerminalType"},
-			},
-		}
+		entry := ciscoConfigEntry(ciscoTerminalTypeOID, int64(99), ciscoTerminalTypeVarbind)
 
 		om.inc(cfg[0].OID, entry, td)
 
@@ -489,16 +515,11 @@ func TestOperatorMetricsDimensionValuesStayBoundedAtRuntime(t *testing.T) {
 
 	t.Run("out of range numeric value", func(t *testing.T) {
 		cfg := []MetricConfig{
-			{OID: "1.3.6.1.4.1.9.9.43.2.0.1", Context: "snmp.trap.cisco_config_range", DimensionFromVarbind: "ccmHistoryEventCommandSource"},
+			ciscoConfigMetric("snmp.trap.cisco_config_range", ciscoCommandSourceVarbind),
 		}
 		td := idx.Lookup(cfg[0].OID)
 		om := newOperatorMetrics(cfg, idx)
-		entry := &TrapEntry{
-			TrapOID: cfg[0].OID,
-			Varbinds: []VarbindValue{
-				{OID: "1.3.6.1.4.1.9.9.43.1.1.1.1", Value: int64(99), Name: "ccmHistoryEventCommandSource"},
-			},
-		}
+		entry := ciscoConfigEntry(ciscoCommandSourceOID, int64(99), ciscoCommandSourceVarbind)
 
 		om.inc(cfg[0].OID, entry, td)
 
@@ -507,27 +528,18 @@ func TestOperatorMetricsDimensionValuesStayBoundedAtRuntime(t *testing.T) {
 
 	t.Run("expanded enum after reload stays bounded", func(t *testing.T) {
 		cfg := []MetricConfig{
-			{OID: "1.3.6.1.4.1.9.9.43.2.0.1", Context: "snmp.trap.cisco_config_enum_reload", DimensionFromVarbind: "ccmHistoryEventTerminalType"},
+			ciscoConfigMetric("snmp.trap.cisco_config_enum_reload", ciscoTerminalTypeVarbind),
 		}
 		om := newOperatorMetrics(cfg, idx)
-		reloadedTrap := &TrapDef{
-			OID:  cfg[0].OID,
-			Name: "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
-			sharedVarbinds: map[string]*VarbindDef{
-				"1.3.6.1.4.1.9.9.43.1.1.1.2": {
-					OID:     "1.3.6.1.4.1.9.9.43.1.1.1.2",
-					Type:    "INTEGER",
-					rawName: "ccmHistoryEventTerminalType",
-					Enum:    testEnum(maxBoundedVarbindValues + 1),
-				},
+		reloadedTrap := ciscoConfigReloadedTrap(map[string]*VarbindDef{
+			ciscoTerminalTypeOID: {
+				OID:     ciscoTerminalTypeOID,
+				Type:    "INTEGER",
+				rawName: ciscoTerminalTypeVarbind,
+				Enum:    testEnum(maxBoundedVarbindValues + 1),
 			},
-		}
-		entry := &TrapEntry{
-			TrapOID: cfg[0].OID,
-			Varbinds: []VarbindValue{
-				{OID: "1.3.6.1.4.1.9.9.43.1.1.1.2", Value: int64(maxBoundedVarbindValues + 1), Name: "ccmHistoryEventTerminalType"},
-			},
-		}
+		})
+		entry := ciscoConfigEntry(ciscoTerminalTypeOID, int64(maxBoundedVarbindValues+1), ciscoTerminalTypeVarbind)
 
 		om.inc(cfg[0].OID, entry, reloadedTrap)
 
@@ -536,33 +548,24 @@ func TestOperatorMetricsDimensionValuesStayBoundedAtRuntime(t *testing.T) {
 
 	t.Run("enum label rename after reload keeps job labels stable", func(t *testing.T) {
 		cfg := []MetricConfig{
-			{OID: "1.3.6.1.4.1.9.9.43.2.0.1", Context: "snmp.trap.cisco_config_enum_rename", DimensionFromVarbind: "ccmHistoryEventTerminalType"},
+			ciscoConfigMetric("snmp.trap.cisco_config_enum_rename", ciscoTerminalTypeVarbind),
 		}
 		td := idx.Lookup(cfg[0].OID)
 		om := newOperatorMetrics(cfg, idx)
-		entry := &TrapEntry{
-			TrapOID: cfg[0].OID,
-			Varbinds: []VarbindValue{
-				{OID: "1.3.6.1.4.1.9.9.43.1.1.1.2", Value: int64(2), Name: "ccmHistoryEventTerminalType"},
-			},
-		}
-		reloadedTrap := &TrapDef{
-			OID:  cfg[0].OID,
-			Name: "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
-			sharedVarbinds: map[string]*VarbindDef{
-				"1.3.6.1.4.1.9.9.43.1.1.1.2": {
-					OID:     "1.3.6.1.4.1.9.9.43.1.1.1.2",
-					Type:    "INTEGER",
-					rawName: "ccmHistoryEventTerminalType",
-					Enum: map[string]string{
-						"1": "none",
-						"2": "terminal",
-						"3": "virtual",
-						"4": "aux",
-					},
+		entry := ciscoConfigEntry(ciscoTerminalTypeOID, int64(2), ciscoTerminalTypeVarbind)
+		reloadedTrap := ciscoConfigReloadedTrap(map[string]*VarbindDef{
+			ciscoTerminalTypeOID: {
+				OID:     ciscoTerminalTypeOID,
+				Type:    "INTEGER",
+				rawName: ciscoTerminalTypeVarbind,
+				Enum: map[string]string{
+					"1": "none",
+					"2": "terminal",
+					"3": "virtual",
+					"4": "aux",
 				},
 			},
-		}
+		})
 
 		om.inc(cfg[0].OID, entry, td)
 		om.inc(cfg[0].OID, entry, reloadedTrap)
@@ -586,27 +589,18 @@ func TestOperatorMetricsDimensionValuesStayBoundedAtRuntime(t *testing.T) {
 
 	t.Run("expanded numeric range after reload stays bounded", func(t *testing.T) {
 		cfg := []MetricConfig{
-			{OID: "1.3.6.1.4.1.9.9.43.2.0.1", Context: "snmp.trap.cisco_config_range_reload", DimensionFromVarbind: "ccmHistoryEventCommandSource"},
+			ciscoConfigMetric("snmp.trap.cisco_config_range_reload", ciscoCommandSourceVarbind),
 		}
 		om := newOperatorMetrics(cfg, idx)
-		reloadedTrap := &TrapDef{
-			OID:  cfg[0].OID,
-			Name: "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
-			sharedVarbinds: map[string]*VarbindDef{
-				"1.3.6.1.4.1.9.9.43.1.1.1.1": {
-					OID:         "1.3.6.1.4.1.9.9.43.1.1.1.1",
-					Type:        "INTEGER",
-					rawName:     "ccmHistoryEventCommandSource",
-					Constraints: "(1..128)",
-				},
+		reloadedTrap := ciscoConfigReloadedTrap(map[string]*VarbindDef{
+			ciscoCommandSourceOID: {
+				OID:         ciscoCommandSourceOID,
+				Type:        "INTEGER",
+				rawName:     ciscoCommandSourceVarbind,
+				Constraints: "(1..128)",
 			},
-		}
-		entry := &TrapEntry{
-			TrapOID: cfg[0].OID,
-			Varbinds: []VarbindValue{
-				{OID: "1.3.6.1.4.1.9.9.43.1.1.1.1", Value: int64(99), Name: "ccmHistoryEventCommandSource"},
-			},
-		}
+		})
+		entry := ciscoConfigEntry(ciscoCommandSourceOID, int64(99), ciscoCommandSourceVarbind)
 
 		om.inc(cfg[0].OID, entry, reloadedTrap)
 
@@ -615,20 +609,11 @@ func TestOperatorMetricsDimensionValuesStayBoundedAtRuntime(t *testing.T) {
 
 	t.Run("missing varbind definition after reload", func(t *testing.T) {
 		cfg := []MetricConfig{
-			{OID: "1.3.6.1.4.1.9.9.43.2.0.1", Context: "snmp.trap.cisco_config_missing", DimensionFromVarbind: "ccmHistoryEventTerminalType"},
+			ciscoConfigMetric("snmp.trap.cisco_config_missing", ciscoTerminalTypeVarbind),
 		}
 		om := newOperatorMetrics(cfg, idx)
-		reloadedTrap := &TrapDef{
-			OID:            cfg[0].OID,
-			Name:           "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
-			sharedVarbinds: map[string]*VarbindDef{},
-		}
-		entry := &TrapEntry{
-			TrapOID: cfg[0].OID,
-			Varbinds: []VarbindValue{
-				{OID: "1.3.6.1.4.1.9.9.43.1.1.1.2", Value: int64(2), Name: "ccmHistoryEventTerminalType"},
-			},
-		}
+		reloadedTrap := ciscoConfigReloadedTrap(map[string]*VarbindDef{})
+		entry := ciscoConfigEntry(ciscoTerminalTypeOID, int64(2), ciscoTerminalTypeVarbind)
 
 		om.inc(cfg[0].OID, entry, reloadedTrap)
 
@@ -637,26 +622,17 @@ func TestOperatorMetricsDimensionValuesStayBoundedAtRuntime(t *testing.T) {
 
 	t.Run("unbounded varbind metadata after reload", func(t *testing.T) {
 		cfg := []MetricConfig{
-			{OID: "1.3.6.1.4.1.9.9.43.2.0.1", Context: "snmp.trap.cisco_config_reloaded", DimensionFromVarbind: "ccmHistoryEventTerminalType"},
+			ciscoConfigMetric("snmp.trap.cisco_config_reloaded", ciscoTerminalTypeVarbind),
 		}
 		om := newOperatorMetrics(cfg, idx)
-		reloadedTrap := &TrapDef{
-			OID:  cfg[0].OID,
-			Name: "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
-			sharedVarbinds: map[string]*VarbindDef{
-				"1.3.6.1.4.1.9.9.43.1.1.1.2": {
-					OID:     "1.3.6.1.4.1.9.9.43.1.1.1.2",
-					Type:    "OctetString",
-					rawName: "ccmHistoryEventTerminalType",
-				},
+		reloadedTrap := ciscoConfigReloadedTrap(map[string]*VarbindDef{
+			ciscoTerminalTypeOID: {
+				OID:     ciscoTerminalTypeOID,
+				Type:    "OctetString",
+				rawName: ciscoTerminalTypeVarbind,
 			},
-		}
-		entry := &TrapEntry{
-			TrapOID: cfg[0].OID,
-			Varbinds: []VarbindValue{
-				{OID: "1.3.6.1.4.1.9.9.43.1.1.1.2", Value: "operator-controlled-value", Name: "ccmHistoryEventTerminalType"},
-			},
-		}
+		})
+		entry := ciscoConfigEntry(ciscoTerminalTypeOID, "operator-controlled-value", ciscoTerminalTypeVarbind)
 
 		om.inc(cfg[0].OID, entry, reloadedTrap)
 

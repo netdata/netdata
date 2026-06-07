@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD013 MD043 -->
+
 # SNMP Trap Profile Format
 
 ## Overview
