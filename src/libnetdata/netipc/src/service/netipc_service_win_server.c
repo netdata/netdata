@@ -208,14 +208,14 @@ nipc_error_t nipc_service_platform_server_init_raw(
     server->expected_method_code = expected_method_code;
     server->base_config = *config;
     server->learned_request_payload_bytes =
-        (config && config->max_request_payload_bytes > 0)
+        config->max_request_payload_bytes > 0
             ? config->max_request_payload_bytes
             : NIPC_MAX_PAYLOAD_DEFAULT;
     server->learned_response_payload_bytes =
-        (config && config->max_response_payload_bytes > 0)
+        config->max_response_payload_bytes > 0
             ? config->max_response_payload_bytes
             : NIPC_MAX_PAYLOAD_DEFAULT;
-    server->auth_token = config ? config->auth_token : 0;
+    server->auth_token = config->auth_token;
 
 
     /* Initialize session tracking */
