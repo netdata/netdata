@@ -66,22 +66,22 @@ func buildBenchExposition(n int) string {
 	var b strings.Builder
 
 	b.WriteString("# TYPE bench_gauge_bytes gauge\n")
-	for i := 0; i < n; i++ {
+	for i := range n {
 		fmt.Fprintf(&b, "bench_gauge_bytes{id=\"%d\",az=\"a\"} %d\n", i, i)
 	}
 	b.WriteString("# TYPE bench_ops_total counter\n")
-	for i := 0; i < n; i++ {
+	for i := range n {
 		fmt.Fprintf(&b, "bench_ops_total{id=\"%d\",az=\"a\"} %d\n", i, i)
 	}
 	b.WriteString("# TYPE bench_latency_seconds summary\n")
-	for i := 0; i < n; i++ {
+	for i := range n {
 		fmt.Fprintf(&b, "bench_latency_seconds{id=\"%d\",quantile=\"0.5\"} 0.1\n", i)
 		fmt.Fprintf(&b, "bench_latency_seconds{id=\"%d\",quantile=\"0.9\"} 0.2\n", i)
 		fmt.Fprintf(&b, "bench_latency_seconds_sum{id=\"%d\"} 1.0\n", i)
 		fmt.Fprintf(&b, "bench_latency_seconds_count{id=\"%d\"} 10\n", i)
 	}
 	b.WriteString("# TYPE bench_dur_seconds histogram\n")
-	for i := 0; i < n; i++ {
+	for i := range n {
 		fmt.Fprintf(&b, "bench_dur_seconds_bucket{id=\"%d\",le=\"0.1\"} 1\n", i)
 		fmt.Fprintf(&b, "bench_dur_seconds_bucket{id=\"%d\",le=\"0.5\"} 2\n", i)
 		fmt.Fprintf(&b, "bench_dur_seconds_bucket{id=\"%d\",le=\"+Inf\"} 3\n", i)
