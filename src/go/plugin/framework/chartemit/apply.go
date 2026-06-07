@@ -4,6 +4,7 @@ package chartemit
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 
@@ -212,6 +213,12 @@ func emitUpdatePhase(api *netdataapi.API, env EmitEnv, updates []UpdateChartActi
 				continue
 			}
 			if dim.IsFloat {
+				// Defensive: a non-finite float renders as 0 on the wire (the C parser accepts
+				// only lowercase "nan"); emit a gap. The planner already maps these to IsEmpty.
+				if math.IsNaN(dim.Float64) || math.IsInf(dim.Float64, 0) {
+					api.SETEMPTY(sanitizeWireID(dim.Name))
+					continue
+				}
 				api.SETFLOAT(sanitizeWireID(dim.Name), dim.Float64)
 				continue
 			}

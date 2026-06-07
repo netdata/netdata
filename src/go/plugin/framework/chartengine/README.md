@@ -83,11 +83,11 @@ plan := attempt.Plan()
 defer attempt.Abort()
 
 err = chartemit.ApplyPlan(api, plan, chartemit.EmitEnv{
-TypeID:      "plugin.job",
-UpdateEvery: 1,
-Plugin:      "example",
-Module:      "example",
-JobName:     "example",
+	TypeID:      "plugin.job",
+	UpdateEvery: 1,
+	Plugin:      "example",
+	Module:      "example",
+	JobName:     "example",
 })
 // handle err
 err = attempt.Commit()
@@ -124,13 +124,13 @@ If inferred dimensions are present without flattened reader metadata, `PreparePl
 
 ## Action Semantics
 
-| Action                  | Meaning                                                                |
-|-------------------------|------------------------------------------------------------------------|
-| `CreateChartAction`     | Materialize chart instance (with chart metadata and labels)            |
-| `CreateDimensionAction` | Materialize dimension for a chart                                      |
-| `UpdateChartAction`     | Emit chart values for current cycle; unseen dims become `IsEmpty=true` |
-| `RemoveDimensionAction` | Obsolete one dimension                                                 |
-| `RemoveChartAction`     | Obsolete one chart                                                     |
+| Action                  | Meaning                                                                                                                              |
+|-------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| `CreateChartAction`     | Materialize chart instance (with chart metadata and labels)                                                                          |
+| `CreateDimensionAction` | Materialize dimension for a chart                                                                                                    |
+| `UpdateChartAction`     | Emit chart values for current cycle; unseen dims, and dims whose value is non-finite (NaN/Inf), become `IsEmpty=true` (gap, never 0) |
+| `RemoveDimensionAction` | Obsolete one dimension                                                                                                               |
+| `RemoveChartAction`     | Obsolete one chart                                                                                                                   |
 
 `chartemit` normalizes emitted action order by phase:
 

@@ -3,6 +3,7 @@
 package chartengine
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -235,6 +236,8 @@ func TestBuildPlanLegacySingleScenarioCases(t *testing.T) {
 		"BuildPlanEmptyEmissionAndScratchReusePruneAcrossCycles":       {run: runTestBuildPlanEmptyEmissionAndScratchReusePruneAcrossCycles},
 		"BuildPlanAutogenContextNamespacePrefixesContext":              {run: runTestBuildPlanAutogenContextNamespacePrefixesContext},
 		"BuildPlanAutogenContextNamespaceStubGroupOnly":                {run: runTestBuildPlanAutogenContextNamespaceStubGroupOnly},
+		"BuildPlanSummaryNaNQuantileGaps":                              {run: runTestBuildPlanSummaryNaNQuantileGaps},
+		"BuildPlanSummaryMixedFiniteNaNQuantileGaps":                   {run: runTestBuildPlanSummaryMixedFiniteNaNQuantileGaps},
 	}
 
 	for name, tc := range tests {
@@ -2382,6 +2385,109 @@ func actionKinds(actions []EngineAction) []ActionKind {
 		out = append(out, action.Kind())
 	}
 	return out
+}
+
+// A summary scraped with NaN quantile values is still an OBSERVED point, so its quantile chart is
+// created (not skipped by the observedCount==0 path) and each NaN quantile dim renders as a gap
+// (IsEmpty → SETEMPTY), never a 0 value.
+func runTestBuildPlanSummaryNaNQuantileGaps(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
+	require.NoError(t, err)
+	require.NoError(t, e.LoadYAML([]byte(`
+version: v1
+groups:
+  - family: Service
+`), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sum := store.Write().SnapshotMeter("svc").Summary("latency", metrix.WithSummaryQuantiles(0.5, 0.9))
+
+	cc.BeginCycle()
+	sum.ObservePoint(metrix.SummaryPoint{
+		Count: 0,
+		Sum:   0,
+		Quantiles: []metrix.QuantilePoint{
+			{Quantile: 0.5, Value: metrix.SampleValue(math.NaN())},
+			{Quantile: 0.9, Value: metrix.SampleValue(math.NaN())},
+		},
+	})
+	cc.CommitCycleSuccess()
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	require.NotNil(t, findCreateChartActionByID(plan, "svc.latency"),
+		"summary quantile chart should be created from an observed all-NaN point")
+
+	var quantileUpdate *UpdateChartAction
+	for i := range plan.Actions {
+		if u, ok := plan.Actions[i].(UpdateChartAction); ok && u.ChartID == "svc.latency" {
+			cp := u
+			quantileUpdate = &cp
+			break
+		}
+	}
+	require.NotNil(t, quantileUpdate, "expected an update action for the quantile chart")
+	require.NotEmpty(t, quantileUpdate.Values)
+	for _, v := range quantileUpdate.Values {
+		assert.Truef(t, v.IsEmpty, "NaN quantile dim %q must gap (IsEmpty), got %+v", v.Name, v)
+	}
+}
+
+func runTestBuildPlanSummaryMixedFiniteNaNQuantileGaps(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
+	require.NoError(t, err)
+	require.NoError(t, e.LoadYAML([]byte(`
+version: v1
+groups:
+  - family: Service
+`), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sum := store.Write().SnapshotMeter("svc").Summary("latency", metrix.WithSummaryQuantiles(0.5, 0.9))
+
+	// One quantile carries a finite value, the other is NaN: the planner must gap
+	// only the NaN dimension and keep the finite one (per-dimension, same chart).
+	cc.BeginCycle()
+	sum.ObservePoint(metrix.SummaryPoint{
+		Count: 1,
+		Sum:   0.4,
+		Quantiles: []metrix.QuantilePoint{
+			{Quantile: 0.5, Value: 0.4},
+			{Quantile: 0.9, Value: metrix.SampleValue(math.NaN())},
+		},
+	})
+	cc.CommitCycleSuccess()
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	require.NotNil(t, findCreateChartActionByID(plan, "svc.latency"),
+		"summary quantile chart should be created")
+
+	var quantileUpdate *UpdateChartAction
+	for i := range plan.Actions {
+		if u, ok := plan.Actions[i].(UpdateChartAction); ok && u.ChartID == "svc.latency" {
+			cp := u
+			quantileUpdate = &cp
+			break
+		}
+	}
+	require.NotNil(t, quantileUpdate, "expected an update action for the quantile chart")
+	require.Len(t, quantileUpdate.Values, 2, "expected both quantile dimensions")
+
+	var empty, finite int
+	for _, v := range quantileUpdate.Values {
+		if v.IsEmpty {
+			empty++
+		} else {
+			finite++
+		}
+	}
+	assert.Equalf(t, 1, empty, "exactly the NaN quantile dim must gap, got %+v", quantileUpdate.Values)
+	assert.Equalf(t, 1, finite, "exactly the finite quantile dim must carry a value, got %+v", quantileUpdate.Values)
 }
 
 func findUpdateAction(plan Plan) *UpdateChartAction {
