@@ -54,12 +54,14 @@ func (s *Session) Send(hdr *protocol.Header, payload []byte) error {
 // headerPayloadLen validates header + payload against the protocol's
 // 32-bit total-length field before any send path narrows lengths.
 func headerPayloadLen(payloadLen int) (int, error) {
-	if payloadLen < 0 ||
-		uint64(payloadLen) > uint64(^uint32(0))-uint64(protocol.HeaderSize) {
+	if payloadLen < 0 {
 		return 0, wrapErr(ErrLimitExceeded, "total message length exceeds protocol limit")
 	}
-	totalMsg := protocol.HeaderSize + payloadLen
-	return totalMsg, nil
+	totalMsg := uint64(protocol.HeaderSize) + uint64(payloadLen)
+	if totalMsg > uint64(^uint32(0)) || totalMsg > uint64(int(^uint(0)>>1)) {
+		return 0, wrapErr(ErrLimitExceeded, "total message length exceeds protocol limit")
+	}
+	return int(totalMsg), nil
 }
 
 func (s *Session) sendInner(hdr *protocol.Header, payload []byte, totalMsg int) error {

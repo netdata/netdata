@@ -24,7 +24,10 @@ impl RawClient {
         s: &str,
     ) -> Result<protocol::StringReverseView<'_>, NipcError> {
         self.validate_method(METHOD_STRING_REVERSE)?;
-        let req_size = STRING_REVERSE_HDR_SIZE + s.len() + 1;
+        let req_size = STRING_REVERSE_HDR_SIZE
+            .checked_add(s.len())
+            .and_then(|size| size.checked_add(1))
+            .ok_or(NipcError::Overflow)?;
         let req_len = {
             let req_buf = self.request_scratch(req_size);
             let req_len = string_reverse_encode(s.as_bytes(), req_buf);

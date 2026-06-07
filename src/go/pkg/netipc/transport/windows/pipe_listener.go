@@ -57,7 +57,10 @@ func (l *Listener) SetPayloadLimits(maxRequestPayloadBytes, maxResponsePayloadBy
 // Accept accepts one client connection. Performs the full handshake.
 func (l *Listener) Accept() (*Session, error) {
 	sessionID := l.nextSessionID.Add(1)
-	return l.AcceptWithConfig(sessionID, l.config)
+	l.mu.Lock()
+	config := l.config
+	l.mu.Unlock()
+	return l.AcceptWithConfig(sessionID, config)
 }
 
 // AcceptWithConfig accepts one client connection using a caller-provided
@@ -145,8 +148,13 @@ func (l *Listener) Close() {
 		)
 		if err == nil && wake != syscall.InvalidHandle && wake != 0 {
 			syscall.CloseHandle(wake)
+			return
 		}
-		return
+		l.mu.Lock()
+		if l.handle == handle {
+			l.handle = syscall.InvalidHandle
+		}
+		l.mu.Unlock()
 	}
 
 	syscall.CloseHandle(handle)

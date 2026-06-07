@@ -942,13 +942,14 @@ fn check_and_recover_stale(path: &str, allow_stale_unlink: bool) -> StaleResult 
         Err(UdsError::Connect(e)) if e == libc::ENOENT => StaleResult::NotExist,
         Err(UdsError::Connect(e)) if e == libc::ECONNREFUSED => {
             if !allow_stale_unlink {
-                return StaleResult::LiveServer;
-            }
-            // Connection refused means stale; unlink only in a private run dir.
-            match std::fs::remove_file(path) {
-                Ok(()) => StaleResult::Stale,
-                Err(err) if err.kind() == io::ErrorKind::NotFound => StaleResult::NotExist,
-                Err(_) => StaleResult::LiveServer,
+                StaleResult::LiveServer
+            } else {
+                // Connection refused means stale; unlink only in a private run dir.
+                match std::fs::remove_file(path) {
+                    Ok(()) => StaleResult::Stale,
+                    Err(err) if err.kind() == io::ErrorKind::NotFound => StaleResult::NotExist,
+                    Err(_) => StaleResult::LiveServer,
+                }
             }
         }
         Err(_) => {

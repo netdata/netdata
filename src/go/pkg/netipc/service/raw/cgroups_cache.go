@@ -1,6 +1,10 @@
 package raw
 
-import "time"
+import (
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
+)
 
 // Default response buffer size for L3 cache refresh.
 const cacheResponseBufSize = 65536
@@ -94,11 +98,15 @@ func (c *Cache) Refresh() bool {
 	var buckets []cacheBucket
 	if len(newItems) > 0 {
 		itemCount, err := checkedLookupU32(len(newItems))
-		if err != nil || itemCount > ^uint32(0)/2 {
+		if err != nil {
 			c.refreshFailureCount++
 			return false
 		}
-		bcount := nextPowerOf2U32(itemCount * 2)
+		bcount, err := cacheBucketCountForItemCount(itemCount)
+		if err != nil {
+			c.refreshFailureCount++
+			return false
+		}
 		buckets = make([]cacheBucket, bcount)
 		mask := bcount - 1
 		for i := range newItems {
@@ -120,6 +128,20 @@ func (c *Cache) Refresh() bool {
 	c.lastRefreshTs = time.Since(c.epoch).Milliseconds()
 
 	return true
+}
+
+func cacheBucketCountForItemCount(itemCount uint32) (uint32, error) {
+	if itemCount == 0 {
+		return 0, nil
+	}
+	if itemCount > 1<<30 {
+		return 0, protocol.ErrOverflow
+	}
+	bcount := nextPowerOf2U32(itemCount * 2)
+	if bcount == 0 || uint64(bcount) > uint64(int(^uint(0)>>1)) {
+		return 0, protocol.ErrOverflow
+	}
+	return bcount, nil
 }
 
 // Ready returns true if at least one successful refresh has occurred.
