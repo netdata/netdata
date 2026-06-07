@@ -1,14 +1,8 @@
 #!/usr/bin/env python3
-"""
-Render a Markdown review document for the sample-gate stage of SOW-0034.
+"""Render a Markdown review document for the sample-gate stage."""
 
-Reads every enriched/<OID>.json file written by classify.py and emits a
-single Markdown file with one section per trap: input description,
-varbind names, and the LLM-produced classification.
-
-Designed to be skimmed -- the operator just wants to spot wrong
-categories, hallucinated placeholders, and marketing tone.
-"""
+# Produces a single review file grouped by category so curators can spot wrong
+# categories, bad placeholders, and marketing tone quickly.
 
 from __future__ import annotations
 

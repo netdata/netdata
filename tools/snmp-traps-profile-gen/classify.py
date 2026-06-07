@@ -1,21 +1,9 @@
 #!/usr/bin/env python3
-"""
-SOW-0034 - SNMP Trap Profile LLM Enrichment Pipeline.
+"""SNMP trap profile enrichment pipeline."""
 
-Reads output/extracted.jsonl (produced by extract.py), submits each trap
-to the LLM gateway with a 4-field classification prompt, validates the
-response, and writes one JSON file per OID under output/enriched/.
-
-Strict rules:
-  * Endpoint-neutral: pass OpenAI-compatible endpoints explicitly with
-    --endpoint, or set the SNMP_TRAP_PROFILE_GEN_* environment defaults.
-  * No authentication header is managed by this helper; use an endpoint or
-    gateway whose auth policy is handled outside committed defaults.
-  * Concurrent in-flight slots are configurable per endpoint.
-  * Schema-validated output; up to 3 LLM attempts with feedback in the
-    retry prompt; mechanical regex fallback only if all 3 attempts fail.
-  * Atomic per-OID file writes; resumable runs.
-"""
+# Reads extract.py JSONL output, calls an OpenAI-compatible endpoint, validates
+# the 3-field classification response, writes one JSON file per OID, and falls
+# back to mechanical regex classification only when all LLM attempts fail.
 
 from __future__ import annotations
 
@@ -525,10 +513,7 @@ def validate(
     response_text: str,
     varbind_names: List[str],
 ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
-    """Parse and validate model JSON.
-
-    Returns ``(record, None)`` on success or ``(None, reason)`` on failure.
-    """
+    """Parse and validate model JSON."""
     if not response_text:
         return None, "empty response"
     obj, reason = parse_response_object(normalize_response_text(response_text))
@@ -564,14 +549,7 @@ async def call_llm(
     cfg: LLMConfig,
     user_prompt: str,
 ) -> str:
-    """Make a single LLM call.
-
-    This helper intentionally does not inject authentication headers. Point it
-    at an OpenAI-compatible endpoint or gateway whose auth policy is handled
-    outside committed defaults.
-
-    Returns the model's text response, or raises on persistent HTTP failure.
-    """
+    """Make a single LLM call."""
     payload = {
         "model": cfg.model,
         "messages": [
@@ -721,12 +699,7 @@ async def enrich_one(
     client: httpx.AsyncClient,
     sem: asyncio.Semaphore,
 ) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
-    """Enrich one trap with schema validation and retry feedback.
-
-    Uses up to three attempts, falling back to mechanical defaults if all fail.
-
-    Returns ``(record, failure_log_entry_or_None)``.
-    """
+    """Enrich one trap with schema validation and retry feedback."""
     # Validator only accepts placeholders that reference varbinds that
     # ``emit.py`` will admit to the file-level table (oid AND syntax).
     # Mirrors the filter in build_user_prompt() so the LLM, the validator,
@@ -914,11 +887,7 @@ async def run_async(
     endpoints: List[LLMConfig],
     progress_every: int,
 ) -> Dict[str, Any]:
-    """Dispatch traps across one-or-more LLM endpoints.
-
-    Each endpoint runs `endpoint.concurrency` worker tasks. Workers pull
-    from a shared queue, so faster endpoints naturally absorb more work.
-    """
+    """Dispatch traps across one-or-more LLM endpoints."""
     out_enriched = os.path.join(out_dir, "enriched")
     os.makedirs(out_enriched, exist_ok=True)
 

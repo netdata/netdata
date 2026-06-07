@@ -1,17 +1,9 @@
 #!/usr/bin/env python3
-"""
-SOW-0033 - SNMP MIB Mechanical Extraction Pipeline.
+"""SNMP MIB mechanical extraction pipeline."""
 
-Walks all configured MIB source directories, compiles every MIB module
-with pysmi, and emits one JSONL record per NOTIFICATION-TYPE / TRAP-TYPE
-definition to output/extracted.jsonl.
-
-Each record carries the trap's OID/name/MIB-meta/description plus
-fully-resolved varbind metadata (type, enum, max-access, status,
-description) for every referenced OBJECT-TYPE.
-
-This stage is fully mechanical; no LLM, no human judgement.
-"""
+# Walk configured MIB directories, compile each MIB with pysmi, and emit one
+# JSONL record per NOTIFICATION-TYPE / TRAP-TYPE. This stage is mechanical:
+# no LLM, no human judgement, and no manual classification.
 
 from __future__ import annotations
 
@@ -123,12 +115,7 @@ def looks_like_mib_filename(path: str) -> bool:
 
 
 def strip_mib_extension(filename: str) -> str:
-    """Derive the MIB module name from a filename.
-
-    Vendor archives use ``.txt``, ``.mib``, ``.my``, ``.MIB``, or no
-    extension at all.  Heuristic: strip a single known extension if present;
-    otherwise return the basename as-is.
-    """
+    """Derive the MIB module name from a filename."""
     base = os.path.basename(filename)
     name, ext = os.path.splitext(base)
     if ext.lower() in {".txt", ".mib", ".my", ".smi", ".asn1"}:
@@ -137,11 +124,7 @@ def strip_mib_extension(filename: str) -> str:
 
 
 def discover_mib_names(source_dirs: List[str]) -> Tuple[List[str], Dict[str, str]]:
-    """Walk source_dirs in priority order; return unique MIB module names.
-
-    Returns (ordered list of unique names, {name: source_file_path}).  First
-    occurrence wins for any given name.
-    """
+    """Walk source_dirs in priority order and return unique MIB module names."""
     seen: "OrderedDict[str, str]" = OrderedDict()
     for root in source_dirs:
         if not os.path.isdir(root):
@@ -162,12 +145,7 @@ def discover_mib_names(source_dirs: List[str]) -> Tuple[List[str], Dict[str, str
 
 
 def expand_vendor_pack_paths(source_dirs: List[str]) -> List[str]:
-    """Expand source dirs with vendor-pack subdirectories.
-
-    For roots in VENDOR_PACK_ROOTS, add each immediate subdirectory so pysmi
-    can resolve imports that reference modules located inside vendor
-    subdirectories (e.g., ``netdisco-mibs/cisco/CISCO-...``).
-    """
+    """Expand source dirs with vendor-pack subdirectories."""
     expanded: "OrderedDict[str, None]" = OrderedDict()
     for d in source_dirs:
         expanded[d] = None
@@ -186,13 +164,8 @@ def expand_vendor_pack_paths(source_dirs: List[str]) -> List[str]:
 # --------------------------------------------------------------------------
 
 
+# Reuse one compiler harness so cross-MIB OBJECTS references can be resolved.
 class CompilerHarness:
-    """Wrap a pysmi compiler and collect emitted JSON documents.
-
-    A single harness is reused across the run; it accumulates a global
-    symbol table keyed by ``module:object`` so cross-MIB OBJECTS references
-    in NOTIFICATION-TYPE definitions can be resolved.
-    """
 
     def __init__(self, source_dirs: List[str]):
         """Initialize the compiler and callback writer."""
@@ -219,12 +192,7 @@ class CompilerHarness:
         self._compiler.add_searchers(StubSearcher(*JsonCodeGen.baseMibs))
 
     def compile_one(self, mib_name: str) -> Tuple[str, Optional[str]]:
-        """Compile a single MIB module by name.
-
-        Returns ``(status, reason)``.  Status is whatever pysmi reports
-        (``compiled``, ``unprocessed``, ``borrowed``, ``no symbols``, ...)
-        when not throwing, or ``error`` when an exception is raised.
-        """
+        """Compile a single MIB module by name."""
         try:
             results = self._compiler.compile(
                 mib_name,
@@ -246,11 +214,7 @@ class CompilerHarness:
 
 
 def build_global_symbols(modules: Dict[str, Dict[str, Any]]) -> Dict[Tuple[str, str], Dict[str, Any]]:
-    """Index every symbol by module and name.
-
-    Cross-module OBJECTS references in NOTIFICATION-TYPE definitions can then
-    be resolved.
-    """
+    """Index every symbol by module and name."""
     out: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for mod_name, doc in modules.items():
         if not isinstance(doc, dict):
@@ -267,11 +231,7 @@ def build_global_symbols(modules: Dict[str, Dict[str, Any]]) -> Dict[Tuple[str, 
 
 
 def find_module_identity(doc: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Return the moduleIdentity entry when present.
-
-    The returned entry can include description, organization, contact-info,
-    last-updated, and revisions.
-    """
+    """Return the moduleIdentity entry when present."""
     for sym in doc.values():
         if isinstance(sym, dict) and sym.get("class") == "moduleidentity":
             return sym
@@ -279,11 +239,7 @@ def find_module_identity(doc: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 def render_syntax(syntax: Any) -> Tuple[Optional[str], Optional[str], Optional[Dict[str, int]]]:
-    """Render a pysmi ``syntax`` block.
-
-    enum_map is keyed by **string** numeric value -> symbolic name (as
-    required by netdata.md §7) so YAML round-trips without surprise.
-    """
+    """Render a pysmi ``syntax`` block."""
     if not isinstance(syntax, dict):
         return None, None, None
     t = syntax.get("type")
@@ -335,11 +291,7 @@ def resolve_varbind(
     obj_ref: Any,
     symbols: Dict[Tuple[str, str], Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """Resolve one NOTIFICATION-TYPE OBJECTS entry to a varbind record.
-
-    Falls back to the raw reference if the target symbol cannot be found in the
-    global symbol table.
-    """
+    """Resolve one NOTIFICATION-TYPE OBJECTS entry to a varbind record."""
     if isinstance(obj_ref, dict):
         ref_mod = obj_ref.get("module")
         ref_name = obj_ref.get("object")

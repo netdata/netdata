@@ -1,23 +1,9 @@
 #!/usr/bin/env python3
-"""
-SOW-0033/0034 - profile YAML emitter.
+"""SNMP trap profile YAML emitter."""
 
-Reads every enriched per-OID JSON record under output/enriched/, groups
-records by inferred vendor (via OID enterprise prefix lookup), and emits
-one YAML file per vendor under the shipped trap-profiles directory
-matching the schema in ``profile-format.md`` (see also
-``.agents/sow/specs/snmp-traps/netdata.md`` §7).
-
-Vendor slug derivation:
-  * IETF / SNMPv2 standard trees (``1.3.6.1.2.1.*``, ``1.3.6.1.6.3.*``)
-    -> ``standard``.
-  * IEEE 802.1AB LLDP tree (``1.0.8802.*``) -> ``ieee-lldp``.
-  * IEEE 802 tree (``1.3.111.*``) -> ``ieee-802``.
-  * Enterprise sub-tree ``1.3.6.1.4.1.<N>.*``: ``<N>`` is looked up in the
-    IANA Private Enterprise Numbers registry, parsed at startup from the
-    bundled ``iana-enterprise-numbers.txt`` file. PENs not in the registry
-    are bucketed under ``enterprise-<N>`` so nothing is silently dropped.
-"""
+# Groups enriched per-OID JSON records by inferred vendor and emits the shipped
+# trap-profile YAML files. Unknown enterprise PENs are kept under
+# enterprise-<N> buckets so extraction never silently drops traps.
 
 from __future__ import annotations
 
@@ -55,14 +41,7 @@ def safe_slug(s: str) -> str:
 
 
 def vendor_for_oid(oid: str) -> str:
-    """Return the vendor slug derived from the trap OID.
-
-    Standard tree -> ``standard``.  IEEE 802.1AB (LLDP) tree -> ``ieee-lldp``.
-    IEEE 802 (anything under ``1.3.111.2.802.*``) -> ``ieee-802``.
-    Enterprise tree -> look up the enterprise number; unknown enterprise
-    numbers become ``enterprise-<N>``.  Malformed or absent OIDs become
-    ``unknown``.
-    """
+    """Return the vendor slug derived from the trap OID."""
     if not oid:
         return "unknown"
     if oid.startswith(("1.3.6.1.2.1.", "1.3.6.1.6.3.")):
@@ -109,20 +88,7 @@ def slim_varbind(vb: Dict[str, Any]) -> Dict[str, Any]:
 def collect_vendor_varbinds(
     recs: List[Dict[str, Any]],
 ) -> Tuple[Dict[str, Dict[str, Any]], List[Tuple[str, Dict[str, Any]]]]:
-    """Build the per-file deduped varbind table.
-
-    Returns ``(table, inline)``. ``table`` maps varbind names to slim varbind
-    dicts for the file-level ``varbinds:`` map. ``inline`` lists varbinds that
-    could not be deduped because they conflict with an earlier entry of the
-    same name.
-
-    Varbinds whose ``slim`` form has no ``oid`` are dropped entirely from
-    both the table and the per-trap reference list. The MIB-extractor flags
-    these with ``resolved: false`` when the IMPORTS chain could not locate
-    the referenced OBJECT-TYPE; emitting them would violate the
-    profile-format contract that requires both ``oid`` and ``type`` on
-    every varbind table entry.
-    """
+    """Build the per-file deduped varbind table."""
     table: Dict[str, Dict[str, Any]] = {}
     inline: List[Tuple[str, Dict[str, Any]]] = []
     for rec in recs:

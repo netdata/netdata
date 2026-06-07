@@ -1,36 +1,9 @@
-"""
-Parse the IANA Private Enterprise Numbers registry into a {pen: slug} dict.
+"""Parse the IANA Private Enterprise Numbers registry."""
 
-Source file (committed alongside this module):
-    tools/snmp-traps-profile-gen/iana-enterprise-numbers.txt
-
-The IANA text format is:
-
-    <PEN>
-      <Organization>
-      <Contact>
-      <Email>
-
-separated by blank lines. We use the organization name as the primary
-source for the vendor slug, with the email-domain stem as a fallback when
-the organization line is empty / placeholder / clearly a personal name
-without a recognizable corporate suffix.
-
-Design choices (deliberately conservative to avoid silent miscategorisation):
-
-1. Strip parenthetical aliases like ``(previously 'Raksha Networks Inc.')``
-   so PEN 22610 becomes ``A10 Networks`` not ``a10-networks-previously-...``.
-2. Split camelCase boundaries (PEN 9 ``ciscoSystems`` -> ``cisco systems``).
-3. Strip only well-anchored corporate suffixes that cannot cause false
-   matches against real-vendor substrings: trailing ``, Inc``, ``, Corp``,
-   ``Corporation``, ``Limited``, ``Co., Ltd.``, ``GmbH & Co. KG``. We do
-   NOT strip free-form ``Co.`` / ``AG`` / ``BV`` etc. because the regex
-   anchor would also chop the tail off vendor names like ``cisco`` -> ``cis``.
-4. Slugify (lowercase, runs of non-alphanumeric -> hyphen).
-5. Fall back to the email-domain stem ONLY when the slug from the org name
-   is empty (or the org line is ``Reserved`` / a single bare token that
-   looks like a person's surname with no corporate marker AT ALL).
-"""
+# The committed registry uses <PEN>/<Organization>/<Contact>/<Email> blocks.
+# Slug derivation is deliberately conservative: strip only safe legal suffixes,
+# split camelCase, and use the email domain only for placeholders or likely
+# personal-name registrations.
 
 from __future__ import annotations
 
@@ -114,12 +87,7 @@ def _slugify(s: str) -> str:
 
 
 def _split_camel(s: str) -> str:
-    """Insert spaces between camelCase boundaries.
-
-    Only applied when the input has NO existing whitespace -- otherwise we'd
-    break brand names like ``NetBotz`` whose author already chose CamelCase
-    deliberately.
-    """
+    """Insert spaces between camelCase boundaries."""
     if " " in s:
         return s
     return re.sub(r"(?<=[a-z])(?=[A-Z])", " ", s)
@@ -154,11 +122,7 @@ def _strip_suffixes(org: str) -> str:
 
 
 def _domain_stem(email: str) -> Optional[str]:
-    """Pull a slugified second-level-domain stem from an IANA contact email.
-
-    IANA writes ``&`` for ``@`` to discourage scraping; we tolerate both.
-    Returns ``None`` for empty / free-mail / placeholder addresses.
-    """
+    """Pull a slugified second-level-domain stem from an IANA contact email."""
     if not email:
         return None
     addr = email.replace("&", "@").strip()
@@ -180,20 +144,7 @@ def _domain_stem(email: str) -> Optional[str]:
 
 
 def _slug_for(pen: str, org: str, email: str) -> str:
-    """Compute the final slug for a PEN, organization, and email triple.
-
-    Heuristic:
-      1. Strip parenthetical aliases / history notes.
-      2. If org is empty / a Reserved placeholder -> email domain or generic.
-      3. Strip safe corporate suffixes.
-      4. If NO suffix was stripped AND a non-free email domain is present,
-         prefer the email-domain stem. This covers the well-known IANA
-         pattern of personal-name registrants whose employer is the actual
-         vendor (e.g. PEN 10520: org "Marc Hirsch", email omnionpower.com
-         -> slug "omnionpower").
-      5. Otherwise slugify the (possibly suffix-stripped) org name.
-      6. Empty slug fallback -> email domain or ``enterprise-<N>``.
-    """
+    """Compute the final slug for a PEN, organization, and email triple."""
     # 1.
     cleaned = _strip_parentheticals(org)
     cleaned_lc = cleaned.strip().lower()
