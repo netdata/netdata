@@ -200,7 +200,7 @@ class CompilerHarness:
         # extraction record can name the on-disk MIB.
         self.module_source_paths: Dict[str, str] = {}
 
-        def _writer(mib_name: str, json_doc: str, cbCtx: Any = None) -> None:
+        def _writer(mib_name: str, json_doc: str, *_args: Any, **_kwargs: Any) -> None:
             try:
                 self.modules[mib_name] = json.loads(json_doc)
             except Exception as exc:
@@ -437,7 +437,7 @@ def stratify_log(message: str, level: int = logging.INFO) -> None:
     logging.log(level, message)
 
 
-def main() -> int:
+def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Extract SNMP trap metadata from a MIB corpus.",
     )
@@ -479,61 +479,50 @@ def main() -> int:
         default=100,
         help="Log progress every N MIBs (0 disables).",
     )
-    args = parser.parse_args()
+    return parser
 
-    logging.basicConfig(
-        level=getattr(logging, args.log_level.upper(), logging.WARNING),
-        format="%(asctime)s %(levelname)s %(message)s",
-    )
 
-    os.makedirs(args.out_dir, exist_ok=True)
-    out_jsonl = os.path.join(args.out_dir, "extracted.jsonl")
-    out_failed = os.path.join(args.out_dir, "failed-mibs.json")
-    out_conflicts = os.path.join(args.out_dir, "dedup-conflicts.json")
-    out_report = os.path.join(args.out_dir, "extraction-report.json")
-
-    # Discover MIBs.
-    sources_with_packs = expand_vendor_pack_paths(DEFAULT_SOURCE_DIRS)
-    mib_names_in_priority, name_to_path = discover_mib_names(sources_with_packs)
-    stratify_log(
-        f"Discovered {len(mib_names_in_priority)} unique MIB module names across "
-        f"{len(sources_with_packs)} source directories.",
-    )
-
+def select_mib_names(
+    args: argparse.Namespace,
+    mib_names_in_priority: List[str],
+    name_to_path: Dict[str, str],
+) -> Optional[List[str]]:
     if args.mibs and not args.all:
         target = [m for m in args.mibs if m in name_to_path]
         missing = sorted(set(args.mibs) - set(target))
         if missing:
             stratify_log(f"Requested MIBs not found in corpus: {missing}", logging.WARNING)
-        mib_names = target or list(args.mibs)
-    elif args.all:
-        mib_names = mib_names_in_priority
-    else:
-        stratify_log("Specify --mibs <NAMES> or --all.", logging.ERROR)
-        return 2
+        return target or list(args.mibs)
+    if args.all:
+        return mib_names_in_priority
+    stratify_log("Specify --mibs <NAMES> or --all.", logging.ERROR)
+    return None
 
-    if args.limit:
-        mib_names = mib_names[: args.limit]
 
-    # Resumability: load already-processed MIB names from existing JSONL.
+def load_already_done(args: argparse.Namespace, out_jsonl: str) -> set:
     already_done: set = set()
-    if args.resume and os.path.exists(out_jsonl):
-        with open(out_jsonl) as f:
-            for line in f:
-                rec = None
-                try:
-                    rec = json.loads(line)
-                except Exception as exc:
-                    logging.debug("skipping malformed resume record: %s", exc)
-                if rec is None:
-                    continue
-                if "mib" in rec:
-                    already_done.add(rec["mib"])
-        stratify_log(f"Resuming; {len(already_done)} MIBs already in output.")
+    if not args.resume or not os.path.exists(out_jsonl):
+        return already_done
+    with open(out_jsonl) as f:
+        for line in f:
+            rec = None
+            try:
+                rec = json.loads(line)
+            except Exception as exc:
+                logging.debug("skipping malformed resume record: %s", exc)
+            if rec is not None and "mib" in rec:
+                already_done.add(rec["mib"])
+    stratify_log(f"Resuming; {len(already_done)} MIBs already in output.")
+    return already_done
 
-    harness = CompilerHarness(sources_with_packs)
 
-    # Compile every requested MIB; failures land in failed-mibs.json.
+def compile_requested_mibs(
+    args: argparse.Namespace,
+    mib_names: List[str],
+    already_done: set,
+    harness: CompilerHarness,
+    name_to_path: Dict[str, str],
+) -> Tuple[Dict[str, Any], Dict[str, str], float]:
     failures: Dict[str, Any] = {}
     statuses: Dict[str, str] = {}
     t0 = time.time()
@@ -559,11 +548,18 @@ def main() -> int:
     dt_compile = time.time() - t0
     stratify_log(f"Compilation finished in {dt_compile:.1f}s "
                  f"compiled={len(harness.modules)} failures={len(failures)}")
+    return failures, statuses, dt_compile
 
-    # Resolve varbinds across modules.
-    symbols = build_global_symbols(harness.modules)
 
-    # Emit per-trap JSONL.
+def write_extracted_traps(
+    args: argparse.Namespace,
+    out_jsonl: str,
+    mib_names: List[str],
+    already_done: set,
+    harness: CompilerHarness,
+    symbols: Dict[Tuple[str, str], Dict[str, Any]],
+    name_to_path: Dict[str, str],
+) -> Tuple[Dict[str, List[Dict[str, str]]], int, int]:
     conflicts: Dict[str, List[Dict[str, str]]] = {}
     oid_first_seen: Dict[str, Tuple[str, str]] = {}
     write_mode = "a" if (args.resume and os.path.exists(out_jsonl)) else "w"
@@ -572,9 +568,7 @@ def main() -> int:
     with open(out_jsonl, write_mode) as fout:
         for mib_name in mib_names:
             doc = harness.modules.get(mib_name)
-            if not isinstance(doc, dict):
-                continue
-            if mib_name in already_done:
+            if not isinstance(doc, dict) or mib_name in already_done:
                 continue
             src = name_to_path.get(mib_name)
             for rec in extract_traps_from_module(mib_name, doc, symbols, src):
@@ -601,14 +595,28 @@ def main() -> int:
                 fout.write(json.dumps(rec, separators=(",", ":")) + "\n")
                 n_records += 1
                 n_varbinds_total += len(rec.get("varbinds") or [])
+    return conflicts, n_records, n_varbinds_total
 
-    # Write side reports.
-    with open(out_failed, "w") as f:
-        json.dump(failures, f, indent=2, sort_keys=True)
-    with open(out_conflicts, "w") as f:
-        json.dump(conflicts, f, indent=2, sort_keys=True)
 
-    report = {
+def write_json_file(path: str, data: Any) -> None:
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2, sort_keys=True)
+
+
+def build_report(
+    sources_with_packs: List[str],
+    mib_names_in_priority: List[str],
+    mib_names: List[str],
+    harness: CompilerHarness,
+    failures: Dict[str, Any],
+    statuses: Dict[str, str],
+    n_records: int,
+    n_varbinds_total: int,
+    conflicts: Dict[str, List[Dict[str, str]]],
+    dt_compile: float,
+    out_jsonl: str,
+) -> Dict[str, Any]:
+    return {
         "source_dirs": sources_with_packs,
         "mibs_discovered": len(mib_names_in_priority),
         "mibs_requested": len(mib_names),
@@ -621,8 +629,82 @@ def main() -> int:
         "elapsed_compile_seconds": dt_compile,
         "out_jsonl": out_jsonl,
     }
-    with open(out_report, "w") as f:
-        json.dump(report, f, indent=2, sort_keys=True)
+
+
+def main() -> int:
+    parser = build_arg_parser()
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        level=getattr(logging, args.log_level.upper(), logging.WARNING),
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
+
+    os.makedirs(args.out_dir, exist_ok=True)
+    out_jsonl = os.path.join(args.out_dir, "extracted.jsonl")
+    out_failed = os.path.join(args.out_dir, "failed-mibs.json")
+    out_conflicts = os.path.join(args.out_dir, "dedup-conflicts.json")
+    out_report = os.path.join(args.out_dir, "extraction-report.json")
+
+    # Discover MIBs.
+    sources_with_packs = expand_vendor_pack_paths(DEFAULT_SOURCE_DIRS)
+    mib_names_in_priority, name_to_path = discover_mib_names(sources_with_packs)
+    stratify_log(
+        f"Discovered {len(mib_names_in_priority)} unique MIB module names across "
+        f"{len(sources_with_packs)} source directories.",
+    )
+
+    mib_names = select_mib_names(args, mib_names_in_priority, name_to_path)
+    if mib_names is None:
+        return 2
+
+    if args.limit:
+        mib_names = mib_names[: args.limit]
+
+    already_done = load_already_done(args, out_jsonl)
+
+    harness = CompilerHarness(sources_with_packs)
+
+    # Compile every requested MIB; failures land in failed-mibs.json.
+    failures, statuses, dt_compile = compile_requested_mibs(
+        args,
+        mib_names,
+        already_done,
+        harness,
+        name_to_path,
+    )
+
+    # Resolve varbinds across modules.
+    symbols = build_global_symbols(harness.modules)
+
+    # Emit per-trap JSONL.
+    conflicts, n_records, n_varbinds_total = write_extracted_traps(
+        args,
+        out_jsonl,
+        mib_names,
+        already_done,
+        harness,
+        symbols,
+        name_to_path,
+    )
+
+    # Write side reports.
+    write_json_file(out_failed, failures)
+    write_json_file(out_conflicts, conflicts)
+    report = build_report(
+        sources_with_packs,
+        mib_names_in_priority,
+        mib_names,
+        harness,
+        failures,
+        statuses,
+        n_records,
+        n_varbinds_total,
+        conflicts,
+        dt_compile,
+        out_jsonl,
+    )
+    write_json_file(out_report, report)
 
     stratify_log(
         f"Wrote {n_records} trap records ({n_varbinds_total} varbinds total) "

@@ -32,7 +32,7 @@ import sys
 import tempfile
 import time
 import traceback
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
@@ -464,14 +464,7 @@ def extract_placeholders(s: str) -> List[str]:
     return [m.split(".", 1)[0] for m in PLACEHOLDER_RE.findall(s)]
 
 
-def validate(
-    response_text: str,
-    varbind_names: List[str],
-) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
-    """Parse + validate model JSON.  Returns (record, None) on success or
-    (None, reason) on failure."""
-    if not response_text:
-        return None, "empty response"
+def normalize_response_text(response_text: str) -> str:
     text = response_text.strip()
     # Strip optional ```json fences a chatty model might add.
     if text.startswith("```"):
@@ -483,40 +476,66 @@ def validate(
         m = re.search(r"\{.*\}", text, re.DOTALL)
         if m:
             text = m.group(0)
+    return text
+
+
+def parse_response_object(text: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     try:
         obj = json.loads(text)
     except Exception as exc:
         return None, f"JSON parse failed: {exc}"
     if not isinstance(obj, dict):
         return None, "response is not a JSON object"
+    return obj, None
+
+
+def validate_response_keys(obj: Dict[str, Any]) -> Optional[str]:
     keys = set(obj.keys())
     required = {"category", "severity", "description"}
     missing = required - keys
     extra = keys - required
     if missing:
-        return None, f"missing required keys: {sorted(missing)}"
+        return f"missing required keys: {sorted(missing)}"
     if extra:
-        return None, f"unexpected extra keys: {sorted(extra)}"
+        return f"unexpected extra keys: {sorted(extra)}"
+    return None
+
+
+def validate_response_values(obj: Dict[str, Any], varbind_names: List[str]) -> Optional[str]:
     if obj["category"] not in ALLOWED_CATEGORIES:
-        return None, f"category not allowed: {obj['category']!r} (expected one of {ALLOWED_CATEGORIES})"
+        return f"category not allowed: {obj['category']!r} (expected one of {ALLOWED_CATEGORIES})"
     if obj["severity"] not in ALLOWED_SEVERITIES:
-        return None, f"severity not allowed: {obj['severity']!r} (expected one of {ALLOWED_SEVERITIES})"
+        return f"severity not allowed: {obj['severity']!r} (expected one of {ALLOWED_SEVERITIES})"
     desc = obj["description"]
     if not isinstance(desc, str):
-        return None, "description not a string"
+        return "description not a string"
     desc_bytes = len(desc.encode("utf-8"))
     if desc_bytes > DESCRIPTION_MAX_BYTES:
-        return None, f"description too long ({desc_bytes} bytes; max {DESCRIPTION_MAX_BYTES})"
+        return f"description too long ({desc_bytes} bytes; max {DESCRIPTION_MAX_BYTES})"
     if BANNED_REGEX.search(desc):
-        return None, "description contains banned phrase"
-    placeholders = extract_placeholders(desc)
-    vb_set = set(varbind_names)
-    std_set = set(STANDARD_PLACEHOLDERS)
-    for ph in placeholders:
-        if ph in vb_set or ph in std_set:
-            continue
-        return None, f"unknown placeholder {{{ph}}} (not in varbinds {sorted(vb_set)[:6]}... or standard set)"
-    return obj, None
+        return "description contains banned phrase"
+    allowed = set(varbind_names) | set(STANDARD_PLACEHOLDERS)
+    for ph in extract_placeholders(desc):
+        if ph not in allowed:
+            return f"unknown placeholder {{{ph}}} (not in varbinds {sorted(varbind_names)[:6]}... or standard set)"
+    return None
+
+
+def validate(
+    response_text: str,
+    varbind_names: List[str],
+) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """Parse + validate model JSON.  Returns (record, None) on success or
+    (None, reason) on failure."""
+    if not response_text:
+        return None, "empty response"
+    obj, reason = parse_response_object(normalize_response_text(response_text))
+    if reason is not None:
+        return None, reason
+    reason = validate_response_keys(obj)
+    if reason is None:
+        reason = validate_response_values(obj, varbind_names)
+    return (obj, None) if reason is None else (None, reason)
 
 
 # --------------------------------------------------------------------------
@@ -641,6 +660,59 @@ def read_json_list(path: str) -> List[Dict[str, Any]]:
     return data
 
 
+def read_trap_records(jsonl_path: str) -> List[Dict[str, Any]]:
+    traps: List[Dict[str, Any]] = []
+    with open(jsonl_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            rec = None
+            try:
+                rec = json.loads(line)
+            except Exception as exc:
+                logging.debug("skipping malformed extracted trap record: %s", exc)
+            if rec is not None and rec.get("oid"):
+                traps.append(rec)
+    return traps
+
+
+def known_enriched_filenames(out_enriched_dir: str) -> set:
+    if not os.path.isdir(out_enriched_dir):
+        return set()
+    return {
+        fn
+        for fn in os.listdir(out_enriched_dir)
+        if fn.endswith(".json")
+    }
+
+
+def sample_traps(traps: List[Dict[str, Any]], sample_size: int, sample_seed: int) -> List[Dict[str, Any]]:
+    if not sample_size or sample_size >= len(traps):
+        return traps
+
+    by_mib: Dict[str, List[Dict[str, Any]]] = {}
+    for trap in traps:
+        by_mib.setdefault(trap.get("mib") or "", []).append(trap)
+    keys = sorted(by_mib.keys(), key=lambda k: deterministic_sample_key(sample_seed, k))
+    for key in keys:
+        by_mib[key].sort(
+            key=lambda trap: deterministic_sample_key(
+                sample_seed,
+                f"{trap.get('oid') or ''}:{trap.get('name') or ''}",
+            )
+        )
+
+    flat = []
+    i = 0
+    while len(flat) < sample_size and any(by_mib[key] for key in keys):
+        key = keys[i % len(keys)]
+        if by_mib[key]:
+            flat.append(by_mib[key].pop())
+        i += 1
+    return flat
+
+
 async def enrich_one(
     trap: Dict[str, Any],
     cfg: LLMConfig,
@@ -742,6 +814,97 @@ async def enrich_one(
     return record, failure_log
 
 
+@dataclass
+class EnrichmentRunStats:
+    total: int
+    progress_every: int
+    failures: List[Dict[str, Any]]
+    n_done: int = 0
+    n_via_mech: int = 0
+    t0: float = 0.0
+    n_via_llm: List[int] = field(default_factory=lambda: [0, 0, 0])
+    n_by_endpoint: Dict[str, int] = field(default_factory=dict)
+
+    def report(self) -> Dict[str, Any]:
+        return {
+            "total": self.total,
+            "done": self.n_done,
+            "via_llm_attempt_1": self.n_via_llm[0],
+            "via_llm_attempt_2": self.n_via_llm[1],
+            "via_llm_attempt_3": self.n_via_llm[2],
+            "via_mechanical_fallback": self.n_via_mech,
+            "by_endpoint": self.n_by_endpoint,
+            "elapsed_seconds": time.time() - self.t0,
+        }
+
+
+def record_enrichment_result(
+    record: Dict[str, Any],
+    failure_log: Optional[Dict[str, Any]],
+    model: str,
+    stats: EnrichmentRunStats,
+) -> None:
+    if failure_log is not None:
+        stats.failures.append(failure_log)
+    src = record.get("enrichment_source") or ""
+    if src.startswith("llm:"):
+        m = re.search(r"attempt-(\d+)$", src)
+        if m:
+            attempt = int(m.group(1)) - 1
+            if 0 <= attempt < 3:
+                stats.n_via_llm[attempt] += 1
+        stats.n_by_endpoint[model] = stats.n_by_endpoint.get(model, 0) + 1
+    else:
+        stats.n_via_mech += 1
+    stats.n_done += 1
+
+
+def log_enrichment_progress(stats: EnrichmentRunStats) -> None:
+    if not stats.progress_every or stats.n_done % stats.progress_every != 0:
+        return
+    dt = time.time() - stats.t0
+    rate = stats.n_done / dt if dt > 0 else 0
+    eta = (stats.total - stats.n_done) / rate if rate > 0 else 0
+    by_ep = " ".join(f"{m}={c}" for m, c in stats.n_by_endpoint.items())
+    logging.info(
+        "progress %d/%d (a1=%d a2=%d a3=%d mech=%d) rate=%.1f/s eta=%.0fs %s",
+        stats.n_done, stats.total,
+        stats.n_via_llm[0], stats.n_via_llm[1], stats.n_via_llm[2], stats.n_via_mech,
+        rate, eta, by_ep,
+    )
+
+
+async def enrich_worker(
+    queue: asyncio.Queue,
+    out_enriched: str,
+    ep: LLMConfig,
+    client: httpx.AsyncClient,
+    ep_sem: asyncio.Semaphore,
+    stats: EnrichmentRunStats,
+) -> None:
+    while True:
+        try:
+            trap = queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return
+        try:
+            record, failure_log = await enrich_one(trap, ep, client, ep_sem)
+            oid = record["oid"]
+            if oid:
+                path = os.path.join(out_enriched, oid_to_filename(oid))
+                await asyncio.to_thread(
+                    atomic_write,
+                    path,
+                    json.dumps(record, separators=(",", ":"), ensure_ascii=False) + "\n",
+                )
+                record_enrichment_result(record, failure_log, ep.model, stats)
+                log_enrichment_progress(stats)
+        except Exception as exc:
+            logging.warning("worker(%s) error on trap %s: %s", ep.model, trap.get("oid"), exc)
+        finally:
+            queue.task_done()
+
+
 async def run_async(
     traps: List[Dict[str, Any]],
     out_dir: str,
@@ -758,63 +921,17 @@ async def run_async(
 
     failures_path = os.path.join(out_dir, "llm-failures.json")
     failures = await asyncio.to_thread(read_json_list, failures_path)
-
-    n_done = 0
-    n_via_llm = [0, 0, 0]            # success on attempt-1 / attempt-2 / attempt-3
-    n_via_mech = 0
-    n_by_endpoint: Dict[str, int] = {ep.model: 0 for ep in endpoints}
-    t0 = time.time()
+    stats = EnrichmentRunStats(
+        total=len(traps),
+        progress_every=progress_every,
+        failures=failures,
+        t0=time.time(),
+        n_by_endpoint={ep.model: 0 for ep in endpoints},
+    )
 
     queue: asyncio.Queue = asyncio.Queue()
     for t in traps:
         queue.put_nowait(t)
-
-    async def worker(ep: LLMConfig, client: httpx.AsyncClient, ep_sem: asyncio.Semaphore) -> None:
-        nonlocal n_done, n_via_mech
-        while True:
-            try:
-                trap = queue.get_nowait()
-            except asyncio.QueueEmpty:
-                return
-            try:
-                record, failure_log = await enrich_one(trap, ep, client, ep_sem)
-                oid = record["oid"]
-                if not oid:
-                    continue
-                path = os.path.join(out_enriched, oid_to_filename(oid))
-                await asyncio.to_thread(
-                    atomic_write,
-                    path,
-                    json.dumps(record, separators=(",", ":"), ensure_ascii=False) + "\n",
-                )
-                if failure_log is not None:
-                    failures.append(failure_log)
-                src = record.get("enrichment_source") or ""
-                if src.startswith("llm:"):
-                    m = re.search(r"attempt-(\d+)$", src)
-                    if m:
-                        a = int(m.group(1)) - 1
-                        if 0 <= a < 3:
-                            n_via_llm[a] += 1
-                    n_by_endpoint[ep.model] = n_by_endpoint.get(ep.model, 0) + 1
-                else:
-                    n_via_mech += 1
-                n_done += 1
-                if progress_every and n_done % progress_every == 0:
-                    dt = time.time() - t0
-                    rate = n_done / dt if dt > 0 else 0
-                    eta = (len(traps) - n_done) / rate if rate > 0 else 0
-                    by_ep = " ".join(f"{m}={c}" for m, c in n_by_endpoint.items())
-                    logging.info(
-                        "progress %d/%d (a1=%d a2=%d a3=%d mech=%d) rate=%.1f/s eta=%.0fs %s",
-                        n_done, len(traps),
-                        n_via_llm[0], n_via_llm[1], n_via_llm[2], n_via_mech,
-                        rate, eta, by_ep,
-                    )
-            except Exception as exc:
-                logging.warning("worker(%s) error on trap %s: %s", ep.model, trap.get("oid"), exc)
-            finally:
-                queue.task_done()
 
     # One httpx.AsyncClient per endpoint (independent connection pool +
     # keep-alives sized to the endpoint's concurrency).
@@ -826,21 +943,11 @@ async def run_async(
             client = await stack.enter_async_context(httpx.AsyncClient(limits=limits, timeout=ep.timeout_s))
             ep_sem = asyncio.Semaphore(ep.concurrency)
             for _ in range(ep.concurrency):
-                ep_workers.append(asyncio.create_task(worker(ep, client, ep_sem)))
+                ep_workers.append(asyncio.create_task(enrich_worker(queue, out_enriched, ep, client, ep_sem, stats)))
         await asyncio.gather(*ep_workers, return_exceptions=False)
 
     await asyncio.to_thread(write_json, failures_path, failures)
-
-    return {
-        "total": len(traps),
-        "done": n_done,
-        "via_llm_attempt_1": n_via_llm[0],
-        "via_llm_attempt_2": n_via_llm[1],
-        "via_llm_attempt_3": n_via_llm[2],
-        "via_mechanical_fallback": n_via_mech,
-        "by_endpoint": n_by_endpoint,
-        "elapsed_seconds": time.time() - t0,
-    }
+    return stats.report()
 
 
 # --------------------------------------------------------------------------
@@ -856,54 +963,14 @@ def load_traps(
     sample_seed: int = 7,
     force: bool = False,
 ) -> List[Dict[str, Any]]:
-    traps: List[Dict[str, Any]] = []
-    with open(jsonl_path) as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            rec = None
-            try:
-                rec = json.loads(line)
-            except Exception as exc:
-                logging.debug("skipping malformed extracted trap record: %s", exc)
-            if rec is None:
-                continue
-            if not rec.get("oid"):
-                continue
-            traps.append(rec)
+    traps = read_trap_records(jsonl_path)
     if only_oids:
         wanted = set(only_oids)
         traps = [t for t in traps if t.get("oid") in wanted]
     if not force:
-        present = set()
-        if os.path.isdir(out_enriched_dir):
-            for fn in os.listdir(out_enriched_dir):
-                if fn.endswith(".json"):
-                    present.add(fn)
+        present = known_enriched_filenames(out_enriched_dir)
         traps = [t for t in traps if oid_to_filename(t["oid"]) not in present]
-    if sample_size and sample_size < len(traps):
-        # Stratify by MIB so the sample spreads across the corpus.
-        by_mib: Dict[str, List[Dict[str, Any]]] = {}
-        for t in traps:
-            by_mib.setdefault(t.get("mib") or "", []).append(t)
-        flat = []
-        keys = sorted(by_mib.keys(), key=lambda k: deterministic_sample_key(sample_seed, k))
-        for k in keys:
-            by_mib[k].sort(
-                key=lambda t: deterministic_sample_key(
-                    sample_seed,
-                    f"{t.get('oid') or ''}:{t.get('name') or ''}",
-                )
-            )
-        i = 0
-        while len(flat) < sample_size and any(by_mib[k] for k in keys):
-            k = keys[i % len(keys)]
-            if by_mib[k]:
-                flat.append(by_mib[k].pop())
-            i += 1
-        traps = flat
-    return traps
+    return sample_traps(traps, sample_size, sample_seed)
 
 
 def main() -> int:
