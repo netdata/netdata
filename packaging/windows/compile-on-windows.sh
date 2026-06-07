@@ -3,15 +3,15 @@
 REPO_ROOT="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null && pwd -P)")")"
 CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
 
-# shellcheck source=./win-build-dir.sh
-. "${REPO_ROOT}/packaging/windows/win-build-dir.sh"
-
-set -eu -o pipefail
-
 if [ "${MSYSTEM:-}" != "UCRT64" ]; then
     export MSYSTEM="UCRT64"
     echo "Setting MSYSTEM=UCRT64 for the Windows build." >&2
 fi
+
+# shellcheck source=./win-build-dir.sh
+. "${REPO_ROOT}/packaging/windows/win-build-dir.sh"
+
+set -eu -o pipefail
 
 windows_path_prefix=
 windows_path_prefix_arg=()
