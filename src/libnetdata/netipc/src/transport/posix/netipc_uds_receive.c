@@ -145,6 +145,8 @@ static nipc_uds_error_t receive_one_chunk(nipc_uds_session_t *session,
 
     if ((size_t)cn < NIPC_HEADER_LEN)
         return NIPC_UDS_ERR_CHUNK;
+    if ((size_t)cn > pkt_buf_size)
+        return NIPC_UDS_ERR_CHUNK;
 
     nipc_chunk_header_t chk;
     nipc_error_t perr = nipc_chunk_header_decode(pkt_buf, (size_t)cn, &chk);
@@ -160,11 +162,12 @@ static nipc_uds_error_t receive_one_chunk(nipc_uds_session_t *session,
     if (chunk_data != chk.chunk_payload_len)
         return NIPC_UDS_ERR_CHUNK;
 
-    if (*assembled + chunk_data > hdr->payload_len)
+    if (*assembled > hdr->payload_len ||
+        chunk_data > hdr->payload_len - *assembled)
         return NIPC_UDS_ERR_CHUNK;
 
-    memcpy(session->recv_buf + *assembled, pkt_buf + NIPC_HEADER_LEN,
-           chunk_data);
+	memcpy(&session->recv_buf[*assembled], &pkt_buf[NIPC_HEADER_LEN],
+	       chunk_data);
     *assembled += chunk_data;
     return NIPC_UDS_OK;
 }
@@ -177,8 +180,11 @@ static nipc_uds_error_t receive_chunked_payload(nipc_uds_session_t *session,
                                                 const void **payload_out,
                                                 size_t *payload_len_out)
 {
-    size_t first_payload_bytes = (size_t)first_packet_len - NIPC_HEADER_LEN;
-    nipc_uds_error_t err = ensure_recv_buf(session, hdr->payload_len);
+	size_t first_payload_bytes = (size_t)first_packet_len - NIPC_HEADER_LEN;
+    if (first_payload_bytes > hdr->payload_len)
+        return NIPC_UDS_ERR_CHUNK;
+
+	nipc_uds_error_t err = ensure_recv_buf(session, hdr->payload_len);
     if (err != NIPC_UDS_OK)
         return err;
 

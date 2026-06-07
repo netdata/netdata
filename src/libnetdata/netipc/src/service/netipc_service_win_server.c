@@ -196,21 +196,11 @@ nipc_error_t nipc_service_platform_server_init_raw(
     if (worker_count < 1)
         worker_count = 1;
 
-    /* Store config */
-    {
-        size_t len = strlen(run_dir);
-        if (len >= sizeof(server->run_dir))
-            len = sizeof(server->run_dir) - 1;
-        memcpy(server->run_dir, run_dir, len);
-        server->run_dir[len] = '\0';
-    }
-    {
-        size_t len = strlen(service_name);
-        if (len >= sizeof(server->service_name))
-            len = sizeof(server->service_name) - 1;
-        memcpy(server->service_name, service_name, len);
-        server->service_name[len] = '\0';
-    }
+    nipc_service_common_copy_cstr_field(server->run_dir, sizeof(server->run_dir),
+                                        run_dir);
+    nipc_service_common_copy_cstr_field(server->service_name,
+                                        sizeof(server->service_name),
+                                        service_name);
 
     server->handler = handler;
     server->handler_user = user;

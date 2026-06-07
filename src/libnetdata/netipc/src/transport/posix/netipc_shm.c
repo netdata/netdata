@@ -35,6 +35,21 @@ static inline uint32_t align64(uint32_t v)
     return (v + (NIPC_SHM_REGION_ALIGNMENT - 1)) & ~(uint32_t)(NIPC_SHM_REGION_ALIGNMENT - 1);
 }
 
+static int copy_cstr_checked(char *dst, size_t dst_size, const char *src)
+{
+    if (!dst || !src || dst_size == 0)
+        return -1;
+
+    size_t len = 0;
+    while (len < dst_size && src[len] != '\0')
+        len++;
+    if (len == dst_size)
+        return -1;
+
+    memcpy(dst, src, len + 1);
+    return 0;
+}
+
 /* Validate service_name: only [a-zA-Z0-9._-], non-empty, not "." or "..". */
 static int validate_service_name(const char *name)
 {
@@ -390,8 +405,15 @@ nipc_shm_error_t nipc_shm_server_create(const char *run_dir,
     out->local_resp_seq    = 0;
     out->spin_tries        = NIPC_SHM_DEFAULT_SPIN;
     out->owner_generation  = hdr->owner_generation;
-    strncpy(out->path, path, sizeof(out->path) - 1);
-    out->path[sizeof(out->path) - 1] = '\0';
+    if (copy_cstr_checked(out->path, sizeof(out->path), path) != 0) {
+        munmap(map, region_size);
+        close(fd);
+        unlinkat(dir_fd, shm_name, 0);
+        close(dir_fd);
+        memset(out, 0, sizeof(*out));
+        out->fd = -1;
+        return NIPC_SHM_ERR_PATH_TOO_LONG;
+    }
 
     close(dir_fd);
     return NIPC_SHM_OK;
@@ -570,8 +592,13 @@ nipc_shm_error_t nipc_shm_client_attach(const char *run_dir,
     out->local_resp_seq    = cur_resp_seq;
     out->spin_tries        = NIPC_SHM_DEFAULT_SPIN;
     out->owner_generation  = hdr->owner_generation;
-    strncpy(out->path, path, sizeof(out->path) - 1);
-    out->path[sizeof(out->path) - 1] = '\0';
+    if (copy_cstr_checked(out->path, sizeof(out->path), path) != 0) {
+        munmap(map, file_size);
+        close(fd);
+        memset(out, 0, sizeof(*out));
+        out->fd = -1;
+        return NIPC_SHM_ERR_PATH_TOO_LONG;
+    }
 
     return NIPC_SHM_OK;
 }
@@ -864,7 +891,12 @@ void nipc_shm_cleanup_stale(const char *run_dir, const char *service_name)
         return;
 
     int dir_fd = dirfd(dir);
-    bool allow_stale_unlink = dir_fd >= 0 && dir_fd_allows_stale_unlink(dir_fd);
+    if (dir_fd < 0) {
+        closedir(dir);
+        return;
+    }
+
+    bool allow_stale_unlink = dir_fd_allows_stale_unlink(dir_fd);
 
     struct dirent *ent;
     while ((ent = readdir(dir)) != NULL) {
@@ -876,12 +908,6 @@ void nipc_shm_cleanup_stale(const char *run_dir, const char *service_name)
         if (strncmp(ent->d_name, prefix, prefix_len) != 0)
             continue;
         if (strcmp(ent->d_name + nlen - suffix_len, suffix) != 0)
-            continue;
-
-        /* Build full path and check if stale */
-        char path[512];
-        int n = snprintf(path, sizeof(path), "%s/%s", run_dir, ent->d_name);
-        if (n < 0 || (size_t)n >= sizeof(path))
             continue;
 
         /* check_shm_stale unlinks stale files and returns:

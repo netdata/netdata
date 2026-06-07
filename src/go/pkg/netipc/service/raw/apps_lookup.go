@@ -104,10 +104,6 @@ func AppsLookupDispatch(handle AppsLookupHandler) DispatchHandler {
 		if builder.ItemCount() != req.ItemCount {
 			return 0, protocol.ErrBadItemCount
 		}
-		n := builder.Finish()
-		if n == 0 {
-			return 0, protocol.ErrOverflow
-		}
-		return n, nil
+		return builder.Finish(), nil
 	}
 }

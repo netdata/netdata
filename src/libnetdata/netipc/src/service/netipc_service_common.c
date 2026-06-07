@@ -63,14 +63,20 @@ uint32_t nipc_service_common_typed_response_batch_items(uint32_t max_request_bat
     return max_request_batch_items;
 }
 
-static void copy_cstr_field(char *dst, size_t dst_size, const char *src)
+void nipc_service_common_copy_cstr_field(char *dst, size_t dst_size, const char *src)
 {
-    if (!src || dst_size == 0)
+    if (!dst || dst_size == 0)
         return;
 
-    size_t len = strlen(src);
-    if (len >= dst_size)
-        len = dst_size - 1;
+    dst[0] = '\0';
+    if (!src)
+        return;
+
+    size_t len = 0;
+    size_t max_copy = dst_size - 1;
+    while (len < max_copy && src[len] != '\0')
+        len++;
+
     memcpy(dst, src, len);
     dst[len] = '\0';
 }
@@ -83,8 +89,8 @@ void nipc_service_common_client_init(nipc_client_ctx_t *ctx,
     ctx->state = NIPC_CLIENT_DISCONNECTED;
     ctx->session_valid = false;
     ctx->shm = NULL;
-    copy_cstr_field(ctx->run_dir, sizeof(ctx->run_dir), run_dir);
-    copy_cstr_field(ctx->service_name, sizeof(ctx->service_name), service_name);
+    nipc_service_common_copy_cstr_field(ctx->run_dir, sizeof(ctx->run_dir), run_dir);
+    nipc_service_common_copy_cstr_field(ctx->service_name, sizeof(ctx->service_name), service_name);
 }
 
 void nipc_service_common_client_status(const nipc_client_ctx_t *ctx,

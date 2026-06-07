@@ -12,6 +12,28 @@
 #include <sys/stat.h>
 #include <sys/un.h>
 
+static int copy_cstr_checked(char *dst, size_t dst_size, const char *src)
+{
+    if (!dst || !src || dst_size == 0)
+        return -1;
+
+    size_t len = 0;
+    while (len < dst_size && src[len] != '\0')
+        len++;
+    if (len == dst_size)
+        return -1;
+
+    memcpy(dst, src, len + 1);
+    return 0;
+}
+
+static int fill_sockaddr_path(struct sockaddr_un *addr, const char *path)
+{
+    memset(addr, 0, sizeof(*addr));
+    addr->sun_family = AF_UNIX;
+    return copy_cstr_checked(addr->sun_path, sizeof(addr->sun_path), path);
+}
+
 static int validate_service_name(const char *name)
 {
     if (!name || name[0] == '\0')
@@ -118,9 +140,10 @@ int nipc_uds_check_and_recover_stale(const char *run_dir,
         return -1;
 
     struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+    if (fill_sockaddr_path(&addr, path) != 0) {
+        close(probe);
+        return -1;
+    }
 
     int ret;
     if (connect(probe, (struct sockaddr *)&addr, sizeof(addr)) == 0) {
@@ -176,9 +199,10 @@ nipc_uds_error_t nipc_uds_listen(const char *run_dir,
         return NIPC_UDS_ERR_SOCKET;
 
     struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+    if (fill_sockaddr_path(&addr, path) != 0) {
+        close(fd);
+        return NIPC_UDS_ERR_PATH_TOO_LONG;
+    }
 
     if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         close(fd);
@@ -194,8 +218,13 @@ nipc_uds_error_t nipc_uds_listen(const char *run_dir,
 
     out->fd = fd;
     out->config = *config;
-    strncpy(out->path, path, sizeof(out->path) - 1);
-    out->path[sizeof(out->path) - 1] = '\0';
+    if (copy_cstr_checked(out->path, sizeof(out->path), path) != 0) {
+        close(fd);
+        unlink(path);
+        memset(out, 0, sizeof(*out));
+        out->fd = -1;
+        return NIPC_UDS_ERR_PATH_TOO_LONG;
+    }
 
     return NIPC_UDS_OK;
 }
@@ -243,9 +272,10 @@ nipc_uds_error_t nipc_uds_connect(const char *run_dir,
         return NIPC_UDS_ERR_SOCKET;
 
     struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+    if (fill_sockaddr_path(&addr, path) != 0) {
+        close(fd);
+        return NIPC_UDS_ERR_PATH_TOO_LONG;
+    }
 
     if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         close(fd);

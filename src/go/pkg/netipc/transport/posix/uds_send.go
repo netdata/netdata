@@ -51,6 +51,8 @@ func (s *Session) Send(hdr *protocol.Header, payload []byte) error {
 	return sendErr
 }
 
+// headerPayloadLen validates header + payload against the protocol's
+// 32-bit total-length field before any send path narrows lengths.
 func headerPayloadLen(payloadLen int) (int, error) {
 	if payloadLen < 0 ||
 		uint64(payloadLen) > uint64(^uint32(0))-uint64(protocol.HeaderSize) {

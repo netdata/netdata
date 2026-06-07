@@ -18,7 +18,7 @@ impl ManagedServer {
         )
         .map_err(|_| NipcError::BadLayout)?;
 
-        *self.listener_handle.lock().unwrap() = Some(listener.handle() as usize);
+        self.remember_windows_listener_handle(&listener);
 
         self.running.store(true, Ordering::Release);
 
@@ -31,7 +31,11 @@ impl ManagedServer {
                 continue;
             }
 
-            let session = match listener.accept_with_config(session_id, accept_cfg) {
+            self.remember_windows_listener_handle(&listener);
+            let accepted = listener.accept_with_config(session_id, accept_cfg);
+            self.remember_windows_listener_handle(&listener);
+
+            let session = match accepted {
                 Ok(s) => s,
                 Err(_) => {
                     if let Some(mut prepared) = prepared_shm {
@@ -82,11 +86,23 @@ impl ManagedServer {
             session_threads.push(t);
         }
 
+        *self.listener_handle.lock().unwrap() = None;
+
         for t in session_threads {
             let _ = t.join();
         }
 
         Ok(())
+    }
+
+    fn remember_windows_listener_handle(&self, listener: &NpListener) {
+        let handle = listener.handle();
+        let stored = if handle == 0 || handle == -1 {
+            None
+        } else {
+            Some(handle as usize)
+        };
+        *self.listener_handle.lock().unwrap() = stored;
     }
 
     fn prepare_windows_accept(&mut self) -> (u64, ServerConfig, Option<PreparedWinShm>, bool) {

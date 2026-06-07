@@ -46,14 +46,27 @@ type AppsLookupItemView struct {
 	labelTableOffset int
 }
 
-func validateAppsLookupSemantics(status, cgroupStatus, orchestrator uint16, ppid, uid uint32, starttime uint64, commLen, pathLen, nameLen, labelCount int) error {
-	if err := validateAppsLookupDomains(status, cgroupStatus, commLen); err != nil {
+type appsLookupSemantics struct {
+	status       uint16
+	cgroupStatus uint16
+	orchestrator uint16
+	ppid         uint32
+	uid          uint32
+	starttime    uint64
+	commLen      int
+	pathLen      int
+	nameLen      int
+	labelCount   int
+}
+
+func validateAppsLookupSemantics(v appsLookupSemantics) error {
+	if err := validateAppsLookupDomains(v.status, v.cgroupStatus, v.commLen); err != nil {
 		return err
 	}
-	if status == PidLookupUnknown {
-		return validateAppsLookupUnknown(orchestrator, cgroupStatus, ppid, uid, starttime, commLen, pathLen, nameLen, labelCount)
+	if v.status == PidLookupUnknown {
+		return validateAppsLookupUnknown(v)
 	}
-	return validateAppsLookupKnown(cgroupStatus, orchestrator, commLen, pathLen, nameLen, labelCount)
+	return validateAppsLookupKnown(v)
 }
 
 func validateAppsLookupDomains(status, cgroupStatus uint16, commLen int) error {
@@ -70,33 +83,33 @@ func validateAppsLookupDomains(status, cgroupStatus uint16, commLen int) error {
 	return nil
 }
 
-func validateAppsLookupUnknown(orchestrator, cgroupStatus uint16, ppid, uid uint32, starttime uint64, commLen, pathLen, nameLen, labelCount int) error {
-	if orchestrator != 0 || cgroupStatus != 0 || ppid != 0 || uid != NipcUIDUnset ||
-		starttime != 0 || commLen != 0 || pathLen != 0 || nameLen != 0 || labelCount != 0 {
+func validateAppsLookupUnknown(v appsLookupSemantics) error {
+	if v.orchestrator != 0 || v.cgroupStatus != 0 || v.ppid != 0 || v.uid != NipcUIDUnset ||
+		v.starttime != 0 || v.commLen != 0 || v.pathLen != 0 || v.nameLen != 0 || v.labelCount != 0 {
 		return ErrBadLayout
 	}
 	return nil
 }
 
-func validateAppsLookupKnown(cgroupStatus, orchestrator uint16, commLen, pathLen, nameLen, labelCount int) error {
-	if commLen == 0 {
+func validateAppsLookupKnown(v appsLookupSemantics) error {
+	if v.commLen == 0 {
 		return ErrBadLayout
 	}
-	switch cgroupStatus {
+	switch v.cgroupStatus {
 	case AppsCgroupKnown:
-		if pathLen == 0 {
+		if v.pathLen == 0 {
 			return ErrBadLayout
 		}
 	case AppsCgroupUnknownRetryLater:
-		if orchestrator != 0 || nameLen != 0 || labelCount != 0 {
+		if v.orchestrator != 0 || v.nameLen != 0 || v.labelCount != 0 {
 			return ErrBadLayout
 		}
 	case AppsCgroupUnknownPermanent:
-		if pathLen == 0 || orchestrator != 0 || nameLen != 0 || labelCount != 0 {
+		if v.pathLen == 0 || v.orchestrator != 0 || v.nameLen != 0 || v.labelCount != 0 {
 			return ErrBadLayout
 		}
 	case AppsCgroupHostRoot:
-		if orchestrator != 0 || pathLen != 0 || nameLen != 0 || labelCount != 0 {
+		if v.orchestrator != 0 || v.pathLen != 0 || v.nameLen != 0 || v.labelCount != 0 {
 			return ErrBadLayout
 		}
 	}
@@ -310,7 +323,18 @@ func decodeAppsLookupItem(item []byte) (*AppsLookupItemView, error) {
 	if ne.Uint16(item[0:2]) != 1 || ne.Uint32(item[20:24]) != 0 || ne.Uint16(item[58:60]) != 0 {
 		return nil, ErrBadLayout
 	}
-	if err := validateAppsLookupSemantics(status, cgroupStatus, orchestrator, ppid, uid, starttime, commLen, pathLen, nameLen, int(labelCount)); err != nil {
+	if err := validateAppsLookupSemantics(appsLookupSemantics{
+		status:       status,
+		cgroupStatus: cgroupStatus,
+		orchestrator: orchestrator,
+		ppid:         ppid,
+		uid:          uid,
+		starttime:    starttime,
+		commLen:      commLen,
+		pathLen:      pathLen,
+		nameLen:      nameLen,
+		labelCount:   int(labelCount),
+	}); err != nil {
 		return nil, err
 	}
 	comm, commEnd, err := lookupString(item, AppsLookupItemHdr, commOff, commLen)
@@ -384,7 +408,18 @@ func (b *AppsLookupBuilder) Add(status, cgroupStatus, orchestrator uint16, pid, 
 		b.err = ErrOverflow
 		return ErrOverflow
 	}
-	if err := validateAppsLookupSemantics(status, cgroupStatus, orchestrator, ppid, uid, starttime, len(comm), len(cgroupPath), len(cgroupName), len(labels)); err != nil {
+	if err := validateAppsLookupSemantics(appsLookupSemantics{
+		status:       status,
+		cgroupStatus: cgroupStatus,
+		orchestrator: orchestrator,
+		ppid:         ppid,
+		uid:          uid,
+		starttime:    starttime,
+		commLen:      len(comm),
+		pathLen:      len(cgroupPath),
+		nameLen:      len(cgroupName),
+		labelCount:   len(labels),
+	}); err != nil {
 		b.err = err
 		return err
 	}

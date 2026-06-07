@@ -30,6 +30,7 @@ bool nipc_service_common_mul_would_overflow(size_t count, size_t size);
 uint32_t nipc_service_common_request_payload_default(void);
 uint32_t nipc_service_common_response_payload_default(void);
 uint32_t nipc_service_common_typed_response_batch_items(uint32_t max_request_batch_items);
+void nipc_service_common_copy_cstr_field(char *dst, size_t dst_size, const char *src);
 
 void nipc_service_common_client_init(nipc_client_ctx_t *ctx,
                                      const char *run_dir,
