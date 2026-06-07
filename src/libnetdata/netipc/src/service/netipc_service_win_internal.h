@@ -33,6 +33,7 @@ enum {
     NIPC_WIN_SERVICE_TEST_FAULT_CACHE_ITEM_PATH_MALLOC_INTERNAL,
 };
 
+const nipc_service_common_client_ops_t *nipc_service_win_client_ops(void);
 void nipc_service_win_client_disconnect(nipc_client_ctx_t *ctx);
 nipc_client_state_t nipc_service_win_client_try_connect(nipc_client_ctx_t *ctx);
 bool nipc_service_win_client_reconnect_for_call(nipc_client_ctx_t *ctx);

@@ -114,6 +114,38 @@ void nipc_service_common_client_close_buffers(nipc_client_ctx_t *ctx)
     ctx->state = NIPC_CLIENT_DISCONNECTED;
 }
 
+bool nipc_service_common_client_refresh(nipc_client_ctx_t *ctx,
+                                        const nipc_service_common_client_ops_t *ops)
+{
+    nipc_client_state_t old_state = ctx->state;
+
+    switch (ctx->state) {
+    case NIPC_CLIENT_DISCONNECTED:
+    case NIPC_CLIENT_NOT_FOUND:
+        ctx->state = NIPC_CLIENT_CONNECTING;
+        ctx->state = ops->try_connect(ctx);
+        if (ctx->state == NIPC_CLIENT_READY)
+            ctx->connect_count++;
+        break;
+
+    case NIPC_CLIENT_BROKEN:
+        ops->disconnect(ctx);
+        ctx->state = NIPC_CLIENT_CONNECTING;
+        ctx->state = ops->try_connect(ctx);
+        if (ctx->state == NIPC_CLIENT_READY)
+            ctx->reconnect_count++;
+        break;
+
+    case NIPC_CLIENT_READY:
+    case NIPC_CLIENT_CONNECTING:
+    case NIPC_CLIENT_AUTH_FAILED:
+    case NIPC_CLIENT_INCOMPATIBLE:
+        break;
+    }
+
+    return ctx->state != old_state;
+}
+
 void nipc_service_common_client_note_request_capacity(nipc_client_ctx_t *ctx,
                                                       uint32_t payload_len)
 {
@@ -153,6 +185,121 @@ nipc_error_t nipc_service_common_response_status_to_error(nipc_client_ctx_t *ctx
     case NIPC_STATUS_INTERNAL_ERROR:
     default:
         return NIPC_ERR_BAD_LAYOUT;
+    }
+}
+
+nipc_error_t nipc_service_common_do_raw_call(
+    nipc_client_ctx_t *ctx,
+    uint16_t method_code,
+    const void *request_payload,
+    size_t request_len,
+    const void **response_payload_out,
+    size_t *response_len_out,
+    nipc_service_common_transport_send_fn send_fn,
+    nipc_service_common_transport_receive_fn receive_fn)
+{
+    nipc_header_t hdr = {0};
+    hdr.kind             = NIPC_KIND_REQUEST;
+    hdr.code             = method_code;
+    hdr.flags            = 0;
+    hdr.item_count       = 1;
+    hdr.message_id       = (uint64_t)(ctx->call_count + 1);
+    hdr.transport_status = NIPC_STATUS_OK;
+
+    nipc_error_t err = send_fn(ctx, &hdr, request_payload, request_len);
+    if (err != NIPC_OK)
+        return err;
+
+    nipc_header_t resp_hdr;
+    err = receive_fn(ctx, ctx->response_buf, ctx->response_buf_size,
+                     &resp_hdr, response_payload_out, response_len_out);
+    if (err != NIPC_OK)
+        return err;
+
+    if (resp_hdr.kind != NIPC_KIND_RESPONSE)
+        return NIPC_ERR_BAD_KIND;
+    if (resp_hdr.code != method_code)
+        return NIPC_ERR_BAD_LAYOUT;
+    if (resp_hdr.message_id != hdr.message_id)
+        return NIPC_ERR_BAD_LAYOUT;
+    return nipc_service_common_response_status_to_error(ctx, &resp_hdr);
+}
+
+nipc_error_t nipc_service_common_call_with_retry(
+    nipc_client_ctx_t *ctx,
+    nipc_service_common_attempt_fn attempt,
+    void *state,
+    const nipc_service_common_client_ops_t *ops)
+{
+    if (ctx->state != NIPC_CLIENT_READY) {
+        ctx->error_count++;
+        return NIPC_ERR_NOT_READY;
+    }
+
+    int overflow_retries = 0;
+    for (;;) {
+        uint32_t prev_req = ctx->session.max_request_payload_bytes;
+        uint32_t prev_resp = ctx->session.max_response_payload_bytes;
+        uint32_t prev_cfg_req = ctx->transport_config.max_request_payload_bytes;
+        uint32_t prev_cfg_resp = ctx->transport_config.max_response_payload_bytes;
+
+        nipc_error_t err = attempt(ctx, state);
+        if (err == NIPC_OK) {
+            ctx->call_count++;
+            return NIPC_OK;
+        }
+
+        if (err != NIPC_ERR_OVERFLOW) {
+            ops->disconnect(ctx);
+            ctx->state = NIPC_CLIENT_BROKEN;
+            if (ops->reconnect_drain_ms > 0 && ops->sleep_ms)
+                ops->sleep_ms(ops->reconnect_drain_ms);
+            if (!ops->reconnect_for_call(ctx)) {
+                ctx->error_count++;
+                return err;
+            }
+
+            ctx->reconnect_count++;
+            if (ops->sleep_ms && ops->reconnect_retry_interval_ms > 0)
+                ops->sleep_ms(ops->reconnect_retry_interval_ms);
+            err = attempt(ctx, state);
+            if (err == NIPC_OK) {
+                ctx->call_count++;
+                return NIPC_OK;
+            }
+
+            ops->disconnect(ctx);
+            ctx->state = NIPC_CLIENT_BROKEN;
+            ctx->error_count++;
+            return err;
+        }
+
+        ops->disconnect(ctx);
+        ctx->state = NIPC_CLIENT_BROKEN;
+        if (!ops->reconnect_for_call(ctx)) {
+            ctx->error_count++;
+            return err;
+        }
+        ctx->reconnect_count++;
+
+        if (ctx->session.max_request_payload_bytes <= prev_req &&
+            ctx->session.max_response_payload_bytes <= prev_resp &&
+            ctx->transport_config.max_request_payload_bytes <= prev_cfg_req &&
+            ctx->transport_config.max_response_payload_bytes <= prev_cfg_resp) {
+            ops->disconnect(ctx);
+            ctx->state = NIPC_CLIENT_BROKEN;
+            ctx->error_count++;
+            return err;
+        }
+
+        if (++overflow_retries >= 8) {
+            ops->disconnect(ctx);
+            ctx->state = NIPC_CLIENT_BROKEN;
+            ctx->error_count++;
+            return err;
+        }
+        if (ops->sleep_ms && ops->reconnect_retry_interval_ms > 0)
+            ops->sleep_ms(ops->reconnect_retry_interval_ms);
     }
 }
 

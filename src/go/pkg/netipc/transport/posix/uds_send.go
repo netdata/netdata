@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/transport/internal/framing"
 )
 
 // Send sends one logical message. The caller fills Kind, Code, Flags,
@@ -18,9 +19,9 @@ func (s *Session) Send(hdr *protocol.Header, payload []byte) error {
 		return wrapErr(ErrBadParam, "session closed")
 	}
 
-	totalMsg, err := headerPayloadLen(len(payload))
-	if err != nil {
-		return err
+	totalMsg, payloadLen, ok := framing.HeaderPayloadLen(len(payload))
+	if !ok {
+		return wrapErr(ErrLimitExceeded, "total message length exceeds protocol limit")
 	}
 
 	if s.role == RoleClient && hdr.Kind == protocol.KindRequest {
@@ -33,13 +34,23 @@ func (s *Session) Send(hdr *protocol.Header, payload []byte) error {
 		s.inflightIDs[hdr.MessageID] = struct{}{}
 	}
 
-	hdr.Magic = protocol.MagicMsg
-	hdr.Version = protocol.Version
-	hdr.HeaderLen = protocol.HeaderLen
-	hdr.PayloadLen = uint32(len(payload))
+	framing.FillMessageHeader(hdr, payloadLen)
 
 	tracked := s.role == RoleClient && hdr.Kind == protocol.KindRequest
-	sendErr := s.sendInner(hdr, payload, totalMsg)
+	sendErr := framing.Sender{
+		PacketSize: s.PacketSize,
+		SendFirstPacket: func(packetHdr *protocol.Header, packetPayload []byte, _ int) error {
+			var hdrBuf [protocol.HeaderSize]byte
+			packetHdr.Encode(hdrBuf[:])
+			return rawSendIov(s.fd, hdrBuf[:], packetPayload)
+		},
+		SendChunk: func(chk protocol.ChunkHeader, chunkPayload []byte) error {
+			var chkBuf [protocol.HeaderSize]byte
+			chk.Encode(chkBuf[:])
+			return rawSendIov(s.fd, chkBuf[:], chunkPayload)
+		},
+		ErrBadParam: func(msg string) error { return wrapErr(ErrBadParam, msg) },
+	}.Send(hdr, payload, totalMsg)
 	if sendErr != nil && tracked {
 		if errors.Is(sendErr, ErrSend) {
 			s.failAllInflight()
@@ -49,71 +60,4 @@ func (s *Session) Send(hdr *protocol.Header, payload []byte) error {
 	}
 
 	return sendErr
-}
-
-// headerPayloadLen validates header + payload against the protocol's
-// 32-bit total-length field before any send path narrows lengths.
-func headerPayloadLen(payloadLen int) (int, error) {
-	if payloadLen < 0 {
-		return 0, wrapErr(ErrLimitExceeded, "total message length exceeds protocol limit")
-	}
-	totalMsg := uint64(protocol.HeaderSize) + uint64(payloadLen)
-	if totalMsg > uint64(^uint32(0)) || totalMsg > uint64(int(^uint(0)>>1)) {
-		return 0, wrapErr(ErrLimitExceeded, "total message length exceeds protocol limit")
-	}
-	return int(totalMsg), nil
-}
-
-func (s *Session) sendInner(hdr *protocol.Header, payload []byte, totalMsg int) error {
-	if totalMsg <= int(s.PacketSize) {
-		var hdrBuf [protocol.HeaderSize]byte
-		hdr.Encode(hdrBuf[:])
-		return rawSendIov(s.fd, hdrBuf[:], payload)
-	}
-
-	chunkPayloadBudget := int(s.PacketSize) - protocol.HeaderSize
-	if chunkPayloadBudget <= 0 {
-		return wrapErr(ErrBadParam, "packet_size too small")
-	}
-
-	firstChunkPayload := min(len(payload), chunkPayloadBudget)
-	remainingAfterFirst := len(payload) - firstChunkPayload
-	continuationChunks := uint32(0)
-	if remainingAfterFirst > 0 {
-		continuationChunks = uint32(1 + ((remainingAfterFirst - 1) / chunkPayloadBudget))
-	}
-	chunkCount := 1 + continuationChunks
-
-	var hdrBuf [protocol.HeaderSize]byte
-	hdr.Encode(hdrBuf[:])
-	if err := rawSendIov(s.fd, hdrBuf[:], payload[:firstChunkPayload]); err != nil {
-		return err
-	}
-
-	offset := firstChunkPayload
-	for ci := uint32(1); ci < chunkCount; ci++ {
-		remaining := len(payload) - offset
-		thisChunk := min(remaining, chunkPayloadBudget)
-
-		chk := protocol.ChunkHeader{
-			Magic:           protocol.MagicChunk,
-			Version:         protocol.Version,
-			Flags:           0,
-			MessageID:       hdr.MessageID,
-			TotalMessageLen: uint32(totalMsg),
-			ChunkIndex:      ci,
-			ChunkCount:      chunkCount,
-			ChunkPayloadLen: uint32(thisChunk),
-		}
-
-		var chkBuf [protocol.HeaderSize]byte
-		chk.Encode(chkBuf[:])
-		if err := rawSendIov(s.fd, chkBuf[:], payload[offset:offset+thisChunk]); err != nil {
-			return err
-		}
-
-		offset += thisChunk
-	}
-
-	return nil
 }

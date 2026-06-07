@@ -33,6 +33,24 @@ static nipc_uds_client_config_t service_client_config_to_transport(
     return transport;
 }
 
+static void client_sleep_ms(uint32_t ms)
+{
+    nipc_service_posix_sleep_us(ms * 1000u);
+}
+
+const nipc_service_common_client_ops_t *nipc_service_posix_client_ops(void)
+{
+    static const nipc_service_common_client_ops_t ops = {
+        .disconnect = nipc_service_posix_client_disconnect,
+        .try_connect = nipc_service_posix_client_try_connect,
+        .reconnect_for_call = nipc_service_posix_client_reconnect_for_call,
+        .sleep_ms = client_sleep_ms,
+        .reconnect_drain_ms = CLIENT_CALL_RECONNECT_DRAIN_MS,
+        .reconnect_retry_interval_ms = CLIENT_CALL_RECONNECT_RETRY_INTERVAL_MS,
+    };
+    return &ops;
+}
+
 void nipc_service_platform_server_config_from_service(
     nipc_service_platform_server_config_t *transport,
     const nipc_server_config_t *config)
@@ -74,36 +92,7 @@ void nipc_client_init(nipc_client_ctx_t *ctx,
 
 bool nipc_client_refresh(nipc_client_ctx_t *ctx)
 {
-    nipc_client_state_t old_state = ctx->state;
-
-    switch (ctx->state) {
-    case NIPC_CLIENT_DISCONNECTED:
-    case NIPC_CLIENT_NOT_FOUND:
-        /* Attempt to connect */
-        ctx->state = NIPC_CLIENT_CONNECTING;
-        ctx->state = nipc_service_posix_client_try_connect(ctx);
-        if (ctx->state == NIPC_CLIENT_READY)
-            ctx->connect_count++;
-        break;
-
-    case NIPC_CLIENT_BROKEN:
-        /* Reconnect: tear down old connection first */
-        nipc_service_posix_client_disconnect(ctx);
-        ctx->state = NIPC_CLIENT_CONNECTING;
-        ctx->state = nipc_service_posix_client_try_connect(ctx);
-        if (ctx->state == NIPC_CLIENT_READY)
-            ctx->reconnect_count++;
-        break;
-
-    case NIPC_CLIENT_READY:
-    case NIPC_CLIENT_CONNECTING:
-    case NIPC_CLIENT_AUTH_FAILED:
-    case NIPC_CLIENT_INCOMPATIBLE:
-        /* No action needed */
-        break;
-    }
-
-    return ctx->state != old_state;
+    return nipc_service_common_client_refresh(ctx, nipc_service_posix_client_ops());
 }
 
 void nipc_client_status(const nipc_client_ctx_t *ctx,

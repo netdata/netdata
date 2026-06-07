@@ -13,8 +13,7 @@ typedef nipc_np_server_config_t nipc_service_platform_server_config_t;
 typedef nipc_uds_server_config_t nipc_service_platform_server_config_t;
 #endif
 
-typedef nipc_error_t (*nipc_service_platform_attempt_fn)(nipc_client_ctx_t *ctx,
-                                                         void *state);
+typedef nipc_service_common_attempt_fn nipc_service_platform_attempt_fn;
 
 enum {
     NIPC_SERVICE_PLATFORM_TEST_FAULT_CACHE_BUCKETS_CALLOC_INTERNAL = 10,

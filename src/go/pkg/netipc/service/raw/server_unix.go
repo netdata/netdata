@@ -3,7 +3,6 @@
 package raw
 
 import (
-	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -200,210 +199,57 @@ func (s *Server) Stop() {
 }
 
 func (s *Server) handleSession(session *posix.Session, shm *posix.ShmContext) {
-	recvBuf := make([]byte, protocol.HeaderSize+int(session.MaxRequestPayloadBytes))
-	respBuf := make([]byte, int(session.MaxResponsePayloadBytes))
-	itemRespBuf := make([]byte, int(session.MaxResponsePayloadBytes))
-	msgBuf := make([]byte, int(session.MaxResponsePayloadBytes)+protocol.HeaderSize)
-
-	defer func() {
-		if shm != nil {
-			shm.ShmDestroy()
-		}
-		session.Close()
-	}()
-
-	for s.running.Load() {
-		var hdr protocol.Header
-		var payload []byte
-
-		if shm != nil {
-			mlen, err := shm.ShmReceive(recvBuf, serverPollTimeoutMs)
-			if err != nil {
-				if err == posix.ErrShmTimeout {
-					continue
+	s.handleServerSession(serverSessionOps{
+		maxRequestPayloadBytes:  session.MaxRequestPayloadBytes,
+		maxResponsePayloadBytes: session.MaxResponsePayloadBytes,
+		receive: func(recvBuf []byte) (protocol.Header, []byte, serverReceiveAction) {
+			if shm != nil {
+				mlen, err := shm.ShmReceive(recvBuf, serverPollTimeoutMs)
+				if err != nil {
+					if err == posix.ErrShmTimeout {
+						return protocol.Header{}, nil, serverReceiveContinue
+					}
+					return protocol.Header{}, nil, serverReceiveStop
 				}
-				return
+				if mlen < protocol.HeaderSize {
+					return protocol.Header{}, nil, serverReceiveStop
+				}
+				hdr, err := protocol.DecodeHeader(recvBuf[:mlen])
+				if err != nil {
+					return protocol.Header{}, nil, serverReceiveStop
+				}
+				return hdr, recvBuf[protocol.HeaderSize:mlen], serverReceiveOK
 			}
-			if mlen < protocol.HeaderSize {
-				return
-			}
-			h, err := protocol.DecodeHeader(recvBuf[:mlen])
-			if err != nil {
-				return
-			}
-			hdr = h
-			payload = recvBuf[protocol.HeaderSize:mlen]
-		} else {
-			// Poll the session fd before blocking on receive
+
 			ready := pollFd(session.Fd(), serverPollTimeoutMs)
 			if ready < 0 {
-				return
+				return protocol.Header{}, nil, serverReceiveStop
 			}
 			if ready == 0 {
-				continue
+				return protocol.Header{}, nil, serverReceiveContinue
 			}
 
-			h, p, err := session.Receive(recvBuf)
+			hdr, payload, err := session.Receive(recvBuf)
 			if err != nil {
-				return
+				return protocol.Header{}, nil, serverReceiveStop
 			}
-			hdr = h
-			payload = p
-		}
-
-		// Protocol violation: unexpected message kind terminates session
-		if hdr.Kind != protocol.KindRequest {
-			return
-		}
-
-		if payloadLen, err := checkedLookupU32(len(payload)); err == nil {
-			serverNotePayloadCapacity(&s.learnedRequestPayloadBytes, payloadLen)
-		}
-
-		if !s.methodSupported(hdr.Code) {
-			respHdr := protocol.Header{
-				Kind:            protocol.KindResponse,
-				Code:            hdr.Code,
-				MessageID:       hdr.MessageID,
-				TransportStatus: protocol.StatusUnsupported,
-				ItemCount:       1,
+			return hdr, payload, serverReceiveOK
+		},
+		send: func(respHdr *protocol.Header, payload []byte, msgBuf *[]byte) error {
+			if shm == nil {
+				return session.Send(respHdr, payload)
 			}
-
+			msg, err := serverEncodeSharedResponse(respHdr, payload, msgBuf)
+			if err != nil {
+				return err
+			}
+			return shm.ShmSend(msg)
+		},
+		close: func() {
 			if shm != nil {
-				if len(msgBuf) < protocol.HeaderSize {
-					msgBuf = make([]byte, protocol.HeaderSize)
-				}
-				msg := msgBuf[:protocol.HeaderSize]
-				respHdr.Magic = protocol.MagicMsg
-				respHdr.Version = protocol.Version
-				respHdr.HeaderLen = protocol.HeaderLen
-				respHdr.PayloadLen = 0
-				respHdr.Encode(msg[:protocol.HeaderSize])
-				if err := shm.ShmSend(msg); err != nil {
-					return
-				}
-			} else if err := session.Send(&respHdr, nil); err != nil {
-				return
+				shm.ShmDestroy()
 			}
-			continue
-		}
-
-		// Dispatch: single-item or batch
-		responseLen := 0
-		isBatch := (hdr.Flags&protocol.FlagBatch != 0) && hdr.ItemCount >= 1
-		var dispatchErr error
-
-		if !isBatch {
-			var derr error
-			responseLen, derr = s.dispatchSingle(hdr.Code, payload, respBuf)
-			if derr != nil {
-				dispatchErr = derr
-				responseLen = 0
-			} else if responseLen < 0 || responseLen > len(respBuf) {
-				dispatchErr = protocol.ErrOverflow
-				responseLen = 0
-			}
-		} else {
-			var bb protocol.BatchBuilder
-			bb.Reset(respBuf, hdr.ItemCount)
-
-			for i := uint32(0); i < hdr.ItemCount && dispatchErr == nil; i++ {
-				itemData, gerr := protocol.BatchItemGet(payload, hdr.ItemCount, i)
-				if gerr != nil {
-					dispatchErr = gerr
-					break
-				}
-
-				itemResultLen, derr := s.dispatchSingle(hdr.Code, itemData, itemRespBuf)
-				if derr != nil {
-					dispatchErr = derr
-					break
-				}
-				if itemResultLen < 0 || itemResultLen > len(itemRespBuf) {
-					dispatchErr = protocol.ErrOverflow
-					break
-				}
-
-				if aerr := bb.Add(itemRespBuf[:itemResultLen]); aerr != nil {
-					dispatchErr = aerr
-					break
-				}
-			}
-
-			if dispatchErr == nil {
-				responseLen, _ = bb.Finish()
-			}
-		}
-
-		// Build response header
-		respHdr := protocol.Header{
-			Kind:      protocol.KindResponse,
-			Code:      hdr.Code,
-			MessageID: hdr.MessageID,
-		}
-
-		if dispatchErr == nil {
-			if responseLen <= int(^uint32(0)) {
-				serverNotePayloadCapacity(&s.learnedResponsePayloadBytes, uint32(responseLen))
-			}
-			respHdr.TransportStatus = protocol.StatusOK
-			if isBatch {
-				respHdr.Flags = protocol.FlagBatch
-				respHdr.ItemCount = hdr.ItemCount
-			} else {
-				respHdr.ItemCount = 1
-			}
-		} else if errors.Is(dispatchErr, protocol.ErrOverflow) {
-			current := session.MaxResponsePayloadBytes
-			if current >= ^uint32(0)/2 {
-				serverNotePayloadCapacity(&s.learnedResponsePayloadBytes, ^uint32(0))
-			} else {
-				serverNotePayloadCapacity(&s.learnedResponsePayloadBytes, current*2)
-			}
-			respHdr.TransportStatus = protocol.StatusLimitExceeded
-			respHdr.ItemCount = 1
-			responseLen = 0
-		} else if errors.Is(dispatchErr, errHandlerFailed) {
-			respHdr.TransportStatus = protocol.StatusInternalError
-			respHdr.ItemCount = 1
-			responseLen = 0
-		} else {
-			respHdr.TransportStatus = protocol.StatusBadEnvelope
-			respHdr.ItemCount = 1
-			responseLen = 0
-		}
-
-		// Send response via the active transport
-		if shm != nil {
-			msgLen := protocol.HeaderSize + responseLen
-			if len(msgBuf) < msgLen {
-				msgBuf = make([]byte, msgLen)
-			}
-			msg := msgBuf[:msgLen]
-
-			respHdr.Magic = protocol.MagicMsg
-			respHdr.Version = protocol.Version
-			respHdr.HeaderLen = protocol.HeaderLen
-			respHdr.PayloadLen = uint32(responseLen)
-
-			respHdr.Encode(msg[:protocol.HeaderSize])
-			if responseLen > 0 {
-				copy(msg[protocol.HeaderSize:], respBuf[:responseLen])
-			}
-
-			if err := shm.ShmSend(msg); err != nil {
-				return
-			}
-			if respHdr.TransportStatus == protocol.StatusLimitExceeded {
-				return
-			}
-		} else {
-			if err := session.Send(&respHdr, respBuf[:responseLen]); err != nil {
-				return
-			}
-			if respHdr.TransportStatus == protocol.StatusLimitExceeded {
-				return
-			}
-		}
-	}
+			session.Close()
+		},
+	})
 }

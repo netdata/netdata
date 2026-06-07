@@ -3,32 +3,24 @@
 package posix
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"syscall"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/transport/internal/framing"
 )
 
 func headerVersionIncompatible(buf []byte, expectedCode uint16) bool {
-	if len(buf) < protocol.HeaderSize {
-		return false
-	}
-
-	return binary.NativeEndian.Uint32(buf[0:4]) == protocol.MagicMsg &&
-		binary.NativeEndian.Uint16(buf[4:6]) != protocol.Version &&
-		binary.NativeEndian.Uint16(buf[6:8]) == protocol.HeaderLen &&
-		binary.NativeEndian.Uint16(buf[8:10]) == protocol.KindControl &&
-		binary.NativeEndian.Uint16(buf[12:14]) == expectedCode
+	return framing.HeaderVersionIncompatible(buf, expectedCode)
 }
 
 func helloLayoutIncompatible(buf []byte) bool {
-	return len(buf) >= 2 && binary.NativeEndian.Uint16(buf[0:2]) != 1
+	return framing.HelloLayoutIncompatible(buf)
 }
 
 func helloAckLayoutIncompatible(buf []byte) bool {
-	return len(buf) >= 2 && binary.NativeEndian.Uint16(buf[0:2]) != 1
+	return framing.HelloAckLayoutIncompatible(buf)
 }
 
 func connectAndHandshake(fd int, path string, config *ClientConfig) (*Session, error) {
@@ -42,15 +34,8 @@ func connectAndHandshake(fd int, path string, config *ClientConfig) (*Session, e
 		pktSize = detectPacketSize(fd)
 	}
 
-	supported := config.SupportedProfiles
-	if supported == 0 {
-		supported = protocol.ProfileBaseline
-	}
-
-	hello := protocol.Hello{
-		LayoutVersion:           1,
-		Flags:                   0,
-		SupportedProfiles:       supported,
+	pkt := framing.BuildHelloPacket(framing.HelloConfig{
+		SupportedProfiles:       config.SupportedProfiles,
 		PreferredProfiles:       config.PreferredProfiles,
 		MaxRequestPayloadBytes:  applyDefault(config.MaxRequestPayloadBytes, protocol.MaxPayloadDefault),
 		MaxRequestBatchItems:    applyDefault(config.MaxRequestBatchItems, defaultBatchItems),
@@ -58,27 +43,7 @@ func connectAndHandshake(fd int, path string, config *ClientConfig) (*Session, e
 		MaxResponseBatchItems:   applyDefault(config.MaxResponseBatchItems, defaultBatchItems),
 		AuthToken:               config.AuthToken,
 		PacketSize:              pktSize,
-	}
-
-	var helloBuf [helloPayloadSize]byte
-	hello.Encode(helloBuf[:])
-
-	hdr := protocol.Header{
-		Magic:           protocol.MagicMsg,
-		Version:         protocol.Version,
-		HeaderLen:       protocol.HeaderLen,
-		Kind:            protocol.KindControl,
-		Flags:           0,
-		Code:            protocol.CodeHello,
-		TransportStatus: protocol.StatusOK,
-		PayloadLen:      helloPayloadSize,
-		ItemCount:       1,
-		MessageID:       0,
-	}
-
-	var pkt [protocol.HeaderSize + helloPayloadSize]byte
-	hdr.Encode(pkt[:protocol.HeaderSize])
-	copy(pkt[protocol.HeaderSize:], helloBuf[:])
+	})
 
 	n, err := syscall.SendmsgN(fd, pkt[:], nil, nil, 0)
 	if err != nil {
@@ -116,7 +81,7 @@ func connectAndHandshake(fd int, path string, config *ClientConfig) (*Session, e
 	if an < protocol.HeaderSize+helloAckPayloadSize {
 		return nil, wrapErr(ErrProtocol, "ack payload truncated")
 	}
-	ack, err := protocol.DecodeHelloAck(ackBuf[protocol.HeaderSize:an])
+	ack, err := framing.DecodeHelloAckPayload(ackBuf[protocol.HeaderSize:an])
 	if err != nil {
 		if errors.Is(err, protocol.ErrBadLayout) &&
 			helloAckLayoutIncompatible(ackBuf[protocol.HeaderSize:an]) {
@@ -163,11 +128,6 @@ func serverHandshake(fd int, config *ServerConfig, sessionID uint64) (*Session, 
 	}
 
 	sRespPay := applyDefault(config.MaxResponsePayloadBytes, protocol.MaxPayloadDefault)
-	sProfiles := config.SupportedProfiles
-	if sProfiles == 0 {
-		sProfiles = protocol.ProfileBaseline
-	}
-	sPreferred := config.PreferredProfiles
 
 	var buf [128]byte
 	n, _, _, _, err := syscall.Recvmsg(fd, buf[:], nil, 0)
@@ -192,7 +152,7 @@ func serverHandshake(fd int, config *ServerConfig, sessionID uint64) (*Session, 
 		return nil, wrapErr(ErrProtocol, "expected HELLO")
 	}
 
-	hello, err := protocol.DecodeHello(buf[protocol.HeaderSize:n])
+	hello, err := framing.DecodeHelloPayload(buf[protocol.HeaderSize:n])
 	if err != nil {
 		if errors.Is(err, protocol.ErrBadLayout) &&
 			helloLayoutIncompatible(buf[protocol.HeaderSize:n]) {
@@ -202,51 +162,18 @@ func serverHandshake(fd int, config *ServerConfig, sessionID uint64) (*Session, 
 		return nil, wrapErr(ErrProtocol, "hello payload: "+err.Error())
 	}
 
-	intersection := hello.SupportedProfiles & sProfiles
-	if intersection == 0 {
-		sendRejection(fd, protocol.StatusUnsupported)
-		return nil, ErrNoProfile
+	ack, status, ok := framing.NegotiateHello(hello, framing.ServerHelloConfig{
+		PacketSize:              serverPktSize,
+		MaxResponsePayloadBytes: sRespPay,
+		SupportedProfiles:       config.SupportedProfiles,
+		PreferredProfiles:       config.PreferredProfiles,
+		AuthToken:               config.AuthToken,
+	})
+	if !ok {
+		sendRejection(fd, status)
+		return nil, helloAckStatusError(status)
 	}
-
-	if hello.AuthToken != config.AuthToken {
-		sendRejection(fd, protocol.StatusAuthFailed)
-		return nil, ErrAuthFailed
-	}
-
-	preferredIntersection := intersection & hello.PreferredProfiles & sPreferred
-	selected := highestBit(intersection)
-	if preferredIntersection != 0 {
-		selected = highestBit(preferredIntersection)
-	}
-
-	if hello.MaxRequestPayloadBytes > protocol.MaxPayloadCap {
-		sendRejection(fd, protocol.StatusLimitExceeded)
-		return nil, ErrLimitExceeded
-	}
-
-	agreedReqPay := hello.MaxRequestPayloadBytes
-	agreedReqBat := hello.MaxRequestBatchItems
-	agreedRespPay := sRespPay
-	agreedRespBat := agreedReqBat
-	agreedPkt := minU32(hello.PacketSize, serverPktSize)
-	if agreedPkt <= protocol.HeaderSize {
-		sendRejection(fd, protocol.StatusIncompatible)
-		return nil, ErrIncompatible
-	}
-
-	ack := protocol.HelloAck{
-		LayoutVersion:                 1,
-		Flags:                         0,
-		ServerSupportedProfiles:       sProfiles,
-		IntersectionProfiles:          intersection,
-		SelectedProfile:               selected,
-		AgreedMaxRequestPayloadBytes:  agreedReqPay,
-		AgreedMaxRequestBatchItems:    agreedReqBat,
-		AgreedMaxResponsePayloadBytes: agreedRespPay,
-		AgreedMaxResponseBatchItems:   agreedRespBat,
-		AgreedPacketSize:              agreedPkt,
-		SessionID:                     sessionID,
-	}
+	ack.SessionID = sessionID
 	if err := sendHelloAck(fd, protocol.StatusOK, ack); err != nil {
 		return nil, wrapErr(ErrSend, "hello_ack send: "+err.Error())
 	}
@@ -254,12 +181,12 @@ func serverHandshake(fd int, config *ServerConfig, sessionID uint64) (*Session, 
 	return &Session{
 		fd:                      fd,
 		role:                    RoleServer,
-		MaxRequestPayloadBytes:  agreedReqPay,
-		MaxRequestBatchItems:    agreedReqBat,
-		MaxResponsePayloadBytes: agreedRespPay,
-		MaxResponseBatchItems:   agreedRespBat,
-		PacketSize:              agreedPkt,
-		SelectedProfile:         selected,
+		MaxRequestPayloadBytes:  ack.AgreedMaxRequestPayloadBytes,
+		MaxRequestBatchItems:    ack.AgreedMaxRequestBatchItems,
+		MaxResponsePayloadBytes: ack.AgreedMaxResponsePayloadBytes,
+		MaxResponseBatchItems:   ack.AgreedMaxResponseBatchItems,
+		PacketSize:              ack.AgreedPacketSize,
+		SelectedProfile:         ack.SelectedProfile,
 		SessionID:               sessionID,
 		inflightIDs:             make(map[uint64]struct{}),
 	}, nil
@@ -270,23 +197,7 @@ func sendRejection(fd int, status uint16) {
 }
 
 func sendHelloAck(fd int, status uint16, ack protocol.HelloAck) error {
-	var ackPayBuf [helloAckPayloadSize]byte
-	ack.Encode(ackPayBuf[:])
-
-	ackHdr := protocol.Header{
-		Magic:           protocol.MagicMsg,
-		Version:         protocol.Version,
-		HeaderLen:       protocol.HeaderLen,
-		Kind:            protocol.KindControl,
-		Code:            protocol.CodeHelloAck,
-		TransportStatus: status,
-		PayloadLen:      helloAckPayloadSize,
-		ItemCount:       1,
-	}
-
-	var pkt [protocol.HeaderSize + helloAckPayloadSize]byte
-	ackHdr.Encode(pkt[:protocol.HeaderSize])
-	copy(pkt[protocol.HeaderSize:], ackPayBuf[:])
+	pkt := framing.BuildHelloAckPacket(status, ack)
 
 	sn, err := syscall.SendmsgN(fd, pkt[:], nil, nil, 0)
 	if err != nil {

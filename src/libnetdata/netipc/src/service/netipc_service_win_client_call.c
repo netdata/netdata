@@ -124,31 +124,10 @@ nipc_error_t nipc_service_platform_do_raw_call(nipc_client_ctx_t *ctx,
                                                const void **response_payload_out,
                                                size_t *response_len_out)
 {
-    nipc_header_t hdr = {0};
-    hdr.kind             = NIPC_KIND_REQUEST;
-    hdr.code             = method_code;
-    hdr.flags            = 0;
-    hdr.item_count       = 1;
-    hdr.message_id       = (uint64_t)(ctx->call_count + 1);
-    hdr.transport_status = NIPC_STATUS_OK;
-
-    nipc_error_t err = transport_send(ctx, &hdr, request_payload, request_len);
-    if (err != NIPC_OK)
-        return err;
-
-    nipc_header_t resp_hdr;
-    err = transport_receive(ctx, ctx->response_buf, ctx->response_buf_size,
-                            &resp_hdr, response_payload_out, response_len_out);
-    if (err != NIPC_OK)
-        return err;
-
-    if (resp_hdr.kind != NIPC_KIND_RESPONSE)
-        return NIPC_ERR_BAD_KIND;
-    if (resp_hdr.code != method_code)
-        return NIPC_ERR_BAD_LAYOUT;
-    if (resp_hdr.message_id != hdr.message_id)
-        return NIPC_ERR_BAD_LAYOUT;
-    return nipc_service_common_response_status_to_error(ctx, &resp_hdr);
+    return nipc_service_common_do_raw_call(
+        ctx, method_code, request_payload, request_len,
+        response_payload_out, response_len_out,
+        transport_send, transport_receive);
 }
 
 /*
@@ -163,74 +142,8 @@ nipc_error_t nipc_service_platform_call_with_retry(
     nipc_service_platform_attempt_fn attempt,
     void *state)
 {
-    if (ctx->state != NIPC_CLIENT_READY) {
-        ctx->error_count++;
-        return NIPC_ERR_NOT_READY;
-    }
-
-    /* Cap overflow-driven retries: payloads grow by powers of 2, so 8
-     * retries allows ~256x growth from the initial negotiated size. */
-    int overflow_retries = 0;
-    for (;;) {
-        uint32_t prev_req = ctx->session.max_request_payload_bytes;
-        uint32_t prev_resp = ctx->session.max_response_payload_bytes;
-        uint32_t prev_cfg_req = ctx->transport_config.max_request_payload_bytes;
-        uint32_t prev_cfg_resp = ctx->transport_config.max_response_payload_bytes;
-
-        nipc_error_t err = attempt(ctx, state);
-        if (err == NIPC_OK) {
-            ctx->call_count++;
-            return NIPC_OK;
-        }
-
-        if (err != NIPC_ERR_OVERFLOW) {
-            nipc_service_win_client_disconnect(ctx);
-            ctx->state = NIPC_CLIENT_BROKEN;
-            if (!nipc_service_win_client_reconnect_for_call(ctx)) {
-                ctx->error_count++;
-                return err;
-            }
-
-            ctx->reconnect_count++;
-            Sleep(CLIENT_CALL_RECONNECT_RETRY_INTERVAL_MS);
-            err = attempt(ctx, state);
-            if (err == NIPC_OK) {
-                ctx->call_count++;
-                return NIPC_OK;
-            }
-
-            nipc_service_win_client_disconnect(ctx);
-            ctx->state = NIPC_CLIENT_BROKEN;
-            ctx->error_count++;
-            return err;
-        }
-
-        nipc_service_win_client_disconnect(ctx);
-        ctx->state = NIPC_CLIENT_BROKEN;
-        if (!nipc_service_win_client_reconnect_for_call(ctx)) {
-            ctx->error_count++;
-            return err;
-        }
-        ctx->reconnect_count++;
-
-        if (ctx->session.max_request_payload_bytes <= prev_req &&
-            ctx->session.max_response_payload_bytes <= prev_resp &&
-            ctx->transport_config.max_request_payload_bytes <= prev_cfg_req &&
-            ctx->transport_config.max_response_payload_bytes <= prev_cfg_resp) {
-            nipc_service_win_client_disconnect(ctx);
-            ctx->state = NIPC_CLIENT_BROKEN;
-            ctx->error_count++;
-            return err;
-        }
-
-        if (++overflow_retries >= 8) {
-            nipc_service_win_client_disconnect(ctx);
-            ctx->state = NIPC_CLIENT_BROKEN;
-            ctx->error_count++;
-            return err;
-        }
-        Sleep(CLIENT_CALL_RECONNECT_RETRY_INTERVAL_MS);
-    }
+    return nipc_service_common_call_with_retry(
+        ctx, attempt, state, nipc_service_win_client_ops());
 }
 
 
