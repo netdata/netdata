@@ -12,7 +12,7 @@ include_guard()
 macro(_nd_windows_config)
   set(OS_WINDOWS True)
 
-  if(NOT "${CMAKE_INSTALL_PREFIX}" STREQUAL "/opt/netdata")
+  if(NOT "${CMAKE_INSTALL_PREFIX}" MATCHES "/opt/netdata$")
     message(FATAL_ERROR "CMAKE_INSTALL_PREFIX must be set to /opt/netdata, but it is set to ${CMAKE_INSTALL_PREFIX}")
   endif()
 
