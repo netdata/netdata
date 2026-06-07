@@ -167,6 +167,214 @@ fn do_encode(dir: &str) {
         let total = b.finish();
         write_file(dir, "cgroups_resp_empty.bin", &buf[..total]);
     }
+
+    // 8. CGROUPS_LOOKUP request variants
+    {
+        let mut buf = [0u8; 8192];
+        let total = encode_cgroups_lookup_request(
+            &[b"/sys/fs/cgroup/a", b"/system.slice/docker-abc.scope"],
+            &mut buf,
+        )
+        .unwrap();
+        write_file(dir, "cgroups_lookup_req.bin", &buf[..total]);
+
+        let total = encode_cgroups_lookup_request(&[], &mut buf).unwrap();
+        write_file(dir, "cgroups_lookup_req_empty.bin", &buf[..total]);
+    }
+
+    // 9. CGROUPS_LOOKUP response variants
+    {
+        let mut buf = [0u8; 8192];
+        let mut b = CgroupsLookupBuilder::new(&mut buf, 1, 100);
+        b.add(
+            CGROUP_LOOKUP_KNOWN,
+            ORCHESTRATOR_K8S,
+            b"/kubepods.slice/pod-a",
+            b"pod-a",
+            &[
+                (b"namespace".as_slice(), b"default".as_slice()),
+                (b"pod".as_slice(), b"web".as_slice()),
+            ],
+        )
+        .unwrap();
+        let total = b.finish().unwrap();
+        write_file(
+            dir,
+            "cgroups_lookup_resp_known_with_labels.bin",
+            &buf[..total],
+        );
+    }
+    {
+        let mut buf = [0u8; 8192];
+        let mut b = CgroupsLookupBuilder::new(&mut buf, 1, 101);
+        b.add(
+            CGROUP_LOOKUP_KNOWN,
+            ORCHESTRATOR_DOCKER,
+            b"/docker/abc",
+            b"",
+            &[],
+        )
+        .unwrap();
+        let total = b.finish().unwrap();
+        write_file(
+            dir,
+            "cgroups_lookup_resp_known_no_labels.bin",
+            &buf[..total],
+        );
+    }
+    {
+        let mut buf = [0u8; 8192];
+        let mut b = CgroupsLookupBuilder::new(&mut buf, 1, 102);
+        b.add(
+            CGROUP_LOOKUP_UNKNOWN_RETRY_LATER,
+            0,
+            b"/missing/retry",
+            b"",
+            &[],
+        )
+        .unwrap();
+        let total = b.finish().unwrap();
+        write_file(dir, "cgroups_lookup_resp_unknown_retry.bin", &buf[..total]);
+    }
+    {
+        let mut buf = [0u8; 8192];
+        let mut b = CgroupsLookupBuilder::new(&mut buf, 1, 103);
+        b.add(CGROUP_LOOKUP_UNKNOWN_PERMANENT, 0, b"/gone", b"", &[])
+            .unwrap();
+        let total = b.finish().unwrap();
+        write_file(
+            dir,
+            "cgroups_lookup_resp_unknown_permanent.bin",
+            &buf[..total],
+        );
+    }
+    {
+        let mut buf = [0u8; 8192];
+        let b = CgroupsLookupBuilder::new(&mut buf, 0, 104);
+        let total = b.finish().unwrap();
+        write_file(dir, "cgroups_lookup_resp_empty.bin", &buf[..total]);
+    }
+
+    // 10. APPS_LOOKUP request variants
+    {
+        let mut buf = [0u8; 8192];
+        let total = encode_apps_lookup_request(&[0, 1234, 4321], &mut buf).unwrap();
+        write_file(dir, "apps_lookup_req.bin", &buf[..total]);
+
+        let total = encode_apps_lookup_request(&[], &mut buf).unwrap();
+        write_file(dir, "apps_lookup_req_empty.bin", &buf[..total]);
+    }
+
+    // 11. APPS_LOOKUP response variants
+    {
+        let mut buf = [0u8; 8192];
+        let mut b = AppsLookupBuilder::new(&mut buf, 1, 200);
+        b.add(
+            PID_LOOKUP_KNOWN,
+            APPS_CGROUP_KNOWN,
+            ORCHESTRATOR_DOCKER,
+            1234,
+            1,
+            1000,
+            123456,
+            b"123456789012345",
+            b"/docker/abc",
+            b"container-a",
+            &[
+                (b"image".as_slice(), b"nginx:latest".as_slice()),
+                (b"service".as_slice(), b"web".as_slice()),
+            ],
+        )
+        .unwrap();
+        let total = b.finish().unwrap();
+        write_file(dir, "apps_lookup_resp_known_full.bin", &buf[..total]);
+    }
+    {
+        let mut buf = [0u8; 8192];
+        let mut b = AppsLookupBuilder::new(&mut buf, 1, 201);
+        b.add(
+            PID_LOOKUP_KNOWN,
+            APPS_CGROUP_UNKNOWN_RETRY_LATER,
+            0,
+            1235,
+            1,
+            1000,
+            123457,
+            b"app",
+            b"/pending",
+            b"",
+            &[],
+        )
+        .unwrap();
+        let total = b.finish().unwrap();
+        write_file(dir, "apps_lookup_resp_known_retry.bin", &buf[..total]);
+    }
+    {
+        let mut buf = [0u8; 8192];
+        let mut b = AppsLookupBuilder::new(&mut buf, 1, 202);
+        b.add(
+            PID_LOOKUP_KNOWN,
+            APPS_CGROUP_UNKNOWN_PERMANENT,
+            0,
+            1236,
+            1,
+            1000,
+            123458,
+            b"app2",
+            b"/permanent",
+            b"",
+            &[],
+        )
+        .unwrap();
+        let total = b.finish().unwrap();
+        write_file(dir, "apps_lookup_resp_known_permanent.bin", &buf[..total]);
+    }
+    {
+        let mut buf = [0u8; 8192];
+        let mut b = AppsLookupBuilder::new(&mut buf, 1, 203);
+        b.add(
+            PID_LOOKUP_KNOWN,
+            APPS_CGROUP_HOST_ROOT,
+            0,
+            1237,
+            1,
+            0,
+            123459,
+            b"sshd",
+            b"",
+            b"",
+            &[],
+        )
+        .unwrap();
+        let total = b.finish().unwrap();
+        write_file(dir, "apps_lookup_resp_known_host_root.bin", &buf[..total]);
+    }
+    {
+        let mut buf = [0u8; 8192];
+        let mut b = AppsLookupBuilder::new(&mut buf, 1, 204);
+        b.add(
+            PID_LOOKUP_UNKNOWN,
+            APPS_CGROUP_KNOWN,
+            0,
+            0,
+            0,
+            NIPC_UID_UNSET,
+            0,
+            b"",
+            b"",
+            b"",
+            &[],
+        )
+        .unwrap();
+        let total = b.finish().unwrap();
+        write_file(dir, "apps_lookup_resp_unknown_pid.bin", &buf[..total]);
+    }
+    {
+        let mut buf = [0u8; 8192];
+        let b = AppsLookupBuilder::new(&mut buf, 0, 205);
+        let total = b.finish().unwrap();
+        write_file(dir, "apps_lookup_resp_empty.bin", &buf[..total]);
+    }
 }
 
 fn do_decode(dir: &str) -> bool {
@@ -324,6 +532,107 @@ fn do_decode(dir: &str) -> bool {
             c.check(v.systemd_enabled == 0, "empty systemd_enabled");
             c.check(v.generation == 42, "empty generation");
         }
+    }
+
+    // 8. CGROUPS_LOOKUP request variants
+    {
+        let data = read_file(dir, "cgroups_lookup_req.bin");
+        let view = CgroupsLookupRequestView::decode(&data);
+        c.check(view.is_ok(), "decode cgroups_lookup_req");
+        if let Ok(v) = view {
+            c.check(v.item_count == 2, "cgroups_lookup_req item_count");
+            c.check(
+                v.item(0).unwrap().as_bytes() == b"/sys/fs/cgroup/a",
+                "cgroups_lookup_req item0",
+            );
+        }
+    }
+    {
+        let data = read_file(dir, "cgroups_lookup_req_empty.bin");
+        let view = CgroupsLookupRequestView::decode(&data);
+        c.check(view.is_ok(), "decode cgroups_lookup_req_empty");
+        if let Ok(v) = view {
+            c.check(v.item_count == 0, "cgroups_lookup_req_empty count");
+        }
+    }
+
+    // 9. CGROUPS_LOOKUP response variants
+    {
+        let data = read_file(dir, "cgroups_lookup_resp_known_with_labels.bin");
+        let view = CgroupsLookupResponseView::decode(&data);
+        c.check(view.is_ok(), "decode cgroups_lookup known labels");
+        if let Ok(v) = view {
+            c.check(v.generation == 100, "cgroups_lookup generation");
+            let item = v.item(0).unwrap();
+            c.check(item.status == CGROUP_LOOKUP_KNOWN, "cgroups_lookup status");
+            c.check(
+                item.orchestrator == ORCHESTRATOR_K8S,
+                "cgroups_lookup orchestrator",
+            );
+            c.check(item.label_count == 2, "cgroups_lookup label_count");
+            c.check(
+                item.label(0).unwrap().key.as_bytes() == b"namespace",
+                "cgroups_lookup label",
+            );
+        }
+    }
+    for file in [
+        "cgroups_lookup_resp_known_no_labels.bin",
+        "cgroups_lookup_resp_unknown_retry.bin",
+        "cgroups_lookup_resp_unknown_permanent.bin",
+        "cgroups_lookup_resp_empty.bin",
+    ] {
+        let data = read_file(dir, file);
+        c.check(CgroupsLookupResponseView::decode(&data).is_ok(), file);
+    }
+
+    // 10. APPS_LOOKUP request variants
+    {
+        let data = read_file(dir, "apps_lookup_req.bin");
+        let view = AppsLookupRequestView::decode(&data);
+        c.check(view.is_ok(), "decode apps_lookup_req");
+        if let Ok(v) = view {
+            c.check(v.item_count == 3, "apps_lookup_req item_count");
+            c.check(v.item(0).unwrap() == 0, "apps_lookup_req pid0");
+        }
+    }
+    {
+        let data = read_file(dir, "apps_lookup_req_empty.bin");
+        let view = AppsLookupRequestView::decode(&data);
+        c.check(view.is_ok(), "decode apps_lookup_req_empty");
+        if let Ok(v) = view {
+            c.check(v.item_count == 0, "apps_lookup_req_empty count");
+        }
+    }
+
+    // 11. APPS_LOOKUP response variants
+    {
+        let data = read_file(dir, "apps_lookup_resp_known_full.bin");
+        let view = AppsLookupResponseView::decode(&data);
+        c.check(view.is_ok(), "decode apps_lookup known full");
+        if let Ok(v) = view {
+            let item = v.item(0).unwrap();
+            c.check(item.pid == 1234, "apps_lookup pid");
+            c.check(item.comm.len == 15, "apps_lookup comm boundary");
+            c.check(
+                item.cgroup_status == APPS_CGROUP_KNOWN,
+                "apps_lookup cgroup status",
+            );
+            c.check(
+                item.label(0).unwrap().value.as_bytes() == b"nginx:latest",
+                "apps_lookup label",
+            );
+        }
+    }
+    for file in [
+        "apps_lookup_resp_known_retry.bin",
+        "apps_lookup_resp_known_permanent.bin",
+        "apps_lookup_resp_known_host_root.bin",
+        "apps_lookup_resp_unknown_pid.bin",
+        "apps_lookup_resp_empty.bin",
+    ] {
+        let data = read_file(dir, file);
+        c.check(AppsLookupResponseView::decode(&data).is_ok(), file);
     }
 
     c.report("Rust decode")
