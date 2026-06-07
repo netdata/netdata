@@ -74,7 +74,7 @@ fi
 
 ${GITHUB_ACTIONS+echo "::group::Configuring"}
 # shellcheck disable=SC2086
-CFLAGS="${BUILD_CFLAGS}" /usr/bin/cmake \
+CFLAGS="${BUILD_CFLAGS}" /ucrt64/bin/cmake \
     -S "${REPO_ROOT}" \
     -B "${build}" \
     -G "${generator}" \
