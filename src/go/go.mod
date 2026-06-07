@@ -1,6 +1,6 @@
 module github.com/netdata/netdata/go/plugins
 
-go 1.26.3
+go 1.26.0
 
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.302.0
 
@@ -83,7 +83,7 @@ require (
 	github.com/ibm-messaging/mq-golang/v5 v5.7.1
 	github.com/maxmind/mmdbwriter v1.2.0
 	github.com/microsoft/go-mssqldb v1.10.0
-	github.com/netdata/systemd-journal-sdk/go v0.5.0
+	github.com/netdata/systemd-journal-sdk/go v0.5.1
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	golang.org/x/sys v0.45.0

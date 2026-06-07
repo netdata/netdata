@@ -259,4 +259,39 @@ None yet.
 
 ## Regression Log
 
-None yet.
+### 2026-06-08 - SDK v0.5.0 Raised Netdata Go Directive
+
+Status: repaired
+
+What broke:
+
+- CI package and Docker jobs failed after the v0.5.0 update because `src/go/go.mod` was raised from `go 1.26.0` to `go 1.26.3`.
+- The SDK `go/v0.5.0` tag declared `go 1.26.3`, so the dependency bump forced the main module directive above the Go toolchain available in several Netdata CI package/docker images.
+
+Evidence:
+
+- `src/go/go.mod` used `github.com/netdata/systemd-journal-sdk/go v0.5.0` and `go 1.26.3` after the completed update.
+- Netdata upstream `src/go/go.mod` still uses `go 1.26.0`.
+- `github.com/netdata/systemd-journal-sdk/go v0.5.1` declares `GoVersion: 1.26` at tag `go/v0.5.1`.
+
+Why previous validation missed it:
+
+- Focused Go tests ran on a local Go toolchain that could satisfy `go 1.26.3`.
+- Package/docker CI images use their own installed Go toolchain and exposed the mismatch only after the PR CI ran.
+
+Repair:
+
+- Updated `src/go/go.mod` from `github.com/netdata/systemd-journal-sdk/go v0.5.0` to `v0.5.1`.
+- Restored `src/go/go.mod` to the upstream Netdata baseline `go 1.26.0`.
+- Removed stale v0.5.0 SDK checksums from `src/go/go.sum`.
+
+Validation:
+
+- `go mod tidy -diff` from `src/go` - passed.
+- `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 120s` from `src/go` - passed.
+
+Artifact updates:
+
+- Specs: no update needed; public SNMP trap behavior did not change.
+- Runtime project skills: no update needed; workflow did not change.
+- End-user/operator docs and skills: no update needed; operator configuration and query behavior did not change.
