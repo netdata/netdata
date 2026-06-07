@@ -41,6 +41,7 @@ pacman -S --noconfirm --needed \
     ucrt64/mingw-w64-ucrt-x86_64-curl \
     ucrt64/mingw-w64-ucrt-x86_64-go \
     ucrt64/mingw-w64-ucrt-x86_64-libuv \
+    ucrt64/mingw-w64-ucrt-x86_64-libyaml \
     ucrt64/mingw-w64-ucrt-x86_64-lz4 \
     ucrt64/mingw-w64-ucrt-x86_64-nsis \
     ucrt64/mingw-w64-ucrt-x86_64-openssl \
