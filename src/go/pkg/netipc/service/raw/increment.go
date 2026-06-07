@@ -139,7 +139,7 @@ func (c *Client) CallIncrementBatch(values []uint64) ([]uint64, error) {
 		}
 
 		out := make([]uint64, itemCount)
-		for i := uint32(0); i < itemCount; i++ {
+		for i := range itemCount {
 			itemData, gerr := protocol.BatchItemGet(respPayload, itemCount, i)
 			if gerr != nil {
 				return gerr
