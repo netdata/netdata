@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""SOW-0034 - SNMP Trap Profile LLM Enrichment Pipeline.
+"""
+SOW-0034 - SNMP Trap Profile LLM Enrichment Pipeline.
 
 Reads output/extracted.jsonl (produced by extract.py), submits each trap
 to the LLM gateway with a 4-field classification prompt, validates the
@@ -524,8 +525,7 @@ def validate(
     response_text: str,
     varbind_names: List[str],
 ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
-    """
-    Parse and validate model JSON.
+    """Parse and validate model JSON.
 
     Returns ``(record, None)`` on success or ``(None, reason)`` on failure.
     """
@@ -564,8 +564,7 @@ async def call_llm(
     cfg: LLMConfig,
     user_prompt: str,
 ) -> str:
-    """
-    Make a single LLM call.
+    """Make a single LLM call.
 
     This helper intentionally does not inject authentication headers. Point it
     at an OpenAI-compatible endpoint or gateway whose auth policy is handled
@@ -722,8 +721,7 @@ async def enrich_one(
     client: httpx.AsyncClient,
     sem: asyncio.Semaphore,
 ) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
-    """
-    Enrich one trap with schema validation and retry feedback.
+    """Enrich one trap with schema validation and retry feedback.
 
     Uses up to three attempts, falling back to mechanical defaults if all fail.
 
@@ -916,8 +914,7 @@ async def run_async(
     endpoints: List[LLMConfig],
     progress_every: int,
 ) -> Dict[str, Any]:
-    """
-    Dispatch traps across one-or-more LLM endpoints.
+    """Dispatch traps across one-or-more LLM endpoints.
 
     Each endpoint runs `endpoint.concurrency` worker tasks. Workers pull
     from a shared queue, so faster endpoints naturally absorb more work.

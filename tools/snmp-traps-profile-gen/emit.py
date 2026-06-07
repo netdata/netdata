@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""SOW-0033/0034 - profile YAML emitter.
+"""
+SOW-0033/0034 - profile YAML emitter.
 
 Reads every enriched per-OID JSON record under output/enriched/, groups
 records by inferred vendor (via OID enterprise prefix lookup), and emits
@@ -54,8 +55,7 @@ def safe_slug(s: str) -> str:
 
 
 def vendor_for_oid(oid: str) -> str:
-    """
-    Return the vendor slug derived from the trap OID.
+    """Return the vendor slug derived from the trap OID.
 
     Standard tree -> ``standard``.  IEEE 802.1AB (LLDP) tree -> ``ieee-lldp``.
     IEEE 802 (anything under ``1.3.111.2.802.*``) -> ``ieee-802``.
@@ -109,14 +109,12 @@ def slim_varbind(vb: Dict[str, Any]) -> Dict[str, Any]:
 def collect_vendor_varbinds(
     recs: List[Dict[str, Any]],
 ) -> Tuple[Dict[str, Dict[str, Any]], List[Tuple[str, Dict[str, Any]]]]:
-    """
-    Build the per-file deduped varbind table.
+    """Build the per-file deduped varbind table.
 
-    Returns:
-      table:    name -> slim_varbind dict (file-level ``varbinds:`` map)
-      inline:   list of (trap_oid, vb) for varbinds we could NOT dedup because
-                they conflict with an earlier entry of the same name. These
-                stay inline in the trap entry.
+    Returns ``(table, inline)``. ``table`` maps varbind names to slim varbind
+    dicts for the file-level ``varbinds:`` map. ``inline`` lists varbinds that
+    could not be deduped because they conflict with an earlier entry of the
+    same name.
 
     Varbinds whose ``slim`` form has no ``oid`` are dropped entirely from
     both the table and the per-trap reference list. The MIB-extractor flags

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Render a Markdown review document for the sample-gate stage of SOW-0034.
+"""
+Render a Markdown review document for the sample-gate stage of SOW-0034.
 
 Reads every enriched/<OID>.json file written by classify.py and emits a
 single Markdown file with one section per trap: input description,

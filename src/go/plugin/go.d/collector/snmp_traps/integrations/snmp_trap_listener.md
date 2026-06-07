@@ -9,7 +9,7 @@ keywords: ['snmp', 'trap', 'inform', 'snmpv3', 'usm', 'syslog',
   'network management']
 message: "Generated from collector metadata.yaml; do not edit directly"
 endmeta-->
-<!-- markdownlint-disable MD012 MD013 MD031 MD032 MD033 MD036 MD043 MD045 -->
+<!-- markdownlint-disable MD012 MD013 MD022 MD031 MD032 MD033 MD036 MD039 MD043 MD045 -->
 
 # SNMP trap listener
 
