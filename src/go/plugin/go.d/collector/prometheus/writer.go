@@ -4,6 +4,7 @@ package prometheus
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -11,6 +12,11 @@ import (
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	commonmodel "github.com/prometheus/common/model"
 )
+
+// seriesCacheRetentionCycles bounds the per-series instrument cache: a cached handle not observed for
+// this many successful cycles is evicted. It mirrors metrix's default store retention so a cached
+// handle lives as long as the series it writes, and the cache stays bounded under label-value churn.
+const seriesCacheRetentionCycles = 10
 
 type metricFamilyWriterPolicy struct {
 	labelPrefix           string
@@ -23,19 +29,42 @@ type metricFamilyWriter struct {
 	store   metrix.CollectorStore
 	policy  metricFamilyWriterPolicy
 	handles map[string]*metricFamilyHandle
+	cycle   uint64
 	*logger.Logger
 }
 
-// metricFamilyHandle caches the per-name canonical distribution schema and instrument options so a
-// family's series can be written each cycle without re-deriving them. Label keys are NOT cached:
-// every series supplies its own labels (a family may mix label-key sets), so series are written
-// through SnapshotMeter.WithLabels rather than a fixed label-key Vec.
+// cachedInstrument is a per-series instrument handle plus the last cycle it was observed, so handles
+// for series that stop appearing in scrapes can be evicted.
+type cachedInstrument[T any] struct {
+	inst     T
+	lastSeen uint64
+}
+
+// metricFamilyHandle caches, per metric name, the canonical distribution schema, instrument options,
+// and the per-series instrument handles. The family handle is created once per name and KEPT for the
+// job's lifetime on purpose: metrix registers an instrument descriptor per name permanently (no
+// unregister API), so if a name reappeared with a changed contract (kind, summary quantiles, or
+// histogram bounds) and the writer re-registered it, metrix would panic on the mismatch. Keeping the
+// handle lets ensureHandle detect that drift and skip it instead of re-registering.
+//
+// The per-series instrument handles inside ARE evicted: they are reused across cycles (skipping
+// per-series instrument re-resolution) and dropped once a series goes unobserved for
+// seriesCacheRetentionCycles, so the cache stays bounded under label-value churn — unlike a metrix
+// vec, whose internal handle cache is unbounded. A family may mix label-key sets; each series is
+// cached and written by its own full label tuple. Per-name state (this handle plus the metrix
+// descriptor) is bounded by metric-name cardinality; metric-NAME churn (a Prometheus anti-pattern)
+// grows it — an accepted metrix-store limit.
 type metricFamilyHandle struct {
 	name             string
 	typ              commonmodel.MetricType
 	summaryQuantiles []float64
 	histogramBounds  []float64
 	opts             []metrix.InstrumentOption
+
+	gauges     map[string]*cachedInstrument[metrix.SnapshotGauge]
+	counters   map[string]*cachedInstrument[metrix.SnapshotCounter]
+	summaries  map[string]*cachedInstrument[metrix.SnapshotSummary]
+	histograms map[string]*cachedInstrument[metrix.SnapshotHistogram]
 }
 
 func newMetricFamilyWriter(store metrix.CollectorStore, policy metricFamilyWriterPolicy, log *logger.Logger) *metricFamilyWriter {
@@ -76,6 +105,8 @@ func (w *metricFamilyWriter) countWritable(mfs prompkg.MetricFamilies) int {
 }
 
 func (w *metricFamilyWriter) writeMetricFamilies(mfs prompkg.MetricFamilies) int {
+	w.cycle++
+
 	written := 0
 	for _, mf := range mfs {
 		if w.skipMetricFamily(mf) {
@@ -99,6 +130,7 @@ func (w *metricFamilyWriter) writeMetricFamilies(mfs prompkg.MetricFamilies) int
 		}
 	}
 
+	w.evictStaleSeries()
 	return written
 }
 
@@ -155,12 +187,6 @@ func (w *metricFamilyWriter) ensureHandle(mf *prompkg.MetricFamily, typ commonmo
 		metrix.WithFloat(true),
 		metrix.WithDescription(getChartTitle(mf.Name(), mf.Help())),
 	}
-	switch typ {
-	case commonmodel.MetricTypeSummary:
-		opts = append(opts, metrix.WithSummaryQuantiles(schema.summaryQuantiles...))
-	case commonmodel.MetricTypeHistogram:
-		opts = append(opts, metrix.WithHistogramBounds(schema.histogramBounds...))
-	}
 
 	handle := &metricFamilyHandle{
 		name:             mf.Name(),
@@ -169,6 +195,20 @@ func (w *metricFamilyWriter) ensureHandle(mf *prompkg.MetricFamily, typ commonmo
 		histogramBounds:  slices.Clone(schema.histogramBounds),
 		opts:             opts,
 	}
+
+	switch typ {
+	case commonmodel.MetricTypeGauge:
+		handle.gauges = make(map[string]*cachedInstrument[metrix.SnapshotGauge])
+	case commonmodel.MetricTypeCounter:
+		handle.counters = make(map[string]*cachedInstrument[metrix.SnapshotCounter])
+	case commonmodel.MetricTypeSummary:
+		handle.opts = append(handle.opts, metrix.WithSummaryQuantiles(schema.summaryQuantiles...))
+		handle.summaries = make(map[string]*cachedInstrument[metrix.SnapshotSummary])
+	case commonmodel.MetricTypeHistogram:
+		handle.opts = append(handle.opts, metrix.WithHistogramBounds(schema.histogramBounds...))
+		handle.histograms = make(map[string]*cachedInstrument[metrix.SnapshotHistogram])
+	}
+
 	w.handles[mf.Name()] = handle
 	return handle, true
 }
@@ -197,7 +237,7 @@ func (w *metricFamilyWriter) observeMetric(handle *metricFamilyHandle, metric pr
 		return false
 	}
 
-	meter := w.store.Write().SnapshotMeter("").WithLabels(w.seriesLabels(metric)...)
+	sig := w.seriesSig(metric)
 
 	switch handle.typ {
 	case commonmodel.MetricTypeGauge:
@@ -205,32 +245,106 @@ func (w *metricFamilyWriter) observeMetric(handle *metricFamilyHandle, metric pr
 		if !ok {
 			return false
 		}
-		meter.Gauge(handle.name, handle.opts...).Observe(value)
+		inst := getOrCreateInstrument(handle.gauges, sig, w.cycle, func() metrix.SnapshotGauge {
+			return w.store.Write().SnapshotMeter("").WithLabels(w.seriesLabels(metric)...).Gauge(handle.name, handle.opts...)
+		})
+		inst.Observe(value)
 		return true
 	case commonmodel.MetricTypeCounter:
 		value, ok := metricScalarValue(metric, commonmodel.MetricTypeCounter)
 		if !ok {
 			return false
 		}
-		meter.Counter(handle.name, handle.opts...).ObserveTotal(value)
+		inst := getOrCreateInstrument(handle.counters, sig, w.cycle, func() metrix.SnapshotCounter {
+			return w.store.Write().SnapshotMeter("").WithLabels(w.seriesLabels(metric)...).Counter(handle.name, handle.opts...)
+		})
+		inst.ObserveTotal(value)
 		return true
 	case commonmodel.MetricTypeSummary:
 		point, ok := toSummaryPoint(metric.Summary())
 		if !ok {
 			return false
 		}
-		meter.Summary(handle.name, handle.opts...).ObservePoint(point)
+		inst := getOrCreateInstrument(handle.summaries, sig, w.cycle, func() metrix.SnapshotSummary {
+			return w.store.Write().SnapshotMeter("").WithLabels(w.seriesLabels(metric)...).Summary(handle.name, handle.opts...)
+		})
+		inst.ObservePoint(point)
 		return true
 	case commonmodel.MetricTypeHistogram:
 		point, ok := toHistogramPoint(metric.Histogram())
 		if !ok {
 			return false
 		}
-		meter.Histogram(handle.name, handle.opts...).ObservePoint(point)
+		inst := getOrCreateInstrument(handle.histograms, sig, w.cycle, func() metrix.SnapshotHistogram {
+			return w.store.Write().SnapshotMeter("").WithLabels(w.seriesLabels(metric)...).Histogram(handle.name, handle.opts...)
+		})
+		inst.ObservePoint(point)
 		return true
 	default:
 		return false
 	}
+}
+
+// getOrCreateInstrument returns the cached instrument handle for a series signature, creating and
+// caching it on first use, and stamps it as observed in the current cycle.
+func getOrCreateInstrument[T any](m map[string]*cachedInstrument[T], sig string, cycle uint64, create func() T) T {
+	e, ok := m[sig]
+	if !ok {
+		e = &cachedInstrument[T]{inst: create()}
+		m[sig] = e
+	}
+	e.lastSeen = cycle
+	return e.inst
+}
+
+// evictStaleSeries drops cached instrument handles for series not observed within the retention
+// window, keeping the cache bounded under label-value churn.
+func (w *metricFamilyWriter) evictStaleSeries() {
+	for _, h := range w.handles {
+		switch h.typ {
+		case commonmodel.MetricTypeGauge:
+			evictStaleInstruments(h.gauges, w.cycle)
+		case commonmodel.MetricTypeCounter:
+			evictStaleInstruments(h.counters, w.cycle)
+		case commonmodel.MetricTypeSummary:
+			evictStaleInstruments(h.summaries, w.cycle)
+		case commonmodel.MetricTypeHistogram:
+			evictStaleInstruments(h.histograms, w.cycle)
+		}
+	}
+}
+
+func evictStaleInstruments[T any](m map[string]*cachedInstrument[T], cycle uint64) {
+	for sig, e := range m {
+		if e.lastSeen+seriesCacheRetentionCycles <= cycle {
+			delete(m, sig)
+		}
+	}
+}
+
+// seriesSig builds a collision-safe key identifying a scraped series by its (prefixed) label tuple.
+// Prometheus labels are sorted by name, so the key is stable for a given series.
+func (w *metricFamilyWriter) seriesSig(metric prompkg.Metric) string {
+	lbs := metric.Labels()
+	if len(lbs) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for _, l := range lbs {
+		key := l.Name
+		if w.policy.labelPrefix != "" {
+			key = w.policy.labelPrefix + "_" + l.Name
+		}
+		b.WriteString(strconv.Itoa(len(key)))
+		b.WriteByte(':')
+		b.WriteString(key)
+		b.WriteByte('=')
+		b.WriteString(strconv.Itoa(len(l.Value)))
+		b.WriteByte(':')
+		b.WriteString(l.Value)
+		b.WriteByte('\xff')
+	}
+	return b.String()
 }
 
 // seriesLabels converts a scraped series' labels into metrix labels, applying the configured

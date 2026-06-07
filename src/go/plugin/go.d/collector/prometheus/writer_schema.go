@@ -137,10 +137,11 @@ func toSummaryPoint(summary *prompkg.Summary) (metrix.SummaryPoint, bool) {
 	}, true
 }
 
-// toHistogramPoint validates and converts a scraped histogram. A present le="+Inf" bucket is kept for
-// the count checks but is informational for output: metrix synthesizes the le="+Inf" flattened series
-// from Count. Valid Prometheus histograms (the +Inf bucket equals Count) are therefore identical to
-// V1; a malformed +Inf count is superseded by Count rather than rejected.
+// toHistogramPoint validates and converts a scraped histogram into a metrix point. The le="+Inf"
+// bucket is intentionally dropped: metrix synthesizes the le="+Inf" flattened series from Count, so a
+// malformed +Inf count is superseded by Count rather than causing the whole histogram to be rejected.
+// Validation (finiteness, strictly-increasing bounds, monotonic cumulative counts, last bucket <=
+// Count) therefore runs over the finite buckets only.
 func toHistogramPoint(histogram *prompkg.Histogram) (metrix.HistogramPoint, bool) {
 	if histogram == nil || len(histogram.Buckets()) == 0 {
 		return metrix.HistogramPoint{}, false
@@ -151,7 +152,13 @@ func toHistogramPoint(histogram *prompkg.Histogram) (metrix.HistogramPoint, bool
 
 	buckets := make([]metrix.BucketPoint, 0, len(histogram.Buckets()))
 	for _, b := range histogram.Buckets() {
-		if (math.IsNaN(b.UpperBound()) || math.IsInf(b.UpperBound(), -1)) || !isFinite(b.CumulativeCount()) || b.CumulativeCount() < 0 {
+		if math.IsNaN(b.UpperBound()) || math.IsInf(b.UpperBound(), -1) {
+			return metrix.HistogramPoint{}, false
+		}
+		if math.IsInf(b.UpperBound(), +1) {
+			continue
+		}
+		if !isFinite(b.CumulativeCount()) || b.CumulativeCount() < 0 {
 			return metrix.HistogramPoint{}, false
 		}
 		buckets = append(buckets, metrix.BucketPoint{
@@ -169,14 +176,8 @@ func toHistogramPoint(histogram *prompkg.Histogram) (metrix.HistogramPoint, bool
 			return metrix.HistogramPoint{}, false
 		}
 	}
-	for i := len(buckets) - 1; i >= 0; i-- {
-		if math.IsInf(buckets[i].UpperBound, +1) {
-			continue
-		}
-		if buckets[i].CumulativeCount > histogram.Count() {
-			return metrix.HistogramPoint{}, false
-		}
-		break
+	if n := len(buckets); n > 0 && buckets[n-1].CumulativeCount > histogram.Count() {
+		return metrix.HistogramPoint{}, false
 	}
 
 	return metrix.HistogramPoint{

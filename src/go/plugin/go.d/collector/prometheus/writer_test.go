@@ -92,6 +92,20 @@ app_dur_count 4
 				assert.InDelta(t, 0.9, value(t, fr, "app_dur_sum", nil), 1e-9)
 			},
 		},
+		"histogram with a malformed +Inf bucket is normalized, not skipped": {
+			exposition: `
+# TYPE app_hist histogram
+app_hist_bucket{le="1"} 5
+app_hist_bucket{le="+Inf"} 0
+app_hist_sum 2.5
+app_hist_count 5
+`,
+			assert: func(t *testing.T, fr metrix.Reader, written int) {
+				assert.Equal(t, 1, written, "a malformed +Inf count must not skip the whole histogram (Count supersedes +Inf)")
+				assert.InDelta(t, 5, value(t, fr, "app_hist_bucket", metrix.Labels{"le": "1"}), 1e-9)
+				assert.InDelta(t, 5, value(t, fr, "app_hist_count", nil), 1e-9)
+			},
+		},
 		"family with heterogeneous label keys writes every series (P0-1)": {
 			exposition: `
 # TYPE app_state gauge
@@ -347,5 +361,79 @@ app_lat_count{id="b"} 2
 		assert.True(t, ok, "canonical-schema series is written")
 		_, ok = fr.Value("app_lat", metrix.Labels{"id": "b", "quantile": "0.5"})
 		assert.False(t, ok, "off-schema series is skipped")
+	})
+
+	t.Run("evicts cached series handles after the retention window", func(t *testing.T) {
+		store := metrix.NewCollectorStore()
+		w := newMetricFamilyWriter(store, metricFamilyWriterPolicy{}, logger.New())
+		cc := cycle(t, store)
+
+		cc.BeginCycle()
+		w.writeMetricFamilies(scrape(t, "# TYPE app_g gauge\napp_g{id=\"1\"} 1\n"))
+		require.NoError(t, cc.CommitCycleSuccess())
+		require.Len(t, w.handles["app_g"].gauges, 1)
+
+		// Only id="2" appears for the next retention window, so id="1" goes unobserved and its
+		// cached handle must be evicted (otherwise the cache would grow unbounded under value churn).
+		for range seriesCacheRetentionCycles {
+			cc.BeginCycle()
+			w.writeMetricFamilies(scrape(t, "# TYPE app_g gauge\napp_g{id=\"2\"} 2\n"))
+			require.NoError(t, cc.CommitCycleSuccess())
+		}
+
+		assert.Len(t, w.handles["app_g"].gauges, 1, "stale series handle must be evicted, leaving only the active one")
+	})
+
+	t.Run("reappearing metric name with a changed type is skipped, never re-registered (no panic)", func(t *testing.T) {
+		store := metrix.NewCollectorStore()
+		w := newMetricFamilyWriter(store, metricFamilyWriterPolicy{}, logger.New())
+		cc := cycle(t, store)
+
+		cc.BeginCycle()
+		require.Equal(t, 1, w.writeMetricFamilies(scrape(t, "# TYPE foo gauge\nfoo 1\n")))
+		require.NoError(t, cc.CommitCycleSuccess())
+
+		// foo is absent well beyond the per-series retention window; its series handle is evicted, but
+		// the family handle is kept.
+		for range seriesCacheRetentionCycles + 5 {
+			cc.BeginCycle()
+			require.NoError(t, cc.CommitCycleSuccess())
+		}
+
+		// foo reappears as a counter. metrix's descriptor for "foo" is a permanent gauge, so
+		// re-registering it as a counter would panic; the kept handle must detect the drift and skip.
+		cc.BeginCycle()
+		assert.NotPanics(t, func() {
+			assert.Equal(t, 0, w.writeMetricFamilies(scrape(t, "# TYPE foo counter\nfoo 5\n")),
+				"a reappearing name with a changed type must be skipped")
+		})
+		require.NoError(t, cc.CommitCycleSuccess())
+	})
+
+	t.Run("reappearing metric name with changed summary quantiles is skipped (no panic)", func(t *testing.T) {
+		store := metrix.NewCollectorStore()
+		w := newMetricFamilyWriter(store, metricFamilyWriterPolicy{}, logger.New())
+		cc := cycle(t, store)
+
+		cc.BeginCycle()
+		require.Equal(t, 1, w.writeMetricFamilies(scrape(t,
+			"# TYPE app_lat summary\napp_lat{quantile=\"0.5\"} 1\napp_lat_sum 1\napp_lat_count 1\n")))
+		require.NoError(t, cc.CommitCycleSuccess())
+
+		// app_lat absent beyond the per-series retention window (series handle evicted, family handle kept).
+		for range seriesCacheRetentionCycles + 5 {
+			cc.BeginCycle()
+			require.NoError(t, cc.CommitCycleSuccess())
+		}
+
+		// app_lat reappears with a different quantile set. metrix's summary descriptor for "app_lat" is
+		// fixed to {0.5}; observing {0.5,0.9} would panic, so the kept handle must skip the drifted series.
+		cc.BeginCycle()
+		assert.NotPanics(t, func() {
+			assert.Equal(t, 0, w.writeMetricFamilies(scrape(t,
+				"# TYPE app_lat summary\napp_lat{quantile=\"0.5\"} 1\napp_lat{quantile=\"0.9\"} 2\napp_lat_sum 3\napp_lat_count 2\n")),
+				"a reappearing summary with a changed quantile set must be skipped")
+		})
+		require.NoError(t, cc.CommitCycleSuccess())
 	})
 }
