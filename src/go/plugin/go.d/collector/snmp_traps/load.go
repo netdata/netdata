@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -312,9 +314,7 @@ func mergeBaseVarbinds(target, base map[string]VarbindDef, protected map[string]
 
 func cloneVarbindMap(src map[string]VarbindDef) map[string]VarbindDef {
 	dst := make(map[string]VarbindDef, len(src))
-	for k, v := range src {
-		dst[k] = v
-	}
+	maps.Copy(dst, src)
 	return dst
 }
 
@@ -330,27 +330,18 @@ func cloneStringMap(src map[string]string) map[string]string {
 		return nil
 	}
 	dst := make(map[string]string, len(src))
-	for k, v := range src {
-		dst[k] = v
-	}
+	maps.Copy(dst, src)
 	return dst
 }
 
 func mergeStringMaps(base, override map[string]string) map[string]string {
 	dst := cloneStringMap(base)
-	for k, v := range override {
-		dst[k] = v
-	}
+	maps.Copy(dst, override)
 	return dst
 }
 
 func stacksContains(stack []string, name string) bool {
-	for _, s := range stack {
-		if s == name {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(stack, name)
 }
 
 func unmarshalProfileYAML(content []byte, def *ProfileDefinition) (err error) {

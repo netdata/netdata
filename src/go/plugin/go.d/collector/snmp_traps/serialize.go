@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strconv"
@@ -128,9 +129,9 @@ func serializeToJournalFields(entry *TrapEntry) ([]JournalField, error) {
 
 	if isDedupSummary && entry.SummaryCounts != nil {
 		sc := entry.SummaryCounts
-		fields = append(fields, JournalField{Name: "TRAP_SUPPRESSED_COUNT", Value: []byte(fmt.Sprintf("%d", sc.TotalSuppressed))})
-		fields = append(fields, JournalField{Name: "TRAP_SUPPRESSED_FINGERPRINTS", Value: []byte(fmt.Sprintf("%d", sc.Fingerprints))})
-		fields = append(fields, JournalField{Name: "TRAP_REPORT_PERIOD_SEC", Value: []byte(fmt.Sprintf("%d", sc.PeriodSec))})
+		fields = append(fields, JournalField{Name: "TRAP_SUPPRESSED_COUNT", Value: fmt.Appendf(nil, "%d", sc.TotalSuppressed)})
+		fields = append(fields, JournalField{Name: "TRAP_SUPPRESSED_FINGERPRINTS", Value: fmt.Appendf(nil, "%d", sc.Fingerprints)})
+		fields = append(fields, JournalField{Name: "TRAP_REPORT_PERIOD_SEC", Value: fmt.Appendf(nil, "%d", sc.PeriodSec)})
 	}
 
 	sortedLabels := sortedMapKeys(entry.Labels)
@@ -199,9 +200,7 @@ func buildTrapJSON(entry *TrapEntry) ([]byte, error) {
 		obj2["fingerprints"] = entry.SummaryCounts.Fingerprints
 		if entry.SummaryCounts.ByTrap != nil {
 			bt := make(map[string]int64, len(entry.SummaryCounts.ByTrap))
-			for oid, count := range entry.SummaryCounts.ByTrap {
-				bt[oid] = count
-			}
+			maps.Copy(bt, entry.SummaryCounts.ByTrap)
 			obj2["by_trap"] = bt
 		}
 		result, err := json.Marshal(obj2)

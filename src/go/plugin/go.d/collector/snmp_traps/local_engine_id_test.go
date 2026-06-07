@@ -437,7 +437,15 @@ func TestSendInformResponseV3AuthPriv(t *testing.T) {
 		t.Fatalf("registerUSMUsersWithLocalEngineID failed: %v", err)
 	}
 
-	reqData := buildV3SecuredInform(t, "testuser", testLocalEngineIDHex, "sha256", "aes", "authpassword", "privpassword", "1.3.6.1.6.3.1.1.5.1")
+	reqData := buildV3SecuredInform(t, v3SecuredTrapSpec{
+		user:        "testuser",
+		engineIDHex: testLocalEngineIDHex,
+		authProto:   "sha256",
+		privProto:   "aes",
+		authKey:     "authpassword",
+		privKey:     "privpassword",
+		trapOID:     "1.3.6.1.6.3.1.1.5.1",
+	})
 	reqCtx, err := DecodeTrap(reqData, net.ParseIP("10.1.2.3"), secTable)
 	if err != nil {
 		t.Fatalf("DecodeTrap failed: %v", err)

@@ -22,11 +22,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
+import hashlib
 import json
 import logging
 import os
-import random
 import re
+import secrets
 import sys
 import tempfile
 import time
@@ -85,6 +86,7 @@ BANNED_REGEX = re.compile(
     r"\b(world[- ]class|powerful|catastrophic|severe issue|critical issue|cutting[- ]edge)\b",
     re.IGNORECASE,
 )
+BACKOFF_RANDOM = secrets.SystemRandom()
 
 
 # --------------------------------------------------------------------------
@@ -92,7 +94,9 @@ BANNED_REGEX = re.compile(
 # --------------------------------------------------------------------------
 
 
-SYSTEM_PROMPT = """You are classifying SNMP traps for the Netdata observability platform. For every trap supplied to you, you output exactly one JSON object — no commentary, no markdown fences. The JSON object has three keys:
+SYSTEM_PROMPT = """You are classifying SNMP traps for the Netdata observability platform.
+For every trap supplied to you, you output exactly one JSON object — no commentary, no markdown fences.
+The JSON object has three keys:
 
 {
   "category":    "<one of the 8 canonical slugs>",
@@ -219,15 +223,24 @@ mib_module: IF-MIB
 varbinds: ifIndex (INTEGER), ifAdminStatus (INTEGER), ifOperStatus (INTEGER)
 
 [Output]
-{"category":"state_change","severity":"warning","description":"Interface ifIndex {ifIndex} went down on {SNMP_DEVICE_HOSTNAME}\\n  admin status: {ifAdminStatus}\\n  operational status: {ifOperStatus}"}
+{
+  "category":"state_change",
+  "severity":"warning",
+  "description":"Interface {ifIndex} down on {SNMP_DEVICE_HOSTNAME}\\n  admin: {ifAdminStatus}\\n  oper: {ifOperStatus}"
+}
 
 [Input]
 trap_name: ccmCLIRunningConfigChanged
 mib_module: CISCO-CONFIG-MAN-MIB
-varbinds: ccmHistoryEventCommandSource (INTEGER), ccmHistoryEventConfigSource (INTEGER), ccmHistoryEventConfigDestination (INTEGER)
+varbinds: ccmHistoryEventCommandSource (INTEGER), ccmHistoryEventConfigSource (INTEGER)
+varbinds: ccmHistoryEventConfigDestination (INTEGER)
 
 [Output]
-{"category":"config_change","severity":"notice","description":"Cisco running-config changed on {SNMP_DEVICE_HOSTNAME}\\n  source: {ccmHistoryEventConfigSource}\\n  destination: {ccmHistoryEventConfigDestination}\\n  command via: {ccmHistoryEventCommandSource}"}
+{
+  "category":"config_change",
+  "severity":"notice",
+  "description":"Cisco running-config changed on {SNMP_DEVICE_HOSTNAME}"
+}
 
 [Input]
 trap_name: authenticationFailure
@@ -243,7 +256,11 @@ mib_module: CISCO-PORT-SECURITY-MIB
 varbinds: cpsIfViolationMacAddress (OctetString), cpsIfViolationVlan (INTEGER), ifIndex (INTEGER)
 
 [Output]
-{"category":"security","severity":"warning","description":"Port-security violation on {SNMP_DEVICE_HOSTNAME}\\n  MAC: {cpsIfViolationMacAddress}\\n  ifIndex: {ifIndex}\\n  VLAN: {cpsIfViolationVlan}"}
+{
+  "category":"security",
+  "severity":"warning",
+  "description":"Port-security violation on {SNMP_DEVICE_HOSTNAME}\\n  MAC: {cpsIfViolationMacAddress}"
+}
 
 [Input]
 trap_name: hh3cLicenseExpired
@@ -251,7 +268,11 @@ mib_module: HH3C-LICENSE-MIB
 varbinds: hh3cLicenseFeatureName (OctetString), hh3cLicenseFeatureState (INTEGER)
 
 [Output]
-{"category":"license","severity":"crit","description":"License expired on {SNMP_DEVICE_HOSTNAME}\\n  feature: {hh3cLicenseFeatureName}\\n  state: {hh3cLicenseFeatureState}"}
+{
+  "category":"license",
+  "severity":"crit",
+  "description":"License expired on {SNMP_DEVICE_HOSTNAME}\\n  feature: {hh3cLicenseFeatureName}"
+}
 
 [Input]
 trap_name: ieee8021SpanningTreeNewRoot
@@ -259,7 +280,11 @@ mib_module: IEEE8021-SPANNING-TREE-MIB
 varbinds: (none)
 
 [Output]
-{"category":"mobility","severity":"notice","description":"Device {SNMP_DEVICE_HOSTNAME} elected as new STP root bridge"}
+{
+  "category":"mobility",
+  "severity":"notice",
+  "description":"Device {SNMP_DEVICE_HOSTNAME} elected as new STP root bridge"
+}
 
 [Input]
 trap_name: cefcFRURemoved
@@ -267,7 +292,11 @@ mib_module: CISCO-ENTITY-FRU-CONTROL-MIB
 varbinds: entPhysicalDescr (OctetString), entPhysicalIndex (INTEGER)
 
 [Output]
-{"category":"diagnostic","severity":"crit","description":"FRU removed from {SNMP_DEVICE_HOSTNAME}\\n  description: {entPhysicalDescr}\\n  index: {entPhysicalIndex}"}
+{
+  "category":"diagnostic",
+  "severity":"crit",
+  "description":"FRU removed from {SNMP_DEVICE_HOSTNAME}\\n  description: {entPhysicalDescr}"
+}
 """
 
 
@@ -343,7 +372,8 @@ def build_retry_prompt(trap: Dict[str, Any], previous_failure_reason: str, previ
         f"Reason: {previous_failure_reason}\n"
         f"Previous output (first 300 chars): {previous_response[:300]!r}\n"
         "\n"
-        "Re-classify the trap below. Output ONLY the JSON object as instructed in the system prompt — no commentary, no markdown fences.\n"
+        "Re-classify the trap below. Output ONLY the JSON object as instructed in the system prompt "
+        "— no commentary, no markdown fences.\n"
         "\n"
         f"{base}"
     )
@@ -356,12 +386,33 @@ def build_retry_prompt(trap: Dict[str, Any], previous_failure_reason: str, previ
 
 CATEGORY_KEYWORDS: List[Tuple[str, str]] = [
     ("auth",          r"auth(enticat|oriz|n)|login|logoff|logout|password|credential|aaaserver"),
-    ("security",      r"violation|intrus|attack|tamper|spoof|firewall|acl[- ]?(hit|deny|drop)|ipsec|portsec|port[-_ ]?security|antivirus"),
+    (
+        "security",
+        r"violation|intrus|attack|tamper|spoof|firewall|acl[- ]?(hit|deny|drop)|"
+        r"ipsec|portsec|port[-_ ]?security|antivirus",
+    ),
     ("license",       r"licens|entitle|expir|grace[- ]?period"),
-    ("config_change", r"config(uration)?(chang|sav|updat|commit|rollback|loaded|written)|runningconfig|startupconfig|configmgmt|configurationchange"),
-    ("mobility",      r"macmov|macnotif|macaddressmoved|stproot|stpnewroot|stptopology|topologychange|hsrp|vrrp"),
-    ("diagnostic",    r"reboot|reset|powerfail|psu|powersupply|\bfan\b|temperat|optical|sfp|xcvr|raid|battery|moduleinsert|moduleremov|hot[- ]?swap|sensoralarm|envmon|hardwarefault"),
-    ("state_change",  r"linkdown|linkup|coldstart|warmstart|bgp(establish|backward)|ospf(if|nbr)stat|state[- ]?(chang|trans)"),
+    (
+        "config_change",
+        r"config(uration)?(chang|sav|updat|commit|rollback|loaded|written)|"
+        r"runningconfig|startupconfig|configmgmt|configurationchange",
+    ),
+    (
+        "mobility",
+        r"macmov|macnotif|macaddressmoved|stproot|stpnewroot|stptopology|"
+        r"topologychange|hsrp|vrrp",
+    ),
+    (
+        "diagnostic",
+        r"reboot|reset|powerfail|psu|powersupply|\bfan\b|temperat|optical|sfp|"
+        r"xcvr|raid|battery|moduleinsert|moduleremov|hot[- ]?swap|sensoralarm|"
+        r"envmon|hardwarefault",
+    ),
+    (
+        "state_change",
+        r"linkdown|linkup|coldstart|warmstart|bgp(establish|backward)|"
+        r"ospf(if|nbr)stat|state[- ]?(chang|trans)",
+    ),
 ]
 
 
@@ -535,7 +586,7 @@ async def call_llm(
             last_exc = exc
             if attempt >= cfg.http_retries:
                 raise
-            backoff = min(8.0, 0.5 * (2 ** attempt)) + random.uniform(0, 0.4)
+            backoff = min(8.0, 0.5 * (2 ** attempt)) + BACKOFF_RANDOM.uniform(0, 0.4)
             await asyncio.sleep(backoff)
     assert last_exc is not None
     raise last_exc
@@ -550,6 +601,10 @@ def oid_to_filename(oid: str) -> str:
     return oid.replace(".", "_") + ".json"
 
 
+def deterministic_sample_key(seed: int, value: str) -> str:
+    return hashlib.sha256(f"{seed}:{value}".encode("utf-8")).hexdigest()
+
+
 def atomic_write(path: str, content: str) -> None:
     d = os.path.dirname(path)
     os.makedirs(d, exist_ok=True)
@@ -562,8 +617,28 @@ def atomic_write(path: str, content: str) -> None:
         if os.path.exists(tmp):
             try:
                 os.remove(tmp)
-            except OSError:
-                pass
+            except OSError as exc:
+                logging.debug("failed to remove temporary file %s: %s", tmp, exc)
+
+
+def write_json(path: str, obj: Any) -> None:
+    with open(path, "w") as f:
+        json.dump(obj, f, indent=2)
+
+
+def read_json_list(path: str) -> List[Dict[str, Any]]:
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except Exception as exc:
+        logging.debug("ignoring unreadable JSON list %s: %s", path, exc)
+        return []
+    if not isinstance(data, list):
+        logging.debug("ignoring non-list JSON content in %s", path)
+        return []
+    return data
 
 
 async def enrich_one(
@@ -584,8 +659,12 @@ async def enrich_one(
     varbind_names = [
         vb.get("name")
         for vb in (trap.get("varbinds") or [])
-        if isinstance(vb, dict) and vb.get("name")
-           and vb.get("oid") and vb.get("syntax")
+        if (
+            isinstance(vb, dict)
+            and vb.get("name")
+            and vb.get("oid")
+            and vb.get("syntax")
+        )
     ]
     attempts_log: List[Dict[str, Any]] = []
     chosen: Optional[Dict[str, Any]] = None
@@ -608,7 +687,11 @@ async def enrich_one(
                 continue
             # Defensive: even if call_llm somehow returns None, we record and retry.
             if not isinstance(resp, str):
-                attempts_log.append({"attempt": attempt_idx + 1, "kind": "empty_response", "reason": f"got {type(resp).__name__}"})
+                attempts_log.append({
+                    "attempt": attempt_idx + 1,
+                    "kind": "empty_response",
+                    "reason": f"got {type(resp).__name__}",
+                })
                 last_failure_reason = f"empty response (got {type(resp).__name__})"
                 last_response_text = ""
                 continue
@@ -674,13 +757,7 @@ async def run_async(
     os.makedirs(out_enriched, exist_ok=True)
 
     failures_path = os.path.join(out_dir, "llm-failures.json")
-    failures: List[Dict[str, Any]] = []
-    if os.path.exists(failures_path):
-        try:
-            with open(failures_path) as f:
-                failures = json.load(f)
-        except Exception:
-            failures = []
+    failures = await asyncio.to_thread(read_json_list, failures_path)
 
     n_done = 0
     n_via_llm = [0, 0, 0]            # success on attempt-1 / attempt-2 / attempt-3
@@ -705,7 +782,11 @@ async def run_async(
                 if not oid:
                     continue
                 path = os.path.join(out_enriched, oid_to_filename(oid))
-                atomic_write(path, json.dumps(record, separators=(",", ":"), ensure_ascii=False) + "\n")
+                await asyncio.to_thread(
+                    atomic_write,
+                    path,
+                    json.dumps(record, separators=(",", ":"), ensure_ascii=False) + "\n",
+                )
                 if failure_log is not None:
                     failures.append(failure_log)
                 src = record.get("enrichment_source") or ""
@@ -748,8 +829,7 @@ async def run_async(
                 ep_workers.append(asyncio.create_task(worker(ep, client, ep_sem)))
         await asyncio.gather(*ep_workers, return_exceptions=False)
 
-    with open(failures_path, "w") as f:
-        json.dump(failures, f, indent=2)
+    await asyncio.to_thread(write_json, failures_path, failures)
 
     return {
         "total": len(traps),
@@ -782,9 +862,12 @@ def load_traps(
             line = line.strip()
             if not line:
                 continue
+            rec = None
             try:
                 rec = json.loads(line)
-            except Exception:
+            except Exception as exc:
+                logging.debug("skipping malformed extracted trap record: %s", exc)
+            if rec is None:
                 continue
             if not rec.get("oid"):
                 continue
@@ -804,12 +887,15 @@ def load_traps(
         by_mib: Dict[str, List[Dict[str, Any]]] = {}
         for t in traps:
             by_mib.setdefault(t.get("mib") or "", []).append(t)
-        rnd = random.Random(sample_seed)
         flat = []
-        keys = sorted(by_mib.keys())
-        rnd.shuffle(keys)
+        keys = sorted(by_mib.keys(), key=lambda k: deterministic_sample_key(sample_seed, k))
         for k in keys:
-            rnd.shuffle(by_mib[k])
+            by_mib[k].sort(
+                key=lambda t: deterministic_sample_key(
+                    sample_seed,
+                    f"{t.get('oid') or ''}:{t.get('name') or ''}",
+                )
+            )
         i = 0
         while len(flat) < sample_size and any(by_mib[k] for k in keys):
             k = keys[i % len(keys)]

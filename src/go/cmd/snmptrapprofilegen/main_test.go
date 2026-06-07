@@ -206,7 +206,7 @@ func TestHashTrapStableAndOrderSensitive(t *testing.T) {
 		t.Fatalf("hash changed between identical records")
 	}
 	rec.Varbinds[0], rec.Varbinds[1] = rec.Varbinds[1], rec.Varbinds[0]
-	if h3 := hashTrap(rec); h3 == h1 {
+	if hashTrap(rec) == h1 {
 		t.Fatalf("hash did not change when varbind order changed")
 	}
 }

@@ -270,7 +270,7 @@ func readBERElement(data []byte, pos int) (tag byte, valueStart, valueEnd, next 
 		if pos+n > len(data) {
 			return 0, 0, 0, 0, fmt.Errorf("BER: truncated length at offset %d", pos)
 		}
-		for i := 0; i < n; i++ {
+		for i := range n {
 			length = (length << 8) | int(data[pos+i])
 		}
 		pos += n

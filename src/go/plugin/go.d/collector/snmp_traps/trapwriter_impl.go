@@ -165,13 +165,7 @@ func journalRetentionSweepInterval(j *JournalWriter) time.Duration {
 		return 0
 	}
 
-	interval := j.cfg.MaxDuration / 2
-	if interval < minRetentionSweepInterval {
-		interval = minRetentionSweepInterval
-	}
-	if interval > maxRetentionSweepInterval {
-		interval = maxRetentionSweepInterval
-	}
+	interval := min(max(j.cfg.MaxDuration/2, minRetentionSweepInterval), maxRetentionSweepInterval)
 	if j.cfg.RotateDur > 0 && j.cfg.RotateDur < interval {
 		interval = j.cfg.RotateDur
 	}

@@ -94,10 +94,10 @@ func TestValidateRetention(t *testing.T) {
 	}{
 		"defaults": {
 			rc: RetentionConfig{
-				MaxSize:     uint64Ptr(defaultMaxSize),
+				MaxSize:     new(defaultMaxSize),
 				MaxDuration: nil,
 				RotateSize:  nil,
-				RotateDur:   durationPtr(defaultRotateDur),
+				RotateDur:   new(defaultRotateDur),
 			},
 			wantErr: false,
 		},
@@ -106,52 +106,52 @@ func TestValidateRetention(t *testing.T) {
 				MaxSize:     nil,
 				MaxDuration: nil,
 				RotateSize:  nil,
-				RotateDur:   durationPtr(defaultRotateDur),
+				RotateDur:   new(defaultRotateDur),
 			},
 			wantErr: false,
 		},
 		"zero_max_size": {
 			rc: RetentionConfig{
-				MaxSize:     uint64Ptr(0),
+				MaxSize:     new(uint64(0)),
 				MaxDuration: nil,
 				RotateSize:  nil,
-				RotateDur:   durationPtr(defaultRotateDur),
+				RotateDur:   new(defaultRotateDur),
 			},
 			wantErr: true,
 		},
 		"negative_max_duration": {
 			rc: RetentionConfig{
-				MaxSize:     uint64Ptr(defaultMaxSize),
-				MaxDuration: durationPtr(-1 * time.Second),
+				MaxSize:     new(defaultMaxSize),
+				MaxDuration: new(-1 * time.Second),
 				RotateSize:  nil,
-				RotateDur:   durationPtr(defaultRotateDur),
+				RotateDur:   new(defaultRotateDur),
 			},
 			wantErr: true,
 		},
 		"zero_rotation_duration": {
 			rc: RetentionConfig{
-				MaxSize:     uint64Ptr(defaultMaxSize),
+				MaxSize:     new(defaultMaxSize),
 				MaxDuration: nil,
 				RotateSize:  nil,
-				RotateDur:   durationPtr(0),
+				RotateDur:   new(time.Duration(0)),
 			},
 			wantErr: false,
 		},
 		"negative_rotation_duration": {
 			rc: RetentionConfig{
-				MaxSize:     uint64Ptr(defaultMaxSize),
+				MaxSize:     new(defaultMaxSize),
 				MaxDuration: nil,
 				RotateSize:  nil,
-				RotateDur:   durationPtr(-1 * time.Hour),
+				RotateDur:   new(-1 * time.Hour),
 			},
 			wantErr: true,
 		},
 		"very_short_max_duration": {
 			rc: RetentionConfig{
-				MaxSize:     uint64Ptr(defaultMaxSize),
-				MaxDuration: durationPtr(500 * time.Millisecond),
+				MaxSize:     new(defaultMaxSize),
+				MaxDuration: new(500 * time.Millisecond),
 				RotateSize:  nil,
-				RotateDur:   durationPtr(defaultRotateDur),
+				RotateDur:   new(defaultRotateDur),
 			},
 			wantErr: true,
 		},
@@ -176,15 +176,15 @@ func TestEffectiveRotateSize(t *testing.T) {
 		expected uint64
 	}{
 		"default_10GB": {
-			rc:       RetentionConfig{MaxSize: uint64Ptr(10 * bytesPerGB)},
+			rc:       RetentionConfig{MaxSize: new(uint64(10 * bytesPerGB))},
 			expected: maxRotationSize,
 		},
 		"1GB_min_clamp": {
-			rc:       RetentionConfig{MaxSize: uint64Ptr(1 * bytesPerGB)},
+			rc:       RetentionConfig{MaxSize: new(uint64(1 * bytesPerGB))},
 			expected: uint64(1 * bytesPerGB / rotationSizeDiv),
 		},
 		"100GB_max_clamp": {
-			rc:       RetentionConfig{MaxSize: uint64Ptr(100 * bytesPerGB)},
+			rc:       RetentionConfig{MaxSize: new(uint64(100 * bytesPerGB))},
 			expected: maxRotationSize,
 		},
 		"null_size_uses_upper_clamp": {
@@ -193,13 +193,13 @@ func TestEffectiveRotateSize(t *testing.T) {
 		},
 		"explicit_rotation_overrides_auto": {
 			rc: RetentionConfig{
-				MaxSize:    uint64Ptr(10 * bytesPerGB),
-				RotateSize: uint64Ptr(100 * bytesPerMB),
+				MaxSize:    new(uint64(10 * bytesPerGB)),
+				RotateSize: new(uint64(100 * bytesPerMB)),
 			},
 			expected: 100 * bytesPerMB,
 		},
 		"small_200MB": {
-			rc:       RetentionConfig{MaxSize: uint64Ptr(200 * bytesPerMB)},
+			rc:       RetentionConfig{MaxSize: new(uint64(200 * bytesPerMB))},
 			expected: uint64(200 * bytesPerMB / rotationSizeDiv),
 		},
 	}
@@ -216,10 +216,10 @@ func TestEffectiveRotateSize(t *testing.T) {
 
 func TestParseRetentionConfig(t *testing.T) {
 	jc := jsonRetentionConfig{
-		MaxSize:     stringPtr("10GB"),
+		MaxSize:     new("10GB"),
 		MaxDuration: nil,
 		RotateSize:  nil,
-		RotateDur:   stringPtr("1h"),
+		RotateDur:   new("1h"),
 	}
 	rc, err := parseRetentionConfig(jc)
 	if err != nil {
@@ -238,10 +238,10 @@ func TestParseRetentionConfig(t *testing.T) {
 
 func TestParseRetentionConfigBothNull(t *testing.T) {
 	jc := jsonRetentionConfig{
-		MaxSize:     stringPtr("null"),
+		MaxSize:     new("null"),
 		MaxDuration: nil,
 		RotateSize:  nil,
-		RotateDur:   stringPtr("1h"),
+		RotateDur:   new("1h"),
 	}
 	rc, err := parseRetentionConfig(jc)
 	if err != nil {
@@ -254,8 +254,8 @@ func TestParseRetentionConfigBothNull(t *testing.T) {
 
 func TestParseRetentionConfigInvalidSize(t *testing.T) {
 	jc := jsonRetentionConfig{
-		MaxSize:   stringPtr("xyz"),
-		RotateDur: stringPtr("1h"),
+		MaxSize:   new("xyz"),
+		RotateDur: new("1h"),
 	}
 	_, err := parseRetentionConfig(jc)
 	if err == nil {
@@ -265,7 +265,7 @@ func TestParseRetentionConfigInvalidSize(t *testing.T) {
 
 func TestParseRetentionConfigInvalidDuration(t *testing.T) {
 	jc := jsonRetentionConfig{
-		RotateDur: stringPtr("xyz"),
+		RotateDur: new("xyz"),
 	}
 	_, err := parseRetentionConfig(jc)
 	if err == nil {
@@ -283,7 +283,7 @@ func TestParseRetentionConfigRotationDurationDisabled(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			rc, err := parseRetentionConfig(jsonRetentionConfig{RotateDur: stringPtr(tc.value)})
+			rc, err := parseRetentionConfig(jsonRetentionConfig{RotateDur: new(tc.value)})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -303,6 +303,7 @@ func TestJournalRoot(t *testing.T) {
 	}
 }
 
+//go:fix inline
 func stringPtr(s string) *string {
-	return &s
+	return new(s)
 }

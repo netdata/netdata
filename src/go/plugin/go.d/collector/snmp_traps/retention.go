@@ -48,13 +48,7 @@ func (rc RetentionConfig) EffectiveRotateSize() uint64 {
 		return *rc.RotateSize
 	}
 	maxSize := rc.EffectiveMaxSize()
-	rot := maxSize / rotationSizeDiv
-	if rot < minRotationSize {
-		rot = minRotationSize
-	}
-	if rot > maxRotationSize {
-		rot = maxRotationSize
-	}
+	rot := min(max(maxSize/rotationSizeDiv, minRotationSize), maxRotationSize)
 	return rot
 }
 
@@ -224,12 +218,14 @@ func formatHumanSize(bytes uint64) string {
 	}
 }
 
+//go:fix inline
 func uint64Ptr(u uint64) *uint64 {
-	return &u
+	return new(u)
 }
 
+//go:fix inline
 func durationPtr(d time.Duration) *time.Duration {
-	return &d
+	return new(d)
 }
 
 func humanDuration(d time.Duration) string {

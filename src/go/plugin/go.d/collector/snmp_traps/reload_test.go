@@ -235,7 +235,7 @@ traps:
 	done := make(chan struct{})
 	var hits int64
 	go func() {
-		for i := 0; i < 1000; i++ {
+		for range 1000 {
 			idx := CurrentProfileIndex()
 			if idx != nil {
 				if idx.Lookup("1.3.6.1.6.3.1.1.5.3") != nil {
@@ -246,7 +246,7 @@ traps:
 		close(done)
 	}()
 
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		require.NoError(t, ReloadProfileCache())
 	}
 

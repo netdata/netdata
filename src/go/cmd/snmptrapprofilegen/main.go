@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -609,12 +610,7 @@ func scanSourceDir(root string) (sourceDirIndex, error) {
 
 func isMIBSourceFile(path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
-	for _, allowed := range mibSourceExtensions {
-		if ext == allowed {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(mibSourceExtensions, ext)
 }
 
 func sourceModuleConflicts(modulePaths map[string][]string) []SourceModuleConflict {
@@ -832,9 +828,7 @@ func classifyRecords(opts generatorOptions, records []TrapRecord) error {
 	results := make(chan classificationResult)
 	var wg sync.WaitGroup
 	for i := 0; i < opts.Concurrency; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for rec := range work {
 				c, err := classifyOne(client, opts, *rec)
 				if err != nil {
@@ -844,7 +838,7 @@ func classifyRecords(opts generatorOptions, records []TrapRecord) error {
 				applyClassification(rec, c)
 				results <- classificationResult{Classification: c}
 			}
-		}()
+		})
 	}
 	go func() {
 		for _, rec := range jobs {

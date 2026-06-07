@@ -6,16 +6,17 @@ import (
 	"context"
 	_ "embed"
 	"errors"
+	"maps"
 	"net"
 	"net/netip"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"golang.org/x/sys/unix"
 )
 
 //go:embed "config_schema.json"
@@ -211,7 +212,9 @@ func (c *Collector) Init(ctx context.Context) error {
 	var lid *LocalEngineID
 	var v3Table *gosnmp.SnmpV3SecurityParametersTable
 	var engineIDWhitelist map[string]struct{}
-	cleanupCreatedState := func() {}
+	cleanupCreatedState := func() {
+		// No engine-state files exist unless SNMPv3 setup below creates them.
+	}
 	if v3Enabled {
 		engineBootsExisted := engineStatePathExists(engineBootsPath(c.jobName))
 		localEngineIDExisted := engineStatePathExists(localEngineIDPath(c.jobName))
@@ -592,9 +595,7 @@ func (c *Collector) applyOverrides(td *TrapDef) *TrapDef {
 	cp := *td
 	if td.Labels != nil {
 		cp.Labels = make(map[string]string, len(td.Labels)+len(ov.Labels))
-		for k, v := range td.Labels {
-			cp.Labels[k] = v
-		}
+		maps.Copy(cp.Labels, td.Labels)
 	}
 	if ov.Category != "" {
 		cp.Category = ov.Category
@@ -606,9 +607,7 @@ func (c *Collector) applyOverrides(td *TrapDef) *TrapDef {
 		if cp.Labels == nil {
 			cp.Labels = make(map[string]string, len(ov.Labels))
 		}
-		for k, v := range ov.Labels {
-			cp.Labels[k] = v
-		}
+		maps.Copy(cp.Labels, ov.Labels)
 	}
 	return &cp
 }
@@ -649,20 +648,7 @@ func versionSet(versions []string) map[SnmpVersion]struct{} {
 }
 
 func versionListContains(versions []string, version string) bool {
-	for _, v := range versions {
-		if v == version {
-			return true
-		}
-	}
-	return false
-}
-
-func monotonicUsec() int64 {
-	var ts unix.Timespec
-	if err := unix.ClockGettime(unix.CLOCK_MONOTONIC, &ts); err != nil {
-		return time.Now().UnixMicro()
-	}
-	return ts.Sec*1_000_000 + ts.Nsec/1_000
+	return slices.Contains(versions, version)
 }
 
 type dyncfgCodedError struct {

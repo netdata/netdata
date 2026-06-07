@@ -557,7 +557,7 @@ func isNumericOID(oid string) bool {
 	if oid == "" || oid[0] == '.' || oid[len(oid)-1] == '.' {
 		return false
 	}
-	for _, part := range strings.Split(oid, ".") {
+	for part := range strings.SplitSeq(oid, ".") {
 		if part == "" {
 			return false
 		}

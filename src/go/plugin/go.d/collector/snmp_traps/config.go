@@ -173,7 +173,7 @@ func rejectUnknownYAMLKeys(node any, spec yamlKeySpec, path string) error {
 	}
 
 	switch v := node.(type) {
-	case map[interface{}]interface{}:
+	case map[any]any:
 		if spec.children == nil {
 			return nil
 		}
@@ -200,7 +200,7 @@ func rejectUnknownYAMLKeys(node any, spec yamlKeySpec, path string) error {
 				return err
 			}
 		}
-	case []interface{}:
+	case []any:
 		if spec.elem == nil {
 			return nil
 		}

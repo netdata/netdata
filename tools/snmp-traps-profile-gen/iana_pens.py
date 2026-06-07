@@ -34,9 +34,9 @@ Design choices (deliberately conservative to avoid silent miscategorisation):
 
 from __future__ import annotations
 
-import re
 import os
-from typing import Dict, Optional
+import re
+from typing import Dict, List, Optional
 
 
 # Well-anchored corporate suffixes. Each pattern is applied at end-of-string.
@@ -128,13 +128,18 @@ def _split_camel(s: str) -> str:
 
 def _strip_parentheticals(s: str) -> str:
     """Remove ``(...)`` aliases / URLs / history notes."""
-    # Repeat until stable so nested or repeated parens fully unwind.
-    prev = None
-    out = s
-    while out != prev:
-        prev = out
-        out = re.sub(r"\s*\([^)]*\)", "", out).strip()
-    return out
+    out: List[str] = []
+    depth = 0
+    for ch in s:
+        if ch == "(":
+            depth += 1
+            continue
+        if ch == ")" and depth > 0:
+            depth -= 1
+            continue
+        if depth == 0:
+            out.append(ch)
+    return " ".join("".join(out).split())
 
 
 def _strip_suffixes(org: str) -> str:

@@ -203,10 +203,10 @@ class CompilerHarness:
         def _writer(mib_name: str, json_doc: str, cbCtx: Any = None) -> None:
             try:
                 self.modules[mib_name] = json.loads(json_doc)
-            except Exception:
+            except Exception as exc:
                 # Malformed JSON from pysmi is exceptionally rare; record
                 # nothing here and let the caller see no module came out.
-                pass
+                logging.debug("pysmi emitted malformed JSON for %s: %s", mib_name, exc)
 
         self._writer = CallbackWriter(_writer)
         self._code_gen = JsonCodeGen()
@@ -520,12 +520,15 @@ def main() -> int:
     if args.resume and os.path.exists(out_jsonl):
         with open(out_jsonl) as f:
             for line in f:
+                rec = None
                 try:
                     rec = json.loads(line)
-                    if "mib" in rec:
-                        already_done.add(rec["mib"])
-                except Exception:
+                except Exception as exc:
+                    logging.debug("skipping malformed resume record: %s", exc)
+                if rec is None:
                     continue
+                if "mib" in rec:
+                    already_done.add(rec["mib"])
         stratify_log(f"Resuming; {len(already_done)} MIBs already in output.")
 
     harness = CompilerHarness(sources_with_packs)

@@ -100,7 +100,7 @@ func (eb *EngineBoots) init() error {
 func (eb *EngineBoots) persist() error {
 	tmpPath := eb.path + ".tmp"
 
-	if err := os.WriteFile(tmpPath, []byte(fmt.Sprintf("%d\n", eb.value)), 0640); err != nil {
+	if err := os.WriteFile(tmpPath, fmt.Appendf(nil, "%d\n", eb.value), 0640); err != nil {
 		return fmt.Errorf("engine-boots: write %s: %w", tmpPath, err)
 	}
 

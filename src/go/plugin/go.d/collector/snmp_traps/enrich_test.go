@@ -334,7 +334,7 @@ func TestEnrichTrapEntryReverseDNSEnabledSchedulesAsyncLookup(t *testing.T) {
 
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
-		if got := dns.lookupCached("203.0.113.10"); got == "peer.mydc.example.com" {
+		if dns.lookupCached("203.0.113.10") == "peer.mydc.example.com" {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)

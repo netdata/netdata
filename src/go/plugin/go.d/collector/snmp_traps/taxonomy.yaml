@@ -20,36 +20,36 @@ placements:
             contexts: [snmp.trap.events]
             chart_library: bars
             dimensions_sort: valueDesc
-            layout: { left: 0, top: 0, width: 3, height: 4 }
+            layout: {left: 0, top: 0, width: 3, height: 4}
           - type: context
             title: Events by Severity
             contexts: [snmp.trap.severity]
             chart_library: bars
             dimensions_sort: valueDesc
-            layout: { left: 3, top: 0, width: 3, height: 4 }
+            layout: {left: 3, top: 0, width: 3, height: 4}
           - type: context
             title: Processing Errors
             contexts: [snmp.trap.errors]
             chart_library: bars
             dimensions_sort: valueDesc
-            layout: { left: 6, top: 0, width: 3, height: 4 }
+            layout: {left: 6, top: 0, width: 3, height: 4}
           - type: context
             title: Dedup Suppressed
             contexts: [snmp.trap.dedup_suppressed]
             chart_library: dygraph
             group_by: [selected]
-            layout: { left: 9, top: 0, width: 3, height: 4 }
+            layout: {left: 9, top: 0, width: 3, height: 4}
       - type: group
         id: trap-events
         title: Trap Events
-        properties: { grouping: true }
+        properties: {grouping: true}
         items:
           - snmp.trap.events
           - snmp.trap.severity
       - type: group
         id: pipeline-health
         title: Pipeline Health
-        properties: { grouping: true }
+        properties: {grouping: true}
         items:
           - snmp.trap.errors
           - snmp.trap.dedup_suppressed

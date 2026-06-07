@@ -71,4 +71,6 @@ func (h *profileReloadHandler) Handle(_ context.Context, method string, _ funcap
 	}
 }
 
-func (h *profileReloadHandler) Cleanup(_ context.Context) {}
+func (h *profileReloadHandler) Cleanup(_ context.Context) {
+	// Reload uses the collector-owned profile cache and has no handler-local state.
+}

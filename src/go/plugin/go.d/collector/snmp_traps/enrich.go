@@ -17,7 +17,7 @@ import (
 
 type reverseDNSResolver struct {
 	mu          sync.RWMutex
-	ctx         context.Context
+	ctx         context.Context // NOSONAR: resolver owns async lookup cancellation for its lifetime.
 	cancel      context.CancelFunc
 	timeout     time.Duration
 	ttl         time.Duration

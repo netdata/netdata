@@ -50,33 +50,51 @@ func buildV3Trap(t *testing.T, user string, trapOID string, extra ...gosnmp.Snmp
 
 func buildV3TrapWithEngineID(t *testing.T, user, engineIDHex, trapOID string, extra ...gosnmp.SnmpPDU) []byte {
 	t.Helper()
-	return buildV3SecuredTrap(t, user, engineIDHex, "none", "none", "", "", trapOID, extra...)
+	return buildV3SecuredTrap(t, v3SecuredTrapSpec{
+		user:        user,
+		engineIDHex: engineIDHex,
+		authProto:   "none",
+		privProto:   "none",
+		trapOID:     trapOID,
+		extra:       extra,
+	})
 }
 
-func buildV3SecuredTrap(t *testing.T, user, engineIDHex, authProto, privProto, authKey, privKey, trapOID string, extra ...gosnmp.SnmpPDU) []byte {
-	t.Helper()
-	return buildV3SecuredPDU(t, gosnmp.SNMPv2Trap, user, engineIDHex, authProto, privProto, authKey, privKey, trapOID, extra...)
+type v3SecuredTrapSpec struct {
+	user        string
+	engineIDHex string
+	authProto   string
+	privProto   string
+	authKey     string
+	privKey     string
+	trapOID     string
+	extra       []gosnmp.SnmpPDU
 }
 
-func buildV3SecuredInform(t *testing.T, user, engineIDHex, authProto, privProto, authKey, privKey, trapOID string, extra ...gosnmp.SnmpPDU) []byte {
+func buildV3SecuredTrap(t *testing.T, spec v3SecuredTrapSpec) []byte {
 	t.Helper()
-	return buildV3SecuredPDU(t, gosnmp.InformRequest, user, engineIDHex, authProto, privProto, authKey, privKey, trapOID, extra...)
+	return buildV3SecuredPDU(t, gosnmp.SNMPv2Trap, spec)
 }
 
-func buildV3SecuredPDU(t *testing.T, pduType gosnmp.PDUType, user, engineIDHex, authProto, privProto, authKey, privKey, trapOID string, extra ...gosnmp.SnmpPDU) []byte {
+func buildV3SecuredInform(t *testing.T, spec v3SecuredTrapSpec) []byte {
 	t.Helper()
-	engineID, err := hex.DecodeString(engineIDHex)
+	return buildV3SecuredPDU(t, gosnmp.InformRequest, spec)
+}
+
+func buildV3SecuredPDU(t *testing.T, pduType gosnmp.PDUType, spec v3SecuredTrapSpec) []byte {
+	t.Helper()
+	engineID, err := hex.DecodeString(spec.engineIDHex)
 	if err != nil {
 		t.Fatalf("invalid test engine ID: %v", err)
 	}
-	authProto = strings.ToLower(authProto)
-	privProto = strings.ToLower(privProto)
+	authProto := strings.ToLower(spec.authProto)
+	privProto := strings.ToLower(spec.privProto)
 	sp := &gosnmp.UsmSecurityParameters{
-		UserName:                 user,
+		UserName:                 spec.user,
 		AuthenticationProtocol:   snmpV3AuthProto(authProto),
-		AuthenticationPassphrase: authKey,
+		AuthenticationPassphrase: spec.authKey,
 		PrivacyProtocol:          snmpV3PrivProto(privProto),
-		PrivacyPassphrase:        privKey,
+		PrivacyPassphrase:        spec.privKey,
 		AuthoritativeEngineID:    string(engineID),
 		AuthoritativeEngineBoots: 1,
 		AuthoritativeEngineTime:  1,
@@ -93,9 +111,9 @@ func buildV3SecuredPDU(t *testing.T, pduType gosnmp.PDUType, user, engineIDHex, 
 	}
 	pdus := []gosnmp.SnmpPDU{
 		{Name: sysUpTimeOID, Type: gosnmp.TimeTicks, Value: uint32(10)},
-		{Name: snmpTrapOIDOID, Type: gosnmp.ObjectIdentifier, Value: trapOID},
+		{Name: snmpTrapOIDOID, Type: gosnmp.ObjectIdentifier, Value: spec.trapOID},
 	}
-	pdus = append(pdus, extra...)
+	pdus = append(pdus, spec.extra...)
 	data, err := g.SnmpEncodePacket(pduType, pdus, 0, 0)
 	if err != nil {
 		t.Fatalf("failed to marshal v3 %s test packet: %v", pduType, err)
@@ -533,7 +551,14 @@ func TestV3DecodeAuthProtocols(t *testing.T) {
 
 	for name, authProto := range tests {
 		t.Run(name, func(t *testing.T) {
-			data := buildV3SecuredTrap(t, "testuser", testEngineIDHex, authProto, "none", "authpassword", "", "1.3.6.1.6.3.1.1.5.1")
+			data := buildV3SecuredTrap(t, v3SecuredTrapSpec{
+				user:        "testuser",
+				engineIDHex: testEngineIDHex,
+				authProto:   authProto,
+				privProto:   "none",
+				authKey:     "authpassword",
+				trapOID:     "1.3.6.1.6.3.1.1.5.1",
+			})
 			tbl, err := buildSnmpV3SecurityTable([]USMUserConfig{{
 				Username:  "testuser",
 				EngineID:  testEngineIDHex,
@@ -565,7 +590,15 @@ func TestV3DecodePrivacyProtocols(t *testing.T) {
 
 	for name, privProto := range tests {
 		t.Run(name, func(t *testing.T) {
-			data := buildV3SecuredTrap(t, "testuser", testEngineIDHex, "sha256", privProto, "authpassword", "privpassword", "1.3.6.1.6.3.1.1.5.1")
+			data := buildV3SecuredTrap(t, v3SecuredTrapSpec{
+				user:        "testuser",
+				engineIDHex: testEngineIDHex,
+				authProto:   "sha256",
+				privProto:   privProto,
+				authKey:     "authpassword",
+				privKey:     "privpassword",
+				trapOID:     "1.3.6.1.6.3.1.1.5.1",
+			})
 			tbl, err := buildSnmpV3SecurityTable([]USMUserConfig{{
 				Username:  "testuser",
 				EngineID:  testEngineIDHex,

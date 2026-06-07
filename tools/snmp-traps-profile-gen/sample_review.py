@@ -15,7 +15,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import sys
 from collections import Counter
 from typing import Any, Dict, List, Optional
@@ -39,11 +38,15 @@ def main() -> int:
         if not fn.endswith(".json"):
             continue
         path = os.path.join(args.in_dir, fn)
+        record = None
         try:
             with open(path) as f:
-                records.append(json.load(f))
-        except Exception:
+                record = json.load(f)
+        except Exception as exc:
+            print(f"Skipping malformed sample record {path}: {exc}", file=sys.stderr)
+        if record is None:
             continue
+        records.append(record)
 
     # Aggregate stats first.
     cat_counter = Counter(r.get("category") or "unknown" for r in records)

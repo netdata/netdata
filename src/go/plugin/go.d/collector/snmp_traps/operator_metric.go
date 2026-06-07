@@ -5,6 +5,7 @@ package snmp_traps
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -270,9 +271,7 @@ func metricDimensionBoundFromVarbind(vb *VarbindDef) (metricDimensionBound, bool
 			return metricDimensionBound{}, false
 		}
 		enum := make(map[string]string, len(vb.Enum))
-		for key, label := range vb.Enum {
-			enum[key] = label
-		}
+		maps.Copy(enum, vb.Enum)
 		return metricDimensionBound{kind: metricDimensionEnum, enum: enum}, true
 	}
 	switch strings.ToLower(vb.Type) {
@@ -391,9 +390,7 @@ func (om *operatorMetrics) collect(store metrix.CollectorStore, jobName string) 
 
 		m.dimMu.Lock()
 		dimSnapshot := make(map[string]*atomic.Uint64, len(m.dimCounts))
-		for k, v := range m.dimCounts {
-			dimSnapshot[k] = v
-		}
+		maps.Copy(dimSnapshot, m.dimCounts)
 		m.dimMu.Unlock()
 
 		for dimVal, ctr := range dimSnapshot {

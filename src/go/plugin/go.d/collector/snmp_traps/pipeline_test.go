@@ -720,7 +720,15 @@ func TestCollectorHandlePacketClassifiesAuthFailureUnknownV3EngineID(t *testing.
 	defer removeJobMetrics(jobName)
 
 	otherEngineID := "80001f888077dfe44faa700259"
-	data := buildV3SecuredTrap(t, "testuser", testEngineIDHex, "sha256", "aes", "authpassword", "privpassword", "1.3.6.1.6.3.1.1.5.1")
+	data := buildV3SecuredTrap(t, v3SecuredTrapSpec{
+		user:        "testuser",
+		engineIDHex: testEngineIDHex,
+		authProto:   "sha256",
+		privProto:   "aes",
+		authKey:     "authpassword",
+		privKey:     "privpassword",
+		trapOID:     "1.3.6.1.6.3.1.1.5.1",
+	})
 	secTable, err := buildSnmpV3SecurityTable([]USMUserConfig{{
 		Username:  "testuser",
 		EngineID:  otherEngineID,
@@ -1090,7 +1098,7 @@ func TestRateLimiterAllow(t *testing.T) {
 	rl := newRateLimiter(true, 100, "drop")
 	addr := netip.MustParseAddr("10.1.2.3")
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		if allowed, _ := rl.Allow(addr); !allowed && i < 100 {
 			t.Fatalf("token bucket exhausted too early at iteration %d", i)
 		}

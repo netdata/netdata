@@ -229,12 +229,10 @@ func TestDynamicEngineIDConcurrentDuplicateRegistration(t *testing.T) {
 
 	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
 	var wg sync.WaitGroup
-	for i := 0; i < 16; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 16 {
+		wg.Go(func() {
 			c.handlePacket(data, peer.IP, nil, peer)
-		}()
+		})
 	}
 	wg.Wait()
 

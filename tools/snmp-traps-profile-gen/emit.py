@@ -28,7 +28,7 @@ import os
 import re
 import sys
 from collections import OrderedDict
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 import yaml
 
@@ -65,7 +65,7 @@ def vendor_for_oid(oid: str) -> str:
     """
     if not oid:
         return "unknown"
-    if oid.startswith("1.3.6.1.2.1.") or oid.startswith("1.3.6.1.6.3."):
+    if oid.startswith(("1.3.6.1.2.1.", "1.3.6.1.6.3.")):
         return "standard"
     if oid.startswith("1.0.8802."):
         # IEEE 802.1AB-2005 (LLDP) and related IEEE Std MIBs.
@@ -231,12 +231,14 @@ def main() -> int:
         if not fn.endswith(".json"):
             continue
         path = os.path.join(args.in_dir, fn)
+        rec = None
         try:
             with open(path) as f:
                 rec = json.load(f)
         except Exception as exc:
             logging.warning("skip %s: %s", path, exc)
             n_skipped += 1
+        if rec is None:
             continue
         n_in += 1
         oid = rec.get("oid") or ""
@@ -255,6 +257,7 @@ def main() -> int:
         entries = [build_profile_entry(r, inline_by_oid) for r in recs_sorted]
         out_path = os.path.join(args.out_dir, f"{vendor}.yaml")
         mibs = sorted({r.get("mib") for r in recs_sorted if r.get("mib")})
+
         def qualified_name(r: Dict[str, Any]) -> str:
             sym = r.get("name")
             mib = r.get("mib")

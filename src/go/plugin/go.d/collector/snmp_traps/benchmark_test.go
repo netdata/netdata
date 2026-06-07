@@ -184,7 +184,7 @@ func BenchmarkMultiJob(b *testing.B) {
 			writers := make([]*countingWriter, numJobs)
 			collectors := make([]*Collector, numJobs)
 			peers := make([]net.IP, numJobs)
-			for i := 0; i < numJobs; i++ {
+			for i := range numJobs {
 				jn := fmt.Sprintf("bm-multi-%d", i)
 				peers[i] = net.ParseIP(fmt.Sprintf("10.1.2.%d", i+1))
 				writers[i] = &countingWriter{}
@@ -202,7 +202,7 @@ func BenchmarkMultiJob(b *testing.B) {
 			var wg sync.WaitGroup
 			perJob := b.N / numJobs
 			remainder := b.N % numJobs
-			for i := 0; i < numJobs; i++ {
+			for i := range numJobs {
 				count := perJob
 				if i < remainder {
 					count++
@@ -210,7 +210,7 @@ func BenchmarkMultiJob(b *testing.B) {
 				wg.Add(1)
 				go func(jobIdx, iterations int) {
 					defer wg.Done()
-					for j := 0; j < iterations; j++ {
+					for range iterations {
 						pkt := make([]byte, len(data))
 						copy(pkt, data)
 						collectors[jobIdx].handlePacket(pkt, peers[jobIdx], nil, nil)
@@ -241,10 +241,7 @@ func BenchmarkMultiJob(b *testing.B) {
 
 func reportDrops(b *testing.B, packets, entries int64) {
 	b.Helper()
-	drops := packets - entries
-	if drops < 0 {
-		drops = 0
-	}
+	drops := max(packets-entries, 0)
 	b.ReportMetric(float64(drops), "drops")
 	if packets > 0 {
 		b.ReportMetric(100*float64(drops)/float64(packets), "drop_pct")

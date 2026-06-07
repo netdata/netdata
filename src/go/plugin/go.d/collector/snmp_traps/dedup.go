@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -259,9 +260,7 @@ func (d *trapDeduper) snapshotSummary() *DedupSummary {
 		return nil
 	}
 	byTrap := make(map[string]int64, len(d.period.byTrap))
-	for oid, count := range d.period.byTrap {
-		byTrap[oid] = count
-	}
+	maps.Copy(byTrap, d.period.byTrap)
 	summary := &DedupSummary{
 		TotalSuppressed: d.period.total,
 		PeriodSec:       int64(d.window / time.Second),
