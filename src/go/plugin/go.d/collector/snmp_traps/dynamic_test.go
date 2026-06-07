@@ -75,33 +75,9 @@ func TestExtractRawV3ContextReportableDiscoveryProbe(t *testing.T) {
 
 func TestDynamicEngineIDTrapRegistration(t *testing.T) {
 	const jobName = "test-dynamic-engine"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
 
 	data := clearV3ReportableFlag(t, buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1"))
-	secTable, err := buildSnmpV3SecurityTable([]USMUserConfig{{
-		Username:  "testuser",
-		AuthProto: "none",
-		PrivProto: "none",
-	}}, true)
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-	}
-	user := USMUserConfig{Username: "testuser", AuthProto: "none", PrivProto: "none"}
-	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:            jobName,
-		trapWriter:         writer,
-		Config:             Config{USMUsers: []USMUserConfig{user}},
-		versions:           map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:          NewAllowlist(nil, nil),
-		v3SecTable:         secTable,
-		dynamicEngineID:    true,
-		dynamicEngineIDMax: defaultDynamicEngineIDMax,
-		dynamicEngineIDReg: newDynamicEngineIDRegistry(secTable, defaultDynamicEngineIDMax, nil, []USMUserConfig{user}),
-	}
-
-	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
+	c, writer, peer := newDynamicEngineIDTestCollector(t, jobName, data, nil)
 	c.handlePacket(data, peer.IP, nil, peer)
 	c.handlePacket(data, peer.IP, nil, peer)
 
@@ -119,35 +95,17 @@ func TestDynamicEngineIDTrapRegistration(t *testing.T) {
 
 func TestDynamicEngineIDCapRejectsNewPairs(t *testing.T) {
 	const jobName = "test-dynamic-engine-cap"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
 
-	secTable, err := buildSnmpV3SecurityTable([]USMUserConfig{{Username: "testuser", AuthProto: "none", PrivProto: "none"}}, true)
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-	}
-	user := USMUserConfig{Username: "testuser", AuthProto: "none", PrivProto: "none"}
-	c := &Collector{
-		jobName:            jobName,
-		trapWriter:         &mockTrapWriter{},
-		Config:             Config{USMUsers: []USMUserConfig{user}},
-		versions:           map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:          NewAllowlist(nil, nil),
-		v3SecTable:         secTable,
-		dynamicEngineID:    true,
-		dynamicEngineIDMax: 1,
-		dynamicEngineIDReg: newDynamicEngineIDRegistry(secTable, 1, nil, []USMUserConfig{user}),
-	}
-
-	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
 	first := clearV3ReportableFlag(t, buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1"))
 	secondEngineID := "80001f888077dfe44faa700259"
 	second := clearV3ReportableFlag(t, buildV3TrapWithEngineID(t, "testuser", secondEngineID, "1.3.6.1.6.3.1.1.5.1"))
+	c, writer, peer := newDynamicEngineIDTestCollector(t, jobName, first, func(c *Collector) {
+		c.dynamicEngineIDMax = 1
+	})
 
 	c.handlePacket(first, peer.IP, nil, peer)
 	c.handlePacket(second, peer.IP, nil, peer)
 
-	writer := c.trapWriter.(*mockTrapWriter)
 	if got := len(writer.entries); got != 1 {
 		t.Fatalf("journaled entries = %d, want 1", got)
 	}
@@ -162,33 +120,9 @@ func TestDynamicEngineIDCapRejectsNewPairs(t *testing.T) {
 
 func TestDynamicEngineIDSkipsReportableTrap(t *testing.T) {
 	const jobName = "test-dynamic-engine-reportable"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
 
 	data := buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
-	secTable, err := buildSnmpV3SecurityTable([]USMUserConfig{{
-		Username:  "testuser",
-		AuthProto: "none",
-		PrivProto: "none",
-	}}, true)
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-	}
-	user := USMUserConfig{Username: "testuser", AuthProto: "none", PrivProto: "none"}
-	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:            jobName,
-		trapWriter:         writer,
-		Config:             Config{USMUsers: []USMUserConfig{user}},
-		versions:           map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:          NewAllowlist(nil, nil),
-		v3SecTable:         secTable,
-		dynamicEngineID:    true,
-		dynamicEngineIDMax: defaultDynamicEngineIDMax,
-		dynamicEngineIDReg: newDynamicEngineIDRegistry(secTable, defaultDynamicEngineIDMax, nil, []USMUserConfig{user}),
-	}
-
-	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
+	c, writer, peer := newDynamicEngineIDTestCollector(t, jobName, data, nil)
 	c.handlePacket(data, peer.IP, nil, peer)
 
 	if got := len(writer.entries); got != 0 {
@@ -201,33 +135,9 @@ func TestDynamicEngineIDSkipsReportableTrap(t *testing.T) {
 
 func TestDynamicEngineIDConcurrentDuplicateRegistration(t *testing.T) {
 	const jobName = "test-dynamic-engine-concurrent"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
 
 	data := clearV3ReportableFlag(t, buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1"))
-	secTable, err := buildSnmpV3SecurityTable([]USMUserConfig{{
-		Username:  "testuser",
-		AuthProto: "none",
-		PrivProto: "none",
-	}}, true)
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-	}
-	user := USMUserConfig{Username: "testuser", AuthProto: "none", PrivProto: "none"}
-	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:            jobName,
-		trapWriter:         writer,
-		Config:             Config{USMUsers: []USMUserConfig{user}},
-		versions:           map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:          NewAllowlist(nil, nil),
-		v3SecTable:         secTable,
-		dynamicEngineID:    true,
-		dynamicEngineIDMax: defaultDynamicEngineIDMax,
-		dynamicEngineIDReg: newDynamicEngineIDRegistry(secTable, defaultDynamicEngineIDMax, nil, []USMUserConfig{user}),
-	}
-
-	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
+	c, writer, peer := newDynamicEngineIDTestCollector(t, jobName, data, nil)
 	var wg sync.WaitGroup
 	for range 16 {
 		wg.Go(func() {
@@ -253,33 +163,9 @@ func TestDynamicEngineIDConcurrentDuplicateRegistration(t *testing.T) {
 
 func TestDynamicEngineIDDoesNotRegisterInformRetry(t *testing.T) {
 	const jobName = "test-dynamic-engine-inform"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
 
 	data := clearV3ReportableFlag(t, buildV3InformWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1"))
-	secTable, err := buildSnmpV3SecurityTable([]USMUserConfig{{
-		Username:  "testuser",
-		AuthProto: "none",
-		PrivProto: "none",
-	}}, true)
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-	}
-	user := USMUserConfig{Username: "testuser", AuthProto: "none", PrivProto: "none"}
-	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:            jobName,
-		trapWriter:         writer,
-		Config:             Config{USMUsers: []USMUserConfig{user}},
-		versions:           map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:          NewAllowlist(nil, nil),
-		v3SecTable:         secTable,
-		dynamicEngineID:    true,
-		dynamicEngineIDMax: defaultDynamicEngineIDMax,
-		dynamicEngineIDReg: newDynamicEngineIDRegistry(secTable, defaultDynamicEngineIDMax, nil, []USMUserConfig{user}),
-	}
-
-	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
+	c, writer, peer := newDynamicEngineIDTestCollector(t, jobName, data, nil)
 	c.handlePacket(data, peer.IP, nil, peer)
 
 	if got := len(writer.entries); got != 0 {
@@ -292,33 +178,9 @@ func TestDynamicEngineIDDoesNotRegisterInformRetry(t *testing.T) {
 
 func TestDynamicEngineIDNoStateForUnknownUsername(t *testing.T) {
 	const jobName = "test-dynamic-engine-unknown-user"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
 
 	data := clearV3ReportableFlag(t, buildV3TrapWithEngineID(t, "otheruser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1"))
-	secTable, err := buildSnmpV3SecurityTable([]USMUserConfig{{
-		Username:  "testuser",
-		AuthProto: "none",
-		PrivProto: "none",
-	}}, true)
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-	}
-	user := USMUserConfig{Username: "testuser", AuthProto: "none", PrivProto: "none"}
-	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:            jobName,
-		trapWriter:         writer,
-		Config:             Config{USMUsers: []USMUserConfig{user}},
-		versions:           map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:          NewAllowlist(nil, nil),
-		v3SecTable:         secTable,
-		dynamicEngineID:    true,
-		dynamicEngineIDMax: defaultDynamicEngineIDMax,
-		dynamicEngineIDReg: newDynamicEngineIDRegistry(secTable, defaultDynamicEngineIDMax, nil, []USMUserConfig{user}),
-	}
-
-	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
+	c, writer, peer := newDynamicEngineIDTestCollector(t, jobName, data, nil)
 	c.handlePacket(data, peer.IP, nil, peer)
 
 	if got := len(writer.entries); got != 0 {
@@ -331,40 +193,18 @@ func TestDynamicEngineIDNoStateForUnknownUsername(t *testing.T) {
 
 func TestDynamicEngineIDRateLimitDropSkipsRetry(t *testing.T) {
 	const jobName = "test-dynamic-engine-rate-drop"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
 
 	data := clearV3ReportableFlag(t, buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1"))
-	secTable, err := buildSnmpV3SecurityTable([]USMUserConfig{{
-		Username:  "testuser",
-		AuthProto: "none",
-		PrivProto: "none",
-	}}, true)
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-	}
-	user := USMUserConfig{Username: "testuser", AuthProto: "none", PrivProto: "none"}
-	writer := &mockTrapWriter{}
 	rl := newRateLimiter(true, 1, "drop")
-	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
+	c, writer, peer := newDynamicEngineIDTestCollector(t, jobName, data, func(c *Collector) {
+		c.rateLimiter = rl
+	})
 	srcAddr, ok := udpPeerAddr(peer)
 	if !ok {
 		t.Fatal("failed to convert UDP peer address")
 	}
 	if allowed, _ := rl.Allow(srcAddr); !allowed {
 		t.Fatal("expected first token to be available")
-	}
-	c := &Collector{
-		jobName:            jobName,
-		trapWriter:         writer,
-		Config:             Config{USMUsers: []USMUserConfig{user}},
-		versions:           map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:          NewAllowlist(nil, nil),
-		rateLimiter:        rl,
-		v3SecTable:         secTable,
-		dynamicEngineID:    true,
-		dynamicEngineIDMax: defaultDynamicEngineIDMax,
-		dynamicEngineIDReg: newDynamicEngineIDRegistry(secTable, defaultDynamicEngineIDMax, nil, []USMUserConfig{user}),
 	}
 
 	c.handlePacket(data, peer.IP, nil, peer)
@@ -383,40 +223,18 @@ func TestDynamicEngineIDRateLimitDropSkipsRetry(t *testing.T) {
 
 func TestDynamicEngineIDRateLimitSampleAllowsRetry(t *testing.T) {
 	const jobName = "test-dynamic-engine-rate-sample"
-	removeJobMetrics(jobName)
-	defer removeJobMetrics(jobName)
 
 	data := clearV3ReportableFlag(t, buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1"))
-	secTable, err := buildSnmpV3SecurityTable([]USMUserConfig{{
-		Username:  "testuser",
-		AuthProto: "none",
-		PrivProto: "none",
-	}}, true)
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-	}
-	user := USMUserConfig{Username: "testuser", AuthProto: "none", PrivProto: "none"}
-	writer := &mockTrapWriter{}
 	rl := newRateLimiter(true, 1, "sample")
-	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
+	c, writer, peer := newDynamicEngineIDTestCollector(t, jobName, data, func(c *Collector) {
+		c.rateLimiter = rl
+	})
 	srcAddr, ok := udpPeerAddr(peer)
 	if !ok {
 		t.Fatal("failed to convert UDP peer address")
 	}
 	if allowed, _ := rl.Allow(srcAddr); !allowed {
 		t.Fatal("expected first token to be available")
-	}
-	c := &Collector{
-		jobName:            jobName,
-		trapWriter:         writer,
-		Config:             Config{USMUsers: []USMUserConfig{user}},
-		versions:           map[SnmpVersion]struct{}{SnmpVersionV3: {}},
-		allowlist:          NewAllowlist(nil, nil),
-		rateLimiter:        rl,
-		v3SecTable:         secTable,
-		dynamicEngineID:    true,
-		dynamicEngineIDMax: defaultDynamicEngineIDMax,
-		dynamicEngineIDReg: newDynamicEngineIDRegistry(secTable, defaultDynamicEngineIDMax, nil, []USMUserConfig{user}),
 	}
 
 	c.handlePacket(data, peer.IP, nil, peer)

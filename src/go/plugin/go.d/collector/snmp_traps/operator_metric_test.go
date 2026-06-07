@@ -132,72 +132,60 @@ func newTestOperatorMetrics(t *testing.T, cfg []MetricConfig) *operatorMetrics {
 	return newOperatorMetrics(cfg, makeTestProfileIndex(t))
 }
 
+func assertMetricDimensionBucket(t *testing.T, om *operatorMetrics, rawValue, bucket, reason string) {
+	t.Helper()
+
+	om.metrics[0].dimMu.Lock()
+	_, rawSeen := om.metrics[0].dimCounts[rawValue]
+	ctr, bucketSeen := om.metrics[0].dimCounts[bucket]
+	om.metrics[0].dimMu.Unlock()
+	if rawSeen {
+		t.Fatalf("%s leaked raw metric dimension %q", reason, rawValue)
+	}
+	if !bucketSeen || ctr.Load() != 1 {
+		count := uint64(0)
+		if ctr != nil {
+			count = ctr.Load()
+		}
+		t.Fatalf("%s bucket %q = seen %v count %d, want seen true count 1", reason, bucket, bucketSeen, count)
+	}
+}
+
 func TestValidateMetricsSuccess(t *testing.T) {
 	idx := makeTestProfileIndex(t)
 
-	t.Run("single-dim metric", func(t *testing.T) {
-		cfg := []MetricConfig{
+	tests := map[string][]MetricConfig{
+		"single-dim metric": {
 			{OID: "1.3.6.1.4.1.9.9.43.2.0.1", Context: "snmp.trap.cisco_config_changes"},
-		}
-		if err := validateMetrics(cfg, idx); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("dimension_from_varbind enum-backed", func(t *testing.T) {
-		cfg := []MetricConfig{
+		},
+		"dimension_from_varbind enum-backed": {
 			{OID: "1.3.6.1.4.1.9.9.43.2.0.1", Context: "snmp.trap.cisco_config", DimensionFromVarbind: "ccmHistoryEventTerminalType"},
-		}
-		if err := validateMetrics(cfg, idx); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("dimension_from_varbind numeric-range", func(t *testing.T) {
-		cfg := []MetricConfig{
+		},
+		"dimension_from_varbind numeric-range": {
 			{OID: "1.3.6.1.4.1.9.9.43.2.0.1", Context: "snmp.trap.cisco_config", DimensionFromVarbind: "ccmHistoryEventCommandSource"},
-		}
-		if err := validateMetrics(cfg, idx); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("dimension_from_varbind integer-range on port-security ifIndex", func(t *testing.T) {
-		cfg := []MetricConfig{
+		},
+		"dimension_from_varbind integer-range on port-security ifIndex": {
 			{OID: "1.3.6.1.4.1.9.9.46.2.0.1", Context: "snmp.trap.port_security", DimensionFromVarbind: "ifIndex"},
-		}
-		if err := validateMetrics(cfg, idx); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("dimension_from_varbind boolean truthvalue", func(t *testing.T) {
-		cfg := []MetricConfig{
+		},
+		"dimension_from_varbind boolean truthvalue": {
 			{OID: "1.3.6.1.4.1.9.9.43.2.0.1", Context: "snmp.trap.cisco_config_enabled", DimensionFromVarbind: "ccmHistoryEventEnabled"},
-		}
-		if err := validateMetrics(cfg, idx); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("multiple metrics", func(t *testing.T) {
-		cfg := []MetricConfig{
+		},
+		"multiple metrics": {
 			{OID: "1.3.6.1.4.1.9.9.43.2.0.1", Context: "snmp.trap.config"},
 			{OID: "1.3.6.1.6.3.1.1.5.1", Context: "snmp.trap.cold_start"},
-		}
-		if err := validateMetrics(cfg, idx); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("SMIv1 and SMIv2 alternate OID spelling", func(t *testing.T) {
-		cfg := []MetricConfig{
+		},
+		"SMIv1 and SMIv2 alternate OID spelling": {
 			{OID: "1.3.6.1.6.3.1.1.5.0.1", Context: "snmp.trap.cold_start"},
-		}
-		if err := validateMetrics(cfg, idx); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+		},
+	}
+
+	for name, cfg := range tests {
+		t.Run(name, func(t *testing.T) {
+			if err := validateMetrics(cfg, idx); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
 }
 
 func TestValidateMetricsFailures(t *testing.T) {
@@ -496,21 +484,7 @@ func TestOperatorMetricsDimensionValuesStayBoundedAtRuntime(t *testing.T) {
 
 		om.inc(cfg[0].OID, entry, td)
 
-		om.metrics[0].dimMu.Lock()
-		_, rawSeen := om.metrics[0].dimCounts["99"]
-		ctr, unknownSeen := om.metrics[0].dimCounts["unknown"]
-		om.metrics[0].dimMu.Unlock()
-		if rawSeen {
-			t.Fatal("raw unknown enum value leaked into metric dimension")
-		}
-		if !unknownSeen || ctr.Load() != 1 {
-			t.Fatalf("unknown enum bucket = seen %v count %d, want seen true count 1", unknownSeen, func() uint64 {
-				if ctr == nil {
-					return 0
-				}
-				return ctr.Load()
-			}())
-		}
+		assertMetricDimensionBucket(t, om, "99", "unknown", "unknown enum")
 	})
 
 	t.Run("out of range numeric value", func(t *testing.T) {
@@ -528,21 +502,7 @@ func TestOperatorMetricsDimensionValuesStayBoundedAtRuntime(t *testing.T) {
 
 		om.inc(cfg[0].OID, entry, td)
 
-		om.metrics[0].dimMu.Lock()
-		_, rawSeen := om.metrics[0].dimCounts["99"]
-		ctr, outOfRangeSeen := om.metrics[0].dimCounts["out_of_range"]
-		om.metrics[0].dimMu.Unlock()
-		if rawSeen {
-			t.Fatal("raw out-of-range numeric value leaked into metric dimension")
-		}
-		if !outOfRangeSeen || ctr.Load() != 1 {
-			t.Fatalf("out_of_range bucket = seen %v count %d, want seen true count 1", outOfRangeSeen, func() uint64 {
-				if ctr == nil {
-					return 0
-				}
-				return ctr.Load()
-			}())
-		}
+		assertMetricDimensionBucket(t, om, "99", "out_of_range", "out-of-range numeric")
 	})
 
 	t.Run("expanded enum after reload stays bounded", func(t *testing.T) {
@@ -571,21 +531,7 @@ func TestOperatorMetricsDimensionValuesStayBoundedAtRuntime(t *testing.T) {
 
 		om.inc(cfg[0].OID, entry, reloadedTrap)
 
-		om.metrics[0].dimMu.Lock()
-		_, rawSeen := om.metrics[0].dimCounts["value_"+strconv.Itoa(maxBoundedVarbindValues+1)]
-		ctr, unknownSeen := om.metrics[0].dimCounts["unknown"]
-		om.metrics[0].dimMu.Unlock()
-		if rawSeen {
-			t.Fatal("expanded enum value leaked into metric dimension")
-		}
-		if !unknownSeen || ctr.Load() != 1 {
-			t.Fatalf("unknown bucket = seen %v count %d, want seen true count 1", unknownSeen, func() uint64 {
-				if ctr == nil {
-					return 0
-				}
-				return ctr.Load()
-			}())
-		}
+		assertMetricDimensionBucket(t, om, "value_"+strconv.Itoa(maxBoundedVarbindValues+1), "unknown", "expanded enum")
 	})
 
 	t.Run("enum label rename after reload keeps job labels stable", func(t *testing.T) {
@@ -664,21 +610,7 @@ func TestOperatorMetricsDimensionValuesStayBoundedAtRuntime(t *testing.T) {
 
 		om.inc(cfg[0].OID, entry, reloadedTrap)
 
-		om.metrics[0].dimMu.Lock()
-		_, rawSeen := om.metrics[0].dimCounts["99"]
-		ctr, outOfRangeSeen := om.metrics[0].dimCounts["out_of_range"]
-		om.metrics[0].dimMu.Unlock()
-		if rawSeen {
-			t.Fatal("expanded numeric range value leaked into metric dimension")
-		}
-		if !outOfRangeSeen || ctr.Load() != 1 {
-			t.Fatalf("out_of_range bucket = seen %v count %d, want seen true count 1", outOfRangeSeen, func() uint64 {
-				if ctr == nil {
-					return 0
-				}
-				return ctr.Load()
-			}())
-		}
+		assertMetricDimensionBucket(t, om, "99", "out_of_range", "expanded numeric range")
 	})
 
 	t.Run("missing varbind definition after reload", func(t *testing.T) {
@@ -700,21 +632,7 @@ func TestOperatorMetricsDimensionValuesStayBoundedAtRuntime(t *testing.T) {
 
 		om.inc(cfg[0].OID, entry, reloadedTrap)
 
-		om.metrics[0].dimMu.Lock()
-		_, rawNameSeen := om.metrics[0].dimCounts["ccmHistoryEventTerminalType"]
-		ctr, missingSeen := om.metrics[0].dimCounts["<missing>"]
-		om.metrics[0].dimMu.Unlock()
-		if rawNameSeen {
-			t.Fatal("raw varbind name leaked into metric dimension")
-		}
-		if !missingSeen || ctr.Load() != 1 {
-			t.Fatalf("<missing> bucket = seen %v count %d, want seen true count 1", missingSeen, func() uint64 {
-				if ctr == nil {
-					return 0
-				}
-				return ctr.Load()
-			}())
-		}
+		assertMetricDimensionBucket(t, om, "ccmHistoryEventTerminalType", "<missing>", "missing varbind")
 	})
 
 	t.Run("unbounded varbind metadata after reload", func(t *testing.T) {
@@ -742,21 +660,7 @@ func TestOperatorMetricsDimensionValuesStayBoundedAtRuntime(t *testing.T) {
 
 		om.inc(cfg[0].OID, entry, reloadedTrap)
 
-		om.metrics[0].dimMu.Lock()
-		_, rawSeen := om.metrics[0].dimCounts["operator-controlled-value"]
-		ctr, unknownSeen := om.metrics[0].dimCounts["unknown"]
-		om.metrics[0].dimMu.Unlock()
-		if rawSeen {
-			t.Fatal("raw value from unbounded reloaded varbind leaked into metric dimension")
-		}
-		if !unknownSeen || ctr.Load() != 1 {
-			t.Fatalf("unknown bucket = seen %v count %d, want seen true count 1", unknownSeen, func() uint64 {
-				if ctr == nil {
-					return 0
-				}
-				return ctr.Load()
-			}())
-		}
+		assertMetricDimensionBucket(t, om, "operator-controlled-value", "unknown", "unbounded reloaded varbind")
 	})
 }
 
@@ -868,32 +772,15 @@ func TestOperatorMetricsNilSafe(t *testing.T) {
 }
 
 func TestCollectorHandlePacketIncrementsOperatorMetric(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
-	trap := &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "SNMPv2-MIB::coldStart",
-		Category:    "state_change",
-		Severity:    "warning",
-		Description: "coldStart from {TRAP_SOURCE_IP}",
-	}
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	packet := readColdStartUDPPacket(t)
+	trap := testColdStartTrap("state_change", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	trap.Name = "SNMPv2-MIB::coldStart"
+	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
+	c := newDefaultTestV2Collector(writer)
+	c.operatorMetrics = newTestOperatorMetrics(t, []MetricConfig{{OID: trap.OID, Context: "snmp.trap.cold_start"}})
 
-	c := &Collector{
-		jobName:    "test",
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, []string{"public"}),
-		operatorMetrics: newTestOperatorMetrics(t, []MetricConfig{
-			{OID: "1.3.6.1.6.3.1.1.5.1", Context: "snmp.trap.cold_start"},
-		}),
-	}
-
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	if c.operatorMetrics.metrics[0].singleCount.Load() != 1 {
 		t.Fatalf("operator metric singleCount = %d, want 1", c.operatorMetrics.metrics[0].singleCount.Load())
@@ -901,33 +788,15 @@ func TestCollectorHandlePacketIncrementsOperatorMetric(t *testing.T) {
 }
 
 func TestCollectorHandlePacketNoOperatorMetricForDroppedTraps(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
+	packet := readColdStartUDPPacket(t)
+	trap := testColdStartTrap("state_change", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	trap.Name = "SNMPv2-MIB::coldStart"
+	setSingleTestTrap(t, trap)
 
-	trap := &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "SNMPv2-MIB::coldStart",
-		Category:    "state_change",
-		Severity:    "warning",
-		Description: "coldStart from {TRAP_SOURCE_IP}",
-	}
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	c := newDefaultTestV2Collector(&mockTrapWriter{err: errors.New("write failed")})
+	c.operatorMetrics = newTestOperatorMetrics(t, []MetricConfig{{OID: trap.OID, Context: "snmp.trap.cold_start"}})
 
-	c := &Collector{
-		jobName: "test",
-		trapWriter: &mockTrapWriter{
-			err: errors.New("write failed"),
-		},
-		versions:  map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist: NewAllowlist(nil, []string{"public"}),
-		operatorMetrics: newTestOperatorMetrics(t, []MetricConfig{
-			{OID: "1.3.6.1.6.3.1.1.5.1", Context: "snmp.trap.cold_start"},
-		}),
-	}
-
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	if c.operatorMetrics.metrics[0].singleCount.Load() != 0 {
 		t.Fatalf("operator metric singleCount = %d, want 0 (write failed)", c.operatorMetrics.metrics[0].singleCount.Load())
@@ -935,32 +804,15 @@ func TestCollectorHandlePacketNoOperatorMetricForDroppedTraps(t *testing.T) {
 }
 
 func TestCollectorHandlePacketNoOperatorMetricForUnconfiguredOID(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
-	trap := &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "SNMPv2-MIB::coldStart",
-		Category:    "state_change",
-		Severity:    "warning",
-		Description: "coldStart from {TRAP_SOURCE_IP}",
-	}
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	packet := readColdStartUDPPacket(t)
+	trap := testColdStartTrap("state_change", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	trap.Name = "SNMPv2-MIB::coldStart"
+	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
+	c := newDefaultTestV2Collector(writer)
+	c.operatorMetrics = newTestOperatorMetrics(t, []MetricConfig{{OID: "9.9.9.9.9.0.1", Context: "snmp.trap.unrelated"}})
 
-	c := &Collector{
-		jobName:    "test",
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, []string{"public"}),
-		operatorMetrics: newTestOperatorMetrics(t, []MetricConfig{
-			{OID: "9.9.9.9.9.0.1", Context: "snmp.trap.unrelated"},
-		}),
-	}
-
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	if c.operatorMetrics.metrics[0].singleCount.Load() != 0 {
 		t.Fatalf("operator metric for unrelated OID should not increment, got %d", c.operatorMetrics.metrics[0].singleCount.Load())
@@ -968,29 +820,14 @@ func TestCollectorHandlePacketNoOperatorMetricForUnconfiguredOID(t *testing.T) {
 }
 
 func TestCollectorHandlePacketNoOperatorMetricWhenNil(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
-	trap := &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "SNMPv2-MIB::coldStart",
-		Category:    "state_change",
-		Severity:    "warning",
-		Description: "coldStart from {TRAP_SOURCE_IP}",
-	}
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	packet := readColdStartUDPPacket(t)
+	trap := testColdStartTrap("state_change", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	trap.Name = "SNMPv2-MIB::coldStart"
+	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
+	c := newDefaultTestV2Collector(writer)
 
-	c := &Collector{
-		jobName:    "test",
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, []string{"public"}),
-	}
-
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("trap not written when no operator metrics: %v", writer.entries)
@@ -1085,22 +922,13 @@ func TestCollectorHandlePacketOperatorMetricWithDimFromVarbind(t *testing.T) {
 }
 
 func TestCollectorNoOperatorMetricOnDedupSuppression(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
-	trap := &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "SNMPv2-MIB::coldStart",
-		Category:    "state_change",
-		Severity:    "warning",
-		Description: "coldStart from {TRAP_SOURCE_IP}",
-	}
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	packet := readColdStartUDPPacket(t)
+	trap := testColdStartTrap("state_change", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	trap.Name = "SNMPv2-MIB::coldStart"
+	setSingleTestTrap(t, trap)
 
 	om := newTestOperatorMetrics(t, []MetricConfig{
-		{OID: "1.3.6.1.6.3.1.1.5.1", Context: "snmp.trap.cold_start"},
+		{OID: trap.OID, Context: "snmp.trap.cold_start"},
 	})
 
 	deduper := newTrapDeduper("test", DedupConfig{Enabled: true, WindowSec: 3600, CacheMaxEntries: 1000}, &mockTrapWriter{}, nil)
@@ -1121,8 +949,8 @@ func TestCollectorNoOperatorMetricOnDedupSuppression(t *testing.T) {
 	addr, _ := netip.ParseAddr("198.51.100.10")
 	peer := &net.UDPAddr{IP: addr.AsSlice(), Port: 16234}
 
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, peer)
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, peer)
+	c.handlePacket(packet.payload, packet.peer, nil, peer)
+	c.handlePacket(packet.payload, packet.peer, nil, peer)
 
 	if om.metrics[0].singleCount.Load() != 1 {
 		t.Fatalf("operator metric singleCount = %d, want 1 (second trap should be dedup-suppressed)", om.metrics[0].singleCount.Load())

@@ -49,28 +49,13 @@ func assertSeverityCounters(t *testing.T, metrics *perJobMetrics, want map[strin
 }
 
 func TestCollectorHandlePacketWritesProfileResolvedTrapEntry(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
-	trap := &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "TEST-MIB::coldStartSecurity",
-		Category:    "security",
-		Severity:    "warning",
-		Description: "security coldStart from {TRAP_SOURCE_IP}",
-	}
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	packet := readColdStartUDPPacket(t)
+	trap := testColdStartTrap("security", "warning", "security coldStart from {TRAP_SOURCE_IP}")
+	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:    "test",
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, []string{"public"}),
-	}
+	c := newDefaultTestV2Collector(writer)
 
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -88,11 +73,7 @@ func TestCollectorHandlePacketWritesProfileResolvedTrapEntry(t *testing.T) {
 }
 
 func TestCollectorHandlePacketRendersTemplatesAfterEnrichment(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
+	packet := readColdStartUDPPacket(t)
 	regKey := "test:198.51.100.10:162"
 	ddsnmp.DeviceRegistry.Register(regKey, ddsnmp.DeviceConnectionInfo{
 		Hostname: "198.51.100.10",
@@ -101,23 +82,12 @@ func TestCollectorHandlePacketRendersTemplatesAfterEnrichment(t *testing.T) {
 	})
 	defer ddsnmp.DeviceRegistry.Unregister(regKey)
 
-	trap := &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "TEST-MIB::coldStartSecurity",
-		Category:    "security",
-		Severity:    "warning",
-		Description: "security coldStart on {_HOSTNAME} from {TRAP_DEVICE_VENDOR}",
-	}
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	trap := testColdStartTrap("security", "warning", "security coldStart on {_HOSTNAME} from {TRAP_DEVICE_VENDOR}")
+	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:    "test",
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, []string{"public"}),
-	}
+	c := newDefaultTestV2Collector(writer)
 
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -128,29 +98,14 @@ func TestCollectorHandlePacketRendersTemplatesAfterEnrichment(t *testing.T) {
 }
 
 func TestCollectorHandlePacketDoesNotUseListenerVnodeAsSourceNode(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
-	trap := &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "TEST-MIB::coldStartSecurity",
-		Category:    "security",
-		Severity:    "warning",
-		Description: "coldStart from {TRAP_SOURCE_IP}",
-	}
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	packet := readColdStartUDPPacket(t)
+	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:    "test",
-		vnode:      "listener-vnode-id",
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, []string{"public"}),
-	}
+	c := newDefaultTestV2Collector(writer)
+	c.vnode = "listener-vnode-id"
 
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -161,11 +116,7 @@ func TestCollectorHandlePacketDoesNotUseListenerVnodeAsSourceNode(t *testing.T) 
 }
 
 func TestCollectorHandlePacketRendersTopologyEnrichmentBeforeReverseDNS(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
+	packet := readColdStartUDPPacket(t)
 	prev := trapTopologyEnrichmentForIP
 	trapTopologyEnrichmentForIP = func(ip string) *snmptopology.TrapTopologyEnrichment {
 		if ip != "198.51.100.10" {
@@ -188,25 +139,18 @@ func TestCollectorHandlePacketRendersTopologyEnrichmentBeforeReverseDNS(t *testi
 	}
 	t.Cleanup(dns.Close)
 
-	trap := &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "TEST-MIB::coldStartSecurity",
-		Category:    "security",
-		Severity:    "warning",
-		Description: "trap on {_HOSTNAME} vendor {TRAP_DEVICE_VENDOR} iface {TRAP_INTERFACE} neighbors {TRAP_NEIGHBORS}",
-	}
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	trap := testColdStartTrap(
+		"security",
+		"warning",
+		"trap on {_HOSTNAME} vendor {TRAP_DEVICE_VENDOR} iface {TRAP_INTERFACE} neighbors {TRAP_NEIGHBORS}",
+	)
+	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:           "test",
-		trapWriter:        writer,
-		versions:          map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:         NewAllowlist(nil, []string{"public"}),
-		reverseDNSEnabled: true,
-		reverseDNS:        dns,
-	}
+	c := newDefaultTestV2Collector(writer)
+	c.reverseDNSEnabled = true
+	c.reverseDNS = dns
 
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -228,36 +172,21 @@ func TestCollectorHandlePacketDedupSuppressesDuplicates(t *testing.T) {
 	removeJobMetrics(jobName)
 	defer removeJobMetrics(jobName)
 
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
-	trap := &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "TEST-MIB::coldStartSecurity",
-		Category:    "security",
-		Severity:    "warning",
-		Description: "coldStart from {TRAP_SOURCE_IP}",
-	}
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	packet := readColdStartUDPPacket(t)
+	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
 	metrics := getJobMetrics(jobName)
 	metrics.setDedupEnabled(true)
-	c := &Collector{
-		Config:     Config{Dedup: DedupConfig{Enabled: true}},
-		jobName:    jobName,
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, []string{"public"}),
-		metrics:    metrics,
-	}
+	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
+	c.Config = Config{Dedup: DedupConfig{Enabled: true}}
+	c.metrics = metrics
 	c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics)
 	c.deduper.start()
 	defer c.deduper.Close()
 
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -281,10 +210,7 @@ func TestCollectorHandlePacketDedupSuppressesDuplicates(t *testing.T) {
 }
 
 func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
+	packet := readColdStartUDPPacket(t)
 
 	t.Run("unknown OID", func(t *testing.T) {
 		const jobName = "test-dedup-unknown-oid"
@@ -295,18 +221,13 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 		writer := &mockTrapWriter{}
 		metrics := getJobMetrics(jobName)
 		metrics.setDedupEnabled(true)
-		c := &Collector{
-			Config:     Config{Dedup: DedupConfig{Enabled: true}},
-			jobName:    jobName,
-			trapWriter: writer,
-			versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-			allowlist:  NewAllowlist(nil, []string{"public"}),
-			metrics:    metrics,
-		}
+		c := newTestV2Collector(jobName, writer, nil, []string{"public"})
+		c.Config = Config{Dedup: DedupConfig{Enabled: true}}
+		c.metrics = metrics
 		c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics)
 
-		c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
-		c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+		c.handlePacket(packet.payload, packet.peer, nil, nil)
+		c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 		if len(writer.entries) != 1 {
 			t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -328,29 +249,19 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 		removeJobMetrics(jobName)
 		defer removeJobMetrics(jobName)
 
-		trap := &TrapDef{
-			OID:         "1.3.6.1.6.3.1.1.5.1",
-			Name:        "TEST-MIB::coldStartTemplate",
-			Category:    "security",
-			Severity:    "warning",
-			Description: "coldStart from {DOES_NOT_EXIST}",
-		}
-		setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+		trap := testColdStartTrap("security", "warning", "coldStart from {DOES_NOT_EXIST}")
+		trap.Name = "TEST-MIB::coldStartTemplate"
+		setSingleTestTrap(t, trap)
 		writer := &mockTrapWriter{}
 		metrics := getJobMetrics(jobName)
 		metrics.setDedupEnabled(true)
-		c := &Collector{
-			Config:     Config{Dedup: DedupConfig{Enabled: true}},
-			jobName:    jobName,
-			trapWriter: writer,
-			versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-			allowlist:  NewAllowlist(nil, []string{"public"}),
-			metrics:    metrics,
-		}
+		c := newTestV2Collector(jobName, writer, nil, []string{"public"})
+		c.Config = Config{Dedup: DedupConfig{Enabled: true}}
+		c.metrics = metrics
 		c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics)
 
-		c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
-		c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+		c.handlePacket(packet.payload, packet.peer, nil, nil)
+		c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 		if len(writer.entries) != 1 {
 			t.Fatalf("written entries = %d, want 1", len(writer.entries))
@@ -373,33 +284,18 @@ func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *test
 	removeJobMetrics(jobName)
 	defer removeJobMetrics(jobName)
 
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
-	trap := &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "TEST-MIB::coldStartSecurity",
-		Category:    "security",
-		Severity:    "warning",
-		Description: "coldStart from {TRAP_SOURCE_IP}",
-	}
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	packet := readColdStartUDPPacket(t)
+	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{err: errors.New("write failed")}
 	metrics := getJobMetrics(jobName)
 	metrics.setDedupEnabled(true)
-	c := &Collector{
-		Config:     Config{Dedup: DedupConfig{Enabled: true}},
-		jobName:    jobName,
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, []string{"public"}),
-		metrics:    metrics,
-	}
+	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
+	c.Config = Config{Dedup: DedupConfig{Enabled: true}}
+	c.metrics = metrics
 	c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics)
 
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
 	if got := atomic.LoadUint64(&metrics.errors.journalWriteFailed); got != 1 {
 		t.Fatalf("journal write failures = %d, want 1", got)
 	}
@@ -408,7 +304,7 @@ func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *test
 	}
 
 	writer.err = nil
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries after rollback = %d, want 1", len(writer.entries))
@@ -423,11 +319,7 @@ func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *test
 }
 
 func TestCollectorHandlePacketDropsDisallowedVersion(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
+	packet := readColdStartUDPPacket(t)
 	writer := &mockTrapWriter{}
 	c := &Collector{
 		jobName:    "test",
@@ -437,7 +329,7 @@ func TestCollectorHandlePacketDropsDisallowedVersion(t *testing.T) {
 	}
 
 	removeJobMetrics("test")
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	if len(writer.entries) != 0 {
 		t.Fatalf("expected 0 entries for disallowed version, got %d", len(writer.entries))
@@ -481,20 +373,11 @@ func TestCollectorHandlePacketDropsDisallowedV3BeforeDecode(t *testing.T) {
 }
 
 func TestCollectorHandlePacketDropsDisallowedCommunity(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
+	packet := readColdStartUDPPacket(t)
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:    "test",
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, []string{"secret"}),
-	}
+	c := newTestV2Collector("test", writer, nil, []string{"secret"})
 
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	if len(writer.entries) != 0 {
 		t.Fatalf("expected 0 entries for disallowed community, got %d", len(writer.entries))
@@ -502,29 +385,14 @@ func TestCollectorHandlePacketDropsDisallowedCommunity(t *testing.T) {
 }
 
 func TestCollectorHandlePacketIncrementsEventsMetric(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
-	trap := &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "TEST-MIB::coldStartSecurity",
-		Category:    "state_change",
-		Severity:    "warning",
-		Description: "coldStart from {TRAP_SOURCE_IP}",
-	}
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	packet := readColdStartUDPPacket(t)
+	trap := testColdStartTrap("state_change", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:    "test",
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, []string{"public"}),
-	}
+	c := newDefaultTestV2Collector(writer)
 
 	removeJobMetrics("test")
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	m := getJobMetrics("test")
 	ev := atomic.LoadUint64(&m.events.stateChange)
@@ -539,28 +407,13 @@ func TestCollectorHandlePacketIncrementsSeverityMetric(t *testing.T) {
 	removeJobMetrics(jobName)
 	defer removeJobMetrics(jobName)
 
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
-	trap := &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "TEST-MIB::coldStartSecurity",
-		Category:    "state_change",
-		Severity:    "warning",
-		Description: "coldStart from {TRAP_SOURCE_IP}",
-	}
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	packet := readColdStartUDPPacket(t)
+	trap := testColdStartTrap("state_change", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:    jobName,
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, []string{"public"}),
-	}
+	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
 
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	m := getJobMetrics(jobName)
 	assertSeverityCounters(t, m, map[string]uint64{"warning": 1})
@@ -617,29 +470,14 @@ func TestCollectMetricsEmitsSeverityCounters(t *testing.T) {
 }
 
 func TestCollectorHandlePacketIncrementsTemplateUnresolved(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
-	trap := &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "TEST-MIB::coldStartSecurity",
-		Category:    "security",
-		Severity:    "warning",
-		Description: "security coldStart from {missing_var}",
-	}
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	packet := readColdStartUDPPacket(t)
+	trap := testColdStartTrap("security", "warning", "security coldStart from {missing_var}")
+	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:    "test",
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, []string{"public"}),
-	}
+	c := newDefaultTestV2Collector(writer)
 
 	removeJobMetrics("test")
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	m := getJobMetrics("test")
 	if v := atomic.LoadUint64(&m.errors.templateUnresolved); v != 1 {
@@ -649,21 +487,12 @@ func TestCollectorHandlePacketIncrementsTemplateUnresolved(t *testing.T) {
 }
 
 func TestCollectorHandlePacketIncrementsAllowlistDrop(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
+	packet := readColdStartUDPPacket(t)
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:    "test",
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist(nil, []string{"secret"}),
-	}
+	c := newTestV2Collector("test", writer, nil, []string{"secret"})
 
 	removeJobMetrics("test")
-	c.handlePacket(packets[0].payload, packets[0].peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	m := getJobMetrics("test")
 	dr := atomic.LoadUint64(&m.errors.droppedAllowlist)
@@ -767,29 +596,14 @@ func TestCollectorHandlePacketClassifiesAuthFailureUnknownV3EngineID(t *testing.
 }
 
 func TestCollectorHandlePacketAllowsIPv4MappedSourceCIDR(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
-	trap := &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "TEST-MIB::coldStartSecurity",
-		Category:    "security",
-		Severity:    "warning",
-		Description: "coldStart from {TRAP_SOURCE_IP}",
-	}
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	packet := readColdStartUDPPacket(t)
+	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:    "test",
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist([]netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, []string{"public"}),
-	}
+	c := newTestV2Collector("test", writer, []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, []string{"public"})
 	peer := &net.UDPAddr{IP: net.ParseIP("::ffff:10.1.2.3"), Port: 9162}
 
-	c.handlePacket(packets[0].payload, peer.IP, nil, peer)
+	c.handlePacket(packet.payload, peer.IP, nil, peer)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("expected IPv4-mapped peer to match IPv4 CIDR, got %d entries", len(writer.entries))
@@ -800,29 +614,14 @@ func TestCollectorHandlePacketAllowsIPv4MappedSourceCIDR(t *testing.T) {
 }
 
 func TestCollectorHandlePacketAllowsNativeIPv6SourceCIDR(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
-	trap := &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "TEST-MIB::coldStartSecurity",
-		Category:    "security",
-		Severity:    "warning",
-		Description: "coldStart from {TRAP_SOURCE_IP}",
-	}
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	packet := readColdStartUDPPacket(t)
+	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:    "test",
-		trapWriter: writer,
-		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:  NewAllowlist([]netip.Prefix{netip.MustParsePrefix("2001:db8::/32")}, []string{"public"}),
-	}
+	c := newTestV2Collector("test", writer, []netip.Prefix{netip.MustParsePrefix("2001:db8::/32")}, []string{"public"})
 	peer := &net.UDPAddr{IP: net.ParseIP("2001:db8::1"), Port: 9162}
 
-	c.handlePacket(packets[0].payload, peer.IP, nil, peer)
+	c.handlePacket(packet.payload, peer.IP, nil, peer)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("expected native IPv6 peer to match IPv6 CIDR, got %d entries", len(writer.entries))
@@ -830,23 +629,13 @@ func TestCollectorHandlePacketAllowsNativeIPv6SourceCIDR(t *testing.T) {
 }
 
 func TestCollectorHandlePacketRateLimitSampleWritesTrap(t *testing.T) {
-	packets := readPcapUDPPackets(t, "testdata/v2c_coldstart.pcap.hex")
-	if len(packets) != 1 {
-		t.Fatalf("expected one packet, got %d", len(packets))
-	}
-
+	packet := readColdStartUDPPacket(t)
 	const jobName = "test-rate-limit-sample"
 	removeJobMetrics(jobName)
 	defer removeJobMetrics(jobName)
 
-	trap := &TrapDef{
-		OID:         "1.3.6.1.6.3.1.1.5.1",
-		Name:        "TEST-MIB::coldStartSecurity",
-		Category:    "security",
-		Severity:    "warning",
-		Description: "coldStart from {TRAP_SOURCE_IP}",
-	}
-	setTestProfileIndex(t, map[string]*TrapDef{trap.OID: trap})
+	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	setSingleTestTrap(t, trap)
 	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
 	rl := newRateLimiter(true, 1, "sample")
 	srcAddr, ok := udpPeerAddr(peer)
@@ -858,15 +647,10 @@ func TestCollectorHandlePacketRateLimitSampleWritesTrap(t *testing.T) {
 	}
 
 	writer := &mockTrapWriter{}
-	c := &Collector{
-		jobName:     jobName,
-		trapWriter:  writer,
-		versions:    map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
-		allowlist:   NewAllowlist(nil, []string{"public"}),
-		rateLimiter: rl,
-	}
+	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
+	c.rateLimiter = rl
 
-	c.handlePacket(packets[0].payload, peer.IP, nil, peer)
+	c.handlePacket(packet.payload, peer.IP, nil, peer)
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("sample-mode rate-limited trap should be written, got %d entries", len(writer.entries))
