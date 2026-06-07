@@ -160,6 +160,32 @@ test_counter_no_meta_metric_1_total{label1="value2"} 11
 				return collr, srv.Close
 			},
 		},
+		"fail if endpoint exposes only non-writable metrics": {
+			wantFail: true,
+			prepare: func() (collr *Collector, cleanup func()) {
+				srv := httptest.NewServer(http.HandlerFunc(
+					func(w http.ResponseWriter, r *http.Request) {
+						_, _ = w.Write([]byte(`app_x_info{version="1.0"} 1`))
+					}))
+				collr = New()
+				collr.URL = srv.URL
+
+				return collr, srv.Close
+			},
+		},
+		"fail if endpoint returns an empty body (no metric families)": {
+			wantFail: true,
+			prepare: func() (collr *Collector, cleanup func()) {
+				srv := httptest.NewServer(http.HandlerFunc(
+					func(w http.ResponseWriter, r *http.Request) {
+						_, _ = w.Write([]byte(""))
+					}))
+				collr = New()
+				collr.URL = srv.URL
+
+				return collr, srv.Close
+			},
+		},
 		"fail if connection refused": {
 			wantFail: true,
 			prepare: func() (collr *Collector, cleanup func()) {

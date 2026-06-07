@@ -379,6 +379,36 @@ app_lat_count{id="b"} 2
 		assert.False(t, ok, "off-schema series is skipped")
 	})
 
+	t.Run("histogram distribution-schema drift skips the off-schema series", func(t *testing.T) {
+		store := metrix.NewCollectorStore()
+		w := newMetricFamilyWriter(store, metricFamilyWriterPolicy{}, logger.New())
+		cc := cycle(t, store)
+
+		cc.BeginCycle()
+		written := w.writeMetricFamilies(scrape(t, `
+# TYPE app_lat histogram
+app_lat_bucket{id="a",le="0.1"} 1
+app_lat_bucket{id="a",le="0.5"} 2
+app_lat_bucket{id="a",le="+Inf"} 2
+app_lat_sum{id="a"} 1
+app_lat_count{id="a"} 2
+app_lat_bucket{id="b",le="0.1"} 1
+app_lat_bucket{id="b",le="0.5"} 2
+app_lat_bucket{id="b",le="1"} 3
+app_lat_bucket{id="b",le="+Inf"} 3
+app_lat_sum{id="b"} 5
+app_lat_count{id="b"} 3
+`))
+		require.NoError(t, cc.CommitCycleSuccess())
+
+		assert.Equal(t, 1, written, "the series whose bucket bounds differ from the family canonical is skipped")
+		fr := store.Read(metrix.ReadFlatten())
+		_, ok := fr.Value("app_lat_bucket", metrix.Labels{"id": "a", "le": "0.1"})
+		assert.True(t, ok, "canonical-schema series is written")
+		_, ok = fr.Value("app_lat_bucket", metrix.Labels{"id": "b", "le": "0.1"})
+		assert.False(t, ok, "off-schema series is skipped")
+	})
+
 	t.Run("evicts cached series handles after the retention window", func(t *testing.T) {
 		store := metrix.NewCollectorStore()
 		w := newMetricFamilyWriter(store, metricFamilyWriterPolicy{}, logger.New())

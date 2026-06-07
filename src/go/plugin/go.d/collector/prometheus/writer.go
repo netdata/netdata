@@ -15,8 +15,10 @@ import (
 )
 
 // seriesCacheRetentionCycles bounds the per-series instrument cache: a cached handle not observed for
-// this many successful cycles is evicted. It mirrors metrix's default store retention so a cached
-// handle lives as long as the series it writes, and the cache stays bounded under label-value churn.
+// this many successful cycles is evicted. This value mirrors two other retention windows that are NOT
+// compiler-linked and MUST be kept in agreement: metrix's default store retention (so a cached handle
+// lives as long as the series it writes) and the chart template's expiry (chartExpireAfterCycles, so a
+// chart is not removed before the series feeding it). The cache also stays bounded under label churn.
 const seriesCacheRetentionCycles = 10
 
 type metricFamilyWriterPolicy struct {

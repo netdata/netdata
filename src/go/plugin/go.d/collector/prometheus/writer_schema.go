@@ -101,6 +101,9 @@ func metricScalarValue(metric prompkg.Metric, typ commonmodel.MetricType) (float
 		}
 	}
 
+	// Untyped fallthrough: a family resolved to gauge/counter via fallback_type carries its value in
+	// Untyped() (a real typed gauge/counter already returned from the switch). This is the only way a
+	// gauge/counter-typed family reaches here.
 	if untyped := metric.Untyped(); untyped != nil && isFinite(untyped.Value()) {
 		return untyped.Value(), true
 	}
