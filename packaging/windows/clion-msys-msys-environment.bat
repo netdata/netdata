@@ -11,11 +11,11 @@ set "batch_dir=%batch_dir:\=/%"
 set MSYSTEM=UCRT64
 
 :: go exists only under MSYS2 MinGW-family profiles, not under MSYS
-set GOROOT=C:\msys64\ucrt64
+set GOROOT=C:\msys64\ucrt64\lib\go
 
 set "PATH=%PATH%;C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64"
 set "PATH=%PATH%;C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.39.33519\bin\Hostx64\x64"
-set "PATH=%PATH%;C:\msys64\usr\bin;C:\msys64\bin;C:\msys64\ucrt64\bin"
+set "PATH=%PATH%;C:\msys64\ucrt64\bin;C:\msys64\usr\bin;C:\msys64\bin"
 ::set PKG_CONFIG_EXECUTABLE=C:\msys64\ucrt64\bin\pkg-config.exe
 ::set CMAKE_C_COMPILER=C:\msys64\ucrt64\bin\gcc.exe
 ::set CMAKE_CC_COMPILER=C:\msys64\ucrt64\bin\g++.exe
