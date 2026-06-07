@@ -4,7 +4,6 @@ package prometheus
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,9 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
@@ -201,413 +200,213 @@ test_counter_no_meta_metric_1_total{label1="value2"} 11
 	}
 }
 
+// TestCollector_Collect drives the real V2 collector (Init, then a framework-style store
+// cycle around Collect) and asserts the metrics it wrote into the metrix store, by metric
+// name + flattened labels. Per-type correctness is exercised exhaustively in writer_test.go;
+// this checks the collector's end-to-end wiring (client/selector/fallback built in Init →
+// scrape → writer → store) plus the config-driven behaviors.
 func TestCollector_Collect(t *testing.T) {
-	type testCaseStep struct {
-		desc          string
-		input         string
-		wantCollected map[string]int64
-		wantCharts    int
-	}
 	tests := map[string]struct {
 		prepare func() *Collector
-		steps   []testCaseStep
+		input   string
+		want    func(t *testing.T, fr metrix.Reader)
 	}{
-		"Gauge": {
+		"gauge and counter values": {
 			prepare: New,
-			steps: []testCaseStep{
-				{
-					desc: "Two first seen series, no meta series ignored",
-					input: `
-# HELP test_gauge_metric_1 Test Gauge Metric 1
-# TYPE test_gauge_metric_1 gauge
-test_gauge_metric_1{label1="value1"} 11
-test_gauge_metric_1{label1="value2"} 12
-test_gauge_no_meta_metric_1{label1="value1"} 11
-test_gauge_no_meta_metric_1{label1="value2"} 12
+			input: `
+# TYPE test_gauge_metric gauge
+test_gauge_metric{label1="value1"} 11
+test_gauge_metric{label1="value2"} 12.5
+# TYPE test_counter_metric_total counter
+test_counter_metric_total{label1="value1"} 11
 `,
-					wantCollected: map[string]int64{
-						"test_gauge_metric_1-label1=value1": 11000,
-						"test_gauge_metric_1-label1=value2": 12000,
-					},
-					wantCharts: 2,
-				},
-				{
-					desc: "One series removed",
-					input: `
-# HELP test_gauge_metric_1 Test Gauge Metric 1
-# TYPE test_gauge_metric_1 gauge
-test_gauge_metric_1{label1="value1"} 11
-`,
-					wantCollected: map[string]int64{
-						"test_gauge_metric_1-label1=value1": 11000,
-					},
-					wantCharts: 1,
-				},
-				{
-					desc: "One series (re)added",
-					input: `
-# HELP test_gauge_metric_1 Test Gauge Metric 1
-# TYPE test_gauge_metric_1 gauge
-test_gauge_metric_1{label1="value1"} 11
-test_gauge_metric_1{label1="value2"} 12
-`,
-					wantCollected: map[string]int64{
-						"test_gauge_metric_1-label1=value1": 11000,
-						"test_gauge_metric_1-label1=value2": 12000,
-					},
-					wantCharts: 2,
-				},
+			want: func(t *testing.T, fr metrix.Reader) {
+				assert.InDelta(t, 11, value(t, fr, "test_gauge_metric", metrix.Labels{"label1": "value1"}), 1e-9)
+				assert.InDelta(t, 12.5, value(t, fr, "test_gauge_metric", metrix.Labels{"label1": "value2"}), 1e-9)
+				assert.InDelta(t, 11, value(t, fr, "test_counter_metric_total", metrix.Labels{"label1": "value1"}), 1e-9)
 			},
 		},
-		"Counter": {
+		"summary flattens to quantiles, sum and count": {
 			prepare: New,
-			steps: []testCaseStep{
-				{
-					desc: "Four first seen series, no meta series collected",
-					input: `
-# HELP test_counter_metric_1_total Test Counter Metric 1
-# TYPE test_counter_metric_1_total counter
-test_counter_metric_1_total{label1="value1"} 11
-test_counter_metric_1_total{label1="value2"} 12
-test_counter_no_meta_metric_1_total{label1="value1"} 11
-test_counter_no_meta_metric_1_total{label1="value2"} 12
+			input: `
+# TYPE test_latency summary
+test_latency{quantile="0.5"} 0.25
+test_latency{quantile="0.99"} 0.5
+test_latency_sum 12.5
+test_latency_count 42
 `,
-					wantCollected: map[string]int64{
-						"test_counter_metric_1_total-label1=value1":         11000,
-						"test_counter_metric_1_total-label1=value2":         12000,
-						"test_counter_no_meta_metric_1_total-label1=value1": 11000,
-						"test_counter_no_meta_metric_1_total-label1=value2": 12000,
-					},
-					wantCharts: 4,
-				},
-				{
-					desc: "Two series removed",
-					input: `
-# HELP test_counter_metric_1_total Test Counter Metric 1
-# TYPE test_counter_metric_1_total counter
-test_counter_metric_1_total{label1="value1"} 11
-test_counter_no_meta_metric_1_total{label1="value1"} 11
-`,
-					wantCollected: map[string]int64{
-						"test_counter_metric_1_total-label1=value1":         11000,
-						"test_counter_no_meta_metric_1_total-label1=value1": 11000,
-					},
-					wantCharts: 2,
-				},
-				{
-					desc: "Two series (re)added",
-					input: `
-# HELP test_counter_metric_1_total Test Counter Metric 1
-# TYPE test_counter_metric_1_total counter
-test_counter_metric_1_total{label1="value1"} 11
-test_counter_metric_1_total{label1="value2"} 12
-test_counter_no_meta_metric_1_total{label1="value1"} 11
-test_counter_no_meta_metric_1_total{label1="value2"} 12
-`,
-					wantCollected: map[string]int64{
-						"test_counter_metric_1_total-label1=value1":         11000,
-						"test_counter_metric_1_total-label1=value2":         12000,
-						"test_counter_no_meta_metric_1_total-label1=value1": 11000,
-						"test_counter_no_meta_metric_1_total-label1=value2": 12000,
-					},
-					wantCharts: 4,
-				},
+			want: func(t *testing.T, fr metrix.Reader) {
+				assert.InDelta(t, 0.25, value(t, fr, "test_latency", metrix.Labels{"quantile": "0.5"}), 1e-9)
+				assert.InDelta(t, 0.5, value(t, fr, "test_latency", metrix.Labels{"quantile": "0.99"}), 1e-9)
+				assert.InDelta(t, 12.5, value(t, fr, "test_latency_sum", nil), 1e-9)
+				assert.InDelta(t, 42, value(t, fr, "test_latency_count", nil), 1e-9)
 			},
 		},
-		"Summary": {
+		"histogram flattens to buckets, sum and count": {
 			prepare: New,
-			steps: []testCaseStep{
-				{
-					desc: "Two first seen series, no meta series collected",
-					input: `
-# HELP test_summary_1_duration_microseconds Test Summary Metric 1
-# TYPE test_summary_1_duration_microseconds summary
-test_summary_1_duration_microseconds{label1="value1",quantile="0.5"} 4931.921
-test_summary_1_duration_microseconds{label1="value1",quantile="0.9"} 4932.921
-test_summary_1_duration_microseconds{label1="value1",quantile="0.99"} 4933.921
-test_summary_1_duration_microseconds_sum{label1="value1"} 283201.29
-test_summary_1_duration_microseconds_count{label1="value1"} 31
-test_summary_no_meta_1_duration_microseconds{label1="value1",quantile="0.5"} 4931.921
-test_summary_no_meta_1_duration_microseconds{label1="value1",quantile="0.9"} 4932.921
-test_summary_no_meta_1_duration_microseconds{label1="value1",quantile="0.99"} 4933.921
-test_summary_no_meta_1_duration_microseconds_sum{label1="value1"} 283201.29
-test_summary_no_meta_1_duration_microseconds_count{label1="value1"} 31
+			input: `
+# TYPE test_dur histogram
+test_dur_bucket{le="0.1"} 4
+test_dur_bucket{le="+Inf"} 6
+test_dur_sum 2.5
+test_dur_count 6
 `,
-					wantCollected: map[string]int64{
-						"test_summary_1_duration_microseconds-label1=value1_count":                 31,
-						"test_summary_1_duration_microseconds-label1=value1_quantile=0.5":          4931921000,
-						"test_summary_1_duration_microseconds-label1=value1_quantile=0.9":          4932921000,
-						"test_summary_1_duration_microseconds-label1=value1_quantile=0.99":         4933921000,
-						"test_summary_1_duration_microseconds-label1=value1_sum":                   283201290,
-						"test_summary_no_meta_1_duration_microseconds-label1=value1_count":         31,
-						"test_summary_no_meta_1_duration_microseconds-label1=value1_quantile=0.5":  4931921000,
-						"test_summary_no_meta_1_duration_microseconds-label1=value1_quantile=0.9":  4932921000,
-						"test_summary_no_meta_1_duration_microseconds-label1=value1_quantile=0.99": 4933921000,
-						"test_summary_no_meta_1_duration_microseconds-label1=value1_sum":           283201290,
-					},
-					wantCharts: 6,
-				},
-				{
-					desc: "One series removed",
-					input: `
-# HELP test_summary_1_duration_microseconds Test Summary Metric 1
-# TYPE test_summary_1_duration_microseconds summary
-test_summary_1_duration_microseconds{label1="value1",quantile="0.5"} 4931.921
-test_summary_1_duration_microseconds{label1="value1",quantile="0.9"} 4932.921
-test_summary_1_duration_microseconds{label1="value1",quantile="0.99"} 4933.921
-test_summary_1_duration_microseconds_sum{label1="value1"} 283201.29
-test_summary_1_duration_microseconds_count{label1="value1"} 31
-`,
-					wantCollected: map[string]int64{
-						"test_summary_1_duration_microseconds-label1=value1_count":         31,
-						"test_summary_1_duration_microseconds-label1=value1_quantile=0.5":  4931921000,
-						"test_summary_1_duration_microseconds-label1=value1_quantile=0.9":  4932921000,
-						"test_summary_1_duration_microseconds-label1=value1_quantile=0.99": 4933921000,
-						"test_summary_1_duration_microseconds-label1=value1_sum":           283201290,
-					},
-					wantCharts: 3,
-				},
-				{
-					desc: "One series (re)added",
-					input: `
-# HELP test_summary_1_duration_microseconds Test Summary Metric 1
-# TYPE test_summary_1_duration_microseconds summary
-test_summary_1_duration_microseconds{label1="value1",quantile="0.5"} 4931.921
-test_summary_1_duration_microseconds{label1="value1",quantile="0.9"} 4932.921
-test_summary_1_duration_microseconds{label1="value1",quantile="0.99"} 4933.921
-test_summary_1_duration_microseconds_sum{label1="value1"} 283201.29
-test_summary_1_duration_microseconds_count{label1="value1"} 31
-test_summary_no_meta_1_duration_microseconds{label1="value1",quantile="0.5"} 4931.921
-test_summary_no_meta_1_duration_microseconds{label1="value1",quantile="0.9"} 4932.921
-test_summary_no_meta_1_duration_microseconds{label1="value1",quantile="0.99"} 4933.921
-test_summary_no_meta_1_duration_microseconds_sum{label1="value1"} 283201.29
-test_summary_no_meta_1_duration_microseconds_count{label1="value1"} 31
-`,
-					wantCollected: map[string]int64{
-						"test_summary_1_duration_microseconds-label1=value1_count":                 31,
-						"test_summary_1_duration_microseconds-label1=value1_quantile=0.5":          4931921000,
-						"test_summary_1_duration_microseconds-label1=value1_quantile=0.9":          4932921000,
-						"test_summary_1_duration_microseconds-label1=value1_quantile=0.99":         4933921000,
-						"test_summary_1_duration_microseconds-label1=value1_sum":                   283201290,
-						"test_summary_no_meta_1_duration_microseconds-label1=value1_count":         31,
-						"test_summary_no_meta_1_duration_microseconds-label1=value1_quantile=0.5":  4931921000,
-						"test_summary_no_meta_1_duration_microseconds-label1=value1_quantile=0.9":  4932921000,
-						"test_summary_no_meta_1_duration_microseconds-label1=value1_quantile=0.99": 4933921000,
-						"test_summary_no_meta_1_duration_microseconds-label1=value1_sum":           283201290,
-					},
-					wantCharts: 6,
-				},
+			want: func(t *testing.T, fr metrix.Reader) {
+				assert.InDelta(t, 4, value(t, fr, "test_dur_bucket", metrix.Labels{"le": "0.1"}), 1e-9)
+				assert.InDelta(t, 6, value(t, fr, "test_dur_bucket", metrix.Labels{"le": "+Inf"}), 1e-9)
+				assert.InDelta(t, 2.5, value(t, fr, "test_dur_sum", nil), 1e-9)
+				assert.InDelta(t, 6, value(t, fr, "test_dur_count", nil), 1e-9)
 			},
 		},
-		"Summary with NaN": {
-			prepare: New,
-			steps: []testCaseStep{
-				{
-					desc: "Two first seen series, no meta series collected",
-					input: `
-# HELP test_summary_1_duration_microseconds Test Summary Metric 1
-# TYPE test_summary_1_duration_microseconds summary
-test_summary_1_duration_microseconds{label1="value1",quantile="0.5"} NaN
-test_summary_1_duration_microseconds{label1="value1",quantile="0.9"} NaN
-test_summary_1_duration_microseconds{label1="value1",quantile="0.99"} NaN
-test_summary_1_duration_microseconds_sum{label1="value1"} 283201.29
-test_summary_1_duration_microseconds_count{label1="value1"} 31
-test_summary_no_meta_1_duration_microseconds{label1="value1",quantile="0.5"} NaN
-test_summary_no_meta_1_duration_microseconds{label1="value1",quantile="0.9"} NaN
-test_summary_no_meta_1_duration_microseconds{label1="value1",quantile="0.99"} NaN
-test_summary_no_meta_1_duration_microseconds_sum{label1="value1"} 283201.29
-test_summary_no_meta_1_duration_microseconds_count{label1="value1"} 31
-`,
-					wantCollected: map[string]int64{
-						"test_summary_1_duration_microseconds-label1=value1_count":         31,
-						"test_summary_1_duration_microseconds-label1=value1_sum":           283201290,
-						"test_summary_no_meta_1_duration_microseconds-label1=value1_count": 31,
-						"test_summary_no_meta_1_duration_microseconds-label1=value1_sum":   283201290,
-					},
-					wantCharts: 6,
-				},
-			},
-		},
-		"Histogram": {
-			prepare: New,
-			steps: []testCaseStep{
-				{
-					desc: "Two first seen series, no meta series collected",
-					input: `
-# HELP test_histogram_1_duration_seconds Test Histogram Metric 1
-# TYPE test_histogram_1_duration_seconds histogram
-test_histogram_1_duration_seconds_bucket{label1="value1",le="0.1"} 4
-test_histogram_1_duration_seconds_bucket{label1="value1",le="0.5"} 5
-test_histogram_1_duration_seconds_bucket{label1="value1",le="+Inf"} 6
-test_histogram_1_duration_seconds_sum{label1="value1"} 0.00147889
-test_histogram_1_duration_seconds_count{label1="value1"} 6
-test_histogram_no_meta_1_duration_seconds_bucket{label1="value1",le="0.1"} 4
-test_histogram_no_meta_1_duration_seconds_bucket{label1="value1",le="0.5"} 5
-test_histogram_no_meta_1_duration_seconds_bucket{label1="value1",le="+Inf"} 6
-test_histogram_no_meta_1_duration_seconds_sum{label1="value1"} 0.00147889
-test_histogram_no_meta_1_duration_seconds_count{label1="value1"} 6
-`,
-					wantCollected: map[string]int64{
-						"test_histogram_1_duration_seconds-label1=value1_bucket=+Inf":         6,
-						"test_histogram_1_duration_seconds-label1=value1_bucket=0.1":          4,
-						"test_histogram_1_duration_seconds-label1=value1_bucket=0.5":          5,
-						"test_histogram_1_duration_seconds-label1=value1_count":               6,
-						"test_histogram_1_duration_seconds-label1=value1_sum":                 1,
-						"test_histogram_no_meta_1_duration_seconds-label1=value1_bucket=+Inf": 6,
-						"test_histogram_no_meta_1_duration_seconds-label1=value1_bucket=0.1":  4,
-						"test_histogram_no_meta_1_duration_seconds-label1=value1_bucket=0.5":  5,
-						"test_histogram_no_meta_1_duration_seconds-label1=value1_count":       6,
-						"test_histogram_no_meta_1_duration_seconds-label1=value1_sum":         1,
-					},
-					wantCharts: 6,
-				},
-				{
-					desc: "One series removed",
-					input: `
-# HELP test_histogram_1_duration_seconds Test Histogram Metric 1
-# TYPE test_histogram_1_duration_seconds histogram
-test_histogram_1_duration_seconds_bucket{label1="value1",le="0.1"} 4
-test_histogram_1_duration_seconds_bucket{label1="value1",le="0.5"} 5
-test_histogram_1_duration_seconds_bucket{label1="value1",le="+Inf"} 6
-`,
-					wantCollected: map[string]int64{
-						"test_histogram_1_duration_seconds-label1=value1_bucket=+Inf": 6,
-						"test_histogram_1_duration_seconds-label1=value1_bucket=0.1":  4,
-						"test_histogram_1_duration_seconds-label1=value1_bucket=0.5":  5,
-						"test_histogram_1_duration_seconds-label1=value1_count":       0,
-						"test_histogram_1_duration_seconds-label1=value1_sum":         0,
-					},
-					wantCharts: 3,
-				},
-				{
-					desc: "One series (re)added",
-					input: `
-# HELP test_histogram_1_duration_seconds Test Histogram Metric 1
-# TYPE test_histogram_1_duration_seconds histogram
-test_histogram_1_duration_seconds_bucket{label1="value1",le="0.1"} 4
-test_histogram_1_duration_seconds_bucket{label1="value1",le="0.5"} 5
-test_histogram_1_duration_seconds_bucket{label1="value1",le="+Inf"} 6
-test_histogram_1_duration_seconds_sum{label1="value1"} 0.00147889
-test_histogram_1_duration_seconds_count{label1="value1"} 6
-test_histogram_no_meta_1_duration_seconds_bucket{label1="value1",le="0.1"} 4
-test_histogram_no_meta_1_duration_seconds_bucket{label1="value1",le="0.5"} 5
-test_histogram_no_meta_1_duration_seconds_bucket{label1="value1",le="+Inf"} 6
-test_histogram_no_meta_1_duration_seconds_sum{label1="value1"} 0.00147889
-test_histogram_no_meta_1_duration_seconds_count{label1="value1"} 6
-`,
-					wantCollected: map[string]int64{
-						"test_histogram_1_duration_seconds-label1=value1_bucket=+Inf":         6,
-						"test_histogram_1_duration_seconds-label1=value1_bucket=0.1":          4,
-						"test_histogram_1_duration_seconds-label1=value1_bucket=0.5":          5,
-						"test_histogram_1_duration_seconds-label1=value1_count":               6,
-						"test_histogram_1_duration_seconds-label1=value1_sum":                 1,
-						"test_histogram_no_meta_1_duration_seconds-label1=value1_bucket=+Inf": 6,
-						"test_histogram_no_meta_1_duration_seconds-label1=value1_bucket=0.1":  4,
-						"test_histogram_no_meta_1_duration_seconds-label1=value1_bucket=0.5":  5,
-						"test_histogram_no_meta_1_duration_seconds-label1=value1_count":       6,
-						"test_histogram_no_meta_1_duration_seconds-label1=value1_sum":         1,
-					},
-					wantCharts: 6,
-				},
-			},
-		},
-		"match Untyped as Gauge": {
+		"untyped falls back to gauge and counter": {
 			prepare: func() *Collector {
-				collr := New()
-				collr.FallbackType.Gauge = []string{"test_gauge_no_meta*"}
-				return collr
+				c := New()
+				c.FallbackType.Gauge = []string{"test_fallback_gauge"}
+				return c
 			},
-			steps: []testCaseStep{
-				{
-					desc: "Two first seen series, meta series processed as Gauge",
-					input: `
-# HELP test_gauge_metric_1 Test Untyped Metric 1
-# TYPE test_gauge_metric_1 gauge
-test_gauge_metric_1{label1="value1"} 11
-test_gauge_metric_1{label1="value2"} 12
-test_gauge_no_meta_metric_1{label1="value1"} 11
-test_gauge_no_meta_metric_1{label1="value2"} 12
+			input: `
+test_fallback_gauge{label1="value1"} 7
+test_things_total{label1="value1"} 5
+test_untyped_dropped{label1="value1"} 9
 `,
-					wantCollected: map[string]int64{
-						"test_gauge_metric_1-label1=value1":         11000,
-						"test_gauge_metric_1-label1=value2":         12000,
-						"test_gauge_no_meta_metric_1-label1=value1": 11000,
-						"test_gauge_no_meta_metric_1-label1=value2": 12000,
-					},
-					wantCharts: 4,
-				},
+			want: func(t *testing.T, fr metrix.Reader) {
+				assert.InDelta(t, 7, value(t, fr, "test_fallback_gauge", metrix.Labels{"label1": "value1"}), 1e-9)
+				assert.InDelta(t, 5, value(t, fr, "test_things_total", metrix.Labels{"label1": "value1"}), 1e-9)
+				_, ok := fr.Value("test_untyped_dropped", metrix.Labels{"label1": "value1"})
+				assert.False(t, ok, "an untyped metric with no fallback and no _total suffix must be dropped")
 			},
 		},
-		"match Untyped as Counter": {
+		"selector drops non-matching metrics": {
 			prepare: func() *Collector {
-				collr := New()
-				collr.FallbackType.Counter = []string{"test_gauge_no_meta*"}
-				return collr
+				c := New()
+				c.Selector = selector.Expr{Allow: []string{"test_keep"}}
+				return c
 			},
-			steps: []testCaseStep{
-				{
-					desc: "Two first seen series, meta series processed as Counter",
-					input: `
-# HELP test_gauge_metric_1 Test Untyped Metric 1
-# TYPE test_gauge_metric_1 gauge
-test_gauge_metric_1{label1="value1"} 11
-test_gauge_metric_1{label1="value2"} 12
-test_gauge_no_meta_metric_1{label1="value1"} 11
-test_gauge_no_meta_metric_1{label1="value2"} 12
+			input: `
+# TYPE test_keep gauge
+test_keep{label1="value1"} 11
+# TYPE test_drop gauge
+test_drop{label1="value1"} 22
 `,
-					wantCollected: map[string]int64{
-						"test_gauge_metric_1-label1=value1":         11000,
-						"test_gauge_metric_1-label1=value2":         12000,
-						"test_gauge_no_meta_metric_1-label1=value1": 11000,
-						"test_gauge_no_meta_metric_1-label1=value2": 12000,
-					},
-					wantCharts: 4,
-				},
+			want: func(t *testing.T, fr metrix.Reader) {
+				assert.InDelta(t, 11, value(t, fr, "test_keep", metrix.Labels{"label1": "value1"}), 1e-9)
+				_, ok := fr.Value("test_drop", metrix.Labels{"label1": "value1"})
+				assert.False(t, ok, "a metric not matched by the selector must be dropped")
+			},
+		},
+		"_info family is skipped": {
+			prepare: New,
+			input: `
+# TYPE test_metric gauge
+test_metric{label1="value1"} 11
+# TYPE test_metric_info gauge
+test_metric_info{version="1.2.3"} 1
+`,
+			want: func(t *testing.T, fr metrix.Reader) {
+				assert.InDelta(t, 11, value(t, fr, "test_metric", metrix.Labels{"label1": "value1"}), 1e-9)
+				_, ok := fr.Value("test_metric_info", metrix.Labels{"version": "1.2.3"})
+				assert.False(t, ok, "an _info family must be skipped")
+			},
+		},
+		"per-metric series limit skips the family": {
+			prepare: func() *Collector {
+				c := New()
+				c.MaxTSPerMetric = 1
+				return c
+			},
+			input: `
+# TYPE test_gauge_metric gauge
+test_gauge_metric{label1="value1"} 11
+test_gauge_metric{label1="value2"} 12
+`,
+			want: func(t *testing.T, fr metrix.Reader) {
+				_, ok := fr.Value("test_gauge_metric", metrix.Labels{"label1": "value1"})
+				assert.False(t, ok, "a family over the per-metric series limit must be skipped entirely")
 			},
 		},
 	}
 
-	for name, test := range tests {
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			collr := test.prepare()
-
-			var metrics []byte
 			srv := httptest.NewServer(http.HandlerFunc(
-				func(w http.ResponseWriter, r *http.Request) {
-					_, _ = w.Write(metrics)
-				}))
+				func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(tc.input)) }))
 			defer srv.Close()
 
+			collr := tc.prepare()
 			collr.URL = srv.URL
 			require.NoError(t, collr.Init(context.Background()))
 
-			for num, step := range test.steps {
-				t.Run(fmt.Sprintf("step num %d ('%s')", num+1, step.desc), func(t *testing.T) {
+			// Drive Collect exactly as the framework does: one store cycle around it.
+			cc := cycle(t, collr.MetricStore())
+			cc.BeginCycle()
+			require.NoError(t, collr.Collect(context.Background()))
+			require.NoError(t, cc.CommitCycleSuccess())
 
-					metrics = []byte(step.input)
-
-					var mx map[string]int64
-
-					for range maxNotSeenTimes + 1 {
-						mx = collr.Collect(context.Background())
-					}
-
-					assert.Equal(t, step.wantCollected, mx)
-					removeObsoleteCharts(collr.Charts())
-					assert.Len(t, *collr.Charts(), step.wantCharts)
-				})
-			}
+			tc.want(t, collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
 		})
 	}
 }
 
-func removeObsoleteCharts(charts *collectorapi.Charts) {
-	var i int
-	for _, chart := range *charts {
-		if !chart.Obsolete {
-			(*charts)[i] = chart
-			i++
-		}
+// TestCollector_ChartCoverage verifies the collector's own ChartTemplateYAML() (the per-job
+// autogen template built in Init from the configured app) plus the collected store materialize
+// the expected chart contexts and dimensions. Unlike the manifest parity test (which builds the
+// template directly), this exercises the real CollectorV2.ChartTemplateYAML() method and the
+// "prometheus" / "prometheus.<app>" context namespace end-to-end via chartengine autogen.
+func TestCollector_ChartCoverage(t *testing.T) {
+	tests := map[string]struct {
+		prepare func() *Collector
+		input   string
+		want    map[string][]string
+	}{
+		"default namespace, scalars and a summary split": {
+			prepare: New,
+			input: `
+# TYPE test_gauge_metric gauge
+test_gauge_metric{label1="value1"} 11
+# TYPE test_counter_metric_total counter
+test_counter_metric_total{label1="value1"} 11
+# TYPE test_summary_duration_seconds summary
+test_summary_duration_seconds{label1="value1",quantile="0.5"} 0.25
+test_summary_duration_seconds{label1="value1",quantile="0.99"} 0.5
+test_summary_duration_seconds_sum{label1="value1"} 12.5
+test_summary_duration_seconds_count{label1="value1"} 42
+`,
+			want: map[string][]string{
+				"prometheus.test_gauge_metric":                   {"test_gauge_metric"},
+				"prometheus.test_counter_metric_total":           {"test_counter_metric_total"},
+				"prometheus.test_summary_duration_seconds":       {"quantile_0.5", "quantile_0.99"},
+				"prometheus.test_summary_duration_seconds_sum":   {"test_summary_duration_seconds_sum"},
+				"prometheus.test_summary_duration_seconds_count": {"test_summary_duration_seconds_count"},
+			},
+		},
+		"app namespace prefixes the context": {
+			prepare: func() *Collector { c := New(); c.Application = "myapp"; return c },
+			input: `
+# TYPE test_gauge_metric gauge
+test_gauge_metric{label1="value1"} 11
+`,
+			want: map[string][]string{
+				"prometheus.myapp.test_gauge_metric": {"test_gauge_metric"},
+			},
+		},
 	}
-	*charts = (*charts)[:i]
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(
+				func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(tc.input)) }))
+			defer srv.Close()
+
+			collr := tc.prepare()
+			collr.URL = srv.URL
+			require.NoError(t, collr.Init(context.Background()))
+
+			cc := cycle(t, collr.MetricStore())
+			cc.BeginCycle()
+			require.NoError(t, collr.Collect(context.Background()))
+			require.NoError(t, cc.CommitCycleSuccess())
+
+			collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{RequiredContexts: tc.want})
+		})
+	}
 }

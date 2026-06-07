@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -106,7 +107,7 @@ app_hist_count 5
 				assert.InDelta(t, 5, value(t, fr, "app_hist_count", nil), 1e-9)
 			},
 		},
-		"family with heterogeneous label keys writes every series (P0-1)": {
+		"family with heterogeneous label keys writes every series": {
 			exposition: `
 # TYPE app_state gauge
 app_state{az="a"} 1
@@ -181,7 +182,7 @@ app_fallback_gauge 7
 app_things_total 5
 `,
 			policy: metricFamilyWriterPolicy{
-				isFallbackTypeGauge: func(name string) bool { return name == "app_fallback_gauge" },
+				isFallbackTypeGauge: matcher.Must(matcher.NewGlobMatcher("app_fallback_gauge")),
 			},
 			assert: func(t *testing.T, fr metrix.Reader, written int) {
 				assert.Equal(t, 2, written)
@@ -189,7 +190,7 @@ app_things_total 5
 				assert.InDelta(t, 5, value(t, fr, "app_things_total", nil), 1e-9)
 			},
 		},
-		"float bucket-bound label format (B1 probe)": {
+		"float bucket-bound label format": {
 			exposition: `
 # TYPE app_size histogram
 app_size_bucket{le="0.00001"} 1
@@ -200,9 +201,9 @@ app_size_count 2
 `,
 			assert: func(t *testing.T, fr metrix.Reader, written int) {
 				assert.Equal(t, 1, written)
-				// metrix formats the flattened bucket "le" label with strconv 'g'; V1 used 'f'.
-				// For sci-notation bounds the dim names differ (decision B1). This probe pins the
-				// metrix format so we know whether any real golden/target trips it.
+				// metrix formats the flattened bucket "le" label with strconv 'g' (V1 used 'f'), so
+				// scientific-notation bounds get different dimension names. This pins the metrix
+				// 'g' format.
 				for _, bound := range []float64{0.00001, 1000000} {
 					leG := strconv.FormatFloat(bound, 'g', -1, 64)
 					_, ok := fr.Value("app_size_bucket", metrix.Labels{"le": leG})

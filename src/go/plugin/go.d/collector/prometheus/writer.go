@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	commonmodel "github.com/prometheus/common/model"
@@ -21,8 +22,8 @@ const seriesCacheRetentionCycles = 10
 type metricFamilyWriterPolicy struct {
 	labelPrefix           string
 	maxTSPerMetric        int
-	isFallbackTypeGauge   func(string) bool
-	isFallbackTypeCounter func(string) bool
+	isFallbackTypeGauge   matcher.Matcher
+	isFallbackTypeCounter matcher.Matcher
 }
 
 type metricFamilyWriter struct {
@@ -68,6 +69,14 @@ type metricFamilyHandle struct {
 }
 
 func newMetricFamilyWriter(store metrix.CollectorStore, policy metricFamilyWriterPolicy, log *logger.Logger) *metricFamilyWriter {
+	// A family with no configured fallback matcher uses a never-matching matcher, so
+	// resolveFamilyType can call MatchString unconditionally (no per-cycle nil check).
+	if policy.isFallbackTypeGauge == nil {
+		policy.isFallbackTypeGauge = matcher.FALSE()
+	}
+	if policy.isFallbackTypeCounter == nil {
+		policy.isFallbackTypeCounter = matcher.FALSE()
+	}
 	return &metricFamilyWriter{
 		store:   store,
 		policy:  policy,
@@ -90,7 +99,7 @@ func (w *metricFamilyWriter) countWritable(mfs prompkg.MetricFamilies) int {
 			continue
 		}
 
-		schema, ok := w.canonicalSchema(mf, typ)
+		schema, ok := deriveMetricFamilySchema(mf, typ)
 		if !ok {
 			continue
 		}
@@ -154,10 +163,10 @@ func (w *metricFamilyWriter) resolveFamilyType(mf *prompkg.MetricFamily) (common
 		commonmodel.MetricTypeHistogram:
 		return mf.Type(), true
 	case commonmodel.MetricTypeUnknown:
-		if w.policy.isFallbackTypeGauge != nil && w.policy.isFallbackTypeGauge(mf.Name()) {
+		if w.policy.isFallbackTypeGauge.MatchString(mf.Name()) {
 			return commonmodel.MetricTypeGauge, true
 		}
-		if (w.policy.isFallbackTypeCounter != nil && w.policy.isFallbackTypeCounter(mf.Name())) || strings.HasSuffix(mf.Name(), "_total") {
+		if w.policy.isFallbackTypeCounter.MatchString(mf.Name()) || strings.HasSuffix(mf.Name(), "_total") {
 			return commonmodel.MetricTypeCounter, true
 		}
 		return "", false
@@ -211,20 +220,6 @@ func (w *metricFamilyWriter) ensureHandle(mf *prompkg.MetricFamily, typ commonmo
 
 	w.handles[mf.Name()] = handle
 	return handle, true
-}
-
-func (w *metricFamilyWriter) canonicalSchema(mf *prompkg.MetricFamily, typ commonmodel.MetricType) (metricFamilySchema, bool) {
-	if handle, ok := w.handles[mf.Name()]; ok {
-		if handle.typ != typ {
-			return metricFamilySchema{}, false
-		}
-		return metricFamilySchema{
-			summaryQuantiles: handle.summaryQuantiles,
-			histogramBounds:  handle.histogramBounds,
-		}, true
-	}
-
-	return deriveMetricFamilySchema(mf, typ)
 }
 
 func (w *metricFamilyWriter) observeMetric(handle *metricFamilyHandle, metric prompkg.Metric) bool {
@@ -360,20 +355,4 @@ func (w *metricFamilyWriter) seriesLabels(metric prompkg.Metric) []metrix.Label 
 		out = append(out, metrix.Label{Key: key, Value: l.Value})
 	}
 	return out
-}
-
-// instrumentUnit returns the chart unit metrix should carry for a family. V1 appends "/s" to summary
-// quantile units (except seconds/time). chartengine autogen adds "/s" itself for the incremental
-// counter/_sum routes but uses the unit as-is for the absolute summary-quantile route, so the writer
-// must add it for summaries; gauges/counters/histograms pass the base unit.
-func instrumentUnit(name string, typ commonmodel.MetricType) string {
-	unit := getChartUnits(name)
-	if typ == commonmodel.MetricTypeSummary {
-		switch unit {
-		case "seconds", "time":
-		default:
-			unit += "/s"
-		}
-	}
-	return unit
 }

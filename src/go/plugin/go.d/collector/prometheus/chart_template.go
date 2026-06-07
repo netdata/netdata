@@ -9,9 +9,9 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// chartExpireAfterCycles mirrors V1's stale-chart removal (10 missed cycles, see collect.go):
-// chartengine autogen removes a chart/dimension after this many successful cycles in which its
-// series is not seen.
+// chartExpireAfterCycles mirrors V1's stale-chart removal (a chart was dropped after 10 missed
+// cycles): chartengine autogen removes a chart/dimension after this many successful cycles in
+// which its series is not seen.
 const chartExpireAfterCycles = 10
 
 // buildChartTemplate returns the per-job chart template (charttpl YAML) for the prometheus collector.

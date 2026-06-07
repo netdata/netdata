@@ -5,7 +5,6 @@ package prometheus
 import (
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"maps"
 	"net/http"
@@ -19,34 +18,21 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-// updateGolden, when set, makes the manifest test (re)write the golden files and
-// skip the comparison. The goldens are a frozen baseline of the V1 collector's
-// observable contract; the V2 migration (PR5) checks parity by diffing its render
-// against them. Regenerate ONLY when intentionally adding a fixture or accepting a
-// contract change, then review the git diff — never to silently absorb V2 drift,
-// which would defeat the baseline. Hand-editing the JSON is error-prone, so this is
-// the supported way to maintain them:
-//
-//	go test ./plugin/go.d/collector/prometheus/ -run TestCollector_compatManifest -update-golden
-var updateGolden = flag.Bool("update-golden", false, "regenerate the prometheus compat-manifest golden files")
-
-// The compat manifest captures the V1 collector's observable CONTRACT, so the V2
-// migration can be verified to preserve it.
+// The compat manifest captures the V1 collector's observable CONTRACT as a frozen
+// golden baseline, so the migrated V2 collector can be verified to preserve it.
 //
 // manifestChart top-level fields are the HARD contract a V2 migration must
 // reproduce: the chart context, its labels (incl. label_prefix), and its dims by
 // semantic name with algo + the real (de-scaled) value. `soft` holds the chart
 // metadata: units and family are reproduced (the writer feeds the V1 chart helpers
 // into the metrix instrument meta) and ASSERTED; chart type is autogen-derived and
-// only logged — V1 leaves distribution charts type-empty while autogen sets "line",
+// only logged — V1 left distribution charts type-empty while autogen sets "line",
 // which is equivalent (an empty type renders as line).
 //
 // Chart title and priority are NOT in the manifest: the writer's feed of them is
@@ -58,14 +44,13 @@ var updateGolden = flag.Bool("update-golden", false, "regenerate the prometheus 
 // The V1 chart-ID strings and the ×1000 / ×1e6 precision divisor are INTENTIONALLY
 // excluded — both change by design in V2 (autogen chart-IDs; float dimensions).
 //
-// Values: V1 pre-scales to int64 (×1000 / ×1e6) then de-scales (mx ÷ Div), so a V1
+// Values: V1 pre-scaled to int64 (×1000 / ×1e6) then de-scaled (mx ÷ Div), so a V1
 // value can sit up to 1/Div (≤ 1/1000) below the true value while V2 writes the true
 // float directly; the comparison tolerates that ≤1e-3 truncation (manifestValueTolerance).
 // V2 does no scaling arithmetic, so it adds no sub-1e-3 error of its own — a real
 // divergence would be gross, not within tolerance. A gap (a dimension with no value
 // this cycle, e.g. a skipped NaN summary quantile) is NOT representable in this JSON
-// shape; both renderers fail loudly on one. Faithful gap handling rides with the
-// deferred NaN-summary decision; the current cases have none.
+// shape; the renderer fails loudly on one, and the current cases produce none.
 type manifestChart struct {
 	Context string            `json:"context"`
 	Labels  map[string]string `json:"labels,omitempty"`
@@ -83,57 +68,6 @@ type manifestSoft struct {
 	Units  string `json:"units"`
 	Family string `json:"family"`
 	Type   string `json:"type"`
-}
-
-func renderManifest(t *testing.T, charts *collectorapi.Charts, mx map[string]int64) []manifestChart {
-	t.Helper()
-	out := make([]manifestChart, 0, len(*charts))
-
-	for _, ch := range *charts {
-		if ch.Obsolete {
-			continue
-		}
-
-		mc := manifestChart{
-			Context: ch.Ctx,
-			Soft:    manifestSoft{Units: ch.Units, Family: ch.Fam, Type: string(ch.Type)},
-		}
-		if len(ch.Labels) > 0 {
-			mc.Labels = make(map[string]string, len(ch.Labels))
-			for _, l := range ch.Labels {
-				mc.Labels[l.Key] = l.Value
-			}
-		}
-		for _, d := range ch.Dims {
-			div := d.Div
-			if div == 0 {
-				div = 1
-			}
-			algo := "absolute"
-			if d.Algo != "" {
-				algo = string(d.Algo)
-			}
-			raw, ok := mx[d.ID]
-			require.Truef(t, ok, "V1 dim %q has no value this cycle (a gap); the manifest cannot represent gaps — faithful gap handling rides with the NaN-summary decision", d.ID)
-			mc.Dims = append(mc.Dims, manifestDim{
-				Name:  d.Name,
-				Algo:  algo,
-				Value: float64(raw) / float64(div),
-			})
-		}
-		sort.Slice(mc.Dims, func(i, j int) bool { return mc.Dims[i].Name < mc.Dims[j].Name })
-
-		out = append(out, mc)
-	}
-
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Context != out[j].Context {
-			return out[i].Context < out[j].Context
-		}
-		return manifestLabelsKey(out[i].Labels) < manifestLabelsKey(out[j].Labels)
-	})
-
-	return out
 }
 
 func manifestLabelsKey(m map[string]string) string {
@@ -158,9 +92,10 @@ type compatManifestCase struct {
 	input   string
 }
 
-// compatManifestCases is the shared fixture for the V1 and V2 compat-manifest tests:
-// the same scraped input and collector config are rendered through both the V1 chart
-// builder and the V2 writer + chartengine path, and checked against the same golden.
+// compatManifestCases is the fixture for the compat-manifest test: each scraped input
+// and collector config is run through the V2 collector (the metric-family writer plus
+// the per-job autogen template rendered by chartengine) and checked against the golden
+// — the frozen V1 contract the migration must preserve.
 func compatManifestCases() map[string]compatManifestCase {
 	return map[string]compatManifestCase{
 		"gauge": {
@@ -213,7 +148,7 @@ test_gauge_metric{label1="value1"} 11
 `,
 		},
 		"app_job_name": {
-			// Application empty -> the app segment falls back to the job Name (charts.go:238-241).
+			// Application empty -> the app segment falls back to the job Name (see application()).
 			prepare: func() *Collector { c := New(); c.Name = "job_app"; return c },
 			input: `
 # TYPE test_gauge_metric gauge
@@ -228,9 +163,9 @@ test_gauge_metric{label1="value1"} 11
 `,
 		},
 		"snmp_units": {
-			// Special unit mappings (charts.go getChartUnits): uppercase snmp-exporter
-			// names octets->bytes, pkts->packets, mtu->octets, speed->bits; underscore
-			// suffix hertz->Hz.
+			// Special unit mappings (getChartUnits): uppercase snmp-exporter names
+			// octets->bytes, pkts->packets, mtu->octets, speed->bits; underscore suffix
+			// hertz->Hz.
 			prepare: New,
 			input: `
 # TYPE ifOutOctets gauge
@@ -278,8 +213,9 @@ test_untyped_metric{label1="value1"} 11
 `,
 		},
 		"fallback_counter": {
-			// Untyped metric forced to counter by regex — a distinct path from the
-			// _total auto-counter (independent `if` at collect.go:176); algo incremental.
+			// Untyped metric forced to counter via fallback_type — distinct from the
+			// _total auto-counter; both are resolved by the writer's resolveFamilyType,
+			// algo incremental.
 			prepare: func() *Collector {
 				c := New()
 				c.FallbackType.Counter = []string{"test_untyped_metric"}
@@ -292,42 +228,9 @@ test_untyped_metric{label1="value1"} 11
 	}
 }
 
-func TestCollector_compatManifest(t *testing.T) {
-	for name, tc := range compatManifestCases() {
-		t.Run(name, func(t *testing.T) {
-			srv := httptest.NewServer(http.HandlerFunc(
-				func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(tc.input)) }))
-			defer srv.Close()
-
-			collr := tc.prepare()
-			collr.URL = srv.URL
-			require.NoError(t, collr.Init(context.Background()))
-
-			mx := collr.Collect(context.Background())
-			require.NotNil(t, mx)
-
-			got := renderManifest(t, collr.Charts(), mx)
-			data, err := json.MarshalIndent(got, "", "  ")
-			require.NoError(t, err)
-			data = append(data, '\n')
-
-			path := filepath.Join("testdata", "golden", goldenName(name)+".json")
-			if *updateGolden {
-				require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
-				require.NoError(t, os.WriteFile(path, data, 0o644))
-				return
-			}
-
-			want, err := os.ReadFile(path)
-			require.NoErrorf(t, err, "missing golden %q — run: go test -run TestCollector_compatManifest -update-golden ./...", path)
-			assert.Equal(t, string(want), string(data))
-		})
-	}
-}
-
-// Config defaults the V2 migration (PR5) must preserve: update_every is the
-// registered Creator default (collectorapi.Defaults); max_time_series[_per_metric]
-// are New() defaults. A V2 re-registration can silently drop them.
+// Config defaults the V2 migration must preserve: update_every is the registered
+// Creator default (collectorapi.Defaults); max_time_series[_per_metric] are New()
+// defaults. A V2 re-registration can silently drop them.
 func TestCollector_compatConfigDefaults(t *testing.T) {
 	creator, ok := collectorapi.DefaultRegistry.Lookup("prometheus")
 	require.True(t, ok, "prometheus collector must be registered")
@@ -342,8 +245,8 @@ func goldenName(name string) string {
 	return strings.NewReplacer(" ", "_", "(", "", ")", "", ">", "", "-", "_", ".", "_", "/", "_", "<", "").Replace(name)
 }
 
-// manifestValueTolerance bounds V1's pre-scale truncation: V1 stores int64(value×Div)
-// then de-scales, losing up to 1/Div (≤ 1/1000) of precision, while V2 writes the true
+// manifestValueTolerance bounds V1's pre-scale truncation: V1 stored int64(value×Div)
+// then de-scaled, losing up to 1/Div (≤ 1/1000) of precision, while V2 writes the true
 // float. V2 does no scaling arithmetic, so it adds no sub-1e-3 error — a real divergence
 // would exceed this.
 const manifestValueTolerance = 1e-3
@@ -365,13 +268,6 @@ func dimValue(dv chartengine.UpdateDimensionValue) float64 {
 	return float64(dv.Int64)
 }
 
-func matcherFunc(m matcher.Matcher) func(string) bool {
-	if m == nil {
-		return nil
-	}
-	return m.MatchString
-}
-
 func manifestLabels(m map[string]string) map[string]string {
 	if len(m) == 0 {
 		return nil
@@ -379,21 +275,19 @@ func manifestLabels(m map[string]string) map[string]string {
 	return maps.Clone(m)
 }
 
-// renderManifestV2 renders the V2 path into the same manifestChart shape as the V1
-// renderManifest, by inspecting the chartengine plan for a store that already holds
-// exactly one freshly-committed cycle of the metric-family writer's output plus the
-// per-job autogen template. The create actions (context, labels, dim name+algo, soft
-// fields) are emitted only on the first cycle, so a single cycle MUST be committed
-// before calling this.
-func renderManifestV2(t *testing.T, store metrix.CollectorStore, app string) []manifestChart {
+// renderManifestV2 renders the V2 path into the manifestChart shape: it loads the given chart
+// template (the collector's ChartTemplateYAML output) into chartengine, plans it against a store
+// that already holds exactly one freshly-committed cycle of the collector's output, and reads the
+// plan. Taking the live template (rather than rebuilding it) keeps the Init -> ChartTemplateYAML()
+// wiring, including the app/Name context namespace, on the tested path. The create actions
+// (context, labels, dim name+algo, soft fields) are emitted only on the first cycle, so a single
+// cycle MUST be committed before calling this.
+func renderManifestV2(t *testing.T, store metrix.CollectorStore, templateYAML string) []manifestChart {
 	t.Helper()
-
-	tmpl, err := buildChartTemplate(app)
-	require.NoError(t, err)
 
 	eng, err := chartengine.New()
 	require.NoError(t, err)
-	require.NoError(t, eng.LoadYAML([]byte(tmpl), 1))
+	require.NoError(t, eng.LoadYAML([]byte(templateYAML), 1))
 
 	attempt, err := eng.PreparePlan(store.Read(metrix.ReadRaw(), metrix.ReadFlatten()))
 	require.NoError(t, err)
@@ -428,7 +322,7 @@ func renderManifestV2(t *testing.T, store metrix.CollectorStore, app string) []m
 			c := charts[v.ChartID]
 			require.NotNilf(t, c, "values reference unknown chart %q", v.ChartID)
 			for _, dv := range v.Values {
-				require.Falsef(t, dv.IsEmpty, "V2 dim %q is a gap; the manifest cannot represent gaps — faithful gap handling rides with the NaN-summary decision", dv.Name)
+				require.Falsef(t, dv.IsEmpty, "V2 dim %q is a gap; the manifest cannot represent gaps (the current cases produce none)", dv.Name)
 				c.dimVal[dv.Name] = dimValue(dv)
 			}
 		}
@@ -451,12 +345,11 @@ func renderManifestV2(t *testing.T, store metrix.CollectorStore, app string) []m
 	return out
 }
 
-// TestCollector_compatManifestV2 proves the V2 path (metric-family writer + per-job
-// autogen template rendered by chartengine) reproduces the V1 collector's observable
+// TestCollector_compatManifestV2 drives the real V2 collector (Init then a framework-style
+// store cycle around Collect) and proves its rendered chart manifest reproduces the V1
 // contract captured in the goldens: identical chart contexts, labels, and dimensions
-// (name, algorithm, value), plus units and family. Only chart type is logged rather
-// than asserted — V1 leaves distribution charts type-empty while autogen sets "line"
-// (equivalent) — matching manifestChart's hard/soft split.
+// (name, algorithm, value), plus units and family. Only chart type is logged rather than
+// asserted — V1 left distribution charts type-empty while autogen sets "line" (equivalent).
 func TestCollector_compatManifestV2(t *testing.T) {
 	for name, tc := range compatManifestCases() {
 		t.Run(name, func(t *testing.T) {
@@ -468,24 +361,13 @@ func TestCollector_compatManifestV2(t *testing.T) {
 			collr.URL = srv.URL
 			require.NoError(t, collr.Init(context.Background()))
 
-			mfs, err := collr.prom.Scrape()
-			require.NoError(t, err)
-
-			policy := metricFamilyWriterPolicy{
-				labelPrefix:           collr.LabelPrefix,
-				maxTSPerMetric:        collr.MaxTSPerMetric,
-				isFallbackTypeGauge:   matcherFunc(collr.fallbackType.gauge),
-				isFallbackTypeCounter: matcherFunc(collr.fallbackType.counter),
-			}
-			store := metrix.NewCollectorStore()
-			w := newMetricFamilyWriter(store, policy, logger.New())
-
-			cc := cycle(t, store)
+			// Drive Collect exactly as the framework does: one store cycle around it.
+			cc := cycle(t, collr.MetricStore())
 			cc.BeginCycle()
-			w.writeMetricFamilies(mfs)
+			require.NoError(t, collr.Collect(context.Background()))
 			require.NoError(t, cc.CommitCycleSuccess())
 
-			got := renderManifestV2(t, store, collr.application())
+			got := renderManifestV2(t, collr.MetricStore(), collr.ChartTemplateYAML())
 
 			data, err := os.ReadFile(filepath.Join("testdata", "golden", goldenName(name)+".json"))
 			require.NoError(t, err)
@@ -528,7 +410,7 @@ func assertManifestParity(t *testing.T, want, got []manifestChart) {
 		assertDimsParity(t, w, g)
 		// Units and family are reproduced by feeding the V1 chart helpers into the
 		// metrix instrument meta, so they are asserted. Chart type is the one residual
-		// difference: V1 leaves distribution charts (histogram/summary) type-empty while
+		// difference: V1 left distribution charts (histogram/summary) type-empty while
 		// autogen sets "line" — semantically identical (an empty type renders as line),
 		// so it is only logged.
 		assert.Equalf(t, w.Soft.Units, g.Soft.Units, "units for context=%q", w.Context)
