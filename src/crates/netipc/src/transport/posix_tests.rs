@@ -1462,6 +1462,40 @@ fn test_receive_packet_too_short_for_header() {
 }
 
 #[test]
+fn test_receive_packet_longer_than_declared_payload() {
+    let (fd0, fd1) = socketpair_seqpacket();
+    let mut session = test_session(fd0, Role::Server, 4096);
+
+    let payload = [0xBE, 0xEF];
+    let mut pkt = [0u8; HEADER_SIZE + 2];
+    let hdr = Header {
+        magic: MAGIC_MSG,
+        version: VERSION,
+        header_len: protocol::HEADER_LEN,
+        kind: KIND_REQUEST,
+        code: 1,
+        flags: 0,
+        transport_status: protocol::STATUS_OK,
+        payload_len: 1,
+        item_count: 1,
+        message_id: 1,
+    };
+    hdr.encode(&mut pkt[..HEADER_SIZE]);
+    pkt[HEADER_SIZE..].copy_from_slice(&payload);
+
+    raw_send(fd1, &pkt).expect("send packet with trailing bytes");
+
+    let mut buf = [0u8; 128];
+    let err = session
+        .receive(&mut buf)
+        .expect_err("trailing bytes should be rejected");
+    assert!(matches!(err, UdsError::Protocol(ref msg)
+        if msg.contains("exceeds declared payload_len")));
+
+    unsafe { libc::close(fd1) };
+}
+
+#[test]
 fn test_receive_batch_directory_too_short_nonchunked() {
     let (fd0, fd1) = socketpair_seqpacket();
     let mut session = test_session(fd0, Role::Server, 4096);

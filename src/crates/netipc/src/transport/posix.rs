@@ -448,8 +448,14 @@ impl UdsSession {
 
         let total_msg = HEADER_SIZE + hdr.payload_len as usize;
 
+        if n > total_msg {
+            return Err(UdsError::Protocol(
+                "packet exceeds declared payload_len".into(),
+            ));
+        }
+
         // Non-chunked: entire message in one packet
-        if n >= total_msg {
+        if n == total_msg {
             let payload = &buf[HEADER_SIZE..HEADER_SIZE + hdr.payload_len as usize];
 
             // Validate batch directory

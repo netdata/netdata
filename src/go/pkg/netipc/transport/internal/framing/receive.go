@@ -60,7 +60,10 @@ func (r Receiver) Receive(buf []byte) (protocol.Header, []byte, error) {
 		return protocol.Header{}, nil, err
 	}
 	payloadLen := int(hdr.PayloadLen)
-	if n >= totalMsg {
+	if n > totalMsg {
+		return protocol.Header{}, nil, r.ErrProtocol("packet exceeds declared payload_len")
+	}
+	if n == totalMsg {
 		payload := buf[protocol.HeaderSize : protocol.HeaderSize+payloadLen]
 		if err := r.validateBatchPayload(hdr, payload); err != nil {
 			return protocol.Header{}, nil, err

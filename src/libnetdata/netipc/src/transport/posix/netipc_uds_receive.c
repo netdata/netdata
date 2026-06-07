@@ -244,7 +244,10 @@ nipc_uds_error_t nipc_uds_receive(nipc_uds_session_t *session,
     if (!nipc_uds_header_payload_len(hdr_out->payload_len, &total_msg))
         return NIPC_UDS_ERR_LIMIT_EXCEEDED;
 
-    if ((size_t)n >= total_msg) {
+    if ((size_t)n > total_msg)
+        return NIPC_UDS_ERR_PROTOCOL;
+
+    if ((size_t)n == total_msg) {
         return return_complete_packet(buf, hdr_out, payload_out,
                                       payload_len_out);
     }

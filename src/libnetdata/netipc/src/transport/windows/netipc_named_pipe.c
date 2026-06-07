@@ -1137,8 +1137,11 @@ nipc_np_error_t nipc_np_receive(nipc_np_session_t *session,
     if (!header_payload_len(hdr_out->payload_len, &total_msg))
         return NIPC_NP_ERR_LIMIT_EXCEEDED;
 
+    if (n > total_msg)
+        return NIPC_NP_ERR_PROTOCOL;
+
     /* Non-chunked: entire message in one read */
-    if (n >= total_msg) {
+    if (n == total_msg) {
         *payload_out = (const uint8_t *)buf + NIPC_HEADER_LEN;
         *payload_len_out = hdr_out->payload_len;
 

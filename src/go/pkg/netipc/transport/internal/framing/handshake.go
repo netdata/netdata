@@ -121,6 +121,8 @@ func NegotiateHello(hello protocol.Hello, config ServerHelloConfig) (protocol.He
 	if hello.AuthToken != config.AuthToken {
 		return protocol.HelloAck{}, protocol.StatusAuthFailed, false
 	}
+	// Level 1 keeps request payload limits client-proposed: the server rejects
+	// values over the wire cap and echoes accepted values unchanged.
 	if hello.MaxRequestPayloadBytes > protocol.MaxPayloadCap {
 		return protocol.HelloAck{}, protocol.StatusLimitExceeded, false
 	}
