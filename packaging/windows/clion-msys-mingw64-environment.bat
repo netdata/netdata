@@ -9,7 +9,7 @@
 set "batch_dir=%~dp0"
 set "batch_dir=%batch_dir:\=/%"
 set MSYSTEM=UCRT64
-set GOROOT=C:\msys64\ucrt64
+set GOROOT=C:\msys64\ucrt64\lib\go
 set PATH="%PATH%;C:\msys64\ucrt64\bin;C:\msys64\usr\bin;C:\msys64\bin"
 ::set PKG_CONFIG_EXECUTABLE=C:\msys64\ucrt64\bin\pkg-config.exe
 ::set CMAKE_C_COMPILER=C:\msys64\ucrt64\bin\gcc.exe
