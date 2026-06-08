@@ -1753,7 +1753,7 @@ modules:
               description: The name of the Application Pool.
           metrics:
             - name: iis.application_pool_current_status
-              description: "IIS App Pool current status. The numeric values map to dimension names as follows: 1 = uninitialized, 2 = initialized, 3 = running, 4 = disabling, 5 = disabled, 6 = shutdown_pending, 7 = delete_pending."
+              description: "IIS App Pool current status"
               unit: "status"
               chart_type: line
               dimensions:
