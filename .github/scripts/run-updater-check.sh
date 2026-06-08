@@ -14,7 +14,7 @@ echo "::endgroup::"
 echo ">>> Updating Netdata..."
 export NETDATA_BASE_URL="http://localhost:8080" # Pull the tarball from the local web server.
 echo 'NETDATA_ACCEPT_MAJOR_VERSIONS="1 9999"' > /etc/netdata/netdata-updater.conf
-timeout 3600 sh -x packaging/installer/netdata-updater.sh --not-running-from-cron --no-updater-self-update
+timeout 3600 sh -x packaging/installer/netdata-updater.sh --force-update --not-running-from-cron --no-updater-self-update
 
 case "$?" in
     124) echo "!!! Updater timed out." ; exit 1 ;;
