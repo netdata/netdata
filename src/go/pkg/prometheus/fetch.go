@@ -83,7 +83,9 @@ func (f *httpFetcher) fetch(ctx context.Context, w io.Writer) error {
 		}
 	} else {
 		f.bodyBuf.Reset(resp.Body)
-		_ = f.gzipr.Reset(f.bodyBuf)
+		if err := f.gzipr.Reset(f.bodyBuf); err != nil {
+			return err
+		}
 	}
 
 	_, err = io.Copy(w, f.gzipr)
