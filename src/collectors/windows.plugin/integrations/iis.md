@@ -162,6 +162,22 @@ Metrics:
 | iis.application_pool_recycles | recycles | recycles/s |
 | iis.application_pool_uptime | uptime | seconds |
 
+#### Application Pool Current State Mapping
+
+The `iis.application_pool_current_status` chart reports the current state of each application pool using seven boolean dimensions. Each dimension is set to `1` when it matches the pool's current state and `0` otherwise. The PerfLib counter value from the `APP_POOL_WAS` object maps directly to dimension names as follows:
+
+| PerfLib State Value | Netdata Dimension | Description |
+|:---:|:---|:---|
+| 1 | `uninitialized` | The application pool has been created but not yet initialized |
+| 2 | `initialized` | The application pool has been initialized |
+| 3 | `running` | The application pool is running |
+| 4 | `disabling` | The application pool is being disabled |
+| 5 | `disabled` | The application pool is disabled |
+| 6 | `shutdown_pending` | The application pool is pending shutdown |
+| 7 | `delete_pending` | The application pool is pending deletion |
+
+The chart uses the `absolute` collection algorithm. Only one dimension is set to `1` at any given time; all other dimensions are `0`.
+
 ### Per IIS W3SCV W3MP
 
 These metrics refer to the World Wide Web Publishing Service, the service responsible for hosting and serving web content.
