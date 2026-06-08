@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,7 +34,7 @@ type (
 		// quantile has not appeared) is deferred and emitted once the type
 		// resolves, or at end of stream — so it may arrive after a later,
 		// unrelated sample. Each sample's Kind and FamilyType are always correct.
-		ScrapeStream(onHelp func(name, help string), onSample func(Sample) error) error
+		ScrapeStream(ctx context.Context, onHelp func(name, help string), onSample func(Sample) error) error
 		HTTPClient() *http.Client
 	}
 
@@ -86,7 +87,7 @@ func (p *prometheus) HTTPClient() *http.Client {
 func (p *prometheus) ScrapeSeries() (Series, error) {
 	p.buf.Reset()
 
-	if err := p.fetch(p.buf); err != nil {
+	if err := p.fetch(context.Background(), p.buf); err != nil {
 		return nil, err
 	}
 
@@ -96,14 +97,14 @@ func (p *prometheus) ScrapeSeries() (Series, error) {
 func (p *prometheus) Scrape() (MetricFamilies, error) {
 	p.buf.Reset()
 
-	if err := p.fetch(p.buf); err != nil {
+	if err := p.fetch(context.Background(), p.buf); err != nil {
 		return nil, err
 	}
 
 	return p.parser.parseToMetricFamilies(p.buf.Bytes())
 }
 
-func (p *prometheus) fetch(w io.Writer) error {
+func (p *prometheus) fetch(ctx context.Context, w io.Writer) error {
 	// TODO: should be a separate text file prom client
 	if p.filepath != "" {
 		f, err := os.Open(p.filepath)
@@ -121,6 +122,7 @@ func (p *prometheus) fetch(w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	req = req.WithContext(ctx)
 
 	req.Header.Add("Accept", acceptHeader)
 	req.Header.Add("Accept-Encoding", "gzip")

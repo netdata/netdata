@@ -5,6 +5,7 @@ package prometheus
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -150,6 +151,7 @@ func TestPrometheusScrapeStream(t *testing.T) {
 			var samples int
 			var help []string
 			err := prom.ScrapeStream(
+				context.Background(),
 				func(name, _ string) { help = append(help, name) },
 				func(Sample) error {
 					samples++
