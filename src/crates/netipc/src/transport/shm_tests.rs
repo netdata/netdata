@@ -1125,7 +1125,10 @@ fn test_check_shm_stale_nonexistent_returns_not_exist() {
     cleanup_shm(svc, sid);
 
     let path = build_shm_path(TEST_RUN_DIR, svc, sid).expect("path");
-    assert!(matches!(check_shm_stale(&path), StaleResult::NotExist));
+    assert!(matches!(
+        check_shm_stale(&path, true),
+        StaleResult::NotExist
+    ));
 }
 
 #[test]
@@ -1133,7 +1136,10 @@ fn test_check_shm_stale_invalid_cstring_returns_not_exist() {
     let bad_path = PathBuf::from(OsString::from_vec(vec![
         b'/', b't', b'm', b'p', b'/', b'n', b'i', b'p', b'c', 0, b'b',
     ]));
-    assert!(matches!(check_shm_stale(&bad_path), StaleResult::NotExist));
+    assert!(matches!(
+        check_shm_stale(&bad_path, true),
+        StaleResult::NotExist
+    ));
 }
 
 #[test]
@@ -1259,7 +1265,7 @@ fn test_check_shm_stale_short_file_invalid() {
     let path = build_shm_path(TEST_RUN_DIR, svc, sid).expect("path");
     std::fs::write(&path, [0u8; 8]).expect("write short file");
 
-    assert!(matches!(check_shm_stale(&path), StaleResult::Invalid));
+    assert!(matches!(check_shm_stale(&path, true), StaleResult::Invalid));
     assert!(!path.exists(), "short stale file should be removed");
 }
 
@@ -1277,7 +1283,7 @@ fn test_check_shm_stale_bad_magic_invalid() {
     server.close();
 
     let path = build_shm_path(TEST_RUN_DIR, svc, sid).expect("path");
-    assert!(matches!(check_shm_stale(&path), StaleResult::Invalid));
+    assert!(matches!(check_shm_stale(&path, true), StaleResult::Invalid));
     assert!(!path.exists(), "bad magic stale file should be removed");
 }
 
@@ -1295,7 +1301,10 @@ fn test_check_shm_stale_zero_generation_recovers() {
     server.close();
 
     let path = build_shm_path(TEST_RUN_DIR, svc, sid).expect("path");
-    assert!(matches!(check_shm_stale(&path), StaleResult::Recovered));
+    assert!(matches!(
+        check_shm_stale(&path, true),
+        StaleResult::Recovered
+    ));
     assert!(
         !path.exists(),
         "zero-generation stale file should be removed"
@@ -1333,7 +1342,7 @@ fn test_check_shm_stale_open_failure_invalid() {
         errno()
     );
 
-    assert!(matches!(check_shm_stale(&path), StaleResult::Invalid));
+    assert!(matches!(check_shm_stale(&path, true), StaleResult::Invalid));
     // Under non-root: file preserved (EACCES). Under root: chmod 000
     // has no effect, so the file is opened, inspected, and removed.
     if unsafe { libc::geteuid() } != 0 {
@@ -1359,7 +1368,7 @@ fn test_check_shm_stale_directory_symlink_invalid() {
     std::fs::create_dir_all(&target).expect("create target dir");
     std::os::unix::fs::symlink(&target, &path).expect("create symlink");
 
-    assert!(matches!(check_shm_stale(&path), StaleResult::Invalid));
+    assert!(matches!(check_shm_stale(&path, true), StaleResult::Invalid));
     assert!(
         !path.exists(),
         "directory symlink stale entry should be removed"

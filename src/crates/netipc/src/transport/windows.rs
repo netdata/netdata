@@ -689,7 +689,9 @@ impl NpSession {
                 self.max_response_batch_items,
             )
         };
-        if payload.len() > max_payload as usize || payload.len() > u32::MAX as usize {
+        if payload.len() > max_payload as usize
+            || payload.len() > (u32::MAX as usize).saturating_sub(HEADER_SIZE)
+        {
             return Err(NpError::LimitExceeded);
         }
         if hdr.item_count > max_items {
@@ -748,7 +750,7 @@ impl NpSession {
         let remaining_after_first = payload.len() - first_chunk_payload;
 
         let continuation_chunks = if remaining_after_first > 0 {
-            (remaining_after_first + chunk_payload_budget - 1) / chunk_payload_budget
+            1 + ((remaining_after_first - 1) / chunk_payload_budget)
         } else {
             0
         };
@@ -847,8 +849,14 @@ impl NpSession {
 
         let total_msg = HEADER_SIZE + hdr.payload_len as usize;
 
+        if n > total_msg {
+            return Err(NpError::Protocol(
+                "packet exceeds declared payload_len".into(),
+            ));
+        }
+
         // Non-chunked
-        if n >= total_msg {
+        if n == total_msg {
             let payload = &buf[HEADER_SIZE..HEADER_SIZE + hdr.payload_len as usize];
 
             // Validate batch directory
@@ -885,7 +893,7 @@ impl NpSession {
 
         let remaining_after_first = hdr.payload_len as usize - first_payload_bytes;
         let expected_continuations = if remaining_after_first > 0 && chunk_payload_budget > 0 {
-            (remaining_after_first + chunk_payload_budget - 1) / chunk_payload_budget
+            1 + ((remaining_after_first - 1) / chunk_payload_budget)
         } else {
             0
         };
@@ -1787,6 +1795,60 @@ mod tests {
         assert_eq!(rhdr.kind, KIND_RESPONSE);
         assert_eq!(rhdr.message_id, 42);
         assert_eq!(rpayload, payload);
+
+        session.close();
+        server.join().expect("server join");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_receive_packet_longer_than_declared_payload() {
+        ensure_run_dir();
+        let svc = unique_service("rs_trailing");
+
+        let mut listener =
+            NpListener::bind(TEST_RUN_DIR, &svc, default_server_config()).expect("bind");
+        let server = thread::spawn(move || {
+            let mut session = listener.accept().expect("accept");
+            let mut buf = [0u8; 256];
+            let (req_hdr, _) = session.receive(&mut buf).expect("recv request");
+
+            let mut pkt = [0u8; HEADER_SIZE + 2];
+            let resp_hdr = Header {
+                magic: MAGIC_MSG,
+                version: VERSION,
+                header_len: protocol::HEADER_LEN,
+                kind: KIND_RESPONSE,
+                code: req_hdr.code,
+                flags: 0,
+                transport_status: protocol::STATUS_OK,
+                payload_len: 1,
+                item_count: 1,
+                message_id: req_hdr.message_id,
+            };
+            resp_hdr.encode(&mut pkt[..HEADER_SIZE]);
+            pkt[HEADER_SIZE..].copy_from_slice(&[0xBE, 0xEF]);
+            raw_write(session.handle, &pkt).expect("raw trailing packet write");
+            session.close();
+        });
+
+        let mut session =
+            NpSession::connect(TEST_RUN_DIR, &svc, &default_client_config()).expect("connect");
+        let mut hdr = Header {
+            kind: KIND_REQUEST,
+            code: protocol::METHOD_INCREMENT,
+            item_count: 1,
+            message_id: 43,
+            ..Header::default()
+        };
+        session.send(&mut hdr, &[0xAA]).expect("send request");
+
+        let mut rbuf = [0u8; 256];
+        let err = session
+            .receive(&mut rbuf)
+            .expect_err("trailing bytes should be rejected");
+        assert!(matches!(err, NpError::Protocol(ref msg)
+            if msg.contains("exceeds declared payload_len")));
 
         session.close();
         server.join().expect("server join");

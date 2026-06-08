@@ -2358,12 +2358,42 @@ set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_
 # build netipc (standalone IPC library, no Netdata deps)
 #
 
+set(NETIPC_PROTOCOL_FILES
+        src/libnetdata/netipc/src/protocol/netipc_protocol.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_increment.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_string_reverse.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_cgroups_snapshot.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_lookup_common.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_cgroups_lookup.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_apps_lookup.c
+)
+
+set(NETIPC_SERVICE_COMMON_FILES
+        src/libnetdata/netipc/src/service/netipc_service_common.c
+        src/libnetdata/netipc/src/service/netipc_service_cgroups_cache_common.c
+        src/libnetdata/netipc/src/service/netipc_service_cgroups_cache.c
+        src/libnetdata/netipc/src/service/netipc_service_cgroups_snapshot.c
+        src/libnetdata/netipc/src/service/netipc_service_cgroups_lookup.c
+        src/libnetdata/netipc/src/service/netipc_service_apps_lookup.c
+)
+
 if(OS_LINUX)
     set(NETIPC_FILES
-            src/libnetdata/netipc/src/protocol/netipc_protocol.c
+            ${NETIPC_PROTOCOL_FILES}
             src/libnetdata/netipc/src/transport/posix/netipc_uds.c
+            src/libnetdata/netipc/src/transport/posix/netipc_uds_handshake.c
+            src/libnetdata/netipc/src/transport/posix/netipc_uds_inflight.c
+            src/libnetdata/netipc/src/transport/posix/netipc_uds_lifecycle.c
+            src/libnetdata/netipc/src/transport/posix/netipc_uds_receive.c
+            src/libnetdata/netipc/src/transport/posix/netipc_uds_send.c
             src/libnetdata/netipc/src/transport/posix/netipc_shm.c
+            ${NETIPC_SERVICE_COMMON_FILES}
             src/libnetdata/netipc/src/service/netipc_service.c
+            src/libnetdata/netipc/src/service/netipc_service_posix_client.c
+            src/libnetdata/netipc/src/service/netipc_service_posix_client_connect.c
+            src/libnetdata/netipc/src/service/netipc_service_posix_client_call.c
+            src/libnetdata/netipc/src/service/netipc_service_posix_server.c
+            src/libnetdata/netipc/src/service/netipc_service_posix_server_session.c
     )
 
     add_library(netipc STATIC ${NETIPC_FILES})
@@ -2372,10 +2402,16 @@ if(OS_LINUX)
     set_target_properties(netipc PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
 elseif(OS_WINDOWS)
     set(NETIPC_FILES
-            src/libnetdata/netipc/src/protocol/netipc_protocol.c
+            ${NETIPC_PROTOCOL_FILES}
             src/libnetdata/netipc/src/transport/windows/netipc_named_pipe.c
             src/libnetdata/netipc/src/transport/windows/netipc_win_shm.c
+            ${NETIPC_SERVICE_COMMON_FILES}
             src/libnetdata/netipc/src/service/netipc_service_win.c
+            src/libnetdata/netipc/src/service/netipc_service_win_client.c
+            src/libnetdata/netipc/src/service/netipc_service_win_client_connect.c
+            src/libnetdata/netipc/src/service/netipc_service_win_client_call.c
+            src/libnetdata/netipc/src/service/netipc_service_win_server.c
+            src/libnetdata/netipc/src/service/netipc_service_win_server_session.c
     )
 
     add_library(netipc STATIC ${NETIPC_FILES})

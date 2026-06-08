@@ -30,6 +30,18 @@ func TestMinU32(t *testing.T) {
 	}
 }
 
+func TestMaxU32(t *testing.T) {
+	if got := maxU32(9, 1); got != 9 {
+		t.Fatalf("maxU32(9, 1) = %d, want 9", got)
+	}
+	if got := maxU32(1, 9); got != 9 {
+		t.Fatalf("maxU32(1, 9) = %d, want 9", got)
+	}
+	if got := maxU32(5, 5); got != 5 {
+		t.Fatalf("maxU32(5, 5) = %d, want 5", got)
+	}
+}
+
 func TestHighestBit(t *testing.T) {
 	cases := []struct {
 		mask uint32
@@ -216,5 +228,19 @@ func TestSetNamedPipeHandleStateInvalidHandle(t *testing.T) {
 	mode := uint32(_PIPE_READMODE_MESSAGE)
 	if err := setNamedPipeHandleState(syscall.InvalidHandle, &mode); err == nil {
 		t.Fatal("setNamedPipeHandleState on invalid handle should fail")
+	}
+}
+
+func TestWaitReadableClosedSession(t *testing.T) {
+	session := &Session{handle: syscall.InvalidHandle}
+	ready, err := session.WaitReadable(1)
+	if err == nil {
+		t.Fatal("WaitReadable on closed session should fail")
+	}
+	if ready {
+		t.Fatal("WaitReadable on closed session returned ready")
+	}
+	if !errors.Is(err, ErrBadParam) {
+		t.Fatalf("WaitReadable on closed session = %v, want ErrBadParam", err)
 	}
 }
