@@ -15,14 +15,25 @@ function(netdata_bundle_libbacktrace)
         set(libbacktrace_INSTALL_DIR "${CMAKE_BINARY_DIR}/libbacktrace-install")
         set(libbacktrace_LIBRARY "${libbacktrace_INSTALL_DIR}/lib/libbacktrace.a")
 
+        # On Windows, ExternalProject runs commands through cmd.exe which cannot
+        # execute shell scripts directly; wrap configure and make with bash.
+        if(OS_WINDOWS)
+                find_program(BASH_EXECUTABLE bash REQUIRED)
+                set(_bt_configure_cmd ${BASH_EXECUTABLE} "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static)
+                set(_bt_build_cmd ${BASH_EXECUTABLE} -c "make install")
+        else()
+                set(_bt_configure_cmd "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static)
+                set(_bt_build_cmd make install)
+        endif()
+
         # Clone and build libbacktrace
         ExternalProject_Add(
                 libbacktrace
                 GIT_REPOSITORY https://github.com/ianlancetaylor/libbacktrace.git
                 SOURCE_DIR "${libbacktrace_SOURCE_DIR}"
                 BINARY_DIR "${libbacktrace_BINARY_DIR}"
-                CONFIGURE_COMMAND "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static
-                BUILD_COMMAND make install
+                CONFIGURE_COMMAND ${_bt_configure_cmd}
+                BUILD_COMMAND ${_bt_build_cmd}
                 INSTALL_COMMAND ""
                 BUILD_BYPRODUCTS "${libbacktrace_LIBRARY}"
                 EXCLUDE_FROM_ALL 1
