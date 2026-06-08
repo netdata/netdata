@@ -4,6 +4,7 @@ package apps_lookup
 
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/service/internal/transportconfig"
 	raw "github.com/netdata/netdata/go/plugins/pkg/netipc/service/raw"
 )
 
@@ -21,21 +22,9 @@ const (
 
 type ClientStatus = raw.ClientStatus
 
-type ClientConfig struct {
-	SupportedProfiles       uint32
-	PreferredProfiles       uint32
-	MaxRequestBatchItems    uint32
-	MaxResponsePayloadBytes uint32
-	AuthToken               uint64
-}
+type ClientConfig transportconfig.TypedConfig
 
-type ServerConfig struct {
-	SupportedProfiles       uint32
-	PreferredProfiles       uint32
-	MaxRequestBatchItems    uint32
-	MaxResponsePayloadBytes uint32
-	AuthToken               uint64
-}
+type ServerConfig transportconfig.TypedConfig
 
 type HandlerFunc = func(*protocol.AppsLookupRequestView, *protocol.AppsLookupBuilder) bool
 

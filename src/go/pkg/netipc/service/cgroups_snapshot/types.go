@@ -8,6 +8,7 @@ package cgroups_snapshot
 
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/service/internal/transportconfig"
 	raw "github.com/netdata/netdata/go/plugins/pkg/netipc/service/raw"
 )
 
@@ -31,25 +32,13 @@ type ClientStatus = raw.ClientStatus
 // cgroups-snapshot service.
 //
 // Transport-only tuning stays below the public typed API.
-type ClientConfig struct {
-	SupportedProfiles       uint32
-	PreferredProfiles       uint32
-	MaxRequestBatchItems    uint32
-	MaxResponsePayloadBytes uint32
-	AuthToken               uint64
-}
+type ClientConfig transportconfig.TypedConfig
 
 // ServerConfig is the public typed-server configuration for the
 // cgroups-snapshot service.
 //
 // Transport-only tuning stays below the public typed API.
-type ServerConfig struct {
-	SupportedProfiles       uint32
-	PreferredProfiles       uint32
-	MaxRequestBatchItems    uint32
-	MaxResponsePayloadBytes uint32
-	AuthToken               uint64
-}
+type ServerConfig transportconfig.TypedConfig
 
 // SnapshotHandler is the typed callback used by the cgroups-snapshot service.
 type SnapshotHandler = func(*protocol.CgroupsRequest, *protocol.CgroupsBuilder) bool

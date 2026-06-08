@@ -845,6 +845,104 @@ func TestAppsLookupBuilderGuardCoverage(t *testing.T) {
 	}
 }
 
+func TestAppsLookupUnknownItemCanonicalLayout(t *testing.T) {
+	var resp [128]byte
+	builder := NewAppsLookupBuilder(resp[:], 1, 7)
+	if err := builder.Add(PidLookupUnknown, AppsCgroupKnown, 0, 4321, 0, NipcUIDUnset, 0, nil, nil, nil, nil); err != nil {
+		t.Fatalf("add unknown apps item: %v", err)
+	}
+	total := builder.Finish()
+	itemStart := appsLookupItemStart(t, resp[:total])
+	item := resp[itemStart:total]
+
+	if got := len(item); got != appsLookupUnknownItemSize {
+		t.Fatalf("unknown item size = %d, want %d", got, appsLookupUnknownItemSize)
+	}
+	if got := ne.Uint32(resp[AppsLookupRespHdr+4 : AppsLookupRespHdr+8]); got != appsLookupUnknownItemSize {
+		t.Fatalf("directory item length = %d, want %d", got, appsLookupUnknownItemSize)
+	}
+	if got := ne.Uint32(item[32:36]); got != AppsLookupItemHdr {
+		t.Fatalf("comm offset = %d, want %d", got, AppsLookupItemHdr)
+	}
+	if got := ne.Uint32(item[40:44]); got != AppsLookupItemHdr+1 {
+		t.Fatalf("path offset = %d, want %d", got, AppsLookupItemHdr+1)
+	}
+	if got := ne.Uint32(item[48:52]); got != AppsLookupItemHdr+2 {
+		t.Fatalf("name offset = %d, want %d", got, AppsLookupItemHdr+2)
+	}
+	if item[AppsLookupItemHdr] != 0 || item[AppsLookupItemHdr+1] != 0 || item[AppsLookupItemHdr+2] != 0 {
+		t.Fatalf("unknown item NUL bytes = %v, want all zero", item[AppsLookupItemHdr:AppsLookupItemHdr+3])
+	}
+
+	view, err := DecodeAppsLookupResponse(resp[:total])
+	if err != nil {
+		t.Fatalf("decode unknown apps item: %v", err)
+	}
+	got, err := view.Item(0)
+	if err != nil {
+		t.Fatalf("read unknown apps item: %v", err)
+	}
+	if got.Status != PidLookupUnknown || got.Pid != 4321 ||
+		len(got.Comm.Bytes()) != 0 || len(got.CgroupPath.Bytes()) != 0 || len(got.CgroupName.Bytes()) != 0 {
+		t.Fatalf("decoded unknown apps item = %+v", got)
+	}
+
+	bad := append([]byte(nil), resp[:total]...)
+	bad[itemStart+AppsLookupItemHdr+1] = 'x'
+	if _, err := DecodeAppsLookupResponse(bad); err != ErrMissingNul {
+		t.Fatalf("decode missing unknown path NUL error = %v, want ErrMissingNul", err)
+	}
+}
+
+func TestCgroupsLookupUnknownItemCanonicalLayout(t *testing.T) {
+	path := []byte("/sys/fs/cgroup/bench/cg-001")
+	var resp [128]byte
+	builder := NewCgroupsLookupBuilder(resp[:], 1, 9)
+	if err := builder.Add(CgroupLookupUnknownRetryLater, 0, path, nil, nil); err != nil {
+		t.Fatalf("add unknown cgroups item: %v", err)
+	}
+	total := builder.Finish()
+	itemStart := cgroupsLookupItemStart(t, resp[:total])
+	item := resp[itemStart:total]
+	wantSize := cgroupsLookupUnknownFixedBytes + len(path) + 1
+
+	if got := len(item); got != wantSize {
+		t.Fatalf("unknown item size = %d, want %d", got, wantSize)
+	}
+	if got := ne.Uint32(resp[CgroupsLookupRespHdr+4 : CgroupsLookupRespHdr+8]); got != uint32(wantSize) {
+		t.Fatalf("directory item length = %d, want %d", got, wantSize)
+	}
+	if got := ne.Uint32(item[8:12]); got != CgroupsLookupItemHdr {
+		t.Fatalf("path offset = %d, want %d", got, CgroupsLookupItemHdr)
+	}
+	wantNameOff := CgroupsLookupItemHdr + len(path) + 1
+	if got := ne.Uint32(item[16:20]); got != uint32(wantNameOff) {
+		t.Fatalf("name offset = %d, want %d", got, wantNameOff)
+	}
+	if item[CgroupsLookupItemHdr+len(path)] != 0 || item[wantNameOff] != 0 {
+		t.Fatalf("unknown item NUL bytes are not canonical")
+	}
+
+	view, err := DecodeCgroupsLookupResponse(resp[:total])
+	if err != nil {
+		t.Fatalf("decode unknown cgroups item: %v", err)
+	}
+	got, err := view.Item(0)
+	if err != nil {
+		t.Fatalf("read unknown cgroups item: %v", err)
+	}
+	if got.Status != CgroupLookupUnknownRetryLater || got.Path.String() != string(path) ||
+		len(got.Name.Bytes()) != 0 || got.LabelCount != 0 {
+		t.Fatalf("decoded unknown cgroups item = %+v", got)
+	}
+
+	bad := append([]byte(nil), resp[:total]...)
+	bad[itemStart+wantNameOff] = 'x'
+	if _, err := DecodeCgroupsLookupResponse(bad); err != ErrMissingNul {
+		t.Fatalf("decode missing unknown name NUL error = %v, want ErrMissingNul", err)
+	}
+}
+
 func TestLookupInternalGuardCoverage(t *testing.T) {
 	if _, ok := checkedU32Int(-1); ok {
 		t.Fatalf("checkedU32Int(-1) succeeded")

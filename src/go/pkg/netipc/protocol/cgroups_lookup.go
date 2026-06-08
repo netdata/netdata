@@ -10,6 +10,8 @@ const (
 	CgroupsLookupReqHdr  = 16
 	CgroupsLookupRespHdr = 16
 	CgroupsLookupItemHdr = 28
+
+	cgroupsLookupUnknownFixedBytes = CgroupsLookupItemHdr + 1
 )
 
 type CgroupsLookupRequestView struct {
@@ -268,6 +270,9 @@ func decodeCgroupsLookupItem(item []byte) (*CgroupsLookupItemView, error) {
 	if err := validateCgroupsLookupSemantics(status, orchestrator, pathLen, nameLen, int(labelCount)); err != nil {
 		return nil, err
 	}
+	if status != CgroupLookupKnown {
+		return decodeCgroupsLookupUnknownItem(item, status, pathOff, pathLen, nameOff)
+	}
 	path, pathEnd, err := lookupString(item, CgroupsLookupItemHdr, pathOff, pathLen)
 	if err != nil {
 		return nil, err
@@ -291,6 +296,31 @@ func decodeCgroupsLookupItem(item []byte) (*CgroupsLookupItemView, error) {
 		LabelCount:       labelCount,
 		item:             item,
 		labelTableOffset: table,
+	}, nil
+}
+
+func decodeCgroupsLookupUnknownItem(item []byte, status uint16, pathOff, pathLen, nameOff int) (*CgroupsLookupItemView, error) {
+	path, pathEnd, err := lookupString(item, CgroupsLookupItemHdr, pathOff, pathLen)
+	if err != nil {
+		return nil, err
+	}
+	name, nameEnd, err := lookupEmptyString(item, CgroupsLookupItemHdr, nameOff)
+	if err != nil {
+		return nil, err
+	}
+	if overlap(pathOff, pathEnd, nameOff, nameEnd) {
+		return nil, ErrBadLayout
+	}
+	labelTableOffset := max(pathEnd, nameEnd)
+	if labelTableOffset != len(item) {
+		return nil, ErrBadLayout
+	}
+	return &CgroupsLookupItemView{
+		Status:           status,
+		Path:             path,
+		Name:             name,
+		item:             item,
+		labelTableOffset: labelTableOffset,
 	}, nil
 }
 
@@ -334,6 +364,9 @@ func (b *CgroupsLookupBuilder) Add(status, orchestrator uint16, path, name []byt
 	if invalidSourceString(path, true) || invalidSourceString(name, false) {
 		b.err = ErrBadLayout
 		return ErrBadLayout
+	}
+	if status != CgroupLookupKnown {
+		return b.addUnknown(status, path)
 	}
 	labelCount, ok := checkedU16Int(len(labels))
 	if !ok {
@@ -431,6 +464,81 @@ func (b *CgroupsLookupBuilder) Add(status, orchestrator uint16, path, name []byt
 		}
 		itemSize = next
 	}
+	dir, ok := lookupDirOffset(CgroupsLookupRespHdr, b.itemCount)
+	if !ok {
+		b.err = ErrOverflow
+		return ErrOverflow
+	}
+	ne.PutUint32(b.buf[dir:dir+4], itemStart32)
+	ne.PutUint32(b.buf[dir+4:dir+8], itemSize32)
+	b.dataOffset = itemStart + itemSize
+	b.itemCount++
+	return nil
+}
+
+func (b *CgroupsLookupBuilder) addUnknown(status uint16, path []byte) error {
+	itemStart, ok := checkedAlign8(b.dataOffset)
+	if !ok {
+		b.err = ErrOverflow
+		return ErrOverflow
+	}
+	nameOff, ok := checkedAddInt(CgroupsLookupItemHdr, len(path))
+	if ok {
+		nameOff, ok = checkedAddInt(nameOff, 1)
+	}
+	if !ok {
+		b.err = ErrOverflow
+		return ErrOverflow
+	}
+	itemSize, ok := checkedAddInt(nameOff, 1)
+	if !ok {
+		b.err = ErrOverflow
+		return ErrOverflow
+	}
+	itemEnd, ok := checkedAddInt(itemStart, itemSize)
+	if !ok {
+		b.err = ErrOverflow
+		return ErrOverflow
+	}
+	if itemEnd > len(b.buf) {
+		b.err = ErrOverflow
+		return ErrOverflow
+	}
+	pathLen32, ok := checkedU32Int(len(path))
+	if !ok {
+		b.err = ErrOverflow
+		return ErrOverflow
+	}
+	nameOff32, ok := checkedU32Int(nameOff)
+	if !ok {
+		b.err = ErrOverflow
+		return ErrOverflow
+	}
+	itemStart32, ok := checkedU32Int(itemStart)
+	if !ok {
+		b.err = ErrOverflow
+		return ErrOverflow
+	}
+	itemSize32, ok := checkedU32Int(itemSize)
+	if !ok {
+		b.err = ErrOverflow
+		return ErrOverflow
+	}
+	clear(b.buf[b.dataOffset:itemStart])
+	item := b.buf[itemStart:itemEnd]
+	ne.PutUint16(item[0:2], 1)
+	ne.PutUint16(item[2:4], status)
+	ne.PutUint16(item[4:6], 0)
+	ne.PutUint16(item[6:8], 0)
+	ne.PutUint32(item[8:12], CgroupsLookupItemHdr)
+	ne.PutUint32(item[12:16], pathLen32)
+	ne.PutUint32(item[16:20], nameOff32)
+	ne.PutUint32(item[20:24], 0)
+	ne.PutUint16(item[24:26], 0)
+	ne.PutUint16(item[26:28], 0)
+	copy(item[CgroupsLookupItemHdr:], path)
+	item[CgroupsLookupItemHdr+len(path)] = 0
+	item[nameOff] = 0
 	dir, ok := lookupDirOffset(CgroupsLookupRespHdr, b.itemCount)
 	if !ok {
 		b.err = ErrOverflow

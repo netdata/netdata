@@ -16,36 +16,24 @@ func (s *Session) Receive(buf []byte) (protocol.Header, []byte, error) {
 		return protocol.Header{}, nil, wrapErr(ErrBadParam, "session closed")
 	}
 
-	maxPayload := s.MaxResponsePayloadBytes
-	if s.role == RoleServer {
-		maxPayload = s.MaxRequestPayloadBytes
-	}
-	maxBatch := s.MaxResponseBatchItems
-	if s.role == RoleServer {
-		maxBatch = s.MaxRequestBatchItems
-	}
-
-	return framing.Receiver{
-		PacketSize:     s.PacketSize,
-		MaxPayload:     maxPayload,
-		MaxBatchItems:  maxBatch,
-		TrackResponses: s.role == RoleClient,
-		InflightIDs:    s.inflightIDs,
-		RecvBuf:        &s.recvBuf,
-		PacketBuf:      &s.pktBuf,
-		Recv: func(dst []byte) (int, error) {
-			return rawRecv(s.handle, dst)
-		},
-		EnsurePacketScratch: ensurePipeScratchBuf,
-		OnRecvError: func(err error) {
-			if errors.Is(err, ErrDisconnected) {
-				s.failAllInflight()
-			}
-		},
-		ErrLimitExceeded: func(msg string) error { return wrapErr(ErrLimitExceeded, msg) },
-		ErrProtocol:      func(msg string) error { return wrapErr(ErrProtocol, msg) },
-		ErrChunk:         func(msg string) error { return wrapErr(ErrChunk, msg) },
-		ErrUnknownMsgID:  func(msg string) error { return wrapErr(ErrUnknownMsgID, msg) },
-		ErrRecv:          func(msg string) error { return wrapErr(ErrRecv, msg) },
-	}.Receive(buf)
+	return framing.SessionReceive(framing.SessionReceiveConfig{
+		RoleServer:              s.role == RoleServer,
+		PacketSize:              s.PacketSize,
+		MaxRequestPayloadBytes:  s.MaxRequestPayloadBytes,
+		MaxRequestBatchItems:    s.MaxRequestBatchItems,
+		MaxResponsePayloadBytes: s.MaxResponsePayloadBytes,
+		MaxResponseBatchItems:   s.MaxResponseBatchItems,
+		InflightIDs:             s.inflightIDs,
+		RecvBuf:                 &s.recvBuf,
+		PacketBuf:               &s.pktBuf,
+		Recv:                    func(dst []byte) (int, error) { return rawRecv(s.handle, dst) },
+		EnsurePacketScratch:     ensurePipeScratchBuf,
+		IsRecvDisconnect:        func(err error) bool { return errors.Is(err, ErrDisconnected) },
+		FailAllInflight:         s.failAllInflight,
+		ErrLimitExceeded:        func(msg string) error { return wrapErr(ErrLimitExceeded, msg) },
+		ErrProtocol:             func(msg string) error { return wrapErr(ErrProtocol, msg) },
+		ErrChunk:                func(msg string) error { return wrapErr(ErrChunk, msg) },
+		ErrUnknownMsgID:         func(msg string) error { return wrapErr(ErrUnknownMsgID, msg) },
+		ErrRecv:                 func(msg string) error { return wrapErr(ErrRecv, msg) },
+	}, buf)
 }

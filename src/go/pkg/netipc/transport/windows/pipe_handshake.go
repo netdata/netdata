@@ -3,7 +3,6 @@
 package windows
 
 import (
-	"errors"
 	"fmt"
 	"syscall"
 
@@ -26,53 +25,27 @@ func helloAckLayoutIncompatible(buf []byte) bool {
 func clientHandshake(handle syscall.Handle, config *ClientConfig) (*Session, error) {
 	pktSize := applyDefault(config.PacketSize, defaultPacketSize)
 
-	pkt := framing.BuildHelloPacket(framing.HelloConfig{
-		SupportedProfiles:       config.SupportedProfiles,
-		PreferredProfiles:       config.PreferredProfiles,
-		MaxRequestPayloadBytes:  applyDefault(config.MaxRequestPayloadBytes, protocol.MaxPayloadDefault),
-		MaxRequestBatchItems:    applyDefault(config.MaxRequestBatchItems, defaultBatchItems),
-		MaxResponsePayloadBytes: applyDefault(config.MaxResponsePayloadBytes, protocol.MaxPayloadDefault),
-		MaxResponseBatchItems:   applyDefault(config.MaxResponseBatchItems, defaultBatchItems),
-		AuthToken:               config.AuthToken,
-		PacketSize:              pktSize,
+	ack, err := framing.ClientHandshake(framing.ClientHandshakeConfig{
+		Hello: framing.HelloConfig{
+			SupportedProfiles:       config.SupportedProfiles,
+			PreferredProfiles:       config.PreferredProfiles,
+			MaxRequestPayloadBytes:  applyDefault(config.MaxRequestPayloadBytes, protocol.MaxPayloadDefault),
+			MaxRequestBatchItems:    applyDefault(config.MaxRequestBatchItems, defaultBatchItems),
+			MaxResponsePayloadBytes: applyDefault(config.MaxResponsePayloadBytes, protocol.MaxPayloadDefault),
+			MaxResponseBatchItems:   applyDefault(config.MaxResponseBatchItems, defaultBatchItems),
+			AuthToken:               config.AuthToken,
+			PacketSize:              pktSize,
+		},
+		Send:            func(pkt []byte) error { return rawWrite(handle, pkt) },
+		Recv:            func(dst []byte) (int, error) { return rawRecv(handle, dst) },
+		StatusError:     helloAckStatusError,
+		ErrSend:         func(msg string) error { return wrapErr(ErrSend, msg) },
+		ErrRecv:         func(msg string) error { return wrapErr(ErrRecv, msg) },
+		ErrProtocol:     func(msg string) error { return wrapErr(ErrProtocol, msg) },
+		ErrIncompatible: func(msg string) error { return wrapErr(ErrIncompatible, msg) },
 	})
-
-	if err := rawWrite(handle, pkt[:]); err != nil {
-		return nil, wrapErr(ErrSend, "hello send: "+err.Error())
-	}
-
-	var ackBuf [128]byte
-	an, err := rawRecv(handle, ackBuf[:])
 	if err != nil {
-		return nil, wrapErr(ErrRecv, "hello_ack recv: "+err.Error())
-	}
-
-	ackHdr, err := protocol.DecodeHeader(ackBuf[:an])
-	if err != nil {
-		if errors.Is(err, protocol.ErrBadVersion) {
-			return nil, wrapErr(ErrIncompatible, "ack header version mismatch")
-		}
-		return nil, wrapErr(ErrProtocol, "ack header: "+err.Error())
-	}
-
-	if ackHdr.Kind != protocol.KindControl || ackHdr.Code != protocol.CodeHelloAck {
-		return nil, wrapErr(ErrProtocol, "expected HELLO_ACK")
-	}
-
-	if err := helloAckStatusError(ackHdr.TransportStatus); err != nil {
 		return nil, err
-	}
-
-	if an < protocol.HeaderSize+helloAckPayloadSize {
-		return nil, wrapErr(ErrProtocol, "ack payload truncated")
-	}
-	ack, err := framing.DecodeHelloAckPayload(ackBuf[protocol.HeaderSize:an])
-	if err != nil {
-		if errors.Is(err, protocol.ErrBadLayout) &&
-			helloAckLayoutIncompatible(ackBuf[protocol.HeaderSize:an]) {
-			return nil, wrapErr(ErrIncompatible, "ack payload layout version mismatch")
-		}
-		return nil, wrapErr(ErrProtocol, "ack payload: "+err.Error())
 	}
 
 	return &Session{
@@ -110,50 +83,25 @@ func serverHandshake(handle syscall.Handle, config *ServerConfig, sessionID uint
 	serverPktSize := applyDefault(config.PacketSize, defaultPacketSize)
 	sRespPay := applyDefault(config.MaxResponsePayloadBytes, protocol.MaxPayloadDefault)
 
-	var buf [128]byte
-	n, err := rawRecv(handle, buf[:])
-	if err != nil {
-		return nil, wrapErr(ErrRecv, "hello recv: "+err.Error())
-	}
-
-	hdr, err := protocol.DecodeHeader(buf[:n])
-	if err != nil {
-		if errors.Is(err, protocol.ErrBadVersion) &&
-			headerVersionIncompatible(buf[:n], protocol.CodeHello) {
-			sendRejection(handle, protocol.StatusIncompatible)
-			return nil, ErrIncompatible
-		}
-		return nil, wrapErr(ErrProtocol, "hello header: "+err.Error())
-	}
-
-	if hdr.Kind != protocol.KindControl || hdr.Code != protocol.CodeHello {
-		return nil, wrapErr(ErrProtocol, "expected HELLO")
-	}
-
-	hello, err := framing.DecodeHelloPayload(buf[protocol.HeaderSize:n])
-	if err != nil {
-		if errors.Is(err, protocol.ErrBadLayout) &&
-			helloLayoutIncompatible(buf[protocol.HeaderSize:n]) {
-			sendRejection(handle, protocol.StatusIncompatible)
-			return nil, ErrIncompatible
-		}
-		return nil, wrapErr(ErrProtocol, "hello payload: "+err.Error())
-	}
-
-	ack, status, ok := framing.NegotiateHello(hello, framing.ServerHelloConfig{
-		PacketSize:              serverPktSize,
-		MaxResponsePayloadBytes: sRespPay,
-		SupportedProfiles:       config.SupportedProfiles,
-		PreferredProfiles:       config.PreferredProfiles,
-		AuthToken:               config.AuthToken,
+	ack, err := framing.ServerHandshake(framing.ServerHandshakeConfig{
+		ServerHelloConfig: framing.ServerHelloConfig{
+			PacketSize:              serverPktSize,
+			MaxResponsePayloadBytes: sRespPay,
+			SupportedProfiles:       config.SupportedProfiles,
+			PreferredProfiles:       config.PreferredProfiles,
+			AuthToken:               config.AuthToken,
+		},
+		SessionID:       sessionID,
+		Recv:            func(dst []byte) (int, error) { return rawRecv(handle, dst) },
+		SendAck:         func(status uint16, ack protocol.HelloAck) error { return sendHelloAck(handle, status, ack) },
+		StatusError:     helloAckStatusError,
+		ErrRecv:         func(msg string) error { return wrapErr(ErrRecv, msg) },
+		ErrSend:         func(msg string) error { return wrapErr(ErrSend, msg) },
+		ErrProtocol:     func(msg string) error { return wrapErr(ErrProtocol, msg) },
+		ErrIncompatible: func(msg string) error { return wrapErr(ErrIncompatible, msg) },
 	})
-	if !ok {
-		sendRejection(handle, status)
-		return nil, helloAckStatusError(status)
-	}
-	ack.SessionID = sessionID
-	if err := sendHelloAck(handle, protocol.StatusOK, ack); err != nil {
-		return nil, wrapErr(ErrSend, "hello_ack send: "+err.Error())
+	if err != nil {
+		return nil, err
 	}
 
 	return &Session{

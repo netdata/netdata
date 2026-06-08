@@ -15,6 +15,8 @@ const (
 	AppsLookupRespHdr = 16
 	AppsLookupItemHdr = 60
 	AppsLookupKeySize = 8
+
+	appsLookupUnknownItemSize = AppsLookupItemHdr + 3
 )
 
 type AppsLookupRequestView struct {
@@ -337,6 +339,9 @@ func decodeAppsLookupItem(item []byte) (*AppsLookupItemView, error) {
 	}); err != nil {
 		return nil, err
 	}
+	if status == PidLookupUnknown {
+		return decodeAppsLookupUnknownItem(item, pid, commOff, pathOff, nameOff)
+	}
 	comm, commEnd, err := lookupString(item, AppsLookupItemHdr, commOff, commLen)
 	if err != nil {
 		return nil, err
@@ -371,6 +376,40 @@ func decodeAppsLookupItem(item []byte) (*AppsLookupItemView, error) {
 		LabelCount:       labelCount,
 		item:             item,
 		labelTableOffset: table,
+	}, nil
+}
+
+func decodeAppsLookupUnknownItem(item []byte, pid uint32, commOff, pathOff, nameOff int) (*AppsLookupItemView, error) {
+	comm, commEnd, err := lookupEmptyString(item, AppsLookupItemHdr, commOff)
+	if err != nil {
+		return nil, err
+	}
+	path, pathEnd, err := lookupEmptyString(item, AppsLookupItemHdr, pathOff)
+	if err != nil {
+		return nil, err
+	}
+	name, nameEnd, err := lookupEmptyString(item, AppsLookupItemHdr, nameOff)
+	if err != nil {
+		return nil, err
+	}
+	if overlap(commOff, commEnd, pathOff, pathEnd) || overlap(commOff, commEnd, nameOff, nameEnd) ||
+		overlap(pathOff, pathEnd, nameOff, nameEnd) {
+		return nil, ErrBadLayout
+	}
+	labelTableOffset := max(commEnd, max(pathEnd, nameEnd))
+	if labelTableOffset != len(item) {
+		return nil, ErrBadLayout
+	}
+	return &AppsLookupItemView{
+		Status:           PidLookupUnknown,
+		CgroupStatus:     AppsCgroupKnown,
+		Pid:              pid,
+		Uid:              NipcUIDUnset,
+		Comm:             comm,
+		CgroupPath:       path,
+		CgroupName:       name,
+		item:             item,
+		labelTableOffset: labelTableOffset,
 	}, nil
 }
 
@@ -422,6 +461,9 @@ func (b *AppsLookupBuilder) Add(status, cgroupStatus, orchestrator uint16, pid, 
 	}); err != nil {
 		b.err = err
 		return err
+	}
+	if status == PidLookupUnknown {
+		return b.addUnknown(pid)
 	}
 	if invalidSourceString(comm, status == PidLookupKnown) ||
 		invalidSourceString(cgroupPath, false) || invalidSourceString(cgroupName, false) {
@@ -559,6 +601,50 @@ func (b *AppsLookupBuilder) Add(status, cgroupStatus, orchestrator uint16, pid, 
 	ne.PutUint32(b.buf[dir:dir+4], itemStart32)
 	ne.PutUint32(b.buf[dir+4:dir+8], itemSize32)
 	b.dataOffset = itemStart + itemSize
+	b.itemCount++
+	return nil
+}
+
+func (b *AppsLookupBuilder) addUnknown(pid uint32) error {
+	itemStart, ok := checkedAlign8(b.dataOffset)
+	if !ok {
+		b.err = ErrOverflow
+		return ErrOverflow
+	}
+	itemEnd, ok := checkedAddInt(itemStart, appsLookupUnknownItemSize)
+	if !ok || itemEnd > len(b.buf) {
+		b.err = ErrOverflow
+		return ErrOverflow
+	}
+	itemStart32, ok := checkedU32Int(itemStart)
+	if !ok {
+		b.err = ErrOverflow
+		return ErrOverflow
+	}
+	itemSize32, ok := checkedU32Int(appsLookupUnknownItemSize)
+	if !ok {
+		b.err = ErrOverflow
+		return ErrOverflow
+	}
+	clear(b.buf[b.dataOffset:itemStart])
+	item := b.buf[itemStart:itemEnd]
+	clear(item)
+	ne.PutUint16(item[0:2], 1)
+	ne.PutUint16(item[2:4], PidLookupUnknown)
+	ne.PutUint32(item[8:12], pid)
+	ne.PutUint32(item[16:20], NipcUIDUnset)
+	ne.PutUint32(item[32:36], AppsLookupItemHdr)
+	ne.PutUint32(item[40:44], AppsLookupItemHdr+1)
+	ne.PutUint32(item[48:52], AppsLookupItemHdr+2)
+
+	dir, ok := lookupDirOffset(AppsLookupRespHdr, b.itemCount)
+	if !ok {
+		b.err = ErrOverflow
+		return ErrOverflow
+	}
+	ne.PutUint32(b.buf[dir:dir+4], itemStart32)
+	ne.PutUint32(b.buf[dir+4:dir+8], itemSize32)
+	b.dataOffset = itemEnd
 	b.itemCount++
 	return nil
 }

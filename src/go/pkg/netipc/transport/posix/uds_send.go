@@ -4,7 +4,6 @@ package posix
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/transport/internal/framing"
@@ -19,26 +18,12 @@ func (s *Session) Send(hdr *protocol.Header, payload []byte) error {
 		return wrapErr(ErrBadParam, "session closed")
 	}
 
-	totalMsg, payloadLen, ok := framing.HeaderPayloadLen(len(payload))
-	if !ok {
-		return wrapErr(ErrLimitExceeded, "total message length exceeds protocol limit")
-	}
-
-	if s.role == RoleClient && hdr.Kind == protocol.KindRequest {
-		if s.inflightIDs == nil {
-			s.inflightIDs = make(map[uint64]struct{})
-		}
-		if _, exists := s.inflightIDs[hdr.MessageID]; exists {
-			return wrapErr(ErrDuplicateMsgID, fmt.Sprintf("message_id %d", hdr.MessageID))
-		}
-		s.inflightIDs[hdr.MessageID] = struct{}{}
-	}
-
-	framing.FillMessageHeader(hdr, payloadLen)
-
-	tracked := s.role == RoleClient && hdr.Kind == protocol.KindRequest
-	sendErr := framing.Sender{
-		PacketSize: s.PacketSize,
+	return framing.SessionSend(framing.SessionSendConfig{
+		RoleClient:       s.role == RoleClient,
+		PacketSize:       s.PacketSize,
+		InflightIDs:      &s.inflightIDs,
+		FailAllInflight:  s.failAllInflight,
+		IsSendDisconnect: func(err error) bool { return errors.Is(err, ErrSend) },
 		SendFirstPacket: func(packetHdr *protocol.Header, packetPayload []byte, _ int) error {
 			var hdrBuf [protocol.HeaderSize]byte
 			packetHdr.Encode(hdrBuf[:])
@@ -49,15 +34,8 @@ func (s *Session) Send(hdr *protocol.Header, payload []byte) error {
 			chk.Encode(chkBuf[:])
 			return rawSendIov(s.fd, chkBuf[:], chunkPayload)
 		},
-		ErrBadParam: func(msg string) error { return wrapErr(ErrBadParam, msg) },
-	}.Send(hdr, payload, totalMsg)
-	if sendErr != nil && tracked {
-		if errors.Is(sendErr, ErrSend) {
-			s.failAllInflight()
-		} else {
-			delete(s.inflightIDs, hdr.MessageID)
-		}
-	}
-
-	return sendErr
+		ErrLimitExceeded:  func(msg string) error { return wrapErr(ErrLimitExceeded, msg) },
+		ErrDuplicateMsgID: func(msg string) error { return wrapErr(ErrDuplicateMsgID, msg) },
+		ErrBadParam:       func(msg string) error { return wrapErr(ErrBadParam, msg) },
+	}, hdr, payload)
 }

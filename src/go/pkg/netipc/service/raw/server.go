@@ -3,9 +3,78 @@ package raw
 import (
 	"errors"
 	"sync/atomic"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 )
+
+const defaultServerWorkerCount = 8
+
+func (s *Server) initCommon(
+	runDir string,
+	serviceName string,
+	expectedMethodCode uint16,
+	handler DispatchHandler,
+	workerCount int,
+	maxRequestPayloadBytes uint32,
+	maxResponsePayloadBytes uint32,
+) {
+	if workerCount < 1 {
+		workerCount = 1
+	}
+	if maxRequestPayloadBytes == 0 {
+		maxRequestPayloadBytes = protocol.MaxPayloadDefault
+	}
+	if maxResponsePayloadBytes == 0 {
+		maxResponsePayloadBytes = protocol.MaxPayloadDefault
+	}
+
+	s.runDir = runDir
+	s.serviceName = serviceName
+	s.expectedMethodCode = expectedMethodCode
+	s.handler = handler
+	s.workerCount = workerCount
+	s.learnedRequestPayloadBytes.Store(maxRequestPayloadBytes)
+	s.learnedResponsePayloadBytes.Store(maxResponsePayloadBytes)
+}
+
+func (s *Server) retryAcceptAfter(cleanup func()) bool {
+	if cleanup != nil {
+		cleanup()
+	}
+	if !s.running.Load() {
+		return false
+	}
+	time.Sleep(10 * time.Millisecond)
+	return true
+}
+
+func (s *Server) acquireWorkerSlot(sem chan struct{}, cleanup func(), closeSession func()) bool {
+	select {
+	case sem <- struct{}{}:
+		return true
+	default:
+		if cleanup != nil {
+			cleanup()
+		}
+		closeSession()
+		return false
+	}
+}
+
+func (s *Server) startSessionWorker(sem chan struct{}, run func()) {
+	s.wg.Add(1)
+	go func() {
+		defer func() {
+			if recover() != nil {
+				// Session handler panicked; keep the accept loop alive.
+			}
+			<-sem
+			s.wg.Done()
+		}()
+		run()
+	}()
+}
 
 func (s *Server) dispatchSingle(methodCode uint16, request []byte, responseBuf []byte) (int, error) {
 	if methodCode != s.expectedMethodCode || s.handler == nil {

@@ -221,6 +221,16 @@ func lookupString(item []byte, hdrSize int, off int, length int) (CStringView, i
 	return NewCStringView(item[off:nul+1], length32), nul + 1, nil
 }
 
+func lookupEmptyString(item []byte, hdrSize int, off int) (CStringView, int, error) {
+	if off < hdrSize || off >= len(item) {
+		return CStringView{}, 0, ErrOutOfBounds
+	}
+	if item[off] != 0 {
+		return CStringView{}, 0, ErrMissingNul
+	}
+	return NewCStringView(item[off:off+1], 0), off + 1, nil
+}
+
 func overlap(aStart, aEnd, bStart, bEnd int) bool {
 	return aStart < bEnd && bStart < aEnd
 }

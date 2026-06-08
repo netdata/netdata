@@ -1,6 +1,10 @@
 package framing
 
-import "github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
+import (
+	"fmt"
+
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
+)
 
 // HeaderPayloadLen validates header + payload before lengths are encoded into
 // the protocol's uint32 wire fields.
@@ -31,6 +35,67 @@ type Sender struct {
 	SendFirstPacket func(*protocol.Header, []byte, int) error
 	SendChunk       func(protocol.ChunkHeader, []byte) error
 	ErrBadParam     func(string) error
+}
+
+type SessionSendConfig struct {
+	RoleClient bool
+	PacketSize uint32
+
+	InflightIDs      *map[uint64]struct{}
+	FailAllInflight  func()
+	IsSendDisconnect func(error) bool
+
+	SendFirstPacket func(*protocol.Header, []byte, int) error
+	SendChunk       func(protocol.ChunkHeader, []byte) error
+
+	ErrLimitExceeded  func(string) error
+	ErrDuplicateMsgID func(string) error
+	ErrBadParam       func(string) error
+}
+
+func SessionSend(config SessionSendConfig, hdr *protocol.Header, payload []byte) error {
+	totalMsg, payloadLen, ok := HeaderPayloadLen(len(payload))
+	if !ok {
+		return config.ErrLimitExceeded("total message length exceeds protocol limit")
+	}
+
+	tracked, err := trackOutboundRequest(config, hdr)
+	if err != nil {
+		return err
+	}
+
+	FillMessageHeader(hdr, payloadLen)
+	sendErr := Sender{
+		PacketSize:      config.PacketSize,
+		SendFirstPacket: config.SendFirstPacket,
+		SendChunk:       config.SendChunk,
+		ErrBadParam:     config.ErrBadParam,
+	}.Send(hdr, payload, totalMsg)
+
+	if sendErr != nil && tracked {
+		if config.IsSendDisconnect(sendErr) {
+			config.FailAllInflight()
+		} else {
+			delete(*config.InflightIDs, hdr.MessageID)
+		}
+	}
+
+	return sendErr
+}
+
+func trackOutboundRequest(config SessionSendConfig, hdr *protocol.Header) (bool, error) {
+	if !config.RoleClient || hdr.Kind != protocol.KindRequest {
+		return false, nil
+	}
+
+	if *config.InflightIDs == nil {
+		*config.InflightIDs = make(map[uint64]struct{})
+	}
+	if _, exists := (*config.InflightIDs)[hdr.MessageID]; exists {
+		return false, config.ErrDuplicateMsgID(fmt.Sprintf("message_id %d", hdr.MessageID))
+	}
+	(*config.InflightIDs)[hdr.MessageID] = struct{}{}
+	return true, nil
 }
 
 // Send writes one complete logical message.

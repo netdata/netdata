@@ -9,11 +9,6 @@ func snapshotDispatch(handler Handler) raw.DispatchHandler {
 	return raw.SnapshotDispatch(handler.Handle, handler.SnapshotMaxItems)
 }
 
-// typedResponseBatchItems keeps typed request/response batch counts symmetric.
-func typedResponseBatchItems(maxRequestBatchItems uint32) uint32 {
-	return maxRequestBatchItems
-}
-
 // Client is the public L2 client context for the cgroups-snapshot service.
 type Client struct {
 	inner *raw.Client

@@ -9,11 +9,6 @@ type Client struct {
 	inner *raw.Client
 }
 
-// typedResponseBatchItems keeps typed request/response batch counts symmetric.
-func typedResponseBatchItems(maxRequestBatchItems uint32) uint32 {
-	return maxRequestBatchItems
-}
-
 func NewClient(runDir, serviceName string, config ClientConfig) *Client {
 	return &Client{inner: raw.NewCgroupsLookupClient(runDir, serviceName, clientConfigToTransport(config))}
 }

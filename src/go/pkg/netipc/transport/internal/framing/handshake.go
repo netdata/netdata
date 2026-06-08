@@ -2,6 +2,7 @@ package framing
 
 import (
 	"encoding/binary"
+	"errors"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 )
@@ -28,6 +29,33 @@ type ServerHelloConfig struct {
 	SupportedProfiles       uint32
 	PreferredProfiles       uint32
 	AuthToken               uint64
+}
+
+type ClientHandshakeConfig struct {
+	Hello HelloConfig
+
+	Send        func([]byte) error
+	Recv        func([]byte) (int, error)
+	StatusError func(uint16) error
+
+	ErrSend         func(string) error
+	ErrRecv         func(string) error
+	ErrProtocol     func(string) error
+	ErrIncompatible func(string) error
+}
+
+type ServerHandshakeConfig struct {
+	ServerHelloConfig
+	SessionID uint64
+
+	Recv        func([]byte) (int, error)
+	SendAck     func(uint16, protocol.HelloAck) error
+	StatusError func(uint16) error
+
+	ErrRecv         func(string) error
+	ErrSend         func(string) error
+	ErrProtocol     func(string) error
+	ErrIncompatible func(string) error
 }
 
 func HeaderVersionIncompatible(buf []byte, expectedCode uint16) bool {
@@ -109,6 +137,48 @@ func DecodeHelloAckPayload(buf []byte) (protocol.HelloAck, error) {
 	return protocol.DecodeHelloAck(buf)
 }
 
+func ClientHandshake(config ClientHandshakeConfig) (protocol.HelloAck, error) {
+	pkt := BuildHelloPacket(config.Hello)
+	if err := config.Send(pkt[:]); err != nil {
+		return protocol.HelloAck{}, config.ErrSend("hello send: " + err.Error())
+	}
+
+	var ackBuf [128]byte
+	n, err := config.Recv(ackBuf[:])
+	if err != nil {
+		return protocol.HelloAck{}, config.ErrRecv("hello_ack recv: " + err.Error())
+	}
+
+	ackHdr, err := DecodeControlHeader(ackBuf[:n], protocol.CodeHelloAck)
+	if err != nil {
+		if errors.Is(err, protocol.ErrBadVersion) {
+			return protocol.HelloAck{}, config.ErrIncompatible("ack header version mismatch")
+		}
+		if errors.Is(err, protocol.ErrBadKind) {
+			return protocol.HelloAck{}, config.ErrProtocol("expected HELLO_ACK")
+		}
+		return protocol.HelloAck{}, config.ErrProtocol("ack header: " + err.Error())
+	}
+
+	if err := config.StatusError(ackHdr.TransportStatus); err != nil {
+		return protocol.HelloAck{}, err
+	}
+
+	if n < protocol.HeaderSize+HelloAckPayloadSize {
+		return protocol.HelloAck{}, config.ErrProtocol("ack payload truncated")
+	}
+	ack, err := DecodeHelloAckPayload(ackBuf[protocol.HeaderSize:n])
+	if err != nil {
+		if errors.Is(err, protocol.ErrBadLayout) &&
+			HelloAckLayoutIncompatible(ackBuf[protocol.HeaderSize:n]) {
+			return protocol.HelloAck{}, config.ErrIncompatible("ack payload layout version mismatch")
+		}
+		return protocol.HelloAck{}, config.ErrProtocol("ack payload: " + err.Error())
+	}
+
+	return ack, nil
+}
+
 func NegotiateHello(hello protocol.Hello, config ServerHelloConfig) (protocol.HelloAck, uint16, bool) {
 	if config.SupportedProfiles == 0 {
 		config.SupportedProfiles = protocol.ProfileBaseline
@@ -153,6 +223,50 @@ func NegotiateHello(hello protocol.Hello, config ServerHelloConfig) (protocol.He
 	return ack, protocol.StatusOK, true
 }
 
+func ServerHandshake(config ServerHandshakeConfig) (protocol.HelloAck, error) {
+	var buf [128]byte
+	n, err := config.Recv(buf[:])
+	if err != nil {
+		return protocol.HelloAck{}, config.ErrRecv("hello recv: " + err.Error())
+	}
+
+	_, err = DecodeControlHeader(buf[:n], protocol.CodeHello)
+	if err != nil {
+		if errors.Is(err, protocol.ErrBadVersion) &&
+			HeaderVersionIncompatible(buf[:n], protocol.CodeHello) {
+			sendRejection(config.SendAck, protocol.StatusIncompatible)
+			return protocol.HelloAck{}, config.ErrIncompatible("hello header version mismatch")
+		}
+		if errors.Is(err, protocol.ErrBadKind) {
+			return protocol.HelloAck{}, config.ErrProtocol("expected HELLO")
+		}
+		return protocol.HelloAck{}, config.ErrProtocol("hello header: " + err.Error())
+	}
+
+	hello, err := DecodeHelloPayload(buf[protocol.HeaderSize:n])
+	if err != nil {
+		if errors.Is(err, protocol.ErrBadLayout) &&
+			HelloLayoutIncompatible(buf[protocol.HeaderSize:n]) {
+			sendRejection(config.SendAck, protocol.StatusIncompatible)
+			return protocol.HelloAck{}, config.ErrIncompatible("hello payload layout version mismatch")
+		}
+		return protocol.HelloAck{}, config.ErrProtocol("hello payload: " + err.Error())
+	}
+
+	ack, status, ok := NegotiateHello(hello, config.ServerHelloConfig)
+	if !ok {
+		sendRejection(config.SendAck, status)
+		return protocol.HelloAck{}, config.StatusError(status)
+	}
+	ack.SessionID = config.SessionID
+
+	if err := config.SendAck(protocol.StatusOK, ack); err != nil {
+		return protocol.HelloAck{}, config.ErrSend("hello_ack send: " + err.Error())
+	}
+
+	return ack, nil
+}
+
 func BuildHelloAckPacket(status uint16, ack protocol.HelloAck) [protocol.HeaderSize + HelloAckPayloadSize]byte {
 	var payload [HelloAckPayloadSize]byte
 	ack.Encode(payload[:])
@@ -172,6 +286,10 @@ func BuildHelloAckPacket(status uint16, ack protocol.HelloAck) [protocol.HeaderS
 	hdr.Encode(pkt[:protocol.HeaderSize])
 	copy(pkt[protocol.HeaderSize:], payload[:])
 	return pkt
+}
+
+func sendRejection(sendAck func(uint16, protocol.HelloAck) error, status uint16) {
+	_ = sendAck(status, protocol.HelloAck{LayoutVersion: 1})
 }
 
 func highestBit(mask uint32) uint32 {

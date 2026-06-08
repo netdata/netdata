@@ -5,7 +5,6 @@ package raw
 import (
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 	windows "github.com/netdata/netdata/go/plugins/pkg/netipc/transport/windows"
@@ -34,7 +33,7 @@ func NewServer(
 	expectedMethodCode uint16,
 	handler DispatchHandler,
 ) *Server {
-	return NewServerWithWorkers(runDir, serviceName, config, expectedMethodCode, handler, 8)
+	return NewServerWithWorkers(runDir, serviceName, config, expectedMethodCode, handler, defaultServerWorkerCount)
 }
 
 // NewServerWithWorkers creates a server with an explicit worker count limit.
@@ -45,29 +44,16 @@ func NewServerWithWorkers(
 	handler DispatchHandler,
 	workerCount int,
 ) *Server {
-	if workerCount < 1 {
-		workerCount = 1
-	}
-	learnedRequest := config.MaxRequestPayloadBytes
-	if learnedRequest == 0 {
-		learnedRequest = protocol.MaxPayloadDefault
-	}
-	learnedResponse := config.MaxResponsePayloadBytes
-	if learnedResponse == 0 {
-		learnedResponse = protocol.MaxPayloadDefault
-	}
-	s := &Server{
-		runDir:             runDir,
-		serviceName:        serviceName,
-		config:             config,
-		expectedMethodCode: expectedMethodCode,
-		handler:            handler,
-		workerCount:        workerCount,
-	}
-	s.learnedRequestPayloadBytes.Store(learnedRequest)
-	s.learnedResponsePayloadBytes.Store(learnedResponse)
-	// Session ids are 1-based; prepareAcceptConfig() allocates with Add(1).
-	s.nextSessionID.Store(0)
+	s := &Server{config: config}
+	s.initCommon(
+		runDir,
+		serviceName,
+		expectedMethodCode,
+		handler,
+		workerCount,
+		config.MaxRequestPayloadBytes,
+		config.MaxResponsePayloadBytes,
+	)
 	return s
 }
 
@@ -175,29 +161,27 @@ func (s *Server) Run() error {
 	for s.running.Load() {
 		sessionID, acceptCfg, preparedShm, ok := s.prepareAcceptConfig()
 		if !ok {
-			time.Sleep(10 * time.Millisecond)
+			s.retryAcceptAfter(nil)
 			continue
 		}
 
 		session, err := listener.AcceptWithConfig(sessionID, acceptCfg)
 		if err != nil {
-			if preparedShm != nil {
-				preparedShm.destroyAll()
-			}
-			if !s.running.Load() {
+			if !s.retryAcceptAfter(func() {
+				if preparedShm != nil {
+					preparedShm.destroyAll()
+				}
+			}) {
 				break
 			}
-			time.Sleep(10 * time.Millisecond)
 			continue
 		}
 
-		select {
-		case sem <- struct{}{}:
-		default:
+		if !s.acquireWorkerSlot(sem, func() {
 			if preparedShm != nil {
 				preparedShm.destroyAll()
 			}
-			session.Close()
+		}, session.Close) {
 			continue
 		}
 
@@ -218,17 +202,9 @@ func (s *Server) Run() error {
 			preparedShm.destroyAll()
 		}
 
-		s.wg.Add(1)
-		go func(sess *windows.Session, shmCtx *windows.WinShmContext) {
-			defer func() {
-				if recover() != nil {
-					// Session handler panicked; log but don't crash the server
-				}
-				<-sem
-				s.wg.Done()
-			}()
-			s.handleSession(sess, shmCtx)
-		}(session, shm)
+		s.startSessionWorker(sem, func() {
+			s.handleSession(session, shm)
+		})
 	}
 
 	s.wg.Wait()

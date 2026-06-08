@@ -5,7 +5,6 @@ package raw
 import (
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/transport/posix"
@@ -35,7 +34,7 @@ func NewServer(
 	expectedMethodCode uint16,
 	handler DispatchHandler,
 ) *Server {
-	return NewServerWithWorkers(runDir, serviceName, config, expectedMethodCode, handler, 8)
+	return NewServerWithWorkers(runDir, serviceName, config, expectedMethodCode, handler, defaultServerWorkerCount)
 }
 
 // NewServerWithWorkers creates a server with an explicit worker count limit.
@@ -46,29 +45,16 @@ func NewServerWithWorkers(
 	handler DispatchHandler,
 	workerCount int,
 ) *Server {
-	if workerCount < 1 {
-		workerCount = 1
-	}
-	learnedRequest := config.MaxRequestPayloadBytes
-	if learnedRequest == 0 {
-		learnedRequest = protocol.MaxPayloadDefault
-	}
-	learnedResponse := config.MaxResponsePayloadBytes
-	if learnedResponse == 0 {
-		learnedResponse = protocol.MaxPayloadDefault
-	}
-	s := &Server{
-		runDir:             runDir,
-		serviceName:        serviceName,
-		config:             config,
-		expectedMethodCode: expectedMethodCode,
-		handler:            handler,
-		workerCount:        workerCount,
-	}
-	s.learnedRequestPayloadBytes.Store(learnedRequest)
-	s.learnedResponsePayloadBytes.Store(learnedResponse)
-	// Session ids are 1-based; prepareAcceptConfig() allocates with Add(1).
-	s.nextSessionID.Store(0)
+	s := &Server{config: config}
+	s.initCommon(
+		runDir,
+		serviceName,
+		expectedMethodCode,
+		handler,
+		workerCount,
+		config.MaxRequestPayloadBytes,
+		config.MaxResponsePayloadBytes,
+	)
 	return s
 }
 
@@ -131,32 +117,27 @@ func (s *Server) Run() error {
 
 		sessionID, acceptCfg, precreatedShm, ok := s.prepareAcceptConfig()
 		if !ok {
-			time.Sleep(10 * time.Millisecond)
+			s.retryAcceptAfter(nil)
 			continue
 		}
 
 		session, err := listener.AcceptWithConfig(sessionID, acceptCfg)
 		if err != nil {
-			if precreatedShm != nil {
-				precreatedShm.ShmDestroy()
-			}
-			if !s.running.Load() {
+			if !s.retryAcceptAfter(func() {
+				if precreatedShm != nil {
+					precreatedShm.ShmDestroy()
+				}
+			}) {
 				break
 			}
-			time.Sleep(10 * time.Millisecond)
 			continue
 		}
 
-		// Try to acquire a worker slot (non-blocking check)
-		select {
-		case sem <- struct{}{}:
-			// Got a slot
-		default:
-			// At capacity: reject client
+		if !s.acquireWorkerSlot(sem, func() {
 			if precreatedShm != nil {
 				precreatedShm.ShmDestroy()
 			}
-			session.Close()
+		}, session.Close) {
 			continue
 		}
 
@@ -173,18 +154,9 @@ func (s *Server) Run() error {
 			precreatedShm.ShmDestroy()
 		}
 
-		// Handle this session in a goroutine
-		s.wg.Add(1)
-		go func(sess *posix.Session, shmCtx *posix.ShmContext) {
-			defer func() {
-				if recover() != nil {
-					// Session handler panicked; log but don't crash the server
-				}
-				<-sem // release worker slot
-				s.wg.Done()
-			}()
-			s.handleSession(sess, shmCtx)
-		}(session, shm)
+		s.startSessionWorker(sem, func() {
+			s.handleSession(session, shm)
+		})
 	}
 
 	// Wait for all active session goroutines to finish

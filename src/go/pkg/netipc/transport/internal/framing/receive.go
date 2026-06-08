@@ -31,6 +31,62 @@ type Receiver struct {
 	ErrRecv          func(string) error
 }
 
+type SessionReceiveConfig struct {
+	RoleServer bool
+
+	PacketSize              uint32
+	MaxRequestPayloadBytes  uint32
+	MaxRequestBatchItems    uint32
+	MaxResponsePayloadBytes uint32
+	MaxResponseBatchItems   uint32
+
+	InflightIDs map[uint64]struct{}
+	RecvBuf     *[]byte
+	PacketBuf   *[]byte
+
+	Recv                func([]byte) (int, error)
+	EnsurePacketScratch func(*[]byte, int) []byte
+	IsRecvDisconnect    func(error) bool
+	FailAllInflight     func()
+
+	ErrLimitExceeded func(string) error
+	ErrProtocol      func(string) error
+	ErrChunk         func(string) error
+	ErrUnknownMsgID  func(string) error
+	ErrRecv          func(string) error
+}
+
+func SessionReceive(config SessionReceiveConfig, buf []byte) (protocol.Header, []byte, error) {
+	maxPayload := config.MaxResponsePayloadBytes
+	maxBatch := config.MaxResponseBatchItems
+	if config.RoleServer {
+		maxPayload = config.MaxRequestPayloadBytes
+		maxBatch = config.MaxRequestBatchItems
+	}
+
+	return Receiver{
+		PacketSize:          config.PacketSize,
+		MaxPayload:          maxPayload,
+		MaxBatchItems:       maxBatch,
+		TrackResponses:      !config.RoleServer,
+		InflightIDs:         config.InflightIDs,
+		RecvBuf:             config.RecvBuf,
+		PacketBuf:           config.PacketBuf,
+		Recv:                config.Recv,
+		EnsurePacketScratch: config.EnsurePacketScratch,
+		OnRecvError: func(err error) {
+			if config.IsRecvDisconnect(err) {
+				config.FailAllInflight()
+			}
+		},
+		ErrLimitExceeded: config.ErrLimitExceeded,
+		ErrProtocol:      config.ErrProtocol,
+		ErrChunk:         config.ErrChunk,
+		ErrUnknownMsgID:  config.ErrUnknownMsgID,
+		ErrRecv:          config.ErrRecv,
+	}.Receive(buf)
+}
+
 // Receive reads and validates one complete logical message.
 func (r Receiver) Receive(buf []byte) (protocol.Header, []byte, error) {
 	n, err := r.Recv(buf)
