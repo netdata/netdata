@@ -96,6 +96,19 @@ void nipc_service_common_client_note_request_capacity(nipc_client_ctx_t *ctx,
                                                       uint32_t payload_len);
 void nipc_service_common_client_note_response_capacity(nipc_client_ctx_t *ctx,
                                                        uint32_t payload_len);
+nipc_error_t nipc_service_common_client_prepare_shm_request(
+    nipc_client_ctx_t *ctx,
+    nipc_header_t *hdr,
+    const void *payload,
+    size_t payload_len,
+    uint8_t **msg_out,
+    size_t *msg_len_out);
+nipc_error_t nipc_service_common_client_parse_shm_response(
+    void *buf,
+    size_t msg_len,
+    nipc_header_t *hdr_out,
+    const void **payload_out,
+    size_t *payload_len_out);
 nipc_error_t nipc_service_common_response_status_to_error(nipc_client_ctx_t *ctx,
                                                           const nipc_header_t *resp_hdr);
 nipc_error_t nipc_service_common_do_raw_call(

@@ -202,6 +202,65 @@ void nipc_service_common_client_note_response_capacity(nipc_client_ctx_t *ctx,
         ctx->transport_config.max_response_payload_bytes = grown;
 }
 
+nipc_error_t nipc_service_common_client_prepare_shm_request(
+    nipc_client_ctx_t *ctx,
+    nipc_header_t *hdr,
+    const void *payload,
+    size_t payload_len,
+    uint8_t **msg_out,
+    size_t *msg_len_out)
+{
+    if (payload_len > UINT32_MAX)
+        return NIPC_ERR_OVERFLOW;
+
+    if (payload_len > ctx->session.max_request_payload_bytes) {
+        nipc_service_common_client_note_request_capacity(
+            ctx, (uint32_t)payload_len);
+        return NIPC_ERR_OVERFLOW;
+    }
+
+    size_t msg_len;
+    if (!nipc_service_common_header_payload_len(payload_len, &msg_len))
+        return NIPC_ERR_OVERFLOW;
+
+    uint8_t *msg = ctx->send_buf;
+    if (!msg || msg_len > ctx->send_buf_size)
+        return NIPC_ERR_OVERFLOW;
+
+    if (payload_len > 0)
+        memmove(msg + NIPC_HEADER_LEN, payload, payload_len);
+
+    hdr->magic = NIPC_MAGIC_MSG;
+    hdr->version = NIPC_VERSION;
+    hdr->header_len = NIPC_HEADER_LEN;
+    hdr->payload_len = (uint32_t)payload_len;
+
+    nipc_header_encode(hdr, msg, NIPC_HEADER_LEN);
+
+    *msg_out = msg;
+    *msg_len_out = msg_len;
+    return NIPC_OK;
+}
+
+nipc_error_t nipc_service_common_client_parse_shm_response(
+    void *buf,
+    size_t msg_len,
+    nipc_header_t *hdr_out,
+    const void **payload_out,
+    size_t *payload_len_out)
+{
+    if (msg_len < NIPC_HEADER_LEN)
+        return NIPC_ERR_TRUNCATED;
+
+    nipc_error_t perr = nipc_header_decode(buf, msg_len, hdr_out);
+    if (perr != NIPC_OK)
+        return perr;
+
+    *payload_out = (const uint8_t *)buf + NIPC_HEADER_LEN;
+    *payload_len_out = msg_len - NIPC_HEADER_LEN;
+    return NIPC_OK;
+}
+
 nipc_error_t nipc_service_common_response_status_to_error(nipc_client_ctx_t *ctx,
                                                           const nipc_header_t *resp_hdr)
 {

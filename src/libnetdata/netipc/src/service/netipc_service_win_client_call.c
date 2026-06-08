@@ -30,29 +30,12 @@ static nipc_error_t transport_send(nipc_client_ctx_t *ctx,
         return NIPC_ERR_OVERFLOW;
 
     if (ctx->shm) {
-        if (payload_len > ctx->session.max_request_payload_bytes) {
-            nipc_service_common_client_note_request_capacity(
-                ctx, (uint32_t)payload_len);
-            return NIPC_ERR_OVERFLOW;
-        }
-
+        uint8_t *msg;
         size_t msg_len;
-        if (!nipc_service_common_header_payload_len(payload_len, &msg_len))
-            return NIPC_ERR_OVERFLOW;
-
-        uint8_t *msg = ctx->send_buf;
-        if (!msg || msg_len > ctx->send_buf_size)
-            return NIPC_ERR_OVERFLOW;
-
-        if (payload_len > 0)
-            memmove(msg + NIPC_HEADER_LEN, payload, payload_len);
-
-        hdr->magic      = NIPC_MAGIC_MSG;
-        hdr->version    = NIPC_VERSION;
-        hdr->header_len = NIPC_HEADER_LEN;
-        hdr->payload_len = (uint32_t)payload_len;
-
-        nipc_header_encode(hdr, msg, NIPC_HEADER_LEN);
+        nipc_error_t perr = nipc_service_common_client_prepare_shm_request(
+            ctx, hdr, payload, payload_len, &msg, &msg_len);
+        if (perr != NIPC_OK)
+            return perr;
 
         nipc_win_shm_error_t serr = nipc_win_shm_send(ctx->shm, msg, msg_len);
         if (serr == NIPC_WIN_SHM_ERR_MSG_TOO_LARGE) {
@@ -87,16 +70,8 @@ static nipc_error_t transport_receive(nipc_client_ctx_t *ctx,
         if (serr != NIPC_WIN_SHM_OK)
             return NIPC_ERR_TRUNCATED;
 
-        if (msg_len < NIPC_HEADER_LEN)
-            return NIPC_ERR_TRUNCATED;
-
-        nipc_error_t perr = nipc_header_decode(buf, msg_len, hdr_out);
-        if (perr != NIPC_OK)
-            return perr;
-
-        *payload_out = (const uint8_t *)buf + NIPC_HEADER_LEN;
-        *payload_len_out = msg_len - NIPC_HEADER_LEN;
-        return NIPC_OK;
+        return nipc_service_common_client_parse_shm_response(
+            buf, msg_len, hdr_out, payload_out, payload_len_out);
     }
 
     /* Named Pipe path */
