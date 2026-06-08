@@ -285,6 +285,11 @@
 - Test(go.d/prometheus): add V1 compatibility manifest golden tests ([#22641](https://github.com/netdata/netdata/issues/22641))
 - Feat(go.d/framework/chartengine): apply context_namespace to autogen chart contexts ([#22642](https://github.com/netdata/netdata/issues/22642))
 - Add offline Function test modes for NetFlow and systemd journal ([#22638](https://github.com/netdata/netdata/issues/22638))
+- Chore(go.d/framework): render non-finite summary quantile values as a gap ([#22643](https://github.com/netdata/netdata/issues/22643))
+- Build(deps): bump actions/checkout from 4 to 6 ([#22645](https://github.com/netdata/netdata/issues/22645))
+- Build(deps): bump github.com/Azure/azure-sdk-for-go/sdk/azcore from 1.21.1 to 1.22.0 in /src/go ([#22647](https://github.com/netdata/netdata/issues/22647))
+- Build(deps): bump github.com/jackc/pgx/v5 from 5.9.2 to 5.10.0 in /src/go ([#22646](https://github.com/netdata/netdata/issues/22646))
+- Build(deps): bump github.com/prometheus/common from 0.68.0 to 0.68.1 in /src/go ([#22644](https://github.com/netdata/netdata/issues/22644))
 
 ## [2.10.0] - 2026-04-09
 
