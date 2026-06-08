@@ -1913,10 +1913,12 @@ modules:
         - hyperv
         - virtualization
         - vm
+        - azure-local
+        - azure-stack-hci
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors website requests and logins.
+          This collector monitors Hyper-V virtualization metrics including virtual machine health status, root partition virtualization layer statistics (TLB flushes, address spaces, attached devices, GPA space), per-VM CPU usage, memory allocation and pressure, storage device I/O and errors, network interface traffic and packets, and virtual switch traffic, packets, and dropped packets.
         method_description: |
           It queries the 'HyperV' object from Perflib in order to gather the metrics.
       supported_platforms:
