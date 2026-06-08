@@ -623,7 +623,7 @@ _safe_download() {
 
   if [ -n "${curl}" ]; then
     set +e
-    "${curl}" --fail --location --write-out "%{http_code}" --connect-timeout 10 --retry 3 "${url}" --output "${dest}" > "${dl_log}"
+    "${curl}" --silent --fail --location --write-out "%{http_code}" --connect-timeout 10 --retry 3 "${url}" --output "${dest}" > "${dl_log}"
     result="$?"
     set -e
 
