@@ -91,7 +91,13 @@ typedef void ** PPvoid_t;
 
 #ifndef _WORD_T
 #define _WORD_T
-typedef unsigned long    Word_t, * PWord_t;  // expect 32-bit or 64-bit words.
+// On Windows (LLP64), unsigned long is 32-bit even in 64-bit mode.
+// Use unsigned long long for JU_64BIT to match pointer width.
+#if defined(JU_64BIT) && defined(_WIN64)
+typedef unsigned long long  Word_t, * PWord_t;
+#else
+typedef unsigned long       Word_t, * PWord_t;  // expect 32-bit or 64-bit words.
+#endif
 #endif
 
 #ifndef NULL
