@@ -39,7 +39,7 @@ func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
 
 func (c *Collector) initFallbackTypeMatcher(expr []string) (matcher.Matcher, error) {
 	if len(expr) == 0 {
-		return nil, nil
+		return matcher.FALSE(), nil
 	}
 
 	m := matcher.FALSE()

@@ -1,6 +1,7 @@
 package prometheus
 
 import (
+	"math"
 	"testing"
 
 	"github.com/prometheus/common/model"
@@ -322,6 +323,36 @@ func TestSummary_Quantiles(t *testing.T) {
 		Summary{quantiles: []Quantile{{quantile: 0.1, value: 1}}}.Quantiles(),
 		[]Quantile{{quantile: 0.1, value: 1}},
 	)
+}
+
+func TestSummary_IsNaN(t *testing.T) {
+	tests := map[string]struct {
+		summary Summary
+		want    bool
+	}{
+		"all quantiles NaN": {
+			summary: Summary{quantiles: []Quantile{{quantile: 0.5, value: math.NaN()}, {quantile: 0.9, value: math.NaN()}}},
+			want:    true,
+		},
+		"no quantiles": {
+			summary: Summary{},
+			want:    true,
+		},
+		"mix of NaN and real quantiles": {
+			summary: Summary{quantiles: []Quantile{{quantile: 0.5, value: math.NaN()}, {quantile: 0.9, value: 0.4}}},
+			want:    false,
+		},
+		"all quantiles real": {
+			summary: Summary{quantiles: []Quantile{{quantile: 0.5, value: 0.1}, {quantile: 0.9, value: 0.4}}},
+			want:    false,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, test.want, test.summary.IsNaN())
+		})
+	}
 }
 
 func TestQuantile_Value(t *testing.T) {
