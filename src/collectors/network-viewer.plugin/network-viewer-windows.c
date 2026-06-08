@@ -96,7 +96,7 @@ DWORD WINAPI GetExtendedUdpTable(PVOID pUdpTable, PDWORD pdwSize, BOOL bOrder,
 
 #define PLUGIN_NETWORK_VIEWER_NAME   "network-viewer.plugin"
 #define NV_WIN_FUNCTION_PROTO        "network-protocols"
-#define NV_WIN_FUNCTION_PROTO_HELP   "Windows TCP and UDP statistics by transport and IP family"
+#define NV_WIN_FUNCTION_PROTO_HELP   "Windows TCP, UDP, and SMB Server Shares statistics grouped by transport and IP family"
 #define NV_WIN_FUNCTION_UPDATE_EVERY 5
 #define NV_WIN_FUNCTION_PRIORITY     100
 #define NV_WIN_FUNCTION_CONN         "network-connections"
