@@ -39,7 +39,7 @@ pacman -S --noconfirm --needed \
     mingw-w64-ucrt-x86_64-toolchain \
     ucrt64/mingw-w64-ucrt-x86_64-brotli \
     ucrt64/mingw-w64-ucrt-x86_64-cmake \
-    ucrt64/mingw-w64-ucrt-x86_64-headers-git \
+    ucrt64/mingw-w64-ucrt-x86_64-headers \
     ucrt64/mingw-w64-ucrt-x86_64-curl \
     ucrt64/mingw-w64-ucrt-x86_64-go \
     ucrt64/mingw-w64-ucrt-x86_64-libuv \
@@ -49,5 +49,6 @@ pacman -S --noconfirm --needed \
     ucrt64/mingw-w64-ucrt-x86_64-openssl \
     ucrt64/mingw-w64-ucrt-x86_64-pcre2 \
     ucrt64/mingw-w64-ucrt-x86_64-protobuf \
-    ucrt64/mingw-w64-ucrt-x86_64-zlib
+    ucrt64/mingw-w64-ucrt-x86_64-zlib \
+    ucrt64/mingw-w64-ucrt-x86_64-zstd
 ${GITHUB_ACTIONS+echo "::endgroup::"}
