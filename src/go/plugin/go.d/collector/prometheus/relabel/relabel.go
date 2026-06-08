@@ -105,10 +105,10 @@ type DropObserver func(sample prompkg.Sample, drop DropInfo)
 //
 // The unexported separatorSet/replacementSet/sourceLabelsSet fields distinguish an
 // explicitly-empty field from an unset one (they are read by withDefaults, validate
-// and applyReplace). They are settable only within this package, so an external
-// programmatic caller cannot express an explicit-empty Separator/Replacement/
-// SourceLabels and gets the defaults for empty values; the config-parsing path
-// (added with profiles) sets them from YAML/JSON.
+// and applyReplace). They are settable only within this package; callers outside the
+// package cannot express explicit-empty Separator/Replacement/SourceLabels via normal
+// struct literals or standard YAML/JSON unmarshaling (unexported fields are ignored),
+// so a dedicated config loader must set them when that behavior is needed.
 type Config struct {
 	SourceLabels []string
 	Separator    string
