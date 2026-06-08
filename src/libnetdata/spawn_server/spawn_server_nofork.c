@@ -1297,22 +1297,34 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
     if(instance->child_pid) {
         kill(instance->child_pid, SIGTERM);
 
-        // escalate to SIGKILL if the child does not exit promptly after SIGTERM, so a
-        // SIGTERM-ignoring child cannot make the final wait block forever. Escalate on a broken
-        // status channel (ERROR) too. No PID-reuse race on the RUNNING path: the spawn server reaps
-        // the child and only then sends the status report that makes timedwait return EXITED, so a
-        // RUNNING result means the child has not been reaped yet and its PID is still held.
-        // NOTE: timeout_ms is already consumed above as the pre-kill grace (waiting for a voluntary
-        // exit before SIGTERM). The post-SIGTERM escalation uses the fixed default so the caller's
-        // grace is not applied twice.
+        // wait a bounded grace for the child to exit after SIGTERM. NOTE: timeout_ms is already
+        // consumed above as the pre-kill grace (voluntary exit before SIGTERM); the post-SIGTERM
+        // grace uses the fixed default so the caller's grace is not applied twice.
+        // No PID-reuse race on the RUNNING path: the spawn server reaps the child and only then
+        // sends the status report that makes timedwait return EXITED, so a RUNNING result means
+        // the child has not been reaped yet and its PID is still held.
         int status;
-        if(spawn_server_exec_timedwait(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status) != SPAWN_TIMEDWAIT_EXITED) {
-            if(kill(instance->child_pid, SIGKILL) != 0)
-                nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                       "SPAWN PARENT: SIGKILL of pid %d failed for request No %zu", instance->child_pid, instance->request_id);
-        }
-        else
+        if(spawn_server_exec_timedwait(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
             return status;
+
+        // still not gone: force-kill, then wait another bounded grace. We must NOT fall through to
+        // an unbounded blocking wait here - a child we cannot signal (e.g. SIGKILL returns EPERM)
+        // would otherwise hang the caller (and shutdown) forever, the very thing this path prevents.
+        if(kill(instance->child_pid, SIGKILL) != 0)
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: SIGKILL of pid %d failed for request No %zu", instance->child_pid, instance->request_id);
+
+        if(spawn_server_exec_timedwait(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
+            return status;
+
+        // could not confirm the child exited within the bounded waits; reclaim the instance so we
+        // neither leak it nor block. The spawn server reaps the child if/when it actually dies.
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: giving up waiting for pid %d after SIGKILL (request No %zu) - reclaiming",
+               instance->child_pid, instance->request_id);
+        instance->child_pid = 0; // already signalled; skip the SIGTERM in destroy
+        spawn_server_exec_destroy(instance);
+        return -1;
     }
 
     return spawn_server_exec_wait(server, instance);
