@@ -81,6 +81,42 @@ void nipc_service_common_copy_cstr_field(char *dst, size_t dst_size, const char 
     dst[len] = '\0';
 }
 
+bool nipc_service_common_client_transport_fields(
+    nipc_service_common_transport_fields_t *fields,
+    const nipc_client_config_t *config)
+{
+    memset(fields, 0, sizeof(*fields));
+    if (!config)
+        return false;
+
+    fields->supported_profiles = config->supported_profiles;
+    fields->preferred_profiles = config->preferred_profiles;
+    fields->max_request_batch_items = config->max_request_batch_items;
+    fields->max_response_payload_bytes = config->max_response_payload_bytes;
+    fields->max_response_batch_items =
+        nipc_service_common_typed_response_batch_items(config->max_request_batch_items);
+    fields->auth_token = config->auth_token;
+    return true;
+}
+
+bool nipc_service_common_server_transport_fields(
+    nipc_service_common_transport_fields_t *fields,
+    const nipc_server_config_t *config)
+{
+    memset(fields, 0, sizeof(*fields));
+    if (!config)
+        return false;
+
+    fields->supported_profiles = config->supported_profiles;
+    fields->preferred_profiles = config->preferred_profiles;
+    fields->max_request_batch_items = config->max_request_batch_items;
+    fields->max_response_payload_bytes = config->max_response_payload_bytes;
+    fields->max_response_batch_items =
+        nipc_service_common_typed_response_batch_items(config->max_request_batch_items);
+    fields->auth_token = config->auth_token;
+    return true;
+}
+
 void nipc_service_common_client_init(nipc_client_ctx_t *ctx,
                                      const char *run_dir,
                                      const char *service_name)
@@ -301,6 +337,60 @@ nipc_error_t nipc_service_common_call_with_retry(
         if (ops->sleep_ms && ops->reconnect_retry_interval_ms > 0)
             ops->sleep_ms(ops->reconnect_retry_interval_ms);
     }
+}
+
+nipc_error_t nipc_service_common_server_init_base(
+    nipc_managed_server_t *server,
+    const char *run_dir,
+    const char *service_name,
+    int worker_count,
+    uint16_t expected_method_code,
+    nipc_server_handler_fn handler,
+    void *user,
+    uint32_t max_request_payload_bytes,
+    uint32_t max_response_payload_bytes)
+{
+    if (!run_dir || !service_name || !handler)
+        return NIPC_ERR_BAD_LAYOUT;
+
+    if (worker_count < 1)
+        worker_count = 1;
+
+    nipc_service_common_copy_cstr_field(server->run_dir, sizeof(server->run_dir),
+                                        run_dir);
+    nipc_service_common_copy_cstr_field(server->service_name,
+                                        sizeof(server->service_name),
+                                        service_name);
+
+    server->handler = handler;
+    server->handler_user = user;
+    server->worker_count = worker_count;
+    server->expected_method_code = expected_method_code;
+    server->learned_request_payload_bytes =
+        max_request_payload_bytes > 0
+            ? max_request_payload_bytes
+            : NIPC_MAX_PAYLOAD_DEFAULT;
+    server->learned_response_payload_bytes =
+        max_response_payload_bytes > 0
+            ? max_response_payload_bytes
+            : NIPC_MAX_PAYLOAD_DEFAULT;
+    server->session_capacity = worker_count * 2;
+    if (server->session_capacity < 16)
+        server->session_capacity = 16;
+    server->session_count = 0;
+    server->next_session_id = 1;
+    return NIPC_OK;
+}
+
+nipc_error_t nipc_service_common_server_alloc_sessions(
+    nipc_managed_server_t *server,
+    nipc_service_common_calloc_fn calloc_fn,
+    int fault_site)
+{
+    server->sessions = calloc_fn((size_t)server->session_capacity,
+                                 sizeof(nipc_session_ctx_t *),
+                                 fault_site);
+    return server->sessions ? NIPC_OK : NIPC_ERR_OVERFLOW;
 }
 
 void nipc_service_common_server_note_request_capacity(nipc_managed_server_t *server,

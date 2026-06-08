@@ -45,6 +45,28 @@ typedef struct {
     uint32_t reconnect_retry_interval_ms;
 } nipc_service_common_client_ops_t;
 
+typedef void *(*nipc_service_common_calloc_fn)(size_t count,
+                                               size_t size,
+                                               int fault_site);
+
+typedef struct {
+    uint32_t supported_profiles;
+    uint32_t preferred_profiles;
+    uint32_t max_request_batch_items;
+    uint32_t max_response_payload_bytes;
+    uint32_t max_response_batch_items;
+    uint64_t auth_token;
+} nipc_service_common_transport_fields_t;
+
+#define NIPC_SERVICE_COMMON_APPLY_TRANSPORT_FIELDS(dst, fields) do { \
+    (dst)->supported_profiles = (fields)->supported_profiles; \
+    (dst)->preferred_profiles = (fields)->preferred_profiles; \
+    (dst)->max_request_batch_items = (fields)->max_request_batch_items; \
+    (dst)->max_response_payload_bytes = (fields)->max_response_payload_bytes; \
+    (dst)->max_response_batch_items = (fields)->max_response_batch_items; \
+    (dst)->auth_token = (fields)->auth_token; \
+} while (0)
+
 uint32_t nipc_service_common_next_power_of_2_u32(uint32_t n);
 bool nipc_service_common_header_payload_len(size_t payload_len,
                                             size_t *msg_len_out);
@@ -55,6 +77,12 @@ uint32_t nipc_service_common_request_payload_default(void);
 uint32_t nipc_service_common_response_payload_default(void);
 uint32_t nipc_service_common_typed_response_batch_items(uint32_t max_request_batch_items);
 void nipc_service_common_copy_cstr_field(char *dst, size_t dst_size, const char *src);
+bool nipc_service_common_client_transport_fields(
+    nipc_service_common_transport_fields_t *fields,
+    const nipc_client_config_t *config);
+bool nipc_service_common_server_transport_fields(
+    nipc_service_common_transport_fields_t *fields,
+    const nipc_server_config_t *config);
 
 void nipc_service_common_client_init(nipc_client_ctx_t *ctx,
                                      const char *run_dir,
@@ -89,6 +117,20 @@ void nipc_service_common_server_note_request_capacity(nipc_managed_server_t *ser
                                                       uint32_t payload_len);
 void nipc_service_common_server_note_response_capacity(nipc_managed_server_t *server,
                                                        uint32_t payload_len);
+nipc_error_t nipc_service_common_server_init_base(
+    nipc_managed_server_t *server,
+    const char *run_dir,
+    const char *service_name,
+    int worker_count,
+    uint16_t expected_method_code,
+    nipc_server_handler_fn handler,
+    void *user,
+    uint32_t max_request_payload_bytes,
+    uint32_t max_response_payload_bytes);
+nipc_error_t nipc_service_common_server_alloc_sessions(
+    nipc_managed_server_t *server,
+    nipc_service_common_calloc_fn calloc_fn,
+    int fault_site);
 void nipc_service_common_prepare_response_header(const nipc_header_t *request_hdr,
                                                  nipc_header_t *resp_hdr);
 void nipc_service_common_apply_dispatch_result(nipc_managed_server_t *server,

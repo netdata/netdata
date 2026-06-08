@@ -21,18 +21,12 @@ static nipc_np_client_config_t service_client_config_to_transport(
     const nipc_client_config_t *config)
 {
     nipc_np_client_config_t transport = {0};
+    nipc_service_common_transport_fields_t fields;
 
-    if (!config)
+    if (!nipc_service_common_client_transport_fields(&fields, config))
         return transport;
 
-    transport.supported_profiles = config->supported_profiles;
-    transport.preferred_profiles = config->preferred_profiles;
-    transport.max_request_batch_items = config->max_request_batch_items;
-    transport.max_response_payload_bytes = config->max_response_payload_bytes;
-    transport.max_response_batch_items =
-        nipc_service_common_typed_response_batch_items(config->max_request_batch_items);
-    transport.auth_token = config->auth_token;
-
+    NIPC_SERVICE_COMMON_APPLY_TRANSPORT_FIELDS(&transport, &fields);
     return transport;
 }
 
@@ -59,17 +53,12 @@ void nipc_service_platform_server_config_from_service(
     const nipc_server_config_t *config)
 {
     memset(transport, 0, sizeof(*transport));
+    nipc_service_common_transport_fields_t fields;
 
-    if (!config)
+    if (!nipc_service_common_server_transport_fields(&fields, config))
         return;
 
-    transport->supported_profiles = config->supported_profiles;
-    transport->preferred_profiles = config->preferred_profiles;
-    transport->max_request_batch_items = config->max_request_batch_items;
-    transport->max_response_payload_bytes = config->max_response_payload_bytes;
-    transport->max_response_batch_items =
-        nipc_service_common_typed_response_batch_items(config->max_request_batch_items);
-    transport->auth_token = config->auth_token;
+    NIPC_SERVICE_COMMON_APPLY_TRANSPORT_FIELDS(transport, &fields);
 }
 
 /* ------------------------------------------------------------------ */

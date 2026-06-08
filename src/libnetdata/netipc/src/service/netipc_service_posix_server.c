@@ -111,43 +111,21 @@ nipc_error_t nipc_service_platform_server_init_raw(
     __atomic_store_n(&server->running, false, __ATOMIC_RELAXED);
     server->acceptor_started = false;
 
-    if (!run_dir || !service_name || !config || !handler)
+    if (!config)
         return NIPC_ERR_BAD_LAYOUT;
 
-    if (worker_count < 1)
-        worker_count = 1;
-
-    nipc_service_common_copy_cstr_field(server->run_dir, sizeof(server->run_dir),
-                                        run_dir);
-    nipc_service_common_copy_cstr_field(server->service_name,
-                                        sizeof(server->service_name),
-                                        service_name);
-
-    server->handler = handler;
-    server->handler_user = user;
-    server->worker_count = worker_count;
-    server->expected_method_code = expected_method_code;
+    nipc_error_t ierr = nipc_service_common_server_init_base(
+        server, run_dir, service_name, worker_count, expected_method_code,
+        handler, user, config->max_request_payload_bytes,
+        config->max_response_payload_bytes);
+    if (ierr != NIPC_OK)
+        return ierr;
     server->base_config = *config;
-    server->learned_request_payload_bytes =
-        config->max_request_payload_bytes > 0
-            ? config->max_request_payload_bytes
-            : NIPC_MAX_PAYLOAD_DEFAULT;
-    server->learned_response_payload_bytes =
-        config->max_response_payload_bytes > 0
-            ? config->max_response_payload_bytes
-            : NIPC_MAX_PAYLOAD_DEFAULT;
-
-    /* Initialize session tracking */
-    server->session_capacity = worker_count * 2; /* room for slots being reaped */
-    if (server->session_capacity < 16)
-        server->session_capacity = 16;
-    server->sessions = nipc_service_posix_calloc((size_t)server->session_capacity,
-                              sizeof(nipc_session_ctx_t *),
-                              NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_SESSIONS_CALLOC_INTERNAL);
-    if (!server->sessions)
-        return NIPC_ERR_OVERFLOW;
-    server->session_count = 0;
-    server->next_session_id = 1; /* spec: monotonic counter starting at 1 */
+    ierr = nipc_service_common_server_alloc_sessions(
+        server, nipc_service_posix_calloc,
+        NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_SESSIONS_CALLOC_INTERNAL);
+    if (ierr != NIPC_OK)
+        return ierr;
     pthread_mutex_init(&server->sessions_lock, NULL);
 
     /* Clean up stale SHM regions from previous crashes (spec requirement:
