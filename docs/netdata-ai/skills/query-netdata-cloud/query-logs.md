@@ -14,14 +14,15 @@ Log Functions are the **Log Explorer** class of Functions
 (per-field value counts) for drill-down and an optional
 **histogram** (bucketed counts over time) for context.
 
-Three log Functions exist today, each backed by a different log
+Four log Functions exist today, each backed by a different log
 source. Their request and response shapes follow the same standard
-envelope, but the journal-field set differs per source:
+envelope, but the field set differs per source:
 
 | Function | Source | Notes |
 |---|---|---|
 | `systemd-journal` | systemd journal namespaces (system, user, namespace-specific, remote-forwarded) | Linux nodes |
 | `windows-events` | Windows event log channels | Windows nodes |
+| `macos-logs` | macOS unified log store through Apple's native OSLog framework | macOS nodes |
 | `otel-logs` | OpenTelemetry logs ingested by the agent | Any node with the OTEL log receiver enabled |
 
 Confirm which are registered on a node via the
@@ -29,7 +30,7 @@ function-listing endpoint in
 [query-functions.md](./query-functions.md). Field names below are
 illustrative for `systemd-journal`; the same Function payload keys
 (`after`, `before`, `last`, `query`, `facets`, `histogram`,
-`__logs_sources`, ...) apply to the other two -- only the **values
+`__logs_sources`, ...) apply to the other log Functions -- only the **values
 and column names** differ per source.
 
 ---

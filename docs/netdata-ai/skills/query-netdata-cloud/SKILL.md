@@ -1,6 +1,6 @@
 ---
 name: query-netdata-cloud
-description: Query Netdata Cloud via its REST API -- metrics, logs (systemd-journal / windows-events / otel-logs), topology graphs (topology:snmp), network flows (flows:netflow), alerts, dynamic configuration (DynCfg), and generic Functions on a node. Use when the user asks about querying Netdata Cloud, fetching metrics from the cloud, querying logs / topology / netflow / sflow / ipfix through Cloud, listing or modifying configurations via DynCfg, calling agent Functions through Cloud, listing spaces/rooms/nodes, or building a curl command against `app.netdata.cloud`. Pairs with the `query-netdata-agents` skill when direct-agent access is needed.
+description: Query Netdata Cloud via its REST API -- metrics, logs (systemd-journal / windows-events / macos-logs / otel-logs), topology graphs (topology:snmp), network flows (flows:netflow), alerts, dynamic configuration (DynCfg), and generic Functions on a node. Use when the user asks about querying Netdata Cloud, fetching metrics from the cloud, querying logs / topology / netflow / sflow / ipfix through Cloud, listing or modifying configurations via DynCfg, calling agent Functions through Cloud, listing spaces/rooms/nodes, or building a curl command against `app.netdata.cloud`. Pairs with the `query-netdata-agents` skill when direct-agent access is needed.
 ---
 
 # Query Netdata Cloud via REST API
@@ -16,7 +16,7 @@ runnable curl commands.
 | Domain | Guide |
 |---|---|
 | Time-series metrics | [query-metrics.md](./query-metrics.md) |
-| Logs (`systemd-journal`, `windows-events`, `otel-logs`) | [query-logs.md](./query-logs.md) |
+| Logs (`systemd-journal`, `windows-events`, `macos-logs`, `otel-logs`) | [query-logs.md](./query-logs.md) |
 | Topology Functions (`topology:snmp`, ...) | [query-topology.md](./query-topology.md) |
 | Network-flow Functions (`flows:netflow` -- NetFlow / sFlow / IPFIX) | [query-flows.md](./query-flows.md) |
 | Alerts and alert transitions | [query-alerts.md](./query-alerts.md) |

@@ -18,7 +18,7 @@ agent API.
 | Domain | Guide |
 |---|---|
 | Generic Function invocation | [query-functions.md](./query-functions.md) |
-| Logs (`systemd-journal`, `windows-events`, `otel-logs`) | [query-logs.md](./query-logs.md) |
+| Logs (`systemd-journal`, `windows-events`, `macos-logs`, `otel-logs`) | [query-logs.md](./query-logs.md) |
 | Topology (`topology:snmp`) | [query-topology.md](./query-topology.md) |
 | Flows (`flows:netflow`) | [query-flows.md](./query-flows.md) |
 | Alerts (v3 paths) | [query-alerts.md](./query-alerts.md) |

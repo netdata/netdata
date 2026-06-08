@@ -72,6 +72,44 @@
     prerequisites:
       description: |
         - Netdata Cloud paid subscription
+- id: "macos-unified-logs"
+  meta:
+    name: "macOS Unified Logs"
+    link: "https://github.com/netdata/netdata/blob/master/src/collectors/macos-logs.plugin/README.md"
+    categories:
+      - logs
+    icon_filename: "macos.svg"
+  keywords:
+    - macos
+    - macos logs
+    - unified logs
+    - oslog
+    - logs
+  overview:
+    description: |
+      The macOS Logs plugin by Netdata makes viewing, exploring and analyzing macOS unified logs simple and efficient.
+
+      It queries Apple's native OSLog framework directly and does not invoke `log show`, `log stream`, or other external log-query commands during normal query execution.
+
+      The plugin exposes the local macOS unified log store as a structured, searchable Logs tab source.
+    visualization:
+      description: |
+        You can start exploring macOS unified logs on the "Logs" tab of the Netdata UI.
+    key_features:
+      description: |
+        - Supports the native **macOS unified log** store.
+        - Uses Apple's public **OSLog** framework.
+        - Allows filtering on macOS log fields for any selected time frame.
+        - Allows full-text search across collected log fields.
+        - Provides a histogram for log entries over time, with a break down per field-value.
+        - Supports severity coloring based on the OSLog level.
+        - Supports PLAY mode through repeated bounded native queries, without running `log stream`.
+  setup:
+    prerequisites:
+      description: |
+        - macOS with the OSLog framework available
+        - Access to the local unified log store; Apple's OSLog API requires an admin account for local system logs
+        - A Netdata Cloud account
 - id: "logs-opentelemetry"
   meta:
     name: "OpenTelemetry Logs"
