@@ -12,6 +12,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	sdkjournal "github.com/netdata/systemd-journal-sdk/go/journal"
+)
+
+const (
+	testJournalCompatibleSealed       = 1 << 0
+	testJournalIncompatibleCompact    = 1 << 4
+	testJournalIncompatibleCompressed = (1 << 0) | (1 << 1) | (1 << 3)
 )
 
 func TestNewJournalWriterEagerOpenCreatesSDKJournalDirectory(t *testing.T) {
@@ -27,6 +35,32 @@ func TestNewJournalWriterEagerOpenCreatesSDKJournalDirectory(t *testing.T) {
 	assert.DirExists(t, w.JournalDirectory())
 	assert.NotEmpty(t, w.ActivePath())
 	assert.FileExists(t, w.ActivePath())
+}
+
+func TestNewJournalWriterCreatesCompactUnsealedUncompressedJournal(t *testing.T) {
+	requireLinuxJournalBackend(t)
+
+	dir := t.TempDir()
+	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	require.NoError(t, err)
+
+	fields := []JournalField{
+		{Name: "MESSAGE", Value: []byte("sdk compact flag entry")},
+		{Name: "SYSLOG_IDENTIFIER", Value: []byte("sdk-test")},
+	}
+	now := time.Now().UnixMicro()
+	require.NoError(t, w.WriteEntry(fields, now, now))
+	activePath := w.ActivePath()
+	require.NoError(t, w.Close())
+
+	r, err := sdkjournal.OpenFileWithOptions(activePath, sdkjournal.ReaderOptions{})
+	require.NoError(t, err)
+	defer r.Close()
+
+	header := r.Header()
+	assert.NotZero(t, header.IncompatibleFlags()&testJournalIncompatibleCompact)
+	assert.Zero(t, header.IncompatibleFlags()&testJournalIncompatibleCompressed)
+	assert.Zero(t, header.CompatibleFlags()&testJournalCompatibleSealed)
 }
 
 func TestJournalWriterWriteAndQueryWithJournalctl(t *testing.T) {

@@ -396,6 +396,178 @@ func BenchmarkFullPacketToJournal(b *testing.B) {
 	}
 }
 
+// BenchmarkUDPPacketToJournal measures the real local UDP receive path:
+// UDP socket -> Listener.readLoop -> Collector.handlePacket ->
+// journalTrapWriter queue -> SDK-backed journal append/sync.
+func BenchmarkUDPPacketToJournal(b *testing.B) {
+	requireJournalctlBenchmark(b)
+
+	h := newUDPPacketToJournalBenchmark(b)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		h.writePacket(b)
+	}
+	h.finish(b, int64(b.N))
+}
+
+func BenchmarkUDPPacketToJournalPaced(b *testing.B) {
+	for _, rate := range []int{25000, 50000, 75000, 100000} {
+		b.Run(fmt.Sprintf("%dpps", rate), func(b *testing.B) {
+			h := newUDPPacketToJournalBenchmark(b)
+			perTick := rate / 1000
+			remainder := rate % 1000
+			sent := int64(0)
+			start := time.Now()
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				target := start.Add(time.Duration(i) * time.Millisecond)
+				if delay := time.Until(target); delay > 0 {
+					time.Sleep(delay)
+				}
+				n := perTick
+				if (i*remainder)%1000 < remainder {
+					n++
+				}
+				for range n {
+					h.writePacket(b)
+				}
+				sent += int64(n)
+			}
+			h.finish(b, sent)
+		})
+	}
+}
+
+type udpPacketToJournalBenchmark struct {
+	data       []byte
+	writer     *journalTrapWriter
+	listener   *Listener
+	conn       *net.UDPConn
+	delivered  atomic.Int64
+	journalDir string
+}
+
+func newUDPPacketToJournalBenchmark(b *testing.B) *udpPacketToJournalBenchmark {
+	b.Helper()
+
+	data := buildBenchV2cTrap(b, "public", "1.3.6.1.6.3.1.1.5.1",
+		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.1.1.0", Type: gosnmp.OctetString, Value: "test-device"},
+		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.1.3.0", Type: gosnmp.TimeTicks, Value: uint32(123456)},
+		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.2.2.1.1.1", Type: gosnmp.Integer, Value: 1},
+		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.2.2.1.1.2", Type: gosnmp.Integer, Value: 2},
+		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.2.2.1.2.1", Type: gosnmp.OctetString, Value: "Gi0/1"},
+	)
+	trap := &TrapDef{
+		OID:         "1.3.6.1.6.3.1.1.5.1",
+		Name:        "TEST-MIB::coldStartSecurity",
+		Category:    "security",
+		Severity:    "warning",
+		Description: "coldStart from {TRAP_SOURCE_IP}",
+	}
+	setBenchProfileIndex(b, map[string]*TrapDef{trap.OID: trap})
+
+	w, err := NewJournalWriter(b.TempDir(), JournalConfig{RotateSize: 200 * bytesPerMB})
+	if err != nil {
+		b.Fatalf("NewJournalWriter: %v", err)
+	}
+	tw := newJournalTrapWriter(w, defaultQueueCapacity)
+	b.Cleanup(func() {
+		_ = tw.Close()
+	})
+
+	c := &Collector{
+		jobName:    "bench-udp",
+		trapWriter: tw,
+		versions:   map[SnmpVersion]struct{}{SnmpVersionV2c: {}},
+		allowlist:  NewAllowlist(nil, []string{"public"}),
+		metrics:    &perJobMetrics{},
+	}
+
+	listener, err := newListener("bench-udp", []EndpointConfig{{Protocol: "udp4", Address: "127.0.0.1", Port: 0}})
+	if err != nil {
+		b.Fatalf("newListener: %v", err)
+	}
+	b.Cleanup(listener.close)
+
+	udpAddr, ok := listener.endpoints[0].conn.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		b.Fatalf("unexpected listener address: %T", listener.endpoints[0].conn.LocalAddr())
+	}
+	conn, err := net.DialUDP("udp4", nil, udpAddr)
+	if err != nil {
+		b.Fatalf("DialUDP: %v", err)
+	}
+	b.Cleanup(func() { _ = conn.Close() })
+
+	h := &udpPacketToJournalBenchmark{
+		data:       data,
+		writer:     tw,
+		listener:   listener,
+		conn:       conn,
+		journalDir: w.JournalDirectory(),
+	}
+	listener.start(func(pkt []byte, peerIP net.IP, conn *net.UDPConn, peer *net.UDPAddr) {
+		c.handlePacket(pkt, peerIP, conn, peer)
+		h.delivered.Add(1)
+	})
+
+	return h
+}
+
+func (h *udpPacketToJournalBenchmark) writePacket(b *testing.B) {
+	b.Helper()
+	if _, err := h.conn.Write(h.data); err != nil {
+		b.Fatalf("Write UDP packet: %v", err)
+	}
+}
+
+func (h *udpPacketToJournalBenchmark) finish(b *testing.B, sent int64) {
+	b.Helper()
+
+	deliveredCount := waitForBenchmarkDeliveries(b, &h.delivered, sent, 250*time.Millisecond)
+	h.listener.close()
+	if err := h.writer.Flush(); err != nil {
+		b.Fatalf("Flush: %v", err)
+	}
+	b.StopTimer()
+
+	if err := h.writer.Close(); err != nil {
+		b.Fatalf("Close: %v", err)
+	}
+	rows := countJournalRowsBenchmark(b, h.journalDir, "TRAP_CATEGORY=security")
+	reportDrops(b, sent, rows)
+	elapsed := b.Elapsed().Seconds()
+	if elapsed > 0 {
+		b.ReportMetric(float64(sent)/elapsed, "sent_packets/s")
+		b.ReportMetric(float64(deliveredCount)/elapsed, "udp_delivered/s")
+		b.ReportMetric(float64(rows)/elapsed, "persisted_entries/s")
+	}
+}
+
+func waitForBenchmarkDeliveries(b *testing.B, delivered *atomic.Int64, want int64, quietFor time.Duration) int64 {
+	b.Helper()
+
+	last := delivered.Load()
+	quietSince := time.Now()
+	for last < want {
+		time.Sleep(time.Millisecond)
+		cur := delivered.Load()
+		if cur != last {
+			last = cur
+			quietSince = time.Now()
+			continue
+		}
+		if time.Since(quietSince) >= quietFor {
+			return cur
+		}
+	}
+	return last
+}
+
 // ---------------------------------------------------------------------------
 // 5. Malformed BER / limit rejection benchmark
 // ---------------------------------------------------------------------------

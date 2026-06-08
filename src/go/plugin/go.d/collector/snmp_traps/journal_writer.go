@@ -68,8 +68,11 @@ func NewJournalWriter(dir string, cfg JournalConfig) (*JournalWriter, error) {
 
 	logCfg := sdkjournal.LogConfig{
 		Options: sdkjournal.Options{
-			MachineID: machineID,
-			BootID:    bootID,
+			MachineID:   machineID,
+			BootID:      bootID,
+			Compact:     true,
+			Compression: sdkjournal.CompressionNone,
+			Seal:        nil,
 		},
 		RotationPolicy:  rotationPolicyFromConfig(cfg),
 		RetentionPolicy: retentionPolicyFromConfig(cfg),
