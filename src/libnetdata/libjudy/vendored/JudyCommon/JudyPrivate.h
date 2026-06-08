@@ -307,7 +307,7 @@ typedef int bool_t;
 
 // A word that is all-ones, normally equal to -1UL, but safer with ~0:
 
-#define cJU_ALLONES  (~0UL)
+#define cJU_ALLONES  (~(Word_t)0)
 
 // Note, these are forward references, but thats OK:
 
