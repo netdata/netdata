@@ -2645,28 +2645,30 @@ list(APPEND ACLK_FILES ${ACLK_PROTO_BUILT_SRCS}
                        ${ACLK_PROTO_BUILT_HDRS})
 
 #
-# nd-run helper program
+# nd-run helper program (POSIX-only: uses grp.h, pwd.h, setuid/execvp)
 #
 
-if(OS_LINUX)
-  pkg_check_modules(CAP IMPORTED_TARGET libcap)
-else()
-  set(CAP_FOUND False)
-endif()
+if(NOT OS_WINDOWS)
+  if(OS_LINUX)
+    pkg_check_modules(CAP IMPORTED_TARGET libcap)
+  else()
+    set(CAP_FOUND False)
+  endif()
 
-if(CAP_FOUND)
-  set(HAVE_CAPABILITY True)
-endif()
+  if(CAP_FOUND)
+    set(HAVE_CAPABILITY True)
+  endif()
 
-set(NDRUN_FILES src/collectors/utils/nd-run.c)
-add_executable(nd-run ${NDRUN_FILES})
-if(CAP_FOUND)
-  target_link_libraries(nd-run PRIVATE PkgConfig::CAP)
+  set(NDRUN_FILES src/collectors/utils/nd-run.c)
+  add_executable(nd-run ${NDRUN_FILES})
+  if(CAP_FOUND)
+    target_link_libraries(nd-run PRIVATE PkgConfig::CAP)
+  endif()
+  target_include_directories(nd-run PRIVATE ${CONFIG_H_DIR})
+  install(TARGETS nd-run
+          COMPONENT netdata
+          DESTINATION "${BINDIR}")
 endif()
-target_include_directories(nd-run PRIVATE ${CONFIG_H_DIR})
-install(TARGETS nd-run
-        COMPONENT netdata
-        DESTINATION "${BINDIR}")
 
 #
 # build plugins
