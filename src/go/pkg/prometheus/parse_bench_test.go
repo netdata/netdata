@@ -28,20 +28,21 @@ import (
 //	parseToMetricFamilies   127868 ns/op    73404 B/op   1314 allocs/op
 //	parseToSeries           111382 ns/op   100444 B/op   1584 allocs/op
 //
-// Unified driver+assembler stream parser (this rewrite — captured 2026-06-05):
+// Unified driver+assembler parser (this rewrite — captured 2026-06-05):
 //
 //	parseToMetricFamilies   133911 ns/op    73408 B/op   1314 allocs/op
 //	parseToSeries           112803 ns/op   100448 B/op   1584 allocs/op
-//	parseToStream           113248 ns/op   102807 B/op   1644 allocs/op
 //
-// No allocation win and no allocation regression: the legacy parser already
-// parsed once per call and reused buffers, and both Scrape and ScrapeSeries match
-// it exactly (flat allocs). ScrapeSeries uses the raw-label path (identical to
-// legacy), so it is essentially free. Scrape/stream are a few percent slower on
-// CPU — the per-sample Sample struct + the shared iterate indirection + assembler
-// dispatch on the families/stream path (profiled: makeSample + applySample,
-// inherent to the single-driver model, not a fixable hotspot). The win is the
-// sample stream that metric relabeling consumes, not raw speed.
+// Scrape (parseToMetricFamilies) and ScrapeSeries keep the legacy allocation profile
+// (flat allocs); ScrapeSeries is the raw-label path (identical to legacy, essentially
+// free), Scrape a few percent slower on CPU (per-sample Sample + iterate indirection +
+// assembler dispatch — makeSample/applySample, inherent to the single-driver model).
+//
+// A transform runs with ownLabels=true, so each kept sample owns a copy of its labels
+// — the cost metric relabeling pays to mutate safely (captured 2026-06-08):
+//
+//	parseToMetricFamilies                142135 ns/op    73412 B/op   1314 allocs/op
+//	parseToMetricFamiliesWithTransform   147460 ns/op    93940 B/op   1709 allocs/op
 
 func readBenchData(tb testing.TB) []byte {
 	tb.Helper()
@@ -64,7 +65,7 @@ func BenchmarkPromTextParser_parseToMetricFamilies(b *testing.B) {
 	b.SetBytes(int64(len(data)))
 	b.ResetTimer()
 	for range b.N {
-		if _, err := p.parseToMetricFamilies(data); err != nil {
+		if _, err := p.parseToMetricFamilies(data, nil); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -83,14 +84,15 @@ func BenchmarkPromTextParser_parseToSeries(b *testing.B) {
 	}
 }
 
-func BenchmarkPromTextParser_parseToStream(b *testing.B) {
+func BenchmarkPromTextParser_parseToMetricFamiliesWithTransform(b *testing.B) {
 	data := readBenchData(b)
 	var p promTextParser
+	keep := func(s Sample) (Sample, bool, error) { return s, true, nil }
 	b.ReportAllocs()
 	b.SetBytes(int64(len(data)))
 	b.ResetTimer()
 	for range b.N {
-		if err := p.parseToStream(data, nil, func(Sample) error { return nil }); err != nil {
+		if _, err := p.parseToMetricFamilies(data, keep); err != nil {
 			b.Fatal(err)
 		}
 	}

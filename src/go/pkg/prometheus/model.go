@@ -42,3 +42,14 @@ type Sample struct {
 	Kind       SampleKind
 	FamilyType model.MetricType
 }
+
+// SampleTransform transforms or drops a single scraped Sample before typed-family
+// assembly. Return (sample, true, nil) to keep it (optionally mutated — rewrite Name
+// or mutate Labels in place), (_, false, nil) to drop it, or a non-nil error to abort
+// the scrape. Each Sample owns its Labels, so in-place mutation is safe and does not
+// affect other samples. It is the hook a Prometheus metric-relabeling step plugs into.
+//
+// Kind and FamilyType reflect the classification BEFORE the transform runs; rewriting
+// Name, le, or quantile does NOT reclassify the sample (matching Prometheus, where
+// relabeling cannot retype a series).
+type SampleTransform func(Sample) (Sample, bool, error)

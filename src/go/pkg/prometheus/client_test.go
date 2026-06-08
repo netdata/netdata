@@ -133,39 +133,60 @@ func TestPrometheusReadFromFile(t *testing.T) {
 	}
 }
 
-func TestPrometheusScrapeStream(t *testing.T) {
+func TestPrometheusScrapeWithTransform(t *testing.T) {
 	errBoom := errors.New("boom")
 
 	tests := map[string]struct {
-		onSampleErr error // returned by onSample (nil = stream everything)
-		wantErr     error
+		transform func(seen *int) SampleTransform
+		wantErr   error
+		check     func(t *testing.T, mfs MetricFamilies, seen int)
 	}{
-		"streams all samples and help": {},
-		"onSample error propagates":    {onSampleErr: errBoom, wantErr: errBoom},
+		"nil transform assembles like Scrape": {
+			transform: func(*int) SampleTransform { return nil },
+			check: func(t *testing.T, mfs MetricFamilies, seen int) {
+				assert.Positive(t, mfs.Len())
+				assert.Zero(t, seen, "nil transform must not be invoked")
+			},
+		},
+		"transform sees every sample and keeps them": {
+			transform: func(seen *int) SampleTransform {
+				return func(s Sample) (Sample, bool, error) { *seen++; return s, true, nil }
+			},
+			check: func(t *testing.T, mfs MetricFamilies, seen int) {
+				assert.Positive(t, seen)
+				assert.Positive(t, mfs.Len())
+			},
+		},
+		"dropping every sample yields no families": {
+			transform: func(seen *int) SampleTransform {
+				return func(s Sample) (Sample, bool, error) { *seen++; return s, false, nil }
+			},
+			check: func(t *testing.T, mfs MetricFamilies, seen int) {
+				assert.Positive(t, seen)
+				assert.Zero(t, mfs.Len())
+			},
+		},
+		"transform error aborts the scrape": {
+			transform: func(*int) SampleTransform {
+				return func(s Sample) (Sample, bool, error) { return s, false, errBoom }
+			},
+			wantErr: errBoom,
+		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			prom := New(http.DefaultClient, web.RequestConfig{URL: "file://testdata/testdata.txt"})
 
-			var samples int
-			var help []string
-			err := prom.ScrapeStream(
-				context.Background(),
-				func(name, _ string) { help = append(help, name) },
-				func(Sample) error {
-					samples++
-					return tc.onSampleErr
-				},
-			)
+			var seen int
+			mfs, err := prom.ScrapeWithTransform(context.Background(), tc.transform(&seen))
 
 			if tc.wantErr != nil {
 				assert.ErrorIs(t, err, tc.wantErr)
 				return
 			}
 			require.NoError(t, err)
-			assert.Positive(t, samples)
-			assert.Contains(t, help, "go_gc_duration_seconds")
+			tc.check(t, mfs, seen)
 		})
 	}
 }
