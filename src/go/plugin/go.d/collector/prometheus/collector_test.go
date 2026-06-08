@@ -15,6 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
@@ -348,6 +349,64 @@ test_gauge_metric{label1="value2"} 12
 			want: func(t *testing.T, fr metrix.Reader) {
 				_, ok := fr.Value("test_gauge_metric", metrix.Labels{"label1": "value1"})
 				assert.False(t, ok, "a family over the per-metric series limit must be skipped entirely")
+			},
+		},
+		"relabel applies before assembly (drop + rename via __name__)": {
+			prepare: func() *Collector {
+				c := New()
+				c.relabelConfigs = []relabel.Config{
+					{
+						SourceLabels: []string{"__name__"},
+						Regex:        relabel.MustNewRegexp("test_drop_me"),
+						Action:       relabel.Drop,
+					},
+					{
+						SourceLabels: []string{"__name__"},
+						Regex:        relabel.MustNewRegexp("test_(.+)"),
+						TargetLabel:  "__name__",
+						Replacement:  "renamed_${1}",
+						Action:       relabel.Replace,
+					},
+				}
+				return c
+			},
+			input: `
+# TYPE test_keep gauge
+test_keep{label1="value1"} 11
+# TYPE test_drop_me gauge
+test_drop_me{label1="value1"} 22
+`,
+			want: func(t *testing.T, fr metrix.Reader) {
+				assert.InDelta(t, 11, value(t, fr, "renamed_keep", metrix.Labels{"label1": "value1"}), 1e-9)
+				_, ok := fr.Value("test_keep", metrix.Labels{"label1": "value1"})
+				assert.False(t, ok, "the renamed metric must not appear under its original name")
+				_, ok = fr.Value("test_drop_me", metrix.Labels{"label1": "value1"})
+				assert.False(t, ok, "the drop rule must drop test_drop_me before assembly")
+				_, ok = fr.Value("renamed_drop_me", metrix.Labels{"label1": "value1"})
+				assert.False(t, ok, "a dropped sample must not be renamed or assembled")
+			},
+		},
+		"relabel rewrites a regular label (copy via Replace)": {
+			prepare: func() *Collector {
+				c := New()
+				c.relabelConfigs = []relabel.Config{
+					{
+						SourceLabels: []string{"method"},
+						Regex:        relabel.MustNewRegexp("(.+)"),
+						TargetLabel:  "verb",
+						Replacement:  "${1}",
+						Action:       relabel.Replace,
+					},
+				}
+				return c
+			},
+			input: `
+# TYPE test_requests_total counter
+test_requests_total{method="get"} 5
+`,
+			want: func(t *testing.T, fr metrix.Reader) {
+				// Replace copies method -> verb; the series carries both labels.
+				assert.InDelta(t, 5, value(t, fr, "test_requests_total", metrix.Labels{"method": "get", "verb": "get"}), 1e-9)
 			},
 		},
 	}

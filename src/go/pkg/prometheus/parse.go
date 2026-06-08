@@ -39,13 +39,31 @@ type promTextParser struct {
 	series Series
 }
 
-func (p *promTextParser) parseToMetricFamilies(text []byte) (MetricFamilies, error) {
+func (p *promTextParser) parseToMetricFamilies(text []byte, transform SampleTransform) (MetricFamilies, error) {
 	p.driver.sr = p.sr
 	p.asm.reset()
 
-	// ownLabels=false: the assembler copies labels into its own buffers, so the
-	// driver may lend the scratch label set (the no-allocation fast path).
-	if err := p.driver.parseSamples(text, false, p.asm.applyHelp, p.asm.applySample); err != nil {
+	// With no transform, ownLabels=false: the assembler copies labels into its own
+	// buffers, so the driver may lend the scratch label set (the no-allocation fast
+	// path). A transform may mutate or retain a sample's labels, so it needs the
+	// sample to own them (ownLabels=true).
+	onSample := p.asm.applySample
+	ownLabels := false
+	if transform != nil {
+		ownLabels = true
+		onSample = func(s Sample) error {
+			s, keep, err := transform(s)
+			if err != nil {
+				return err
+			}
+			if !keep {
+				return nil
+			}
+			return p.asm.applySample(s)
+		}
+	}
+
+	if err := p.driver.parseSamples(text, ownLabels, p.asm.applyHelp, onSample); err != nil {
 		return nil, err
 	}
 
@@ -71,17 +89,6 @@ func (p *promTextParser) parseToSeries(text []byte) (Series, error) {
 	p.series.Sort()
 
 	return p.series, nil
-}
-
-func (p *promTextParser) parseToStream(text []byte, onHelp func(name, help string), onSample func(Sample) error) error {
-	if onSample == nil {
-		return nil
-	}
-	p.driver.sr = p.sr
-
-	// ownLabels=true: each Sample must own its labels because the consumer may
-	// retain or mutate them (e.g. relabeling) past the next sample.
-	return p.driver.parseSamples(text, true, onHelp, onSample)
 }
 
 // parseDriver runs the single exposition parse pass (iterate). On top of it,
@@ -174,7 +181,7 @@ func (d *parseDriver) iterate(
 // turns each series into a Sample (Kind + FamilyType) and defers a _sum/_count
 // whose family type is not yet known, back-resolving it once the type appears (a
 // later # TYPE, _bucket, or quantile series) or flushing it at EOF. Deferral can
-// emit a _sum/_count after a later, unrelated series — see ScrapeStream's doc.
+// emit a _sum/_count after a later, unrelated series — see ScrapeWithTransform's doc.
 func (d *parseDriver) parseSamples(text []byte, ownLabels bool, onHelp func(name, help string), onSample func(Sample) error) error {
 	d.reset()
 

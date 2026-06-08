@@ -3,17 +3,19 @@
 package prometheus
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
 // collect scrapes the endpoint and writes the metric families to the metrix store. The
 // store cycle (begin/commit) is driven by the framework around Collect, so this only
 // writes observations and returns an error to abort the cycle.
-func (c *Collector) collect() error {
-	mfs, err := c.scrape()
+func (c *Collector) collect(ctx context.Context) error {
+	mfs, err := c.scrape(ctx)
 	if err != nil {
 		return err
 	}
@@ -24,8 +26,8 @@ func (c *Collector) collect() error {
 // check probes the endpoint and enforces the startup gates the V1 collector applied once:
 // the expected-prefix guard and the total time-series limit. Unlike V1 these are read-only
 // (V1 mutated Config to make them one-shot); they run only at Check, i.e. autodetection.
-func (c *Collector) check() error {
-	mfs, err := c.scrape()
+func (c *Collector) check(ctx context.Context) error {
+	mfs, err := c.scrape(ctx)
 	if err != nil {
 		return err
 	}
@@ -45,8 +47,8 @@ func (c *Collector) check() error {
 
 // scrape fetches the endpoint and enforces the empty-scrape contract: an empty scrape is
 // an error (endpoint down or exposing nothing), not silent no-data.
-func (c *Collector) scrape() (prometheus.MetricFamilies, error) {
-	mfs, err := c.prom.Scrape()
+func (c *Collector) scrape(ctx context.Context) (prometheus.MetricFamilies, error) {
+	mfs, err := c.prom.ScrapeWithTransform(ctx, c.relabelTransform)
 	if err != nil {
 		return nil, err
 	}
@@ -71,4 +73,13 @@ func calcMetrics(mfs prometheus.MetricFamilies) int {
 		n += len(mf.Metrics())
 	}
 	return n
+}
+
+// onRelabelDrop logs why a relabel rule dropped a sample, at debug level. It logs
+// the metric name and the rule outcome, never label values (cardinality/PII).
+func (c *Collector) onRelabelDrop(s prometheus.Sample, d relabel.DropInfo) {
+	c.When(d.RuleIndex >= 0).
+		Debugf("relabel dropped metric %q: %s (rule %d, action %q)", s.Name, d.Reason, d.RuleIndex, d.Action).
+		Else().
+		Debugf("relabel dropped metric %q: %s", s.Name, d.Reason)
 }
