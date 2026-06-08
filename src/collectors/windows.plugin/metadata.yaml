@@ -1753,7 +1753,7 @@ modules:
               description: The name of the Application Pool.
           metrics:
             - name: iis.application_pool_current_status
-              description: "IIS App Pool current status"
+              description: IIS App Pool current status
               unit: "status"
               chart_type: line
               dimensions:
