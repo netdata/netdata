@@ -1,6 +1,6 @@
 #include "node_info.h"
 
-#include "proto/nodeinstance/info/v1/info.pb.h"
+#include "nodeinstance/info/v1/info.pb.h"
 
 #include "schema_wrapper_utils.h"
 

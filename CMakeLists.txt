@@ -2671,7 +2671,11 @@ endif()
 #
 # proto definitions
 #
-netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
+# aclk-schemas moved to Buf v2 (PR netdata/aclk-schemas#57): the module root is
+# now "proto/" and internal imports are relative to it (e.g. "aclk/v1/lib.proto"),
+# so protoc's include root must be the proto/ directory. Generated headers are
+# therefore included without the "proto/" prefix (e.g. "aclk/v1/lib.pb.h").
+netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas/proto"
                             "${CMAKE_BINARY_DIR}/src/aclk/aclk-schemas"
                             ACLK_PROTO_BUILT_SRCS
                             ACLK_PROTO_BUILT_HDRS
