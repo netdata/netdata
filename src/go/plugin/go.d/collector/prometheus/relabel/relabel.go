@@ -247,7 +247,7 @@ func (c Config) validate() error {
 			c.Modulus != defaultConfig.Modulus ||
 			c.Separator != defaultConfig.Separator ||
 			c.Replacement != defaultConfig.Replacement {
-			return fmt.Errorf("%s action requires only 'source_labels' and `target_label`, and no other fields", c.Action)
+			return fmt.Errorf("%s action requires only 'source_labels' and 'target_label', and no other fields", c.Action)
 		}
 	}
 	if c.Action == LabelDrop || c.Action == LabelKeep {
