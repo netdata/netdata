@@ -38,19 +38,35 @@ var (
 // Config.NameScheme.
 const defaultNameValidationScheme = commonmodel.UTF8Validation
 
+// Action is the operation a relabel rule performs on a sample's labels and metric
+// name. It mirrors Prometheus's relabel actions; New canonicalizes the value, so it
+// is case-insensitive. "Joined value" below means the SourceLabels values joined by
+// Separator.
 type Action string
 
 const (
-	Replace   Action = "replace"
-	Keep      Action = "keep"
-	Drop      Action = "drop"
+	// Replace sets TargetLabel from the regex match of the joined value (Replacement
+	// is the template; an empty result deletes the target label).
+	Replace Action = "replace"
+	// Keep keeps the sample only when Regex matches the joined value.
+	Keep Action = "keep"
+	// Drop drops the sample when Regex matches the joined value.
+	Drop Action = "drop"
+	// KeepEqual keeps the sample only when TargetLabel equals the joined value.
 	KeepEqual Action = "keepequal"
+	// DropEqual drops the sample when TargetLabel equals the joined value.
 	DropEqual Action = "dropequal"
-	HashMod   Action = "hashmod"
-	LabelMap  Action = "labelmap"
+	// HashMod sets TargetLabel to the MD5 of the joined value modulo Modulus.
+	HashMod Action = "hashmod"
+	// LabelMap copies each label whose name matches Regex to a new name from Replacement.
+	LabelMap Action = "labelmap"
+	// LabelDrop removes every label whose name matches Regex.
 	LabelDrop Action = "labeldrop"
+	// LabelKeep removes every label whose name does not match Regex.
 	LabelKeep Action = "labelkeep"
+	// Lowercase sets TargetLabel to the lowercased joined value.
 	Lowercase Action = "lowercase"
+	// Uppercase sets TargetLabel to the uppercased joined value.
 	Uppercase Action = "uppercase"
 )
 
@@ -108,6 +124,9 @@ type Config struct {
 	sourceLabelsSet bool
 }
 
+// Regexp is a relabel regular expression: a regexp.Regexp compiled fully anchored
+// (see NewRegexp). The zero value has no pattern; build one with NewRegexp or
+// MustNewRegexp.
 type Regexp struct {
 	*regexp.Regexp
 }

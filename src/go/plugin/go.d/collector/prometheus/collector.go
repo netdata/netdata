@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
 //go:embed "config_schema.json"
@@ -67,10 +68,12 @@ type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	prom          prometheus.Prometheus
-	store         metrix.CollectorStore
-	writer        *metricFamilyWriter
-	chartTemplate string
+	prom             prometheus.Prometheus
+	relabelConfigs   []relabel.Config
+	relabelTransform prometheus.SampleTransform
+	store            metrix.CollectorStore
+	writer           *metricFamilyWriter
+	chartTemplate    string
 }
 
 func (c *Collector) Configuration() any {
@@ -87,6 +90,15 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("init prometheus client: %v", err)
 	}
 	c.prom = prom
+
+	// relabelConfigs are empty in this PR (rules are set by tests; profiles populate
+	// them later), so NewTransform returns a nil transform and Scrape keeps its
+	// no-transform fast path. A non-empty, invalid rule set fails Init here.
+	transform, err := relabel.NewTransform(c.relabelConfigs, c.onRelabelDrop)
+	if err != nil {
+		return fmt.Errorf("init relabel: %v", err)
+	}
+	c.relabelTransform = transform
 
 	gaugeFallback, err := c.initFallbackTypeMatcher(c.FallbackType.Gauge)
 	if err != nil {
@@ -113,12 +125,12 @@ func (c *Collector) Init(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
-	return c.check()
+func (c *Collector) Check(ctx context.Context) error {
+	return c.check(ctx)
 }
 
-func (c *Collector) Collect(context.Context) error {
-	return c.collect()
+func (c *Collector) Collect(ctx context.Context) error {
+	return c.collect(ctx)
 }
 
 func (c *Collector) Cleanup(context.Context) {
