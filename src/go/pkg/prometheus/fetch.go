@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -70,7 +71,7 @@ func (f *httpFetcher) fetch(ctx context.Context, w io.Writer) error {
 		return fmt.Errorf("server '%s' returned HTTP status code %d (%s)", req.URL, resp.StatusCode, resp.Status)
 	}
 
-	if resp.Header.Get("Content-Encoding") != "gzip" {
+	if !strings.EqualFold(resp.Header.Get("Content-Encoding"), "gzip") {
 		_, err = io.Copy(w, resp.Body)
 		return err
 	}
