@@ -18,6 +18,7 @@ modules:
         - tcp
         - udp
         - ports
+        - freebsd
       related_resources:
         integrations:
           list: []
@@ -29,9 +30,14 @@ modules:
         method_description: |
           This plugin reads the system's socket tables to enumerate all active network connections,
           including TCP and UDP sockets in all states, for both IPv4 and IPv6.
+
+          On Linux it consumes `NETLINK_INET_DIAG` and the `/proc` socket tables;
+          on FreeBSD it walks `KERN_PROC_FILEDESC` and consults `net.inet.tcp.pcblist`
+          to attribute sockets to processes.
       supported_platforms:
         include:
           - Linux
+          - FreeBSD
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -74,7 +80,8 @@ modules:
       scopes: []
     functions:
       description: |
-        This plugin exposes a real-time function for viewing active network connections.
+        This plugin exposes real-time functions for viewing active network connections and,
+        on FreeBSD, system-wide TCP and UDP stack statistics.
       list:
         - id: network-connections
           name: Network Connections
@@ -85,7 +92,8 @@ modules:
             including connection direction (listen, inbound, outbound, local), process information,
             and TCP performance metrics (RTT, retransmissions).
 
-            Connections are classified as system or container based on network namespace.
+            On Linux, connections are classified as system or container based on network namespace.
+            On FreeBSD, namespaces are not exposed to userspace and the classification is omitted.
           parameters: []
           returns:
             description: ""
@@ -93,6 +101,26 @@ modules:
           performance: ""
           security: ""
           availability: ""
+        - id: network-protocols
+          name: Network Protocols
+          description: |
+            Shows FreeBSD TCP and UDP stack statistics grouped by transport protocol.
+
+            Each row covers one transport (TCP or UDP) and reports IPv4+IPv6 combined
+            traffic counters (received, sent, errors), TCP-specific connection counters
+            (active opens, currently established, passive opens, resets, total segments,
+            retransmitted segments), and the UDP-specific datagrams-with-no-port counter.
+
+            Values are per-second deltas sampled from `net.inet.tcp.stats`,
+            `net.inet.tcp.states`, and `net.inet.udp.stats`. The first call after the
+            plugin starts returns zeros because there is no previous sample to diff against.
+          parameters: []
+          returns:
+            description: ""
+            columns: []
+          performance: ""
+          security: ""
+          availability: "FreeBSD only."
   - meta:
       plugin_name: network-viewer.plugin
       module_name: PerflibNetworkProtocols
