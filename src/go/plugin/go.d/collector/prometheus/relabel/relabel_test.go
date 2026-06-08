@@ -5,6 +5,7 @@ package relabel
 import (
 	"testing"
 
+	"github.com/grafana/regexp"
 	commonmodel "github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/stretchr/testify/assert"
@@ -12,6 +13,25 @@ import (
 
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 )
+
+func TestRegexp_String(t *testing.T) {
+	tests := map[string]struct {
+		re   Regexp
+		want string
+	}{
+		"NewRegexp returns the un-anchored source":  {re: MustNewRegexp("(.*)_total"), want: "(.*)_total"},
+		"NewRegexp with empty source":               {re: MustNewRegexp(""), want: ""},
+		"zero value":                                {re: Regexp{}, want: ""},
+		"raw non-anchored value is safe (no panic)": {re: Regexp{Regexp: regexp.MustCompile("x")}, want: ""},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var got string
+			require.NotPanics(t, func() { got = tc.re.String() })
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
 
 func TestProcessor_Apply(t *testing.T) {
 	tests := map[string]struct {

@@ -126,9 +126,10 @@ type Config struct {
 
 // Regexp is a relabel regular expression: a regexp.Regexp compiled fully anchored
 // (see NewRegexp). The zero value has no pattern; build one with NewRegexp or
-// MustNewRegexp.
+// MustNewRegexp. String returns the original, un-anchored source.
 type Regexp struct {
 	*regexp.Regexp
+	original string // un-anchored source passed to NewRegexp; returned by String
 }
 
 // Processor applies an ordered list of rules to samples. It reuses internal
@@ -266,7 +267,7 @@ func (c Config) validate() error {
 
 func NewRegexp(s string) (Regexp, error) {
 	re, err := regexp.Compile("^(?s:" + s + ")$")
-	return Regexp{Regexp: re}, err
+	return Regexp{Regexp: re, original: s}, err
 }
 
 func MustNewRegexp(s string) Regexp {
@@ -277,13 +278,11 @@ func MustNewRegexp(s string) Regexp {
 	return re
 }
 
+// String returns the original, un-anchored pattern passed to NewRegexp. It returns
+// "" for the zero value or any Regexp not built via NewRegexp, and never inspects the
+// compiled form, so it is safe on a Regexp wrapping an arbitrary *regexp.Regexp.
 func (re Regexp) String() string {
-	if re.Regexp == nil {
-		return ""
-	}
-
-	str := re.Regexp.String()
-	return str[5 : len(str)-2]
+	return re.original
 }
 
 // Apply runs the rules against one sample. It returns the (possibly mutated)
