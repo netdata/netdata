@@ -16,4 +16,21 @@ void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t 
                             HTTP_ACCESS *access, int *priority, uint32_t *version);
 void host_functions2json(RRDHOST *host, BUFFER *wb);
 
+// Snapshot of a single user-visible host function. The strings are duplicated
+// references (string_dup()) so the entry stays valid after the host functions
+// read lock is released; the entry is keyed by the function name.
+struct rrd_function_manifest_entry {
+    STRING *help;           // owned reference
+    STRING *tags;           // owned reference
+    HTTP_ACCESS access;
+    int priority;
+    uint32_t version;
+};
+
+// Returns a new dictionary, keyed by function name, holding one
+// struct rrd_function_manifest_entry per available, user-visible function.
+// The caller owns it and must dictionary_destroy() it; the string references
+// are released by a delete callback registered on the dictionary.
+DICTIONARY *host_functions_to_manifest_dict(RRDHOST *host);
+
 #endif //NETDATA_RRDFUNCTIONS_EXPORTERS_H

@@ -147,6 +147,7 @@ struct topic_name {
     { .id = ACLK_TOPICID_NODE_COLLECTORS,       .name = "node-instance-collectors" },
     { .id = ACLK_TOPICID_CTXS_SNAPSHOT,         .name = "contexts-snapshot"        },
     { .id = ACLK_TOPICID_CTXS_UPDATED,          .name = "contexts-updated"         },
+    { .id = ACLK_TOPICID_NODE_MANIFEST,         .name = "node-instance-manifest"   },
     { .id = ACLK_TOPICID_UNKNOWN,               .name = NULL                       }
 };
 
@@ -172,6 +173,9 @@ enum aclk_topics compulsory_topics[] = {
     ACLK_TOPICID_NODE_COLLECTORS,
     ACLK_TOPICID_CTXS_SNAPSHOT,
     ACLK_TOPICID_CTXS_UPDATED,
+    // ACLK_TOPICID_NODE_MANIFEST is intentionally NOT compulsory: older clouds do
+    // not advertise it. The agent sends the manifest only when the topic is present
+    // (see aclk_topic_available()), staying compatible with clouds that lack it.
     ACLK_TOPICID_UNKNOWN
 };
 
@@ -305,6 +309,18 @@ int aclk_generate_topic_cache(struct json_object *json)
     return 0;
 }
 
+static struct aclk_topic *topic_cache_find(enum aclk_topics topic)
+{
+    if (!aclk_topic_cache)
+        return NULL;
+
+    for (size_t i = 0; i < aclk_topic_cache_items; i++) {
+        if (aclk_topic_cache[i]->topic_id == topic)
+            return aclk_topic_cache[i];
+    }
+    return NULL;
+}
+
 /*
  * Build a topic based on sub_topic and final_topic
  * if the sub topic starts with / assume that is an absolute topic
@@ -317,12 +333,24 @@ const char *aclk_get_topic(enum aclk_topics topic)
         return NULL;
     }
 
-    for (size_t i = 0; i < aclk_topic_cache_items; i++) {
-        if (aclk_topic_cache[i]->topic_id == topic)
-            return aclk_topic_cache[i]->topic;
+    struct aclk_topic *t = topic_cache_find(topic);
+    if (!t) {
+        netdata_log_error("Unknown topic");
+        return NULL;
     }
-    netdata_log_error("Unknown topic");
-    return NULL;
+
+    return t->topic;
+}
+
+// Quiet variant of aclk_get_topic() that does not log when the topic is absent.
+// Used to gate optional outgoing messages (e.g. the node instance manifest) on
+// whether the cloud advertised the topic in its password response. Requires a
+// usable topic string, not just the id: topic_generate_final() leaves ->topic
+// NULL when the cloud sent no #{claim_id} tag to substitute.
+bool aclk_topic_available(enum aclk_topics topic)
+{
+    struct aclk_topic *t = topic_cache_find(topic);
+    return t && t->topic;
 }
 
 /*

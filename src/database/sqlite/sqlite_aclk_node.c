@@ -45,6 +45,37 @@ static void build_node_collectors(RRDHOST *host)
         aclk_host_config->node_id, rrdhost_hostname(host));
 }
 
+static void build_node_manifest(RRDHOST *host)
+{
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+
+    struct update_node_instance_manifest manifest;
+
+    CLAIM_ID claim_id = claim_id_get();
+    manifest.node_id = aclk_host_config->node_id;
+    manifest.claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL;
+    now_realtime_timeval(&manifest.updated_at);
+
+    // rrd_rdlock() for the same reason build_node_info() takes it: an archived host keeps its
+    // aclk config, so it is still reached by this loop, and rrdhost_cleanup_data_collection_and_health()
+    // destroys host->functions. This excludes the orphan-cleanup path, which does that under
+    // rrd_wrlock() (service.c). It does NOT cover
+    // rrdhost_free___consume_metadata_lifetime_writelock(), which drops rrd_wrlock() before
+    // rrdhost_free_unlinked() - that exposure is pre-existing and identical for build_node_info()
+    // and build_node_collectors(), which dereference the host in this same loop.
+    rrd_rdlock();
+    manifest.functions = host_functions_to_manifest_dict(host);
+    rrd_rdunlock();
+
+    aclk_update_node_instance_manifest(&manifest);
+
+    dictionary_destroy(manifest.functions);
+
+    nd_log(NDLS_ACCESS, NDLP_DEBUG,
+           "ACLK RES [%s (%s)]: NODE MANIFEST SENT",
+        aclk_host_config->node_id, rrdhost_hostname(host));
+}
+
 static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_completion)
 {
     struct update_node_info node_info;
@@ -107,6 +138,10 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
     freez(host_version);
 
     aclk_send_timestamp_set(&aclk_host_config->node_collectors_send, now_realtime_sec());
+
+    // Every node info send also re-arms the function manifest, the same way it arms the
+    // collectors above. Arming (not setting) keeps an older pending deadline intact.
+    aclk_send_timestamp_arm(&aclk_host_config->node_manifest_send_time, now_realtime_sec());
 }
 
 void send_node_info_with_wait(RRDHOST *host)
@@ -169,7 +204,7 @@ static inline void hostname_snapshot_update(STRING **snapshot, RRDHOST *host)
     *snapshot = hostname;
 }
 
-void aclk_check_node_info_and_collectors(void)
+void aclk_check_node_info_collectors_and_manifest(void)
 {
     RRDHOST *host;
 
@@ -190,6 +225,11 @@ void aclk_check_node_info_and_collectors(void)
     struct replay_who_counters replay_counters = { 0 };
 #endif
 
+    // The node manifest is optional: older clouds do not advertise its topic. Checked once
+    // here, before anything claims a pending send, so a pending manifest survives until a
+    // cloud that supports it is connected.
+    bool manifest_topic_available = aclk_topic_available(ACLK_TOPICID_NODE_MANIFEST);
+
     time_t now = now_realtime_sec();
     dfe_start_reentrant(rrdhost_root_index, host)
     {
@@ -206,10 +246,30 @@ void aclk_check_node_info_and_collectors(void)
 
         time_t node_info_send_time = aclk_send_timestamp_get(&aclk_host_config->node_info_send_time);
         time_t node_collectors_send = aclk_send_timestamp_get(&aclk_host_config->node_collectors_send);
-        if (!node_info_send_time && !node_collectors_send)
+        time_t node_manifest_send_time = aclk_send_timestamp_get(&aclk_host_config->node_manifest_send_time);
+
+        // Whether a pending manifest can actually be sent. Unlike the other two send times, this
+        // one can be blocked by a condition that never clears (an old cloud that does not advertise
+        // the topic, a node the cloud never registered), so it must NOT count as pending for the
+        // early exit below - otherwise those hosts stay on the per-second path forever, redoing the
+        // replication and context checks and re-emitting the NODES INFO line. The request itself is
+        // deliberately left armed, so it goes out as soon as the condition clears.
+        //
+        // node_id here is the string that build_node_manifest() actually sends. Do NOT test
+        // host->node_id.uuid instead: a child can inherit its node_id from its parent
+        // (stream_sender_get_node_and_claim_id_from_parent() assigns host->node_id directly)
+        // without it ever reaching the aclk config, and the manifest carries no machine_guid the
+        // cloud could fall back on.
+        bool manifest_pending =
+            node_manifest_send_time && manifest_topic_available && aclk_host_config->node_id[0];
+
+        if (!node_info_send_time && !node_collectors_send && !manifest_pending)
             continue;
 
-        if (unlikely(rrdhost_receiver_replicating_charts(host))) {
+        // read once: this gates THIS host below, while replicating_rcv accumulates across
+        // all hosts for the summary log at the end of the function
+        bool host_replicating_rcv = rrdhost_receiver_replicating_charts(host) != 0;
+        if (unlikely(host_replicating_rcv)) {
             internal_error(true, "ACLK SYNC: Host %s is still replicating in", rrdhost_hostname(host));
             replicating_rcv++;
             hostname_snapshot_update(&replicating_rcv_host, host);
@@ -225,12 +285,15 @@ void aclk_check_node_info_and_collectors(void)
         replication_tracking_counters(host, &replay_counters);
 #endif
 
-        if(replicating_rcv)
+        // defer this host only: a host replicating in has an incomplete chart/function set,
+        // so anything built from it now would be wrong. Testing the fleet-wide replicating_rcv
+        // counter here would defer every host that follows a replicating one in index order.
+        if(host_replicating_rcv)
             continue;
 
         bool pp_queue_empty = !rrdcontext_queue_entries(&host->rrdctx.pp_queue);
 
-        if (!pp_queue_empty && (node_info_send_time || node_collectors_send)) {
+        if (!pp_queue_empty && (node_info_send_time || node_collectors_send || manifest_pending)) {
             context_pp++;
             hostname_snapshot_update(&context_pp_host, host);
         }
@@ -250,6 +313,14 @@ void aclk_check_node_info_and_collectors(void)
             aclk_send_timestamp_claim(&aclk_host_config->node_collectors_send, node_collectors_send)) {
             build_node_collectors(host);
             internal_error(true, "ACLK SYNC: Sending collectors for %s", rrdhost_hostname(host));
+        }
+
+        node_manifest_send_time = aclk_send_timestamp_get(&aclk_host_config->node_manifest_send_time);
+        if (manifest_pending && pp_queue_empty && node_manifest_send_time &&
+            nd_time_t_add_compare(node_manifest_send_time, 30, now) < 0 &&
+            aclk_send_timestamp_claim(&aclk_host_config->node_manifest_send_time, node_manifest_send_time)) {
+            build_node_manifest(host);
+            internal_error(true, "ACLK SYNC: Sending node manifest for %s", rrdhost_hostname(host));
         }
     }
     dfe_done(host);

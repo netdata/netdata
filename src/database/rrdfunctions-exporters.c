@@ -178,3 +178,38 @@ void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t 
     }
     dfe_done(t);
 }
+
+static void manifest_entry_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
+                                     void *data __maybe_unused) {
+    struct rrd_function_manifest_entry *e = value;
+    string_freez(e->help);
+    string_freez(e->tags);
+}
+
+DICTIONARY *host_functions_to_manifest_dict(RRDHOST *host) {
+    DICTIONARY *dst = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    dictionary_register_delete_callback(dst, manifest_entry_delete_cb, NULL);
+
+    if(!host || !host->functions || !dictionary_entries(host->functions)) return dst;
+
+    struct rrd_host_function *t;
+    dfe_start_read(host->functions, t) {
+        if(!rrd_function_is_available(t, host)) continue;
+        if(t->options & (RRD_FUNCTION_DYNCFG | RRD_FUNCTION_RESTRICTED)) continue;
+
+        // duplicate the string references, so the entry stays valid after this
+        // read lock is released
+        struct rrd_function_manifest_entry e = {
+            .help = string_dup(t->help),
+            .tags = string_dup(t->tags),
+            .access = t->access,
+            .priority = t->priority,
+            .version = t->version,
+        };
+
+        dictionary_set(dst, t_dfe.name, &e, sizeof(e));
+    }
+    dfe_done(t);
+
+    return dst;
+}

@@ -387,6 +387,9 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t *quer
         case UPDATE_NODE_INFO:
             worker_is_busy(UV_EVENT_UPDATE_NODE_INFO);
             break;
+        case UPDATE_NODE_MANIFEST:
+            worker_is_busy(UV_EVENT_UPDATE_NODE_MANIFEST);
+            break;
         case CTX_SEND_SNAPSHOT:
             worker_is_busy(UV_EVENT_CTX_SEND_SNAPSHOT);
             break;
@@ -536,7 +539,7 @@ static void start_alert_push(uv_work_t *req)
         return;
 
     worker_is_busy(UV_EVENT_ACLK_NODE_INFO);
-    aclk_check_node_info_and_collectors();
+    aclk_check_node_info_collectors_and_manifest();
     worker_is_idle();
 
     worker_is_busy(UV_EVENT_ACLK_ALERT_PUSH);
@@ -763,6 +766,8 @@ static void aclk_synchronization_event_loop(void *arg)
                     aclk_send_timestamp_set(
                         &aclk_host_config->node_info_send_time,
                         (host == localhost || immediate) ? 1 : now_realtime_sec());
+                    // the manifest is re-armed by build_node_info() itself, so every path that
+                    // sends node info re-arms it, not only this opcode
                     break;
                 case ACLK_CANCEL_NODE_UPDATE_TIMER:
                     host = cmd.param[0];
@@ -1032,6 +1037,12 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_u
     aclk_send_timestamp_set(
         &aclk_host_config->node_info_send_time,
         (host == localhost || NULL == localhost) ? nd_time_t_add_saturating(now, -25) : now);
+    // node_manifest_send_time is deliberately NOT armed here: build_node_info() arms it, so a
+    // host's first manifest is always armed after its node info was built, and there is a single
+    // arming point to reason about. This orders the ARMING only - both messages are dispatched to
+    // parallel query workers, so it is no guarantee of publish order at the cloud. What keeps the
+    // manifest from describing a node the cloud does not know is the node_id check in
+    // aclk_check_node_info_collectors_and_manifest().
 
     struct aclk_sync_cfg_t *expected = NULL;
     if (__atomic_compare_exchange_n(&host->aclk_host_config, &expected, aclk_host_config, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {
@@ -1339,4 +1350,29 @@ void destroy_aclk_config(RRDHOST *host)
 void aclk_queue_node_info(RRDHOST *host, bool immediate)
 {
     (void) queue_aclk_sync_cmd(ACLK_QUEUE_NODE_INFO, (void *)host, (void *)(uintptr_t)immediate);
+}
+
+// Requests a refresh of the cloud function manifest for this host.
+//
+// Arming is a single atomic CAS on the host's aclk config, so - unlike node info, which needs
+// the event loop to create a missing config - this does NOT go through the command queue. That
+// keeps a burst of function registrations (a parent's children reconnecting, a plugin
+// restarting) from flooding the ACLK sync command pool, and avoids publishing a borrowed host
+// pointer to another thread.
+//
+// A change made before the arm is always reported: build_node_manifest() reads the live function
+// list rather than a snapshot taken here, so an already-armed request covers this change too,
+// and a change racing with the send re-arms (the claim resets the timestamp to 0).
+void aclk_arm_node_manifest(RRDHOST *host)
+{
+    if (!host)
+        return;
+
+    // No config: nothing to arm. build_node_info() arms the first manifest for every host that
+    // gets one, which covers every function registered until then.
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    if (!aclk_host_config)
+        return;
+
+    aclk_send_timestamp_arm(&aclk_host_config->node_manifest_send_time, now_realtime_sec());
 }

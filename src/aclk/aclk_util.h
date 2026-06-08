@@ -98,10 +98,12 @@ enum aclk_topics {
     ACLK_TOPICID_ALARM_SNAPSHOT        = 17,
     ACLK_TOPICID_NODE_COLLECTORS       = 18,
     ACLK_TOPICID_CTXS_SNAPSHOT         = 19,
-    ACLK_TOPICID_CTXS_UPDATED          = 20
+    ACLK_TOPICID_CTXS_UPDATED          = 20,
+    ACLK_TOPICID_NODE_MANIFEST         = 21
 };
 
 const char *aclk_get_topic(enum aclk_topics topic);
+bool aclk_topic_available(enum aclk_topics topic);
 int aclk_generate_topic_cache(json_object *json);
 void free_topic_cache(void);
 const char *aclk_topic_cache_iterate(size_t *iter);

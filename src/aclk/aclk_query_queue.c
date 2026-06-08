@@ -95,6 +95,7 @@ void aclk_query_free(aclk_query_t *query)
         case REGISTER_NODE:
         case NODE_STATE_UPDATE:
         case UPDATE_NODE_INFO:
+        case UPDATE_NODE_MANIFEST:
         case UPDATE_NODE_COLLECTORS:
         case CTX_SEND_SNAPSHOT:
         case CTX_SEND_SNAPSHOT_UPD:

@@ -62,8 +62,11 @@ typedef struct aclk_sync_cfg_t {
     int alert_count;
     int snapshot_count;
     int checkpoint_count;
-    aclk_send_timestamp_t node_info_send_time;  // atomic: event loop to alert-push worker
-    aclk_send_timestamp_t node_collectors_send; // atomic: node-info builders to alert-push worker
+    aclk_send_timestamp_t node_info_send_time;     // atomic: event loop to alert-push worker
+    aclk_send_timestamp_t node_collectors_send;    // atomic: node-info builders to alert-push worker
+    aclk_send_timestamp_t node_manifest_send_time; // atomic: armed by collector/streaming/pluginsd
+                                                   // threads and by build_node_info(); claimed by
+                                                   // the alert-push worker
     char node_id[UUID_STR_LEN];
 } aclk_sync_cfg_t;
 
@@ -75,6 +78,27 @@ static inline time_t aclk_send_timestamp_get(const aclk_send_timestamp_t *send_t
 static inline void aclk_send_timestamp_set(aclk_send_timestamp_t *send_time, time_t value)
 {
     __atomic_store_n(send_time, value, __ATOMIC_RELEASE);
+}
+
+// Arms a send without ever pushing an already-armed deadline further out.
+// Used by the node manifest, whose triggers (one per function registration or
+// removal) are frequent enough that re-arming on every change could keep the
+// coalescing window from ever elapsing.
+//
+// A stored value LATER than the one being armed is replaced, so a backward wall-clock step (a bad
+// RTC corrected by the first NTP sync, a restored VM snapshot) cannot strand the request until the
+// clock catches up. Unlike aclk_send_timestamp_set(), which self-heals on the next publication,
+// arm-only-if-zero would keep an unreachable deadline forever.
+static inline void aclk_send_timestamp_arm(aclk_send_timestamp_t *send_time, time_t value)
+{
+    time_t expected = __atomic_load_n(send_time, __ATOMIC_ACQUIRE);
+
+    while (expected == 0 || expected > value) {
+        if (__atomic_compare_exchange_n(
+                send_time, &expected, value, false, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE))
+            return;
+        // expected now holds the current value; re-test and retry
+    }
 }
 
 static inline bool aclk_send_timestamp_claim(aclk_send_timestamp_t *send_time, time_t expected)
@@ -141,5 +165,6 @@ void aclk_push_alert_config(const char *node_id, const char *config_hash);
 void schedule_node_state_update(RRDHOST *host, uint64_t delay);
 void unregister_node(const char *machine_guid);
 void aclk_queue_node_info(RRDHOST *host, bool immediate);
+void aclk_arm_node_manifest(RRDHOST *host);
 
 #endif //NETDATA_SQLITE_ACLK_H
