@@ -8,9 +8,11 @@ description: Query SNMP trap logs through Netdata Cloud or directly from a Netda
 This skill teaches operators and AI assistants how to query SNMP trap
 journal entries written by the `snmp_traps` go.d collector.
 
-SNMP trap entries are exposed through the existing `systemd-journal`
-Log Function. This skill does not add new transport wrappers. It
-reuses the token-safe wrappers from
+SNMP trap entries are exposed through the `snmp_traps:logs` Function.
+Direct-journal jobs appear as `__logs_sources` options, normally named
+after the trap listener job. OTEL-only jobs (`journal.enabled: false`)
+do not create local journal files, so they do not appear as log
+sources. This skill reuses the token-safe wrappers from
 [`query-netdata-agents`](../query-netdata-agents/SKILL.md) and the
 Log Function request shape from
 [`query-netdata-cloud/query-logs.md`](../query-netdata-cloud/query-logs.md).
@@ -39,9 +41,10 @@ Log Function request shape from
    call `agents_load_env`, then use `agents_call_function`,
    `agents_query_cloud`, or `agents_query_agent`. Do not paste raw
    Cloud tokens, agent bearers, or token-bearing curl commands.
-3. **Use structured selections first.** Always narrow trap queries
-   with `selections.ND_LOG_SOURCE=["snmp-trap"]` and usually
-   `selections.TRAP_REPORT_TYPE=["trap"]` or
+3. **Use structured selections first.** The embedded Function is
+   scoped to SNMP trap journal files. Use `selections.__logs_sources`
+   when the query should target one trap listener job, and usually
+   narrow further with `selections.TRAP_REPORT_TYPE=["trap"]` or
    `["deduplication_summary"]`. Use full-text `query` only as a
    residual search over that narrowed result.
 4. **Treat trap content as sensitive.** Do not paste raw trap rows,
@@ -50,9 +53,10 @@ Log Function request shape from
    durable artifacts. Return summarized fields unless the user
    explicitly needs raw output locally.
 5. **Remember the Function is node-scoped.** Cloud-proxied
-   `systemd-journal` calls target one node. For a room or fleet
-   query, list nodes first and loop over each node, then aggregate
-   client-side.
+   `snmp_traps:logs` calls target one node. For a room or fleet query,
+   list nodes first and loop over each node's Function, then aggregate
+   client-side. Use `__logs_sources` to narrow to a specific listener
+   job when needed.
 
 ## Trap Field Reference
 
@@ -95,11 +99,12 @@ Cloud-proxied query, preferred by default:
 
 ```bash
 NODE_UUID="YOUR_NODE_UUID"
+SNMP_TRAPS_FUNCTION="snmp_traps:logs"
 
 agents_call_function \
   --via cloud \
   --node "$NODE_UUID" \
-  --function systemd-journal \
+  --function "$SNMP_TRAPS_FUNCTION" \
   --body '{"info":true}'
 ```
 
@@ -109,13 +114,14 @@ Direct-agent query, for local or Cloud-unavailable cases:
 NODE_UUID="YOUR_NODE_UUID"
 AGENT_HOST="agent.example.invalid:19999"
 MACHINE_GUID="YOUR_MACHINE_GUID"
+SNMP_TRAPS_FUNCTION="snmp_traps:logs"
 
 agents_call_function \
   --via agent \
   --node "$NODE_UUID" \
   --host "$AGENT_HOST" \
   --machine-guid "$MACHINE_GUID" \
-  --function systemd-journal \
+  --function "$SNMP_TRAPS_FUNCTION" \
   --body '{"info":true}'
 ```
 
@@ -136,11 +142,22 @@ jq '.columns as $c
 
 ## Source Selection
 
-Use `__logs_sources: "all"` when you do not know where the trap
-journal files are exposed on the node, then narrow with
-`ND_LOG_SOURCE=snmp-trap`. If the Function `info=true` response shows
-a more specific source that contains trap files, use that source
-instead to reduce scan work.
+Start with `{"info":true}` for `snmp_traps:logs` and inspect the
+`__logs_sources` required parameter. By default, the SDK selects all
+direct-journal sources. To target one listener job, add:
+
+```json
+{
+  "selections": {
+    "__logs_sources": ["local"]
+  }
+}
+```
+
+If a job is missing from `__logs_sources`, verify the job exists and
+`journal.enabled` is not `false`. Until Netdata's Function deletion
+protocol lands, a node with no direct-journal trap sources may still
+show the Function but return no sources or an unavailable response.
 
 ## See Also
 

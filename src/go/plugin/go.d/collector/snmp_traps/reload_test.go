@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -426,7 +427,7 @@ traps:
 	defer ReleaseProfileCache()
 
 	writer := &mockTrapWriter{}
-	d := newTrapDeduper("local", DedupConfig{Enabled: true}, writer, nil)
+	d := newTrapDeduper("local", DedupConfig{Enabled: true}, writer, nil, "")
 
 	entry := &TrapEntry{SourceIP: "198.51.100.10", TrapOID: "1.3.6.1.6.3.1.1.5.3"}
 	_, suppressed := d.Admit(entry, nil, nil)
@@ -531,8 +532,19 @@ func TestProfileReloadHandlerMethodParams(t *testing.T) {
 
 func TestSnmpTrapsMethods(t *testing.T) {
 	methods := snmpTrapsMethods()
-	require.Len(t, methods, 1)
-	assert.Equal(t, reloadProfilesMethodID, methods[0].ID)
-	assert.True(t, methods[0].AgentWide)
-	assert.Equal(t, "text", methods[0].ResponseType)
+	require.Len(t, methods, 2)
+
+	byID := make(map[string]funcapi.MethodConfig, len(methods))
+	for _, method := range methods {
+		byID[method.ID] = method
+	}
+
+	reload := byID[reloadProfilesMethodID]
+	assert.True(t, reload.AgentWide)
+	assert.Equal(t, "text", reload.ResponseType)
+
+	logs := byID[snmpTrapsLogsMethodID]
+	assert.True(t, logs.AgentWide)
+	assert.True(t, logs.RawRequest)
+	assert.Equal(t, "logs", logs.ResponseType)
 }

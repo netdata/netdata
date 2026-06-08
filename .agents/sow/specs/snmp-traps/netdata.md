@@ -33,13 +33,13 @@ The cohort exhibits six distinct trap-as-X primitives (see `comparison/design-fo
 | Eventlog + handler relational update | LibreNMS | Operator-built SQL alerts; not OOB. |
 | Pure pass-through | Cribl | No storage, no alerting in-product. |
 
-**The choice — hybrid, but the journal is the universal store**:
+**The choice — hybrid, with direct journal as the default local store**:
 
-1. **Every trap is captured in the journal — by default.** In the default configuration (dedup disabled), the plugin writes one journal entry per received trap, no exceptions. Operators can opt-in to deduplication (§10) for flap-heavy environments; when opt-in dedup is enabled, repeated identical traps within a configurable window are collapsed and surfaced periodically through a dedup-summary entry. Operators who enable dedup accept that suppressed individual trap PDUs are summarized rather than persisted in full.
+1. **Every trap is captured in the direct journal by default for explicit jobs.** In the default job configuration (`journal.enabled` omitted or `true`, dedup disabled), the plugin writes one journal entry per received trap, no exceptions. Operators can opt-in to deduplication (§10) for flap-heavy environments; when opt-in dedup is enabled, repeated identical traps within a configurable window are collapsed and surfaced periodically through a dedup-summary entry. Operators who enable dedup accept that suppressed individual trap PDUs are summarized rather than persisted in full. Operators can explicitly disable direct journal output with `journal.enabled: false` only when another output backend, currently OTLP, is enabled.
 2. **Plugin-self metrics** (two NIDL contexts always emitted plus an opt-in third for dedup — see §12) for plugin health monitoring.
 3. **Per-OID metrics for alerting are opt-in** — operator selects which OIDs get a dedicated metric via plugin configuration (NOT via profile YAML). See §7.
 
-The journal is the foundation. Metrics are a derived signal for alerting on specific traps the operator cares about.
+Direct journal storage is the default foundation. Metrics are a derived signal for alerting on specific traps the operator cares about. OTEL-only jobs are supported for operators who want remote log delivery without local journal files, but those jobs do not create local journal sources and therefore do not appear in the embedded local logs Function's `__logs_sources` selector.
 
 **Why this choice**:
 
@@ -140,9 +140,20 @@ The implementation language is **Go** (user decision recorded on 2026-05-25). Th
 
 **Process model** (accepted by SOW-0035 M1 ADR-0001): The trap plugin is a **standard in-process go.d collector V2 module** at `src/go/plugin/go.d/collector/snmp_traps/`, registered as `snmp_traps`. No separate process, no CGo, no subprocess bridge.
 
-**Journal writer backend**: The trap collector uses the Go systemd journal SDK module `github.com/netdata/systemd-journal-sdk/go/journal` at `go/v0.4.0` behind the local `TrapWriter` abstraction. `NewJournalWriter()` constructs `journal.NewLog()` with `LogOpenEager` and `LogIdentityStrict`, so journal directory creation/open, active file creation, writer lock acquisition, machine ID parsing, boot ID parsing, rotation policy validation, and retention policy validation are proven during job creation before DynCfg apply succeeds.
+**Journal writer backend**: The trap collector uses the Go systemd journal SDK module `github.com/netdata/systemd-journal-sdk/go/journal` at `go/v0.5.1` behind the local `TrapWriter` abstraction. `NewJournalWriter()` constructs `journal.NewLog()` with `LogOpenEager` and `LogIdentityStrict`, so journal directory creation/open, active file creation, writer lock acquisition, machine ID parsing, boot ID parsing, rotation policy validation, and retention policy validation are proven during job creation before DynCfg apply succeeds when direct journal output is enabled.
 
 The configured per-job root remains `/var/cache/netdata/traps/{job_name}/`. The SDK appends the machine-id child directory, so the effective query directory is `/var/cache/netdata/traps/{job_name}/{machine_id}/`. Use the SDK-backed writer's effective `JournalDirectory()` for `journalctl --directory` validation.
+
+**Output backend selection**:
+
+- `journal.enabled` defaults to `true`. When enabled, the job preflights direct journal creation/open and retention config at job creation time.
+- `journal.enabled: false` disables direct journal creation and skips direct-journal preflight. Retention settings are ignored because the backend is disabled.
+- `otlp.enabled` defaults to `false`. When enabled, the job preflights the OTLP receiver at job creation time.
+- At least one backend must be enabled. `journal.enabled: false` with `otlp.enabled: false` fails job creation with HTTP-422.
+- Direct journal + OTLP fanout is supported. Direct journal is the primary local forensic backend; OTLP export failures are counted separately and do not make a successful direct journal write fail.
+- Direct journal files are written in SDK compact mode with compression disabled and FSS/sealing disabled. Existing readable non-compact files remain queryable by the SDK reader; new files use the compact format.
+
+**Embedded logs Function**: `go.d.plugin` exposes one module Function named `snmp_traps:logs`. It uses the journal SDK Netdata Function API against the shared traps root (`/var/cache/netdata/traps/`) and maps each direct-journal job directory to one `__logs_sources` option named after the job. The SDK selects all direct-journal sources by default; operators can narrow to one job with `selections.__logs_sources=["{job_name}"]`. OTEL-only jobs do not create direct journal directories and therefore do not appear as log sources. Until Netdata's dedicated Function deletion protocol lands, a node with no direct-journal trap sources may still show `snmp_traps:logs`; the Function must return no sources or an unavailable response instead of pretending a source exists.
 
 **Rationale**: In-process module code means no IPC for cross-plugin enrichment (SOW-0037), trivially shared profile cache (Go package-level state + refcount), and the well-understood go.d job lifecycle. A CGo bridge to libsystemd cannot set `_HOSTNAME` (journald owns trusted fields); a subprocess Rust bridge adds process management complexity. The SDK-backed writer preserves direct journal file control, creation-time failure detection, and `journalctl` compatibility without maintaining a package-local copy of the journal binary format.
 
@@ -479,7 +490,7 @@ Endpoint syntax:
 
 `headers` is an optional string map converted to gRPC metadata. Header values may be go.d secret references; the existing go.d secret resolver resolves string values before the collector receives the config. Header values are never emitted as trap attributes or logged.
 
-The OTLP writer implements the same `TrapWriter` interface as the journal writer but is a secondary fan-out backend. The journal-direct writer remains authoritative; an OTLP enqueue/export failure increments `snmp.trap.errors.otlp_export_failed` and drops only the OTLP copy. Journal write failures still increment `journal_write_failed` and affect the primary trap persistence path.
+The OTLP writer implements the same `TrapWriter` interface as the journal writer. When direct journal is enabled, OTLP is a secondary fan-out backend: an OTLP enqueue/export failure increments `snmp.trap.errors.otlp_export_failed` and drops only the OTLP copy. When `journal.enabled` is `false`, OTLP becomes the primary/only backend and primary write failures are counted as `otlp_export_failed`. Journal write failures increment `journal_write_failed` only for jobs with direct journal enabled.
 
 ## 8. OOB Catalog Strategy
 
@@ -671,7 +682,7 @@ Per-job retention policy mirrors the retention semantics used by the NetFlow plu
 
 The active journal file must be queryable by `journalctl --directory=...`; waiting until rotation/close to build indexes is not acceptable for the MVP. The SDK writer owns the journal file format details, active-file indexes, rotation, retention, and existing-chain validation/reopen behavior.
 
-The journal-direct backend is Linux-only in SOW-0035. On non-Linux platforms, trap job creation must fail with a coded unsupported-backend error instead of starting and failing at runtime. Future SOWs may add a non-journal backend such as OTLP for platforms without `journalctl`.
+The journal-direct backend is Linux-only. When direct journal is enabled on a non-Linux platform, trap job creation must fail with a coded unsupported-backend error instead of starting and failing at runtime. OTEL-only jobs (`journal.enabled: false`, `otlp.enabled: true`) are not blocked by the direct-journal Linux check.
 
 When dedup is enabled (§10), summary entries land in the same per-job journal directory and obey the same retention.
 
@@ -853,7 +864,7 @@ The optional standards-compliant OTLP exporter (operator opt-in, defaults off) i
 
 ## 11b. OTLP Exporter Attribute Universe — optional second backend
 
-When the operator enables the OTLP exporter (defaults off; configured per §7.5), every trap also lands as a vendor-neutral OTLP LogRecord that any OTEL-compatible receiver can ingest (Netdata's own OTEL plugin, Splunk, Datadog, Grafana Cloud, OpenSearch, vendor-X). The OTLP path is intentionally standards-compliant — it does NOT use the journal field names from §11 because OTEL attribute naming convention is dotted-lowercase. The journal-direct path (§11) remains the high-fidelity Netdata-native path.
+When the operator enables the OTLP exporter (defaults off; configured per §7.5), every trap also lands as a vendor-neutral OTLP LogRecord that any OTEL-compatible receiver can ingest (Netdata's own OTEL plugin, Splunk, Datadog, Grafana Cloud, OpenSearch, vendor-X). The OTLP path is intentionally standards-compliant — it does NOT use the journal field names from §11 because OTEL attribute naming convention is dotted-lowercase. The journal-direct path (§11) remains the default high-fidelity Netdata-native path, but operators may disable it and run OTEL-only with `journal.enabled: false`.
 
 The plugin emits both shapes from a single internal `TrapEntry` model — the writer interface applies the per-backend naming convention at serialization time.
 
@@ -975,7 +986,7 @@ Operators alert on these for pipeline health:
 - `sanitized > 0` sustained → varbind values containing control characters being binary-encoded; investigate sender.
 - `profile_load_failed > 0` → operator-provided profile YAML failed to parse during DynCfg hot-reload (SOW-0037 M3); plugin continues with the previous profile index; operator must fix the bad YAML and reload.
 - `journal_write_failed > 0` → disk-full, permission, or filesystem error while writing to the per-job journal directory; trap is dropped, hot path continues (the writer never blocks).
-- `otlp_export_failed > 0` → the optional OTLP backend could not accept or export one or more trap records after the job had already started; the journal-direct path remains authoritative and continues independently. Investigate the configured OTLP receiver, network path, TLS/auth configuration, or queue sizing.
+- `otlp_export_failed > 0` → the OTLP backend could not accept or export one or more trap records after the job had already started. For direct-journal+OTLP jobs, the journal-direct path remains authoritative and continues independently. For OTEL-only jobs, this means the only configured backend dropped or failed records. Investigate the configured OTLP receiver, network path, TLS/auth configuration, or queue sizing.
 
 ### Context 3: `snmp.trap.dedup_suppressed` (only when opt-in dedup is enabled on at least one job)
 
@@ -997,7 +1008,7 @@ In addition to the two plugin-self contexts, operator-selected OIDs (via §7.5) 
 
 Phase B resolved most of the original questions. What remains:
 
-1. **Go process / writer backend** — **ACCEPTED (SOW-0035 M1, ADR-0001; amended 2026-05-26 for the SDK integration, 2026-05-28 for SDK `go/v0.3.0`, and 2026-05-31 for SDK `go/v0.4.0`)**: Standard in-process go.d collector V2 module with a thin SDK-backed Go journal adapter over `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.4.0`. No separate process, no CGo, no subprocess bridge. See `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md`.
+1. **Go process / writer backend** — **ACCEPTED (SOW-0035 M1, ADR-0001; amended 2026-05-26 for the SDK integration, 2026-05-28 for SDK `go/v0.3.0`, 2026-05-31 for SDK `go/v0.4.0`, and 2026-06-08 for SDK `go/v0.5.1`)**: Standard in-process go.d collector V2 module with a thin SDK-backed Go journal adapter over `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.5.1`. No separate process, no CGo, no subprocess bridge. See `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md`.
 
 2. **Profile YAML hot-reload mechanism — ACCEPTED (SOW-0037 M3)**: operators add or edit YAML files under `/etc/netdata/go.d/snmp.trap-profiles/` and trigger the agent-wide `reload-profiles` Function through the Functions/DynCfg surface. The plugin parses and validates all profile files, builds a full replacement OID index, and atomically swaps it into the shared cache only after the new index is complete. Failed reloads keep the previous index active, return an operator-visible error, log the profile loader error with file/path detail, and increment `snmp.trap.errors.profile_load_failed`. Reload without an active `snmp_traps` job returns unavailable because profile memory is intentionally not retained while idle. The current Function framework still dispatches agent-wide methods through one running job instance, but this method does not expose a job selector and the reload applies to the shared profile cache used by all listeners. Profile memory is still loaded on first runnable trap job creation and released after the last runnable trap job stops. Runtime MIB compilation remains out of scope.
 
@@ -1087,7 +1098,7 @@ The implementation is tracked through five sequential SOWs under `.agents/sow/pe
 | **SOW-0036** | SNMPv3 USM (static engineID whitelist, per-job) + INFORM acknowledgement + `snmpEngineBoots` persistence per job; per-job allowlist + rate limiting; plugin configuration schema + DynCfg per-job orchestration refinement; plugin-self NIDL metrics (per-job dimensions, full error universe per §12, including BER limit violations from §18) | Production-grade per-job auth + rate limiting + telemetry |
 | **SOW-0037** | Cross-plugin enrichment (sysName/vendor/topology); **opt-in** deduplication (per-job, disabled by default — see §10) with periodic summary entries; profile YAML hot-reload via DynCfg (no runtime MIB compilation per §14); operator per-OID metric opt-in | Operational depth: enriched, optionally deduped, hot-reloadable |
 | **SOW-0038** | Throughput benchmark harness; SNMPv3 dynamic engineID discovery (opt-in); standards-compliant OTLP exporter (§11b — optional, vendor-neutral; works with Netdata's OTEL plugin and any OTLP-compliant receiver) | Scale + interop |
-| **SOW-0039** | **Collector consistency bundle**: `metadata.yaml` + `config_schema.json` + stock `.conf` + `health.d/snmp_trap.conf` + `README.md` + `taxonomy.yaml` (passes `check-markdown.yml` + `check_collector_taxonomy.py` CI gates). **systemd-journal default-facet registration** in `src/collectors/systemd-journal.plugin/systemd-journal.c` `SYSTEMD_KEYS_INCLUDED_IN_FACETS` for the plugin-controlled `TRAP_*` field names (operators pick `TRAP_TAG_*` labels via the UI's facet selector — macro is defaults only). **End-user AI skill `query-snmp-traps`** (`docs/netdata-ai/skills/query-snmp-traps/`) + how-tos catalog. **User documentation** for the offline MIB-to-YAML conversion workflow (per §7). **SOW-0032 comparative-analysis.md closeout**. **Final merge gate** — single PR sequence ending here. | Mergeable, CI-passing, documented |
+| **SOW-0039** | **Collector consistency bundle**: `metadata.yaml` + `config_schema.json` + stock `.conf` + `health.d/snmp_trap.conf` + `README.md` + `taxonomy.yaml` (passes `check-markdown.yml` + `check_collector_taxonomy.py` CI gates). **Embedded SNMP traps logs Function** in `go.d.plugin`, exposed as `snmp_traps:logs`, with direct-journal jobs selected through `__logs_sources` and trap-specific default facets. **End-user AI skill `query-snmp-traps`** (`docs/netdata-ai/skills/query-snmp-traps/`) + how-tos catalog. **User documentation** for the offline MIB-to-YAML conversion workflow (per §7). **SOW-0032 comparative-analysis.md closeout**. **Final merge gate** — single PR sequence ending here. | Mergeable, CI-passing, documented |
 
 The OTLP exporter (§11b) is intentionally deferred to SOW-0038 — it is optional, operator-opt-in, and not part of the MVP. The journal-direct backend (§11) is the load-bearing path and ships in SOW-0035.
 

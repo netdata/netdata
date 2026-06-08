@@ -493,6 +493,9 @@ func (m *mockFunctionExecutor) snapshot() []Function {
 	defer m.mu.Unlock()
 	out := make([]Function, len(m.executed))
 	copy(out, m.executed)
+	for i := range out {
+		out[i].Context = nil
+	}
 	return out
 }
 

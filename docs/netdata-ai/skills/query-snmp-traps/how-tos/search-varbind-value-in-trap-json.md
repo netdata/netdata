@@ -8,6 +8,7 @@ contains a specific value?
 ## Inputs
 
 - `NODE_UUID`: node running the `snmp_traps` collector.
+- `SNMP_TRAPS_JOB`: trap listener job name. Default examples use `local`.
 - `NEEDLE`: the value or substring to find.
 - Optional time window and trap OID/category/severity selectors.
 
@@ -25,16 +26,17 @@ contains a specific value?
 
    ```bash
    NODE_UUID="YOUR_NODE_UUID"
+   SNMP_TRAPS_JOB="local"
+   SNMP_TRAPS_FUNCTION="snmp_traps:logs"
    NEEDLE="[VARBIND_VALUE]"
 
-   BODY="$(jq -n --arg needle "$NEEDLE" '{
+   BODY="$(jq -n --arg job "$SNMP_TRAPS_JOB" --arg needle "$NEEDLE" '{
      after: -86400,
      before: 0,
      last: 200,
      direction: "backward",
-     "__logs_sources": "all",
      selections: {
-       ND_LOG_SOURCE: ["snmp-trap"],
+       __logs_sources: [$job],
        TRAP_REPORT_TYPE: ["trap"]
      },
      query: $needle,
@@ -46,7 +48,7 @@ contains a specific value?
    agents_call_function \
      --via cloud \
      --node "$NODE_UUID" \
-     --function systemd-journal \
+     --function "$SNMP_TRAPS_FUNCTION" \
      --body "$BODY" \
      > .local/audits/query-snmp-traps/varbind-search.json
    ```

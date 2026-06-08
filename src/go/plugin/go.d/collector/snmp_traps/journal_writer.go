@@ -48,12 +48,16 @@ type JournalWriter struct {
 }
 
 func journalRoot(jobName string) string {
+	// Caller must validate jobName first; it becomes a filesystem path segment.
+	return filepath.Join(journalBaseRoot(), jobName)
+}
+
+func journalBaseRoot() string {
 	cache := buildinfo.CacheDir
 	if cache == "" {
 		cache = "/var/cache/netdata"
 	}
-	// Caller must validate jobName first; it becomes a filesystem path segment.
-	return filepath.Join(cache, "traps", jobName)
+	return filepath.Join(cache, "traps")
 }
 
 func NewJournalWriter(dir string, cfg JournalConfig) (*JournalWriter, error) {

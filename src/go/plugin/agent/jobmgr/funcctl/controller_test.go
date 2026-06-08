@@ -4,8 +4,10 @@ package funcctl
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -398,6 +400,7 @@ func TestControllerLifecycleHooks(t *testing.T) {
 		"job stop unregisters job methods":                             {},
 		"cleanup unregisters static methods":                           {},
 		"cleanup with api configured still unregisters static methods": {},
+		"api registration honors method tags":                          {},
 	}
 
 	for name := range tests {
@@ -489,6 +492,25 @@ func TestControllerLifecycleHooks(t *testing.T) {
 				controller.Cleanup()
 
 				assert.Contains(t, reg.unregisteredNames(), "mod:a")
+
+			case "api registration honors method tags":
+				var buf bytes.Buffer
+				controller = New(Options{
+					FnReg: reg,
+					API:   dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
+				})
+				controller.RegisterModules(collectorapi.Registry{
+					"mod": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{ID: "logs", Tags: "logs"}}
+						},
+					},
+				})
+
+				controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+
+				assert.Contains(t, buf.String(), "FUNCTION GLOBAL \"mod:logs\"")
+				assert.Contains(t, buf.String(), "\"logs\" 0x0000")
 			}
 		})
 	}
@@ -576,6 +598,274 @@ func TestControllerRegisterJobMethods(t *testing.T) {
 	}
 }
 
+func TestControllerRawModuleMethodRequest(t *testing.T) {
+	tests := map[string]struct {
+		fn       functions.Function
+		raw      func(context.Context, funcapi.RawMethodRequest) *funcapi.FunctionResponse
+		wantCode int
+		check    func(*testing.T, map[string]any)
+	}{
+		"raw query response is passed through": {
+			fn: functions.Function{
+				UID:     "raw-query",
+				Timeout: time.Second,
+				Payload: []byte(`{"last":10}`),
+			},
+			raw: func(_ context.Context, req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
+				assert.Equal(t, "logs", req.Method)
+				assert.False(t, req.Info)
+				assert.JSONEq(t, `{"last":10}`, string(req.Payload))
+				return funcapi.RawResponse(map[string]any{
+					"status":      200,
+					"type":        "table",
+					"has_history": true,
+					"data":        []any{[]any{"ok"}},
+				})
+			},
+			wantCode: 200,
+			check: func(t *testing.T, resp map[string]any) {
+				assert.Equal(t, float64(200), resp["status"])
+				assert.Equal(t, "table", resp["type"])
+				assert.Equal(t, true, resp["has_history"])
+				assert.NotContains(t, resp, "accepted_params")
+			},
+		},
+		"raw info response is handled by collector": {
+			fn: functions.Function{
+				UID:     "raw-info",
+				Timeout: time.Second,
+				Args:    []string{"info"},
+			},
+			raw: func(_ context.Context, req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
+				assert.True(t, req.Info)
+				return funcapi.RawResponse(map[string]any{
+					"status":          200,
+					"type":            "table",
+					"has_history":     true,
+					"accepted_params": []any{"last"},
+				})
+			},
+			wantCode: 200,
+			check: func(t *testing.T, resp map[string]any) {
+				assert.Equal(t, true, resp["has_history"])
+				assert.Contains(t, resp, "accepted_params")
+				assert.NotContains(t, resp, "required_params")
+			},
+		},
+		"canceled function context reaches raw handler": {
+			fn: func() functions.Function {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return functions.Function{
+					UID:     "raw-cancel",
+					Context: ctx,
+					Timeout: time.Second,
+				}
+			}(),
+			raw: func(ctx context.Context, _ funcapi.RawMethodRequest) *funcapi.FunctionResponse {
+				assert.ErrorIs(t, ctx.Err(), context.Canceled)
+				return funcapi.RawResponse(map[string]any{
+					"status":       499,
+					"errorMessage": "Request cancelled.",
+				})
+			},
+			wantCode: 499,
+			check: func(t *testing.T, resp map[string]any) {
+				assert.Equal(t, float64(499), resp["status"])
+				assert.Equal(t, "Request cancelled.", resp["errorMessage"])
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var gotCode int
+			var gotResp map[string]any
+			reg := newTestFunctionRegistry()
+			controller := New(Options{
+				FnReg: reg,
+				JSONWriter: func(data []byte, code int) {
+					gotCode = code
+					require.NoError(t, json.Unmarshal(data, &gotResp))
+				},
+			})
+			handler := &rawTestHandler{raw: tc.raw}
+			controller.RegisterModules(collectorapi.Registry{
+				"mod": collectorapi.Creator{
+					Methods: func() []funcapi.MethodConfig {
+						return []funcapi.MethodConfig{{
+							ID:         "logs",
+							RawRequest: true,
+							AgentWide:  true,
+						}}
+					},
+					MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+						return handler
+					},
+				},
+			})
+			controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+
+			call := reg.handlers["mod:logs"]
+			require.NotNil(t, call)
+			call(tc.fn)
+
+			assert.Equal(t, tc.wantCode, gotCode)
+			tc.check(t, gotResp)
+		})
+	}
+}
+
+func TestControllerRawJobMethodRequest(t *testing.T) {
+	tests := map[string]struct {
+		fn       functions.Function
+		raw      func(context.Context, funcapi.RawMethodRequest) *funcapi.FunctionResponse
+		wantCode int
+		check    func(*testing.T, map[string]any)
+	}{
+		"raw query response is passed through": {
+			fn: functions.Function{
+				UID:     "raw-query",
+				Timeout: time.Second,
+				Payload: []byte(`{"last":10}`),
+			},
+			raw: func(_ context.Context, req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
+				assert.Equal(t, "job1:logs", req.Method)
+				assert.False(t, req.Info)
+				assert.JSONEq(t, `{"last":10}`, string(req.Payload))
+				return funcapi.RawResponse(map[string]any{
+					"status":      200,
+					"type":        "table",
+					"has_history": true,
+					"data":        []any{[]any{"ok"}},
+				})
+			},
+			wantCode: 200,
+			check: func(t *testing.T, resp map[string]any) {
+				assert.Equal(t, float64(200), resp["status"])
+				assert.Equal(t, "table", resp["type"])
+				assert.Equal(t, true, resp["has_history"])
+				assert.NotContains(t, resp, "accepted_params")
+			},
+		},
+		"raw info response is handled by collector": {
+			fn: functions.Function{
+				UID:     "raw-info",
+				Timeout: time.Second,
+				Args:    []string{"info"},
+			},
+			raw: func(_ context.Context, req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
+				assert.True(t, req.Info)
+				return funcapi.RawResponse(map[string]any{
+					"status":          200,
+					"type":            "table",
+					"has_history":     true,
+					"accepted_params": []any{"last"},
+				})
+			},
+			wantCode: 200,
+			check: func(t *testing.T, resp map[string]any) {
+				assert.Equal(t, true, resp["has_history"])
+				assert.Contains(t, resp, "accepted_params")
+				assert.NotContains(t, resp, "required_params")
+			},
+		},
+		"canceled function context reaches raw handler": {
+			fn: func() functions.Function {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return functions.Function{
+					UID:     "raw-cancel",
+					Context: ctx,
+					Timeout: time.Second,
+				}
+			}(),
+			raw: func(ctx context.Context, _ funcapi.RawMethodRequest) *funcapi.FunctionResponse {
+				assert.ErrorIs(t, ctx.Err(), context.Canceled)
+				return funcapi.RawResponse(map[string]any{
+					"status":       499,
+					"errorMessage": "Request cancelled.",
+				})
+			},
+			wantCode: 499,
+			check: func(t *testing.T, resp map[string]any) {
+				assert.Equal(t, float64(499), resp["status"])
+				assert.Equal(t, "Request cancelled.", resp["errorMessage"])
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var gotCode int
+			var gotResp map[string]any
+			reg := newTestFunctionRegistry()
+			controller := New(Options{
+				FnReg: reg,
+				JSONWriter: func(data []byte, code int) {
+					gotCode = code
+					require.NoError(t, json.Unmarshal(data, &gotResp))
+				},
+			})
+			handler := &rawTestHandler{raw: tc.raw}
+			controller.RegisterModules(collectorapi.Registry{
+				"mod": collectorapi.Creator{
+					JobMethods: func(job collectorapi.RuntimeJob) []funcapi.MethodConfig {
+						return []funcapi.MethodConfig{{
+							ID:         job.Name() + ":logs",
+							RawRequest: true,
+						}}
+					},
+					MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+						return handler
+					},
+				},
+			})
+			controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+
+			call := reg.handlers["mod:job1:logs"]
+			require.NotNil(t, call)
+			call(tc.fn)
+
+			assert.Equal(t, tc.wantCode, gotCode)
+			tc.check(t, gotResp)
+		})
+	}
+}
+
+func TestControllerRawJobMethodRequiresRawHandler(t *testing.T) {
+	var gotCode int
+	var gotResp map[string]any
+	reg := newTestFunctionRegistry()
+	controller := New(Options{
+		FnReg: reg,
+		JSONWriter: func(data []byte, code int) {
+			gotCode = code
+			require.NoError(t, json.Unmarshal(data, &gotResp))
+		},
+	})
+	controller.RegisterModules(collectorapi.Registry{
+		"mod": collectorapi.Creator{
+			JobMethods: func(job collectorapi.RuntimeJob) []funcapi.MethodConfig {
+				return []funcapi.MethodConfig{{ID: job.Name() + ":logs", RawRequest: true}}
+			},
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return &tableTestHandler{}
+			},
+		},
+	})
+	controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+
+	reg.handlers["mod:job1:logs"](functions.Function{
+		UID:     "missing-raw-handler",
+		Timeout: time.Second,
+	})
+
+	assert.Equal(t, 500, gotCode)
+	assert.Equal(t, float64(500), gotResp["status"])
+	assert.Contains(t, gotResp["errorMessage"], "requires raw request handling")
+}
+
 type testRuntimeJob struct {
 	fullName   string
 	moduleName string
@@ -597,6 +887,47 @@ func (j *testRuntimeJob) ModuleName() string { return j.moduleName }
 func (j *testRuntimeJob) Name() string       { return j.name }
 func (j *testRuntimeJob) IsRunning() bool    { return j.running }
 func (j *testRuntimeJob) Collector() any     { return nil }
+
+type rawTestHandler struct {
+	handle func(context.Context, string, funcapi.ResolvedParams) *funcapi.FunctionResponse
+	raw    func(context.Context, funcapi.RawMethodRequest) *funcapi.FunctionResponse
+}
+
+var _ funcapi.RawMethodHandler = (*rawTestHandler)(nil)
+
+func (h *rawTestHandler) MethodParams(context.Context, string) ([]funcapi.ParamConfig, error) {
+	return nil, nil
+}
+
+func (h *rawTestHandler) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if h.handle != nil {
+		return h.handle(ctx, method, params)
+	}
+	return &funcapi.FunctionResponse{Status: 200}
+}
+
+func (h *rawTestHandler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
+	if h.raw == nil {
+		return &funcapi.FunctionResponse{Status: 200}
+	}
+	return h.raw(ctx, req)
+}
+
+func (h *rawTestHandler) Cleanup(context.Context) {}
+
+type tableTestHandler struct{}
+
+var _ funcapi.MethodHandler = (*tableTestHandler)(nil)
+
+func (h *tableTestHandler) MethodParams(context.Context, string) ([]funcapi.ParamConfig, error) {
+	return nil, nil
+}
+
+func (h *tableTestHandler) Handle(context.Context, string, funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	return &funcapi.FunctionResponse{Status: 200}
+}
+
+func (h *tableTestHandler) Cleanup(context.Context) {}
 
 type testFunctionRegistry struct {
 	handlers     map[string]func(functions.Function)

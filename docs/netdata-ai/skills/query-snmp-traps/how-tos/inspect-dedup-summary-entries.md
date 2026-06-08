@@ -8,6 +8,7 @@ collector deduplication window?
 ## Inputs
 
 - `NODE_UUID`: node running the `snmp_traps` collector.
+- `SNMP_TRAPS_JOB`: trap listener job name. Default examples use `local`.
 - Time window covering the suspected flap.
 - Optional trap OID or device selector.
 
@@ -24,15 +25,16 @@ collector deduplication window?
 
    ```bash
    NODE_UUID="YOUR_NODE_UUID"
+   SNMP_TRAPS_JOB="local"
+   SNMP_TRAPS_FUNCTION="snmp_traps:logs"
 
-   BODY="$(jq -n '{
+   BODY="$(jq -n --arg job "$SNMP_TRAPS_JOB" '{
      after: -3600,
      before: 0,
      last: 200,
      direction: "backward",
-     "__logs_sources": "all",
      selections: {
-       ND_LOG_SOURCE: ["snmp-trap"],
+       __logs_sources: [$job],
        TRAP_REPORT_TYPE: ["deduplication_summary"]
      },
      facets: ["TRAP_REPORT_PERIOD_SEC"]
@@ -43,7 +45,7 @@ collector deduplication window?
    agents_call_function \
      --via cloud \
      --node "$NODE_UUID" \
-     --function systemd-journal \
+     --function "$SNMP_TRAPS_FUNCTION" \
      --body "$BODY" \
      > .local/audits/query-snmp-traps/dedup-summaries.json
    ```
@@ -79,14 +81,13 @@ collector deduplication window?
    ```bash
    TRAP_OID="[TRAP_OID]"
 
-   BODY="$(jq -n --arg oid "$TRAP_OID" '{
+   BODY="$(jq -n --arg job "$SNMP_TRAPS_JOB" --arg oid "$TRAP_OID" '{
      after: -3600,
      before: 0,
      last: 200,
      direction: "backward",
-     "__logs_sources": "all",
      selections: {
-       ND_LOG_SOURCE: ["snmp-trap"],
+       __logs_sources: [$job],
        TRAP_REPORT_TYPE: ["deduplication_summary"]
      },
      query: $oid

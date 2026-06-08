@@ -54,6 +54,10 @@ func (c *Controller) respondMethodDataWithParams(
 		c.respondError(fn, 500, "internal error: module returned nil response")
 		return
 	}
+	if dataResp.RawResponse != nil {
+		c.respondJSON(fn, dataResp.RawResponse)
+		return
+	}
 	if dataResp.Status >= 400 {
 		c.respondError(fn, dataResp.Status, "%s", dataResp.Message)
 		return

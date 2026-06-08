@@ -25,11 +25,17 @@ var configSchema string
 //go:embed "charts.yaml"
 var chartTemplateYAML string
 
+const (
+	trapWriteFailureJournal = "journal_write_failed"
+	trapWriteFailureOTLP    = "otlp_export_failed"
+)
+
 func init() {
 	collectorapi.Register("snmp_traps", collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 1,
+			Disabled:    true,
 		},
 		CreateV2:      func() collectorapi.CollectorV2 { return New() },
 		Config:        func() any { return &Config{} },
@@ -77,6 +83,7 @@ type Collector struct {
 	profileCacheHeld   bool
 	operatorMetrics    *operatorMetrics
 	dynamicChartYAML   string
+	writeFailureDim    string
 }
 
 func (c *Collector) Configuration() any {
@@ -88,10 +95,6 @@ func (c *Collector) SetJobName(name string) {
 }
 
 func (c *Collector) Init(ctx context.Context) error {
-	if runtime.GOOS != "linux" {
-		return &dyncfgCodedError{err: errors.New("SNMP trap journal backend requires Linux"), code: 422}
-	}
-
 	if err := validateJobName(c.jobName); err != nil {
 		return &dyncfgCodedError{err: err, code: 422}
 	}
@@ -132,6 +135,13 @@ func (c *Collector) Init(ctx context.Context) error {
 	if _, err := validateOTLPConfig(c.OTLP); err != nil {
 		return &dyncfgCodedError{err: err, code: 422}
 	}
+	journalEnabled := c.Journal.enabled()
+	if !journalEnabled && !c.OTLP.Enabled {
+		return &dyncfgCodedError{err: errors.New("at least one SNMP trap output backend must be enabled: journal.enabled or otlp.enabled"), code: 422}
+	}
+	if journalEnabled && runtime.GOOS != "linux" {
+		return &dyncfgCodedError{err: errors.New("SNMP trap journal backend requires Linux"), code: 422}
+	}
 
 	if err := validateOverrides(c.Overrides); err != nil {
 		return &dyncfgCodedError{err: err, code: 422}
@@ -148,9 +158,13 @@ func (c *Collector) Init(ctx context.Context) error {
 		}
 	}
 
-	retCfg, err := parseRetentionConfig(c.Retention)
-	if err != nil {
-		return &dyncfgCodedError{err: err, code: 422}
+	var retCfg RetentionConfig
+	if journalEnabled {
+		ret, err := parseRetentionConfig(c.Retention)
+		if err != nil {
+			return &dyncfgCodedError{err: err, code: 422}
+		}
+		retCfg = ret
 	}
 
 	if c.listener != nil {
@@ -188,23 +202,31 @@ func (c *Collector) Init(ctx context.Context) error {
 		c.dynamicChartYAML = tmpl
 	}
 
-	dir := journalRoot(c.jobName)
-	journalCfg := retCfg.makeJournalConfig()
-	journalWriter, err := NewJournalWriter(dir, journalCfg)
-	if err != nil {
-		releaseProfiles()
-		return &dyncfgCodedError{err: err, code: 422}
+	var journalWriter *JournalWriter
+	if journalEnabled {
+		dir := journalRoot(c.jobName)
+		journalCfg := retCfg.makeJournalConfig()
+		var err error
+		journalWriter, err = NewJournalWriter(dir, journalCfg)
+		if err != nil {
+			releaseProfiles()
+			return &dyncfgCodedError{err: err, code: 422}
+		}
 	}
 
 	listener, err := newListener(c.jobName, c.Listen.Endpoints)
 	if err != nil {
 		releaseProfiles()
-		journalWriter.Close()
+		if journalWriter != nil {
+			journalWriter.Close()
+		}
 		return &dyncfgCodedError{err: err, code: 422}
 	}
 	cleanupPreflight := func() {
 		releaseProfiles()
-		journalWriter.Close()
+		if journalWriter != nil {
+			journalWriter.Close()
+		}
 		listener.close()
 	}
 
@@ -268,10 +290,17 @@ func (c *Collector) Init(ctx context.Context) error {
 			return &dyncfgCodedError{err: err, code: 422}
 		}
 	}
-	tw := newJournalTrapWriter(journalWriter, defaultQueueCapacity)
-	trapWriter := newFanoutTrapWriter(tw, secondaryWriter, metrics)
+	var primaryWriter TrapWriter
+	writeFailureDim := trapWriteFailureJournal
+	if journalWriter != nil {
+		primaryWriter = newJournalTrapWriter(journalWriter, defaultQueueCapacity)
+	}
+	trapWriter := newFanoutTrapWriter(primaryWriter, secondaryWriter, metrics)
+	if primaryWriter == nil {
+		writeFailureDim = trapWriteFailureOTLP
+	}
 	metrics.setDedupEnabled(c.Dedup.Enabled)
-	deduper := newTrapDeduper(c.jobName, c.Dedup, trapWriter, metrics)
+	deduper := newTrapDeduper(c.jobName, c.Dedup, trapWriter, metrics, writeFailureDim)
 	if deduper != nil {
 		deduper.start()
 	}
@@ -307,10 +336,14 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.metrics = metrics
 	c.listener = listener
 	c.trapWriter = trapWriter
-	c.journalDir = journalWriter.JournalDirectory()
+	c.journalDir = ""
+	if journalWriter != nil {
+		c.journalDir = journalWriter.JournalDirectory()
+	}
 	c.deduper = deduper
 	c.profileCacheHeld = true
 	releaseProfileCache = false
+	c.writeFailureDim = writeFailureDim
 	if len(c.Metrics) > 0 {
 		c.operatorMetrics = newOperatorMetrics(c.Metrics, idx)
 	}
@@ -358,6 +391,8 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	c.metrics = nil
 	c.operatorMetrics = nil
 	c.dynamicChartYAML = ""
+	c.journalDir = ""
+	c.writeFailureDim = ""
 }
 
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
@@ -367,6 +402,13 @@ func (c *Collector) ChartTemplateYAML() string {
 		return c.dynamicChartYAML
 	}
 	return chartTemplateYAML
+}
+
+func (c *Collector) trapWriteFailureDim() string {
+	if c.writeFailureDim != "" {
+		return c.writeFailureDim
+	}
+	return trapWriteFailureJournal
 }
 
 func (c *Collector) collect(ctx context.Context) error {
@@ -531,7 +573,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		if c.deduper != nil {
 			c.deduper.Rollback(admission)
 		}
-		c.incTrapError("journal_write_failed")
+		c.incTrapError(c.trapWriteFailureDim())
 		return
 	}
 

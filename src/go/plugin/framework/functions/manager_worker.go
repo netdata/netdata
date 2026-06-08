@@ -34,7 +34,9 @@ func (m *Manager) runWorker() {
 					panicked = true
 				}
 			}()
-			req.handler(*req.fn)
+			fn := *req.fn
+			fn.Context = req.ctx
+			req.handler(fn)
 		}()
 
 		if panicked {

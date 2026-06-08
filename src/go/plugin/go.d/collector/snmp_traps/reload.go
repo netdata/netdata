@@ -10,7 +10,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-const reloadProfilesMethodID = "reload-profiles"
+const (
+	reloadProfilesMethodID = "reload-profiles"
+	snmpTrapsLogsMethodID  = "logs"
+)
 
 func reloadProfilesMethodConfig() funcapi.MethodConfig {
 	return funcapi.MethodConfig{
@@ -26,6 +29,21 @@ func reloadProfilesMethodConfig() funcapi.MethodConfig {
 func snmpTrapsMethods() []funcapi.MethodConfig {
 	return []funcapi.MethodConfig{
 		reloadProfilesMethodConfig(),
+		snmpTrapsLogsMethodConfig(),
+	}
+}
+
+func snmpTrapsLogsMethodConfig() funcapi.MethodConfig {
+	return funcapi.MethodConfig{
+		ID:           snmpTrapsLogsMethodID,
+		Name:         "SNMP Trap Logs",
+		UpdateEvery:  1,
+		Help:         "Query SNMP trap journal entries received by SNMP trap listener jobs",
+		RequireCloud: true,
+		Tags:         "logs",
+		ResponseType: "logs",
+		RawRequest:   true,
+		AgentWide:    true,
 	}
 }
 
@@ -34,7 +52,7 @@ func snmpTrapsMethodHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {
 	if !ok {
 		return nil
 	}
-	return &profileReloadHandler{collector: c}
+	return newSNMPTrapsFunctionHandler(c)
 }
 
 type profileReloadHandler struct {

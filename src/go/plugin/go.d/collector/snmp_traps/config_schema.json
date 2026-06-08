@@ -247,15 +247,29 @@
           }
         }
       },
-      "otlp": {
-        "title": "OTLP exporter",
-        "description": "Optional second backend that exports traps as OTLP/gRPC LogRecords. Disabled by default. When enabled, the collector preflights the receiver at job creation time.",
+      "journal": {
+        "title": "Direct journal output",
+        "description": "Direct Netdata journal storage for received traps. Enabled by default for explicit jobs and preflighted during job creation.",
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "enabled": {
             "title": "Enabled",
-            "description": "Enable OTLP/gRPC Logs export in addition to the journal-direct path.",
+            "description": "Write traps to local direct journal files and expose the SNMP traps logs Function. Disable only when another backend, such as OTLP, is enabled.",
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "otlp": {
+        "title": "OTLP exporter",
+        "description": "Optional backend that exports traps as OTLP/gRPC LogRecords. Disabled by default. When enabled, the collector preflights the receiver at job creation time.",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "description": "Enable OTLP/gRPC Logs export. This may run together with direct journal output or as the only output when journal.enabled is false.",
             "type": "boolean",
             "default": false
           },
@@ -303,7 +317,7 @@
       },
       "retention": {
         "title": "Retention",
-        "description": "Per-job journal retention and rotation policy.",
+        "description": "Per-job direct journal retention and rotation policy. Ignored when journal.enabled is false.",
         "type": "object",
         "additionalProperties": false,
         "properties": {

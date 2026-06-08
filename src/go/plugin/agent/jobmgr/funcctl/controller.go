@@ -159,7 +159,7 @@ func (c *Controller) registerModuleMethodsOnFirstJobStart(moduleName string) {
 					Name:     funcName,
 					Timeout:  60,
 					Help:     help,
-					Tags:     "top",
+					Tags:     methodTags(method),
 					Access:   access,
 					Priority: 100,
 					Version:  3,
@@ -192,6 +192,13 @@ func methodFunctionNames(moduleName string, method funcapi.MethodConfig) []strin
 		funcNames = append(funcNames, alias)
 	}
 	return funcNames
+}
+
+func methodTags(method funcapi.MethodConfig) string {
+	if method.Tags != "" {
+		return method.Tags
+	}
+	return "top"
 }
 
 func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []funcapi.MethodConfig) {
@@ -245,7 +252,7 @@ func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []f
 				Name:     funcName,
 				Timeout:  60,
 				Help:     help,
-				Tags:     "top",
+				Tags:     methodTags(method),
 				Access:   access,
 				Priority: 100,
 				Version:  3,

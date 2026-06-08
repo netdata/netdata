@@ -9,6 +9,9 @@ type fanoutTrapWriter struct {
 }
 
 func newFanoutTrapWriter(primary, secondary TrapWriter, metrics *perJobMetrics) TrapWriter {
+	if primary == nil {
+		return secondary
+	}
 	if secondary == nil {
 		return primary
 	}

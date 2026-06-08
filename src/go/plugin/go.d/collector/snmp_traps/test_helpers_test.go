@@ -68,7 +68,7 @@ func newDedupTestV2Collector(t *testing.T, jobName string, writer TrapWriter) (*
 	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
 	c.Config = Config{Dedup: DedupConfig{Enabled: true}}
 	c.metrics = metrics
-	c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics)
+	c.deduper = newTrapDeduper(jobName, c.Dedup, writer, metrics, "")
 	return c, metrics
 }
 

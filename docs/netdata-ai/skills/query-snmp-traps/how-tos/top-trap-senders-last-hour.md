@@ -7,6 +7,7 @@ Which source devices sent the most SNMP traps in the last hour?
 ## Inputs
 
 - `NODE_UUID`: node running the `snmp_traps` collector.
+- `SNMP_TRAPS_JOB`: trap listener job name. Default examples use `local`.
 - Optional `LAST_SECONDS`, defaulting to `3600`.
 
 ## Steps
@@ -22,16 +23,17 @@ Which source devices sent the most SNMP traps in the last hour?
 
    ```bash
    NODE_UUID="YOUR_NODE_UUID"
+   SNMP_TRAPS_JOB="local"
+   SNMP_TRAPS_FUNCTION="snmp_traps:logs"
    LAST_SECONDS=3600
 
-   BODY="$(jq -n --argjson last_seconds "$LAST_SECONDS" '{
+   BODY="$(jq -n --arg job "$SNMP_TRAPS_JOB" --argjson last_seconds "$LAST_SECONDS" '{
      after: (0 - $last_seconds),
      before: 0,
      last: 50,
      direction: "backward",
-     "__logs_sources": "all",
      selections: {
-       ND_LOG_SOURCE: ["snmp-trap"],
+       __logs_sources: [$job],
        TRAP_REPORT_TYPE: ["trap"]
      },
      facets: ["TRAP_SOURCE_IP", "_HOSTNAME", "TRAP_DEVICE_VENDOR", "TRAP_SEVERITY"]
@@ -42,7 +44,7 @@ Which source devices sent the most SNMP traps in the last hour?
    agents_call_function \
      --via cloud \
      --node "$NODE_UUID" \
-     --function systemd-journal \
+     --function "$SNMP_TRAPS_FUNCTION" \
      --body "$BODY" \
      > .local/audits/query-snmp-traps/top-senders.json
    ```

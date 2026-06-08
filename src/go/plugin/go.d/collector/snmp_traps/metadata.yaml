@@ -39,10 +39,11 @@ modules:
           - **Deduplication**: Optional configurable per-job dedup that suppresses repeated identical traps within a window. The first matching trap is journaled immediately; subsequent matches increment a summary counter and a periodic summary entry is written.
           - **Per-OID overrides**: Operators can override the profile-assigned category, severity, and labels for specific OIDs without editing profiles.
           - **Per-OID metric opt-in**: Operators can promote selected trap OIDs to dedicated Netdata metric charts for finer-grained alerting and dashboards. Each metric entry selects an OID, a context name under `snmp.trap.`, and optionally a bounded-cardinality varbind for multi-dimensional counting.
-          - **OTLP/gRPC export**: Optional second backend that exports traps as OTLP LogRecords in addition to the journal-direct path.
+          - **Direct journal storage**: Enabled by default for explicit jobs. Stores traps as local direct journal files and exposes the embedded `snmp_traps:logs` Function. Direct-journal jobs appear as `__logs_sources` options.
+          - **OTLP/gRPC export**: Optional backend that exports traps as OTLP LogRecords. It can run together with direct journal storage, or as the only output when `journal.enabled` is `false`.
           - **Self-metrics**: Per-job counters for trap events (by category and severity), processing errors (by type), and dedup suppression (when enabled).
 
-          Trap entries are written as structured systemd-journal log messages with plugin-controlled fields (`TRAP_REPORT_TYPE`, `TRAP_OID`, `TRAP_NAME`, `TRAP_CATEGORY`, `TRAP_SEVERITY`, `TRAP_PDU_TYPE`, `TRAP_VERSION`, `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, `TRAP_DEVICE_VENDOR`, `TRAP_INTERFACE`, `TRAP_NEIGHBORS`, `TRAP_SUPPRESSED_COUNT`, `TRAP_SUPPRESSED_FINGERPRINTS`, `TRAP_REPORT_PERIOD_SEC`, `TRAP_JSON`) plus profile-defined labels (`TRAP_TAG_*`). Query traps with the `systemd-journal` plugin Function through Netdata Cloud or directly via the Agent HTTP API.
+          When direct journal storage is enabled, trap entries are written as structured systemd-journal log messages with plugin-controlled fields (`TRAP_REPORT_TYPE`, `TRAP_OID`, `TRAP_NAME`, `TRAP_CATEGORY`, `TRAP_SEVERITY`, `TRAP_PDU_TYPE`, `TRAP_VERSION`, `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, `TRAP_DEVICE_VENDOR`, `TRAP_INTERFACE`, `TRAP_NEIGHBORS`, `TRAP_SUPPRESSED_COUNT`, `TRAP_SUPPRESSED_FINGERPRINTS`, `TRAP_REPORT_PERIOD_SEC`, `TRAP_JSON`) plus profile-defined labels (`TRAP_TAG_*`). Query traps with the embedded `snmp_traps:logs` Function through Netdata Cloud or directly via the Agent HTTP API. The Function selects all direct-journal jobs by default and can narrow to one listener with `selections.__logs_sources=["<job>"]`. OTEL-only jobs do not create local journal files and therefore do not appear as log sources.
 
           **Closed 8-category / 8-severity taxonomy** (from the OOB profile pack):
 
@@ -87,7 +88,7 @@ modules:
           2. Validates the SNMP version, community/USM, and source against the job configuration
           3. Resolves the trap OID against loaded profiles to get a name, category, severity, and varbind labels
           4. Enriches the entry with optional reverse DNS (`_HOSTNAME`) and dedup logic (if enabled)
-          5. Writes the structured entry to the per-job systemd-journal namespace (and optionally exports via OTLP)
+          5. Writes the structured entry to the per-job direct journal when enabled, and exports via OTLP when configured
           6. Increments the per-job self-metrics (events by category and severity, errors by type)
 
           **Custom MIB workflow**: Operators with device-specific MIBs not covered by the OOB profiles can use the installed `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` helper to convert MIBs into trap profile YAMLs offline. The helper writes profiles under `snmp-trap-profile-gen-output/profiles/`; copy the needed YAML files to `/etc/netdata/go.d/snmp.trap-profiles/`, then run the `snmp_traps:reload-profiles` Function or re-apply/restart the trap job so job creation validates and loads the new files. See [SNMP trap profile format](/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md) for the YAML schema.
@@ -119,7 +120,7 @@ modules:
           description: |
             The collector is event-driven and does not poll devices. CPU cost is proportional to the received trap rate.
             Profile OID lookups use hash tables. Deduplication, when enabled, adds a configurable fingerprint cache.
-            For high-volume environments, size the dedup cache and journal rotation according to sustained trap volume and retention requirements.
+            For high-volume environments, size the dedup cache and journal rotation according to sustained trap volume and retention requirements. OTEL-only jobs avoid local journal storage but do not appear as sources in the embedded local logs viewer.
     setup:
       prerequisites:
         list:
@@ -246,13 +247,22 @@ modules:
                 - `cache_max_entries`: Maximum fingerprints kept in memory (default 100000).
                 - `key_varbinds`: Additional varbind names to include in the dedup fingerprint (default `[]`, fingerprint is source device + trap OID only).
 
+            - name: journal
+              group: Direct journal
+              description: Direct local journal storage for received traps. Enabled by default for explicit jobs.
+              default_value: "enabled: true"
+              required: false
+              detailed_description: |
+                - `enabled`: Write traps to local direct journal files and expose the job as a `__logs_sources` option in the embedded `snmp_traps:logs` Function.
+                - Set `enabled: false` only when another output backend, such as OTLP, is enabled.
+
             - name: otlp
               group: OTLP export
-              description: Optional second backend that exports traps as OTLP/gRPC LogRecords. Disabled by default.
+              description: Optional backend that exports traps as OTLP/gRPC LogRecords. Disabled by default.
               default_value: ""
               required: false
               detailed_description: |
-                - `enabled`: Enable OTLP/gRPC Logs export.
+                - `enabled`: Enable OTLP/gRPC Logs export. This can run together with direct journal storage or as the only output when `journal.enabled` is `false`.
                 - `endpoint`: OTLP/gRPC endpoint. `http://host:port` uses plaintext gRPC; `https://host:port` uses TLS (default `http://127.0.0.1:4317`).
                 - `headers`: Optional OTLP metadata headers (values may use Netdata secret references).
                 - `request_timeout`: Timeout for connection preflight and export calls (default `5s`).
@@ -262,7 +272,7 @@ modules:
 
             - name: retention
               group: Retention
-              description: Per-job journal retention and rotation policy.
+              description: Per-job direct journal retention and rotation policy. Ignored when `journal.enabled` is `false`.
               default_value: ""
               required: false
               detailed_description: |
@@ -315,6 +325,23 @@ modules:
                     versions:
                       - v1
                       - v2c
+            - name: OTEL-only export
+              description: |
+                A job that disables direct journal creation and exports traps only through OTLP.
+                This job does not appear as a local `__logs_sources` option because no direct journal files are written.
+              config: |
+                jobs:
+                  - name: local-otel
+                    listen:
+                      endpoints:
+                        - protocol: udp
+                          address: 0.0.0.0
+                          port: 162
+                    journal:
+                      enabled: false
+                    otlp:
+                      enabled: true
+                      endpoint: "http://127.0.0.1:4317"
             - name: SNMPv3 with static USM
               description: |
                 A job accepting v3 traps from a known device. The USM user has a static engine ID,
@@ -608,5 +635,6 @@ modules:
               sender device's configuration. Verify engine ID matches. Use Netdata secret references for keys.
           - name: journal retention eating disk space
             description: |
-              The default retention uses size-based eviction (`max_size: 10GB`) with no time-based age limit.
+              The default direct journal retention uses size-based eviction (`max_size: 10GB`) with no time-based age limit.
               For high-trap environments, reduce `max_size` or enable `max_duration` to age-out old entries.
+              OTEL-only jobs can set `journal.enabled: false`; they do not create local journal files and do not appear as sources in the local logs Function.

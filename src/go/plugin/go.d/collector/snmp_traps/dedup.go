@@ -43,11 +43,12 @@ type dedupPeriodState struct {
 }
 
 type trapDeduper struct {
-	jobName    string
-	window     time.Duration
-	maxEntries int
-	writer     TrapWriter
-	metrics    *perJobMetrics
+	jobName         string
+	window          time.Duration
+	maxEntries      int
+	writer          TrapWriter
+	metrics         *perJobMetrics
+	writeFailureDim string
 
 	mu      sync.Mutex
 	entries map[dedupKey]*list.Element
@@ -79,9 +80,12 @@ func validateDedupConfig(cfg DedupConfig) error {
 	return nil
 }
 
-func newTrapDeduper(jobName string, cfg DedupConfig, writer TrapWriter, metrics *perJobMetrics) *trapDeduper {
+func newTrapDeduper(jobName string, cfg DedupConfig, writer TrapWriter, metrics *perJobMetrics, writeFailureDim string) *trapDeduper {
 	if !cfg.Enabled {
 		return nil
+	}
+	if writeFailureDim == "" {
+		writeFailureDim = trapWriteFailureJournal
 	}
 	window := time.Duration(cfg.WindowSec) * time.Second
 	if window <= 0 {
@@ -92,13 +96,14 @@ func newTrapDeduper(jobName string, cfg DedupConfig, writer TrapWriter, metrics 
 		maxEntries = defaultDedupCacheMaxEntries
 	}
 	return &trapDeduper{
-		jobName:    jobName,
-		window:     window,
-		maxEntries: maxEntries,
-		writer:     writer,
-		metrics:    metrics,
-		entries:    make(map[dedupKey]*list.Element),
-		order:      list.New(),
+		jobName:         jobName,
+		window:          window,
+		maxEntries:      maxEntries,
+		writer:          writer,
+		metrics:         metrics,
+		writeFailureDim: writeFailureDim,
+		entries:         make(map[dedupKey]*list.Element),
+		order:           list.New(),
 		period: dedupPeriodState{
 			byTrap:       make(map[string]int64),
 			fingerprints: make(map[dedupKey]struct{}),
@@ -248,7 +253,7 @@ func (d *trapDeduper) emitSummary(now time.Time) {
 		SummaryCounts:         summary,
 	}
 	if err := d.writer.Write(entry); err != nil && d.metrics != nil {
-		d.metrics.incError("journal_write_failed")
+		d.metrics.incError(d.writeFailureDim)
 	}
 }
 

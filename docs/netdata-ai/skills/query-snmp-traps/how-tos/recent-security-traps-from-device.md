@@ -7,6 +7,7 @@ Which security-category SNMP traps did one device send recently?
 ## Inputs
 
 - `NODE_UUID`: node running the `snmp_traps` collector.
+- `SNMP_TRAPS_JOB`: trap listener job name. Default examples use `local`.
 - One of:
   - `DEVICE_IP`: the expected `TRAP_SOURCE_IP`.
   - `DEVICE_HOSTNAME`: the expected `_HOSTNAME`.
@@ -25,16 +26,17 @@ Which security-category SNMP traps did one device send recently?
 
    ```bash
    NODE_UUID="YOUR_NODE_UUID"
+   SNMP_TRAPS_JOB="local"
+   SNMP_TRAPS_FUNCTION="snmp_traps:logs"
    DEVICE_IP="[DEVICE_IP]"
 
-   BODY="$(jq -n --arg device_ip "$DEVICE_IP" '{
+   BODY="$(jq -n --arg job "$SNMP_TRAPS_JOB" --arg device_ip "$DEVICE_IP" '{
      after: -86400,
      before: 0,
      last: 200,
      direction: "backward",
-     "__logs_sources": "all",
      selections: {
-       ND_LOG_SOURCE: ["snmp-trap"],
+       __logs_sources: [$job],
        TRAP_REPORT_TYPE: ["trap"],
        TRAP_CATEGORY: ["security"],
        TRAP_SOURCE_IP: [$device_ip]
@@ -47,7 +49,7 @@ Which security-category SNMP traps did one device send recently?
    agents_call_function \
      --via cloud \
      --node "$NODE_UUID" \
-     --function systemd-journal \
+     --function "$SNMP_TRAPS_FUNCTION" \
      --body "$BODY" \
      > .local/audits/query-snmp-traps/security-traps-device.json
    ```
@@ -57,16 +59,17 @@ Which security-category SNMP traps did one device send recently?
 
    ```bash
    NODE_UUID="YOUR_NODE_UUID"
+   SNMP_TRAPS_JOB="local"
+   SNMP_TRAPS_FUNCTION="snmp_traps:logs"
    DEVICE_HOSTNAME="[DEVICE_HOSTNAME]"
 
-   BODY="$(jq -n --arg hostname "$DEVICE_HOSTNAME" '{
+   BODY="$(jq -n --arg job "$SNMP_TRAPS_JOB" --arg hostname "$DEVICE_HOSTNAME" '{
      after: -86400,
      before: 0,
      last: 200,
      direction: "backward",
-     "__logs_sources": "all",
      selections: {
-       ND_LOG_SOURCE: ["snmp-trap"],
+       __logs_sources: [$job],
        TRAP_REPORT_TYPE: ["trap"],
        TRAP_CATEGORY: ["security"],
        _HOSTNAME: [$hostname]
@@ -77,7 +80,7 @@ Which security-category SNMP traps did one device send recently?
    agents_call_function \
      --via cloud \
      --node "$NODE_UUID" \
-     --function systemd-journal \
+     --function "$SNMP_TRAPS_FUNCTION" \
      --body "$BODY" \
      > .local/audits/query-snmp-traps/security-traps-device.json
    ```

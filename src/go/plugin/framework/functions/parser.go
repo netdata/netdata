@@ -4,6 +4,7 @@ package functions
 
 import (
 	"bytes"
+	"context"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -24,6 +25,7 @@ const (
 type Function struct {
 	key         string
 	UID         string
+	Context     context.Context
 	Timeout     time.Duration
 	Name        string
 	Args        []string

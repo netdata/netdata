@@ -46,6 +46,14 @@ type OTLPConfig struct {
 	QueueCapacity  int               `yaml:"queue_capacity,omitempty" json:"queue_capacity"`
 }
 
+type JournalBackendConfig struct {
+	Enabled *bool `yaml:"enabled,omitempty" json:"enabled"`
+}
+
+func (c JournalBackendConfig) enabled() bool {
+	return c.Enabled == nil || *c.Enabled
+}
+
 type OverrideConfig struct {
 	OID      string            `yaml:"oid" json:"oid"`
 	Category string            `yaml:"category,omitempty" json:"category"`
@@ -64,24 +72,25 @@ type MetricConfig struct {
 }
 
 type Config struct {
-	Vnode              string              `yaml:"vnode,omitempty" json:"vnode"`
-	ReverseDNS         ReverseDNSConfig    `yaml:"reverse_dns,omitempty" json:"reverse_dns"`
-	UpdateEvery        int                 `yaml:"update_every,omitempty" json:"update_every"`
-	Listen             ListenConfig        `yaml:"listen" json:"listen"`
-	Versions           []string            `yaml:"versions,omitempty" json:"versions"`
-	Communities        []string            `yaml:"communities,omitempty" json:"communities"`
-	USMUsers           []USMUserConfig     `yaml:"usm_users,omitempty" json:"usm_users"`
-	EngineIDWhitelist  []string            `yaml:"engine_id_whitelist,omitempty" json:"engine_id_whitelist"`
-	LocalEngineID      string              `yaml:"local_engine_id,omitempty" json:"local_engine_id"`
-	DynamicEngineID    bool                `yaml:"dynamic_engine_id_discovery,omitempty" json:"dynamic_engine_id_discovery"`
-	DynamicEngineIDMax int                 `yaml:"dynamic_engine_id_max_pairs,omitempty" json:"dynamic_engine_id_max_pairs"`
-	Allowlist          AllowlistConfig     `yaml:"allowlist,omitempty" json:"allowlist"`
-	RateLimit          RateLimitConfig     `yaml:"rate_limit,omitempty" json:"rate_limit"`
-	Dedup              DedupConfig         `yaml:"dedup,omitempty" json:"dedup"`
-	OTLP               OTLPConfig          `yaml:"otlp,omitempty" json:"otlp"`
-	Retention          jsonRetentionConfig `yaml:"retention,omitempty" json:"retention"`
-	Overrides          []OverrideConfig    `yaml:"overrides,omitempty" json:"overrides"`
-	Metrics            []MetricConfig      `yaml:"metrics,omitempty" json:"metrics"`
+	Vnode              string               `yaml:"vnode,omitempty" json:"vnode"`
+	ReverseDNS         ReverseDNSConfig     `yaml:"reverse_dns,omitempty" json:"reverse_dns"`
+	UpdateEvery        int                  `yaml:"update_every,omitempty" json:"update_every"`
+	Listen             ListenConfig         `yaml:"listen" json:"listen"`
+	Versions           []string             `yaml:"versions,omitempty" json:"versions"`
+	Communities        []string             `yaml:"communities,omitempty" json:"communities"`
+	USMUsers           []USMUserConfig      `yaml:"usm_users,omitempty" json:"usm_users"`
+	EngineIDWhitelist  []string             `yaml:"engine_id_whitelist,omitempty" json:"engine_id_whitelist"`
+	LocalEngineID      string               `yaml:"local_engine_id,omitempty" json:"local_engine_id"`
+	DynamicEngineID    bool                 `yaml:"dynamic_engine_id_discovery,omitempty" json:"dynamic_engine_id_discovery"`
+	DynamicEngineIDMax int                  `yaml:"dynamic_engine_id_max_pairs,omitempty" json:"dynamic_engine_id_max_pairs"`
+	Allowlist          AllowlistConfig      `yaml:"allowlist,omitempty" json:"allowlist"`
+	RateLimit          RateLimitConfig      `yaml:"rate_limit,omitempty" json:"rate_limit"`
+	Dedup              DedupConfig          `yaml:"dedup,omitempty" json:"dedup"`
+	Journal            JournalBackendConfig `yaml:"journal,omitempty" json:"journal"`
+	OTLP               OTLPConfig           `yaml:"otlp,omitempty" json:"otlp"`
+	Retention          jsonRetentionConfig  `yaml:"retention,omitempty" json:"retention"`
+	Overrides          []OverrideConfig     `yaml:"overrides,omitempty" json:"overrides"`
+	Metrics            []MetricConfig       `yaml:"metrics,omitempty" json:"metrics"`
 }
 
 type ListenConfig struct {
@@ -147,6 +156,7 @@ var (
 		"allowlist":                   {children: map[string]yamlKeySpec{"source_cidrs": {}}},
 		"rate_limit":                  {children: map[string]yamlKeySpec{"enabled": {}, "per_source_pps": {}, "mode": {}}},
 		"dedup":                       {children: map[string]yamlKeySpec{"enabled": {}, "window_sec": {}, "cache_max_entries": {}, "key_varbinds": {}}},
+		"journal":                     {children: map[string]yamlKeySpec{"enabled": {}}},
 		"otlp":                        {children: map[string]yamlKeySpec{"enabled": {}, "endpoint": {}, "headers": {allowAny: true}, "request_timeout": {}, "flush_interval": {}, "batch_size": {}, "queue_capacity": {}}},
 		"retention":                   {children: map[string]yamlKeySpec{"max_size": {}, "max_duration": {}, "rotation_size": {}, "rotation_duration": {}}},
 		"overrides":                   {elem: &overrideYAMLSpec},

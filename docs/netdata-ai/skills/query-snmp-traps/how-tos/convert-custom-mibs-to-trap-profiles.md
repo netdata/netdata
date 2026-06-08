@@ -12,6 +12,8 @@ Netdata SNMP trap profile YAMLs?
   `NAGIOS-NOTIFY-MIB`.
 - `NODE_UUID`: Netdata node UUID, only needed when reloading profiles
   through the Agent Function path.
+- `SNMP_TRAPS_JOB`: trap listener job name for verification queries.
+  Default examples use `local`.
 
 ## Steps
 
@@ -97,16 +99,17 @@ Netdata SNMP trap profile YAMLs?
 
    ```bash
    NODE_UUID="YOUR_NODE_UUID"
+   SNMP_TRAPS_JOB="local"
+   SNMP_TRAPS_FUNCTION="snmp_traps:logs"
    TRAP_OID="1.3.6.1.4.1.20006.1.6"
 
-   BODY="$(jq -n --arg oid "$TRAP_OID" '{
+   BODY="$(jq -n --arg job "$SNMP_TRAPS_JOB" --arg oid "$TRAP_OID" '{
      after: -3600,
      before: 0,
      last: 20,
      direction: "backward",
-     "__logs_sources": "all",
      selections: {
-       ND_LOG_SOURCE: ["snmp-trap"],
+       __logs_sources: [$job],
        TRAP_REPORT_TYPE: ["trap"]
      },
      query: $oid,
@@ -118,7 +121,7 @@ Netdata SNMP trap profile YAMLs?
    agents_call_function \
      --via cloud \
      --node "$NODE_UUID" \
-     --function systemd-journal \
+     --function "$SNMP_TRAPS_FUNCTION" \
      --body "$BODY" \
      > .local/audits/query-snmp-traps/custom-profile-verify.json
 

@@ -907,7 +907,7 @@ func TestCollectorNoOperatorMetricOnDedupSuppression(t *testing.T) {
 		{OID: trap.OID, Context: "snmp.trap.cold_start"},
 	})
 
-	deduper := newTrapDeduper("test", DedupConfig{Enabled: true, WindowSec: 3600, CacheMaxEntries: 1000}, &mockTrapWriter{}, nil)
+	deduper := newTrapDeduper("test", DedupConfig{Enabled: true, WindowSec: 3600, CacheMaxEntries: 1000}, &mockTrapWriter{}, nil, "")
 	if deduper != nil {
 		deduper.start()
 		defer deduper.Close()

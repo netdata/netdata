@@ -8,6 +8,7 @@ Which nodes in a room received critical or emergency SNMP traps?
 
 - `SPACE_ID`: Netdata Cloud space ID.
 - `ROOM_ID`: Netdata Cloud room ID.
+- `SNMP_TRAPS_JOB`: trap listener job name on each node. Default examples use `local`.
 - Optional severity list. The example uses `emerg` and `crit`.
 
 ## Steps
@@ -40,14 +41,16 @@ Which nodes in a room received critical or emergency SNMP traps?
 3. Query every node for severe trap rows:
 
    ```bash
-   BODY="$(jq -n '{
+   SNMP_TRAPS_JOB="local"
+   SNMP_TRAPS_FUNCTION="snmp_traps:logs"
+
+   BODY="$(jq -n --arg job "$SNMP_TRAPS_JOB" '{
      after: -3600,
      before: 0,
      last: 200,
      direction: "backward",
-     "__logs_sources": "all",
      selections: {
-       ND_LOG_SOURCE: ["snmp-trap"],
+       __logs_sources: [$job],
        TRAP_REPORT_TYPE: ["trap"],
        TRAP_SEVERITY: ["emerg", "crit"]
      },
@@ -62,7 +65,7 @@ Which nodes in a room received critical or emergency SNMP traps?
      if ! agents_call_function \
          --via cloud \
          --node "$NODE_UUID" \
-         --function systemd-journal \
+         --function "$SNMP_TRAPS_FUNCTION" \
          --body "$BODY" \
          > "$OUT"; then
        rm -f "$OUT"
@@ -124,6 +127,9 @@ output.
   node state changes while the loop is running; failed nodes are skipped.
 - If the room is large, reduce the time window first or query only
   nodes that run the `snmp_traps` collector.
+- If nodes use different trap listener job names, repeat the query with
+  each job name in `selections.__logs_sources`, or omit that selection
+  to query all direct-journal trap jobs on each node.
 - Use `alert` as an additional severity when the question is about
   all urgent traps, not just critical/emergency traps.
 

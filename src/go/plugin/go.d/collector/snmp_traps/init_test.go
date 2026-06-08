@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,21 @@ import (
 
 func TestCollectorChartTemplateYAML(t *testing.T) {
 	collecttest.AssertChartTemplateSchema(t, New().ChartTemplateYAML())
+}
+
+func TestCollectorRegistrationDisabledByDefault(t *testing.T) {
+	creator, ok := collectorapi.DefaultRegistry.Lookup("snmp_traps")
+	require.True(t, ok)
+	assert.True(t, creator.Defaults.Disabled)
+}
+
+func TestJournalBackendConfigEnabledDefault(t *testing.T) {
+	disabled := false
+	enabled := true
+
+	assert.True(t, JournalBackendConfig{}.enabled())
+	assert.False(t, JournalBackendConfig{Enabled: &disabled}.enabled())
+	assert.True(t, JournalBackendConfig{Enabled: &enabled}.enabled())
 }
 
 func TestValidateJobName(t *testing.T) {
@@ -175,6 +191,9 @@ func TestCollectorInit_BindsEndpointsAndCheckIsNoop(t *testing.T) {
 
 	require.NoError(t, c.Init(context.Background()))
 	require.NotNil(t, c.listener)
+	require.NotEmpty(t, c.journalDir)
+	require.DirExists(t, c.journalDir)
+	assert.Equal(t, trapWriteFailureJournal, c.trapWriteFailureDim())
 	require.NoError(t, c.Check(context.Background()))
 
 	c.Cleanup(context.Background())
@@ -228,6 +247,53 @@ func TestCollectorInit_InvalidEndpointsIsCodedError(t *testing.T) {
 	require.ErrorAs(t, err, &coded)
 	assert.Equal(t, 422, coded.Code())
 	assert.Nil(t, c.listener)
+}
+
+func TestCollectorInit_NoOutputBackendIsCodedError(t *testing.T) {
+	disabled := false
+	c := New()
+	c.SetJobName("local")
+	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
+	c.Journal.Enabled = &disabled
+
+	err := c.Init(context.Background())
+	require.Error(t, err)
+	var coded interface{ Code() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 422, coded.Code())
+	assert.Contains(t, err.Error(), "at least one SNMP trap output backend")
+	assert.Nil(t, c.listener)
+}
+
+func TestCollectorInit_OTELOnlySkipsJournalCreation(t *testing.T) {
+	setMinimalProfileDir(t)
+	cacheDir := withTestCacheDir(t)
+	disabled := false
+	badRetention := "not-a-size"
+	srv := startOTLPFixture(t, nil)
+
+	const jobName = "otel-only"
+	c := New()
+	c.SetJobName(jobName)
+	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
+	c.Journal.Enabled = &disabled
+	c.Retention.MaxSize = &badRetention
+	c.OTLP = OTLPConfig{
+		Enabled:       true,
+		Endpoint:      srv.endpoint,
+		FlushInterval: "1h",
+		QueueCapacity: 16,
+	}
+
+	require.NoError(t, c.Init(context.Background()))
+	require.NotNil(t, c.listener)
+	assert.Empty(t, c.journalDir)
+	assert.NoDirExists(t, journalRoot(jobName))
+	assert.Equal(t, trapWriteFailureOTLP, c.trapWriteFailureDim())
+	assert.NoDirExists(t, cacheDir+"/traps")
+
+	c.Cleanup(context.Background())
+	require.Nil(t, c.listener)
 }
 
 func TestCollectorInit_BindsMultipleEndpoints(t *testing.T) {
