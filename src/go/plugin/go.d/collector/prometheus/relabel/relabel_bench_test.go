@@ -150,7 +150,7 @@ func benchSample(name string, lbs map[string]string, kind prompkg.SampleKind, fa
 
 func benchLabels(n int) map[string]string {
 	lbs := make(map[string]string, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		lbs["label_"+strconv.Itoa(i)] = "value"
 	}
 	return lbs
