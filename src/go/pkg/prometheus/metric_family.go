@@ -53,6 +53,15 @@ type (
 	}
 )
 
+func NewMetricFamily(name, help string, typ model.MetricType, metrics []Metric) *MetricFamily {
+	return &MetricFamily{
+		name:    name,
+		help:    help,
+		typ:     typ,
+		metrics: metrics,
+	}
+}
+
 func (mfs MetricFamilies) Len() int {
 	return len(mfs)
 }

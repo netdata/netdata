@@ -39,3 +39,11 @@ func (c *cache) addChart(key string, chart *collectorapi.Chart) {
 		v.charts = append(v.charts, chart)
 	}
 }
+
+func (c *cache) getFirstChart(key string) *collectorapi.Chart {
+	v, ok := c.entries[key]
+	if !ok || len(v.charts) == 0 {
+		return nil
+	}
+	return v.charts[0]
+}

@@ -39,8 +39,9 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 
 func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
-		config   Config
-		wantFail bool
+		config          Config
+		wantFail        bool
+		wantErrContains string
 	}{
 		"non empty URL": {
 			wantFail: false,
@@ -51,6 +52,54 @@ func TestCollector_Init(t *testing.T) {
 			config: Config{
 				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
 				Selector:   selector.Expr{Allow: []string{`name{label=#"value"}`}},
+			},
+		},
+		"fail if selector_groups and flat selector are both set": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				Selector:   selector.Expr{Allow: []string{"ok"}},
+				SelectorGroups: []SelectorGroup{
+					{Name: "g1"},
+				},
+			},
+		},
+		"fail if selector_groups and flat rules are both set": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				LabelRelabel: []RelabelRule{
+					{Action: "labeldrop", Regex: "^x$"},
+				},
+				SelectorGroups: []SelectorGroup{
+					{Name: "g1"},
+				},
+			},
+		},
+		"fail if selector_groups and context_rules are both set": {
+			wantFail:        true,
+			wantErrContains: "mutually exclusive",
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				ContextRules: []ContextRule{
+					{Match: ".*", Context: "x"},
+				},
+				SelectorGroups: []SelectorGroup{
+					{Name: "g1"},
+				},
+			},
+		},
+		"fail if selector_groups and dimension_rules are both set": {
+			wantFail:        true,
+			wantErrContains: "mutually exclusive",
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				DimensionRules: []DimensionRule{
+					{Match: ".*", Dimension: "x"},
+				},
+				SelectorGroups: []SelectorGroup{
+					{Name: "g1"},
+				},
 			},
 		},
 		"default": {
@@ -64,10 +113,14 @@ func TestCollector_Init(t *testing.T) {
 			collr := New()
 			collr.Config = test.config
 
+			err := collr.Init(context.Background())
 			if test.wantFail {
-				assert.Error(t, collr.Init(context.Background()))
+				require.Error(t, err)
+				if test.wantErrContains != "" {
+					assert.ErrorContains(t, err, test.wantErrContains)
+				}
 			} else {
-				assert.NoError(t, collr.Init(context.Background()))
+				assert.NoError(t, err)
 			}
 		})
 	}
