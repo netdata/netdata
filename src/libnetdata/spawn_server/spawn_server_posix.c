@@ -221,8 +221,15 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout
     // the caller's timeout_ms is the SIGTERM grace; fall back to a default when not specified.
     int grace_ms = timeout_ms > 0 ? timeout_ms : SPAWN_KILL_DEFAULT_GRACE_MS;
     int status;
-    if(spawn_server_exec_timedwait(server, si, grace_ms, &status) != SPAWN_TIMEDWAIT_EXITED)
-        kill(si->child_pid, SIGKILL);
+    if(spawn_server_exec_timedwait(server, si, grace_ms, &status) != SPAWN_TIMEDWAIT_EXITED) {
+        if(kill(si->child_pid, SIGKILL) != 0)
+            // a failed SIGKILL almost always means the child is already gone (ESRCH); the wait
+            // below then returns immediately. SIGKILL is uncatchable, so it cannot be ignored by
+            // a live child - the only unbounded case left is uninterruptible (D-state) sleep,
+            // which no signal or timeout can resolve.
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: SIGKILL of pid %d failed: %s", si->child_pid, si->cmdline);
+    }
     else
         return status;
 

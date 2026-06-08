@@ -369,8 +369,10 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     // the caller's timeout_ms is the SIGTERM grace; fall back to a default when not specified.
     int grace_ms = timeout_ms > 0 ? timeout_ms : SPAWN_KILL_DEFAULT_GRACE_MS;
     int status;
-    if(spawn_server_exec_timedwait(server, si, grace_ms, &status) != SPAWN_TIMEDWAIT_EXITED)
-        uv_process_kill(&si->process, SIGKILL);
+    if(spawn_server_exec_timedwait(server, si, grace_ms, &status) != SPAWN_TIMEDWAIT_EXITED) {
+        if(uv_process_kill(&si->process, SIGKILL))
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: uv_process_kill(SIGKILL) failed");
+    }
     else
         return status;
 
