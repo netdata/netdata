@@ -42,8 +42,10 @@ func TestFuncTopology_Handle(t *testing.T) {
 				validateVSphereTopologyV1Data(t, data)
 				require.Equal(t, 0, data.Actors.Rows)
 				require.Equal(t, 0, data.Links.Rows)
+				require.Nil(t, data.Overlays)
 				require.EqualValues(t, 0, data.Stats["hosts"])
 				require.EqualValues(t, 0, data.Stats["vms"])
+				require.EqualValues(t, 0, data.Stats["overlay_refs"])
 			},
 		},
 		"unknown method": {
@@ -55,7 +57,7 @@ func TestFuncTopology_Handle(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			handler := &funcTopology{collector: tc.collector(), agentID: "vsphere_vcenter1"}
+			handler := &funcTopology{collector: tc.collector(), agentID: "vsphere_vcenter1", jobName: "vsphere_vcenter1"}
 
 			resp := handler.Handle(context.Background(), tc.method, nil)
 
@@ -151,7 +153,7 @@ func newVSphereTopologyTestCollector() *Collector {
 
 func TestFuncTopology_HandleWithInventoryCache(t *testing.T) {
 	collr := newVSphereTopologyTestCollector()
-	handler := &funcTopology{collector: collr, agentID: "vsphere_vcenter1"}
+	handler := &funcTopology{collector: collr, agentID: "vsphere_vcenter1", jobName: "vsphere_vcenter1"}
 
 	resp := handler.Handle(context.Background(), "topology:vsphere", nil)
 
@@ -167,12 +169,14 @@ func TestFuncTopology_HandleWithInventoryCache(t *testing.T) {
 	require.Equal(t, "virtualization", data.Types.ActorTypes["vsphere_vm"].Layer)
 	require.Equal(t, 8, data.Actors.Rows)
 	require.Equal(t, 9, data.Links.Rows)
+	require.EqualValues(t, 1, data.Stats["overlay_refs"])
 
 	actors := topologyTableRows(t, data.Actors, data.Dictionaries)
 	requireTopologyRow(t, actors, "vsphere_moid", "datacenter-1")
 	requireTopologyRow(t, actors, "vsphere_moid", "domain-c1")
 	requireTopologyRow(t, actors, "vsphere_moid", "host-1")
 	vm := requireTopologyRow(t, actors, "vsphere_moid", "vm-1")
+	datastore := requireTopologyRow(t, actors, "vsphere_moid", "datastore-1")
 	network := requireTopologyRow(t, actors, "vsphere_moid", "network-1")
 	require.Equal(t, "vsphere_vm", vm["type"])
 	require.Equal(t, "vm", vm["object_type"])
@@ -200,6 +204,21 @@ func TestFuncTopology_HandleWithInventoryCache(t *testing.T) {
 	require.Equal(t, "vm-1", runEvidence["source_moid"])
 	require.Equal(t, "host", runEvidence["target_type"])
 	require.Equal(t, "host-1", runEvidence["target_moid"])
+
+	template := data.Types.OverlayTemplates[vsphereDatastoreUtilizationOverlay]
+	require.Equal(t, topologyv1.OverlayProviderNetdataMetrics, template.Provider)
+	require.Equal(t, []string{"vsphere.datastore_space_utilization"}, template.Contexts)
+	require.Equal(t, []string{"used"}, template.Dimensions)
+	require.Equal(t, []string{vsphereOverlaySelectorCollectJob, vsphereOverlaySelectorID}, template.SelectorParams)
+	require.Equal(t, topologyv1.NewOverlayMerge(topologyv1.OverlayMergeRefsSet, topologyv1.OverlayMergeValuesLast), template.Merge)
+
+	require.NotNil(t, data.Overlays)
+	require.NotNil(t, data.Overlays.Refs)
+	refs := topologyTableRows(t, *data.Overlays.Refs, data.Dictionaries)
+	ref := requireTopologyRow(t, refs, vsphereOverlaySelectorID, "datastore-1")
+	require.Equal(t, vsphereDatastoreUtilizationOverlay, ref[topologyv1.OverlayRefsTemplateColumn])
+	require.Equal(t, topologyIntValue(t, datastore["_row"]), topologyIntValue(t, ref[topologyv1.OverlayRefsActorColumn]))
+	require.Equal(t, "vsphere_vcenter1", ref[vsphereOverlaySelectorCollectJob])
 }
 
 func TestFuncTopology_DoesNotLinkToFilteredActors(t *testing.T) {
@@ -232,7 +251,7 @@ func TestFuncTopology_DoesNotLinkToFilteredActors(t *testing.T) {
 		},
 	}
 
-	data, ok := collr.topologyData("agent")
+	data, ok := collr.topologyData("agent", "job")
 
 	require.True(t, ok)
 	validateVSphereTopologyV1Data(t, data)
@@ -243,6 +262,21 @@ func TestFuncTopology_DoesNotLinkToFilteredActors(t *testing.T) {
 	require.Contains(t, keys, "datacenter:datacenter-1->vm:vm-1:vsphere_ownership")
 	require.NotContains(t, keys, "cluster:domain-c-filtered->host:host-1:vsphere_ownership")
 	require.NotContains(t, keys, "vm:vm-1->host:host-filtered:vsphere_runs_on")
+}
+
+func TestFuncTopology_SanitizesOverlayCollectJobLikeChartLabels(t *testing.T) {
+	collr := newVSphereTopologyTestCollector()
+
+	data, ok := collr.topologyData("vsphere_vcenter1", "job'\nname\x00")
+
+	require.True(t, ok)
+	validateVSphereTopologyV1Data(t, data)
+	require.Equal(t, "vsphere_vcenter1", data.Producer.Instance)
+	require.NotNil(t, data.Overlays)
+	require.NotNil(t, data.Overlays.Refs)
+	refs := topologyTableRows(t, *data.Overlays.Refs, data.Dictionaries)
+	ref := requireTopologyRow(t, refs, vsphereOverlaySelectorID, "datastore-1")
+	require.Equal(t, "job name", ref[vsphereOverlaySelectorCollectJob])
 }
 
 func validateVSphereTopologyV1Data(t *testing.T, data topologyv1.Data) {

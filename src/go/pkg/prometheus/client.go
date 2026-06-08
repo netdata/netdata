@@ -23,6 +23,17 @@ type (
 		// ScrapeSeries and parse prometheus format metrics
 		ScrapeSeries() (Series, error)
 		Scrape() (MetricFamilies, error)
+		// ScrapeStream scrapes and invokes onSample for every sample — a flat
+		// [Sample] stream before typed-family assembly — with the selector (if
+		// any) already applied; onHelp, if non-nil, receives per-family HELP. It
+		// stops and returns the first error from a callback.
+		//
+		// Order is exposition order, with one exception: a _sum/_count sample
+		// whose family type is not yet known (its # TYPE, first bucket, or first
+		// quantile has not appeared) is deferred and emitted once the type
+		// resolves, or at end of stream — so it may arrive after a later,
+		// unrelated sample. Each sample's Kind and FamilyType are always correct.
+		ScrapeStream(onHelp func(name, help string), onSample func(Sample) error) error
 		HTTPClient() *http.Client
 	}
 

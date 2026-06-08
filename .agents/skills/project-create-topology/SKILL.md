@@ -102,6 +102,23 @@ developer-facing and must stay in this project skill, not under
    - Use overlay templates once per payload or type.
    - Links and actors carry compact refs and parameters only.
    - Do not put full metric query payloads on every row.
+   - Build Go producer refs with `topologyv1.NewActorOverlayRefsBuilder` or
+     `topologyv1.NewLinkOverlayRefsBuilder` instead of hand-assembling compact
+     tables.
+   - Overlay refs use a `template` column, exactly one convention owner column
+     (`actor` with type `actor_ref` or `link` with type `link_ref`), and one
+     column for each selector param required by the referenced template. Do not
+     add any other `actor_ref` or `link_ref` columns to overlay refs. Every row
+     must have a non-null owner value.
+   - The `template` column and required selector-param columns must be `string`
+     or `string_ref`; required selector-param row values must resolve to
+     non-empty strings.
+   - Do not use `template`, `actor`, or `link` as selector params; those names
+     are reserved refs-table convention columns.
+   - For `netdata.metrics`, `node_id` means node scope, `collect_job` maps to
+     chart label `_collect_job`, and other selector params map to same-named
+     chart labels. In go.d producers, pass `job.Name()` for `collect_job`; do
+     not use `job.FullName()`.
 
 7. Define correlation semantics when actors can be resolved across payloads.
    - Declare whether the topology needs loose-side resolution, actor
@@ -400,6 +417,11 @@ For SNMP/L2 managed device actor modals:
   high-cardinality evidence rows.
 - Raw JSON columns are hidden/debug-only unless a schema-declared projection
   renders a scalar value.
+- Overlay templates and refs validate global template references, required
+  selector-param columns, selector-param string types and values, reserved
+  selector-param names, exactly one convention actor/link owner column, no extra
+  actor/link ref owner columns, non-null owner row values, provider/merge enum
+  membership, and link-type `overlay_templates` references.
 - Payload size is measured on realistic or captured data.
 - Raw sensitive captures remain under `.local/`.
 

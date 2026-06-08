@@ -268,6 +268,18 @@ For example:
 | Chart `context`               | `queries`           |
 | **Resulting context**         | **`mysql.queries`** |
 
+**Autogen charts** — the **top-level** `context_namespace` also prefixes the contexts of charts
+created by `engine.autogen` (metrics not matched by any template dimension), joined with the same
+`.`. Group-level `context_namespace` does not apply to autogen, since unmatched series belong to
+no group. For example, with top-level `context_namespace: nagios`, an unmatched metric
+`check_load` autogenerates the context `nagios.check_load`.
+
+The autogen context is `context_namespace` joined with the **full metric name**, and a metric's name
+includes any `SnapshotMeter("<prefix>")` prefix (`<prefix>.<instrument>`). So a non-empty meter prefix
+**stacks after** `context_namespace` — e.g. `context_namespace: app` with `SnapshotMeter("app")` and
+instrument `foo` yields `app.app.foo`. When you set `context_namespace`, write metrics with
+`SnapshotMeter("")` so the namespace has a single source; do not also encode it in the meter prefix.
+
 ### 3. engine
 
 Template-level policy that controls metric filtering and autogeneration.

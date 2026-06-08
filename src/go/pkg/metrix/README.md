@@ -94,10 +94,10 @@
 
 ### Writers
 
-| Mode     | Gauge-like family                                                                                                               | Counter-like family                                                                                           |
-|----------|---------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
-| Snapshot | `MeasureSetGauge(...).ObservePoint(...)` or preferred `ObserveFields(...)`                                                      | `MeasureSetCounter(...).ObserveTotalPoint(...)` or preferred `ObserveTotalFields(...)`                       |
-| Stateful | `MeasureSetGauge(...).SetPoint(...)`, `AddPoint(...)`, `SetFields(...)`, `AddFields(...)`, `SetField(...)`, `AddField(...)`    | `MeasureSetCounter(...).AddPoint(...)`, `AddFields(...)`, `AddField(...)`                                    |
+| Mode     | Gauge-like family                                                                                                           | Counter-like family                                                                    |
+|----------|-----------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| Snapshot | `MeasureSetGauge(...).ObservePoint(...)` or preferred `ObserveFields(...)`                                                  | `MeasureSetCounter(...).ObserveTotalPoint(...)` or preferred `ObserveTotalFields(...)` |
+| Stateful | `MeasureSetGauge(...).SetPoint(...)`, `AddPoint(...)`, `SetFields(...)`, `AddFields(...)`, `SetField(...)`, `AddField(...)` | `MeasureSetCounter(...).AddPoint(...)`, `AddFields(...)`, `AddField(...)`              |
 
 ### Phase-1 write contract
 
@@ -243,6 +243,7 @@ see [how-to-write-a-collector.md](/src/go/plugin/go.d/docs/how-to-write-a-collec
 - **Schema stability** — Re-registering an existing metric name with different kind/mode/schema returns an error (or panics in strict runtime paths).
 - **MeasureSet flatten naming** — Flattened `MeasureSet` series use per-field metric names like `<name>_<field>` and also carry a synthetic `measure_field=<field>` label.
 - **MeasureSet counter semantics** — Stateful counter-like `MeasureSet` families reject negative `AddPoint(...)` deltas, just like scalar counters.
+- **Summary NaN quantiles** — a summary point may carry NaN quantile *values* (e.g. an empty observation window); they are stored (only Inf is rejected) and render as a chart gap downstream (chartengine emits `SETEMPTY`). Count and Sum must still be finite.
 - **Collector retention** — `CollectorStore` evicts series not seen for 10 successful cycles by default.
 
 ## Internal Architecture Notes

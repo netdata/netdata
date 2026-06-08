@@ -5,6 +5,7 @@ package prometheus
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -128,6 +129,42 @@ func TestPrometheusReadFromFile(t *testing.T) {
 		res, err := prom.ScrapeSeries()
 		assert.NoError(t, err)
 		verifyTestData(t, res)
+	}
+}
+
+func TestPrometheusScrapeStream(t *testing.T) {
+	errBoom := errors.New("boom")
+
+	tests := map[string]struct {
+		onSampleErr error // returned by onSample (nil = stream everything)
+		wantErr     error
+	}{
+		"streams all samples and help": {},
+		"onSample error propagates":    {onSampleErr: errBoom, wantErr: errBoom},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			prom := New(http.DefaultClient, web.RequestConfig{URL: "file://testdata/testdata.txt"})
+
+			var samples int
+			var help []string
+			err := prom.ScrapeStream(
+				func(name, _ string) { help = append(help, name) },
+				func(Sample) error {
+					samples++
+					return tc.onSampleErr
+				},
+			)
+
+			if tc.wantErr != nil {
+				assert.ErrorIs(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Positive(t, samples)
+			assert.Contains(t, help, "go_gc_duration_seconds")
+		})
 	}
 }
 

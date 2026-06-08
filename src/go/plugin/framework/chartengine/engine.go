@@ -72,6 +72,7 @@ func (e *Engine) Load(spec *charttpl.Spec, revision uint64) error {
 	e.mu.Lock()
 	e.state.cfg.autogen = autogenPolicy
 	e.state.cfg.selector = selectorPolicy
+	e.state.cfg.autogenContextNamespace = spec.ContextNamespace
 	e.state.program = compiled
 	e.state.matchIndex = buildMatchIndex(compiled.Charts())
 	// Template revision change resets routing/materialization internals.
