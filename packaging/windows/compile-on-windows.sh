@@ -52,16 +52,28 @@ if [ -n "${windows_path_prefix}" ]; then
     windows_path_prefix_arg=("-DNETDATA_WINDOWS_PATH_PREFIX=${windows_path_prefix}")
 fi
 
+# Prepend UCRT64 toolchain so cmake finds native Windows tools before MSYS2 wrappers.
+# Without this, cmake picks /usr/bin/cc (MSYS2 stub) instead of /ucrt64/bin/gcc.
+# UCRT64 cmake is a native Windows binary: it converts PATH to Windows format for lookups,
+# so prepending /ucrt64/bin here ensures it finds gcc and ninja from the UCRT64 toolchain.
+export PATH="/ucrt64/bin:/ucrt64/sbin:${PATH}"
+unset CC CXX
+
 if [ -d "${build}" ]; then
 	rm -rf "${build}"
 fi
 
 generator="Unix Makefiles"
 build_args="-j $(nproc)"
+cmake_make_program=()
 
-if command -v ninja >/dev/null 2>&1; then
+# UCRT64 ninja (native Windows binary) uses CreateProcess to invoke the compiler,
+# whereas MSYS2 ninja uses /bin/sh which strips backslashes from Windows-style paths,
+# causing "command not found" failures at exit code 127.
+if [ -x "/ucrt64/bin/ninja" ]; then
     generator="Ninja"
     build_args="-k 1"
+    cmake_make_program=("-DCMAKE_MAKE_PROGRAM=/ucrt64/bin/ninja")
 fi
 
 COMMON_CFLAGS="-Wa,-mbig-obj -pipe -D_FILE_OFFSET_BITS=64 -D__USE_MINGW_ANSI_STDIO=1"
@@ -78,6 +90,7 @@ CFLAGS="${BUILD_CFLAGS}" /ucrt64/bin/cmake \
     -S "${REPO_ROOT}" \
     -B "${build}" \
     -G "${generator}" \
+    "${cmake_make_program[@]}" \
     -DCMAKE_INSTALL_PREFIX="/opt/netdata" \
     -DBUILD_FOR_PACKAGING=On \
     -DNETDATA_USER="${USER}" \
