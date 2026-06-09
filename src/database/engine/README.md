@@ -21,7 +21,7 @@ Using the **timestamp** and **duration**, Netdata calculates for each point its 
 
 For incremental metrics (counters), Netdata interpolates the collected values to align them to the expected **end time** at the microsecond level, absorbing data collection micro-latencies.
 
-When data points are stored in higher tiers (time aggregations - see [Tiers](#Tiers) below), each data point has:
+When data points are stored in higher tiers (time aggregations - see [Tiers](#tiers) below), each data point has:
 
 1. The **sum** of the original values that have been aggregated
 2. The **count** of all the original values aggregated,
@@ -83,7 +83,7 @@ This collection of 64 pages that is packed and compressed together is called an 
 
 #### Datafiles
 
-Multiple **extents** are appended to **datafiles** (filename suffix `.ndf`), until these **datafiles** become full. The size of each **datafile** is determined automatically by Netdata. The minimum for each **datafile** is 4MB and the maximum 512MB. Depending on the amount of disk space configured for each tier, Netdata will decide a **datafile** size trying to maintain about 50 datafiles for the whole database, within the limits mentioned (4MB min, 512MB max per file). The maximum number of datafiles supported is 65536, and therefore the maximum database size (per tier) that Netdata can support is 32TB.
+Multiple **extents** are appended to **datafiles** (filename suffix `.ndf`) until these **datafiles** become full. The size of each **datafile** is determined automatically by Netdata. Depending on the amount of disk space configured for each tier, Netdata chooses a target **datafile** size and clamps it between the compiled minimum and maximum datafile sizes. The current target is to keep about 100 datafiles for the tier.
 
 #### Journal Files
 
@@ -169,7 +169,7 @@ Its primary use is to index information about the open datafile, the one that st
 
 The clean queue is an LRU for reducing the journal v2 scans during querying.
 
-Open cache uses memory ballooning too, like the main cache, based on its own hot pages. Open cache hot size is mainly controlled by the size of the open datafile. This is why on netdata versions with journal files v2, we decreased the maximum datafile size from 1GB to 512MB, and we increased the target number of datafiles from 20 to 50.
+Open cache uses memory ballooning too, like the main cache, based on its own hot pages. Open cache hot size is mainly controlled by the size of the open datafile. This is why Netdata keeps datafile sizes bounded and targets many datafiles per tier.
 
 On bigger setups open cache will get a bigger LRU by automatically sizing it (the whole open cache) to 5% to the size of (the whole) main cache.
 
@@ -186,7 +186,3 @@ The time-ranges of the queries running control the amount of shared memory requi
 ## Metrics Registry
 
 DBENGINE uses 150 bytes of memory for every metric for which retention is maintained but is not currently being collected.
-
-
-
-

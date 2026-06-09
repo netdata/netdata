@@ -1,11 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package prometheus
 
 import (
 	"errors"
 	"fmt"
 	"io"
-	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/prometheus/common/model"
@@ -26,56 +26,63 @@ const (
 	bucketSuffix = "_bucket"
 )
 
+// promTextParser orchestrates a single parse pass. The driver parses the
+// exposition once into a flat sample stream; the assembler folds that stream
+// into typed MetricFamilies. Scrape() (families), ScrapeSeries() (Series), and
+// the exported sample stream are all produced from this one model.
 type promTextParser struct {
-	metrics MetricFamilies
-	series  Series
-
 	sr selector.Selector
 
-	currMF     *MetricFamily
-	currSeries labels.Labels
+	driver parseDriver
+	asm    assembler
+	series Series
+}
 
-	summaries  map[uint64]*Summary
-	histograms map[uint64]*Histogram
+func (p *promTextParser) parseToMetricFamilies(text []byte, transform SampleTransform) (MetricFamilies, error) {
+	p.driver.sr = p.sr
+	p.asm.reset()
 
-	isCount    bool
-	isSum      bool
-	isQuantile bool
-	isBucket   bool
+	// With no transform, ownLabels=false: the assembler copies labels into its own
+	// buffers, so the driver may lend the scratch label set (the no-allocation fast
+	// path). A transform may mutate or retain a sample's labels, so it needs the
+	// sample to own them (ownLabels=true).
+	onSample := p.asm.applySample
+	ownLabels := false
+	if transform != nil {
+		ownLabels = true
+		onSample = func(s Sample) error {
+			s, keep, err := transform(s)
+			if err != nil {
+				return err
+			}
+			if !keep {
+				return nil
+			}
+			return p.asm.applySample(s)
+		}
+	}
 
-	currQuantile float64
-	currBucket   float64
+	if err := p.driver.parseSamples(text, ownLabels, p.asm.applyHelp, onSample); err != nil {
+		return nil, err
+	}
+
+	return p.asm.families(), nil
 }
 
 func (p *promTextParser) parseToSeries(text []byte) (Series, error) {
+	p.driver.sr = p.sr
 	p.series.Reset()
 
-	parser := textparse.NewPromParser(text, labels.NewSymbolTable())
-	for {
-		entry, err := parser.Next()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			if entry == textparse.EntryInvalid && strings.HasPrefix(err.Error(), "invalid metric type") {
-				continue
-			}
-			return nil, fmt.Errorf("failed to parse prometheus metrics: %v", err)
-		}
-
-		switch entry {
-		case textparse.EntrySeries:
-			p.currSeries = p.currSeries[:0]
-
-			parser.Metric(&p.currSeries)
-
-			if p.sr != nil && !p.sr.Matches(p.currSeries) {
-				continue
-			}
-
-			_, _, val := parser.Series()
-			p.series.Add(SeriesSample{Labels: copyLabels(p.currSeries), Value: val})
-		}
+	// Series keeps the raw label set straight from textparse (sorted, with __name__
+	// in its sorted position) — identical to the legacy parser. It does NOT go
+	// through the Sample model (which separates __name__), so there is no deferral,
+	// no reordering, and the sorted-label invariant is preserved.
+	err := p.driver.iterate(text, nil, nil, func(series labels.Labels, value float64) error {
+		p.series.Add(SeriesSample{Labels: copyLabels(series), Value: value})
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	p.series.Sort()
@@ -83,11 +90,45 @@ func (p *promTextParser) parseToSeries(text []byte) (Series, error) {
 	return p.series, nil
 }
 
-var reSpace = regexp.MustCompile(`\s+`)
+// parseDriver runs the single exposition parse pass (iterate). On top of it,
+// parseSamples emits a flat, classified sample stream, deferring a _sum/_count
+// whose family type is not yet known and back-resolving it once the type appears
+// (a later # TYPE, _bucket, or quantile series) or at EOF. familyTypes/pending
+// hold that deferral state.
+type parseDriver struct {
+	sr selector.Selector
 
-func (p *promTextParser) parseToMetricFamilies(text []byte) (MetricFamilies, error) {
-	p.reset()
+	familyTypes map[string]model.MetricType
+	pending     []pendingSample
+	currSeries  labels.Labels
+}
 
+type pendingSample struct {
+	baseName string
+	sample   Sample
+	role     pendingRole
+}
+
+type pendingRole uint8
+
+const (
+	pendingNone pendingRole = iota
+	pendingSum
+	pendingCount
+)
+
+// iterate runs the shared single-pass exposition loop. For every series it calls
+// onSeries with the raw label set (textparse order — sorted, __name__ in its
+// sorted position) and value, after applying the selector; onHelp/onType deliver
+// per-family metadata. This is the one parse loop: ScrapeSeries consumes it
+// directly (raw labels, byte-identical to the legacy parser), while the flat
+// sample stream is layered on top by parseSamples.
+func (d *parseDriver) iterate(
+	text []byte,
+	onHelp func(name, help string),
+	onType func(name string, typ model.MetricType) error,
+	onSeries func(series labels.Labels, value float64) error,
+) error {
 	parser := textparse.NewPromParser(text, labels.NewSymbolTable())
 	for {
 		entry, err := parser.Next()
@@ -98,340 +139,268 @@ func (p *promTextParser) parseToMetricFamilies(text []byte) (MetricFamilies, err
 			if entry == textparse.EntryInvalid && strings.HasPrefix(err.Error(), "invalid metric type") {
 				continue
 			}
-			return nil, fmt.Errorf("failed to parse prometheus metrics: %v", err)
+			return fmt.Errorf("failed to parse prometheus metrics: %v", err)
 		}
 
 		switch entry {
 		case textparse.EntryHelp:
-			name, help := parser.Help()
-			p.setMetricFamilyByName(string(name))
-			p.currMF.help = string(help)
-			if strings.IndexByte(p.currMF.help, '\n') != -1 {
-				// convert multiline to one line because HELP is used as the chart title.
-				p.currMF.help = reSpace.ReplaceAllString(strings.TrimSpace(p.currMF.help), " ")
+			if onHelp != nil {
+				name, help := parser.Help()
+				onHelp(string(name), sanitizeHelp(string(help)))
 			}
 		case textparse.EntryType:
-			name, typ := parser.Type()
-			p.setMetricFamilyByName(string(name))
-			p.currMF.typ = typ
+			if onType != nil {
+				name, typ := parser.Type()
+				if err := onType(string(name), typ); err != nil {
+					return err
+				}
+			}
 		case textparse.EntrySeries:
-			p.currSeries = p.currSeries[:0]
+			d.currSeries = d.currSeries[:0]
+			parser.Metric(&d.currSeries)
 
-			parser.Metric(&p.currSeries)
-
-			if p.sr != nil && !p.sr.Matches(p.currSeries) {
+			if d.sr != nil && !d.sr.Matches(d.currSeries) {
 				continue
 			}
 
-			p.setMetricFamilyBySeries()
-
 			_, _, value := parser.Series()
 
-			switch p.currMF.typ {
-			case model.MetricTypeGauge:
-				p.addGauge(value)
-			case model.MetricTypeCounter:
-				p.addCounter(value)
-			case model.MetricTypeSummary:
-				p.addSummary(value)
-			case model.MetricTypeHistogram:
-				p.addHistogram(value)
-			case model.MetricTypeUnknown:
-				p.addUnknown(value)
+			if onSeries != nil {
+				if err := onSeries(d.currSeries, value); err != nil {
+					return err
+				}
 			}
 		}
 	}
 
-	for k, v := range p.metrics {
-		if len(v.Metrics()) == 0 {
-			delete(p.metrics, k)
-		}
-	}
-
-	return p.metrics, nil
+	return nil
 }
 
-func (p *promTextParser) setMetricFamilyByName(name string) {
-	mf, ok := p.metrics[name]
-	if !ok {
-		mf = &MetricFamily{name: name, typ: model.MetricTypeUnknown}
-		p.metrics[name] = mf
-	}
-	p.currMF = mf
-}
+// parseSamples layers the flat, classified sample stream on top of iterate. It
+// turns each series into a Sample (Kind + FamilyType) and defers a _sum/_count
+// whose family type is not yet known, back-resolving it once the type appears (a
+// later # TYPE, _bucket, or quantile series) or flushing it at EOF. Deferral can
+// emit a _sum/_count after a later, unrelated series — see ScrapeWithTransform's doc.
+func (d *parseDriver) parseSamples(text []byte, ownLabels bool, onHelp func(name, help string), onSample func(Sample) error) error {
+	d.reset()
 
-func (p *promTextParser) setMetricFamilyBySeries() {
-	p.isSum, p.isCount, p.isQuantile, p.isBucket = false, false, false, false
-	p.currQuantile, p.currBucket = 0, 0
-
-	name, ok := metricNameValue(p.currSeries)
-	if !ok {
-		p.currMF = nil
-		return
-	}
-
-	if p.currMF != nil && p.currMF.name == name {
-		if p.currMF.typ == model.MetricTypeSummary {
-			p.setQuantile()
-		}
-		return
-	}
-
-	typ := model.MetricTypeUnknown
-
-	switch {
-	case strings.HasSuffix(name, sumSuffix):
-		n := strings.TrimSuffix(name, sumSuffix)
-		if mf, ok := p.metrics[n]; ok && isSummaryOrHistogram(mf.typ) {
-			p.isSum = true
-			_ = setLabelValue(p.currSeries, labels.MetricName, n)
-			p.currMF = mf
-			return
-		}
-	case strings.HasSuffix(name, countSuffix):
-		n := strings.TrimSuffix(name, countSuffix)
-		if mf, ok := p.metrics[n]; ok && isSummaryOrHistogram(mf.typ) {
-			p.isCount = true
-			_ = setLabelValue(p.currSeries, labels.MetricName, n)
-			p.currMF = mf
-			return
-		}
-	case strings.HasSuffix(name, bucketSuffix):
-		n := strings.TrimSuffix(name, bucketSuffix)
-		if mf, ok := p.metrics[n]; ok && isSummaryOrHistogram(mf.typ) {
-			_ = setLabelValue(p.currSeries, labels.MetricName, n)
-			p.setBucket()
-			p.currMF = mf
-			return
-		}
-		if p.currSeries.Has(bucketLabel) {
-			_ = setLabelValue(p.currSeries, labels.MetricName, n)
-			p.setBucket()
-			name = n
-			typ = model.MetricTypeHistogram
-		}
-	case p.currSeries.Has(quantileLabel):
-		typ = model.MetricTypeSummary
-		p.setQuantile()
-	}
-
-	p.setMetricFamilyByName(name)
-	if p.currMF.typ == "" || p.currMF.typ == model.MetricTypeUnknown {
-		p.currMF.typ = typ
-	}
-}
-
-func (p *promTextParser) setQuantile() {
-	if lbs, v, ok := removeLabel(p.currSeries, quantileLabel); ok {
-		p.isQuantile = true
-		p.currSeries = lbs
-		p.currQuantile, _ = strconv.ParseFloat(v, 64)
-	}
-}
-
-func (p *promTextParser) setBucket() {
-	if lbs, v, ok := removeLabel(p.currSeries, bucketLabel); ok {
-		p.isBucket = true
-		p.currSeries = lbs
-		p.currBucket, _ = strconv.ParseFloat(v, 64)
-	}
-}
-
-func (p *promTextParser) addGauge(value float64) {
-	p.currSeries, _, _ = removeLabel(p.currSeries, labels.MetricName)
-
-	if v := len(p.currMF.metrics); v == cap(p.currMF.metrics) {
-		p.currMF.metrics = append(p.currMF.metrics, Metric{
-			labels: copyLabels(p.currSeries),
-			gauge:  &Gauge{value: value},
-		})
-	} else {
-		p.currMF.metrics = p.currMF.metrics[:v+1]
-		if p.currMF.metrics[v].gauge == nil {
-			p.currMF.metrics[v].gauge = &Gauge{}
-		}
-		p.currMF.metrics[v].gauge.value = value
-		p.currMF.metrics[v].labels = p.currMF.metrics[v].labels[:0]
-		p.currMF.metrics[v].labels = append(p.currMF.metrics[v].labels, p.currSeries...)
-	}
-}
-
-func (p *promTextParser) addCounter(value float64) {
-	p.currSeries, _, _ = removeLabel(p.currSeries, labels.MetricName)
-
-	if v := len(p.currMF.metrics); v == cap(p.currMF.metrics) {
-		p.currMF.metrics = append(p.currMF.metrics, Metric{
-			labels:  copyLabels(p.currSeries),
-			counter: &Counter{value: value},
-		})
-	} else {
-		p.currMF.metrics = p.currMF.metrics[:v+1]
-		if p.currMF.metrics[v].counter == nil {
-			p.currMF.metrics[v].counter = &Counter{}
-		}
-		p.currMF.metrics[v].counter.value = value
-		p.currMF.metrics[v].labels = p.currMF.metrics[v].labels[:0]
-		p.currMF.metrics[v].labels = append(p.currMF.metrics[v].labels, p.currSeries...)
-	}
-}
-
-func (p *promTextParser) addUnknown(value float64) {
-	p.currSeries, _, _ = removeLabel(p.currSeries, labels.MetricName)
-
-	if v := len(p.currMF.metrics); v == cap(p.currMF.metrics) {
-		p.currMF.metrics = append(p.currMF.metrics, Metric{
-			labels:  copyLabels(p.currSeries),
-			untyped: &Untyped{value: value},
-		})
-	} else {
-		p.currMF.metrics = p.currMF.metrics[:v+1]
-		if p.currMF.metrics[v].untyped == nil {
-			p.currMF.metrics[v].untyped = &Untyped{}
-		}
-		p.currMF.metrics[v].untyped.value = value
-		p.currMF.metrics[v].labels = p.currMF.metrics[v].labels[:0]
-		p.currMF.metrics[v].labels = append(p.currMF.metrics[v].labels, p.currSeries...)
-	}
-}
-
-func (p *promTextParser) addSummary(value float64) {
-	hash := p.currSeries.Hash()
-
-	p.currSeries, _, _ = removeLabel(p.currSeries, labels.MetricName)
-
-	s, ok := p.summaries[hash]
-	if !ok {
-		if v := len(p.currMF.metrics); v == cap(p.currMF.metrics) {
-			s = &Summary{}
-			p.currMF.metrics = append(p.currMF.metrics, Metric{
-				labels:  copyLabels(p.currSeries),
-				summary: s,
-			})
-		} else {
-			p.currMF.metrics = p.currMF.metrics[:v+1]
-			if p.currMF.metrics[v].summary == nil {
-				p.currMF.metrics[v].summary = &Summary{}
+	err := d.iterate(text, onHelp,
+		func(name string, typ model.MetricType) error {
+			d.familyTypes[name] = typ
+			var err error
+			d.pending, err = emitResolvedPending(d.pending, name, typ, onSample)
+			return err
+		},
+		func(series labels.Labels, value float64) error {
+			sample, baseName, role, ok := d.makeSample(series, value, ownLabels)
+			if !ok {
+				return nil
 			}
-			p.currMF.metrics[v].summary.sum = 0
-			p.currMF.metrics[v].summary.count = 0
-			p.currMF.metrics[v].summary.quantiles = p.currMF.metrics[v].summary.quantiles[:0]
-			p.currMF.metrics[v].labels = p.currMF.metrics[v].labels[:0]
-			p.currMF.metrics[v].labels = append(p.currMF.metrics[v].labels, p.currSeries...)
-			s = p.currMF.metrics[v].summary
-		}
 
-		p.summaries[hash] = s
-	}
-
-	switch {
-	case p.isQuantile:
-		s.quantiles = append(s.quantiles, Quantile{quantile: p.currQuantile, value: value})
-	case p.isSum:
-		s.sum = value
-	case p.isCount:
-		s.count = value
-	}
-}
-
-func (p *promTextParser) addHistogram(value float64) {
-	hash := p.currSeries.Hash()
-
-	p.currSeries, _, _ = removeLabel(p.currSeries, labels.MetricName)
-
-	h, ok := p.histograms[hash]
-	if !ok {
-		if v := len(p.currMF.metrics); v == cap(p.currMF.metrics) {
-			h = &Histogram{}
-			p.currMF.metrics = append(p.currMF.metrics, Metric{
-				labels:    copyLabels(p.currSeries),
-				histogram: h,
-			})
-		} else {
-			p.currMF.metrics = p.currMF.metrics[:v+1]
-			if p.currMF.metrics[v].histogram == nil {
-				p.currMF.metrics[v].histogram = &Histogram{}
+			// A quantile/bucket series reveals the family type; back-resolve any
+			// _sum/_count buffered before it.
+			switch sample.Kind {
+			case SampleKindSummaryQuantile:
+				var err error
+				d.pending, err = emitResolvedPending(d.pending, sample.Name, model.MetricTypeSummary, onSample)
+				if err != nil {
+					return err
+				}
+			case SampleKindHistogramBucket:
+				var err error
+				d.pending, err = emitResolvedPending(d.pending, strings.TrimSuffix(sample.Name, bucketSuffix), model.MetricTypeHistogram, onSample)
+				if err != nil {
+					return err
+				}
 			}
-			p.currMF.metrics[v].histogram.sum = 0
-			p.currMF.metrics[v].histogram.count = 0
-			p.currMF.metrics[v].histogram.buckets = p.currMF.metrics[v].histogram.buckets[:0]
-			p.currMF.metrics[v].labels = p.currMF.metrics[v].labels[:0]
-			p.currMF.metrics[v].labels = append(p.currMF.metrics[v].labels, p.currSeries...)
-			h = p.currMF.metrics[v].histogram
-		}
 
-		p.histograms[hash] = h
+			if role != pendingNone {
+				if !ownLabels {
+					sample.Labels = copyLabels(sample.Labels)
+				}
+				d.pending = append(d.pending, pendingSample{
+					baseName: baseName,
+					sample:   sample,
+					role:     role,
+				})
+				return nil
+			}
+
+			return onSample(sample)
+		},
+	)
+	if err != nil {
+		return err
 	}
 
-	switch {
-	case p.isBucket:
-		h.buckets = append(h.buckets, Bucket{upperBound: p.currBucket, cumulativeCount: value})
-	case p.isSum:
-		h.sum = value
-	case p.isCount:
-		h.count = value
-	}
-}
-
-func (p *promTextParser) reset() {
-	p.currMF = nil
-	p.currSeries = p.currSeries[:0]
-
-	if p.metrics == nil {
-		p.metrics = make(MetricFamilies)
-	}
-	for _, mf := range p.metrics {
-		mf.help = ""
-		mf.typ = ""
-		mf.metrics = mf.metrics[:0]
-	}
-
-	if p.summaries == nil {
-		p.summaries = make(map[uint64]*Summary)
-	}
-	for k := range p.summaries {
-		delete(p.summaries, k)
-	}
-
-	if p.histograms == nil {
-		p.histograms = make(map[uint64]*Histogram)
-	}
-	for k := range p.histograms {
-		delete(p.histograms, k)
-	}
-}
-
-func copyLabels(lbs []labels.Label) []labels.Label {
-	return append([]labels.Label(nil), lbs...)
-}
-
-func removeLabel(lbs labels.Labels, name string) (labels.Labels, string, bool) {
-	for i, v := range lbs {
-		if v.Name == name {
-			return append(lbs[:i], lbs[i+1:]...), v.Value, true
+	// Flush still-unresolved _sum/_count as plain scalars (matches the legacy
+	// behavior for a _sum/_count whose family type never appears).
+	for _, ps := range d.pending {
+		if err := onSample(ps.sample); err != nil {
+			return err
 		}
 	}
-	return lbs, "", false
+	d.pending = d.pending[:0]
+
+	return nil
 }
 
-func metricNameValue(lbs labels.Labels) (string, bool) {
-	for _, v := range lbs {
-		if v.Name == labels.MetricName {
-			return v.Value, true
+func (d *parseDriver) makeSample(series labels.Labels, value float64, ownLabels bool) (Sample, string, pendingRole, bool) {
+	name, ok := metricNameValue(series)
+	if !ok {
+		return Sample{}, "", pendingNone, false
+	}
+
+	var lbs labels.Labels
+	if ownLabels {
+		lbs = copyLabelsWithoutName(series)
+	} else {
+		lbs, _, _ = removeLabel(series, labels.MetricName)
+	}
+
+	sample := Sample{
+		Name:       name,
+		Labels:     lbs,
+		Value:      value,
+		Kind:       SampleKindScalar,
+		FamilyType: d.familyTypes[name],
+	}
+	if sample.FamilyType == "" {
+		sample.FamilyType = model.MetricTypeUnknown
+	}
+
+	if sample.Labels.Has(quantileLabel) {
+		if sample.FamilyType != model.MetricTypeUnknown && sample.FamilyType != model.MetricTypeSummary {
+			return sample, "", pendingNone, true
+		}
+		sample.Kind = SampleKindSummaryQuantile
+		sample.FamilyType = model.MetricTypeSummary
+		d.familyTypes[name] = model.MetricTypeSummary
+		return sample, "", pendingNone, true
+	}
+
+	// A histogram bucket requires an "le" label. A _bucket-named series without le
+	// is malformed: it is NOT treated as a bucket but falls through to a plain
+	// metric, preserving its value. (The legacy parser folded such a series into
+	// the histogram family and dropped its value; valid buckets always carry le,
+	// so real input is unaffected.)
+	if strings.HasSuffix(name, bucketSuffix) && sample.Labels.Has(bucketLabel) {
+		if sample.FamilyType != model.MetricTypeUnknown && sample.FamilyType != model.MetricTypeHistogram {
+			return sample, "", pendingNone, true
+		}
+		baseName := strings.TrimSuffix(name, bucketSuffix)
+		sample.Kind = SampleKindHistogramBucket
+		sample.FamilyType = model.MetricTypeHistogram
+		d.familyTypes[baseName] = model.MetricTypeHistogram
+		return sample, "", pendingNone, true
+	}
+
+	if strings.HasSuffix(name, sumSuffix) {
+		if sample.FamilyType != model.MetricTypeUnknown &&
+			sample.FamilyType != model.MetricTypeSummary &&
+			sample.FamilyType != model.MetricTypeHistogram {
+			return sample, "", pendingNone, true
+		}
+
+		baseName := strings.TrimSuffix(name, sumSuffix)
+		switch d.familyTypes[baseName] {
+		case model.MetricTypeSummary:
+			sample.Kind = SampleKindSummarySum
+			sample.FamilyType = model.MetricTypeSummary
+			return sample, "", pendingNone, true
+		case model.MetricTypeHistogram:
+			sample.Kind = SampleKindHistogramSum
+			sample.FamilyType = model.MetricTypeHistogram
+			return sample, "", pendingNone, true
+		default:
+			return sample, baseName, pendingSum, true
 		}
 	}
-	return "", false
-}
 
-func setLabelValue(lbs labels.Labels, name, value string) bool {
-	for i, v := range lbs {
-		if v.Name == name {
-			lbs[i].Value = value
-			return true
+	if strings.HasSuffix(name, countSuffix) {
+		if sample.FamilyType != model.MetricTypeUnknown &&
+			sample.FamilyType != model.MetricTypeSummary &&
+			sample.FamilyType != model.MetricTypeHistogram {
+			return sample, "", pendingNone, true
+		}
+
+		baseName := strings.TrimSuffix(name, countSuffix)
+		switch d.familyTypes[baseName] {
+		case model.MetricTypeSummary:
+			sample.Kind = SampleKindSummaryCount
+			sample.FamilyType = model.MetricTypeSummary
+			return sample, "", pendingNone, true
+		case model.MetricTypeHistogram:
+			sample.Kind = SampleKindHistogramCount
+			sample.FamilyType = model.MetricTypeHistogram
+			return sample, "", pendingNone, true
+		default:
+			return sample, baseName, pendingCount, true
 		}
 	}
-	return false
+
+	return sample, "", pendingNone, true
 }
 
-func isSummaryOrHistogram(typ model.MetricType) bool {
-	return typ == model.MetricTypeSummary || typ == model.MetricTypeHistogram
+func (d *parseDriver) reset() {
+	d.currSeries = d.currSeries[:0]
+
+	if d.familyTypes == nil {
+		d.familyTypes = make(map[string]model.MetricType)
+	}
+	for k := range d.familyTypes {
+		delete(d.familyTypes, k)
+	}
+
+	d.pending = d.pending[:0]
+}
+
+// emitResolvedPending flushes buffered _sum/_count samples for baseName now that
+// its family type is known, emitting them in buffered (exposition) order.
+func emitResolvedPending(pending []pendingSample, baseName string, typ model.MetricType, onSample func(Sample) error) ([]pendingSample, error) {
+	if len(pending) == 0 {
+		return pending, nil
+	}
+
+	out := pending[:0]
+	for _, ps := range pending {
+		if ps.baseName != baseName {
+			out = append(out, ps)
+			continue
+		}
+
+		sample := ps.sample
+		sample.FamilyType = typ
+		switch typ {
+		case model.MetricTypeSummary:
+			if ps.role == pendingSum {
+				sample.Kind = SampleKindSummarySum
+			} else {
+				sample.Kind = SampleKindSummaryCount
+			}
+		case model.MetricTypeHistogram:
+			if ps.role == pendingSum {
+				sample.Kind = SampleKindHistogramSum
+			} else {
+				sample.Kind = SampleKindHistogramCount
+			}
+		default:
+			sample.Kind = SampleKindScalar
+			sample.FamilyType = model.MetricTypeUnknown
+		}
+
+		if err := onSample(sample); err != nil {
+			return nil, err
+		}
+	}
+
+	return out, nil
+}
+
+func sanitizeHelp(help string) string {
+	if strings.IndexByte(help, '\n') == -1 {
+		return help
+	}
+	// HELP is used as a chart title; collapse multiline help to one line.
+	return strings.Join(strings.Fields(help), " ")
 }

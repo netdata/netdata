@@ -211,6 +211,18 @@ nipc_error_t nipc_client_call_cgroups_snapshot(
     nipc_client_ctx_t *ctx,
     nipc_cgroups_resp_view_t *view_out);
 
+nipc_error_t nipc_client_call_cgroups_lookup(
+    nipc_client_ctx_t *ctx,
+    const nipc_str_view_t *paths,
+    uint32_t path_count,
+    nipc_cgroups_lookup_resp_view_t *view_out);
+
+nipc_error_t nipc_client_call_apps_lookup(
+    nipc_client_ctx_t *ctx,
+    const uint32_t *pids,
+    uint32_t pid_count,
+    nipc_apps_lookup_resp_view_t *view_out);
+
 /* ------------------------------------------------------------------ */
 /*  Managed server                                                     */
 /* ------------------------------------------------------------------ */
@@ -234,6 +246,22 @@ typedef struct {
 
     void *user;
 } nipc_cgroups_service_handler_t;
+
+typedef struct {
+    nipc_cgroups_lookup_handler_fn handle;
+    void *user;
+} nipc_cgroups_lookup_service_handler_t;
+
+typedef struct {
+    nipc_apps_lookup_handler_fn handle;
+    void *user;
+} nipc_apps_lookup_service_handler_t;
+
+typedef union {
+    nipc_cgroups_service_handler_t cgroups_snapshot;
+    nipc_cgroups_lookup_service_handler_t cgroups_lookup;
+    nipc_apps_lookup_service_handler_t apps_lookup;
+} nipc_server_typed_handler_t;
 
 typedef struct nipc_managed_server nipc_managed_server_t;
 
@@ -269,7 +297,7 @@ struct nipc_managed_server {
     /* Callback */
     nipc_server_handler_fn handler;
     void *handler_user;
-    nipc_cgroups_service_handler_t service_handler;
+    nipc_server_typed_handler_t typed_handler;
     uint16_t expected_method_code;
     uint32_t learned_request_payload_bytes;
     uint32_t learned_response_payload_bytes;
@@ -317,6 +345,22 @@ nipc_error_t nipc_server_init_typed(nipc_managed_server_t *server,
                                const nipc_server_config_t *config,
                                int worker_count,
                                const nipc_cgroups_service_handler_t *service_handler);
+
+nipc_error_t nipc_server_init_cgroups_lookup(
+    nipc_managed_server_t *server,
+    const char *run_dir,
+    const char *service_name,
+    const nipc_server_config_t *config,
+    int worker_count,
+    const nipc_cgroups_lookup_service_handler_t *service_handler);
+
+nipc_error_t nipc_server_init_apps_lookup(
+    nipc_managed_server_t *server,
+    const char *run_dir,
+    const char *service_name,
+    const nipc_server_config_t *config,
+    int worker_count,
+    const nipc_apps_lookup_service_handler_t *service_handler);
 
 #ifdef NIPC_INTERNAL_TESTING
 /*

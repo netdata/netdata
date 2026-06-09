@@ -11,6 +11,29 @@ DICTIONARY *nd_journal_files_registry = NULL;
 DICTIONARY *used_hashes_registry = NULL;
 
 static usec_t systemd_journal_session = 0;
+static bool nd_journal_scan_progress_enabled = true;
+
+void nd_journal_set_scan_progress_enabled(bool enabled)
+{
+    nd_journal_scan_progress_enabled = enabled;
+}
+
+static void nd_journal_scan_progress(void)
+{
+    if (nd_journal_scan_progress_enabled)
+        send_newline_and_flush(&stdout_mutex);
+}
+
+void nd_journal_use_single_directory(const char *path)
+{
+    string_freez(journal_directories[0].path);
+    journal_directories[0].path = string_strdupz(path);
+
+    for (size_t i = 1; i < MAX_JOURNAL_DIRECTORIES; i++) {
+        string_freez(journal_directories[i].path);
+        journal_directories[i].path = NULL;
+    }
+}
 
 void buffer_json_journal_versions(BUFFER *wb)
 {
@@ -659,14 +682,14 @@ void nd_journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, 
             if (files)
                 dictionary_set(files, full_path, NULL, 0);
 
-            send_newline_and_flush(&stdout_mutex);
+            nd_journal_scan_progress();
         } else if (entry->d_type == DT_LNK) {
             struct stat info;
             if (stat(full_path, &info) == -1)
                 continue;
 
+            // Journal discovery intentionally follows symlinked journal directories.
             if (S_ISDIR(info.st_mode)) {
-                // The symbolic link points to a directory
                 char resolved_path[FILENAME_MAX + 1];
                 if (realpath(full_path, resolved_path) != NULL) {
                     nd_journal_directory_scan_recursively(files, dirs, resolved_path, depth + 1);
@@ -675,7 +698,7 @@ void nd_journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, 
                 if (files)
                     dictionary_set(files, full_path, NULL, 0);
 
-                send_newline_and_flush(&stdout_mutex);
+                nd_journal_scan_progress();
             }
         }
     }

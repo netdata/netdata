@@ -467,7 +467,7 @@ func TestChunking(t *testing.T) {
 	}
 
 	// Client receives
-	rHdr, rPayload, err = client.Receive(recvBuf)
+	_, rPayload, err = client.Receive(recvBuf)
 	if err != nil {
 		t.Fatalf("client Receive (chunked): %v", err)
 	}

@@ -48,7 +48,11 @@ func writeRawShmRegionFile(t *testing.T, runDir, service string, sessionID uint6
 	if err != nil {
 		t.Fatalf("open %s: %v", path, err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			t.Fatalf("close %s: %v", path, err)
+		}
+	}()
 
 	if err := f.Truncate(int64(size)); err != nil {
 		t.Fatalf("truncate %s: %v", path, err)
@@ -343,12 +347,12 @@ func TestCheckShmStaleVariants(t *testing.T) {
 	validSize := int(respOff + respCap)
 
 	missingPath := filepath.Join(runDir, "missing.ipcshm")
-	if got := checkShmStale(missingPath); got != shmStaleNotExist {
+	if got := checkShmStale(missingPath, true); got != shmStaleNotExist {
 		t.Fatalf("missing path result = %v, want %v", got, shmStaleNotExist)
 	}
 
 	tinyPath := writeRawShmRegionFile(t, runDir, "go_shm_check_tiny", 1, 8, nil)
-	if got := checkShmStale(tinyPath); got != shmStaleInvalid {
+	if got := checkShmStale(tinyPath, true); got != shmStaleInvalid {
 		t.Fatalf("tiny file result = %v, want %v", got, shmStaleInvalid)
 	}
 	if _, err := os.Stat(tinyPath); !errors.Is(err, os.ErrNotExist) {
@@ -359,14 +363,14 @@ func TestCheckShmStaleVariants(t *testing.T) {
 		fillShmHeader(data, int32(os.Getpid()), 1, reqOff, reqCap, respOff, respCap)
 		binary.NativeEndian.PutUint32(data[shmHeaderMagicOff:shmHeaderMagicOff+4], 0)
 	})
-	if got := checkShmStale(badMagicPath); got != shmStaleInvalid {
+	if got := checkShmStale(badMagicPath, true); got != shmStaleInvalid {
 		t.Fatalf("bad magic result = %v, want %v", got, shmStaleInvalid)
 	}
 
 	livePath := writeRawShmRegionFile(t, runDir, "go_shm_check_live", 3, validSize, func(data []byte) {
 		fillShmHeader(data, int32(os.Getpid()), 7, reqOff, reqCap, respOff, respCap)
 	})
-	if got := checkShmStale(livePath); got != shmStaleLive {
+	if got := checkShmStale(livePath, true); got != shmStaleLive {
 		t.Fatalf("live path result = %v, want %v", got, shmStaleLive)
 	}
 	if _, err := os.Stat(livePath); err != nil {
@@ -376,7 +380,7 @@ func TestCheckShmStaleVariants(t *testing.T) {
 	legacyPath := writeRawShmRegionFile(t, runDir, "go_shm_check_legacy", 4, validSize, func(data []byte) {
 		fillShmHeader(data, int32(os.Getpid()), 0, reqOff, reqCap, respOff, respCap)
 	})
-	if got := checkShmStale(legacyPath); got != shmStaleRecovered {
+	if got := checkShmStale(legacyPath, true); got != shmStaleRecovered {
 		t.Fatalf("legacy path result = %v, want %v", got, shmStaleRecovered)
 	}
 	if _, err := os.Stat(legacyPath); !errors.Is(err, os.ErrNotExist) {
@@ -389,7 +393,7 @@ func TestCheckShmStaleVariants(t *testing.T) {
 	if err := os.Chmod(unreadablePath, 0); err != nil {
 		t.Fatalf("chmod unreadable stale file: %v", err)
 	}
-	if got := checkShmStale(unreadablePath); got != shmStaleInvalid {
+	if got := checkShmStale(unreadablePath, true); got != shmStaleInvalid {
 		t.Fatalf("unreadable path result = %v, want %v", got, shmStaleInvalid)
 	}
 	if _, err := os.Stat(unreadablePath); !errors.Is(err, os.ErrNotExist) {
@@ -403,8 +407,8 @@ func TestCheckShmStaleVariants(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dirPath, "keep"), 0700); err != nil {
 		t.Fatalf("mkdir stale dir: %v", err)
 	}
-	if got := checkShmStale(dirPath); got != shmStaleInvalid {
-		t.Fatalf("directory path result = %v, want %v", got, shmStaleInvalid)
+	if got := checkShmStale(dirPath, true); got != shmStaleLive {
+		t.Fatalf("directory path result = %v, want %v", got, shmStaleLive)
 	}
 	if info, err := os.Stat(dirPath); err != nil || !info.IsDir() {
 		t.Fatalf("non-empty stale directory should remain, stat err = %v", err)

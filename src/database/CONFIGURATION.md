@@ -18,7 +18,14 @@ Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configurati
 
 :::note
 
-In a Parent-Child setup, these settings manage the entire storage space used by the Parent for storing metrics collected both by itself and its Children.
+In a Parent-Child setup, these settings control the Parent's total storage for metrics collected locally and metrics received from Children.
+
+Child and Parent storage are independent:
+
+- A Child can keep local history based on its own `[db].mode`.
+- Streamed metrics can also be persisted on the Parent, in the Parent's own dbengine files.
+
+Retention size is enforced **per-tier**, not per Child, so all streaming Children share the Parent's tier quota. For Parent sizing guidance, see [Parent Retention Sizing](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md#parent-retention-sizing).
 
 :::
 
@@ -29,6 +36,12 @@ You can fine-tune retention for each tier by setting a time limit or size limit.
 | Size Limit = 0, Time Limit > 0 | **Time based:** data is stored for a specific duration regardless of disk usage                                                          |
 | Time Limit = 0, Size Limit > 0 | **Space based:** data is stored with a disk space limit, regardless of time                                                              |
 | Time Limit > 0, Size Limit > 0 | **Combined time and space limits:** data is deleted once it reaches either the time limit or the disk space limit, whichever comes first |
+
+:::note
+
+Retention size limits are soft targets, not hard caps enforced at write time. Actual disk usage can temporarily exceed the configured limit. For the detailed enforcement behavior, see [Retention Size Enforcement](/src/database/README.md#retention-size-enforcement).
+
+:::
 
 You can change these limits using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) to open `netdata.conf`:
 

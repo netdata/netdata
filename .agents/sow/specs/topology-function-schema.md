@@ -426,8 +426,44 @@ graph relationships.
 Refreshable traffic, state, error, packet, or utilization data is represented by
 overlay templates and per-actor/per-link refs.
 
-Templates define the query mechanism once. Refs provide only template ids and
-parameters. Aggregated links merge refs according to the template merge policy.
+Templates define the query mechanism once. Refs provide only template ids, one
+owner reference, and selector parameters. The refs table uses schema ids for
+column names, so template ids, selector params, and refs column ids must match
+the topology `$defs/id` contract: start with a letter and then use only letters,
+digits, `_`, `.`, `:`, or `-`.
+
+The refs-table convention is:
+
+- `template`: string or string_ref template name resolving to
+  `data.types.overlay_templates`;
+- exactly one convention owner column: `actor` with type `actor_ref` or `link`
+  with type `link_ref`; every row must have a non-null owner value;
+- one column for each selector param required by the referenced template.
+
+Selector params must not use reserved refs-table convention column names:
+`template`, `actor`, or `link`.
+
+No other `actor_ref` or `link_ref` columns are valid in overlay refs. Consumers
+can identify ownership from the fixed `actor` / `link` column ids instead of
+scanning all columns by type.
+
+The `template` column and all selector-param columns required by a row's
+resolved template must be `string` or `string_ref`. Required selector-param row
+values must resolve to non-empty strings. Selector-param columns used by other
+templates may be nullable and null on rows whose template does not require them.
+Future selectors that need `ip_ref`, `mac_ref`, or empty-string matching must
+relax this contract explicitly.
+
+For `provider: "netdata.metrics"`, selector params are interpreted as:
+
+- `node_id`: node-scope selector, not a chart label;
+- `collect_job`: chart label `_collect_job`;
+- other params: same-named chart labels.
+
+Aggregated actors or links merge overlay refs according to the template merge
+policy. `merge.refs` controls ref-list handling, currently `append` or `set`.
+`merge.values` controls how multiple matching metric values collapse, currently
+`sum`, `min`, `max`, `avg`, `last`, or `none`.
 
 ## Compatibility
 

@@ -1,7 +1,13 @@
 use super::*;
 #[cfg(target_os = "linux")]
 use crate::protocol::PROFILE_SHM_FUTEX;
-use crate::protocol::{increment_encode, BatchBuilder, CgroupsBuilder, PROFILE_BASELINE};
+use crate::protocol::{
+    increment_encode, AppsLookupBuilder, AppsLookupRequestView, BatchBuilder, CgroupsBuilder,
+    CgroupsLookupBuilder, CgroupsLookupRequestView, APPS_CGROUP_HOST_ROOT, APPS_CGROUP_KNOWN,
+    CGROUP_LOOKUP_KNOWN, CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, METHOD_APPS_LOOKUP,
+    METHOD_CGROUPS_LOOKUP, NIPC_UID_UNSET, ORCHESTRATOR_DOCKER, ORCHESTRATOR_K8S, PID_LOOKUP_KNOWN,
+    PID_LOOKUP_UNKNOWN, PROFILE_BASELINE,
+};
 use std::os::fd::RawFd;
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
@@ -131,6 +137,14 @@ fn snapshot_client(service: &str, config: ClientConfig) -> RawClient {
     RawClient::new_snapshot(TEST_RUN_DIR, service, config)
 }
 
+fn cgroups_lookup_client(service: &str, config: ClientConfig) -> RawClient {
+    RawClient::new_cgroups_lookup(TEST_RUN_DIR, service, config)
+}
+
+fn apps_lookup_client(service: &str, config: ClientConfig) -> RawClient {
+    RawClient::new_apps_lookup(TEST_RUN_DIR, service, config)
+}
+
 fn increment_client(service: &str, config: ClientConfig) -> RawClient {
     RawClient::new_increment(TEST_RUN_DIR, service, config)
 }
@@ -249,6 +263,111 @@ fn test_cgroups_snapshot_handler() -> SnapshotHandler {
 
 fn test_cgroups_dispatch() -> DispatchHandler {
     snapshot_dispatch(test_cgroups_snapshot_handler(), 3)
+}
+
+fn test_cgroups_lookup_handler() -> CgroupsLookupHandler {
+    Arc::new(
+        |req: &CgroupsLookupRequestView<'_>, builder: &mut CgroupsLookupBuilder<'_>| {
+            for i in 0..req.item_count {
+                let item = match req.item(i) {
+                    Ok(item) => item,
+                    Err(_) => return false,
+                };
+                if item.as_bytes() == b"/known" {
+                    if builder
+                        .add(
+                            CGROUP_LOOKUP_KNOWN,
+                            ORCHESTRATOR_K8S,
+                            item.as_bytes(),
+                            b"pod-a",
+                            &[(b"namespace".as_slice(), b"default".as_slice())],
+                        )
+                        .is_err()
+                    {
+                        return false;
+                    }
+                } else if builder
+                    .add(
+                        CGROUP_LOOKUP_UNKNOWN_RETRY_LATER,
+                        0,
+                        item.as_bytes(),
+                        b"",
+                        &[],
+                    )
+                    .is_err()
+                {
+                    return false;
+                }
+            }
+            true
+        },
+    )
+}
+
+fn test_cgroups_lookup_dispatch() -> DispatchHandler {
+    cgroups_lookup_dispatch(test_cgroups_lookup_handler())
+}
+
+fn test_apps_lookup_handler() -> AppsLookupHandler {
+    Arc::new(
+        |req: &AppsLookupRequestView<'_>, builder: &mut AppsLookupBuilder<'_>| {
+            for i in 0..req.item_count {
+                let pid = match req.item(i) {
+                    Ok(pid) => pid,
+                    Err(_) => return false,
+                };
+                let result = match pid {
+                    1234 => builder.add(
+                        PID_LOOKUP_KNOWN,
+                        APPS_CGROUP_KNOWN,
+                        ORCHESTRATOR_DOCKER,
+                        pid,
+                        1,
+                        1000,
+                        42,
+                        b"nginx",
+                        b"/docker/abc",
+                        b"container-a",
+                        &[(b"image".as_slice(), b"nginx:latest".as_slice())],
+                    ),
+                    0 => builder.add(
+                        PID_LOOKUP_KNOWN,
+                        APPS_CGROUP_HOST_ROOT,
+                        0,
+                        pid,
+                        0,
+                        0,
+                        0,
+                        b"swapper",
+                        b"",
+                        b"",
+                        &[],
+                    ),
+                    _ => builder.add(
+                        PID_LOOKUP_UNKNOWN,
+                        APPS_CGROUP_KNOWN,
+                        0,
+                        pid,
+                        0,
+                        NIPC_UID_UNSET,
+                        0,
+                        b"",
+                        b"",
+                        b"",
+                        &[],
+                    ),
+                };
+                if result.is_err() {
+                    return false;
+                }
+            }
+            true
+        },
+    )
+}
+
+fn test_apps_lookup_dispatch() -> DispatchHandler {
+    apps_lookup_dispatch(test_apps_lookup_handler())
 }
 
 fn increment_handler() -> IncrementHandler {
@@ -798,6 +917,84 @@ fn test_cgroups_call() {
     let status = client.status();
     assert_eq!(status.call_count, 1);
     assert_eq!(status.error_count, 0);
+
+    client.close();
+    server.stop();
+    cleanup_all(svc);
+}
+
+#[test]
+fn test_cgroups_lookup_call() {
+    let svc = "rs_svc_cgroups_lookup";
+    ensure_run_dir();
+    cleanup_all(svc);
+
+    let mut server = TestServer::start(
+        svc,
+        METHOD_CGROUPS_LOOKUP,
+        Some(test_cgroups_lookup_dispatch()),
+    );
+
+    let mut client = cgroups_lookup_client(svc, client_config());
+    client.refresh();
+    assert!(client.ready());
+
+    let view = client
+        .call_cgroups_lookup(&[b"/known".as_slice(), b"/missing".as_slice()])
+        .expect("cgroups lookup call");
+
+    assert_eq!(view.item_count, 2);
+    let item0 = view.item(0).expect("item 0");
+    assert_eq!(item0.status, CGROUP_LOOKUP_KNOWN);
+    assert_eq!(item0.orchestrator, ORCHESTRATOR_K8S);
+    assert_eq!(item0.path.as_bytes(), b"/known");
+    assert_eq!(item0.name.as_bytes(), b"pod-a");
+    assert_eq!(item0.label_count, 1);
+
+    let item1 = view.item(1).expect("item 1");
+    assert_eq!(item1.status, CGROUP_LOOKUP_UNKNOWN_RETRY_LATER);
+    assert_eq!(item1.path.as_bytes(), b"/missing");
+    assert_eq!(item1.name.as_bytes(), b"");
+
+    client.close();
+    server.stop();
+    cleanup_all(svc);
+}
+
+#[test]
+fn test_apps_lookup_call() {
+    let svc = "rs_svc_apps_lookup";
+    ensure_run_dir();
+    cleanup_all(svc);
+
+    let mut server = TestServer::start(svc, METHOD_APPS_LOOKUP, Some(test_apps_lookup_dispatch()));
+
+    let mut client = apps_lookup_client(svc, client_config());
+    client.refresh();
+    assert!(client.ready());
+
+    let view = client
+        .call_apps_lookup(&[1234, 0, 9999])
+        .expect("apps lookup call");
+
+    assert_eq!(view.item_count, 3);
+    let item0 = view.item(0).expect("item 0");
+    assert_eq!(item0.pid, 1234);
+    assert_eq!(item0.status, PID_LOOKUP_KNOWN);
+    assert_eq!(item0.cgroup_status, APPS_CGROUP_KNOWN);
+    assert_eq!(item0.comm.as_bytes(), b"nginx");
+    assert_eq!(item0.cgroup_path.as_bytes(), b"/docker/abc");
+    assert_eq!(item0.label_count, 1);
+
+    let item1 = view.item(1).expect("item 1");
+    assert_eq!(item1.pid, 0);
+    assert_eq!(item1.cgroup_status, APPS_CGROUP_HOST_ROOT);
+    assert_eq!(item1.cgroup_path.as_bytes(), b"");
+
+    let item2 = view.item(2).expect("item 2");
+    assert_eq!(item2.pid, 9999);
+    assert_eq!(item2.status, PID_LOOKUP_UNKNOWN);
+    assert_eq!(item2.uid, NIPC_UID_UNSET);
 
     client.close();
     server.stop();

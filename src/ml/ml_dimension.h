@@ -35,6 +35,11 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
 
 bool ml_dimension_deserialize_kmeans(const char *json_str);
 
+// Set dim's post-training state (mt/ts/suppression counters). Caller must hold
+// dim->slock. Used by both the successful-training path and the undersampled
+// early-return so the post-cycle state machine stays in sync.
+void ml_dimension_finalize_constant_state(ml_dimension_t *dim);
+
 class DimensionLookupInfo {
 public:
     DimensionLookupInfo()

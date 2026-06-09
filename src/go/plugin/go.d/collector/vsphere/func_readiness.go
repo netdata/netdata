@@ -125,7 +125,7 @@ func vsphereMethodHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {
 	}
 	return &funcVSphere{
 		readiness: &funcReadiness{collector: c},
-		topology:  &funcTopology{collector: c, agentID: job.FullName()},
+		topology:  &funcTopology{collector: c, agentID: job.FullName(), jobName: job.Name()},
 	}
 }
 

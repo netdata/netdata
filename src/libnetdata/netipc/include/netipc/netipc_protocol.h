@@ -56,6 +56,8 @@ extern "C" {
 #define NIPC_METHOD_INCREMENT        1u
 #define NIPC_METHOD_CGROUPS_SNAPSHOT 2u
 #define NIPC_METHOD_STRING_REVERSE   3u
+#define NIPC_METHOD_CGROUPS_LOOKUP   4u
+#define NIPC_METHOD_APPS_LOOKUP      5u
 
 /* Profile bits */
 #define NIPC_PROFILE_BASELINE    0x01u
@@ -72,6 +74,9 @@ extern "C" {
 
 /* Alignment for batch items and cgroups items */
 #define NIPC_ALIGNMENT 8u
+
+/* Common lookup sentinel values */
+#define NIPC_UID_UNSET 0xFFFFFFFFu
 
 /* ------------------------------------------------------------------ */
 /*  Error codes                                                       */
@@ -93,6 +98,39 @@ typedef enum {
     NIPC_ERR_HANDLER_FAILED,  /* typed handler rejected an otherwise valid request */
     NIPC_ERR_NOT_READY,       /* client not connected / service unavailable */
 } nipc_error_t;
+
+/* ------------------------------------------------------------------ */
+/*  Shared cgroups/apps lookup enums                                  */
+/* ------------------------------------------------------------------ */
+
+typedef enum {
+    NIPC_ORCHESTRATOR_UNKNOWN = 0,
+    NIPC_ORCHESTRATOR_SYSTEMD = 1,
+    NIPC_ORCHESTRATOR_DOCKER  = 2,
+    NIPC_ORCHESTRATOR_K8S     = 3,
+    NIPC_ORCHESTRATOR_KVM     = 4,
+    NIPC_ORCHESTRATOR_LXC     = 5,
+    NIPC_ORCHESTRATOR_PODMAN  = 6,
+    NIPC_ORCHESTRATOR_NSPAWN  = 7,
+} nipc_orchestrator_t;
+
+typedef enum {
+    NIPC_CGROUP_LOOKUP_KNOWN = 0,
+    NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER = 1,
+    NIPC_CGROUP_LOOKUP_UNKNOWN_PERMANENT = 2,
+} nipc_cgroup_lookup_status_t;
+
+typedef enum {
+    NIPC_PID_LOOKUP_KNOWN = 0,
+    NIPC_PID_LOOKUP_UNKNOWN = 1,
+} nipc_pid_lookup_status_t;
+
+typedef enum {
+    NIPC_APPS_CGROUP_KNOWN = 0,
+    NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER = 1,
+    NIPC_APPS_CGROUP_UNKNOWN_PERMANENT = 2,
+    NIPC_APPS_CGROUP_HOST_ROOT = 3,
+} nipc_apps_cgroup_status_t;
 
 /* ------------------------------------------------------------------ */
 /*  Outer message header (32 bytes)                                   */
@@ -306,6 +344,11 @@ typedef struct {
     uint32_t    len;   /* length excluding the NUL */
 } nipc_str_view_t;
 
+typedef struct {
+    nipc_str_view_t key;
+    nipc_str_view_t value;
+} nipc_lookup_label_view_t;
+
 /*
  * Per-item view -- ephemeral, borrows the payload buffer.
  * Valid only while the payload buffer is alive.
@@ -409,6 +452,200 @@ nipc_error_t nipc_cgroups_builder_add(nipc_cgroups_builder_t *b,
 size_t nipc_cgroups_builder_finish(nipc_cgroups_builder_t *b);
 
 /* ------------------------------------------------------------------ */
+/*  Cgroups/apps lookup codecs                                        */
+/* ------------------------------------------------------------------ */
+
+#define NIPC_CGROUPS_LOOKUP_REQ_HDR_SIZE       16u
+#define NIPC_CGROUPS_LOOKUP_RESP_HDR_SIZE      16u
+#define NIPC_CGROUPS_LOOKUP_ITEM_HDR_SIZE      28u
+#define NIPC_APPS_LOOKUP_REQ_HDR_SIZE          16u
+#define NIPC_APPS_LOOKUP_RESP_HDR_SIZE         16u
+#define NIPC_APPS_LOOKUP_ITEM_HDR_SIZE         60u
+#define NIPC_LOOKUP_DIR_ENTRY_SIZE              8u
+#define NIPC_LOOKUP_LABEL_ENTRY_SIZE           16u
+#define NIPC_APPS_LOOKUP_KEY_SIZE               8u
+
+typedef struct {
+    uint32_t offset;
+    uint32_t length;
+} nipc_lookup_dir_entry_t;
+
+typedef struct {
+    uint32_t key_offset;
+    uint32_t key_length;
+    uint32_t value_offset;
+    uint32_t value_length;
+} nipc_lookup_label_entry_t;
+
+typedef struct {
+    const uint8_t *_payload;
+    size_t _payload_len;
+    uint32_t item_count;
+} nipc_cgroups_lookup_req_view_t;
+
+typedef struct {
+    nipc_str_view_t path;
+} nipc_cgroups_lookup_req_item_t;
+
+typedef struct {
+    uint16_t layout_version;
+    uint16_t flags;
+    uint32_t item_count;
+    uint64_t generation;
+    const uint8_t *_payload;
+    size_t _payload_len;
+} nipc_cgroups_lookup_resp_view_t;
+
+typedef struct {
+    uint16_t status;
+    uint16_t orchestrator;
+    nipc_str_view_t path;
+    nipc_str_view_t name;
+    uint16_t label_count;
+    const uint8_t *_item;
+    uint32_t _item_len;
+    uint32_t _label_table_offset;
+} nipc_cgroups_lookup_item_view_t;
+
+typedef struct {
+    uint8_t *buf;
+    size_t buf_len;
+    uint64_t generation;
+    uint32_t item_count;
+    uint32_t max_items;
+    nipc_error_t error;
+    size_t data_offset;
+} nipc_cgroups_lookup_builder_t;
+
+typedef struct {
+    const uint8_t *_payload;
+    size_t _payload_len;
+    uint32_t item_count;
+} nipc_apps_lookup_req_view_t;
+
+typedef struct {
+    uint32_t pid;
+} nipc_apps_lookup_req_item_t;
+
+typedef struct {
+    uint16_t layout_version;
+    uint16_t flags;
+    uint32_t item_count;
+    uint64_t generation;
+    const uint8_t *_payload;
+    size_t _payload_len;
+} nipc_apps_lookup_resp_view_t;
+
+typedef struct {
+    uint16_t status;
+    uint16_t orchestrator;
+    uint16_t cgroup_status;
+    uint32_t pid;
+    uint32_t ppid;
+    uint32_t uid;
+    uint64_t starttime;
+    nipc_str_view_t comm;
+    nipc_str_view_t cgroup_path;
+    nipc_str_view_t cgroup_name;
+    uint16_t label_count;
+    const uint8_t *_item;
+    uint32_t _item_len;
+    uint32_t _label_table_offset;
+} nipc_apps_lookup_item_view_t;
+
+typedef struct {
+    uint8_t *buf;
+    size_t buf_len;
+    uint64_t generation;
+    uint32_t item_count;
+    uint32_t max_items;
+    nipc_error_t error;
+    size_t data_offset;
+} nipc_apps_lookup_builder_t;
+
+size_t nipc_cgroups_lookup_req_encode(const nipc_str_view_t *paths,
+                                      uint32_t item_count,
+                                      void *buf, size_t buf_len);
+nipc_error_t nipc_cgroups_lookup_req_decode(const void *buf, size_t buf_len,
+                                            nipc_cgroups_lookup_req_view_t *out);
+nipc_error_t nipc_cgroups_lookup_req_item(
+    const nipc_cgroups_lookup_req_view_t *view,
+    uint32_t index,
+    nipc_cgroups_lookup_req_item_t *out);
+
+nipc_error_t nipc_cgroups_lookup_resp_decode(const void *buf, size_t buf_len,
+                                             nipc_cgroups_lookup_resp_view_t *out);
+nipc_error_t nipc_cgroups_lookup_resp_item(
+    const nipc_cgroups_lookup_resp_view_t *view,
+    uint32_t index,
+    nipc_cgroups_lookup_item_view_t *out);
+nipc_error_t nipc_cgroups_lookup_item_label(
+    const nipc_cgroups_lookup_item_view_t *item,
+    uint32_t index,
+    nipc_lookup_label_view_t *out);
+
+void nipc_cgroups_lookup_builder_init(nipc_cgroups_lookup_builder_t *b,
+                                      void *buf, size_t buf_len,
+                                      uint32_t max_items,
+                                      uint64_t generation);
+void nipc_cgroups_lookup_builder_set_generation(nipc_cgroups_lookup_builder_t *b,
+                                                uint64_t generation);
+uint32_t nipc_cgroups_lookup_builder_estimate_max_items(size_t buf_len);
+nipc_error_t nipc_cgroups_lookup_builder_add(
+    nipc_cgroups_lookup_builder_t *b,
+    uint16_t status,
+    uint16_t orchestrator,
+    const char *path, uint32_t path_len,
+    const char *name, uint32_t name_len,
+    const nipc_lookup_label_view_t *labels,
+    uint16_t label_count);
+size_t nipc_cgroups_lookup_builder_finish(nipc_cgroups_lookup_builder_t *b);
+
+size_t nipc_apps_lookup_req_encode(const uint32_t *pids,
+                                   uint32_t item_count,
+                                   void *buf, size_t buf_len);
+nipc_error_t nipc_apps_lookup_req_decode(const void *buf, size_t buf_len,
+                                         nipc_apps_lookup_req_view_t *out);
+nipc_error_t nipc_apps_lookup_req_item(
+    const nipc_apps_lookup_req_view_t *view,
+    uint32_t index,
+    nipc_apps_lookup_req_item_t *out);
+
+nipc_error_t nipc_apps_lookup_resp_decode(const void *buf, size_t buf_len,
+                                          nipc_apps_lookup_resp_view_t *out);
+nipc_error_t nipc_apps_lookup_resp_item(
+    const nipc_apps_lookup_resp_view_t *view,
+    uint32_t index,
+    nipc_apps_lookup_item_view_t *out);
+nipc_error_t nipc_apps_lookup_item_label(
+    const nipc_apps_lookup_item_view_t *item,
+    uint32_t index,
+    nipc_lookup_label_view_t *out);
+
+void nipc_apps_lookup_builder_init(nipc_apps_lookup_builder_t *b,
+                                   void *buf, size_t buf_len,
+                                   uint32_t max_items,
+                                   uint64_t generation);
+void nipc_apps_lookup_builder_set_generation(nipc_apps_lookup_builder_t *b,
+                                             uint64_t generation);
+uint32_t nipc_apps_lookup_builder_estimate_max_items(size_t buf_len);
+nipc_error_t nipc_apps_lookup_builder_add(
+    nipc_apps_lookup_builder_t *b,
+    uint16_t status,
+    uint16_t cgroup_status,
+    uint16_t orchestrator,
+    uint32_t pid,
+    uint32_t ppid,
+    uint32_t uid,
+    uint64_t starttime,
+    const char *comm, uint32_t comm_len,
+    const char *cgroup_path, uint32_t cgroup_path_len,
+    const char *cgroup_name, uint32_t cgroup_name_len,
+    const nipc_lookup_label_view_t *labels,
+    uint16_t label_count);
+size_t nipc_apps_lookup_builder_finish(nipc_apps_lookup_builder_t *b);
+
+/* ------------------------------------------------------------------ */
 /*  INCREMENT codec (8 bytes)                                         */
 /* ------------------------------------------------------------------ */
 
@@ -501,6 +738,26 @@ nipc_error_t nipc_dispatch_cgroups_snapshot(
     uint8_t *resp, size_t resp_size, size_t *resp_len,
     uint32_t max_items,
     nipc_cgroups_handler_fn handler, void *user);
+
+typedef bool (*nipc_cgroups_lookup_handler_fn)(
+    void *user,
+    const nipc_cgroups_lookup_req_view_t *request,
+    nipc_cgroups_lookup_builder_t *builder);
+
+nipc_error_t nipc_dispatch_cgroups_lookup(
+    const uint8_t *req, size_t req_len,
+    uint8_t *resp, size_t resp_size, size_t *resp_len,
+    nipc_cgroups_lookup_handler_fn handler, void *user);
+
+typedef bool (*nipc_apps_lookup_handler_fn)(
+    void *user,
+    const nipc_apps_lookup_req_view_t *request,
+    nipc_apps_lookup_builder_t *builder);
+
+nipc_error_t nipc_dispatch_apps_lookup(
+    const uint8_t *req, size_t req_len,
+    uint8_t *resp, size_t resp_size, size_t *resp_len,
+    nipc_apps_lookup_handler_fn handler, void *user);
 
 /* ------------------------------------------------------------------ */
 /*  Utility: 8-byte alignment                                         */

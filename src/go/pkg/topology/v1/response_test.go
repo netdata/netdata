@@ -1413,6 +1413,436 @@ func TestValidateDecodedResponseAllowsUnusedCorrelationRuleColumns(t *testing.T)
 	require.NoError(t, err)
 }
 
+func TestValidateDecodedResponseRejectsInvalidOverlaySemantics(t *testing.T) {
+	cases := map[string]struct {
+		mutate func(*Data)
+		want   string
+	}{
+		"unknown refs template": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				data.Overlays = &OverlayRefs{Refs: testOverlayRefsTable(
+					[]Column{
+						NewColumn(OverlayRefsTemplateColumn, "string"),
+						NewColumn(OverlayRefsActorColumn, "actor_ref"),
+						NewColumn("collect_job", "string"),
+						NewColumn("id", "string"),
+					},
+					[]ColumnEncoding{
+						Const("missing"),
+						Const(0),
+						Const("job"),
+						Const("node-a"),
+					},
+				)}
+			},
+			want: "references unknown overlay template",
+		},
+		"missing selector param column": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				data.Overlays = &OverlayRefs{Refs: testOverlayRefsTable(
+					[]Column{
+						NewColumn(OverlayRefsTemplateColumn, "string"),
+						NewColumn(OverlayRefsActorColumn, "actor_ref"),
+						NewColumn("id", "string"),
+					},
+					[]ColumnEncoding{
+						Const("node_cpu"),
+						Const(0),
+						Const("node-a"),
+					},
+				)}
+			},
+			want: "missing selector param column \"collect_job\"",
+		},
+		"reserved selector param column": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				template := data.Types.OverlayTemplates["node_cpu"]
+				template.SelectorParams = []string{OverlayRefsTemplateColumn}
+				data.Types.OverlayTemplates["node_cpu"] = template
+			},
+			want: "uses reserved overlay refs column",
+		},
+		"missing template column": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				data.Overlays = &OverlayRefs{Refs: testOverlayRefsTable(
+					[]Column{
+						NewColumn(OverlayRefsActorColumn, "actor_ref"),
+						NewColumn("collect_job", "string"),
+						NewColumn("id", "string"),
+					},
+					[]ColumnEncoding{
+						Const(0),
+						Const("job"),
+						Const("node-a"),
+					},
+				)}
+			},
+			want: "missing required template column",
+		},
+		"template column non-string type": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				data.Overlays = &OverlayRefs{Refs: testOverlayRefsTable(
+					[]Column{
+						NewColumn(OverlayRefsTemplateColumn, "uint"),
+						NewColumn(OverlayRefsActorColumn, "actor_ref"),
+						NewColumn("collect_job", "string"),
+						NewColumn("id", "string"),
+					},
+					[]ColumnEncoding{
+						Const(0),
+						Const(0),
+						Const("job"),
+						Const("node-a"),
+					},
+				)}
+			},
+			want: "data.overlays.refs.template column must be string or string_ref",
+		},
+		"missing owner column": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				data.Overlays = &OverlayRefs{Refs: testOverlayRefsTable(
+					[]Column{
+						NewColumn(OverlayRefsTemplateColumn, "string"),
+						NewColumn("collect_job", "string"),
+						NewColumn("id", "string"),
+					},
+					[]ColumnEncoding{
+						Const("node_cpu"),
+						Const("job"),
+						Const("node-a"),
+					},
+				)}
+			},
+			want: "must contain exactly one owner column: actor actor_ref or link link_ref",
+		},
+		"non-convention owner column": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				data.Overlays = &OverlayRefs{Refs: testOverlayRefsTable(
+					[]Column{
+						NewColumn(OverlayRefsTemplateColumn, "string"),
+						NewColumn("owner", "actor_ref"),
+						NewColumn("collect_job", "string"),
+						NewColumn("id", "string"),
+					},
+					[]ColumnEncoding{
+						Const("node_cpu"),
+						Const(0),
+						Const("job"),
+						Const("node-a"),
+					},
+				)}
+			},
+			want: "data.overlays.refs.owner uses non-convention actor_ref owner column",
+		},
+		"actor owner column wrong type": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				data.Overlays = &OverlayRefs{Refs: testOverlayRefsTable(
+					[]Column{
+						NewColumn(OverlayRefsTemplateColumn, "string"),
+						NewColumn(OverlayRefsActorColumn, "link_ref"),
+						NewColumn("collect_job", "string"),
+						NewColumn("id", "string"),
+					},
+					[]ColumnEncoding{
+						Const("node_cpu"),
+						Const(0),
+						Const("job"),
+						Const("node-a"),
+					},
+				)}
+			},
+			want: "data.overlays.refs.actor column must be actor_ref",
+		},
+		"link owner column wrong type": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				data.Overlays = &OverlayRefs{Refs: testOverlayRefsTable(
+					[]Column{
+						NewColumn(OverlayRefsTemplateColumn, "string"),
+						NewColumn(OverlayRefsLinkColumn, "actor_ref"),
+						NewColumn("collect_job", "string"),
+						NewColumn("id", "string"),
+					},
+					[]ColumnEncoding{
+						Const("node_cpu"),
+						Const(0),
+						Const("job"),
+						Const("node-a"),
+					},
+				)}
+			},
+			want: "data.overlays.refs.link column must be link_ref",
+		},
+		"multiple owner columns": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				data.Overlays = &OverlayRefs{Refs: testOverlayRefsTable(
+					[]Column{
+						NewColumn(OverlayRefsTemplateColumn, "string"),
+						NewColumn(OverlayRefsActorColumn, "actor_ref"),
+						NewColumn(OverlayRefsLinkColumn, "link_ref"),
+						NewColumn("collect_job", "string"),
+						NewColumn("id", "string"),
+					},
+					[]ColumnEncoding{
+						Const("node_cpu"),
+						Const(0),
+						Const(0),
+						Const("job"),
+						Const("node-a"),
+					},
+				)}
+			},
+			want: "must contain exactly one owner column: actor actor_ref or link link_ref",
+		},
+		"null actor owner value": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				data.Overlays = &OverlayRefs{Refs: testOverlayRefsTable(
+					[]Column{
+						NewColumn(OverlayRefsTemplateColumn, "string"),
+						NewColumn(OverlayRefsActorColumn, "actor_ref", WithNullable()),
+						NewColumn("collect_job", "string"),
+						NewColumn("id", "string"),
+					},
+					[]ColumnEncoding{
+						Const("node_cpu"),
+						Const(nil),
+						Const("job"),
+						Const("node-a"),
+					},
+				)}
+			},
+			want: "data.overlays.refs.actor[0] is not a non-null owner reference",
+		},
+		"null link owner value": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				data.Overlays = &OverlayRefs{Refs: testOverlayRefsTable(
+					[]Column{
+						NewColumn(OverlayRefsTemplateColumn, "string"),
+						NewColumn(OverlayRefsLinkColumn, "link_ref", WithNullable()),
+						NewColumn("collect_job", "string"),
+						NewColumn("id", "string"),
+					},
+					[]ColumnEncoding{
+						Const("node_cpu"),
+						Const(nil),
+						Const("job"),
+						Const("node-a"),
+					},
+				)}
+			},
+			want: "data.overlays.refs.link[0] is not a non-null owner reference",
+		},
+		"selector column non-string type": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				data.Overlays = &OverlayRefs{Refs: testOverlayRefsTable(
+					[]Column{
+						NewColumn(OverlayRefsTemplateColumn, "string"),
+						NewColumn(OverlayRefsActorColumn, "actor_ref"),
+						NewColumn("collect_job", "string"),
+						NewColumn("id", "uint"),
+					},
+					[]ColumnEncoding{
+						Const("node_cpu"),
+						Const(0),
+						Const("job"),
+						Const(7),
+					},
+				)}
+			},
+			want: "data.overlays.refs.id column must be string or string_ref",
+		},
+		"empty selector value": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				data.Overlays = &OverlayRefs{Refs: testOverlayRefsTable(
+					[]Column{
+						NewColumn(OverlayRefsTemplateColumn, "string"),
+						NewColumn(OverlayRefsActorColumn, "actor_ref"),
+						NewColumn("collect_job", "string"),
+						NewColumn("id", "string"),
+					},
+					[]ColumnEncoding{
+						Const("node_cpu"),
+						Const(0),
+						Const("job"),
+						Const(""),
+					},
+				)}
+			},
+			want: "data.overlays.refs.id[0] is not a non-empty string",
+		},
+		"null selector value": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				data.Overlays = &OverlayRefs{Refs: testOverlayRefsTable(
+					[]Column{
+						NewColumn(OverlayRefsTemplateColumn, "string"),
+						NewColumn(OverlayRefsActorColumn, "actor_ref"),
+						NewColumn("collect_job", "string"),
+						NewColumn("id", "string", WithNullable()),
+					},
+					[]ColumnEncoding{
+						Const("node_cpu"),
+						Const(0),
+						Const("job"),
+						Const(nil),
+					},
+				)}
+			},
+			want: "data.overlays.refs.id[0] is not a non-empty string",
+		},
+		"link type references unknown template": {
+			mutate: func(data *Data) {
+				data.Types.LinkTypes["dependency"] = LinkType{
+					Orientation:      "directed",
+					DirectionRole:    "dependency",
+					Aggregation:      LinkAggregation{Direction: "preserve"},
+					OverlayTemplates: []string{"missing"},
+				}
+			},
+			want: "references unknown overlay template",
+		},
+		"invalid provider": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				template := data.Types.OverlayTemplates["node_cpu"]
+				template.Provider = "unknown"
+				data.Types.OverlayTemplates["node_cpu"] = template
+			},
+			want: "provider has unsupported value",
+		},
+		"invalid merge refs": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				template := data.Types.OverlayTemplates["node_cpu"]
+				template.Merge.Refs = "replace"
+				data.Types.OverlayTemplates["node_cpu"] = template
+			},
+			want: "merge.refs has unsupported value",
+		},
+		"invalid merge values": {
+			mutate: func(data *Data) {
+				data.Types.OverlayTemplates = testOverlayTemplates()
+				template := data.Types.OverlayTemplates["node_cpu"]
+				template.Merge.Values = "median"
+				data.Types.OverlayTemplates["node_cpu"] = template
+			},
+			want: "merge.values has unsupported value",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			data := minimalValidationData(nil)
+			tc.mutate(&data)
+
+			err := validateResponseData(t, data)
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
+func TestValidateDecodedResponseAcceptsValidOverlaySemantics(t *testing.T) {
+	data := minimalValidationData(nil)
+	data.Types.OverlayTemplates = testOverlayTemplates()
+	data.Types.LinkTypes["dependency"] = LinkType{
+		Orientation:      "directed",
+		DirectionRole:    "dependency",
+		Aggregation:      LinkAggregation{Direction: "preserve"},
+		OverlayTemplates: []string{"node_cpu"},
+	}
+	data.Overlays = &OverlayRefs{Refs: testOverlayRefsTable(
+		[]Column{
+			NewColumn(OverlayRefsTemplateColumn, "string"),
+			NewColumn(OverlayRefsLinkColumn, "link_ref"),
+			NewColumn("collect_job", "string"),
+			NewColumn("id", "string"),
+		},
+		[]ColumnEncoding{
+			Const("node_cpu"),
+			Const(0),
+			Const("job"),
+			Const("node-a"),
+		},
+	)}
+
+	err := validateResponseData(t, data)
+
+	require.NoError(t, err)
+}
+
+func TestValidateDecodedResponseAcceptsZeroSelectorOverlaySemantics(t *testing.T) {
+	data := minimalValidationData(nil)
+	data.Types.OverlayTemplates = map[string]OverlayTemplate{
+		"node_state": NewOverlayTemplate(
+			OverlayProviderNetdataMetrics,
+			NewOverlayMerge(OverlayMergeRefsSet, OverlayMergeValuesLast),
+		),
+	}
+	data.Overlays = &OverlayRefs{Refs: testOverlayRefsTable(
+		[]Column{
+			NewColumn(OverlayRefsTemplateColumn, "string"),
+			NewColumn(OverlayRefsActorColumn, "actor_ref"),
+		},
+		[]ColumnEncoding{
+			Const("node_state"),
+			Const(0),
+		},
+	)}
+
+	err := validateResponseData(t, data)
+
+	require.NoError(t, err)
+}
+
+func TestValidateDecodedResponseAcceptsMultiTemplateOverlaySelectorScoping(t *testing.T) {
+	data := minimalValidationData(nil)
+	data.Types.OverlayTemplates = map[string]OverlayTemplate{
+		"node_cpu": NewOverlayTemplate(
+			OverlayProviderNetdataMetrics,
+			NewOverlayMerge(OverlayMergeRefsSet, OverlayMergeValuesLast),
+			WithOverlaySelectorParams("cpu_id"),
+		),
+		"node_mem": NewOverlayTemplate(
+			OverlayProviderNetdataMetrics,
+			NewOverlayMerge(OverlayMergeRefsSet, OverlayMergeValuesLast),
+			WithOverlaySelectorParams("mem_id"),
+		),
+	}
+	data.Overlays = &OverlayRefs{Refs: testOverlayRefsTableRows(2,
+		[]Column{
+			NewColumn(OverlayRefsTemplateColumn, "string"),
+			NewColumn(OverlayRefsActorColumn, "actor_ref"),
+			NewColumn("cpu_id", "string", WithNullable()),
+			NewColumn("mem_id", "string", WithNullable()),
+		},
+		[]ColumnEncoding{
+			Values("node_cpu", "node_mem"),
+			Const(0),
+			Values("cpu0", nil),
+			Values(nil, "mem0"),
+		},
+	)}
+
+	err := validateResponseData(t, data)
+
+	require.NoError(t, err)
+}
+
 func TestPresentationTokenEnumsMatchSchema(t *testing.T) {
 	schemaDoc := loadTopologySchema(t)
 
@@ -1424,6 +1854,9 @@ func TestPresentationTokenEnumsMatchSchema(t *testing.T) {
 	assert.ElementsMatch(t, actorSizeScaleTokens, schemaEnum(t, schemaDoc, "actor_size_scale_token"))
 	assert.ElementsMatch(t, linkSemanticRoleTokens, schemaEnum(t, schemaDoc, "link_semantic_role"))
 	assert.ElementsMatch(t, iconTokens, schemaEnum(t, schemaDoc, "icon_token"))
+	assert.ElementsMatch(t, overlayProviderTokens, schemaEnumAtPath(t, schemaDoc, "$defs", "overlay_template", "properties", "provider"))
+	assert.ElementsMatch(t, overlayMergeRefsTokens, schemaEnumAtPath(t, schemaDoc, "$defs", "overlay_merge", "properties", "refs"))
+	assert.ElementsMatch(t, overlayMergeValuesTokens, schemaEnumAtPath(t, schemaDoc, "$defs", "overlay_merge", "properties", "values"))
 }
 
 func TestValidateDecodedResponseRejectsInvalidActorReference(t *testing.T) {
@@ -1565,6 +1998,27 @@ func dependencyLinkTableWith(rows int, extraColumns []Column, extraValues []Colu
 	return MustTable(rows, columns, values)
 }
 
+func testOverlayTemplates() map[string]OverlayTemplate {
+	return map[string]OverlayTemplate{
+		"node_cpu": NewOverlayTemplate(
+			OverlayProviderNetdataMetrics,
+			NewOverlayMerge(OverlayMergeRefsSet, OverlayMergeValuesLast),
+			WithOverlayContexts("system.cpu"),
+			WithOverlayDimensions("user"),
+			WithOverlaySelectorParams("collect_job", "id"),
+		),
+	}
+}
+
+func testOverlayRefsTable(columns []Column, values []ColumnEncoding) *Table {
+	return testOverlayRefsTableRows(1, columns, values)
+}
+
+func testOverlayRefsTableRows(rows int, columns []Column, values []ColumnEncoding) *Table {
+	table := MustTable(rows, columns, values)
+	return &table
+}
+
 func withActors(actors Table) func(*Data) {
 	return func(data *Data) {
 		data.Actors = actors
@@ -1625,9 +2079,20 @@ func loadTopologySchema(t *testing.T) map[string]any {
 func schemaEnum(t *testing.T, schemaDoc map[string]any, defName string) []string {
 	t.Helper()
 
-	defs, ok := schemaDoc["$defs"].(map[string]any)
-	require.True(t, ok)
-	definition, ok := defs[defName].(map[string]any)
+	return schemaEnumAtPath(t, schemaDoc, "$defs", defName)
+}
+
+func schemaEnumAtPath(t *testing.T, schemaDoc map[string]any, path ...string) []string {
+	t.Helper()
+
+	var current any = schemaDoc
+	for _, element := range path {
+		obj, ok := current.(map[string]any)
+		require.True(t, ok)
+		current, ok = obj[element]
+		require.True(t, ok)
+	}
+	definition, ok := current.(map[string]any)
 	require.True(t, ok)
 	rawEnum, ok := definition["enum"].([]any)
 	require.True(t, ok)

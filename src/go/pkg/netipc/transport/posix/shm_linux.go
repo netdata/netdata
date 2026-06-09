@@ -156,15 +156,15 @@ func ShmServerCreate(runDir, serviceName string, sessionID uint64, reqCapacity, 
 	regionSize := int(respOff + respCap)
 
 	// Try O_EXCL create first (fast path, no stale check needed).
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600) // #nosec G304 -- path is built from runDir, validated service name, and hex session ID.
 	if err != nil && os.IsExist(err) {
 		// File exists — do stale recovery and retry.
-		stale := checkShmStale(path)
+		stale := checkShmStale(path, runDirAllowsStaleUnlink(runDir))
 		if stale == shmStaleLive {
 			return nil, fmt.Errorf("%w: live server owns SHM region", ErrShmOpen)
 		}
 		// Stale file was unlinked, retry create
-		f, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
+		f, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600) // #nosec G304 -- path is built from runDir, validated service name, and hex session ID.
 	}
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrShmOpen, err)
@@ -172,16 +172,16 @@ func ShmServerCreate(runDir, serviceName string, sessionID uint64, reqCapacity, 
 	fd := int(f.Fd())
 
 	if err := syscall.Ftruncate(fd, int64(regionSize)); err != nil {
-		f.Close()
-		os.Remove(path)
+		_ = f.Close()
+		_ = os.Remove(path)
 		return nil, fmt.Errorf("%w: %v", ErrShmTruncate, err)
 	}
 
 	data, err := syscall.Mmap(fd, 0, regionSize,
 		syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
-		f.Close()
-		os.Remove(path)
+		_ = f.Close()
+		_ = os.Remove(path)
 		return nil, fmt.Errorf("%w: %v", ErrShmMmap, err)
 	}
 
@@ -206,7 +206,7 @@ func ShmServerCreate(runDir, serviceName string, sessionID uint64, reqCapacity, 
 	binary.NativeEndian.PutUint32(data[shmHeaderRespCapOff:shmHeaderRespCapOff+4], respCap)
 
 	// Release fence: ensure header writes are visible before clients
-	atomic.StoreUint32((*uint32)(unsafe.Pointer(&data[shmHeaderReqSignalOff])), 0)
+	atomic.StoreUint32((*uint32)(unsafe.Pointer(&data[shmHeaderReqSignalOff])), 0) // #nosec G103 -- mmap header fields require raw aligned atomic access.
 
 	// Close the os.File but keep the fd open (Mmap holds a reference).
 	// Actually, we need to keep the fd ourselves for the context.
@@ -216,12 +216,12 @@ func ShmServerCreate(runDir, serviceName string, sessionID uint64, reqCapacity, 
 	// The safe way: dup the fd, then close the file.
 	newFd, err := syscall.Dup(fd)
 	if err != nil {
-		syscall.Munmap(data)
-		f.Close()
-		os.Remove(path)
+		_ = syscall.Munmap(data)
+		_ = f.Close()
+		_ = os.Remove(path)
 		return nil, fmt.Errorf("%w: dup: %v", ErrShmOpen, err)
 	}
-	f.Close() // closes original fd
+	_ = f.Close() // closes original fd
 
 	return &ShmContext{
 		role:             ShmRoleServer,
@@ -242,15 +242,15 @@ func ShmServerCreate(runDir, serviceName string, sessionID uint64, reqCapacity, 
 // ShmDestroy destroys a server SHM region (munmap, close, unlink).
 func (c *ShmContext) ShmDestroy() {
 	if c.data != nil {
-		syscall.Munmap(c.data)
+		_ = syscall.Munmap(c.data)
 		c.data = nil
 	}
 	if c.fd >= 0 {
-		syscall.Close(c.fd)
+		_ = syscall.Close(c.fd)
 		c.fd = -1
 	}
 	if c.path != "" {
-		os.Remove(c.path)
+		_ = os.Remove(c.path)
 		c.path = ""
 	}
 }
@@ -266,7 +266,7 @@ func ShmClientAttach(runDir, serviceName string, sessionID uint64) (*ShmContext,
 		return nil, err
 	}
 
-	f, err := os.OpenFile(path, os.O_RDWR, 0)
+	f, err := os.OpenFile(path, os.O_RDWR, 0) // #nosec G304 -- path is built from runDir, validated service name, and hex session ID.
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrShmOpen, err)
 	}
@@ -274,45 +274,45 @@ func ShmClientAttach(runDir, serviceName string, sessionID uint64) (*ShmContext,
 
 	info, err := f.Stat()
 	if err != nil {
-		f.Close()
+		_ = f.Close()
 		return nil, fmt.Errorf("%w: stat: %v", ErrShmOpen, err)
 	}
 
 	fileSize := int(info.Size())
 	if fileSize < int(shmHeaderLen) {
-		f.Close()
+		_ = f.Close()
 		return nil, ErrShmNotReady
 	}
 
 	data, err := syscall.Mmap(fd, 0, fileSize,
 		syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
-		f.Close()
+		_ = f.Close()
 		return nil, fmt.Errorf("%w: %v", ErrShmMmap, err)
 	}
 
 	// Acquire fence
-	atomic.LoadUint32((*uint32)(unsafe.Pointer(&data[shmHeaderReqSignalOff])))
+	atomic.LoadUint32((*uint32)(unsafe.Pointer(&data[shmHeaderReqSignalOff]))) // #nosec G103 -- mmap header fields require raw aligned atomic access.
 
 	// Validate header
 	magic := binary.NativeEndian.Uint32(data[shmHeaderMagicOff : shmHeaderMagicOff+4])
 	if magic != shmRegionMagic {
-		syscall.Munmap(data)
-		f.Close()
+		_ = syscall.Munmap(data)
+		_ = f.Close()
 		return nil, ErrShmBadMagic
 	}
 
 	version := binary.NativeEndian.Uint16(data[shmHeaderVersionOff : shmHeaderVersionOff+2])
 	if version != shmRegionVersion {
-		syscall.Munmap(data)
-		f.Close()
+		_ = syscall.Munmap(data)
+		_ = f.Close()
 		return nil, ErrShmBadVersion
 	}
 
 	hdrLen := binary.NativeEndian.Uint16(data[shmHeaderHeaderLenOff : shmHeaderHeaderLenOff+2])
 	if hdrLen != uint16(shmHeaderLen) {
-		syscall.Munmap(data)
-		f.Close()
+		_ = syscall.Munmap(data)
+		_ = f.Close()
 		return nil, ErrShmBadHeader
 	}
 
@@ -323,8 +323,8 @@ func ShmClientAttach(runDir, serviceName string, sessionID uint64) (*ShmContext,
 
 	headerEnd := shmAlign64(uint32(shmHeaderLen))
 	if reqOff < headerEnd || reqCap == 0 || respOff < headerEnd || respCap == 0 {
-		syscall.Munmap(data)
-		f.Close()
+		_ = syscall.Munmap(data)
+		_ = f.Close()
 		return nil, ErrShmNotReady
 	}
 
@@ -333,8 +333,8 @@ func ShmClientAttach(runDir, serviceName string, sessionID uint64) (*ShmContext,
 		respOff%shmRegionAlignment != 0 ||
 		respCap%shmRegionAlignment != 0 ||
 		respOff < shmAlign64(reqOff+reqCap) {
-		syscall.Munmap(data)
-		f.Close()
+		_ = syscall.Munmap(data)
+		_ = f.Close()
 		return nil, ErrShmBadSize
 	}
 
@@ -343,22 +343,22 @@ func ShmClientAttach(runDir, serviceName string, sessionID uint64) (*ShmContext,
 	respEnd := int(respOff) + int(respCap)
 	needed := max(respEnd, reqEnd)
 	if fileSize < needed {
-		syscall.Munmap(data)
-		f.Close()
+		_ = syscall.Munmap(data)
+		_ = f.Close()
 		return nil, ErrShmBadSize
 	}
 
 	// Read current sequence numbers
 	curReqSeq, err := atomicLoadU64(data, shmHeaderReqSeqOff)
 	if err != nil {
-		syscall.Munmap(data)
-		f.Close()
+		_ = syscall.Munmap(data)
+		_ = f.Close()
 		return nil, fmt.Errorf("%w: load req_seq: %v", ErrShmBadParam, err)
 	}
 	curRespSeq, err := atomicLoadU64(data, shmHeaderRespSeqOff)
 	if err != nil {
-		syscall.Munmap(data)
-		f.Close()
+		_ = syscall.Munmap(data)
+		_ = f.Close()
 		return nil, fmt.Errorf("%w: load resp_seq: %v", ErrShmBadParam, err)
 	}
 	ownerGen := binary.NativeEndian.Uint32(data[shmHeaderOwnerGenOff : shmHeaderOwnerGenOff+4])
@@ -366,11 +366,11 @@ func ShmClientAttach(runDir, serviceName string, sessionID uint64) (*ShmContext,
 	// Dup fd and close file
 	newFd, err := syscall.Dup(fd)
 	if err != nil {
-		syscall.Munmap(data)
-		f.Close()
+		_ = syscall.Munmap(data)
+		_ = f.Close()
 		return nil, fmt.Errorf("%w: dup: %v", ErrShmOpen, err)
 	}
-	f.Close()
+	_ = f.Close()
 
 	return &ShmContext{
 		role:             ShmRoleClient,
@@ -391,11 +391,11 @@ func ShmClientAttach(runDir, serviceName string, sessionID uint64) (*ShmContext,
 // ShmClose closes a client SHM context (no unlink).
 func (c *ShmContext) ShmClose() {
 	if c.data != nil {
-		syscall.Munmap(c.data)
+		_ = syscall.Munmap(c.data)
 		c.data = nil
 	}
 	if c.fd >= 0 {
-		syscall.Close(c.fd)
+		_ = syscall.Close(c.fd)
 		c.fd = -1
 	}
 }
@@ -527,7 +527,7 @@ func (c *ShmContext) ShmReceive(buf []byte, timeoutMs uint32) (int, error) {
 		var deadlineNs uint64
 		if timeoutMs > 0 {
 			var nowTs syscall.Timespec
-			syscall.Syscall(syscall.SYS_CLOCK_GETTIME, 1 /* CLOCK_MONOTONIC */, uintptr(unsafe.Pointer(&nowTs)), 0)
+			syscall.Syscall(syscall.SYS_CLOCK_GETTIME, 1 /* CLOCK_MONOTONIC */, uintptr(unsafe.Pointer(&nowTs)), 0) // #nosec G103 -- syscall requires passing a Timespec pointer.
 			deadlineNs = uint64(nowTs.Sec)*1_000_000_000 + uint64(nowTs.Nsec) +
 				uint64(timeoutMs)*1_000_000
 		}
@@ -550,7 +550,7 @@ func (c *ShmContext) ShmReceive(buf []byte, timeoutMs uint32) (int, error) {
 			var ts *syscall.Timespec
 			if deadlineNs > 0 {
 				var nowTs syscall.Timespec
-				syscall.Syscall(syscall.SYS_CLOCK_GETTIME, 1 /* CLOCK_MONOTONIC */, uintptr(unsafe.Pointer(&nowTs)), 0)
+				syscall.Syscall(syscall.SYS_CLOCK_GETTIME, 1 /* CLOCK_MONOTONIC */, uintptr(unsafe.Pointer(&nowTs)), 0) // #nosec G103 -- syscall requires passing a Timespec pointer.
 				nowVal := uint64(nowTs.Sec)*1_000_000_000 + uint64(nowTs.Nsec)
 				if nowVal >= deadlineNs {
 					return 0, ErrShmTimeout
@@ -654,7 +654,7 @@ func atomicLoadU64(data []byte, off int) (uint64, error) {
 	if off < 0 || off+8 > len(data) {
 		return 0, errShmOutOfBounds
 	}
-	ptr := (*uint64)(unsafe.Pointer(&data[off]))
+	ptr := (*uint64)(unsafe.Pointer(&data[off])) // #nosec G103 -- mmap header fields require raw aligned atomic access.
 	return atomic.LoadUint64(ptr), nil
 }
 
@@ -662,7 +662,7 @@ func atomicLoadU32(data []byte, off int) (uint32, error) {
 	if off < 0 || off+4 > len(data) {
 		return 0, errShmOutOfBounds
 	}
-	ptr := (*uint32)(unsafe.Pointer(&data[off]))
+	ptr := (*uint32)(unsafe.Pointer(&data[off])) // #nosec G103 -- mmap header fields require raw aligned atomic access.
 	return atomic.LoadUint32(ptr), nil
 }
 
@@ -670,7 +670,7 @@ func atomicStoreU32(data []byte, off int, val uint32) error {
 	if off < 0 || off+4 > len(data) {
 		return errShmOutOfBounds
 	}
-	ptr := (*uint32)(unsafe.Pointer(&data[off]))
+	ptr := (*uint32)(unsafe.Pointer(&data[off])) // #nosec G103 -- mmap header fields require raw aligned atomic access.
 	atomic.StoreUint32(ptr, val)
 	return nil
 }
@@ -679,7 +679,7 @@ func atomicAddU64(data []byte, off int, val uint64) error {
 	if off < 0 || off+8 > len(data) {
 		return errShmOutOfBounds
 	}
-	ptr := (*uint64)(unsafe.Pointer(&data[off]))
+	ptr := (*uint64)(unsafe.Pointer(&data[off])) // #nosec G103 -- mmap header fields require raw aligned atomic access.
 	atomic.AddUint64(ptr, val)
 	return nil
 }
@@ -688,7 +688,7 @@ func atomicAddU32(data []byte, off int, val uint32) error {
 	if off < 0 || off+4 > len(data) {
 		return errShmOutOfBounds
 	}
-	ptr := (*uint32)(unsafe.Pointer(&data[off]))
+	ptr := (*uint32)(unsafe.Pointer(&data[off])) // #nosec G103 -- mmap header fields require raw aligned atomic access.
 	atomic.AddUint32(ptr, val)
 	return nil
 }
@@ -697,7 +697,7 @@ func futexWakeCall(data []byte, off int, count int) int {
 	if off < 0 || off+4 > len(data) {
 		return -1
 	}
-	addr := unsafe.Pointer(&data[off])
+	addr := unsafe.Pointer(&data[off]) // #nosec G103 -- futex needs the address of the mmap signal word.
 	r1, _, _ := syscall.Syscall6(
 		syscall.SYS_FUTEX,
 		uintptr(addr),
@@ -712,10 +712,10 @@ func futexWaitCall(data []byte, off int, expected uint32, ts *syscall.Timespec) 
 	if off < 0 || off+4 > len(data) {
 		return -1
 	}
-	addr := unsafe.Pointer(&data[off])
+	addr := unsafe.Pointer(&data[off]) // #nosec G103 -- futex needs the address of the mmap signal word.
 	var tsPtr uintptr
 	if ts != nil {
-		tsPtr = uintptr(unsafe.Pointer(ts))
+		tsPtr = uintptr(unsafe.Pointer(ts)) // #nosec G103 -- futex syscall requires an optional Timespec pointer.
 	}
 	r1, _, errno := syscall.Syscall6(
 		syscall.SYS_FUTEX,
@@ -742,6 +742,7 @@ func ShmCleanupStale(runDir, serviceName string) {
 	if err != nil {
 		return
 	}
+	allowStaleUnlink := runDirAllowsStaleUnlink(runDir)
 	prefix := serviceName + "-"
 	suffix := ".ipcshm"
 	for _, e := range entries {
@@ -756,7 +757,7 @@ func ShmCleanupStale(runDir, serviceName string) {
 			continue
 		}
 		path := filepath.Join(runDir, name)
-		result := checkShmStale(path)
+		result := checkShmStale(path, allowStaleUnlink)
 		_ = result // checkShmStale already unlinks stale/invalid files
 	}
 }
@@ -774,47 +775,65 @@ const (
 	shmStaleInvalid
 )
 
-func checkShmStale(path string) shmStaleResult {
+func removeStalePath(path string, allowStaleUnlink bool) bool {
+	if !allowStaleUnlink {
+		return false
+	}
+	err := os.Remove(path)
+	return err == nil || os.IsNotExist(err)
+}
+
+func checkShmStale(path string, allowStaleUnlink bool) shmStaleResult {
 	info, err := os.Stat(path)
 	if err != nil {
 		return shmStaleNotExist
 	}
 
 	if info.Size() < int64(shmHeaderLen) {
-		os.Remove(path)
+		if !removeStalePath(path, allowStaleUnlink) {
+			return shmStaleLive
+		}
 		return shmStaleInvalid
 	}
 
-	f, err := os.Open(path)
+	f, err := os.Open(path) // #nosec G304 -- path comes from the validated SHM cleanup scan or buildShmPath.
 	if err != nil {
-		os.Remove(path)
+		if !removeStalePath(path, allowStaleUnlink) {
+			return shmStaleLive
+		}
 		return shmStaleInvalid
 	}
 
 	data, err := syscall.Mmap(int(f.Fd()), 0, int(shmHeaderLen),
 		syscall.PROT_READ, syscall.MAP_SHARED)
-	f.Close()
+	_ = f.Close()
 	if err != nil {
-		os.Remove(path)
+		if !removeStalePath(path, allowStaleUnlink) {
+			return shmStaleLive
+		}
 		return shmStaleInvalid
 	}
 
 	magic := binary.NativeEndian.Uint32(data[shmHeaderMagicOff : shmHeaderMagicOff+4])
 	if magic != shmRegionMagic {
-		syscall.Munmap(data)
-		os.Remove(path)
+		_ = syscall.Munmap(data)
+		if !removeStalePath(path, allowStaleUnlink) {
+			return shmStaleLive
+		}
 		return shmStaleInvalid
 	}
 
 	ownerPid := int(int32(binary.NativeEndian.Uint32(data[shmHeaderOwnerPidOff : shmHeaderOwnerPidOff+4])))
 	ownerGen := binary.NativeEndian.Uint32(data[shmHeaderOwnerGenOff : shmHeaderOwnerGenOff+4])
-	syscall.Munmap(data)
+	_ = syscall.Munmap(data)
 
 	if pidAlive(ownerPid) && ownerGen != 0 {
 		return shmStaleLive
 	}
 
 	// Dead owner or zero generation (PID reuse / legacy) — stale
-	os.Remove(path)
+	if !removeStalePath(path, allowStaleUnlink) {
+		return shmStaleLive
+	}
 	return shmStaleRecovered
 }
