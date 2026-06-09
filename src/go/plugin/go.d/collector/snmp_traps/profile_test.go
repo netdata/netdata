@@ -888,6 +888,15 @@ traps:
 	assert.Contains(t, msg, "10.0.0.1")
 }
 
+func TestRenderMessageResolvesTabularVarbindInstances(t *testing.T) {
+	td := testIFMIBLinkDownTrapDef()
+	entry := testIFMIBLinkDownEntry()
+
+	msg := renderMessage(entry, td)
+
+	assert.Equal(t, "Link 1 operational state changed to down on 198.51.100.10.", msg)
+}
+
 func TestRenderMessageMissingVarbind(t *testing.T) {
 	dir := t.TempDir()
 	writeProfileYAML(t, dir, "test.yaml", `
@@ -969,6 +978,88 @@ func TestRenderMessageNumericOIDRawRef(t *testing.T) {
 
 	msg := renderMessage(entry, td)
 	assert.Contains(t, msg, "2")
+}
+
+func TestResolveVarbindRawResolvesTabularVarbindInstance(t *testing.T) {
+	td := testIFMIBLinkDownTrapDef()
+	entry := testIFMIBLinkDownEntry()
+
+	got := resolveVarbindRaw("ifOperStatus", entry, td)
+
+	assert.Equal(t, "2", got)
+}
+
+func TestFindVarbindForProfileOIDExactMatchWins(t *testing.T) {
+	entry := &TrapEntry{
+		Varbinds: []VarbindValue{
+			{OID: testIFMIBIfIndexOID + ".1", Type: "INTEGER", Value: int64(1)},
+			{OID: testIFMIBIfIndexOID, Type: "INTEGER", Value: int64(99)},
+		},
+	}
+
+	got, ok := findVarbindForProfileOID(entry, testIFMIBIfIndexOID)
+
+	require.True(t, ok)
+	assert.Equal(t, testIFMIBIfIndexOID, got.OID)
+	assert.Equal(t, int64(99), got.Value)
+}
+
+func TestOIDMatchesColumnRequiresArcBoundary(t *testing.T) {
+	assert.True(t, oidMatchesColumn(testIFMIBIfOperStatusOID, testIFMIBIfOperStatusOID+".1"))
+	assert.False(t, oidMatchesColumn(testIFMIBIfOperStatusOID, testIFMIBIfOperStatusOID))
+	assert.False(t, oidMatchesColumn(testIFMIBIfOperStatusOID, testIFMIBIfOperStatusOID+"0.1"))
+}
+
+func TestFindVarbindForProfileOIDFirstMatchingInstanceWins(t *testing.T) {
+	entry := &TrapEntry{
+		Varbinds: []VarbindValue{
+			{OID: testIFMIBIfIndexOID + ".2", Type: "INTEGER", Value: int64(2)},
+			{OID: testIFMIBIfIndexOID + ".1", Type: "INTEGER", Value: int64(1)},
+		},
+	}
+
+	got, ok := findVarbindForProfileOID(entry, testIFMIBIfIndexOID)
+
+	require.True(t, ok)
+	assert.Equal(t, testIFMIBIfIndexOID+".2", got.OID)
+	assert.Equal(t, int64(2), got.Value)
+}
+
+func TestFindVarbindForProfileOIDMatchesScalarZeroInstance(t *testing.T) {
+	const sysNameOID = "1.3.6.1.2.1.1.5"
+	entry := &TrapEntry{
+		Varbinds: []VarbindValue{
+			{OID: sysNameOID + ".0", Type: "OctetString", Value: "switch01"},
+		},
+	}
+
+	got, ok := findVarbindForProfileOID(entry, sysNameOID)
+
+	require.True(t, ok)
+	assert.Equal(t, sysNameOID+".0", got.OID)
+	assert.Equal(t, "switch01", got.Value)
+}
+
+func TestFindVarbindDefForObservedOIDUsesLongestColumnPrefix(t *testing.T) {
+	td := &TrapDef{
+		sharedVarbinds: map[string]*VarbindDef{
+			"1.3.6.1.4.1.999.1": {
+				OID:     "1.3.6.1.4.1.999.1",
+				Type:    "INTEGER",
+				rawName: "shortColumn",
+			},
+			"1.3.6.1.4.1.999.1.1": {
+				OID:     "1.3.6.1.4.1.999.1.1",
+				Type:    "INTEGER",
+				rawName: "longColumn",
+			},
+		},
+	}
+
+	got := findVarbindDefForObservedOID(td, "1.3.6.1.4.1.999.1.1.7")
+
+	require.NotNil(t, got)
+	assert.Equal(t, "longColumn", got.rawName)
 }
 
 func TestRenderMessageMalformedNumericOIDRawRef(t *testing.T) {
@@ -1352,6 +1443,19 @@ traps:
 	assert.Equal(t, "down", resolved.Enum)
 }
 
+func TestResolve2TierResolvesTabularVarbindInstance(t *testing.T) {
+	td := testIFMIBLinkDownTrapDef()
+	raw := VarbindValue{OID: testIFMIBIfOperStatusOID + ".1", Type: "INTEGER", Value: int64(2)}
+
+	resolved := resolve2TierVarbind(raw.OID, raw, td)
+
+	assert.Equal(t, "ifOperStatus", resolved.Name)
+	assert.Equal(t, testIFMIBIfOperStatusOID+".1", resolved.OID)
+	assert.Equal(t, ASN1Type("INTEGER"), resolved.Type)
+	assert.Equal(t, int64(2), resolved.Value)
+	assert.Equal(t, "down", resolved.Enum)
+}
+
 // =============================================================================
 // Stock profile index verification
 // =============================================================================
@@ -1384,6 +1488,79 @@ func TestStockProfileIndexLoads(t *testing.T) {
 // =============================================================================
 // Test helpers
 // =============================================================================
+
+const (
+	testIFMIBLinkDownOID      = "1.3.6.1.6.3.1.1.5.3"
+	testIFMIBIfIndexOID       = "1.3.6.1.2.1.2.2.1.1"
+	testIFMIBIfAdminStatusOID = "1.3.6.1.2.1.2.2.1.7"
+	testIFMIBIfOperStatusOID  = "1.3.6.1.2.1.2.2.1.8"
+)
+
+func testIFMIBLinkDownTrapDef() *TrapDef {
+	return &TrapDef{
+		OID:         testIFMIBLinkDownOID,
+		Name:        "IF-MIB::linkDown",
+		Category:    "state_change",
+		Severity:    "warning",
+		Description: "Link {ifIndex} operational state changed to {ifOperStatus} on {_HOSTNAME}.",
+		VarbindRefs: []any{"ifIndex", "ifAdminStatus", "ifOperStatus"},
+		sharedVarbinds: map[string]*VarbindDef{
+			testIFMIBIfIndexOID: {
+				OID:     testIFMIBIfIndexOID,
+				Type:    "INTEGER",
+				rawName: "ifIndex",
+			},
+			testIFMIBIfAdminStatusOID: {
+				OID:     testIFMIBIfAdminStatusOID,
+				Type:    "INTEGER",
+				rawName: "ifAdminStatus",
+				Enum: map[string]string{
+					"1": "up",
+					"2": "down",
+					"3": "testing",
+				},
+			},
+			testIFMIBIfOperStatusOID: {
+				OID:     testIFMIBIfOperStatusOID,
+				Type:    "INTEGER",
+				rawName: "ifOperStatus",
+				Enum: map[string]string{
+					"1": "up",
+					"2": "down",
+					"3": "testing",
+				},
+			},
+		},
+	}
+}
+
+func testIFMIBLinkDownEntry() *TrapEntry {
+	return &TrapEntry{
+		TrapOID:  testIFMIBLinkDownOID,
+		TrapName: "IF-MIB::linkDown",
+		SourceIP: "198.51.100.10",
+		Varbinds: []VarbindValue{
+			{OID: testIFMIBIfIndexOID + ".1", Type: "INTEGER", Value: int64(1)},
+			{OID: testIFMIBIfAdminStatusOID + ".1", Type: "INTEGER", Value: int64(1)},
+			{OID: testIFMIBIfOperStatusOID + ".1", Type: "INTEGER", Value: int64(2)},
+		},
+	}
+}
+
+func testIFMIBLinkDownPDU() *TrapPDU {
+	return &TrapPDU{
+		OID:      testIFMIBLinkDownOID,
+		SourceIP: "198.51.100.10",
+		PeerIP:   "198.51.100.10",
+		Version:  SnmpVersionV2c,
+		PduType:  PduTypeTrap,
+		Varbinds: []VarbindValue{
+			{OID: testIFMIBIfIndexOID + ".1", Type: "INTEGER", Value: int64(1)},
+			{OID: testIFMIBIfAdminStatusOID + ".1", Type: "INTEGER", Value: int64(1)},
+			{OID: testIFMIBIfOperStatusOID + ".1", Type: "INTEGER", Value: int64(2)},
+		},
+	}
+}
 
 func writeProfileYAML(t *testing.T, dir, name, content string) {
 	t.Helper()

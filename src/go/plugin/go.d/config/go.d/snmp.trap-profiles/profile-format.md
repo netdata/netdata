@@ -195,8 +195,16 @@ before the final OID arc. For example, a received
 `1.3.6.1.4.1.14179.2.6.3.24`, and the reverse is also true. If both forms are
 present as separate profile entries, the exact match wins.
 
-This tolerance applies only to trap OID lookup. Varbind OIDs are matched
-exactly.
+This tolerance applies only to trap OID lookup.
+
+Varbind OID resolution is exact-match-first. If a profile varbind OID does not
+exactly match a received PDU varbind OID, it also matches received varbind OIDs
+under `profile_oid + "."`. This covers SMI table cells such as `ifIndex.1` for
+a profile column OID `ifIndex`, and scalar `.0` instances for profiles that use
+the base scalar OID. When mapping a received PDU varbind OID back to profile
+metadata, exact match wins; otherwise the longest matching profile varbind OID
+prefix wins. The trap-OID `.0.` alternate spelling rule is not applied to
+varbind OIDs.
 
 When deduplication is enabled in a later SOW and a configured
 `dedup_key_varbinds` varbind is absent from a received PDU, the fingerprint

@@ -265,6 +265,36 @@ func TestSerializeToJournalFieldsTRAPJSONShape(t *testing.T) {
 	}
 }
 
+func TestSerializeToJournalFieldsTRAPJSONUsesProfileNamesForTabularVarbindInstances(t *testing.T) {
+	td := testIFMIBLinkDownTrapDef()
+	entry := trapEntryFromPDU("local", testIFMIBLinkDownPDU(), td, 1000000, 1000)
+
+	fields, err := serializeToJournalFields(entry)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fieldMap := fieldsToMap(fields)
+
+	var obj map[string]map[string]any
+	if err := json.Unmarshal([]byte(fieldMap["TRAP_JSON"]), &obj); err != nil {
+		t.Fatalf("TRAP_JSON not valid: %v", err)
+	}
+
+	if _, ok := obj[testIFMIBIfOperStatusOID+".1"]; ok {
+		t.Fatalf("TRAP_JSON kept raw instance OID key %q instead of profile varbind name", testIFMIBIfOperStatusOID+".1")
+	}
+	status, ok := obj["ifOperStatus"]
+	if !ok {
+		t.Fatalf("ifOperStatus key not found in TRAP_JSON: %v", obj)
+	}
+	if status["oid"] != testIFMIBIfOperStatusOID+".1" {
+		t.Fatalf("ifOperStatus oid = %v, want %s", status["oid"], testIFMIBIfOperStatusOID+".1")
+	}
+	if status["enum"] != "down" {
+		t.Fatalf("ifOperStatus enum = %v, want down", status["enum"])
+	}
+}
+
 func TestSerializeToJournalFieldsDuplicateJSONKeys(t *testing.T) {
 	entry := &TrapEntry{
 		JobName:               "local",

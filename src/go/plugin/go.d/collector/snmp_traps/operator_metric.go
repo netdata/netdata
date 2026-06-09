@@ -224,10 +224,8 @@ func resolveMetricDimValue(entry *TrapEntry, td *TrapDef, varbindName string, bo
 		return "<missing>"
 	}
 
-	for _, v := range entry.Varbinds {
-		if v.OID == vb.OID {
-			return bound.Value(v, vb)
-		}
+	if v, ok := findVarbindForProfileOID(entry, vb.OID); ok {
+		return bound.Value(v, vb)
 	}
 	return "<missing>"
 }

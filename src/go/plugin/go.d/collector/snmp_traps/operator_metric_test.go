@@ -497,6 +497,34 @@ func TestOperatorMetricsIncDimensionFromVarbind(t *testing.T) {
 	}
 }
 
+func TestOperatorMetricsIncDimensionFromTabularVarbindInstance(t *testing.T) {
+	idx := makeTestProfileIndex(t)
+	td := idx.Lookup(ciscoConfigTrapOID)
+
+	cfg := []MetricConfig{
+		ciscoConfigMetric("snmp.trap.cisco_config", ciscoTerminalTypeVarbind),
+	}
+	om := newTestOperatorMetrics(t, cfg)
+
+	entry := ciscoConfigEntry(ciscoTerminalTypeOID+".99", int64(2), "")
+
+	om.inc(ciscoConfigTrapOID, entry, td)
+
+	om.metrics[0].dimMu.Lock()
+	ctr, ok := om.metrics[0].dimCounts["console"]
+	_, missingSeen := om.metrics[0].dimCounts["<missing>"]
+	om.metrics[0].dimMu.Unlock()
+	if !ok {
+		t.Fatalf("dimCounts does not contain 'console', got %v", om.metrics[0].dimCounts)
+	}
+	if missingSeen {
+		t.Fatal("tabular varbind instance was counted as <missing>")
+	}
+	if ctr.Load() != 1 {
+		t.Fatalf("console count = %d, want 1", ctr.Load())
+	}
+}
+
 func TestOperatorMetricsDimensionValuesStayBoundedAtRuntime(t *testing.T) {
 	idx := makeTestProfileIndex(t)
 

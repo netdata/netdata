@@ -314,7 +314,11 @@ The lookup contract is:
    - `enterprise.0.specific` -> `enterprise.specific`
    - `enterprise.specific` -> `enterprise.0.specific`
 3. Degenerate or too-short OIDs do not produce alternate matches.
-4. The tolerance applies only to trap-OID lookup. Varbind OID resolution is exact because varbind OIDs do not have this SMIv1 trap encoding ambiguity.
+4. The tolerance applies only to trap-OID lookup. Varbind OID resolution does
+   not use the SMIv1 / SMIv2 `.0.` trap-OID alternate-spelling rule. Varbinds
+   are resolved exact-match-first; if exact lookup misses, a profile varbind OID
+   also matches received PDU varbind OIDs under `profile_oid + "."` so table
+   cells and scalar `.0` instances resolve against their profile metadata.
 
 Operators and generated profiles may therefore use the canonical OID form produced by their MIB tooling. The receiver still matches traps sent by devices that use the alternate SMI form. Exact-match precedence prevents the fallback from overriding an explicitly-authored profile entry when both forms exist.
 
@@ -322,7 +326,13 @@ Operators and generated profiles may therefore use the canonical OID form produc
 
 The plugin resolves each varbind in the PDU in this order:
 
-1. **Profile file-scoped `varbinds:` table** — if the profile defines this varbind by OID, use its declared name, type, and (future) `display_hint` directly. The shipped OOB pack covers 437 vendor PENs / 71,787 traps with file-scoped varbind metadata — operators get rich decoding for top vendors without installing any MIB file.
+1. **Profile file-scoped `varbinds:` table** — if the profile defines this
+   varbind by OID, use its declared name, type, and (future) `display_hint`
+   directly. Lookup is exact-match-first; on miss, the longest profile varbind
+   OID that prefixes the received PDU OID as `profile_oid + "."` wins. The
+   shipped OOB pack covers 437 vendor PENs / 71,787 traps with file-scoped
+   varbind metadata — operators get rich decoding for top vendors without
+   installing any MIB file.
 2. **Raw fallback** — varbind not in any loaded profile. Render as OID-keyed entry with the ASN.1-decoded type only. The varbind still lands in `TRAP_JSON` (§11) with its OID and value; just without a symbolic name.
 
 There is **no runtime MIB compilation tier**. The plugin does not parse SMIv1/v2 MIB files at runtime; there is no `pysmi`/`gosmi`/Rust-MIB-crate dependency. Operators who need coverage for a vendor MIB not in the shipped OOB pack convert their MIB files to profile YAMLs **offline** using the shipped helper `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` and drop the resulting YAML into `/etc/netdata/go.d/snmp.trap-profiles/` (per the SNMP polling plugin pattern — see §15 and the user-facing documentation shipped with the plugin).

@@ -154,6 +154,29 @@ func TestTrapDeduperNumericOIDKeyVarbindNarrowFingerprint(t *testing.T) {
 	}
 }
 
+func TestTrapDeduperNumericColumnOIDKeyVarbindNarrowFingerprint(t *testing.T) {
+	d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil, "")
+	td := &TrapDef{DedupKeyVarbinds: []string{"1.3.6.1.2.1.2.2.1.1"}}
+
+	first := dedupTestColumnEntry("198.51.100.10", "1.3.6.1.2.1.2.2.1.1.1", "1")
+	_, suppressed := d.Admit(first, td, nil)
+	if suppressed {
+		t.Fatal("first occurrence was suppressed")
+	}
+
+	differentIfIndex := dedupTestColumnEntry("198.51.100.10", "1.3.6.1.2.1.2.2.1.1.2", "2")
+	_, suppressed = d.Admit(differentIfIndex, td, nil)
+	if suppressed {
+		t.Fatal("different column-OID key varbind value was suppressed")
+	}
+
+	sameIfIndex := dedupTestColumnEntry("198.51.100.10", "1.3.6.1.2.1.2.2.1.1.1", "1")
+	_, suppressed = d.Admit(sameIfIndex, td, nil)
+	if !suppressed {
+		t.Fatal("same column-OID key varbind value was not suppressed")
+	}
+}
+
 func TestTrapDeduperMissingKeyVarbindSentinelDiffersFromEmptyString(t *testing.T) {
 	d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil, "")
 	td := &TrapDef{DedupKeyVarbinds: []string{"ifAlias"}}
@@ -394,6 +417,18 @@ func dedupTestEntry(sourceIP, ifIndex string) *TrapEntry {
 		Varbinds: []VarbindValue{{
 			Name:  "ifIndex",
 			OID:   "1.3.6.1.2.1.2.2.1.1.1",
+			Type:  "Integer",
+			Value: ifIndex,
+		}},
+	}
+}
+
+func dedupTestColumnEntry(sourceIP, oid, ifIndex string) *TrapEntry {
+	return &TrapEntry{
+		SourceIP: sourceIP,
+		TrapOID:  "1.3.6.1.6.3.1.1.5.3",
+		Varbinds: []VarbindValue{{
+			OID:   oid,
 			Type:  "Integer",
 			Value: ifIndex,
 		}},

@@ -148,7 +148,7 @@ func resolveVarbindByName(name string, entry *TrapEntry, td *TrapDef) string {
 
 func resolveVarbindByOID(oid string, entry *TrapEntry, td *TrapDef) string {
 	if td != nil {
-		if vb := td.varbindByOID(oid); vb != nil {
+		if vb := findVarbindDefForObservedOID(td, oid); vb != nil {
 			return resolveVarbindValue(vb.rawName, oid, vb, entry)
 		}
 	}
@@ -172,10 +172,8 @@ func resolveVarbindRaw(name string, entry *TrapEntry, td *TrapDef) string {
 }
 
 func resolveVarbindValue(name, oid string, vb *VarbindDef, entry *TrapEntry) string {
-	for _, v := range entry.Varbinds {
-		if v.OID == oid {
-			return varbindDisplayValue(v, vb)
-		}
+	if v, ok := findVarbindForProfileOID(entry, oid); ok {
+		return varbindDisplayValue(v, vb)
 	}
 	return "<missing>"
 }
@@ -190,12 +188,60 @@ func resolveRawVarbindByName(name string, entry *TrapEntry) string {
 }
 
 func resolveRawVarbindByOID(oid string, entry *TrapEntry) string {
-	for _, v := range entry.Varbinds {
-		if v.OID == oid {
-			return varbindRawValue(v)
-		}
+	if v, ok := findVarbindForProfileOID(entry, oid); ok {
+		return varbindRawValue(v)
 	}
 	return "<missing>"
+}
+
+func oidMatchesColumn(profileOID, observedOID string) bool {
+	if profileOID == "" || observedOID == "" || profileOID == observedOID {
+		return false
+	}
+	return strings.HasPrefix(observedOID, profileOID+".")
+}
+
+func findVarbindForProfileOID(entry *TrapEntry, profileOID string) (VarbindValue, bool) {
+	if entry == nil || profileOID == "" {
+		return VarbindValue{}, false
+	}
+	for _, v := range entry.Varbinds {
+		if v.OID == profileOID {
+			return v, true
+		}
+	}
+	for _, v := range entry.Varbinds {
+		if oidMatchesColumn(profileOID, v.OID) {
+			return v, true
+		}
+	}
+	return VarbindValue{}, false
+}
+
+func findVarbindDefForObservedOID(td *TrapDef, observedOID string) *VarbindDef {
+	if td == nil || observedOID == "" || td.sharedVarbinds == nil {
+		return nil
+	}
+	if vb := td.varbindByOID(observedOID); vb != nil {
+		return vb
+	}
+
+	var best *VarbindDef
+	bestLen := -1
+	for oid, vb := range td.sharedVarbinds {
+		if vb == nil {
+			continue
+		}
+		profileOID := vb.OID
+		if profileOID == "" {
+			profileOID = oid
+		}
+		if oidMatchesColumn(profileOID, observedOID) && len(profileOID) > bestLen {
+			best = vb
+			bestLen = len(profileOID)
+		}
+	}
+	return best
 }
 
 // varbindDisplayValue renders a varbind as a string, using enum labels when available.
@@ -254,7 +300,7 @@ func truncateUTF8(s string, maxBytes int) string {
 // 2. Raw fallback (OID-keyed, ASN.1-decoded type only)
 func resolve2TierVarbind(oid string, raw VarbindValue, td *TrapDef) VarbindValue {
 	if td != nil {
-		if vb := td.varbindByOID(oid); vb != nil {
+		if vb := findVarbindDefForObservedOID(td, oid); vb != nil {
 			return VarbindValue{
 				Name:  vb.rawName,
 				OID:   oid,

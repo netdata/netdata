@@ -373,9 +373,12 @@ func dedupVarbind(entry *TrapEntry, name string) (VarbindValue, bool) {
 		return VarbindValue{}, false
 	}
 	for _, vb := range entry.Varbinds {
-		if vb.Name == name || (isNumericOID(name) && vb.OID == name) {
+		if vb.Name == name {
 			return vb, true
 		}
+	}
+	if isNumericOID(name) {
+		return findVarbindForProfileOID(entry, name)
 	}
 	return VarbindValue{}, false
 }
