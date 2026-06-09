@@ -52,6 +52,11 @@ int netdata_cachestat_runtime_snapshot_apps(
     struct netdata_ebpf_cachestat_pid_snapshot_list *out);
 void netdata_cachestat_runtime_free_apps_snapshot(struct netdata_ebpf_cachestat_pid_snapshot_list *out);
 int netdata_cachestat_runtime_delete_pid(struct netdata_ebpf_cachestat_runtime *rt, unsigned int pid);
+int netdata_cachestat_runtime_delete_pids(
+    struct netdata_ebpf_cachestat_runtime *rt,
+    unsigned int *pids,
+    size_t count);
+int netdata_cachestat_runtime_pid_is_alive(unsigned int pid);
 void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt);
 */
 import "C"
@@ -63,6 +68,13 @@ import (
 
 type CachestatRuntime struct {
 	ptr *C.struct_netdata_ebpf_cachestat_runtime
+
+	// appsBuf is a persistent output buffer reused across SnapshotApps calls
+	// so the per-cycle allocation pressure is zero in the steady state.
+	// Each call resets it to len==0 and rebuilds; the slice's backing array
+	// is preserved so growth is amortised.  Owned by the runtime; cleared
+	// (set to nil) in Close().
+	appsBuf []CachestatAppSnapshot
 }
 
 type CachestatRuntimeConfig struct {
@@ -200,12 +212,19 @@ func (r *CachestatRuntime) SnapshotApps(mapsPerCore bool) ([]CachestatAppSnapsho
 	}
 	defer C.netdata_cachestat_runtime_free_apps_snapshot(&cList)
 
+	// Reuse the persistent buffer.  Each cycle we reset to len==0 and
+	// rebuild from the C-side items.  growth is amortised via the preserved
+	// backing array; per-cycle allocation is zero in the steady state.
+	out := r.appsBuf[:0]
 	if cList.count == 0 || cList.items == nil {
+		r.appsBuf = out
 		return nil, nil
 	}
 
 	items := unsafe.Slice((*C.struct_netdata_ebpf_cachestat_pid_snapshot)(unsafe.Pointer(cList.items)), int(cList.count))
-	out := make([]CachestatAppSnapshot, 0, len(items))
+	if cap(out) < len(items) {
+		out = make([]CachestatAppSnapshot, 0, len(items))
+	}
 	for _, item := range items {
 		var comm [CachestatAppCommLen]byte
 		copy(comm[:], unsafe.Slice((*byte)(unsafe.Pointer(&item.comm[0])), CachestatAppCommLen))
@@ -220,7 +239,7 @@ func (r *CachestatRuntime) SnapshotApps(mapsPerCore bool) ([]CachestatAppSnapsho
 			MarkBufferDirty:    uint32(item.mark_buffer_dirty),
 		})
 	}
-
+	r.appsBuf = out
 	return out, nil
 }
 
@@ -236,6 +255,41 @@ func (r *CachestatRuntime) DeletePid(pid uint32) error {
 	return nil
 }
 
+// DeletePids removes a batch of stale PIDs in a single CGO call.  On
+// kernel >= 5.6 the runtime uses bpf_map_delete_batch; older kernels fall
+// back to a tight C loop of bpf_map_delete_elem.  Both paths also handle the
+// buffer/arena accumulator eviction.  The C-side single round-trip
+// replaces N CGO calls and amortises the cost of any per-call bookkeeping
+// (e.g. acc_htable_rebuild for the accumulator).
+//
+// An empty input is a no-op and never errors.
+func (r *CachestatRuntime) DeletePids(pids []uint32) error {
+	if r == nil || r.ptr == nil {
+		return ErrDisabled
+	}
+	if len(pids) == 0 {
+		return nil
+	}
+
+	if ret := C.netdata_cachestat_runtime_delete_pids(
+		r.ptr,
+		(*C.uint)(unsafe.Pointer(&pids[0])),
+		C.size_t(len(pids)),
+	); ret != 0 {
+		return fmt.Errorf("delete %d pids from cstat_pid failed: %d", len(pids), int(ret))
+	}
+
+	return nil
+}
+
+// PidIsAlive reports whether pid is currently a running process.  It uses
+// the same kill(pid, 0) check the legacy C collector used to detect exited
+// PIDs; this matches the historical semantics and avoids evicting PIDs
+// that are merely idle (no BPF ct activity).
+func PidIsAlive(pid uint32) bool {
+	return C.netdata_cachestat_runtime_pid_is_alive(C.uint(pid)) != 0
+}
+
 func (r *CachestatRuntime) Close() {
 	if r == nil || r.ptr == nil {
 		return
@@ -243,4 +297,5 @@ func (r *CachestatRuntime) Close() {
 
 	C.netdata_cachestat_runtime_close(r.ptr)
 	r.ptr = nil
+	r.appsBuf = nil
 }

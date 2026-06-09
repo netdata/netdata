@@ -36,7 +36,7 @@ func TestBuildCachestatPublish(t *testing.T) {
 	}
 }
 
-func TestCachestatSharedMemoryStoreEvictsAfterStaleCycles(t *testing.T) {
+func TestCachestatSharedMemoryStoreFlagsStaleAfterStaleCycles(t *testing.T) {
 	store := NewCachestatSharedMemoryStore()
 	app := libbpfloader.CachestatAppSnapshot{Pid: 42, Ppid: 1, Ct: 100, MarkPageAccessed: 10}
 
@@ -57,21 +57,21 @@ func TestCachestatSharedMemoryStoreEvictsAfterStaleCycles(t *testing.T) {
 		}
 	}
 
-	// One more call with unchanged ct — miss count reaches cachestatStaleCycles → evict.
+	// One more call with unchanged ct — miss count reaches cachestatStaleCycles.
+	// The store flags the PID as a stale candidate; the caller is responsible
+	// for the authoritative liveness check (libbpfloader.PidIsAlive) and the
+	// actual BPF map deletion.
 	stale := store.UpdateApps([]libbpfloader.CachestatAppSnapshot{app})
 	if len(stale) != 1 || stale[0] != 42 {
-		t.Fatalf("expected eviction of PID 42, got stale=%v", stale)
-	}
-	if len(store.Snapshot()) != 0 {
-		t.Fatalf("expected empty snapshot after eviction")
+		t.Fatalf("expected stale candidate for PID 42, got stale=%v", stale)
 	}
 }
 
-func TestCachestatSharedMemoryStoreNoEvictionWhenCtAdvances(t *testing.T) {
+func TestCachestatSharedMemoryStoreNoFlagWhenCtAdvances(t *testing.T) {
 	store := NewCachestatSharedMemoryStore()
 	app := libbpfloader.CachestatAppSnapshot{Pid: 7, Ct: 100}
 
-	// Drive the miss count to cachestatStaleCycles-1 (one cycle before eviction).
+	// Drive the miss count to cachestatStaleCycles-1 (one cycle before the flag).
 	for i := 0; i <= cachestatStaleCycles-1; i++ {
 		store.UpdateApps([]libbpfloader.CachestatAppSnapshot{app})
 	}
@@ -82,21 +82,21 @@ func TestCachestatSharedMemoryStoreNoEvictionWhenCtAdvances(t *testing.T) {
 	// Advance ct — miss count must reset to zero.
 	app.Ct = 200
 	if stale := store.UpdateApps([]libbpfloader.CachestatAppSnapshot{app}); len(stale) != 0 {
-		t.Fatalf("expected no eviction after ct advance, got stale=%v", stale)
+		t.Fatalf("expected no stale flag after ct advance, got stale=%v", stale)
 	}
 
 	// Now drive another cachestatStaleCycles-1 stale cycles — still below threshold.
 	for i := 0; i < cachestatStaleCycles-1; i++ {
 		stale := store.UpdateApps([]libbpfloader.CachestatAppSnapshot{app})
 		if len(stale) != 0 {
-			t.Fatalf("cycle %d after ct advance: unexpected eviction", i)
+			t.Fatalf("cycle %d after ct advance: unexpected flag", i)
 		}
 	}
 
-	// The cachestatStaleCycles-th stale cycle triggers eviction.
+	// The cachestatStaleCycles-th stale cycle flags the PID as a stale candidate.
 	stale := store.UpdateApps([]libbpfloader.CachestatAppSnapshot{app})
 	if len(stale) != 1 || stale[0] != 7 {
-		t.Fatalf("expected eviction of PID 7 after second stale run, got stale=%v", stale)
+		t.Fatalf("expected stale flag for PID 7 after second stale run, got stale=%v", stale)
 	}
 }
 

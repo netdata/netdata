@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <signal.h>
 #include <unistd.h>
 
 #include <bpf/bpf.h>
@@ -1145,6 +1147,93 @@ int netdata_cachestat_runtime_delete_pid(struct netdata_ebpf_cachestat_runtime *
         return -1;
 
     return bpf_map_delete_elem(fd, &pid);
+}
+
+/*
+ * Bulk delete: prefers bpf_map_delete_batch (kernel >= 5.6) when available;
+ * otherwise falls back to a tight C loop of bpf_map_delete_elem.  Both
+ * paths use the same fd as the single-delete path, so behaviour is
+ * equivalent to calling netdata_cachestat_runtime_delete_pid() for each pid.
+ *
+ * For the buffer/arena flavor (no cstat_pid map) the per-pid accumulator
+ * eviction is deferred to a single rebuild at the end of the batch so
+ * 100 evictions do not trigger 100 hash-table rebuilds.
+ */
+int netdata_cachestat_runtime_delete_pids(
+    struct netdata_ebpf_cachestat_runtime *rt,
+    uint32_t *pids,
+    size_t count)
+{
+    if (!rt || !pids || count == 0)
+        return 0;
+
+    struct bpf_object *obj = cachestat_runtime_object(rt);
+    if (!rt || !obj)
+        return -1;
+
+    struct bpf_map *map = bpf_object__find_map_by_name(obj, "cstat_pid");
+    if (!map) {
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
+        /* cachestat_acc_evict_tgid() internally rebuilds the acc_htable
+         * after every successful swap-with-last removal.  In a batch of
+         * N evictions this means N rebuilds — each O(acc_count) — plus
+         * one redundant final rebuild below.  Batched rebuild is a
+         * follow-up optimisation; for now we accept the O(N*acc_count)
+         * cost because eviction batches are typically small (≤ 10). */
+        for (size_t i = 0; i < count; i++) {
+            cachestat_acc_evict_tgid(rt, pids[i]);
+        }
+        if (rt->acc_count > 0)
+            acc_htable_rebuild(rt);
+#endif
+        return 0;
+    }
+
+    int fd = bpf_map__fd(map);
+    if (fd < 0)
+        return -1;
+
+    /* Try the batch helper first; fall back to per-key delete on ENOSYS
+     * (older kernels) or EINVAL/EOPNOTSUPP (the kernel rejected the batch
+     * shape).  ENOENT also falls through because htab_map_delete_batch
+     * stops at the first missing key — the remaining PIDs are still
+     * deletable individually, so we don't want one vanished PID to abort
+     * the whole batch.
+     *
+     * bpf_map_delete_batch takes __u32 count, not size_t, so we use a
+     * local; on overflow we skip the batch and go straight to the loop. */
+    if (count <= UINT32_MAX) {
+        uint32_t batch_count = (uint32_t)count;
+        int rc = bpf_map_delete_batch(fd, pids, &batch_count, NULL);
+        if (rc == 0)
+            return 0;
+        if (rc != -ENOSYS && rc != -EINVAL && rc != -EOPNOTSUPP && rc != -ENOENT)
+            return rc;
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        int per = bpf_map_delete_elem(fd, &pids[i]);
+        /* Treat "not found" as success: the PID may have been removed by
+         * the BPF program between snapshot and delete. */
+        if (per != 0 && per != -ENOENT)
+            return per;
+    }
+    return 0;
+}
+
+/*
+ * Liveness check matching the legacy C-version behavior: a process is
+ * alive iff kill(pid, 0) succeeds.  kill returns -1 with errno == ESRCH
+ * for a non-existent process, and -1 with EPERM for a process owned by
+ * another user (still alive).
+ */
+int netdata_cachestat_runtime_pid_is_alive(uint32_t pid)
+{
+    if (pid == 0)
+        return 0;
+    if (kill((pid_t)pid, 0) == 0)
+        return 1;
+    return (errno == EPERM) ? 1 : 0;
 }
 
 void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt)

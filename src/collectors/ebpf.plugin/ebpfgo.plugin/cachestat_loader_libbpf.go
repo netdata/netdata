@@ -38,16 +38,17 @@ func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, err
 		return nil, err
 	}
 
-	publisher, err := NewSharedPidMemoryPublisher(cfg.PidTableSize)
-	if err != nil {
-		rt.Close()
-		return nil, err
-	}
+	// The shared memory publisher is opened lazily on the first publish call
+	// (see runCachestatPlugin).  Opening here unconditionally would reserve
+	// ~17.5 MB of VMA and RSS for hosts that have neither apps nor cgroups
+	// integration enabled (the default), even though the SHM is never
+	// written or read.  The handle exposes the PidTableSize to the lazy
+	// open path.
 
 	return &CachestatLegacyHandle{
 		Plan:           plan,
 		Runtime:        rt,
-		SharedMemory:   publisher,
+		SharedMemory:   nil,
 		UpdateEvery:    cfg.UpdateEvery,
 		ConfigFound:    cfg.ConfigFound,
 		PidTableSize:   cfg.PidTableSize,

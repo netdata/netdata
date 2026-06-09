@@ -3,6 +3,7 @@
 #include "shared_pid_memory.h"
 
 #include <fcntl.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -40,18 +41,28 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total)
     ctx->shm_fd = -1;
     ctx->sem = SEM_FAILED;
 
-    // Unlink both objects before recreating so consumers detect a new inode on the
-    // SHM segment.  The consumer side checks st_dev/st_ino on every refresh cycle;
-    // when the inode changes it closes its old semaphore handle and reopens, which
-    // means it will pick up the new semaphore instead of holding a stale one.
-    // Unlinking just the semaphore (as was done before) left the SHM inode unchanged,
-    // so consumers never knew to reopen and ended up using a different semaphore
-    // than the publisher — breaking mutual exclusion.
-    shared_pid_memory_unlink_all();
-
+    /* A normal Close() unlinks both objects (see shared_pid_memory_close
+     * below), so on a clean restart shm_open with O_CREAT creates a fresh
+     * segment and the kernel zero-fills it.  The "reused" branch below
+     * therefore fires only on crash-restart: the prior publisher died
+     * before its Close() could unlink, the SHM name persists in the
+     * kernel, and the new shm_open reopens the same inode.  This is
+     * preferable to the previous behaviour (unlink on every open) which
+     * deleted the SHM the previous publisher was still writing to,
+     * breaking mutual exclusion on netdata respawn.
+     *
+     * We probe the pre-truncate size with fstat() to detect the reused
+     * case: a non-zero size means the crashed publisher left rows in the
+     * segment, and the new run must clear them — the kernel only
+     * zero-fills when shm_open creates a new segment.  Clearing on the
+     * reuse path preserves the original optimisation that avoids a
+     * 17.5 MB page-fault storm on the first-publish-after-create path. */
     ctx->shm_fd = shm_open(NETDATA_EBPFGO_INTEGRATION_NAME, O_CREAT | O_RDWR, 0660);
     if (ctx->shm_fd < 0)
         goto fail;
+
+    struct stat pre_stat;
+    bool reused = (fstat(ctx->shm_fd, &pre_stat) == 0) && (pre_stat.st_size > 0);
 
     ctx->total = total;
     size_t length = shared_pid_memory_nbytes(ctx);
@@ -64,11 +75,23 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total)
         goto fail;
     }
 
+    if (reused) {
+        /* Reused SHM: the previous run may have written rows beyond
+         * this run's high-water mark, and those rows would survive
+         * forever (publish's tail-zeroing only operates on prev_count
+         * which starts at 0).  Zero the segment so the consumer's
+         * binary search does not return stale PIDs from the prior
+         * run.  This is a one-time cost on restart, not per cycle. */
+        memset(ctx->entries, 0, length);
+    }
+
     ctx->sem = sem_open(NETDATA_EBPFGO_SHM_INTEGRATION_NAME, O_CREAT, 0660, 1);
     if (ctx->sem == SEM_FAILED)
         goto fail;
 
-    memset(ctx->entries, 0, length);
+    /* POSIX guarantees a newly-created shm_open segment is zero-filled,
+     * so when !reused we trust the kernel and skip the explicit memset
+     * (this preserves the per-startup 17.5 MB page-fault saving). */
     return ctx;
 
 fail:
@@ -94,8 +117,8 @@ int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_p
     if (entries && count)
         memcpy(ctx->entries, entries, count * sizeof(struct ebpf_pid_stat));
 
-    /* Zero only the slots vacated since the previous cycle.  The initial
-     * memset in shared_pid_memory_open already zeroed the entire segment, so
+    /* Zero only the slots vacated since the previous cycle.  POSIX
+     * guarantees the shm_open segment is zero-filled at create time, so
      * on the first call prev_count==0 and this is a no-op. */
     if (ctx->prev_count > count)
         memset(ctx->entries + count, 0,

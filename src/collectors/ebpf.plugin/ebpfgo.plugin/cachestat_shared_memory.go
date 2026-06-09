@@ -7,8 +7,10 @@ import (
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
 
-// cachestatStaleCycles is the number of consecutive collection cycles with no
-// ct advance before a PID entry is evicted from both the BPF map and the SHM.
+// cachestatStaleCycles is the debouncer window before a PID is flagged as a
+// stale candidate and the caller performs the authoritative liveness check
+// (libbpfloader.PidIsAlive).  Without this debouncer we would run kill() on
+// every PID every cycle, which is too expensive.
 const cachestatStaleCycles = 3
 
 type cachestatSharedMemoryStore struct {
@@ -127,8 +129,13 @@ func buildCachestatPidStat(app libbpfloader.CachestatAppSnapshot, previous netda
 }
 
 // UpdateApps updates the in-memory snapshot from the latest BPF snapshot.
-// It returns the PIDs that should be deleted from the kernel BPF map because
-// their ct has not advanced for cachestatStaleCycles consecutive cycles.
+// It returns the PIDs whose ct has not advanced for cachestatStaleCycles
+// consecutive cycles; the caller is responsible for the authoritative
+// liveness check (libbpfloader.PidIsAlive) before removing them from the
+// kernel BPF map.
+//
+// The store itself is liveness-agnostic so it can be unit-tested without a
+// running /proc and without pulling libbpf into the test binary.
 func (s *cachestatSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatAppSnapshot) []uint32 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -156,8 +163,9 @@ func (s *cachestatSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatApp
 		if seen && app.Ct == lastCt {
 			miss := s.missCount[app.Pid] + 1
 			if miss >= cachestatStaleCycles {
-				// ct has not advanced for cachestatStaleCycles cycles:
-				// treat the PID as exited and evict it.
+				// ct stagnation threshold reached.  The caller will
+				// confirm liveness via libbpfloader.PidIsAlive and
+				// delete from the BPF map only if the process is gone.
 				stalePIDs = append(stalePIDs, app.Pid)
 				continue
 			}

@@ -82,6 +82,19 @@ func (r *CachestatRuntime) DeletePid(pid uint32) error {
 	return ErrDisabled
 }
 
+func (r *CachestatRuntime) DeletePids(pids []uint32) error {
+	_ = pids
+	return ErrDisabled
+}
+
 func (r *CachestatRuntime) Close() {
 	// No-op in the disabled build because the runtime never acquired native resources.
+}
+
+// PidIsAlive is the package-level liveness probe; on the disabled build the
+// runtime never opens a BPF map and there is no PIDs to evict, so a
+// conservative "alive" answer keeps the existing behaviour (no eviction).
+func PidIsAlive(pid uint32) bool {
+	_ = pid
+	return true
 }
