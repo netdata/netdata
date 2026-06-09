@@ -44,11 +44,43 @@ Netdata v2.3.0 introduces two alerts specific to permanent nodes:
 | `streaming_never_connected` | A permanent node has never connected to a Parent.       |
 | `streaming_disconnected`    | A previously connected permanent node has disconnected. |
 
+:::important
+
+Both alerts are configured with `to: silent` by default. This means they trigger and appear on the Parent dashboard, but **do not send notifications** unless you explicitly enable them.
+
+:::
+
+### Enabling Notifications for Streaming Alerts
+
+1. **Override the alert to send notifications.** On the Parent node, create or edit `/etc/netdata/health.d/streaming.conf` (in the user config directory, not the stock file). Override the alert by changing `to: silent` to a role such as `sysadmin` or `admin`:
+
+   ```yaml
+   template: streaming_disconnected
+         on: netdata.streaming_inbound
+    chart labels: type=permanent
+         calc: ${stale disconnected}
+        units: nodes
+        every: 10s
+         warn: $netdata.uptime.uptime > 30 * 60 AND $this > 0
+        delay: up 5m down 5m multiplier 1.5 max 30m
+      summary: Permanent streaming nodes disconnected
+         info: Permanent child nodes disconnected from this parent.
+           to: sysadmin
+   ```
+
+   Alternatively, use the [Alerts Configuration Manager](/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md) in Netdata Cloud to override alert delivery settings without editing files manually. See [Overriding Stock Alerts](/src/health/overriding-stock-alerts.md) and [Alert Configuration Ordering](/src/health/alert-configuration-ordering.md) for details.
+
+2. **Reload health configuration** on the Parent:
+
+   ```bash
+   sudo netdatacli reload-health
+   ```
+
+3. **Enable Cloud notifications.** An administrator must [enable Alert notifications for the Space](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-notification-methods.md#manage-space-notification-settings). Without this step, Netdata Cloud will not forward any alert notifications.
+
 :::note
 
-Both alerts are configured with `to: silent` by default, which means they trigger internally but **do not send notifications**. To receive notifications when a permanent node disconnects or never connects, override the `to` recipient in the streaming health configuration.
-
-You can enable notifications by editing `health.d/streaming.conf` using `edit-config` on your Parent node and changing `to: silent` to a notification destination such as `sysadmin` or a specific endpoint. Alternatively, you can use the [Alerts Configuration Manager](/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md) in Netdata Cloud to override alert delivery settings without editing files manually. See the [Alert Configuration Ordering](/src/health/alert-configuration-ordering.md) reference for details on how configuration overrides are resolved.
+These alerts only apply to **permanent nodes**. Ephemeral nodes are excluded and do not trigger streaming disconnection alerts.
 
 :::
 
