@@ -98,9 +98,6 @@ func parseRetentionConfig(jc jsonRetentionConfig) (RetentionConfig, error) {
 			}
 			rc.RotateDur = &d
 		}
-	} else {
-		d := defaultRotateDur
-		rc.RotateDur = &d
 	}
 
 	return rc, validateRetention(rc)

@@ -97,7 +97,7 @@ func TestValidateRetention(t *testing.T) {
 				MaxSize:     new(defaultMaxSize),
 				MaxDuration: nil,
 				RotateSize:  nil,
-				RotateDur:   new(defaultRotateDur),
+				RotateDur:   nil,
 			},
 			wantErr: false,
 		},
@@ -106,7 +106,7 @@ func TestValidateRetention(t *testing.T) {
 				MaxSize:     nil,
 				MaxDuration: nil,
 				RotateSize:  nil,
-				RotateDur:   new(defaultRotateDur),
+				RotateDur:   nil,
 			},
 			wantErr: false,
 		},
@@ -115,7 +115,7 @@ func TestValidateRetention(t *testing.T) {
 				MaxSize:     new(uint64(0)),
 				MaxDuration: nil,
 				RotateSize:  nil,
-				RotateDur:   new(defaultRotateDur),
+				RotateDur:   nil,
 			},
 			wantErr: true,
 		},
@@ -124,7 +124,7 @@ func TestValidateRetention(t *testing.T) {
 				MaxSize:     new(defaultMaxSize),
 				MaxDuration: new(-1 * time.Second),
 				RotateSize:  nil,
-				RotateDur:   new(defaultRotateDur),
+				RotateDur:   nil,
 			},
 			wantErr: true,
 		},
@@ -151,7 +151,7 @@ func TestValidateRetention(t *testing.T) {
 				MaxSize:     new(defaultMaxSize),
 				MaxDuration: new(500 * time.Millisecond),
 				RotateSize:  nil,
-				RotateDur:   new(defaultRotateDur),
+				RotateDur:   nil,
 			},
 			wantErr: true,
 		},
@@ -214,12 +214,21 @@ func TestEffectiveRotateSize(t *testing.T) {
 	}
 }
 
-func TestParseRetentionConfig(t *testing.T) {
+func TestEffectiveRotateDurationDefaultDisabled(t *testing.T) {
+	if got := (RetentionConfig{}).EffectiveRotateDur(); got != 0 {
+		t.Fatalf("expected disabled default rotate duration, got %v", got)
+	}
+	if got := (RetentionConfig{RotateDur: new(1 * time.Hour)}).EffectiveRotateDur(); got != time.Hour {
+		t.Fatalf("expected explicit rotate duration 1h, got %v", got)
+	}
+}
+
+func TestParseRetentionConfigDefaults(t *testing.T) {
 	jc := jsonRetentionConfig{
 		MaxSize:     new("10GB"),
 		MaxDuration: nil,
 		RotateSize:  nil,
-		RotateDur:   new("1h"),
+		RotateDur:   nil,
 	}
 	rc, err := parseRetentionConfig(jc)
 	if err != nil {
@@ -231,6 +240,22 @@ func TestParseRetentionConfig(t *testing.T) {
 	if rc.MaxDuration != nil {
 		t.Fatalf("expected nil max_duration")
 	}
+	if rc.RotateDur != nil {
+		t.Fatalf("expected nil rotate_dur default, got %v", rc.RotateDur)
+	}
+	if got := rc.EffectiveRotateDur(); got != 0 {
+		t.Fatalf("expected disabled effective rotate_dur default, got %v", got)
+	}
+}
+
+func TestParseRetentionConfigExplicitRotationDuration(t *testing.T) {
+	jc := jsonRetentionConfig{
+		RotateDur: new("1h"),
+	}
+	rc, err := parseRetentionConfig(jc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if rc.RotateDur == nil || *rc.RotateDur != 1*time.Hour {
 		t.Fatalf("expected rotate_dur 1h, got %v", rc.RotateDur)
 	}
@@ -241,7 +266,7 @@ func TestParseRetentionConfigBothNull(t *testing.T) {
 		MaxSize:     new("null"),
 		MaxDuration: nil,
 		RotateSize:  nil,
-		RotateDur:   new("1h"),
+		RotateDur:   nil,
 	}
 	rc, err := parseRetentionConfig(jc)
 	if err != nil {

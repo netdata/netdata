@@ -79,6 +79,19 @@ func TestConfigSchemaDynCfgObjectFieldsHaveSafeDefaults(t *testing.T) {
 	}
 }
 
+func TestConfigSchemaDynCfgRetentionDefaultDisablesTimeRotation(t *testing.T) {
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(configSchema), &schema))
+
+	retention := schemaProperty(t, schema, "jsonSchema", "properties", "retention")
+	defaults, ok := retention["default"].(map[string]any)
+	require.Truef(t, ok, "retention default is %T", retention["default"])
+	assert.Nil(t, defaults["rotation_duration"])
+
+	rotationDuration := schemaProperty(t, schema, "jsonSchema", "properties", "retention", "properties", "rotation_duration")
+	assert.Nil(t, rotationDuration["default"])
+}
+
 func TestConfigSchemaDynCfgTabsRenderAllTopLevelFieldsOnce(t *testing.T) {
 	var schema map[string]any
 	require.NoError(t, json.Unmarshal([]byte(configSchema), &schema))

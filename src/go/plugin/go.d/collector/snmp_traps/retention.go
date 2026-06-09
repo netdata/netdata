@@ -12,14 +12,13 @@ import (
 )
 
 const (
-	defaultMaxSize   = uint64(10 * 1000 * 1000 * 1000) // 10 GB
-	defaultRotateDur = 1 * time.Hour
-	minRotationSize  = uint64(5 * 1024 * 1024)   // 5 MB
-	maxRotationSize  = uint64(200 * 1024 * 1024) // 200 MB
-	rotationSizeDiv  = 20
-	bytesPerKB       = 1024
-	bytesPerMB       = 1024 * 1024
-	bytesPerGB       = 1024 * 1024 * 1024
+	defaultMaxSize  = uint64(10 * 1000 * 1000 * 1000) // 10 GB
+	minRotationSize = uint64(5 * 1024 * 1024)         // 5 MB
+	maxRotationSize = uint64(200 * 1024 * 1024)       // 200 MB
+	rotationSizeDiv = 20
+	bytesPerKB      = 1024
+	bytesPerMB      = 1024 * 1024
+	bytesPerGB      = 1024 * 1024 * 1024
 )
 
 type RetentionConfig struct {
@@ -56,7 +55,7 @@ func (rc RetentionConfig) EffectiveRotateDur() time.Duration {
 	if rc.RotateDur != nil {
 		return *rc.RotateDur
 	}
-	return defaultRotateDur
+	return 0
 }
 
 func validateRetention(rc RetentionConfig) error {

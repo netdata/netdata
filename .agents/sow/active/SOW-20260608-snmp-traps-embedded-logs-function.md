@@ -499,6 +499,37 @@ Open decisions:
   - The public Go proxy had not indexed `v0.6.1` at update time, so the module
     was fetched directly from GitHub and the resulting checksum was recorded in
     `src/go/go.sum`.
+- Reviewed direct journal retention defaults after user questioned
+  `rotation_duration: 1h`.
+  Evidence:
+  - `defaultRotateDur` made omitted `retention.rotation_duration` become `1h`
+    at runtime, not only in the DynCfg schema.
+  - Size rotation is already automatic from `rotation_size: null`: `max_size/20`
+    clamped to 5MB-200MB, so the default `max_size: 10GB` rotates files around
+    200MB.
+  - Time rotation at `1h` can create many small files for low-volume trap jobs
+    without improving retention guarantees.
+  User decision:
+  - Default time-based rotation must be disabled. Operators may still set
+    `rotation_duration` explicitly when they want age-based file rotation.
+  Resolution target:
+  - Missing or `null` `retention.rotation_duration` must produce disabled
+    time-based rotation.
+  - DynCfg schema and generated/operator docs must show `rotation_duration:
+    null` as the default.
+  - Tests must prove the runtime default and explicit duration behavior.
+- Verified OTLP backend selection after user clarified that OTLP must be
+  independent of direct journal output.
+  Evidence:
+  - `c.OTLP.Enabled` is the only gate for creating the OTLP writer.
+  - `journal.enabled` only controls direct journal validation/creation.
+  - The combined validation rejects only the invalid case where both output
+    backends are disabled.
+  Resolution:
+  - No runtime code change needed.
+  - Updated schema and generated/operator docs wording to state that
+    `otlp.enabled: true` exports through OTLP regardless of `journal.enabled`;
+    `journal.enabled` only decides whether traps are also written locally.
 
 ## Validation
 

@@ -317,7 +317,7 @@
         "properties": {
           "enabled": {
             "title": "Enabled",
-            "description": "Enable OTLP/gRPC Logs export. This may run together with direct journal output or as the only output when journal.enabled is false.",
+            "description": "Enable OTLP/gRPC Logs export. When enabled, traps are exported through OTLP regardless of journal.enabled; if journal.enabled is true, traps are also written to local direct journals.",
             "type": "boolean",
             "default": false
           },
@@ -372,7 +372,7 @@
           "max_size": "10GB",
           "max_duration": null,
           "rotation_size": null,
-          "rotation_duration": "1h"
+          "rotation_duration": null
         },
         "additionalProperties": false,
         "properties": {
@@ -396,9 +396,9 @@
           },
           "rotation_duration": {
             "title": "Per-file rotation duration",
-            "description": "Maximum age of a single journal file before rotation. Set to null or 0 to disable time-based rotation.",
+            "description": "Maximum age of a single journal file before rotation. Null or 0 disables time-based rotation.",
             "type": ["string", "null"],
-            "default": "1h"
+            "default": null
           }
         }
       },
