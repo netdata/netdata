@@ -443,8 +443,10 @@ size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_
  */
 #ifdef ENABLE_JSONC
 size_t json_walk(json_object *t, void *callback_data, int (*callback_function)(struct json_entry *)) {
-    JSON_ENTRY e;
+    if (!t || json_object_get_type(t) != json_type_object)
+        return 0;
 
+    JSON_ENTRY e = { 0 };
     e.callback_data = callback_data;
     enum json_type type;
     json_object_object_foreach(t, key, val) {
