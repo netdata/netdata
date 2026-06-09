@@ -14,12 +14,22 @@ const maxMessageLen = 512
 // It resolves {varname}, {varname.raw}, {numeric.oid}, and special vars against the
 // current entry's varbinds and profile definition.
 func renderMessage(entry *TrapEntry, td *TrapDef) string {
-	tmpl := td.Description
+	tmpl := ""
+	if td != nil {
+		tmpl = td.Description
+	}
 	if tmpl == "" {
-		tmpl = "{TRAP_NAME} on {_HOSTNAME}."
+		tmpl = "{{trap_name}} on {{hostname}}."
 	}
 
-	result := renderTemplate(tmpl, entry, td)
+	var result string
+	if td != nil && td.descriptionTemplate != nil {
+		result = renderGoProfileTemplate(td.descriptionTemplate, tmpl, entry, td)
+	} else if isGoProfileTemplate(tmpl) {
+		result = renderGoProfileTemplate(nil, tmpl, entry, td)
+	} else {
+		result = renderTemplate(tmpl, entry, td)
+	}
 	if len(result) > maxMessageLen {
 		result = truncateUTF8(result, maxMessageLen-3) + "..."
 	}
@@ -34,7 +44,14 @@ func renderLabels(entry *TrapEntry, td *TrapDef) map[string]string {
 	}
 	labels := make(map[string]string, len(td.Labels))
 	for key, tmpl := range td.Labels {
-		val := renderTemplate(tmpl, entry, td)
+		var val string
+		if td.labelTemplates != nil && td.labelTemplates[key] != nil {
+			val = renderGoProfileTemplate(td.labelTemplates[key], tmpl, entry, td)
+		} else if isGoProfileTemplate(tmpl) {
+			val = renderGoProfileTemplate(nil, tmpl, entry, td)
+		} else {
+			val = renderTemplate(tmpl, entry, td)
+		}
 		labels[key] = val
 	}
 	return labels

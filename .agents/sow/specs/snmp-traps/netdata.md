@@ -339,27 +339,37 @@ There is **no runtime MIB compilation tier**. The plugin does not parse SMIv1/v2
 
 ### Description template syntax
 
-`{varname}` substitutions. Recognized references:
+`description` uses a restricted Go `text/template` subset. Supported functions:
 
 | Reference | Resolved to |
 |---|---|
-| `{ifDescr}`, `{ifIndex}`, `{cpsIfViolationMacAddress}`, … | Varbind by MIB symbolic name |
-| `{1.3.6.1.2.1.31.1.1.1.1}` | Varbind by numeric OID (fallback when no MIB name) |
-| `{_HOSTNAME}`, `{TRAP_SOURCE_IP}`, `{TRAP_NAME}`, `{TRAP_DEVICE_VENDOR}` | Standard journal fields |
-| `{TRAP_INTERFACE}`, `{TRAP_NEIGHBORS}` | Topology fields when co-located |
-| `{ifOperStatus}` | MIB enum value, symbolic (e.g., `down`) by default |
-| `{ifOperStatus.raw}` | MIB enum value, raw numeric (e.g., `2`) |
+| `{{hostname}}` | Resolved device hostname from enrichment, or source IP fallback |
+| `{{source_ip}}` | UDP source address of the trap PDU |
+| `{{trap_name}}` | The trap's symbolic name |
+| `{{vendor}}` | Inferred device vendor slug |
+| `{{trap_interface}}`, `{{trap_neighbors}}` | Topology fields when co-located |
+| `{{value "ifOperStatus"}}` | MIB enum value, symbolic (e.g., `down`) by default |
+| `{{raw "ifOperStatus"}}` | MIB enum value, raw numeric (e.g., `2`) |
+| `{{first ...}}` | First non-empty argument, for optional-varbind fallback |
 
-If a reference cannot be resolved (varbind absent, MIB not loaded, etc.):
-- Missing varbind → `<missing>`
-- Unrecognized variable name → `<unresolved:varname>` plus `snmp.trap.errors.template_unresolved` increment so the operator notices
+Supported control flow is limited to `{{with ...}}{{else}}{{end}}`.
+Known-but-absent varbinds render as empty strings, not `<missing>`, so profiles
+use `with` or `first` when optional context is included.
+
+Unknown functions, unknown varbind names, malformed templates, variables,
+assignments, `if`, `range`, arbitrary pipelines, and template inclusion actions
+fail at profile load / job creation.
 
 If `description` is absent, default template is:
 ```
-{TRAP_NAME} on {_HOSTNAME}.
+{{trap_name}} on {{hostname}}.
 ```
 
-Templates are compiled at profile-load (tokenize → segment list). Hot-path substitution is bounded-size buffer fill. MESSAGE capped at 512 bytes (post-substitution); truncated with ASCII `...` marker if exceeded. The 512-byte cap includes the marker bytes. Full forensic data remains in `TRAP_JSON`.
+Templates are compiled and validated at profile-load. Runtime rendering uses the
+pre-validated template with per-trap functions. MESSAGE capped at 512 bytes
+(post-substitution); truncated with ASCII `...` marker if exceeded. The
+512-byte cap includes the marker bytes. Full forensic data remains in
+`TRAP_JSON`.
 
 ### No `journal_fields:` list, no `metric:` block
 

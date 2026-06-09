@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -120,6 +121,144 @@ func TestSourceRankUsesPathBoundary(t *testing.T) {
 	}
 }
 
+func TestNormalizeTrapRecordsCollapsesDotZeroAliases(t *testing.T) {
+	records := []TrapRecord{
+		{
+			OID:           "1.3.6.1.4.1.818.1.1.18.11.0.40",
+			MIB:           "GE-PARALLELUPS",
+			Name:          "upsAlarmOutputOverloadRestored-eighth",
+			QualifiedName: "GE-PARALLELUPS::upsAlarmOutputOverloadRestored-eighth",
+			Form:          "TRAP-TYPE",
+		},
+		{
+			OID:           "1.3.6.1.4.1.818.1.1.18.11.40",
+			MIB:           "GEPARALLELUPS-MIB",
+			Name:          "upsTrapAlarmOutputOverloadRestoredeighth",
+			QualifiedName: "GEPARALLELUPS-MIB::upsTrapAlarmOutputOverloadRestoredeighth",
+			Form:          "NOTIFICATION-TYPE",
+		},
+	}
+
+	winners, exactConflicts, dotZeroConflicts := normalizeTrapRecords(records, nil)
+	if len(exactConflicts) != 0 {
+		t.Fatalf("exact conflicts = %#v, want none", exactConflicts)
+	}
+	if len(dotZeroConflicts) != 1 {
+		t.Fatalf("dot-zero conflicts = %#v, want one conflict", dotZeroConflicts)
+	}
+	if dotZeroConflicts[0].OID != "1.3.6.1.4.1.818.1.1.18.11.40" {
+		t.Fatalf("logical conflict OID = %q", dotZeroConflicts[0].OID)
+	}
+	if len(winners) != 1 {
+		t.Fatalf("winners = %#v, want one", winners)
+	}
+	if winners[0].Form != "NOTIFICATION-TYPE" {
+		t.Fatalf("winner form = %q, want NOTIFICATION-TYPE", winners[0].Form)
+	}
+	if len(dotZeroConflicts[0].Rejected) != 1 || dotZeroConflicts[0].Rejected[0].OID != records[0].OID {
+		t.Fatalf("rejected records = %#v, want SMIv1 trap", dotZeroConflicts[0].Rejected)
+	}
+}
+
+func TestConflictWinnersUsesRejectedRecordOID(t *testing.T) {
+	records := []TrapRecord{
+		{OID: "1.3.6.1.4.1.1.0.1", QualifiedName: "V1::trap", Form: "TRAP-TYPE"},
+		{OID: "1.3.6.1.4.1.1.1", QualifiedName: "V2::trap", Form: "NOTIFICATION-TYPE"},
+	}
+	conflicts := []Conflict{{
+		OID:      "1.3.6.1.4.1.1.1",
+		Chosen:   conflictRec(records[1]),
+		Rejected: []ConflictRec{conflictRec(records[0])},
+		Rule:     "trap-oid-dot0-equivalence",
+	}}
+	winners := conflictWinners(records, conflicts)
+	if len(winners) != 1 || winners[0].QualifiedName != "V2::trap" {
+		t.Fatalf("winners = %#v, want only V2::trap", winners)
+	}
+}
+
+func TestCompareBaselineProfilesReportsExactRuntimeAndLogicalOverlap(t *testing.T) {
+	dir := t.TempDir()
+	writeTestProfile(t, dir, "baseline.yaml", []string{
+		"1.2.3.0.1",
+		"1.2.3.0.2",
+		"1.2.3.0.3",
+	})
+	records := []TrapRecord{
+		{OID: "1.2.3.0.1", QualifiedName: "TEST::exact"},
+		{OID: "1.2.3.2", QualifiedName: "TEST::dotZeroEquivalent"},
+		{OID: "1.2.3.0.4", QualifiedName: "TEST::new"},
+	}
+
+	report, err := compareBaselineProfiles(dir, records)
+	if err != nil {
+		t.Fatalf("compareBaselineProfiles failed: %v", err)
+	}
+	summary := report.Summary
+	if summary.ExactOverlap != 1 || summary.ExactCandidateNew != 2 || summary.ExactBaselineMissing != 2 {
+		t.Fatalf("exact summary = %#v", summary)
+	}
+	if summary.BaselineRuntimeMatched != 2 || summary.BaselineRuntimeMissing != 1 {
+		t.Fatalf("baseline runtime summary = %#v", summary)
+	}
+	if summary.CandidateRuntimeMatched != 2 || summary.CandidateRuntimeNew != 1 {
+		t.Fatalf("candidate runtime summary = %#v", summary)
+	}
+	if summary.LogicalOverlap != 2 || summary.LogicalCandidateNew != 1 || summary.LogicalBaselineMissing != 1 {
+		t.Fatalf("logical summary = %#v", summary)
+	}
+}
+
+func TestClassifyCommandNormalizesBeforeCallingLLM(t *testing.T) {
+	var calls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{{
+				"message": map[string]string{
+					"content": `{"category":"state_change","severity":"notice","description":"Logical trap changed on {{hostname}}."}`,
+				},
+			}},
+		})
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	inPath := filepath.Join(dir, "traps.jsonl")
+	outPath := filepath.Join(dir, "enriched.jsonl")
+	cachePath := filepath.Join(dir, "classification-cache.jsonl")
+	records := []TrapRecord{
+		{OID: "1.3.6.1.4.1.1.0.1", QualifiedName: "V1::trap", Name: "trap", MIB: "V1", Form: "TRAP-TYPE"},
+		{OID: "1.3.6.1.4.1.1.1", QualifiedName: "V2::trap", Name: "trap", MIB: "V2", Form: "NOTIFICATION-TYPE"},
+	}
+	if err := writeJSONL(inPath, records); err != nil {
+		t.Fatalf("write input JSONL: %v", err)
+	}
+
+	err := classifyCommand([]string{
+		"--in", inPath,
+		"--out", outPath,
+		"--cache", cachePath,
+		"--base-url", server.URL,
+		"--model", "test-model",
+		"--concurrency", "1",
+		"--require-llm",
+	})
+	if err != nil {
+		t.Fatalf("classifyCommand failed: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("LLM calls = %d, want 1 normalized winner", calls)
+	}
+	got, err := readTrapJSONL(outPath)
+	if err != nil {
+		t.Fatalf("read output JSONL: %v", err)
+	}
+	if len(got) != 1 || got[0].Form != "NOTIFICATION-TYPE" {
+		t.Fatalf("classified output = %#v, want one NOTIFICATION-TYPE winner", got)
+	}
+}
+
 func TestParseOptionsRequiresSourceDir(t *testing.T) {
 	if _, err := parseOptions([]string{"--all"}, true); err == nil || !strings.Contains(err.Error(), "provide at least one --source-dir") {
 		t.Fatalf("parseOptions without source dir error = %v, want --source-dir requirement", err)
@@ -129,6 +268,18 @@ func TestParseOptionsRequiresSourceDir(t *testing.T) {
 func writeTestMIB(t *testing.T, dir, name, content string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+		t.Fatalf("write %s: %v", name, err)
+	}
+}
+
+func writeTestProfile(t *testing.T, dir, name string, oids []string) {
+	t.Helper()
+	var b strings.Builder
+	b.WriteString("traps:\n")
+	for i, oid := range oids {
+		fmt.Fprintf(&b, "  - oid: %s\n    name: TEST-MIB::trap%d\n    category: unknown\n    severity: notice\n", oid, i)
+	}
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(b.String()), 0o644); err != nil {
 		t.Fatalf("write %s: %v", name, err)
 	}
 }
@@ -217,7 +368,7 @@ func TestBuildProfileDropsUnresolvedVarbinds(t *testing.T) {
 		QualifiedName: "TEST-MIB::testTrap",
 		Category:      "unknown",
 		Severity:      "notice",
-		Description:   "TEST-MIB::testTrap on {_HOSTNAME}.",
+		Description:   "TEST-MIB::testTrap on {{hostname}}.",
 		TrapStatus:    "current",
 		MIB:           "TEST-MIB",
 		Varbinds: []VarbindRecord{
@@ -242,28 +393,38 @@ func TestLLMResponseValidation(t *testing.T) {
 		QualifiedName: "TEST-MIB::testTrap",
 		Varbinds:      []VarbindRecord{{Name: "ifIndex", OID: "1.2.3", Type: "Integer32"}},
 	}
-	cat, sev, desc, err := parseLLMResponse(`{"category":"state_change","severity":"warning","description":"Trap for interface {ifIndex} on {SNMP_DEVICE_HOSTNAME}."}`, rec)
+	cat, sev, desc, err := parseLLMResponse(`{"category":"state_change","severity":"warning","description":"Trap for interface {{value \"ifIndex\"}} on {{hostname}}."}`, rec)
 	if err != nil {
 		t.Fatalf("parseLLMResponse failed: %v", err)
 	}
 	if cat != "state_change" || sev != "warning" {
 		t.Fatalf("classification = %s/%s", cat, sev)
 	}
-	if !strings.Contains(desc, "{_HOSTNAME}") {
+	if !strings.Contains(desc, "{{hostname}}") {
 		t.Fatalf("description did not normalize hostname placeholder: %q", desc)
+	}
+	_, _, desc, err = parseLLMResponse(`{"category":"state_change","severity":"notice","description":"Trap{{with value \"ifIndex\"}} for interface {{.}}{{end}} on {{hostname}}."}`, rec)
+	if err != nil {
+		t.Fatalf("parseLLMResponse failed for with block without else: %v", err)
+	}
+	if !strings.Contains(desc, `{{with value "ifIndex"}}`) {
+		t.Fatalf("description did not preserve with block: %q", desc)
 	}
 	_, _, desc, err = parseLLMResponse(`{"category":"state_change","severity":"warning","description":"Trap from TRAP_SOURCE_IP through TRAP_DEVICE_VENDOR on SNMP_DEVICE_HOSTNAME."}`, rec)
 	if err != nil {
 		t.Fatalf("parseLLMResponse failed for bare built-in placeholders: %v", err)
 	}
-	if !strings.Contains(desc, "{TRAP_SOURCE_IP}") || !strings.Contains(desc, "{TRAP_DEVICE_VENDOR}") {
+	if !strings.Contains(desc, "{{source_ip}}") || !strings.Contains(desc, "{{vendor}}") {
 		t.Fatalf("description did not normalize bare built-in placeholders: %q", desc)
 	}
 	if _, _, _, err := parseLLMResponse(`{"category":"bad","severity":"warning","description":"x"}`, rec); err == nil {
 		t.Fatalf("invalid category accepted")
 	}
-	if _, _, _, err := parseLLMResponse(`{"category":"state_change","severity":"warning","description":"Bad {invented} on {_HOSTNAME}."}`, rec); err == nil {
+	if _, _, _, err := parseLLMResponse(`{"category":"state_change","severity":"warning","description":"Bad {{value \"invented\"}} on {{hostname}}."}`, rec); err == nil {
 		t.Fatalf("invented placeholder accepted")
+	}
+	if _, _, _, err := parseLLMResponse(`{"category":"state_change","severity":"warning","description":"Bad legacy {ifIndex} on {{hostname}}."}`, rec); err == nil {
+		t.Fatalf("legacy placeholder accepted")
 	}
 	if _, _, _, err := parseLLMResponse(`{"category":"state_change","severity":"warning","description":"x","extra":"bad"}`, rec); err == nil {
 		t.Fatalf("schema-invalid response with extra property accepted")
@@ -281,18 +442,18 @@ func TestValidateClassificationForRecordRejectsMismatchedPlaceholders(t *testing
 		Prompt:      defaultPromptVer,
 		Category:    "state_change",
 		Severity:    "warning",
-		Description: "Trap for interface {ifIndex} on {SNMP_DEVICE_HOSTNAME}.",
+		Description: "Trap for interface {{value \"ifIndex\"}} on {{hostname}}.",
 	}
 	c, err := validateClassificationForRecord(valid, rec)
 	if err != nil {
 		t.Fatalf("valid classification rejected: %v", err)
 	}
-	if !strings.Contains(c.Description, "{_HOSTNAME}") {
+	if !strings.Contains(c.Description, "{{hostname}}") {
 		t.Fatalf("description did not normalize hostname placeholder: %q", c.Description)
 	}
 
 	invalidPlaceholder := valid
-	invalidPlaceholder.Description = "Trap for interface {ifName} on {_HOSTNAME}."
+	invalidPlaceholder.Description = "Trap for interface {{value \"ifName\"}} on {{hostname}}."
 	if _, err := validateClassificationForRecord(invalidPlaceholder, rec); err == nil {
 		t.Fatalf("classification with unavailable placeholder accepted")
 	}
@@ -313,11 +474,11 @@ func TestParseLLMResponseRepairsUniquePlaceholderSuffix(t *testing.T) {
 			Type: "DisplayString",
 		}},
 	}
-	_, _, desc, err := parseLLMResponse(`{"category":"state_change","severity":"notice","description":"Network adapter target {iBMPSGNetworkAdapterTargetObjectPath} came online on {_HOSTNAME}."}`, rec)
+	_, _, desc, err := parseLLMResponse(`{"category":"state_change","severity":"notice","description":"Network adapter target {{value \"iBMPSGNetworkAdapterTargetObjectPath\"}} came online on {{hostname}}."}`, rec)
 	if err != nil {
 		t.Fatalf("parseLLMResponse failed: %v", err)
 	}
-	if !strings.Contains(desc, "{iBMPSGNetworkAdapterOnlineEventTargetObjectPath}") {
+	if !strings.Contains(desc, `{{value "iBMPSGNetworkAdapterOnlineEventTargetObjectPath"}}`) {
 		t.Fatalf("description was not repaired to exact placeholder: %q", desc)
 	}
 }
@@ -330,7 +491,7 @@ func TestParseLLMResponseRejectsAmbiguousPlaceholderSuffix(t *testing.T) {
 			{Name: "prefixTwoTargetObjectPath", OID: "1.2.4", Type: "DisplayString"},
 		},
 	}
-	if _, _, _, err := parseLLMResponse(`{"category":"state_change","severity":"notice","description":"Target {TargetObjectPath} changed on {_HOSTNAME}."}`, rec); err == nil {
+	if _, _, _, err := parseLLMResponse(`{"category":"state_change","severity":"notice","description":"Target {{value \"TargetObjectPath\"}} changed on {{hostname}}."}`, rec); err == nil {
 		t.Fatalf("ambiguous placeholder suffix accepted")
 	}
 }
@@ -344,11 +505,11 @@ func TestParseLLMResponseRepairsDuplicatedFinalCamelWord(t *testing.T) {
 			Type: "DisplayString",
 		}},
 	}
-	_, _, desc, err := parseLLMResponse(`{"category":"diagnostic","severity":"warning","description":"CRC value {hwPhysicalPortCrcPerCurrentValueStringString} exceeded threshold on {_HOSTNAME}."}`, rec)
+	_, _, desc, err := parseLLMResponse(`{"category":"diagnostic","severity":"warning","description":"CRC value {{value \"hwPhysicalPortCrcPerCurrentValueStringString\"}} exceeded threshold on {{hostname}}."}`, rec)
 	if err != nil {
 		t.Fatalf("parseLLMResponse failed: %v", err)
 	}
-	if !strings.Contains(desc, "{hwPhysicalPortCrcPerCurrentValueString}") {
+	if !strings.Contains(desc, `{{value "hwPhysicalPortCrcPerCurrentValueString"}}`) {
 		t.Fatalf("description was not repaired to exact placeholder: %q", desc)
 	}
 }
@@ -365,10 +526,10 @@ func TestClassifierUserPromptSeparatesUnavailableVarbinds(t *testing.T) {
 		},
 	}
 	prompt := classifierUserPrompt(rec, "")
-	if !strings.Contains(prompt, "{usable}") || !strings.Contains(prompt, "{usable.raw}") {
+	if !strings.Contains(prompt, `{{value "usable"}}`) || !strings.Contains(prompt, `{{raw "usable"}}`) {
 		t.Fatalf("prompt missing usable placeholders:\n%s", prompt)
 	}
-	if strings.Contains(prompt, "{missingType}") {
+	if strings.Contains(prompt, `{{value "missingType"}}`) || strings.Contains(prompt, `{{raw "missingType"}}`) {
 		t.Fatalf("prompt allowed unavailable placeholder:\n%s", prompt)
 	}
 	if !strings.Contains(prompt, "unavailable_varbind_names_do_not_use_as_placeholders: missingType") {
@@ -387,7 +548,8 @@ func TestSanitizePromptTextEscapesAndRespectsByteLimit(t *testing.T) {
 
 func TestClassifyOneFeedsValidationErrorBackToLLM(t *testing.T) {
 	var prompts []string
-	var sawThinkingDisabled bool
+	var sawThinkingDisabledDirect bool
+	var sawThinkingDisabledExtraBody bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		data, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -399,12 +561,18 @@ func TestClassifyOneFeedsValidationErrorBackToLLM(t *testing.T) {
 				Content string `json:"content"`
 			} `json:"messages"`
 			ChatTemplateKwargs map[string]bool `json:"chat_template_kwargs"`
+			ExtraBody          struct {
+				ChatTemplateKwargs map[string]bool `json:"chat_template_kwargs"`
+			} `json:"extra_body"`
 		}
 		if err := json.Unmarshal(data, &req); err != nil {
 			t.Fatalf("decode request body: %v", err)
 		}
 		if enabled, ok := req.ChatTemplateKwargs["enable_thinking"]; ok && !enabled {
-			sawThinkingDisabled = true
+			sawThinkingDisabledDirect = true
+		}
+		if enabled, ok := req.ExtraBody.ChatTemplateKwargs["enable_thinking"]; ok && !enabled {
+			sawThinkingDisabledExtraBody = true
 		}
 		for _, msg := range req.Messages {
 			if msg.Role == "user" {
@@ -412,9 +580,9 @@ func TestClassifyOneFeedsValidationErrorBackToLLM(t *testing.T) {
 			}
 		}
 
-		content := `{"category":"state_change","severity":"warning","description":"state changed to {notAvailableValue} on {_HOSTNAME}."}`
+		content := `{"category":"state_change","severity":"warning","description":"state changed to {{value \"notAvailableValue\"}} on {{hostname}}."}`
 		if len(prompts) == 2 {
-			content = `{"category":"state_change","severity":"warning","description":"state changed to {rtmOperStatus} on {_HOSTNAME}."}`
+			content = `{"category":"state_change","severity":"warning","description":"state changed to {{value \"rtmOperStatus\"}} on {{hostname}}."}`
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"choices": []map[string]any{{"message": map[string]string{"content": content}}},
@@ -444,16 +612,19 @@ func TestClassifyOneFeedsValidationErrorBackToLLM(t *testing.T) {
 	if c.Source != "llm:test-model:attempt-2" {
 		t.Fatalf("classification source = %q, want second LLM attempt", c.Source)
 	}
-	if !sawThinkingDisabled {
-		t.Fatalf("LLM request did not disable thinking through chat_template_kwargs")
+	if !sawThinkingDisabledDirect {
+		t.Fatalf("LLM request did not disable thinking through top-level chat_template_kwargs")
+	}
+	if !sawThinkingDisabledExtraBody {
+		t.Fatalf("LLM request did not disable thinking through extra_body.chat_template_kwargs")
 	}
 	if len(prompts) != 2 {
 		t.Fatalf("LLM prompts = %d, want 2", len(prompts))
 	}
-	if !strings.Contains(prompts[1], "previous_validation_error: unknown placeholder &#123;notAvailableValue&#125;") {
+	if !strings.Contains(prompts[1], `previous_validation_error: function "value" references unknown varbind "notAvailableValue"`) {
 		t.Fatalf("second prompt did not include validation feedback:\n%s", prompts[1])
 	}
-	if !strings.Contains(prompts[0], "{rtmOperStatus}") {
+	if !strings.Contains(prompts[0], `{{value "rtmOperStatus"}}`) {
 		t.Fatalf("prompt did not list exact allowed varbind placeholder:\n%s", prompts[0])
 	}
 }
@@ -464,7 +635,7 @@ func TestClassifyOneRetriesSchemaFailuresFiveTimes(t *testing.T) {
 		attempts++
 		content := `{"category":"state_change","severity":"warning","description":"state changed","extra":"not allowed"}`
 		if attempts == maxLLMAttempts {
-			content = `{"category":"state_change","severity":"warning","description":"state changed on {_HOSTNAME}."}`
+			content = `{"category":"state_change","severity":"warning","description":"state changed on {{hostname}}."}`
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"choices": []map[string]any{{"message": map[string]string{"content": content}}},

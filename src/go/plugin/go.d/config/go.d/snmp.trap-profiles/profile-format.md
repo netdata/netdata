@@ -233,28 +233,39 @@ matches arriving varbinds by OID at runtime.
 
 #### Description template
 
-`description:` is a template substituted at render time. Recognized
-placeholders:
+`description:` is a restricted Go `text/template` string substituted at render
+time. Supported functions:
 
-| Reference                       | Resolved to |
-|---------------------------------|-------------|
-| `{<varbind_name>}`              | Varbind value, formatted per its enum (and future `display_hint`) |
-| `{<varbind_name>.raw}`          | Varbind raw value (numeric for enums, undecoded bytes for OctetString) |
-| `{<numeric_oid>}`               | Varbind value by OID when no symbolic name is available |
-| `{_HOSTNAME}`        | Resolved device hostname from enrichment, or source IP fallback; the writer does not perform DNS lookup |
-| `{TRAP_SOURCE_IP}`              | UDP source address of the trap PDU |
-| `{TRAP_NAME}`              | The trap's symbolic name |
-| `{TRAP_DEVICE_VENDOR}`          | Inferred device vendor slug |
-| `{TRAP_INTERFACE}`       | Topology-resolved interface, when topology is co-located |
-| `{TRAP_NEIGHBORS}`       | Topology-resolved upstream neighbours, when co-located |
+| Reference | Resolved to |
+|---|---|
+| `{{hostname}}` | Resolved device hostname from enrichment, or source IP fallback; the writer does not perform DNS lookup |
+| `{{source_ip}}` | UDP source address of the trap PDU |
+| `{{trap_name}}` | The trap's symbolic name |
+| `{{vendor}}` | Inferred device vendor slug |
+| `{{trap_interface}}` | Topology-resolved interface, when topology is co-located |
+| `{{trap_neighbors}}` | Topology-resolved upstream neighbours, when topology is co-located |
+| `{{value "varbindName"}}` | Varbind value, formatted per its enum (and future `display_hint`) |
+| `{{raw "varbindName"}}` | Varbind raw value (numeric for enums, undecoded bytes for OctetString) |
+| `{{first ...}}` | First non-empty argument, for optional-varbind fallback |
 
-Unresolved references render as `<missing>` for absent varbinds, or
-`<unresolved:varname>` for unknown placeholder names. The latter also
-increments the `snmp.trap.errors.template_unresolved` plugin metric so
-operators notice and can correct the profile.
+Supported control flow is limited to `{{with ...}}{{else}}{{end}}`.
+Known-but-absent varbinds render as an empty string, not `<missing>`, so use
+`with` or `first` when optional context is included:
+
+```yaml
+description: '{{with first (value "ifDescr") (value "ifName") (value "ifIndex")}}Interface {{.}} went down{{else}}Interface went down{{end}} on {{hostname}}.'
+```
+
+Unknown functions, unknown varbind names, malformed templates, variables,
+assignments, `if`, `range`, arbitrary pipelines, and template inclusion actions
+fail at profile load so configuration errors are visible at job creation time.
+
+Legacy single-brace templates from early development builds still render during
+transition, but regenerated stock profiles and new operator profiles should use
+the restricted Go-template syntax.
 
 If `description:` is absent the plugin renders the default template
-`"{TRAP_NAME} on {_HOSTNAME}."`.
+`"{{trap_name}} on {{hostname}}."`.
 
 The rendered `MESSAGE` is capped at 512 bytes, including the ASCII `...`
 truncation marker when truncation is needed. Multi-line MESSAGE values are

@@ -116,6 +116,29 @@ go run ./cmd/snmptrapprofilegen generate \
   --catalogue ../../src/go/plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json
 ```
 
+`generate --classify` normalizes the extracted trap records before making LLM
+calls. Exact duplicate trap OIDs are resolved first, then SMIv1/SMIv2 trap-OID
+aliases that differ only by a single `.0.` segment before the final arc are
+collapsed to one logical trap identity. The classifier only sees the resulting
+winner set.
+
+The standalone Go `classify` subcommand also normalizes its JSONL input before
+calling the model. Pass the same repeated `--source-dir` values used during
+extraction when source-priority tie breaking matters.
+
+For stock regeneration review, pass the current stock profile directory to emit
+a baseline overlap report:
+
+```sh
+go run ./cmd/snmptrapprofilegen generate \
+  --source-dir /path/to/mibs \
+  --all \
+  --out-dir /tmp/snmp-trap-profile-gen-output \
+  --profiles-out-dir /tmp/snmp-trap-profile-gen-output/profiles \
+  --catalogue /tmp/snmp-trap-profile-gen-output/catalogue.json \
+  --baseline-profiles-dir ../../src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default
+```
+
 The helper uses the bundled IANA PEN snapshot by default. In installed Netdata
 that file is
 `/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt`.
@@ -129,7 +152,10 @@ output/
   extracted.jsonl           # one line per trap (extract.py)
   extraction-report.json    # counts + dirs scanned
   failed-mibs.json          # per-MIB compile failures
-  dedup-conflicts.json      # OIDs found in more than one MIB module
+  conflicts.json            # exact duplicate trap OIDs
+  dot0-conflicts.json       # SMIv1/SMIv2 trap OID aliases
+  source-conflicts.json     # duplicate MIB module definitions by source path
+  baseline-overlap.json     # optional, when --baseline-profiles-dir is passed
   enriched/<OID>.json       # one file per trap (classify.py)
   llm-failures.json         # validation failures + reasons
   enrichment-report.json    # counts of primary/fallback model/mech

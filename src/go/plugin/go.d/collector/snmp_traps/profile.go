@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"text/template"
 )
 
 var validCategories = map[string]bool{
@@ -99,6 +100,9 @@ type TrapDef struct {
 
 	// sourceFile is the profile file this trap came from.
 	sourceFile string
+
+	descriptionTemplate *template.Template
+	labelTemplates      map[string]*template.Template
 }
 
 // varbindResolvedNameRefs returns symbolic varbind names this trap references from the file table.
@@ -397,12 +401,19 @@ func validateTrapDef(td *TrapDef, fileVarbinds map[string]VarbindDef) error {
 		return err
 	}
 
+	if err := compileTrapTemplates(td, fileVarbinds); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func validateLabelTemplates(td *TrapDef, fileVarbinds map[string]VarbindDef) error {
 	src := td.sourceFile
 	for key, tmpl := range td.Labels {
+		if isGoProfileTemplate(tmpl) {
+			continue
+		}
 		for _, ref := range templateRefs(tmpl) {
 			name := strings.TrimSuffix(ref, ".raw")
 			if name == "" {

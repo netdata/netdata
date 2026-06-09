@@ -934,6 +934,200 @@ traps:
 	assert.Contains(t, msg, "<missing>")
 }
 
+func TestRenderMessageGoTemplateFirstFallbackSkipsMissingVarbinds(t *testing.T) {
+	dir := t.TempDir()
+	writeProfileYAML(t, dir, "test.yaml", `
+varbinds:
+  ifIndex:
+    oid: 1.3.6.1.2.1.2.2.1.1
+    type: INTEGER
+  ifName:
+    oid: 1.3.6.1.2.1.31.1.1.1.1
+    type: OctetString
+  ifDescr:
+    oid: 1.3.6.1.2.1.2.2.1.2
+    type: OctetString
+
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.3
+    name: IF-MIB::linkDown
+    category: state_change
+    severity: warning
+    description: '{{first (value "ifDescr") (value "ifName") (value "ifIndex") "Interface"}} went down on {{hostname}}.'
+    varbinds: [ifIndex, ifName, ifDescr]
+`)
+
+	setTestDirs(t, dir)
+	resetProfileCacheForTest()
+
+	idx, err := AcquireProfileCache()
+	require.NoError(t, err)
+	defer ReleaseProfileCache()
+
+	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
+	require.NotNil(t, td)
+
+	entry := &TrapEntry{
+		TrapName: "IF-MIB::linkDown",
+		SourceIP: "198.51.100.10",
+		Varbinds: []VarbindValue{
+			{OID: "1.3.6.1.2.1.2.2.1.1.7", Type: "INTEGER", Value: int64(7)},
+		},
+	}
+
+	msg := renderMessage(entry, td)
+	assert.Equal(t, "7 went down on 198.51.100.10.", msg)
+	assert.NotContains(t, msg, "<missing>")
+}
+
+func TestRenderMessageGoTemplateWithFallback(t *testing.T) {
+	dir := t.TempDir()
+	writeProfileYAML(t, dir, "test.yaml", `
+varbinds:
+  ifDescr:
+    oid: 1.3.6.1.2.1.2.2.1.2
+    type: OctetString
+
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.4
+    name: IF-MIB::linkUp
+    category: state_change
+    severity: notice
+    description: '{{with value "ifDescr"}}Interface {{.}}{{else}}Interface{{end}} came up on {{hostname}}.'
+    varbinds: [ifDescr]
+`)
+
+	setTestDirs(t, dir)
+	resetProfileCacheForTest()
+
+	idx, err := AcquireProfileCache()
+	require.NoError(t, err)
+	defer ReleaseProfileCache()
+
+	td := idx.Lookup("1.3.6.1.6.3.1.1.5.4")
+	require.NotNil(t, td)
+
+	entry := &TrapEntry{TrapName: "IF-MIB::linkUp", SourceIP: "198.51.100.10"}
+	assert.Equal(t, "Interface came up on 198.51.100.10.", renderMessage(entry, td))
+
+	entry.Varbinds = []VarbindValue{{OID: "1.3.6.1.2.1.2.2.1.2.7", Type: "OctetString", Value: "Gi0/7"}}
+	assert.Equal(t, "Interface Gi0/7 came up on 198.51.100.10.", renderMessage(entry, td))
+}
+
+func TestRenderMessageGoTemplateWithBlockWithoutElse(t *testing.T) {
+	dir := t.TempDir()
+	writeProfileYAML(t, dir, "test.yaml", `
+varbinds:
+  ccmHistoryEventTerminalUser:
+    oid: 1.3.6.1.4.1.9.9.43.1.1.6.1.8
+    type: DisplayString
+
+traps:
+  - oid: 1.3.6.1.4.1.9.9.43.2.0.2
+    name: CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged
+    category: config_change
+    severity: notice
+    description: 'Running configuration changed{{with value "ccmHistoryEventTerminalUser"}} by {{.}}{{end}} on {{hostname}}.'
+    varbinds: [ccmHistoryEventTerminalUser]
+`)
+
+	setTestDirs(t, dir)
+	resetProfileCacheForTest()
+
+	idx, err := AcquireProfileCache()
+	require.NoError(t, err)
+	defer ReleaseProfileCache()
+
+	td := idx.Lookup("1.3.6.1.4.1.9.9.43.2.0.2")
+	require.NotNil(t, td)
+
+	entry := &TrapEntry{TrapName: "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged", SourceIP: "198.51.100.10"}
+	assert.Equal(t, "Running configuration changed on 198.51.100.10.", renderMessage(entry, td))
+
+	entry.Varbinds = []VarbindValue{{OID: "1.3.6.1.4.1.9.9.43.1.1.6.1.8.1", Type: "DisplayString", Value: "admin"}}
+	assert.Equal(t, "Running configuration changed by admin on 198.51.100.10.", renderMessage(entry, td))
+}
+
+func TestLoadProfileRejectsInvalidGoTemplates(t *testing.T) {
+	tests := map[string]string{
+		"unknown function": `
+varbinds:
+  ifIndex:
+    oid: 1.3.6.1.2.1.2.2.1.1
+    type: INTEGER
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.3
+    name: IF-MIB::linkDown
+    category: state_change
+    severity: warning
+    description: '{{badfunc "ifIndex"}} on {{hostname}}.'
+    varbinds: [ifIndex]
+`,
+		"unknown varbind": `
+varbinds:
+  ifIndex:
+    oid: 1.3.6.1.2.1.2.2.1.1
+    type: INTEGER
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.3
+    name: IF-MIB::linkDown
+    category: state_change
+    severity: warning
+    description: '{{value "ifName"}} changed on {{hostname}}.'
+    varbinds: [ifIndex]
+`,
+		"forbidden range": `
+varbinds:
+  ifIndex:
+    oid: 1.3.6.1.2.1.2.2.1.1
+    type: INTEGER
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.3
+    name: IF-MIB::linkDown
+    category: state_change
+    severity: warning
+    description: '{{range value "ifIndex"}}x{{end}} on {{hostname}}.'
+    varbinds: [ifIndex]
+`,
+	}
+
+	for name, profile := range tests {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeProfileYAML(t, dir, "test.yaml", profile)
+			setTestDirs(t, dir)
+			resetProfileCacheForTest()
+			_, err := AcquireProfileCache()
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestLoadProfileRejectsUnboundedGoTemplateLabel(t *testing.T) {
+	dir := t.TempDir()
+	writeProfileYAML(t, dir, "test.yaml", `
+varbinds:
+  ifDescr:
+    oid: 1.3.6.1.2.1.2.2.1.2
+    type: OctetString
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.3
+    name: IF-MIB::linkDown
+    category: state_change
+    severity: warning
+    description: 'Interface changed on {{hostname}}.'
+    labels:
+      iface: '{{value "ifDescr"}}'
+    varbinds: [ifDescr]
+`)
+
+	setTestDirs(t, dir)
+	resetProfileCacheForTest()
+	_, err := AcquireProfileCache()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unbounded varbind")
+}
+
 func TestRenderMessageUnresolvedRef(t *testing.T) {
 	entry := &TrapEntry{
 		TrapName: "IF-MIB::linkDown",
