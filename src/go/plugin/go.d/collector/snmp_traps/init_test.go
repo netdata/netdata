@@ -18,10 +18,10 @@ func TestCollectorChartTemplateYAML(t *testing.T) {
 	collecttest.AssertChartTemplateSchema(t, New().ChartTemplateYAML())
 }
 
-func TestCollectorRegistrationDisabledByDefault(t *testing.T) {
+func TestCollectorRegistrationAvailableByDefault(t *testing.T) {
 	creator, ok := collectorapi.DefaultRegistry.Lookup("snmp_traps")
 	require.True(t, ok)
-	assert.True(t, creator.Defaults.Disabled)
+	assert.False(t, creator.Defaults.Disabled)
 }
 
 func TestJournalBackendConfigEnabledDefault(t *testing.T) {

@@ -23,8 +23,10 @@ logs viewer backed by the journal SDK Netdata Function API.
 
 Additional constraints from the user:
 
-- The whole `snmp_traps` module must be disabled by default.
-- A job must enable SNMP traps explicitly.
+- The `snmp_traps` module must be available to go.d and DynCfg by default, but
+  must ship with no default jobs.
+- A job must be added through `/etc/netdata/go.d/snmp_traps.conf` or DynCfg to
+  enable SNMP trap listening.
 - Direct journal output must be enabled by default for enabled jobs.
 - Users must be able to disable direct journal creation and keep only OTEL.
 - Direct-journal jobs must appear as selectable log sources in one SNMP traps
@@ -72,8 +74,10 @@ Unknowns:
 
 ### Acceptance Criteria
 
-- `snmp_traps` is disabled by default at module registration and still works
-  when explicitly enabled/configured.
+- `snmp_traps` is available by default at module registration so file config and
+  DynCfg can configure it.
+- Stock configuration creates no SNMP trap jobs, so no listener, profile cache,
+  journal writer, or OTLP exporter starts until a job is configured.
 - SNMP trap jobs support `journal.enabled`, defaulting to `true`.
 - `journal.enabled: false` with `otlp.enabled: true` creates an OTEL-only job:
   no direct journal directory/writer is created, and direct-journal creation
@@ -128,9 +132,9 @@ Sources checked:
 
 Current state:
 
-- `collectorapi.Register("snmp_traps", ...)` has `Methods:
-  snmpTrapsMethods`, `MethodHandler: snmpTrapsMethodHandler`, and no
-  `Disabled: true`.
+- Before the availability fix, `collectorapi.Register("snmp_traps", ...)` had
+  `Defaults.Disabled: true`, which made the module unavailable during normal
+  go.d startup.
 - `Collector.Init()` creates a journal writer before listener creation and
   before optional OTLP writer creation.
 - `config_schema.json` documents OTLP as "in addition to the journal-direct
@@ -143,6 +147,10 @@ Current state:
   as `status: 304` or `status: 499`.
 - `netdataapi.FUNCTIONREMOVE()` remains a no-op until the dedicated Function
   deletion protocol PR handles removal correctly.
+- Installed runtime evidence from `journalctl --namespace netdata --since today`
+  shows go.d skipping `snmp_traps` with "module disabled by default, should be
+  explicitly enabled in the config"; this prevents both
+  `/etc/netdata/go.d/snmp_traps.conf` file jobs and DynCfg template exposure.
 
 Risks:
 
@@ -209,6 +217,8 @@ Clean-end-state target:
   `__logs_sources`.
 - `snmp_traps` supports direct-journal, OTEL-only, and combined backends using
   one TrapWriter fanout model.
+- `snmp_traps` remains available at module registration; stock install has no
+  trap job configured and therefore starts no trap runtime work by default.
 - Removed as redundant (i): any collector-local double-wrap or fake
   unavailable per-job logs Function, and the local `FUNCTION_REMOVE` protocol
   implementation attempted in this branch.
@@ -283,7 +293,7 @@ Validation plan:
   - raw `info` request dispatch;
   - cancellation/timeout callback behavior.
 - SNMP traps tests for:
-  - module disabled by default;
+  - module available by default with no stock job;
   - `journal.enabled` default true;
   - OTEL-only no journal creation;
   - no-backend config rejected;
@@ -328,10 +338,14 @@ Open decisions:
 
 ## Implications And Decisions
 
-1. User decision: the `snmp_traps` module is disabled by default.
+1. User decision: the `snmp_traps` module is available by default, but has no
+   jobs by default.
+   - Implication: go.d file configuration and DynCfg can configure SNMP traps
+     without an additional plugin-level availability toggle.
    - Implication: stock install does not start a listener or allocate trap
-     profile/runtime resources unless explicitly enabled.
-   - Risk: operators must explicitly enable/configure a job.
+     profile/runtime resources unless a job is configured.
+   - Risk: if the module is accidentally marked unavailable with
+     `Defaults.Disabled`, users cannot configure it and DynCfg does not show it.
 
 2. User decision: direct journal output is enabled by default for enabled jobs.
    - Implication: existing and typical jobs keep local forensic logs and expose
@@ -377,8 +391,8 @@ Open decisions:
 ## Plan
 
 1. Framework batch: add raw Function support with tests.
-2. Collector backend batch: add module default-disabled behavior and
-   `journal.enabled` backend selection with tests.
+2. Collector backend batch: keep the module available with no default jobs and
+   add `journal.enabled` backend selection with tests.
 3. Logs Function batch: register and handle one SDK-backed
    `snmp:traps` Function that lists direct-journal job directories through
    `__logs_sources`.
@@ -437,6 +451,9 @@ Open decisions:
   subtree; the dependency update is still required so the branch consumes the
   latest released module tag.
 - Updated `src/go/go.mod` and `src/go/go.sum` to SDK Go module `v0.6.0`.
+- Corrected SNMP traps availability semantics: the module is no longer marked
+  `Defaults.Disabled`, stock config still creates no jobs, and the module stays
+  visible to file config and DynCfg.
 
 ## Validation
 
@@ -446,12 +463,16 @@ Current validation state:
   rework.
 - External reviewer pass completed after the one-Function `__logs_sources`
   rework; no blocking production issue was reported.
+- Local focused validation passed after correcting SNMP traps module
+  availability semantics.
 
 Acceptance criteria evidence:
 
-- Module disabled by default: `src/go/plugin/go.d/collector/snmp_traps/collector.go`
-  sets `Defaults.Disabled: true`; covered by
-  `TestCollectorRegistrationDisabledByDefault`.
+- Module available by default with no stock jobs: `snmp_traps` registration does
+  not set `Defaults.Disabled`, while stock `snmp_traps.conf` contains only
+  commented example jobs; covered by
+  `TestCollectorRegistrationAvailableByDefault` and
+  `TestReader_StockSNMPTrapsConfigHasNoJobs`.
 - `journal.enabled` default true and OTEL-only mode: implemented in
   `config.go` / `collector.go`; covered by
   `TestJournalBackendConfigEnabledDefault` and
@@ -497,6 +518,15 @@ Tests or equivalent validation:
 - Passed after SDK `v0.6.0` update with Go toolchain 1.26.0:
   `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 180s`
 - Passed after SDK `v0.6.0` update:
+  `bash .agents/sow/scan-sensitive.sh .agents/sow/active/SOW-20260608-snmp-traps-embedded-logs-function.md`
+- Passed after availability fix with Go toolchain 1.26.0:
+  `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 180s`
+- Passed after availability fix with Go toolchain 1.26.0:
+  `go test ./plugin/agent ./plugin/agent/discovery/file ./plugin/agent/discovery/sd -count=1 -timeout 180s`
+- Passed after availability fix with Go toolchain 1.26.0:
+  `go test ./cmd/godplugin ./pkg/funcapi ./plugin/agent/jobmgr/funcctl ./plugin/agent/jobmgr ./plugin/framework/functions -count=1 -timeout 180s`
+- Passed after availability fix: `git diff --check`
+- Passed after availability fix:
   `bash .agents/sow/scan-sensitive.sh .agents/sow/active/SOW-20260608-snmp-traps-embedded-logs-function.md`
 
 Real-use evidence:

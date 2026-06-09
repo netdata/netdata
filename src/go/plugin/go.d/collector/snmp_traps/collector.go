@@ -35,7 +35,6 @@ func init() {
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 1,
-			Disabled:    true,
 		},
 		CreateV2:      func() collectorapi.CollectorV2 { return New() },
 		Config:        func() any { return &Config{} },
