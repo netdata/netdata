@@ -84,6 +84,8 @@ These alerts only apply to **permanent nodes**. Ephemeral nodes are excluded and
 
 :::
 
+**See also:** [Centralized Cloud Notifications](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md) for notification setup, and [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md) for troubleshooting node offline states.
+
 ## Automatic Node Instance Cleanup in Netdata Cloud
 
 Netdata Cloud automatically removes inactive nodes to keep your dashboards clean and organized.
