@@ -1662,8 +1662,6 @@ void ebpf_print_help()
         "\n"
         " [-]-all               Enable all chart groups (global, apps, and cgroup), unless -g is also given.\n"
         "\n"
-        " [-]-cachestat         Enable charts related to process run time.\n"
-        "\n"
         " [-]-dcstat            Enable charts related to directory cache.\n"
         "\n"
         " [-]-disk              Enable charts related to disk monitoring.\n"
