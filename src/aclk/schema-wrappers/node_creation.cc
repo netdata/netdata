@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "proto/nodeinstance/create/v1/creation.pb.h"
+#include "nodeinstance/create/v1/creation.pb.h"
 #include "node_creation.h"
 
 #include "schema_wrapper_utils.h"

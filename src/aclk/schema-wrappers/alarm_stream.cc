@@ -2,7 +2,7 @@
 
 #include "alarm_stream.h"
 
-#include "proto/alarm/v1/stream.pb.h"
+#include "alarm/v1/stream.pb.h"
 
 #include "libnetdata/libnetdata.h"
 
