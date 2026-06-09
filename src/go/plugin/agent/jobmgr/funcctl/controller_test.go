@@ -605,13 +605,43 @@ func TestControllerRegisterJobMethods(t *testing.T) {
 	}
 }
 
+type rawControllerMethodCase struct {
+	fn       functions.Function
+	raw      func(context.Context, funcapi.RawMethodRequest) *funcapi.FunctionResponse
+	wantCode int
+	check    func(*testing.T, map[string]any)
+}
+
+func runRawControllerMethodCase(t *testing.T, tc rawControllerMethodCase, creator collectorapi.Creator, callName string) {
+	t.Helper()
+
+	var gotCode int
+	var gotResp map[string]any
+	reg := newTestFunctionRegistry()
+	controller := New(Options{
+		FnReg: reg,
+		JSONWriter: func(data []byte, code int) {
+			gotCode = code
+			require.NoError(t, json.Unmarshal(data, &gotResp))
+		},
+	})
+	handler := &rawTestHandler{raw: tc.raw}
+	creator.MethodHandler = func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+		return handler
+	}
+	controller.RegisterModules(collectorapi.Registry{"mod": creator})
+	controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+
+	call := reg.handlers[callName]
+	require.NotNil(t, call)
+	call(tc.fn)
+
+	assert.Equal(t, tc.wantCode, gotCode)
+	tc.check(t, gotResp)
+}
+
 func TestControllerRawModuleMethodRequest(t *testing.T) {
-	tests := map[string]struct {
-		fn       functions.Function
-		raw      func(context.Context, funcapi.RawMethodRequest) *funcapi.FunctionResponse
-		wantCode int
-		check    func(*testing.T, map[string]any)
-	}{
+	tests := map[string]rawControllerMethodCase{
 		"raw query response is passed through": {
 			fn: functions.Function{
 				UID:     "raw-query",
@@ -686,50 +716,21 @@ func TestControllerRawModuleMethodRequest(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			var gotCode int
-			var gotResp map[string]any
-			reg := newTestFunctionRegistry()
-			controller := New(Options{
-				FnReg: reg,
-				JSONWriter: func(data []byte, code int) {
-					gotCode = code
-					require.NoError(t, json.Unmarshal(data, &gotResp))
+			runRawControllerMethodCase(t, tc, collectorapi.Creator{
+				Methods: func() []funcapi.MethodConfig {
+					return []funcapi.MethodConfig{{
+						ID:         "logs",
+						RawRequest: true,
+						AgentWide:  true,
+					}}
 				},
-			})
-			handler := &rawTestHandler{raw: tc.raw}
-			controller.RegisterModules(collectorapi.Registry{
-				"mod": collectorapi.Creator{
-					Methods: func() []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{
-							ID:         "logs",
-							RawRequest: true,
-							AgentWide:  true,
-						}}
-					},
-					MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-						return handler
-					},
-				},
-			})
-			controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
-
-			call := reg.handlers["mod:logs"]
-			require.NotNil(t, call)
-			call(tc.fn)
-
-			assert.Equal(t, tc.wantCode, gotCode)
-			tc.check(t, gotResp)
+			}, "mod:logs")
 		})
 	}
 }
 
 func TestControllerRawJobMethodRequest(t *testing.T) {
-	tests := map[string]struct {
-		fn       functions.Function
-		raw      func(context.Context, funcapi.RawMethodRequest) *funcapi.FunctionResponse
-		wantCode int
-		check    func(*testing.T, map[string]any)
-	}{
+	tests := map[string]rawControllerMethodCase{
 		"raw query response is passed through": {
 			fn: functions.Function{
 				UID:     "raw-query",
@@ -804,38 +805,14 @@ func TestControllerRawJobMethodRequest(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			var gotCode int
-			var gotResp map[string]any
-			reg := newTestFunctionRegistry()
-			controller := New(Options{
-				FnReg: reg,
-				JSONWriter: func(data []byte, code int) {
-					gotCode = code
-					require.NoError(t, json.Unmarshal(data, &gotResp))
+			runRawControllerMethodCase(t, tc, collectorapi.Creator{
+				JobMethods: func(job collectorapi.RuntimeJob) []funcapi.MethodConfig {
+					return []funcapi.MethodConfig{{
+						ID:         job.Name() + ":logs",
+						RawRequest: true,
+					}}
 				},
-			})
-			handler := &rawTestHandler{raw: tc.raw}
-			controller.RegisterModules(collectorapi.Registry{
-				"mod": collectorapi.Creator{
-					JobMethods: func(job collectorapi.RuntimeJob) []funcapi.MethodConfig {
-						return []funcapi.MethodConfig{{
-							ID:         job.Name() + ":logs",
-							RawRequest: true,
-						}}
-					},
-					MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-						return handler
-					},
-				},
-			})
-			controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
-
-			call := reg.handlers["mod:job1:logs"]
-			require.NotNil(t, call)
-			call(tc.fn)
-
-			assert.Equal(t, tc.wantCode, gotCode)
-			tc.check(t, gotResp)
+			}, "mod:job1:logs")
 		})
 	}
 }

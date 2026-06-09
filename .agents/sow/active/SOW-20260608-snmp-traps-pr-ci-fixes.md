@@ -2,9 +2,10 @@
 
 ## Status
 
-Status: completed
+Status: in-progress
 
-Completed actionable CI/static-analysis fixes for this batch.
+Reopened for the 2026-06-09 CI batch after the journal SDK `v0.6.3`
+update exposed new branch-caused failures.
 
 Remaining non-code gates:
 
@@ -23,7 +24,7 @@ Bring the SNMP traps PR closer to merge-ready state by fixing remaining CI and s
 
 ### User Request
 
-Fix the rest of the issues after updating the journal SDK to `v0.5.1`.
+Fix the current PR CI issues after updating the journal SDK to `v0.6.3`.
 
 ### Acceptance Criteria
 
@@ -39,8 +40,12 @@ Status: in-progress
 
 Problem/root-cause model:
 
-- Current PR CI failures after the SDK `v0.5.1` fix are no longer package/docker Go-version failures.
-- Remaining failures are lint/style/toolchain/static-analysis issues in branch-added Python tooling, YAML metadata, Go code formatting/fix output, and external analysis gates.
+- Current PR CI failures after the SDK `v0.6.3` update are no longer
+  package/docker Go-version failures.
+- Remaining actionable failures are a Go 1.26 `go fix` diff, a static bundle
+  runtime check that cannot find `plugins.d/snmp-trap-profile-gen`, Codacy
+  markdownlint findings in the generated SNMP traps integration page, and the
+  Sonar quality gate duplication threshold.
 - The SOW `no-working-files` failure is intentional branch-local merge guarding, not a code defect, and is excluded from this batch by user direction to keep SOW files locally.
 
 Evidence reviewed:
@@ -48,17 +53,35 @@ Evidence reviewed:
 - `gh pr checks 22652 --repo netdata/netdata` reports failures in flake8, yamllint, Go toolchain tests, Codacy, Sonar, and SOW no-working-files.
 - `.github/workflows/sow.yml` rejects SOW working files in PR head as a merge guard.
 - `AGENTS.md` allows branch-local SOWs during PR work and requires removal only before merge.
+- `gh pr checks 22652 --repo netdata/netdata --watch=false` on 2026-06-09
+  reports failures in static builds, Go toolchain tests, Codacy Static Code
+  Analysis, SonarCloud Code Analysis, and `no-working-files`.
+- Go toolchain log for job `80381870997` shows `go fix ./...` wants to update
+  `src/go/cmd/godplugin/main.go` to use `slices.Contains`.
+- Static build logs for jobs under run `27222784975` fail in
+  `jobs/81-netdata-runtime-check.sh`; the downloaded job log reports
+  `/opt/netdata/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` missing.
+- Public Codacy PR API reports 75 added markdownlint findings, all in
+  `src/go/plugin/go.d/collector/snmp_traps/integrations/snmp_trap_listener.md`.
+- SonarCloud Code Analysis summary reports quality gate failure from
+  `3.1% Duplication on New Code` against a `<= 3%` threshold; code-scanning
+  alerts remain clean.
 
 Affected contracts and surfaces:
 
-- Python generator tooling under `tools/snmp-traps-profile-gen/`.
-- SNMP trap collector taxonomy YAML.
+- Static installer permission normalization in `netdata-installer.sh`.
+- Integration documentation generation in `integrations/gen_docs_integrations.py`.
 - Go source files touched by `go fmt` / `go fix`.
+- Job manager test structure used to reduce Sonar new-code duplication.
 - Static-analysis results for PR #22652.
 
 Clean-end-state target:
 
 - CI-relevant lint/toolchain/static-analysis findings caused by the branch are fixed with minimal behavior change.
+- Static artifacts include the SNMP trap profile generator wherever the runtime
+  checker expects it, instead of weakening the runtime check.
+- Generated SNMP traps integration documentation is produced in the repository's
+  existing markdownlint-compatible style.
 - SOW files remain locally available and are not part of this fix batch.
 - Any final merge-only SOW cleanup remains separate.
 
@@ -82,10 +105,15 @@ Sensitive data handling plan:
 Implementation plan:
 
 1. Capture exact remaining CI findings.
-2. Fix flake8 and yamllint issues.
-3. Run and inspect Go toolchain formatting/fix output; apply required diffs only with evidence.
-4. Triage Codacy and Sonar findings; fix actionable branch-caused issues.
-5. Run focused validation and commit only source/lint fixes.
+2. Apply the Go 1.26 `go fix` diff in `src/go/cmd/godplugin/main.go`.
+3. Inspect static packaging/build wiring for Go helper commands and install
+   `snmp-trap-profile-gen` into the static artifact path expected by
+   `packaging/runtime-check.sh`.
+4. Inspect the generated SNMP traps integration page and its generator/source
+   metadata; fix the source path so regenerated docs are markdownlint clean.
+5. Re-check Sonar duplication evidence; reduce actionable branch-caused
+   duplication if the duplicated file set can be identified.
+6. Run focused validation and commit only source/lint fixes.
 
 Validation plan:
 
@@ -98,7 +126,9 @@ Validation plan:
 Artifact impact plan:
 
 - AGENTS.md: no update expected.
-- Runtime project skills: no update expected unless a new static-analysis workflow gotcha is discovered.
+- Runtime project skills: update required because Sonar PR new-code measure
+  values are stored under `periods[0].value`; add a focused how-to for future
+  PR duplication-gate triage.
 - Specs: no product behavior change expected.
 - End-user/operator docs and skills: no product behavior change expected.
 - SOW lifecycle: keep this SOW branch-local and uncommitted unless takeover is needed.
@@ -109,35 +139,46 @@ Open decisions:
 
 ## Validation
 
-- Local Python lint:
-  `.local/venv-flake8/bin/python -m flake8 tools/snmp-traps-profile-gen/*.py`
+- Go toolchain:
+  `go fix ./...` in `src/go` passed and left no extra diff after applying the
+  Go 1.26 fixes.
+- Focused Go tests:
+  `go test ./cmd/godplugin ./plugin/agent/jobmgr ./plugin/agent/jobmgr/funcctl ./plugin/go.d/collector/snmp_traps ./plugin/ibm.d/modules/as400`
   passed.
-- Local Python import/syntax:
-  `.local/venv-flake8/bin/python -m compileall -q tools/snmp-traps-profile-gen`
+- Static installer syntax:
+  `bash -n netdata-installer.sh packaging/makeself/install-or-update.sh packaging/runtime-check.sh`
   passed.
-- Local exact pydocstyle probe for the Codacy-reported rule family:
-  `.local/venv-flake8/bin/python -m pydocstyle --select D203,D212,D213 ...`
-  passed after converting reported multi-line docstrings to single-line
-  summaries.
-- Whitespace validation: `git diff --check` passed.
-- Pushed commit: `a91bcbe1a7 Fix SNMP trap profile generator docstring lint`.
-- PR #22652 static/style checks at last poll:
-  - Codacy Static Code Analysis: `SUCCESS`, Codacy API issue count `0`.
-  - SonarCloud and SonarCloud Code Analysis: `SUCCESS`.
-  - Review workflow: `flake8`, `yamllint`, `shellcheck`, `golangci-lint`
-    all `SUCCESS`; `hadolint` and `actionlint` skipped by workflow logic.
-  - SOW `sensitive-data`: `SUCCESS`.
-  - SOW `no-working-files`: `FAILURE`, intentionally out of this batch.
+- Integration docs:
+  `python3 integrations/gen_docs_integrations.py -c go.d.plugin/snmp_traps`
+  passed and produced only the intended generated page diff.
+- Whitespace validation:
+  `git diff --check` passed.
+- Static build root cause:
+  CI logs showed CMake installed `snmp-trap-profile-gen`, but
+  `netdata-installer.sh` chmod-normalized libexec files to `0644` and only
+  restored executability for `*plugin`/`*.sh`; the fix restores `0750` for
+  `snmp-trap-profile-gen` before the runtime checker runs.
+- Codacy:
+  public PR API still reports the old 75 markdownlint findings until a new
+  branch commit is pushed; local generated output now contains
+  `<!-- markdownlint-disable-file -->` from the generator.
+- Sonar:
+  public quality gate reports only `new_duplicated_lines_density` failing at
+  `3.1 > 3`. File-level Sonar data showed a 93-line duplicate block in
+  `src/go/plugin/agent/jobmgr/funcctl/controller_test.go`; the test harness was
+  refactored into a shared helper, which should drop the PR below the threshold
+  after the next Sonar analysis.
 
 ## Artifact Maintenance Gate
 
 - AGENTS.md: no update needed; workflow and guardrails unchanged.
-- Runtime project skills: no update needed; no new reusable workflow beyond
-  the already documented Codacy API fallback.
+- Runtime project skills: updated `.agents/skills/sonarqube-audit/SKILL.md`
+  and added `.agents/skills/sonarqube-audit/how-tos/triage-pr-duplication-gate.md`
+  with the PR duplication-gate API workflow.
 - Specs: no update needed; no product behavior or public contract changed.
-- End-user/operator docs: no update needed; style-only generator docstring
-  cleanup.
+- End-user/operator docs: generated SNMP traps integration page now includes
+  the generated-doc markdownlint suppression.
 - End-user/operator skills: no update needed; no public/operator workflow
   changed.
-- SOW lifecycle: this local SOW records the batch as completed but remains
-  untracked and local, consistent with the branch-SOW merge-guard discussion.
+- SOW lifecycle: this SOW remains active branch-local takeover memory; final
+  merge preparation still has to delete active SOW working files.

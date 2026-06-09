@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"os/user"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -287,10 +288,8 @@ func resolveFunctionCLIRequestByPublicName(functionName string, registry collect
 			if method.ID == "" {
 				continue
 			}
-			for _, publicName := range funcapi.MethodFunctionNames(moduleName, method) {
-				if publicName == functionName {
-					return moduleName, method.ID, creator, true
-				}
+			if slices.Contains(funcapi.MethodFunctionNames(moduleName, method), functionName) {
+				return moduleName, method.ID, creator, true
 			}
 		}
 	}

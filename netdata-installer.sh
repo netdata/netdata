@@ -1017,6 +1017,11 @@ if [ "$(id -u)" -eq 0 ]; then
     fi
   fi
 
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen"
+    run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen"
+  fi
+
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-plugin" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-plugin"
     if ! iscontainer && command -v setcap 1>/dev/null 2>&1; then
