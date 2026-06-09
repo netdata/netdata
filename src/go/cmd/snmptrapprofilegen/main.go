@@ -40,7 +40,7 @@ const (
 	defaultCatalogue    = "snmp-trap-profile-gen-output/profiles/catalogue.json"
 	defaultBaseURL      = "http://localhost:8356/v1"
 	defaultModel        = "qwen3.6-35b-a3b"
-	defaultPromptVer    = "snmp-trap-profile-gen-v10"
+	defaultPromptVer    = "snmp-trap-profile-gen-v11"
 	defaultSchemaVer    = "trap-classifier-input-v1"
 	defaultBatchSize    = 32
 	defaultConcurrency  = 4
@@ -1026,6 +1026,10 @@ DESCRIPTION RULES:
 - The description must end with " on {_HOSTNAME}." exactly.
 - Put all useful varbind context before the final " on {_HOSTNAME}."
 - Say what happened first. Include useful context from varbind placeholders only when it helps the operator.
+- For linkUp/linkDown-style traps, describe the event itself instead of saying
+  "changed to {statusVarbind}" unless the MIB clearly states that status
+  varbind is the new state. Some standards use the status varbind for the
+  previous/other state, and some devices omit it from the PDU.
 - Prefer concise wording that works in a log stream. Avoid marketing language, long explanations, and root-cause guesses.
 - Use placeholders only in curly braces.
 - Built-in placeholders are runtime log fields provided by Netdata, not varbinds:
@@ -1055,7 +1059,7 @@ DESCRIPTION RULES:
 
 GOOD EXAMPLES - use these as style patterns only. Do not copy example varbind names unless they appear in the current allowed_description_placeholders.
 Input intent: linkDown, allowed placeholders include {ifName}, {ifOperStatus}
-Output: {"category":"state_change","severity":"warning","description":"Interface {ifName} changed operational state to {ifOperStatus} on {_HOSTNAME}."}
+Output: {"category":"state_change","severity":"warning","description":"Interface {ifName} went down on {_HOSTNAME}."}
 
 Input intent: authenticationFailure, no trap varbinds
 Output: {"category":"auth","severity":"warning","description":"SNMP authentication failure from {TRAP_SOURCE_IP} on {_HOSTNAME}."}

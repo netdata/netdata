@@ -12295,7 +12295,7 @@ traps:
     name: IF-MIB::linkDown
     category: state_change
     severity: warning
-    description: Link {ifIndex} operational state changed to {ifOperStatus} on {_HOSTNAME}.
+    description: Link {ifIndex} went down on {_HOSTNAME}.
     status: current
     varbinds:
       - ifIndex
@@ -12305,7 +12305,7 @@ traps:
     name: IF-MIB::linkUp
     category: state_change
     severity: notice
-    description: Link {ifIndex} operational state changed to {ifOperStatus} on {_HOSTNAME}.
+    description: Link {ifIndex} came up on {_HOSTNAME}.
     status: current
     varbinds:
       - ifIndex

@@ -1485,12 +1485,61 @@ func TestStockProfileIndexLoads(t *testing.T) {
 	}
 }
 
+func TestStockIFMIBLinkMessagesDoNotDependOnIfOperStatus(t *testing.T) {
+	resetProfileCacheForTest()
+
+	idx, err := AcquireProfileCache()
+	if err != nil {
+		t.Skipf("no stock profiles available: %v", err)
+	}
+	defer ReleaseProfileCache()
+
+	tests := map[string]struct {
+		oid  string
+		want string
+	}{
+		"linkDown": {
+			oid:  testIFMIBLinkDownOID,
+			want: "Link 1 went down on lab-switch.",
+		},
+		"linkUp": {
+			oid:  testIFMIBLinkUpOID,
+			want: "Link 1 came up on lab-switch.",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			td := idx.Lookup(tc.oid)
+			require.NotNil(t, td)
+
+			entry := trapEntryFromPDU("local", &TrapPDU{
+				OID:      tc.oid,
+				SourceIP: "198.51.100.10",
+				PeerIP:   "198.51.100.10",
+				Version:  SnmpVersionV2c,
+				PduType:  PduTypeTrap,
+				Varbinds: []VarbindValue{
+					{OID: testIFMIBIfIndexOID + ".1", Type: "INTEGER", Value: int64(1)},
+				},
+			}, td, 1000000, 1000)
+			entry.DeviceHostname = "lab-switch"
+
+			renderTrapEntryTemplates(entry, td)
+
+			assert.Equal(t, tc.want, entry.Message)
+			assert.False(t, hasUnresolvedTemplateMarker(entry.Message))
+		})
+	}
+}
+
 // =============================================================================
 // Test helpers
 // =============================================================================
 
 const (
 	testIFMIBLinkDownOID      = "1.3.6.1.6.3.1.1.5.3"
+	testIFMIBLinkUpOID        = "1.3.6.1.6.3.1.1.5.4"
 	testIFMIBIfIndexOID       = "1.3.6.1.2.1.2.2.1.1"
 	testIFMIBIfAdminStatusOID = "1.3.6.1.2.1.2.2.1.7"
 	testIFMIBIfOperStatusOID  = "1.3.6.1.2.1.2.2.1.8"
