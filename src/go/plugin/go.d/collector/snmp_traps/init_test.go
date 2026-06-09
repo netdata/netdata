@@ -4,6 +4,7 @@ package snmp_traps
 
 import (
 	"context"
+	"encoding/json"
 	"net"
 	"os"
 	"testing"
@@ -22,6 +23,150 @@ func TestCollectorRegistrationAvailableByDefault(t *testing.T) {
 	creator, ok := collectorapi.DefaultRegistry.Lookup("snmp_traps")
 	require.True(t, ok)
 	assert.False(t, creator.Defaults.Disabled)
+}
+
+func TestConfigSchemaDynCfgListFieldsHaveSafeDefaults(t *testing.T) {
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(configSchema), &schema))
+
+	assertSchemaArrayProperty(t, schema, "listen.endpoints", []string{"jsonSchema", "properties", "listen", "properties", "endpoints"}, "array", []any{
+		map[string]any{"protocol": "udp", "address": "0.0.0.0", "port": float64(162)},
+	})
+	assertSchemaArrayProperty(t, schema, "versions", []string{"jsonSchema", "properties", "versions"}, "array", []any{"v1", "v2c"})
+
+	for _, tc := range []struct {
+		name        string
+		path        []string
+		wantDefault []any
+	}{
+		{name: "communities", path: []string{"jsonSchema", "properties", "communities"}},
+		{name: "usm_users", path: []string{"jsonSchema", "properties", "usm_users"}},
+		{name: "engine_id_whitelist", path: []string{"jsonSchema", "properties", "engine_id_whitelist"}},
+		{name: "allowlist.source_cidrs", path: []string{"jsonSchema", "properties", "allowlist", "properties", "source_cidrs"}, wantDefault: []any{"0.0.0.0/0", "::/0"}},
+		{name: "dedup.key_varbinds", path: []string{"jsonSchema", "properties", "dedup", "properties", "key_varbinds"}},
+		{name: "overrides", path: []string{"jsonSchema", "properties", "overrides"}},
+		{name: "metrics", path: []string{"jsonSchema", "properties", "metrics"}},
+	} {
+		wantDefault := tc.wantDefault
+		if wantDefault == nil {
+			wantDefault = []any{}
+		}
+		assertSchemaArrayProperty(t, schema, tc.name, tc.path, []any{"array", "null"}, wantDefault)
+	}
+}
+
+func TestConfigSchemaDynCfgObjectFieldsHaveSafeDefaults(t *testing.T) {
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(configSchema), &schema))
+
+	for _, tc := range []struct {
+		name string
+		path []string
+	}{
+		{name: "listen", path: []string{"jsonSchema", "properties", "listen"}},
+		{name: "reverse_dns", path: []string{"jsonSchema", "properties", "reverse_dns"}},
+		{name: "allowlist", path: []string{"jsonSchema", "properties", "allowlist"}},
+		{name: "rate_limit", path: []string{"jsonSchema", "properties", "rate_limit"}},
+		{name: "dedup", path: []string{"jsonSchema", "properties", "dedup"}},
+		{name: "journal", path: []string{"jsonSchema", "properties", "journal"}},
+		{name: "otlp", path: []string{"jsonSchema", "properties", "otlp"}},
+		{name: "retention", path: []string{"jsonSchema", "properties", "retention"}},
+		{name: "overrides.labels", path: []string{"jsonSchema", "properties", "overrides", "items", "properties", "labels"}},
+	} {
+		prop := schemaProperty(t, schema, tc.path...)
+		require.Containsf(t, prop, "default", "schema property %q has no default", tc.name)
+		assert.NotNilf(t, prop["default"], "schema property %q has nil default", tc.name)
+	}
+}
+
+func TestConfigSchemaDynCfgTabsRenderAllTopLevelFieldsOnce(t *testing.T) {
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(configSchema), &schema))
+
+	topLevelProps := schemaProperty(t, schema, "jsonSchema", "properties")
+	uiSchema := schemaProperty(t, schema, "uiSchema")
+	assert.Equal(t, "tabs", uiSchema["ui:flavour"])
+
+	uiOptions := schemaProperty(t, schema, "uiSchema", "ui:options")
+	tabsRaw, ok := uiOptions["tabs"].([]any)
+	require.Truef(t, ok, "uiSchema.ui:options.tabs is %T", uiOptions["tabs"])
+
+	wantTabs := []struct {
+		title  string
+		fields []string
+	}{
+		{title: "Base", fields: []string{"update_every", "vnode"}},
+		{title: "Listener", fields: []string{"listen"}},
+		{title: "SNMP", fields: []string{
+			"versions",
+			"communities",
+			"usm_users",
+			"engine_id_whitelist",
+			"local_engine_id",
+			"dynamic_engine_id_discovery",
+			"dynamic_engine_id_max_pairs",
+		}},
+		{title: "Filtering", fields: []string{"allowlist", "rate_limit", "dedup"}},
+		{title: "Outputs", fields: []string{"journal", "otlp"}},
+		{title: "Storage", fields: []string{"retention"}},
+		{title: "Enrichment", fields: []string{"reverse_dns", "overrides"}},
+		{title: "Metrics", fields: []string{"metrics"}},
+	}
+	require.Len(t, tabsRaw, len(wantTabs))
+
+	seen := make(map[string]int, len(topLevelProps))
+	for i, tabRaw := range tabsRaw {
+		tab, ok := tabRaw.(map[string]any)
+		require.Truef(t, ok, "tab %d is %T", i, tabRaw)
+
+		assert.Equalf(t, wantTabs[i].title, tab["title"], "tab %d title", i)
+		fields := schemaStringSlice(t, tab["fields"], "tab fields")
+		assert.Equalf(t, wantTabs[i].fields, fields, "tab %q fields", wantTabs[i].title)
+
+		for _, field := range fields {
+			assert.Containsf(t, topLevelProps, field, "tab %q references unknown field %q", wantTabs[i].title, field)
+			seen[field]++
+		}
+	}
+
+	for field := range topLevelProps {
+		assert.Equalf(t, 1, seen[field], "top-level schema field %q tab references", field)
+	}
+}
+
+func assertSchemaArrayProperty(t *testing.T, schema map[string]any, name string, path []string, wantType any, wantDefault []any) {
+	t.Helper()
+	prop := schemaProperty(t, schema, path...)
+	assert.Equalf(t, wantType, prop["type"], "schema property %q type", name)
+	assert.Equalf(t, wantDefault, prop["default"], "schema property %q default", name)
+}
+
+func schemaStringSlice(t *testing.T, raw any, name string) []string {
+	t.Helper()
+	items, ok := raw.([]any)
+	require.Truef(t, ok, "%s is %T", name, raw)
+
+	out := make([]string, 0, len(items))
+	for i, item := range items {
+		s, ok := item.(string)
+		require.Truef(t, ok, "%s[%d] is %T", name, i, item)
+		out = append(out, s)
+	}
+	return out
+}
+
+func schemaProperty(t *testing.T, schema map[string]any, path ...string) map[string]any {
+	t.Helper()
+	var cur any = schema
+	for _, key := range path {
+		m, ok := cur.(map[string]any)
+		require.Truef(t, ok, "schema path %v: %q parent is %T", path, key, cur)
+		cur, ok = m[key]
+		require.Truef(t, ok, "schema path %v: missing %q", path, key)
+	}
+	prop, ok := cur.(map[string]any)
+	require.Truef(t, ok, "schema path %v resolved to %T", path, cur)
+	return prop
 }
 
 func TestJournalBackendConfigEnabledDefault(t *testing.T) {

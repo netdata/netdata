@@ -21,11 +21,27 @@
         "title": "Listen",
         "description": "Network endpoints this listener binds during job creation.",
         "type": "object",
+        "default": {
+          "endpoints": [
+            {
+              "protocol": "udp",
+              "address": "0.0.0.0",
+              "port": 162
+            }
+          ]
+        },
         "additionalProperties": false,
         "properties": {
           "endpoints": {
             "title": "Endpoints",
             "type": "array",
+            "default": [
+              {
+                "protocol": "udp",
+                "address": "0.0.0.0",
+                "port": 162
+              }
+            ],
             "minItems": 1,
             "items": {
               "type": "object",
@@ -74,6 +90,7 @@
         "title": "Communities",
         "description": "SNMPv1/v2c community allowlist. Empty accepts all communities.",
         "type": ["array", "null"],
+        "default": [],
         "items": {
           "type": "string"
         },
@@ -82,7 +99,8 @@
       "usm_users": {
         "title": "USM Users",
         "description": "SNMPv3 USM users with auth and privacy protocols. Auth and privacy keys use Netdata secret references.",
-        "type": "array",
+        "type": ["array", "null"],
+        "default": [],
         "items": {
           "type": "object",
           "additionalProperties": false,
@@ -128,6 +146,7 @@
         "title": "Engine ID Whitelist",
         "description": "Static SNMPv3 engine IDs accepted by this listener for v3 Trap PDUs (hex strings). Required when v3 is enabled and dynamic_engine_id_discovery is disabled. Must be empty when dynamic_engine_id_discovery is enabled.",
         "type": ["array", "null"],
+        "default": [],
         "items": {
           "type": "string",
           "pattern": "^[0-9A-Fa-f]{10,64}$"
@@ -157,6 +176,9 @@
         "title": "Reverse DNS",
         "description": "Optional source-IP PTR enrichment for _HOSTNAME. Disabled by default; when enabled, trap packet handling uses cached non-blocking lookups and falls back to source IP until a name is available.",
         "type": "object",
+        "default": {
+          "enabled": false
+        },
         "additionalProperties": false,
         "properties": {
           "enabled": {
@@ -171,12 +193,15 @@
         "title": "Allowlist",
         "description": "Pre-decode source-IP CIDR allowlist.",
         "type": "object",
+        "default": {
+          "source_cidrs": ["0.0.0.0/0", "::/0"]
+        },
         "additionalProperties": false,
         "properties": {
           "source_cidrs": {
             "title": "Source CIDRs",
             "description": "Source IP CIDR allowlist matched before BER decode. Empty accepts IPv4 and IPv6 from all sources.",
-            "type": "array",
+            "type": ["array", "null"],
             "default": ["0.0.0.0/0", "::/0"],
             "items": {
               "type": "string"
@@ -188,6 +213,11 @@
         "title": "Rate Limit",
         "description": "Per-source token-bucket rate limiting. Default off.",
         "type": "object",
+        "default": {
+          "enabled": false,
+          "per_source_pps": 1000,
+          "mode": "drop"
+        },
         "additionalProperties": false,
         "properties": {
           "enabled": {
@@ -216,6 +246,12 @@
         "title": "Deduplication",
         "description": "Optional per-job trap deduplication. Disabled by default; when enabled, repeated matching traps inside the window are summarized instead of journaled individually.",
         "type": "object",
+        "default": {
+          "enabled": false,
+          "window_sec": 5,
+          "cache_max_entries": 100000,
+          "key_varbinds": []
+        },
         "additionalProperties": false,
         "properties": {
           "enabled": {
@@ -239,7 +275,7 @@
           },
           "key_varbinds": {
             "title": "Key varbinds",
-            "type": "array",
+            "type": ["array", "null"],
             "items": {
               "type": "string"
             },
@@ -251,6 +287,9 @@
         "title": "Direct journal output",
         "description": "Direct Netdata journal storage for received traps. Enabled by default for explicit jobs and preflighted during job creation.",
         "type": "object",
+        "default": {
+          "enabled": true
+        },
         "additionalProperties": false,
         "properties": {
           "enabled": {
@@ -265,6 +304,15 @@
         "title": "OTLP exporter",
         "description": "Optional backend that exports traps as OTLP/gRPC LogRecords. Disabled by default. When enabled, the collector preflights the receiver at job creation time.",
         "type": "object",
+        "default": {
+          "enabled": false,
+          "endpoint": "http://127.0.0.1:4317",
+          "headers": null,
+          "request_timeout": "5s",
+          "flush_interval": "200ms",
+          "batch_size": 512,
+          "queue_capacity": 10000
+        },
         "additionalProperties": false,
         "properties": {
           "enabled": {
@@ -283,6 +331,7 @@
             "title": "Headers",
             "description": "Optional OTLP metadata headers. Values may use Netdata secret references. Header values are not emitted as trap attributes.",
             "type": ["object", "null"],
+            "default": null,
             "additionalProperties": {
               "type": "string"
             }
@@ -319,6 +368,12 @@
         "title": "Retention",
         "description": "Per-job direct journal retention and rotation policy. Ignored when journal.enabled is false.",
         "type": "object",
+        "default": {
+          "max_size": "10GB",
+          "max_duration": null,
+          "rotation_size": null,
+          "rotation_duration": "1h"
+        },
         "additionalProperties": false,
         "properties": {
           "max_size": {
@@ -350,7 +405,8 @@
       "overrides": {
         "title": "Per-OID overrides",
         "description": "Per-OID category, severity, and label overrides on top of profile defaults.",
-        "type": "array",
+        "type": ["array", "null"],
+        "default": [],
         "items": {
           "type": "object",
           "additionalProperties": false,
@@ -375,7 +431,8 @@
             "labels": {
               "title": "Labels",
               "description": "Additional labels for this OID.",
-              "type": "object",
+              "type": ["object", "null"],
+              "default": {},
               "additionalProperties": {
                 "type": "string"
               }
@@ -387,7 +444,8 @@
       "metrics": {
         "title": "Per-OID metric opt-in",
         "description": "Promote selected trap OIDs to dedicated metric charts for finer-grained alerting. Each entry defines an OID, a context name (must start with \"snmp.trap.\"), and an optional bounded-cardinality varbind for multi-dimensional counting.",
-        "type": "array",
+        "type": ["array", "null"],
+        "default": [],
         "items": {
           "type": "object",
           "additionalProperties": false,
@@ -417,6 +475,70 @@
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "vnode"
+          ]
+        },
+        {
+          "title": "Listener",
+          "fields": [
+            "listen"
+          ]
+        },
+        {
+          "title": "SNMP",
+          "fields": [
+            "versions",
+            "communities",
+            "usm_users",
+            "engine_id_whitelist",
+            "local_engine_id",
+            "dynamic_engine_id_discovery",
+            "dynamic_engine_id_max_pairs"
+          ]
+        },
+        {
+          "title": "Filtering",
+          "fields": [
+            "allowlist",
+            "rate_limit",
+            "dedup"
+          ]
+        },
+        {
+          "title": "Outputs",
+          "fields": [
+            "journal",
+            "otlp"
+          ]
+        },
+        {
+          "title": "Storage",
+          "fields": [
+            "retention"
+          ]
+        },
+        {
+          "title": "Enrichment",
+          "fields": [
+            "reverse_dns",
+            "overrides"
+          ]
+        },
+        {
+          "title": "Metrics",
+          "fields": [
+            "metrics"
+          ]
+        }
+      ]
     },
     "listen": {
       "endpoints": {

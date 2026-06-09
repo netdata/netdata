@@ -454,6 +454,51 @@ Open decisions:
 - Corrected SNMP traps availability semantics: the module is no longer marked
   `Defaults.Disabled`, stock config still creates no jobs, and the module stays
   visible to file config and DynCfg.
+- Investigated DynCfg UI validation errors such as `usm_users` showing "must be
+  array"; the same failure class applies to other SNMP traps list/object fields.
+  Evidence:
+  - `config_schema.json` contains 9 array fields:
+    `listen.endpoints`, `versions`, `communities`, `usm_users`,
+    `engine_id_whitelist`, `allowlist.source_cidrs`,
+    `dedup.key_varbinds`, `overrides`, and `metrics`.
+  - Several optional list fields were strict arrays without `default: []`, and
+    parent objects lacked defaults, so a new DynCfg form could render an empty
+    array UI while AJV validated `null` or a missing parent object.
+  - Dashboard DynCfg uses `@rjsf/core` with `liveValidate` and does not enable
+    RJSF default-form-state population.
+  - Existing go.d schemas commonly make optional arrays nullable, and schemas
+    that want empty list defaults set `default: []`.
+  - Runtime defaults in the collector remain the source of truth:
+    `New()` defaults versions to `v1/v2c`, source allowlist defaults to all
+    IPv4/IPv6, direct journal output defaults enabled through a nil pointer, and
+    OTLP, rate limiting, and deduplication default disabled.
+  Resolution target:
+  - All SNMP traps array fields must have DynCfg-safe defaults. Required arrays
+    keep strict array types with concrete defaults; optional arrays accept
+    `null` and default to an empty list.
+  - Parent object fields must have defaults matching runtime defaults so nested
+    array defaults are reachable in a fresh DynCfg form.
+- Added DynCfg tabs to the SNMP traps schema using the existing go.d
+  `uiSchema` pattern.
+  Evidence:
+  - Existing go.d schemas use top-level `uiSchema` with `ui:flavour: tabs` and
+    `ui:options.tabs[].fields`; examples include SNMP, Prometheus, HDFS, and
+    MSSQL.
+  - Dashboard `TabsLayout` renders only properties listed in tab `fields`, so
+    every top-level SNMP traps property must be assigned to exactly one tab.
+  Resolution:
+  - Tabs are: Base, Listener, SNMP, Filtering, Outputs, Storage, Enrichment, and
+    Metrics.
+  - Added a schema guard test so future top-level fields cannot be added without
+    being assigned to a tab.
+- Updated the journal SDK dependency from Go module `v0.6.0` to `v0.6.1`.
+  Evidence:
+  - Remote SDK tag `go/v0.6.1` resolves to commit `87bba8b4`.
+  - SDK `go/v0.6.0..go/v0.6.1` updates Go Netdata histogram metadata generation
+    for Function responses.
+  - The public Go proxy had not indexed `v0.6.1` at update time, so the module
+    was fetched directly from GitHub and the resulting checksum was recorded in
+    `src/go/go.sum`.
 
 ## Validation
 
@@ -465,6 +510,12 @@ Current validation state:
   rework; no blocking production issue was reported.
 - Local focused validation passed after correcting SNMP traps module
   availability semantics.
+- Local focused validation passed after the DynCfg schema array/object
+  default/nullability audit.
+- Local focused validation passed after adding DynCfg tabs to the SNMP traps
+  schema.
+- Local focused validation passed after updating the journal SDK Go module to
+  `v0.6.1`.
 
 Acceptance criteria evidence:
 
@@ -498,6 +549,17 @@ Acceptance criteria evidence:
 - Dynamic Function removal: local `FUNCTION_REMOVE` implementation was removed
   from this branch by user decision; stale-string scan found no local
   `FUNCTION_REMOVE` protocol references.
+- DynCfg list/object defaults: all 9 SNMP traps schema array fields have safe
+  defaults, optional arrays are nullable, and parent objects expose defaults
+  matching runtime behavior; covered by
+  `TestConfigSchemaDynCfgListFieldsHaveSafeDefaults` and
+  `TestConfigSchemaDynCfgObjectFieldsHaveSafeDefaults`.
+- DynCfg tab layout: every top-level SNMP traps schema property is assigned to
+  exactly one tab; covered by
+  `TestConfigSchemaDynCfgTabsRenderAllTopLevelFieldsOnce`.
+- Journal SDK `v0.6.1`: dependency is recorded in `src/go/go.mod` and
+  `src/go/go.sum`; Function framework and SNMP traps tests pass with the new
+  SDK.
 
 Tests or equivalent validation:
 
@@ -528,6 +590,28 @@ Tests or equivalent validation:
 - Passed after availability fix: `git diff --check`
 - Passed after availability fix:
   `bash .agents/sow/scan-sensitive.sh .agents/sow/active/SOW-20260608-snmp-traps-embedded-logs-function.md`
+- Passed after DynCfg schema fix: array-field audit found no SNMP traps schema
+  array without a default.
+- Passed after DynCfg schema fix:
+  `python3 -m json.tool src/go/plugin/go.d/collector/snmp_traps/config_schema.json >/dev/null`
+- Passed after DynCfg schema fix with Go toolchain 1.26.0:
+  `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 180s`
+- Passed after DynCfg schema fix with Go toolchain 1.26.0:
+  `go test ./plugin/agent/jobmgr ./plugin/agent/discovery/sd -count=1 -timeout 180s`
+- Passed after DynCfg schema fix: `git diff --check`
+- Passed after DynCfg schema fix:
+  `bash .agents/sow/scan-sensitive.sh .agents/sow/active/SOW-20260608-snmp-traps-embedded-logs-function.md`
+- Passed after DynCfg tabs update:
+  `python3 -m json.tool src/go/plugin/go.d/collector/snmp_traps/config_schema.json >/dev/null`
+- Passed after DynCfg tabs update with Go toolchain 1.26.0:
+  `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 180s`
+- Passed after DynCfg tabs update: array-field audit found no SNMP traps schema
+  array without a default.
+- Passed after DynCfg tabs update: `git diff --check`
+- Passed after journal SDK `v0.6.1` update with Go toolchain 1.26.0:
+  `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 180s`
+- Passed after journal SDK `v0.6.1` update with Go toolchain 1.26.0:
+  `go test ./cmd/godplugin ./pkg/funcapi ./plugin/agent/jobmgr/funcctl ./plugin/agent/jobmgr ./plugin/framework/functions -count=1 -timeout 180s`
 
 Real-use evidence:
 
