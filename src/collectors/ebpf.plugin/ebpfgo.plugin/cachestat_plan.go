@@ -21,6 +21,7 @@ type CachestatLegacyConfig struct {
 	IsDebian        bool
 	HasBTF          bool
 	ConfigFound     bool
+	Enabled         bool
 	AppsEnabled     bool
 	CgroupsEnabled  bool
 	BTFPath         string
@@ -83,6 +84,7 @@ func defaultCachestatLegacyConfig() CachestatLegacyConfig {
 		PidTableSize:   cachestatDefaultPIDTableSize,
 		MapsPerCore:    true,
 		ObjectFlavor:   cachestatDefaultObjectFlavor,
+		Enabled:        true,
 		AppsEnabled:    false,
 		CgroupsEnabled: false,
 		AppsLevel:      0, // NETDATA_APPS_LEVEL_REAL_PARENT — matches stock cachestat.conf default
@@ -98,6 +100,9 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 		return CachestatLegacyConfig{}, err
 	}
 	cfg.ConfigFound = found
+	if fileCfg.Enabled != nil {
+		cfg.Enabled = *fileCfg.Enabled
+	}
 	if fileCfg.UpdateEvery != nil && *fileCfg.UpdateEvery > 0 {
 		cfg.UpdateEvery = *fileCfg.UpdateEvery
 	}

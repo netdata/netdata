@@ -121,7 +121,8 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         send_END();
 
 #if defined(OS_LINUX)
-        send_cachestat_data_to_netdata(w, type, dt);
+        if (apps_ebpf_cachestat_is_available())
+            send_cachestat_data_to_netdata(w, type, dt);
 #endif
 
         if (unlikely(!w->values[PDF_PROCESSES]))
@@ -475,7 +476,8 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
             send_file_charts_to_netdata(w, type, lbl_name, title, false);
 
 #if defined(OS_LINUX)
-        send_cachestat_charts_to_netdata(w, type, lbl_name);
+        if (apps_ebpf_cachestat_is_available())
+            send_cachestat_charts_to_netdata(w, type, lbl_name);
 #endif
 
         fprintf(stdout, "CHART %s.%s_uptime '' '%s uptime' 'seconds' uptime %s.uptime line 20250 %d\n",

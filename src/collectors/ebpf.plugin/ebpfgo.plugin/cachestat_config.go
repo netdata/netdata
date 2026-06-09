@@ -19,6 +19,7 @@ const (
 )
 
 type cachestatConfigFile struct {
+	Enabled         *bool
 	UpdateEvery     *int
 	AppsEnabled     *bool
 	Cgroups         *bool
@@ -82,6 +83,7 @@ func parseCachestatConfigFile(path string) (cachestatConfigFile, bool, error) {
 	var cfg cachestatConfigFile
 	scanner := bufio.NewScanner(file)
 	inGlobal := false
+	inEbpfPrograms := false
 	found := false
 
 	for scanner.Scan() {
@@ -91,7 +93,27 @@ func parseCachestatConfigFile(path string) (cachestatConfigFile, bool, error) {
 		}
 
 		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
-			inGlobal = strings.EqualFold(strings.TrimSpace(line[1:len(line)-1]), "global")
+			section := strings.ToLower(strings.TrimSpace(line[1 : len(line)-1]))
+			inGlobal = section == "global"
+			inEbpfPrograms = section == "ebpf programs"
+			continue
+		}
+
+		if inEbpfPrograms {
+			key, value, ok := strings.Cut(line, "=")
+			if !ok {
+				continue
+			}
+			key = strings.ToLower(strings.TrimSpace(key))
+			value = strings.TrimSpace(value)
+			if key == "cachestat" {
+				b, ok := parseConfigBool(value)
+				if !ok {
+					return cachestatConfigFile{}, false, fmt.Errorf("%s: invalid cachestat %q", path, value)
+				}
+				cfg.Enabled = boolPtr(b)
+				found = true
+			}
 			continue
 		}
 
@@ -194,6 +216,9 @@ func parseCachestatConfigFile(path string) (cachestatConfigFile, bool, error) {
 }
 
 func (c *cachestatConfigFile) apply(other cachestatConfigFile) {
+	if other.Enabled != nil {
+		c.Enabled = other.Enabled
+	}
 	if other.UpdateEvery != nil {
 		c.UpdateEvery = other.UpdateEvery
 	}

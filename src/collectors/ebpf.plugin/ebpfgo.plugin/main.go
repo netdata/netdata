@@ -23,7 +23,17 @@ func main() {
 		}
 	}
 
-	handle, err := LoadCachestatLegacyFromSystem()
+	cfg, err := resolveCachestatLegacyConfig()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat config load failed: %v\n", err)
+		os.Exit(1)
+	}
+	if !cfg.Enabled {
+		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat collection disabled by configuration\n")
+		os.Exit(0)
+	}
+
+	handle, err := LoadCachestatLegacy(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat load failed: %v\n", err)
 		os.Exit(1)

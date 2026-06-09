@@ -11,6 +11,11 @@ static netdata_ebpfgo_shared_pid_memory_t apps_ebpf_shared_memory_ctx = {
     .sem = SEM_FAILED,
 };
 
+/* Set to true on the first successful SHM refresh; never reset.
+ * Gates chart creation and data sending so no cachestat charts appear
+ * when the Go plugin is disabled or not yet started. */
+static bool apps_ebpf_cachestat_available = false;
+
 static inline int64_t apps_ebpf_diff_counters(uint64_t current, uint64_t previous)
 {
     if (current < previous)
@@ -85,10 +90,18 @@ void apps_ebpf_accumulate_cachestat(void)
 
 bool apps_ebpf_shared_memory_refresh(void)
 {
-    return netdata_ebpfgo_shared_pid_memory_refresh(
+    bool ok = netdata_ebpfgo_shared_pid_memory_refresh(
         &apps_ebpf_shared_memory_ctx,
         NETDATA_EBPFGO_INTEGRATION_NAME,
         NETDATA_EBPFGO_SHM_INTEGRATION_NAME);
+    if (ok)
+        apps_ebpf_cachestat_available = true;
+    return ok;
+}
+
+bool apps_ebpf_cachestat_is_available(void)
+{
+    return apps_ebpf_cachestat_available;
 }
 
 bool apps_ebpf_sync_pid_stat(struct pid_stat *p)
