@@ -72,15 +72,14 @@ listener:
 
 ### UDP buffer tuning is not in this file
 
-If you receive a high flow rate, the kernel UDP receive buffer matters more than `max_packet_size`. Tune at the kernel level:
+If you receive a high flow rate, the kernel UDP receive buffer matters more than `max_packet_size`. The plugin requests a large buffer (64 MiB) at startup via `setsockopt(SO_RCVBUF)`, but the kernel silently caps unprivileged requests at `net.core.rmem_max`, and distribution defaults are tiny (~208 KiB). Raise the cap at the kernel level:
 
 ```bash
-sudo sysctl -w net.core.rmem_max=33554432
-sudo sysctl -w net.core.rmem_default=8388608
+sudo sysctl -w net.core.rmem_max=67108864
 sudo sysctl -w net.core.netdev_max_backlog=250000
 ```
 
-Persist these in `/etc/sysctl.d/99-netflow.conf`. The plugin does not call `setsockopt(SO_RCVBUF)` itself; whatever the kernel default is, that's what the listener gets.
+Persist these in `/etc/sysctl.d/99-netflow.conf`. The plugin logs the effective buffer size at startup; `net.core.rmem_default` does not affect it — only `rmem_max` does.
 
 ## `protocols`
 

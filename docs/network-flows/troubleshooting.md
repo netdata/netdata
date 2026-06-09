@@ -101,15 +101,14 @@ grep ^Udp: /proc/net/snmp          # RcvbufErrors counter (system-wide)
 
 `/proc/net/udp` lists open sockets and includes per-socket `drops`; the kernel-wide UDP `RcvbufErrors` total lives under the `Udp:` line of `/proc/net/snmp` (this is what Netdata's own `ipv4.udperrors` chart and the `1m_ipv4_udp_receive_buffer_errors` alert read).
 
-If drops are occurring, the kernel UDP receive buffer is too small for the burst rate. Tune:
+If drops are occurring, the kernel UDP receive buffer is too small for the burst rate. The plugin requests a 64 MiB receive buffer at startup, but the kernel silently caps unprivileged requests at `net.core.rmem_max` — and distribution defaults are tiny (~208 KiB, a few tens of datagrams). Raise the cap:
 
 ```bash
-sudo sysctl -w net.core.rmem_max=33554432
-sudo sysctl -w net.core.rmem_default=8388608
+sudo sysctl -w net.core.rmem_max=67108864
 sudo sysctl -w net.core.netdev_max_backlog=250000
 ```
 
-Persist in `/etc/sysctl.d/99-netflow.conf`.
+Persist in `/etc/sysctl.d/99-netflow.conf` and restart the plugin (it logs the effective buffer size at startup). `net.core.rmem_default` does not matter for the plugin's socket — only `rmem_max` does.
 
 **Per-protocol switch off:**
 

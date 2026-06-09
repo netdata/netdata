@@ -31,7 +31,7 @@ Practical guidance:
 
 - Plan with **~30 000 flows/s as the conservative floor** for a well-provisioned agent — it holds even for high-cardinality traffic on fast NVMe, and includes UDP receive, protocol decode, all four storage tiers, and the typical enrichment stack without BMP / BioRIS. Treat rates toward 100 000 flows/s as achievable when your traffic is low-cardinality and the raw tier sits on dedicated NVMe.
 - Enabling periodic fsync (`sync_every_entries` > 0) trades throughput for a tighter crash-durability window: each fsync stalls the receive path, and on slow disks this causes `RcvbufErrors` (kernel-level UDP drops) well below the envelope.
-- Bursts above your sustainable rate cost UDP queue backpressure and eventually `RcvbufErrors`. Tune the kernel UDP receive buffer (`net.core.rmem_max`, `net.core.rmem_default`, `net.core.netdev_max_backlog`) for headroom.
+- Bursts above your sustainable rate cost UDP queue backpressure and eventually `RcvbufErrors`. The plugin requests a 64 MiB receive buffer at startup, capped by `net.core.rmem_max` — raise that sysctl (and `net.core.netdev_max_backlog`) for burst headroom.
 - The hot path is single-threaded. Adding cores does not raise the per-agent ceiling. The way to go past it is to add agents (next section).
 
 ## Distributed deployment is the scaling answer
