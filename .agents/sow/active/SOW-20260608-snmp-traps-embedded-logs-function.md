@@ -499,6 +499,38 @@ Open decisions:
   - The public Go proxy had not indexed `v0.6.1` at update time, so the module
     was fetched directly from GitHub and the resulting checksum was recorded in
     `src/go/go.sum`.
+- User requested updating the embedded logs integration to SDK Go module
+  `v0.6.2`.
+  Evidence:
+  - `go list -m -json github.com/netdata/systemd-journal-sdk/go@v0.6.2`
+    resolves tag `go/v0.6.2` at commit
+    `369e64e00ffa56e7a24a94e9abf7c5ea5746b0b4`.
+  - SDK `go/v0.6.1..go/v0.6.2` changes only `go/journal/netdata.go` and
+    `go/journal/netdata_test.go`.
+  - The SDK commit subject is `Fix Netdata function tail anchor paging`.
+  Resolution target:
+  - `src/go/go.mod` requires
+    `github.com/netdata/systemd-journal-sdk/go v0.6.2`.
+  - `src/go/go.sum` contains the `v0.6.2` checksums.
+  - No Netdata config, Function name, or API surface changes are introduced by
+    this dependency refresh.
+  Superseded by the `v0.6.3` dependency refresh below; the final code diff does
+  not need to retain unused `v0.6.2` checksum lines.
+- User requested updating the embedded logs integration to SDK Go module
+  `v0.6.3`.
+  Evidence:
+  - `go list -m -json github.com/netdata/systemd-journal-sdk/go@v0.6.3`
+    resolves tag `go/v0.6.3` at commit
+    `60c4a2ae528a6c4438fe601602eacc55b0be34c2`.
+  - SDK `go/v0.6.2..go/v0.6.3` changes `go/journal/explorer.go`,
+    `go/journal/netdata.go`, and `go/journal/netdata_test.go`.
+  - The SDK commit subject is `Close Netdata function stateful parity gaps`.
+  Resolution target:
+  - `src/go/go.mod` requires
+    `github.com/netdata/systemd-journal-sdk/go v0.6.3`.
+  - `src/go/go.sum` contains the `v0.6.3` checksums.
+  - No Netdata config, Function name, or Go integration API changes are
+    introduced by this dependency refresh.
 - Reviewed direct journal retention defaults after user questioned
   `rotation_duration: 1h`.
   Evidence:
@@ -643,6 +675,18 @@ Tests or equivalent validation:
   `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 180s`
 - Passed after journal SDK `v0.6.1` update with Go toolchain 1.26.0:
   `go test ./cmd/godplugin ./pkg/funcapi ./plugin/agent/jobmgr/funcctl ./plugin/agent/jobmgr ./plugin/framework/functions -count=1 -timeout 180s`
+- Passed after journal SDK `v0.6.2` update with Go toolchain 1.26.0:
+  `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 180s`
+- Passed after journal SDK `v0.6.2` update with Go toolchain 1.26.0:
+  `go test ./cmd/godplugin ./pkg/funcapi ./plugin/agent/jobmgr/funcctl ./plugin/agent/jobmgr ./plugin/framework/functions -count=1 -timeout 180s`
+- Passed after journal SDK `v0.6.2` update:
+  `git diff --check`
+- Passed after journal SDK `v0.6.3` update with Go toolchain 1.26.0:
+  `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 180s`
+- Passed after journal SDK `v0.6.3` update with Go toolchain 1.26.0:
+  `go test ./cmd/godplugin ./pkg/funcapi ./plugin/agent/jobmgr/funcctl ./plugin/agent/jobmgr ./plugin/framework/functions -count=1 -timeout 180s`
+- Passed after journal SDK `v0.6.3` update:
+  `git diff --check`
 
 Real-use evidence:
 
