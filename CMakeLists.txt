@@ -2370,6 +2370,25 @@ set_source_files_properties(src/libnetdata/libjudy/vendored/JudyL/j__udyLGet.c P
 set_source_files_properties(src/libnetdata/libjudy/vendored/JudyL/JudyLByCount.c PROPERTIES COMPILE_OPTIONS "-DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB")
 set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_SOURCE_DIR}/src/libnetdata/libjudy/src/JudyL")
 
+set(NETIPC_PROTOCOL_FILES
+        src/libnetdata/netipc/src/protocol/netipc_protocol.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_increment.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_string_reverse.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_cgroups_snapshot.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_lookup_common.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_cgroups_lookup.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_apps_lookup.c
+)
+
+set(NETIPC_SERVICE_COMMON_FILES
+        src/libnetdata/netipc/src/service/netipc_service_common.c
+        src/libnetdata/netipc/src/service/netipc_service_cgroups_cache_common.c
+        src/libnetdata/netipc/src/service/netipc_service_cgroups_cache.c
+        src/libnetdata/netipc/src/service/netipc_service_cgroups_snapshot.c
+        src/libnetdata/netipc/src/service/netipc_service_cgroups_lookup.c
+        src/libnetdata/netipc/src/service/netipc_service_apps_lookup.c
+)
+
 #
 # build netipc (standalone IPC library, no Netdata deps)
 #
