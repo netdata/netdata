@@ -149,6 +149,7 @@ static int rw_spinlock_writer_mutex_test(void) {
 typedef struct {
     RW_SPINLOCK *lock;
     uint32_t stop;
+    uint32_t active;   // count of readers that have taken the read lock at least once
 } rw_spinlock_churn_ctx_t;
 
 typedef struct {
@@ -158,9 +159,16 @@ typedef struct {
 
 static void rw_spinlock_reader_churn(void *arg) {
     rw_spinlock_churn_ctx_t *ctx = (rw_spinlock_churn_ctx_t *)arg;
+    bool counted = false;
     while (!__atomic_load_n(&ctx->stop, __ATOMIC_ACQUIRE)) {
-        if (rw_spinlock_tryread_lock(ctx->lock))
+        if (rw_spinlock_tryread_lock(ctx->lock)) {
+            if (!counted) {
+                // signal (once) that this reader is actively churning
+                __atomic_add_fetch(&ctx->active, 1, __ATOMIC_RELEASE);
+                counted = true;
+            }
             rw_spinlock_read_unlock(ctx->lock);
+        }
     }
 }
 
@@ -174,7 +182,7 @@ static void rw_spinlock_liveness_writer(void *arg) {
 static int rw_spinlock_writer_liveness_test(void) {
     int errors = 0;
     RW_SPINLOCK lock = RW_SPINLOCK_INITIALIZER;
-    rw_spinlock_churn_ctx_t rctx = { .lock = &lock, .stop = 0 };
+    rw_spinlock_churn_ctx_t rctx = { .lock = &lock, .stop = 0, .active = 0 };
     rw_spinlock_liveness_writer_ctx_t wctx = { .lock = &lock, .acquired = 0 };
 
     fprintf(stderr, "  - writer liveness: a writer must acquire despite %d churning readers\n",
@@ -184,6 +192,19 @@ static int rw_spinlock_writer_liveness_test(void) {
     for (int i = 0; i < RW_SPINLOCK_TEST_READERS; i++)
         readers[i] = nd_thread_create("rwsp_rd", NETDATA_THREAD_OPTION_DONT_LOG,
                                       rw_spinlock_reader_churn, &rctx);
+
+    // Do not start the writer until every reader is actively churning (each has
+    // taken the read lock at least once). Otherwise the writer could acquire a
+    // free, uncontended lock before the readers exist and the test would pass
+    // vacuously, exercising none of the writer-vs-readers contention. Bounded
+    // deadline is only a hang-guard, not a correctness signal.
+    usec_t ready_deadline = now_monotonic_usec() + 5 * USEC_PER_SEC;
+    while (__atomic_load_n(&rctx.active, __ATOMIC_ACQUIRE) < RW_SPINLOCK_TEST_READERS &&
+           now_monotonic_usec() < ready_deadline) {
+        ; // spin until all readers are churning
+    }
+    RW_TEST(__atomic_load_n(&rctx.active, __ATOMIC_ACQUIRE) == RW_SPINLOCK_TEST_READERS,
+            "all readers are churning before the writer starts");
 
     ND_THREAD *writer = nd_thread_create("rwsp_wr", NETDATA_THREAD_OPTION_DONT_LOG,
                                          rw_spinlock_liveness_writer, &wctx);
