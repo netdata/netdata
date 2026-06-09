@@ -85,7 +85,7 @@ Unknowns:
 - Existing `snmp_traps:reload-profiles` remains registered and behaves as
   before.
 - Direct-journal jobs appear as `__logs_sources` options in one
-  `snmp_traps:logs` Function using the SDK Netdata Function API.
+  `snmp:traps` Function using the SDK Netdata Function API.
 - OTEL-only jobs create no direct journal source and are not listed in
   `__logs_sources`.
 - When no direct journal root/source exists, the temporary behavior is an
@@ -203,8 +203,8 @@ Clean-end-state target:
   - a handler path that can receive raw Function requests and handle `info`;
   - cancellation visibility for long-running Function handlers.
 - `snmp_traps` keeps module-wide reload and adds one module-wide
-  `snmp_traps:logs` Function.
-- `snmp_traps:logs` queries the shared traps journal root and uses SDK
+  `snmp:traps` Function.
+- `snmp:traps` queries the shared traps journal root and uses SDK
   `NetdataFunctionState.FileMetadata()` to expose direct-journal job names as
   `__logs_sources`.
 - `snmp_traps` supports direct-journal, OTEL-only, and combined backends using
@@ -260,7 +260,7 @@ Implementation plan:
    - keep direct-journal creation failures as creation-time failures;
    - preserve OTLP preflight failures as creation-time failures when enabled.
 3. Add SNMP traps logs Function:
-   - register one module-wide `snmp_traps:logs` Function;
+   - register one module-wide `snmp:traps` Function;
    - use SDK `NewNetdataJournalFunction()` with trap-specific defaults;
    - call `RunDirectoryRequestBytesWithOptions()` on the shared traps journal
      root;
@@ -365,7 +365,7 @@ Open decisions:
 
 7. User decision: expose one SNMP traps logs Function and use
    `__logs_sources` for job selection.
-   - Implication: the public Function is `snmp_traps:logs`; direct-journal jobs
+   - Implication: the public Function is `snmp:traps`; direct-journal jobs
      are selected through the SDK logs source selector.
    - Implication: all direct-journal sources are selected by default by the SDK.
    - Risk: until Function deletion lands, the module-wide Function can remain
@@ -378,7 +378,7 @@ Open decisions:
 2. Collector backend batch: add module default-disabled behavior and
    `journal.enabled` backend selection with tests.
 3. Logs Function batch: register and handle one SDK-backed
-   `snmp_traps:logs` Function that lists direct-journal job directories through
+   `snmp:traps` Function that lists direct-journal job directories through
    `__logs_sources`.
 4. Documentation/spec batch: update config schema, stock config, generated
    integration docs, spec, and public trap-query skill as needed.
@@ -396,13 +396,13 @@ Open decisions:
   passthrough, and cancellation context propagation.
 - Implemented `journal.enabled` backend selection with direct-journal default,
   OTEL-only support, and no-backend creation-time failure.
-- Added SDK-backed per-job `snmp_traps:<job>:logs` Function for direct-journal
-  jobs only. This was superseded by the later approved one-Function
-  `__logs_sources` design and is being reworked.
+- Earlier implementation iteration used per-job logs Functions for
+  direct-journal jobs only. This was superseded by the approved one-Function
+  `snmp:traps` + `__logs_sources` design.
 - Added explicit SDK error-path coverage for malformed raw logs requests.
 - Made dedup summary write-failure metric selection an explicit constructor
   input instead of mutable setup after construction.
-- Added plugins.d `FUNCTION_REMOVE` support and Go API emission for dynamic
+- Earlier implementation iteration added plugins.d Function removal support for dynamic
   Function removal. This was superseded by the later user decision to leave
   deletion to the dedicated protocol PR and has been removed from the branch.
 - Updated SNMP trap config schema, stock config, metadata, generated
@@ -411,13 +411,21 @@ Open decisions:
 
 ### 2026-06-09
 
-- Recorded the user decision to use one `snmp_traps:logs` Function with
+- Recorded the user decision to use one `snmp:traps` Function with
   `__logs_sources` job selection.
 - Removed local `FUNCTION_REMOVE` protocol and Go emission from this branch.
 - Reworked the logs Function from per-job Functions to one source-selecting
   module Function.
+- Corrected the public Function name to `snmp:traps` while keeping the internal
+  collector module/method as `snmp_traps` / `logs`.
+- Added module/static public Function-name routing so direct `godplugin`
+  execution resolves public names and aliases to the internal module method
+  instead of splitting the public name.
+- Updated the `go.d.plugin` Function CLI module resolver to load the module
+  that owns the public Function name, so `snmp:traps` loads `snmp_traps`
+  rather than the unrelated `snmp` collector.
 - Updated SNMP traps metadata, generated integration docs, durable spec, and
-  public trap-query skill/how-tos for `snmp_traps:logs` and
+  public trap-query skill/how-tos for `snmp:traps` and
   `__logs_sources`.
 
 ## Validation
@@ -443,6 +451,13 @@ Acceptance criteria evidence:
 - Direct-journal jobs appear in `__logs_sources`, default source selection
   queries all direct-journal jobs, and explicit source selection filters by job:
   covered by `TestSNMPTrapsLogsFunctionInfoAndQuery`.
+- Public Function name is `snmp:traps`, registers under that name, and direct
+  execution routes it to the internal `snmp_traps` / `logs` method: covered by
+  `TestControllerLifecycleHooks`,
+  `TestResolveFunctionCLIRequest`,
+  `TestExecuteFunction_ModuleMethodPublicFunctionName`,
+  `TestSNMPTrapsMethodsExposeReloadAndLogs`, and
+  `TestSNMPTrapsJournalFunctionUsesPublicFunctionName`.
 - Missing direct-journal root returns an unavailable/no-sources response:
   covered by `TestSNMPTrapsLogsFunctionUnavailableWithoutJournal`.
 - SDK raw info/query responses are passed through: covered by
@@ -456,6 +471,8 @@ Acceptance criteria evidence:
 Tests or equivalent validation:
 
 - PASS: `GOTOOLCHAIN=go1.26.0 go test ./pkg/netdataapi ./plugin/framework/collectorapi ./plugin/agent/jobmgr/funcctl ./plugin/agent/jobmgr ./plugin/framework/functions ./pkg/funcapi -count=1`
+- PASS: `GOTOOLCHAIN=go1.26.0 go test ./pkg/funcapi ./plugin/agent/jobmgr/funcctl ./plugin/agent/jobmgr ./plugin/framework/functions -count=1 -timeout 180s`
+- PASS: `GOTOOLCHAIN=go1.26.0 go test ./cmd/godplugin ./pkg/funcapi ./plugin/agent/jobmgr/funcctl ./plugin/agent/jobmgr ./plugin/framework/functions -count=1 -timeout 180s`
 - PASS: `GOTOOLCHAIN=go1.26.0 go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 180s`
 - PASS: `python3 -m json.tool src/go/plugin/go.d/collector/snmp_traps/config_schema.json >/dev/null`
 - PASS: `python3 integrations/gen_taxonomy.py --check-only`
@@ -490,9 +507,9 @@ Same-failure scan:
 
 - PASS: searched for `FUNCTION_REMOVE`, `PLUGINSD_KEYWORD_FUNCTION_REMOVE`,
   and `pluginsd_function_remove`; no local protocol implementation remains.
-- PASS: searched for old per-job `snmp_traps:<job>:logs` / constructed
-  `snmp_traps:${...}:logs` docs and code references; replaced the SNMP trap
-  surface with `snmp_traps:logs` plus `__logs_sources`.
+- PASS: searched for old per-job logs Function docs and code references,
+  including constructed names; replaced the SNMP trap surface with
+  `snmp:traps` plus `__logs_sources`.
 
 Sensitive data gate:
 
@@ -508,7 +525,7 @@ Sensitive data gate:
 - End-user/operator docs: updated SNMP trap metadata/generated docs/stock
   config; no local plugins.d Function protocol docs changes remain.
 - End-user/operator skills: updated `docs/netdata-ai/skills/query-snmp-traps`
-  and how-tos for the embedded `snmp_traps:logs` Function.
+  and how-tos for the embedded `snmp:traps` Function.
 - SOW lifecycle: active branch-local file; delete before merge after durable
   artifacts are updated.
 
@@ -523,11 +540,11 @@ Project skills update:
 End-user/operator docs update:
 
 - Updated SNMP trap integration metadata/generated docs/stock config for
-  `snmp_traps:logs` and `__logs_sources`.
+  `snmp:traps` and `__logs_sources`.
 
 End-user/operator skills update:
 
-- Updated public `query-snmp-traps` skill and how-tos for `snmp_traps:logs`.
+- Updated public `query-snmp-traps` skill and how-tos for `snmp:traps`.
 
 Lessons:
 

@@ -13,6 +13,7 @@ import (
 const (
 	reloadProfilesMethodID = "reload-profiles"
 	snmpTrapsLogsMethodID  = "logs"
+	snmpTrapsFunctionName  = "snmp:traps"
 )
 
 func reloadProfilesMethodConfig() funcapi.MethodConfig {
@@ -36,6 +37,7 @@ func snmpTrapsMethods() []funcapi.MethodConfig {
 func snmpTrapsLogsMethodConfig() funcapi.MethodConfig {
 	return funcapi.MethodConfig{
 		ID:           snmpTrapsLogsMethodID,
+		FunctionName: snmpTrapsFunctionName,
 		Name:         "SNMP Trap Logs",
 		UpdateEvery:  1,
 		Help:         "Query SNMP trap journal entries received by SNMP trap listener jobs",

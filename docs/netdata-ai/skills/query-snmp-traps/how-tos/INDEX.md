@@ -3,7 +3,7 @@
 This directory holds operational SNMP trap query recipes. Each
 how-to uses the token-safe wrappers from
 [`query-netdata-agents`](../../query-netdata-agents/SKILL.md) and
-the `snmp_traps:logs` Function with optional `__logs_sources`
+the `snmp:traps` Function with optional `__logs_sources`
 selection.
 
 ## The "if you analyze, you author a how-to" rule

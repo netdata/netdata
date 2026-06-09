@@ -100,7 +100,7 @@ Netdata SNMP trap profile YAMLs?
    ```bash
    NODE_UUID="YOUR_NODE_UUID"
    SNMP_TRAPS_JOB="local"
-   SNMP_TRAPS_FUNCTION="snmp_traps:logs"
+   SNMP_TRAPS_FUNCTION="snmp:traps"
    TRAP_OID="1.3.6.1.4.1.20006.1.6"
 
    BODY="$(jq -n --arg job "$SNMP_TRAPS_JOB" --arg oid "$TRAP_OID" '{

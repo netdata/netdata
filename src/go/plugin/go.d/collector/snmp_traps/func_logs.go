@@ -83,7 +83,7 @@ func (h *snmpTrapsFunctionHandler) isLogsMethod(method string) bool {
 
 func newSNMPTrapsJournalFunction() sdkjournal.NetdataJournalFunction {
 	cfg := sdkjournal.SystemdJournalNetdataFunctionConfig()
-	cfg.FunctionName = "snmp-traps"
+	cfg.FunctionName = snmpTrapsFunctionName
 	cfg.DefaultFacets = []string{
 		"TRAP_REPORT_TYPE",
 		"TRAP_SEVERITY",

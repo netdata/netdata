@@ -502,14 +502,21 @@ func TestControllerLifecycleHooks(t *testing.T) {
 				controller.RegisterModules(collectorapi.Registry{
 					"mod": collectorapi.Creator{
 						Methods: func() []funcapi.MethodConfig {
-							return []funcapi.MethodConfig{{ID: "logs", Tags: "logs"}}
+							return []funcapi.MethodConfig{{
+								ID:           "logs",
+								FunctionName: "snmp:traps",
+								Tags:         "logs",
+							}}
 						},
 					},
 				})
 
 				controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
 
-				assert.Contains(t, buf.String(), "FUNCTION GLOBAL \"mod:logs\"")
+				assert.Contains(t, reg.registeredNames(), "snmp:traps")
+				assert.NotContains(t, reg.registeredNames(), "mod:logs")
+				assert.Contains(t, buf.String(), "FUNCTION GLOBAL \"snmp:traps\"")
+				assert.NotContains(t, buf.String(), "FUNCTION GLOBAL \"mod:logs\"")
 				assert.Contains(t, buf.String(), "\"logs\" 0x0000")
 			}
 		})

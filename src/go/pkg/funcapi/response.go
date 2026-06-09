@@ -5,6 +5,9 @@ package funcapi
 // MethodConfig describes a function method provided by a module.
 type MethodConfig struct {
 	ID string // Method ID (e.g., "top-queries")
+	// FunctionName overrides the public Function name for module/static methods.
+	// Empty uses the default "<module>:<method>" name.
+	FunctionName string
 	// FIXME: funcctl currently honors aliases only for module/static methods.
 	// Job method registration still publishes only the canonical module:method name.
 	Aliases      []string // Additional function names to register for this method

@@ -545,6 +545,7 @@ func TestSnmpTrapsMethods(t *testing.T) {
 
 	logs := byID[snmpTrapsLogsMethodID]
 	assert.True(t, logs.AgentWide)
+	assert.Equal(t, snmpTrapsFunctionName, logs.FunctionName)
 	assert.True(t, logs.RawRequest)
 	assert.Equal(t, "logs", logs.ResponseType)
 }

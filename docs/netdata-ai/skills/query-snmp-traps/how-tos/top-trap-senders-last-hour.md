@@ -24,7 +24,7 @@ Which source devices sent the most SNMP traps in the last hour?
    ```bash
    NODE_UUID="YOUR_NODE_UUID"
    SNMP_TRAPS_JOB="local"
-   SNMP_TRAPS_FUNCTION="snmp_traps:logs"
+   SNMP_TRAPS_FUNCTION="snmp:traps"
    LAST_SECONDS=3600
 
    BODY="$(jq -n --arg job "$SNMP_TRAPS_JOB" --argjson last_seconds "$LAST_SECONDS" '{

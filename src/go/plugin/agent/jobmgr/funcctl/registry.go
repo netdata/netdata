@@ -11,8 +11,14 @@ import (
 )
 
 type moduleFuncRegistry struct {
-	mu      sync.RWMutex
-	modules map[string]*moduleFunc
+	mu           sync.RWMutex
+	modules      map[string]*moduleFunc
+	methodRoutes map[string]methodRoute
+}
+
+type methodRoute struct {
+	moduleName string
+	methodID   string
 }
 
 type moduleFunc struct {
@@ -31,7 +37,8 @@ type jobEntry struct {
 
 func newModuleFuncRegistry() *moduleFuncRegistry {
 	return &moduleFuncRegistry{
-		modules: make(map[string]*moduleFunc),
+		modules:      make(map[string]*moduleFunc),
+		methodRoutes: make(map[string]methodRoute),
 	}
 }
 
@@ -51,6 +58,7 @@ func (r *moduleFuncRegistry) registerModule(name string, creator collectorapi.Cr
 		jobs:        make(map[string]*jobEntry),
 		jobMethods:  make(map[string][]funcapi.MethodConfig),
 	}
+	r.rebuildMethodRoutesLocked()
 }
 
 func indexMethods(methods []funcapi.MethodConfig) map[string]funcapi.MethodConfig {
@@ -140,6 +148,17 @@ func (r *moduleFuncRegistry) getMethod(moduleName, methodID string) (*funcapi.Me
 		return nil, false
 	}
 	return &cfg, true
+}
+
+func (r *moduleFuncRegistry) resolveMethodRoute(functionName string) (string, string, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	route, ok := r.methodRoutes[functionName]
+	if !ok {
+		return "", "", false
+	}
+	return route.moduleName, route.methodID, true
 }
 
 func (r *moduleFuncRegistry) getMethods(moduleName string) []funcapi.MethodConfig {
@@ -295,4 +314,19 @@ func (r *moduleFuncRegistry) snapshotCreators() map[string]collectorapi.Creator 
 		out[name] = module.creator
 	}
 	return out
+}
+
+func (r *moduleFuncRegistry) rebuildMethodRoutesLocked() {
+	r.methodRoutes = make(map[string]methodRoute)
+	for moduleName, module := range r.modules {
+		for _, method := range module.methods {
+			if method.ID == "" {
+				continue
+			}
+			route := methodRoute{moduleName: moduleName, methodID: method.ID}
+			for _, functionName := range funcapi.MethodFunctionNames(moduleName, method) {
+				r.methodRoutes[functionName] = route
+			}
+		}
+	}
 }

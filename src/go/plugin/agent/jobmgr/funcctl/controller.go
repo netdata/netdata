@@ -115,7 +115,7 @@ func (c *Controller) Cleanup() {
 			if method.ID == "" {
 				continue
 			}
-			for _, funcName := range methodFunctionNames(name, method) {
+			for _, funcName := range funcapi.MethodFunctionNames(name, method) {
 				c.fnReg.Unregister(funcName)
 				if c.api != nil {
 					c.api.FunctionRemove(funcName)
@@ -153,7 +153,7 @@ func (c *Controller) registerModuleMethodsOnFirstJobStart(moduleName string) {
 				access = cloudAccess
 			}
 
-			for _, funcName := range methodFunctionNames(moduleName, method) {
+			for _, funcName := range funcapi.MethodFunctionNames(moduleName, method) {
 				c.fnReg.Register(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
 				c.api.FunctionGlobal(netdataapi.FunctionGlobalOpts{
 					Name:     funcName,
@@ -168,30 +168,12 @@ func (c *Controller) registerModuleMethodsOnFirstJobStart(moduleName string) {
 			continue
 		}
 
-		for _, funcName := range methodFunctionNames(moduleName, method) {
+		for _, funcName := range funcapi.MethodFunctionNames(moduleName, method) {
 			c.fnReg.Register(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
 		}
 	}
 
 	c.staticMethodsSeen[moduleName] = struct{}{}
-}
-
-func methodFunctionNames(moduleName string, method funcapi.MethodConfig) []string {
-	funcName := fmt.Sprintf("%s:%s", moduleName, method.ID)
-	funcNames := []string{funcName}
-	seen := map[string]struct{}{funcName: {}}
-
-	for _, alias := range method.Aliases {
-		if alias == "" {
-			continue
-		}
-		if _, ok := seen[alias]; ok {
-			continue
-		}
-		seen[alias] = struct{}{}
-		funcNames = append(funcNames, alias)
-	}
-	return funcNames
 }
 
 func methodTags(method funcapi.MethodConfig) string {

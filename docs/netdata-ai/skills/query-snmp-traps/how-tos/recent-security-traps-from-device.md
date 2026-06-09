@@ -27,7 +27,7 @@ Which security-category SNMP traps did one device send recently?
    ```bash
    NODE_UUID="YOUR_NODE_UUID"
    SNMP_TRAPS_JOB="local"
-   SNMP_TRAPS_FUNCTION="snmp_traps:logs"
+   SNMP_TRAPS_FUNCTION="snmp:traps"
    DEVICE_IP="[DEVICE_IP]"
 
    BODY="$(jq -n --arg job "$SNMP_TRAPS_JOB" --arg device_ip "$DEVICE_IP" '{
@@ -60,7 +60,7 @@ Which security-category SNMP traps did one device send recently?
    ```bash
    NODE_UUID="YOUR_NODE_UUID"
    SNMP_TRAPS_JOB="local"
-   SNMP_TRAPS_FUNCTION="snmp_traps:logs"
+   SNMP_TRAPS_FUNCTION="snmp:traps"
    DEVICE_HOSTNAME="[DEVICE_HOSTNAME]"
 
    BODY="$(jq -n --arg job "$SNMP_TRAPS_JOB" --arg hostname "$DEVICE_HOSTNAME" '{

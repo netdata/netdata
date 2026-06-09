@@ -8,7 +8,7 @@ description: Query SNMP trap logs through Netdata Cloud or directly from a Netda
 This skill teaches operators and AI assistants how to query SNMP trap
 journal entries written by the `snmp_traps` go.d collector.
 
-SNMP trap entries are exposed through the `snmp_traps:logs` Function.
+SNMP trap entries are exposed through the `snmp:traps` Function.
 Direct-journal jobs appear as `__logs_sources` options, normally named
 after the trap listener job. OTEL-only jobs (`journal.enabled: false`)
 do not create local journal files, so they do not appear as log
@@ -53,7 +53,7 @@ Log Function request shape from
    durable artifacts. Return summarized fields unless the user
    explicitly needs raw output locally.
 5. **Remember the Function is node-scoped.** Cloud-proxied
-   `snmp_traps:logs` calls target one node. For a room or fleet query,
+   `snmp:traps` calls target one node. For a room or fleet query,
    list nodes first and loop over each node's Function, then aggregate
    client-side. Use `__logs_sources` to narrow to a specific listener
    job when needed.
@@ -99,7 +99,7 @@ Cloud-proxied query, preferred by default:
 
 ```bash
 NODE_UUID="YOUR_NODE_UUID"
-SNMP_TRAPS_FUNCTION="snmp_traps:logs"
+SNMP_TRAPS_FUNCTION="snmp:traps"
 
 agents_call_function \
   --via cloud \
@@ -114,7 +114,7 @@ Direct-agent query, for local or Cloud-unavailable cases:
 NODE_UUID="YOUR_NODE_UUID"
 AGENT_HOST="agent.example.invalid:19999"
 MACHINE_GUID="YOUR_MACHINE_GUID"
-SNMP_TRAPS_FUNCTION="snmp_traps:logs"
+SNMP_TRAPS_FUNCTION="snmp:traps"
 
 agents_call_function \
   --via agent \
@@ -142,7 +142,7 @@ jq '.columns as $c
 
 ## Source Selection
 
-Start with `{"info":true}` for `snmp_traps:logs` and inspect the
+Start with `{"info":true}` for `snmp:traps` and inspect the
 `__logs_sources` required parameter. By default, the SDK selects all
 direct-journal sources. To target one listener job, add:
 

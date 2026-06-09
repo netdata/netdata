@@ -38,6 +38,11 @@ type methodExecutionInput struct {
 }
 
 func (c *Controller) ExecuteFunction(functionName string, fn functions.Function) {
+	if moduleName, methodID, ok := c.registry.resolveMethodRoute(functionName); ok {
+		c.makeMethodFuncHandler(moduleName, methodID)(fn)
+		return
+	}
+
 	moduleName, methodID, err := functions.SplitFunctionName(functionName)
 	if err != nil {
 		c.respondError(fn, 400, "%v", err)

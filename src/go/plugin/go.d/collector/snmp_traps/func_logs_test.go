@@ -25,12 +25,18 @@ func TestSNMPTrapsMethodsExposeReloadAndLogs(t *testing.T) {
 
 	assert.Contains(t, byID, reloadProfilesMethodID)
 	logs := byID[snmpTrapsLogsMethodID]
+	assert.Equal(t, snmpTrapsFunctionName, logs.FunctionName)
 	assert.Equal(t, "SNMP Trap Logs", logs.Name)
 	assert.Equal(t, "logs", logs.Tags)
 	assert.Equal(t, "logs", logs.ResponseType)
 	assert.True(t, logs.RawRequest)
 	assert.True(t, logs.RequireCloud)
 	assert.True(t, logs.AgentWide)
+}
+
+func TestSNMPTrapsJournalFunctionUsesPublicFunctionName(t *testing.T) {
+	fn := newSNMPTrapsJournalFunction()
+	assert.Equal(t, snmpTrapsFunctionName, fn.Config.FunctionName)
 }
 
 func TestSNMPTrapsLogsFunctionInfoAndQuery(t *testing.T) {
