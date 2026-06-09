@@ -48,9 +48,25 @@ impl IngestService {
         let now = now_usec();
         self.decoders.refresh_enrichment_state();
         self.run_tier_maintenance(now);
-        let entries_since_sync = self.sync_if_needed(entries_since_sync);
+        let entries_since_sync = if self.periodic_sync_enabled() {
+            self.sync_if_needed(entries_since_sync)
+        } else {
+            // Periodic fsync is disabled (sync_every_entries = 0): the raw
+            // journal reaches disk via kernel writeback and is fully synced on
+            // rotation and at shutdown. Facet state still persists on the tick
+            // cadence, and the entry counter keeps accumulating so shutdown
+            // performs one final sync.
+            if let Err(err) = self.facet_runtime.persist_if_dirty() {
+                tracing::warn!("facet runtime persist failed: {}", err);
+            }
+            entries_since_sync
+        };
         self.persist_decoder_state_if_due(now);
         entries_since_sync
+    }
+
+    fn periodic_sync_enabled(&self) -> bool {
+        self.cfg.listener.sync_every_entries > 0
     }
 
     fn handle_received_packet(
@@ -181,7 +197,8 @@ impl IngestService {
     }
 
     fn sync_if_threshold_reached(&mut self, entries_since_sync: usize) -> usize {
-        if entries_since_sync >= self.cfg.listener.sync_every_entries {
+        let sync_every_entries = self.cfg.listener.sync_every_entries;
+        if sync_every_entries > 0 && entries_since_sync >= sync_every_entries {
             return self.sync_if_needed(entries_since_sync);
         }
 

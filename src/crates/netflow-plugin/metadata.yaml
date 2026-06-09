@@ -53,7 +53,7 @@ modules:
         auto_detection:
           description: "The plugin starts when enabled in netflow.yaml and listens on the configured UDP port."
         limits:
-          description: "Operational limits are driven by sustained flows/s, cardinality, retention, storage speed, and enrichment. Plan around 25k sustained flows/s per well-provisioned agent for the full raw + rollup pipeline; use distributed agents for larger deployments."
+          description: "Operational limits are driven by sustained flows/s, cardinality, retention, storage speed, and enrichment. Plan around 30k-100k sustained flows/s per well-provisioned agent for the full raw + rollup pipeline, depending on flow cardinality and disk I/O; use distributed agents for larger deployments."
         performance_impact:
           description: "Disabled until exporters send traffic. Once active, CPU and disk I/O scale with flow rate and cardinality; size retention and storage from observed flows/s."
     setup:
@@ -213,7 +213,7 @@ modules:
         auto_detection:
           description: "The plugin starts when enabled in netflow.yaml and listens on the configured UDP port."
         limits:
-          description: "Operational limits are driven by sustained flows/s, template churn, cardinality, retention, storage speed, and enrichment. Plan around 25k sustained flows/s per well-provisioned agent for the full raw + rollup pipeline; use distributed agents for larger deployments."
+          description: "Operational limits are driven by sustained flows/s, template churn, cardinality, retention, storage speed, and enrichment. Plan around 30k-100k sustained flows/s per well-provisioned agent for the full raw + rollup pipeline, depending on flow cardinality and disk I/O; use distributed agents for larger deployments."
         performance_impact:
           description: "Disabled until exporters send traffic. Once active, CPU and disk I/O scale with flow rate, template volume, and cardinality; size retention and storage from observed flows/s."
     setup:

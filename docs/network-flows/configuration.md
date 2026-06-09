@@ -59,7 +59,7 @@ Controls the UDP socket and the journal write cadence.
 listener:
   listen: "0.0.0.0:2055"
   max_packet_size: 9216
-  sync_every_entries: 1024
+  sync_every_entries: 0
   sync_interval: "1s"
 ```
 
@@ -67,8 +67,8 @@ listener:
 |---|---|---|---|
 | `listen` | `--netflow-listen` | `0.0.0.0:2055` | Address and port for the UDP socket. Same socket handles NetFlow v5/v7/v9, IPFIX, and sFlow. |
 | `max_packet_size` | `--netflow-max-packet-size` | `9216` | Maximum UDP datagram in bytes. Increase for jumbo sFlow datagrams or routers that send oversized IPFIX. |
-| `sync_every_entries` | `--netflow-sync-every-entries` | `1024` | Flush the raw journal to disk after this many records, regardless of `sync_interval`. |
-| `sync_interval` | `--netflow-sync-interval` | `1s` | Maximum time between forced flushes. |
+| `sync_every_entries` | `--netflow-sync-every-entries` | `0` | Periodic fsync of the active raw journal. `0` (default) disables it: data reaches disk via kernel writeback, and every journal file is fully synced when rotated and at shutdown. Values > 0 fsync after that many records (and at least once per `sync_interval`); at high flow rates the fsync stalls the receive path and can cause UDP drops. |
+| `sync_interval` | `--netflow-sync-interval` | `1s` | Maximum time between forced fsyncs when `sync_every_entries` > 0. Also the cadence for facet-state persistence and tier maintenance. |
 
 ### UDP buffer tuning is not in this file
 
