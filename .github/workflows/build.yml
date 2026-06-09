@@ -649,9 +649,10 @@ jobs:
         id: prepare
         if: needs.file-check.outputs.run == 'true'
         run: |
-          mkdir -p download/latest latest
+          mkdir -p download/latest latest "download/$(cat artifacts/latest-version.txt)"
           mv artifacts/* download/latest
           cp -a download/latest/* latest
+          cp -a download/latest/* "download/$(cat artifacts/latest-version.txt)"
           ls -al download/latest
       - name: Verify that artifacts work with installer
         id: verify
@@ -719,9 +720,10 @@ jobs:
         id: prepare
         if: needs.file-check.outputs.run == 'true'
         run: |
-          mkdir -p download/latest latest
+          mkdir -p download/latest latest "download/$(cat artifacts/latest-version.txt)"
           mv artifacts/* download/latest
           cp -a download/latest/* latest
+          cp -a download/latest/* "download/$(cat artifacts/latest-version.txt)"
           ls -al download/latest
       - name: Verify that artifacts work with installer
         id: verify
@@ -789,9 +791,10 @@ jobs:
         id: prepare
         if: needs.file-check.outputs.run == 'true'
         run: |
-          mkdir -p download/latest latest
+          mkdir -p download/latest latest "download/$(cat artifacts/latest-version.txt)"
           mv artifacts/* download/latest
           cp -a download/latest/* latest
+          cp -a download/latest/* "download/$(cat artifacts/latest-version.txt)"
           ls -al download/latest
       - name: Run Updater Check
         id: check
