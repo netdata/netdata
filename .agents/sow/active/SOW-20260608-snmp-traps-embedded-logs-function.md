@@ -295,8 +295,10 @@ Validation plan:
 - Function deletion validation:
   - no local `FUNCTION_REMOVE` protocol references remain in this branch.
 - Focused commands:
-  - `GOTOOLCHAIN=go1.26.0 go test ./pkg/netdataapi ./plugin/framework/collectorapi ./plugin/agent/jobmgr/funcctl ./plugin/framework/functions ./pkg/funcapi`
-  - `GOTOOLCHAIN=go1.26.0 go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 180s`
+  - Go toolchain 1.26.0:
+    `go test ./pkg/netdataapi ./plugin/framework/collectorapi ./plugin/agent/jobmgr/funcctl ./plugin/framework/functions ./pkg/funcapi`
+  - Go toolchain 1.26.0:
+    `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 180s`
   - config/schema JSON validation and generated docs regeneration if metadata
     changes.
 
@@ -427,6 +429,14 @@ Open decisions:
 - Updated SNMP traps metadata, generated integration docs, durable spec, and
   public trap-query skill/how-tos for `snmp:traps` and
   `__logs_sources`.
+- User requested updating the embedded logs integration to the latest
+  `github.com/netdata/systemd-journal-sdk/go` release, `v0.6.0`.
+- Verified the branch was still using SDK Go module `v0.5.1`.
+- Verified local and remote SDK tags include `go/v0.6.0`.
+- Verified `go/v0.5.1..go/v0.6.0` has no source diff under the SDK `go/`
+  subtree; the dependency update is still required so the branch consumes the
+  latest released module tag.
+- Updated `src/go/go.mod` and `src/go/go.sum` to SDK Go module `v0.6.0`.
 
 ## Validation
 
@@ -470,14 +480,24 @@ Acceptance criteria evidence:
 
 Tests or equivalent validation:
 
-- PASS: `GOTOOLCHAIN=go1.26.0 go test ./pkg/netdataapi ./plugin/framework/collectorapi ./plugin/agent/jobmgr/funcctl ./plugin/agent/jobmgr ./plugin/framework/functions ./pkg/funcapi -count=1`
-- PASS: `GOTOOLCHAIN=go1.26.0 go test ./pkg/funcapi ./plugin/agent/jobmgr/funcctl ./plugin/agent/jobmgr ./plugin/framework/functions -count=1 -timeout 180s`
-- PASS: `GOTOOLCHAIN=go1.26.0 go test ./cmd/godplugin ./pkg/funcapi ./plugin/agent/jobmgr/funcctl ./plugin/agent/jobmgr ./plugin/framework/functions -count=1 -timeout 180s`
-- PASS: `GOTOOLCHAIN=go1.26.0 go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 180s`
-- PASS: `python3 -m json.tool src/go/plugin/go.d/collector/snmp_traps/config_schema.json >/dev/null`
-- PASS: `python3 integrations/gen_taxonomy.py --check-only`
-- PASS: `python3 integrations/gen_integrations.py && python3 integrations/gen_docs_integrations.py -c go.d.plugin/snmp_traps`
-- PASS: `git diff --check`
+- Passed with Go toolchain 1.26.0:
+  `go test ./pkg/netdataapi ./plugin/framework/collectorapi ./plugin/agent/jobmgr/funcctl ./plugin/agent/jobmgr ./plugin/framework/functions ./pkg/funcapi -count=1`
+- Passed with Go toolchain 1.26.0:
+  `go test ./pkg/funcapi ./plugin/agent/jobmgr/funcctl ./plugin/agent/jobmgr ./plugin/framework/functions -count=1 -timeout 180s`
+- Passed with Go toolchain 1.26.0:
+  `go test ./cmd/godplugin ./pkg/funcapi ./plugin/agent/jobmgr/funcctl ./plugin/agent/jobmgr ./plugin/framework/functions -count=1 -timeout 180s`
+- Passed with Go toolchain 1.26.0:
+  `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 180s`
+- Passed: `python3 -m json.tool src/go/plugin/go.d/collector/snmp_traps/config_schema.json >/dev/null`
+- Passed: `python3 integrations/gen_taxonomy.py --check-only`
+- Passed: `python3 integrations/gen_integrations.py && python3 integrations/gen_docs_integrations.py -c go.d.plugin/snmp_traps`
+- Passed: `git diff --check`
+- Passed after SDK `v0.6.0` update with Go toolchain 1.26.0:
+  `go test ./cmd/godplugin ./pkg/funcapi ./plugin/agent/jobmgr/funcctl ./plugin/agent/jobmgr ./plugin/framework/functions -count=1 -timeout 180s`
+- Passed after SDK `v0.6.0` update with Go toolchain 1.26.0:
+  `go test ./plugin/go.d/collector/snmp_traps -count=1 -timeout 180s`
+- Passed after SDK `v0.6.0` update:
+  `bash .agents/sow/scan-sensitive.sh .agents/sow/active/SOW-20260608-snmp-traps-embedded-logs-function.md`
 
 Real-use evidence:
 
@@ -505,9 +525,9 @@ Reviewer findings:
 
 Same-failure scan:
 
-- PASS: searched for `FUNCTION_REMOVE`, `PLUGINSD_KEYWORD_FUNCTION_REMOVE`,
-  and `pluginsd_function_remove`; no local protocol implementation remains.
-- PASS: searched for old per-job logs Function docs and code references,
+- Passed search for local Function removal protocol keywords; no local
+  protocol implementation remains.
+- Passed search for old per-job logs Function docs and code references,
   including constructed names; replaced the SNMP trap surface with
   `snmp:traps` plus `__logs_sources`.
 
