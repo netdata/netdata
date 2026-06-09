@@ -208,13 +208,30 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     return si;
 }
 
-int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms __maybe_unused) {
+int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms) {
     if (!si) return -1;
 
     if (kill(si->child_pid, SIGTERM))
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: kill() of pid %d failed: %s",
                si->child_pid, si->cmdline);
+
+    // escalate to SIGKILL if the child does not exit promptly after SIGTERM (or if the wait could
+    // not be completed), so a SIGTERM-ignoring child cannot make the final wait block forever.
+    // the caller's timeout_ms is the SIGTERM grace; fall back to a default when not specified.
+    int grace_ms = timeout_ms > 0 ? timeout_ms : SPAWN_KILL_DEFAULT_GRACE_MS;
+    int status;
+    if(spawn_server_exec_timedwait(server, si, grace_ms, &status) != SPAWN_TIMEDWAIT_EXITED) {
+        if(kill(si->child_pid, SIGKILL) != 0)
+            // a failed SIGKILL almost always means the child is already gone (ESRCH); the wait
+            // below then returns immediately. SIGKILL is uncatchable, so it cannot be ignored by
+            // a live child - the only unbounded case left is uninterruptible (D-state) sleep,
+            // which no signal or timeout can resolve.
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: SIGKILL of pid %d failed: %s", si->child_pid, si->cmdline);
+    }
+    else
+        return status;
 
     return spawn_server_exec_wait(server, si);
 }
@@ -268,6 +285,45 @@ static int spawn_server_waitpid(SPAWN_INSTANCE *si) {
     }
 
     return status;
+}
+
+SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, int *status) {
+    if (!si) { if(status) *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
+
+    // close the child pipes to force it to exit, matching spawn_server_exec_wait and the
+    // other backends; otherwise a child blocked on stdin/stdout would never see EOF and
+    // would stay alive until the deadline forces a SIGKILL
+    if (si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
+    if (si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
+
+    // a negative timeout would become a huge usec_t deadline (= unbounded wait); clamp to poll-once
+    if(timeout_ms < 0) timeout_ms = 0;
+    usec_t deadline_ut = now_monotonic_usec() + (usec_t)timeout_ms * USEC_PER_MS;
+
+    while(!__atomic_load_n(&si->exited, __ATOMIC_RELAXED)) {
+        int wstatus = 0;
+        pid_t pid = waitpid(si->child_pid, &wstatus, WNOHANG);
+        if(pid == si->child_pid) {
+            __atomic_store_n(&si->waitpid_status, wstatus, __ATOMIC_RELAXED);
+            __atomic_store_n(&si->exited, true, __ATOMIC_RELAXED);
+            break;
+        }
+
+        if(pid < 0 && errno != EINTR)
+            // child reaped elsewhere (e.g. ECHILD) - let the blocking wait resolve it immediately
+            break;
+
+        // pid == 0 (still running) or EINTR (interrupted before any state change):
+        // keep waiting, but never past the deadline
+        if(now_monotonic_usec() >= deadline_ut)
+            return SPAWN_TIMEDWAIT_RUNNING;
+
+        sleep_usec(10 * USEC_PER_MS);
+    }
+
+    int st = spawn_server_exec_wait(server, si);
+    if(status) *status = st;
+    return SPAWN_TIMEDWAIT_EXITED;
 }
 
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {

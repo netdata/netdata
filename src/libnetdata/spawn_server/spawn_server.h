@@ -45,6 +45,26 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms);
 int spawn_server_exec_wait(SPAWN_SERVER *server, SPAWN_INSTANCE *si);
 
+typedef enum __attribute__((packed)) {
+    SPAWN_TIMEDWAIT_EXITED = 0,     // the child exited; *status holds its status and si has been freed
+    SPAWN_TIMEDWAIT_RUNNING = 1,    // the timeout expired; the child is still running and si remains valid
+    SPAWN_TIMEDWAIT_ERROR = 2,      // the wait could not be completed (broken status channel / unusable
+                                    // handle); the child's state is unknown, si remains valid, and the
+                                    // caller must reclaim it (e.g. via spawn_server_exec_kill())
+} SPAWN_TIMEDWAIT_RESULT;
+
+// Wait for the child for up to timeout_ms. A non-positive timeout_ms performs a single, minimal
+// bounded poll (the nofork backend uses a ~1ms slice because its wait primitive treats 0 as
+// "wait forever"; the others poll once); the wait is always bounded, never infinite.
+// On SPAWN_TIMEDWAIT_EXITED the instance has been freed, exactly like spawn_server_exec_wait().
+// On SPAWN_TIMEDWAIT_RUNNING or SPAWN_TIMEDWAIT_ERROR the caller keeps ownership and must eventually
+// call spawn_server_exec_timedwait(), spawn_server_exec_wait() or spawn_server_exec_kill().
+// ERROR is distinct from RUNNING on purpose: the wait could not progress (it is not merely "not yet"),
+// so callers must NOT loop on it (that would spin forever when timeout_ms == 0) - they must reclaim
+// the instance, typically by killing it.
+// status is optional (may be NULL): on EXITED the wait/cleanup still happens, the status is just not stored.
+SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, int *status);
+
 int spawn_server_instance_read_fd(SPAWN_INSTANCE *si);
 int spawn_server_instance_write_fd(SPAWN_INSTANCE *si);
 pid_t spawn_server_instance_pid(SPAWN_INSTANCE *si);
