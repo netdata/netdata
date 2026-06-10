@@ -30,6 +30,8 @@ type profileLoadPaths struct {
 	all       multipath.MultiPath
 }
 
+var maxProfileFileBytes int64 = 128 * 1024 * 1024
+
 // getProfileDirs returns the multipath of profile directories.
 // Order: user dirs first, then stock dir last.
 func getProfileDirs() multipath.MultiPath {
@@ -357,7 +359,15 @@ func readMaybeGzipFile(filename string) ([]byte, error) {
 		defer gz.Close()
 		r = gz
 	}
-	return io.ReadAll(r)
+	lr := io.LimitReader(r, maxProfileFileBytes+1)
+	data, err := io.ReadAll(lr)
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maxProfileFileBytes {
+		return nil, fmt.Errorf("profile file %q exceeds maximum decompressed size %d bytes", filename, maxProfileFileBytes)
+	}
+	return data, nil
 }
 
 func findProfileExtends(paths multipath.MultiPath, name string) (string, error) {

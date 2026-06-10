@@ -312,6 +312,9 @@ func resolveTemplateVarbind(name string, entry *TrapEntry, td *TrapDef, raw bool
 	if !ok {
 		return ""
 	}
+	if isSensitiveTrapVarbind(v) {
+		return redactedTrapVarbind
+	}
 	if raw {
 		return varbindRawValue(v)
 	}

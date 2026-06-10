@@ -270,6 +270,19 @@ traps:
 	assert.Len(t, idx.trapsByOID, 1)
 }
 
+func TestReadMaybeGzipFileRejectsOversizedDecompressedProfile(t *testing.T) {
+	dir := t.TempDir()
+	writeProfileYAMLGzip(t, dir, "oversized.yaml.gz", strings.Repeat("x", 32))
+
+	oldLimit := maxProfileFileBytes
+	maxProfileFileBytes = 16
+	t.Cleanup(func() { maxProfileFileBytes = oldLimit })
+
+	_, err := readMaybeGzipFile(filepath.Join(dir, "oversized.yaml.gz"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds maximum decompressed size")
+}
+
 func TestStockProfileStoreUsesCatalogueWithoutParsingProfiles(t *testing.T) {
 	rootDir := t.TempDir()
 	stockDir := filepath.Join(rootDir, "default")
@@ -1241,6 +1254,46 @@ traps:
 	assert.Equal(t, "Running configuration changed by admin on 198.51.100.10.", renderMessage(entry, td))
 }
 
+func TestRenderMessageAndLabelsRedactSensitiveCommunityVarbind(t *testing.T) {
+	entry := &TrapEntry{
+		SourceIP: "198.51.100.10",
+		Varbinds: []VarbindValue{
+			{OID: snmpTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
+		},
+	}
+	td := testSensitiveCommunityTrapDef(
+		"Community {snmpTrapCommunity} raw {snmpTrapCommunity.raw} oid {1.3.6.1.6.3.18.1.4}",
+		map[string]string{"community": "{snmpTrapCommunity}"},
+	)
+
+	msg := renderMessage(entry, td)
+	labels := renderLabels(entry, td)
+
+	assert.NotContains(t, msg, "private-community")
+	assert.Contains(t, msg, redactedTrapVarbind)
+	assert.Equal(t, redactedTrapVarbind, labels["community"])
+}
+
+func TestRenderGoTemplateMessageAndLabelsRedactSensitiveCommunityVarbind(t *testing.T) {
+	entry := &TrapEntry{
+		SourceIP: "198.51.100.10",
+		Varbinds: []VarbindValue{
+			{OID: snmpTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
+		},
+	}
+	td := testSensitiveCommunityTrapDef(
+		`Community {{value "snmpTrapCommunity"}} raw {{raw "snmpTrapCommunity"}}`,
+		map[string]string{"community": `{{value "snmpTrapCommunity"}}`},
+	)
+
+	msg := renderMessage(entry, td)
+	labels := renderLabels(entry, td)
+
+	assert.NotContains(t, msg, "private-community")
+	assert.Contains(t, msg, redactedTrapVarbind)
+	assert.Equal(t, redactedTrapVarbind, labels["community"])
+}
+
 func TestLoadProfileRejectsGoTemplateIfBlock(t *testing.T) {
 	dir := t.TempDir()
 	writeProfileYAML(t, dir, "test.yaml", `
@@ -1390,6 +1443,19 @@ func TestRenderMessageNumericOIDRawRef(t *testing.T) {
 
 	msg := renderMessage(entry, td)
 	assert.Contains(t, msg, "2")
+}
+
+func testSensitiveCommunityTrapDef(description string, labels map[string]string) *TrapDef {
+	return &TrapDef{
+		Description: description,
+		Labels:      labels,
+		sharedVarbinds: map[string]*VarbindDef{
+			strings.TrimSuffix(snmpTrapCommunityOID, ".0"): {
+				OID:     strings.TrimSuffix(snmpTrapCommunityOID, ".0"),
+				rawName: "snmpTrapCommunity",
+			},
+		},
+	}
 }
 
 func TestResolveVarbindRawResolvesTabularVarbindInstance(t *testing.T) {

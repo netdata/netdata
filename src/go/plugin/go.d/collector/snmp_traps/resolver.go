@@ -10,6 +10,8 @@ import (
 
 const maxMessageLen = 512
 
+const redactedTrapVarbind = "<redacted>"
+
 // renderMessage renders a trap description template into a human-readable MESSAGE.
 // It resolves {varname}, {varname.raw}, {numeric.oid}, and special vars against the
 // current entry's varbinds and profile definition.
@@ -190,6 +192,9 @@ func resolveVarbindRaw(name string, entry *TrapEntry, td *TrapDef) string {
 
 func resolveVarbindValue(name, oid string, vb *VarbindDef, entry *TrapEntry) string {
 	if v, ok := findVarbindForProfileOID(entry, oid); ok {
+		if isSensitiveTrapVarbind(v) {
+			return redactedTrapVarbind
+		}
 		return varbindDisplayValue(v, vb)
 	}
 	return "<missing>"
@@ -198,6 +203,9 @@ func resolveVarbindValue(name, oid string, vb *VarbindDef, entry *TrapEntry) str
 func resolveRawVarbindByName(name string, entry *TrapEntry) string {
 	for _, v := range entry.Varbinds {
 		if v.Name == name {
+			if isSensitiveTrapVarbind(v) {
+				return redactedTrapVarbind
+			}
 			return varbindRawValue(v)
 		}
 	}
@@ -206,6 +214,9 @@ func resolveRawVarbindByName(name string, entry *TrapEntry) string {
 
 func resolveRawVarbindByOID(oid string, entry *TrapEntry) string {
 	if v, ok := findVarbindForProfileOID(entry, oid); ok {
+		if isSensitiveTrapVarbind(v) {
+			return redactedTrapVarbind
+		}
 		return varbindRawValue(v)
 	}
 	return "<missing>"

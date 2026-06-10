@@ -5,6 +5,7 @@ package jobmgr
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -201,15 +202,24 @@ func (m *Manager) runDyncfgCmdTest(task dyncfgCmdTestTask) {
 	)
 
 	if err := job.Init(ctx); err != nil {
-		m.dyncfgResponder.SendCodef(task.fn, 422, "Job initialization failed: %v", err)
+		m.sendDyncfgCmdTestError(task.fn, 422, "Job initialization failed: %v", err)
 		return
 	}
 	if err := job.Check(ctx); err != nil {
-		m.dyncfgResponder.SendCodef(task.fn, 422, "Job check failed: %v", err)
+		m.sendDyncfgCmdTestError(task.fn, 422, "Job check failed: %v", err)
 		return
 	}
 
 	m.dyncfgResponder.SendCodef(task.fn, 200, "")
+}
+
+func (m *Manager) sendDyncfgCmdTestError(fn dyncfg.Function, defaultCode int, format string, err error) {
+	code := defaultCode
+	var coded dyncfg.CodedError
+	if errors.As(err, &coded) {
+		code = coded.Code()
+	}
+	m.dyncfgResponder.SendCodef(fn, code, format, err)
 }
 
 func (m *Manager) dyncfgCmdTestTimeout(fn dyncfg.Function) time.Duration {

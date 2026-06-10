@@ -1846,6 +1846,39 @@ Still pending:
 - Real installation/lab validation remains a product validation step outside
   this code-readiness pass.
 
+External reviewer final pass findings accepted for this patch:
+
+- Qwen found `readMaybeGzipFile()` used unbounded `io.ReadAll()` for profile
+  YAML and stock catalogue files. This is a local-file write/access risk rather
+  than a network-triggered issue, but a malformed `.yaml.gz` or
+  `catalogue.json.gz` should not be able to expand without a hard cap inside the
+  agent. Plan: cap decompressed reads and return an explicit error when the cap
+  is exceeded.
+- Qwen and Minimax both found a profile-template side path where a custom
+  profile could explicitly render the synthetic SNMP community varbind into
+  `MESSAGE`, labels/`TRAP_TAG_*`, or OTLP body fields. Existing TRAP_JSON and
+  OTLP varbind serialization redaction is correct, and stock profiles do not
+  reference the community in templates, but profile rendering should also
+  redact sensitive varbinds. Plan: redact sensitive varbinds in both legacy
+  `{var}` templates and Go `{{value "var"}}` / `{{raw "var"}}` templates.
+- Qwen found the DynCfg `test` command path hardcoded `422` for all `Init()` and
+  `Check()` failures. Runtime apply/update already preserves coded errors.
+  Plan: preserve `dyncfg.CodedError.Code()` in `test` responses too, falling
+  back to `422` for plain errors.
+
+Rejected or deferred final-pass findings:
+
+- Active SOW files remain an expected draft-branch merge guard and will be
+  removed during final merge preparation after durable memory transfer.
+- Health/chart naming singular-vs-plural is a product naming consistency item,
+  not a runtime correctness bug. The user already approved the file rename to
+  `snmp_traps.conf`; chart contexts remain `snmp.trap.*`.
+- Engine state path `snmp-trap` vs journal path `snmp-traps` is pre-release and
+  harmless, but changing it now would touch state-path semantics. Leave unless a
+  maintainer explicitly requests a rename.
+- C-side `TRAP_TAG_*` unit coverage and SELinux policy packaging remain
+  follow-up candidates unless maintainers make them merge blockers.
+
 ## Artifact Maintenance Gate
 
 - Specs, generated integration docs, and the operator skill have already been

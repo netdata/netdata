@@ -201,6 +201,70 @@ func TestDyncfgCmdTest_PassesJobNameToV2Collector(t *testing.T) {
 	assert.Equal(t, float64(200), resp["status"])
 }
 
+func TestDyncfgCmdTest_CodedInitAndCheckErrorsPreserveCode(t *testing.T) {
+	tests := map[string]struct {
+		register   func(*Manager, string)
+		wantStatus float64
+		wantError  string
+	}{
+		"init coded error": {
+			register: func(mgr *Manager, moduleName string) {
+				mgr.modules.Register(moduleName, collectorapi.Creator{
+					Create: func() collectorapi.CollectorV1 {
+						return &collectorapi.MockCollectorV1{
+							InitFunc: func(context.Context) error {
+								return &externalCodedError{err: errors.New("bind failed"), code: 503}
+							},
+						}
+					},
+				})
+			},
+			wantStatus: 503,
+			wantError:  "Job initialization failed: bind failed",
+		},
+		"check coded error": {
+			register: func(mgr *Manager, moduleName string) {
+				mgr.modules.Register(moduleName, collectorapi.Creator{
+					Create: func() collectorapi.CollectorV1 {
+						return &collectorapi.MockCollectorV1{
+							CheckFunc: func(context.Context) error {
+								return &externalCodedError{err: errors.New("preflight failed"), code: 503}
+							},
+						}
+					},
+				})
+			},
+			wantStatus: 503,
+			wantError:  "Job check failed: preflight failed",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var buf bytes.Buffer
+			moduleName := strings.ReplaceAll(name, " ", "_")
+			mgr := newCollectorTestManager()
+			mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
+			tc.register(mgr, moduleName)
+
+			fn := dyncfg.NewFunction(functions.Function{
+				UID:         name,
+				ContentType: "application/json",
+				Payload:     mustMarshalCollectorConfigPayload(t, prepareDyncfgCfg(moduleName, "payload-name")),
+				Args:        []string{mgr.dyncfgModID(moduleName), string(dyncfg.CommandTest), "tested-job"},
+			})
+
+			mgr.dyncfgCmdTest(fn)
+			mgr.cmdTestWG.Wait()
+
+			var resp map[string]any
+			mustDecodeFunctionPayload(t, buf.String(), name, &resp)
+			assert.Equal(t, tc.wantStatus, resp["status"])
+			assert.Contains(t, resp["errorMessage"], tc.wantError)
+		})
+	}
+}
+
 func TestDyncfgCollectorSeqExec_SyncsSecretStoreDepsForMutatingCommands(t *testing.T) {
 	tests := map[string]struct {
 		command        dyncfg.Command
