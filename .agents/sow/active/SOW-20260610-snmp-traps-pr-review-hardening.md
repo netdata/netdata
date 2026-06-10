@@ -2293,3 +2293,31 @@ Validation evidence for this SonarCloud batch:
   directly after one package-level run tripped the existing 1 ms decode-budget
   guard.
 - `git diff --check` passed.
+
+Follow-up SonarCloud finding after commit `07f536a1d2`:
+
+- SonarCloud PR API reports one remaining open issue for PR `22652`:
+  - key `AZ6y3oSf8fBMsvP3INAC`
+  - rule `godre:S8242`
+  - file `src/go/plugin/agent/jobmgr/funcctl/controller_test.go`
+  - line `702`
+  - message: remove the `context.Context` field and pass context as a
+    parameter to methods that need it.
+- Root cause:
+  - The production `Function.Context` field was removed, but the funcctl test
+    table still stored `context.Context` in `rawControllerMethodCase`.
+- Fix plan:
+  - Keep the test intent but replace the stored context with a scalar
+    cancellation flag.
+  - Let `runRawControllerMethodCase()` create the canceled context at call time.
+  - Re-run the affected funcctl tests and `git diff --check`.
+- Implemented:
+  - Replaced `rawControllerMethodCase.ctx context.Context` with
+    `cancelContext bool`.
+  - Kept context creation inside `runRawControllerMethodCase()`.
+- Validation:
+  - `GOTOOLCHAIN=go1.26.0 go test -count=1
+    ./plugin/agent/jobmgr/funcctl ./plugin/agent/jobmgr
+    ./plugin/framework/functions ./plugin/go.d/collector/snmp_traps
+    ./cmd/godplugin ./plugin/framework/dyncfg` passed.
+  - `git diff --check` passed.

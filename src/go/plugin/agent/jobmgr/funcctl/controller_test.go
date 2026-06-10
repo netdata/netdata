@@ -698,11 +698,11 @@ func TestControllerRegisterJobMethods(t *testing.T) {
 }
 
 type rawControllerMethodCase struct {
-	fn       functions.Function
-	ctx      context.Context
-	raw      func(context.Context, funcapi.RawMethodRequest) *funcapi.FunctionResponse
-	wantCode int
-	check    func(*testing.T, map[string]any)
+	fn            functions.Function
+	cancelContext bool
+	raw           func(context.Context, funcapi.RawMethodRequest) *funcapi.FunctionResponse
+	wantCode      int
+	check         func(*testing.T, map[string]any)
 }
 
 func runRawControllerMethodCase(t *testing.T, tc rawControllerMethodCase, creator collectorapi.Creator, callName string) {
@@ -727,9 +727,9 @@ func runRawControllerMethodCase(t *testing.T, tc rawControllerMethodCase, creato
 
 	call := reg.handlers[callName]
 	require.NotNil(t, call)
-	ctx := tc.ctx
-	if ctx == nil {
-		ctx = context.Background()
+	ctx := context.Background()
+	if tc.cancelContext {
+		ctx = canceledTestContext()
 	}
 	reg.call(callName, ctx, tc.fn)
 
@@ -797,7 +797,7 @@ func TestControllerRawModuleMethodRequest(t *testing.T) {
 				UID:     "raw-cancel",
 				Timeout: time.Second,
 			},
-			ctx: canceledTestContext(),
+			cancelContext: true,
 			raw: func(ctx context.Context, _ funcapi.RawMethodRequest) *funcapi.FunctionResponse {
 				assert.ErrorIs(t, ctx.Err(), context.Canceled)
 				return funcapi.RawResponse(map[string]any{
@@ -923,7 +923,7 @@ func TestControllerRawJobMethodRequest(t *testing.T) {
 				UID:     "raw-cancel",
 				Timeout: time.Second,
 			},
-			ctx: canceledTestContext(),
+			cancelContext: true,
 			raw: func(ctx context.Context, _ funcapi.RawMethodRequest) *funcapi.FunctionResponse {
 				assert.ErrorIs(t, ctx.Err(), context.Canceled)
 				return funcapi.RawResponse(map[string]any{
