@@ -306,13 +306,23 @@ func (r *moduleFuncRegistry) findMethodCollision(moduleName, jobName, methodID s
 
 func (r *moduleFuncRegistry) rebuildMethodRoutesLocked() {
 	r.methodRoutes = make(map[string]methodRoute)
-	for moduleName, module := range r.modules {
+	moduleNames := make([]string, 0, len(r.modules))
+	for moduleName := range r.modules {
+		moduleNames = append(moduleNames, moduleName)
+	}
+	sort.Strings(moduleNames)
+
+	for _, moduleName := range moduleNames {
+		module := r.modules[moduleName]
 		for _, method := range module.methods {
 			if method.ID == "" {
 				continue
 			}
 			route := methodRoute{moduleName: moduleName, methodID: method.ID}
 			for _, functionName := range funcapi.MethodFunctionNames(moduleName, method) {
+				if _, exists := r.methodRoutes[functionName]; exists {
+					continue
+				}
 				r.methodRoutes[functionName] = route
 			}
 		}

@@ -218,6 +218,23 @@ func TestModuleFuncRegistry_Concurrency(t *testing.T) {
 	<-done
 }
 
+func TestModuleFuncRegistry_MethodRouteCollisionKeepsFirstOwner(t *testing.T) {
+	r := newModuleFuncRegistry()
+	r.registerModuleWithMethods("bbb", collectorapi.Creator{}, []funcapi.MethodConfig{{
+		ID:           "logs",
+		FunctionName: "shared:logs",
+	}})
+	r.registerModuleWithMethods("aaa", collectorapi.Creator{}, []funcapi.MethodConfig{{
+		ID:           "logs",
+		FunctionName: "shared:logs",
+	}})
+
+	moduleName, methodID, ok := r.resolveMethodRoute("shared:logs")
+	require.True(t, ok)
+	assert.Equal(t, "aaa", moduleName)
+	assert.Equal(t, "logs", methodID)
+}
+
 func TestModuleFuncRegistry_VerifyJobGeneration_JobStopped(t *testing.T) {
 	r := newModuleFuncRegistry()
 	r.registerModule("postgres", collectorapi.Creator{})
