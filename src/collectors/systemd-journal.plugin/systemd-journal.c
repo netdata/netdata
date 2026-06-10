@@ -166,6 +166,7 @@ static __always_inline SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(cons
     "|TRAP_DEVICE_VENDOR"                                                                                                      \
     "|TRAP_INTERFACE"                                                                                                          \
     "|TRAP_NEIGHBORS"                                                                                                          \
+    "|TRAP_TAG_*"                                                                                                              \
                                                                                                                                \
     ""
 
