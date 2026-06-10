@@ -267,7 +267,7 @@ Available inside both `match` expressions and `config_template` bodies. All vari
 | `.SysInfo.Contact` | string | Value of `sysContact.0`. May be empty. |
 | `.SysInfo.Name` | string | Value of `sysName.0` (typically the device hostname or FQDN). Defaults to the literal string `unknown` when the device does not return one. |
 | `.SysInfo.Location` | string | Value of `sysLocation.0`. May be empty. |
-| `.SysInfo.Organization` | string | Vendor or organization parsed from `sysObjectID` against the embedded enterprise-numbers table. Defaults to `Unknown` when the OID is not in the table. |
+| `.SysInfo.Organization` | string | Vendor or organization parsed from `sysObjectID` against the bundled enterprise-numbers table. Defaults to `Unknown` when the OID is not in the table. |
 | `.SysInfo.Vendor` | string | Vendor name inferred from `sysObjectID` and `sysDescr` via the bundled overrides. Empty when no override matches. |
 | `.SysInfo.Category` | string | Device category (e.g. `router`, `switch`, `printer`). Sourced from the bundled SNMP overrides; empty when no override matches the device. The set of category values is determined by the overrides, not a closed enum. |
 | `.SysInfo.Model` | string | Device model inferred from `sysObjectID` and `sysDescr` via the bundled overrides. Empty when no override matches. |

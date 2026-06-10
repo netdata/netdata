@@ -17,5 +17,6 @@ exclude_paths:
   - TODO-netflow-plugin-refactor.md
   - src/go/pkg/l2topology/parity/README.md
   - src/go/pkg/l2topology/parity/evidence/**
+  - src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/**
   - .agents/**
   - docs/netdata-ai/skills/**
