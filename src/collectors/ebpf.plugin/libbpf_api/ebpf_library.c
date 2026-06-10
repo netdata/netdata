@@ -409,6 +409,9 @@ void ebpf_set_thread_mode(netdata_run_mode_t lmode)
 
 void ebpf_enable_specific_chart(ebpf_module_t *em, int disable_cgroup)
 {
+    if (em == &ebpf_modules[EBPF_MODULE_SOCKET_IDX] && ebpf_socket_is_migration_disabled())
+        return;
+
     ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_RUNNING);
 
     if (!disable_cgroup) {

@@ -855,8 +855,10 @@ void ebpf_function_thread(void *ptr)
 
     struct functions_evloop_globals *wg = functions_evloop_init(1, "EBPF", &lock, &ebpf_plugin_exit, NULL);
 
-    functions_evloop_add_function(
-        wg, EBPF_FUNCTION_SOCKET, ebpf_function_socket_manipulation, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
+    if (!ebpf_socket_is_migration_disabled()) {
+        functions_evloop_add_function(
+            wg, EBPF_FUNCTION_SOCKET, ebpf_function_socket_manipulation, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
+    }
 
     netdata_mutex_lock(&lock);
     int i;

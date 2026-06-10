@@ -40,6 +40,13 @@ netdata_mutex_t lock;
 netdata_mutex_t ebpf_exit_cleanup;
 netdata_mutex_t collect_data_mutex;
 
+bool ebpf_socket_is_migration_disabled(void)
+{
+    // Keep the socket code available during the ebpf.plugin -> ebpfgo.plugin migration,
+    // but prevent ebpf.plugin from starting or advertising the socket runtime.
+    return true;
+}
+
 struct netdata_static_thread cgroup_integration_thread = {
     .name = "EBPF CGROUP INT",
     .config_section = NULL,
@@ -87,10 +94,10 @@ ebpf_module_t ebpf_modules[] = {
      .functions =
          {.start_routine = ebpf_socket_thread,
           .apps_routine = ebpf_socket_create_apps_charts,
-          .fnct_routine = ebpf_socket_read_open_connections,
+          .fnct_routine = NULL,
           .bpf_unload = ebpf_socket_unload_bpf,
-          .fcnt_name = EBPF_FUNCTION_SOCKET,
-          .fcnt_desc = EBPF_PLUGIN_SOCKET_FUNCTION_DESCRIPTION,
+          .fcnt_name = NULL,
+          .fcnt_desc = NULL,
           .fcnt_thread_chart_name = NULL,
           .fcnt_thread_lifetime_name = NULL},
      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,

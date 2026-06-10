@@ -185,6 +185,7 @@ enum ebpf_algorithms_list { NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_
 // Threads
 void ebpf_process_thread(void *ptr);
 void ebpf_socket_thread(void *ptr);
+bool ebpf_socket_is_migration_disabled(void);
 
 // Common variables
 extern netdata_mutex_t lock;
