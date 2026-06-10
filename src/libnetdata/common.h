@@ -640,6 +640,58 @@ static inline int kill(pid_t pid __maybe_unused, int sig __maybe_unused) {
     return -1;
 }
 
+// ── struct statfs / statfs() ── absent from UCRT64 ───────────────────────────
+// paths.c uses statfs() only to detect procfs/sysfs (Linux-only fs types).
+// On Windows those filesystems never exist; returning -1 makes callers skip
+// procfs/sysfs-specific logic, which is the correct behaviour.
+#ifndef _STATFS_DEFINED
+#define _STATFS_DEFINED
+struct statfs { long f_type; };
+static inline int statfs(const char *path __maybe_unused, struct statfs *buf __maybe_unused) {
+    errno = ENOSYS;
+    return -1;
+}
+#endif
+
+// ── d_type / DT_* ── MinGW UCRT64 struct dirent has no d_type member ─────────
+// Windows has no inode numbers, so d_ino is always 0.  Mapping d_type to d_ino
+// means every entry reports DT_UNKNOWN (0), and callers fall through to the
+// stat()-based type check (the DT_UNKNOWN branch is always guarded in paths.c).
+#ifndef DT_UNKNOWN
+#define DT_UNKNOWN  0
+#define DT_DIR      4
+#define DT_REG      8
+#define DT_LNK     10
+#define d_type      d_ino
+#endif
+
+// ── strerror_r() ── POSIX XSI variant, absent from UCRT64 ────────────────────
+// Windows provides strerror_s() with reversed argument order and returns errno.
+static inline int strerror_r(int errnum, char *buf, size_t buflen) {
+    return (int)strerror_s(buf, buflen, errnum);
+}
+
+// ── syslog stubs ── openlog/closelog/syslog/LOG_PID absent from UCRT64 ────────
+// nd_log-to-syslog.c is compiled unconditionally; these become no-ops on Windows
+// because the Windows log sink (EventLog / OutputDebugString) is used instead.
+#ifndef LOG_PID
+#define LOG_PID    0x01
+#define LOG_ODELAY 0x04
+#define LOG_NDELAY 0x08
+static inline void openlog(const char *ident __maybe_unused, int opt __maybe_unused, int fac __maybe_unused) {}
+static inline void closelog(void) {}
+static inline void syslog(int pri __maybe_unused, const char *fmt __maybe_unused, ...) {}
+#endif
+
+// ── htole64 / le64toh / htole32 / le32toh ── absent from UCRT64 (no endian.h) ─
+// x86_64 Windows is always little-endian, so host and LE byte-order are identical.
+#ifndef htole64
+#define htole64(x) (x)
+#define le64toh(x) (x)
+#define htole32(x) (x)
+#define le32toh(x) (x)
+#endif
+
 #endif // OS_WINDOWS
 
 // --------------------------------------------------------------------------------------------------------------------
