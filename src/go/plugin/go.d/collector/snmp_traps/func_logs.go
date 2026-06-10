@@ -64,7 +64,9 @@ func (h *snmpTrapsFunctionHandler) HandleRaw(ctx context.Context, req funcapi.Ra
 	return funcapi.RawResponse(resp)
 }
 
-func (h *snmpTrapsFunctionHandler) Cleanup(context.Context) {}
+func (h *snmpTrapsFunctionHandler) Cleanup(context.Context) {
+	// No owned resources: the SDK journal function is stateless between calls.
+}
 
 func (h *snmpTrapsFunctionHandler) isLogsMethod(method string) bool {
 	return method == snmpTrapsLogsMethodID
@@ -226,4 +228,6 @@ func (s snmpTrapsLogsState) FileMetadata(path string) *sdkjournal.NetdataJournal
 	}
 }
 
-func (s snmpTrapsLogsState) UpdateFileJournalVsRealtimeDeltaUsec(string, uint64) {}
+func (s snmpTrapsLogsState) UpdateFileJournalVsRealtimeDeltaUsec(string, uint64) {
+	// SNMP trap logs do not publish per-file reader lag metrics today.
+}

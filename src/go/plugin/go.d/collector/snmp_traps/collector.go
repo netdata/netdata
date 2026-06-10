@@ -506,7 +506,16 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 				}
 			}
 			c.incTrapError(dim)
-			c.writeDecodeErrorEntry(data, decodePeerIP, conn, peer, dim, err, sniffedVersion, versionKnown)
+			c.writeDecodeErrorEntry(decodeErrorRecord{
+				data:           data,
+				peerIP:         decodePeerIP,
+				conn:           conn,
+				peer:           peer,
+				kind:           dim,
+				err:            err,
+				sniffedVersion: sniffedVersion,
+				versionKnown:   versionKnown,
+			})
 			return
 		}
 	}

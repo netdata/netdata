@@ -186,7 +186,7 @@ func (c *Controller) registerModuleMethodsOnFirstJobStart(moduleName string) {
 				if _, seen := c.staticMethodsSeen[funcName]; seen {
 					continue
 				}
-				c.fnReg.Register(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
+				c.registerFunction(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
 				c.api.FunctionGlobal(netdataapi.FunctionGlobalOpts{
 					Name:     funcName,
 					Timeout:  60,
@@ -205,7 +205,7 @@ func (c *Controller) registerModuleMethodsOnFirstJobStart(moduleName string) {
 			if _, seen := c.staticMethodsSeen[funcName]; seen {
 				continue
 			}
-			c.fnReg.Register(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
+			c.registerFunction(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
 			c.staticMethodsSeen[funcName] = struct{}{}
 		}
 	}
@@ -220,6 +220,17 @@ func methodTags(method funcapi.MethodConfig) string {
 
 func methodAvailable(method funcapi.MethodConfig) bool {
 	return method.Available == nil || method.Available()
+}
+
+func (c *Controller) registerFunction(name string, handler functions.Handler) {
+	if ctxReg, ok := c.fnReg.(functions.ContextRegistry); ok {
+		ctxReg.RegisterWithContext(name, handler)
+		return
+	}
+
+	c.fnReg.Register(name, func(fn functions.Function) {
+		handler(c.baseContext(), fn)
+	})
 }
 
 func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []funcapi.MethodConfig) {
@@ -259,7 +270,7 @@ func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []f
 		// FIXME: job methods currently ignore method.Aliases and publish only the
 		// canonical module:method name. Static/module methods use methodFunctionNames().
 		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)
-		c.fnReg.Register(funcName, c.makeJobMethodFuncHandler(job.ModuleName(), job.Name(), method.ID))
+		c.registerFunction(funcName, c.makeJobMethodFuncHandler(job.ModuleName(), job.Name(), method.ID))
 
 		if c.api != nil {
 			help := method.Help

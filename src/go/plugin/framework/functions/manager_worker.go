@@ -2,7 +2,10 @@
 
 package functions
 
-import "runtime/debug"
+import (
+	"context"
+	"runtime/debug"
+)
 
 func (m *Manager) runWorker() {
 	for {
@@ -35,8 +38,11 @@ func (m *Manager) runWorker() {
 				}
 			}()
 			fn := *req.fn
-			fn.Context = req.ctx
-			req.handler(fn)
+			ctx := req.ctx
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			req.handler(ctx, fn)
 		}()
 
 		if panicked {

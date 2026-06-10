@@ -4,7 +4,6 @@ package functions
 
 import (
 	"bytes"
-	"context"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -23,10 +22,8 @@ const (
 )
 
 type Function struct {
-	key string
-	UID string
-	// Context is valid only while the handler is running.
-	Context     context.Context
+	key         string
+	UID         string
 	Timeout     time.Duration
 	Name        string
 	Args        []string

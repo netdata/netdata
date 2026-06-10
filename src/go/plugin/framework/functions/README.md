@@ -143,11 +143,14 @@ Pathology-focused metrics currently exposed:
 - start fallback timer (`defaultCancelFallbackDelay = 5s`)
 - if no terminal output arrives before timer, manager finalizes with `499`
 
-Important limitation:
+Handler cancellation:
 
-- handlers are currently `func(Function)` (no `context.Context` parameter)
-- manager cannot force-stop handler code directly
-- fallback `499` is the deterministic safety net
+- handlers registered with `RegisterWithContext()` or `RegisterPrefixWithContext()`
+  receive the request context directly
+- legacy `Register()` / `RegisterPrefix()` handlers remain supported, but they
+  cannot observe cancellation themselves
+- fallback `499` is still the deterministic safety net for handlers that do not
+  return after cancellation
 
 ### 3) Unknown / already completed request
 

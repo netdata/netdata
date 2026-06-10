@@ -39,7 +39,7 @@ type methodExecutionInput struct {
 
 func (c *Controller) ExecuteFunction(functionName string, fn functions.Function) {
 	if moduleName, methodID, ok := c.registry.resolveMethodRoute(functionName); ok {
-		c.makeMethodFuncHandler(moduleName, methodID)(fn)
+		c.makeMethodFuncHandler(moduleName, methodID)(c.baseContext(), fn)
 		return
 	}
 
@@ -49,13 +49,12 @@ func (c *Controller) ExecuteFunction(functionName string, fn functions.Function)
 		return
 	}
 
-	c.makeMethodFuncHandler(moduleName, methodID)(fn)
+	c.makeMethodFuncHandler(moduleName, methodID)(c.baseContext(), fn)
 }
 
-func (c *Controller) executeMethodRequest(in methodExecutionInput) {
-	parent := c.baseContext()
-	if in.fn.Context != nil {
-		parent = in.fn.Context
+func (c *Controller) executeMethodRequest(parent context.Context, in methodExecutionInput) {
+	if parent == nil {
+		parent = c.baseContext()
 	}
 	ctx, cancel := context.WithTimeout(parent, in.fn.Timeout)
 	defer cancel()
@@ -141,8 +140,8 @@ func (c *Controller) executeMethodRequest(in methodExecutionInput) {
 	in.respond(dataResp, methodParams, updateEvery)
 }
 
-func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) func(functions.Function) {
-	return func(fn functions.Function) {
+func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) functions.Handler {
+	return func(ctx context.Context, fn functions.Function) {
 		methodCfg, ok := c.registry.getMethod(moduleName, methodID)
 		if !ok {
 			c.respondError(fn, 404, "unknown method '%s' for module '%s'", methodID, moduleName)
@@ -194,7 +193,7 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) func(fun
 			return
 		}
 
-		c.executeMethodRequest(methodExecutionInput{
+		c.executeMethodRequest(ctx, methodExecutionInput{
 			fn:         fn,
 			moduleName: moduleName,
 			jobName:    jobName,
@@ -463,8 +462,8 @@ func methodRequiresJobParam(cfg *funcapi.MethodConfig) bool {
 	return cfg == nil || !cfg.AgentWide
 }
 
-func (c *Controller) makeJobMethodFuncHandler(moduleName, jobName, methodID string) func(functions.Function) {
-	return func(fn functions.Function) {
+func (c *Controller) makeJobMethodFuncHandler(moduleName, jobName, methodID string) functions.Handler {
+	return func(ctx context.Context, fn functions.Function) {
 		methodCfg, ok := c.registry.getJobMethod(moduleName, jobName, methodID)
 		if !ok {
 			c.respondError(fn, 404, "unknown method '%s' for job '%s:%s'", methodID, moduleName, jobName)
@@ -485,7 +484,7 @@ func (c *Controller) makeJobMethodFuncHandler(moduleName, jobName, methodID stri
 			return
 		}
 
-		c.executeMethodRequest(methodExecutionInput{
+		c.executeMethodRequest(ctx, methodExecutionInput{
 			fn:         fn,
 			moduleName: moduleName,
 			jobName:    jobName,

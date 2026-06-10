@@ -84,6 +84,29 @@ func TestManager_Register(t *testing.T) {
 	}
 }
 
+func TestManager_RegisterWithContext(t *testing.T) {
+	type ctxKey struct{}
+	mgr := NewManager()
+	wantCtx := context.WithValue(context.Background(), ctxKey{}, "request")
+	var gotCtx context.Context
+	var gotFn Function
+
+	mgr.RegisterWithContext("fn", func(ctx context.Context, fn Function) {
+		gotCtx = ctx
+		gotFn = fn
+	})
+
+	handler, scheduleKey, ok := mgr.lookupFunctionRoute(Function{Name: "fn"})
+	if !ok {
+		t.Fatal("expected function route")
+	}
+	handler(wantCtx, Function{Name: "fn", UID: "tx1"})
+
+	assert.Equal(t, routeScheduleKey("fn", ""), scheduleKey)
+	assert.Equal(t, "request", gotCtx.Value(ctxKey{}))
+	assert.Equal(t, Function{Name: "fn", UID: "tx1"}, gotFn)
+}
+
 func TestManager_RegisterPrefix(t *testing.T) {
 	type inputFn struct {
 		name    string
@@ -167,6 +190,29 @@ func TestManager_RegisterPrefix(t *testing.T) {
 			assert.Equal(t, test.expected, got)
 		})
 	}
+}
+
+func TestManager_RegisterPrefixWithContext(t *testing.T) {
+	type ctxKey struct{}
+	mgr := NewManager()
+	wantCtx := context.WithValue(context.Background(), ctxKey{}, "request")
+	var gotCtx context.Context
+	var gotFn Function
+
+	mgr.RegisterPrefixWithContext("config", "collector:", func(ctx context.Context, fn Function) {
+		gotCtx = ctx
+		gotFn = fn
+	})
+
+	handler, scheduleKey, ok := mgr.lookupFunctionRoute(Function{Name: "config", Args: []string{"collector:job"}})
+	if !ok {
+		t.Fatal("expected prefix function route")
+	}
+	handler(wantCtx, Function{Name: "config", UID: "tx1", Args: []string{"collector:job"}})
+
+	assert.Equal(t, routeScheduleKey("config", "collector:"), scheduleKey)
+	assert.Equal(t, "request", gotCtx.Value(ctxKey{}))
+	assert.Equal(t, Function{Name: "config", UID: "tx1", Args: []string{"collector:job"}}, gotFn)
 }
 
 func TestManager_UnregisterPrefix(t *testing.T) {
@@ -493,9 +539,6 @@ func (m *mockFunctionExecutor) snapshot() []Function {
 	defer m.mu.Unlock()
 	out := make([]Function, len(m.executed))
 	copy(out, m.executed)
-	for i := range out {
-		out[i].Context = nil
-	}
 	return out
 }
 

@@ -699,6 +699,7 @@ func TestControllerRegisterJobMethods(t *testing.T) {
 
 type rawControllerMethodCase struct {
 	fn       functions.Function
+	ctx      context.Context
 	raw      func(context.Context, funcapi.RawMethodRequest) *funcapi.FunctionResponse
 	wantCode int
 	check    func(*testing.T, map[string]any)
@@ -726,10 +727,20 @@ func runRawControllerMethodCase(t *testing.T, tc rawControllerMethodCase, creato
 
 	call := reg.handlers[callName]
 	require.NotNil(t, call)
-	call(tc.fn)
+	ctx := tc.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	reg.call(callName, ctx, tc.fn)
 
 	assert.Equal(t, tc.wantCode, gotCode)
 	tc.check(t, gotResp)
+}
+
+func canceledTestContext() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	return ctx
 }
 
 func TestControllerRawModuleMethodRequest(t *testing.T) {
@@ -782,15 +793,11 @@ func TestControllerRawModuleMethodRequest(t *testing.T) {
 			},
 		},
 		"canceled function context reaches raw handler": {
-			fn: func() functions.Function {
-				ctx, cancel := context.WithCancel(context.Background())
-				cancel()
-				return functions.Function{
-					UID:     "raw-cancel",
-					Context: ctx,
-					Timeout: time.Second,
-				}
-			}(),
+			fn: functions.Function{
+				UID:     "raw-cancel",
+				Timeout: time.Second,
+			},
+			ctx: canceledTestContext(),
 			raw: func(ctx context.Context, _ funcapi.RawMethodRequest) *funcapi.FunctionResponse {
 				assert.ErrorIs(t, ctx.Err(), context.Canceled)
 				return funcapi.RawResponse(map[string]any{
@@ -852,9 +859,8 @@ func TestControllerModuleMethodRequestContextCancellation(t *testing.T) {
 	})
 	controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
 
-	reg.handlers["mod:query"](functions.Function{
+	reg.call("mod:query", ctx, functions.Function{
 		UID:     "normal-cancel",
-		Context: ctx,
 		Timeout: time.Second,
 	})
 
@@ -913,15 +919,11 @@ func TestControllerRawJobMethodRequest(t *testing.T) {
 			},
 		},
 		"canceled function context reaches raw handler": {
-			fn: func() functions.Function {
-				ctx, cancel := context.WithCancel(context.Background())
-				cancel()
-				return functions.Function{
-					UID:     "raw-cancel",
-					Context: ctx,
-					Timeout: time.Second,
-				}
-			}(),
+			fn: functions.Function{
+				UID:     "raw-cancel",
+				Timeout: time.Second,
+			},
+			ctx: canceledTestContext(),
 			raw: func(ctx context.Context, _ funcapi.RawMethodRequest) *funcapi.FunctionResponse {
 				assert.ErrorIs(t, ctx.Err(), context.Canceled)
 				return funcapi.RawResponse(map[string]any{
@@ -1048,15 +1050,17 @@ func (h *tableTestHandler) Handle(context.Context, string, funcapi.ResolvedParam
 func (h *tableTestHandler) Cleanup(context.Context) {}
 
 type testFunctionRegistry struct {
-	handlers     map[string]func(functions.Function)
-	registered   []string
-	unregistered []string
-	onRegister   func(string, func(functions.Function))
+	handlers        map[string]func(functions.Function)
+	contextHandlers map[string]functions.Handler
+	registered      []string
+	unregistered    []string
+	onRegister      func(string, func(functions.Function))
 }
 
 func newTestFunctionRegistry() *testFunctionRegistry {
 	return &testFunctionRegistry{
-		handlers: make(map[string]func(functions.Function)),
+		handlers:        make(map[string]func(functions.Function)),
+		contextHandlers: make(map[string]functions.Handler),
 	}
 }
 
@@ -1068,13 +1072,36 @@ func (r *testFunctionRegistry) Register(name string, fn func(functions.Function)
 	}
 }
 
+func (r *testFunctionRegistry) RegisterWithContext(name string, fn functions.Handler) {
+	legacy := func(f functions.Function) {
+		fn(context.Background(), f)
+	}
+	r.handlers[name] = legacy
+	r.contextHandlers[name] = fn
+	r.registered = append(r.registered, name)
+	if r.onRegister != nil {
+		r.onRegister(name, legacy)
+	}
+}
+
 func (r *testFunctionRegistry) Unregister(name string) {
 	r.unregistered = append(r.unregistered, name)
 	delete(r.handlers, name)
+	delete(r.contextHandlers, name)
 }
 
 func (r *testFunctionRegistry) RegisterPrefix(string, string, func(functions.Function)) {}
 func (r *testFunctionRegistry) UnregisterPrefix(string, string)                         {}
+
+func (r *testFunctionRegistry) RegisterPrefixWithContext(string, string, functions.Handler) {}
+
+func (r *testFunctionRegistry) call(name string, ctx context.Context, fn functions.Function) {
+	if handler := r.contextHandlers[name]; handler != nil {
+		handler(ctx, fn)
+		return
+	}
+	r.handlers[name](fn)
+}
 
 func (r *testFunctionRegistry) registeredNames() []string {
 	out := make([]string, len(r.registered))

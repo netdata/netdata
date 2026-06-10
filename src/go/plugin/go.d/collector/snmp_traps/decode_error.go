@@ -14,13 +14,24 @@ import (
 
 const maxDecodeErrorLen = 256
 
-func (c *Collector) writeDecodeErrorEntry(data []byte, peerIP net.IP, conn *net.UDPConn, peer *net.UDPAddr, kind string, decodeErr error, sniffedVersion SnmpVersion, versionKnown bool) {
+type decodeErrorRecord struct {
+	data           []byte
+	peerIP         net.IP
+	conn           *net.UDPConn
+	peer           *net.UDPAddr
+	kind           string
+	err            error
+	sniffedVersion SnmpVersion
+	versionKnown   bool
+}
+
+func (c *Collector) writeDecodeErrorEntry(rec decodeErrorRecord) {
 	if c.trapWriter == nil {
 		return
 	}
 
-	if c.rateLimiter != nil && peer != nil {
-		srcAddr, ok := udpPeerAddr(peer)
+	if c.rateLimiter != nil && rec.peer != nil {
+		srcAddr, ok := udpPeerAddr(rec.peer)
 		if ok {
 			allowed, mode := c.rateLimiter.Allow(srcAddr)
 			if !allowed {
@@ -32,31 +43,31 @@ func (c *Collector) writeDecodeErrorEntry(data []byte, peerIP net.IP, conn *net.
 		}
 	}
 
-	entry := newDecodeErrorEntry(c.jobName, data, peerIP, conn, peer, kind, decodeErr, sniffedVersion, versionKnown)
+	entry := newDecodeErrorEntry(c.jobName, rec)
 	if err := c.trapWriter.Write(entry); err != nil {
 		c.incTrapError(c.trapWriteFailureDim())
 	}
 }
 
-func newDecodeErrorEntry(jobName string, data []byte, peerIP net.IP, conn *net.UDPConn, peer *net.UDPAddr, kind string, decodeErr error, sniffedVersion SnmpVersion, versionKnown bool) *TrapEntry {
+func newDecodeErrorEntry(jobName string, rec decodeErrorRecord) *TrapEntry {
 	now := time.Now().UnixMicro()
-	sourceIP, sourcePeer, sourcePort := decodeErrorSource(peerIP, peer)
-	listener := decodeErrorListener(conn)
-	errText := sanitizeDecodeError(decodeErr)
-	packetHash := sha256.Sum256(data)
+	sourceIP, sourcePeer, sourcePort := decodeErrorSource(rec.peerIP, rec.peer)
+	listener := decodeErrorListener(rec.conn)
+	errText := sanitizeDecodeError(rec.err)
+	packetHash := sha256.Sum256(rec.data)
 
 	info := &DecodeErrorInfo{
-		Kind:          kind,
+		Kind:          rec.kind,
 		Error:         errText,
-		PacketSize:    len(data),
+		PacketSize:    len(rec.data),
 		PacketSHA256:  hex.EncodeToString(packetHash[:]),
 		SourceUDPPort: sourcePort,
 		Listener:      listener,
 	}
-	if versionKnown {
-		info.SnmpVersion = string(sniffedVersion)
+	if rec.versionKnown {
+		info.SnmpVersion = string(rec.sniffedVersion)
 	}
-	if engineID, ok := decodeErrorEngineID(data); ok {
+	if engineID, ok := decodeErrorEngineID(rec.data); ok {
 		info.EngineID = engineID
 	}
 
@@ -64,7 +75,7 @@ func newDecodeErrorEntry(jobName string, data []byte, peerIP net.IP, conn *net.U
 	if messageSource == "" {
 		messageSource = sourceIP
 	}
-	message := fmt.Sprintf("SNMP trap decode failed from %s: %s: %s", messageSource, kind, errText)
+	message := fmt.Sprintf("SNMP trap decode failed from %s: %s: %s", messageSource, rec.kind, errText)
 	if len(message) > maxMessageLen {
 		message = truncateUTF8(message, maxMessageLen-3) + "..."
 	}
@@ -74,12 +85,12 @@ func newDecodeErrorEntry(jobName string, data []byte, peerIP net.IP, conn *net.U
 		ReportType:            ReportTypeDecodeError,
 		ReceivedRealtimeUsec:  now,
 		ReceivedMonotonicUsec: monotonicUsec(),
-		Category:              decodeErrorCategory(kind),
+		Category:              decodeErrorCategory(rec.kind),
 		Severity:              "warning",
 		Message:               message,
 		SourceIP:              sourceIP,
 		SourceUDPPeer:         sourcePeer,
-		SnmpVersion:           sniffedVersion,
+		SnmpVersion:           rec.sniffedVersion,
 		DecodeError:           info,
 	}
 }

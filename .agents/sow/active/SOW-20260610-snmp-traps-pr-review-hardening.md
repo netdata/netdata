@@ -2198,3 +2198,98 @@ Validation evidence for this CI batch:
   updated in the changed branch files.
 - Branch-local SOW files remain active takeover memory and must be removed only
   during final merge preparation.
+
+## SonarCloud PR Issue Batch - 2026-06-10
+
+SonarCloud PR analysis for commit
+`15ad1ce8eafacff9b1ea0a1b23a36dee42c88a23` reports 5 open code smells:
+
+- `go:S1186` in `src/go/plugin/go.d/collector/snmp_traps/func_logs.go:67`:
+  empty `Cleanup()` method on the SNMP traps Function handler.
+- `go:S1186` in `src/go/plugin/go.d/collector/snmp_traps/func_logs.go:229`:
+  empty SDK progress callback method.
+- `go:S107` in `src/go/plugin/go.d/collector/snmp_traps/decode_error.go:17`:
+  `writeDecodeErrorEntry()` has 8 parameters.
+- `go:S107` in `src/go/plugin/go.d/collector/snmp_traps/decode_error.go:41`:
+  `newDecodeErrorEntry()` has 9 parameters.
+- `godre:S8242` in `src/go/plugin/framework/functions/parser.go:29`:
+  `Function` stores a `context.Context` field.
+
+User decision:
+
+- Fix all five issues in source instead of marking them false positive.
+- Use the long-term-best path for the `context.Context` issue:
+  remove `Function.Context`, add an additive context-aware registration path in
+  the Functions framework, preserve the existing `Register(name, func(Function))`
+  and `RegisterPrefix(name, prefix, func(Function))` API for compatibility, and
+  have Function controller code use the context-aware path when the registry
+  supports it.
+
+Framework short decision gate:
+
+1. Root cause:
+   - The Function manager creates a per-invocation cancellation context, but
+     existing handler callbacks only accept `functions.Function`.
+   - The branch temporarily carried that context inside `functions.Function` so
+     raw log Functions could stop SDK journal queries when Netdata cancels a
+     request.
+2. Why collector-local code is wrong:
+   - Cancellation belongs to the Function framework, not the SNMP traps
+     collector. Any future raw Function that blocks on I/O needs the same
+     request context.
+3. Why additive and backward-compatible:
+   - The existing registry interface and handler signature remain available.
+   - The real manager gains context-aware registration methods.
+   - Existing handlers registered through the old API are wrapped and receive
+     identical `Function` values, only without the internal context field.
+4. Clean framework shape:
+   - The request context is passed as an invocation parameter, matching Go
+     context conventions and avoiding context storage in request data structs.
+5. Approval source:
+   - User approved the long-term-best fix after reviewing the 5 SonarCloud
+     findings.
+6. Affected packages and callers searched:
+   - `src/go/plugin/framework/functions`
+   - `src/go/plugin/agent/jobmgr/funcctl`
+   - `src/go/plugin/agent/jobmgr`
+   - `src/go/plugin/framework/dyncfg`
+   - `src/go/cmd/godplugin`
+7. Representative validation:
+   - Framework Functions manager tests.
+   - Function controller tests.
+   - Job manager Function dispatch tests.
+   - SNMP traps logs and decode-error tests.
+8. Documentation and artifacts:
+   - No user-facing docs change is needed. This is an internal framework API
+     extension with no plugin protocol change.
+
+Implemented for this SonarCloud batch:
+
+- Removed `Function.Context` from the parsed Function request struct.
+- Added `functions.Handler` and optional `functions.ContextRegistry` support.
+- Added `Manager.RegisterWithContext()` and
+  `Manager.RegisterPrefixWithContext()` while preserving the existing
+  `Register()` and `RegisterPrefix()` APIs as compatibility wrappers.
+- Changed the Function manager worker to pass the per-invocation context as a
+  handler argument instead of storing it on `Function`.
+- Changed `funcctl` to use context-aware registration when available and to
+  fall back to the existing registry API for older/test registries.
+- Updated funcctl cancellation tests to call context-aware registered handlers.
+- Added explicit empty-method comments for the SNMP traps Function cleanup hook
+  and the unused journal-reader lag callback.
+- Replaced long decode-error helper parameter lists with `decodeErrorRecord`.
+- Updated the Functions README cancellation section to describe the new
+  context-aware handler path.
+
+Validation evidence for this SonarCloud batch:
+
+- `GOTOOLCHAIN=go1.26.0 go test -count=1
+  ./plugin/framework/functions ./plugin/agent/jobmgr/funcctl
+  ./plugin/agent/jobmgr ./plugin/go.d/collector/snmp_traps` passed.
+- `GOTOOLCHAIN=go1.26.0 go test -count=1 ./cmd/godplugin
+  ./plugin/framework/dyncfg` passed.
+- The timing-sensitive
+  `TestCollectorHandlePacketRendersTemplatesAfterEnrichment` passed when rerun
+  directly after one package-level run tripped the existing 1 ms decode-budget
+  guard.
+- `git diff --check` passed.
