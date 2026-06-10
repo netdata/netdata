@@ -146,11 +146,11 @@ func (tw *journalTrapWriter) writeOne(entry *TrapEntry) error {
 		// Test/benchmark sink mode; production Init always supplies a journal.
 		return nil
 	}
-	payloads, sanitizedFields, err := tw.serializer.serialize(entry)
+	payloads, binaryEncodedFields, err := tw.serializer.serialize(entry)
 	if err != nil {
 		return err
 	}
-	return tw.journal.WriteRawEntry(payloads, sanitizedFields, entry.ReceivedRealtimeUsec, entry.ReceivedMonotonicUsec)
+	return tw.journal.WriteRawEntry(payloads, binaryEncodedFields, entry.ReceivedRealtimeUsec, entry.ReceivedMonotonicUsec)
 }
 
 func (tw *journalTrapWriter) sync() error {
@@ -260,11 +260,11 @@ func (tw *journalTrapWriter) Write(entry *TrapEntry) error {
 	}
 }
 
-func (tw *journalTrapWriter) SanitizedFields() uint64 {
+func (tw *journalTrapWriter) BinaryEncodedFields() uint64 {
 	if tw.journal == nil {
 		return 0
 	}
-	return tw.journal.SanitizedFields()
+	return tw.journal.BinaryEncodedFields()
 }
 
 func (tw *journalTrapWriter) Flush() error {

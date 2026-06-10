@@ -39,12 +39,12 @@ type JournalConfig struct {
 }
 
 type JournalWriter struct {
-	mu              sync.Mutex
-	log             *sdkjournal.Log
-	cfg             JournalConfig
-	journalDir      string
-	activePath      string
-	sanitizedFields uint64
+	mu                  sync.Mutex
+	log                 *sdkjournal.Log
+	cfg                 JournalConfig
+	journalDir          string
+	activePath          string
+	binaryEncodedFields uint64
 }
 
 func journalRoot(jobName string) string {
@@ -160,8 +160,8 @@ func (w *JournalWriter) WriteEntry(fields []JournalField, realtimeUsec, monotoni
 		return sdkjournal.ErrWriterClosed
 	}
 	// The SDK writes length-delimited journal DATA objects. Unsafe values cannot
-	// inject fields, but we count them for the future self-metrics surface.
-	count := sanitizedFieldCount(fields)
+	// inject fields, but we count them for the self-metrics surface.
+	count := binaryEncodedFieldCount(fields)
 	err := w.log.Append(fields, sdkjournal.EntryOptions{
 		RealtimeUsec:  uint64(realtimeUsec),
 		MonotonicUsec: uint64(monotonicUsec),
@@ -170,7 +170,7 @@ func (w *JournalWriter) WriteEntry(fields []JournalField, realtimeUsec, monotoni
 		return err
 	}
 	if count > 0 {
-		atomic.AddUint64(&w.sanitizedFields, uint64(count))
+		atomic.AddUint64(&w.binaryEncodedFields, uint64(count))
 	}
 	if activePath := w.log.ActivePath(); activePath != "" {
 		w.activePath = activePath
@@ -178,7 +178,7 @@ func (w *JournalWriter) WriteEntry(fields []JournalField, realtimeUsec, monotoni
 	return nil
 }
 
-func (w *JournalWriter) WriteRawEntry(payloads [][]byte, sanitizedFields int, realtimeUsec, monotonicUsec int64) error {
+func (w *JournalWriter) WriteRawEntry(payloads [][]byte, binaryEncodedFields int, realtimeUsec, monotonicUsec int64) error {
 	if realtimeUsec < 0 || monotonicUsec < 0 {
 		return errNegativeTimestamp
 	}
@@ -196,8 +196,8 @@ func (w *JournalWriter) WriteRawEntry(payloads [][]byte, sanitizedFields int, re
 	if err != nil {
 		return err
 	}
-	if sanitizedFields > 0 {
-		atomic.AddUint64(&w.sanitizedFields, uint64(sanitizedFields))
+	if binaryEncodedFields > 0 {
+		atomic.AddUint64(&w.binaryEncodedFields, uint64(binaryEncodedFields))
 	}
 	if activePath := w.log.ActivePath(); activePath != "" {
 		w.activePath = activePath
@@ -205,8 +205,8 @@ func (w *JournalWriter) WriteRawEntry(payloads [][]byte, sanitizedFields int, re
 	return nil
 }
 
-func (w *JournalWriter) SanitizedFields() uint64 {
-	return atomic.LoadUint64(&w.sanitizedFields)
+func (w *JournalWriter) BinaryEncodedFields() uint64 {
+	return atomic.LoadUint64(&w.binaryEncodedFields)
 }
 
 func (w *JournalWriter) SweepRetention() error {

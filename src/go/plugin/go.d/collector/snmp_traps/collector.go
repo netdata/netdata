@@ -438,8 +438,8 @@ func (c *Collector) collect(ctx context.Context) error {
 		c.reverseDNS.maybeSweep(now)
 	}
 	if c.metrics != nil {
-		if w, ok := c.trapWriter.(interface{ SanitizedFields() uint64 }); ok {
-			c.metrics.setSanitized(w.SanitizedFields())
+		if w, ok := c.trapWriter.(interface{ BinaryEncodedFields() uint64 }); ok {
+			c.metrics.setBinaryEncoded(w.BinaryEncodedFields())
 		}
 	}
 	collectMetrics(c.store, c.jobName)

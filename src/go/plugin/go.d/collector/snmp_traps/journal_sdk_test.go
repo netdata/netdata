@@ -111,7 +111,7 @@ func TestJournalWriterCWE117InjectionNotQueryableAsField(t *testing.T) {
 	assert.Empty(t, strings.TrimSpace(out))
 }
 
-func TestJournalWriterCountsSanitizedFields(t *testing.T) {
+func TestJournalWriterCountsBinaryEncodedFields(t *testing.T) {
 	requireLinuxJournalBackend(t)
 
 	dir := t.TempDir()
@@ -124,7 +124,7 @@ func TestJournalWriterCountsSanitizedFields(t *testing.T) {
 		{Name: "PRIORITY", Value: []byte("4")},
 	}
 	require.NoError(t, w.WriteEntry(fields, 1000, 1000))
-	assert.Equal(t, uint64(1), w.SanitizedFields())
+	assert.Equal(t, uint64(1), w.BinaryEncodedFields())
 }
 
 func TestJournalTrapWriterCloseReturnsWorkerFailure(t *testing.T) {

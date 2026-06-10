@@ -51,9 +51,9 @@ func (w *fanoutTrapWriter) Close() error {
 	return errors.Join(w.primary.Close(), secondaryErr)
 }
 
-func (w *fanoutTrapWriter) SanitizedFields() uint64 {
-	if sanitized, ok := w.primary.(interface{ SanitizedFields() uint64 }); ok {
-		return sanitized.SanitizedFields()
+func (w *fanoutTrapWriter) BinaryEncodedFields() uint64 {
+	if binaryEncoded, ok := w.primary.(interface{ BinaryEncodedFields() uint64 }); ok {
+		return binaryEncoded.BinaryEncodedFields()
 	}
 	return 0
 }

@@ -64,7 +64,7 @@ func TestJournalFieldNeedsBinary_Empty(t *testing.T) {
 	}
 }
 
-func TestSanitizedFieldCount(t *testing.T) {
+func TestBinaryEncodedFieldCount(t *testing.T) {
 	fields := []JournalField{
 		{Name: "SAFE", Value: []byte("hello")},
 		{Name: "UNSAFE", Value: []byte("hello\nworld")},
@@ -72,9 +72,9 @@ func TestSanitizedFieldCount(t *testing.T) {
 		{Name: "NUL", Value: []byte{0x48, 0x00}},
 	}
 
-	count := sanitizedFieldCount(fields)
+	count := binaryEncodedFieldCount(fields)
 	if count != 2 {
-		t.Fatalf("expected 2 sanitized fields, got %d", count)
+		t.Fatalf("expected 2 binary-encoded fields, got %d", count)
 	}
 }
 

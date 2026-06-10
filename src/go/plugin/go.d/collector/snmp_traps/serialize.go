@@ -308,12 +308,12 @@ func sortedMapKeys(m map[string]string) []string {
 }
 
 type journalHotSerializer struct {
-	payloads        [][]byte
-	buf             []byte
-	labelKeys       []string
-	jsonEntries     []rawJSONVarbindEntry
-	seenJSONKeys    map[string]int
-	sanitizedFields int
+	payloads            [][]byte
+	buf                 []byte
+	labelKeys           []string
+	jsonEntries         []rawJSONVarbindEntry
+	seenJSONKeys        map[string]int
+	binaryEncodedFields int
 }
 
 func (s *journalHotSerializer) serialize(entry *TrapEntry) ([][]byte, int, error) {
@@ -425,14 +425,14 @@ func (s *journalHotSerializer) serialize(entry *TrapEntry) ([][]byte, int, error
 		s.addStringField("TRAP_TAG_"+upperKey, val)
 	}
 
-	return s.payloads, s.sanitizedFields, nil
+	return s.payloads, s.binaryEncodedFields, nil
 }
 
 func (s *journalHotSerializer) reset() {
 	s.payloads = s.payloads[:0]
 	s.buf = s.buf[:0]
 	s.labelKeys = s.labelKeys[:0]
-	s.sanitizedFields = 0
+	s.binaryEncodedFields = 0
 }
 
 func (s *journalHotSerializer) addStringField(name, value string) {
@@ -455,7 +455,7 @@ func (s *journalHotSerializer) addIntField(name string, value int64) {
 
 func (s *journalHotSerializer) addPayload(start, valueStart int) {
 	if journalFieldNeedsBinary(s.buf[valueStart:]) {
-		s.sanitizedFields++
+		s.binaryEncodedFields++
 	}
 	s.payloads = append(s.payloads, s.buf[start:])
 }

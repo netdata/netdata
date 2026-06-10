@@ -14,12 +14,12 @@ import (
 var _ TrapWriter = (*mockTrapWriter)(nil)
 
 type mockTrapWriter struct {
-	mu              sync.Mutex
-	entries         []*TrapEntry
-	flushes         int
-	closed          bool
-	err             error
-	sanitizedFields uint64
+	mu                  sync.Mutex
+	entries             []*TrapEntry
+	flushes             int
+	closed              bool
+	err                 error
+	binaryEncodedFields uint64
 }
 
 func (m *mockTrapWriter) Write(entry *TrapEntry) error {
@@ -42,10 +42,10 @@ func (m *mockTrapWriter) Flush() error {
 	return nil
 }
 
-func (m *mockTrapWriter) SanitizedFields() uint64 {
+func (m *mockTrapWriter) BinaryEncodedFields() uint64 {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.sanitizedFields
+	return m.binaryEncodedFields
 }
 
 func (m *mockTrapWriter) Close() error {
@@ -126,12 +126,12 @@ func TestFanoutTrapWriterCloseReturnsPrimaryAndSecondaryErrors(t *testing.T) {
 	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed)
 }
 
-func TestFanoutTrapWriterForwardsSanitizedFieldsFromPrimary(t *testing.T) {
-	primary := &mockTrapWriter{sanitizedFields: 7}
+func TestFanoutTrapWriterForwardsBinaryEncodedFieldsFromPrimary(t *testing.T) {
+	primary := &mockTrapWriter{binaryEncodedFields: 7}
 	secondary := &mockTrapWriter{}
 	writer := newFanoutTrapWriter(primary, secondary, nil)
 
-	sanitized, ok := writer.(interface{ SanitizedFields() uint64 })
+	binaryEncoded, ok := writer.(interface{ BinaryEncodedFields() uint64 })
 	require.True(t, ok)
-	assert.Equal(t, uint64(7), sanitized.SanitizedFields())
+	assert.Equal(t, uint64(7), binaryEncoded.BinaryEncodedFields())
 }

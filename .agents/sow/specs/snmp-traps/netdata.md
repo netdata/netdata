@@ -993,7 +993,7 @@ This is one chart. Operator slices/dices via NIDL controls:
 | Aspect | Value |
 |---|---|
 | Instance | Per job (one instance per listener) |
-| Dimensions | `unknown_oid`, `decode_failed`, `template_unresolved`, `malformed_pdu`, `dropped_allowlist`, `rate_limited`, `auth_failures`, `usm_failures`, `unknown_engine_id`, `inform_response_failed`, `sanitized`, `profile_load_failed`, `journal_write_failed`, `otlp_export_failed` |
+| Dimensions | `unknown_oid`, `decode_failed`, `template_unresolved`, `malformed_pdu`, `dropped_allowlist`, `rate_limited`, `auth_failures`, `usm_failures`, `unknown_engine_id`, `inform_response_failed`, `binary_encoded`, `profile_load_failed`, `journal_write_failed`, `otlp_export_failed` |
 | Unit | events/s (incremental counter) |
 | Labels | `job_name`, `hub`, possibly `source_device` where source is identifiable |
 | Node / vnode | Hub vnode |
@@ -1008,7 +1008,7 @@ Operators alert on these for pipeline health:
 - `auth_failures` / `usm_failures` > 0 → SNMPv3 authentication, privacy, username, or USM configuration problem.
 - `unknown_engine_id` > 0 → in static mode, sender engine ID is missing from the receiver whitelist or the sender is misconfigured; in dynamic mode, the first increment for a newly accepted `(engineID, username)` pair is expected visibility with a spoofing advisory, while repeated/new rejected increments indicate cap exhaustion, invalid sender state, or an unauthorized/misconfigured sender.
 - `inform_response_failed > 0` → INFORM Response send failures; investigate UDP socket health.
-- `sanitized > 0` sustained → varbind values containing control characters being binary-encoded; investigate sender.
+- `binary_encoded > 0` sustained → varbind values containing control characters being binary-encoded; investigate sender.
 - `profile_load_failed > 0` → profile validation/reload failed, or a previously validated stock profile file could not be lazy-loaded after job start. During DynCfg reload, the plugin continues with the previous profile index and the operator must fix the bad YAML and reload. During runtime stock lazy-load failure, the trap is still written with raw OID/varbind data and the operator should inspect the installed stock profile files.
 - `journal_write_failed > 0` → disk-full, permission, or filesystem error while writing to the per-job journal directory; trap is dropped, hot path continues (the writer never blocks).
 - `otlp_export_failed > 0` → the OTLP backend could not accept or export one or more trap records after the job had already started. For direct-journal+OTLP jobs, the journal-direct path remains authoritative and continues independently. For OTEL-only jobs, this means the only configured backend dropped or failed records. Investigate the configured OTLP receiver, network path, TLS/auth configuration, or queue sizing.

@@ -477,9 +477,9 @@ modules:
         metric: snmp.trap.errors
         info: The SNMP trap listener failed to send INFORM acknowledgements back to senders.
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
-      - name: snmp_trap_sanitized_fields
+      - name: snmp_trap_binary_encoded_fields
         metric: snmp.trap.errors
-        info: The SNMP trap listener sanitized fields before writing to the journal.
+        info: The SNMP trap listener wrote fields with binary journal encoding.
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
       - name: snmp_trap_profile_load_failures
         metric: snmp.trap.errors
@@ -601,8 +601,8 @@ modules:
                   description: SNMPv3 trap from an unknown or unregistered engine ID
                 - name: inform_response_failed
                   description: Failed to send INFORM response to sender
-                - name: sanitized
-                  description: Field values sanitized by CWE-117 log-injection filter
+                - name: binary_encoded
+                  description: Field values written with binary journal encoding for CWE-117 protection
                 - name: profile_load_failed
                   description: Trap profile YAML load or parse errors
                 - name: journal_write_failed

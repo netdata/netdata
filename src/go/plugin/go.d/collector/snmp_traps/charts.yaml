@@ -30,7 +30,7 @@ groups:
       - snmp_trap_errors_usm_failures
       - snmp_trap_errors_unknown_engine_id
       - snmp_trap_errors_inform_response_failed
-      - snmp_trap_errors_sanitized
+      - snmp_trap_errors_binary_encoded
       - snmp_trap_errors_profile_load_failed
       - snmp_trap_errors_journal_write_failed
       - snmp_trap_errors_otlp_export_failed
@@ -113,8 +113,8 @@ groups:
             name: unknown_engine_id
           - selector: snmp_trap_errors_inform_response_failed
             name: inform_response_failed
-          - selector: snmp_trap_errors_sanitized
-            name: sanitized
+          - selector: snmp_trap_errors_binary_encoded
+            name: binary_encoded
           - selector: snmp_trap_errors_profile_load_failed
             name: profile_load_failed
           - selector: snmp_trap_errors_journal_write_failed

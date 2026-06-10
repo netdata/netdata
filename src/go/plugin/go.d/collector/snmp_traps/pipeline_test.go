@@ -650,8 +650,8 @@ func TestCollectMetricsEmitsCounters(t *testing.T) {
 	}
 }
 
-func TestCollectorCollectPublishesSanitizedMetric(t *testing.T) {
-	const jobName = "test-sanitized"
+func TestCollectorCollectPublishesBinaryEncodedMetric(t *testing.T) {
+	const jobName = "test-binary-encoded"
 	withCleanJobMetrics(t, jobName)
 
 	store := metrix.NewCollectorStore()
@@ -663,7 +663,7 @@ func TestCollectorCollectPublishesSanitizedMetric(t *testing.T) {
 	c := &Collector{
 		jobName:    jobName,
 		listener:   &Listener{},
-		trapWriter: &mockTrapWriter{sanitizedFields: 2},
+		trapWriter: &mockTrapWriter{binaryEncodedFields: 2},
 		metrics:    getJobMetrics(jobName),
 		store:      store,
 	}
@@ -677,8 +677,8 @@ func TestCollectorCollectPublishesSanitizedMetric(t *testing.T) {
 	}
 
 	labels := metrix.Labels{"job_name": jobName}
-	if v, ok := store.Read().Value("snmp_trap_errors_sanitized", labels); !ok || v != 2 {
-		t.Fatalf("errors sanitized value = %v/%v, want 2/true", v, ok)
+	if v, ok := store.Read().Value("snmp_trap_errors_binary_encoded", labels); !ok || v != 2 {
+		t.Fatalf("errors binary_encoded value = %v/%v, want 2/true", v, ok)
 	}
 }
 

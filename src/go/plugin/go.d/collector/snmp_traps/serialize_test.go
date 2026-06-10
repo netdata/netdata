@@ -444,7 +444,7 @@ func TestJournalHotSerializerMatchesSerializeToJournalFields(t *testing.T) {
 				ByTrap:          map[string]int64{"1.3.6.1.6.3.1.1.5.3": 12},
 			},
 		},
-		"Sanitized": {
+		"Binary encoded": {
 			JobName:               "local",
 			ReportType:            ReportTypeTrap,
 			ReceivedRealtimeUsec:  1000000,
@@ -485,13 +485,13 @@ func TestJournalHotSerializerMatchesSerializeToJournalFields(t *testing.T) {
 			}
 
 			var s journalHotSerializer
-			payloads, sanitizedFields, err := s.serialize(entry)
+			payloads, binaryEncodedFields, err := s.serialize(entry)
 			if err != nil {
 				t.Fatalf("journalHotSerializer.serialize: %v", err)
 			}
 
-			if sanitizedFields != sanitizedFieldCount(fields) {
-				t.Fatalf("sanitized fields = %d, want %d", sanitizedFields, sanitizedFieldCount(fields))
+			if binaryEncodedFields != binaryEncodedFieldCount(fields) {
+				t.Fatalf("binary-encoded fields = %d, want %d", binaryEncodedFields, binaryEncodedFieldCount(fields))
 			}
 			if got, want := rawPayloadsToMap(payloads), fieldsToMap(fields); !mapsEqual(got, want) {
 				t.Fatalf("hot payload map mismatch\ngot:  %#v\nwant: %#v", got, want)

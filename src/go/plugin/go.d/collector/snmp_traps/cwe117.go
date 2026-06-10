@@ -31,7 +31,7 @@ func classifyFieldEncoding(value []byte) (binary bool, safe bool) {
 	return needsBinary, !needsBinary
 }
 
-func sanitizedFieldCount(fields []JournalField) int {
+func binaryEncodedFieldCount(fields []JournalField) int {
 	count := 0
 	for _, f := range fields {
 		if journalFieldNeedsBinary(f.Value) {

@@ -20,7 +20,7 @@ type trapErrors struct {
 	usmFailures        uint64
 	unknownEngineID    uint64
 	informResponseFail uint64
-	sanitized          uint64
+	binaryEncoded      uint64
 	profileLoadFailed  uint64
 	journalWriteFailed uint64
 	otlpExportFailed   uint64
@@ -191,8 +191,8 @@ func (m *perJobMetrics) addError(dim string, n uint64) {
 		atomic.AddUint64(&m.errors.unknownEngineID, n)
 	case "inform_response_failed":
 		atomic.AddUint64(&m.errors.informResponseFail, n)
-	case "sanitized":
-		atomic.AddUint64(&m.errors.sanitized, n)
+	case "binary_encoded":
+		atomic.AddUint64(&m.errors.binaryEncoded, n)
 	case "profile_load_failed":
 		atomic.AddUint64(&m.errors.profileLoadFailed, n)
 	case "journal_write_failed":
@@ -204,9 +204,9 @@ func (m *perJobMetrics) addError(dim string, n uint64) {
 	}
 }
 
-func (m *perJobMetrics) setSanitized(v uint64) {
-	// Sanitized fields are the writer's absolute cumulative total.
-	atomic.StoreUint64(&m.errors.sanitized, v)
+func (m *perJobMetrics) setBinaryEncoded(v uint64) {
+	// Binary encoded fields are the writer's absolute cumulative total.
+	atomic.StoreUint64(&m.errors.binaryEncoded, v)
 }
 
 func (m *perJobMetrics) setDedupEnabled(enabled bool) {
@@ -277,7 +277,7 @@ func collectErrors(store metrix.CollectorStore, jobName string, m *perJobMetrics
 	meter.Counter("snmp_trap_errors_usm_failures").ObserveTotal(float64(atomic.LoadUint64(&m.errors.usmFailures)))
 	meter.Counter("snmp_trap_errors_unknown_engine_id").ObserveTotal(float64(atomic.LoadUint64(&m.errors.unknownEngineID)))
 	meter.Counter("snmp_trap_errors_inform_response_failed").ObserveTotal(float64(atomic.LoadUint64(&m.errors.informResponseFail)))
-	meter.Counter("snmp_trap_errors_sanitized").ObserveTotal(float64(atomic.LoadUint64(&m.errors.sanitized)))
+	meter.Counter("snmp_trap_errors_binary_encoded").ObserveTotal(float64(atomic.LoadUint64(&m.errors.binaryEncoded)))
 	meter.Counter("snmp_trap_errors_profile_load_failed").ObserveTotal(float64(atomic.LoadUint64(&m.errors.profileLoadFailed)))
 	meter.Counter("snmp_trap_errors_journal_write_failed").ObserveTotal(float64(atomic.LoadUint64(&m.errors.journalWriteFailed)))
 	meter.Counter("snmp_trap_errors_otlp_export_failed").ObserveTotal(float64(atomic.LoadUint64(&m.errors.otlpExportFailed)))
