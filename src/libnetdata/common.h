@@ -316,7 +316,11 @@ typedef uint32_t uid_t;
 #include <fcntl.h>
 #include <process.h>
 #include <tlhelp32.h>
+// sys/cygwin.h only exists under the Cygwin/MSYS subsystems.
+// UCRT64 is a native Windows toolchain with no Cygwin layer.
+#if defined(__CYGWIN__) || defined(__MSYS__)
 #include <sys/cygwin.h>
+#endif
 #include <winevt.h>
 #include <evntprov.h>
 #include <wbemidl.h>

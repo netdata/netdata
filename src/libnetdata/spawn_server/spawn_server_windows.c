@@ -24,8 +24,14 @@ static void update_cygpath_env(void) {
 
     char win_path[MAX_PATH];
 
-    // Convert Cygwin root path to Windows path
+#if defined(__CYGWIN__) || defined(__MSYS__)
     cygwin_conv_path(CCP_POSIX_TO_WIN_A, "/", win_path, sizeof(win_path));
+#else
+    // On UCRT64 there is no Cygwin layer. NETDATA_WINDOWS_PATH_PREFIX is the
+    // Windows installation directory (e.g. "C:\Program Files\Netdata") where
+    // MSYS2 is bundled, baked in at build time via cmake config.h.
+    strncpyz(win_path, NETDATA_WINDOWS_PATH_PREFIX, sizeof(win_path));
+#endif
 
     nd_setenv("NETDATA_CYGWIN_BASE_PATH", win_path, 1);
 
@@ -63,7 +69,14 @@ static BUFFER *argv_to_windows(const char **argv) {
     // argv[0] is the path
     size_t b_size = strlen(argv[0]) * 2 + FILENAME_MAX;
     CLEAN_CHAR_P *b = mallocz(b_size);
+#if defined(__CYGWIN__) || defined(__MSYS__)
     cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE, argv[0], b, b_size);
+#else
+    {
+        CLEAN_CHAR_P *translated = os_translate_msys_to_windows_path(argv[0]);
+        snprintfz(b, b_size, "%s", translated);
+    }
+#endif
 
     for(size_t i = 0; argv[i] ;i++) {
         const char *s = (i == 0) ? b : argv[i];
@@ -271,7 +284,12 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
 
     // Store process information in instance
     instance->dwProcessId = pi.dwProcessId;
+#if defined(__CYGWIN__) || defined(__MSYS__)
     instance->child_pid = cygwin_winpid_to_pid((pid_t)pi.dwProcessId);
+#else
+    // On UCRT64, the Windows process ID is the native PID directly.
+    instance->child_pid = (pid_t)pi.dwProcessId;
+#endif
     instance->process_handle = pi.hProcess;
 
     // Convert handles to POSIX file descriptors
