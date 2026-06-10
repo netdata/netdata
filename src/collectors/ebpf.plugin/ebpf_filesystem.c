@@ -919,14 +919,6 @@ static void ebpf_filesystem_exit(void *pptr)
         return;
     }
 
-    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-        ebpf_obsolete_filesystem_global(em);
-
-        fflush(stdout);
-        netdata_mutex_unlock(&lock);
-    }
-
     ebpf_filesystem_cleanup_ebpf_data();
     if (dimensions) {
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);

@@ -288,12 +288,6 @@ static void ebpf_sync_exit(void *pptr)
     if (!em)
         return;
 
-    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-        ebpf_obsolete_sync_global(em);
-        netdata_mutex_unlock(&lock);
-    }
-
     if (!ebpf_plugin_stop() && em->functions.bpf_unload)
         em->functions.bpf_unload(em);
 

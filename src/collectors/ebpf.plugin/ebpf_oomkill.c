@@ -126,19 +126,6 @@ static void oomkill_cleanup(void *pptr)
     collect_pids &= ~(1 << EBPF_MODULE_OOMKILL_IDX);
     netdata_mutex_unlock(&lock);
 
-    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-
-        if (em->cgroup_charts) {
-            ebpf_obsolete_oomkill_cgroup_charts(em);
-        }
-
-        ebpf_obsolete_oomkill_apps(em);
-
-        fflush(stdout);
-        netdata_mutex_unlock(&lock);
-    }
-
     if (!ebpf_plugin_stop() && em->functions.bpf_unload)
         em->functions.bpf_unload(em);
 

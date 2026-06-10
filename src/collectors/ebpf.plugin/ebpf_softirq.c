@@ -80,15 +80,6 @@ static void softirq_cleanup(void *pptr)
         return;
     }
 
-    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-
-        ebpf_obsolete_softirq_global(em);
-
-        netdata_mutex_unlock(&lock);
-        fflush(stdout);
-    }
-
     for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
         ebpf_disable_tracepoint(&softirq_tracepoints[i]);
     }

@@ -51,7 +51,7 @@ in the `info` response:
 
 | Class | `has_history` | Frontend behavior | Examples |
 |---|---|---|---|
-| **Simple Table** | `false` | Backend returns the whole current dataset; frontend filters/sorts/searches in-memory | `processes`, `network-connections`, `network-interfaces`, `network-sockets-tracing`, `block-devices`, `mount-points`, `containers-vms`, `systemd-services`, `netdata-streaming`, `netdata-api-calls`, `netdata-metrics-cardinality`, `<db>:top-queries`, `<db>:running-queries`, `<db>:deadlock-info`, `<db>:error-info` |
+| **Simple Table** | `false` | Backend returns the whole current dataset; frontend filters/sorts/searches in-memory | `processes`, `network-connections`, `network-interfaces`, `block-devices`, `mount-points`, `containers-vms`, `systemd-services`, `netdata-streaming`, `netdata-api-calls`, `netdata-metrics-cardinality`, `<db>:top-queries`, `<db>:running-queries`, `<db>:deadlock-info`, `<db>:error-info` |
 | **Log Explorer** | `true` | Backend filters / facets / histograms before sending; supports infinite scroll, anchor pagination, delta and PLAY modes | `systemd-journal`, `windows-events`, `otel-logs` |
 
 Two additional `type` values are used by purpose-built Functions
@@ -243,7 +243,6 @@ stock Linux Netdata install (verified live):
 | `processes` | table | Live process list with CPU / memory / I/O / page faults / PPID |
 | `network-connections` | table | Active sockets/connections (proto, state, addresses, ports, perf metrics) |
 | `network-interfaces` | table | Per-interface traffic, packet counts, drops, link status |
-| `network-sockets-tracing` | table | Detailed open-socket information |
 | `block-devices` | table | Per-block-device read/write throughput, ops, latency, utilization |
 | `mount-points` | table | Filesystem mount points with space and inode usage |
 | `containers-vms` | table | Active containers and cgroups with resource usage |

@@ -27,7 +27,6 @@
 #include "libnetdata/netipc/netipc_netdata.h"
 
 #include "ebpf_apps.h"
-#include "ebpf_functions.h"
 #include "ebpf_cgroup.h"
 
 #define NETDATA_EBPF_OLD_CONFIG_FILE "ebpf.conf"
@@ -391,7 +390,7 @@ static inline bool ebpf_module_thread_has_valid_state(ebpf_module_t *em)
 {
     enum ebpf_threads_status enabled = ebpf_module_enabled_get(em);
 
-    if (likely(enabled == NETDATA_THREAD_EBPF_RUNNING || enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING))
+    if (likely(enabled == NETDATA_THREAD_EBPF_RUNNING))
         return true;
 
     collector_error("Cannot start thread %s with invalid state %u.", em->info.thread_name, (unsigned int)enabled);
