@@ -307,6 +307,10 @@ typedef uint32_t uid_t;
 // --------------------------------------------------------------------------------------------------------------------
 
 #if defined(OS_WINDOWS)
+// winsock2.h must come before windows.h to avoid conflicts with the older
+// winsock.h that windows.h pulls in, and to get WSAPoll / ws2tcpip types.
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <wctype.h>
 #include <wchar.h>
@@ -430,6 +434,144 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset);
 int   munmap(void *ptr, size_t len);
 int   madvise(void *addr, size_t len, int advice);
 #endif // MAP_SHARED
+
+// ── POSIX resource limits ── UCRT64 has no sys/resource.h ──────────────────
+#ifndef RLIM_INFINITY
+typedef unsigned long rlim_t;
+#define RLIM_INFINITY  ((rlim_t)~0UL)
+struct rlimit {
+    rlim_t rlim_cur;
+    rlim_t rlim_max;
+};
+#define RLIMIT_NOFILE 7
+static inline int getrlimit(int resource __maybe_unused, struct rlimit *rlim __maybe_unused) { return 0; }
+static inline int setrlimit(int resource __maybe_unused, const struct rlimit *rlim __maybe_unused) { return 0; }
+#endif // RLIM_INFINITY
+
+// ── S_ISSOCK ── POSIX socket-type check absent from UCRT64 sys/stat.h ───────
+#ifndef S_ISSOCK
+#  ifdef S_IFSOCK
+#    define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
+#  else
+#    define S_ISSOCK(m) (0)
+#  endif
+#endif
+
+// ── Unix domain socket types ─────────────────────────────────────────────────
+// Windows 10+ SDK provides afunix.h; fall back to a minimal stub otherwise.
+#ifndef UNIX_PATH_MAX
+#  if defined(__has_include) && __has_include(<afunix.h>)
+#    include <afunix.h>
+#  else
+#    ifndef AF_UNIX
+#      define AF_UNIX 1
+#    endif
+#    define UNIX_PATH_MAX 108
+struct sockaddr_un {
+    unsigned short sun_family;
+    char           sun_path[UNIX_PATH_MAX];
+};
+#  endif
+#endif // UNIX_PATH_MAX
+
+// ── readlink() stub ── UCRT64 has no readlink; callers handle -1 gracefully ─
+static inline ssize_t readlink(const char *path __maybe_unused,
+                                char *buf __maybe_unused,
+                                size_t bufsiz __maybe_unused) {
+    errno = ENOSYS;
+    return -1;
+}
+
+// ── sysconf() / _SC_CLK_TCK ── UCRT64 has no sysconf ─────────────────────────
+#ifndef _SC_CLK_TCK
+#  define _SC_CLK_TCK 2
+static inline long sysconf(int name) {
+    if (name == _SC_CLK_TCK) return 100;
+    errno = EINVAL;
+    return -1;
+}
+#endif
+
+// ── strcasestr() ── GNU extension absent from UCRT64 ──────────────────────────
+static inline char *strcasestr(const char *haystack, const char *needle) {
+    if (!needle || !*needle) return (char *)haystack;
+    size_t nlen = strlen(needle);
+    for (; *haystack; haystack++)
+        if (strncasecmp(haystack, needle, nlen) == 0)
+            return (char *)haystack;
+    return NULL;
+}
+
+// ── PTHREAD_STACK_MIN ── absent from MinGW-w64 UCRT64 winpthreads ─────────────
+#ifndef PTHREAD_STACK_MIN
+#  define PTHREAD_STACK_MIN (64 * 1024)
+#endif
+
+// ── nfds_t ── POSIX type absent from UCRT64 ────────────────────────────────────
+#ifndef _NFDS_T
+#  define _NFDS_T
+typedef unsigned long nfds_t;
+#endif
+
+// ── poll() ── UCRT64 has no poll(); delegate to WSAPoll via winsock2.h ──────────
+// winsock2.h defines struct pollfd == WSAPOLLFD (same layout), so the cast is safe.
+// Socket fds on UCRT64 are raw SOCKET/Win32 HANDLE values stored in int variables.
+static inline int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
+    return WSAPoll((WSAPOLLFD *)fds, (ULONG)nfds, timeout);
+}
+
+// ── getsockopt / setsockopt ── Winsock declares char* for optval; POSIX void* ──
+// Define wrappers before the macros so the wrapper bodies call raw Winsock.
+static inline int nd_getsockopt(int s, int l, int o, void *v, socklen_t *vl) {
+    int ilen = (int)*vl;
+    int r = getsockopt(s, l, o, (char *)v, &ilen);
+    *vl = (socklen_t)ilen;
+    return r;
+}
+static inline int nd_setsockopt(int s, int l, int o, const void *v, socklen_t vl) {
+    return setsockopt(s, l, o, (const char *)v, (int)vl);
+}
+#define getsockopt nd_getsockopt
+#define setsockopt nd_setsockopt
+
+// ── fcntl / F_GETFL / F_SETFL / F_GETFD / F_SETFD / O_NONBLOCK / FD_CLOEXEC ──
+// UCRT64 has no POSIX fcntl; implement what socket.c needs via Winsock APIs.
+// fd values are raw SOCKET / Win32 HANDLE values (not CRT fd indices).
+#ifndef F_GETFL
+#  define F_GETFL    3
+#  define F_SETFL    4
+#  define F_GETFD    1
+#  define F_SETFD    2
+#  define FD_CLOEXEC 1
+#  ifndef O_NONBLOCK
+#    define O_NONBLOCK 0x0004
+#  endif
+static inline int fcntl(int fd, int cmd, ...) {
+    switch (cmd) {
+    case F_GETFL:
+    case F_GETFD:
+        return 0;
+    case F_SETFL: {
+        va_list ap; va_start(ap, cmd);
+        int flags = va_arg(ap, int); va_end(ap);
+        u_long mode = (flags & O_NONBLOCK) ? 1 : 0;
+        // zero-extend int → uintptr_t to avoid sign-extension of SOCKET values
+        SOCKET s = (SOCKET)(uintptr_t)(unsigned int)fd;
+        return (ioctlsocket(s, FIONBIO, &mode) == 0) ? 0 : -1;
+    }
+    case F_SETFD: {
+        va_list ap; va_start(ap, cmd);
+        int flags = va_arg(ap, int); va_end(ap);
+        HANDLE h = (HANDLE)(uintptr_t)(unsigned int)fd;
+        DWORD inherit = (flags & FD_CLOEXEC) ? 0 : HANDLE_FLAG_INHERIT;
+        return SetHandleInformation(h, HANDLE_FLAG_INHERIT, inherit) ? 0 : -1;
+    }
+    default:
+        errno = EINVAL;
+        return -1;
+    }
+}
+#endif // F_GETFL
 
 #endif // OS_WINDOWS
 
