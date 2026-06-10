@@ -17,35 +17,25 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 )
 
-func newSNMPTrapsFunctionHandler(c *Collector) *snmpTrapsFunctionHandler {
+func newSNMPTrapsFunctionHandler(_ *Collector) *snmpTrapsFunctionHandler {
 	return &snmpTrapsFunctionHandler{
-		collector:   c,
-		reload:      &profileReloadHandler{collector: c},
 		logs:        newSNMPTrapsJournalFunction(),
 		journalRoot: journalBaseRoot(),
 	}
 }
 
 type snmpTrapsFunctionHandler struct {
-	collector   *Collector
-	reload      *profileReloadHandler
 	logs        sdkjournal.NetdataJournalFunction
 	journalRoot string
 }
 
 var _ funcapi.RawMethodHandler = (*snmpTrapsFunctionHandler)(nil)
 
-func (h *snmpTrapsFunctionHandler) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if method == reloadProfilesMethodID {
-		return h.reload.MethodParams(ctx, method)
-	}
+func (h *snmpTrapsFunctionHandler) MethodParams(_ context.Context, _ string) ([]funcapi.ParamConfig, error) {
 	return nil, nil
 }
 
-func (h *snmpTrapsFunctionHandler) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if method == reloadProfilesMethodID {
-		return h.reload.Handle(ctx, method, params)
-	}
+func (h *snmpTrapsFunctionHandler) Handle(_ context.Context, method string, _ funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	return funcapi.NotFoundResponse(method)
 }
 
@@ -73,9 +63,7 @@ func (h *snmpTrapsFunctionHandler) HandleRaw(ctx context.Context, req funcapi.Ra
 	return funcapi.RawResponse(resp)
 }
 
-func (h *snmpTrapsFunctionHandler) Cleanup(ctx context.Context) {
-	h.reload.Cleanup(ctx)
-}
+func (h *snmpTrapsFunctionHandler) Cleanup(context.Context) {}
 
 func (h *snmpTrapsFunctionHandler) isLogsMethod(method string) bool {
 	return method == snmpTrapsLogsMethodID

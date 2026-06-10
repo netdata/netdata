@@ -10,6 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"text/template"
+
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
 var validCategories = map[string]bool{
@@ -247,12 +249,16 @@ type profileCache struct {
 	mu         sync.Mutex
 	current    atomic.Pointer[ProfileIndex]
 	loaded     bool
+	dirty      bool
 	activeRefs int
+	watcher    *profileWatcher
 }
 
 var globalProfileCache profileCache
 
 var errNoActiveProfileJobs = errors.New("snmp_traps profile reload requires at least one active job")
+
+var automaticProfileWatcherEnabled = executable.Name != "test"
 
 // AcquireProfileCache lazily loads profiles on first call.
 // Returns the current profile index and any load error.
@@ -267,10 +273,22 @@ func AcquireProfileCache() (*ProfileIndex, error) {
 		}
 		globalProfileCache.current.Store(idx)
 		globalProfileCache.loaded = true
+		globalProfileCache.dirty = false
+	} else if globalProfileCache.dirty {
+		idx, err := loadUserProfileCache(globalProfileCache.current.Load())
+		if err != nil {
+			return nil, err
+		}
+		globalProfileCache.current.Store(idx)
+		globalProfileCache.loaded = true
+		globalProfileCache.dirty = false
 	}
 
 	if idx := globalProfileCache.current.Load(); idx != nil {
 		globalProfileCache.activeRefs++
+		if globalProfileCache.activeRefs == 1 {
+			globalProfileCache.startUserProfileWatcherLocked()
+		}
 		return idx, nil
 	}
 	return nil, errors.New("snmp_traps profile cache is empty after load")
@@ -287,16 +305,30 @@ func CurrentProfileIndex() *ProfileIndex {
 // the stock profile memory cost.
 func ReleaseProfileCache() {
 	globalProfileCache.mu.Lock()
-	defer globalProfileCache.mu.Unlock()
 
 	if globalProfileCache.activeRefs <= 0 {
+		globalProfileCache.mu.Unlock()
 		return
 	}
+	var watcher *profileWatcher
 	globalProfileCache.activeRefs--
 	if globalProfileCache.activeRefs == 0 {
+		watcher = globalProfileCache.stopUserProfileWatcherLocked()
 		globalProfileCache.current.Store(nil)
 		globalProfileCache.loaded = false
+		globalProfileCache.dirty = false
 	}
+	globalProfileCache.mu.Unlock()
+
+	if watcher != nil {
+		watcher.Stop()
+	}
+}
+
+func MarkProfileCacheDirty() {
+	globalProfileCache.mu.Lock()
+	globalProfileCache.dirty = true
+	globalProfileCache.mu.Unlock()
 }
 
 // ReloadProfileCache re-parses all profile directories and atomically swaps
@@ -304,6 +336,12 @@ func ReleaseProfileCache() {
 // is returned.
 func ReloadProfileCache() error {
 	return reloadProfileCache(loadProfileCache)
+}
+
+func ReloadUserProfileCache() error {
+	return reloadProfileCache(func() (*ProfileIndex, error) {
+		return loadUserProfileCache(CurrentProfileIndex())
+	})
 }
 
 func reloadProfileCache(load func() (*ProfileIndex, error)) error {
@@ -333,16 +371,47 @@ func reloadProfileCache(load func() (*ProfileIndex, error)) error {
 	}
 	globalProfileCache.current.Store(idx)
 	globalProfileCache.loaded = true
+	globalProfileCache.dirty = false
 	return nil
+}
+
+func (c *profileCache) startUserProfileWatcherLocked() {
+	if !automaticProfileWatcherEnabled || c.watcher != nil {
+		return
+	}
+	paths := getProfileLoadPaths()
+	if len(paths.eagerDirs) == 0 {
+		return
+	}
+	watcher := newUserProfileWatcher(paths.eagerDirs)
+	if err := watcher.Start(); err != nil {
+		return
+	}
+	c.watcher = watcher
+}
+
+func (c *profileCache) stopUserProfileWatcherLocked() *profileWatcher {
+	if c.watcher == nil {
+		return nil
+	}
+	watcher := c.watcher
+	c.watcher = nil
+	return watcher
 }
 
 // resetProfileCacheForTest clears the shared cache for test isolation.
 func resetProfileCacheForTest() {
 	globalProfileCache.mu.Lock()
-	defer globalProfileCache.mu.Unlock()
+	watcher := globalProfileCache.stopUserProfileWatcherLocked()
 	globalProfileCache.current.Store(nil)
 	globalProfileCache.loaded = false
+	globalProfileCache.dirty = false
 	globalProfileCache.activeRefs = 0
+	globalProfileCache.mu.Unlock()
+
+	if watcher != nil {
+		watcher.Stop()
+	}
 }
 
 func validateFileVarbinds(fileVarbinds map[string]VarbindDef, src string) error {

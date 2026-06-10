@@ -8,14 +8,14 @@ Sub-state: non-decision Function framework, secret handling, lazy PEN loading,
 compressed profile installation, retry classification, writer shutdown,
 listener observability hardening, the approved persistent-journal storage path,
 the binary journal encoding metric rename, decode-error journal entries,
-listener read-error logging, and the final Go 1.26 cleanup are implemented
-locally. Runtime validation found two remaining issues: DynCfg test
-instantiates collectors without injecting the job name, and installed agents
-cannot start direct-journal trap jobs unless packaging/service setup creates
-`/var/log/journal/netdata/snmp-traps` for the plugin user. The missing
-`snmp:traps` Function on a failed job is an expected consequence of the
-direct-journal-only availability gate: the Function is published only after a
-direct-journal trap job starts successfully.
+listener read-error logging, final Go 1.26 cleanup, DynCfg test job-name
+injection, direct-journal directory setup, and user-profile automatic reload are
+implemented locally. The public manual `snmp_traps:reload-profiles` Function has
+been removed from source/docs in favor of an internal watcher for user-supplied
+trap profiles only. Stock trap profiles MUST NOT be watched for live reload;
+Netdata upgrade paths may update stock profile files together with code that
+interprets them, so stock changes are picked up by process/job restart rather
+than by a live profile watcher.
 
 ## Requirements
 
@@ -149,6 +149,20 @@ Unknowns:
   stay uncompressed `.yaml`.
 - The profile loader supports user and stock `.yaml`, `.yml`, `.yaml.gz`, and
   `.yml.gz` as needed, with user files always eagerly loaded and validated.
+- User-supplied trap profile changes are picked up automatically while trap jobs
+  are running:
+  - only user profile directories are watched/fingerprinted;
+  - stock profile directories and stock catalogue files are not watched;
+  - automatic reloads rebuild only user-supplied profiles and carry over the
+    existing stock route/store until all jobs stop or the process restarts;
+  - if a user profile replaces a stock filename, the carried-over stock routes
+    for that filename are filtered out;
+  - successful automatic reloads atomically swap the shared profile index;
+  - failed automatic reloads keep the last valid profile index active, increment
+    profile-load failure metrics, and leave the cache dirty so subsequent DynCfg
+    test/apply validates and fails at job creation until profiles are fixed.
+- The public `snmp_traps:reload-profiles` Function is removed from the visible
+  Function surface. The public logs Function remains `snmp:traps`.
 - IANA PEN lookup is lazy and disk-backed; no package init builds a large
   enterprise-number map for users that do not need it.
 - Invalid configuration and invalid profiles still fail with non-retryable
@@ -208,6 +222,13 @@ Current state:
   and documents that `AgentWide` still dispatches through the first running job.
 - `snmp_traps` registers `snmp:traps` as `AgentWide: true`,
   `RawRequest: true`, and `RequireCloud: true`.
+- `snmp_traps` previously exposed a public `snmp_traps:reload-profiles`
+  maintenance Function, but the user rejected this UX because profile reload
+  should not be a manual action surfaced next to the `snmp:traps` logs viewer.
+- `src/go/go.mod:23` already depends on `github.com/fsnotify/fsnotify`, which
+  supports Linux inotify, BSD/macOS kqueue, Windows ReadDirectoryChangesW, and
+  illumos FEN. `src/go/plugin/agent/discovery/file/watch.go` is an accepted
+  in-repo pattern for fsnotify plus periodic refresh and event-settle debounce.
 - Runtime validation on an installed PR build showed:
   - direct Function calls for `snmp:traps` return `404`, proving the Function is
     not registered by `go.d.plugin`, not merely hidden by the UI;
@@ -235,6 +256,10 @@ Current state:
   `TRAP_TAG_<KEY>`.
 - `load.go` currently reads only `.yaml` / `.yml` profile files with
   `os.ReadFile`.
+- `load.go` eagerly loads user profile directories and builds a lazy stock
+  route table from stock profiles/catalogue. This means the automatic watcher
+  can be scoped to user profile directories without loading the full stock
+  profile database into memory.
 - `CMakeLists.txt` currently installs stock trap profile `.yaml` files raw.
 - `snmputils/sysinfo.go` embeds `enterprise-numbers.txt` and builds the PEN map
   at package initialization.
@@ -1599,8 +1624,9 @@ Runtime evidence:
 - After creating the directory with the running plugin user and restarting
   Netdata, installed-agent logs showed `snmp_traps/local` check success and
   started.
-- `/api/v1/functions` listed both `snmp_traps:reload-profiles` and
-  `snmp:traps`.
+- At that point in the branch, `/api/v1/functions` listed both
+  `snmp_traps:reload-profiles` and `snmp:traps`; the reload Function was later
+  removed from the visible surface in favor of automatic user-profile reload.
 - Direct local execution of `snmp:traps` returned `412` Cloud SSO required
   rather than `404`, proving the Function is registered while preserving the
   Cloud-only access contract.
@@ -1613,6 +1639,44 @@ Validation evidence:
   packaging/cmake/pkg-files/deb/plugin-go/postinst
   packaging/makeself/install-or-update.sh` passed.
 - `git diff --check` completed without warnings.
+
+### 2026-06-10 User Profile Auto-Reload And Function Surface Cleanup
+
+Implemented locally:
+
+- Removed the visible `snmp_traps:reload-profiles` Function from the published
+  `snmp_traps` method list. The only public SNMP traps Function in this area is
+  the direct-journal logs Function `snmp:traps`.
+- Added an internal user-profile watcher that starts when the first trap job
+  acquires the shared profile cache and stops when the last job releases it.
+- The watcher fingerprints only user-supplied profile directories. Stock
+  profile directories and stock catalogue files are not watched, per user
+  decision, because Netdata upgrades may update stock profiles together with the
+  code that interprets them.
+- Automatic watcher reloads use a user-only reload path that preserves the
+  existing stock route/store until all trap jobs stop or the process restarts.
+  User profiles that replace a stock filename still remove the corresponding
+  carried-over stock routes.
+- The watcher uses fsnotify plus a periodic fingerprint fallback. Fingerprints
+  include profile filename, size, mtime, and mode, and include underscore-prefixed
+  profile files because they can be used by `extends`.
+- On user-profile changes, the watcher marks the cache dirty, attempts a
+  background reload, and atomically swaps in the new profile index only on
+  success.
+- If reload fails, existing jobs keep the previous valid index and
+  profile-load-failure metrics increment. The dirty flag remains set so the next
+  DynCfg test/apply or job creation synchronously validates the changed user
+  profiles and fails until the profile files are fixed.
+- If user-profile fingerprinting itself fails, the watcher marks the cache dirty
+  and attempts a reload so readability/permission failures are surfaced on the
+  next DynCfg test/apply instead of leaving the current cache silently valid.
+- Updated operator docs and the SNMP traps query skill how-to to describe
+  automatic user-profile reload instead of a manual Function call.
+
+Validation evidence:
+
+- `go test -count=1 ./plugin/go.d/collector/snmp_traps
+  ./plugin/agent/jobmgr/funcctl ./cmd/godplugin ./plugin/agent/jobmgr` passed.
 
 Closed review nits:
 

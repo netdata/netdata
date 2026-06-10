@@ -70,30 +70,15 @@ Netdata SNMP trap profile YAMLs?
      /etc/netdata/go.d/snmp.trap-profiles/
    ```
 
-6. Reload profiles:
+6. Wait for active SNMP trap jobs to reload user profiles automatically.
 
-   ```bash
-   source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
-   agents_load_env
-
-   NODE_UUID="YOUR_NODE_UUID"
-
-   agents_call_function \
-     --via cloud \
-     --node "$NODE_UUID" \
-     --function snmp_traps:reload-profiles \
-     --body '{"info":true}'
-
-   agents_call_function \
-     --via cloud \
-     --node "$NODE_UUID" \
-     --function snmp_traps:reload-profiles \
-     --body '{}'
-   ```
-
-   If no SNMP trap job is active, the reload action is unavailable by
-   design. Re-apply the job through DynCfg or restart the Netdata Agent
-   so the next job creation validates and loads the new profile files.
+   The collector watches `/etc/netdata/go.d/snmp.trap-profiles/` while at
+   least one SNMP trap job is active. If a changed profile is invalid, the
+   collector keeps using the last valid profile index; subsequent DynCfg
+   test/apply also fails until the profile file is fixed. Stock profile
+   updates are picked up after trap jobs stop/start or the Netdata Agent
+   restarts. If no trap job is active, the next job creation loads and
+   validates the profile files.
 
 7. Verify that unknown OIDs resolve:
 
@@ -148,8 +133,9 @@ durable artifacts.
 - Helper output is mechanical unless `--classify` is used with an
   OpenAI-compatible endpoint. Review generated category, severity, and
   descriptions before installing profiles for production use.
-- If generated YAML is malformed, job creation or profile reload fails
-  instead of silently accepting bad profiles.
+- If generated YAML is malformed, active jobs keep the last valid profile
+  index and new job creation/test fails instead of silently accepting bad
+  profiles.
 - A validation run with `NAGIOS-NOTIFY-MIB` produced `nagios.yaml`
   containing four traps: `nHostEvent`, `nHostNotify`, `nSvcEvent`, and
   `nSvcNotify`.

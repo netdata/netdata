@@ -98,31 +98,9 @@ func isDir(path string) bool {
 // loadProfileCache loads user profiles and builds a lazy route table for stock profiles.
 func loadProfileCache() (*ProfileIndex, error) {
 	paths := getProfileLoadPaths()
-	seen := make(map[string]bool)
-
-	index := &ProfileIndex{
-		trapsByOID:      make(map[string]*TrapDef),
-		namesByTrapName: make(map[string]*TrapDef),
-	}
-
-	for _, dir := range paths.eagerDirs {
-		files, err := loadProfilesFromDir(dir, paths.all)
-		if err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				return nil, fmt.Errorf("failed to load trap profiles from '%s': %w", dir, err)
-			}
-			continue
-		}
-
-		for _, file := range files {
-			if seen[file.name] {
-				continue
-			}
-			seen[file.name] = true
-			if err := index.addTraps(file.traps); err != nil {
-				return nil, err
-			}
-		}
+	index, seen, err := loadUserProfiles(paths)
+	if err != nil {
+		return nil, err
 	}
 
 	if paths.stockDir != "" {
@@ -141,6 +119,63 @@ func loadProfileCache() (*ProfileIndex, error) {
 	}
 
 	return index, nil
+}
+
+// loadUserProfileCache reloads only user profiles and carries over the existing
+// stock store. This is used for live reloads so Netdata upgrades do not live-load
+// changed stock profile metadata without the matching process/job restart.
+func loadUserProfileCache(current *ProfileIndex) (*ProfileIndex, error) {
+	if current == nil || current.stock == nil {
+		return loadProfileCache()
+	}
+
+	paths := getProfileLoadPaths()
+	index, seen, err := loadUserProfiles(paths)
+	if err != nil {
+		return nil, err
+	}
+
+	index.stock = current.stock.cloneFiltered(seen)
+	if err := copyLoadedStockTraps(index, current, seen); err != nil {
+		return nil, err
+	}
+
+	if len(index.trapsByOID) == 0 && (index.stock == nil || index.stock.empty()) {
+		return nil, fmt.Errorf("no trap profiles found in %v", paths.all)
+	}
+
+	return index, nil
+}
+
+func loadUserProfiles(paths profileLoadPaths) (*ProfileIndex, map[string]bool, error) {
+	seen := make(map[string]bool)
+
+	index := &ProfileIndex{
+		trapsByOID:      make(map[string]*TrapDef),
+		namesByTrapName: make(map[string]*TrapDef),
+	}
+
+	for _, dir := range paths.eagerDirs {
+		files, err := loadProfilesFromDir(dir, paths.all)
+		if err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				return nil, nil, fmt.Errorf("failed to load trap profiles from '%s': %w", dir, err)
+			}
+			continue
+		}
+
+		for _, file := range files {
+			if seen[file.name] {
+				continue
+			}
+			seen[file.name] = true
+			if err := index.addTraps(file.traps); err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+
+	return index, seen, nil
 }
 
 func (idx *ProfileIndex) addTraps(traps []*TrapDef) error {
@@ -351,6 +386,95 @@ type stockProfileStore struct {
 	enterpriseRoutes map[string]string
 	loaded           map[string]bool
 	mu               sync.Mutex
+}
+
+func (s *stockProfileStore) cloneFiltered(replaced map[string]bool) *stockProfileStore {
+	if s == nil {
+		return nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	clone := &stockProfileStore{
+		dir:              s.dir,
+		extendsPaths:     s.extendsPaths,
+		files:            make(map[string]string, len(s.files)),
+		exactRoutes:      make(map[string]string, len(s.exactRoutes)),
+		enterpriseRoutes: make(map[string]string, len(s.enterpriseRoutes)),
+		loaded:           make(map[string]bool, len(s.loaded)),
+	}
+	for name, path := range s.files {
+		if replaced[name] {
+			continue
+		}
+		clone.files[name] = path
+	}
+	for oid, name := range s.exactRoutes {
+		if replaced[name] {
+			continue
+		}
+		clone.exactRoutes[oid] = name
+	}
+	for prefix, name := range s.enterpriseRoutes {
+		if replaced[name] {
+			continue
+		}
+		clone.enterpriseRoutes[prefix] = name
+	}
+	for name, loaded := range s.loaded {
+		if replaced[name] {
+			continue
+		}
+		clone.loaded[name] = loaded
+	}
+
+	return clone
+}
+
+func (s *stockProfileStore) loadedProfilePaths(replaced map[string]bool) map[string]string {
+	if s == nil {
+		return nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	paths := make(map[string]string)
+	for name, loaded := range s.loaded {
+		if !loaded || replaced[name] {
+			continue
+		}
+		if path := s.files[name]; path != "" {
+			paths[filepath.Clean(path)] = name
+		}
+	}
+	return paths
+}
+
+func copyLoadedStockTraps(dst, current *ProfileIndex, replaced map[string]bool) error {
+	if dst == nil || current == nil || current.stock == nil {
+		return nil
+	}
+
+	loadedPaths := current.stock.loadedProfilePaths(replaced)
+	if len(loadedPaths) == 0 {
+		return nil
+	}
+
+	var traps []*TrapDef
+	current.mu.RLock()
+	for _, td := range current.trapsByOID {
+		if td == nil {
+			continue
+		}
+		if _, ok := loadedPaths[filepath.Clean(td.sourceFile)]; ok {
+			traps = append(traps, td)
+		}
+	}
+	current.mu.RUnlock()
+
+	return dst.addTraps(traps)
 }
 
 func (s *stockProfileStore) empty() bool {

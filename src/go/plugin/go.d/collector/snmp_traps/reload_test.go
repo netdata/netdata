@@ -450,98 +450,14 @@ traps:
 	assert.NotContains(t, writer.entries[0].Message, "OLD-MIB::linkDown")
 }
 
-func TestProfileReloadHandlerSuccess(t *testing.T) {
-	dir := t.TempDir()
-	writeProfileYAML(t, dir, "test.yaml", `
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.3
-    name: IF-MIB::linkDown
-    category: state_change
-    severity: warning
-`)
-
-	setTestDirs(t, dir)
-	resetProfileCacheForTest()
-	_, err := AcquireProfileCache()
-	require.NoError(t, err)
-	defer ReleaseProfileCache()
-
-	handler := &profileReloadHandler{}
-	resp := handler.Handle(t.Context(), reloadProfilesMethodID, nil)
-	require.NotNil(t, resp)
-	assert.Equal(t, 200, resp.Status)
-	assert.Equal(t, "profile reload successful", resp.Message)
-}
-
-func TestProfileReloadHandlerFailure(t *testing.T) {
-	dir := t.TempDir()
-	writeProfileYAML(t, dir, "test.yaml", `
-traps:
-  - oid: 1.3.6.1.6.3.1.1.5.3
-    name: IF-MIB::linkDown
-    category: state_change
-    severity: warning
-`)
-
-	setTestDirs(t, dir)
-	resetProfileCacheForTest()
-	_, err := AcquireProfileCache()
-	require.NoError(t, err)
-	defer ReleaseProfileCache()
-
-	emptyDir := t.TempDir()
-	setTestDirs(t, emptyDir)
-
-	handler := &profileReloadHandler{}
-	resp := handler.Handle(t.Context(), reloadProfilesMethodID, nil)
-	require.NotNil(t, resp)
-	assert.Equal(t, 422, resp.Status)
-	assert.Contains(t, resp.Message, "no trap profiles found")
-}
-
-func TestProfileReloadHandlerUnavailableWithoutActiveJob(t *testing.T) {
-	setMinimalProfileDir(t)
-	resetProfileCacheForTest()
-
-	handler := &profileReloadHandler{}
-	resp := handler.Handle(t.Context(), reloadProfilesMethodID, nil)
-	require.NotNil(t, resp)
-	assert.Equal(t, 503, resp.Status)
-	assert.Contains(t, resp.Message, "requires at least one active job")
-}
-
-func TestProfileReloadHandlerUnknownMethod(t *testing.T) {
-	handler := &profileReloadHandler{}
-	resp := handler.Handle(t.Context(), "unknown-method", nil)
-	require.NotNil(t, resp)
-	assert.Equal(t, 404, resp.Status)
-	assert.Contains(t, resp.Message, "unknown method")
-}
-
-func TestProfileReloadHandlerMethodParams(t *testing.T) {
-	handler := &profileReloadHandler{}
-
-	params, err := handler.MethodParams(t.Context(), reloadProfilesMethodID)
-	require.NoError(t, err)
-	assert.Nil(t, params)
-
-	params, err = handler.MethodParams(t.Context(), "other")
-	require.NoError(t, err)
-	assert.Nil(t, params)
-}
-
 func TestSnmpTrapsMethods(t *testing.T) {
 	methods := snmpTrapsMethods()
-	require.Len(t, methods, 2)
+	require.Len(t, methods, 1)
 
 	byID := make(map[string]funcapi.MethodConfig, len(methods))
 	for _, method := range methods {
 		byID[method.ID] = method
 	}
-
-	reload := byID[reloadProfilesMethodID]
-	assert.True(t, reload.AgentWide)
-	assert.Equal(t, "text", reload.ResponseType)
 
 	logs := byID[snmpTrapsLogsMethodID]
 	assert.True(t, logs.AgentWide)

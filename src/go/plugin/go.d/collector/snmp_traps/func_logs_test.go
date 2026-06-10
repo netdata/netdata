@@ -14,16 +14,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSNMPTrapsMethodsExposeReloadAndLogs(t *testing.T) {
+func TestSNMPTrapsMethodsExposeLogsOnly(t *testing.T) {
 	methods := snmpTrapsMethods()
-	require.Len(t, methods, 2)
+	require.Len(t, methods, 1)
 
 	byID := make(map[string]funcapi.MethodConfig, len(methods))
 	for _, method := range methods {
 		byID[method.ID] = method
 	}
 
-	assert.Contains(t, byID, reloadProfilesMethodID)
 	logs := byID[snmpTrapsLogsMethodID]
 	assert.Equal(t, snmpTrapsFunctionName, logs.FunctionName)
 	assert.Equal(t, "SNMP Trap Logs", logs.Name)
