@@ -3,8 +3,10 @@
 package snmp_traps
 
 import (
+	"bufio"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"net"
 	"os"
 	"path/filepath"
@@ -266,6 +268,53 @@ traps:
 	assert.Equal(t, "TEST-CISCO-MIB::testTrap", td.Name)
 	assert.True(t, store.loaded["ciscosystems.yaml"])
 	assert.Len(t, idx.trapsByOID, 1)
+}
+
+func TestOverridesApplyToLazyLoadedStockProfiles(t *testing.T) {
+	stockDir := t.TempDir()
+	const oid = "1.3.6.1.4.1.9.1.0.1"
+	writeProfileYAMLGzip(t, stockDir, "ciscosystems.yaml.gz", `
+traps:
+  - oid: 1.3.6.1.4.1.9.1.0.1
+    name: TEST-CISCO-MIB::testTrap
+    category: diagnostic
+    severity: warning
+    labels:
+      vendor: stock
+`)
+
+	idx := &ProfileIndex{
+		trapsByOID:      make(map[string]*TrapDef),
+		namesByTrapName: make(map[string]*TrapDef),
+	}
+	store, err := buildStockProfileStore(stockDir, multipath.New(stockDir), nil, idx)
+	require.NoError(t, err)
+	idx.stock = store
+
+	td := idx.Lookup(oid)
+	require.NotNil(t, td)
+	require.Equal(t, "diagnostic", td.Category)
+	require.Equal(t, "warning", td.Severity)
+
+	c := New()
+	c.overrides = buildOverrideMap([]OverrideConfig{
+		{
+			OID:      oid,
+			Category: "security",
+			Severity: "crit",
+			Labels:   map[string]string{"site": "edge"},
+		},
+	})
+
+	overridden := c.applyOverrides(td)
+	require.NotSame(t, td, overridden)
+	assert.Equal(t, "security", overridden.Category)
+	assert.Equal(t, "crit", overridden.Severity)
+	assert.Equal(t, map[string]string{"vendor": "stock", "site": "edge"}, overridden.Labels)
+
+	assert.Equal(t, "diagnostic", td.Category)
+	assert.Equal(t, "warning", td.Severity)
+	assert.Equal(t, map[string]string{"vendor": "stock"}, td.Labels)
 }
 
 func TestStockProfileStoreLazyLoadErrorIsReported(t *testing.T) {
@@ -1819,6 +1868,48 @@ func TestStockProfileIndexLoads(t *testing.T) {
 	assert.NotEmpty(t, idx.trapsByOID, "first stock lookup should retain the routed profile file")
 }
 
+func TestStockProfileCatalogueMatchesDefaultFiles(t *testing.T) {
+	stockDir := trapProfilesDirFromThisFile()
+	if stockDir == "" {
+		t.Skip("no stock profiles available")
+	}
+	cataloguePath := filepath.Join(filepath.Dir(stockDir), "catalogue.json")
+	data, err := os.ReadFile(cataloguePath)
+	require.NoError(t, err)
+
+	var catalogue map[string]struct {
+		File      string `json:"file"`
+		TrapCount int    `json:"trap_count"`
+	}
+	require.NoError(t, json.Unmarshal(data, &catalogue))
+	require.NotEmpty(t, catalogue)
+
+	files, err := profileFilesInDir(stockDir)
+	require.NoError(t, err)
+	require.NotEmpty(t, files)
+
+	countsByFile := make(map[string]int, len(files))
+	totalFiles := 0
+	for _, path := range files {
+		name := filepath.Base(path)
+		require.False(t, strings.HasSuffix(name, ".gz"), "stock profiles must stay uncompressed in the repository")
+		count := countProfileTrapEntries(t, path)
+		countsByFile[name] = count
+		totalFiles += count
+	}
+	require.Len(t, countsByFile, len(catalogue), "catalogue and default profile file count must match")
+
+	totalCatalogue := 0
+	for vendor, entry := range catalogue {
+		require.NotEmpty(t, entry.File, "catalogue entry %q has no file", vendor)
+		count, ok := countsByFile[entry.File]
+		require.True(t, ok, "catalogue entry %q references missing profile file %q", vendor, entry.File)
+		assert.Equal(t, entry.TrapCount, count, "catalogue trap_count mismatch for %s", entry.File)
+		totalCatalogue += entry.TrapCount
+	}
+	assert.Equal(t, totalFiles, totalCatalogue, "catalogue trap_count sum must match profile files")
+}
+
 func TestStockIFMIBLinkMessagesDoNotDependOnIfOperStatus(t *testing.T) {
 	resetProfileCacheForTest()
 
@@ -1831,14 +1922,17 @@ func TestStockIFMIBLinkMessagesDoNotDependOnIfOperStatus(t *testing.T) {
 	tests := map[string]struct {
 		oid          string
 		wantContains []string
+		stateWord    string
 	}{
 		"linkDown": {
 			oid:          testIFMIBLinkDownOID,
 			wantContains: []string{"1", "down", "lab-switch"},
+			stateWord:    "down",
 		},
 		"linkUp": {
 			oid:          testIFMIBLinkUpOID,
 			wantContains: []string{"1", "up", "lab-switch"},
+			stateWord:    "up",
 		},
 	}
 
@@ -1865,6 +1959,26 @@ func TestStockIFMIBLinkMessagesDoNotDependOnIfOperStatus(t *testing.T) {
 				assert.Contains(t, entry.Message, want)
 			}
 			assert.NotContains(t, entry.Message, "ifOperStatus")
+			assert.NotContains(t, entry.Message, "ifAdminStatus")
+			assert.NotContains(t, entry.Message, "changed to")
+			assert.False(t, hasUnresolvedTemplateMarker(entry.Message))
+
+			entry = trapEntryFromPDU("local", &TrapPDU{
+				OID:      tc.oid,
+				SourceIP: "198.51.100.10",
+				PeerIP:   "198.51.100.10",
+				Version:  SnmpVersionV2c,
+				PduType:  PduTypeTrap,
+			}, td, 1000000, 1000)
+			entry.DeviceHostname = "lab-switch"
+
+			renderTrapEntryTemplates(entry, td)
+
+			assert.Contains(t, entry.Message, tc.stateWord)
+			assert.Contains(t, entry.Message, "lab-switch")
+			assert.NotContains(t, entry.Message, "ifOperStatus")
+			assert.NotContains(t, entry.Message, "ifAdminStatus")
+			assert.NotContains(t, entry.Message, "changed to")
 			assert.False(t, hasUnresolvedTemplateMarker(entry.Message))
 		})
 	}
@@ -1966,4 +2080,21 @@ func writeProfileYAMLGzip(t *testing.T, dir, name, content string) {
 	_, err = zw.Write([]byte(content))
 	require.NoError(t, err)
 	require.NoError(t, zw.Close())
+}
+
+func countProfileTrapEntries(t *testing.T, path string) int {
+	t.Helper()
+	file, err := os.Open(path)
+	require.NoError(t, err)
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	count := 0
+	for scanner.Scan() {
+		if strings.HasPrefix(scanner.Text(), "  - oid:") {
+			count++
+		}
+	}
+	require.NoError(t, scanner.Err())
+	return count
 }
