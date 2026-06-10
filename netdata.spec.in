@@ -689,6 +689,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 # eBPF belongs to a different sub-package
 %if %{_have_ebpf}
 %exclude %{_libexecdir}/%{name}/plugins.d/ebpf.plugin
+%exclude %{_libexecdir}/%{name}/plugins.d/ebpf-go.plugin
 %exclude %{_libdir}/%{name}/conf.d/ebpf.d.conf
 %exclude %{_libdir}/%{name}/conf.d/ebpf.d
 %exclude %{_libexecdir}/%{name}/plugins.d/ebpf.d
@@ -723,7 +724,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %exclude %{_libdir}/%{name}/conf.d/otel-signal-viewer.yaml
 
 # xenstat belongs to a different sub-package
+%if %{_have_xenstat}
 %exclude %{_libexecdir}/%{name}/plugins.d/xenstat.plugin
+%endif
 
 # IBM plugin belongs to a different sub-package
 %if %{_have_ibm_plugin}
@@ -856,6 +859,7 @@ Requires(pre): %{name}-user >= %{version}
 %files plugin-ebpf
 %defattr(4750,root,netdata,4750)
 %{_libexecdir}/%{name}/plugins.d/ebpf.plugin
+%{_libexecdir}/%{name}/plugins.d/ebpf-go.plugin
 %defattr(0644,root,netdata,0755)
 %{_libdir}/%{name}/conf.d/ebpf.d.conf
 %{_libdir}/%{name}/conf.d/ebpf.d

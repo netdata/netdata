@@ -1,0 +1,244 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestParseLegacyConfigKeys(t *testing.T) {
+	// Keys present in the stock cachestat.conf (old C plugin format) must be
+	// recognised and mapped to Go-plugin equivalents.
+	tests := map[string]struct {
+		content      string
+		wantFlavor   string // "" means "don't care / unchanged"
+		wantPidLevel int    // -1 means "not set"
+	}{
+		"ebpf type format legacy forces tracing flavor": {
+			content:      "[global]\nebpf type format = legacy\n",
+			wantFlavor:   "tracing",
+			wantPidLevel: -1,
+		},
+		"ebpf type format auto leaves flavor unchanged": {
+			content:      "[global]\nebpf type format = auto\n",
+			wantFlavor:   "",
+			wantPidLevel: -1,
+		},
+		"ebpf type format co-re leaves flavor unchanged": {
+			content:      "[global]\nebpf type format = co-re\n",
+			wantFlavor:   "",
+			wantPidLevel: -1,
+		},
+		"ebpf co-re tracing probe forces tracing flavor": {
+			content:      "[global]\nebpf co-re tracing = probe\n",
+			wantFlavor:   "tracing",
+			wantPidLevel: -1,
+		},
+		"ebpf co-re tracing trampoline leaves flavor unchanged": {
+			content:      "[global]\nebpf co-re tracing = trampoline\n",
+			wantFlavor:   "",
+			wantPidLevel: -1,
+		},
+		"collect pid real parent sets level 0": {
+			content:      "[global]\ncollect pid = real parent\n",
+			wantFlavor:   "",
+			wantPidLevel: 0,
+		},
+		"collect pid parent sets level 1": {
+			content:      "[global]\ncollect pid = parent\n",
+			wantFlavor:   "",
+			wantPidLevel: 1,
+		},
+		"collect pid all sets level 2": {
+			content:      "[global]\ncollect pid = all\n",
+			wantFlavor:   "",
+			wantPidLevel: 2,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "cachestat.conf")
+			if err := os.WriteFile(path, []byte(tc.content), 0o600); err != nil {
+				t.Fatalf("write config: %v", err)
+			}
+
+			cfg, ok, err := parseCachestatConfigFile(path)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+			if !ok {
+				t.Fatal("expected file to be detected as found")
+			}
+
+			if tc.wantFlavor != "" {
+				if cfg.ObjectFlavor == nil || *cfg.ObjectFlavor != tc.wantFlavor {
+					t.Fatalf("ObjectFlavor = %v, want %q", cfg.ObjectFlavor, tc.wantFlavor)
+				}
+			} else if cfg.ObjectFlavor != nil {
+				t.Fatalf("ObjectFlavor should be nil, got %q", *cfg.ObjectFlavor)
+			}
+
+			if tc.wantPidLevel >= 0 {
+				if cfg.CollectPidLevel == nil || *cfg.CollectPidLevel != tc.wantPidLevel {
+					t.Fatalf("CollectPidLevel = %v, want %d", cfg.CollectPidLevel, tc.wantPidLevel)
+				}
+			} else if cfg.CollectPidLevel != nil {
+				t.Fatalf("CollectPidLevel should be nil, got %d", *cfg.CollectPidLevel)
+			}
+		})
+	}
+}
+
+func TestApplyPidTableSizeClamp(t *testing.T) {
+	tests := map[string]struct {
+		in   uint32
+		want uint32
+	}{
+		"zero stays zero":       {0, 0},
+		"small value unchanged": {100, 100},
+		"at cap unchanged":      {cachestatMaxPIDTableSize, cachestatMaxPIDTableSize},
+		"above cap clamped":     {cachestatMaxPIDTableSize + 1, cachestatMaxPIDTableSize},
+		"far above cap clamped": {4194304, cachestatMaxPIDTableSize},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := applyPidTableSizeClamp(tc.in)
+			if got != tc.want {
+				t.Fatalf("applyPidTableSizeClamp(%d) = %d, want %d", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseCachestatConfigFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ebpf.d.conf")
+
+	content := []byte(`
+[global]
+    update every = 17
+    pid table size = 4096
+    maps per core = no
+    btf path = /tmp/btf
+    lifetime = 123
+    ebpf object flavor = arena
+`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, ok, err := parseCachestatConfigFile(path)
+	if err != nil {
+		t.Fatalf("parse config: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected config to be detected")
+	}
+
+	if cfg.UpdateEvery == nil || *cfg.UpdateEvery != 17 {
+		t.Fatalf("unexpected update every: %#v", cfg.UpdateEvery)
+	}
+	if cfg.PidTable == nil || *cfg.PidTable != 4096 {
+		t.Fatalf("unexpected pid table size: %#v", cfg.PidTable)
+	}
+	if cfg.MapsPerCore == nil || *cfg.MapsPerCore {
+		t.Fatalf("unexpected maps per core: %#v", cfg.MapsPerCore)
+	}
+	if cfg.BTFPath == nil || *cfg.BTFPath != "/tmp/btf" {
+		t.Fatalf("unexpected btf path: %#v", cfg.BTFPath)
+	}
+	if cfg.Lifetime == nil || *cfg.Lifetime != 123 {
+		t.Fatalf("unexpected lifetime: %#v", cfg.Lifetime)
+	}
+	if cfg.ObjectFlavor == nil || *cfg.ObjectFlavor != "arena" {
+		t.Fatalf("unexpected object flavor: %#v", cfg.ObjectFlavor)
+	}
+}
+
+func TestLoadCachestatConfigFilesPrefersUserAndLegacyOverlay(t *testing.T) {
+	userRoot := t.TempDir()
+	stockRoot := t.TempDir()
+
+	t.Setenv("NETDATA_USER_CONFIG_DIR", userRoot)
+	t.Setenv("NETDATA_STOCK_CONFIG_DIR", stockRoot)
+
+	for _, rel := range []string{"ebpf.d", filepath.Join("ebpf.d", "cachestat.conf")} {
+		if err := os.MkdirAll(filepath.Join(userRoot, filepath.Dir(rel)), 0o755); err != nil {
+			t.Fatalf("mkdir user %q: %v", rel, err)
+		}
+		if err := os.MkdirAll(filepath.Join(stockRoot, filepath.Dir(rel)), 0o755); err != nil {
+			t.Fatalf("mkdir stock %q: %v", rel, err)
+		}
+	}
+
+	write := func(root, rel, content string) {
+		path := filepath.Join(root, rel)
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+
+	write(stockRoot, "ebpf.d.conf", `
+[global]
+    update every = 11
+    pid table size = 2048
+    maps per core = yes
+    btf path = /stock/btf
+    ebpf object flavor = tracing
+`)
+	write(stockRoot, filepath.Join("ebpf.d", "cachestat.conf"), `
+[global]
+    pid table size = 4096
+`)
+	write(userRoot, "ebpf.d.conf", `
+[global]
+    update every = 23
+`)
+	write(userRoot, filepath.Join("ebpf.d", "cachestat.conf"), `
+[global]
+    maps per core = no
+    ebpf object flavor = buffer
+`)
+
+	cfg, found, err := loadCachestatConfigFiles()
+	if err != nil {
+		t.Fatalf("load config files: %v", err)
+	}
+	if !found {
+		t.Fatal("expected config files to be detected")
+	}
+
+	if cfg.UpdateEvery == nil || *cfg.UpdateEvery != 23 {
+		t.Fatalf("unexpected update every: %#v", cfg.UpdateEvery)
+	}
+	if cfg.PidTable == nil || *cfg.PidTable != 4096 {
+		t.Fatalf("unexpected pid table size: %#v", cfg.PidTable)
+	}
+	if cfg.MapsPerCore == nil || *cfg.MapsPerCore {
+		t.Fatalf("unexpected maps per core: %#v", cfg.MapsPerCore)
+	}
+	if cfg.BTFPath == nil || *cfg.BTFPath != "/stock/btf" {
+		t.Fatalf("unexpected btf path: %#v", cfg.BTFPath)
+	}
+	if cfg.ObjectFlavor == nil || *cfg.ObjectFlavor != "buffer" {
+		t.Fatalf("unexpected object flavor: %#v", cfg.ObjectFlavor)
+	}
+}
+
+func TestLoadCachestatConfigFilesMissingReturnsNotFound(t *testing.T) {
+	t.Setenv("NETDATA_USER_CONFIG_DIR", t.TempDir())
+	t.Setenv("NETDATA_STOCK_CONFIG_DIR", t.TempDir())
+
+	cfg, found, err := loadCachestatConfigFiles()
+	if err != nil {
+		t.Fatalf("load config files: %v", err)
+	}
+	if found {
+		t.Fatal("expected no config files to be found")
+	}
+	if cfg.UpdateEvery != nil || cfg.PidTable != nil || cfg.MapsPerCore != nil || cfg.BTFPath != nil || cfg.Lifetime != nil || cfg.ObjectFlavor != nil {
+		t.Fatalf("expected empty config, got %#v", cfg)
+	}
+}

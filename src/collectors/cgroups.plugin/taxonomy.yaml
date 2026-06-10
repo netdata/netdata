@@ -1,0 +1,5 @@
+taxonomy_version: 1
+plugin_name: cgroups.plugin
+module_name: /sys/fs/cgroup
+taxonomy_optout:
+  reason: Collector taxonomy is not yet authored for the cgroups.plugin cachestat charts that mirror the legacy ebpf.plugin contract.
