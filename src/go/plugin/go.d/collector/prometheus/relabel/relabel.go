@@ -109,7 +109,7 @@ func (d DropInfo) Dropped() bool { return d.Reason != DropReasonNone }
 type Config struct {
 	SourceLabels []string                     `yaml:"source_labels,flow,omitempty" json:"source_labels,omitempty"`
 	Separator    string                       `yaml:"separator,omitempty" json:"separator,omitempty"`
-	Regex        Regexp                       `yaml:"regex,omitempty" json:"regex,omitempty"`
+	Regex        Regexp                       `yaml:"regex,omitempty" json:"regex"`
 	Modulus      uint64                       `yaml:"modulus,omitempty" json:"modulus,omitempty"`
 	TargetLabel  string                       `yaml:"target_label,omitempty" json:"target_label,omitempty"`
 	Replacement  string                       `yaml:"replacement,omitempty" json:"replacement,omitempty"`
@@ -205,7 +205,7 @@ func (c *Config) applyRaw(sourceLabels *[]string, separator *string, regex *Rege
 type configShadow struct {
 	SourceLabels *[]string                    `yaml:"source_labels,flow,omitempty" json:"source_labels,omitempty"`
 	Separator    *string                      `yaml:"separator,omitempty" json:"separator,omitempty"`
-	Regex        Regexp                       `yaml:"regex,omitempty" json:"regex,omitempty"`
+	Regex        Regexp                       `yaml:"regex,omitempty" json:"regex"`
 	Modulus      uint64                       `yaml:"modulus,omitempty" json:"modulus,omitempty"`
 	TargetLabel  string                       `yaml:"target_label,omitempty" json:"target_label,omitempty"`
 	Replacement  *string                      `yaml:"replacement,omitempty" json:"replacement,omitempty"`
