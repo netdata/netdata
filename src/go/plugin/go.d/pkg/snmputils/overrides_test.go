@@ -27,7 +27,6 @@ func TestOverrides_OnUnknownOID(t *testing.T) {
 		"create_from_override_with_normalization": {
 			oid: "1.3.6.1.4.1.99999.42", // not in base DB
 			overrides: &overrides{
-				EnterpriseNumbers: enterpriseNumbersOverrides{OrgToVendor: map[string]string{}},
 				SysObjectIDs: sysObjectIDOverrides{
 					OIDOverrides: map[string]sysObjectIDOverride{
 						"1.3.6.1.4.1.99999.42": {
@@ -58,38 +57,65 @@ func TestOverrides_OnUnknownOID(t *testing.T) {
 	}
 }
 
-func TestOrgToVendorMapping(t *testing.T) {
-	cases := map[string]struct {
-		oid string
-	}{
-		"maps_org_to_vendor_when_override_present": {oid: "1.3.6.1.4.1.2505.3"},
-	}
+func TestPenToVendorMappingDoesNotRequireRegistry(t *testing.T) {
+	withEnterpriseNumbersFile(t, filepath.Join(t.TempDir(), "missing.txt"))
+	defer withOverrides(t, &overrides{
+		EnterpriseNumbers: enterpriseNumbersOverrides{
+			PenToVendor: map[string]string{
+				"2505": "CanonicalVendor",
+			},
+		},
+	})()
 
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			rawOrg := lookupEnterpriseNumber(tc.oid)
-			if rawOrg == "" {
-				t.Skip("no organization resolved for test OID; skipping")
-			}
+	si := &SysInfo{SysObjectID: "1.3.6.1.4.1.2505.3"}
+	updateMetadata(si)
 
-			defer withOverrides(t, &overrides{
-				EnterpriseNumbers: enterpriseNumbersOverrides{
-					OrgToVendor: map[string]string{
-						rawOrg: "CanonicalVendor",
-					},
-				},
-				SysObjectIDs: sysObjectIDOverrides{
-					OIDOverrides: map[string]sysObjectIDOverride{},
-					CategoryMap:  map[string]string{},
-				},
-			})()
+	assert.Equal(t, "CanonicalVendor", si.Vendor, "vendor mapping via pen_to_vendor failed")
+}
 
-			si := &SysInfo{SysObjectID: tc.oid}
-			updateMetadata(si)
+func TestPenToVendorMappingTakesPrecedenceOverOrgToVendor(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "iana-enterprise-numbers.txt")
+	require.NoError(t, os.WriteFile(path, []byte(`
+424242
+  Example Devices Inc.
+`), 0644))
+	withEnterpriseNumbersFile(t, path)
+	defer withOverrides(t, &overrides{
+		EnterpriseNumbers: enterpriseNumbersOverrides{
+			PenToVendor: map[string]string{
+				"424242": "VendorByPEN",
+			},
+			OrgToVendor: map[string]string{
+				"Example Devices Inc.": "VendorByOrg",
+			},
+		},
+	})()
 
-			assert.Equal(t, "CanonicalVendor", si.Vendor, "vendor mapping via org_to_vendor failed")
-		})
-	}
+	si := &SysInfo{SysObjectID: "1.3.6.1.4.1.424242.3"}
+	updateMetadata(si)
+
+	assert.Equal(t, "VendorByPEN", si.Vendor)
+}
+
+func TestOrgToVendorMappingFallback(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "iana-enterprise-numbers.txt")
+	require.NoError(t, os.WriteFile(path, []byte(`
+424242
+  Example Devices Inc.
+`), 0644))
+	withEnterpriseNumbersFile(t, path)
+	defer withOverrides(t, &overrides{
+		EnterpriseNumbers: enterpriseNumbersOverrides{
+			OrgToVendor: map[string]string{
+				"Example Devices Inc.": "VendorByOrg",
+			},
+		},
+	})()
+
+	si := &SysInfo{SysObjectID: "1.3.6.1.4.1.424242.3"}
+	updateMetadata(si)
+
+	assert.Equal(t, "VendorByOrg", si.Vendor)
 }
 
 func TestLookupEnterpriseNumber(t *testing.T) {
@@ -235,13 +261,14 @@ func TestAllMetadataYAMLsLoadAndMerge(t *testing.T) {
 	require.NotNil(t, agg, "aggregate overrides must not be nil")
 }
 
-func TestShippedOrgToVendorOverridesCoverCurrentPENRenames(t *testing.T) {
+func TestShippedPenToVendorOverridesCoverCurrentPENRenames(t *testing.T) {
 	dir := getSnmpMetadataDir()
 	require.NotEmpty(t, dir, "metadata dir must resolve in tests")
 
 	agg, err := loadOverridesFromDir(dir)
 	require.NoError(t, err)
-	require.Equal(t, "Infinera", agg.EnterpriseNumbers.OrgToVendor["Nokia (formerly 'Infinera Corp.')"])
+	require.Equal(t, "Infinera", agg.EnterpriseNumbers.PenToVendor["21296"])
+	require.Equal(t, "NEC", agg.EnterpriseNumbers.PenToVendor["48079"])
 
 	withEnterpriseNumbersFile(t, enterpriseNumbersFilePath())
 	rawOrg := lookupEnterpriseNumber("1.3.6.1.4.1.21296.1")

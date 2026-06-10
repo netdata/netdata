@@ -106,6 +106,7 @@ func updateMetadata(si *SysInfo) {
 		return
 	}
 
+	pen, _ := enterpriseNumberFromSysObject(si.SysObjectID)
 	rawOrg := lookupEnterpriseNumber(si.SysObjectID)
 
 	var finalCategory string
@@ -128,8 +129,10 @@ func updateMetadata(si *SysInfo) {
 			finalCategory = normalized
 		}
 
-		// Map the raw organization name to a standardized vendor name.
-		if vendor, found := overridesData.EnterpriseNumbers.OrgToVendor[rawOrg]; found {
+		// PEN-keyed overrides are stable across IANA organization-name changes.
+		if vendor, found := overridesData.EnterpriseNumbers.PenToVendor[pen]; found {
+			finalVendor = vendor
+		} else if vendor, found := overridesData.EnterpriseNumbers.OrgToVendor[rawOrg]; found {
 			finalVendor = vendor
 		}
 	}
@@ -153,12 +156,7 @@ var (
 )
 
 func lookupEnterpriseNumber(sysObject string) string {
-	const rootOidIanaPEN = "1.3.6.1.4.1"
-	v, ok := strings.CutPrefix(sysObject, rootOidIanaPEN+".") // .1.3.6.1.4.1.14988.1 => 14988.1
-	if !ok {
-		return ""
-	}
-	num, _, ok := strings.Cut(v, ".")
+	num, ok := enterpriseNumberFromSysObject(sysObject)
 	if !ok {
 		return ""
 	}
@@ -168,6 +166,19 @@ func lookupEnterpriseNumber(sysObject string) string {
 		return ""
 	}
 	return mapping[num]
+}
+
+func enterpriseNumberFromSysObject(sysObject string) (string, bool) {
+	const rootOidIanaPEN = "1.3.6.1.4.1"
+	v, ok := strings.CutPrefix(sysObject, rootOidIanaPEN+".") // .1.3.6.1.4.1.14988.1 => 14988.1
+	if !ok {
+		return "", false
+	}
+	num, _, ok := strings.Cut(v, ".")
+	if !ok {
+		return "", false
+	}
+	return num, true
 }
 
 func enterpriseNumbersMapping() (map[string]string, error) {
