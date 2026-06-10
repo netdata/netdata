@@ -117,6 +117,9 @@ Every field is optional except where an action requires it; `action` defaults to
 | `lowercase` | Set `target_label` to the lowercased joined input. See [example](#normalize-label-case).                                                                                                      |
 | `uppercase` | Set `target_label` to the uppercased joined input. See [example](#normalize-label-case).                                                                                                      |
 
+> The label-name actions `labelmap`, `labeldrop`, and `labelkeep` act on labels only — they never touch the metric name
+> (`__name__`). To rename a metric, use a `replace` rule with `target_label: __name__`.
+
 ## How it works
 
 1. For each scraped metric, every block whose `match` matches the metric's **current** name runs, in order.
@@ -227,12 +230,12 @@ Strip a metric down to a known set of labels, removing everything else:
 relabeling:
   - match: 'mysql_*'
     metric_relabel_configs:
-      - regex: '__name__|instance|job'
+      - regex: 'instance|job'
         action: labelkeep
 ```
 
-`labelkeep` removes every label whose name is **not** in the regex. Always include `__name__` — without it the metric
-name itself is stripped, which leaves the metric nameless and the sample is dropped.
+`labelkeep` removes every label whose name is **not** in the regex. The metric name (`__name__`) is always kept, so you
+do not list it.
 
 ### Normalize label case
 
@@ -262,8 +265,9 @@ relabeling:
         replacement: 'app_$1'
 ```
 
-A label `region` becomes `app_region`. `labelmap` matches against label **names** and writes the new name from
-`replacement`; the original labels remain, so add a [`labeldrop`](#remove-a-high-cardinality-label) rule afterwards if you want them removed.
+A label `region` becomes `app_region`; the metric name (`__name__`) is left untouched. `labelmap` matches against label
+**names** and writes the new name from `replacement`; the original labels remain, so add a [`labeldrop`](#remove-a-high-cardinality-label)
+rule afterwards if you want them removed.
 
 ### Scope rules to a subset of metrics
 
