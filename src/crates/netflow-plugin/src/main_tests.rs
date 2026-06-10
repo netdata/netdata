@@ -216,17 +216,23 @@ async fn e2e_timestamp_source_first_switched_is_persisted_as_source_timestamp() 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_rebuild_with_tiers_ahead_of_raw_adds_no_duplicate_rows() {
     let (cfg, _tmp) = offline_journal_cfg();
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("system time")
-        .as_micros() as u64;
     let minute = 60_000_000_u64;
-    let t1 = now - 10 * minute;
-    let t2 = now - 9 * minute;
+    // Anchor to a CLOSED 5m boundary ~20min in the past: deterministic 1m and
+    // 5m buckets, and safely inside the rebuild raw-file window (the rebuild
+    // only considers raw files overlapping roughly the last hour — flows
+    // older than that are not rebuilt at all, which rules out using a closed
+    // 1h bucket here; the 1h tier shares the identical per-tier cutoff loop).
+    let base = closed_5m_base();
+    let t1 = base + minute; // 1m bucket A, 5m bucket P
+    let t2 = base + 2 * minute; // 1m bucket B, same 5m bucket P
+    let t3 = base + 3 * minute; // 1m bucket C (new), still 5m bucket P
 
+    // Flows are keyed by PROTOCOL (a rollup dimension); BYTES = 100 + protocol.
     write_raw_flows(&cfg, 0x11, 1, &[(t1, 1), (t1, 2), (t1, 3), (t2, 1), (t2, 2)]);
 
     let minute_1_dir = cfg.journal.minute_1_tier_dir();
+    let minute_5_dir = cfg.journal.minute_5_tier_dir();
+
     rebuild_tiers_with_fresh_service(&cfg).await;
     let after_first = timestamp_counts(&journal_source_realtime_timestamps(&minute_1_dir));
     assert_eq!(
@@ -235,11 +241,30 @@ async fn e2e_rebuild_with_tiers_ahead_of_raw_adds_no_duplicate_rows() {
         "rebuild should materialize the two closed 1m buckets: {after_first:?}"
     );
     assert_eq!(after_first.values().sum::<usize>(), 5, "{after_first:?}");
+    // Metric content, not just row counts: per-1m-bucket BYTES sums.
+    let bytes_first = bucket_bytes_sums(&minute_1_dir);
+    assert_eq!(
+        bytes_first.values().copied().collect::<Vec<_>>(),
+        vec![101 + 102 + 103, 101 + 102],
+        "1m tier BYTES must aggregate the raw flows: {bytes_first:?}"
+    );
+    // The same flows roll into one 5m bucket: 3 protocol rows, metrics merged.
+    let bytes_5m_first = bucket_bytes_sums(&minute_5_dir);
+    assert_eq!(
+        timestamp_counts(&journal_source_realtime_timestamps(&minute_5_dir))
+            .values()
+            .copied()
+            .collect::<Vec<_>>(),
+        vec![3]
+    );
+    assert_eq!(
+        bytes_5m_first.values().copied().collect::<Vec<_>>(),
+        vec![2 * 101 + 2 * 102 + 103],
+        "5m tier must merge per-protocol metrics across the bucket"
+    );
 
-    // Raw grows past the tiers (new flows after the covered window). The
-    // cutoff must skip everything the tiers already cover and add ONLY the
-    // new bucket.
-    let t3 = now - 8 * minute;
+    // Raw grows past the 1m tier (t3 opens a new 1m bucket) while staying
+    // INSIDE the 5m bucket the 5m tier already flushed.
     write_raw_flows(&cfg, 0x22, 100, &[(t3, 1), (t3, 2)]);
     rebuild_tiers_with_fresh_service(&cfg).await;
     let after_second = timestamp_counts(&journal_source_realtime_timestamps(&minute_1_dir));
@@ -253,17 +278,35 @@ async fn e2e_rebuild_with_tiers_ahead_of_raw_adds_no_duplicate_rows() {
     assert_eq!(
         after_second.len(),
         3,
-        "the new bucket must be materialized exactly once: {after_second:?}"
+        "the new 1m bucket must be materialized exactly once: {after_second:?}"
+    );
+    let bytes_second = bucket_bytes_sums(&minute_1_dir);
+    assert_eq!(
+        bytes_second.values().copied().collect::<Vec<_>>(),
+        vec![101 + 102 + 103, 101 + 102, 101 + 102],
+        "covered buckets keep their metrics; only the new bucket is added: {bytes_second:?}"
+    );
+    // Per-tier cutoff semantics (characterized on purpose): t3 falls INSIDE
+    // the 5m bucket the 5m tier already flushed, so its flows are never
+    // re-derived into that tier — the crash window loses late arrivals to an
+    // already-covered bucket. The 1m tier picked them up because its cutoff
+    // was earlier. The 1h tier shares this exact mechanism.
+    assert_eq!(
+        bucket_bytes_sums(&minute_5_dir),
+        bytes_5m_first,
+        "5m tier must not re-derive flows inside its already-covered bucket"
     );
 
     // Strict rollups-ahead-of-raw: the tiers now cover everything raw holds.
-    // A further rebuild must be a no-op.
+    // A further rebuild must be a no-op on all tiers.
     rebuild_tiers_with_fresh_service(&cfg).await;
-    let after_third = timestamp_counts(&journal_source_realtime_timestamps(&minute_1_dir));
     assert_eq!(
-        after_second, after_third,
+        after_second,
+        timestamp_counts(&journal_source_realtime_timestamps(&minute_1_dir)),
         "rebuild with tiers fully ahead of raw must be a no-op (cutoff must skip all raw rows)"
     );
+    assert_eq!(bytes_second, bucket_bytes_sums(&minute_1_dir));
+    assert_eq!(bucket_bytes_sums(&minute_5_dir), bytes_5m_first);
 }
 
 /// Characterization: a torn tail on the newest tier and raw journal files
@@ -272,26 +315,61 @@ async fn e2e_rebuild_with_tiers_ahead_of_raw_adds_no_duplicate_rows() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_rebuild_tolerates_torn_tier_and_raw_tails() {
     let (cfg, _tmp) = offline_journal_cfg();
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("system time")
-        .as_micros() as u64;
     let minute = 60_000_000_u64;
-    write_raw_flows(&cfg, 0x11, 1, &[(now - 10 * minute, 1), (now - 9 * minute, 2)]);
+    let base = closed_5m_base();
+    // Two 1m buckets with two flows each.
+    write_raw_flows(
+        &cfg,
+        0x11,
+        1,
+        &[
+            (base + minute, 1),
+            (base + minute, 2),
+            (base + 2 * minute, 1),
+            (base + 2 * minute, 2),
+        ],
+    );
 
     // Materialize tier files, then tear the newest tier and raw tails.
     rebuild_tiers_with_fresh_service(&cfg).await;
-    assert!(
-        tier_file_count(&cfg.journal.minute_1_tier_dir()) > 0,
-        "rebuild should have produced 1m tier files"
+    let minute_1_dir = cfg.journal.minute_1_tier_dir();
+    let intact = timestamp_counts(&journal_source_realtime_timestamps(&minute_1_dir));
+    assert_eq!(
+        intact.values().copied().collect::<Vec<_>>(),
+        vec![2, 2],
+        "two 1m buckets with two protocol rows each: {intact:?}"
     );
-    truncate_newest_journal(&cfg.journal.minute_1_tier_dir(), 13);
-    truncate_newest_journal(&cfg.journal.raw_tier_dir(), 13);
+    truncate_newest_journal_mid_last_entry(&minute_1_dir);
+    truncate_newest_journal_mid_last_entry(&cfg.journal.raw_tier_dir());
+
+    // The tear must be visible to readers: the torn last tier entry is gone.
+    let torn = readable_timestamp_counts(&minute_1_dir);
+    assert_eq!(
+        torn.values().sum::<usize>(),
+        3,
+        "truncation must destroy exactly the last tier row: {torn:?}"
+    );
 
     // Two consecutive restarts: the first sees the torn tails, the second sees
     // whatever the first left behind. Both must succeed.
     rebuild_tiers_with_fresh_service(&cfg).await;
     rebuild_tiers_with_fresh_service(&cfg).await;
+
+    // Recovery semantics (characterized, not aspirational): a surviving row in
+    // the torn row's bucket advances the cutoff over that bucket, so the torn
+    // tier row is NOT re-derived from raw — the crash window loses that one
+    // row, nothing else. Both restarts converge on the same stable state.
+    let recovered = readable_timestamp_counts(&minute_1_dir);
+    assert_eq!(
+        recovered.values().sum::<usize>(),
+        3,
+        "post-recovery tier rows must be stable, with only the torn row lost: {recovered:?}"
+    );
+    assert_eq!(
+        recovered.len(),
+        2,
+        "both 1m buckets must still be present: {recovered:?}"
+    );
 }
 
 /// A journal config rooted in a fresh temp dir, with no UDP listener involved.
@@ -302,15 +380,75 @@ fn offline_journal_cfg() -> (plugin_config::PluginConfig, TempDir) {
     (cfg, tmp)
 }
 
+/// Start of a fully closed 5m bucket ~20-25 minutes in the past: 1m and 5m
+/// buckets derived from it are deterministically closed, and the timestamps
+/// stay inside the rebuild's ~1h raw-file window (a fully closed 1h bucket
+/// would necessarily fall outside it).
+fn closed_5m_base() -> u64 {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system time")
+        .as_micros() as u64;
+    let five_minutes = 300_000_000_u64;
+    bucket_start_usec(now, five_minutes) - 4 * five_minutes
+}
+
+/// Per-bucket sums of the BYTES field across all rows of a tier directory,
+/// keyed by `_SOURCE_REALTIME_TIMESTAMP`.
+fn bucket_bytes_sums(path: &Path) -> BTreeMap<u64, u64> {
+    let mut sums = BTreeMap::new();
+    for file_path in journal_files(path) {
+        let repo_file = RepoFile::from_path(&file_path).expect("parse journal repository metadata");
+        let journal =
+            JournalFile::<Mmap>::open(&repo_file, 8 * 1024 * 1024).expect("open journal file");
+        let mut reader = JournalReader::default();
+        reader.set_location(Location::Head);
+        let mut decompress_buf = Vec::new();
+        loop {
+            if !reader
+                .step(&journal, Direction::Forward)
+                .expect("step journal reader")
+            {
+                break;
+            }
+            let mut data_offsets = Vec::<NonZeroU64>::new();
+            reader
+                .entry_data_offsets(&journal, &mut data_offsets)
+                .expect("enumerate journal data offsets");
+            let mut ts: Option<u64> = None;
+            let mut bytes: Option<u64> = None;
+            for offset in data_offsets {
+                let guard = journal.data_ref(offset).expect("read data object");
+                let payload = if guard.is_compressed() {
+                    guard
+                        .decompress(&mut decompress_buf)
+                        .expect("decompress payload");
+                    decompress_buf.as_slice()
+                } else {
+                    guard.raw_payload()
+                };
+                if let Some(value) = payload.strip_prefix(b"_SOURCE_REALTIME_TIMESTAMP=") {
+                    ts = std::str::from_utf8(value).ok().and_then(|v| v.parse().ok());
+                } else if let Some(value) = payload.strip_prefix(b"BYTES=") {
+                    bytes = std::str::from_utf8(value).ok().and_then(|v| v.parse().ok());
+                }
+            }
+            if let (Some(ts), Some(bytes)) = (ts, bytes) {
+                *sums.entry(ts).or_insert(0_u64) += bytes;
+            }
+        }
+    }
+    sums
+}
+
 /// Write one synthetic ARCHIVED raw-tier journal file containing flows with
 /// explicit (historical) entry realtimes, so the tier buckets derived from
 /// them are already closed. The `Log` writer cannot back-date entries (its
 /// realtime clock enforces monotonicity from open time), so this uses the
 /// core `JournalWriter` directly — the same pattern as the query scan tests.
-/// Each flow is a distinct 10.0.0.0/24 source keyed by `src`. Addresses and
-/// ports are raw-only fields that do NOT survive into rollups, so the rollup
-/// row count per bucket is driven by PROTOCOL (= `src`), which is a rollup
-/// dimension.
+/// Each flow is keyed by `protocol_key`: addresses and ports are raw-only
+/// fields that do NOT survive into rollups, so PROTOCOL (a rollup dimension)
+/// is what drives distinct rollup rows; BYTES = 100 + protocol_key.
 fn write_raw_flows(
     cfg: &plugin_config::PluginConfig,
     seq_seed: u8,
@@ -350,16 +488,21 @@ fn write_raw_flows(
 
     let mut data = Vec::new();
     let mut refs = Vec::new();
-    for (index, &(ts_usec, src)) in flows.iter().enumerate() {
+    for (index, &(ts_usec, protocol_key)) in flows.iter().enumerate() {
         let record = crate::flow::FlowRecord {
             flow_version: "ipfix",
-            protocol: src,
-            src_port: 5000 + src as u16,
+            protocol: protocol_key,
+            src_port: 5000 + protocol_key as u16,
             dst_port: 53,
-            bytes: 100 + src as u64,
+            bytes: 100 + protocol_key as u64,
             packets: 1,
             flows: 1,
-            src_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 0, src))),
+            src_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(
+                10,
+                0,
+                0,
+                protocol_key,
+            ))),
             dst_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(192, 0, 2, 1))),
             ..Default::default()
         };
@@ -403,9 +546,67 @@ fn timestamp_counts(timestamps: &[u64]) -> BTreeMap<u64, usize> {
     counts
 }
 
-/// Truncate the most recently modified journal file in `dir` by `delta` bytes
-/// (deliberately non-8-aligned to land mid-entry).
-fn truncate_newest_journal(dir: &Path, delta: u64) {
+/// Like `journal_source_realtime_timestamps` + `timestamp_counts`, but stops
+/// at the first unreadable entry instead of panicking — the journald-style
+/// tolerant read needed to inspect a deliberately torn file (the low-level
+/// `JournalReader::step` surfaces a torn entry as an error and leaves the
+/// tolerance decision to the caller).
+fn readable_timestamp_counts(path: &Path) -> BTreeMap<u64, usize> {
+    let mut counts = BTreeMap::new();
+    for file_path in journal_files(path) {
+        let Some(repo_file) = RepoFile::from_path(&file_path) else {
+            continue;
+        };
+        let Ok(journal) = JournalFile::<Mmap>::open(&repo_file, 8 * 1024 * 1024) else {
+            continue;
+        };
+        let mut reader = JournalReader::default();
+        reader.set_location(Location::Head);
+        let mut decompress_buf = Vec::new();
+        loop {
+            match reader.step(&journal, Direction::Forward) {
+                Ok(true) => {}
+                Ok(false) | Err(_) => break,
+            }
+            let mut data_offsets = Vec::<NonZeroU64>::new();
+            if reader
+                .entry_data_offsets(&journal, &mut data_offsets)
+                .is_err()
+            {
+                break;
+            }
+            let mut ts: Option<u64> = None;
+            for offset in data_offsets {
+                let Ok(guard) = journal.data_ref(offset) else {
+                    break;
+                };
+                let payload = if guard.is_compressed() {
+                    if guard.decompress(&mut decompress_buf).is_err() {
+                        break;
+                    }
+                    decompress_buf.as_slice()
+                } else {
+                    guard.raw_payload()
+                };
+                if let Some(value) = payload.strip_prefix(b"_SOURCE_REALTIME_TIMESTAMP=") {
+                    ts = std::str::from_utf8(value).ok().and_then(|v| v.parse().ok());
+                }
+            }
+            if let Some(ts) = ts {
+                *counts.entry(ts).or_insert(0) += 1;
+            }
+        }
+    }
+    counts
+}
+
+/// Tear the most recently modified journal file in `dir` mid-way through its
+/// LAST entry object. Truncating a fixed number of trailing bytes is not
+/// enough: journal files grow in rounded size increments, so the tail of the
+/// file is unused arena padding and cutting it tears nothing. This locates the
+/// last entry's offset with the reader and truncates 13 (non-8-aligned) bytes
+/// past it, destroying exactly that entry.
+fn truncate_newest_journal_mid_last_entry(dir: &Path) {
     let newest = journal_files(dir)
         .into_iter()
         .max_by_key(|path| {
@@ -414,17 +615,29 @@ fn truncate_newest_journal(dir: &Path, delta: u64) {
                 .expect("journal file mtime")
         })
         .expect("tier directory should contain at least one journal file");
-    let len = fs::metadata(&newest).expect("journal metadata").len();
-    assert!(
-        len > delta,
-        "journal file {} too small to truncate",
-        newest.display()
-    );
+
+    let last_entry_offset = {
+        let repo_file = RepoFile::from_path(&newest).expect("parse journal repository metadata");
+        let journal =
+            JournalFile::<Mmap>::open(&repo_file, 8 * 1024 * 1024).expect("open journal file");
+        let mut reader = JournalReader::default();
+        reader.set_location(Location::Head);
+        let mut last = None;
+        while reader
+            .step(&journal, Direction::Forward)
+            .expect("step journal reader")
+        {
+            last = Some(reader.get_entry_offset().expect("entry offset"));
+        }
+        last.expect("journal file should contain at least one entry").get()
+    };
+
     let file = fs::OpenOptions::new()
         .write(true)
         .open(&newest)
         .expect("open journal for truncation");
-    file.set_len(len - delta).expect("truncate journal tail");
+    file.set_len(last_entry_offset + 13)
+        .expect("truncate journal mid last entry");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
