@@ -198,6 +198,7 @@ BuildRequires: ninja
 BuildRequires: pkgconfig
 BuildRequires: curl
 BuildRequires: findutils
+BuildRequires: zstd
 BuildRequires: pkgconfig(zlib)
 BuildRequires: pkgconfig(uuid)
 BuildRequires: pkgconfig(libuv)

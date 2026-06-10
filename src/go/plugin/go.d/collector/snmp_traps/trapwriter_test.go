@@ -6,6 +6,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -134,4 +135,45 @@ func TestFanoutTrapWriterForwardsBinaryEncodedFieldsFromPrimary(t *testing.T) {
 	binaryEncoded, ok := writer.(interface{ BinaryEncodedFields() uint64 })
 	require.True(t, ok)
 	assert.Equal(t, uint64(7), binaryEncoded.BinaryEncodedFields())
+}
+
+func TestJournalTrapWriterConcurrentWriteCloseDoesNotPanic(t *testing.T) {
+	for attempt := 0; attempt < 50; attempt++ {
+		writer := newJournalTrapWriter(nil, 2)
+		start := make(chan struct{})
+		done := make(chan struct{})
+
+		var wg sync.WaitGroup
+		for i := 0; i < 8; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				for {
+					err := writer.Write(&TrapEntry{JobName: "local", Message: "trap"})
+					if errors.Is(err, errWriterClosed) {
+						return
+					}
+					if err != nil && !errors.Is(err, errQueueFull) {
+						return
+					}
+				}
+			}()
+		}
+
+		close(start)
+		time.Sleep(time.Millisecond)
+		require.NoError(t, writer.Close())
+
+		go func() {
+			wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Fatal("writer goroutines did not stop after Close")
+		}
+	}
 }

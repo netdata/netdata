@@ -406,7 +406,7 @@ func appendFingerprintValue(buf []byte, val any) []byte {
 		buf = appendFingerprintPart(buf, "bool")
 		buf = appendFingerprintBool(buf, v)
 	case []byte:
-		buf = appendFingerprintPart(buf, "string")
+		buf = appendFingerprintPart(buf, "bytes")
 		buf = appendFingerprintHex(buf, v)
 	default:
 		buf = appendFingerprintPart(buf, "other")

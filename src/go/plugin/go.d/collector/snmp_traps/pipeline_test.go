@@ -454,6 +454,22 @@ func TestCollectorHandlePacketDecodeErrorNormalizesIPv4MappedSource(t *testing.T
 	}
 }
 
+func TestCollectorHandlePacketDropsWhenAllowlistCannotDetermineSource(t *testing.T) {
+	const jobName = "test-allowlist-missing-source"
+	writer := &mockTrapWriter{}
+	c := newTestV2Collector(jobName, writer, []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, []string{"public"})
+	metrics := withCleanJobMetrics(t, jobName)
+
+	c.handlePacket([]byte{0x30, 0x00}, nil, nil, nil)
+
+	if len(writer.entries) != 0 {
+		t.Fatalf("written entries = %d, want 0", len(writer.entries))
+	}
+	if got := atomic.LoadUint64(&metrics.errors.droppedAllowlist); got != 1 {
+		t.Fatalf("dropped_allowlist = %d, want 1", got)
+	}
+}
+
 func TestCollectorHandlePacketDropsDisallowedCommunity(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	writer := &mockTrapWriter{}
@@ -922,6 +938,16 @@ func TestAllowlistDefaultIncludesIPv6(t *testing.T) {
 	}
 }
 
+func TestPacketSourceAddrFallsBackToPeerIP(t *testing.T) {
+	addr, ok := packetSourceAddr(net.ParseIP("::ffff:10.1.2.3"), nil)
+	if !ok {
+		t.Fatal("expected source address from peerIP")
+	}
+	if got := addr.String(); got != "10.1.2.3" {
+		t.Fatalf("source addr = %q, want 10.1.2.3", got)
+	}
+}
+
 func TestAllowlistCommunity(t *testing.T) {
 	al := NewAllowlist(nil, []string{"public", "private"})
 
@@ -992,6 +1018,12 @@ func TestRateLimiterEvictsOldestTrackedSourceAtCapacity(t *testing.T) {
 	if allowed, _ := rl.Allow(second); !allowed {
 		t.Fatal("expected second source to be allowed")
 	}
+
+	now := time.Now()
+	rl.mu.Lock()
+	rl.buckets[first].lastFill = now.Add(-time.Minute)
+	rl.buckets[second].lastFill = now
+	rl.mu.Unlock()
 
 	allowed, mode := rl.Allow(third)
 	if !allowed {

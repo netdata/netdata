@@ -38,6 +38,7 @@
             "description": "UDP socket receive buffer requested during job creation, in bytes. Set 0 to keep the operating system default. The default is 4 MiB per bound endpoint.",
             "type": "integer",
             "minimum": 0,
+            "maximum": 268435456,
             "default": 4194304
           },
           "endpoints": {

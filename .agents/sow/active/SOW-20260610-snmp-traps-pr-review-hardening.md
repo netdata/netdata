@@ -2035,6 +2035,84 @@ Validation evidence:
 - `GOTOOLCHAIN=go1.26.0 go test -count=1
   ./plugin/go.d/collector/snmp_traps ./plugin/go.d/pkg/snmputils` passed.
 
+Additional post-rebase findings accepted for the next hardening commit:
+
+- **RPM build dependency gap.**
+  - Evidence: `CMakeLists.txt` now calls the `zstd` CLI during `plugin-go`
+    install/package steps, and installer/manual dependency paths include `zstd`,
+    but `netdata.spec.in` has no `BuildRequires: zstd`.
+  - Impact: RPM builds can fail on builders that do not already have the zstd
+    command installed.
+  - Plan: add the RPM build requirement.
+- **`journalTrapWriter` Write/Close race.**
+  - Evidence: `Write()` checks `closed` and then sends on `queue`; `Close()`
+    can close the same queue between those operations. Current collector
+    shutdown order prevents this in normal operation, but the writer API is
+    fragile and can panic if a future caller writes while closing.
+  - Plan: serialize the closed check and queue send with queue close, and add a
+    concurrent Write/Close regression test.
+- **Allowlist fallback source handling.**
+  - Evidence: `handlePacket()` only checks source allowlist when a UDP peer
+    object is present and parseable. Some tests and future internal paths pass
+    only `peerIP`.
+  - Plan: derive the source from `peerIP` when `peer` is unavailable, and drop
+    only when an allowlist exists and no source address can be parsed.
+- **Dedup string/bytes fingerprint tag collision.**
+  - Evidence: `appendFingerprintValue()` uses the `string` type tag for both
+    Go `string` values and `[]byte` values, so a string value equal to a byte
+    value's hex representation can collide.
+  - Plan: use a distinct `bytes` tag for `[]byte` values and add a regression
+    test.
+- **Potentially flaky rate limiter eviction test.**
+  - Evidence: `TestRateLimiterEvictsOldestTrackedSourceAtCapacity` assumes
+    which entry is evicted even when two buckets may have equal `lastFill`
+    values and map iteration order is randomized.
+  - Plan: make the test set deterministic bucket timestamps before eviction.
+- **Unbounded receive-buffer config.**
+  - Evidence: `listen.receive_buffer` validates only `>= 0` in code and schema.
+  - Impact: a mistaken config can pass with an absurd value even though the
+    kernel later caps or rejects it.
+  - Plan: cap configured receive buffer at 256 MiB in schema and init
+    validation, with focused tests.
+
+Implemented in this batch:
+
+- Added `BuildRequires: zstd` to the RPM spec.
+- Serialized `journalTrapWriter.Write()` with queue closure to remove the
+  send-on-closed-channel race window.
+- Added packet source derivation from `peerIP` when the UDP peer object is
+  unavailable, while still failing closed when an allowlist exists and no
+  source address can be parsed.
+- Changed dedup fingerprint encoding so `[]byte` values use a distinct `bytes`
+  type tag.
+- Made the rate-limiter eviction regression test deterministic by forcing
+  bucket ages before eviction.
+- Added a 256 MiB `listen.receive_buffer` maximum in schema, runtime
+  validation, metadata, generated integration docs, and sample config.
+
+Validation evidence for this batch:
+
+- Focused tests passed:
+  - `TestJournalTrapWriterConcurrentWriteCloseDoesNotPanic`
+  - `TestDedupFingerprintDistinguishesStringFromBytes`
+  - `TestPacketSourceAddrFallsBackToPeerIP`
+  - `TestCollectorHandlePacketDropsWhenAllowlistCannotDetermineSource`
+  - `TestRateLimiterEvictsOldestTrackedSourceAtCapacity`
+  - `TestCollectorInit_TooLargeReceiveBufferIsCodedError`
+  - `TestConfigSchemaDynCfgListenDefaultIncludesReceiveBuffer`
+- Broader affected Go tests passed:
+  - `./plugin/go.d/collector/snmp_traps`
+  - `./plugin/go.d/pkg/snmputils`
+  - `./plugin/go.d/collector/snmp_topology`
+  - `./plugin/go.d/collector/snmp/ddsnmp`
+  - `./cmd/godplugin`
+  - `./cmd/snmptrapprofilegen`
+  - `./plugin/agent/jobmgr/funcctl`
+  - `./plugin/agent/jobmgr`
+  - `./pkg/funcapi`
+- `git diff --check` passed.
+- `bash -n` passed for the touched installer/runtime shell scripts.
+
 ## Artifact Maintenance Gate
 
 - Specs, generated integration docs, and the operator skill have already been

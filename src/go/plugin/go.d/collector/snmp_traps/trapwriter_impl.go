@@ -31,6 +31,7 @@ type journalTrapWriter struct {
 	serializer journalHotSerializer
 
 	closed    int32
+	queueMu   sync.Mutex
 	failedErr error
 	failedMu  sync.Mutex
 
@@ -242,6 +243,9 @@ func (tw *journalTrapWriter) drainAndDiscard() {
 }
 
 func (tw *journalTrapWriter) Write(entry *TrapEntry) error {
+	tw.queueMu.Lock()
+	defer tw.queueMu.Unlock()
+
 	if atomic.LoadInt32(&tw.closed) != 0 {
 		return errWriterClosed
 	}
@@ -300,7 +304,9 @@ func (tw *journalTrapWriter) Close() error {
 		return tw.failedErr
 	}
 
+	tw.queueMu.Lock()
 	close(tw.queue)
+	tw.queueMu.Unlock()
 	<-tw.doneCh
 
 	tw.failedMu.Lock()

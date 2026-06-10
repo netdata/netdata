@@ -460,15 +460,15 @@ func (c *Collector) collect(ctx context.Context) error {
 func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, peer *net.UDPAddr) {
 	decodePeerIP := peerIP
 	rateLimitChecked := false
-	if peer != nil {
-		srcAddr, ok := udpPeerAddr(peer)
-		if ok {
-			decodePeerIP = net.IP(srcAddr.AsSlice())
-			if c.allowlist != nil && !c.allowlist.AllowedSource(srcAddr) {
-				c.incTrapError("dropped_allowlist")
-				return
-			}
+	if srcAddr, ok := packetSourceAddr(peerIP, peer); ok {
+		decodePeerIP = net.IP(srcAddr.AsSlice())
+		if c.allowlist != nil && !c.allowlist.AllowedSource(srcAddr) {
+			c.incTrapError("dropped_allowlist")
+			return
 		}
+	} else if c.allowlist != nil {
+		c.incTrapError("dropped_allowlist")
+		return
 	}
 
 	sniffedVersion, versionKnown := sniffSNMPVersion(data)
@@ -625,6 +625,20 @@ func udpPeerAddr(peer *net.UDPAddr) (netip.Addr, bool) {
 	}
 	addr, ok := netip.AddrFromSlice(peer.IP)
 	if !ok {
+		return netip.Addr{}, false
+	}
+	return addr.Unmap(), true
+}
+
+func packetSourceAddr(peerIP net.IP, peer *net.UDPAddr) (netip.Addr, bool) {
+	if addr, ok := udpPeerAddr(peer); ok {
+		return addr, true
+	}
+	if peerIP == nil {
+		return netip.Addr{}, false
+	}
+	addr, err := netip.ParseAddr(peerIP.String())
+	if err != nil {
 		return netip.Addr{}, false
 	}
 	return addr.Unmap(), true

@@ -92,6 +92,7 @@ func TestConfigSchemaDynCfgListenDefaultIncludesReceiveBuffer(t *testing.T) {
 
 	receiveBuffer := schemaProperty(t, schema, "jsonSchema", "properties", "listen", "properties", "receive_buffer")
 	assert.Equal(t, float64(defaultListenerReceiveBuffer), receiveBuffer["default"])
+	assert.Equal(t, float64(maxListenerReceiveBuffer), receiveBuffer["maximum"])
 }
 
 func TestConfigSchemaDynCfgRetentionDefaultDisablesTimeRotation(t *testing.T) {
@@ -440,6 +441,23 @@ func TestCollectorInit_InvalidReceiveBufferIsCodedError(t *testing.T) {
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
 	c.Listen.ReceiveBuffer = -1
+
+	err := c.Init(context.Background())
+	require.Error(t, err)
+	var coded interface{ Code() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 422, coded.Code())
+	assert.Contains(t, err.Error(), "listen.receive_buffer")
+	assert.Nil(t, c.listener)
+}
+
+func TestCollectorInit_TooLargeReceiveBufferIsCodedError(t *testing.T) {
+	withTestCacheDir(t)
+
+	c := New()
+	c.SetJobName("local")
+	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
+	c.Listen.ReceiveBuffer = maxListenerReceiveBuffer + 1
 
 	err := c.Init(context.Background())
 	require.Error(t, err)

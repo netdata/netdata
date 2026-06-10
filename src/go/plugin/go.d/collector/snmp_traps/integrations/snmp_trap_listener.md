@@ -204,7 +204,7 @@ The following options can be defined globally: update_every, autodetection_retry
 <a id="option-listener-listen"></a>
 ##### listen
 
-- `receive_buffer`: UDP socket receive buffer requested during job creation, in bytes (default 4194304; set 0 to keep the operating system default).
+- `receive_buffer`: UDP socket receive buffer requested during job creation, in bytes (default 4194304; set 0 to keep the operating system default; maximum 268435456).
 Each endpoint has:
 - `protocol`: Transport protocol (`udp` only).
 - `address`: Local IP address to bind (e.g., `0.0.0.0` for all interfaces).

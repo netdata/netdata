@@ -14,6 +14,7 @@ import (
 const (
 	maxDatagramSize              = 8192
 	defaultListenerReceiveBuffer = 4 * 1024 * 1024
+	maxListenerReceiveBuffer     = 256 * 1024 * 1024
 	listenerReadErrorBackoff     = 100 * time.Millisecond
 )
 

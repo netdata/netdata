@@ -102,6 +102,9 @@ func validateListenConfig(cfg ListenConfig) error {
 	if cfg.ReceiveBuffer < 0 {
 		return fmt.Errorf("listen.receive_buffer must be zero or positive, got %d", cfg.ReceiveBuffer)
 	}
+	if cfg.ReceiveBuffer > maxListenerReceiveBuffer {
+		return fmt.Errorf("listen.receive_buffer must be <= %d, got %d", maxListenerReceiveBuffer, cfg.ReceiveBuffer)
+	}
 	return nil
 }
 

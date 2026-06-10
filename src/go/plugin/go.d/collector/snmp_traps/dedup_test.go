@@ -229,6 +229,34 @@ func TestTrapDeduperMissingKeyVarbindSentinelDiffersFromEmptyString(t *testing.T
 	}
 }
 
+func TestDedupFingerprintDistinguishesStringFromBytes(t *testing.T) {
+	td := &TrapDef{DedupKeyVarbinds: []string{"payload"}}
+	base := TrapEntry{
+		SourceIP: "198.51.100.10",
+		TrapOID:  "1.3.6.1.6.3.1.1.5.3",
+	}
+
+	stringEntry := base
+	stringEntry.Varbinds = []VarbindValue{{
+		Name:  "payload",
+		OID:   "1.3.6.1.4.1.32473.1.1",
+		Type:  "OctetString",
+		Value: "6162",
+	}}
+
+	bytesEntry := base
+	bytesEntry.Varbinds = []VarbindValue{{
+		Name:  "payload",
+		OID:   "1.3.6.1.4.1.32473.1.1",
+		Type:  "OctetString",
+		Value: []byte{0x61, 0x62},
+	}}
+
+	if dedupFingerprint(&stringEntry, td, nil) == dedupFingerprint(&bytesEntry, td, nil) {
+		t.Fatal("string value collided with byte-slice value")
+	}
+}
+
 func TestTrapDeduperTTLExpiryAllowsNewFirstOccurrence(t *testing.T) {
 	d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil, "")
 	d.window = time.Nanosecond
