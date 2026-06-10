@@ -47,6 +47,14 @@ extern "C" {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+// rand_s() is a UCRT extension that requires _CRT_RAND_S before stdlib.h is processed.
+// CMake's feature-check defines it in the test code but not in the build; define it here.
+#ifdef _WIN32
+#ifndef _CRT_RAND_S
+#define _CRT_RAND_S
+#endif
+#endif
+
 #include <pthread.h>
 #include <errno.h>
 #include <stdbool.h>
@@ -690,6 +698,45 @@ static inline void syslog(int pri __maybe_unused, const char *fmt __maybe_unused
 #define le64toh(x) (x)
 #define htole32(x) (x)
 #define le32toh(x) (x)
+#endif
+
+// ── if_nametoindex() ── in <net/if.h> on POSIX; on Windows it lives in iphlpapi ─
+// iphlpapi is already linked by CMakeLists.txt; just include the header.
+#include <iphlpapi.h>
+
+// ── fchown() ── POSIX, absent from UCRT64 ────────────────────────────────────
+// Log file ownership (uid/gid) is meaningless on Windows; no-op returning success.
+static inline int fchown(int fd __maybe_unused, uid_t owner __maybe_unused, gid_t group __maybe_unused) {
+    return 0;
+}
+
+// ── ffs() ── POSIX from <strings.h>; MinGW UCRT64 strings.h does not declare it ─
+// GCC/MinGW provides __builtin_ffs() which maps to the BSF instruction.
+#ifndef ffs
+#define ffs(x) __builtin_ffs(x)
+#endif
+
+// ── sigjmp_buf / sigsetjmp / siglongjmp ── POSIX signal-safe jump, absent from UCRT64 ─
+// Windows has no signal mask; alias to the plain setjmp/longjmp variants.
+#include <setjmp.h>
+#ifndef _SIGJMP_BUF_DEFINED
+#define _SIGJMP_BUF_DEFINED
+typedef jmp_buf sigjmp_buf;
+#define sigsetjmp(env, savemask) setjmp(env)
+#define siglongjmp(env, val)     longjmp(env, val)
+#endif
+
+// ── siginfo_t ── POSIX signal info struct, absent from UCRT64 ────────────────
+// Provides si_signo, si_code, si_addr for code that compiles unconditionally.
+// On Windows the protected-access signal handler is never invoked (SEH is used
+// instead), so this stub only needs to satisfy the compiler.
+#ifndef _SIGINFO_T_DEFINED
+#define _SIGINFO_T_DEFINED
+typedef struct {
+    int   si_signo;
+    int   si_code;
+    void *si_addr;
+} siginfo_t;
 #endif
 
 #endif // OS_WINDOWS
