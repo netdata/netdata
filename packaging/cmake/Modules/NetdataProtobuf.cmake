@@ -89,9 +89,24 @@ endfunction()
 # Handle detection of Protobuf
 macro(netdata_detect_protobuf)
         if(OS_WINDOWS)
+                # Prefer an explicit env-var override; fall back to PATH search.
+                # IMPORTANT: do NOT use find_program(PROTOBUF_PROTOC_EXECUTABLE …)
+                # directly after set(PROTOBUF_PROTOC_EXECUTABLE "") — the preceding
+                # set() creates a regular variable that shadows the CACHE entry
+                # written by find_program, leaving PROTOBUF_PROTOC_EXECUTABLE empty.
+                # Using a temporary variable avoids the shadowing.
                 set(PROTOBUF_PROTOC_EXECUTABLE "$ENV{PROTOBUF_PROTOC_EXECUTABLE}")
                 if(NOT PROTOBUF_PROTOC_EXECUTABLE)
-                        find_program(PROTOBUF_PROTOC_EXECUTABLE protoc REQUIRED)
+                        find_program(_nd_protoc_exe NAMES protoc protoc.exe)
+                        if(_nd_protoc_exe)
+                                set(PROTOBUF_PROTOC_EXECUTABLE "${_nd_protoc_exe}")
+                        else()
+                                message(FATAL_ERROR
+                                        "protoc compiler not found. "
+                                        "Install it (e.g. pacman -S mingw-w64-ucrt-x86_64-protobuf) "
+                                        "or set the PROTOBUF_PROTOC_EXECUTABLE environment variable.")
+                        endif()
+                        unset(_nd_protoc_exe CACHE)
                 endif()
                 set(PROTOBUF_CFLAGS_OTHER "")
                 set(PROTOBUF_INCLUDE_DIRS "")
