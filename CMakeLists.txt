@@ -2534,7 +2534,22 @@ endif()
 netdata_add_sqlite3_to_target(libnetdata)
 
 if(OS_WINDOWS)
-        set(HAVE_ETW True)
+        # Detect whether the Microsoft Windows SDK mc.exe is available at configure time.
+        # ETW requires mc.exe + rc.exe (Windows SDK) and link.exe (MSVC), which are absent
+        # in a pure MSYS2/MinGW environment.  Fall back to WEL (windmc/windres) when absent.
+        find_program(WINDOWS_SDK_MC NAMES mc
+                HINTS
+                        "C:/Program Files (x86)/Windows Kits/10/bin"
+                        "$ENV{WindowsSdkVerBinPath}"
+                        "$ENV{WindowsSdkDir}/bin"
+                PATH_SUFFIXES "x64"
+                NO_DEFAULT_PATH)   # Avoids matching /usr/bin/mc (Midnight Commander in MSYS2)
+
+        if(WINDOWS_SDK_MC)
+                set(HAVE_ETW True)
+        else()
+                set(HAVE_ETW False)
+        endif()
         set(HAVE_WEL True)
 
         # Output the results for debugging purposes
