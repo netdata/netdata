@@ -720,6 +720,12 @@ static inline int getgrgid_r(gid_t gid __maybe_unused,
 #define pipe(fds) _pipe((fds), 65536, _O_BINARY)
 #endif
 
+// ── wcscasecmp() ── POSIX wide-string case-insensitive compare, absent from UCRT64 ─
+// Windows equivalent is _wcsicmp() from <wchar.h>, which is already included.
+#ifndef wcscasecmp
+#define wcscasecmp(a, b) _wcsicmp(a, b)
+#endif
+
 // ── pipe2() ── Linux extension that creates a pipe and sets flags atomically ──
 // UCRT64 has no pipe2(); flags (O_CLOEXEC, O_NONBLOCK) are either 0 or no-ops
 // on Windows, so ignoring them is safe.
