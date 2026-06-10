@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
@@ -29,6 +30,12 @@ const (
 	trapWriteFailureJournal = "journal_write_failed"
 	trapWriteFailureOTLP    = "otlp_export_failed"
 )
+
+var activeDirectJournalJobs atomic.Int64
+
+func directJournalLogsAvailable() bool {
+	return activeDirectJournalJobs.Load() > 0
+}
 
 func init() {
 	collectorapi.Register("snmp_traps", collectorapi.Creator{
@@ -338,6 +345,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.journalDir = ""
 	if journalWriter != nil {
 		c.journalDir = journalWriter.JournalDirectory()
+		activeDirectJournalJobs.Add(1)
 	}
 	c.deduper = deduper
 	c.profileCacheHeld = true
@@ -385,6 +393,9 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	if c.profileCacheHeld {
 		ReleaseProfileCache()
 		c.profileCacheHeld = false
+	}
+	if c.journalDir != "" {
+		activeDirectJournalJobs.Add(-1)
 	}
 	removeJobMetrics(c.jobName)
 	c.metrics = nil

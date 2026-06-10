@@ -170,6 +170,9 @@ func buildTrapJSON(entry *TrapEntry) ([]byte, error) {
 	seenKeys := make(map[string]int)
 
 	for _, vb := range entry.Varbinds {
+		if isSensitiveTrapVarbind(vb) {
+			continue
+		}
 		key := vb.Name
 		if key == "" {
 			key = vb.OID
@@ -226,6 +229,16 @@ func buildTrapJSON(entry *TrapEntry) ([]byte, error) {
 		return nil, err
 	}
 	return result, nil
+}
+
+func isSensitiveTrapVarbind(vb VarbindValue) bool {
+	oid := normalizeOID(vb.OID)
+	if oid == snmpTrapCommunityOID || oid == strings.TrimSuffix(snmpTrapCommunityOID, ".0") {
+		return true
+	}
+
+	name := strings.TrimSuffix(vb.Name, ".0")
+	return name == "snmpTrapCommunity"
 }
 
 type jsonVarbindEntry struct {
@@ -495,6 +508,9 @@ func (s *journalHotSerializer) appendTrapJSONObject(entry *TrapEntry) error {
 	}
 
 	for _, vb := range entry.Varbinds {
+		if isSensitiveTrapVarbind(vb) {
+			continue
+		}
 		key := vb.Name
 		if key == "" {
 			key = vb.OID

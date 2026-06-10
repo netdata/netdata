@@ -356,6 +356,20 @@ func TestCollectorHandlePacketDropsDisallowedCommunity(t *testing.T) {
 	}
 }
 
+func TestCollectorHandlePacketAllowsAllowedCommunity(t *testing.T) {
+	packet := readColdStartUDPPacket(t)
+	trap := testColdStartTrap("state_change", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	setSingleTestTrap(t, trap)
+	writer := &mockTrapWriter{}
+	c := newTestV2Collector("test", writer, nil, []string{"public"})
+
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
+
+	if len(writer.entries) != 1 {
+		t.Fatalf("written entries = %d, want 1", len(writer.entries))
+	}
+}
+
 func TestCollectorHandlePacketIncrementsEventsMetric(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	trap := testColdStartTrap("state_change", "warning", "coldStart from {TRAP_SOURCE_IP}")

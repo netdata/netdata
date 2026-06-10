@@ -347,15 +347,19 @@ func TestCollectorInit_BindsEndpointsAndCheckIsNoop(t *testing.T) {
 	c.SetJobName("local")
 	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: port}}
 
+	startJournalJobs := activeDirectJournalJobs.Load()
 	require.NoError(t, c.Init(context.Background()))
 	require.NotNil(t, c.listener)
 	require.NotEmpty(t, c.journalDir)
 	require.DirExists(t, c.journalDir)
+	assert.Equal(t, startJournalJobs+1, activeDirectJournalJobs.Load())
+	assert.True(t, directJournalLogsAvailable())
 	assert.Equal(t, trapWriteFailureJournal, c.trapWriteFailureDim())
 	require.NoError(t, c.Check(context.Background()))
 
 	c.Cleanup(context.Background())
 	require.Nil(t, c.listener)
+	assert.Equal(t, startJournalJobs, activeDirectJournalJobs.Load())
 }
 
 func TestCollectorInit_IdempotentDoubleInit(t *testing.T) {
@@ -443,15 +447,18 @@ func TestCollectorInit_OTELOnlySkipsJournalCreation(t *testing.T) {
 		QueueCapacity: 16,
 	}
 
+	startJournalJobs := activeDirectJournalJobs.Load()
 	require.NoError(t, c.Init(context.Background()))
 	require.NotNil(t, c.listener)
 	assert.Empty(t, c.journalDir)
+	assert.Equal(t, startJournalJobs, activeDirectJournalJobs.Load())
 	assert.NoDirExists(t, journalRoot(jobName))
 	assert.Equal(t, trapWriteFailureOTLP, c.trapWriteFailureDim())
 	assert.NoDirExists(t, cacheDir+"/traps")
 
 	c.Cleanup(context.Background())
 	require.Nil(t, c.listener)
+	assert.Equal(t, startJournalJobs, activeDirectJournalJobs.Load())
 }
 
 func TestCollectorInit_BindsMultipleEndpoints(t *testing.T) {

@@ -44,6 +44,7 @@ func snmpTrapsLogsMethodConfig() funcapi.MethodConfig {
 		RequireCloud: true,
 		Tags:         "logs",
 		ResponseType: "logs",
+		Available:    directJournalLogsAvailable,
 		RawRequest:   true,
 		AgentWide:    true,
 	}

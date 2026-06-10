@@ -304,17 +304,6 @@ func (r *moduleFuncRegistry) findMethodCollision(moduleName, jobName, methodID s
 	return "", false
 }
 
-func (r *moduleFuncRegistry) snapshotCreators() map[string]collectorapi.Creator {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	out := make(map[string]collectorapi.Creator, len(r.modules))
-	for name, module := range r.modules {
-		out[name] = module.creator
-	}
-	return out
-}
-
 func (r *moduleFuncRegistry) rebuildMethodRoutesLocked() {
 	r.methodRoutes = make(map[string]methodRoute)
 	for moduleName, module := range r.modules {

@@ -217,6 +217,36 @@ func TestOTLPTrapEntrySerialization(t *testing.T) {
 	assert.Equal(t, "Gi1/0/1", ifName["value"].GetStringValue())
 }
 
+func TestOTLPTrapEntrySerializationOmitsCommunityVarbind(t *testing.T) {
+	entry := &TrapEntry{
+		JobName:              "local",
+		ReportType:           ReportTypeTrap,
+		ReceivedRealtimeUsec: 123456,
+		TrapOID:              "1.3.6.1.6.3.1.1.5.3",
+		Category:             "state_change",
+		Severity:             "warning",
+		Message:              "Interface down",
+		SourceIP:             "192.0.2.10",
+		PduType:              PduTypeTrap,
+		SnmpVersion:          SnmpVersionV1,
+		Varbinds: []VarbindValue{
+			{OID: snmpTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
+			{Name: "ifName", OID: "1.3.6.1.2.1.31.1.1.1.1.7", Type: "OctetString", Value: "Gi1/0/1"},
+		},
+	}
+
+	req, err := buildOTLPExportRequest("local", []*TrapEntry{entry})
+	require.NoError(t, err)
+	require.Len(t, req.ResourceLogs, 1)
+	require.Len(t, req.ResourceLogs[0].ScopeLogs, 1)
+	require.Len(t, req.ResourceLogs[0].ScopeLogs[0].LogRecords, 1)
+
+	attrs := otlpAttrMap(req.ResourceLogs[0].ScopeLogs[0].LogRecords[0].Attributes)
+	varbinds := otlpKVListMap(attrs["snmp.varbinds"])
+	assert.NotContains(t, varbinds, "snmpTrapCommunity.0")
+	assert.Contains(t, varbinds, "ifName")
+}
+
 func TestOTLPDedupSummarySerialization(t *testing.T) {
 	entry := &TrapEntry{
 		JobName:              "local",

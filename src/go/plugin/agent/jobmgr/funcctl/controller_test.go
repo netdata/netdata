@@ -396,10 +396,12 @@ func TestControllerLifecycleHooks(t *testing.T) {
 	tests := map[string]struct{}{
 		"register modules does not register static methods yet":        {},
 		"first job start registers static methods once":                {},
+		"availability-gated static method registers when available":    {},
 		"public method name collision skips colliding module":          {},
 		"topology methods register direct alias":                       {},
 		"job stop unregisters job methods":                             {},
 		"cleanup unregisters static methods":                           {},
+		"cleanup ignores unavailable static methods":                   {},
 		"cleanup with api configured still unregisters static methods": {},
 		"api registration honors method tags":                          {},
 	}
@@ -430,6 +432,28 @@ func TestControllerLifecycleHooks(t *testing.T) {
 				controller.OnJobStart(newTestRuntimeJob("mod", "job2", true))
 
 				assert.Equal(t, []string{"mod:a"}, reg.registeredNames())
+
+			case "availability-gated static method registers when available":
+				available := false
+				controller.RegisterModules(collectorapi.Registry{
+					"mod": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{
+								ID:        "logs",
+								Available: func() bool { return available },
+							}}
+						},
+					},
+				})
+
+				controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+				assert.Empty(t, reg.registeredNames())
+
+				available = true
+				controller.OnJobStart(newTestRuntimeJob("mod", "job2", true))
+				controller.OnJobStart(newTestRuntimeJob("mod", "job3", true))
+
+				assert.Equal(t, []string{"mod:logs"}, reg.registeredNames())
 
 			case "public method name collision skips colliding module":
 				controller.RegisterModules(collectorapi.Registry{
@@ -495,6 +519,24 @@ func TestControllerLifecycleHooks(t *testing.T) {
 				controller.Cleanup()
 
 				assert.Contains(t, reg.unregisteredNames(), "mod:a")
+
+			case "cleanup ignores unavailable static methods":
+				controller.RegisterModules(collectorapi.Registry{
+					"mod": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{
+								ID:        "logs",
+								Available: func() bool { return false },
+							}}
+						},
+					},
+				})
+
+				controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+				controller.Cleanup()
+
+				assert.Empty(t, reg.registeredNames())
+				assert.Empty(t, reg.unregisteredNames())
 
 			case "cleanup with api configured still unregisters static methods":
 				var buf bytes.Buffer

@@ -147,35 +147,24 @@ func (c *Controller) OnJobStop(job collectorapi.RuntimeJob) {
 }
 
 func (c *Controller) Cleanup() {
-	for name, creator := range c.registry.snapshotCreators() {
-		if creator.Methods == nil {
-			continue
-		}
-		for _, method := range creator.Methods() {
-			if method.ID == "" {
-				continue
-			}
-			for _, funcName := range funcapi.MethodFunctionNames(name, method) {
-				c.fnReg.Unregister(funcName)
-				if c.api != nil {
-					c.api.FunctionRemove(funcName)
-				}
-			}
+	for funcName := range c.staticMethodsSeen {
+		c.fnReg.Unregister(funcName)
+		if c.api != nil {
+			c.api.FunctionRemove(funcName)
 		}
 	}
 }
 
 func (c *Controller) registerModuleMethodsOnFirstJobStart(moduleName string) {
-	if _, ok := c.staticMethodsSeen[moduleName]; ok {
-		return
-	}
-
 	creator, ok := c.registry.getCreator(moduleName)
 	if !ok || creator.Methods == nil {
 		return
 	}
 
 	for _, method := range creator.Methods() {
+		if !methodAvailable(method) {
+			continue
+		}
 		if method.ID == "" {
 			c.Warningf("skipping function registration for module '%s': empty method ID", moduleName)
 			continue
@@ -194,6 +183,9 @@ func (c *Controller) registerModuleMethodsOnFirstJobStart(moduleName string) {
 			}
 
 			for _, funcName := range funcapi.MethodFunctionNames(moduleName, method) {
+				if _, seen := c.staticMethodsSeen[funcName]; seen {
+					continue
+				}
 				c.fnReg.Register(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
 				c.api.FunctionGlobal(netdataapi.FunctionGlobalOpts{
 					Name:     funcName,
@@ -204,16 +196,19 @@ func (c *Controller) registerModuleMethodsOnFirstJobStart(moduleName string) {
 					Priority: 100,
 					Version:  3,
 				})
+				c.staticMethodsSeen[funcName] = struct{}{}
 			}
 			continue
 		}
 
 		for _, funcName := range funcapi.MethodFunctionNames(moduleName, method) {
+			if _, seen := c.staticMethodsSeen[funcName]; seen {
+				continue
+			}
 			c.fnReg.Register(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
+			c.staticMethodsSeen[funcName] = struct{}{}
 		}
 	}
-
-	c.staticMethodsSeen[moduleName] = struct{}{}
 }
 
 func methodTags(method funcapi.MethodConfig) string {
@@ -221,6 +216,10 @@ func methodTags(method funcapi.MethodConfig) string {
 		return method.Tags
 	}
 	return "top"
+}
+
+func methodAvailable(method funcapi.MethodConfig) bool {
+	return method.Available == nil || method.Available()
 }
 
 func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []funcapi.MethodConfig) {

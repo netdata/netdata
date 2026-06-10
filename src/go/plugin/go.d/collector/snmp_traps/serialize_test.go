@@ -265,6 +265,45 @@ func TestSerializeToJournalFieldsTRAPJSONShape(t *testing.T) {
 	}
 }
 
+func TestSerializeToJournalFieldsTRAPJSONOmitsCommunityVarbind(t *testing.T) {
+	entry := &TrapEntry{
+		JobName:               "local",
+		ReportType:            ReportTypeTrap,
+		ReceivedRealtimeUsec:  1000000,
+		ReceivedMonotonicUsec: 1000,
+		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
+		Message:               "test",
+		SourceIP:              "10.0.0.1",
+		PduType:               PduTypeTrap,
+		SnmpVersion:           SnmpVersionV1,
+		Varbinds: []VarbindValue{
+			{OID: snmpTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
+			{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
+		},
+	}
+
+	fields, err := serializeToJournalFields(entry)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fieldMap := fieldsToMap(fields)
+
+	if strings.Contains(fieldMap["TRAP_JSON"], "private-community") {
+		t.Fatalf("TRAP_JSON leaked SNMP community: %s", fieldMap["TRAP_JSON"])
+	}
+
+	var obj map[string]any
+	if err := json.Unmarshal([]byte(fieldMap["TRAP_JSON"]), &obj); err != nil {
+		t.Fatalf("TRAP_JSON not valid: %v", err)
+	}
+	if _, ok := obj["snmpTrapCommunity.0"]; ok {
+		t.Fatalf("TRAP_JSON includes sensitive community varbind: %v", obj["snmpTrapCommunity.0"])
+	}
+	if _, ok := obj["ifIndex"]; !ok {
+		t.Fatal("TRAP_JSON dropped non-sensitive varbind")
+	}
+}
+
 func TestSerializeToJournalFieldsTRAPJSONUsesProfileNamesForTabularVarbindInstances(t *testing.T) {
 	td := testIFMIBLinkDownTrapDef()
 	entry := trapEntryFromPDU("local", testIFMIBLinkDownPDU(), td, 1000000, 1000)
@@ -386,6 +425,7 @@ func TestJournalHotSerializerMatchesSerializeToJournalFields(t *testing.T) {
 			SnmpVersion:           SnmpVersionV2c,
 			Labels:                map[string]string{"z_key": "z_val", "a_key": "a_val"},
 			Varbinds: []VarbindValue{
+				{OID: snmpTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
 				{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
 				{OID: "1.3.6.1.2.1.2.2.1.2", Name: "ifIndex", Type: "OctetString", Value: "eth0"},
 			},

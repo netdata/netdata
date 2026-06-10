@@ -549,3 +549,16 @@ func TestSnmpTrapsMethods(t *testing.T) {
 	assert.True(t, logs.RawRequest)
 	assert.Equal(t, "logs", logs.ResponseType)
 }
+
+func TestSnmpTrapsLogsMethodAvailabilityFollowsDirectJournalJobs(t *testing.T) {
+	startJournalJobs := activeDirectJournalJobs.Load()
+	activeDirectJournalJobs.Store(0)
+	t.Cleanup(func() { activeDirectJournalJobs.Store(startJournalJobs) })
+
+	logs := snmpTrapsLogsMethodConfig()
+	require.NotNil(t, logs.Available)
+	assert.False(t, logs.Available())
+
+	activeDirectJournalJobs.Store(1)
+	assert.True(t, logs.Available())
+}

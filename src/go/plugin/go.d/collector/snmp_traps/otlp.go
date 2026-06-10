@@ -660,6 +660,9 @@ func otlpVarbindsValue(entry *TrapEntry) *commonpb.AnyValue {
 	seenKeys := make(map[string]int)
 	values := make([]*commonpb.KeyValue, 0, len(entry.Varbinds))
 	for _, vb := range entry.Varbinds {
+		if isSensitiveTrapVarbind(vb) {
+			continue
+		}
 		key := vb.Name
 		if key == "" {
 			key = vb.OID
