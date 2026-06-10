@@ -61,7 +61,7 @@
         "properties": {
           "allow": {
             "title": "Allow",
-            "description": "Allow time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/prometheus/selector#readme).",
+            "description": "Allow time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/pkg/prometheus/selector#readme).",
             "type": [
               "array",
               "null"
@@ -74,7 +74,7 @@
           },
           "deny": {
             "title": "Deny",
-            "description": "Deny time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/prometheus/selector#readme).",
+            "description": "Deny time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/pkg/prometheus/selector#readme).",
             "type": [
               "array",
               "null"
@@ -89,7 +89,7 @@
       },
       "relabeling": {
         "title": "Metric relabeling",
-        "description": "Prometheus-compatible metric relabeling applied before charts are built. Each block scopes its rules to the metrics whose name matches `match`.",
+        "description": "Prometheus-compatible metric relabeling applied before charts are built. Each block scopes its rules to the metrics whose name matches `match`. See the [relabeling reference](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/prometheus/relabel#readme) for the full syntax and examples.",
         "type": [
           "array",
           "null"

@@ -136,7 +136,9 @@ modules:
               group: Customization
               detailed_description: |
                 A list of relabeling blocks. Each block applies a list of Prometheus
-                `metric_relabel_configs` rules to the metrics whose name matches `match`.
+                `metric_relabel_configs` rules to the metrics whose name matches `match`. See the
+                [relabeling reference](/src/go/plugin/go.d/collector/prometheus/relabel/README.md)
+                for the full action set and more examples.
 
                 - `match`: Netdata simple patterns matched against the full metric name — including
                   any `_bucket`/`_sum`/`_count` suffix, so prefer globs like `app_lat*` over an exact
