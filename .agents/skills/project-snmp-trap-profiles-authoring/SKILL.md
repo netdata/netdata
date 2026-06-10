@@ -205,8 +205,9 @@ classifications were done under the prior taxonomy and are now stale).
 
 Stock profile YAMLs stay raw in the repository so changes are reviewable in
 `git diff`. Installed/package stock vendor profiles MUST be compressed as
-`.yaml.gz`; the runtime loader supports both raw `.yaml` and compressed
-`.yaml.gz`. Operator/user profiles under `/etc/netdata/go.d/snmp.trap-profiles/`
-SHOULD stay uncompressed `.yaml` for editability. If a single vendor file grows
-past ~10 MB in the repository, revisit description verbosity rather than hiding
-unreviewable generated bloat behind compression.
+`.yaml.zst`; the runtime loader supports raw `.yaml`, compressed `.yaml.zst`,
+and draft-era `.yaml.gz` compatibility. Operator/user profiles under
+`/etc/netdata/go.d/snmp.trap-profiles/` SHOULD stay uncompressed `.yaml` for
+editability. If a single vendor file grows past ~10 MB in the repository,
+revisit description verbosity rather than hiding unreviewable generated bloat
+behind compression.

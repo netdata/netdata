@@ -18,6 +18,7 @@ declare -a package_tree=(
   gcc-c++
   git
   gzip
+  zstd
   libatomic1
   libelf-devel
   libjson-c-devel

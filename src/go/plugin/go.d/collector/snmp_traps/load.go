@@ -19,6 +19,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
@@ -339,10 +340,10 @@ func loadProfile(filename string, extendsPaths multipath.MultiPath, stack []stri
 }
 
 func readProfileFile(filename string) ([]byte, error) {
-	return readMaybeGzipFile(filename)
+	return readMaybeCompressedFile(filename)
 }
 
-func readMaybeGzipFile(filename string) ([]byte, error) {
+func readMaybeCompressedFile(filename string) ([]byte, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -351,7 +352,16 @@ func readMaybeGzipFile(filename string) ([]byte, error) {
 
 	var r io.Reader = file
 	var gz *gzip.Reader
-	if strings.HasSuffix(filename, ".gz") {
+	var zr *zstd.Decoder
+	switch {
+	case strings.HasSuffix(filename, ".zst"):
+		zr, err = zstd.NewReader(file)
+		if err != nil {
+			return nil, err
+		}
+		defer zr.Close()
+		r = zr
+	case strings.HasSuffix(filename, ".gz"):
 		gz, err = gzip.NewReader(file)
 		if err != nil {
 			return nil, err
@@ -359,6 +369,7 @@ func readMaybeGzipFile(filename string) ([]byte, error) {
 		defer gz.Close()
 		r = gz
 	}
+
 	lr := io.LimitReader(r, maxProfileFileBytes+1)
 	data, err := io.ReadAll(lr)
 	if err != nil {
@@ -371,21 +382,36 @@ func readMaybeGzipFile(filename string) ([]byte, error) {
 }
 
 func findProfileExtends(paths multipath.MultiPath, name string) (string, error) {
-	if path, err := paths.Find(name); err == nil {
-		return path, nil
+	var lastErr error
+	for _, candidate := range profilePathCandidates(name) {
+		path, err := paths.Find(candidate)
+		if err == nil {
+			return path, nil
+		}
+		lastErr = err
 	}
-	return paths.Find(name + ".gz")
+	return "", lastErr
 }
 
 func isProfileFileName(name string) bool {
 	return strings.HasSuffix(name, ".yaml") ||
 		strings.HasSuffix(name, ".yml") ||
+		strings.HasSuffix(name, ".yaml.zst") ||
+		strings.HasSuffix(name, ".yml.zst") ||
 		strings.HasSuffix(name, ".yaml.gz") ||
 		strings.HasSuffix(name, ".yml.gz")
 }
 
 func profileLogicalName(name string) string {
+	name = strings.TrimSuffix(name, ".zst")
 	return strings.TrimSuffix(name, ".gz")
+}
+
+func profilePathCandidates(name string) []string {
+	if strings.HasSuffix(name, ".zst") || strings.HasSuffix(name, ".gz") {
+		return []string{name}
+	}
+	return []string{name, name + ".zst", name + ".gz"}
 }
 
 type stockProfileStore struct {
@@ -690,8 +716,8 @@ func loadStockProfileCatalogue(stockDir string) (stockProfileCatalogue, error) {
 
 func readStockProfileCatalogueFile(dir string) ([]byte, error) {
 	var lastErr error
-	for _, name := range []string{"catalogue.json", "catalogue.json.gz"} {
-		data, err := readMaybeGzipFile(filepath.Join(dir, name))
+	for _, name := range []string{"catalogue.json", "catalogue.json.zst", "catalogue.json.gz"} {
+		data, err := readMaybeCompressedFile(filepath.Join(dir, name))
 		if err == nil {
 			return data, nil
 		}
@@ -719,11 +745,11 @@ func catalogueProfilePath(dir, name string) (string, string, error) {
 	if filepath.Base(name) != name || strings.ContainsRune(name, '\\') {
 		return "", "", fmt.Errorf("must be a profile filename, not a path")
 	}
-	if !isProfileFileName(name) && !isProfileFileName(name+".gz") {
+	if !profilePathIsSupported(name) {
 		return "", "", fmt.Errorf("unsupported profile filename")
 	}
 
-	for _, candidate := range []string{name, name + ".gz"} {
+	for _, candidate := range profilePathCandidates(name) {
 		if !isProfileFileName(candidate) {
 			continue
 		}
@@ -741,6 +767,15 @@ func catalogueProfilePath(dir, name string) (string, string, error) {
 		return path, profileLogicalName(candidate), nil
 	}
 	return "", "", os.ErrNotExist
+}
+
+func profilePathIsSupported(name string) bool {
+	for _, candidate := range profilePathCandidates(name) {
+		if isProfileFileName(candidate) {
+			return true
+		}
+	}
+	return false
 }
 
 func (idx *ProfileIndex) loadedTrapNameSource(name string) string {

@@ -80,7 +80,7 @@ Facts:
   - some tests do not prove the new public Function paths.
 - User direction:
   - stock profile YAMLs remain uncompressed in the repository, but installed
-    stock profiles should be `.gz`;
+    stock profiles should be compressed with zstd and stored as `.zst`;
   - user-supplied profiles must always be loaded and validated at job creation;
   - PEN data should not be encoded in Go and should be lazy-loaded only when
     needed;
@@ -105,8 +105,11 @@ Inferences:
 - Moving journals under `/var/log/journal` can reduce new watcher work, but it
   increases the need to prove compatibility with the existing
   systemd-journal.plugin watcher, journalctl, permissions, and retention.
-- Installed `.yaml.gz` profiles reduce disk/package footprint, but loader,
+- Installed `.yaml.zst` profiles reduce disk/package footprint, but loader,
   packaging, docs, tests, and regeneration expectations must all agree.
+- The embedded `snmp:traps` viewer should be useful on first open: common trap
+  fields must be requested as default facets and the default visible columns
+  must include `TRAP_NAME`.
 
 Unknowns:
 
@@ -145,10 +148,18 @@ Unknowns:
   - systemd-journal.plugin discovers nested trap journals through its existing
     recursive scan/watch path;
   - retention remains per job.
-- Stock trap profiles install compressed as `.yaml.gz`, while repository files
+- Stock trap profiles install compressed as `.yaml.zst`, while repository files
   stay uncompressed `.yaml`.
-- The profile loader supports user and stock `.yaml`, `.yml`, `.yaml.gz`, and
-  `.yml.gz` as needed, with user files always eagerly loaded and validated.
+- The profile loader supports user and stock `.yaml`, `.yml`, `.yaml.zst`, and
+  `.yml.zst` as needed, with user files always eagerly loaded and validated.
+  Draft-era `.gz` compatibility may remain in the loader if it is low-risk, but
+  packages must ship zstd-compressed stock files.
+- Trap journal entries include a dedicated job-name field so users can filter
+  by trap job without relying on `SYSLOG_IDENTIFIER`.
+- The `snmp:traps` logs viewer defaults include at least these facet fields:
+  `TRAP_CATEGORY`, `TRAP_DEVICE_VENDOR`, `TRAP_NAME`, `TRAP_SEVERITY`,
+  `TRAP_SOURCE_IP`, and `_HOSTNAME`.
+- The `snmp:traps` logs viewer default visible columns include `TRAP_NAME`.
 - User-supplied trap profile changes are picked up automatically while trap jobs
   are running:
   - only user profile directories are watched/fingerprinted;
@@ -182,7 +193,7 @@ Unknowns:
 - Focused validation passes locally:
   - `go test` for `funcctl`, `jobmgr`, `godplugin`, `snmp_traps`, `ddsnmp`,
     and `snmputils` affected packages;
-  - profile loader gzip tests;
+  - profile loader zstd tests;
   - packaging/install checks affected by compressed profiles and journal path;
   - `git diff --check`.
 
@@ -418,7 +429,7 @@ Risks:
        footprint still grows for users that never enable traps.
    - Required action:
      - Keep repository profile YAMLs uncompressed.
-     - Install stock profiles compressed as `.yaml.gz`.
+     - Install stock profiles compressed as `.yaml.zst`.
      - Update loader, packaging, docs, and tests to match.
 
 7. **IANA PEN data is duplicated and eagerly loaded in Go.**
@@ -980,7 +991,7 @@ Implementation plan:
    direct journals exist, without adding plugin protocol changes.
 4. Move trap journal root to the approved log path and validate directory
    creation/readability at job creation.
-5. Compress installed stock trap profiles and update the loader for `.gz`
+5. Compress installed stock trap profiles and update the loader for `.zst`
    support while keeping repository files raw.
 6. Replace eager embedded PEN loading with a lazy disk-backed loader shared by
    runtime and generator where practical.
@@ -1282,6 +1293,12 @@ Open decisions:
 
 ### 2026-06-10
 
+- Recorded the additional user requirements for this batch:
+  - installed stock trap profiles must be zstd-compressed as `.yaml.zst`;
+  - journal entries must expose the trap job name as a dedicated filterable
+    field;
+  - the embedded `snmp:traps` viewer must default to useful trap facets;
+  - `TRAP_NAME` must be visible in the default table columns.
 - Created SOW from user request after two PR review passes identified
   merge-readiness and integration-risk findings.
 - Committed the parser/tooling changes separately before running additional
@@ -1467,10 +1484,11 @@ Implemented locally:
   is available, falling back to full YAML parsing only for older/missing
   catalogues.
 - Kept user/operator profiles eagerly loaded and validated at job creation.
-- Added support for `catalogue.json.gz` alongside `catalogue.json`, matching the
-  install-time compression requirement.
-- Added install-time gzip handling for the stock catalogue so packages install
-  `catalogue.json.gz` instead of raw JSON.
+- Added support for `catalogue.json.zst` alongside `catalogue.json`, matching
+  the install-time compression requirement. Draft-era `.gz` compatibility is
+  retained only as a low-risk reader fallback.
+- Added install-time zstd handling for the stock catalogue so packages install
+  `catalogue.json.zst` instead of raw JSON.
 - Tightened topology trap enrichment so `TRAP_NEIGHBORS` includes only LLDP/CDP
   neighbors on the interface matched by the trap source IP. Management IP
   matches still provide device identity without guessing all device neighbors.
@@ -1505,11 +1523,11 @@ Validation evidence:
 - `cmake --install /tmp/netdata-snmptraps-cmake-yml-check-no-xen --component
   plugin-go --prefix /tmp/netdata-snmptraps-install.[redacted]` passed.
 - The temporary component install produced:
-  - `usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/catalogue.json.gz`;
+  - `usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/catalogue.json.zst`;
   - no raw `catalogue.json`;
   - no raw stock trap profile `.yaml` files under `default/`;
-  - 817 installed stock profile `.yaml.gz` files;
-  - `catalogue.json.gz` size `541359` bytes.
+  - installed stock profile `.yaml.zst` files;
+  - the compressed catalogue is installed instead of raw JSON.
 - `python3 integrations/gen_integrations.py` passed.
 - `python3 integrations/gen_docs_integrations.py -c go.d.plugin/snmp_traps`
   passed.
@@ -1564,7 +1582,7 @@ Validation evidence:
   plugin-go --prefix /tmp/netdata-snmptraps-install.[redacted]` passed and
   verified:
   - `profile-format.md` is installed;
-  - `catalogue.json.gz` is installed;
+  - `catalogue.json.zst` is installed;
   - raw `catalogue.json` is not installed;
   - no raw stock `.yaml` files are installed under `default/`.
 - `git diff --check` completed without warnings.
@@ -1839,6 +1857,57 @@ Closed review nits:
       PR already updates capability handling for UDP/162; policy packaging would
       introduce a new cross-distro security surface outside the collector.
 
+### 2026-06-10 Zstd Profile Install And Trap Viewer Defaults Batch
+
+Implemented locally:
+
+- Switched installed stock trap profile compression from gzip to zstd:
+  - repository stock YAML remains raw and reviewable;
+  - CMake compresses installed stock `.yaml` / `.yml` files to `.yaml.zst` /
+    `.yml.zst`;
+  - CMake compresses the installed stock catalogue to `catalogue.json.zst`;
+  - the runtime loader reads raw YAML, `.zst`, and draft-era `.gz`
+    compatibility files with the existing decompressed-size cap.
+- Added `TRAP_JOB` as a dedicated journal field in both the allocation-light
+  serializer and the structured-field serializer.
+- Added `TRAP_JOB` to the C-side systemd-journal facet allowlist.
+- Tightened `snmp:traps` embedded viewer defaults:
+  - default facets are `TRAP_CATEGORY`, `TRAP_DEVICE_VENDOR`, `TRAP_NAME`,
+    `TRAP_SEVERITY`, `TRAP_SOURCE_IP`, `_HOSTNAME`, and `TRAP_JOB`;
+  - empty `facets: []` requests are normalized to those defaults;
+  - `TRAP_NAME` is marked visible in the returned column metadata.
+- Updated packaging dependency surfaces so source/static builds have the `zstd`
+  command available:
+  - main installer dependency helper;
+  - legacy distro dependency helpers;
+  - makeself Alpine bootstrap;
+  - Windows/MSYS2 build dependency scripts;
+  - manual source-install documentation.
+- Updated metadata, generated integration docs, profile-format docs, the trap
+  profile authoring skill, and the SNMP trap query skill.
+
+Validation evidence:
+
+- `GOTOOLCHAIN=go1.26.0 go test -count=1
+  ./cmd/godplugin ./plugin/agent/jobmgr/funcctl ./plugin/agent/jobmgr
+  ./plugin/go.d/collector/snmp_traps ./pkg/funcapi
+  ./plugin/go.d/pkg/snmputils` passed.
+- `bash -n` passed for the touched installer/dependency shell scripts,
+  including the Windows/MSYS2 helpers.
+- `command -v zstd && zstd --version` found `/usr/bin/zstd`, version `1.5.7`.
+- `cmake -S . -B /tmp/netdata-snmptraps-zstd-check -G Ninja
+  -DENABLE_PLUGIN_GO=ON -DENABLE_PLUGIN_XENSTAT=OFF` passed.
+- `cmake --build /tmp/netdata-snmptraps-zstd-check --target go.d.plugin
+  snmp-trap-profile-gen nd-mcp` passed.
+- `cmake --install /tmp/netdata-snmptraps-zstd-check --component plugin-go
+  --prefix /tmp/netdata-snmptraps-zstd-install.[redacted]` passed and verified:
+  - `817` installed stock trap profile `.yaml.zst` files;
+  - `0` raw installed stock trap profile `.yaml` / `.yml` files;
+  - `0` installed stock trap profile `.yaml.gz` / `.yml.gz` files;
+  - `catalogue.json.zst` installed beside `iana-enterprise-numbers.txt` and
+    `profile-format.md`.
+- `git diff --check` completed without warnings.
+
 Still pending:
 
 - Expected SOW merge guard remains until active SOW working files are deleted
@@ -1848,12 +1917,12 @@ Still pending:
 
 External reviewer final pass findings accepted for this patch:
 
-- Qwen found `readMaybeGzipFile()` used unbounded `io.ReadAll()` for profile
-  YAML and stock catalogue files. This is a local-file write/access risk rather
-  than a network-triggered issue, but a malformed `.yaml.gz` or
-  `catalogue.json.gz` should not be able to expand without a hard cap inside the
-  agent. Plan: cap decompressed reads and return an explicit error when the cap
-  is exceeded.
+- Qwen found the compressed profile reader used unbounded `io.ReadAll()` for
+  profile YAML and stock catalogue files.
+  This is a local-file write/access risk rather than a network-triggered issue,
+  but a malformed compressed profile or catalogue should not be able to expand
+  without a hard cap inside the agent. Plan: cap decompressed reads and return
+  an explicit error when the cap is exceeded.
 - Qwen and Minimax both found a profile-template side path where a custom
   profile could explicitly render the synthetic SNMP community varbind into
   `MESSAGE`, labels/`TRAP_TAG_*`, or OTLP body fields. Existing TRAP_JSON and

@@ -16,6 +16,7 @@ package_tree="
   gcc
   git
   gzip
+  zstd
   libatomic1
   libelf-dev
   libjson-c-dev

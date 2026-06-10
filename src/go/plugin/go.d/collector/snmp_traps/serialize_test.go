@@ -46,6 +46,7 @@ func TestSerializeToJournalFields(t *testing.T) {
 	assertField(t, fieldMap, "MESSAGE", "linkDown on interface eth0")
 	assertField(t, fieldMap, "PRIORITY", "4")
 	assertField(t, fieldMap, "SYSLOG_IDENTIFIER", "local")
+	assertField(t, fieldMap, "TRAP_JOB", "local")
 	assertField(t, fieldMap, "_HOSTNAME", "core-sw-01")
 	assertField(t, fieldMap, "ND_LOG_SOURCE", "snmp-trap")
 	assertField(t, fieldMap, "TRAP_REPORT_TYPE", "trap")
@@ -112,6 +113,7 @@ func TestSerializeToJournalFieldsDedupSummary(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	fieldMap := fieldsToMap(fields)
+	assertField(t, fieldMap, "TRAP_JOB", "local")
 	assertField(t, fieldMap, "TRAP_REPORT_TYPE", "deduplication_summary")
 	assertField(t, fieldMap, "TRAP_SUPPRESSED_COUNT", "5")
 	assertField(t, fieldMap, "TRAP_SUPPRESSED_FINGERPRINTS", "3")
@@ -157,6 +159,7 @@ func TestSerializeToJournalFieldsDecodeError(t *testing.T) {
 	}
 	fieldMap := fieldsToMap(fields)
 
+	assertField(t, fieldMap, "TRAP_JOB", "local")
 	assertField(t, fieldMap, "TRAP_REPORT_TYPE", "decode_error")
 	assertField(t, fieldMap, "TRAP_CATEGORY", "diagnostic")
 	assertField(t, fieldMap, "TRAP_SEVERITY", "warning")

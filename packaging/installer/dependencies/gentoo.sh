@@ -9,6 +9,7 @@ DONT_WAIT=0
 
 package_tree="
   app-alternatives/gzip
+  app-arch/zstd
   app-alternatives/tar
   app-arch/lz4
   dev-lang/python

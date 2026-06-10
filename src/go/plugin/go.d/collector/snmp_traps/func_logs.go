@@ -60,6 +60,7 @@ func (h *snmpTrapsFunctionHandler) HandleRaw(ctx context.Context, req funcapi.Ra
 	if err != nil {
 		return funcapi.ErrorResponse(400, "SNMP trap logs query failed: %v", err)
 	}
+	tuneSNMPTrapsLogsResponse(resp)
 	return funcapi.RawResponse(resp)
 }
 
@@ -72,32 +73,34 @@ func (h *snmpTrapsFunctionHandler) isLogsMethod(method string) bool {
 func newSNMPTrapsJournalFunction() sdkjournal.NetdataJournalFunction {
 	cfg := sdkjournal.SystemdJournalNetdataFunctionConfig()
 	cfg.FunctionName = snmpTrapsFunctionName
-	cfg.DefaultFacets = []string{
-		"TRAP_REPORT_TYPE",
-		"TRAP_DECODE_ERROR_KIND",
-		"TRAP_SEVERITY",
+	cfg.DefaultFacets = snmpTrapsDefaultLogFacets()
+	cfg.DefaultViewKeys = snmpTrapsDefaultViewKeys()
+	cfg.DefaultHistogram = "TRAP_SEVERITY"
+	return sdkjournal.NewNetdataJournalFunction(cfg, sdkjournal.SystemdJournalProfile{})
+}
+
+func snmpTrapsDefaultLogFacets() []string {
+	return []string{
 		"TRAP_CATEGORY",
-		"TRAP_NAME",
 		"TRAP_DEVICE_VENDOR",
-		"_HOSTNAME",
+		"TRAP_NAME",
+		"TRAP_SEVERITY",
 		"TRAP_SOURCE_IP",
-		"TRAP_SOURCE_UDP_PEER",
-		"TRAP_SOURCE_UDP_PORT",
-		"TRAP_LISTENER",
-		"TRAP_ENGINE_ID",
-		"TRAP_OID",
-		"TRAP_PDU_TYPE",
-		"TRAP_VERSION",
-		"ND_NIDL_NODE",
+		"_HOSTNAME",
+		"TRAP_JOB",
 	}
-	cfg.DefaultViewKeys = []string{
+}
+
+func snmpTrapsDefaultViewKeys() []string {
+	return []string{
 		"MESSAGE",
+		"_HOSTNAME",
+		"TRAP_NAME",
 		"TRAP_SEVERITY",
 		"TRAP_CATEGORY",
-		"TRAP_NAME",
+		"TRAP_JOB",
 		"TRAP_DECODE_ERROR_KIND",
 		"TRAP_DECODE_ERROR",
-		"_HOSTNAME",
 		"TRAP_SOURCE_IP",
 		"TRAP_SOURCE_UDP_PEER",
 		"TRAP_SOURCE_UDP_PORT",
@@ -107,8 +110,6 @@ func newSNMPTrapsJournalFunction() sdkjournal.NetdataJournalFunction {
 		"TRAP_PACKET_SHA256",
 		"TRAP_JSON",
 	}
-	cfg.DefaultHistogram = "TRAP_SEVERITY"
-	return sdkjournal.NewNetdataJournalFunction(cfg, sdkjournal.SystemdJournalProfile{})
 }
 
 func netdataLogsRequestPayload(req funcapi.RawMethodRequest) []byte {
@@ -118,7 +119,48 @@ func netdataLogsRequestPayload(req funcapi.RawMethodRequest) []byte {
 	if len(bytes.TrimSpace(req.Payload)) == 0 {
 		return []byte(`{}`)
 	}
-	return req.Payload
+	return normalizeSNMPTrapsLogsRequestPayload(req.Payload)
+}
+
+func normalizeSNMPTrapsLogsRequestPayload(payload []byte) []byte {
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &object); err != nil {
+		return payload
+	}
+	facetsRaw, ok := object["facets"]
+	if !ok {
+		return payload
+	}
+	var facets []json.RawMessage
+	if err := json.Unmarshal(facetsRaw, &facets); err != nil || len(facets) != 0 {
+		return payload
+	}
+	defaultFacets, err := json.Marshal(snmpTrapsDefaultLogFacets())
+	if err != nil {
+		return payload
+	}
+	object["facets"] = defaultFacets
+	normalized, err := json.Marshal(object)
+	if err != nil {
+		return payload
+	}
+	return normalized
+}
+
+func tuneSNMPTrapsLogsResponse(resp map[string]any) {
+	setSNMPTrapsColumnVisible(resp, "TRAP_NAME")
+}
+
+func setSNMPTrapsColumnVisible(resp map[string]any, key string) {
+	columns, ok := resp["columns"].(map[string]any)
+	if !ok {
+		return
+	}
+	column, ok := columns[key].(map[string]any)
+	if !ok {
+		return
+	}
+	column["visible"] = true
 }
 
 func netdataLogsRunOptions(ctx context.Context, timeout time.Duration, root string) sdkjournal.NetdataFunctionRunOptions {

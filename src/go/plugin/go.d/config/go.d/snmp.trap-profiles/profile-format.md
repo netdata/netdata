@@ -39,8 +39,9 @@ The plugin reads stock profiles from the go.d stock config directory
 profiles from the go.d user config directory `snmp.trap-profiles/` subdirectory
 (typically `/etc/netdata/go.d/snmp.trap-profiles/`). Stock files are plain
 `.yaml` in the source repository for reviewability; installed packages ship
-them as `.yaml.gz`. The loader accepts `.yaml`, `.yml`, `.yaml.gz`, and
-`.yml.gz`.
+them as `.yaml.zst`. The loader accepts `.yaml`, `.yml`, `.yaml.zst`, and
+`.yml.zst`; draft-era `.yaml.gz` and `.yml.gz` files are also accepted as a
+compatibility fallback.
 
 Profiles are loaded **only when the first runnable SNMP trap job is created** —
 Netdata agents that do not receive traps never pay the memory footprint.
@@ -343,7 +344,7 @@ The plugin loader mirrors the SNMP polling plugin's multipath pattern
 
 1. **Same filename in higher-priority directory replaces the lower-priority
    one entirely.** Operator `ciscosystems.yaml` fully replaces stock
-   `ciscosystems.yaml` or installed `ciscosystems.yaml.gz` — copy + edit the
+   `ciscosystems.yaml` or installed `ciscosystems.yaml.zst` — copy + edit the
    whole file to customize one vendor.
 2. **Different filename adds entries.** Operator `site-additions.yaml`
    (different filename) merges its `traps:` into the loaded set without

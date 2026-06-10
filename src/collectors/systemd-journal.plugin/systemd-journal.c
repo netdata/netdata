@@ -155,6 +155,7 @@ static __always_inline SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(cons
     "|TRAP_DECODE_ERROR_KIND"                                                                                                  \
     "|TRAP_DECODE_ERROR"                                                                                                       \
     "|TRAP_REPORT_PERIOD_SEC"                                                                                                  \
+    "|TRAP_JOB"                                                                                                                \
     "|TRAP_OID"                                                                                                                \
     "|TRAP_NAME"                                                                                                               \
     "|TRAP_CATEGORY"                                                                                                           \

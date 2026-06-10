@@ -16,6 +16,7 @@ declare -a package_tree=(
   gcc
   git
   gzip
+  zstd
   json-c
   libelf
   libmnl

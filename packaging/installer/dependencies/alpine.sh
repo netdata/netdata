@@ -19,6 +19,7 @@ package_tree="
   gcc
   git
   gzip
+  zstd
   json-c-dev
   libatomic
   libmnl-dev

@@ -67,6 +67,7 @@ The collector writes structured fields that are useful for queries:
 | `MESSAGE` | Rendered human-readable trap description |
 | `ND_LOG_SOURCE=snmp-trap` | Fast discriminator for trap entries |
 | `TRAP_REPORT_TYPE` | `trap`, `deduplication_summary`, or `decode_error` |
+| `TRAP_JOB` | Trap listener job name |
 | `TRAP_OID` | Numeric trap OID |
 | `TRAP_NAME` | MIB-qualified trap name |
 | `TRAP_PDU_TYPE` | `trap` (unacknowledged) or `inform` |

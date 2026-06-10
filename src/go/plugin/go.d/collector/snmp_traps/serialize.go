@@ -71,6 +71,7 @@ func serializeToJournalFields(entry *TrapEntry) ([]JournalField, error) {
 	fields = append(fields, JournalField{Name: "MESSAGE", Value: []byte(entry.Message)})
 	fields = append(fields, JournalField{Name: "PRIORITY", Value: []byte(severityPriority(entry.Severity))})
 	fields = append(fields, JournalField{Name: "SYSLOG_IDENTIFIER", Value: []byte(entry.JobName)})
+	fields = append(fields, JournalField{Name: "TRAP_JOB", Value: []byte(entry.JobName)})
 
 	if !isDedupSummary && hostname != "" {
 		fields = append(fields, JournalField{Name: "_HOSTNAME", Value: []byte(hostname)})
@@ -365,6 +366,7 @@ func (s *journalHotSerializer) serialize(entry *TrapEntry) ([][]byte, int, error
 	s.addStringField("MESSAGE", entry.Message)
 	s.addStringField("PRIORITY", severityPriority(entry.Severity))
 	s.addStringField("SYSLOG_IDENTIFIER", entry.JobName)
+	s.addStringField("TRAP_JOB", entry.JobName)
 
 	if !isDedupSummary && hostname != "" {
 		s.addStringField("_HOSTNAME", hostname)

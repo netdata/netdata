@@ -752,6 +752,13 @@ declare -A pkg_gzip=(
   ['default']="gzip"
 )
 
+declare -A pkg_zstd_cmd=(
+  ['gentoo']="app-arch/zstd"
+  ['macos']="zstd"
+  ['freebsd']="zstd"
+  ['default']="zstd"
+)
+
 declare -A pkg_tar=(
   ['gentoo']="app-alternatives/tar"
   ['clearlinux']="os-core-update"
@@ -1265,6 +1272,7 @@ packages() {
     require_cmd tar || suitable_package tar
     require_cmd curl || suitable_package curl
     require_cmd gzip || suitable_package gzip
+    require_cmd zstd || suitable_package zstd_cmd
     require_cmd patch || suitable_package patch
   fi
 

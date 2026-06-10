@@ -60,6 +60,17 @@ func TestSNMPTrapsLogsFunctionInfoAndQuery(t *testing.T) {
 	assert.Contains(t, string(rawInfo), "local")
 	assert.Contains(t, string(rawInfo), "remote")
 
+	defaults := handler.HandleRaw(context.Background(), funcapiRawRequest("logs", false, []byte(`{
+  "last": 10,
+  "direction": "backward",
+  "facets": []
+}`)))
+	require.NotNil(t, defaults)
+	require.NotNil(t, defaults.RawResponse)
+	assert.Equal(t, 200, defaults.RawResponse["status"])
+	assertResponseFacetIDs(t, defaults.RawResponse, snmpTrapsDefaultLogFacets())
+	assertResponseColumnVisible(t, defaults.RawResponse, "TRAP_NAME")
+
 	query := handler.HandleRaw(context.Background(), funcapiRawRequest("logs", false, []byte(`{
   "last": 10,
   "direction": "backward",
@@ -134,6 +145,8 @@ func writeTestTrapJournal(t *testing.T, root, jobName, message, category string)
 		{Name: "MESSAGE", Value: []byte(message)},
 		{Name: "PRIORITY", Value: []byte("4")},
 		{Name: "SYSLOG_IDENTIFIER", Value: []byte(jobName)},
+		{Name: "TRAP_JOB", Value: []byte(jobName)},
+		{Name: "_HOSTNAME", Value: []byte(jobName + "-host")},
 		{Name: "ND_LOG_SOURCE", Value: []byte("snmp-trap")},
 		{Name: "TRAP_REPORT_TYPE", Value: []byte("trap")},
 		{Name: "TRAP_OID", Value: []byte("1.3.6.1.6.3.1.1.5.1")},
@@ -141,6 +154,7 @@ func writeTestTrapJournal(t *testing.T, root, jobName, message, category string)
 		{Name: "TRAP_CATEGORY", Value: []byte(category)},
 		{Name: "TRAP_SEVERITY", Value: []byte("warning")},
 		{Name: "TRAP_SOURCE_IP", Value: []byte("192.0.2.1")},
+		{Name: "TRAP_DEVICE_VENDOR", Value: []byte("test-vendor")},
 		{Name: "TRAP_JSON", Value: []byte(`{"trap_oid":"1.3.6.1.6.3.1.1.5.1"}`)},
 	}, now, monotonicUsec()))
 	require.NoError(t, w.Sync())
@@ -154,4 +168,30 @@ func funcapiRawRequest(method string, info bool, payload []byte) funcapi.RawMeth
 		Payload: payload,
 		Timeout: time.Second,
 	}
+}
+
+func assertResponseFacetIDs(t *testing.T, response map[string]any, want []string) {
+	t.Helper()
+	facets, ok := response["facets"].([]any)
+	require.True(t, ok, "response facets type = %T", response["facets"])
+	got := make(map[string]bool, len(facets))
+	for _, facetAny := range facets {
+		facet, ok := facetAny.(map[string]any)
+		require.True(t, ok, "facet type = %T", facetAny)
+		id, ok := facet["id"].(string)
+		require.True(t, ok, "facet id type = %T", facet["id"])
+		got[id] = true
+	}
+	for _, id := range want {
+		assert.True(t, got[id], "expected default facet %s in %#v", id, got)
+	}
+}
+
+func assertResponseColumnVisible(t *testing.T, response map[string]any, key string) {
+	t.Helper()
+	columns, ok := response["columns"].(map[string]any)
+	require.True(t, ok, "response columns type = %T", response["columns"])
+	column, ok := columns[key].(map[string]any)
+	require.True(t, ok, "missing column %s in %#v", key, columns)
+	assert.Equal(t, true, column["visible"])
 }

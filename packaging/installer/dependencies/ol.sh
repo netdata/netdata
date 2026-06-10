@@ -17,6 +17,7 @@ declare -a package_tree=(
   gcc-c++
   git
   gzip
+  zstd
   json-c-devel
   libatomic
   libmnl-devel

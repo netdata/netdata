@@ -14,6 +14,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -222,7 +223,29 @@ traps:
 	assert.NotNil(t, td.sharedVarbinds)
 }
 
-func TestProfileLoadGzipYAML(t *testing.T) {
+func TestProfileLoadZstdYAML(t *testing.T) {
+	dir := t.TempDir()
+	writeProfileYAMLZstd(t, dir, "test.yaml.zst", `
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.3
+    name: IF-MIB::linkDown
+    category: state_change
+    severity: warning
+`)
+
+	setTestDirs(t, dir)
+	resetProfileCacheForTest()
+
+	idx, err := AcquireProfileCache()
+	require.NoError(t, err)
+	defer ReleaseProfileCache()
+
+	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
+	require.NotNil(t, td)
+	assert.Equal(t, "IF-MIB::linkDown", td.Name)
+}
+
+func TestProfileLoadLegacyGzipYAML(t *testing.T) {
 	dir := t.TempDir()
 	writeProfileYAMLGzip(t, dir, "test.yaml.gz", `
 traps:
@@ -244,9 +267,9 @@ traps:
 	assert.Equal(t, "IF-MIB::linkDown", td.Name)
 }
 
-func TestStockProfileStoreLazyLoadsRoutedGzip(t *testing.T) {
+func TestStockProfileStoreLazyLoadsRoutedZstd(t *testing.T) {
 	stockDir := t.TempDir()
-	writeProfileYAMLGzip(t, stockDir, "ciscosystems.yaml.gz", `
+	writeProfileYAMLZstd(t, stockDir, "ciscosystems.yaml.zst", `
 traps:
   - oid: 1.3.6.1.4.1.9.1.0.1
     name: TEST-CISCO-MIB::testTrap
@@ -270,15 +293,15 @@ traps:
 	assert.Len(t, idx.trapsByOID, 1)
 }
 
-func TestReadMaybeGzipFileRejectsOversizedDecompressedProfile(t *testing.T) {
+func TestReadMaybeCompressedFileRejectsOversizedDecompressedProfile(t *testing.T) {
 	dir := t.TempDir()
-	writeProfileYAMLGzip(t, dir, "oversized.yaml.gz", strings.Repeat("x", 32))
+	writeProfileYAMLZstd(t, dir, "oversized.yaml.zst", strings.Repeat("x", 32))
 
 	oldLimit := maxProfileFileBytes
 	maxProfileFileBytes = 16
 	t.Cleanup(func() { maxProfileFileBytes = oldLimit })
 
-	_, err := readMaybeGzipFile(filepath.Join(dir, "oversized.yaml.gz"))
+	_, err := readMaybeCompressedFile(filepath.Join(dir, "oversized.yaml.zst"))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exceeds maximum decompressed size")
 }
@@ -287,8 +310,8 @@ func TestStockProfileStoreUsesCatalogueWithoutParsingProfiles(t *testing.T) {
 	rootDir := t.TempDir()
 	stockDir := filepath.Join(rootDir, "default")
 	require.NoError(t, os.MkdirAll(stockDir, 0o755))
-	writeProfileYAMLGzip(t, stockDir, "ciscosystems.yaml.gz", `not: [valid`)
-	writeProfileYAMLGzip(t, rootDir, "catalogue.json.gz", `{
+	writeProfileYAMLZstd(t, stockDir, "ciscosystems.yaml.zst", `not: [valid`)
+	writeProfileYAMLZstd(t, rootDir, "catalogue.json.zst", `{
   "ciscosystems": {
     "file": "ciscosystems.yaml",
     "trap_count": 1,
@@ -316,7 +339,7 @@ func TestStockProfileStoreUsesCatalogueWithoutParsingProfiles(t *testing.T) {
 func TestOverridesApplyToLazyLoadedStockProfiles(t *testing.T) {
 	stockDir := t.TempDir()
 	const oid = "1.3.6.1.4.1.9.1.0.1"
-	writeProfileYAMLGzip(t, stockDir, "ciscosystems.yaml.gz", `
+	writeProfileYAMLZstd(t, stockDir, "ciscosystems.yaml.zst", `
 traps:
   - oid: 1.3.6.1.4.1.9.1.0.1
     name: TEST-CISCO-MIB::testTrap
@@ -362,7 +385,7 @@ traps:
 
 func TestStockProfileStoreLazyLoadErrorIsReported(t *testing.T) {
 	stockDir := t.TempDir()
-	writeProfileYAMLGzip(t, stockDir, "ciscosystems.yaml.gz", `
+	writeProfileYAMLZstd(t, stockDir, "ciscosystems.yaml.zst", `
 traps:
   - oid: 1.3.6.1.4.1.9.1.0.1
     name: TEST-CISCO-MIB::testTrap
@@ -377,7 +400,7 @@ traps:
 	store, err := buildStockProfileStore(stockDir, multipath.New(stockDir), nil, idx)
 	require.NoError(t, err)
 	idx.stock = store
-	require.NoError(t, os.Remove(filepath.Join(stockDir, "ciscosystems.yaml.gz")))
+	require.NoError(t, os.Remove(filepath.Join(stockDir, "ciscosystems.yaml.zst")))
 
 	td, err := idx.LookupWithError("1.3.6.1.4.1.9.1.0.1")
 	require.Error(t, err)
@@ -395,7 +418,7 @@ traps:
     category: security
     severity: warning
 `)
-	writeProfileYAMLGzip(t, stockDir, "ciscosystems.yaml.gz", `
+	writeProfileYAMLZstd(t, stockDir, "ciscosystems.yaml.zst", `
 traps:
   - oid: 1.3.6.1.4.1.9.1.0.2
     name: TEST-CISCO-MIB::stockTrap
@@ -1989,6 +2012,7 @@ func TestStockProfileCatalogueMatchesDefaultFiles(t *testing.T) {
 	totalFiles := 0
 	for _, path := range files {
 		name := filepath.Base(path)
+		require.False(t, strings.HasSuffix(name, ".zst"), "stock profiles must stay uncompressed in the repository")
 		require.False(t, strings.HasSuffix(name, ".gz"), "stock profiles must stay uncompressed in the repository")
 		routes := profileTrapRoutesFromFile(t, path)
 		routesByFile[name] = routes
@@ -2165,6 +2189,20 @@ func writeProfileYAML(t *testing.T, dir, name, content string) {
 	path := filepath.Join(dir, name)
 	err := os.WriteFile(path, []byte(content), 0644)
 	require.NoError(t, err)
+}
+
+func writeProfileYAMLZstd(t *testing.T, dir, name, content string) {
+	t.Helper()
+	path := filepath.Join(dir, name)
+	file, err := os.Create(path)
+	require.NoError(t, err)
+	defer file.Close()
+
+	zw, err := zstd.NewWriter(file)
+	require.NoError(t, err)
+	_, err = zw.Write([]byte(content))
+	require.NoError(t, err)
+	require.NoError(t, zw.Close())
 }
 
 func writeProfileYAMLGzip(t *testing.T, dir, name, content string) {

@@ -4392,9 +4392,9 @@ if(ENABLE_PLUGIN_GO)
     install(FILES ${GO_SNMP_TRAP_PROFILE_FILES}
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default)
-    find_program(GZIP_EXECUTABLE NAMES gzip DOC "GZIP compression program")
-    if(NOT GZIP_EXECUTABLE)
-        message(FATAL_ERROR "Unable to find gzip command required to compress SNMP trap stock profiles")
+    find_program(ZSTD_EXECUTABLE NAMES zstd DOC "Zstandard compression program")
+    if(NOT ZSTD_EXECUTABLE)
+        message(FATAL_ERROR "Unable to find zstd command required to compress SNMP trap stock profiles")
     endif()
     install(CODE "
         file(GLOB _snmp_trap_profiles
@@ -4402,11 +4402,11 @@ if(ENABLE_PLUGIN_GO)
             \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default/*.yml\")
         foreach(_profile IN LISTS _snmp_trap_profiles)
             execute_process(
-                COMMAND \"${GZIP_EXECUTABLE}\" -f -9 \"\${_profile}\"
-                RESULT_VARIABLE _gzip_result
-                ERROR_VARIABLE _gzip_error)
-            if(NOT _gzip_result EQUAL 0)
-                message(FATAL_ERROR \"failed to gzip SNMP trap profile '\${_profile}': \${_gzip_error}\")
+                COMMAND \"${ZSTD_EXECUTABLE}\" -q -f -19 --rm \"\${_profile}\"
+                RESULT_VARIABLE _zstd_result
+                ERROR_VARIABLE _zstd_error)
+            if(NOT _zstd_result EQUAL 0)
+                message(FATAL_ERROR \"failed to zstd-compress SNMP trap profile '\${_profile}': \${_zstd_error}\")
             endif()
         endforeach()
     " COMPONENT plugin-go)
@@ -4417,11 +4417,11 @@ if(ENABLE_PLUGIN_GO)
         set(_snmp_trap_catalogue \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/catalogue.json\")
         if(EXISTS \"\${_snmp_trap_catalogue}\")
             execute_process(
-                COMMAND \"${GZIP_EXECUTABLE}\" -f -9 \"\${_snmp_trap_catalogue}\"
-                RESULT_VARIABLE _gzip_result
-                ERROR_VARIABLE _gzip_error)
-            if(NOT _gzip_result EQUAL 0)
-                message(FATAL_ERROR \"failed to gzip SNMP trap profile catalogue '\${_snmp_trap_catalogue}': \${_gzip_error}\")
+                COMMAND \"${ZSTD_EXECUTABLE}\" -q -f -19 --rm \"\${_snmp_trap_catalogue}\"
+                RESULT_VARIABLE _zstd_result
+                ERROR_VARIABLE _zstd_error)
+            if(NOT _zstd_result EQUAL 0)
+                message(FATAL_ERROR \"failed to zstd-compress SNMP trap profile catalogue '\${_snmp_trap_catalogue}': \${_zstd_error}\")
             endif()
         endif()
     " COMPONENT plugin-go)
