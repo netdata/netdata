@@ -1,0 +1,10 @@
+taxonomy_version: 1
+plugin_name: windows.plugin
+module_name: GetFans
+placements:
+  - id: windows-fans
+    section_id: system.hardware
+    title: Fans (Win)
+    items:
+      - system.hw.sensor.fan.input
+      - system.hw.sensor.fan.alarm

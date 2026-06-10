@@ -40,6 +40,14 @@ static struct proc_module {
      .rd = NULL,
      .thread = NULL,
      .cleanup = do_GetPowerSupply_cleanup},
+    {.name = "GetFans",
+     .dim = "GetFans",
+     .enabled = CONFIG_BOOLEAN_YES,
+     .update_every = 10 * UPDATE_EVERY_MIN,
+     .func = do_GetFans,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = do_GetFans_cleanup},
     {.name = "GetSensors",
      .dim = "GetSensors",
      .enabled = CONFIG_BOOLEAN_YES,
@@ -209,8 +217,8 @@ static struct proc_module {
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL, .rd = NULL, .thread = NULL, .cleanup = NULL}};
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 36
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 36
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 37
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 37
 #endif
 
 static void windows_main_cleanup(void *pptr)

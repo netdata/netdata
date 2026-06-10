@@ -15,6 +15,7 @@ modules:
         - S.M.A.R.T.
         - SCSI devices
         - ATA devices
+        - Windows
       related_resources:
         integrations:
           list: []
@@ -24,16 +25,16 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors the health status of storage devices by analyzing S.M.A.R.T. (Self-Monitoring, Analysis, and Reporting Technology) counters.
-          It relies on the [`smartctl`](https://linux.die.net/man/8/smartctl) CLI tool but avoids directly executing the binary.
-          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
-          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+          It relies on the [`smartctl`](https://linux.die.net/man/8/smartctl) CLI tool.
+          On Linux and BSD, it executes `smartctl` through `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          On Windows, it executes the installed `smartctl.exe` directly from `PATH` or the default smartmontools installation directory.
 
           Executed commands:
-          -  `smartctl --json --scan`
-          -  `smartctl --json --all {deviceName} --device {deviceType} --nocheck {powerMode}`
+          -  `smartctl --json --scan` or `smartctl --json --scan-open`
+          -  `smartctl --json --xall --device {deviceType} --nocheck {powerMode} {deviceName}`
         method_description: ""
       supported_platforms:
-        include: [Linux, BSD]
+        include: [Linux, BSD, Windows]
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -50,7 +51,9 @@ modules:
         list:
           - title: Install smartmontools (v7.0+)
             description: |
-              Install `smartmontools` version 7.0 or later using your distribution's package manager. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
+              Install `smartmontools` version 7.0 or later. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
+
+              On Windows, install smartmontools and make sure `smartctl.exe` is available in `PATH` or under the default `Program Files\smartmontools\bin\smartctl.exe` location.
           - title: For Netdata running in a Docker container
             description: |
               **Provide access to storage devices**.
