@@ -14,6 +14,7 @@ Group=netdata
 RuntimeDirectory=netdata
 RuntimeDirectoryMode=0775
 PIDFile=/run/netdata/netdata.pid
+ExecStartPre=/bin/sh -c 'if [ -d /var/log/journal ]; then install -d -o @netdata_user_POST@ -g @netdata_group_POST@ -m 0755 /var/log/journal/netdata /var/log/journal/netdata/snmp-traps; fi'
 ExecStart=@sbindir_POST@/netdata -P /run/netdata/netdata.pid -D
 PermissionsStartOnly=true
 

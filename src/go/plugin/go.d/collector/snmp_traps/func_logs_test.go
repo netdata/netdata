@@ -32,6 +32,7 @@ func TestSNMPTrapsMethodsExposeReloadAndLogs(t *testing.T) {
 	assert.True(t, logs.RawRequest)
 	assert.True(t, logs.RequireCloud)
 	assert.True(t, logs.AgentWide)
+	assert.NotNil(t, logs.Available)
 }
 
 func TestSNMPTrapsJournalFunctionUsesPublicFunctionName(t *testing.T) {

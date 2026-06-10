@@ -776,6 +776,16 @@ install_netdata_tmpfiles() {
   fi
 }
 
+install_netdata_snmp_trap_journal_dir() {
+  if [ "${UID}" -ne 0 ] || [ ! -d /var/log/journal ]; then
+    return 0
+  fi
+
+  run mkdir -p /var/log/journal/netdata/snmp-traps || return 1
+  run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" /var/log/journal/netdata || return 1
+  run chmod 0755 /var/log/journal/netdata /var/log/journal/netdata/snmp-traps || return 1
+}
+
 install_netdata_dirs() {
   _DIRS_INSTALLED=0
   if install_netdata_tmpfiles && command -v systemd-tmpfiles >/dev/null 2>&1 ; then
@@ -804,6 +814,10 @@ install_netdata_dirs() {
     fi
     run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_CLAIMING_DIR}"
     run chmod 770 "${NETDATA_CLAIMING_DIR}"
+  fi
+
+  if ! install_netdata_snmp_trap_journal_dir; then
+    warning "Failed to create /var/log/journal/netdata/snmp-traps. SNMP trap jobs using direct journals will fail until it is created manually."
   fi
 }
 

@@ -548,6 +548,7 @@ func TestSnmpTrapsMethods(t *testing.T) {
 	assert.Equal(t, snmpTrapsFunctionName, logs.FunctionName)
 	assert.True(t, logs.RawRequest)
 	assert.Equal(t, "logs", logs.ResponseType)
+	require.NotNil(t, logs.Available)
 }
 
 func TestSnmpTrapsLogsMethodAvailabilityFollowsDirectJournalJobs(t *testing.T) {

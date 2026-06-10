@@ -9,8 +9,13 @@ compressed profile installation, retry classification, writer shutdown,
 listener observability hardening, the approved persistent-journal storage path,
 the binary journal encoding metric rename, decode-error journal entries,
 listener read-error logging, and the final Go 1.26 cleanup are implemented
-locally. Remaining review-risk items are validation-only or final merge
-preparation items.
+locally. Runtime validation found two remaining issues: DynCfg test
+instantiates collectors without injecting the job name, and installed agents
+cannot start direct-journal trap jobs unless packaging/service setup creates
+`/var/log/journal/netdata/snmp-traps` for the plugin user. The missing
+`snmp:traps` Function on a failed job is an expected consequence of the
+direct-journal-only availability gate: the Function is published only after a
+direct-journal trap job starts successfully.
 
 ## Requirements
 
@@ -203,6 +208,21 @@ Current state:
   and documents that `AgentWide` still dispatches through the first running job.
 - `snmp_traps` registers `snmp:traps` as `AgentWide: true`,
   `RawRequest: true`, and `RequireCloud: true`.
+- Runtime validation on an installed PR build showed:
+  - direct Function calls for `snmp:traps` return `404`, proving the Function is
+    not registered by `go.d.plugin`, not merely hidden by the UI;
+  - DynCfg `test` for an SNMP traps job fails with
+    `Job initialization failed: job name is empty`;
+  - `runDyncfgCmdTest()` creates a module via `newConfigModule()` and calls
+    `Init()` directly, while normal job creation uses `jobFactory.createV2()`
+    which injects `SetJobName(cfg.Name())` before config application;
+  - `snmpTrapsLogsMethodConfig()` uses an `Available` callback backed by the
+    active direct-journal job counter, so a failed job does not publish
+    `snmp:traps`. This matches the direct-journal-only Function requirement.
+  - recent installed-agent logs show the configured trap job failing at
+    initialization with `mkdir /var/log/journal/netdata: permission denied`.
+    `/var/log/journal` exists and is owned by `root:systemd-journal`, while
+    `/var/log/journal/netdata/snmp-traps` does not exist.
 - `journal_writer.go` currently stores trap journals under
   `buildinfo.CacheDir/traps/<job>`.
 - `systemd-journal-files.c` adds `/var/log/journal` as a default directory and
@@ -230,6 +250,13 @@ Risks:
 - **Function API regression:** changing dispatch can affect all go.d Functions,
   not only SNMP traps. Tests must cover existing module methods, job methods,
   aliases, public names, and CLI resolution.
+- **DynCfg test regression:** collectors that require framework-injected job
+  names fail the DynCfg test path even though the normal apply path can inject
+  the same name correctly.
+- **Packaging/service setup regression:** direct-journal trap jobs correctly
+  fail at job creation when their journal directory cannot be created, but the
+  installer/package/service layer must create the Netdata-owned subdirectory on
+  systems that already have persistent journald enabled.
 - **Stale Function UX:** if `snmp:traps` remains visible when no direct-journal
   job exists, users can click a logs Function that cannot return data.
 - **Streaming/protocol risk:** Function removal is intentionally handled by a
@@ -1549,6 +1576,43 @@ Validation evidence:
     `0 allocs/op`;
   - `BenchmarkDedupAdmitDuplicate-24`: `378.9 ns/op`, `0 B/op`,
     `0 allocs/op`.
+
+### 2026-06-10 Installed Runtime Function Availability Fix
+
+Implemented locally:
+
+- DynCfg `test` now injects `SetJobName()` into V2 collectors before applying
+  config and calling `Init()`, matching normal job creation.
+- Installer/service setup now conditionally creates
+  `/var/log/journal/netdata/snmp-traps` for the Netdata plugin user when
+  `/var/log/journal` already exists.
+- The installer does not create `/var/log/journal` itself, so it does not
+  silently enable persistent journald storage on systems that have not enabled
+  it.
+- `snmp:traps` remains gated on running direct-journal trap jobs; OTLP-only or
+  failed jobs do not publish the direct-journal logs Function.
+
+Runtime evidence:
+
+- Installed-agent logs showed `snmp_traps/local` failing at job initialization
+  with a permission error while creating `/var/log/journal/netdata`.
+- After creating the directory with the running plugin user and restarting
+  Netdata, installed-agent logs showed `snmp_traps/local` check success and
+  started.
+- `/api/v1/functions` listed both `snmp_traps:reload-profiles` and
+  `snmp:traps`.
+- Direct local execution of `snmp:traps` returned `412` Cloud SSO required
+  rather than `404`, proving the Function is registered while preserving the
+  Cloud-only access contract.
+
+Validation evidence:
+
+- `go test -count=1 ./plugin/agent/jobmgr ./plugin/agent/jobmgr/funcctl
+  ./cmd/godplugin ./plugin/go.d/collector/snmp_traps` passed.
+- `sh -n packaging/installer/functions.sh
+  packaging/cmake/pkg-files/deb/plugin-go/postinst
+  packaging/makeself/install-or-update.sh` passed.
+- `git diff --check` completed without warnings.
 
 Closed review nits:
 

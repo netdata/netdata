@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -35,6 +36,39 @@ type externalCodedError struct {
 func (e *externalCodedError) Error() string   { return e.err.Error() }
 func (e *externalCodedError) Code() int       { return e.code }
 func (e *externalCodedError) Retryable() bool { return e.retryable }
+
+type jobNameRequiredV2Collector struct {
+	collectorapi.Base
+
+	jobName string
+	store   metrix.CollectorStore
+}
+
+func newJobNameRequiredV2Collector() *jobNameRequiredV2Collector {
+	return &jobNameRequiredV2Collector{
+		store: metrix.NewCollectorStore(),
+	}
+}
+
+func (c *jobNameRequiredV2Collector) SetJobName(name string) {
+	c.jobName = name
+}
+
+func (c *jobNameRequiredV2Collector) Init(context.Context) error {
+	if c.jobName == "" {
+		return errors.New("job name missing")
+	}
+	return nil
+}
+
+func (c *jobNameRequiredV2Collector) Check(context.Context) error   { return nil }
+func (c *jobNameRequiredV2Collector) Collect(context.Context) error { return nil }
+func (c *jobNameRequiredV2Collector) Cleanup(context.Context)       {}
+func (c *jobNameRequiredV2Collector) Configuration() any            { return map[string]any{} }
+func (c *jobNameRequiredV2Collector) MetricStore() metrix.CollectorStore {
+	return c.store
+}
+func (c *jobNameRequiredV2Collector) ChartTemplateYAML() string { return "" }
 
 func TestDyncfgConfigUserconfig_InvalidPayload_Returns400Only(t *testing.T) {
 	tests := map[string]struct {
@@ -139,6 +173,32 @@ func TestDyncfgCmdTestTimeout_RequestTimeoutOverridesDefault(t *testing.T) {
 
 	withoutTimeout := dyncfg.NewFunction(functions.Function{})
 	assert.Equal(t, cmdTestDefaultTimeout, mgr.dyncfgCmdTestTimeout(withoutTimeout))
+}
+
+func TestDyncfgCmdTest_PassesJobNameToV2Collector(t *testing.T) {
+	var buf bytes.Buffer
+
+	mgr := newCollectorTestManager()
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
+	mgr.modules.Register("jobnamerequired", collectorapi.Creator{
+		CreateV2: func() collectorapi.CollectorV2 {
+			return newJobNameRequiredV2Collector()
+		},
+	})
+
+	fn := dyncfg.NewFunction(functions.Function{
+		UID:         "test-v2-job-name",
+		ContentType: "application/json",
+		Payload:     mustMarshalCollectorConfigPayload(t, prepareDyncfgCfg("jobnamerequired", "payload-name")),
+		Args:        []string{mgr.dyncfgModID("jobnamerequired"), string(dyncfg.CommandTest), "tested-job"},
+	})
+
+	mgr.dyncfgCmdTest(fn)
+	mgr.cmdTestWG.Wait()
+
+	var resp map[string]any
+	mustDecodeFunctionPayload(t, buf.String(), "test-v2-job-name", &resp)
+	assert.Equal(t, float64(200), resp["status"])
 }
 
 func TestDyncfgCollectorSeqExec_SyncsSecretStoreDepsForMutatingCommands(t *testing.T) {

@@ -175,6 +175,9 @@ func (m *Manager) runDyncfgCmdTest(task dyncfgCmdTestTask) {
 		m.dyncfgResponder.SendCodef(task.fn, 500, "Module %s instantiation failed: %v.", task.moduleName, err)
 		return
 	}
+	if named, ok := job.(jobNameSetter); ok {
+		named.SetJobName(task.cfg.Name())
+	}
 
 	cleanupCtx, cleanupCancel := context.WithTimeout(m.baseContext(), cmdTestWorkerDrainWait)
 	defer cleanupCancel()
