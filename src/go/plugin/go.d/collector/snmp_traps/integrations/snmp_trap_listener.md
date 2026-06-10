@@ -36,7 +36,7 @@ This collector listens for incoming SNMP Trap and INFORM notifications from netw
 - **OTLP/gRPC export**: Optional backend that exports traps as OTLP LogRecords. When `otlp.enabled` is `true`, traps are exported through OTLP regardless of `journal.enabled`; if direct journal storage is also enabled, both backends receive traps.
 - **Self-metrics**: Per-job counters for trap events (by category and severity), processing errors (by type), and dedup suppression (when enabled).
 
-When direct journal storage is enabled, trap entries are written as structured systemd-journal log messages with plugin-controlled fields (`TRAP_REPORT_TYPE`, `TRAP_OID`, `TRAP_NAME`, `TRAP_CATEGORY`, `TRAP_SEVERITY`, `TRAP_PDU_TYPE`, `TRAP_VERSION`, `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, `TRAP_DEVICE_VENDOR`, `TRAP_INTERFACE`, `TRAP_NEIGHBORS`, `TRAP_SUPPRESSED_COUNT`, `TRAP_SUPPRESSED_FINGERPRINTS`, `TRAP_REPORT_PERIOD_SEC`, `TRAP_JSON`) plus profile-defined labels (`TRAP_TAG_*`). Query traps with the embedded `snmp:traps` Function through Netdata Cloud or directly via the Agent HTTP API. The Function selects all direct-journal jobs by default and can narrow to one listener with `selections.__logs_sources=["<job>"]`. OTEL-only jobs do not create local journal files and therefore do not appear as log sources.
+When direct journal storage is enabled, trap entries are written as structured systemd-journal log messages with plugin-controlled fields (`TRAP_REPORT_TYPE`, `TRAP_OID`, `TRAP_NAME`, `TRAP_CATEGORY`, `TRAP_SEVERITY`, `TRAP_PDU_TYPE`, `TRAP_VERSION`, `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, `TRAP_DEVICE_VENDOR`, `TRAP_INTERFACE`, `TRAP_NEIGHBORS`, `TRAP_SUPPRESSED_COUNT`, `TRAP_SUPPRESSED_FINGERPRINTS`, `TRAP_REPORT_PERIOD_SEC`, `TRAP_JSON`) plus profile-defined labels (`TRAP_TAG_*`). Query traps with the embedded `snmp:traps` Function through Netdata Cloud or directly via the Agent HTTP API. The Function selects all direct-journal jobs by default and can narrow to one listener with `selections.__logs_sources=["<job>"]`. OTLP-only jobs do not create local journal files and therefore do not appear as log sources.
 
 **Closed 8-category / 8-severity taxonomy** (from the OOB profile pack):
 
@@ -123,7 +123,7 @@ Deduplication, when enabled, uses a per-job fingerprint cache capped by `dedup.c
 
 The collector is event-driven and does not poll devices. CPU cost is proportional to the received trap rate.
 Profile OID lookups use hash tables. Deduplication, when enabled, adds a configurable fingerprint cache.
-For high-volume environments, size the dedup cache and journal rotation according to sustained trap volume and retention requirements. OTEL-only jobs avoid local journal storage but do not appear as sources in the embedded local logs viewer.
+For high-volume environments, size the dedup cache and journal rotation according to sustained trap volume and retention requirements. OTLP-only jobs avoid local journal storage but do not appear as sources in the embedded local logs viewer.
 
 
 ## Setup
@@ -203,6 +203,7 @@ The following options can be defined globally: update_every, autodetection_retry
 <a id="option-listener-listen"></a>
 ##### listen
 
+- `receive_buffer`: UDP socket receive buffer requested during job creation, in bytes (default 4194304; set 0 to keep the operating system default).
 Each endpoint has:
 - `protocol`: Transport protocol (`udp` only).
 - `address`: Local IP address to bind (e.g., `0.0.0.0` for all interfaces).
@@ -255,7 +256,7 @@ Each user has:
 ##### otlp
 
 - `enabled`: Enable OTLP/gRPC Logs export. When `true`, traps are exported through OTLP regardless of `journal.enabled`; if direct journal storage is also enabled, both backends receive traps.
-- `endpoint`: OTLP/gRPC endpoint. `http://host:port` uses plaintext gRPC; `https://host:port` uses TLS (default `http://127.0.0.1:4317`).
+- `endpoint`: OTLP/gRPC endpoint. `http://host:port` uses plaintext gRPC; `https://host:port` uses TLS (default `http://127.0.0.1:4317`). Use `https://` for remote collectors when trap contents should be protected in transit.
 - `headers`: Optional OTLP metadata headers (values may use Netdata secret references).
 - `request_timeout`: Timeout for connection preflight and export calls (default `5s`).
 - `flush_interval`: Maximum time to buffer records before export (default `200ms`).
@@ -340,6 +341,7 @@ The allowlist is left open (`0.0.0.0/0` and `::/0`) — restrict it for producti
 jobs:
   - name: local
     listen:
+      receive_buffer: 4194304
       endpoints:
         - protocol: udp
           address: 0.0.0.0
@@ -351,7 +353,7 @@ jobs:
 ```
 </details>
 
-###### OTEL-only export
+###### OTLP-only export
 
 A job that disables direct journal creation and exports traps only through OTLP.
 This job does not appear as a local `__logs_sources` option because no direct journal files are written.
@@ -647,4 +649,4 @@ sender device's configuration. Verify engine ID matches. Use Netdata secret refe
 
 The default direct journal retention uses size-based eviction (`max_size: 10GB`) with no time-based age limit.
 For high-trap environments, reduce `max_size` or enable `max_duration` to age-out old entries.
-OTEL-only jobs can set `journal.enabled: false`; they do not create local journal files and do not appear as sources in the local logs Function.
+OTLP-only jobs can set `journal.enabled: false`; they do not create local journal files and do not appear as sources in the local logs Function.

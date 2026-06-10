@@ -10,7 +10,7 @@ journal entries written by the `snmp_traps` go.d collector.
 
 SNMP trap entries are exposed through the `snmp:traps` Function.
 Direct-journal jobs appear as `__logs_sources` options, normally named
-after the trap listener job. OTEL-only jobs (`journal.enabled: false`)
+after the trap listener job. OTLP-only jobs (`journal.enabled: false`)
 do not create local journal files, so they do not appear as log
 sources. This skill reuses the token-safe wrappers from
 [`query-netdata-agents`](../query-netdata-agents/SKILL.md) and the

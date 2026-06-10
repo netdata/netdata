@@ -331,7 +331,7 @@
           },
           "endpoint": {
             "title": "Endpoint",
-            "description": "OTLP/gRPC endpoint. http://host:port and bare host:port use plaintext gRPC; https://host:port uses TLS with system trust roots.",
+            "description": "OTLP/gRPC endpoint. http://host:port and bare host:port use plaintext gRPC; https://host:port uses TLS with system trust roots. Use https:// for remote collectors when trap contents should be protected in transit.",
             "type": "string",
             "default": "http://127.0.0.1:4317"
           },

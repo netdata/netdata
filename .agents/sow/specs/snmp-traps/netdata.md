@@ -39,7 +39,7 @@ The cohort exhibits six distinct trap-as-X primitives (see `comparison/design-fo
 2. **Plugin-self metrics** (two NIDL contexts always emitted plus an opt-in third for dedup — see §12) for plugin health monitoring.
 3. **Per-OID metrics for alerting are opt-in** — operator selects which OIDs get a dedicated metric via plugin configuration (NOT via profile YAML). See §7.
 
-Direct journal storage is the default foundation. Metrics are a derived signal for alerting on specific traps the operator cares about. OTEL-only jobs are supported for operators who want remote log delivery without local journal files, but those jobs do not create local journal sources and therefore do not appear in the embedded local logs Function's `__logs_sources` selector.
+Direct journal storage is the default foundation. Metrics are a derived signal for alerting on specific traps the operator cares about. OTLP-only jobs are supported for operators who want remote log delivery without local journal files, but those jobs do not create local journal sources and therefore do not appear in the embedded local logs Function's `__logs_sources` selector.
 
 **Why this choice**:
 
@@ -153,7 +153,7 @@ The configured per-job root is `/var/log/journal/netdata/snmp-traps/{job_name}/`
 - Direct journal + OTLP fanout is supported. Direct journal is the primary local forensic backend; OTLP export failures are counted separately and do not make a successful direct journal write fail.
 - Direct journal files are written in SDK compact mode with compression disabled and FSS/sealing disabled. Existing readable non-compact files remain queryable by the SDK reader; new files use the compact format.
 
-**Embedded logs Function**: `go.d.plugin` exposes one module Function named `snmp:traps`. It uses the journal SDK Netdata Function API against the shared traps root (`/var/log/journal/netdata/snmp-traps/`) and maps each direct-journal job directory to one `__logs_sources` option named after the job. The SDK selects all direct-journal sources by default; operators can narrow to one job with `selections.__logs_sources=["{job_name}"]`. OTEL-only jobs do not create direct journal directories and therefore do not appear as log sources. Until Netdata's dedicated Function deletion protocol lands, stale function advertisement is avoided by only registering the logs method when direct-journal jobs exist.
+**Embedded logs Function**: `go.d.plugin` exposes one module Function named `snmp:traps`. It uses the journal SDK Netdata Function API against the shared traps root (`/var/log/journal/netdata/snmp-traps/`) and maps each direct-journal job directory to one `__logs_sources` option named after the job. The SDK selects all direct-journal sources by default; operators can narrow to one job with `selections.__logs_sources=["{job_name}"]`. OTLP-only jobs do not create direct journal directories and therefore do not appear as log sources. Until Netdata's dedicated Function deletion protocol lands, stale function advertisement is avoided by only registering the logs method when direct-journal jobs exist.
 
 **Rationale**: In-process module code means no IPC for cross-plugin enrichment (SOW-0037), trivially shared profile cache (Go package-level state + refcount), and the well-understood go.d job lifecycle. A CGo bridge to libsystemd cannot set `_HOSTNAME` (journald owns trusted fields); a subprocess Rust bridge adds process management complexity. The SDK-backed writer preserves direct journal file control, creation-time failure detection, and `journalctl` compatibility without maintaining a package-local copy of the journal binary format.
 
@@ -509,7 +509,7 @@ Endpoint syntax:
 
 - `http://host:port` means plaintext OTLP/gRPC.
 - `https://host:port` means TLS OTLP/gRPC using system trust roots.
-- bare `host:port` is accepted as plaintext OTLP/gRPC for local receivers such as Netdata's OTEL plugin and the OpenTelemetry Collector default.
+- bare `host:port` is accepted as plaintext OTLP/gRPC for local receivers such as Netdata's OTEL plugin and the OpenTelemetry Collector default. Operators should use `https://host:port` for remote receivers when trap contents should be protected in transit.
 - Any other scheme or a URL path fails validation.
 
 `headers` is an optional string map converted to gRPC metadata. Header values may be go.d secret references; the existing go.d secret resolver resolves string values before the collector receives the config. Header values are never emitted as trap attributes or logged.
@@ -708,7 +708,7 @@ Per-job retention policy mirrors the retention semantics used by the NetFlow plu
 
 The active journal file must be queryable by `journalctl --directory=...`; waiting until rotation/close to build indexes is not acceptable for the MVP. The SDK writer owns the journal file format details, active-file indexes, rotation, retention, and existing-chain validation/reopen behavior.
 
-The journal-direct backend is Linux-only. When direct journal is enabled on a non-Linux platform, trap job creation must fail with a coded unsupported-backend error instead of starting and failing at runtime. OTEL-only jobs (`journal.enabled: false`, `otlp.enabled: true`) are not blocked by the direct-journal Linux check.
+The journal-direct backend is Linux-only. When direct journal is enabled on a non-Linux platform, trap job creation must fail with a coded unsupported-backend error instead of starting and failing at runtime. OTLP-only jobs (`journal.enabled: false`, `otlp.enabled: true`) are not blocked by the direct-journal Linux check.
 
 When dedup is enabled (§10), summary entries land in the same per-job journal directory and obey the same retention.
 
@@ -890,7 +890,7 @@ The optional standards-compliant OTLP exporter (operator opt-in, defaults off) i
 
 ## 11b. OTLP Exporter Attribute Universe — optional second backend
 
-When the operator enables the OTLP exporter (defaults off; configured per §7.5), every trap also lands as a vendor-neutral OTLP LogRecord that any OTEL-compatible receiver can ingest (Netdata's own OTEL plugin, Splunk, Datadog, Grafana Cloud, OpenSearch, vendor-X). The OTLP path is intentionally standards-compliant — it does NOT use the journal field names from §11 because OTEL attribute naming convention is dotted-lowercase. The journal-direct path (§11) remains the default high-fidelity Netdata-native path, but operators may disable it and run OTEL-only with `journal.enabled: false`.
+When the operator enables the OTLP exporter (defaults off; configured per §7.5), every trap also lands as a vendor-neutral OTLP LogRecord that any OTEL-compatible receiver can ingest (Netdata's own OTEL plugin, Splunk, Datadog, Grafana Cloud, OpenSearch, vendor-X). The OTLP path is intentionally standards-compliant — it does NOT use the journal field names from §11 because OTEL attribute naming convention is dotted-lowercase. The journal-direct path (§11) remains the default high-fidelity Netdata-native path, but operators may disable it and run OTLP-only with `journal.enabled: false`.
 
 The plugin emits both shapes from a single internal `TrapEntry` model — the writer interface applies the per-backend naming convention at serialization time.
 
@@ -1012,7 +1012,7 @@ Operators alert on these for pipeline health:
 - `binary_encoded > 0` sustained → varbind values containing control characters being binary-encoded; investigate sender.
 - `profile_load_failed > 0` → profile validation/reload failed, or a previously validated stock profile file could not be lazy-loaded after job start. During DynCfg reload, the plugin continues with the previous profile index and the operator must fix the bad YAML and reload. During runtime stock lazy-load failure, the trap is still written with raw OID/varbind data and the operator should inspect the installed stock profile files.
 - `journal_write_failed > 0` → disk-full, permission, or filesystem error while writing to the per-job journal directory; trap is dropped, hot path continues (the writer never blocks).
-- `otlp_export_failed > 0` → the OTLP backend could not accept or export one or more trap records after the job had already started. For direct-journal+OTLP jobs, the journal-direct path remains authoritative and continues independently. For OTEL-only jobs, this means the only configured backend dropped or failed records. Investigate the configured OTLP receiver, network path, TLS/auth configuration, or queue sizing.
+- `otlp_export_failed > 0` → the OTLP backend could not accept or export one or more trap records after the job had already started. For direct-journal+OTLP jobs, the journal-direct path remains authoritative and continues independently. For OTLP-only jobs, this means the only configured backend dropped or failed records. Investigate the configured OTLP receiver, network path, TLS/auth configuration, or queue sizing.
 
 ### Context 3: `snmp.trap.dedup_suppressed` (only when opt-in dedup is enabled on at least one job)
 
