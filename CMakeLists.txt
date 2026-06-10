@@ -4428,6 +4428,9 @@ if(ENABLE_PLUGIN_GO)
     install(FILES src/go/plugin/go.d/config/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
+    install(FILES src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
 
     install(DIRECTORY
             COMPONENT plugin-go
