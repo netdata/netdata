@@ -92,6 +92,7 @@ var bareBuiltInPlaceholderAliases = []struct {
 
 var placeholderRefRe = regexp.MustCompile(`\{([^{}]+)\}`)
 var templateVarbindCallArgRe = regexp.MustCompile(`\b(value|raw)\s+"([^"]+)"`)
+var bareTemplateActionRe = regexp.MustCompile(`\{\{\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*\}\}`)
 var legacyTemplateRefRe = regexp.MustCompile(`(^|[^{])\{[^{}\n]+\}([^}]|$)`)
 var mibSourceExtensions = []string{"", ".mib", ".my", ".mi2", ".txt", ".trp", ".smi"}
 
@@ -1098,7 +1099,7 @@ DESCRIPTION RULES:
 - Approved built-ins: {{hostname}}, {{source_ip}}, {{trap_name}}, {{vendor}}, {{trap_interface}}, {{trap_neighbors}}.
 - Approved varbind calls: {{value "varbindName"}} and {{raw "varbindName"}}, using only names from allowed_template_varbinds.
 - Approved fallback helper: {{first ...}} returns the first non-empty argument.
-- Approved optional block: {{with ...}}{{else}}{{end}}. Do not use if, range, variables, assignments, pipelines, comparisons, arithmetic, templates, blocks, or arbitrary functions.
+- Approved optional blocks: {{with ...}}{{else}}{{end}} and {{if ...}}{{else}}{{end}}. Do not use range, variables, assignments, pipelines, comparisons, arithmetic, templates, blocks, or arbitrary functions.
 - Missing known varbinds render as empty strings, so use fallbacks or optional blocks when including optional varbind context.
 - Use {{source_ip}} only when sender identity matters, use {{trap_name}} only when the MIB text is too generic, and never write "by {{vendor}}".
 - Do not invent, shorten, normalize, translate, or infer placeholder names.
@@ -1129,7 +1130,7 @@ func classifierUserPrompt(rec TrapRecord, feedback string) string {
 	fmt.Fprintf(&b, "mib_organization: %s\n", sanitizePromptText(rec.MIBOrganization, 240))
 	fmt.Fprintf(&b, "trap_description: <UNTRUSTED_MIB_DESCRIPTION>%s</UNTRUSTED_MIB_DESCRIPTION>\n", sanitizePromptText(rec.TrapDescription, 900))
 	allowedPlaceholders := allowedPlaceholderNames(rec)
-	fmt.Fprintf(&b, "allowed_template_functions: hostname, source_ip, trap_name, vendor, trap_interface, trap_neighbors, value, raw, first, with/else/end\n")
+	fmt.Fprintf(&b, "allowed_template_functions: hostname, source_ip, trap_name, vendor, trap_interface, trap_neighbors, value, raw, first, with/if/else/end\n")
 	fmt.Fprintf(&b, "allowed_template_varbinds: %s\n", strings.Join(allowedVarbindNames(rec), ", "))
 	fmt.Fprintf(&b, "allowed_template_varbind_expressions: %s\n", strings.Join(allowedPlaceholders, ", "))
 	b.WriteString("allowed_varbind_details:\n")
@@ -1218,12 +1219,17 @@ func parseLLMResponse(text string, rec TrapRecord) (string, string, string, erro
 	if err := json.Unmarshal(objectBytes, &payload); err != nil {
 		return "", "", "", fmt.Errorf("invalid JSON object: %w", err)
 	}
+	payload = repairClassifierPayload(payload, rec)
 	if err := validateClassifierResponseSchema(payload); err != nil {
 		return "", "", "", withClassifierPayloadContext(err, payload)
 	}
 
 	var obj classifierResponse
-	if err := json.Unmarshal(objectBytes, &obj); err != nil {
+	repairedObjectBytes, err := json.Marshal(payload)
+	if err != nil {
+		return "", "", "", fmt.Errorf("encode schema-valid response: %w", err)
+	}
+	if err := json.Unmarshal(repairedObjectBytes, &obj); err != nil {
 		return "", "", "", fmt.Errorf("decode schema-valid response: %w", err)
 	}
 	desc := strings.TrimSpace(obj.Description)
@@ -1275,6 +1281,9 @@ func validateDescriptionStyle(desc string) error {
 	if !strings.HasSuffix(desc, " on {{hostname}}.") {
 		return fmt.Errorf("description must end with %q", " on {{hostname}}.")
 	}
+	if strings.Count(desc, "{{hostname}}") != 1 {
+		return errors.New("description must contain {{hostname}} exactly once, only in the final suffix")
+	}
 	return nil
 }
 
@@ -1301,6 +1310,45 @@ func withClassifierPayloadContext(err error, payload any) error {
 		strings.Join(sortedKeys(validCategories), ", "),
 		strings.Join(sortedKeys(validSeverities), ", "),
 	)
+}
+
+func repairClassifierPayload(payload any, rec TrapRecord) any {
+	obj, ok := payload.(map[string]any)
+	if !ok || len(obj) != 3 {
+		return payload
+	}
+	category, _ := obj["category"].(string)
+	if validCategories[category] {
+		return payload
+	}
+	repairedCategory, ok := repairInvalidCategory(category, rec)
+	if !ok {
+		return payload
+	}
+	repaired := make(map[string]any, len(obj))
+	for k, v := range obj {
+		repaired[k] = v
+	}
+	repaired["category"] = repairedCategory
+	return repaired
+}
+
+func repairInvalidCategory(category string, rec TrapRecord) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(category)) {
+	case "threshold", "routing", "redundancy", "state", "status":
+		return "state_change", true
+	case "configuration", "config", "copy":
+		return "config_change", true
+	case "authentication", "authorization":
+		return "auth", true
+	case "critical", "hardware", "software", "network", "performance", "resource", "fault", "operation", "trap", "success", "completed":
+		return "diagnostic", true
+	}
+	if validSeverities[category] {
+		cat, _, _ := mechanicalClassification(rec)
+		return cat, true
+	}
+	return "", false
 }
 
 func loadClassifierResponseSchema() (*jsonschema.Schema, error) {
@@ -1333,12 +1381,16 @@ func normalizeLLMDescription(desc string) string {
 
 func repairDescriptionTemplateVarbindNames(desc string, rec TrapRecord) string {
 	allowed := allowedVarbindNameSet(rec)
+	desc = repairBareTemplateVarbindActions(desc, allowed)
 	return templateVarbindCallArgRe.ReplaceAllStringFunc(desc, func(match string) string {
 		parts := templateVarbindCallArgRe.FindStringSubmatch(match)
 		if len(parts) != 3 {
 			return match
 		}
 		name := parts[2]
+		if isTemplateBuiltin(name) {
+			return name
+		}
 		if allowed[name] {
 			return match
 		}
@@ -1347,6 +1399,29 @@ func repairDescriptionTemplateVarbindNames(desc string, rec TrapRecord) string {
 		}
 		return match
 	})
+}
+
+func repairBareTemplateVarbindActions(desc string, allowed map[string]bool) string {
+	return bareTemplateActionRe.ReplaceAllStringFunc(desc, func(match string) string {
+		parts := bareTemplateActionRe.FindStringSubmatch(match)
+		if len(parts) != 2 {
+			return match
+		}
+		name := parts[1]
+		if isTemplateBuiltin(name) || !allowed[name] {
+			return match
+		}
+		return `{{value "` + name + `"}}`
+	})
+}
+
+func isTemplateBuiltin(name string) bool {
+	switch name {
+	case "hostname", "source_ip", "trap_name", "vendor", "trap_interface", "trap_neighbors":
+		return true
+	default:
+		return false
+	}
 }
 
 func uniqueVarbindNameSuffixMatch(name string, rec TrapRecord) (string, bool) {
@@ -1427,6 +1502,17 @@ func validateClassifierTemplateTree(n parse.Node, rec TrapRecord) error {
 		}
 		return validateClassifierTemplatePipe(node.Pipe, rec)
 	case *parse.WithNode:
+		if node == nil {
+			return nil
+		}
+		if err := validateClassifierTemplatePipe(node.Pipe, rec); err != nil {
+			return err
+		}
+		if err := validateClassifierTemplateTree(node.List, rec); err != nil {
+			return err
+		}
+		return validateClassifierTemplateTree(node.ElseList, rec)
+	case *parse.IfNode:
 		if node == nil {
 			return nil
 		}
@@ -1591,7 +1677,7 @@ func placeholderSuffixes(ph string) []string {
 	seen := map[string]bool{}
 	var out []string
 	add := func(s string) {
-		if len(s) >= 8 && !seen[s] {
+		if len(s) >= 6 && !seen[s] {
 			seen[s] = true
 			out = append(out, s)
 		}

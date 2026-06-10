@@ -1048,6 +1048,40 @@ traps:
 	assert.Equal(t, "Running configuration changed by admin on 198.51.100.10.", renderMessage(entry, td))
 }
 
+func TestRenderMessageGoTemplateWithIfBlock(t *testing.T) {
+	dir := t.TempDir()
+	writeProfileYAML(t, dir, "test.yaml", `
+varbinds:
+  ifName:
+    oid: 1.3.6.1.2.1.31.1.1.1.1
+    type: OctetString
+
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.4
+    name: IF-MIB::linkUp
+    category: state_change
+    severity: notice
+    description: 'Interface{{if value "ifName"}} {{value "ifName"}}{{end}} came up on {{hostname}}.'
+    varbinds: [ifName]
+`)
+
+	setTestDirs(t, dir)
+	resetProfileCacheForTest()
+
+	idx, err := AcquireProfileCache()
+	require.NoError(t, err)
+	defer ReleaseProfileCache()
+
+	td := idx.Lookup("1.3.6.1.6.3.1.1.5.4")
+	require.NotNil(t, td)
+
+	entry := &TrapEntry{TrapName: "IF-MIB::linkUp", SourceIP: "198.51.100.10"}
+	assert.Equal(t, "Interface came up on 198.51.100.10.", renderMessage(entry, td))
+
+	entry.Varbinds = []VarbindValue{{OID: "1.3.6.1.2.1.31.1.1.1.1.7", Type: "OctetString", Value: "Gi0/7"}}
+	assert.Equal(t, "Interface Gi0/7 came up on 198.51.100.10.", renderMessage(entry, td))
+}
+
 func TestLoadProfileRejectsInvalidGoTemplates(t *testing.T) {
 	tests := map[string]string{
 		"unknown function": `

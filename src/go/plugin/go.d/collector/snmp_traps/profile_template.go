@@ -135,6 +135,17 @@ func validateProfileTemplateTree(n parse.Node, ctx templateValidationContext) er
 			return err
 		}
 		return validateProfileTemplateTree(node.ElseList, ctx)
+	case *parse.IfNode:
+		if node == nil {
+			return nil
+		}
+		if err := validateProfileTemplatePipe(node.Pipe, ctx); err != nil {
+			return err
+		}
+		if err := validateProfileTemplateTree(node.List, ctx); err != nil {
+			return err
+		}
+		return validateProfileTemplateTree(node.ElseList, ctx)
 	default:
 		return ctx.errf("forbidden template action %T", n)
 	}

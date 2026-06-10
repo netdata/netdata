@@ -352,12 +352,14 @@ There is **no runtime MIB compilation tier**. The plugin does not parse SMIv1/v2
 | `{{raw "ifOperStatus"}}` | MIB enum value, raw numeric (e.g., `2`) |
 | `{{first ...}}` | First non-empty argument, for optional-varbind fallback |
 
-Supported control flow is limited to `{{with ...}}{{else}}{{end}}`.
+Supported control flow is limited to `{{with ...}}{{else}}{{end}}` and
+`{{if ...}}{{else}}{{end}}`, using the same restricted function calls allowed
+for plain actions.
 Known-but-absent varbinds render as empty strings, not `<missing>`, so profiles
-use `with` or `first` when optional context is included.
+use `with`, `if`, or `first` when optional context is included.
 
 Unknown functions, unknown varbind names, malformed templates, variables,
-assignments, `if`, `range`, arbitrary pipelines, and template inclusion actions
+assignments, `range`, arbitrary pipelines, and template inclusion actions
 fail at profile load / job creation.
 
 If `description` is absent, default template is:

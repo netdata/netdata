@@ -248,16 +248,18 @@ time. Supported functions:
 | `{{raw "varbindName"}}` | Varbind raw value (numeric for enums, undecoded bytes for OctetString) |
 | `{{first ...}}` | First non-empty argument, for optional-varbind fallback |
 
-Supported control flow is limited to `{{with ...}}{{else}}{{end}}`.
+Supported control flow is limited to `{{with ...}}{{else}}{{end}}` and
+`{{if ...}}{{else}}{{end}}`, using the same restricted function calls allowed
+for plain actions.
 Known-but-absent varbinds render as an empty string, not `<missing>`, so use
-`with` or `first` when optional context is included:
+`with`, `if`, or `first` when optional context is included:
 
 ```yaml
 description: '{{with first (value "ifDescr") (value "ifName") (value "ifIndex")}}Interface {{.}} went down{{else}}Interface went down{{end}} on {{hostname}}.'
 ```
 
 Unknown functions, unknown varbind names, malformed templates, variables,
-assignments, `if`, `range`, arbitrary pipelines, and template inclusion actions
+assignments, `range`, arbitrary pipelines, and template inclusion actions
 fail at profile load so configuration errors are visible at job creation time.
 
 Legacy single-brace templates from early development builds still render during

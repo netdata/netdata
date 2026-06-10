@@ -410,12 +410,33 @@ func TestLLMResponseValidation(t *testing.T) {
 	if !strings.Contains(desc, `{{with value "ifIndex"}}`) {
 		t.Fatalf("description did not preserve with block: %q", desc)
 	}
+	cat, sev, desc, err = parseLLMResponse(`{"category":"info","severity":"info","description":"Transfer completed on {{hostname}}."}`, rec)
+	if err != nil {
+		t.Fatalf("parseLLMResponse failed for repairable severity-as-category response: %v", err)
+	}
+	if cat != "unknown" || sev != "info" {
+		t.Fatalf("repaired classification = %s/%s, want unknown/info", cat, sev)
+	}
 	_, _, desc, err = parseLLMResponse(`{"category":"state_change","severity":"warning","description":"Trap from TRAP_SOURCE_IP through TRAP_DEVICE_VENDOR on SNMP_DEVICE_HOSTNAME."}`, rec)
 	if err != nil {
 		t.Fatalf("parseLLMResponse failed for bare built-in placeholders: %v", err)
 	}
 	if !strings.Contains(desc, "{{source_ip}}") || !strings.Contains(desc, "{{vendor}}") {
 		t.Fatalf("description did not normalize bare built-in placeholders: %q", desc)
+	}
+	_, _, desc, err = parseLLMResponse(`{"category":"state_change","severity":"notice","description":"Trap on interface {{value \"trap_interface\"}} on {{hostname}}."}`, rec)
+	if err != nil {
+		t.Fatalf("parseLLMResponse failed for builtin through value repair: %v", err)
+	}
+	if !strings.Contains(desc, "{{trap_interface}}") {
+		t.Fatalf("description did not repair builtin through value: %q", desc)
+	}
+	_, _, desc, err = parseLLMResponse(`{"category":"state_change","severity":"notice","description":"Trap on {{ifIndex}} on {{hostname}}."}`, rec)
+	if err != nil {
+		t.Fatalf("parseLLMResponse failed for bare varbind action repair: %v", err)
+	}
+	if !strings.Contains(desc, `{{value "ifIndex"}}`) {
+		t.Fatalf("description did not repair bare varbind action: %q", desc)
 	}
 	if _, _, _, err := parseLLMResponse(`{"category":"bad","severity":"warning","description":"x"}`, rec); err == nil {
 		t.Fatalf("invalid category accepted")
@@ -425,6 +446,16 @@ func TestLLMResponseValidation(t *testing.T) {
 	}
 	if _, _, _, err := parseLLMResponse(`{"category":"state_change","severity":"warning","description":"Bad legacy {ifIndex} on {{hostname}}."}`, rec); err == nil {
 		t.Fatalf("legacy placeholder accepted")
+	}
+	_, _, desc, err = parseLLMResponse(`{"category":"state_change","severity":"warning","description":"Trap{{if value \"ifIndex\"}} for interface {{value \"ifIndex\"}}{{end}} on {{hostname}}."}`, rec)
+	if err != nil {
+		t.Fatalf("parseLLMResponse rejected restricted if action: %v", err)
+	}
+	if !strings.Contains(desc, `{{if value "ifIndex"}}`) {
+		t.Fatalf("description did not preserve restricted if action: %q", desc)
+	}
+	if _, _, _, err := parseLLMResponse(`{"category":"state_change","severity":"warning","description":"Bad event on {{hostname}} with duplicate host on {{hostname}}."}`, rec); err == nil || !strings.Contains(err.Error(), "exactly once") {
+		t.Fatalf("duplicate hostname error = %v, want explicit hostname count feedback", err)
 	}
 	if _, _, _, err := parseLLMResponse(`{"category":"state_change","severity":"warning","description":"x","extra":"bad"}`, rec); err == nil {
 		t.Fatalf("schema-invalid response with extra property accepted")
