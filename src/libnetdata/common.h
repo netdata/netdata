@@ -343,7 +343,95 @@ typedef uint32_t uid_t;
 #ifdef OCSP_RESPONSE
 #undef OCSP_RESPONSE
 #endif
-#endif
+
+// -------------------------------------------------------------------------
+// UCRT64 / MinGW-w64 POSIX compatibility shims
+// These extensions are provided by the MSYS runtime but not by UCRT64.
+// -------------------------------------------------------------------------
+
+#include <direct.h>
+
+// suseconds_t is POSIX-only, absent from UCRT64's sys/types.h
+typedef long suseconds_t;
+
+// UCRT64 mkdir() takes only one argument; redirect the POSIX 2-arg form.
+#define mkdir(path, mode) _mkdir(path)
+
+// strsep() is a BSD/glibc extension absent from UCRT64
+static inline char *strsep(char **stringp, const char *delim) {
+    char *s = *stringp;
+    if (!s) return NULL;
+    char *end = strpbrk(s, delim);
+    if (end) { *end = '\0'; *stringp = end + 1; }
+    else *stringp = NULL;
+    return s;
+}
+
+// POSIX thread-safe time functions — UCRT64 provides _s variants with
+// reversed parameter order and errno_t return value.
+static inline struct tm *gmtime_r(const time_t *timep, struct tm *result) {
+    return (gmtime_s(result, timep) == 0) ? result : NULL;
+}
+static inline struct tm *localtime_r(const time_t *timep, struct tm *result) {
+    return (localtime_s(result, timep) == 0) ? result : NULL;
+}
+
+// Minimal strptime() — UCRT64 has no strptime.
+// Handles %Y %m %d %H %M %S %n %t and literal characters.
+// Sufficient for Netdata's RFC 3339 / ISO 8601 parsers.
+static inline char *strptime(const char *s, const char *format, struct tm *t) {
+    const char *sp = s;
+    const char *fp = format;
+    while (*fp) {
+        if (*fp != '%') {
+            if (*sp != *fp) return NULL;
+            sp++; fp++;
+            continue;
+        }
+        fp++;
+        char *e;
+        long v;
+        switch (*fp++) {
+        case 'Y': v = strtol(sp, &e, 10); if (e == sp) return NULL; t->tm_year = (int)(v - 1900); sp = e; break;
+        case 'm': v = strtol(sp, &e, 10); if (e == sp) return NULL; t->tm_mon  = (int)(v - 1);    sp = e; break;
+        case 'd': v = strtol(sp, &e, 10); if (e == sp) return NULL; t->tm_mday = (int)v;           sp = e; break;
+        case 'H': v = strtol(sp, &e, 10); if (e == sp) return NULL; t->tm_hour = (int)v;           sp = e; break;
+        case 'M': v = strtol(sp, &e, 10); if (e == sp) return NULL; t->tm_min  = (int)v;           sp = e; break;
+        case 'S': v = strtol(sp, &e, 10); if (e == sp) return NULL; t->tm_sec  = (int)v;           sp = e; break;
+        case 'n': case 't': while (isspace((unsigned char)*sp)) sp++; break;
+        default: return NULL;
+        }
+    }
+    return (char *)sp;
+}
+
+// mmap/munmap/madvise constants — UCRT64 has no sys/mman.h.
+// Implementations live in nd-mmap.c; these constants and declarations
+// allow the rest of the tree to compile without per-call-site guards.
+#ifndef MAP_SHARED
+#define PROT_READ       0x01
+#define PROT_WRITE      0x02
+#define PROT_EXEC       0x04
+#define PROT_NONE       0x00
+#define MAP_SHARED      0x01
+#define MAP_PRIVATE     0x02
+#define MAP_ANONYMOUS   0x20
+#define MAP_ANON        MAP_ANONYMOUS
+#define MAP_FAILED      ((void *)-1)
+#define MADV_SEQUENTIAL 0
+#define MADV_RANDOM     0
+#define MADV_WILLNEED   0
+#define MADV_DONTNEED   0
+#define MADV_DONTFORK   0
+#define MADV_DONTDUMP   0
+#define MADV_HUGEPAGE   0
+#define MADV_MERGEABLE  0
+void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset);
+int   munmap(void *ptr, size_t len);
+int   madvise(void *addr, size_t len, int advice);
+#endif // MAP_SHARED
+
+#endif // OS_WINDOWS
 
 // --------------------------------------------------------------------------------------------------------------------
 
