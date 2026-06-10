@@ -495,14 +495,25 @@ static inline ssize_t readlink(const char *path __maybe_unused,
     return -1;
 }
 
-// ── sysconf() / _SC_CLK_TCK ── UCRT64 has no sysconf ─────────────────────────
+// ── sysconf() ── UCRT64 has no sysconf; provide the values callers need ───────
 #ifndef _SC_CLK_TCK
-#  define _SC_CLK_TCK 2
+#  define _SC_CLK_TCK            2
+#  define _SC_PAGESIZE           30
+#  define _SC_PAGE_SIZE          _SC_PAGESIZE
+#  define _SC_NPROCESSORS_ONLN   84
 static inline long sysconf(int name) {
-    if (name == _SC_CLK_TCK) return 100;
+    if (name == _SC_CLK_TCK)           return 100;
+    if (name == _SC_PAGESIZE)          return 4096;
+    if (name == _SC_NPROCESSORS_ONLN)  return 1;
     errno = EINVAL;
     return -1;
 }
+#endif
+
+// ── O_NOFOLLOW ── absent from UCRT64; Windows has no symlink-follow prevention ─
+// Setting it to 0 keeps the bitmask intact without effect.
+#ifndef O_NOFOLLOW
+#define O_NOFOLLOW 0
 #endif
 
 // ── strcasestr() ── GNU extension absent from UCRT64 ──────────────────────────
@@ -880,6 +891,65 @@ typedef struct {
 // Windows has no symlinks to follow; stat() and lstat() are semantically identical.
 #ifndef lstat
 #define lstat(path, buf) stat(path, buf)
+#endif
+
+// ── struct rusage / getrusage() / RUSAGE_SELF ── POSIX resource usage, absent ─
+// <sys/resource.h> does not exist on UCRT64.  Return an all-zeros struct so
+// callers (e.g. apps.plugin CPU accounting) compile and produce zero-usage output
+// rather than crashing.  All fields kept so sizeof(struct rusage) stays stable.
+#ifndef _RUSAGE_DEFINED
+#define _RUSAGE_DEFINED
+#define RUSAGE_SELF     0
+#define RUSAGE_CHILDREN (-1)
+struct rusage {
+    struct timeval ru_utime;   // user time used
+    struct timeval ru_stime;   // system time used
+    long ru_maxrss;            // max resident set size
+    long ru_ixrss;             // integral shared text size
+    long ru_idrss;             // integral unshared data size
+    long ru_isrss;             // integral unshared stack size
+    long ru_minflt;            // page reclaims (soft page faults)
+    long ru_majflt;            // page faults (hard page faults)
+    long ru_nswap;             // swaps
+    long ru_inblock;           // block input operations
+    long ru_oublock;           // block output operations
+    long ru_msgsnd;            // messages sent
+    long ru_msgrcv;            // messages received
+    long ru_nsignals;          // signals received
+    long ru_nvcsw;             // voluntary context switches
+    long ru_nivcsw;            // involuntary context switches
+};
+static inline int getrusage(int who __maybe_unused, struct rusage *r) {
+    if (r) memset(r, 0, sizeof(*r));
+    return 0;
+}
+#endif
+
+// ── struct statvfs / statvfs() ── POSIX fs stats, absent from UCRT64 ─────────
+// <sys/statvfs.h> is guarded by HAVE_SYS_STATVFS_H which is not set on Windows.
+// Stub returns 0 (success) when the path exists, -1 otherwise, so callers that
+// use statvfs() only to validate a path still work correctly.
+#ifndef _STATVFS_DEFINED
+#define _STATVFS_DEFINED
+struct statvfs {
+    unsigned long  f_bsize;   // filesystem block size
+    unsigned long  f_frsize;  // fundamental block size
+    uint64_t       f_blocks;  // total blocks
+    uint64_t       f_bfree;   // free blocks
+    uint64_t       f_bavail;  // available blocks to non-root
+    uint64_t       f_files;   // total file nodes
+    uint64_t       f_ffree;   // free file nodes
+    uint64_t       f_favail;  // available file nodes
+    unsigned long  f_fsid;    // filesystem id
+    unsigned long  f_flag;    // mount flags
+    unsigned long  f_namemax; // max filename length
+};
+static inline int statvfs(const char *path, struct statvfs *buf) {
+    if (!buf) { errno = EINVAL; return -1; }
+    memset(buf, 0, sizeof(*buf));
+    buf->f_namemax = 255;
+    return GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES ? 0 : -1;
+}
 #endif
 
 // ── posix_memalign() ── POSIX aligned malloc, absent from UCRT64 ─────────────
