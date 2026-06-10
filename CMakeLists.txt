@@ -241,8 +241,17 @@ mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
 cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's journal file reader implementation" False "ENABLE_PLUGIN_SYSTEMD_JOURNAL" False)
 
-# Setup Rust/Corrosion for plugins that need it
-if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER OR ENABLE_PLUGIN_NETFLOW)
+# Enable the PromQL evaluator and /api/v3/promql/* + Prometheus mirror
+# endpoints. Disabling this removes the netdata_promql Rust crate, the
+# C data-source shim, the v3 promql handler, and the v1 query/query_range
+# dispatch entries from the build. See SOW-0017.
+option(ENABLE_PROMQL "Enable the PromQL evaluator and /api/v3/promql/* endpoints" ON)
+
+# Setup Rust/Corrosion. Required whenever any of the gated Rust
+# components is on -- netdata_promql is the typical reason, but the
+# block also covers otel-plugin, otel-signal-viewer-plugin,
+# netflow-plugin, and journal_reader_ffi.
+if(ENABLE_PROMQL OR ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER OR ENABLE_PLUGIN_NETFLOW)
     include(FetchContent)
     FetchContent_Declare(
         Corrosion
@@ -251,10 +260,8 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
     )
     FetchContent_MakeAvailable(Corrosion)
 
-    # Corrosion places cargo build artifacts under ${CMAKE_BINARY_DIR}/cargo/
-    # (see Corrosion.cmake cargo_target_dir). Register it for cleanup so that
-    # `ninja clean` removes it.  If a future Corrosion version changes this
-    # path, this line must be updated to match.
+    # Corrosion places cargo build artifacts under ${CMAKE_BINARY_DIR}/cargo/.
+    # Register it for cleanup so `ninja clean` removes it.
     set_directory_properties(PROPERTIES ADDITIONAL_CLEAN_FILES "${CMAKE_BINARY_DIR}/cargo")
 
     if(ENABLE_NETDATA_JOURNAL_FILE_READER)
@@ -262,8 +269,11 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
                                CRATES journal_reader_ffi)
     endif()
 
-    # Import crates from the main cargo workspace
+    # Import crates from the main cargo workspace.
     set(_WORKSPACE_CRATES "")
+    if(ENABLE_PROMQL)
+        list(APPEND _WORKSPACE_CRATES netdata_promql)
+    endif()
     if(ENABLE_PLUGIN_OTEL)
         list(APPEND _WORKSPACE_CRATES otel-plugin)
     endif()
@@ -278,60 +288,65 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
                                CRATES ${_WORKSPACE_CRATES})
     endif()
 
-    if(ENABLE_PLUGIN_OTEL)
-      if(STATIC_BUILD)
-        corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable "-C" "target-feature=+crt-static")
-      else()
-        corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable)
-      endif()
+    if(ENABLE_PROMQL AND STATIC_BUILD)
+        corrosion_add_target_rustflags(netdata_promql "-C" "target-feature=+crt-static")
     endif()
 
-    if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
-      set(OTEL_SIGNAL_VIEWER_RUSTFLAGS --cfg=tracing_unstable)
-
-      # We depend (transitively) on the `io-uring` crate which doesn't provide
-      # prebuilt bindings for 32-bit arches. Considering this is a compile-time
-      # and not a runtime dependency (because we don't use foyer's io-uring
-      # engine), we can simply skip the check.
-      if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        list(APPEND OTEL_SIGNAL_VIEWER_RUSTFLAGS --cfg=io_uring_skip_arch_check)
-      endif()
-
-      if(STATIC_BUILD)
-        list(APPEND OTEL_SIGNAL_VIEWER_RUSTFLAGS "-C" "target-feature=+crt-static")
-      endif()
-
-      corrosion_add_target_rustflags(otel-signal-viewer-plugin ${OTEL_SIGNAL_VIEWER_RUSTFLAGS})
-    endif()
-
-    if(ENABLE_PLUGIN_NETFLOW)
-      set(NETFLOW_PLUGIN_RUSTFLAGS "")
-
-      # We depend (transitively) on the `io-uring` crate which doesn't provide
-      # prebuilt bindings for 32-bit arches. Considering this is a compile-time
-      # and not a runtime dependency (because we don't use foyer's io-uring
-      # engine), we can simply skip the check.
-      if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        list(APPEND NETFLOW_PLUGIN_RUSTFLAGS --cfg=io_uring_skip_arch_check)
-        # The workspace release profile still propagates fat LTO, single-codegen-unit,
-        # and debuginfo settings through Rust dependencies on 32-bit builds. Override
-        # Cargo's release profile too so the entire dependency graph stays linkable.
-        corrosion_set_env_vars(
-                netflow-plugin
-                "CARGO_PROFILE_RELEASE_DEBUG=0"
-                "CARGO_PROFILE_RELEASE_LTO=off"
-                "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=8")
-      endif()
-
-      if(STATIC_BUILD)
-        list(APPEND NETFLOW_PLUGIN_RUSTFLAGS "-C" "target-feature=+crt-static")
-      endif()
-
-      if(NETFLOW_PLUGIN_RUSTFLAGS)
-        corrosion_add_target_rustflags(netflow-plugin ${NETFLOW_PLUGIN_RUSTFLAGS})
-      endif()
-    endif()
+if(ENABLE_PLUGIN_OTEL)
+  if(STATIC_BUILD)
+    corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable "-C" "target-feature=+crt-static")
+  else()
+    corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable)
+  endif()
 endif()
+
+if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
+  set(OTEL_SIGNAL_VIEWER_RUSTFLAGS --cfg=tracing_unstable)
+
+  # We depend (transitively) on the `io-uring` crate which doesn't provide
+  # prebuilt bindings for 32-bit arches. Considering this is a compile-time
+  # and not a runtime dependency (because we don't use foyer's io-uring
+  # engine), we can simply skip the check.
+  if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(APPEND OTEL_SIGNAL_VIEWER_RUSTFLAGS --cfg=io_uring_skip_arch_check)
+  endif()
+
+  if(STATIC_BUILD)
+    list(APPEND OTEL_SIGNAL_VIEWER_RUSTFLAGS "-C" "target-feature=+crt-static")
+  endif()
+
+  corrosion_add_target_rustflags(otel-signal-viewer-plugin ${OTEL_SIGNAL_VIEWER_RUSTFLAGS})
+endif()
+
+if(ENABLE_PLUGIN_NETFLOW)
+  set(NETFLOW_PLUGIN_RUSTFLAGS "")
+
+  # We depend (transitively) on the `io-uring` crate which doesn't provide
+  # prebuilt bindings for 32-bit arches. Considering this is a compile-time
+  # and not a runtime dependency (because we don't use foyer's io-uring
+  # engine), we can simply skip the check.
+  if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(APPEND NETFLOW_PLUGIN_RUSTFLAGS --cfg=io_uring_skip_arch_check)
+    # The workspace release profile still propagates fat LTO, single-codegen-unit,
+    # and debuginfo settings through Rust dependencies on 32-bit builds. Override
+    # Cargo's release profile too so the entire dependency graph stays linkable.
+    corrosion_set_env_vars(
+            netflow-plugin
+            "CARGO_PROFILE_RELEASE_DEBUG=0"
+            "CARGO_PROFILE_RELEASE_LTO=off"
+            "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=8")
+  endif()
+
+  if(STATIC_BUILD)
+    list(APPEND NETFLOW_PLUGIN_RUSTFLAGS "-C" "target-feature=+crt-static")
+  endif()
+
+  if(NETFLOW_PLUGIN_RUSTFLAGS)
+    corrosion_add_target_rustflags(netflow-plugin ${NETFLOW_PLUGIN_RUSTFLAGS})
+  endif()
+endif()
+
+endif() # outer Corrosion gate
 
 option(ENABLE_MIMALLOC "Enable mimalloc allocator" OFF)
 
@@ -1787,6 +1802,13 @@ set(RRD_PLUGIN_FILES
         src/database/contexts/rrdcontext-context-registry.h
 )
 
+if(ENABLE_PROMQL)
+    list(APPEND RRD_PLUGIN_FILES
+            src/database/contexts/promql-data-source.c
+            src/database/contexts/promql-data-source.h
+    )
+endif()
+
 if(ENABLE_DBENGINE)
     list(APPEND RRD_PLUGIN_FILES
             src/database/engine/rrdengine.c
@@ -1999,6 +2021,12 @@ set(WEB_PLUGIN_FILES
         src/web/websocket/websocket.c
         src/web/websocket/websocket.h
 )
+
+if(ENABLE_PROMQL)
+    list(APPEND WEB_PLUGIN_FILES
+         src/web/api/v3/api_v3_promql.c
+         src/web/api/v3/api_v3_promql_discovery.c)
+endif()
 
 set(CLAIM_PLUGIN_FILES
         src/claim/claim.c
@@ -3353,6 +3381,7 @@ target_include_directories(netdata PRIVATE
 target_link_libraries(netdata PRIVATE
         m
         libnetdata
+        "$<$<BOOL:${ENABLE_PROMQL}>:netdata_promql>"
         "$<$<BOOL:${OS_LINUX}>:rt>"
         "$<$<BOOL:${ENABLE_MQTTWEBSOCKETS}>:mqttwebsockets>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_LIBRARIES}>"

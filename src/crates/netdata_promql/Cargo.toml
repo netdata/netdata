@@ -1,0 +1,25 @@
+[package]
+name = "netdata_promql"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "PromQL evaluator for the Netdata Agent"
+license = "GPL-3.0-or-later"
+
+[lints]
+workspace = true
+
+[lib]
+# Both:
+#  * `staticlib` for linking into the daemon (the C side)
+#  * `rlib` so integration tests under `tests/` can import the crate
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+promql-parser = "0.9"
+regex = "1.10"
+thiserror = { workspace = true }
+
+[build-dependencies]
+cbindgen = "0.28"
+bindgen = "0.71"

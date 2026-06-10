@@ -246,6 +246,21 @@ static struct web_api_command api_commands_v3[] = {
         .allow_subpaths = 0
     },
 
+    // PromQL query endpoints. Gated by ENABLE_PROMQL because the handler
+    // and the netdata_promql staticlib are only built when the feature is
+    // enabled. Handler dispatches internally between /promql/query and
+    // /promql/query_range using w->url_path_decoded.
+#ifdef ENABLE_PROMQL
+    {
+        .api = "promql",
+        .hash = 0,
+        .acl = HTTP_ACL_METRICS,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v3_promql,
+        .allow_subpaths = 1
+    },
+#endif
+
     {// terminator
      .api = NULL,
      .hash = 0,

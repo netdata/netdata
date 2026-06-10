@@ -231,6 +231,73 @@ static struct web_api_command api_commands_v1[] = {
         .allow_subpaths = 0
     },
 
+    // Prometheus HTTP API mirror paths. Same handler as /api/v3/promql/*,
+    // exposed under /api/v1/ so Grafana Prometheus datasources work without
+    // a non-default path prefix. See SOW-0017.
+#ifdef ENABLE_PROMQL
+    {
+        .api = "query",
+        .hash = 0,
+        .acl = HTTP_ACL_METRICS,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v3_promql,
+        .allow_subpaths = 0
+    },
+    {
+        .api = "query_range",
+        .hash = 0,
+        .acl = HTTP_ACL_METRICS,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v3_promql,
+        .allow_subpaths = 0
+    },
+    // Discovery endpoints (SOW-0018 chunk 1). Grafana's Prometheus
+    // datasource probes these for metric browser, label autocomplete, and
+    // datasource health-check (heuristics classification). All five route
+    // through the same callback; the handler distinguishes by
+    // w->url_path_decoded.
+    {
+        .api = "labels",
+        .hash = 0,
+        .acl = HTTP_ACL_METRICS,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v1_promql_discovery,
+        .allow_subpaths = 0
+    },
+    {
+        .api = "label",
+        .hash = 0,
+        .acl = HTTP_ACL_METRICS,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v1_promql_discovery,
+        .allow_subpaths = 1     // /api/v1/label/<name>/values
+    },
+    {
+        .api = "series",
+        .hash = 0,
+        .acl = HTTP_ACL_METRICS,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v1_promql_discovery,
+        .allow_subpaths = 0
+    },
+    {
+        .api = "metadata",
+        .hash = 0,
+        .acl = HTTP_ACL_METRICS,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v1_promql_discovery,
+        .allow_subpaths = 0
+    },
+    {
+        .api = "status",
+        .hash = 0,
+        .acl = HTTP_ACL_METRICS,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v1_promql_discovery,
+        .allow_subpaths = 1     // /api/v1/status/buildinfo
+    },
+#endif
+
     {
         // terminator - keep this last on this list
         .api = NULL,

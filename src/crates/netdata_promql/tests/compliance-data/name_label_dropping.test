@@ -1,0 +1,142 @@
+# Test for __name__ label drop.
+load 5m
+	metric_total{env="1"}		0 60 120
+	another_metric_total{env="1"}	60 120 180
+
+# Does not drop __name__ for vector selector.
+eval instant at 10m metric_total{env="1"}
+	metric_total{env="1"} 120
+
+# Drops __name__ for unary operators.
+eval instant at 10m -metric_total
+	{env="1"} -120
+
+# Drops __name__ for binary operators.
+eval instant at 10m metric_total + another_metric_total
+	{env="1"} 300
+
+# Does not drop __name__ for binary comparison operators.
+eval instant at 10m metric_total <= another_metric_total
+	metric_total{env="1"} 120
+
+# Drops __name__ for binary comparison operators with "bool" modifier.
+eval instant at 10m metric_total <= bool another_metric_total
+	{env="1"} 1
+
+# Drops __name__ for vector-scalar operations.
+eval instant at 10m metric_total * 2
+	{env="1"} 240
+
+# Drops __name__ for instant-vector functions.
+eval instant at 10m clamp(metric_total, 0, 100)
+	{env="1"} 100
+
+# Drops __name__ for round function.
+eval instant at 10m round(metric_total)
+	{env="1"} 120
+
+# Drops __name__ for range-vector functions.
+eval instant at 10m rate(metric_total{env="1"}[10m])
+	{env="1"} 0.2
+
+# Does not drop __name__ for last_over_time function.
+eval instant at 10m last_over_time(metric_total{env="1"}[10m])
+	metric_total{env="1"} 120
+
+# Does not drop __name__ for first_over_time function.
+eval instant at 10m first_over_time(metric_total{env="1"}[10m])
+	metric_total{env="1"} 60
+
+# However, when a subquery contains a name-dropping function, that should be respected.
+eval instant at 10m last_over_time(abs(metric_total{env="1"})[10m:])
+	{env="1"} 120
+
+# Drops name for other _over_time functions.
+eval instant at 10m max_over_time(metric_total{env="1"}[10m])
+	{env="1"} 120
+
+# Allows relabeling (to-be-dropped) __name__  via label_replace.
+eval instant at 10m label_replace(rate({env="1"}[10m]), "my_name", "rate_$1", "__name__", "(.+)")
+	{my_name="rate_metric_total", env="1"} 0.2
+	{my_name="rate_another_metric_total", env="1"} 0.2
+
+# Allows preserving __name__ via label_replace.
+eval instant at 10m label_replace(rate({env="1"}[10m]), "__name__", "rate_$1", "__name__", "(.+)")
+	rate_metric_total{env="1"} 0.2
+	rate_another_metric_total{env="1"} 0.2
+
+# Allows relabeling (to-be-dropped) __name__  via label_join.
+eval instant at 10m label_join(rate({env="1"}[10m]), "my_name", "_", "__name__")
+	{my_name="metric_total", env="1"} 0.2
+	{my_name="another_metric_total", env="1"} 0.2
+
+# Allows preserving __name__ via label_join.
+eval instant at 10m label_join(rate({env="1"}[10m]), "__name__", "_", "__name__", "env")
+	metric_total_1{env="1"} 0.2
+	another_metric_total_1{env="1"} 0.2
+
+# Does not drop metric names from aggregation operators.
+eval instant at 10m sum by (__name__, env) (metric_total{env="1"})
+	metric_total{env="1"} 120
+
+# Aggregation operators by __name__ lead to duplicate labelset errors (aggregation is partitioned by not yet removed __name__ label).
+# This is an accidental side effect of delayed __name__ label dropping
+eval instant at 10m sum by (__name__) (rate({env="1"}[10m]))
+  expect fail
+
+# Aggregation operators aggregate metrics with same labelset and to-be-dropped names.
+# This is an accidental side effect of delayed __name__ label dropping
+eval instant at 10m sum(rate({env="1"}[10m])) by (env)
+	{env="1"} 0.4
+
+# Aggregationk operators propagate __name__ label dropping information.
+eval instant at 10m topk(10, sum by (__name__, env) (metric_total{env="1"}))
+	metric_total{env="1"} 120
+
+eval instant at 10m topk(10, sum by (__name__, env) (rate(metric_total{env="1"}[10m])))
+	{env="1"} 0.2
+
+clear
+
+# More testing for __name__ label drop with different input series.
+load 1m
+  metric_total{env="1"} 0+1x10
+  metric_total{env="2"} 0+3x10
+
+# Metric name is preserved as there is no function that drops it.
+eval instant at 10m sum by (__name__) (metric_total{env="1"})
+  metric_total 10
+
+# Metric name is dropped at the end because of rate and because there is no label function to preserve it.
+eval instant at 10m sum by (__name__) (rate(metric_total{env="2"}[5m]))
+  {} 0.05
+
+# Metric name is preserved with label_replace even though it would have been dropped with rate.
+eval instant at 10m label_replace(sum by (__name__) (rate(metric_total{env="2"}[5m])), "__name__", "$1", "__name__", "(.+)")
+  metric_total 0.05
+
+# Combining the above cases in an OR expression, we drop the name if any of the series drops it.
+eval instant at 10m sum by (__name__) (metric_total{env="1"} or rate(metric_total{env="2"}[5m]))
+  {} 10.05
+
+# Changing the order of the OR expression should not change the result.
+eval instant at 10m sum by (__name__) (rate(metric_total{env="2"}[5m]) or metric_total{env="1"})
+  {} 10.05
+
+# With non-matching first selector, we use the second to determine if __name__ is dropped.
+eval instant at 10m sum by (__name__) (metric_total{env="3"} or rate(metric_total{env="2"}[5m]))
+  {} 0.05
+
+# Same as above, but with reversed order.
+eval instant at 10m sum by (__name__) (rate(metric_total{env="3"}[5m]) or metric_total{env="1"})
+  metric_total 10
+
+clear
+
+# Test delayed name removal with range queries and OR operator.
+load 10m
+  metric_a 1 _
+  metric_b 3 4
+
+eval range from 0 to 20m step 10m -metric_a or -metric_b
+  {} -1 -4 _
