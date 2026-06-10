@@ -15,7 +15,6 @@ package_tree="
   flex
   git
   gzip
-  zstd
   json-c
   liblz4
   libuv

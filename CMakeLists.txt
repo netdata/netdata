@@ -4392,17 +4392,13 @@ if(ENABLE_PLUGIN_GO)
     install(FILES ${GO_SNMP_TRAP_PROFILE_FILES}
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default)
-    find_program(ZSTD_EXECUTABLE NAMES zstd DOC "Zstandard compression program")
-    if(NOT ZSTD_EXECUTABLE)
-        message(FATAL_ERROR "Unable to find zstd command required to compress SNMP trap stock profiles")
-    endif()
     install(CODE "
         file(GLOB _snmp_trap_profiles
             \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default/*.yaml\"
             \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default/*.yml\")
         foreach(_profile IN LISTS _snmp_trap_profiles)
             execute_process(
-                COMMAND \"${ZSTD_EXECUTABLE}\" -q -f -19 --rm \"\${_profile}\"
+                COMMAND \"${CMAKE_BINARY_DIR}/${SNMP_TRAP_PROFILE_GEN_BIN}\" compress-zstd --rm \"\${_profile}\"
                 RESULT_VARIABLE _zstd_result
                 ERROR_VARIABLE _zstd_error)
             if(NOT _zstd_result EQUAL 0)
@@ -4417,7 +4413,7 @@ if(ENABLE_PLUGIN_GO)
         set(_snmp_trap_catalogue \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/catalogue.json\")
         if(EXISTS \"\${_snmp_trap_catalogue}\")
             execute_process(
-                COMMAND \"${ZSTD_EXECUTABLE}\" -q -f -19 --rm \"\${_snmp_trap_catalogue}\"
+                COMMAND \"${CMAKE_BINARY_DIR}/${SNMP_TRAP_PROFILE_GEN_BIN}\" compress-zstd --rm \"\${_snmp_trap_catalogue}\"
                 RESULT_VARIABLE _zstd_result
                 ERROR_VARIABLE _zstd_error)
             if(NOT _zstd_result EQUAL 0)

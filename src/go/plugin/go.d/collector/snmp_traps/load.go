@@ -770,12 +770,7 @@ func catalogueProfilePath(dir, name string) (string, string, error) {
 }
 
 func profilePathIsSupported(name string) bool {
-	for _, candidate := range profilePathCandidates(name) {
-		if isProfileFileName(candidate) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(profilePathCandidates(name), isProfileFileName)
 }
 
 func (idx *ProfileIndex) loadedTrapNameSource(name string) string {

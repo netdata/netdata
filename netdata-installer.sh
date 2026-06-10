@@ -278,6 +278,8 @@ REMOVE_BUILD=1
 
 RELEASE_CHANNEL="nightly" # valid values are 'nightly' and 'stable'
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY:-"no"}"
+# The parser keeps legacy no-op flags for command-line compatibility.
+# shellcheck disable=SC2034
 while [ -n "${1}" ]; do
   case "${1}" in
     "--zlib-is-really-here") LIBS_ARE_HERE=1 ;;
@@ -550,6 +552,7 @@ cmake_install() {
     fi
 }
 
+# shellcheck disable=SC2329
 build_error() {
   netdata_banner
   trap - EXIT
@@ -576,6 +579,7 @@ fi
 
 if [ "${NEED_GO_TOOLCHAIN}" -eq 1 ]; then
   progress "Checking for a usable Go toolchain and attempting to install one to /usr/local/go if needed."
+  # shellcheck source=/dev/null
   . "${NETDATA_SOURCE_DIR}/packaging/check-for-go-toolchain.sh"
 
   if ! ensure_go_toolchain; then

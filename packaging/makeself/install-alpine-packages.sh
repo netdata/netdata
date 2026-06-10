@@ -42,7 +42,6 @@ apk add --no-cache -U \
   util-linux-dev \
   wget \
   xz \
-  zstd \
   zlib-dev \
   zlib-static \
   || exit 1

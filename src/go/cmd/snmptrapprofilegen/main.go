@@ -31,6 +31,7 @@ import (
 
 	"github.com/golangsnmp/gomib"
 	gomibmib "github.com/golangsnmp/gomib/mib"
+	"github.com/klauspost/compress/zstd"
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"gopkg.in/yaml.v3"
@@ -362,6 +363,8 @@ func run(args []string) error {
 		return classifyCommand(args[1:])
 	case "emit":
 		return emitCommand(args[1:])
+	case "compress-zstd":
+		return compressZstdCommand(args[1:])
 	case "generate":
 		opts, err := parseOptions(args[1:], true)
 		if err != nil {
@@ -408,6 +411,77 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "common example:")
 	fmt.Fprintln(w, "  snmp-trap-profile-gen generate --source-dir ./mibs --all --out-dir ./snmp-trap-profile-gen-output")
+}
+
+func compressZstdCommand(args []string) error {
+	fs := flag.NewFlagSet("compress-zstd", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	removeSource := fs.Bool("rm", false, "remove each source file after successful compression")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() == 0 {
+		return errors.New("compress-zstd requires at least one file")
+	}
+	for _, path := range fs.Args() {
+		if err := compressZstdFile(path, *removeSource); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func compressZstdFile(path string, removeSource bool) error {
+	source, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	info, err := source.Stat()
+	if err != nil {
+		return err
+	}
+	tmpPath := path + ".zst.tmp"
+	targetPath := path + ".zst"
+	_ = os.Remove(tmpPath)
+	target, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, info.Mode().Perm())
+	if err != nil {
+		return err
+	}
+
+	encoder, err := zstd.NewWriter(target, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(19)))
+	if err != nil {
+		_ = target.Close()
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if _, err := io.Copy(encoder, source); err != nil {
+		_ = encoder.Close()
+		_ = target.Close()
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := encoder.Close(); err != nil {
+		_ = target.Close()
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := target.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	_ = os.Remove(targetPath)
+	if err := os.Rename(tmpPath, targetPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if removeSource {
+		if err := os.Remove(path); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func parseOptions(args []string, forGenerate bool) (generatorOptions, error) {

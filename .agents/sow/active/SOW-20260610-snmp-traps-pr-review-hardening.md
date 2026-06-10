@@ -2113,6 +2113,85 @@ Validation evidence for this batch:
 - `git diff --check` passed.
 - `bash -n` passed for the touched installer/runtime shell scripts.
 
+## CI Failure Triage - 2026-06-10
+
+GitHub Actions failures reviewed for PR #22652:
+
+- **Go toolchain tests.**
+  - Evidence: `Go toolchain tests (... src/go, 1.26.0, ...)` failed after the
+    Go 1.26 modernization check produced a diff for
+    `src/go/plugin/go.d/collector/snmp_traps/trapwriter_test.go`.
+  - Root cause: the new concurrent writer test still used counted `for` loops
+    and manual `WaitGroup.Add` / goroutine / `Done` plumbing.
+  - Plan: apply the generated Go 1.26 style change and rerun the affected Go
+    test package.
+- **Package and Docker builds.**
+  - Evidence: representative DEB and Docker logs failed at
+    `CMakeLists.txt:4397` with `Unable to find zstd command required to
+    compress SNMP trap stock profiles`.
+  - Additional evidence: representative RPM package logs later failed before
+    CMake with `zstd is needed by netdata-...` because the previous branch tip
+    added `BuildRequires: zstd`.
+  - Root cause: CMake requires an external `zstd` executable at configure time.
+    Several CI/build images provide `libzstd` development packages, but not
+    necessarily the `zstd` command-line tool. The RPM build dependency then
+    made prebuilt package-builder images fail before they could build the PR.
+  - Plan: remove the external CLI requirement by using the already-built
+    `snmp-trap-profile-gen` Go helper to zstd-compress installed stock profile
+    files and catalogue files, then remove the extra external `zstd` command
+    dependency from installer/package dependency surfaces.
+- **ShellCheck.**
+  - Evidence: `reviewdog/action-shellcheck` reported warnings in changed shell
+    files including `netdata-installer.sh`,
+    `packaging/installer/install-required-packages.sh`,
+    `packaging/installer/functions.sh`,
+    `packaging/installer/dependencies/alpine.sh`,
+    `packaging/makeself/install-or-update.sh`,
+    `packaging/utils/compile-and-run-windows.sh`, and
+    `packaging/windows/msys2-dependencies.sh`.
+  - Root cause: ShellCheck runs on every changed shell file and reports legacy
+    file-level warnings, not only the new lines.
+  - Plan: fix narrow warnings where practical and add file-level suppressions
+    only for existing dynamic-script patterns that ShellCheck cannot infer.
+- **Fixture tests and some source image builds.**
+  - Evidence: logs failed while contacting Docker Hub
+    (`registry-1.docker.io` timeout / `i/o timeout`) before branch code ran.
+  - Root cause: external registry/network flake.
+  - Plan: no code change; rerun after real branch failures are fixed.
+
+Implemented for this CI batch:
+
+- Added an internal `snmp-trap-profile-gen compress-zstd --rm <file...>`
+  packaging helper backed by the existing Go zstd dependency.
+- Changed CMake install rules to call the built Go helper for stock trap
+  profile and catalogue compression instead of `find_program(zstd)`.
+- Removed the extra external `zstd` command dependency from RPM, source
+  installer dependency files, makeself Alpine dependencies, Windows MSYS2
+  dependencies, and manual install docs.
+- Applied the Go 1.26 modernization changes for:
+  - `profilePathIsSupported()` using `slices.ContainsFunc`;
+  - the concurrent journal-writer test using `for range` and `WaitGroup.Go`.
+- Added narrow ShellCheck suppressions for existing dynamic installer-script
+  patterns surfaced because the branch touches those shell files.
+
+Validation evidence for this CI batch:
+
+- `GOTOOLCHAIN=go1.26.0 go fmt ./...` in `src/go` produced no modified files.
+- `GOTOOLCHAIN=go1.26.0 go test -count=1 ./cmd/snmptrapprofilegen
+  ./plugin/go.d/collector/snmp_traps` passed.
+- ShellCheck passed for all current changed shell files against
+  `upstream/master`.
+- `bash -n` passed for all current changed shell files against
+  `upstream/master`.
+- `git diff --check` passed.
+- Minimal CMake validation passed:
+  - configured with `ENABLE_PLUGIN_GO=On` and unrelated optional plugins off;
+  - built `snmp_trap_profile_gen` and `go-plugin`;
+  - installed `plugin-go` into `/tmp/netdata-snmptraps-ci-install`;
+  - verified `817` installed `*.yaml.zst` stock trap profiles;
+  - verified `0` installed raw `*.yaml` / `*.yml` stock trap profiles;
+  - verified `catalogue.json.zst` exists.
+
 ## Artifact Maintenance Gate
 
 - Specs, generated integration docs, and the operator skill have already been

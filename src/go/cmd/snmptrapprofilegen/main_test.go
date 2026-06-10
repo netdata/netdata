@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 )
 
@@ -34,6 +36,40 @@ func TestParsePENsAndVendorForOID(t *testing.T) {
 		if got := vendorForOID(oid, pens); got != want {
 			t.Fatalf("vendorForOID(%s) = %q, want %q", oid, got, want)
 		}
+	}
+}
+
+func TestCompressZstdCommandCompressesAndRemovesSource(t *testing.T) {
+	dir := t.TempDir()
+	sourcePath := filepath.Join(dir, "vendor.yaml")
+	sourceData := []byte("profile: vendor\n")
+	if err := os.WriteFile(sourcePath, sourceData, 0o640); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	if err := compressZstdCommand([]string{"--rm", sourcePath}); err != nil {
+		t.Fatalf("compress-zstd failed: %v", err)
+	}
+	if _, err := os.Stat(sourcePath); !os.IsNotExist(err) {
+		t.Fatalf("source file still exists after --rm: %v", err)
+	}
+
+	targetPath := sourcePath + ".zst"
+	compressed, err := os.ReadFile(targetPath)
+	if err != nil {
+		t.Fatalf("read compressed file: %v", err)
+	}
+	decoder, err := zstd.NewReader(bytes.NewReader(compressed))
+	if err != nil {
+		t.Fatalf("create zstd reader: %v", err)
+	}
+	defer decoder.Close()
+	decoded, err := io.ReadAll(decoder)
+	if err != nil {
+		t.Fatalf("decode compressed file: %v", err)
+	}
+	if !bytes.Equal(decoded, sourceData) {
+		t.Fatalf("decoded data = %q, want %q", decoded, sourceData)
 	}
 }
 

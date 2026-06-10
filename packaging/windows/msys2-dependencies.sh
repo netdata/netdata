@@ -21,7 +21,6 @@ pacman -S --noconfirm --needed \
     libutil-linux \
     libutil-linux-devel \
     libyaml-devel \
-    zstd \
     libzstd-devel \
     msys2-devel \
     msys/brotli-devel \

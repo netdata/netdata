@@ -2,7 +2,7 @@
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# shellcheck source=./packaging/makeself/functions.sh
+# shellcheck source=/dev/null
 . "$(dirname "${0}")"/functions.sh
 
 export LC_ALL=C
@@ -91,9 +91,13 @@ fi
 # -----------------------------------------------------------------------------
 progress "Attempt to create user/group netdata/netadata"
 
+# These variables are consumed by helper functions from functions.sh.
+# shellcheck disable=SC2034
 NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C"
+# shellcheck disable=SC2034
 NETDATA_ADDED_TO_GROUPS=""
 # Default user/group
+# shellcheck disable=SC2034
 NETDATA_USER="netdata"
 NETDATA_GROUP="netdata"
 

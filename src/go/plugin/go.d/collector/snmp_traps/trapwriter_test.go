@@ -138,16 +138,14 @@ func TestFanoutTrapWriterForwardsBinaryEncodedFieldsFromPrimary(t *testing.T) {
 }
 
 func TestJournalTrapWriterConcurrentWriteCloseDoesNotPanic(t *testing.T) {
-	for attempt := 0; attempt < 50; attempt++ {
+	for range 50 {
 		writer := newJournalTrapWriter(nil, 2)
 		start := make(chan struct{})
 		done := make(chan struct{})
 
 		var wg sync.WaitGroup
-		for i := 0; i < 8; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range 8 {
+			wg.Go(func() {
 				<-start
 				for {
 					err := writer.Write(&TrapEntry{JobName: "local", Message: "trap"})
@@ -158,7 +156,7 @@ func TestJournalTrapWriterConcurrentWriteCloseDoesNotPanic(t *testing.T) {
 						return
 					}
 				}
-			}()
+			})
 		}
 
 		close(start)

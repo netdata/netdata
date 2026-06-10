@@ -278,7 +278,9 @@ prepare_cmake_options() {
   # Keep forwarding the install prefix even when it is empty.
   # This installer uses an empty prefix for /usr/... destinations instead of
   # CMake's /usr/local default.
+  # shellcheck disable=SC2034
   NETDATA_CMAKE_INSTALL_PREFIX_OPTION="-DCMAKE_INSTALL_PREFIX=${NETDATA_PREFIX-}"
+  # shellcheck disable=SC2034
   NETDATA_WINDOWS_PATH_PREFIX_OPTION=
 
   #
@@ -288,6 +290,7 @@ prepare_cmake_options() {
   # callers can pass them as separately quoted arguments.
 
   if [ -n "${NETDATA_WINDOWS_PATH_PREFIX:-}" ]; then
+    # shellcheck disable=SC2034
     NETDATA_WINDOWS_PATH_PREFIX_OPTION="-DNETDATA_WINDOWS_PATH_PREFIX=${NETDATA_WINDOWS_PATH_PREFIX}"
   fi
 

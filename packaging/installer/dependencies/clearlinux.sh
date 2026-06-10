@@ -23,7 +23,6 @@ declare -a package_tree=(
   flex
   git
   gzip
-  zstd
   make
   python3-basic
   service-os-dev
