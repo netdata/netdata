@@ -2192,6 +2192,26 @@ Validation evidence for this CI batch:
   - verified `0` installed raw `*.yaml` / `*.yml` stock trap profiles;
   - verified `catalogue.json.zst` exists.
 
+Additional rerun evidence:
+
+- `Go Tests` rerun `27298897608` completed successfully on commit
+  `19bf4d59b5ecce246354567ef6fcc128382b63d4`.
+- `Build Windows` failed at install-time SNMP trap profile compression:
+  `compress-zstd --rm` compressed the installed YAML, then failed removing the
+  source because Windows still considered the source file in use.
+- Root cause: `compressZstdFile()` deferred closing the source profile file
+  until function return, but `--rm` removes the source before return. This is
+  legal on Linux and fails on Windows.
+- Fix: close the source file immediately after `io.Copy()` and before encoder
+  close, target rename, and optional source removal.
+- The representative CentOS Stream 9 package failure is not branch logic:
+  `proxy.golang.org` returned an HTTP/2 stream `INTERNAL_ERROR` while
+  downloading `github.com/prometheus/prometheus@v0.302.0`.
+- The Docker amd64 job is red, but GitHub does not expose the failed
+  `Build Image` step log through job logs or the run log archive. The run
+  archive contains setup/checkout/buildx logs for that job but no failing build
+  step output, so no branch root cause can be proven from available artifacts.
+
 ## Artifact Maintenance Gate
 
 - Specs, generated integration docs, and the operator skill have already been

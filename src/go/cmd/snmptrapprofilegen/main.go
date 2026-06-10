@@ -436,10 +436,10 @@ func compressZstdFile(path string, removeSource bool) error {
 	if err != nil {
 		return err
 	}
-	defer source.Close()
 
 	info, err := source.Stat()
 	if err != nil {
+		_ = source.Close()
 		return err
 	}
 	tmpPath := path + ".zst.tmp"
@@ -447,16 +447,25 @@ func compressZstdFile(path string, removeSource bool) error {
 	_ = os.Remove(tmpPath)
 	target, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, info.Mode().Perm())
 	if err != nil {
+		_ = source.Close()
 		return err
 	}
 
 	encoder, err := zstd.NewWriter(target, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(19)))
 	if err != nil {
+		_ = source.Close()
 		_ = target.Close()
 		_ = os.Remove(tmpPath)
 		return err
 	}
 	if _, err := io.Copy(encoder, source); err != nil {
+		_ = source.Close()
+		_ = encoder.Close()
+		_ = target.Close()
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := source.Close(); err != nil {
 		_ = encoder.Close()
 		_ = target.Close()
 		_ = os.Remove(tmpPath)
