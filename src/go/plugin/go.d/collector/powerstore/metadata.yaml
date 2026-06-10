@@ -249,7 +249,7 @@ modules:
 
                 ```yaml
                 - hostname: my_powerstore
-                  guid: 4d30de6c-8bfb-4239-8c5e-0f3e600eeca0
+                  guid: a1b2c3d4-e5f6-7890-abcd-ef1234567890
                 ```
 
                 Then reference that hostname in the collector job's `vnode` field. The `vnode` value must match the `hostname` in vnodes.conf exactly (case-sensitive).
