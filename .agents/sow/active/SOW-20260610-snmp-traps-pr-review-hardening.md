@@ -1582,15 +1582,14 @@ Implemented locally:
   without log floods.
 - Go 1.26 `go fix ./...` output was applied to the trap profile generator and
   trap profile tests.
-- The existing `ibm.d/as400` Sonar cleanup was tightened from
-  `WriteString(string(ch))` to `WriteRune(ch)` and `Len()` because that file was
-  already touched by the branch.
+- The earlier unrelated `ibm.d/as400` Sonar cleanup was removed from the
+  current branch to keep this PR scoped to SNMP traps.
 
 Validation evidence:
 
 - `go test -count=1 ./plugin/go.d/collector/snmp_traps
   ./plugin/go.d/collector/snmp_topology ./plugin/agent/jobmgr/funcctl
-  ./cmd/godplugin ./pkg/funcapi ./plugin/ibm.d/modules/as400` passed.
+  ./cmd/godplugin ./pkg/funcapi` passed.
 - `go test -count=1 ./cmd/snmptrapprofilegen` passed.
 - `go fix ./...` in `src/go` passed after applying the toolchain diff.
 - `git diff --check` completed without warnings.
@@ -1731,6 +1730,52 @@ Validation evidence:
 - `rg -n "reload-profiles|snmp_traps:reload" .agents/sow/specs src/go docs
   integrations` now returns only the explicit superseded/rejected manual
   Function note in the durable spec.
+
+### 2026-06-10 External Review Rerun Fixes
+
+Implemented locally after the full-scope reviewer rerun:
+
+- Removed `TRAP_JSON` from `SYSTEMD_KEYS_INCLUDED_IN_FACETS` in
+  `src/collectors/systemd-journal.plugin/systemd-journal.c`, matching the
+  earlier recorded decision that `TRAP_JSON` is high-cardinality payload data
+  and should not be a default C-side facet.
+- Made the direct `godplugin` Function CLI public-name resolver deterministic
+  by sorting module names before scanning. This matches the Function controller
+  collision behavior and prevents CLI/daemon disagreement if a future module
+  claims the same public Function name.
+- Added a CLI collision regression test proving sorted first-owner behavior.
+- Removed the lingering unrelated `src/go/plugin/ibm.d/modules/as400` diff from
+  the branch.
+
+Rejected or stale rerun findings:
+
+- The persistent-journal-root startup error classification is already
+  retryable `503` in current code:
+  `src/go/plugin/go.d/collector/snmp_traps/collector.go` calls
+  `dyncfgStartupError()` for `validatePersistentJournalRoot()`.
+- The systemd v235 service template does not define any `CapabilityBoundingSet`
+  entries and runs the daemon as root, so the specific "missing
+  CAP_NET_BIND_SERVICE from v235 bounding set" finding does not apply to that
+  template. The modern service template does include the capability.
+- RPM-native postinstall journal-directory creation is outside this repository's
+  packaging tree. This branch still creates the directory in the native
+  installer, Debian plugin package postinst, makeself path, and systemd service
+  `ExecStartPre`; any separate RPM spec follow-up belongs in the packaging
+  repository if maintainers require package-install-time creation before service
+  start.
+- The claimed fsnotify add-watch leak on `os.Stat` failure is not reachable in
+  the cited code path because `watcher.Add()` is called only after successful
+  `os.Stat()` and directory validation.
+
+Validation evidence:
+
+- `go test -count=1 ./cmd/godplugin ./plugin/agent/jobmgr/funcctl
+  ./plugin/agent/jobmgr ./plugin/go.d/collector/snmp_traps ./pkg/funcapi
+  ./plugin/ibm.d/modules/as400` passed.
+- `git diff --check` completed without warnings.
+- `git diff upstream/master...HEAD --
+  src/go/plugin/ibm.d/modules/as400/helpers.go` is expected to be empty after
+  this fix is committed.
 
 Closed review nits:
 

@@ -102,3 +102,23 @@ func TestResolveFunctionCLIRequest(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveFunctionCLIRequestPublicNameCollisionUsesSortedModule(t *testing.T) {
+	registry := collectorapi.Registry{
+		"bbb": collectorapi.Creator{
+			Methods: func() []funcapi.MethodConfig {
+				return []funcapi.MethodConfig{{ID: "logs", FunctionName: "shared:logs"}}
+			},
+		},
+		"aaa": collectorapi.Creator{
+			Methods: func() []funcapi.MethodConfig {
+				return []funcapi.MethodConfig{{ID: "logs", FunctionName: "shared:logs"}}
+			},
+		},
+	}
+
+	moduleName, methodID, _, err := resolveFunctionCLIRequest("shared:logs", registry)
+	require.NoError(t, err)
+	assert.Equal(t, "aaa", moduleName)
+	assert.Equal(t, "logs", methodID)
+}

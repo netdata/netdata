@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/user"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -280,7 +281,14 @@ func resolveFunctionCLIRequest(functionName string, registry collectorapi.Regist
 }
 
 func resolveFunctionCLIRequestByPublicName(functionName string, registry collectorapi.Registry) (string, string, collectorapi.Creator, bool) {
-	for moduleName, creator := range registry {
+	moduleNames := make([]string, 0, len(registry))
+	for moduleName := range registry {
+		moduleNames = append(moduleNames, moduleName)
+	}
+	sort.Strings(moduleNames)
+
+	for _, moduleName := range moduleNames {
+		creator := registry[moduleName]
 		if creator.Methods == nil {
 			continue
 		}
