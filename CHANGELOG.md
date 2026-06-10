@@ -301,6 +301,11 @@
 - Add deterministic unit tests for rw-spinlock API  ([#22659](https://github.com/netdata/netdata/issues/22659))
 - Feat(go.d/prometheus): add relabeling engine ([#22660](https://github.com/netdata/netdata/issues/22660))
 - Refactor(go/pkg/prometheus): extract the scrape transport into a fetcher ([#22664](https://github.com/netdata/netdata/issues/22664))
+- Bound alert notification execution wait ([#22626](https://github.com/netdata/netdata/issues/22626))
+- Fix(json): validate json_object before processing in json_walk function ([#22309](https://github.com/netdata/netdata/issues/22309))
+- Protect v2 journal populate walk from SIGBUS ([#22514](https://github.com/netdata/netdata/issues/22514))
+- Bump aclk-schemas and adapt to Buf v2 proto layout ([#22662](https://github.com/netdata/netdata/issues/22662))
+- Networ Viewer (FreeBSD) ([#22632](https://github.com/netdata/netdata/issues/22632))
 
 ## [2.10.0] - 2026-04-09
 
