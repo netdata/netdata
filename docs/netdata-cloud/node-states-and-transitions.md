@@ -275,7 +275,7 @@ netdatacli remove-stale-node <node-id>
 2. On the Parent dashboard, can you see the alert raised? If the alert is visible but no notification arrived, the `to: silent` default is in effect.
 3. Has a Space administrator [enabled Alert notifications](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-notification-methods.md#manage-space-notification-settings) for your Space?
 
-**Solution:** See [Enabling Notifications for Streaming Alerts](/docs/nodes-ephemerality.md#enabling-notifications-for-streaming-alerts) for step-by-step instructions covering alert override, health reload, and Cloud notification setup.
+**Solution:** See [Enabling Notifications for Streaming Alerts](/docs/nodes-ephemerality.md#enabling-notifications-for-streaming-alerts) for step-by-step instructions covering alert override and Cloud notification setup.
 
 ### Node reappears after deletion
 
