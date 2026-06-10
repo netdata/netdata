@@ -4,6 +4,7 @@ package snmp_traps
 
 import (
 	"compress/gzip"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -301,6 +302,10 @@ func loadProfile(filename string, extendsPaths multipath.MultiPath, stack []stri
 }
 
 func readProfileFile(filename string) ([]byte, error) {
+	return readMaybeGzipFile(filename)
+}
+
+func readMaybeGzipFile(filename string) ([]byte, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -353,6 +358,13 @@ func (s *stockProfileStore) empty() bool {
 }
 
 func buildStockProfileStore(dir string, extendsPaths multipath.MultiPath, replaced map[string]bool, idx *ProfileIndex) (*stockProfileStore, error) {
+	if store, ok, err := buildStockProfileStoreFromCatalogue(dir, extendsPaths, replaced, idx); ok || err != nil {
+		return store, err
+	}
+	return buildStockProfileStoreFromProfiles(dir, extendsPaths, replaced, idx)
+}
+
+func buildStockProfileStoreFromProfiles(dir string, extendsPaths multipath.MultiPath, replaced map[string]bool, idx *ProfileIndex) (*stockProfileStore, error) {
 	files, err := profileFilesInDir(dir)
 	if err != nil {
 		return nil, err
@@ -430,6 +442,171 @@ func buildStockProfileStore(dir string, extendsPaths multipath.MultiPath, replac
 	}
 
 	return store, nil
+}
+
+type stockProfileCatalogue map[string]stockProfileCatalogueEntry
+
+type stockProfileCatalogueEntry struct {
+	File     string   `json:"file"`
+	TrapOIDs []string `json:"trap_oids"`
+}
+
+func buildStockProfileStoreFromCatalogue(
+	dir string,
+	extendsPaths multipath.MultiPath,
+	replaced map[string]bool,
+	idx *ProfileIndex,
+) (*stockProfileStore, bool, error) {
+	catalogue, err := loadStockProfileCatalogue(dir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, false, nil
+		}
+		return nil, true, err
+	}
+
+	store := &stockProfileStore{
+		dir:              dir,
+		extendsPaths:     extendsPaths,
+		files:            make(map[string]string),
+		exactRoutes:      make(map[string]string),
+		enterpriseRoutes: make(map[string]string),
+		loaded:           make(map[string]bool),
+	}
+
+	stockOIDs := make(map[string]string)
+	stockOIDFiles := make(map[string]string)
+	prefixFiles := make(map[string]map[string]bool)
+
+	for _, vendor := range sortedCatalogueVendors(catalogue) {
+		entry := catalogue[vendor]
+		if entry.File == "" {
+			return nil, true, fmt.Errorf("stock trap profile catalogue entry %q has empty file", vendor)
+		}
+		if len(entry.TrapOIDs) == 0 {
+			return nil, false, nil
+		}
+
+		path, name, err := catalogueProfilePath(dir, entry.File)
+		if err != nil {
+			return nil, true, fmt.Errorf("stock trap profile catalogue entry %q references file %q: %w", vendor, entry.File, err)
+		}
+		if replaced[name] {
+			continue
+		}
+		store.files[name] = path
+
+		for _, oid := range entry.TrapOIDs {
+			source := path
+			if existing := idx.lookupLoaded(oid); existing != nil {
+				return nil, true, fmt.Errorf("%s: duplicate trap OID %s (already defined in %s)", source, oid, existing.sourceFile)
+			}
+			if existing := stockOIDs[oid]; existing != "" {
+				return nil, true, fmt.Errorf("%s: duplicate trap OID %s (already defined in %s)", source, oid, existing)
+			}
+			stockOIDs[oid] = source
+			stockOIDFiles[oid] = name
+
+			if prefix, ok := enterpriseTrapPrefix(oid); ok {
+				if prefixFiles[prefix] == nil {
+					prefixFiles[prefix] = make(map[string]bool)
+				}
+				prefixFiles[prefix][name] = true
+				continue
+			}
+			store.exactRoutes[oid] = name
+		}
+	}
+
+	for oid := range stockOIDs {
+		prefix, ok := enterpriseTrapPrefix(oid)
+		if !ok {
+			continue
+		}
+		filesForPrefix := prefixFiles[prefix]
+		if len(filesForPrefix) == 1 {
+			for file := range filesForPrefix {
+				store.enterpriseRoutes[prefix] = file
+			}
+			continue
+		}
+		store.exactRoutes[oid] = stockOIDFiles[oid]
+	}
+
+	return store, true, nil
+}
+
+func loadStockProfileCatalogue(stockDir string) (stockProfileCatalogue, error) {
+	if stockDir == "" {
+		return nil, os.ErrNotExist
+	}
+	data, err := readStockProfileCatalogueFile(filepath.Dir(stockDir))
+	if err != nil {
+		return nil, err
+	}
+	var catalogue stockProfileCatalogue
+	if err := json.Unmarshal(data, &catalogue); err != nil {
+		return nil, fmt.Errorf("invalid stock trap profile catalogue: %w", err)
+	}
+	if len(catalogue) == 0 {
+		return nil, fmt.Errorf("stock trap profile catalogue is empty")
+	}
+	return catalogue, nil
+}
+
+func readStockProfileCatalogueFile(dir string) ([]byte, error) {
+	var lastErr error
+	for _, name := range []string{"catalogue.json", "catalogue.json.gz"} {
+		data, err := readMaybeGzipFile(filepath.Join(dir, name))
+		if err == nil {
+			return data, nil
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		lastErr = err
+	}
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, os.ErrNotExist
+}
+
+func sortedCatalogueVendors(catalogue stockProfileCatalogue) []string {
+	vendors := make([]string, 0, len(catalogue))
+	for vendor := range catalogue {
+		vendors = append(vendors, vendor)
+	}
+	slices.Sort(vendors)
+	return vendors
+}
+
+func catalogueProfilePath(dir, name string) (string, string, error) {
+	if filepath.Base(name) != name || strings.ContainsRune(name, '\\') {
+		return "", "", fmt.Errorf("must be a profile filename, not a path")
+	}
+	if !isProfileFileName(name) && !isProfileFileName(name+".gz") {
+		return "", "", fmt.Errorf("unsupported profile filename")
+	}
+
+	for _, candidate := range []string{name, name + ".gz"} {
+		if !isProfileFileName(candidate) {
+			continue
+		}
+		path := filepath.Join(dir, candidate)
+		fi, err := os.Stat(path)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return "", "", err
+		}
+		if fi.IsDir() {
+			return "", "", fmt.Errorf("%s is a directory", path)
+		}
+		return path, profileLogicalName(candidate), nil
+	}
+	return "", "", os.ErrNotExist
 }
 
 func (idx *ProfileIndex) loadedTrapNameSource(name string) string {

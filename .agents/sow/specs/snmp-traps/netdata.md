@@ -414,6 +414,7 @@ jobs:
   - name: local                           # job name → /var/log/journal/netdata/snmp-traps/local/
     enabled: false                        # stock default = disabled; operator enables
     listen:
+      receive_buffer: 4194304             # per-endpoint UDP SO_RCVBUF request in bytes; 0 keeps OS default
       endpoints:
         - protocol: udp
           address: "0.0.0.0"
@@ -450,7 +451,7 @@ jobs:
       max_size: 10GB                      # default 10 GB total
       max_duration: null                  # null = no time-based eviction
       rotation_size: null                 # null = auto (max_size / 20, clamped)
-      rotation_duration: 1h
+      rotation_duration: null             # null = no time-based rotation
     # Per-OID overrides (rare; profile defaults are normally enough)
     overrides:
       - oid: 1.3.6.1.4.1.9.9.43.2.0.1
@@ -699,7 +700,7 @@ Per-job retention policy mirrors the retention semantics used by the NetFlow plu
 | `retention.max_size` | `10GB` | Total bytes of journal files for this job; oldest files are deleted when exceeded. Set to `null` to disable size-based eviction. |
 | `retention.max_duration` | `null` (disabled) | Maximum age of the oldest journal file; older files are deleted. Set to a duration (e.g., `7d`, `30d`) to enable. |
 | `retention.rotation_size` | auto (`max_size / 20`, clamped 5MB-200MB) | Per-file rotation size. |
-| `retention.rotation_duration` | `1h` | Per-file rotation duration. `0`/`null` disables time-based rotation. |
+| `retention.rotation_duration` | `null` (disabled) | Per-file rotation duration. Set to a duration (e.g., `24h`) to enable time-based rotation. |
 
 **Retention rules apply independently and inclusively** — either threshold being exceeded triggers cleanup of the oldest file. Both `null` is allowed only as an explicit manual-cleanup configuration; the default is size-capped. When both are `null`, the periodic retention sweep is a no-op and no file is deleted by the plugin.
 

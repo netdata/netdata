@@ -388,6 +388,63 @@ func TestBuildProfileDropsUnresolvedVarbinds(t *testing.T) {
 	}
 }
 
+func TestEmitProfilesWritesRouteMetadataToCatalogue(t *testing.T) {
+	dir := t.TempDir()
+	penFile := filepath.Join(dir, "iana-enterprise-numbers.txt")
+	if err := os.WriteFile(penFile, []byte("9\n  Cisco Systems, Inc.\n"), 0o644); err != nil {
+		t.Fatalf("write PEN file: %v", err)
+	}
+
+	profilesDir := filepath.Join(dir, "profiles")
+	cataloguePath := filepath.Join(dir, "catalogue.json")
+	records := []TrapRecord{
+		{
+			OID:           "1.3.6.1.6.3.1.1.5.1",
+			QualifiedName: "SNMPv2-MIB::coldStart",
+			MIB:           "SNMPv2-MIB",
+			Category:      "state_change",
+			Severity:      "notice",
+			Description:   "Cold start on {{hostname}}.",
+		},
+		{
+			OID:           "1.3.6.1.6.3.1.1.5.3",
+			QualifiedName: "IF-MIB::linkDown",
+			MIB:           "IF-MIB",
+			Category:      "state_change",
+			Severity:      "warning",
+			Description:   "Interface down on {{hostname}}.",
+		},
+	}
+	if _, err := emitProfiles(generatorOptions{
+		ProfilesOutDir: profilesDir,
+		CataloguePath:  cataloguePath,
+		PENFile:        penFile,
+	}, records); err != nil {
+		t.Fatalf("emitProfiles failed: %v", err)
+	}
+
+	var catalogue map[string]struct {
+		File      string   `json:"file"`
+		TrapCount int      `json:"trap_count"`
+		TrapOIDs  []string `json:"trap_oids"`
+	}
+	data, err := os.ReadFile(cataloguePath)
+	if err != nil {
+		t.Fatalf("read catalogue: %v", err)
+	}
+	if err := json.Unmarshal(data, &catalogue); err != nil {
+		t.Fatalf("decode catalogue: %v", err)
+	}
+	entry := catalogue["standard"]
+	if entry.File != "standard.yaml" || entry.TrapCount != 2 {
+		t.Fatalf("standard catalogue entry = %#v, want file standard.yaml with 2 traps", entry)
+	}
+	wantOIDs := []string{"1.3.6.1.6.3.1.1.5.1", "1.3.6.1.6.3.1.1.5.3"}
+	if strings.Join(entry.TrapOIDs, ",") != strings.Join(wantOIDs, ",") {
+		t.Fatalf("trap_oids = %#v, want %#v", entry.TrapOIDs, wantOIDs)
+	}
+}
+
 func TestLLMResponseValidation(t *testing.T) {
 	rec := TrapRecord{
 		QualifiedName: "TEST-MIB::testTrap",

@@ -11,8 +11,15 @@ import (
 	"time"
 )
 
-const maxDatagramSize = 8192
-const listenerReadErrorBackoff = 100 * time.Millisecond
+const (
+	maxDatagramSize              = 8192
+	defaultListenerReceiveBuffer = 4 * 1024 * 1024
+	listenerReadErrorBackoff     = 100 * time.Millisecond
+)
+
+var setUDPReadBuffer = func(conn *net.UDPConn, bytes int) error {
+	return conn.SetReadBuffer(bytes)
+}
 
 type listenerEndpoint struct {
 	conn *net.UDPConn
@@ -28,14 +35,14 @@ type Listener struct {
 	wg        sync.WaitGroup
 }
 
-func newListener(jobName string, endpoints []EndpointConfig) (*Listener, error) {
+func newListener(jobName string, cfg ListenConfig) (*Listener, error) {
 	l := &Listener{
 		jobName: jobName,
 	}
 
 	var bound []*net.UDPConn
 
-	for i, ep := range endpoints {
+	for i, ep := range cfg.Endpoints {
 		protocol := strings.ToLower(ep.Protocol)
 		addr := net.JoinHostPort(ep.Address, strconv.Itoa(ep.Port))
 		udpAddr, err := net.ResolveUDPAddr(protocol, addr)
@@ -48,6 +55,13 @@ func newListener(jobName string, endpoints []EndpointConfig) (*Listener, error) 
 		if err != nil {
 			closeConns(bound)
 			return nil, fmt.Errorf("endpoint %d: bind %s: %w", i, addr, err)
+		}
+		if cfg.ReceiveBuffer > 0 {
+			if err := setUDPReadBuffer(conn, cfg.ReceiveBuffer); err != nil {
+				conn.Close()
+				closeConns(bound)
+				return nil, fmt.Errorf("endpoint %d: set receive buffer for %s to %d bytes: %w", i, addr, cfg.ReceiveBuffer, err)
+			}
 		}
 
 		bound = append(bound, conn)

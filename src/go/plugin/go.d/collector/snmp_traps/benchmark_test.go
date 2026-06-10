@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 )
 
 // ---------------------------------------------------------------------------
@@ -487,7 +488,9 @@ func newUDPPacketToJournalBenchmark(b *testing.B) *udpPacketToJournalBenchmark {
 		metrics:    &perJobMetrics{},
 	}
 
-	listener, err := newListener("bench-udp", []EndpointConfig{{Protocol: "udp4", Address: "127.0.0.1", Port: 0}})
+	listener, err := newListener("bench-udp", ListenConfig{
+		Endpoints: []EndpointConfig{{Protocol: "udp4", Address: "127.0.0.1", Port: 0}},
+	})
 	if err != nil {
 		b.Fatalf("newListener: %v", err)
 	}
@@ -613,6 +616,59 @@ func BenchmarkBERRejection(b *testing.B) {
 }
 
 // ---------------------------------------------------------------------------
+// 6. Profile-cache and dedup hot-path benchmarks
+// ---------------------------------------------------------------------------
+
+func BenchmarkBuildStockProfileStoreDefaultProfiles(b *testing.B) {
+	dir := trapProfilesDirFromThisFile()
+	if dir == "" {
+		b.Skip("default trap profile directory not found")
+	}
+	paths := multipath.New(dir)
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		idx := &ProfileIndex{
+			trapsByOID:      make(map[string]*TrapDef),
+			namesByTrapName: make(map[string]*TrapDef),
+		}
+		store, err := buildStockProfileStore(dir, paths, nil, idx)
+		if err != nil {
+			b.Fatalf("buildStockProfileStore: %v", err)
+		}
+		if store.empty() {
+			b.Fatal("expected non-empty stock profile store")
+		}
+	}
+}
+
+func BenchmarkDedupFingerprint(b *testing.B) {
+	entry := benchmarkDedupEntry()
+	td := &TrapDef{DedupKeyVarbinds: []string{"ifIndex", "ifDescr"}}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = dedupFingerprint(entry, td, nil)
+	}
+}
+
+func BenchmarkDedupAdmitDuplicate(b *testing.B) {
+	entry := benchmarkDedupEntry()
+	td := &TrapDef{DedupKeyVarbinds: []string{"ifIndex", "ifDescr"}}
+	d := newTrapDeduper("bench-dedup", DedupConfig{Enabled: true}, nil, nil, "")
+	if _, suppressed := d.Admit(entry, td, nil); suppressed {
+		b.Fatal("first dedup admission was unexpectedly suppressed")
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = d.Admit(entry, td, nil)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Existing helpers (preserved)
 // ---------------------------------------------------------------------------
 
@@ -666,6 +722,19 @@ func benchmarkTrapEntry() *TrapEntry {
 		Varbinds: []VarbindValue{
 			{Name: "ifIndex", OID: "1.3.6.1.2.1.2.2.1.1", Type: "INTEGER", Value: int64(1)},
 			{Name: "ifDescr", OID: "1.3.6.1.2.1.31.1.1.1.1", Type: "OctetString", Value: "Ethernet1"},
+		},
+	}
+}
+
+func benchmarkDedupEntry() *TrapEntry {
+	return &TrapEntry{
+		SourceIP: "192.0.2.10",
+		TrapOID:  "1.3.6.1.6.3.1.1.5.3",
+		Varbinds: []VarbindValue{
+			{Name: "ifIndex", OID: "1.3.6.1.2.1.2.2.1.1.1", Type: "INTEGER", Value: int64(7)},
+			{Name: "ifDescr", OID: "1.3.6.1.2.1.31.1.1.1.1.7", Type: "OctetString", Value: "Gi0/7"},
+			{Name: "ifAdminStatus", OID: "1.3.6.1.2.1.2.2.1.7.7", Type: "INTEGER", Value: int64(1)},
+			{Name: "ifOperStatus", OID: "1.3.6.1.2.1.2.2.1.8.7", Type: "INTEGER", Value: int64(2)},
 		},
 	}
 }

@@ -56,6 +56,9 @@ func New() *Collector {
 	return &Collector{
 		Config: Config{
 			Versions: []string{"v1", "v2c"},
+			Listen: ListenConfig{
+				ReceiveBuffer: defaultListenerReceiveBuffer,
+			},
 		},
 		store: store,
 	}
@@ -105,7 +108,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		return dyncfgConfigError(err)
 	}
 
-	if err := validateEndpoints(c.Listen.Endpoints); err != nil {
+	if err := validateListenConfig(c.Listen); err != nil {
 		return dyncfgConfigError(err)
 	}
 
@@ -224,7 +227,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		}
 	}
 
-	listener, err := newListener(c.jobName, c.Listen.Endpoints)
+	listener, err := newListener(c.jobName, c.Listen)
 	if err != nil {
 		releaseProfiles()
 		if journalWriter != nil {

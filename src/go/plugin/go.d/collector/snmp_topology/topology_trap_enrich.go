@@ -67,32 +67,61 @@ func (c *topologyCache) trapEnrichmentForIP(ip string) *TrapTopologyEnrichment {
 		enrich.Interface = ifName
 	}
 
-	neighborNames := make(map[string]struct{})
-	for _, r := range c.lldpRemotes {
-		if r.sysName != "" {
-			name := strings.TrimSpace(r.sysName)
-			if name != "" {
-				neighborNames[name] = struct{}{}
-			}
-		}
-	}
-	for _, r := range c.cdpRemotes {
-		if r.sysName != "" {
-			name := strings.TrimSpace(r.sysName)
-			if name != "" {
-				neighborNames[name] = struct{}{}
-			}
-		}
-	}
-	if len(neighborNames) > 0 {
-		enrich.Neighbors = make([]string, 0, len(neighborNames))
-		for name := range neighborNames {
-			enrich.Neighbors = append(enrich.Neighbors, name)
-		}
-		sort.Strings(enrich.Neighbors)
+	if ifIndex != "" {
+		enrich.Neighbors = c.trapNeighborNamesForInterface(ifIndex)
 	}
 
 	return enrich
+}
+
+func (c *topologyCache) trapNeighborNamesForInterface(ifIndex string) []string {
+	neighborNames := make(map[string]struct{})
+	for key, r := range c.lldpRemotes {
+		if r == nil || lldpRemoteLocalPortNum(key, r) != ifIndex {
+			continue
+		}
+		if name := strings.TrimSpace(r.sysName); name != "" {
+			neighborNames[name] = struct{}{}
+		}
+	}
+	for key, r := range c.cdpRemotes {
+		if r == nil || cdpRemoteIfIndex(key, r) != ifIndex {
+			continue
+		}
+		if name := strings.TrimSpace(r.sysName); name != "" {
+			neighborNames[name] = struct{}{}
+		}
+	}
+	if len(neighborNames) == 0 {
+		return nil
+	}
+
+	neighbors := make([]string, 0, len(neighborNames))
+	for name := range neighborNames {
+		neighbors = append(neighbors, name)
+	}
+	sort.Strings(neighbors)
+	return neighbors
+}
+
+func lldpRemoteLocalPortNum(key string, r *lldpRemote) string {
+	if r != nil && strings.TrimSpace(r.localPortNum) != "" {
+		return strings.TrimSpace(r.localPortNum)
+	}
+	if before, _, ok := strings.Cut(key, ":"); ok {
+		return strings.TrimSpace(before)
+	}
+	return ""
+}
+
+func cdpRemoteIfIndex(key string, r *cdpRemote) string {
+	if r != nil && strings.TrimSpace(r.ifIndex) != "" {
+		return strings.TrimSpace(r.ifIndex)
+	}
+	if before, _, ok := strings.Cut(key, ":"); ok {
+		return strings.TrimSpace(before)
+	}
+	return ""
 }
 
 func (c *topologyCache) localDeviceHasIP(ip string) bool {

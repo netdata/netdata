@@ -4413,6 +4413,18 @@ if(ENABLE_PLUGIN_GO)
     install(FILES src/go/plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
+    install(CODE "
+        set(_snmp_trap_catalogue \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/catalogue.json\")
+        if(EXISTS \"\${_snmp_trap_catalogue}\")
+            execute_process(
+                COMMAND \"${GZIP_EXECUTABLE}\" -f -9 \"\${_snmp_trap_catalogue}\"
+                RESULT_VARIABLE _gzip_result
+                ERROR_VARIABLE _gzip_error)
+            if(NOT _gzip_result EQUAL 0)
+                message(FATAL_ERROR \"failed to gzip SNMP trap profile catalogue '\${_snmp_trap_catalogue}': \${_gzip_error}\")
+            endif()
+        endif()
+    " COMPONENT plugin-go)
     install(FILES src/go/plugin/go.d/config/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)

@@ -317,48 +317,47 @@ func sortedDedupSummaryItems(byTrap map[string]int64) []dedupSummaryItem {
 }
 
 func dedupFingerprint(entry *TrapEntry, td *TrapDef, jobKeys []string) dedupKey {
-	h := sha256.New()
-	writeFingerprintPart(h, "source")
-	writeFingerprintPart(h, dedupSourceDevice(entry))
-	writeFingerprintPart(h, "trap_oid")
-	writeFingerprintPart(h, entry.TrapOID)
+	var stack [512]byte
+	buf := stack[:0]
+	buf = appendFingerprintPart(buf, "source")
+	buf = appendDedupSourceDevice(buf, entry)
+	buf = appendFingerprintPart(buf, "trap_oid")
+	buf = appendFingerprintPart(buf, entry.TrapOID)
 
 	for _, name := range dedupKeyVarbinds(td, jobKeys) {
-		writeFingerprintPart(h, "varbind")
-		writeFingerprintPart(h, name)
+		buf = appendFingerprintPart(buf, "varbind")
+		buf = appendFingerprintPart(buf, name)
 		vb, ok := dedupVarbind(entry, name)
 		if !ok {
-			writeFingerprintPart(h, dedupVarbindMissing)
+			buf = appendFingerprintPart(buf, dedupVarbindMissing)
 			continue
 		}
-		writeFingerprintPart(h, dedupVarbindPresent)
-		writeFingerprintPart(h, vb.OID)
-		writeFingerprintPart(h, string(vb.Type))
-		writeFingerprintValue(h, canonicalVarbindValue(vb.Value))
+		buf = appendFingerprintPart(buf, dedupVarbindPresent)
+		buf = appendFingerprintPart(buf, vb.OID)
+		buf = appendFingerprintPart(buf, string(vb.Type))
+		buf = appendFingerprintValue(buf, vb.Value)
 	}
 
-	var out dedupKey
-	copy(out[:], h.Sum(nil))
-	return out
+	return sha256.Sum256(buf)
 }
 
-func dedupSourceDevice(entry *TrapEntry) string {
+func appendDedupSourceDevice(buf []byte, entry *TrapEntry) []byte {
 	if entry == nil {
-		return ""
+		return appendFingerprintPart(buf, "")
 	}
 	if entry.SourceVnodeID != "" {
-		return "vnode:" + entry.SourceVnodeID
+		return appendFingerprintJoined(buf, "vnode:", entry.SourceVnodeID)
 	}
 	if entry.SourceIP != "" {
-		return "ip:" + entry.SourceIP
+		return appendFingerprintJoined(buf, "ip:", entry.SourceIP)
 	}
 	if entry.SourceUDPPeer != "" {
-		return "peer:" + entry.SourceUDPPeer
+		return appendFingerprintJoined(buf, "peer:", entry.SourceUDPPeer)
 	}
 	if entry.DeviceHostname != "" {
-		return "hostname:" + entry.DeviceHostname
+		return appendFingerprintJoined(buf, "hostname:", entry.DeviceHostname)
 	}
-	return ""
+	return appendFingerprintPart(buf, "")
 }
 
 func dedupKeyVarbinds(td *TrapDef, jobKeys []string) []string {
@@ -383,38 +382,84 @@ func dedupVarbind(entry *TrapEntry, name string) (VarbindValue, bool) {
 	return VarbindValue{}, false
 }
 
-func writeFingerprintValue(h fingerprintWriter, val any) {
+func appendFingerprintValue(buf []byte, val any) []byte {
 	switch v := val.(type) {
 	case nil:
-		writeFingerprintPart(h, "nil")
+		buf = appendFingerprintPart(buf, "nil")
 	case string:
-		writeFingerprintPart(h, "string")
-		writeFingerprintPart(h, v)
+		buf = appendFingerprintPart(buf, "string")
+		buf = appendFingerprintPart(buf, v)
 	case int64:
-		writeFingerprintPart(h, "int64")
-		writeFingerprintPart(h, strconv.FormatInt(v, 10))
+		buf = appendFingerprintPart(buf, "int64")
+		buf = appendFingerprintInt(buf, v)
 	case uint64:
-		writeFingerprintPart(h, "uint64")
-		writeFingerprintPart(h, strconv.FormatUint(v, 10))
+		buf = appendFingerprintPart(buf, "uint64")
+		buf = appendFingerprintUint(buf, v)
 	case float64:
-		writeFingerprintPart(h, "float64")
-		writeFingerprintPart(h, strconv.FormatFloat(v, 'g', -1, 64))
+		buf = appendFingerprintPart(buf, "float64")
+		buf = appendFingerprintFloat(buf, v)
 	case bool:
-		writeFingerprintPart(h, "bool")
-		writeFingerprintPart(h, strconv.FormatBool(v))
+		buf = appendFingerprintPart(buf, "bool")
+		buf = appendFingerprintBool(buf, v)
+	case []byte:
+		buf = appendFingerprintPart(buf, "string")
+		buf = appendFingerprintHex(buf, v)
 	default:
-		writeFingerprintPart(h, "other")
-		writeFingerprintPart(h, fmt.Sprintf("%v", v))
+		buf = appendFingerprintPart(buf, "other")
+		buf = appendFingerprintPart(buf, fmt.Sprintf("%v", v))
 	}
+	return buf
 }
 
-type fingerprintWriter interface {
-	Write([]byte) (int, error)
-}
-
-func writeFingerprintPart(h fingerprintWriter, s string) {
+func appendFingerprintPart(buf []byte, s string) []byte {
 	var lenBuf [8]byte
 	binary.BigEndian.PutUint64(lenBuf[:], uint64(len(s)))
-	_, _ = h.Write(lenBuf[:])
-	_, _ = h.Write([]byte(s))
+	buf = append(buf, lenBuf[:]...)
+	return append(buf, s...)
+}
+
+func appendFingerprintJoined(buf []byte, prefix, value string) []byte {
+	var lenBuf [8]byte
+	binary.BigEndian.PutUint64(lenBuf[:], uint64(len(prefix)+len(value)))
+	buf = append(buf, lenBuf[:]...)
+	buf = append(buf, prefix...)
+	return append(buf, value...)
+}
+
+func appendFingerprintInt(buf []byte, v int64) []byte {
+	var tmp [32]byte
+	return appendFingerprintBytes(buf, strconv.AppendInt(tmp[:0], v, 10))
+}
+
+func appendFingerprintUint(buf []byte, v uint64) []byte {
+	var tmp [32]byte
+	return appendFingerprintBytes(buf, strconv.AppendUint(tmp[:0], v, 10))
+}
+
+func appendFingerprintFloat(buf []byte, v float64) []byte {
+	var tmp [32]byte
+	return appendFingerprintBytes(buf, strconv.AppendFloat(tmp[:0], v, 'g', -1, 64))
+}
+
+func appendFingerprintBool(buf []byte, v bool) []byte {
+	var tmp [5]byte
+	return appendFingerprintBytes(buf, strconv.AppendBool(tmp[:0], v))
+}
+
+func appendFingerprintHex(buf []byte, v []byte) []byte {
+	var lenBuf [8]byte
+	hexLen := len(v) * 2
+	binary.BigEndian.PutUint64(lenBuf[:], uint64(hexLen))
+	buf = append(buf, lenBuf[:]...)
+	for _, c := range v {
+		buf = append(buf, "0123456789abcdef"[c>>4], "0123456789abcdef"[c&0x0f])
+	}
+	return buf
+}
+
+func appendFingerprintBytes(buf []byte, value []byte) []byte {
+	var lenBuf [8]byte
+	binary.BigEndian.PutUint64(lenBuf[:], uint64(len(value)))
+	buf = append(buf, lenBuf[:]...)
+	return append(buf, value...)
 }

@@ -94,7 +94,8 @@ type Config struct {
 }
 
 type ListenConfig struct {
-	Endpoints []EndpointConfig `yaml:"endpoints" json:"endpoints"`
+	Endpoints     []EndpointConfig `yaml:"endpoints" json:"endpoints"`
+	ReceiveBuffer int              `yaml:"receive_buffer,omitempty" json:"receive_buffer"`
 }
 
 type yamlKeySpec struct {
@@ -145,7 +146,7 @@ var (
 		"vnode":                       {},
 		"reverse_dns":                 {children: map[string]yamlKeySpec{"enabled": {}}},
 		"update_every":                {},
-		"listen":                      {children: map[string]yamlKeySpec{"endpoints": {elem: &endpointYAMLSpec}}},
+		"listen":                      {children: map[string]yamlKeySpec{"endpoints": {elem: &endpointYAMLSpec}, "receive_buffer": {}}},
 		"versions":                    {},
 		"communities":                 {},
 		"usm_users":                   {elem: &usmUserYAMLSpec},

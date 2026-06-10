@@ -270,6 +270,36 @@ traps:
 	assert.Len(t, idx.trapsByOID, 1)
 }
 
+func TestStockProfileStoreUsesCatalogueWithoutParsingProfiles(t *testing.T) {
+	rootDir := t.TempDir()
+	stockDir := filepath.Join(rootDir, "default")
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAMLGzip(t, stockDir, "ciscosystems.yaml.gz", `not: [valid`)
+	writeProfileYAMLGzip(t, rootDir, "catalogue.json.gz", `{
+  "ciscosystems": {
+    "file": "ciscosystems.yaml",
+    "trap_count": 1,
+    "trap_oids": ["1.3.6.1.4.1.9.1.0.1"]
+  }
+}`)
+
+	idx := &ProfileIndex{
+		trapsByOID:      make(map[string]*TrapDef),
+		namesByTrapName: make(map[string]*TrapDef),
+	}
+	store, err := buildStockProfileStore(stockDir, multipath.New(stockDir), nil, idx)
+	require.NoError(t, err)
+	idx.stock = store
+
+	assert.Empty(t, idx.trapsByOID)
+	assert.Equal(t, "ciscosystems.yaml", store.route("1.3.6.1.4.1.9.1.0.1"))
+
+	td, err := idx.LookupWithError("1.3.6.1.4.1.9.1.0.1")
+	require.Error(t, err)
+	assert.Nil(t, td)
+	assert.Contains(t, err.Error(), "failed to lazy-load stock trap profile")
+}
+
 func TestOverridesApplyToLazyLoadedStockProfiles(t *testing.T) {
 	stockDir := t.TempDir()
 	const oid = "1.3.6.1.4.1.9.1.0.1"
@@ -1878,8 +1908,9 @@ func TestStockProfileCatalogueMatchesDefaultFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	var catalogue map[string]struct {
-		File      string `json:"file"`
-		TrapCount int    `json:"trap_count"`
+		File      string   `json:"file"`
+		TrapCount int      `json:"trap_count"`
+		TrapOIDs  []string `json:"trap_oids"`
 	}
 	require.NoError(t, json.Unmarshal(data, &catalogue))
 	require.NotEmpty(t, catalogue)
@@ -1888,23 +1919,24 @@ func TestStockProfileCatalogueMatchesDefaultFiles(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, files)
 
-	countsByFile := make(map[string]int, len(files))
+	routesByFile := make(map[string]profileTrapRoutes, len(files))
 	totalFiles := 0
 	for _, path := range files {
 		name := filepath.Base(path)
 		require.False(t, strings.HasSuffix(name, ".gz"), "stock profiles must stay uncompressed in the repository")
-		count := countProfileTrapEntries(t, path)
-		countsByFile[name] = count
-		totalFiles += count
+		routes := profileTrapRoutesFromFile(t, path)
+		routesByFile[name] = routes
+		totalFiles += len(routes.oids)
 	}
-	require.Len(t, countsByFile, len(catalogue), "catalogue and default profile file count must match")
+	require.Len(t, routesByFile, len(catalogue), "catalogue and default profile file count must match")
 
 	totalCatalogue := 0
 	for vendor, entry := range catalogue {
 		require.NotEmpty(t, entry.File, "catalogue entry %q has no file", vendor)
-		count, ok := countsByFile[entry.File]
+		routes, ok := routesByFile[entry.File]
 		require.True(t, ok, "catalogue entry %q references missing profile file %q", vendor, entry.File)
-		assert.Equal(t, entry.TrapCount, count, "catalogue trap_count mismatch for %s", entry.File)
+		assert.Equal(t, entry.TrapCount, len(routes.oids), "catalogue trap_count mismatch for %s", entry.File)
+		assert.Equal(t, routes.oids, entry.TrapOIDs, "catalogue trap_oids mismatch for %s", entry.File)
 		totalCatalogue += entry.TrapCount
 	}
 	assert.Equal(t, totalFiles, totalCatalogue, "catalogue trap_count sum must match profile files")
@@ -2082,19 +2114,30 @@ func writeProfileYAMLGzip(t *testing.T, dir, name, content string) {
 	require.NoError(t, zw.Close())
 }
 
-func countProfileTrapEntries(t *testing.T, path string) int {
+type profileTrapRoutes struct {
+	oids  []string
+	names []string
+}
+
+func profileTrapRoutesFromFile(t *testing.T, path string) profileTrapRoutes {
 	t.Helper()
 	file, err := os.Open(path)
 	require.NoError(t, err)
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	count := 0
+	var routes profileTrapRoutes
 	for scanner.Scan() {
-		if strings.HasPrefix(scanner.Text(), "  - oid:") {
-			count++
+		line := scanner.Text()
+		if strings.HasPrefix(line, "  - oid: ") {
+			routes.oids = append(routes.oids, strings.TrimSpace(strings.TrimPrefix(line, "  - oid: ")))
+			continue
+		}
+		if strings.HasPrefix(line, "    name: ") {
+			routes.names = append(routes.names, strings.TrimSpace(strings.TrimPrefix(line, "    name: ")))
 		}
 	}
 	require.NoError(t, scanner.Err())
-	return count
+	require.Len(t, routes.names, len(routes.oids), "%s has mismatched trap OID/name counts", path)
+	return routes
 }

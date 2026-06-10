@@ -5,6 +5,7 @@ package snmp_traps
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"os"
 	"path/filepath"
@@ -80,6 +81,19 @@ func TestConfigSchemaDynCfgObjectFieldsHaveSafeDefaults(t *testing.T) {
 	}
 }
 
+func TestConfigSchemaDynCfgListenDefaultIncludesReceiveBuffer(t *testing.T) {
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(configSchema), &schema))
+
+	listen := schemaProperty(t, schema, "jsonSchema", "properties", "listen")
+	defaults, ok := listen["default"].(map[string]any)
+	require.Truef(t, ok, "listen default is %T", listen["default"])
+	assert.Equal(t, float64(defaultListenerReceiveBuffer), defaults["receive_buffer"])
+
+	receiveBuffer := schemaProperty(t, schema, "jsonSchema", "properties", "listen", "properties", "receive_buffer")
+	assert.Equal(t, float64(defaultListenerReceiveBuffer), receiveBuffer["default"])
+}
+
 func TestConfigSchemaDynCfgRetentionDefaultDisablesTimeRotation(t *testing.T) {
 	var schema map[string]any
 	require.NoError(t, json.Unmarshal([]byte(configSchema), &schema))
@@ -91,6 +105,10 @@ func TestConfigSchemaDynCfgRetentionDefaultDisablesTimeRotation(t *testing.T) {
 
 	rotationDuration := schemaProperty(t, schema, "jsonSchema", "properties", "retention", "properties", "rotation_duration")
 	assert.Nil(t, rotationDuration["default"])
+}
+
+func TestCollectorDefaultListenReceiveBuffer(t *testing.T) {
+	assert.Equal(t, defaultListenerReceiveBuffer, New().Listen.ReceiveBuffer)
 }
 
 func TestConfigSchemaDynCfgTabsRenderAllTopLevelFieldsOnce(t *testing.T) {
@@ -415,6 +433,23 @@ func TestCollectorInit_InvalidEndpointsIsCodedError(t *testing.T) {
 	assert.Nil(t, c.listener)
 }
 
+func TestCollectorInit_InvalidReceiveBufferIsCodedError(t *testing.T) {
+	withTestCacheDir(t)
+
+	c := New()
+	c.SetJobName("local")
+	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
+	c.Listen.ReceiveBuffer = -1
+
+	err := c.Init(context.Background())
+	require.Error(t, err)
+	var coded interface{ Code() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 422, coded.Code())
+	assert.Contains(t, err.Error(), "listen.receive_buffer")
+	assert.Nil(t, c.listener)
+}
+
 func TestCollectorInit_NoOutputBackendIsCodedError(t *testing.T) {
 	disabled := false
 	c := New()
@@ -570,6 +605,32 @@ func TestCollectorInit_BindFailureIsRetryableCodedError(t *testing.T) {
 	var retryable interface{ Retryable() bool }
 	require.ErrorAs(t, err, &retryable)
 	assert.True(t, retryable.Retryable())
+	assert.Nil(t, c.listener)
+}
+
+func TestCollectorInit_ReceiveBufferFailureIsRetryableCodedError(t *testing.T) {
+	setMinimalProfileDir(t)
+	withTestCacheDir(t)
+
+	oldSetUDPReadBuffer := setUDPReadBuffer
+	t.Cleanup(func() { setUDPReadBuffer = oldSetUDPReadBuffer })
+	setUDPReadBuffer = func(_ *net.UDPConn, _ int) error {
+		return errors.New("set buffer failed")
+	}
+
+	c := New()
+	c.SetJobName("local")
+	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
+
+	err := c.Init(context.Background())
+	require.Error(t, err)
+	var coded interface{ Code() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 503, coded.Code())
+	var retryable interface{ Retryable() bool }
+	require.ErrorAs(t, err, &retryable)
+	assert.True(t, retryable.Retryable())
+	assert.Contains(t, err.Error(), "set receive buffer")
 	assert.Nil(t, c.listener)
 }
 

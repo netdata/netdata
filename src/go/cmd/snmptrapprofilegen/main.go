@@ -1897,6 +1897,7 @@ func emitProfiles(opts generatorOptions, records []TrapRecord) (map[string]int, 
 		catalogue[vendor] = map[string]any{
 			"file":          vendor + ".yaml",
 			"trap_count":    len(pf.Traps),
+			"trap_oids":     profileTrapOIDs(pf.Traps),
 			"varbind_count": len(pf.Varbinds),
 			"mib_count":     pf.MibCount,
 			"mibs":          mibsForRecords(recs),
@@ -2614,6 +2615,14 @@ func sampleTrapNames(records []TrapRecord, n int) []string {
 	var out []string
 	for i := 0; i < len(records) && i < n; i++ {
 		out = append(out, records[i].QualifiedName)
+	}
+	return out
+}
+
+func profileTrapOIDs(traps []profileTrap) []string {
+	out := make([]string, 0, len(traps))
+	for _, trap := range traps {
+		out = append(out, trap.OID)
 	}
 	return out
 }

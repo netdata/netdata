@@ -4,6 +4,7 @@ package snmp_traps
 
 import (
 	"net"
+	"reflect"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -12,7 +13,10 @@ import (
 )
 
 func TestSendInformResponseV2c(t *testing.T) {
-	reqData := buildV2cPDU(t, gosnmp.InformRequest, "public", "1.3.6.1.6.3.1.1.5.1")
+	reqData := buildV2cPDU(t, gosnmp.InformRequest, "public", "1.3.6.1.6.3.1.1.5.1",
+		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.2.2.1.1.7", Type: gosnmp.Integer, Value: 7},
+		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.31.1.1.1.1.7", Type: gosnmp.OctetString, Value: "Gi0/7"},
+	)
 	reqPkt, err := decodePacket(reqData, nil)
 	if err != nil {
 		t.Fatalf("decode request packet: %v", err)
@@ -26,7 +30,11 @@ func TestSendInformResponseV2c(t *testing.T) {
 		t.Fatalf("sendInformResponse failed: %v", err)
 	}
 
-	respPkt := readInformResponse(t, peerConn)
+	respData := readInformResponseBytes(t, peerConn)
+	if len(respData) > len(reqData) {
+		t.Fatalf("response length = %d, want <= request length %d", len(respData), len(reqData))
+	}
+	respPkt := decodeInformResponse(t, respData)
 	if respPkt.PDUType != gosnmp.GetResponse {
 		t.Fatalf("response PDU type = %s, want GetResponse", respPkt.PDUType)
 	}
@@ -35,6 +43,9 @@ func TestSendInformResponseV2c(t *testing.T) {
 	}
 	if respPkt.Community != reqPkt.Community {
 		t.Fatalf("response community = %q, want %q", respPkt.Community, reqPkt.Community)
+	}
+	if !reflect.DeepEqual(respPkt.Variables, reqPkt.Variables) {
+		t.Fatalf("response varbinds = %#v, want %#v", respPkt.Variables, reqPkt.Variables)
 	}
 }
 
@@ -133,7 +144,12 @@ func informUDPConnPair(t *testing.T) (*net.UDPConn, *net.UDPConn) {
 func readInformResponse(t *testing.T, peerConn *net.UDPConn) *gosnmp.SnmpPacket {
 	t.Helper()
 
-	buf := readInformResponseBytes(t, peerConn)
+	return decodeInformResponse(t, readInformResponseBytes(t, peerConn))
+}
+
+func decodeInformResponse(t *testing.T, buf []byte) *gosnmp.SnmpPacket {
+	t.Helper()
+
 	decoder := &gosnmp.GoSNMP{Logger: trapDecodeLogger}
 	respPkt, err := decoder.SnmpDecodePacket(buf)
 	if err != nil {

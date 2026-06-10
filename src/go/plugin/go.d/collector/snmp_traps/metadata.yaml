@@ -161,6 +161,7 @@ modules:
               default_value: ""
               required: true
               detailed_description: |
+                - `receive_buffer`: UDP socket receive buffer requested during job creation, in bytes (default 4194304; set 0 to keep the operating system default).
                 Each endpoint has:
                 - `protocol`: Transport protocol (`udp` only).
                 - `address`: Local IP address to bind (e.g., `0.0.0.0` for all interfaces).
@@ -322,6 +323,7 @@ modules:
                 jobs:
                   - name: local
                     listen:
+                      receive_buffer: 4194304
                       endpoints:
                         - protocol: udp
                           address: 0.0.0.0

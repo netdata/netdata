@@ -95,6 +95,16 @@ func validateEndpoints(endpoints []EndpointConfig) error {
 	return nil
 }
 
+func validateListenConfig(cfg ListenConfig) error {
+	if err := validateEndpoints(cfg.Endpoints); err != nil {
+		return err
+	}
+	if cfg.ReceiveBuffer < 0 {
+		return fmt.Errorf("listen.receive_buffer must be zero or positive, got %d", cfg.ReceiveBuffer)
+	}
+	return nil
+}
+
 func validateVersions(versions []string) ([]string, error) {
 	if len(versions) == 0 {
 		return nil, errors.New("at least one SNMP version is required")

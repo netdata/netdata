@@ -12,16 +12,29 @@ func TestTopologyCacheTrapEnrichmentForIP(t *testing.T) {
 	cache := newTopologyCache()
 	cache.ifIndexByIP["192.0.2.10"] = "7"
 	cache.ifNamesByIndex["7"] = "Gi0/7"
-	cache.lldpRemotes["7:2"] = &lldpRemote{sysName: "dist-b"}
-	cache.lldpRemotes["7:1"] = &lldpRemote{sysName: "dist-a"}
-	cache.lldpRemotes["8:1"] = &lldpRemote{sysName: "dist-c"}
-	cache.cdpRemotes["7:1"] = &cdpRemote{sysName: "dist-a"}
+	cache.lldpRemotes["7:2"] = &lldpRemote{localPortNum: "7", sysName: "dist-b"}
+	cache.lldpRemotes["7:1"] = &lldpRemote{localPortNum: "7", sysName: "dist-a"}
+	cache.lldpRemotes["8:1"] = &lldpRemote{localPortNum: "8", sysName: "dist-c"}
+	cache.cdpRemotes["7:1"] = &cdpRemote{ifIndex: "7", sysName: "dist-a"}
 	cache.cdpRemotes["9:1"] = &cdpRemote{ifIndex: "9", sysName: "dist-d"}
 
 	enrich := cache.trapEnrichmentForIP("192.0.2.10")
 	require.NotNil(t, enrich)
 	require.Equal(t, "Gi0/7", enrich.Interface)
-	require.Equal(t, []string{"dist-a", "dist-b", "dist-c", "dist-d"}, enrich.Neighbors)
+	require.Equal(t, []string{"dist-a", "dist-b"}, enrich.Neighbors)
+}
+
+func TestTopologyCacheTrapEnrichmentForIPFallsBackToRemoteMapKeys(t *testing.T) {
+	cache := newTopologyCache()
+	cache.ifIndexByIP["192.0.2.10"] = "7"
+	cache.lldpRemotes["7:2"] = &lldpRemote{sysName: "dist-b"}
+	cache.lldpRemotes["8:1"] = &lldpRemote{sysName: "dist-c"}
+	cache.cdpRemotes["7:1"] = &cdpRemote{sysName: "dist-a"}
+	cache.cdpRemotes["9:1"] = &cdpRemote{sysName: "dist-d"}
+
+	enrich := cache.trapEnrichmentForIP("192.0.2.10")
+	require.NotNil(t, enrich)
+	require.Equal(t, []string{"dist-a", "dist-b"}, enrich.Neighbors)
 }
 
 func TestTopologyCacheTrapEnrichmentForIPNoInterfaceMatch(t *testing.T) {
@@ -39,7 +52,7 @@ func TestTopologyCacheTrapEnrichmentForIPManagementIPWithoutInterfaceMatch(t *te
 	enrich := cache.trapEnrichmentForIP("192.0.2.30")
 	require.NotNil(t, enrich)
 	require.Empty(t, enrich.Interface)
-	require.Equal(t, []string{"dist-a"}, enrich.Neighbors)
+	require.Empty(t, enrich.Neighbors)
 }
 
 func TestTopologyCacheTrapEnrichmentForIPIncludesLocalDeviceIdentity(t *testing.T) {

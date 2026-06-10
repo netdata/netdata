@@ -481,6 +481,61 @@ func TestReverseDNSResolveAsyncSkipsPending(t *testing.T) {
 	}
 }
 
+func TestReverseDNSResolveAsyncLimitsConcurrentLookups(t *testing.T) {
+	dns := newReverseDNSResolver()
+	defer dns.Close()
+	dns.lookupSem = make(chan struct{}, 1)
+
+	started := make(chan string, 1)
+	release := make(chan struct{})
+	dns.lookupAddr = func(ctx context.Context, ip string) ([]string, error) {
+		started <- ip
+		select {
+		case <-release:
+			return []string{"first.example.com."}, nil
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+
+	dns.resolveAsync("10.1.2.3")
+	select {
+	case ip := <-started:
+		if ip != "10.1.2.3" {
+			t.Fatalf("lookup started for %s, want first IP", ip)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("first reverse DNS lookup was not started")
+	}
+
+	dns.resolveAsync("10.1.2.4")
+
+	dns.mu.RLock()
+	_, firstPending := dns.pending["10.1.2.3"]
+	_, secondPending := dns.pending["10.1.2.4"]
+	activeLookups := len(dns.lookupSem)
+	dns.mu.RUnlock()
+	if !firstPending {
+		t.Fatal("first lookup was not marked pending")
+	}
+	if secondPending {
+		t.Fatal("second lookup was marked pending despite full concurrency limit")
+	}
+	if activeLookups != 1 {
+		t.Fatalf("active lookups = %d, want 1", activeLookups)
+	}
+
+	close(release)
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if dns.lookupCached("10.1.2.3") == "first.example.com" {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("first reverse DNS cache was not populated, got %q", dns.lookupCached("10.1.2.3"))
+}
+
 func TestReverseDNSResolveAsyncNilResolver(t *testing.T) {
 	var dns *reverseDNSResolver
 	dns.resolveAsync("10.1.2.3")

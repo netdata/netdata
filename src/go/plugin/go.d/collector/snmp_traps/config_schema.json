@@ -22,6 +22,7 @@
         "description": "Network endpoints this listener binds during job creation.",
         "type": "object",
         "default": {
+          "receive_buffer": 4194304,
           "endpoints": [
             {
               "protocol": "udp",
@@ -32,6 +33,13 @@
         },
         "additionalProperties": false,
         "properties": {
+          "receive_buffer": {
+            "title": "Receive buffer",
+            "description": "UDP socket receive buffer requested during job creation, in bytes. Set 0 to keep the operating system default. The default is 4 MiB per bound endpoint.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 4194304
+          },
           "endpoints": {
             "title": "Endpoints",
             "type": "array",

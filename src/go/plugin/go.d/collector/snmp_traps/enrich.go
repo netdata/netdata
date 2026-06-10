@@ -26,6 +26,7 @@ type reverseDNSResolver struct {
 	lastSweep   time.Time
 	closed      bool
 	lookupAddr  func(context.Context, string) ([]string, error)
+	lookupSem   chan struct{}
 	cache       map[string]reverseDNSCacheEntry
 	pending     map[string]struct{}
 }
@@ -40,6 +41,7 @@ const (
 	defaultReverseDNSTTL         = 10 * time.Minute
 	defaultReverseDNSNegativeTTL = 30 * time.Second
 	defaultReverseDNSMaxEntries  = 10000
+	defaultReverseDNSConcurrent  = 32
 	reverseDNSSweepInterval      = 5 * time.Minute
 )
 
@@ -53,6 +55,7 @@ func newReverseDNSResolver() *reverseDNSResolver {
 		negativeTTL: defaultReverseDNSNegativeTTL,
 		maxEntries:  defaultReverseDNSMaxEntries,
 		lookupAddr:  net.DefaultResolver.LookupAddr,
+		lookupSem:   make(chan struct{}, defaultReverseDNSConcurrent),
 		cache:       make(map[string]reverseDNSCacheEntry),
 		pending:     make(map[string]struct{}),
 	}
@@ -139,6 +142,15 @@ func (r *reverseDNSResolver) resolveAsync(ip string) {
 		r.mu.Unlock()
 		return
 	}
+	lookupSem := r.lookupSem
+	if lookupSem != nil {
+		select {
+		case lookupSem <- struct{}{}:
+		default:
+			r.mu.Unlock()
+			return
+		}
+	}
 	r.pending[ip] = struct{}{}
 	parentCtx := r.ctx
 	if parentCtx == nil {
@@ -151,6 +163,11 @@ func (r *reverseDNSResolver) resolveAsync(ip string) {
 	r.mu.Unlock()
 
 	go func() {
+		defer func() {
+			if lookupSem != nil {
+				<-lookupSem
+			}
+		}()
 		ctx, cancel := context.WithTimeout(parentCtx, r.timeout)
 		defer cancel()
 
