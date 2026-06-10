@@ -619,7 +619,11 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     # -funwind-tables = generate unwind tables for all functions
     # -fasynchronous-unwind-tables = the unwind table generated is precise at instruction boundary, instead of function boundary
     add_compile_options(-fno-omit-frame-pointer -funwind-tables -fasynchronous-unwind-tables)
-    add_link_options(-rdynamic)
+    if(NOT OS_WINDOWS)
+        # -rdynamic exports all symbols to the dynamic symbol table for backtrace support.
+        # It is an ELF-only flag; MinGW-w64 targets PE/COFF and does not support it.
+        add_link_options(-rdynamic)
+    endif()
     message(STATUS "Added compiler and linker flags for better stack trace support")
 endif()
 
@@ -3267,7 +3271,13 @@ if(OS_WINDOWS)
         set_target_properties(netdata_driver PROPERTIES LIBRARY_OUTPUT_NAME "netdata_driver")
         set_target_properties(netdata_driver PROPERTIES PREFIX "")
         set_target_properties(netdata_driver PROPERTIES SUFFIX ".sys")
-        target_include_directories(netdata_driver BEFORE PRIVATE "/ucrt64/include/ddk" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/driver")
+        # Derive the DDK include path from the compiler location so cmake stores
+        # a Windows-style path (e.g. C:/msys64/ucrt64/include/ddk).  A hardcoded
+        # POSIX path (/ucrt64/include/ddk) passes through cmake unchanged and UCRT64
+        # native GCC, invoked via CreateProcess with no MSYS2 shell, cannot translate
+        # it to the correct Windows path, causing "wdm.h: No such file or directory".
+        get_filename_component(_ddk_include "${CMAKE_C_COMPILER}/../../include/ddk" REALPATH)
+        target_include_directories(netdata_driver BEFORE PRIVATE "${_ddk_include}" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/driver")
         target_compile_options(netdata_driver PRIVATE
                 -Wall
                 -Wextra
