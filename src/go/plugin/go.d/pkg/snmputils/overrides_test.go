@@ -267,6 +267,7 @@ func TestShippedPenToVendorOverridesCoverCurrentPENRenames(t *testing.T) {
 
 	agg, err := loadOverridesFromDir(dir)
 	require.NoError(t, err)
+	require.Equal(t, "Nokia", agg.EnterpriseNumbers.PenToVendor["6486"])
 	require.Equal(t, "Infinera", agg.EnterpriseNumbers.PenToVendor["21296"])
 	require.Equal(t, "NEC", agg.EnterpriseNumbers.PenToVendor["48079"])
 
