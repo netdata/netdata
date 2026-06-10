@@ -206,6 +206,227 @@ async fn e2e_timestamp_source_first_switched_is_persisted_as_source_timestamp() 
     );
 }
 
+/// Characterization: restarting with tier journals already covering (part of)
+/// the raw window (the "rollups ahead of raw" crash ordering) must not
+/// duplicate tier rows. The protection is the `find_last_tier_timestamp`
+/// cutoff (`rebuild.rs`) consumed by `observe_tiers_with_cutoffs` (`tiers.rs`).
+///
+/// Tiers bucket by receive time, so this writes a synthetic raw journal with
+/// receive timestamps far enough in the past that every bucket is closed.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_rebuild_with_tiers_ahead_of_raw_adds_no_duplicate_rows() {
+    let (cfg, _tmp) = offline_journal_cfg();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system time")
+        .as_micros() as u64;
+    let minute = 60_000_000_u64;
+    let t1 = now - 10 * minute;
+    let t2 = now - 9 * minute;
+
+    write_raw_flows(&cfg, 0x11, 1, &[(t1, 1), (t1, 2), (t1, 3), (t2, 1), (t2, 2)]);
+
+    let minute_1_dir = cfg.journal.minute_1_tier_dir();
+    rebuild_tiers_with_fresh_service(&cfg).await;
+    let after_first = timestamp_counts(&journal_source_realtime_timestamps(&minute_1_dir));
+    assert_eq!(
+        after_first.len(),
+        2,
+        "rebuild should materialize the two closed 1m buckets: {after_first:?}"
+    );
+    assert_eq!(after_first.values().sum::<usize>(), 5, "{after_first:?}");
+
+    // Raw grows past the tiers (new flows after the covered window). The
+    // cutoff must skip everything the tiers already cover and add ONLY the
+    // new bucket.
+    let t3 = now - 8 * minute;
+    write_raw_flows(&cfg, 0x22, 100, &[(t3, 1), (t3, 2)]);
+    rebuild_tiers_with_fresh_service(&cfg).await;
+    let after_second = timestamp_counts(&journal_source_realtime_timestamps(&minute_1_dir));
+    for (ts, count) in &after_first {
+        assert_eq!(
+            after_second.get(ts),
+            Some(count),
+            "bucket {ts} changed row count after rebuild — duplicated or lost tier rows: {after_second:?}"
+        );
+    }
+    assert_eq!(
+        after_second.len(),
+        3,
+        "the new bucket must be materialized exactly once: {after_second:?}"
+    );
+
+    // Strict rollups-ahead-of-raw: the tiers now cover everything raw holds.
+    // A further rebuild must be a no-op.
+    rebuild_tiers_with_fresh_service(&cfg).await;
+    let after_third = timestamp_counts(&journal_source_realtime_timestamps(&minute_1_dir));
+    assert_eq!(
+        after_second, after_third,
+        "rebuild with tiers fully ahead of raw must be a no-op (cutoff must skip all raw rows)"
+    );
+}
+
+/// Characterization: a torn tail on the newest tier and raw journal files
+/// (power loss mid-write) must not break the next startup — the cutoff lookup
+/// and the rebuild scan must tolerate a partial last entry.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_rebuild_tolerates_torn_tier_and_raw_tails() {
+    let (cfg, _tmp) = offline_journal_cfg();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system time")
+        .as_micros() as u64;
+    let minute = 60_000_000_u64;
+    write_raw_flows(&cfg, 0x11, 1, &[(now - 10 * minute, 1), (now - 9 * minute, 2)]);
+
+    // Materialize tier files, then tear the newest tier and raw tails.
+    rebuild_tiers_with_fresh_service(&cfg).await;
+    assert!(
+        tier_file_count(&cfg.journal.minute_1_tier_dir()) > 0,
+        "rebuild should have produced 1m tier files"
+    );
+    truncate_newest_journal(&cfg.journal.minute_1_tier_dir(), 13);
+    truncate_newest_journal(&cfg.journal.raw_tier_dir(), 13);
+
+    // Two consecutive restarts: the first sees the torn tails, the second sees
+    // whatever the first left behind. Both must succeed.
+    rebuild_tiers_with_fresh_service(&cfg).await;
+    rebuild_tiers_with_fresh_service(&cfg).await;
+}
+
+/// A journal config rooted in a fresh temp dir, with no UDP listener involved.
+fn offline_journal_cfg() -> (plugin_config::PluginConfig, TempDir) {
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let mut cfg = plugin_config::PluginConfig::default();
+    cfg.journal.journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
+    (cfg, tmp)
+}
+
+/// Write one synthetic ARCHIVED raw-tier journal file containing flows with
+/// explicit (historical) entry realtimes, so the tier buckets derived from
+/// them are already closed. The `Log` writer cannot back-date entries (its
+/// realtime clock enforces monotonicity from open time), so this uses the
+/// core `JournalWriter` directly — the same pattern as the query scan tests.
+/// Each flow is a distinct 10.0.0.0/24 source keyed by `src`. Addresses and
+/// ports are raw-only fields that do NOT survive into rollups, so the rollup
+/// row count per bucket is driven by PROTOCOL (= `src`), which is a rollup
+/// dimension.
+fn write_raw_flows(
+    cfg: &plugin_config::PluginConfig,
+    seq_seed: u8,
+    head_seqnum: u64,
+    flows: &[(u64, u8)],
+) {
+    use journal_core::{JournalFileOptions, JournalWriter};
+
+    let head_realtime = flows.first().expect("at least one flow").0;
+    let machine_dir = cfg
+        .journal
+        .raw_tier_dir()
+        .join("11111111-1111-1111-1111-111111111111");
+    fs::create_dir_all(&machine_dir).expect("create raw machine dir");
+    let seqnum_id_hex = format!("{seq_seed:02x}").repeat(16);
+    let path = machine_dir.join(format!(
+        "system@{seqnum_id_hex}-{head_seqnum:016x}-{head_realtime:016x}.journal"
+    ));
+
+    let test_uuid = |seed: u8| uuid::Uuid::from_bytes([seed; 16]);
+    let repo_file = RepoFile::from_path(&path).expect("archived test path should parse");
+    let mut journal_file = JournalFile::create(
+        &repo_file,
+        JournalFileOptions::new(
+            test_uuid(seq_seed),
+            test_uuid(seq_seed.wrapping_add(1)),
+            test_uuid(seq_seed.wrapping_add(2)),
+        ),
+    )
+    .expect("create raw test journal");
+    let mut writer = JournalWriter::new(
+        &mut journal_file,
+        head_seqnum,
+        test_uuid(seq_seed.wrapping_add(3)),
+    )
+    .expect("create raw test writer");
+
+    let mut data = Vec::new();
+    let mut refs = Vec::new();
+    for (index, &(ts_usec, src)) in flows.iter().enumerate() {
+        let record = crate::flow::FlowRecord {
+            flow_version: "ipfix",
+            protocol: src,
+            src_port: 5000 + src as u16,
+            dst_port: 53,
+            bytes: 100 + src as u64,
+            packets: 1,
+            flows: 1,
+            src_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 0, src))),
+            dst_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(192, 0, 2, 1))),
+            ..Default::default()
+        };
+        record.encode_to_journal_buf(&mut data, &mut refs);
+        let source_field = format!("_SOURCE_REALTIME_TIMESTAMP={ts_usec}");
+        let mut payloads: Vec<&[u8]> = refs.iter().map(|r| &data[r.clone()]).collect();
+        payloads.push(source_field.as_bytes());
+        writer
+            .add_entry(
+                &mut journal_file,
+                &payloads,
+                ts_usec,
+                100 + index as u64,
+            )
+            .expect("write raw test entry");
+    }
+}
+
+async fn rebuild_tiers_with_fresh_service(cfg: &plugin_config::PluginConfig) {
+    let metrics = Arc::new(ingest::IngestMetrics::default());
+    let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+    let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+    let mut service = ingest::IngestService::new(
+        cfg.clone(),
+        Arc::clone(&metrics),
+        Arc::clone(&open_tiers),
+        Arc::clone(&tier_flow_indexes),
+    )
+    .expect("create rebuild ingest service");
+    service
+        .rebuild_materialized_from_raw_for_test()
+        .await
+        .expect("rebuild materialized tiers from raw");
+}
+
+fn timestamp_counts(timestamps: &[u64]) -> BTreeMap<u64, usize> {
+    let mut counts = BTreeMap::new();
+    for &ts in timestamps {
+        *counts.entry(ts).or_insert(0) += 1;
+    }
+    counts
+}
+
+/// Truncate the most recently modified journal file in `dir` by `delta` bytes
+/// (deliberately non-8-aligned to land mid-entry).
+fn truncate_newest_journal(dir: &Path, delta: u64) {
+    let newest = journal_files(dir)
+        .into_iter()
+        .max_by_key(|path| {
+            fs::metadata(path)
+                .and_then(|m| m.modified())
+                .expect("journal file mtime")
+        })
+        .expect("tier directory should contain at least one journal file");
+    let len = fs::metadata(&newest).expect("journal metadata").len();
+    assert!(
+        len > delta,
+        "journal file {} too small to truncate",
+        newest.display()
+    );
+    let file = fs::OpenOptions::new()
+        .write(true)
+        .open(&newest)
+        .expect("open journal for truncation");
+    file.set_len(len - delta).expect("truncate journal tail");
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_query_service_timeseries_path_returns_chart_data() {
     let (cfg, _metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
