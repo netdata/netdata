@@ -43,13 +43,18 @@ type Sample struct {
 	FamilyType model.MetricType
 }
 
-// SampleTransform transforms or drops a single scraped Sample before typed-family
-// assembly. Return (sample, true, nil) to keep it (optionally mutated — rewrite Name
-// or mutate Labels in place), (_, false, nil) to drop it, or a non-nil error to abort
-// the scrape. Each Sample owns its Labels, so in-place mutation is safe and does not
-// affect other samples. It is the hook a Prometheus metric-relabeling step plugs into.
-//
-// Kind and FamilyType reflect the classification BEFORE the transform runs; rewriting
-// Name, le, or quantile does NOT reclassify the sample (matching Prometheus, where
-// relabeling cannot retype a series).
-type SampleTransform func(Sample) (Sample, bool, error)
+// HelpEntry is a family's HELP text, keyed by family name, carried alongside a
+// SampleBatch (HELP is parsed per family, before assembly).
+type HelpEntry struct {
+	Name string
+	Help string
+}
+
+// SampleBatch is the flat, classified sample stream of one scrape plus the
+// per-family HELP, returned by [Prometheus.ScrapeSamples] before typed-family
+// assembly. The caller owns the samples (each Sample owns its Labels) and may
+// relabel them in place, then fold the result with [Assemble].
+type SampleBatch struct {
+	Help    []HelpEntry
+	Samples []Sample
+}

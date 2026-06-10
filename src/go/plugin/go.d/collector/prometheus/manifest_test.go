@@ -28,7 +28,7 @@ import (
 // golden baseline, so the migrated V2 collector can be verified to preserve it.
 //
 // manifestChart top-level fields are the HARD contract a V2 migration must
-// reproduce: the chart context, its labels (incl. label_prefix), and its dims by
+// reproduce: the chart context, its labels, and its dims by
 // semantic name with algo + the real (de-scaled) value. `soft` holds the chart
 // metadata: units and family are reproduced (the writer feeds the V1 chart helpers
 // into the metrix instrument meta) and ASSERTED; chart type is autogen-derived and
@@ -150,13 +150,6 @@ test_gauge_metric{label1="value1"} 11
 		"app_job_name": {
 			// Application empty -> the app segment falls back to the job Name (see application()).
 			prepare: func() *Collector { c := New(); c.Name = "job_app"; return c },
-			input: `
-# TYPE test_gauge_metric gauge
-test_gauge_metric{label1="value1"} 11
-`,
-		},
-		"label_prefix": {
-			prepare: func() *Collector { c := New(); c.LabelPrefix = "px"; return c },
 			input: `
 # TYPE test_gauge_metric gauge
 test_gauge_metric{label1="value1"} 11

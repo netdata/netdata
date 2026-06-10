@@ -23,7 +23,6 @@
   "force_http2": true,
   "name": "ok",
   "app": "ok",
-  "label_prefix": "ok",
   "selector": {
     "allow": [
       "ok"
@@ -32,6 +31,24 @@
       "ok"
     ]
   },
+  "relabeling": [
+    {
+      "match": "ok",
+      "metric_relabel_configs": [
+        {
+          "source_labels": [
+            "ok"
+          ],
+          "separator": "ok",
+          "regex": "ok",
+          "modulus": 123,
+          "target_label": "ok",
+          "replacement": "ok",
+          "action": "replace"
+        }
+      ]
+    }
+  ],
   "expected_prefix": "ok",
   "max_time_series": 123,
   "max_time_series_per_metric": 123,

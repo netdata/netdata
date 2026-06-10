@@ -18,19 +18,22 @@ type (
 	Prometheus interface {
 		// ScrapeSeries and parse prometheus format metrics
 		ScrapeSeries() (Series, error)
+		// Scrape is ScrapeContext with a background context (for callers that do
+		// not thread one).
 		Scrape() (MetricFamilies, error)
-		// ScrapeWithTransform scrapes, runs transform on every sample (a flat
-		// [Sample] stream before typed-family assembly, with the selector already
-		// applied), then assembles the kept, transformed samples into MetricFamilies.
-		// A nil transform behaves exactly like Scrape. The result aliases reused
-		// buffers, valid until the next scrape on this instance (same as Scrape).
+		// ScrapeContext scrapes and assembles typed MetricFamilies, honoring ctx for
+		// the fetch (cancellation/deadline). This is the no-buffer fast path.
+		ScrapeContext(ctx context.Context) (MetricFamilies, error)
+		// ScrapeSamples scrapes and returns the flat, classified sample stream plus
+		// per-family HELP, with the selector applied, before typed-family assembly.
+		// The caller owns the samples and may relabel them in place, then fold the
+		// result with [Assemble]. This is the seam a metric-relabeling step plugs into.
 		//
-		// Samples reach transform in exposition order, with one exception: a
-		// _sum/_count sample whose family type is not yet known (its # TYPE, first
-		// bucket, or first quantile has not appeared) is deferred and delivered once
-		// the type resolves, or at end of scrape — so it may arrive after a later,
-		// unrelated sample. A per-sample (stateless) transform is unaffected.
-		ScrapeWithTransform(ctx context.Context, transform SampleTransform) (MetricFamilies, error)
+		// Samples are in exposition order, with one exception: a _sum/_count sample
+		// whose family type is not yet known (its # TYPE, first bucket, or first
+		// quantile has not appeared) is deferred and delivered once the type resolves,
+		// or at end of scrape — so it may arrive after a later, unrelated sample.
+		ScrapeSamples(ctx context.Context) (SampleBatch, error)
 		HTTPClient() *http.Client
 	}
 
@@ -82,15 +85,25 @@ func (p *prometheus) ScrapeSeries() (Series, error) {
 }
 
 func (p *prometheus) Scrape() (MetricFamilies, error) {
-	return p.ScrapeWithTransform(context.Background(), nil)
+	return p.ScrapeContext(context.Background())
 }
 
-func (p *prometheus) ScrapeWithTransform(ctx context.Context, transform SampleTransform) (MetricFamilies, error) {
+func (p *prometheus) ScrapeContext(ctx context.Context) (MetricFamilies, error) {
 	p.buf.Reset()
 
 	if err := p.src.fetch(ctx, p.buf); err != nil {
 		return nil, err
 	}
 
-	return p.parser.parseToMetricFamilies(p.buf.Bytes(), transform)
+	return p.parser.parseToMetricFamilies(p.buf.Bytes())
+}
+
+func (p *prometheus) ScrapeSamples(ctx context.Context) (SampleBatch, error) {
+	p.buf.Reset()
+
+	if err := p.src.fetch(ctx, p.buf); err != nil {
+		return SampleBatch{}, err
+	}
+
+	return p.parser.parseToSamples(p.buf.Bytes())
 }
