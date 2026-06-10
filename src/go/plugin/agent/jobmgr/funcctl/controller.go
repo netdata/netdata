@@ -5,6 +5,7 @@ package funcctl
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -66,12 +67,51 @@ func (c *Controller) SetAPI(api *dyncfg.Responder) {
 }
 
 func (c *Controller) RegisterModules(modules collectorapi.Registry) {
-	for name, creator := range modules {
+	names := make([]string, 0, len(modules))
+	for name := range modules {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	plannedPublicNames := make(map[string]string)
+	for _, name := range names {
+		creator := modules[name]
 		if creator.Methods == nil && creator.JobMethods == nil {
 			continue
 		}
-		c.registry.registerModule(name, creator)
+		methods := moduleMethods(creator)
+		if functionName, owner, collides := c.moduleMethodPublicNameCollision(name, methods, plannedPublicNames); collides {
+			c.Errorf("skipping function registration for module '%s': public function name '%s' collides with %s", name, functionName, owner)
+			continue
+		}
+		c.registry.registerModuleWithMethods(name, creator, methods)
 	}
+}
+
+func moduleMethods(creator collectorapi.Creator) []funcapi.MethodConfig {
+	if creator.Methods == nil {
+		return nil
+	}
+	return creator.Methods()
+}
+
+func (c *Controller) moduleMethodPublicNameCollision(moduleName string, methods []funcapi.MethodConfig, planned map[string]string) (string, string, bool) {
+	for _, method := range methods {
+		if method.ID == "" {
+			continue
+		}
+		owner := fmt.Sprintf("%s:%s", moduleName, method.ID)
+		for _, functionName := range funcapi.MethodFunctionNames(moduleName, method) {
+			if routeModule, routeMethod, ok := c.registry.resolveMethodRoute(functionName); ok {
+				return functionName, fmt.Sprintf("%s:%s", routeModule, routeMethod), true
+			}
+			if existing := planned[functionName]; existing != "" && existing != owner {
+				return functionName, existing, true
+			}
+			planned[functionName] = owner
+		}
+	}
+	return "", "", false
 }
 
 func (c *Controller) GetJobNames(moduleName string) []string {
@@ -190,6 +230,10 @@ func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []f
 		if method.ID == "" {
 			c.Warningf("skipping job method registration for %s[%s]: empty method ID", job.ModuleName(), job.Name())
 			continue
+		}
+		if method.FunctionName != "" || len(method.Aliases) != 0 {
+			c.Errorf("job method registration aborted for %s[%s]: method '%s' uses public FunctionName or Aliases, which are supported only for module methods", job.ModuleName(), job.Name(), method.ID)
+			return
 		}
 
 		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)

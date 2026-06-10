@@ -23,8 +23,9 @@ const (
 )
 
 type Function struct {
-	key         string
-	UID         string
+	key string
+	UID string
+	// Context is valid only while the handler is running.
 	Context     context.Context
 	Timeout     time.Duration
 	Name        string

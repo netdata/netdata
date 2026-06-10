@@ -43,13 +43,12 @@ func newModuleFuncRegistry() *moduleFuncRegistry {
 }
 
 func (r *moduleFuncRegistry) registerModule(name string, creator collectorapi.Creator) {
+	r.registerModuleWithMethods(name, creator, moduleMethods(creator))
+}
+
+func (r *moduleFuncRegistry) registerModuleWithMethods(name string, creator collectorapi.Creator, methods []funcapi.MethodConfig) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	var methods []funcapi.MethodConfig
-	if creator.Methods != nil {
-		methods = creator.Methods()
-	}
 
 	r.modules[name] = &moduleFunc{
 		creator:     creator,

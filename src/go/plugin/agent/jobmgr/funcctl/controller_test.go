@@ -396,6 +396,7 @@ func TestControllerLifecycleHooks(t *testing.T) {
 	tests := map[string]struct{}{
 		"register modules does not register static methods yet":        {},
 		"first job start registers static methods once":                {},
+		"public method name collision skips colliding module":          {},
 		"topology methods register direct alias":                       {},
 		"job stop unregisters job methods":                             {},
 		"cleanup unregisters static methods":                           {},
@@ -429,6 +430,27 @@ func TestControllerLifecycleHooks(t *testing.T) {
 				controller.OnJobStart(newTestRuntimeJob("mod", "job2", true))
 
 				assert.Equal(t, []string{"mod:a"}, reg.registeredNames())
+
+			case "public method name collision skips colliding module":
+				controller.RegisterModules(collectorapi.Registry{
+					"aaa": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{ID: "logs", FunctionName: "shared:logs"}}
+						},
+					},
+					"bbb": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{ID: "logs", FunctionName: "shared:logs"}}
+						},
+					},
+				})
+
+				controller.OnJobStart(newTestRuntimeJob("aaa", "job1", true))
+				controller.OnJobStart(newTestRuntimeJob("bbb", "job1", true))
+
+				assert.Equal(t, []string{"shared:logs"}, reg.registeredNames())
+				assert.True(t, controller.registry.isModuleRegistered("aaa"))
+				assert.False(t, controller.registry.isModuleRegistered("bbb"))
 
 			case "topology methods register direct alias":
 				controller.RegisterModules(collectorapi.Registry{
@@ -528,6 +550,7 @@ func TestControllerRegisterJobMethods(t *testing.T) {
 		"fail fast on collision with static method":          {},
 		"fail fast on collision with other job":              {},
 		"fail fast on duplicate within batch":                {},
+		"fail fast on job method public names":               {},
 		"registry is populated before handlers are callable": {},
 		"success commits all methods":                        {},
 	}
@@ -563,6 +586,16 @@ func TestControllerRegisterJobMethods(t *testing.T) {
 				controller.registry.registerModule("mod", collectorapi.Creator{})
 
 				controller.registerJobMethods(newTestRuntimeJob("mod", "job1", true), []funcapi.MethodConfig{{ID: "dup"}, {ID: "dup"}})
+
+				assert.Empty(t, reg.registeredNames())
+				assert.Empty(t, controller.registry.getJobMethods("mod", "job1"))
+
+			case "fail fast on job method public names":
+				controller.registry.registerModule("mod", collectorapi.Creator{})
+
+				controller.registerJobMethods(newTestRuntimeJob("mod", "job1", true), []funcapi.MethodConfig{
+					{ID: "logs", FunctionName: "public:logs", Aliases: []string{"public:alias"}},
+				})
 
 				assert.Empty(t, reg.registeredNames())
 				assert.Empty(t, controller.registry.getJobMethods("mod", "job1"))
