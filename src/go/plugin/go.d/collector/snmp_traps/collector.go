@@ -29,6 +29,9 @@ var chartTemplateYAML string
 const (
 	trapWriteFailureJournal = "journal_write_failed"
 	trapWriteFailureOTLP    = "otlp_export_failed"
+
+	listenerReadErrorLogEvery     = time.Hour
+	listenerReadErrorLogKeyPrefix = "snmp_traps:listener_read_failed:"
 )
 
 var activeDirectJournalJobs atomic.Int64
@@ -294,6 +297,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	overrides := buildOverrideMap(c.Overrides)
 	metrics := getJobMetrics(c.jobName)
 	listener.metrics = metrics
+	listener.onReadError = c.logListenerReadError
 	var secondaryWriter TrapWriter
 	if c.OTLP.Enabled {
 		secondaryWriter, err = newOTLPTrapWriter(ctx, c.jobName, c.OTLP, metrics)
@@ -466,7 +470,8 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		}
 	}
 
-	if version, ok := sniffSNMPVersion(data); ok && !c.versionAllowed(version) {
+	sniffedVersion, versionKnown := sniffSNMPVersion(data)
+	if versionKnown && !c.versionAllowed(sniffedVersion) {
 		c.incTrapError("dropped_allowlist")
 		return
 	}
@@ -500,6 +505,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 				}
 			}
 			c.incTrapError(dim)
+			c.writeDecodeErrorEntry(data, decodePeerIP, conn, peer, dim, err, sniffedVersion, versionKnown)
 			return
 		}
 	}
@@ -647,6 +653,15 @@ func (c *Collector) warnf(format string, args ...any) {
 	if c.Logger != nil {
 		c.Warningf(format, args...)
 	}
+}
+
+func (c *Collector) logListenerReadError(ep EndpointConfig, err error) {
+	if c.Logger == nil {
+		return
+	}
+	endpoint := listenerEndpointLogName(ep)
+	c.Limit(listenerReadErrorLogKeyPrefix+endpoint, 1, listenerReadErrorLogEvery).
+		Warningf("SNMP trap listener read failed (endpoint=%s): %v", endpoint, err)
 }
 
 func (c *Collector) applyOverrides(td *TrapDef) *TrapDef {

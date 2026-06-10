@@ -266,9 +266,9 @@ Per spec §19, proposed in Go:
 ```go
 type ReportType string
 const (
-    ReportTypeTrap               ReportType = "trap"
-    ReportTypeDedupSummary       ReportType = "deduplication_summary"
-    ReportTypeDecodeErrorSummary ReportType = "decode_error_summary" // reserved until decode-summary payload is specified
+    ReportTypeTrap         ReportType = "trap"
+    ReportTypeDedupSummary ReportType = "deduplication_summary"
+    ReportTypeDecodeError  ReportType = "decode_error"
 )
 
 type PduType string
@@ -311,9 +311,20 @@ type DedupSummary struct {
     ByTrap          map[string]int64 `json:"by_trap"` // Numeric OID → count; MESSAGE renderer resolves names.
 }
 
+type DecodeErrorInfo struct {
+    Kind          string `json:"kind"`
+    Error         string `json:"error"`
+    PacketSize    int    `json:"packet_size"`
+    PacketSHA256  string `json:"packet_sha256"`
+    SourceUDPPort int    `json:"source_udp_port,omitempty"`
+    Listener      string `json:"listener,omitempty"`
+    SnmpVersion   string `json:"snmp_version,omitempty"`
+    EngineID      string `json:"engine_id,omitempty"`
+}
+
 type TrapEntry struct {
     JobName               string     // Which job produced this entry
-    ReportType            ReportType // trap / deduplication_summary / decode_error_summary
+    ReportType            ReportType // trap / deduplication_summary / decode_error
     ReceivedRealtimeUsec  int64      // Wall-clock receive timestamp from recv path
     ReceivedMonotonicUsec int64      // CLOCK_MONOTONIC receive timestamp from recv path
     TrapOID               string     // Numeric OID (e.g. "1.3.6.1.4.1.9.9.315.0.1")
@@ -333,6 +344,7 @@ type TrapEntry struct {
     Labels                map[string]string // Nil means no labels; lowercase keys
     Varbinds              []VarbindValue    // Ordered varbind values from PDU
     SummaryCounts         *DedupSummary     // Only when ReportType = deduplication_summary
+    DecodeError           *DecodeErrorInfo  // Only when ReportType = decode_error
 }
 ```
 

@@ -128,6 +128,63 @@ func TestSerializeToJournalFieldsDedupSummary(t *testing.T) {
 	}
 }
 
+func TestSerializeToJournalFieldsDecodeError(t *testing.T) {
+	entry := &TrapEntry{
+		JobName:               "local",
+		ReportType:            ReportTypeDecodeError,
+		ReceivedRealtimeUsec:  1000000,
+		ReceivedMonotonicUsec: 1000,
+		Category:              "diagnostic",
+		Severity:              "warning",
+		Message:               "SNMP trap decode failed from 10.0.0.1: malformed_pdu: BER: trailing data",
+		SourceIP:              "10.0.0.1",
+		SourceUDPPeer:         "10.0.0.1",
+		SnmpVersion:           SnmpVersionV2c,
+		DecodeError: &DecodeErrorInfo{
+			Kind:          "malformed_pdu",
+			Error:         "BER: trailing data",
+			PacketSize:    42,
+			PacketSHA256:  strings.Repeat("a", 64),
+			SourceUDPPort: 9162,
+			Listener:      "0.0.0.0:162",
+			EngineID:      "8000000001020304",
+		},
+	}
+
+	fields, err := serializeToJournalFields(entry)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fieldMap := fieldsToMap(fields)
+
+	assertField(t, fieldMap, "TRAP_REPORT_TYPE", "decode_error")
+	assertField(t, fieldMap, "TRAP_CATEGORY", "diagnostic")
+	assertField(t, fieldMap, "TRAP_SEVERITY", "warning")
+	assertField(t, fieldMap, "TRAP_VERSION", "v2c")
+	assertField(t, fieldMap, "TRAP_SOURCE_IP", "10.0.0.1")
+	assertField(t, fieldMap, "TRAP_SOURCE_UDP_PEER", "10.0.0.1")
+	assertField(t, fieldMap, "TRAP_SOURCE_UDP_PORT", "9162")
+	assertField(t, fieldMap, "TRAP_DECODE_ERROR_KIND", "malformed_pdu")
+	assertField(t, fieldMap, "TRAP_DECODE_ERROR", "BER: trailing data")
+	assertField(t, fieldMap, "TRAP_PACKET_SIZE", "42")
+	assertField(t, fieldMap, "TRAP_PACKET_SHA256", strings.Repeat("a", 64))
+	assertField(t, fieldMap, "TRAP_LISTENER", "0.0.0.0:162")
+	assertField(t, fieldMap, "TRAP_ENGINE_ID", "8000000001020304")
+	assertFieldAbsent(t, fieldMap, "TRAP_OID")
+	assertFieldAbsent(t, fieldMap, "TRAP_NAME")
+
+	var details map[string]any
+	if err := json.Unmarshal([]byte(fieldMap["TRAP_JSON"]), &details); err != nil {
+		t.Fatalf("TRAP_JSON not valid: %v", err)
+	}
+	if got := details["kind"]; got != "malformed_pdu" {
+		t.Fatalf("TRAP_JSON kind = %v, want malformed_pdu", got)
+	}
+	if got := details["packet_sha256"]; got != strings.Repeat("a", 64) {
+		t.Fatalf("TRAP_JSON packet_sha256 = %v", got)
+	}
+}
+
 func TestSerializeToJournalFieldsSeverityMapping(t *testing.T) {
 	tests := map[string]struct {
 		severity Severity
@@ -455,6 +512,27 @@ func TestJournalHotSerializerMatchesSerializeToJournalFields(t *testing.T) {
 			SourceIP:              "10.0.0.1",
 			PduType:               PduTypeTrap,
 			SnmpVersion:           SnmpVersionV2c,
+		},
+		"DecodeError": {
+			JobName:               "local",
+			ReportType:            ReportTypeDecodeError,
+			ReceivedRealtimeUsec:  1000000,
+			ReceivedMonotonicUsec: 1000,
+			Severity:              "warning",
+			Category:              "diagnostic",
+			Message:               "SNMP trap decode failed from 10.0.0.1: malformed_pdu: BER: trailing data",
+			SourceIP:              "10.0.0.1",
+			SourceUDPPeer:         "10.0.0.1",
+			SnmpVersion:           SnmpVersionV2c,
+			DecodeError: &DecodeErrorInfo{
+				Kind:          "malformed_pdu",
+				Error:         "BER: trailing data",
+				PacketSize:    42,
+				PacketSHA256:  strings.Repeat("a", 64),
+				SourceUDPPort: 9162,
+				Listener:      "0.0.0.0:162",
+				EngineID:      "8000000001020304",
+			},
 		},
 		"JSONEscapingAndValueTypes": {
 			JobName:               "local",

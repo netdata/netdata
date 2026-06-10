@@ -559,6 +559,9 @@ func otlpEventName(entry *TrapEntry) string {
 	if entry.ReportType == ReportTypeDedupSummary {
 		return "snmp.trap.deduplication_summary"
 	}
+	if entry.ReportType == ReportTypeDecodeError {
+		return "snmp.trap.decode_error"
+	}
 	cat := string(entry.Category)
 	if cat == "" {
 		cat = "unknown"
@@ -603,6 +606,9 @@ func otlpTrapAttributes(entry *TrapEntry, severitySlug string) []*commonpb.KeyVa
 		attrs = appendStringAttr(attrs, "netdata.topology.interface", entry.TopologyInterface)
 		attrs = appendStringAttr(attrs, "netdata.topology.neighbors", entry.TopologyNeighbors)
 	}
+	if entry.DecodeError != nil {
+		appendDecodeErrorOTLPAttributes(&attrs, entry.DecodeError)
+	}
 
 	if entry.SummaryCounts != nil {
 		attrs = append(attrs,
@@ -624,6 +630,18 @@ func otlpTrapAttributes(entry *TrapEntry, severitySlug string) []*commonpb.KeyVa
 	return attrs
 }
 
+func appendDecodeErrorOTLPAttributes(attrs *[]*commonpb.KeyValue, info *DecodeErrorInfo) {
+	*attrs = appendStringAttr(*attrs, "snmp.trap.decode_error.kind", info.Kind)
+	*attrs = appendStringAttr(*attrs, "snmp.trap.decode_error.message", info.Error)
+	*attrs = append(*attrs, otlpKVInt("snmp.trap.packet_size", int64(info.PacketSize)))
+	*attrs = appendStringAttr(*attrs, "snmp.trap.packet_sha256", info.PacketSHA256)
+	if info.SourceUDPPort > 0 {
+		*attrs = append(*attrs, otlpKVInt("network.peer.port", int64(info.SourceUDPPort)))
+	}
+	*attrs = appendStringAttr(*attrs, "netdata.trap.listener", info.Listener)
+	*attrs = appendStringAttr(*attrs, "snmp.engine_id", info.EngineID)
+}
+
 func appendStringAttr(attrs []*commonpb.KeyValue, key, val string) []*commonpb.KeyValue {
 	if val == "" {
 		return attrs
@@ -632,6 +650,29 @@ func appendStringAttr(attrs []*commonpb.KeyValue, key, val string) []*commonpb.K
 }
 
 func otlpVarbindsValue(entry *TrapEntry) *commonpb.AnyValue {
+	if entry.DecodeError != nil {
+		info := entry.DecodeError
+		values := []*commonpb.KeyValue{
+			otlpKVString("kind", info.Kind),
+			otlpKVString("error", info.Error),
+			otlpKVInt("packet_size", int64(info.PacketSize)),
+			otlpKVString("packet_sha256", info.PacketSHA256),
+		}
+		if info.SourceUDPPort > 0 {
+			values = append(values, otlpKVInt("source_udp_port", int64(info.SourceUDPPort)))
+		}
+		if info.Listener != "" {
+			values = append(values, otlpKVString("listener", info.Listener))
+		}
+		if info.SnmpVersion != "" {
+			values = append(values, otlpKVString("snmp_version", info.SnmpVersion))
+		}
+		if info.EngineID != "" {
+			values = append(values, otlpKVString("engine_id", info.EngineID))
+		}
+		return otlpKVListValue(values)
+	}
+
 	if entry.SummaryCounts != nil {
 		sc := entry.SummaryCounts
 		values := []*commonpb.KeyValue{

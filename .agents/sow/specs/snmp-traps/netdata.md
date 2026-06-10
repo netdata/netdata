@@ -172,7 +172,7 @@ SOW-0035 M1 finalizes the exact process/writer boundary for the Go implementatio
 
 1. Receive from a configured endpoint into a reusable buffer.
 2. Pre-decode allowlist (source IP, CIDR match). Drop if disallowed (no decode cost).
-3. BER limit pre-scan, then SNMP trap decode with the chosen parser, within bounded limits (see §18) — drop and increment counter on limit violation.
+3. BER limit pre-scan, then SNMP trap decode with the chosen parser, within bounded limits (see §18). Accepted-source decode failures write one `TRAP_REPORT_TYPE=decode_error` entry after configured per-source rate-limit policy, then increment the matching error counter.
 4. Community / USM auth check.
 5. Per-job rate-limit (token bucket). Drop or sample if over budget (operator chooses).
 6. Identify source: PDU-based first (v1 `agent-addr`; v2c/v3 `snmpTrapAddress.0` varbind per RFC 3584); fall back to UDP peer. Candidate source addresses are accepted only after IP parsing/normalization. Malformed or non-IP `snmpTrapAddress.0` values are ignored for source identity and `_HOSTNAME` fallback; the kernel-provided UDP peer remains the final safe fallback.
@@ -783,7 +783,7 @@ The plugin's reserved `TRAP_*` field set is the closed list documented later in 
 **Closed reserved `TRAP_*` field set** (operators cannot use `TRAP_TAG_*` keys that uppercase to any of these — but since labels are namespaced under `TRAP_TAG_*`, collision is structurally impossible):
 
 ```
-TRAP_REPORT_TYPE          trap / deduplication_summary / decode_error_summary
+TRAP_REPORT_TYPE          trap / deduplication_summary / decode_error
 TRAP_OID                  Numeric OID
 TRAP_NAME                 MIB-qualified <MIB-MODULE>::<symbol>
 TRAP_CATEGORY             One of 8 canonical category slugs (§3)
@@ -792,16 +792,23 @@ TRAP_PDU_TYPE             trap / inform
 TRAP_VERSION              v1 / v2c / v3
 TRAP_SOURCE_IP            Identified source per RFC 3584 cascade (§5)
 TRAP_SOURCE_UDP_PEER      UDP transport peer
+TRAP_SOURCE_UDP_PORT      UDP transport source port for decode-error entries
 TRAP_DEVICE_VENDOR        Source-device vendor slug
 TRAP_INTERFACE            Source-device topology interface (when topology enrichment is co-located, §13 Q4)
 TRAP_NEIGHBORS            Source-device topology neighbors (same as above)
-TRAP_JSON                 Structured varbind payload, JSON object
+TRAP_JSON                 Structured varbind payload or decode-error details, JSON object
 TRAP_SUPPRESSED_COUNT     Dedup summary entries only
 TRAP_SUPPRESSED_FINGERPRINTS  Dedup summary entries only
 TRAP_REPORT_PERIOD_SEC    Dedup summary entries only
+TRAP_DECODE_ERROR_KIND    Decode-error entries only; bounded failure class
+TRAP_DECODE_ERROR         Decode-error entries only; sanitized decoder error text
+TRAP_PACKET_SIZE          Decode-error entries only; received datagram size
+TRAP_PACKET_SHA256        Decode-error entries only; SHA-256 fingerprint of the received datagram
+TRAP_LISTENER             Decode-error entries only; listener endpoint when known
+TRAP_ENGINE_ID            Decode-error entries only; SNMPv3 engine ID when safely extractable
 ```
 
-`decode_error_summary` is reserved in the enum for forward compatibility; SOW-0035 does not emit that report type. Real trap entries use `trap`; deduplication summary entries are owned by the later deduplication SOW.
+Real trap entries use `trap`; deduplication summary entries use `deduplication_summary`; accepted-source decode failures use `decode_error`.
 
 ### Real trap entry (full example)
 
@@ -858,11 +865,44 @@ TRAP_JSON={"period_sec":5,"total_suppressed":247,"by_trap":{"1.3.6.1.6.3.1.1.5.3
 
 The MESSAGE is multi-line as designed (§10) — the same shape as the §10 example. Multi-line MESSAGE values are written using systemd-journal's binary field encoding (see CWE-117 below) so newlines inside MESSAGE cannot inject other fields.
 
-Filterable: `journalctl TRAP_REPORT_TYPE=trap` (real traps only), `journalctl TRAP_REPORT_TYPE=deduplication_summary` (suppression history only). New report types may be added later for other pipeline events (e.g., `decode_error_summary`).
+Filterable: `journalctl TRAP_REPORT_TYPE=trap` (real traps only), `journalctl TRAP_REPORT_TYPE=deduplication_summary` (suppression history only), and `journalctl TRAP_REPORT_TYPE=decode_error` (accepted-source malformed/undecodable datagrams only).
+
+### Decode-error entry (full example)
+
+Decode-error rows are individual forensic events for UDP datagrams that passed
+the source allowlist and configured rate-limit policy but could not be decoded
+as an accepted trap. Raw packet bytes are deliberately not written because SNMP
+v1/v2c community strings and binary payloads can appear in the datagram.
+
+```
+MESSAGE=SNMP trap decode failed from 10.0.0.5: malformed_pdu: BER: trailing data
+PRIORITY=4
+SYSLOG_IDENTIFIER=local
+_HOSTNAME=10.0.0.5
+ND_LOG_SOURCE=snmp-trap
+TRAP_REPORT_TYPE=decode_error
+TRAP_CATEGORY=diagnostic
+TRAP_SEVERITY=warning
+TRAP_VERSION=v2c
+TRAP_SOURCE_IP=10.0.0.5
+TRAP_SOURCE_UDP_PEER=10.0.0.5
+TRAP_SOURCE_UDP_PORT=9162
+TRAP_LISTENER=0.0.0.0:162
+TRAP_DECODE_ERROR_KIND=malformed_pdu
+TRAP_DECODE_ERROR=BER: trailing data
+TRAP_PACKET_SIZE=42
+TRAP_PACKET_SHA256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+TRAP_JSON={"kind":"malformed_pdu","error":"BER: trailing data","packet_size":42,"packet_sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","source_udp_port":9162,"listener":"0.0.0.0:162","snmp_version":"v2c"}
+```
 
 ### `TRAP_JSON` content
 
 The full structured varbind payload as a single-line JSON object. Keyed by varbind symbolic name when known (profile inline `varbinds:` resolved it, or MIB index has it), by OID otherwise. Each value carries `{oid, type, value}` and optionally `enum`/`display_hint` rendering applied. If malformed input creates duplicate JSON keys after symbolic-name and OID fallback, the first occurrence keeps the base key and later occurrences use deterministic suffixed keys (`<key>#2`, `<key>#3`, ...), preserving every received varbind without introducing duplicate JSON object keys.
+
+For `TRAP_REPORT_TYPE=decode_error`, `TRAP_JSON` carries the same bounded
+decode-error details as the dedicated fields: `kind`, `error`, `packet_size`,
+`packet_sha256`, and optional `source_udp_port`, `listener`, `snmp_version`,
+and `engine_id`.
 
 This guarantees forensic completeness: even with zero profile coverage and no MIB loaded, the journal contains everything needed to reconstruct what arrived on the wire. The fixed field name avoids the per-OID field-name explosion of older designs.
 
@@ -901,7 +941,7 @@ The plugin emits both shapes from a single internal `TrapEntry` model — the wr
 | `body` | Rendered description template | Primary log message (counterpart to journal `MESSAGE`) |
 | `severity_number` | Mapped from syslog PRIORITY | See severity mapping below |
 | `severity_text` | Mapped severity name | OTLP standard text label |
-| `EventName` (top-level LogRecord field) | `"snmp.trap.<category>"` (e.g. `snmp.trap.security`) | The OTel Logs Data Model `EventName` field (OTLP proto field `event_name` in `LogRecord`) — top-level typed-event identifier per the OTel spec. Enables backend-side category routing without parsing attributes. Dotted-lowercase per OTEL semconv. Dedup summary entries use `"snmp.trap.deduplication_summary"`. Note: the OTel semconv attribute `event.name` is a separate concept (an attribute key, lowercased+dotted); Netdata uses the top-level `EventName` field here. |
+| `EventName` (top-level LogRecord field) | `"snmp.trap.<category>"` (e.g. `snmp.trap.security`) | The OTel Logs Data Model `EventName` field (OTLP proto field `event_name` in `LogRecord`) — top-level typed-event identifier per the OTel spec. Enables backend-side category routing without parsing attributes. Dotted-lowercase per OTEL semconv. Dedup summary entries use `"snmp.trap.deduplication_summary"`; decode-error entries use `"snmp.trap.decode_error"`. Note: the OTel semconv attribute `event.name` is a separate concept (an attribute key, lowercased+dotted); Netdata uses the top-level `EventName` field here. |
 | Resource attribute `service.name` | `"netdata-snmptrap"` (constant — identifies the Netdata producer) | OTEL standard |
 | Resource attribute `service.instance.id` | `<job_name>` (the listener job, matches journal `SYSLOG_IDENTIFIER`) | OTEL standard |
 
@@ -936,6 +976,7 @@ OTLP `severity_number` loses the 8-slug Netdata taxonomy (only one of `emerg/ale
 | OTLP attribute | Journal-path equivalent (§11) | Notes |
 |---|---|---|
 | `network.peer.address` | `TRAP_SOURCE_UDP_PEER` | OTEL standard for transport peer. **Always emitted.** The UDP socket's `recvfrom()` source address. |
+| `network.peer.port` | `TRAP_SOURCE_UDP_PORT` | OTEL standard for transport source port. Emitted for decode-error entries when known. |
 | `snmp.source.ip` | `TRAP_SOURCE_IP` | Identified source per §5 step 6 cascade (`snmpTrapAddress.0` → v1 `agent-addr` → UDP peer). **Always emitted.** Carries the same value as `network.peer.address` when no proxy / NAT / explicit `snmpTrapAddress.0` is involved; carries a different value when the trap was relayed (e.g., via NAT, proxy, or sender-set `snmpTrapAddress.0` differing from UDP peer). Both attributes always present preserves query uniformity across all entries. |
 | `snmp.version` | `TRAP_VERSION` | v1 / v2c / v3 |
 | `snmp.trap.oid` | `TRAP_OID` | Numeric OID |
@@ -943,7 +984,13 @@ OTLP `severity_number` loses the 8-slug Netdata taxonomy (only one of `emerg/ale
 | `snmp.trap.category` | `TRAP_CATEGORY` | One of the 8 canonical category slugs |
 | `snmp.trap.severity` | `TRAP_SEVERITY` | Profile slug — kept alongside OTLP `severity_number` to preserve Netdata 8-slug taxonomy |
 | `snmp.trap.pdu_type` | `TRAP_PDU_TYPE` | trap / inform |
-| `snmp.trap.report_type` | `TRAP_REPORT_TYPE` | trap / deduplication_summary / decode_error_summary |
+| `snmp.trap.report_type` | `TRAP_REPORT_TYPE` | trap / deduplication_summary / decode_error |
+| `snmp.trap.decode_error.kind` | `TRAP_DECODE_ERROR_KIND` | Decode-error entries only |
+| `snmp.trap.decode_error.message` | `TRAP_DECODE_ERROR` | Decode-error entries only |
+| `snmp.trap.packet_size` | `TRAP_PACKET_SIZE` | Decode-error entries only |
+| `snmp.trap.packet_sha256` | `TRAP_PACKET_SHA256` | Decode-error entries only |
+| `netdata.trap.listener` | `TRAP_LISTENER` | Decode-error entries only |
+| `snmp.engine_id` | `TRAP_ENGINE_ID` | Decode-error entries only |
 | `snmp.device.hostname` | `_HOSTNAME` | Intentionally NOT `host.name` — the SNMP device is not the OTEL host of the producing process |
 | `snmp.device.vendor` | `TRAP_DEVICE_VENDOR` | Vendor slug from PEN |
 | `snmp.varbinds` | `TRAP_JSON` | Structured nested object (OTEL supports nested attributes) — receivers may flatten as `snmp.varbinds.<name>.<field>` |
@@ -962,6 +1009,18 @@ For dedup summary entries (§10), the same translation applies:
 - `snmp.trap.report_type` = `"deduplication_summary"`
 - `snmp.trap.suppressed_count`, `snmp.trap.suppressed_fingerprints`, `snmp.trap.report_period_sec` carry the structured counts
 - `snmp.varbinds` carries the per-trap suppression map
+
+For decode-error entries (§11), the same translation applies:
+
+- `body` = sanitized decode-error message
+- `EventName` (top-level LogRecord field) = `"snmp.trap.decode_error"`
+- `severity_number` = 13 (WARN)
+- `snmp.trap.report_type` = `"decode_error"`
+- `snmp.trap.decode_error.kind`, `snmp.trap.decode_error.message`,
+  `snmp.trap.packet_size`, `snmp.trap.packet_sha256`, `network.peer.port`,
+  `netdata.trap.listener`, and `snmp.engine_id` carry the structured details
+- `snmp.varbinds` carries the bounded decode-error detail object; it never
+  carries raw packet bytes
 
 ### Injection-safety in the OTLP path
 
@@ -1184,7 +1243,7 @@ Semantics:
 | Field | Type | Notes |
 |---|---|---|
 | `JobName` | string | Which job produced this entry. |
-| `ReportType` | enum {`trap`, `deduplication_summary`, `decode_error_summary`} | §11. `decode_error_summary` is reserved and not emitted in SOW-0035. |
+| `ReportType` | enum {`trap`, `deduplication_summary`, `decode_error`} | §11 |
 | `ReceivedRealtimeUsec` | int64 | Wall-clock receive timestamp captured on the recv path; journal realtime and OTLP `time_unix_nano` derive from this |
 | `ReceivedMonotonicUsec` | int64 | `CLOCK_MONOTONIC` receive timestamp captured with `ReceivedRealtimeUsec`; journal monotonic timestamp derives from this |
 | `TrapOID` | string | Numeric OID |
@@ -1202,6 +1261,7 @@ Semantics:
 | `Labels` | map<string, string> | Profile + operator labels. Nil means no labels. Lowercase keys → `TRAP_TAG_<KEY>` in journal, `trap.<key>` in OTLP |
 | `Varbinds` | ordered list of `{Name, OID, Type, Value, Enum?}` | Structured; writer serializes to `TRAP_JSON` or `snmp.varbinds`; `display_hint` is reserved and not emitted initially |
 | `SummaryCounts` | optional `{TotalSuppressed, Fingerprints, PeriodSec, ByTrap}` | Only when `ReportType=deduplication_summary`; `ByTrap` is keyed by numeric OID and the MESSAGE renderer resolves names from the profile index when available |
+| `DecodeError` | optional `{Kind, Error, PacketSize, PacketSHA256, SourceUDPPort?, Listener?, SnmpVersion?, EngineID?}` | Only when `ReportType=decode_error`; raw packet bytes are not stored |
 
 The interface contract is defined formally in `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md` §3-4 (SOW-0035 M1, ADR-0001). The SOW-0038 M3 OTLP exporter implements the same interface as the SOW-0035 M4 journal writer.
 

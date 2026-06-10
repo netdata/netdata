@@ -27,12 +27,13 @@ type listenerEndpoint struct {
 }
 
 type Listener struct {
-	jobName   string
-	endpoints []listenerEndpoint
-	metrics   *perJobMetrics
-	mu        sync.Mutex
-	closed    bool
-	wg        sync.WaitGroup
+	jobName     string
+	endpoints   []listenerEndpoint
+	metrics     *perJobMetrics
+	onReadError func(EndpointConfig, error)
+	mu          sync.Mutex
+	closed      bool
+	wg          sync.WaitGroup
 }
 
 func newListener(jobName string, cfg ListenConfig) (*Listener, error) {
@@ -93,6 +94,9 @@ func (l *Listener) readLoop(ep listenerEndpoint, handler func([]byte, net.IP, *n
 			if l.metrics != nil {
 				l.metrics.incError("listener_read_failed")
 			}
+			if l.onReadError != nil {
+				l.onReadError(ep.cfg, err)
+			}
 			time.Sleep(listenerReadErrorBackoff)
 			continue
 		}
@@ -128,4 +132,9 @@ func closeConns(conns []*net.UDPConn) {
 	for _, c := range conns {
 		c.Close()
 	}
+}
+
+func listenerEndpointLogName(ep EndpointConfig) string {
+	protocol := strings.ToLower(ep.Protocol)
+	return protocol + "://" + net.JoinHostPort(ep.Address, strconv.Itoa(ep.Port))
 }

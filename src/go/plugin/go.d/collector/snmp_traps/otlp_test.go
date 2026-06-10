@@ -278,6 +278,52 @@ func TestOTLPDedupSummarySerialization(t *testing.T) {
 	assert.Equal(t, int64(2), summary["fingerprints"].GetIntValue())
 }
 
+func TestOTLPDecodeErrorSerialization(t *testing.T) {
+	const packetHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+	entry := &TrapEntry{
+		JobName:              "local",
+		ReportType:           ReportTypeDecodeError,
+		ReceivedRealtimeUsec: 2000,
+		Category:             "diagnostic",
+		Severity:             "warning",
+		Message:              "SNMP trap decode failed from 192.0.2.10: malformed_pdu: BER: trailing data",
+		SourceIP:             "192.0.2.10",
+		SourceUDPPeer:        "192.0.2.10",
+		SnmpVersion:          SnmpVersionV2c,
+		DecodeError: &DecodeErrorInfo{
+			Kind:          "malformed_pdu",
+			Error:         "BER: trailing data",
+			PacketSize:    42,
+			PacketSHA256:  packetHash,
+			SourceUDPPort: 9162,
+			Listener:      "0.0.0.0:162",
+			EngineID:      "8000000001020304",
+		},
+	}
+
+	record, err := trapEntryToOTLPLogRecord(entry)
+	require.NoError(t, err)
+	assert.Equal(t, logpb.SeverityNumber_SEVERITY_NUMBER_WARN, record.SeverityNumber)
+	assert.Equal(t, "snmp.trap.decode_error", record.EventName)
+	assert.Equal(t, "decode_error", otlpAttrMap(record.Attributes)["snmp.trap.report_type"].GetStringValue())
+
+	attrs := otlpAttrMap(record.Attributes)
+	assert.Equal(t, "malformed_pdu", attrs["snmp.trap.decode_error.kind"].GetStringValue())
+	assert.Equal(t, "BER: trailing data", attrs["snmp.trap.decode_error.message"].GetStringValue())
+	assert.Equal(t, int64(42), attrs["snmp.trap.packet_size"].GetIntValue())
+	assert.Equal(t, packetHash, attrs["snmp.trap.packet_sha256"].GetStringValue())
+	assert.Equal(t, int64(9162), attrs["network.peer.port"].GetIntValue())
+	assert.Equal(t, "0.0.0.0:162", attrs["netdata.trap.listener"].GetStringValue())
+	assert.Equal(t, "8000000001020304", attrs["snmp.engine_id"].GetStringValue())
+
+	details := otlpKVListMap(attrs["snmp.varbinds"])
+	assert.Equal(t, "malformed_pdu", details["kind"].GetStringValue())
+	assert.Equal(t, "BER: trailing data", details["error"].GetStringValue())
+	assert.Equal(t, int64(42), details["packet_size"].GetIntValue())
+	assert.Equal(t, packetHash, details["packet_sha256"].GetStringValue())
+}
+
 func TestOTLPTrapWriterPreflightHeadersAndFlush(t *testing.T) {
 	srv := startOTLPFixture(t, nil)
 	metrics := &perJobMetrics{}

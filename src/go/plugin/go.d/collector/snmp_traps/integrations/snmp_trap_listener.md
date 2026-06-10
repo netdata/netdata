@@ -36,7 +36,7 @@ This collector listens for incoming SNMP Trap and INFORM notifications from netw
 - **OTLP/gRPC export**: Optional backend that exports traps as OTLP LogRecords. When `otlp.enabled` is `true`, traps are exported through OTLP regardless of `journal.enabled`; if direct journal storage is also enabled, both backends receive traps.
 - **Self-metrics**: Per-job counters for trap events (by category and severity), processing errors (by type), and dedup suppression (when enabled).
 
-When direct journal storage is enabled, trap entries are written as structured systemd-journal log messages with plugin-controlled fields (`TRAP_REPORT_TYPE`, `TRAP_OID`, `TRAP_NAME`, `TRAP_CATEGORY`, `TRAP_SEVERITY`, `TRAP_PDU_TYPE`, `TRAP_VERSION`, `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, `TRAP_DEVICE_VENDOR`, `TRAP_INTERFACE`, `TRAP_NEIGHBORS`, `TRAP_SUPPRESSED_COUNT`, `TRAP_SUPPRESSED_FINGERPRINTS`, `TRAP_REPORT_PERIOD_SEC`, `TRAP_JSON`) plus profile-defined labels (`TRAP_TAG_*`). Query traps with the embedded `snmp:traps` Function through Netdata Cloud or directly via the Agent HTTP API. The Function selects all direct-journal jobs by default and can narrow to one listener with `selections.__logs_sources=["<job>"]`. OTLP-only jobs do not create local journal files and therefore do not appear as log sources.
+When direct journal storage is enabled, trap entries are written as structured systemd-journal log messages with plugin-controlled fields (`TRAP_REPORT_TYPE`, `TRAP_OID`, `TRAP_NAME`, `TRAP_CATEGORY`, `TRAP_SEVERITY`, `TRAP_PDU_TYPE`, `TRAP_VERSION`, `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, `TRAP_SOURCE_UDP_PORT`, `TRAP_DEVICE_VENDOR`, `TRAP_INTERFACE`, `TRAP_NEIGHBORS`, `TRAP_SUPPRESSED_COUNT`, `TRAP_SUPPRESSED_FINGERPRINTS`, `TRAP_REPORT_PERIOD_SEC`, `TRAP_DECODE_ERROR_KIND`, `TRAP_DECODE_ERROR`, `TRAP_PACKET_SIZE`, `TRAP_PACKET_SHA256`, `TRAP_LISTENER`, `TRAP_ENGINE_ID`, `TRAP_JSON`) plus profile-defined labels (`TRAP_TAG_*`). Query traps with the embedded `snmp:traps` Function through Netdata Cloud or directly via the Agent HTTP API. The Function selects all direct-journal jobs by default and can narrow to one listener with `selections.__logs_sources=["<job>"]`. OTLP-only jobs do not create local journal files and therefore do not appear as log sources.
 
 **Closed 8-category / 8-severity taxonomy** (from the OOB profile pack):
 
@@ -116,6 +116,7 @@ SNMP trap collection is not auto-detected. The collector must be explicitly conf
 #### Limits
 
 BER decode limits protect the UDP-exposed parser: datagrams are capped at 8 KiB, varbinds at 256 per PDU, BER nesting depth at 8, encoded OID length at 128 bytes, OctetString values at 1024 bytes, and decode time at 1 ms per PDU.
+Accepted-source decode failures are written as `TRAP_REPORT_TYPE=decode_error` rows with sanitized error details, source address/port, listener endpoint when known, sniffed SNMP version when known, packet size, and packet SHA-256. Raw packet bytes are not written because SNMP community strings and binary payloads can appear in received datagrams.
 Deduplication, when enabled, uses a per-job fingerprint cache capped by `dedup.cache_max_entries` (default 100000).
 
 

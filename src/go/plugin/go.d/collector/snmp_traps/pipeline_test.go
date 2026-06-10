@@ -344,6 +344,116 @@ func TestCollectorHandlePacketDropsDisallowedV3BeforeDecode(t *testing.T) {
 	}
 }
 
+func TestCollectorHandlePacketWritesDecodeErrorEntry(t *testing.T) {
+	const jobName = "test-decode-error-entry"
+	metrics := withCleanJobMetrics(t, jobName)
+	writer := &mockTrapWriter{}
+	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
+
+	data := make([]byte, maxDatagramSize+1)
+	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
+	c.handlePacket(data, peer.IP, nil, peer)
+
+	if len(writer.entries) != 1 {
+		t.Fatalf("written entries = %d, want 1", len(writer.entries))
+	}
+	entry := writer.entries[0]
+	if entry.ReportType != ReportTypeDecodeError {
+		t.Fatalf("ReportType = %q, want decode_error", entry.ReportType)
+	}
+	if entry.DecodeError == nil {
+		t.Fatal("DecodeError is nil")
+	}
+	if entry.DecodeError.Kind != "malformed_pdu" {
+		t.Fatalf("DecodeError.Kind = %q, want malformed_pdu", entry.DecodeError.Kind)
+	}
+	if entry.DecodeError.PacketSize != maxDatagramSize+1 {
+		t.Fatalf("DecodeError.PacketSize = %d, want %d", entry.DecodeError.PacketSize, maxDatagramSize+1)
+	}
+	if len(entry.DecodeError.PacketSHA256) != 64 {
+		t.Fatalf("DecodeError.PacketSHA256 length = %d, want 64", len(entry.DecodeError.PacketSHA256))
+	}
+	if entry.SourceIP != "10.1.2.3" {
+		t.Fatalf("SourceIP = %q, want 10.1.2.3", entry.SourceIP)
+	}
+	if entry.SourceUDPPeer != "10.1.2.3" {
+		t.Fatalf("SourceUDPPeer = %q, want 10.1.2.3", entry.SourceUDPPeer)
+	}
+	if entry.DecodeError.SourceUDPPort != 9162 {
+		t.Fatalf("SourceUDPPort = %d, want 9162", entry.DecodeError.SourceUDPPort)
+	}
+	if !strings.Contains(entry.Message, "malformed_pdu") {
+		t.Fatalf("Message = %q, want malformed_pdu", entry.Message)
+	}
+	if got := atomic.LoadUint64(&metrics.errors.malformedPDU); got != 1 {
+		t.Fatalf("malformed_pdu = %d, want 1", got)
+	}
+}
+
+func TestCollectorHandlePacketDecodeErrorHonorsAllowlist(t *testing.T) {
+	const jobName = "test-decode-error-allowlist"
+	metrics := withCleanJobMetrics(t, jobName)
+	writer := &mockTrapWriter{}
+	c := newTestV2Collector(jobName, writer, []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, []string{"public"})
+
+	peer := &net.UDPAddr{IP: net.ParseIP("192.0.2.10"), Port: 9162}
+	c.handlePacket([]byte{0xff, 0x00}, peer.IP, nil, peer)
+
+	if len(writer.entries) != 0 {
+		t.Fatalf("written entries = %d, want 0", len(writer.entries))
+	}
+	if got := atomic.LoadUint64(&metrics.errors.droppedAllowlist); got != 1 {
+		t.Fatalf("dropped_allowlist = %d, want 1", got)
+	}
+	if got := atomic.LoadUint64(&metrics.errors.decodeFailed); got != 0 {
+		t.Fatalf("decode_failed = %d, want 0", got)
+	}
+}
+
+func TestCollectorHandlePacketDecodeErrorHonorsRateLimitDrop(t *testing.T) {
+	const jobName = "test-decode-error-rate-limit"
+	metrics := withCleanJobMetrics(t, jobName)
+	writer := &mockTrapWriter{}
+	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
+	c.rateLimiter = newRateLimiter(true, 1, "drop")
+
+	data := make([]byte, maxDatagramSize+1)
+	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
+	c.handlePacket(data, peer.IP, nil, peer)
+	c.handlePacket(data, peer.IP, nil, peer)
+
+	if len(writer.entries) != 1 {
+		t.Fatalf("written entries = %d, want 1", len(writer.entries))
+	}
+	if got := atomic.LoadUint64(&metrics.errors.malformedPDU); got != 2 {
+		t.Fatalf("malformed_pdu = %d, want 2", got)
+	}
+	if got := atomic.LoadUint64(&metrics.errors.rateLimited); got != 1 {
+		t.Fatalf("rate_limited = %d, want 1", got)
+	}
+}
+
+func TestCollectorHandlePacketDecodeErrorNormalizesIPv4MappedSource(t *testing.T) {
+	const jobName = "test-decode-error-ipv4-mapped"
+	writer := &mockTrapWriter{}
+	c := newTestV2Collector(jobName, writer, []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, []string{"public"})
+
+	data := make([]byte, maxDatagramSize+1)
+	peer := &net.UDPAddr{IP: net.ParseIP("::ffff:10.1.2.3"), Port: 9162}
+	c.handlePacket(data, peer.IP, nil, peer)
+
+	if len(writer.entries) != 1 {
+		t.Fatalf("written entries = %d, want 1", len(writer.entries))
+	}
+	entry := writer.entries[0]
+	if entry.SourceIP != "10.1.2.3" {
+		t.Fatalf("SourceIP = %q, want 10.1.2.3", entry.SourceIP)
+	}
+	if entry.SourceUDPPeer != "10.1.2.3" {
+		t.Fatalf("SourceUDPPeer = %q, want 10.1.2.3", entry.SourceUDPPeer)
+	}
+}
+
 func TestCollectorHandlePacketDropsDisallowedCommunity(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	writer := &mockTrapWriter{}

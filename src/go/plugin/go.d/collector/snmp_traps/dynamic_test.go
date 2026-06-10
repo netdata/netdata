@@ -125,8 +125,11 @@ func TestDynamicEngineIDSkipsReportableTrap(t *testing.T) {
 	c, writer, peer := newDynamicEngineIDTestCollector(t, jobName, data, nil)
 	c.handlePacket(data, peer.IP, nil, peer)
 
-	if got := len(writer.entries); got != 0 {
-		t.Fatalf("journaled entries = %d, want 0", got)
+	if got := len(writer.entries); got != 1 {
+		t.Fatalf("journaled entries = %d, want 1 decode_error", got)
+	}
+	if got := writer.entries[0].ReportType; got != ReportTypeDecodeError {
+		t.Fatalf("ReportType = %q, want decode_error", got)
 	}
 	if got := c.dynamicEngineIDReg.size(); got != 0 {
 		t.Fatalf("dynamic registry size = %d, want 0", got)
@@ -168,8 +171,11 @@ func TestDynamicEngineIDDoesNotRegisterInformRetry(t *testing.T) {
 	c, writer, peer := newDynamicEngineIDTestCollector(t, jobName, data, nil)
 	c.handlePacket(data, peer.IP, nil, peer)
 
-	if got := len(writer.entries); got != 0 {
-		t.Fatalf("journaled entries = %d, want 0", got)
+	if got := len(writer.entries); got != 1 {
+		t.Fatalf("journaled entries = %d, want 1 decode_error", got)
+	}
+	if got := writer.entries[0].ReportType; got != ReportTypeDecodeError {
+		t.Fatalf("ReportType = %q, want decode_error", got)
 	}
 	if got := c.dynamicEngineIDReg.size(); got != 0 {
 		t.Fatalf("dynamic registry size = %d, want 0", got)
@@ -183,8 +189,11 @@ func TestDynamicEngineIDNoStateForUnknownUsername(t *testing.T) {
 	c, writer, peer := newDynamicEngineIDTestCollector(t, jobName, data, nil)
 	c.handlePacket(data, peer.IP, nil, peer)
 
-	if got := len(writer.entries); got != 0 {
-		t.Fatalf("journaled entries = %d, want 0", got)
+	if got := len(writer.entries); got != 1 {
+		t.Fatalf("journaled entries = %d, want 1 decode_error", got)
+	}
+	if got := writer.entries[0].ReportType; got != ReportTypeDecodeError {
+		t.Fatalf("ReportType = %q, want decode_error", got)
 	}
 	if got := c.dynamicEngineIDReg.size(); got != 0 {
 		t.Fatalf("dynamic registry size = %d, want 0", got)

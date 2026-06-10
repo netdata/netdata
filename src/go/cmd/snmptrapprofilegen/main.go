@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -1327,9 +1328,7 @@ func repairClassifierPayload(payload any, rec TrapRecord) any {
 		return payload
 	}
 	repaired := make(map[string]any, len(obj))
-	for k, v := range obj {
-		repaired[k] = v
-	}
+	maps.Copy(repaired, obj)
 	repaired["category"] = repairedCategory
 	return repaired
 }

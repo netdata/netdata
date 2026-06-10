@@ -2129,12 +2129,12 @@ func profileTrapRoutesFromFile(t *testing.T, path string) profileTrapRoutes {
 	var routes profileTrapRoutes
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, "  - oid: ") {
-			routes.oids = append(routes.oids, strings.TrimSpace(strings.TrimPrefix(line, "  - oid: ")))
+		if after, ok := strings.CutPrefix(line, "  - oid: "); ok {
+			routes.oids = append(routes.oids, strings.TrimSpace(after))
 			continue
 		}
-		if strings.HasPrefix(line, "    name: ") {
-			routes.names = append(routes.names, strings.TrimSpace(strings.TrimPrefix(line, "    name: ")))
+		if after, ok := strings.CutPrefix(line, "    name: "); ok {
+			routes.names = append(routes.names, strings.TrimSpace(after))
 		}
 	}
 	require.NoError(t, scanner.Err())

@@ -2,9 +2,12 @@
 
 ## Status
 
-Status: open
+Status: completed
 
-Sub-state: created from the 2026-06-01 SOW-0039 close-gate review; no implementation started.
+Sub-state: metric, chart, health, docs, and unit-test coverage were already
+implemented in earlier branch commits; user approved adding bounded log
+visibility for operator troubleshooting. The bounded log path is implemented
+and validated.
 
 ## Requirements
 
@@ -18,7 +21,7 @@ Track the close-gate reviewer finding that `listener.go` currently backs off and
 
 ### Acceptance Criteria
 
-- Persistent listener read errors are observable through a bounded metric and/or rate-limited log.
+- Persistent listener read errors are observable through a bounded metric and a rate-limited log.
 - Closed-listener shutdown remains quiet.
 - Hot-path behavior for normal trap receipt remains unchanged.
 
@@ -42,6 +45,7 @@ Affected contracts and surfaces:
 Existing patterns to reuse:
 
 - Existing `snmp.trap.errors` chart dimensions and rate-limited logging discipline from collector guidance.
+- Existing go.d logger pattern: `c.Limit(key, 1, window).Warningf(...)`.
 
 Risk and blast radius:
 
@@ -53,13 +57,20 @@ Sensitive data handling plan:
 
 Implementation plan:
 
-1. Decide metric-only vs metric plus rate-limited log.
-2. Add bounded counter and tests.
-3. Update charts, metadata, health/docs if a public metric changes.
+1. Keep the existing `listener_read_failed` metric, chart, metadata, health,
+   generated docs, and unit tests.
+2. Add a listener read-error callback so socket code reports unexpected read
+   failures without depending directly on the collector logger.
+3. Add a collector-side rate-limited warning that logs operation, listener
+   endpoint, and sanitized OS error, without packet contents or peer data.
+4. Add tests proving unexpected read errors invoke the callback, clean shutdown
+   remains quiet, and collector logging is rate-limited.
 
 Validation plan:
 
-- Unit test read-error path with a fake listener or injected read error; run SNMP traps Go tests and collector consistency checks if charts/docs change.
+- Unit test read-error path with an injected read error; run SNMP traps Go tests.
+- No chart, metadata, health, or generated-doc changes are expected for the log
+  addition because the public metric surface already exists.
 
 Artifact impact plan:
 
@@ -76,7 +87,10 @@ Open-source reference evidence:
 
 Open decisions:
 
-- Metric-only or metric plus rate-limited log.
+- User chose metric plus rate-limited log on 2026-06-10. Rationale: operators
+  troubleshooting traps expect trap-related errors to be findable in logs; the
+  metric/health path shows persistence while the log carries the concrete OS
+  read error.
 
 ## Followup
 
@@ -85,3 +99,17 @@ None yet.
 ## Regression Log
 
 None yet.
+
+## Validation
+
+- `go test -count=1 ./plugin/go.d/collector/snmp_traps` passed from `src/go`.
+- `git diff --check` passed.
+
+## Outcome
+
+- Unexpected UDP listener read errors now increment the existing
+  `listener_read_failed` metric and emit a rate-limited warning with the
+  listener endpoint and OS read error.
+- Closed-listener shutdown remains quiet.
+- The log path does not write packet contents, peer data, SNMP communities, or
+  trap varbinds.

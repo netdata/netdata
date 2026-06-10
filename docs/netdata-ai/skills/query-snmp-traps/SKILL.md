@@ -1,6 +1,6 @@
 ---
 name: query-snmp-traps
-description: Query SNMP trap logs through Netdata Cloud or directly from a Netdata Agent. Use when the user asks about SNMP traps, trap journal entries, trap severities, trap categories, trap senders, deduplication summaries, TRAP_* fields, TRAP_JSON varbind searches, or how to inspect received traps in the Logs UI/API.
+description: Query SNMP trap logs through Netdata Cloud or directly from a Netdata Agent. Use when the user asks about SNMP traps, trap journal entries, trap severities, trap categories, trap senders, deduplication summaries, decode errors, TRAP_* fields, TRAP_JSON varbind searches, or how to inspect received traps in the Logs UI/API.
 ---
 
 # Query SNMP traps
@@ -44,9 +44,9 @@ Log Function request shape from
 3. **Use structured selections first.** The embedded Function is
    scoped to SNMP trap journal files. Use `selections.__logs_sources`
    when the query should target one trap listener job, and usually
-   narrow further with `selections.TRAP_REPORT_TYPE=["trap"]` or
-   `["deduplication_summary"]`. Use full-text `query` only as a
-   residual search over that narrowed result.
+   narrow further with `selections.TRAP_REPORT_TYPE=["trap"]`,
+   `["deduplication_summary"]`, or `["decode_error"]`. Use full-text
+   `query` only as a residual search over that narrowed result.
 4. **Treat trap content as sensitive.** Do not paste raw trap rows,
    SNMP communities, USM secrets, MAC addresses, usernames, public
    device IPs, customer hostnames, or full `TRAP_JSON` payloads into
@@ -66,7 +66,7 @@ The collector writes structured fields that are useful for queries:
 |---|---|
 | `MESSAGE` | Rendered human-readable trap description |
 | `ND_LOG_SOURCE=snmp-trap` | Fast discriminator for trap entries |
-| `TRAP_REPORT_TYPE` | `trap` or `deduplication_summary`; `decode_error_summary` is reserved for future decode-failure reports |
+| `TRAP_REPORT_TYPE` | `trap`, `deduplication_summary`, or `decode_error` |
 | `TRAP_OID` | Numeric trap OID |
 | `TRAP_NAME` | MIB-qualified trap name |
 | `TRAP_PDU_TYPE` | `trap` (unacknowledged) or `inform` |
@@ -75,6 +75,7 @@ The collector writes structured fields that are useful for queries:
 | `TRAP_SEVERITY` | One of `emerg`, `alert`, `crit`, `err`, `warning`, `notice`, `info`, `debug` |
 | `TRAP_SOURCE_IP` | Identified trap source IP |
 | `TRAP_SOURCE_UDP_PEER` | UDP peer address |
+| `TRAP_SOURCE_UDP_PORT` | UDP peer source port for decode-error rows |
 | `_HOSTNAME` | Source device hostname when resolved by collector identity |
 | `ND_NIDL_NODE` | Netdata vnode identity when known |
 | `TRAP_DEVICE_VENDOR` | Vendor slug when known |
@@ -85,6 +86,12 @@ The collector writes structured fields that are useful for queries:
 | `TRAP_SUPPRESSED_COUNT` | Dedup summary only |
 | `TRAP_SUPPRESSED_FINGERPRINTS` | Dedup summary only |
 | `TRAP_REPORT_PERIOD_SEC` | Dedup summary only |
+| `TRAP_DECODE_ERROR_KIND` | Decode-error rows only; bounded failure class |
+| `TRAP_DECODE_ERROR` | Decode-error rows only; sanitized decoder error text |
+| `TRAP_PACKET_SIZE` | Decode-error rows only; received datagram size |
+| `TRAP_PACKET_SHA256` | Decode-error rows only; packet fingerprint without raw bytes |
+| `TRAP_LISTENER` | Decode-error rows only; listener endpoint when known |
+| `TRAP_ENGINE_ID` | Decode-error rows only; SNMPv3 engine ID when safely extractable |
 
 ## Standard Setup
 

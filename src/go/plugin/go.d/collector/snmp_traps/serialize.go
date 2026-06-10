@@ -44,13 +44,14 @@ func serializeToJournalFields(entry *TrapEntry) ([]JournalField, error) {
 	}
 
 	isDedupSummary := entry.ReportType == ReportTypeDedupSummary
-	isDecodeSummary := entry.ReportType == ReportTypeDecodeErrorSummary
-	isSummary := isDedupSummary || isDecodeSummary
+	isDecodeError := entry.ReportType == ReportTypeDecodeError
 
-	if !isSummary {
+	if !isDedupSummary && !isDecodeError {
 		if entry.TrapOID == "" {
 			return nil, errMissingTrapOID
 		}
+	}
+	if !isDedupSummary {
 		if entry.SourceIP == "" && entry.SourceUDPPeer == "" && entry.DeviceHostname == "" {
 			return nil, errMissingSourceIP
 		}
@@ -71,13 +72,13 @@ func serializeToJournalFields(entry *TrapEntry) ([]JournalField, error) {
 	fields = append(fields, JournalField{Name: "PRIORITY", Value: []byte(severityPriority(entry.Severity))})
 	fields = append(fields, JournalField{Name: "SYSLOG_IDENTIFIER", Value: []byte(entry.JobName)})
 
-	if !isSummary && hostname != "" {
+	if !isDedupSummary && hostname != "" {
 		fields = append(fields, JournalField{Name: "_HOSTNAME", Value: []byte(hostname)})
 	}
 
 	fields = append(fields, JournalField{Name: "ND_LOG_SOURCE", Value: []byte("snmp-trap")})
 
-	if !isSummary && entry.SourceVnodeID != "" {
+	if !isDedupSummary && entry.SourceVnodeID != "" {
 		fields = append(fields, JournalField{Name: "ND_NIDL_NODE", Value: []byte(entry.SourceVnodeID)})
 	}
 
@@ -87,11 +88,13 @@ func serializeToJournalFields(entry *TrapEntry) ([]JournalField, error) {
 	}
 	fields = append(fields, JournalField{Name: "TRAP_REPORT_TYPE", Value: []byte(reportType)})
 
-	if !isSummary {
+	if !isDedupSummary && !isDecodeError {
 		fields = append(fields, JournalField{Name: "TRAP_OID", Value: []byte(entry.TrapOID)})
 		if entry.TrapName != "" {
 			fields = append(fields, JournalField{Name: "TRAP_NAME", Value: []byte(entry.TrapName)})
 		}
+	}
+	if !isDedupSummary {
 		if entry.Category != "" {
 			fields = append(fields, JournalField{Name: "TRAP_CATEGORY", Value: []byte(entry.Category)})
 		}
@@ -133,6 +136,9 @@ func serializeToJournalFields(entry *TrapEntry) ([]JournalField, error) {
 		fields = append(fields, JournalField{Name: "TRAP_SUPPRESSED_FINGERPRINTS", Value: fmt.Appendf(nil, "%d", sc.Fingerprints)})
 		fields = append(fields, JournalField{Name: "TRAP_REPORT_PERIOD_SEC", Value: fmt.Appendf(nil, "%d", sc.PeriodSec)})
 	}
+	if isDecodeError && entry.DecodeError != nil {
+		appendDecodeErrorJournalFields(&fields, entry.DecodeError)
+	}
 
 	sortedLabels := sortedMapKeys(entry.Labels)
 	for _, key := range sortedLabels {
@@ -166,6 +172,10 @@ func isValidTrapTagKey(upperKey string) bool {
 }
 
 func buildTrapJSON(entry *TrapEntry) ([]byte, error) {
+	if entry.DecodeError != nil {
+		return json.Marshal(entry.DecodeError)
+	}
+
 	obj := make(map[string]jsonVarbindEntry)
 	seenKeys := make(map[string]int)
 
@@ -330,13 +340,14 @@ func (s *journalHotSerializer) serialize(entry *TrapEntry) ([][]byte, int, error
 	}
 
 	isDedupSummary := entry.ReportType == ReportTypeDedupSummary
-	isDecodeSummary := entry.ReportType == ReportTypeDecodeErrorSummary
-	isSummary := isDedupSummary || isDecodeSummary
+	isDecodeError := entry.ReportType == ReportTypeDecodeError
 
-	if !isSummary {
+	if !isDedupSummary && !isDecodeError {
 		if entry.TrapOID == "" {
 			return nil, 0, errMissingTrapOID
 		}
+	}
+	if !isDedupSummary {
 		if entry.SourceIP == "" && entry.SourceUDPPeer == "" && entry.DeviceHostname == "" {
 			return nil, 0, errMissingSourceIP
 		}
@@ -355,13 +366,13 @@ func (s *journalHotSerializer) serialize(entry *TrapEntry) ([][]byte, int, error
 	s.addStringField("PRIORITY", severityPriority(entry.Severity))
 	s.addStringField("SYSLOG_IDENTIFIER", entry.JobName)
 
-	if !isSummary && hostname != "" {
+	if !isDedupSummary && hostname != "" {
 		s.addStringField("_HOSTNAME", hostname)
 	}
 
 	s.addStringField("ND_LOG_SOURCE", "snmp-trap")
 
-	if !isSummary && entry.SourceVnodeID != "" {
+	if !isDedupSummary && entry.SourceVnodeID != "" {
 		s.addStringField("ND_NIDL_NODE", entry.SourceVnodeID)
 	}
 
@@ -371,11 +382,13 @@ func (s *journalHotSerializer) serialize(entry *TrapEntry) ([][]byte, int, error
 	}
 	s.addStringField("TRAP_REPORT_TYPE", reportType)
 
-	if !isSummary {
+	if !isDedupSummary && !isDecodeError {
 		s.addStringField("TRAP_OID", entry.TrapOID)
 		if entry.TrapName != "" {
 			s.addStringField("TRAP_NAME", entry.TrapName)
 		}
+	}
+	if !isDedupSummary {
 		if entry.Category != "" {
 			s.addStringField("TRAP_CATEGORY", string(entry.Category))
 		}
@@ -415,6 +428,9 @@ func (s *journalHotSerializer) serialize(entry *TrapEntry) ([][]byte, int, error
 		s.addIntField("TRAP_SUPPRESSED_FINGERPRINTS", sc.Fingerprints)
 		s.addIntField("TRAP_REPORT_PERIOD_SEC", sc.PeriodSec)
 	}
+	if isDecodeError && entry.DecodeError != nil {
+		s.addDecodeErrorFields(entry.DecodeError)
+	}
 
 	for _, key := range s.sortedLabelKeys(entry.Labels) {
 		val := entry.Labels[key]
@@ -453,6 +469,28 @@ func (s *journalHotSerializer) addIntField(name string, value int64) {
 	s.addPayload(start, valueStart)
 }
 
+func (s *journalHotSerializer) addDecodeErrorFields(info *DecodeErrorInfo) {
+	if info.Kind != "" {
+		s.addStringField("TRAP_DECODE_ERROR_KIND", info.Kind)
+	}
+	if info.Error != "" {
+		s.addStringField("TRAP_DECODE_ERROR", info.Error)
+	}
+	s.addIntField("TRAP_PACKET_SIZE", int64(info.PacketSize))
+	if info.PacketSHA256 != "" {
+		s.addStringField("TRAP_PACKET_SHA256", info.PacketSHA256)
+	}
+	if info.SourceUDPPort > 0 {
+		s.addIntField("TRAP_SOURCE_UDP_PORT", int64(info.SourceUDPPort))
+	}
+	if info.Listener != "" {
+		s.addStringField("TRAP_LISTENER", info.Listener)
+	}
+	if info.EngineID != "" {
+		s.addStringField("TRAP_ENGINE_ID", info.EngineID)
+	}
+}
+
 func (s *journalHotSerializer) addPayload(start, valueStart int) {
 	if journalFieldNeedsBinary(s.buf[valueStart:]) {
 		s.binaryEncodedFields++
@@ -475,7 +513,7 @@ func (s *journalHotSerializer) addTrapJSONField(entry *TrapEntry) error {
 	s.buf = append(s.buf, '=')
 	valueStart := len(s.buf)
 
-	if entry.SummaryCounts != nil {
+	if entry.SummaryCounts != nil || entry.DecodeError != nil {
 		trapJSON, err := buildTrapJSON(entry)
 		if err != nil {
 			return err
@@ -490,6 +528,28 @@ func (s *journalHotSerializer) addTrapJSONField(entry *TrapEntry) error {
 	}
 	s.addPayload(start, valueStart)
 	return nil
+}
+
+func appendDecodeErrorJournalFields(fields *[]JournalField, info *DecodeErrorInfo) {
+	if info.Kind != "" {
+		*fields = append(*fields, JournalField{Name: "TRAP_DECODE_ERROR_KIND", Value: []byte(info.Kind)})
+	}
+	if info.Error != "" {
+		*fields = append(*fields, JournalField{Name: "TRAP_DECODE_ERROR", Value: []byte(info.Error)})
+	}
+	*fields = append(*fields, JournalField{Name: "TRAP_PACKET_SIZE", Value: fmt.Appendf(nil, "%d", info.PacketSize)})
+	if info.PacketSHA256 != "" {
+		*fields = append(*fields, JournalField{Name: "TRAP_PACKET_SHA256", Value: []byte(info.PacketSHA256)})
+	}
+	if info.SourceUDPPort > 0 {
+		*fields = append(*fields, JournalField{Name: "TRAP_SOURCE_UDP_PORT", Value: fmt.Appendf(nil, "%d", info.SourceUDPPort)})
+	}
+	if info.Listener != "" {
+		*fields = append(*fields, JournalField{Name: "TRAP_LISTENER", Value: []byte(info.Listener)})
+	}
+	if info.EngineID != "" {
+		*fields = append(*fields, JournalField{Name: "TRAP_ENGINE_ID", Value: []byte(info.EngineID)})
+	}
 }
 
 type rawJSONVarbindEntry struct {

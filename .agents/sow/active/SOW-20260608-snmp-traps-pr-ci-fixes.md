@@ -139,6 +139,21 @@ Open decisions:
 
 ## Validation
 
+- 2026-06-10 Go 1.26 follow-up:
+  - Current PR CI failed the Go toolchain job because `go fix ./...` still
+    wanted mechanical changes in:
+    - `src/go/cmd/snmptrapprofilegen/main.go` (`maps.Copy`);
+    - `src/go/plugin/go.d/collector/snmp_traps/profile_test.go`
+      (`strings.CutPrefix`).
+  - Applied the `go fix ./...` output locally.
+  - Re-ran `go fix ./...` in `src/go`; it completed without producing new
+    changes.
+  - Re-ran focused tests:
+    - `go test -count=1 ./plugin/go.d/collector/snmp_traps
+      ./plugin/go.d/collector/snmp_topology ./plugin/agent/jobmgr/funcctl
+      ./cmd/godplugin ./pkg/funcapi ./plugin/ibm.d/modules/as400`;
+    - `go test -count=1 ./cmd/snmptrapprofilegen`.
+  - `git diff --check` completed without warnings.
 - Go toolchain:
   `go fix ./...` in `src/go` passed and left no extra diff after applying the
   Go 1.26 fixes.
