@@ -121,6 +121,13 @@ static ssize_t nd_sock_write_persist(ND_SOCK *s, const void *buf, const size_t n
     return bytes;
 }
 
+// MSG_DONTWAIT is a POSIX extension absent from Winsock2. On Windows, sockets are
+// set non-blocking via ioctlsocket(), so passing 0 achieves the same "return
+// immediately if no data" semantics.
+#ifndef MSG_DONTWAIT
+#define MSG_DONTWAIT 0
+#endif
+
 ALWAYS_INLINE
 static ssize_t nd_sock_revc_nowait(ND_SOCK *s, void *buf, size_t num) {
     if (nd_sock_is_ssl(s))

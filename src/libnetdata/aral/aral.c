@@ -931,7 +931,7 @@ retry_acquisition:
         }
         else {
             // let the adders/deallocators do it
-            sched_yield();
+            yield_the_processor();
             tinysleep();
         }
     }

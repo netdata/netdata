@@ -22,26 +22,14 @@ pacman -S --noconfirm --needed \
     git \
     ninja \
     python \
-    liblz4-devel \
-    libutil-linux \
-    libutil-linux-devel \
-    libyaml-devel \
-    libzstd-devel \
     msys2-devel \
-    msys/brotli-devel \
-    msys/libuv-devel \
-    msys/pcre2-devel \
-    msys/zlib-devel \
-    msys/libcurl-devel \
-    openssl-devel \
-    protobuf-devel \
     mingw-w64-ucrt-x86_64-rust \
     mingw-w64-ucrt-x86_64-toolchain \
     ucrt64/mingw-w64-ucrt-x86_64-brotli \
     ucrt64/mingw-w64-ucrt-x86_64-cmake \
-    ucrt64/mingw-w64-ucrt-x86_64-headers \
     ucrt64/mingw-w64-ucrt-x86_64-curl \
     ucrt64/mingw-w64-ucrt-x86_64-go \
+    ucrt64/mingw-w64-ucrt-x86_64-headers \
     ucrt64/mingw-w64-ucrt-x86_64-libuv \
     ucrt64/mingw-w64-ucrt-x86_64-libyaml \
     ucrt64/mingw-w64-ucrt-x86_64-lz4 \
