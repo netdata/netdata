@@ -1847,17 +1847,23 @@ async fn bench_udp_loss_ceiling() {
         sock.connect(&sender_listen).expect("connect sender");
         let total = target_pps.saturating_mul(duration_secs);
         let start = Instant::now();
+        let mut attempted = 0_u64;
         let mut sent = 0_u64;
         let mut idx = 0_usize;
-        while sent < total {
+        while attempted < total {
             let due = (start.elapsed().as_secs_f64() * target_pps as f64) as u64;
             let upto = due.min(total);
-            while sent < upto {
-                let _ = sock.send(&payloads[idx % payloads.len()]);
-                sent += 1;
+            while attempted < upto {
+                // Count only datagrams the local stack accepted; a failed
+                // send (e.g. ENOBUFS) never reached the receiver and must not
+                // inflate the reported loss.
+                if sock.send(&payloads[idx % payloads.len()]).is_ok() {
+                    sent += 1;
+                }
+                attempted += 1;
                 idx += 1;
             }
-            if sent < total {
+            if attempted < total {
                 std::thread::sleep(Duration::from_micros(150));
             }
         }
@@ -1873,7 +1879,10 @@ async fn bench_udp_loss_ceiling() {
     let entries = metrics.journal_entries_written.load(Ordering::Relaxed) - entries_before;
 
     shutdown.cancel();
-    let _ = ingest_task.await;
+    ingest_task
+        .await
+        .expect("join ingestion task")
+        .expect("ingestion run");
 
     let secs = duration_secs as f64;
     let flows_per_pkt = if recv > 0 {
