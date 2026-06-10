@@ -739,6 +739,16 @@ typedef struct {
 } siginfo_t;
 #endif
 
+// ── posix_memalign() ── POSIX aligned malloc, absent from UCRT64 ─────────────
+// Windows _aligned_malloc() has reversed argument order and returns NULL on failure.
+#ifndef _POSIX_MEMALIGN_DEFINED
+#define _POSIX_MEMALIGN_DEFINED
+static inline int posix_memalign(void **memptr, size_t alignment, size_t size) {
+    *memptr = _aligned_malloc(size, alignment);
+    return *memptr ? 0 : ENOMEM;
+}
+#endif
+
 #endif // OS_WINDOWS
 
 // --------------------------------------------------------------------------------------------------------------------

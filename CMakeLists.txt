@@ -2534,6 +2534,10 @@ endif()
 netdata_add_sqlite3_to_target(libnetdata)
 
 if(OS_WINDOWS)
+        # rand_s() is a UCRT extension gated by _CRT_RAND_S, which must be defined before
+        # stdlib.h is processed.  Injecting it here guarantees it fires before any header.
+        target_compile_definitions(libnetdata PUBLIC _CRT_RAND_S)
+
         # Detect whether the Microsoft Windows SDK mc.exe is available at configure time.
         # ETW requires mc.exe + rc.exe (Windows SDK) and link.exe (MSVC), which are absent
         # in a pure MSYS2/MinGW environment.  Fall back to WEL (windmc/windres) when absent.
