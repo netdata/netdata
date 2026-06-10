@@ -91,31 +91,31 @@ earlier block's rename.
 Inside a block, `metric_relabel_configs` is a list of rules applied **in order** (see [How a rule reads](#how-a-rule-reads)).
 Every field is optional except where an action requires it; `action` defaults to `replace`.
 
-| Field           | Description                                                                                                                                                                | Default |
-|-----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| `source_labels` | Label names whose values are joined (with `separator`) into the rule's input string. Use `__name__` for the metric name.                                                  | —       |
-| `separator`     | String placed between joined `source_labels` values.                                                                                                                       | `;`     |
-| `regex`         | Regular expression matched against the joined input. It is **fully anchored** (implicitly `^…$`); to match a substring, wrap it in `.*`.                                    | `(.*)`  |
-| `modulus`       | Positive integer, used only by the `hashmod` action.                                                                                                                       | —       |
-| `target_label`  | The label the action writes. Use `__name__` to write the metric name.                                                                                                      | —       |
-| `replacement`   | The value written, with regex capture-group expansion (`$1`, or `${name}` for named groups).                                                                                | `$1`    |
-| `action`        | One of the [actions](#actions) below.                                                                                                                                       | `replace` |
+| Field           | Description                                                                                                                              | Default   |
+|-----------------|------------------------------------------------------------------------------------------------------------------------------------------|-----------|
+| `source_labels` | Label names whose values are joined (with `separator`) into the rule's input string. Use `__name__` for the metric name.                 | —         |
+| `separator`     | String placed between joined `source_labels` values.                                                                                     | `;`       |
+| `regex`         | Regular expression matched against the joined input. It is **fully anchored** (implicitly `^…$`); to match a substring, wrap it in `.*`. | `(.*)`    |
+| `modulus`       | Positive integer, used only by the `hashmod` action.                                                                                     | —         |
+| `target_label`  | The label the action writes. Use `__name__` to write the metric name.                                                                    | —         |
+| `replacement`   | The value written, with regex capture-group expansion (`$1`, or `${name}` for named groups).                                             | `$1`      |
+| `action`        | One of the [actions](#actions) below.                                                                                                    | `replace` |
 
 ### Actions
 
-| Action      | What it does                                                                                                                                                                                   |
-|-------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Action      | What it does                                                                                                                                                                                            |
+|-------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `replace`   | If `regex` matches the joined input, set `target_label` to the expanded `replacement` (an empty result removes the label); a non-match leaves the label unchanged. See [example](#add-a-derived-label). |
-| `keep`      | Keep the metric only if `regex` matches the joined input; otherwise drop it. See [example](#keep-only-specific-metrics).                                                                       |
-| `drop`      | Drop the metric if `regex` matches the joined input. See [example](#drop-metrics-you-dont-want).                                                                                               |
-| `keepequal` | Keep the metric only if `target_label`'s value equals the joined input.                                                                                                                       |
-| `dropequal` | Drop the metric if `target_label`'s value equals the joined input.                                                                                                                            |
-| `hashmod`   | Set `target_label` to `md5(joined input) mod modulus` — useful for sharding.                                                                                                                  |
-| `labelmap`  | For every label whose **name** matches `regex`, copy its value to a new label named by `replacement`. See [example](#prefix-label-names-replaces-label_prefix).                                |
-| `labeldrop` | Remove every label whose name matches `regex`. See [example](#remove-a-high-cardinality-label).                                                                                               |
-| `labelkeep` | Remove every label whose name does **not** match `regex`. See [example](#keep-only-a-few-labels).                                                                                             |
-| `lowercase` | Set `target_label` to the lowercased joined input. See [example](#normalize-label-case).                                                                                                      |
-| `uppercase` | Set `target_label` to the uppercased joined input. See [example](#normalize-label-case).                                                                                                      |
+| `keep`      | Keep the metric only if `regex` matches the joined input; otherwise drop it. See [example](#keep-only-specific-metrics).                                                                                |
+| `drop`      | Drop the metric if `regex` matches the joined input. See [example](#drop-metrics-you-dont-want).                                                                                                        |
+| `keepequal` | Keep the metric only if `target_label`'s value equals the joined input.                                                                                                                                 |
+| `dropequal` | Drop the metric if `target_label`'s value equals the joined input.                                                                                                                                      |
+| `hashmod`   | Set `target_label` to `md5(joined input) mod modulus` — useful for sharding.                                                                                                                            |
+| `labelmap`  | For every label whose **name** matches `regex`, copy its value to a new label named by `replacement`. See [example](#prefix-label-names-replaces-label_prefix).                                         |
+| `labeldrop` | Remove every label whose name matches `regex`. See [example](#remove-a-high-cardinality-label).                                                                                                         |
+| `labelkeep` | Remove every label whose name does **not** match `regex`. See [example](#keep-only-a-few-labels).                                                                                                       |
+| `lowercase` | Set `target_label` to the lowercased joined input. See [example](#normalize-label-case).                                                                                                                |
+| `uppercase` | Set `target_label` to the uppercased joined input. See [example](#normalize-label-case).                                                                                                                |
 
 > The label-name actions `labelmap`, `labeldrop`, and `labelkeep` act on labels only — they never touch the metric name
 > (`__name__`). To rename a metric, use a `replace` rule with `target_label: __name__`.
