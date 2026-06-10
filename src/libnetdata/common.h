@@ -573,6 +573,73 @@ static inline int fcntl(int fd, int cmd, ...) {
 }
 #endif // F_GETFL
 
+// ── struct passwd / getpwuid_r ── pwd.h absent on UCRT64 ────────────────────
+// Stub always reports "not found" so callers fall back to numeric UID string.
+#ifndef _PASSWD_DEFINED
+#define _PASSWD_DEFINED
+struct passwd {
+    char  *pw_name;
+    uid_t  pw_uid;
+    gid_t  pw_gid;
+};
+static inline int getpwuid_r(uid_t uid __maybe_unused,
+                              struct passwd *pwd __maybe_unused,
+                              char *buf __maybe_unused,
+                              size_t buflen __maybe_unused,
+                              struct passwd **result) {
+    if (result) *result = NULL;
+    return ENOENT;
+}
+#endif
+
+// ── struct group / getgrgid_r ── grp.h absent on UCRT64 ─────────────────────
+// Stub always reports "not found" so callers fall back to numeric GID string.
+#ifndef _GROUP_DEFINED
+#define _GROUP_DEFINED
+struct group {
+    char  *gr_name;
+    gid_t  gr_gid;
+};
+static inline int getgrgid_r(gid_t gid __maybe_unused,
+                              struct group *grp __maybe_unused,
+                              char *buf __maybe_unused,
+                              size_t buflen __maybe_unused,
+                              struct group **result) {
+    if (result) *result = NULL;
+    return ENOENT;
+}
+#endif
+
+// ── WIFEXITED / WEXITSTATUS / WIFSIGNALED / WTERMSIG ── sys/wait.h absent ───
+// On Windows, processes exit normally (no POSIX signal killing).
+// _pclose / waitpid return the exit code directly.
+#ifndef WIFEXITED
+#define WIFEXITED(status)    (1)
+#define WEXITSTATUS(status)  ((status) & 0xFF)
+#define WIFSIGNALED(status)  (0)
+#define WTERMSIG(status)     (0)
+#endif
+
+// ── SIGPIPE / SIGTRAP ── absent from UCRT64 signal.h ─────────────────────────
+#ifndef SIGPIPE
+#define SIGPIPE  13
+#endif
+#ifndef SIGTRAP
+#define SIGTRAP   5
+#endif
+
+// ── pipe() ── POSIX 2-arg version; UCRT64 only has _pipe(fds, size, mode) ───
+#ifndef pipe
+#define pipe(fds) _pipe((fds), 65536, _O_BINARY)
+#endif
+
+// ── kill() stub ── POSIX, absent from UCRT64 ─────────────────────────────────
+// Callers in spawn_server_windows.c already follow up with TerminateProcess().
+static inline int kill(pid_t pid __maybe_unused, int sig __maybe_unused) {
+    errno = ESRCH;
+    return -1;
+}
+
 #endif // OS_WINDOWS
 
 // --------------------------------------------------------------------------------------------------------------------
