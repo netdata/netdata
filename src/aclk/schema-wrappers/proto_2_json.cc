@@ -76,13 +76,21 @@ char *protomsg_to_json(const void *protobin, size_t len, const char *msgname)
     if (msg == NULL)
         return strdupz("Don't know this message type by name.");
 
-    if (!msg->ParseFromArray(protobin, len))
+    if (!msg->ParseFromArray(protobin, len)) {
+        delete msg;
         return strdupz("Can't parse this message. Malformed or wrong parser used.");
+    }
 
     JsonPrintOptions options;
 
     std::string output;
-    google::protobuf::util::MessageToJsonString(*msg, &output, options);
+    // MessageToJsonString returns a nodiscard Status (absl::Status or the
+    // protobuf util Status depending on the linked version). On failure
+    // 'output' is empty/partial, so check it instead of returning a silent
+    // truncated result. .ok() is available on both Status types.
+    auto status = google::protobuf::util::MessageToJsonString(*msg, &output, options);
     delete msg;
+    if (!status.ok())
+        return strdupz("Failed to convert this message to JSON.");
     return strdupz(output.c_str());
 }
