@@ -443,6 +443,70 @@ async fn e2e_tier_commit_workers_roundtrip() {
     );
 }
 
+/// Shutdown with residual closed buckets that no handoff ever responded to:
+/// `finish_shutdown` posts the final per-tier response BEFORE raising the
+/// shutdown flag, so the workers' drain must commit these rows. Guards the
+/// respond/drain ordering — signaling first let a worker drain an empty slot
+/// and exit while the final buckets were posted behind it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_tier_commit_workers_shutdown_drains_residual_buckets() {
+    let (cfg, _tmp) = offline_journal_cfg();
+    let metrics = Arc::new(ingest::IngestMetrics::default());
+    let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+    let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+    let mut service = ingest::IngestService::new(
+        cfg.clone(),
+        Arc::clone(&metrics),
+        Arc::clone(&open_tiers),
+        Arc::clone(&tier_flow_indexes),
+    )
+    .expect("create ingest service");
+
+    // Spawn first: the claim-on-spawn doorbells block on a response that
+    // never comes, so the buckets ingested below stay in the accumulators.
+    service.spawn_tier_commit_workers_for_test();
+
+    let receive_ts = closed_5m_base() + 60_000_000;
+    for protocol in [1_u8, 2] {
+        let record = crate::flow::FlowRecord {
+            flow_version: "ipfix",
+            protocol,
+            bytes: 100 + protocol as u64,
+            packets: 1,
+            flows: 1,
+            ..Default::default()
+        };
+        assert!(service.ingest_decoded_record_for_test(receive_ts, &record));
+    }
+    assert_eq!(
+        metrics.tier_entries_written.load(Ordering::Relaxed),
+        0,
+        "nothing responded yet; the closed buckets must still be residual"
+    );
+
+    service.finish_shutdown_for_test(0);
+
+    assert_eq!(
+        metrics.tier_entries_written.load(Ordering::Relaxed),
+        4,
+        "shutdown must drain the residual 1m and 5m buckets through the workers"
+    );
+    let minute_1 = timestamp_counts(&journal_source_realtime_timestamps(
+        &cfg.journal.minute_1_tier_dir(),
+    ));
+    assert_eq!(minute_1.values().sum::<usize>(), 2, "{minute_1:?}");
+    let minute_5 = timestamp_counts(&journal_source_realtime_timestamps(
+        &cfg.journal.minute_5_tier_dir(),
+    ));
+    assert_eq!(minute_5.values().sum::<usize>(), 2, "{minute_5:?}");
+    let bytes = bucket_bytes_sums(&cfg.journal.minute_1_tier_dir());
+    assert_eq!(
+        bytes.values().copied().collect::<Vec<_>>(),
+        vec![101 + 102],
+        "drained rows must carry the aggregated metrics: {bytes:?}"
+    );
+}
+
 /// A journal config rooted in a fresh temp dir, with no UDP listener involved.
 fn offline_journal_cfg() -> (plugin_config::PluginConfig, TempDir) {
     let tmp = tempfile::tempdir().expect("create temp dir");

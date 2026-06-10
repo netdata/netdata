@@ -227,15 +227,18 @@ impl IngestService {
             return;
         }
 
-        // Worker shutdown sequence (order matters; see the SOW):
-        // signal -> wake sleepers -> final per-tier response -> join ->
-        // final facet persist -> decoder persist. The raw journal sync stays
-        // on this thread as today.
-        self.tier_handoff.begin_shutdown();
+        // Worker shutdown sequence (order matters; see the SOW): the final
+        // per-tier response runs FIRST, filling every slot's pending under
+        // its mutex BEFORE the shutdown flag is raised. A worker can only
+        // reach its drain after observing the flag, and the flag is stored
+        // after the responses on this same thread — so the drain always
+        // finds the final batch already posted. Signaling first raced the
+        // respond against the drain and could strand the last buckets.
         let now = now_usec();
         for index in 0..MATERIALIZED_TIERS.len() {
             self.respond_tier_handoff(index, now);
         }
+        self.tier_handoff.begin_shutdown();
         let _ = self.sync_if_needed(entries_since_sync);
         super::tier_commit::join_workers(std::mem::take(&mut self.tier_worker_handles));
         if let Err(err) = self.facet_runtime.persist_if_dirty() {

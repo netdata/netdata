@@ -23,7 +23,6 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicU32;
 use std::time::Instant;
 
-const TIER_WORKERS: [TierKind; 3] = MATERIALIZED_TIERS;
 /// Wake stagger after each tier's epoch boundary (1m/5m/1h order). Content is
 /// epoch-keyed at accumulation time, so stagger only spreads disk work.
 const TIER_WAKE_STAGGER_USEC: [u64; 3] = [1_000_000, 2_000_000, 3_000_000];
@@ -240,7 +239,7 @@ fn worker_loop(shared: &TierHandoffShared, mut worker: TierWorker) {
             }
         }
         if shared.shutdown.load(Ordering::Relaxed) {
-            drain_and_exit(shared, &mut worker, bucket_usec, &mut encode_buf, seen_generation);
+            drain_and_exit(shared, &mut worker, bucket_usec, &mut encode_buf);
             return;
         }
 
@@ -265,7 +264,7 @@ fn worker_loop(shared: &TierHandoffShared, mut worker: TierWorker) {
         commit_and_return(shared, &mut worker, bucket_usec, &mut encode_buf, batch);
 
         if shared.shutdown.load(Ordering::Relaxed) {
-            drain_and_exit(shared, &mut worker, bucket_usec, &mut encode_buf, seen_generation);
+            drain_and_exit(shared, &mut worker, bucket_usec, &mut encode_buf);
             return;
         }
 
@@ -342,19 +341,22 @@ fn sync_with_failure_policy(worker: &mut TierWorker) {
     }
 }
 
-/// Final drain: claim whatever the main thread posted with the shutdown
-/// signal, commit it best-effort, sync, and exit. Write failures during the
-/// drain are logged and counted, never abort.
+/// Final drain: claim whatever the main thread posted before the shutdown
+/// signal (`finish_shutdown` responds to every tier BEFORE raising the flag,
+/// so the batch is always in the slot by the time a worker gets here), commit
+/// it best-effort, sync, and exit. Write failures during the drain are logged
+/// and counted, never abort.
 fn drain_and_exit(
     shared: &TierHandoffShared,
     worker: &mut TierWorker,
     bucket_usec: u64,
     encode_buf: &mut JournalEncodeBuffer,
-    _seen_generation: u64,
 ) {
     let batch = {
         let sync = &shared.slots[worker.index];
         let mut slot = sync.slot.lock().unwrap_or_else(|_| std::process::abort());
+        // No prune runs once shutdown begins; cleared for slot hygiene.
+        slot.in_flight_hours.clear();
         std::mem::take(&mut slot.pending)
     };
     if !batch.is_empty() {
@@ -389,12 +391,14 @@ fn next_anniversary(bucket_usec: u64, stagger_usec: u64) -> Instant {
 /// is exiting anyway).
 pub(super) fn join_workers(handles: Vec<std::thread::JoinHandle<()>>) {
     let deadline = Instant::now() + SHUTDOWN_JOIN_TIMEOUT;
-    for handle in handles {
+    'workers: for handle in handles {
         let name = handle.thread().name().unwrap_or("nf-tier-?").to_string();
         while !handle.is_finished() {
             if Instant::now() >= deadline {
                 tracing::error!("{name} did not finish within the shutdown deadline; abandoning");
-                return;
+                // Keep checking the remaining workers: a finished one still
+                // joins instantly, and each abandonment is logged by name.
+                continue 'workers;
             }
             std::thread::sleep(Duration::from_millis(10));
         }
@@ -433,10 +437,13 @@ pub(super) fn commit_batch(
             .saturating_sub(1);
         for (&flow_ref, &row_metrics) in bucket {
             let contribution = {
-                let Ok(indexes) = tier_flow_indexes.read() else {
-                    tracing::warn!("failed to lock tier flow index store for read");
-                    return;
-                };
+                // Poison means a thread panicked holding the store; the
+                // module's loud-failure policy applies — a silent return here
+                // would drop the rest of the batch on the floor.
+                let indexes = tier_flow_indexes.read().unwrap_or_else(|_| {
+                    tracing::error!("tier flow index store poisoned; aborting");
+                    std::process::abort()
+                });
                 indexes.emit_row(flow_ref, row_metrics, encode_buf)
             };
             let Some(contribution) = contribution else {
