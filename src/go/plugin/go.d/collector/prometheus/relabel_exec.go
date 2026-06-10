@@ -117,7 +117,9 @@ func (c *Collector) applyJobRelabel(batch prompkg.SampleBatch) (prompkg.SampleBa
 
 		sample, drop := c.applyBlocks(raw)
 		if drop.Dropped() {
-			c.onRelabelDrop(raw, drop)
+			// Log the sample as it stood when the drop happened — an earlier block may
+			// have renamed it. (rawKey stays keyed on the original for family tracking.)
+			c.onRelabelDrop(sample, drop)
 			if isTyped {
 				t.recordDropped(rawKey)
 			}
