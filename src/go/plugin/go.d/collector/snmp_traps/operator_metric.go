@@ -41,7 +41,10 @@ func validateMetrics(metrics []MetricConfig, idx *ProfileIndex) error {
 		}
 		seenOIDs[m.OID] = struct{}{}
 
-		td := idx.Lookup(m.OID)
+		td, err := idx.LookupWithError(m.OID)
+		if err != nil {
+			return fmt.Errorf("%s: profile lookup for oid %q failed: %w", prefix, m.OID, err)
+		}
 		if td == nil {
 			return fmt.Errorf("%s: oid %q not found in any loaded profile", prefix, m.OID)
 		}

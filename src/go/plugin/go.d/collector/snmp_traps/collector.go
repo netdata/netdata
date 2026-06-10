@@ -543,10 +543,15 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 
 	idx := CurrentProfileIndex()
 	var td *TrapDef
+	var profileLookupErr error
 	if idx != nil {
-		td = idx.Lookup(pdu.OID)
+		td, profileLookupErr = idx.LookupWithError(pdu.OID)
+		if profileLookupErr != nil {
+			c.warnf("SNMP trap profile lookup failed for OID %s: %v", pdu.OID, profileLookupErr)
+			c.incTrapError("profile_load_failed")
+		}
 	}
-	unknownOID := td == nil
+	unknownOID := td == nil && profileLookupErr == nil
 	if td != nil {
 		td = c.applyOverrides(td)
 	}

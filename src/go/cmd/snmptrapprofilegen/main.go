@@ -1099,7 +1099,8 @@ DESCRIPTION RULES:
 - Approved built-ins: {{hostname}}, {{source_ip}}, {{trap_name}}, {{vendor}}, {{trap_interface}}, {{trap_neighbors}}.
 - Approved varbind calls: {{value "varbindName"}} and {{raw "varbindName"}}, using only names from allowed_template_varbinds.
 - Approved fallback helper: {{first ...}} returns the first non-empty argument.
-- Approved optional blocks: {{with ...}}{{else}}{{end}} and {{if ...}}{{else}}{{end}}. Do not use range, variables, assignments, pipelines, comparisons, arithmetic, templates, blocks, or arbitrary functions.
+- Approved optional blocks: {{with ...}}{{else}}{{end}}. Do not use {{if ...}} for any reason. Do not use range, variables, assignments, pipelines, comparisons, arithmetic, templates, blocks, or arbitrary functions.
+- For value-dependent wording, do not branch on the value. Write "state changed{{with value \"stateVarbind\"}} to {{.}}{{end}}" instead.
 - Missing known varbinds render as empty strings, so use fallbacks or optional blocks when including optional varbind context.
 - Use {{source_ip}} only when sender identity matters, use {{trap_name}} only when the MIB text is too generic, and never write "by {{vendor}}".
 - Do not invent, shorten, normalize, translate, or infer placeholder names.
@@ -1130,7 +1131,7 @@ func classifierUserPrompt(rec TrapRecord, feedback string) string {
 	fmt.Fprintf(&b, "mib_organization: %s\n", sanitizePromptText(rec.MIBOrganization, 240))
 	fmt.Fprintf(&b, "trap_description: <UNTRUSTED_MIB_DESCRIPTION>%s</UNTRUSTED_MIB_DESCRIPTION>\n", sanitizePromptText(rec.TrapDescription, 900))
 	allowedPlaceholders := allowedPlaceholderNames(rec)
-	fmt.Fprintf(&b, "allowed_template_functions: hostname, source_ip, trap_name, vendor, trap_interface, trap_neighbors, value, raw, first, with/if/else/end\n")
+	fmt.Fprintf(&b, "allowed_template_functions: hostname, source_ip, trap_name, vendor, trap_interface, trap_neighbors, value, raw, first, with/else/end\n")
 	fmt.Fprintf(&b, "allowed_template_varbinds: %s\n", strings.Join(allowedVarbindNames(rec), ", "))
 	fmt.Fprintf(&b, "allowed_template_varbind_expressions: %s\n", strings.Join(allowedPlaceholders, ", "))
 	b.WriteString("allowed_varbind_details:\n")
@@ -1513,16 +1514,7 @@ func validateClassifierTemplateTree(n parse.Node, rec TrapRecord) error {
 		}
 		return validateClassifierTemplateTree(node.ElseList, rec)
 	case *parse.IfNode:
-		if node == nil {
-			return nil
-		}
-		if err := validateClassifierTemplatePipe(node.Pipe, rec); err != nil {
-			return err
-		}
-		if err := validateClassifierTemplateTree(node.List, rec); err != nil {
-			return err
-		}
-		return validateClassifierTemplateTree(node.ElseList, rec)
+		return errors.New("if template actions are not allowed; use with/else/end for optional text")
 	default:
 		return fmt.Errorf("forbidden template action %T", n)
 	}

@@ -3,8 +3,10 @@
 package snmp_traps
 
 import (
+	"compress/gzip"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"maps"
 	"os"
@@ -12,6 +14,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 
 	"gopkg.in/yaml.v2"
 
@@ -20,28 +23,40 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 )
 
+type profileLoadPaths struct {
+	eagerDirs []string
+	stockDir  string
+	all       multipath.MultiPath
+}
+
 // getProfileDirs returns the multipath of profile directories.
 // Order: user dirs first, then stock dir last.
 func getProfileDirs() multipath.MultiPath {
+	return getProfileLoadPaths().all
+}
+
+func getProfileLoadPaths() profileLoadPaths {
 	if testDirsOverride != nil {
-		return multipath.New(testDirsOverride...)
+		return profileLoadPaths{eagerDirs: append([]string(nil), testDirsOverride...), all: multipath.New(testDirsOverride...)}
 	}
 
 	if executable.Name == "test" {
-		return multipath.New(trapProfilesDirFromThisFile())
+		stockDir := trapProfilesDirFromThisFile()
+		return profileLoadPaths{stockDir: stockDir, all: multipath.New(stockDir)}
 	}
 
 	if dir := filepath.Join(executable.Directory, "../config/go.d/snmp.trap-profiles/default"); isDir(dir) {
-		return multipath.New(dir)
+		return profileLoadPaths{stockDir: dir, all: multipath.New(dir)}
 	}
 
 	var dirs []string
 	for _, dir := range pluginconfig.CollectorsUserDirs() {
 		dirs = append(dirs, trapProfilesUserDir(dir))
 	}
-	dirs = append(dirs, trapProfilesStockDir(pluginconfig.CollectorsStockDir()))
+	stockDir := trapProfilesStockDir(pluginconfig.CollectorsStockDir())
+	allDirs := append(append([]string(nil), dirs...), stockDir)
 
-	return multipath.New(dirs...)
+	return profileLoadPaths{eagerDirs: dirs, stockDir: stockDir, all: multipath.New(allDirs...)}
 }
 
 // testDirsOverride is set by tests to redirect profile loading to temp dirs.
@@ -79,17 +94,20 @@ func isDir(path string) bool {
 	return fi.Mode().IsDir()
 }
 
-// loadProfileCache loads all profile YAMLs into a ProfileIndex.
+// loadProfileCache loads user profiles and builds a lazy route table for stock profiles.
 func loadProfileCache() (*ProfileIndex, error) {
-	profileDirs := getProfileDirs()
+	paths := getProfileLoadPaths()
 	seen := make(map[string]bool)
 
-	var allTraps []*TrapDef
+	index := &ProfileIndex{
+		trapsByOID:      make(map[string]*TrapDef),
+		namesByTrapName: make(map[string]*TrapDef),
+	}
 
-	for _, dir := range profileDirs {
-		files, err := loadProfilesFromDir(dir, profileDirs)
+	for _, dir := range paths.eagerDirs {
+		files, err := loadProfilesFromDir(dir, paths.all)
 		if err != nil {
-			if pluginconfig.IsStock(dir) || !errors.Is(err, os.ErrNotExist) {
+			if !errors.Is(err, os.ErrNotExist) {
 				return nil, fmt.Errorf("failed to load trap profiles from '%s': %w", dir, err)
 			}
 			continue
@@ -100,31 +118,54 @@ func loadProfileCache() (*ProfileIndex, error) {
 				continue
 			}
 			seen[file.name] = true
-			allTraps = append(allTraps, file.traps...)
+			if err := index.addTraps(file.traps); err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	if len(allTraps) == 0 {
-		return nil, fmt.Errorf("no trap profiles found in %v", profileDirs)
+	if paths.stockDir != "" {
+		store, err := buildStockProfileStore(paths.stockDir, paths.all, seen, index)
+		if err != nil {
+			if pluginconfig.IsStock(paths.stockDir) || !errors.Is(err, os.ErrNotExist) {
+				return nil, fmt.Errorf("failed to load trap profile index from '%s': %w", paths.stockDir, err)
+			}
+		} else {
+			index.stock = store
+		}
 	}
 
-	index := &ProfileIndex{
-		trapsByOID: make(map[string]*TrapDef, len(allTraps)),
-	}
-	namesByTrapName := make(map[string]*TrapDef, len(allTraps))
-
-	for _, td := range allTraps {
-		if existing, ok := index.trapsByOID[td.OID]; ok {
-			return nil, fmt.Errorf("%s: duplicate trap OID %s (already defined in %s)", td.sourceFile, td.OID, existing.sourceFile)
-		}
-		if existing, ok := namesByTrapName[td.Name]; ok {
-			return nil, fmt.Errorf("%s: duplicate trap name %s (already defined in %s)", td.sourceFile, td.Name, existing.sourceFile)
-		}
-		index.trapsByOID[td.OID] = td
-		namesByTrapName[td.Name] = td
+	if len(index.trapsByOID) == 0 && (index.stock == nil || index.stock.empty()) {
+		return nil, fmt.Errorf("no trap profiles found in %v", paths.all)
 	}
 
 	return index, nil
+}
+
+func (idx *ProfileIndex) addTraps(traps []*TrapDef) error {
+	idx.mu.Lock()
+	defer idx.mu.Unlock()
+	return idx.addTrapsLocked(traps)
+}
+
+func (idx *ProfileIndex) addTrapsLocked(traps []*TrapDef) error {
+	if idx.trapsByOID == nil {
+		idx.trapsByOID = make(map[string]*TrapDef, len(traps))
+	}
+	if idx.namesByTrapName == nil {
+		idx.namesByTrapName = make(map[string]*TrapDef, len(traps))
+	}
+	for _, td := range traps {
+		if existing, ok := idx.trapsByOID[td.OID]; ok {
+			return fmt.Errorf("%s: duplicate trap OID %s (already defined in %s)", td.sourceFile, td.OID, existing.sourceFile)
+		}
+		if existing, ok := idx.namesByTrapName[td.Name]; ok {
+			return fmt.Errorf("%s: duplicate trap name %s (already defined in %s)", td.sourceFile, td.Name, existing.sourceFile)
+		}
+		idx.trapsByOID[td.OID] = td
+		idx.namesByTrapName[td.Name] = td
+	}
+	return nil
 }
 
 type loadedProfileFile struct {
@@ -132,7 +173,7 @@ type loadedProfileFile struct {
 	traps []*TrapDef
 }
 
-// loadProfilesFromDir walks a directory and loads all .yaml/yml profile files.
+// loadProfilesFromDir walks a directory and loads all supported profile files.
 func loadProfilesFromDir(dirpath string, extendsPaths multipath.MultiPath) ([]loadedProfileFile, error) {
 	var files []loadedProfileFile
 	if dirpath == "" {
@@ -146,7 +187,7 @@ func loadProfilesFromDir(dirpath string, extendsPaths multipath.MultiPath) ([]lo
 		if d.IsDir() {
 			return nil
 		}
-		if !strings.HasSuffix(d.Name(), ".yaml") && !strings.HasSuffix(d.Name(), ".yml") {
+		if !isProfileFileName(d.Name()) {
 			return nil
 		}
 		if strings.HasPrefix(d.Name(), "_") {
@@ -158,7 +199,7 @@ func loadProfilesFromDir(dirpath string, extendsPaths multipath.MultiPath) ([]lo
 			return fmt.Errorf("invalid profile '%s': %w", path, ferr)
 		}
 
-		files = append(files, loadedProfileFile{name: d.Name(), traps: fileTraps})
+		files = append(files, loadedProfileFile{name: profileLogicalName(d.Name()), traps: fileTraps})
 		return nil
 	}); err != nil {
 		return nil, err
@@ -170,7 +211,7 @@ func loadProfilesFromDir(dirpath string, extendsPaths multipath.MultiPath) ([]lo
 // loadProfile loads a single profile YAML and returns its validated trap definitions.
 // Returns traps, loaded file-level varbinds, and error.
 func loadProfile(filename string, extendsPaths multipath.MultiPath, stack []string) ([]*TrapDef, map[string]VarbindDef, error) {
-	content, err := os.ReadFile(filename)
+	content, err := readProfileFile(filename)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -209,7 +250,7 @@ func loadProfile(filename string, extendsPaths multipath.MultiPath, stack []stri
 			if stacksContains(stack, extName) {
 				return nil, nil, fmt.Errorf("%s: circular extends detected: %q", filename, extName)
 			}
-			extPath, err := extendsPaths.Find(extName)
+			extPath, err := findProfileExtends(extendsPaths, extName)
 			if err != nil {
 				return nil, nil, fmt.Errorf("%s: cannot find extension %q: %v", filename, extName, err)
 			}
@@ -257,6 +298,239 @@ func loadProfile(filename string, extendsPaths multipath.MultiPath, stack []stri
 	}
 
 	return allTraps, fileVarbinds, nil
+}
+
+func readProfileFile(filename string) ([]byte, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var r io.Reader = file
+	var gz *gzip.Reader
+	if strings.HasSuffix(filename, ".gz") {
+		gz, err = gzip.NewReader(file)
+		if err != nil {
+			return nil, err
+		}
+		defer gz.Close()
+		r = gz
+	}
+	return io.ReadAll(r)
+}
+
+func findProfileExtends(paths multipath.MultiPath, name string) (string, error) {
+	if path, err := paths.Find(name); err == nil {
+		return path, nil
+	}
+	return paths.Find(name + ".gz")
+}
+
+func isProfileFileName(name string) bool {
+	return strings.HasSuffix(name, ".yaml") ||
+		strings.HasSuffix(name, ".yml") ||
+		strings.HasSuffix(name, ".yaml.gz") ||
+		strings.HasSuffix(name, ".yml.gz")
+}
+
+func profileLogicalName(name string) string {
+	return strings.TrimSuffix(name, ".gz")
+}
+
+type stockProfileStore struct {
+	dir              string
+	extendsPaths     multipath.MultiPath
+	files            map[string]string
+	exactRoutes      map[string]string
+	enterpriseRoutes map[string]string
+	loaded           map[string]bool
+	mu               sync.Mutex
+}
+
+func (s *stockProfileStore) empty() bool {
+	return s == nil || (len(s.exactRoutes) == 0 && len(s.enterpriseRoutes) == 0)
+}
+
+func buildStockProfileStore(dir string, extendsPaths multipath.MultiPath, replaced map[string]bool, idx *ProfileIndex) (*stockProfileStore, error) {
+	files, err := profileFilesInDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	store := &stockProfileStore{
+		dir:              dir,
+		extendsPaths:     extendsPaths,
+		files:            make(map[string]string),
+		exactRoutes:      make(map[string]string),
+		enterpriseRoutes: make(map[string]string),
+		loaded:           make(map[string]bool),
+	}
+
+	stockOIDs := make(map[string]string)
+	stockOIDFiles := make(map[string]string)
+	stockNames := make(map[string]string)
+	prefixFiles := make(map[string]map[string]bool)
+
+	for _, path := range files {
+		name := profileLogicalName(filepath.Base(path))
+		if replaced[name] {
+			continue
+		}
+		traps, _, err := loadProfile(path, extendsPaths, nil)
+		if err != nil {
+			return nil, fmt.Errorf("invalid profile '%s': %w", path, err)
+		}
+		if len(traps) == 0 {
+			continue
+		}
+		store.files[name] = path
+
+		for _, td := range traps {
+			if existing := idx.lookupLoaded(td.OID); existing != nil {
+				return nil, fmt.Errorf("%s: duplicate trap OID %s (already defined in %s)", td.sourceFile, td.OID, existing.sourceFile)
+			}
+			if existing := idx.loadedTrapNameSource(td.Name); existing != "" {
+				return nil, fmt.Errorf("%s: duplicate trap name %s (already defined in %s)", td.sourceFile, td.Name, existing)
+			}
+			if existing := stockOIDs[td.OID]; existing != "" {
+				return nil, fmt.Errorf("%s: duplicate trap OID %s (already defined in %s)", td.sourceFile, td.OID, existing)
+			}
+			if existing := stockNames[td.Name]; existing != "" {
+				return nil, fmt.Errorf("%s: duplicate trap name %s (already defined in %s)", td.sourceFile, td.Name, existing)
+			}
+			stockOIDs[td.OID] = td.sourceFile
+			stockOIDFiles[td.OID] = name
+			stockNames[td.Name] = td.sourceFile
+
+			if prefix, ok := enterpriseTrapPrefix(td.OID); ok {
+				if prefixFiles[prefix] == nil {
+					prefixFiles[prefix] = make(map[string]bool)
+				}
+				prefixFiles[prefix][name] = true
+				continue
+			}
+			store.exactRoutes[td.OID] = name
+		}
+	}
+
+	for oid := range stockOIDs {
+		prefix, ok := enterpriseTrapPrefix(oid)
+		if !ok {
+			continue
+		}
+		filesForPrefix := prefixFiles[prefix]
+		if len(filesForPrefix) == 1 {
+			for file := range filesForPrefix {
+				store.enterpriseRoutes[prefix] = file
+			}
+			continue
+		}
+		store.exactRoutes[oid] = stockOIDFiles[oid]
+	}
+
+	return store, nil
+}
+
+func (idx *ProfileIndex) loadedTrapNameSource(name string) string {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+	if idx.namesByTrapName == nil {
+		return ""
+	}
+	if td := idx.namesByTrapName[name]; td != nil {
+		return td.sourceFile
+	}
+	return ""
+}
+
+func profileFilesInDir(dirpath string) ([]string, error) {
+	if dirpath == "" {
+		return nil, os.ErrNotExist
+	}
+	var files []string
+	err := filepath.WalkDir(dirpath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !isProfileFileName(d.Name()) || strings.HasPrefix(d.Name(), "_") {
+			return nil
+		}
+		files = append(files, path)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	slices.Sort(files)
+	return files, nil
+}
+
+func enterpriseTrapPrefix(oid string) (string, bool) {
+	const prefix = "1.3.6.1.4.1."
+	if !strings.HasPrefix(oid, prefix) {
+		return "", false
+	}
+	rest := strings.TrimPrefix(oid, prefix)
+	nextDot := strings.IndexByte(rest, '.')
+	if nextDot <= 0 {
+		return "", false
+	}
+	pen := rest[:nextDot]
+	for i := 0; i < len(pen); i++ {
+		if pen[i] < '0' || pen[i] > '9' {
+			return "", false
+		}
+	}
+	return prefix + pen, true
+}
+
+func (idx *ProfileIndex) loadStockForOID(oid string) error {
+	if idx == nil || idx.stock == nil {
+		return nil
+	}
+	return idx.stock.loadForOID(idx, oid)
+}
+
+func (s *stockProfileStore) loadForOID(idx *ProfileIndex, oid string) error {
+	name := s.route(oid)
+	if name == "" {
+		return nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.loaded[name] {
+		return nil
+	}
+	path := s.files[name]
+	if path == "" {
+		return fmt.Errorf("stock trap profile %q not found in %s", name, s.dir)
+	}
+	traps, _, err := loadProfile(path, s.extendsPaths, nil)
+	if err != nil {
+		return fmt.Errorf("failed to lazy-load stock trap profile %q: %w", path, err)
+	}
+	if err := idx.addTraps(traps); err != nil {
+		return err
+	}
+	s.loaded[name] = true
+	return nil
+}
+
+func (s *stockProfileStore) route(oid string) string {
+	for _, candidate := range []string{oid, alternateTrapOID(oid)} {
+		if file := s.exactRoutes[candidate]; file != "" {
+			return file
+		}
+		if prefix, ok := enterpriseTrapPrefix(candidate); ok {
+			if file := s.enterpriseRoutes[prefix]; file != "" {
+				return file
+			}
+		}
+	}
+	return ""
 }
 
 func validateExtendsName(name string) error {

@@ -163,14 +163,37 @@ type ProfileDefinition struct {
 
 // ProfileIndex is a loaded, validated OID index ready for trap lookup.
 type ProfileIndex struct {
-	trapsByOID map[string]*TrapDef
+	mu              sync.RWMutex
+	trapsByOID      map[string]*TrapDef
+	namesByTrapName map[string]*TrapDef
+	stock           *stockProfileStore
 }
 
 // Lookup returns the TrapDef for a given numeric OID, or nil if not found.
 func (idx *ProfileIndex) Lookup(oid string) *TrapDef {
+	td, _ := idx.LookupWithError(oid)
+	return td
+}
+
+// LookupWithError returns the TrapDef for a given numeric OID and reports
+// stock lazy-load failures separately from genuine unknown OIDs.
+func (idx *ProfileIndex) LookupWithError(oid string) (*TrapDef, error) {
 	if idx == nil {
-		return nil
+		return nil, nil
 	}
+	if td := idx.lookupLoaded(oid); td != nil {
+		return td, nil
+	}
+	if err := idx.loadStockForOID(oid); err != nil {
+		return nil, err
+	}
+	return idx.lookupLoaded(oid), nil
+}
+
+func (idx *ProfileIndex) lookupLoaded(oid string) *TrapDef {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+
 	if td := idx.trapsByOID[oid]; td != nil {
 		return td
 	}

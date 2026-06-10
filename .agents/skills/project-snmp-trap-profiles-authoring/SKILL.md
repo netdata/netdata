@@ -203,8 +203,10 @@ done under the prior taxonomy and are now stale).
 
 ## File size discipline
 
-Stock profile YAMLs ship raw (no compression) so changes are reviewable in
-`git diff`. The plugin binary's packaging already compresses on the way to
-disk. If a single vendor file grows past ~10 MB the right answer is to
-revisit description verbosity (don't truncate; cut redundant phrasing in
-the prompt) rather than ship gzip.
+Stock profile YAMLs stay raw in the repository so changes are reviewable in
+`git diff`. Installed/package stock vendor profiles MUST be compressed as
+`.yaml.gz`; the runtime loader supports both raw `.yaml` and compressed
+`.yaml.gz`. Operator/user profiles under `/etc/netdata/go.d/snmp.trap-profiles/`
+SHOULD stay uncompressed `.yaml` for editability. If a single vendor file grows
+past ~10 MB in the repository, revisit description verbosity rather than hiding
+unreviewable generated bloat behind compression.

@@ -4390,6 +4390,22 @@ if(ENABLE_PLUGIN_GO)
     install(FILES ${GO_SNMP_TRAP_PROFILE_FILES}
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default)
+    find_program(GZIP_EXECUTABLE NAMES gzip DOC "GZIP compression program")
+    if(NOT GZIP_EXECUTABLE)
+        message(FATAL_ERROR "Unable to find gzip command required to compress SNMP trap stock profiles")
+    endif()
+    install(CODE "
+        file(GLOB _snmp_trap_profiles \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default/*.yaml\")
+        foreach(_profile IN LISTS _snmp_trap_profiles)
+            execute_process(
+                COMMAND \"${GZIP_EXECUTABLE}\" -f -9 \"\${_profile}\"
+                RESULT_VARIABLE _gzip_result
+                ERROR_VARIABLE _gzip_error)
+            if(NOT _gzip_result EQUAL 0)
+                message(FATAL_ERROR \"failed to gzip SNMP trap profile '\${_profile}': \${_gzip_error}\")
+            endif()
+        endforeach()
+    " COMPONENT plugin-go)
     install(FILES src/go/plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)

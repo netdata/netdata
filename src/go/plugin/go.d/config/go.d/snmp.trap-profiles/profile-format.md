@@ -33,21 +33,25 @@ and the IEEE LLDP file (`ieee-lldp.yaml`).
 
 ### How profiles are loaded
 
-The plugin loads stock profiles from the go.d stock config directory
+The plugin reads stock profiles from the go.d stock config directory
 `snmp.trap-profiles/default/` subdirectory (typically
 `/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default/`) and operator
-overrides from the go.d user config directory `snmp.trap-profiles/` subdirectory
-(typically `/etc/netdata/go.d/snmp.trap-profiles/`).
+profiles from the go.d user config directory `snmp.trap-profiles/` subdirectory
+(typically `/etc/netdata/go.d/snmp.trap-profiles/`). Stock files are plain
+`.yaml` in the source repository for reviewability; installed packages ship
+them as `.yaml.gz`. The loader accepts `.yaml`, `.yml`, `.yaml.gz`, and
+`.yml.gz`.
 
 Profiles are loaded **only when the first runnable SNMP trap job is created** —
 Netdata agents that do not receive traps never pay the memory footprint.
 
-Profile loading is shared across trap jobs: the first runnable job builds the
-profile index, later jobs reuse it, and the last job release lets the Agent
-reclaim it. Failed profile loads are creation-time job failures surfaced to
-DynCfg; they do not leave a permanently poisoned cache. If all trap jobs are
-removed, the cache is released and the next trap job creation loads profiles
-again.
+Profile loading is shared across trap jobs: the first runnable job eagerly
+loads operator profiles, validates stock profiles, builds a stock OID route
+table, and later jobs reuse the same cache. Stock profile definitions are loaded
+into memory only when the first matching trap OID needs that stock file. Failed
+profile validation is a creation-time job failure surfaced to DynCfg; it does
+not leave a permanently poisoned cache. If all trap jobs are removed, the cache
+is released and the next trap job creation validates profiles again.
 
 ## File layout
 
@@ -248,18 +252,17 @@ time. Supported functions:
 | `{{raw "varbindName"}}` | Varbind raw value (numeric for enums, undecoded bytes for OctetString) |
 | `{{first ...}}` | First non-empty argument, for optional-varbind fallback |
 
-Supported control flow is limited to `{{with ...}}{{else}}{{end}}` and
-`{{if ...}}{{else}}{{end}}`, using the same restricted function calls allowed
-for plain actions.
+Supported control flow is limited to `{{with ...}}{{else}}{{end}}`, using the
+same restricted function calls allowed for plain actions.
 Known-but-absent varbinds render as an empty string, not `<missing>`, so use
-`with`, `if`, or `first` when optional context is included:
+`with` or `first` when optional context is included:
 
 ```yaml
 description: '{{with first (value "ifDescr") (value "ifName") (value "ifIndex")}}Interface {{.}} went down{{else}}Interface went down{{end}} on {{hostname}}.'
 ```
 
 Unknown functions, unknown varbind names, malformed templates, variables,
-assignments, `range`, arbitrary pipelines, and template inclusion actions
+assignments, `if`, `range`, arbitrary pipelines, and template inclusion actions
 fail at profile load so configuration errors are visible at job creation time.
 
 Legacy single-brace templates from early development builds still render during
@@ -340,7 +343,8 @@ The plugin loader mirrors the SNMP polling plugin's multipath pattern
 
 1. **Same filename in higher-priority directory replaces the lower-priority
    one entirely.** Operator `ciscosystems.yaml` fully replaces stock
-   `ciscosystems.yaml` — copy + edit the whole file to customize one vendor.
+   `ciscosystems.yaml` or installed `ciscosystems.yaml.gz` — copy + edit the
+   whole file to customize one vendor.
 2. **Different filename adds entries.** Operator `site-additions.yaml`
    (different filename) merges its `traps:` into the loaded set without
    touching stock files.

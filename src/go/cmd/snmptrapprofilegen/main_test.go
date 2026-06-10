@@ -447,12 +447,8 @@ func TestLLMResponseValidation(t *testing.T) {
 	if _, _, _, err := parseLLMResponse(`{"category":"state_change","severity":"warning","description":"Bad legacy {ifIndex} on {{hostname}}."}`, rec); err == nil {
 		t.Fatalf("legacy placeholder accepted")
 	}
-	_, _, desc, err = parseLLMResponse(`{"category":"state_change","severity":"warning","description":"Trap{{if value \"ifIndex\"}} for interface {{value \"ifIndex\"}}{{end}} on {{hostname}}."}`, rec)
-	if err != nil {
-		t.Fatalf("parseLLMResponse rejected restricted if action: %v", err)
-	}
-	if !strings.Contains(desc, `{{if value "ifIndex"}}`) {
-		t.Fatalf("description did not preserve restricted if action: %q", desc)
+	if _, _, _, err := parseLLMResponse(`{"category":"state_change","severity":"warning","description":"Trap{{if value \"ifIndex\"}} for interface {{value \"ifIndex\"}}{{end}} on {{hostname}}."}`, rec); err == nil || !strings.Contains(err.Error(), "if template actions are not allowed") {
+		t.Fatalf("if action error = %v, want explicit rejection", err)
 	}
 	if _, _, _, err := parseLLMResponse(`{"category":"state_change","severity":"warning","description":"Bad event on {{hostname}} with duplicate host on {{hostname}}."}`, rec); err == nil || !strings.Contains(err.Error(), "exactly once") {
 		t.Fatalf("duplicate hostname error = %v, want explicit hostname count feedback", err)

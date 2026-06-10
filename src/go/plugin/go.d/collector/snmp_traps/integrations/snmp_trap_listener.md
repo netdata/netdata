@@ -67,8 +67,8 @@ When direct journal storage is enabled, trap entries are written as structured s
 
 | Type | Default path | Notes |
 |------|--------------|-------|
-| **Stock profiles** | `/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default/` | Shipped with Netdata |
-| **User profiles** | `/etc/netdata/go.d/snmp.trap-profiles/` | Place custom or converted profiles here |
+| **Stock profiles** | `/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default/` | Shipped with Netdata; packages store vendor files as `.yaml.gz` |
+| **User profiles** | `/etc/netdata/go.d/snmp.trap-profiles/` | Place custom or converted `.yaml` profiles here |
 
 > Depending on installation, paths may be prefixed with `/opt/netdata`.
 
@@ -80,7 +80,7 @@ A **trap profile** defines per-OID mappings:
 **At runtime, the collector**:
 1. Receives a trap PDU on a bound UDP endpoint
 2. Validates the SNMP version, community/USM, and source against the job configuration
-3. Resolves the trap OID against loaded profiles to get a name, category, severity, and varbind labels
+3. Resolves the trap OID against operator profiles and lazily-loaded stock profile files to get a name, category, severity, and varbind labels
 4. Enriches the entry with optional reverse DNS (`_HOSTNAME`) and dedup logic (if enabled)
 5. Writes the structured entry to the per-job direct journal when enabled, and exports via OTLP when configured
 6. Increments the per-job self-metrics (events by category and severity, errors by type)

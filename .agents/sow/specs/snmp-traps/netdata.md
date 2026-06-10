@@ -352,14 +352,13 @@ There is **no runtime MIB compilation tier**. The plugin does not parse SMIv1/v2
 | `{{raw "ifOperStatus"}}` | MIB enum value, raw numeric (e.g., `2`) |
 | `{{first ...}}` | First non-empty argument, for optional-varbind fallback |
 
-Supported control flow is limited to `{{with ...}}{{else}}{{end}}` and
-`{{if ...}}{{else}}{{end}}`, using the same restricted function calls allowed
-for plain actions.
+Supported control flow is limited to `{{with ...}}{{else}}{{end}}`, using the
+same restricted function calls allowed for plain actions.
 Known-but-absent varbinds render as empty strings, not `<missing>`, so profiles
-use `with`, `if`, or `first` when optional context is included.
+use `with` or `first` when optional context is included.
 
 Unknown functions, unknown varbind names, malformed templates, variables,
-assignments, `range`, arbitrary pipelines, and template inclusion actions
+assignments, `if`, `range`, arbitrary pipelines, and template inclusion actions
 fail at profile load / job creation.
 
 If `description` is absent, default template is:
@@ -379,12 +378,14 @@ The journal captures every varbind always (§11). The plugin emits its own self-
 
 ### Profile loading — lazy shared cache, multipath, filename-dedup, field-merge on extends-chain
 
-The loader is plugin-wide shared state, not per-listener state. It loads on first runnable trap job creation, is shared by all listeners, and is released when no runnable trap jobs remain. Agents with all trap jobs disabled (or no trap jobs configured) never pay the profile memory footprint. A profile load or validation failure is a job-creation failure and returns HTTP-422 through DynCfg before any listener is reported as started.
+The loader is plugin-wide shared state, not per-listener state. It initializes on first runnable trap job creation, is shared by all listeners, and is released when no runnable trap jobs remain. Agents with all trap jobs disabled (or no trap jobs configured) never pay the profile memory footprint. A profile load or validation failure is a job-creation failure and returns HTTP-422 through DynCfg before any listener is reported as started.
+
+Operator profiles are loaded eagerly at job creation. Stock profiles are validated at job creation, but the loader retains only a small OID-to-stock-file route table until a matching trap arrives. The first matching trap loads the routed stock vendor file into the shared profile index, and later listeners reuse it. Stock YAML remains uncompressed in git for review; installed packages store stock vendor files as `.yaml.gz`, and the runtime loader accepts both raw and gzip-compressed profile files.
 
 The loader mirrors the established SNMP polling pattern (`src/go/plugin/go.d/collector/snmp/ddsnmp/load.go`):
 
 1. **Multipath load** — operator overrides first, then stock: `/etc/netdata/go.d/snmp.trap-profiles/` → `/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default/`.
-2. **Filename dedup** — same filename in a higher-priority directory replaces the lower-priority one entirely. Operator override file `ciscosystems.yaml` fully replaces stock `ciscosystems.yaml`; operators copy + edit to customize a single vendor file.
+2. **Filename dedup** — same logical filename in a higher-priority directory replaces the lower-priority one entirely. Operator override file `ciscosystems.yaml` fully replaces stock `ciscosystems.yaml` or installed `ciscosystems.yaml.gz`; operators copy + edit to customize a single vendor file.
 3. **Field-level merge via `extends:` chain** — when a profile YAML lists `extends: [_base1.yaml, _base2.yaml]`, the loader merges trap entries; later `extends` entries override earlier ones on a per-OID basis. Within a single profile entry, field-level (the override file's fields win for the fields it specifies; unspecified fields inherit from the extended base).
 4. **Directory ordering** — within a single directory, files are loaded in `filepath.WalkDir()` lexical order (Go contract). If two files in the same directory define the same OID via `extends`, the alphabetically-later file wins.
 
@@ -1006,7 +1007,7 @@ Operators alert on these for pipeline health:
 - `unknown_engine_id` > 0 → in static mode, sender engine ID is missing from the receiver whitelist or the sender is misconfigured; in dynamic mode, the first increment for a newly accepted `(engineID, username)` pair is expected visibility with a spoofing advisory, while repeated/new rejected increments indicate cap exhaustion, invalid sender state, or an unauthorized/misconfigured sender.
 - `inform_response_failed > 0` → INFORM Response send failures; investigate UDP socket health.
 - `sanitized > 0` sustained → varbind values containing control characters being binary-encoded; investigate sender.
-- `profile_load_failed > 0` → operator-provided profile YAML failed to parse during DynCfg hot-reload (SOW-0037 M3); plugin continues with the previous profile index; operator must fix the bad YAML and reload.
+- `profile_load_failed > 0` → profile validation/reload failed, or a previously validated stock profile file could not be lazy-loaded after job start. During DynCfg reload, the plugin continues with the previous profile index and the operator must fix the bad YAML and reload. During runtime stock lazy-load failure, the trap is still written with raw OID/varbind data and the operator should inspect the installed stock profile files.
 - `journal_write_failed > 0` → disk-full, permission, or filesystem error while writing to the per-job journal directory; trap is dropped, hot path continues (the writer never blocks).
 - `otlp_export_failed > 0` → the OTLP backend could not accept or export one or more trap records after the job had already started. For direct-journal+OTLP jobs, the journal-direct path remains authoritative and continues independently. For OTEL-only jobs, this means the only configured backend dropped or failed records. Investigate the configured OTLP receiver, network path, TLS/auth configuration, or queue sizing.
 

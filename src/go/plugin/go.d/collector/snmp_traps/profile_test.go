@@ -3,6 +3,7 @@
 package snmp_traps
 
 import (
+	"compress/gzip"
 	"context"
 	"net"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -216,6 +218,118 @@ traps:
 	assert.Equal(t, "state_change", td.Category)
 	assert.Equal(t, "warning", td.Severity)
 	assert.NotNil(t, td.sharedVarbinds)
+}
+
+func TestProfileLoadGzipYAML(t *testing.T) {
+	dir := t.TempDir()
+	writeProfileYAMLGzip(t, dir, "test.yaml.gz", `
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.3
+    name: IF-MIB::linkDown
+    category: state_change
+    severity: warning
+`)
+
+	setTestDirs(t, dir)
+	resetProfileCacheForTest()
+
+	idx, err := AcquireProfileCache()
+	require.NoError(t, err)
+	defer ReleaseProfileCache()
+
+	td := idx.Lookup("1.3.6.1.6.3.1.1.5.3")
+	require.NotNil(t, td)
+	assert.Equal(t, "IF-MIB::linkDown", td.Name)
+}
+
+func TestStockProfileStoreLazyLoadsRoutedGzip(t *testing.T) {
+	stockDir := t.TempDir()
+	writeProfileYAMLGzip(t, stockDir, "ciscosystems.yaml.gz", `
+traps:
+  - oid: 1.3.6.1.4.1.9.1.0.1
+    name: TEST-CISCO-MIB::testTrap
+    category: diagnostic
+    severity: warning
+`)
+
+	idx := &ProfileIndex{
+		trapsByOID:      make(map[string]*TrapDef),
+		namesByTrapName: make(map[string]*TrapDef),
+	}
+	store, err := buildStockProfileStore(stockDir, multipath.New(stockDir), nil, idx)
+	require.NoError(t, err)
+	idx.stock = store
+
+	assert.Empty(t, idx.trapsByOID)
+	td := idx.Lookup("1.3.6.1.4.1.9.1.0.1")
+	require.NotNil(t, td)
+	assert.Equal(t, "TEST-CISCO-MIB::testTrap", td.Name)
+	assert.True(t, store.loaded["ciscosystems.yaml"])
+	assert.Len(t, idx.trapsByOID, 1)
+}
+
+func TestStockProfileStoreLazyLoadErrorIsReported(t *testing.T) {
+	stockDir := t.TempDir()
+	writeProfileYAMLGzip(t, stockDir, "ciscosystems.yaml.gz", `
+traps:
+  - oid: 1.3.6.1.4.1.9.1.0.1
+    name: TEST-CISCO-MIB::testTrap
+    category: diagnostic
+    severity: warning
+`)
+
+	idx := &ProfileIndex{
+		trapsByOID:      make(map[string]*TrapDef),
+		namesByTrapName: make(map[string]*TrapDef),
+	}
+	store, err := buildStockProfileStore(stockDir, multipath.New(stockDir), nil, idx)
+	require.NoError(t, err)
+	idx.stock = store
+	require.NoError(t, os.Remove(filepath.Join(stockDir, "ciscosystems.yaml.gz")))
+
+	td, err := idx.LookupWithError("1.3.6.1.4.1.9.1.0.1")
+	require.Error(t, err)
+	assert.Nil(t, td)
+	assert.Contains(t, err.Error(), "failed to lazy-load stock trap profile")
+}
+
+func TestStockProfileStoreSkipsSameBasenameUserReplacement(t *testing.T) {
+	userDir := t.TempDir()
+	stockDir := t.TempDir()
+	writeProfileYAML(t, userDir, "ciscosystems.yaml", `
+traps:
+  - oid: 1.3.6.1.4.1.9.1.0.1
+    name: TEST-CISCO-MIB::userTrap
+    category: security
+    severity: warning
+`)
+	writeProfileYAMLGzip(t, stockDir, "ciscosystems.yaml.gz", `
+traps:
+  - oid: 1.3.6.1.4.1.9.1.0.2
+    name: TEST-CISCO-MIB::stockTrap
+    category: diagnostic
+    severity: warning
+`)
+
+	idx := &ProfileIndex{
+		trapsByOID:      make(map[string]*TrapDef),
+		namesByTrapName: make(map[string]*TrapDef),
+	}
+	seen := map[string]bool{}
+	files, err := loadProfilesFromDir(userDir, multipath.New(userDir, stockDir))
+	require.NoError(t, err)
+	for _, file := range files {
+		seen[file.name] = true
+		require.NoError(t, idx.addTraps(file.traps))
+	}
+
+	store, err := buildStockProfileStore(stockDir, multipath.New(userDir, stockDir), seen, idx)
+	require.NoError(t, err)
+	idx.stock = store
+
+	assert.NotNil(t, idx.Lookup("1.3.6.1.4.1.9.1.0.1"))
+	assert.Nil(t, idx.Lookup("1.3.6.1.4.1.9.1.0.2"))
+	assert.Empty(t, store.files)
 }
 
 func TestProfileIndexLookupTrapOIDTolerance(t *testing.T) {
@@ -1048,7 +1162,7 @@ traps:
 	assert.Equal(t, "Running configuration changed by admin on 198.51.100.10.", renderMessage(entry, td))
 }
 
-func TestRenderMessageGoTemplateWithIfBlock(t *testing.T) {
+func TestLoadProfileRejectsGoTemplateIfBlock(t *testing.T) {
 	dir := t.TempDir()
 	writeProfileYAML(t, dir, "test.yaml", `
 varbinds:
@@ -1068,18 +1182,9 @@ traps:
 	setTestDirs(t, dir)
 	resetProfileCacheForTest()
 
-	idx, err := AcquireProfileCache()
-	require.NoError(t, err)
-	defer ReleaseProfileCache()
-
-	td := idx.Lookup("1.3.6.1.6.3.1.1.5.4")
-	require.NotNil(t, td)
-
-	entry := &TrapEntry{TrapName: "IF-MIB::linkUp", SourceIP: "198.51.100.10"}
-	assert.Equal(t, "Interface came up on 198.51.100.10.", renderMessage(entry, td))
-
-	entry.Varbinds = []VarbindValue{{OID: "1.3.6.1.2.1.31.1.1.1.1.7", Type: "OctetString", Value: "Gi0/7"}}
-	assert.Equal(t, "Interface Gi0/7 came up on 198.51.100.10.", renderMessage(entry, td))
+	_, err := AcquireProfileCache()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "if template actions are not allowed")
 }
 
 func TestLoadProfileRejectsInvalidGoTemplates(t *testing.T) {
@@ -1698,19 +1803,20 @@ func TestStockProfileIndexLoads(t *testing.T) {
 	defer ReleaseProfileCache()
 
 	assert.NotNil(t, idx)
-	assert.GreaterOrEqual(t, len(idx.trapsByOID), 50000)
+	assert.Empty(t, idx.trapsByOID, "stock profiles should be routed lazily, not retained at startup")
+	require.NotNil(t, idx.stock)
+	assert.NotEmpty(t, idx.stock.exactRoutes)
 
 	// Verify known IETF standard trap OIDs
 	td := idx.Lookup("1.3.6.1.6.3.1.1.5.1")
-	if td != nil {
-		assert.Equal(t, "state_change", td.Category)
-	}
+	require.NotNil(t, td)
+	assert.Equal(t, "state_change", td.Category)
 
 	td = idx.Lookup("1.3.6.1.6.3.1.1.5.3")
-	if td != nil {
-		assert.Equal(t, "state_change", td.Category)
-		assert.NotEmpty(t, td.Name)
-	}
+	require.NotNil(t, td)
+	assert.Equal(t, "state_change", td.Category)
+	assert.NotEmpty(t, td.Name)
+	assert.NotEmpty(t, idx.trapsByOID, "first stock lookup should retain the routed profile file")
 }
 
 func TestStockIFMIBLinkMessagesDoNotDependOnIfOperStatus(t *testing.T) {
@@ -1844,4 +1950,17 @@ func writeProfileYAML(t *testing.T, dir, name, content string) {
 	path := filepath.Join(dir, name)
 	err := os.WriteFile(path, []byte(content), 0644)
 	require.NoError(t, err)
+}
+
+func writeProfileYAMLGzip(t *testing.T, dir, name, content string) {
+	t.Helper()
+	path := filepath.Join(dir, name)
+	file, err := os.Create(path)
+	require.NoError(t, err)
+	defer file.Close()
+
+	zw := gzip.NewWriter(file)
+	_, err = zw.Write([]byte(content))
+	require.NoError(t, err)
+	require.NoError(t, zw.Close())
 }
