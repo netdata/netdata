@@ -34,7 +34,7 @@ traps:
     name: NSCRTV-EPONEOC-MOD-EOC-MIB::modEoCTrapNotification
     category: diagnostic
     severity: warning
-    description: EOC trap code {modEoCTrapCode} with severity {modEoCTrapSeverity} reported on {_HOSTNAME}.
+    description: ModEoC event {{value "modEoCTrapCode"}} reported on {{hostname}}.
     status: current
     varbinds:
       - modEoCTrapTime
@@ -46,23 +46,23 @@ traps:
     name: SPIDCOM-TRAPS::deviceDown
     category: state_change
     severity: crit
-    description: Device connection to distant node is down on {_HOSTNAME}.
+    description: Connection with distant node is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.22764.4.1.2
     name: SPIDCOM-TRAPS::deviceUp
     category: state_change
-    severity: notice
-    description: Device connection established on {_HOSTNAME}.
+    severity: warning
+    description: Device connection is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.22764.4.1.3
     name: SPIDCOM-TRAPS::maxAttenuation
     category: diagnostic
     severity: warning
-    description: Attenuation threshold reached on {_HOSTNAME}.
+    description: Maximum attenuation threshold reached on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.22764.4.1.4
     name: SPIDCOM-TRAPS::maxNoise
     category: diagnostic
     severity: warning
-    description: Noise threshold reached on {_HOSTNAME}.
+    description: Noise threshold reached on {{hostname}}.
     status: current

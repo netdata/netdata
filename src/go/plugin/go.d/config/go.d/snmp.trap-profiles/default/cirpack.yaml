@@ -16,9 +16,9 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.9193.0.1
     name: KMIB::cirpackstarting
-    category: state_change
-    severity: notice
-    description: Device {kName} is starting with log {kLog} on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: Device {{value "kName"}} is starting with log {{value "kLog"}} on {{hostname}}.
     status: current
     varbinds:
       - kName
@@ -27,7 +27,7 @@ traps:
     name: KMIB::cirpackOk
     category: diagnostic
     severity: info
-    description: Device {kName} reported status {kLog} on {_HOSTNAME}.
+    description: Device {{value "kName"}} is OK on {{hostname}}.
     status: current
     varbinds:
       - kName
@@ -36,7 +36,7 @@ traps:
     name: KMIB::cirpackabort
     category: diagnostic
     severity: crit
-    description: Device {kName} is aborting with log {kLog} on {_HOSTNAME}.
+    description: Device {{value "kName"}} is aborting with major status on {{hostname}}.
     status: current
     varbinds:
       - kName
@@ -45,16 +45,16 @@ traps:
     name: KMIB::cirpackmisbehave
     category: diagnostic
     severity: warning
-    description: 'Device {kName} reported misbehave: {kLog} on {_HOSTNAME}.'
+    description: 'Device {{value "kName"}} reported minor misbehavior: {{value "kLog"}} on {{hostname}}.'
     status: current
     varbinds:
       - kName
       - kLog
   - oid: 1.3.6.1.4.1.9193.0.5
     name: KMIB::cirpackdown
-    category: state_change
+    category: diagnostic
     severity: crit
-    description: Device {kName} reported critical down status with log {kLog} on {_HOSTNAME}.
+    description: Device {{value "kName"}} is down on {{hostname}}.
     status: current
     varbinds:
       - kName
@@ -62,8 +62,8 @@ traps:
   - oid: 1.3.6.1.4.1.9193.0.6
     name: KMIB::cirpackcritical
     category: diagnostic
-    severity: alert
-    description: 'Device {kName} reported critical status: {kLog} on {_HOSTNAME}.'
+    severity: crit
+    description: Device {{value "kName"}} is not polling on {{hostname}}.
     status: current
     varbinds:
       - kName
@@ -72,7 +72,7 @@ traps:
     name: KMIB::cirpacktestingw
     category: diagnostic
     severity: warning
-    description: Self-test warning {kLog} for device {kName} on {_HOSTNAME}.
+    description: Object self-test warning {{value "kLog"}} on {{hostname}}.
     status: current
     varbinds:
       - kName
@@ -81,7 +81,7 @@ traps:
     name: KMIB::cirpackUnknown
     category: diagnostic
     severity: notice
-    description: Device {kName} reported status {kLog} on {_HOSTNAME}.
+    description: Device {{value "kName"}} is not supervised on {{hostname}}.
     status: current
     varbinds:
       - kName
@@ -90,7 +90,7 @@ traps:
     name: KMIB::cirpacklog
     category: diagnostic
     severity: info
-    description: Device {kName} logged {kLog} on {_HOSTNAME}.
+    description: 'Device {{value "kName"}} logged: {{value "kLog"}} on {{hostname}}.'
     status: current
     varbinds:
       - kName

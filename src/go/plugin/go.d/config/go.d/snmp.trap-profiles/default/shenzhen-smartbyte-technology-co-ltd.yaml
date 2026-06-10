@@ -43,7 +43,7 @@ traps:
     name: NMS-SYS-MIB::powerChange
     category: diagnostic
     severity: warning
-    description: Power supply {powerIndex} state changed to {powerState} on {_HOSTNAME}.
+    description: Power state changed to {{value "powerState"}} on {{hostname}}.
     status: current
     varbinds:
       - powerIndex
@@ -54,7 +54,7 @@ traps:
     name: NMS-SYS-MIB::batteryLow
     category: diagnostic
     severity: warning
-    description: Battery low event detected for power supply {powerIndex} on {_HOSTNAME}.
+    description: Battery low event detected{{with value "powerIndex"}} on power index {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - powerIndex
@@ -62,15 +62,15 @@ traps:
     name: NMS-SYS-MIB::batteryRecover
     category: diagnostic
     severity: notice
-    description: Battery recover event detected on power supply {powerIndex} on {_HOSTNAME}.
+    description: Battery recover event detected on {{hostname}}.
     status: current
     varbinds:
       - powerIndex
   - oid: 1.3.6.1.4.1.56166.1.2.7.4
     name: NMS-SYS-MIB::fanFailure
     category: diagnostic
-    severity: err
-    description: Fan {fanIndex} failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Fan failure detected on fan index {{value "fanIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - fanIndex
@@ -78,7 +78,7 @@ traps:
     name: NMS-SYS-MIB::fanNormal
     category: diagnostic
     severity: notice
-    description: Fan {fanIndex} recovered to normal state on {_HOSTNAME}.
+    description: Fan {{value "fanIndex"}} recovered to normal state on {{hostname}}.
     status: current
     varbinds:
       - fanIndex
@@ -86,7 +86,7 @@ traps:
     name: NMS-SYS-MIB::fanSpeedStatusChange
     category: diagnostic
     severity: warning
-    description: Fan {fanIndex} speed status changed to {fanSpeedStatus} on {_HOSTNAME}.
+    description: Fan speed status changed to {{value "fanSpeedStatus"}} on fan {{value "fanIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - fanIndex

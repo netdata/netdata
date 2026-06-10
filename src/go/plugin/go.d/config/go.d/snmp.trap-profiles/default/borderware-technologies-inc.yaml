@@ -26,7 +26,7 @@ traps:
     name: BORDERWARE-FW-MIB::alAlarm
     category: security
     severity: warning
-    description: Security alarm {alName} triggered from {alRemoteIpAddr} on port {alDestPort} on {_HOSTNAME}.
+    description: Security alarm {{value "alName"}} triggered from {{value "alRemoteIpAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - alLastChange

@@ -42,7 +42,7 @@ traps:
     name: PHION-MIB::eventTrap
     category: diagnostic
     severity: warning
-    description: Event {eventIDDescription} with severity {eventSeverity} occurred on {_HOSTNAME}.
+    description: Event {{value "eventID"}} {{value "eventIDDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - eventID

@@ -84,7 +84,7 @@ traps:
     name: RAPID-SYSTEM-CONFIG-MIB::rsAlarmTrap
     category: diagnostic
     severity: warning
-    description: Alarm {rsAlarmLabel} with level {rsAlarmLevel} raised on {_HOSTNAME}.
+    description: RapidStream alarm {{value "rsAlarmLabel"}} triggered on {{hostname}}.
     status: current
     varbinds:
       - rsAlarmId
@@ -95,21 +95,21 @@ traps:
       - rsAlarmMsg
   - oid: 1.3.6.1.4.1.4355.2.3.0.2
     name: RAPID-SYSTEM-CONFIG-MIB::rsSnmpStart
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: SNMP agent started on {_HOSTNAME}.
+    description: SNMP agent started on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4355.2.3.0.3
     name: RAPID-SYSTEM-CONFIG-MIB::rsSnmpShutdown
     category: diagnostic
-    severity: crit
-    description: SNMP service terminated on {_HOSTNAME}.
+    severity: alert
+    description: SNMP service terminated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4355.3.1.4.0.1
     name: RAPID-IPSEC-SA-MON-MIB-EXT::rsEspAuthFailureTrap
     category: security
     severity: warning
-    description: IPSec authentication failure with {rsIpsecSaEspInAuthErrors} errors on {_HOSTNAME}.
+    description: IPSec authentication errors detected on SA with {{value "rsIpsecSaEspInAuthErrors"}} failures on {{hostname}}.
     status: current
     varbinds:
       - rsIpsecSaEspInAuthErrors
@@ -117,7 +117,7 @@ traps:
     name: RAPID-IPSEC-SA-MON-MIB-EXT::rsAhAuthFailureTrap
     category: security
     severity: warning
-    description: IPSec AH authentication failure count {rsIpsecSaAhInAuthErrors} detected on {_HOSTNAME}.
+    description: IPSec AH authentication errors detected{{with value "rsIpsecSaAhInAuthErrors"}} count {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - rsIpsecSaAhInAuthErrors
@@ -125,7 +125,7 @@ traps:
     name: RAPID-IPSEC-SA-MON-MIB-EXT::rsEspReplayFailureTrap
     category: security
     severity: warning
-    description: IPSec replay failure detected with {rsIpsecSaEspInReplayErrors} errors on {_HOSTNAME}.
+    description: IPSec replay failure detected with {{value "rsIpsecSaEspInReplayErrors"}} errors on {{hostname}}.
     status: current
     varbinds:
       - rsIpsecSaEspInReplayErrors
@@ -133,7 +133,7 @@ traps:
     name: RAPID-IPSEC-SA-MON-MIB-EXT::rsAhReplayFailureTrap
     category: security
     severity: warning
-    description: IPSec AH SA replay failure detected with {rsIpsecSaAhInReplayErrors} errors on {_HOSTNAME}.
+    description: IPSec AH replay failure detected with {{value "rsIpsecSaAhInReplayErrors"}} errors on {{hostname}}.
     status: current
     varbinds:
       - rsIpsecSaAhInReplayErrors
@@ -141,7 +141,7 @@ traps:
     name: RAPID-IPSEC-SA-MON-MIB-EXT::rsEspPolicyFailureTrap
     category: security
     severity: warning
-    description: IPSec policy error detected with {rsIpsecSaEspInPolicyErrors} discarded packets on {_HOSTNAME}.
+    description: IPSec policy error detected with {{value "rsIpsecSaEspInPolicyErrors"}} discarded packets on {{hostname}}.
     status: current
     varbinds:
       - rsIpsecSaEspInPolicyErrors
@@ -149,7 +149,7 @@ traps:
     name: RAPID-IPSEC-SA-MON-MIB-EXT::rsAhPolicyFailureTrap
     category: security
     severity: warning
-    description: IPSec AH policy failure with {rsIpsecSaAhInPolicyErrors} errors on {_HOSTNAME}.
+    description: IPSec AH policy failure detected with {{value "rsIpsecSaAhInPolicyErrors"}} errors on {{hostname}}.
     status: current
     varbinds:
       - rsIpsecSaAhInPolicyErrors
@@ -157,7 +157,7 @@ traps:
     name: RAPID-IPSEC-SA-MON-MIB-EXT::rsInvalidSpiTrap
     category: security
     severity: warning
-    description: Packet with unknown SPI {rsIpsecSPI} detected from {rsIpsecPeerAddress} on {_HOSTNAME}.
+    description: Unknown SPI {{value "rsIpsecSPI"}} detected from {{value "rsIpsecPeerAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - rsIpsecLocalAddress

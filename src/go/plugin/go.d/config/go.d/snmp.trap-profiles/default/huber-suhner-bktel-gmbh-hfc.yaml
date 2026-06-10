@@ -9,5 +9,5 @@ traps:
     name: BKTEL-HFC862-HMSNE-MIB::neSynchronizeEvent
     category: diagnostic
     severity: notice
-    description: Data synchronization event triggered on {_HOSTNAME}.
+    description: LMT data synchronization event triggered on {{hostname}}.
     status: current

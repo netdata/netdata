@@ -101,7 +101,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::loginOK
     category: auth
     severity: notice
-    description: Administrator login successful via {polycomVSAuthLocation} from {polycomVSAuthClientAddress} on {_HOSTNAME}.
+    description: Administrator login successful via {{value "polycomVSAuthLocation"}} from {{value "polycomVSAuthClientAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSAuthLocation
@@ -110,7 +110,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::loginFail
     category: auth
     severity: warning
-    description: Administrator login attempt failed from {polycomVSAuthClientAddress} via {polycomVSAuthLocation} on {_HOSTNAME}.
+    description: Administrator login failure from {{value "polycomVSAuthClientAddress"}} via {{value "polycomVSAuthLocation"}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSAuthLocation
@@ -119,13 +119,13 @@ traps:
     name: POLYCOM-VIDEO-MIB::lowBattery
     category: diagnostic
     severity: warning
-    description: Low battery condition detected on {_HOSTNAME}.
+    description: Low battery condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2684.1.1.0.4
     name: POLYCOM-VIDEO-MIB::callUp
     category: state_change
     severity: notice
-    description: Call successfully connected to {polycomVSPhoneNumber} on {_HOSTNAME}.
+    description: Call connected to {{value "polycomVSPhoneNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSPhoneNumber
@@ -133,7 +133,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::callDown
     category: state_change
     severity: notice
-    description: Call disconnected with normal clearing from {polycomVSPhoneNumber} on {_HOSTNAME}.
+    description: Call disconnected to {{value "polycomVSPhoneNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSPhoneNumber
@@ -141,7 +141,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::callFail
     category: state_change
     severity: warning
-    description: Call disconnected with abnormal reason {polycomVSReason} for {polycomVSPhoneNumber} on {_HOSTNAME}.
+    description: Call disconnected with cause {{value "polycomVSReason"}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSReason
@@ -150,7 +150,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::userAssist
     category: diagnostic
     severity: notice
-    description: User assistance request received from {polycomVSPlead} on {_HOSTNAME}.
+    description: User assistance request sent to GMS by {{value "polycomVSPlead"}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSPlead
@@ -158,19 +158,19 @@ traps:
     name: POLYCOM-VIDEO-MIB::visualConcertUp
     category: state_change
     severity: notice
-    description: Visual concert pod connected on {_HOSTNAME}.
+    description: Visual Concert pod connected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2684.1.1.0.9
     name: POLYCOM-VIDEO-MIB::visualConcertOff
     category: state_change
-    severity: warning
-    description: Visual concert pod disconnected on {_HOSTNAME}.
+    severity: notice
+    description: Visual concert pod disconnected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2684.1.1.0.10
     name: POLYCOM-VIDEO-MIB::micChange
     category: state_change
     severity: notice
-    description: Mic pod or VTX connection status changed to {polycomVSMicData} on {_HOSTNAME}.
+    description: Microphone pod or VTX status changed to {{value "polycomVSMicData"}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSMicData
@@ -178,7 +178,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::autoAnswerChange
     category: config_change
     severity: notice
-    description: Auto answer setting changed to {polycomVSAutoAnswerSetting} on {_HOSTNAME}.
+    description: Auto answer setting changed to {{value "polycomVSAutoAnswerSetting"}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSAutoAnswerSetting
@@ -186,7 +186,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::timeServerUp
     category: state_change
     severity: notice
-    description: Time server {polycomVSTimeServerAddress} successfully connected on {_HOSTNAME}.
+    description: Time server {{value "polycomVSTimeServerAddress"}} connected on {{hostname}}.
     status: current
     varbinds:
       - polycomVSTimeServerAddress
@@ -194,7 +194,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::timeServerDown
     category: diagnostic
     severity: warning
-    description: Time server {polycomVSTimeServerAddress} connection failed on {_HOSTNAME}.
+    description: Time server {{value "polycomVSTimeServerAddress"}} connection failed on {{hostname}}.
     status: current
     varbinds:
       - polycomVSTimeServerAddress
@@ -202,21 +202,21 @@ traps:
     name: POLYCOM-VIDEO-MIB::timeServerOn
     category: config_change
     severity: notice
-    description: Time server setting changed to {polycomVSTimeServerSetting} on {_HOSTNAME}.
+    description: Time server enabled{{with value "polycomVSTimeServerSetting"}} setting {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSTimeServerSetting
   - oid: 1.3.6.1.4.1.2684.1.1.0.15
     name: POLYCOM-VIDEO-MIB::timeServerOff
     category: state_change
-    severity: notice
-    description: Time server disabled on {_HOSTNAME}.
+    severity: warning
+    description: Time server is disabled on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2684.1.1.0.16
     name: POLYCOM-VIDEO-MIB::gdsUp
     category: state_change
     severity: notice
-    description: Global directory server {polycomVSGDSAddress} successfully connected on {_HOSTNAME}.
+    description: Global directory server connected at {{value "polycomVSGDSAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSGDSAddress
@@ -224,7 +224,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::gdsDown
     category: diagnostic
     severity: warning
-    description: Global directory server at {polycomVSGDSAddress} is not connected correctly on {_HOSTNAME}.
+    description: Global directory server {{value "polycomVSGDSAddress"}} is not connected on {{hostname}}.
     status: current
     varbinds:
       - polycomVSGDSAddress
@@ -232,7 +232,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::gdsOff
     category: state_change
     severity: notice
-    description: Global directory server at {polycomVSGDSAddress} is disabled on {_HOSTNAME}.
+    description: Global directory server disabled{{with value "polycomVSGDSAddress"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSGDSAddress
@@ -240,29 +240,29 @@ traps:
     name: POLYCOM-VIDEO-MIB::gatekeeperReg
     category: state_change
     severity: notice
-    description: Gatekeeper {polycomVSGatekeeperAddress} registered successfully on {_HOSTNAME}.
+    description: Gatekeeper registered successfully at {{value "polycomVSGatekeeperAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSGatekeeperAddress
   - oid: 1.3.6.1.4.1.2684.1.1.0.20
     name: POLYCOM-VIDEO-MIB::gatekeeperDown
     category: state_change
-    severity: warning
-    description: Gatekeeper registration failed at {polycomVSGatekeeperAddress} on {_HOSTNAME}.
+    severity: crit
+    description: Gatekeeper registration failed at {{value "polycomVSGatekeeperAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSGatekeeperAddress
   - oid: 1.3.6.1.4.1.2684.1.1.0.21
     name: POLYCOM-VIDEO-MIB::gatekeeperOff
     category: state_change
-    severity: notice
-    description: Gatekeeper disabled on {_HOSTNAME}.
+    severity: alert
+    description: Gatekeeper is disabled on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2684.1.1.0.22
     name: POLYCOM-VIDEO-MIB::ipAddressChange
     category: state_change
     severity: notice
-    description: System IP address changed from {polycomVSPreviousIPAddress} to {polycomVSCurrentIPAddress} on {_HOSTNAME}.
+    description: System IP address changed from {{value "polycomVSPreviousIPAddress"}} to {{value "polycomVSCurrentIPAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSPreviousIPAddress
@@ -271,7 +271,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::interfaceTypeChange
     category: state_change
     severity: notice
-    description: Network interface card type changed from {polycomVSPreviousNicType} to {polycomVSCurrentNicType} on {_HOSTNAME}.
+    description: Network interface card type changed from {{value "polycomVSPreviousNicType"}} to {{value "polycomVSCurrentNicType"}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSPreviousNicType
@@ -280,7 +280,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::lineEnabled
     category: state_change
     severity: notice
-    description: V.35 or ISDN line {polycomVSNicLineNumber} has been enabled on {_HOSTNAME}.
+    description: V.35 or ISDN line {{value "polycomVSNicLineNumber"}} enabled on {{hostname}}.
     status: current
     varbinds:
       - polycomVSNicLineNumber
@@ -288,7 +288,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::lineDisabled
     category: state_change
     severity: warning
-    description: V.35 or ISDN line {polycomVSNicLineNumber} has been disabled on {_HOSTNAME}.
+    description: V.35 or ISDN line {{value "polycomVSNicLineNumber"}} has been disabled on {{hostname}}.
     status: current
     varbinds:
       - polycomVSNicLineNumber
@@ -296,7 +296,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::lineUp
     category: state_change
     severity: notice
-    description: V.35 or ISDN line {polycomVSNicLineNumber} became available on {_HOSTNAME}.
+    description: V.35 or ISDN line {{value "polycomVSNicLineNumber"}} enabled on {{hostname}}.
     status: current
     varbinds:
       - polycomVSNicLineNumber
@@ -304,7 +304,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::lineDown
     category: state_change
     severity: warning
-    description: V.35 or ISDN line {polycomVSNicLineNumber} is not working correctly on {_HOSTNAME}.
+    description: V.35 or ISDN line {{value "polycomVSNicLineNumber"}} is enabled but not working correctly on {{hostname}}.
     status: current
     varbinds:
       - polycomVSNicLineNumber
@@ -312,7 +312,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::v35PortsEnabled
     category: config_change
     severity: notice
-    description: V.35 ports enabled setting changed to {polycomVSV35PortsEnabled} on {_HOSTNAME}.
+    description: V.35 ports enabled setting changed to {{value "polycomVSV35PortsEnabled"}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSV35PortsEnabled
@@ -320,28 +320,28 @@ traps:
     name: POLYCOM-VIDEO-MIB::lineCountChange
     category: state_change
     severity: notice
-    description: Available V.35 or ISDN line count changed from {polycomVSPreviousNicLineCount} to {polycomVSCurrentNicLineCount} on {_HOSTNAME}.
+    description: Available V.35 or ISDN line count changed from {{value "polycomVSPreviousNicLineCount"}} to {{value "polycomVSCurrentNicLineCount"}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSPreviousNicLineCount
       - polycomVSCurrentNicLineCount
   - oid: 1.3.6.1.4.1.2684.1.1.0.30
     name: POLYCOM-VIDEO-MIB::mainCameraUp
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Main camera is working correctly on {_HOSTNAME}.
+    description: Main camera is working correctly on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2684.1.1.0.31
     name: POLYCOM-VIDEO-MIB::mainCameraDown
     category: diagnostic
     severity: warning
-    description: Main camera reported as not working correctly on {_HOSTNAME}.
+    description: Main camera is not working correctly on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2684.1.1.0.32
     name: POLYCOM-VIDEO-MIB::upnpChange
     category: state_change
     severity: notice
-    description: UPnP device status changed to {polycomVSUPnPStatus} on {_HOSTNAME}.
+    description: UPnP device status changed to {{value "polycomVSUPnPStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSUPnPStatus
@@ -349,7 +349,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::percentPacketLossExcessive
     category: diagnostic
     severity: warning
-    description: Excessive packet loss of {polycomVSPercentPacketLoss}% detected on {_HOSTNAME}.
+    description: Excessive packet loss of {{value "polycomVSPercentPacketLoss"}}% detected on {{hostname}}.
     status: current
     varbinds:
       - polycomVSPercentPacketLoss
@@ -357,7 +357,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::jitterExcessive
     category: diagnostic
     severity: warning
-    description: Excessive jitter {polycomVSJitter} detected on {_HOSTNAME}.
+    description: Excessive jitter of {{value "polycomVSJitter"}} ms detected on {{hostname}}.
     status: current
     varbinds:
       - polycomVSJitter
@@ -365,7 +365,7 @@ traps:
     name: POLYCOM-VIDEO-MIB::latencyExcessive
     category: diagnostic
     severity: warning
-    description: Excessive latency {polycomVSLatency} detected on {_HOSTNAME}.
+    description: Excessive latency detected on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - polycomVSLatency

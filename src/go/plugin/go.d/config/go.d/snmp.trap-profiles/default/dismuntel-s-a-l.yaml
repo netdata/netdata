@@ -14,7 +14,7 @@ traps:
     name: DISMUNTELv00-MIB::alarmMsg
     category: diagnostic
     severity: warning
-    description: Alarm {psAlarmString} reported on {_HOSTNAME}.
+    description: 'Alarm event triggered{{with value "psAlarmString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - psAlarmString

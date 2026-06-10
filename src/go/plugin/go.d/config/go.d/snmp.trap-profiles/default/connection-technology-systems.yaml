@@ -21,20 +21,20 @@ traps:
   - oid: 1.3.6.1.4.1.9304.50.3112.9.0.1
     name: CTS-cvt_wac_wpc_mac_mpc3112-MIB::SystemPowerDown
     category: diagnostic
-    severity: emerg
-    description: System power down detected on {_HOSTNAME}.
+    severity: alert
+    description: System power down detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9304.100.3110.9.0.1
     name: IES-3110-MIB::swhSystemPowerDown
     category: diagnostic
     severity: alert
-    description: System power down detected on {_HOSTNAME}.
+    description: System power down detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9304.100.3110.9.0.2
     name: IES-3110-MIB::swhBroadcastStorm
     category: diagnostic
     severity: warning
-    description: Broadcast storm detected with {etherStatsBroadcastPkts} packets on interface {ifIndex} on {_HOSTNAME}.
+    description: Broadcast storm detected on interface {{first (value "ifIndex") "link"}} with {{value "etherStatsBroadcastPkts"}} broadcast packets on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -43,7 +43,7 @@ traps:
     name: IES-3110-MIB::swhBroadcastNormal
     category: diagnostic
     severity: info
-    description: Normal broadcast packet count {etherStatsBroadcastPkts} on interface {ifIndex} on {_HOSTNAME}.
+    description: Broadcast packet statistics are normal on {{first (value "ifIndex") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -52,7 +52,7 @@ traps:
     name: IES-3110-MIB::swhSFPAbnormality
     category: diagnostic
     severity: warning
-    description: SFP abnormality detected on interface {ifIndex} on {_HOSTNAME}.
+    description: SFP abnormality detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -60,8 +60,8 @@ traps:
   - oid: 1.3.6.1.4.1.9304.100.3110.9.0.8
     name: IES-3110-MIB::swhFaultAlarm
     category: diagnostic
-    severity: err
-    description: Fault alarm triggered for interface {ifIndex} on {_HOSTNAME}.
+    severity: crit
+    description: Hardware fault alarm detected on {{first (value "ifIndex") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -70,7 +70,7 @@ traps:
     name: IES-3110-MIB::swhWarningAlarm
     category: diagnostic
     severity: warning
-    description: Warning alarm triggered on {_HOSTNAME}.
+    description: Warning alarm triggered{{with value "sysLocation"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -79,7 +79,7 @@ traps:
     name: IES-3110-MIB::swhMinorAlarm
     category: diagnostic
     severity: warning
-    description: Minor alarm triggered on interface {ifIndex} at {sysLocation} on {_HOSTNAME}.
+    description: Minor alarm detected on {{first (value "ifIndex") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -88,7 +88,7 @@ traps:
     name: IES-3110-MIB::swhLoopBack
     category: state_change
     severity: notice
-    description: Loop back event detected on interface {ifIndex} on {_HOSTNAME}.
+    description: Loopback state changed on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -97,7 +97,7 @@ traps:
     name: IES-3110-MIB::swhBatteryMode
     category: diagnostic
     severity: warning
-    description: Battery discharge mode detected on {_HOSTNAME}.
+    description: Battery discharge mode detected on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -105,8 +105,8 @@ traps:
   - oid: 1.3.6.1.4.1.9304.100.3110.9.0.15
     name: IES-3110-MIB::swhCATVPower
     category: diagnostic
-    severity: notice
-    description: CATV power event detected on {_HOSTNAME}.
+    severity: warning
+    description: CATV power event detected on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -115,7 +115,7 @@ traps:
     name: IES-3110-MIB::swhNormalAlarm
     category: diagnostic
     severity: notice
-    description: Normal alarm reported on {_HOSTNAME}.
+    description: Normal alarm condition detected on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -123,17 +123,17 @@ traps:
   - oid: 1.3.6.1.4.1.9304.100.3110.9.0.17
     name: IES-3110-MIB::swhPowerExceptional
     category: diagnostic
-    severity: warning
-    description: Power exceptional condition detected on {_HOSTNAME}.
+    severity: crit
+    description: Power exceptional condition detected on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
       - sysLocation
   - oid: 1.3.6.1.4.1.9304.100.3110.9.0.20
     name: IES-3110-MIB::swhSystemPowerOn
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: System power on event detected on {_HOSTNAME}.
+    description: System power on event detected on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -142,13 +142,13 @@ traps:
     name: IPS-3106-SE-PB-MIB::swhSystemPowerDown
     category: diagnostic
     severity: alert
-    description: System power down detected on {_HOSTNAME}.
+    description: System power down detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9304.100.31064.9.0.8
     name: IPS-3106-SE-PB-MIB::swhFaultAlarm
     category: diagnostic
-    severity: warning
-    description: Fault alarm detected on interface {ifIndex} at {sysLocation} on {_HOSTNAME}.
+    severity: crit
+    description: Hardware fault alarm detected on {{first (value "ifIndex") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -157,7 +157,7 @@ traps:
     name: IPS-3106-SE-PB-MIB::swhWarningAlarm
     category: diagnostic
     severity: warning
-    description: Warning alarm triggered on {_HOSTNAME}.
+    description: Warning alarm triggered on {{first (value "ifIndex") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -166,7 +166,7 @@ traps:
     name: IPS-3106-SE-PB-MIB::swhMinorAlarm
     category: diagnostic
     severity: warning
-    description: Minor alarm detected on interface {ifIndex} at {sysLocation} on {_HOSTNAME}.
+    description: Minor alarm detected on {{first (value "ifIndex") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -175,7 +175,7 @@ traps:
     name: IPS-3106-SE-PB-MIB::swhCriticalAlarm
     category: diagnostic
     severity: crit
-    description: Critical alarm triggered on {_HOSTNAME}.
+    description: Critical alarm detected{{with value "ifIndex"}} on interface {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -184,7 +184,7 @@ traps:
     name: IPS-3106-SE-PB-MIB::swhLoopBack
     category: state_change
     severity: notice
-    description: Loop back event detected on interface {ifIndex} on {_HOSTNAME}.
+    description: Loop back state changed on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -193,7 +193,7 @@ traps:
     name: IPS-3106-SE-PB-MIB::swhNormalAlarm
     category: diagnostic
     severity: notice
-    description: Normal alarm event reported on {_HOSTNAME}.
+    description: Normal alarm condition detected on {{first (value "ifIndex") "device"}} at {{value "sysLocation"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -202,7 +202,7 @@ traps:
     name: IPS-3106-SE-PB-MIB::swhCaseFanState
     category: diagnostic
     severity: warning
-    description: Fan state change detected on {_HOSTNAME}.
+    description: Fan state changed on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -211,7 +211,7 @@ traps:
     name: IPS-3106-SE-PB-MIB::swhSystemPowerOn
     category: diagnostic
     severity: notice
-    description: System power on event detected on {_HOSTNAME}.
+    description: System power on event detected on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -220,19 +220,19 @@ traps:
     name: IPS-3106-SE-PB-MIB::swhSystemPowerUp
     category: state_change
     severity: notice
-    description: System power up event detected on {_HOSTNAME}.
+    description: System power up detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9304.300.3002.9.0.1
     name: HES-3112-MIB::cvtSystemPowerDown
     category: diagnostic
     severity: alert
-    description: System power down detected on {_HOSTNAME}.
+    description: System power down detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9304.300.3002.9.0.2
     name: HES-3112-MIB::cvtBroadcastStorm
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Broadcast packet rate {etherStatsBroadcastPkts} exceeded limit on interface {ifIndex} on {_HOSTNAME}.
+    description: Broadcast storm detected on interface {{first (value "ifIndex") "link"}} with {{value "etherStatsBroadcastPkts"}} broadcast packets on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -241,7 +241,7 @@ traps:
     name: HES-3112-MIB::cvtBroadcastNormal
     category: diagnostic
     severity: info
-    description: Normal broadcast packet count {etherStatsBroadcastPkts} on interface {ifIndex} on {_HOSTNAME}.
+    description: Normal broadcast packet statistics reported on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -249,8 +249,8 @@ traps:
   - oid: 1.3.6.1.4.1.9304.300.3002.9.0.8
     name: HES-3112-MIB::cvtFaultAlarm
     category: diagnostic
-    severity: err
-    description: Fault alarm detected on interface {ifIndex} at {sysLocation} on {_HOSTNAME}.
+    severity: crit
+    description: Fault alarm detected on {{first (value "ifIndex") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -259,7 +259,7 @@ traps:
     name: HES-3112-MIB::cvtWarningAlarm
     category: diagnostic
     severity: warning
-    description: Warning alarm triggered on {_HOSTNAME}.
+    description: Warning alarm triggered on {{first (value "ifIndex") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -268,16 +268,16 @@ traps:
     name: HES-3112-MIB::cvtMinorAlarm
     category: diagnostic
     severity: warning
-    description: Minor alarm detected on interface {ifIndex} at {sysLocation} on {_HOSTNAME}.
+    description: Minor alarm detected on {{first (value "ifIndex") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
       - sysLocation
   - oid: 1.3.6.1.4.1.9304.300.3002.9.0.13
     name: HES-3112-MIB::cvtLoopBack
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Loop back event detected on interface {ifIndex} on {_HOSTNAME}.
+    description: Loopback test initiated on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -286,7 +286,7 @@ traps:
     name: HES-3112-MIB::cvtBatteryMode
     category: diagnostic
     severity: warning
-    description: Battery discharge detected on {_HOSTNAME}.
+    description: Battery switched to discharge mode on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -294,8 +294,8 @@ traps:
   - oid: 1.3.6.1.4.1.9304.300.3002.9.0.15
     name: HES-3112-MIB::cvtCATVPower
     category: diagnostic
-    severity: warning
-    description: CATV power event detected on {_HOSTNAME}.
+    severity: notice
+    description: CATV power event detected on {{first (value "ifIndex") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -303,8 +303,8 @@ traps:
   - oid: 1.3.6.1.4.1.9304.300.3002.9.0.17
     name: HES-3112-MIB::cvtPowerExceptional
     category: diagnostic
-    severity: err
-    description: Power exceptional condition detected on {_HOSTNAME}.
+    severity: crit
+    description: Power exceptional condition detected on {{first (value "sysLocation") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex

@@ -234,49 +234,49 @@ traps:
     name: USHA-MIB::ushaPowerRestored
     category: diagnostic
     severity: notice
-    description: Utility power has been restored on {_HOSTNAME}.
+    description: Utility power has been restored on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.2
     name: USHA-MIB::ushaPowerFail
     category: diagnostic
     severity: alert
-    description: Utility power failure detected on {_HOSTNAME}.
+    description: Utility power failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.3
     name: USHA-MIB::ushaReturnFromLowBattery
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS returned from low battery condition on {_HOSTNAME}.
+    description: UPS has returned from a low battery condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.4
     name: USHA-MIB::ushaLowBattery
     category: diagnostic
     severity: alert
-    description: UPS batteries are low and will soon be exhausted on {_HOSTNAME}.
+    description: UPS batteries are low and will soon be exhausted on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.5
     name: USHA-MIB::ushaUpsOk
     category: diagnostic
     severity: info
-    description: UPS status is normal on {_HOSTNAME}.
+    description: UPS is working fine on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.6
     name: USHA-MIB::ushaUpsFailed
     category: diagnostic
-    severity: alert
-    description: UPS failure detected on {_HOSTNAME}.
+    severity: crit
+    description: UPS severe failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.7
     name: USHA-MIB::ushaUpsNotOnBattery
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS is not on battery power on {_HOSTNAME}.
+    description: UPS is not on battery power on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.8
     name: USHA-MIB::ushaUpsOnBattery
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: UPS switched to battery backup with {upsBatteryGroupEstimatedChargeRemaining}% charge remaining on {_HOSTNAME}.
+    description: UPS switched to battery backup power on {{hostname}}.
     status: current
     varbinds:
       - upsBatteryGroupEstimatedChargeRemaining
@@ -285,8 +285,8 @@ traps:
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.9
     name: USHA-MIB::ushaTestOver
     category: diagnostic
-    severity: notice
-    description: UPS battery test completed with result {upsTestBatteryTestResult} on {_HOSTNAME}.
+    severity: info
+    description: UPS battery test completed on {{hostname}}.
     status: current
     varbinds:
       - upsBatteryTest
@@ -298,49 +298,49 @@ traps:
     name: USHA-MIB::ushaTestInProgress
     category: diagnostic
     severity: info
-    description: USHA testing in progress on {_HOSTNAME}.
+    description: USHA testing is in progress on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.11
     name: USHA-MIB::ushaBypassOn
     category: state_change
     severity: notice
-    description: UPS has enabled bypass on {_HOSTNAME}.
+    description: UPS has enabled bypass on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.12
     name: USHA-MIB::ushaUpsOnline
     category: state_change
     severity: notice
-    description: UPS returned to normal online status on {_HOSTNAME}.
+    description: UPS returned to normal online status on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.13
     name: USHA-MIB::ushaCommunicationLost
     category: diagnostic
     severity: crit
-    description: Communication to the UPS has been lost on {_HOSTNAME}.
+    description: Communication to the UPS has been lost on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.14
     name: USHA-MIB::ushaCommunicationEstablished
     category: state_change
     severity: notice
-    description: UPS communication established on {_HOSTNAME}.
+    description: UPS communication established on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.15
     name: USHA-MIB::ushaUpsGoingDown
     category: diagnostic
-    severity: warning
-    description: UPS shutdown command received on {_HOSTNAME}.
+    severity: alert
+    description: UPS has been given shutdown command on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.16
     name: USHA-MIB::ushaUpsTurnedOff
     category: diagnostic
     severity: warning
-    description: UPS turned off on {_HOSTNAME}.
+    description: UPS turned off on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.17
     name: USHA-MIB::ushaUpsSleeping
     category: state_change
     severity: notice
-    description: UPS has entered sleep mode on {_HOSTNAME}.
+    description: UPS has entered sleep mode for {{value "upsControlUpsSleepTime"}} minutes on {{hostname}}.
     status: current
     varbinds:
       - upsControlUpsSleepTime
@@ -348,25 +348,25 @@ traps:
     name: USHA-MIB::ushaUpsWokeUp
     category: state_change
     severity: notice
-    description: UPS woke up from sleep mode on {_HOSTNAME}.
+    description: UPS woke up from sleep mode on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.19
     name: USHA-MIB::ushaUpsRebooted
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS rebooted on {_HOSTNAME}.
+    description: UPS rebooted on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.20
     name: USHA-MIB::ushaUpsShutdownCancelled
     category: diagnostic
     severity: notice
-    description: UPS shutdown process cancelled on {_HOSTNAME}.
+    description: UPS shutdown process was cancelled on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.21
     name: USHA-MIB::ushaUpsNotOverTemperature
     category: diagnostic
     severity: notice
-    description: UPS internal temperature returned to normal at {upsBatteryGroupTemperature} on {_HOSTNAME}.
+    description: UPS internal temperature returned to normal on {{hostname}}.
     status: current
     varbinds:
       - upsBatteryGroupTemperature
@@ -374,8 +374,8 @@ traps:
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.22
     name: USHA-MIB::ushaUpsOverTemperature
     category: diagnostic
-    severity: warning
-    description: UPS over-temperature event with temperature {upsBatteryGroupTemperature} exceeding setpoint {upsConfigGroupOverTemperatureSetPoint} on {_HOSTNAME}.
+    severity: alert
+    description: UPS over-temperature condition detected with temperature {{value "upsBatteryGroupTemperature"}} on {{hostname}}.
     status: current
     varbinds:
       - upsBatteryGroupTemperature
@@ -384,7 +384,7 @@ traps:
     name: USHA-MIB::ushaUpsNotOverLoad
     category: diagnostic
     severity: warning
-    description: UPS load {upsOutputGroupPercentLoad} returned from overload on {_HOSTNAME}.
+    description: UPS load returned from overload to {{value "upsOutputGroupPercentLoad"}}% on {{hostname}}.
     status: current
     varbinds:
       - upsOutputGroupPercentLoad
@@ -393,7 +393,7 @@ traps:
     name: USHA-MIB::ushaUpsOverLoad
     category: diagnostic
     severity: alert
-    description: UPS overload detected with load {upsOutputGroupPercentLoad} exceeding setpoint {upsConfigGroupOverLoadSetPoint} on {_HOSTNAME}.
+    description: UPS overload detected at {{value "upsOutputGroupPercentLoad"}}% on {{hostname}}.
     status: current
     varbinds:
       - upsOutputGroupPercentLoad
@@ -402,19 +402,19 @@ traps:
     name: USHA-MIB::ushaUpsModuleInserted
     category: diagnostic
     severity: notice
-    description: UPS Battery Module inserted on {_HOSTNAME}.
+    description: UPS battery module inserted on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.26
     name: USHA-MIB::ushaUpsModuleRemoved
     category: diagnostic
     severity: warning
-    description: UPS battery module removed on {_HOSTNAME}.
+    description: UPS battery module unplugged on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.27
     name: USHA-MIB::emdTemperatureNotHigh
     category: diagnostic
     severity: notice
-    description: EMD temperature {emdSatatusTemperature} is not over high set point {emdConfigTempHighSetPoint} on {_HOSTNAME}.
+    description: EMD temperature {{value "emdSatatusTemperature"}} is not over high set point {{value "emdConfigTempHighSetPoint"}} on {{hostname}}.
     status: current
     varbinds:
       - emdSatatusTemperature
@@ -424,7 +424,7 @@ traps:
     name: USHA-MIB::emdTemperatureTooHigh
     category: diagnostic
     severity: warning
-    description: EMD temperature {emdSatatusTemperature} exceeded high set point {emdConfigTempHighSetPoint} on {_HOSTNAME}.
+    description: EMD temperature {{value "emdSatatusTemperature"}} exceeds high set point {{value "emdConfigTempHighSetPoint"}} on {{hostname}}.
     status: current
     varbinds:
       - emdSatatusTemperature
@@ -433,8 +433,8 @@ traps:
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.29
     name: USHA-MIB::emdTemperatureNotLow
     category: diagnostic
-    severity: warning
-    description: EMD temperature {emdSatatusTemperature} is not under low set point {emdConfigTempLowSetPoint} on {_HOSTNAME}.
+    severity: notice
+    description: EMD temperature {{value "emdSatatusTemperature"}} is not below low set point {{value "emdConfigTempLowSetPoint"}} on {{hostname}}.
     status: current
     varbinds:
       - emdSatatusTemperature
@@ -444,7 +444,7 @@ traps:
     name: USHA-MIB::emdTemperatureTooLow
     category: diagnostic
     severity: warning
-    description: EMD temperature {emdSatatusTemperature} is below low set point {emdConfigTempLowSetPoint} on {_HOSTNAME}.
+    description: EMD temperature {{value "emdSatatusTemperature"}} is below low set point {{value "emdConfigTempLowSetPoint"}} on {{hostname}}.
     status: current
     varbinds:
       - emdSatatusTemperature
@@ -454,7 +454,7 @@ traps:
     name: USHA-MIB::emdHumidityNotHigh
     category: diagnostic
     severity: warning
-    description: Humidity {emdSatatusHumidity} is not over high set point {emdConfigHumidityHighSetPoint} on {_HOSTNAME}.
+    description: Humidity sensor {{value "emdConfigHumidityName"}} is not over high set point on {{hostname}}.
     status: current
     varbinds:
       - emdSatatusHumidity
@@ -464,7 +464,7 @@ traps:
     name: USHA-MIB::emdHumidityTooHigh
     category: diagnostic
     severity: warning
-    description: Humidity {emdSatatusHumidity} exceeded high set point {emdConfigHumidityHighSetPoint} on {_HOSTNAME}.
+    description: Humidity {{value "emdSatatusHumidity"}} exceeded high set point {{value "emdConfigHumidityHighSetPoint"}} on {{hostname}}.
     status: current
     varbinds:
       - emdSatatusHumidity
@@ -474,7 +474,7 @@ traps:
     name: USHA-MIB::emdHumidityNotLow
     category: diagnostic
     severity: warning
-    description: Humidity {emdSatatusHumidity} is not under low set point {emdConfigHumidityLowSetPoint} on {_HOSTNAME}.
+    description: Humidity {{value "emdSatatusHumidity"}} is not below low set point {{value "emdConfigHumidityLowSetPoint"}}% on {{hostname}}.
     status: current
     varbinds:
       - emdSatatusHumidity
@@ -484,7 +484,7 @@ traps:
     name: USHA-MIB::emdHumidityTooLow
     category: diagnostic
     severity: warning
-    description: Humidity {emdSatatusHumidity} is below low set point {emdConfigHumidityLowSetPoint} on {_HOSTNAME}.
+    description: Humidity {{value "emdSatatusHumidity"}} is below low set point {{value "emdConfigHumidityLowSetPoint"}}% on {{hostname}}.
     status: current
     varbinds:
       - emdSatatusHumidity
@@ -492,9 +492,9 @@ traps:
       - emdConfigHumidityName
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.35
     name: USHA-MIB::emdAlarm1Normal
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: EMD Alarm-1 {emdConfigAlarm1Name} is not active on {_HOSTNAME}.
+    description: EMD Alarm-1 is not active on {{hostname}}.
     status: current
     varbinds:
       - emdConfigAlarm1Type
@@ -503,7 +503,7 @@ traps:
     name: USHA-MIB::emdAlarm1Active
     category: diagnostic
     severity: warning
-    description: EMD Alarm-1 activated for {emdConfigAlarm1Name} on {_HOSTNAME}.
+    description: EMD Alarm-1 activated for {{value "emdConfigAlarm1Name"}} on {{hostname}}.
     status: current
     varbinds:
       - emdConfigAlarm1Type
@@ -511,8 +511,8 @@ traps:
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.37
     name: USHA-MIB::emdAlarm2Normal
     category: diagnostic
-    severity: notice
-    description: EMD Alarm-2 {emdConfigAlarm2Name} cleared to normal on {_HOSTNAME}.
+    severity: info
+    description: EMD Alarm-2 cleared for {{value "emdConfigAlarm2Name"}} on {{hostname}}.
     status: current
     varbinds:
       - emdConfigAlarm2Type
@@ -521,7 +521,7 @@ traps:
     name: USHA-MIB::emdAlarm2Active
     category: diagnostic
     severity: warning
-    description: EMD Alarm-2 activated with type {emdConfigAlarm2Type} and name {emdConfigAlarm2Name} on {_HOSTNAME}.
+    description: EMD Alarm-2 activated for {{value "emdConfigAlarm2Name"}} on {{hostname}}.
     status: current
     varbinds:
       - emdConfigAlarm2Type
@@ -530,355 +530,355 @@ traps:
     name: USHA-MIB::ushaUpsInternalwarning
     category: diagnostic
     severity: warning
-    description: Internal warning detected on {_HOSTNAME}.
+    description: Internal hardware warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.40
     name: USHA-MIB::ushaUpsReturnFromInternalwarning
     category: diagnostic
     severity: notice
-    description: UPS returned from internal warning state on {_HOSTNAME}.
+    description: UPS returned from internal warning on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.41
     name: USHA-MIB::ushaUpsEPOActive
     category: diagnostic
     severity: warning
-    description: EPO active state detected on {_HOSTNAME}.
+    description: EPO (Emergency Power Off) is active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.42
     name: USHA-MIB::ushaUpsReturnFromEPOActive
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS returned from EPO active state on {_HOSTNAME}.
+    description: UPS returned from EPO active state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.43
     name: USHA-MIB::ushaUpsModuleUnlock
-    category: security
-    severity: warning
-    description: Module unlock detected on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: UPS module unlock event detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.44
     name: USHA-MIB::ushaUpsReturnFromModuleUnlock
     category: state_change
     severity: notice
-    description: Module unlock state returned to normal on {_HOSTNAME}.
+    description: UPS module unlock event completed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.45
     name: USHA-MIB::ushaUpsMain1Neutralloss
     category: diagnostic
-    severity: err
-    description: Main 1 neutral loss detected on {_HOSTNAME}.
+    severity: alert
+    description: Main 1 neutral loss detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.46
     name: USHA-MIB::ushaUpsReturnFromMain1Neutralloss
     category: diagnostic
     severity: warning
-    description: UPS returned from Main 1 neutral loss on {_HOSTNAME}.
+    description: UPS returned from Main 1 neutral loss on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.47
     name: USHA-MIB::ushaUpsMain1phaseerror
     category: diagnostic
     severity: warning
-    description: Main 1 phase error detected on {_HOSTNAME}.
+    description: Main 1 phase error detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.48
     name: USHA-MIB::ushaUpsReturnFromMain1phaseerror
     category: diagnostic
     severity: warning
-    description: UPS returned from main 1 phase error on {_HOSTNAME}.
+    description: UPS returned from Main 1 phase error on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.49
     name: USHA-MIB::ushaUpsSitefault
     category: diagnostic
-    severity: warning
-    description: Site fault detected on {_HOSTNAME}.
+    severity: alert
+    description: Site fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.50
     name: USHA-MIB::ushaUpsReturnFromSitefault
     category: diagnostic
-    severity: notice
-    description: Return from site fault on {_HOSTNAME}.
+    severity: warning
+    description: UPS returned from site fault on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.51
     name: USHA-MIB::ushaUpsBypassAbnormal
     category: diagnostic
     severity: warning
-    description: Bypass abnormal condition detected on {_HOSTNAME}.
+    description: Bypass abnormal condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.52
     name: USHA-MIB::ushaUpsReturnFromBypassAbnormal
     category: diagnostic
     severity: warning
-    description: UPS returned from abnormal bypass state on {_HOSTNAME}.
+    description: UPS returned from abnormal bypass state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.53
     name: USHA-MIB::ushaUpsBypassPhaseError
     category: diagnostic
-    severity: err
-    description: Bypass phase error detected on {_HOSTNAME}.
+    severity: crit
+    description: Bypass phase error detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.54
     name: USHA-MIB::ushaUpsReturnFromBypassPhaseError
     category: diagnostic
     severity: warning
-    description: UPS returned from bypass phase error on {_HOSTNAME}.
+    description: UPS returned from bypass phase error on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.55
     name: USHA-MIB::ushaUpsBatteryOpen
     category: diagnostic
     severity: warning
-    description: Battery open state detected on {_HOSTNAME}.
+    description: Battery open condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.56
     name: USHA-MIB::ushaUpsReturnFromBatteryOpen
     category: diagnostic
     severity: notice
-    description: UPS returned from battery open state on {_HOSTNAME}.
+    description: UPS returned from battery open state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.57
     name: USHA-MIB::ushaUpsBatteryOverCharge
     category: diagnostic
     severity: warning
-    description: Battery over charge condition detected on {_HOSTNAME}.
+    description: Battery over charge detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.58
     name: USHA-MIB::ushaUpsReturnFromBatteryOverCharge
     category: diagnostic
     severity: notice
-    description: UPS returned from battery over charge state on {_HOSTNAME}.
+    description: UPS returned from battery over charge condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.59
     name: USHA-MIB::ushaUpsBatteryReverse
     category: diagnostic
-    severity: warning
-    description: Battery reverse condition detected on {_HOSTNAME}.
+    severity: crit
+    description: Battery reverse condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.60
     name: USHA-MIB::ushaUpsReturnFromBatteryReverse
     category: diagnostic
     severity: notice
-    description: UPS returned from battery reverse mode on {_HOSTNAME}.
+    description: UPS returned from battery reverse on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.61
     name: USHA-MIB::ushaUpsOverloadforewarning
     category: diagnostic
     severity: warning
-    description: Overload forewarning detected on {_HOSTNAME}.
+    description: Overload forewarning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.62
     name: USHA-MIB::ushaUpsReturnFromOverloadforewarning
     category: diagnostic
-    severity: notice
-    description: Device returned from overload forewarning on {_HOSTNAME}.
+    severity: warning
+    description: UPS returned from overload forewarning on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.63
     name: USHA-MIB::ushaUpsOverloadWarning
     category: diagnostic
     severity: warning
-    description: Overload warning detected on {_HOSTNAME}.
+    description: UPS overload warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.64
     name: USHA-MIB::ushaUpsReturnFromOverloadWarning
     category: diagnostic
-    severity: notice
-    description: Return from overload warning on {_HOSTNAME}.
+    severity: warning
+    description: UPS returned from overload warning on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.65
     name: USHA-MIB::ushaUpsFanLock
     category: diagnostic
-    severity: err
-    description: Fan lock detected on {_HOSTNAME}.
+    severity: crit
+    description: Fan lock detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.66
     name: USHA-MIB::ushaUpsReturnFromFanLock
     category: diagnostic
     severity: warning
-    description: Fan lock condition cleared on {_HOSTNAME}.
+    description: Fan lock condition resolved on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.67
     name: USHA-MIB::ushaUpsMaintaincoverisopen
     category: diagnostic
     severity: warning
-    description: Maintain cover is open on {_HOSTNAME}.
+    description: Maintain cover is open on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.68
     name: USHA-MIB::ushaUpsReturnFromMaintaincoverisopen
     category: diagnostic
-    severity: warning
-    description: Maintenance cover is open on {_HOSTNAME}.
+    severity: notice
+    description: UPS returned from maintenance mode with cover open on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.69
     name: USHA-MIB::ushaUpsChargerfault
     category: diagnostic
-    severity: err
-    description: Charger fault detected on {_HOSTNAME}.
+    severity: warning
+    description: Charger fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.70
     name: USHA-MIB::ushaUpsReturnFromChargerfault
     category: diagnostic
-    severity: warning
-    description: UPS returned from charger fault on {_HOSTNAME}.
+    severity: notice
+    description: UPS returned from charger fault on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.71
     name: USHA-MIB::ushaUpsModulelocationerror
     category: diagnostic
     severity: warning
-    description: Module location error detected on {_HOSTNAME}.
+    description: Module location error detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.72
     name: USHA-MIB::ushaUpsReturnFromModulelocationerror
     category: diagnostic
-    severity: warning
-    description: Module location error reported on {_HOSTNAME}.
+    severity: notice
+    description: UPS returned from module location error on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.73
     name: USHA-MIB::ushaUpsTurnonabnormal
     category: diagnostic
     severity: warning
-    description: Abnormal UPS turn-on event detected on {_HOSTNAME}.
+    description: Abnormal UPS turn-on event detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.74
     name: USHA-MIB::ushaUpsReturnFromTurnonabnormal
     category: diagnostic
     severity: warning
-    description: Power supply returned from turn-on abnormal on {_HOSTNAME}.
+    description: UPS returned from abnormal turn-on event on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.75
     name: USHA-MIB::ushaUpsRedundancyloss
     category: state_change
     severity: alert
-    description: Redundancy loss detected on {_HOSTNAME}.
+    description: Redundancy loss detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.76
     name: USHA-MIB::ushaUpsReturnFromRedundancyloss
     category: state_change
     severity: notice
-    description: Redundancy loss recovered on {_HOSTNAME}.
+    description: System returned from redundancy loss on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.77
     name: USHA-MIB::ushaUpsHotSwapActived
     category: state_change
     severity: notice
-    description: Hot swap activation detected on {_HOSTNAME}.
+    description: Hot swap module activated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.78
     name: USHA-MIB::ushaUpsReturnFromHotSwapActived
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: UPS returned from hot swap active state on {_HOSTNAME}.
+    description: UPS returned from hot swap active state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.79
     name: USHA-MIB::ushaUpsBatteryInform
     category: diagnostic
     severity: warning
-    description: Battery inform warning triggered on {_HOSTNAME}.
+    description: Battery inform warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.80
     name: USHA-MIB::ushaUpsReturnFromBatteryInform
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS returned from battery on {_HOSTNAME}.
+    description: UPS returned from battery power on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.81
     name: USHA-MIB::ushaUpsInspectionInform
     category: diagnostic
-    severity: notice
-    description: Inspection inform received on {_HOSTNAME}.
+    severity: warning
+    description: Inspection warning reported on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.82
     name: USHA-MIB::ushaUpsReturnFromInspectionInform
     category: diagnostic
-    severity: notice
-    description: Inspection process completed on {_HOSTNAME}.
+    severity: info
+    description: UPS returned from inspection on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.83
     name: USHA-MIB::ushaUpsGuaranteeInform
     category: diagnostic
     severity: warning
-    description: Guarantee Inform warning received on {_HOSTNAME}.
+    description: USHA UPS guarantee warning triggered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.84
     name: USHA-MIB::ushaUpsReturnFromGuaranteeInform
     category: diagnostic
     severity: notice
-    description: UPS returned from guarantee inform state on {_HOSTNAME}.
+    description: UPS returned from guarantee inform on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.85
     name: USHA-MIB::ushaUpsTemperatureLow
     category: diagnostic
     severity: warning
-    description: Temperature low warning detected on {_HOSTNAME}.
+    description: Low temperature warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.86
     name: USHA-MIB::ushaUpsReturnFromTemperatureLow
     category: diagnostic
     severity: notice
-    description: Temperature low condition cleared on {_HOSTNAME}.
+    description: UPS returned from low temperature condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.87
     name: USHA-MIB::ushaUpsTemperatureHigh
     category: diagnostic
     severity: warning
-    description: Temperature high warning detected on {_HOSTNAME}.
+    description: Temperature high warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.88
     name: USHA-MIB::ushaUpsReturnFromTemperatureHigh
     category: diagnostic
     severity: notice
-    description: Temperature high condition cleared on {_HOSTNAME}.
+    description: Temperature condition returned to normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.89
     name: USHA-MIB::ushaUpsBatteryOverTemperature
     category: diagnostic
     severity: warning
-    description: Battery over temperature warning on {_HOSTNAME}.
+    description: Battery over temperature warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.90
     name: USHA-MIB::ushaUpsReturnFromBatteryOverTemperature
     category: diagnostic
     severity: warning
-    description: UPS returned from battery over temperature state on {_HOSTNAME}.
+    description: UPS returned from battery over temperature condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.91
     name: USHA-MIB::ushaUpsFanMaintainInform
     category: diagnostic
     severity: warning
-    description: Fan maintenance warning received on {_HOSTNAME}.
+    description: Fan maintenance warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.92
     name: USHA-MIB::ushaUpsReturnFromFanMaintainInform
     category: diagnostic
     severity: notice
-    description: Fan maintenance mode ended on {_HOSTNAME}.
+    description: Fan maintenance mode ended on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.93
     name: USHA-MIB::ushaUpsBusCapacitanceMaintainInform
     category: diagnostic
     severity: warning
-    description: Bus capacitance maintenance warning on {_HOSTNAME}.
+    description: Bus capacitance maintenance warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.94
     name: USHA-MIB::ushaUpsReturnFromBusCapacitanceMaintainInform
     category: diagnostic
     severity: notice
-    description: UPS returned from bus capacitance maintenance on {_HOSTNAME}.
+    description: UPS returned from bus capacitance maintenance on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.95
     name: USHA-MIB::ushaUpsSystemOverCapacity
     category: diagnostic
-    severity: warning
-    description: System over capacity detected on {_HOSTNAME}.
+    severity: alert
+    description: System over capacity detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.2.1.2.0.96
     name: USHA-MIB::ushaUpsReturnFromSystemOverCapacity
     category: diagnostic
     severity: warning
-    description: System returned from over capacity state on {_HOSTNAME}.
+    description: System returned from over capacity state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.1
     name: IPOMANII-MIB::ipmInletVoltageTooHigh
     category: diagnostic
     severity: crit
-    description: Input voltage {inletStatusVoltage} exceeded high threshold {inletConfigVoltageHigh} on {_HOSTNAME}.
+    description: Input voltage {{value "inletStatusVoltage"}} exceeded high threshold {{value "inletConfigVoltageHigh"}} on {{hostname}}.
     status: current
     varbinds:
       - inletConfigIndex
@@ -889,7 +889,7 @@ traps:
     name: IPOMANII-MIB::ipmInletVoltageNotTooHigh
     category: diagnostic
     severity: warning
-    description: Input voltage {inletStatusVoltage} exceeded high threshold {inletConfigVoltageHigh} on {_HOSTNAME}.
+    description: Input voltage exceeded high threshold on {{first (value "inletConfigDesc") "inlet"}} on {{hostname}}.
     status: current
     varbinds:
       - inletConfigIndex
@@ -899,8 +899,8 @@ traps:
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.3
     name: IPOMANII-MIB::ipmInletVoltageTooLow
     category: diagnostic
-    severity: warning
-    description: Input voltage {inletStatusVoltage} is below low threshold {inletConfigVoltageLow} on {_HOSTNAME}.
+    severity: crit
+    description: Input voltage {{value "inletStatusVoltage"}} is below low threshold {{value "inletConfigVoltageLow"}} on {{hostname}}.
     status: current
     varbinds:
       - inletConfigIndex
@@ -911,7 +911,7 @@ traps:
     name: IPOMANII-MIB::ipmInletVoltageNotTooLow
     category: diagnostic
     severity: warning
-    description: Input voltage {inletStatusVoltage} below low threshold {inletConfigVoltageLow} on inlet {inletConfigDesc} on {_HOSTNAME}.
+    description: Input voltage {{value "inletStatusVoltage"}} is below low threshold on {{hostname}}.
     status: current
     varbinds:
       - inletConfigIndex
@@ -922,7 +922,7 @@ traps:
     name: IPOMANII-MIB::ipmInletCurrentTooHigh
     category: diagnostic
     severity: crit
-    description: Input current {inletStatusCurrent} exceeded high threshold {inletConfigCurrentHigh} on {_HOSTNAME}.
+    description: Input current {{value "inletStatusCurrent"}} exceeded high threshold {{value "inletConfigCurrentHigh"}} on {{hostname}}.
     status: current
     varbinds:
       - inletConfigIndex
@@ -933,7 +933,7 @@ traps:
     name: IPOMANII-MIB::ipmInletCurrentNotTooHigh
     category: diagnostic
     severity: warning
-    description: Inlet current {inletStatusCurrent} exceeded high threshold {inletConfigCurrentHigh} on {_HOSTNAME}.
+    description: Inlet current {{value "inletStatusCurrent"}} is not too high on {{hostname}}.
     status: current
     varbinds:
       - inletConfigIndex
@@ -943,8 +943,8 @@ traps:
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.7
     name: IPOMANII-MIB::ipmInletFrequencyTooHigh
     category: diagnostic
-    severity: warning
-    description: Input frequency {inletStatusFrequency} exceeded high threshold {inletConfigFrequencyHigh} for {inletConfigDesc} on {_HOSTNAME}.
+    severity: crit
+    description: Input frequency {{value "inletStatusFrequency"}} exceeds high threshold {{value "inletConfigFrequencyHigh"}} on {{hostname}}.
     status: current
     varbinds:
       - inletConfigIndex
@@ -955,7 +955,7 @@ traps:
     name: IPOMANII-MIB::ipmInletFrequencyNotTooHigh
     category: diagnostic
     severity: warning
-    description: Inlet frequency {inletStatusFrequency} exceeded high threshold {inletConfigFrequencyHigh} on {_HOSTNAME}.
+    description: Inlet frequency {{value "inletStatusFrequency"}} exceeded high threshold {{value "inletConfigFrequencyHigh"}} on {{hostname}}.
     status: current
     varbinds:
       - inletConfigIndex
@@ -965,8 +965,8 @@ traps:
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.9
     name: IPOMANII-MIB::ipmInletFrequencyTooLow
     category: diagnostic
-    severity: warning
-    description: Input frequency {inletStatusFrequency} below low threshold {inletConfigFrequencyLow} for {inletConfigDesc} on {_HOSTNAME}.
+    severity: crit
+    description: Inlet frequency {{value "inletStatusFrequency"}} is below threshold {{value "inletConfigFrequencyLow"}} on {{hostname}}.
     status: current
     varbinds:
       - inletConfigIndex
@@ -977,7 +977,7 @@ traps:
     name: IPOMANII-MIB::ipmInletFrequencyNotTooLow
     category: diagnostic
     severity: warning
-    description: Inlet frequency {inletStatusFrequency} below low threshold {inletConfigFrequencyLow} for {inletConfigDesc} on {_HOSTNAME}.
+    description: Inlet frequency {{value "inletStatusFrequency"}} is below low threshold {{value "inletConfigFrequencyLow"}} on {{hostname}}.
     status: current
     varbinds:
       - inletConfigIndex
@@ -987,8 +987,8 @@ traps:
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.11
     name: IPOMANII-MIB::ipmOutletCurrentTooHigh
     category: diagnostic
-    severity: warning
-    description: Outlet {outletConfigDesc} current {outletStatusCurrent} exceeded threshold {outletConfigCurrentHigh} on {_HOSTNAME}.
+    severity: crit
+    description: Outlet {{value "outletConfigDesc"}} current {{value "outletStatusCurrent"}} exceeded high threshold on {{hostname}}.
     status: current
     varbinds:
       - outletConfigIndex
@@ -999,7 +999,7 @@ traps:
     name: IPOMANII-MIB::ipmOutletCurrentNotTooHigh
     category: diagnostic
     severity: warning
-    description: Outlet {outletConfigDesc} current {outletStatusCurrent} exceeded high threshold {outletConfigCurrentHigh} on {_HOSTNAME}.
+    description: Outlet {{value "outletConfigDesc"}} current {{value "outletStatusCurrent"}}mA exceeded high threshold {{value "outletConfigCurrentHigh"}}A on {{hostname}}.
     status: current
     varbinds:
       - outletConfigIndex
@@ -1010,7 +1010,7 @@ traps:
     name: IPOMANII-MIB::ipmOutletStateChanged
     category: state_change
     severity: notice
-    description: Outlet {outletConfigDesc} state changed to {outletStatusStatus} on {_HOSTNAME}.
+    description: Outlet {{value "outletConfigDesc"}} state changed to {{value "outletStatusStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - outletConfigIndex
@@ -1020,7 +1020,7 @@ traps:
     name: IPOMANII-MIB::ipmEmdTemperatureNotHigh
     category: diagnostic
     severity: notice
-    description: EMD temperature {ipmEnvEmdStatusTemperature} is not high on {_HOSTNAME}.
+    description: EMD temperature is not high on {{hostname}}.
     status: current
     varbinds:
       - ipmEnvEmdStatusTemperature
@@ -1030,7 +1030,7 @@ traps:
     name: IPOMANII-MIB::ipmEmdTemperatureTooHigh
     category: diagnostic
     severity: warning
-    description: Temperature {ipmEnvEmdStatusTemperature} exceeded threshold {ipmEnvEmdConfigTempHighSetPoint} on {_HOSTNAME}.
+    description: EMD temperature {{value "ipmEnvEmdStatusTemperature"}} exceeded high set point {{value "ipmEnvEmdConfigTempHighSetPoint"}} on {{hostname}}.
     status: current
     varbinds:
       - ipmEnvEmdStatusTemperature
@@ -1040,7 +1040,7 @@ traps:
     name: IPOMANII-MIB::ipmEmdTemperatureNotLow
     category: diagnostic
     severity: warning
-    description: EMD temperature {ipmEnvEmdStatusTemperature} is not low relative to set point {ipmEnvEmdConfigTempLowSetPoint} on {_HOSTNAME}.
+    description: EMD temperature {{value "ipmEnvEmdStatusTemperature"}} is below low set point on {{hostname}}.
     status: current
     varbinds:
       - ipmEnvEmdStatusTemperature
@@ -1050,7 +1050,7 @@ traps:
     name: IPOMANII-MIB::ipmEmdTemperatureTooLow
     category: diagnostic
     severity: warning
-    description: EMD temperature {ipmEnvEmdStatusTemperature} is below set point {ipmEnvEmdConfigTempLowSetPoint} on {_HOSTNAME}.
+    description: EMD temperature {{value "ipmEnvEmdStatusTemperature"}} is below low set point on {{hostname}}.
     status: current
     varbinds:
       - ipmEnvEmdStatusTemperature
@@ -1059,8 +1059,8 @@ traps:
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.18
     name: IPOMANII-MIB::ipmEmdHumidityNotHigh
     category: diagnostic
-    severity: notice
-    description: Humidity {ipmEnvEmdStatusHumidity} is not high on {_HOSTNAME}.
+    severity: warning
+    description: Humidity not high on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - ipmEnvEmdStatusHumidity
@@ -1070,7 +1070,7 @@ traps:
     name: IPOMANII-MIB::ipmEmdHumidityTooHigh
     category: diagnostic
     severity: warning
-    description: Humidity {ipmEnvEmdStatusHumidity}% exceeded high threshold {ipmEnvEmdConfigHumiHighSetPoint}% for {ipmEnvEmdConfigHumiName} on {_HOSTNAME}.
+    description: Humidity {{value "ipmEnvEmdStatusHumidity"}} exceeded high set point {{value "ipmEnvEmdConfigHumiHighSetPoint"}}% on {{hostname}}.
     status: current
     varbinds:
       - ipmEnvEmdStatusHumidity
@@ -1080,7 +1080,7 @@ traps:
     name: IPOMANII-MIB::ipmEmdHumidityNotLow
     category: diagnostic
     severity: warning
-    description: Humidity {ipmEnvEmdStatusHumidity} is not low on {_HOSTNAME}.
+    description: Humidity {{value "ipmEnvEmdStatusHumidity"}} is not low on {{hostname}}.
     status: current
     varbinds:
       - ipmEnvEmdStatusHumidity
@@ -1090,7 +1090,7 @@ traps:
     name: IPOMANII-MIB::ipmEmdHumidityTooLow
     category: diagnostic
     severity: warning
-    description: Humidity {ipmEnvEmdStatusHumidity}% dropped below threshold {ipmEnvEmdConfigHumiLowSetPoint}% for {ipmEnvEmdConfigHumiName} on {_HOSTNAME}.
+    description: Humidity {{value "ipmEnvEmdStatusHumidity"}} is below set point {{value "ipmEnvEmdConfigHumiLowSetPoint"}}% on {{hostname}}.
     status: current
     varbinds:
       - ipmEnvEmdStatusHumidity
@@ -1100,7 +1100,7 @@ traps:
     name: IPOMANII-MIB::ipmEmdAlarm1Normal
     category: diagnostic
     severity: notice
-    description: EMD Alarm 1 {ipmEnvEmdConfigAlarm1Name} returned to normal state on {_HOSTNAME}.
+    description: EMD Alarm 1 returned to normal state for {{value "ipmEnvEmdConfigAlarm1Name"}} on {{hostname}}.
     status: current
     varbinds:
       - ipmEnvEmdConfigAlarm1Type
@@ -1109,7 +1109,7 @@ traps:
     name: IPOMANII-MIB::ipmEmdAlarm1Active
     category: diagnostic
     severity: warning
-    description: EMD Alarm 1 {ipmEnvEmdConfigAlarm1Name} active on {_HOSTNAME}.
+    description: EMD Alarm 1 active for {{value "ipmEnvEmdConfigAlarm1Name"}} on {{hostname}}.
     status: current
     varbinds:
       - ipmEnvEmdConfigAlarm1Type
@@ -1118,7 +1118,7 @@ traps:
     name: IPOMANII-MIB::ipmEmdAlarm2Normal
     category: diagnostic
     severity: notice
-    description: EMD Alarm-2 {ipmEnvEmdConfigAlarm2Name} returned to normal state on {_HOSTNAME}.
+    description: EMD alarm 2 cleared for {{value "ipmEnvEmdConfigAlarm2Name"}} on {{hostname}}.
     status: current
     varbinds:
       - ipmEnvEmdConfigAlarm2Type
@@ -1127,7 +1127,7 @@ traps:
     name: IPOMANII-MIB::ipmEmdAlarm2Active
     category: diagnostic
     severity: warning
-    description: EMD Alarm2 active for {ipmEnvEmdConfigAlarm2Name} on {_HOSTNAME}.
+    description: 'EMD Alarm 2 active: {{value "ipmEnvEmdConfigAlarm2Name"}} on {{hostname}}.'
     status: current
     varbinds:
       - ipmEnvEmdConfigAlarm2Type
@@ -1136,749 +1136,749 @@ traps:
     name: IPOMANII-MIB::ipmSlave01Inlet01OverHigh
     category: diagnostic
     severity: crit
-    description: Slave01 input01 voltage exceeded high threshold on {_HOSTNAME}.
+    description: Slave01 input01 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.27
     name: IPOMANII-MIB::ipmSlave01Inlet01NotOverHigh
     category: diagnostic
-    severity: warning
-    description: Voltage not over high threshold detected on {_HOSTNAME}.
+    severity: crit
+    description: Slave01 input01 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.28
     name: IPOMANII-MIB::ipmSlave01Inlet02OverHigh
     category: diagnostic
-    severity: alert
-    description: Critical voltage over high threshold detected on Slave01 input02 on {_HOSTNAME}.
+    severity: crit
+    description: Slave01 input02 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.29
     name: IPOMANII-MIB::ipmSlave01Inlet02NotOverHigh
     category: diagnostic
-    severity: warning
-    description: Slave01 input02 voltage not over high threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave01 input02 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.30
     name: IPOMANII-MIB::ipmSlave01Inlet01UnderLow
     category: diagnostic
     severity: crit
-    description: Slave01 input01 voltage under low threshold on {_HOSTNAME}.
+    description: Slave01 input01 voltage is under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.31
     name: IPOMANII-MIB::ipmSlave01Inlet01NotUnderLow
     category: diagnostic
-    severity: warning
-    description: Voltage not under low threshold for Slave01 input01 on {_HOSTNAME}.
+    severity: crit
+    description: Slave01 input01 voltage not under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.32
     name: IPOMANII-MIB::ipmSlave01Inlet02UnderLow
     category: diagnostic
     severity: crit
-    description: Slave01 input02 voltage under low threshold on {_HOSTNAME}.
+    description: Slave01 input02 voltage is under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.33
     name: IPOMANII-MIB::ipmSlave01Inlet02NotUnderLow
     category: diagnostic
-    severity: warning
-    description: Slave01 input02 voltage not under low threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave01 input02 voltage not under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.34
     name: IPOMANII-MIB::ipmSlave01Inlet01CurrentOverTh
     category: diagnostic
-    severity: warning
-    description: Slave01 input01 current exceeded high threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave01 input01 current exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.35
     name: IPOMANII-MIB::ipmSlave01Inlet01NotCurrentOverTh
     category: diagnostic
-    severity: warning
-    description: Slave01 input01 current not over high threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave01 input01 current is not over high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.36
     name: IPOMANII-MIB::ipmSlave01Inlet02CurrentOverTh
     category: diagnostic
-    severity: warning
-    description: Slave01 input02 current exceeded high threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave01 input02 current exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.37
     name: IPOMANII-MIB::ipmSlave01Inlet02NotCurrentOverTh
     category: diagnostic
     severity: warning
-    description: Slave01 input02 current not over high threshold on {_HOSTNAME}.
+    description: Slave01 input02 current exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.38
     name: IPOMANII-MIB::ipmSlave01EmdTemperatureNotHigh
     category: diagnostic
-    severity: notice
-    description: Slave01 EMD temperature is not high on {_HOSTNAME}.
+    severity: info
+    description: Slave01 EMD temperature is not high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.39
     name: IPOMANII-MIB::ipmSlave01EmdTemperatureTooHigh
     category: diagnostic
     severity: warning
-    description: Slave01 EMD temperature reported as too high on {_HOSTNAME}.
+    description: Slave01 EMD temperature is too high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.40
     name: IPOMANII-MIB::ipmSlave01EmdTemperatureNotLow
     category: diagnostic
     severity: warning
-    description: Slave01 EMD temperature not low on {_HOSTNAME}.
+    description: Slave01 EMD temperature is not low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.41
     name: IPOMANII-MIB::ipmSlave01EmdTemperatureTooLow
     category: diagnostic
     severity: warning
-    description: Temperature too low detected on {_HOSTNAME}.
+    description: Slave01 EMD temperature is too low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.42
     name: IPOMANII-MIB::ipmSlave01EmdHumidityNotHigh
     category: diagnostic
-    severity: warning
-    description: Slave01 humidity sensor reported not high on {_HOSTNAME}.
+    severity: notice
+    description: Slave01 EMD humidity condition not high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.43
     name: IPOMANII-MIB::ipmSlave01EmdHumidityTooHigh
     category: diagnostic
     severity: warning
-    description: Humidity threshold exceeded for Slave01 emd on {_HOSTNAME}.
+    description: Slave01 emd humidity is too high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.44
     name: IPOMANII-MIB::ipmSlave01EmdHumidityNotLow
     category: diagnostic
     severity: warning
-    description: Humidity sensor reported not low condition on {_HOSTNAME}.
+    description: Slave01 EMD humidity is not low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.45
     name: IPOMANII-MIB::ipmSlave01EmdHumidityTooLow
     category: diagnostic
     severity: warning
-    description: Humidity sensor reported too low condition on {_HOSTNAME}.
+    description: Slave01 emd humidity is too low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.46
     name: IPOMANII-MIB::ipmSlave01EmdAlarm1Normal
     category: diagnostic
     severity: notice
-    description: Slave01 EMD Alarm1 returned to normal state on {_HOSTNAME}.
+    description: Slave01 emd Alarm1 returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.47
     name: IPOMANII-MIB::ipmSlave01EmdAlarm1Active
     category: diagnostic
-    severity: warning
-    description: Slave01 emd Alarm1 Active on {_HOSTNAME}.
+    severity: alert
+    description: Slave01 emd Alarm1 Active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.48
     name: IPOMANII-MIB::ipmSlave01EmdAlarm2Normal
     category: diagnostic
     severity: notice
-    description: Slave01 emd Alarm2 returned to normal state on {_HOSTNAME}.
+    description: Slave01 EMD Alarm 2 returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.49
     name: IPOMANII-MIB::ipmSlave01EmdAlarm2Active
     category: diagnostic
     severity: warning
-    description: Slave01 emd Alarm2 active on {_HOSTNAME}.
+    description: Slave01 EMD Alarm 2 is active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.50
     name: IPOMANII-MIB::ipmSlave01OutletCurrentOverTh
     category: diagnostic
     severity: warning
-    description: Slave01 outlet current exceeded threshold on {_HOSTNAME}.
+    description: Slave01 outlet current exceeded threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.51
     name: IPOMANII-MIB::ipmSlave02Inlet01OverHigh
     category: diagnostic
     severity: crit
-    description: Slave02 input01 voltage exceeded high threshold on {_HOSTNAME}.
+    description: Slave02 input01 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.52
     name: IPOMANII-MIB::ipmSlave02Inlet01NotOverHigh
     category: diagnostic
-    severity: warning
-    description: Slave02 input01 voltage not over high threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave02 input01 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.53
     name: IPOMANII-MIB::ipmSlave02Inlet02OverHigh
     category: diagnostic
-    severity: warning
-    description: Voltage over high threshold detected on Slave02 input02 on {_HOSTNAME}.
+    severity: crit
+    description: Slave02 input02 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.54
     name: IPOMANII-MIB::ipmSlave02Inlet02NotOverHigh
     category: diagnostic
-    severity: warning
-    description: Voltage threshold warning for Slave02 input02 on {_HOSTNAME}.
+    severity: crit
+    description: Slave02 input02 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.55
     name: IPOMANII-MIB::ipmSlave02Inlet01UnderLow
     category: diagnostic
     severity: crit
-    description: Slave02 input01 voltage under low threshold detected on {_HOSTNAME}.
+    description: Slave02 input01 voltage is under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.56
     name: IPOMANII-MIB::ipmSlave02Inlet01NotUnderLow
     category: diagnostic
-    severity: warning
-    description: Slave02 input01 voltage not under low threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave02 input01 voltage is not under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.57
     name: IPOMANII-MIB::ipmSlave02Inlet02UnderLow
     category: diagnostic
     severity: crit
-    description: Slave02 input02 voltage under low threshold detected on {_HOSTNAME}.
+    description: Slave02 input02 voltage is under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.58
     name: IPOMANII-MIB::ipmSlave02Inlet02NotUnderLow
     category: diagnostic
     severity: crit
-    description: Slave02 input02 voltage not under low threshold detected on {_HOSTNAME}.
+    description: Slave02 input02 voltage is not under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.59
     name: IPOMANII-MIB::ipmSlave02Inlet01CurrentOverTh
     category: diagnostic
     severity: crit
-    description: Slave02 input01 current exceeded high threshold on {_HOSTNAME}.
+    description: Slave02 input01 current exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.60
     name: IPOMANII-MIB::ipmSlave02Inlet01NotCurrentOverTh
     category: diagnostic
     severity: warning
-    description: Slave02 input01 current not over high threshold on {_HOSTNAME}.
+    description: Slave02 input01 current is not over high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.61
     name: IPOMANII-MIB::ipmSlave02Inlet02CurrentOverTh
     category: diagnostic
-    severity: warning
-    description: Slave02 input02 current exceeded high threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave02 input02 current exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.62
     name: IPOMANII-MIB::ipmSlave02Inlet02NotCurrentOverTh
     category: diagnostic
     severity: warning
-    description: Slave02 input02 current not over high threshold on {_HOSTNAME}.
+    description: Slave02 input02 current is not over high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.63
     name: IPOMANII-MIB::ipmSlave02EmdTemperatureNotHigh
     category: diagnostic
-    severity: notice
-    description: Slave02 EMD temperature is not high on {_HOSTNAME}.
+    severity: info
+    description: Slave02 EMD temperature is not high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.64
     name: IPOMANII-MIB::ipmSlave02EmdTemperatureTooHigh
     category: diagnostic
     severity: warning
-    description: Temperature threshold exceeded for Slave02 emd on {_HOSTNAME}.
+    description: Slave02 EMD temperature is too high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.65
     name: IPOMANII-MIB::ipmSlave02EmdTemperatureNotLow
     category: diagnostic
     severity: warning
-    description: Slave02 EMD temperature is not low on {_HOSTNAME}.
+    description: Slave02 EMD temperature is not low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.66
     name: IPOMANII-MIB::ipmSlave02EmdTemperatureTooLow
     category: diagnostic
     severity: warning
-    description: Temperature too low on Slave02 emd on {_HOSTNAME}.
+    description: Slave02 EMD temperature is too low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.67
     name: IPOMANII-MIB::ipmSlave02EmdHumidityNotHigh
     category: diagnostic
-    severity: notice
-    description: Slave02 emd humidity condition reported as not high on {_HOSTNAME}.
+    severity: warning
+    description: Slave02 EMD humidity is not high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.68
     name: IPOMANII-MIB::ipmSlave02EmdHumidityTooHigh
     category: diagnostic
     severity: warning
-    description: Humidity threshold exceeded on Slave02 emd on {_HOSTNAME}.
+    description: Slave02 EMD humidity is too high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.69
     name: IPOMANII-MIB::ipmSlave02EmdHumidityNotLow
     category: diagnostic
-    severity: notice
-    description: Humidity sensor reported not low on {_HOSTNAME}.
+    severity: warning
+    description: Slave02 EMD humidity is not low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.70
     name: IPOMANII-MIB::ipmSlave02EmdHumidityTooLow
     category: diagnostic
     severity: warning
-    description: Humidity sensor reported too low condition on {_HOSTNAME}.
+    description: Slave02 emd humidity is too low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.71
     name: IPOMANII-MIB::ipmSlave02EmdAlarm1Normal
     category: diagnostic
     severity: notice
-    description: Slave02 emd Alarm1 returned to normal state on {_HOSTNAME}.
+    description: Slave02 EMD Alarm 1 returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.72
     name: IPOMANII-MIB::ipmSlave02EmdAlarm1Active
     category: diagnostic
-    severity: warning
-    description: Slave02 emd Alarm1 active on {_HOSTNAME}.
+    severity: crit
+    description: Slave02 EMD Alarm1 is active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.73
     name: IPOMANII-MIB::ipmSlave02EmdAlarm2Normal
     category: diagnostic
     severity: notice
-    description: Alarm2 returned to normal state on {_HOSTNAME}.
+    description: Slave02 EMD Alarm 2 returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.74
     name: IPOMANII-MIB::ipmSlave02EmdAlarm2Active
     category: diagnostic
-    severity: warning
-    description: Slave02 emd Alarm2 Active on {_HOSTNAME}.
+    severity: alert
+    description: Slave02 emd Alarm2 Active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.75
     name: IPOMANII-MIB::ipmSlave02OutletCurrentOverTh
     category: diagnostic
     severity: warning
-    description: Slave02 outlet current exceeded threshold on {_HOSTNAME}.
+    description: Slave02 outlet current exceeded threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.76
     name: IPOMANII-MIB::ipmSlave03Inlet01OverHigh
     category: diagnostic
     severity: crit
-    description: Voltage over high threshold detected on Slave03 input01 on {_HOSTNAME}.
+    description: Slave03 input01 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.77
     name: IPOMANII-MIB::ipmSlave03Inlet01NotOverHigh
     category: diagnostic
-    severity: warning
-    description: Voltage threshold exceeded for Slave03 input01 on {_HOSTNAME}.
+    severity: crit
+    description: Slave03 input01 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.78
     name: IPOMANII-MIB::ipmSlave03Inlet02OverHigh
     category: diagnostic
     severity: crit
-    description: Slave03 input02 voltage exceeded high threshold on {_HOSTNAME}.
+    description: Slave03 input02 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.79
     name: IPOMANII-MIB::ipmSlave03Inlet02NotOverHigh
     category: diagnostic
-    severity: warning
-    description: Voltage threshold warning for Slave03 input02 on {_HOSTNAME}.
+    severity: crit
+    description: Slave03 input02 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.80
     name: IPOMANII-MIB::ipmSlave03Inlet01UnderLow
     category: diagnostic
     severity: crit
-    description: Slave03 input01 voltage under low threshold on {_HOSTNAME}.
+    description: Slave03 input01 voltage under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.81
     name: IPOMANII-MIB::ipmSlave03Inlet01NotUnderLow
     category: diagnostic
     severity: warning
-    description: Slave03 input01 voltage is not under low threshold on {_HOSTNAME}.
+    description: Slave03 input01 voltage is not under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.82
     name: IPOMANII-MIB::ipmSlave03Inlet02UnderLow
     category: diagnostic
     severity: crit
-    description: Slave03 input02 voltage under low threshold on {_HOSTNAME}.
+    description: Slave03 input02 voltage is under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.83
     name: IPOMANII-MIB::ipmSlave03Inlet02NotUnderLow
     category: diagnostic
     severity: warning
-    description: Slave03 input02 voltage not under low threshold on {_HOSTNAME}.
+    description: Slave03 input02 voltage is not under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.84
     name: IPOMANII-MIB::ipmSlave03Inlet01CurrentOverTh
     category: diagnostic
-    severity: alert
-    description: Current exceeded high threshold on Slave03 input01 on {_HOSTNAME}.
+    severity: crit
+    description: Slave03 input01 current exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.85
     name: IPOMANII-MIB::ipmSlave03Inlet01NotCurrentOverTh
     category: diagnostic
-    severity: warning
-    description: Slave03 inlet01 current not over high threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave03 input01 current exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.86
     name: IPOMANII-MIB::ipmSlave03Inlet02CurrentOverTh
     category: diagnostic
-    severity: warning
-    description: Slave03 input02 current exceeded high threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave03 input02 current exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.87
     name: IPOMANII-MIB::ipmSlave03Inlet02NotCurrentOverTh
     category: diagnostic
-    severity: warning
-    description: Slave03 input02 current not over high threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave03 input02 current exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.88
     name: IPOMANII-MIB::ipmSlave03EmdTemperatureNotHigh
     category: diagnostic
     severity: info
-    description: Slave03 EMD temperature not high on {_HOSTNAME}.
+    description: Slave03 EMD temperature is not high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.89
     name: IPOMANII-MIB::ipmSlave03EmdTemperatureTooHigh
     category: diagnostic
     severity: warning
-    description: Temperature warning for Slave03 emd on {_HOSTNAME}.
+    description: Slave03 EMD temperature is too high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.90
     name: IPOMANII-MIB::ipmSlave03EmdTemperatureNotLow
     category: diagnostic
     severity: warning
-    description: Temperature not low detected on {_HOSTNAME}.
+    description: Slave03 EMD temperature is not low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.91
     name: IPOMANII-MIB::ipmSlave03EmdTemperatureTooLow
     category: diagnostic
     severity: warning
-    description: Slave03 EMD temperature too low on {_HOSTNAME}.
+    description: Slave03 EMD temperature is too low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.92
     name: IPOMANII-MIB::ipmSlave03EmdHumidityNotHigh
     category: diagnostic
     severity: warning
-    description: Humidity sensor reported not high status on {_HOSTNAME}.
+    description: Slave03 EMD humidity condition not high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.93
     name: IPOMANII-MIB::ipmSlave03EmdHumidityTooHigh
     category: diagnostic
     severity: warning
-    description: Humidity sensor reported high humidity on {_HOSTNAME}.
+    description: Slave03 EMd humidity is too high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.94
     name: IPOMANII-MIB::ipmSlave03EmdHumidityNotLow
     category: diagnostic
     severity: warning
-    description: Humidity sensor reported not low condition on {_HOSTNAME}.
+    description: Slave03 EMD humidity is not low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.95
     name: IPOMANII-MIB::ipmSlave03EmdHumidityTooLow
     category: diagnostic
     severity: warning
-    description: Humidity sensor reported too low condition on {_HOSTNAME}.
+    description: Slave03 EMD humidity is too low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.96
     name: IPOMANII-MIB::ipmSlave03EmdAlarm1Normal
     category: diagnostic
     severity: notice
-    description: Slave03 emd Alarm1 returned to normal state on {_HOSTNAME}.
+    description: Slave03 emd Alarm1 returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.97
     name: IPOMANII-MIB::ipmSlave03EmdAlarm1Active
     category: diagnostic
     severity: warning
-    description: Slave03 emd Alarm1 Active reported on {_HOSTNAME}.
+    description: Slave03 emd Alarm1 Active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.98
     name: IPOMANII-MIB::ipmSlave03EmdAlarm2Normal
     category: diagnostic
     severity: notice
-    description: Slave03 emd Alarm2 returned to normal state on {_HOSTNAME}.
+    description: Slave03 emd Alarm2 returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.99
     name: IPOMANII-MIB::ipmSlave03EmdAlarm2Active
     category: diagnostic
     severity: warning
-    description: Slave03 EMD Alarm2 active on {_HOSTNAME}.
+    description: Slave03 EMD Alarm 2 is active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.100
     name: IPOMANII-MIB::ipmSlave03OutletCurrentOverTh
     category: diagnostic
     severity: warning
-    description: Outlet current exceeded threshold on {_HOSTNAME}.
+    description: Slave03 outlet current exceeded threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.101
     name: IPOMANII-MIB::ipmSlave04Inlet01OverHigh
     category: diagnostic
-    severity: warning
-    description: Voltage over high threshold detected on Slave04 input01 on {_HOSTNAME}.
+    severity: crit
+    description: Slave04 input01 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.102
     name: IPOMANII-MIB::ipmSlave04Inlet01NotOverHigh
     category: diagnostic
-    severity: warning
-    description: Slave04 input01 voltage not over high threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave04 input01 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.103
     name: IPOMANII-MIB::ipmSlave04Inlet02OverHigh
     category: diagnostic
     severity: crit
-    description: Slave04 input02 voltage exceeded high threshold on {_HOSTNAME}.
+    description: Slave04 input02 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.104
     name: IPOMANII-MIB::ipmSlave04Inlet02NotOverHigh
     category: diagnostic
-    severity: warning
-    description: Slave04 input02 voltage not over high threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave04 input02 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.105
     name: IPOMANII-MIB::ipmSlave04Inlet01UnderLow
     category: diagnostic
     severity: crit
-    description: Slave04 input01 voltage under low threshold on {_HOSTNAME}.
+    description: Slave04 input01 voltage is under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.106
     name: IPOMANII-MIB::ipmSlave04Inlet01NotUnderLow
     category: diagnostic
-    severity: warning
-    description: Voltage on Slave04 input01 is not under low threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave04 input01 voltage is not under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.107
     name: IPOMANII-MIB::ipmSlave04Inlet02UnderLow
     category: diagnostic
     severity: crit
-    description: Slave04 input02 voltage under low threshold on {_HOSTNAME}.
+    description: Slave04 input02 voltage under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.108
     name: IPOMANII-MIB::ipmSlave04Inlet02NotUnderLow
     category: diagnostic
-    severity: warning
-    description: Slave04 input02 voltage not under low threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave04 input02 voltage is not under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.109
     name: IPOMANII-MIB::ipmSlave04Inlet01CurrentOverTh
     category: diagnostic
-    severity: warning
-    description: Current exceeded high threshold for Slave04 input01 on {_HOSTNAME}.
+    severity: crit
+    description: Slave04 input01 current exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.110
     name: IPOMANII-MIB::ipmSlave04Inlet01NotCurrentOverTh
     category: diagnostic
     severity: warning
-    description: Slave04 input01 current not over high threshold on {_HOSTNAME}.
+    description: Slave04 input01 current is not over high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.111
     name: IPOMANII-MIB::ipmSlave04Inlet02CurrentOverTh
     category: diagnostic
-    severity: warning
-    description: Slave04 input02 current exceeded high threshold on {_HOSTNAME}.
+    severity: alert
+    description: Current over high threshold on Slave04 input02 on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.112
     name: IPOMANII-MIB::ipmSlave04Inlet02NotCurrentOverTh
     category: diagnostic
-    severity: warning
-    description: Current on Slave04 input02 is not over high threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave04 input02 current exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.113
     name: IPOMANII-MIB::ipmSlave04EmdTemperatureNotHigh
     category: diagnostic
     severity: notice
-    description: Slave04 EMD temperature status reported as not high on {_HOSTNAME}.
+    description: Slave04 EMD temperature is not high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.114
     name: IPOMANII-MIB::ipmSlave04EmdTemperatureTooHigh
     category: diagnostic
     severity: warning
-    description: Slave04 EMD temperature too high on {_HOSTNAME}.
+    description: Slave04 EMD temperature is too high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.115
     name: IPOMANII-MIB::ipmSlave04EmdTemperatureNotLow
     category: diagnostic
     severity: warning
-    description: Temperature warning for Slave04 emd on {_HOSTNAME}.
+    description: Slave04 EMD temperature is not low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.116
     name: IPOMANII-MIB::ipmSlave04EmdTemperatureTooLow
     category: diagnostic
     severity: warning
-    description: Slave04 EMD temperature reported too low on {_HOSTNAME}.
+    description: Slave04 EMD temperature is too low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.117
     name: IPOMANII-MIB::ipmSlave04EmdHumidityNotHigh
     category: diagnostic
-    severity: notice
-    description: Humidity sensor status not high on {_HOSTNAME}.
+    severity: warning
+    description: Slave04 EMD humidity sensor reported not high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.118
     name: IPOMANII-MIB::ipmSlave04EmdHumidityTooHigh
     category: diagnostic
     severity: warning
-    description: Humidity threshold exceeded for Slave04 emd on {_HOSTNAME}.
+    description: Slave04 EMD humidity is too high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.119
     name: IPOMANII-MIB::ipmSlave04EmdHumidityNotLow
     category: diagnostic
     severity: warning
-    description: Humidity sensor reported not low condition on {_HOSTNAME}.
+    description: Slave04 EMD humidity is not low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.120
     name: IPOMANII-MIB::ipmSlave04EmdHumidityTooLow
     category: diagnostic
     severity: warning
-    description: Humidity sensor reported too low condition on {_HOSTNAME}.
+    description: Slave04 emd humidity is too low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.121
     name: IPOMANII-MIB::ipmSlave04EmdAlarm1Normal
     category: diagnostic
     severity: notice
-    description: Slave04 emd Alarm1 returned to normal state on {_HOSTNAME}.
+    description: Slave04 emd Alarm1 returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.122
     name: IPOMANII-MIB::ipmSlave04EmdAlarm1Active
     category: diagnostic
-    severity: warning
-    description: Slave04 emd Alarm1 Active on {_HOSTNAME}.
+    severity: alert
+    description: Slave04 emd Alarm1 Active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.123
     name: IPOMANII-MIB::ipmSlave04EmdAlarm2Normal
     category: diagnostic
     severity: notice
-    description: Alarm2 returned to normal state on {_HOSTNAME}.
+    description: Slave04 EMD Alarm2 returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.124
     name: IPOMANII-MIB::ipmSlave04EmdAlarm2Active
     category: diagnostic
-    severity: warning
-    description: Slave04 emd Alarm2 Active on {_HOSTNAME}.
+    severity: crit
+    description: Slave04 EMD Alarm 2 is active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.125
     name: IPOMANII-MIB::ipmSlave04OutletCurrentOverTh
     category: diagnostic
     severity: warning
-    description: Slave04 outlet current exceeded threshold on {_HOSTNAME}.
+    description: Slave04 outlet current exceeded threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.126
     name: IPOMANII-MIB::ipmSlave05Inlet01OverHigh
     category: diagnostic
     severity: crit
-    description: Voltage over high threshold detected on Slave05 input01 on {_HOSTNAME}.
+    description: Slave05 input01 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.127
     name: IPOMANII-MIB::ipmSlave05Inlet01NotOverHigh
     category: diagnostic
-    severity: warning
-    description: Voltage not over high threshold detected on {_HOSTNAME}.
+    severity: crit
+    description: Slave05 input01 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.128
     name: IPOMANII-MIB::ipmSlave05Inlet02OverHigh
     category: diagnostic
-    severity: alert
-    description: Slave05 input02 voltage exceeded high threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave05 input02 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.129
     name: IPOMANII-MIB::ipmSlave05Inlet02NotOverHigh
     category: diagnostic
-    severity: warning
-    description: Slave05 input02 voltage not over high threshold detected on {_HOSTNAME}.
+    severity: crit
+    description: Slave05 input02 voltage exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.130
     name: IPOMANII-MIB::ipmSlave05Inlet01UnderLow
     category: diagnostic
     severity: crit
-    description: Voltage under low threshold detected on Slave05 input01 on {_HOSTNAME}.
+    description: Slave05 input01 voltage under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.131
     name: IPOMANII-MIB::ipmSlave05Inlet01NotUnderLow
     category: diagnostic
     severity: warning
-    description: Slave05 input01 voltage not under low threshold on {_HOSTNAME}.
+    description: Slave05 input01 voltage is not under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.132
     name: IPOMANII-MIB::ipmSlave05Inlet02UnderLow
     category: diagnostic
     severity: crit
-    description: Slave05 input02 voltage under low threshold on {_HOSTNAME}.
+    description: Slave05 input02 voltage under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.133
     name: IPOMANII-MIB::ipmSlave05Inlet02NotUnderLow
     category: diagnostic
-    severity: alert
-    description: Voltage on Slave05 input02 is not under low threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave05 input02 voltage is not under low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.134
     name: IPOMANII-MIB::ipmSlave05Inlet01CurrentOverTh
     category: diagnostic
-    severity: warning
-    description: Slave05 input01 current exceeded high threshold on {_HOSTNAME}.
+    severity: crit
+    description: Current over high threshold on Slave05 input01 on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.135
     name: IPOMANII-MIB::ipmSlave05Inlet01NotCurrentOverTh
     category: diagnostic
     severity: warning
-    description: Slave05 input01 current not over high threshold on {_HOSTNAME}.
+    description: Slave05 input01 current is not over high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.136
     name: IPOMANII-MIB::ipmSlave05Inlet02CurrentOverTh
     category: diagnostic
-    severity: warning
-    description: Slave05 input02 current exceeded high threshold on {_HOSTNAME}.
+    severity: crit
+    description: Slave05 input02 current exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.137
     name: IPOMANII-MIB::ipmSlave05Inlet02NotCurrentOverTh
     category: diagnostic
     severity: warning
-    description: Slave05 input02 current not over high threshold on {_HOSTNAME}.
+    description: Slave05 input02 current is not over high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.138
     name: IPOMANII-MIB::ipmSlave05EmdTemperatureNotHigh
     category: diagnostic
-    severity: notice
-    description: Temperature sensor Slave05 emd reported normal state on {_HOSTNAME}.
+    severity: info
+    description: Slave05 EMD temperature is not high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.139
     name: IPOMANII-MIB::ipmSlave05EmdTemperatureTooHigh
     category: diagnostic
     severity: warning
-    description: Temperature warning for Slave05 emd detected on {_HOSTNAME}.
+    description: Slave05 EMD temperature is too high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.140
     name: IPOMANII-MIB::ipmSlave05EmdTemperatureNotLow
     category: diagnostic
     severity: warning
-    description: Slave05 EMD temperature is not low on {_HOSTNAME}.
+    description: Slave05 EMD temperature is not low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.141
     name: IPOMANII-MIB::ipmSlave05EmdTemperatureTooLow
     category: diagnostic
     severity: warning
-    description: Slave05 EMD temperature reported too low on {_HOSTNAME}.
+    description: Slave05 EMD temperature is too low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.142
     name: IPOMANII-MIB::ipmSlave05EmdHumidityNotHigh
     category: diagnostic
     severity: warning
-    description: Humidity threshold not exceeded on {_HOSTNAME}.
+    description: Slave05 EMD humidity is not high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.143
     name: IPOMANII-MIB::ipmSlave05EmdHumidityTooHigh
     category: diagnostic
     severity: warning
-    description: Humidity threshold exceeded for Slave05 on {_HOSTNAME}.
+    description: Slave05 emd humidity is too high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.144
     name: IPOMANII-MIB::ipmSlave05EmdHumidityNotLow
     category: diagnostic
     severity: warning
-    description: Humidity sensor reported not low condition on {_HOSTNAME}.
+    description: Slave05 EMD humidity is not low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.145
     name: IPOMANII-MIB::ipmSlave05EmdHumidityTooLow
     category: diagnostic
     severity: warning
-    description: Humidity sensor reported too low condition on {_HOSTNAME}.
+    description: Slave05 emd humidity is too low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.146
     name: IPOMANII-MIB::ipmSlave05EmdAlarm1Normal
     category: diagnostic
     severity: notice
-    description: Slave05 emd Alarm1 returned to normal state on {_HOSTNAME}.
+    description: Slave05 EMD Alarm1 returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.147
     name: IPOMANII-MIB::ipmSlave05EmdAlarm1Active
     category: diagnostic
-    severity: warning
-    description: Slave05 emd Alarm1 Active on {_HOSTNAME}.
+    severity: alert
+    description: Slave05 emd Alarm1 Active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.148
     name: IPOMANII-MIB::ipmSlave05EmdAlarm2Normal
     category: diagnostic
     severity: notice
-    description: Slave05 emd Alarm2 returned to normal state on {_HOSTNAME}.
+    description: Slave05 EMD Alarm2 returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.149
     name: IPOMANII-MIB::ipmSlave05EmdAlarm2Active
     category: diagnostic
     severity: warning
-    description: Slave05 emd Alarm2 Active on {_HOSTNAME}.
+    description: Slave05 emd Alarm2 Active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2468.1.4.2.2.0.150
     name: IPOMANII-MIB::ipmSlave05OutletCurrentOverTh
     category: diagnostic
     severity: warning
-    description: Slave05 outlet current exceeded threshold on {_HOSTNAME}.
+    description: Slave05 outlet current exceeded threshold on {{hostname}}.
     status: current

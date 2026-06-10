@@ -97,7 +97,7 @@ traps:
     name: SAEUROPE-TRAPCONTROL-MIB::trapControlMsgTrap
     category: diagnostic
     severity: warning
-    description: Message {msgText} with severity {msgSeverity} generated on {_HOSTNAME}.
+    description: Device message {{value "msgText"}} generated on {{hostname}}.
     status: current
     varbinds:
       - msgId
@@ -118,7 +118,7 @@ traps:
     name: SAEUROPE-TRAPCONTROL-MIB::trapControlMsgTrap2
     category: diagnostic
     severity: warning
-    description: Message {msgText} with severity {msgSeverity} on {msgSubject} on {_HOSTNAME}.
+    description: Device message {{value "msgText"}} on {{value "msgSubject"}} on {{hostname}}.
     status: current
     varbinds:
       - msgId

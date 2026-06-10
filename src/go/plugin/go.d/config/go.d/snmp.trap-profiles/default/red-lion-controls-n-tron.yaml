@@ -17,7 +17,7 @@ traps:
     name: NTRON714FX6-MIB::ntronPowerChange
     category: diagnostic
     severity: warning
-    description: Power fault status changed to {ntronPowerFault} on {_HOSTNAME}.
+    description: Power fault status changed to {{value "ntronPowerFault"}} on {{hostname}}.
     status: current
     varbinds:
       - ntronPowerFault

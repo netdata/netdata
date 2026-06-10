@@ -36,7 +36,7 @@ traps:
     name: ADVANTECH-EKI-PRONEER-MIB::ddmiAlarmWarning
     category: diagnostic
     severity: warning
-    description: DDMI alarm {ddmiAlarmDescr} reported on {_HOSTNAME}.
+    description: DDMI alarm warning {{value "ddmiAlarmDescr"}} on {{hostname}}.
     status: current
     varbinds:
       - ddmiAlarmDescr
@@ -44,7 +44,7 @@ traps:
     name: ADVANTECH-EKI-PRONEER-MIB::xRingProMasterChange
     category: state_change
     severity: notice
-    description: XRing Pro master status changed to {xRingMasterStatus} on ring {xRingProRingID} on {_HOSTNAME}.
+    description: XRing Pro master changed to {{value "xRingMasterStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - xRingMasterStatus
@@ -53,7 +53,7 @@ traps:
     name: ADVANTECH-EKI-PRONEER-MIB::stpStateChange
     category: state_change
     severity: notice
-    description: STP port {stpPortStatusIndex} changed status to {stpPortStatus} on {_HOSTNAME}.
+    description: STP port {{value "stpPortStatusIndex"}} status changed to {{value "stpPortStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - stpPortStatusIndex

@@ -33,7 +33,7 @@ traps:
     name: REDUND-TRAP-MIB::sysMcpRedundDown
     category: state_change
     severity: alert
-    description: MCP redundancy failed on slot {sysMcpRedundIndx} with state {sysMcpRedundOperState} on {_HOSTNAME}.
+    description: MCP redundancy down, active MCP at slot {{value "sysMcpRedundIndx"}} on {{hostname}}.
     status: current
     varbinds:
       - sysMcpRedundIndx
@@ -42,7 +42,7 @@ traps:
     name: PVC-TRAP-MIB::remotePvcDown
     category: state_change
     severity: warning
-    description: Remote PVC circuit {atmPvcCktId} on card {atmPortCardIndex} port {atmPortPortIndex} went down on {_HOSTNAME}.
+    description: Remote PVC circuit {{value "atmPvcCktId"}} on card {{value "atmPortCardIndex"}} port {{value "atmPortPortIndex"}} went down on {{hostname}}.
     status: current
     varbinds:
       - atmPortCardIndex

@@ -400,9 +400,9 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.47196.4.1.1.3.1.1.5.0.1
     name: ARUBAWIRED-LOOPPROTECT-MIB::arubaWiredLoopProtectLoopDetectedNotification
-    category: security
+    category: state_change
     severity: warning
-    description: Loop detected on interface {ifIndex} with {arubaWiredLoopProtectPortLoopCount} occurrences on {_HOSTNAME}.
+    description: Loop detected on interface {{first (value "ifIndex") "link"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -410,9 +410,9 @@ traps:
       - arubaWiredLoopProtectPortReceiverAction
   - oid: 1.3.6.1.4.1.47196.4.1.1.3.1.1.5.0.2
     name: ARUBAWIRED-LOOPPROTECT-MIB::arubaWiredLoopProtectVlanLoopDetectedNotification
-    category: state_change
-    severity: warning
-    description: VLAN loop detected on {arubaWiredLoopProtectLoopDetectedVlan} with {arubaWiredLoopProtectPortLoopCount} occurrences on {_HOSTNAME}.
+    category: security
+    severity: alert
+    description: VLAN loop detected on {{first (value "ifIndex") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -423,16 +423,16 @@ traps:
     name: ARUBAWIRED-MGMD-RMON-TRAP-MIB::arubaWiredMgmdRmonTrapEvent
     category: diagnostic
     severity: notice
-    description: RMON event {eventIndex} ({eventDescription}) triggered on {_HOSTNAME}.
+    description: 'RMON event {{value "eventIndex"}} triggered{{with value "eventDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eventIndex
       - eventDescription
   - oid: 1.3.6.1.4.1.47196.4.1.1.3.5.0.1
     name: ARUBAWIRED-RPVST-MIB::arubaWiredRpvstErrantBpduReceived
-    category: diagnostic
+    category: security
     severity: warning
-    description: Errant BPDU received on port {arubaWiredRpvstPortName} in VLAN {arubaWiredRpvstVlanIndex} on {_HOSTNAME}.
+    description: Errant BPDU received on {{first (value "arubaWiredRpvstPortName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredRpvstVlanIndex
@@ -447,7 +447,7 @@ traps:
     name: ARUBAWIRED-RPVST-MIB::arubaWiredRpvstNewRoot
     category: state_change
     severity: notice
-    description: Spanning tree root changed to {arubaWiredRpvstNewRootBridgeID} for VLAN {arubaWiredRpvstVlanIndex} on {_HOSTNAME}.
+    description: Spanning tree root changed to {{value "arubaWiredRpvstNewRootBridgeID"}} on VLAN {{value "arubaWiredRpvstVlanIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredRpvstVlanIndex
@@ -456,9 +456,9 @@ traps:
       - arubaWiredRpvstRootBridgeChangeTimeStamp
   - oid: 1.3.6.1.4.1.47196.4.1.1.3.5.0.3
     name: ARUBAWIRED-RPVST-MIB::arubaWiredRpvstRootGuardInconsistency
-    category: security
+    category: state_change
     severity: warning
-    description: Root Guard inconsistency on {arubaWiredRpvstPortName} due to superior BPDU from {arubaWiredRpvstSuperiorBpduSrcMac} on {_HOSTNAME}.
+    description: Root guard inconsistency on {{value "arubaWiredRpvstPortName"}} due to superior BPDU on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredRpvstVlanIndex
@@ -469,7 +469,7 @@ traps:
     name: ARUBAWIRED-RPVST-MIB::arubaWiredRpvstLoopGuardInconsistency
     category: state_change
     severity: warning
-    description: Loop Guard inconsistency detected on port {arubaWiredRpvstPortName} for VLAN {arubaWiredRpvstVlanIndex} on {_HOSTNAME}.
+    description: RPVST loop guard inconsistency detected on {{value "arubaWiredRpvstPortName"}} for VLAN {{value "arubaWiredRpvstVlanIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredRpvstVlanIndex
@@ -479,7 +479,7 @@ traps:
     name: ARUBAWIRED-RPVST-MIB::arubaWiredRpvstTopologyChange
     category: state_change
     severity: notice
-    description: Topology change detected on VLAN {arubaWiredRpvstVlanIndex} port {arubaWiredRpvstPortName} on {_HOSTNAME}.
+    description: Topology change detected in VLAN {{value "arubaWiredRpvstVlanIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredRpvstVlanIndex
@@ -489,9 +489,9 @@ traps:
       - arubaWiredRpvstTopoChangeTime
   - oid: 1.3.6.1.4.1.47196.4.1.1.3.6.0.1
     name: ARUBAWIRED-MVRP-MIB::arubaWiredMvrpVlanLimitReachedEvent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: MVRP dynamic VLAN limit reached with {arubaWiredMvrpMaxVlanLimit} VLANs on {_HOSTNAME}.
+    description: MVRP VLAN limit reached at {{value "arubaWiredMvrpMaxVlanLimit"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredMvrpMaxVlanLimit
@@ -499,31 +499,31 @@ traps:
     name: ARUBAWIRED-VSX-MIB::islUp
     category: state_change
     severity: notice
-    description: ISL transitioned to inSync state on {_HOSTNAME}.
+    description: ISL transitioned to inSync state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.47196.4.1.1.3.7.3.1.2
     name: ARUBAWIRED-VSX-MIB::islDown
     category: state_change
     severity: warning
-    description: ISL link transitioned to outOfSync state on {_HOSTNAME}.
+    description: ISL link transitioned to outOfSync state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.47196.4.1.1.3.7.3.1.3
     name: ARUBAWIRED-VSX-MIB::keepAliveUp
     category: state_change
     severity: notice
-    description: Keepalive established on {_HOSTNAME}.
+    description: Keepalive established on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.47196.4.1.1.3.7.3.1.4
     name: ARUBAWIRED-VSX-MIB::keepAliveDown
     category: state_change
     severity: warning
-    description: Keepalive state changed to failed on {_HOSTNAME}.
+    description: Keepalive link is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.47196.4.1.1.3.10.1.1
     name: ARUBAWIRED-VSF-MIB::arubaWiredVsfMemberStatusChange
     category: state_change
     severity: notice
-    description: VSF member {arubaWiredVsfMemberIndex} status changed to {arubaWiredVsfMemberStatus} on {_HOSTNAME}.
+    description: VSF member {{value "arubaWiredVsfMemberIndex"}} joined the stack on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredVsfMemberIndex
@@ -533,7 +533,7 @@ traps:
     name: ARUBAWIRED-VSF-MIB::arubaWiredVsfFragmentStatusChange
     category: state_change
     severity: warning
-    description: VSF fragment {arubaWiredVsfMemberIndex} status changed to {arubaWiredVsfOperStatus} on {_HOSTNAME}.
+    description: VSF stack fragment {{value "arubaWiredVsfOperStatus"}} for member {{value "arubaWiredVsfMemberIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredVsfMemberIndex
@@ -542,7 +542,7 @@ traps:
     name: ARUBAWIRED-POWERSUPPLY-MIB::arubaWiredPSUStateNotification
     category: diagnostic
     severity: warning
-    description: Power supply {arubaWiredPSUSlotIndex} in group {arubaWiredPSUGroupIndex} state changed to {arubaWiredPSUState} on {_HOSTNAME}.
+    description: Power supply {{value "arubaWiredPSUSlotIndex"}} state changed to {{value "arubaWiredPSUState"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredPSUGroupIndex
@@ -552,7 +552,7 @@ traps:
     name: ARUBAWIRED-TEMPSENSOR-MIB::arubaWiredTempSensorStateNotification
     category: diagnostic
     severity: warning
-    description: Temperature sensor {arubaWiredTempSensorName} reported state {arubaWiredTempSensorState} on {_HOSTNAME}.
+    description: Temperature sensor {{value "arubaWiredTempSensorName"}} state changed to {{value "arubaWiredTempSensorState"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredTempSensorName
@@ -561,7 +561,7 @@ traps:
     name: ARUBAWIRED-FANTRAY-MIB::arubaWiredFanTrayStateNotification
     category: diagnostic
     severity: warning
-    description: Fan tray {arubaWiredFanTrayName} reported state {arubaWiredFanTrayState} on {_HOSTNAME}.
+    description: Fan tray {{value "arubaWiredFanTrayName"}} state changed to {{value "arubaWiredFanTrayState"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredFanTrayName
@@ -570,7 +570,7 @@ traps:
     name: ARUBAWIRED-FAN-MIB::arubaWiredFanStateNotification
     category: diagnostic
     severity: warning
-    description: Fan {arubaWiredFanName} reported state {arubaWiredFanState} on {_HOSTNAME}.
+    description: Fan {{value "arubaWiredFanName"}} state changed to {{value "arubaWiredFanState"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredFanName
@@ -578,8 +578,8 @@ traps:
   - oid: 1.3.6.1.4.1.47196.4.1.1.3.11.6.0.1
     name: ARUBAWIRED-MODULE-MIB::arubaWiredModuleStateNotification
     category: state_change
-    severity: notice
-    description: Module {arubaWiredModuleName} state changed to {arubaWiredModuleState} on {_HOSTNAME}.
+    severity: warning
+    description: Module {{value "arubaWiredModuleName"}} state changed to {{value "arubaWiredModuleState"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredModuleType
@@ -589,7 +589,7 @@ traps:
     name: ARUBAWIRED-MODULE-MIB::arubaWiredModuleInsertedNotification
     category: state_change
     severity: notice
-    description: Module {arubaWiredModuleName} inserted on {_HOSTNAME}.
+    description: Wired module {{value "arubaWiredModuleName"}} inserted on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredModuleType
@@ -598,7 +598,7 @@ traps:
     name: ARUBAWIRED-MODULE-MIB::arubaWiredModuleRemovedNotification
     category: state_change
     severity: notice
-    description: Module {arubaWiredModuleName} removed on {_HOSTNAME}.
+    description: Module {{value "arubaWiredModuleName"}} removed on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredModuleType
@@ -607,7 +607,7 @@ traps:
     name: ARUBAWIRED-MODULE-MIB::arubaWiredModuleUnrecognizedNotification
     category: diagnostic
     severity: warning
-    description: Unrecognized module {arubaWiredModuleName} reported {arubaWiredModuleUnrecognizedDescriptor} on {_HOSTNAME}.
+    description: 'Unrecognized module {{value "arubaWiredModuleName"}} detected{{with value "arubaWiredModuleUnrecognizedDescriptor"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - arubaWiredModuleType
@@ -617,7 +617,7 @@ traps:
     name: ARUBAWIRED-MSTP-MIB::arubaWiredMstpErrantBpduReceived
     category: security
     severity: warning
-    description: Errant BPDU received on {arubaWiredMstpPortName} from {arubaWiredMstpErrantBpduSrcMac} on {_HOSTNAME}.
+    description: Errant BPDU received on {{first (value "arubaWiredMstpPortName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredMstpPortName
@@ -629,7 +629,7 @@ traps:
     name: ARUBAWIRED-MSTP-MIB::arubaWiredMstpInstanceTopologyChange
     category: state_change
     severity: notice
-    description: Topology change detected on MSTP instance {arubaWiredMstpInstanceID} on {_HOSTNAME}.
+    description: MSTP topology change detected on instance {{value "arubaWiredMstpInstanceID"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredMstpPortName
@@ -641,7 +641,7 @@ traps:
     name: ARUBAWIRED-MSTP-MIB::arubaWiredMstpCISTTopologyChange
     category: state_change
     severity: notice
-    description: Topology change detected on port {arubaWiredMstpPortName} with role transition from {arubaWiredMstpOldPortRole} to {arubaWiredMstpNewPortRole} on {_HOSTNAME}.
+    description: MSTP topology change detected on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredMstpPortName
@@ -652,7 +652,7 @@ traps:
     name: ARUBAWIRED-MSTP-MIB::arubaWiredMstpInstanceNewRoot
     category: state_change
     severity: notice
-    description: STP instance {arubaWiredMstpInstanceID} elected new root bridge {arubaWiredMstpNewRootBridgeID} on {_HOSTNAME}.
+    description: MSTP instance {{value "arubaWiredMstpInstanceID"}} elected new root bridge on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredMstpInstanceID
@@ -663,7 +663,7 @@ traps:
     name: ARUBAWIRED-MSTP-MIB::arubaWiredMstpCISTNewRoot
     category: state_change
     severity: notice
-    description: Spanning tree elected new root bridge {arubaWiredMstpNewRootBridgeID} on {_HOSTNAME}.
+    description: MSTP CIST new root elected on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredMstpPreviousRootBridgeID
@@ -673,7 +673,7 @@ traps:
     name: ARUBAWIRED-MSTP-MIB::arubaWiredMstpInstanceLoopGuardInconsistency
     category: state_change
     severity: warning
-    description: Loop guard inconsistency detected on port {arubaWiredMstpPortName} for instance {arubaWiredMstpInstanceID} on {_HOSTNAME}.
+    description: Loop guard inconsistency detected on {{value "arubaWiredMstpPortName"}} for instance {{value "arubaWiredMstpInstanceID"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredMstpPortName
@@ -681,9 +681,9 @@ traps:
       - arubaWiredMstpPortDesignatedBridge
   - oid: 1.3.6.1.4.1.47196.4.1.1.3.13.0.7
     name: ARUBAWIRED-MSTP-MIB::arubaWiredMstpCISTLoopGuardInconsistency
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Loop Guard inconsistency detected on port {arubaWiredMstpPortName} with designated bridge {arubaWiredMstpPortDesignatedBridge} on {_HOSTNAME}.
+    description: Loop guard inconsistency detected on {{first (value "arubaWiredMstpPortName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredMstpPortName
@@ -692,7 +692,7 @@ traps:
     name: ARUBAWIRED-MSTP-MIB::arubaWiredMstpInstanceRootGuardInconsistency
     category: security
     severity: warning
-    description: Root Guard inconsistency detected on port {arubaWiredMstpPortName} due to superior BPDU from {arubaWiredMstpSuperiorBpduSrcMac} on {_HOSTNAME}.
+    description: Root Guard inconsistency detected on {{value "arubaWiredMstpPortName"}} due to superior BPDU on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredMstpPortName
@@ -703,7 +703,7 @@ traps:
     name: ARUBAWIRED-MSTP-MIB::arubaWiredMstpCISTRootGuardInconsistency
     category: security
     severity: warning
-    description: Root Guard triggered on {arubaWiredMstpPortName} due to superior BPDU from {arubaWiredMstpSuperiorBpduSrcMac} on {_HOSTNAME}.
+    description: Root guard inconsistency on {{value "arubaWiredMstpPortName"}} due to superior BPDU on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredMstpPortName
@@ -713,7 +713,7 @@ traps:
     name: ARUBAWIRED-VSFv2-MIB::arubaWiredVsfv2MemberStatusChange
     category: state_change
     severity: notice
-    description: VSF member {arubaWiredVsfv2MemberIndex} status changed to {arubaWiredVsfv2MemberStatus} on {_HOSTNAME}.
+    description: VSF member {{value "arubaWiredVsfv2MemberIndex"}} joined the stack on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredVsfv2MemberIndex
@@ -723,7 +723,7 @@ traps:
     name: ARUBAWIRED-VSFv2-MIB::arubaWiredVsfv2FragmentStatusChange
     category: state_change
     severity: warning
-    description: VSF stack fragment {arubaWiredVsfv2MemberIndex} changed operational status to {arubaWiredVsfv2OperStatus} on {_HOSTNAME}.
+    description: VSF stack fragment {{value "arubaWiredVsfv2OperStatus"}} for member {{value "arubaWiredVsfv2MemberIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredVsfv2MemberIndex
@@ -732,7 +732,7 @@ traps:
     name: ARUBAWIRED-AAA-MIB::arubaWiredRadiusServerStatusChange
     category: state_change
     severity: warning
-    description: RADIUS server {arubaWiredRadiusServerAddress} reachability status changed to {arubaWiredRadiusServerReachabilityStatus} on {_HOSTNAME}.
+    description: RADIUS server {{value "arubaWiredRadiusServerAddress"}} reachability status changed to {{value "arubaWiredRadiusServerReachabilityStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredRadiusServerVrfName
@@ -742,9 +742,9 @@ traps:
       - arubaWiredRadiusServerReachabilityStatus
   - oid: 1.3.6.1.4.1.47196.4.1.1.3.16.0.2
     name: ARUBAWIRED-AAA-MIB::arubaWiredTacacsServerStatusChange
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: TACACS server {arubaWiredTacacsServerAddress} reachability status changed to {arubaWiredTacacsServerReachabilityStatus} on {_HOSTNAME}.
+    description: TACACS server {{value "arubaWiredTacacsServerAddress"}} reachability status changed to {{value "arubaWiredTacacsServerReachabilityStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredTacacsServerVrfName
@@ -755,7 +755,7 @@ traps:
     name: ARUBAWIRED-MACNOTIFY-MIB::arubaWiredMacNotifyMacAddressTableChange
     category: state_change
     severity: notice
-    description: MAC address {arubaWiredMacNotifyMacAddress} {arubaWiredMacNotifyAction} on port {arubaWiredMacNotifyToPortId} on {_HOSTNAME}.
+    description: MAC address {{value "arubaWiredMacNotifyAction"}} on {{value "arubaWiredMacNotifyMacAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredMacNotifyAction
@@ -769,7 +769,7 @@ traps:
     name: ARUBAWIRED-CONFIG-MIB::arubaWiredConfigurationChangeNotification
     category: config_change
     severity: notice
-    description: Running configuration changed by {arubaWiredConfigurationChangeSource} on {_HOSTNAME}.
+    description: Running configuration changed{{with value "arubaWiredConfigurationChangeSource"}} by {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredConfigurationChangeSource
@@ -778,7 +778,7 @@ traps:
     name: ARUBAWIRED-CONFIG-MIB::arubaWiredConfigurationNotificationOnCompletion
     category: config_change
     severity: notice
-    description: Configuration copy operation completed on {_HOSTNAME}.
+    description: Configuration copy operation completed{{with value "arubaWiredConfigurationCopyState"}} with state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredConfigurationCopyServerAddress
@@ -791,7 +791,7 @@ traps:
     name: ARUBAWIRED-PORTSECURITY-MIB::arubaWiredPortSecurityViolationStatusChange
     category: security
     severity: warning
-    description: Wired port security violation triggered for client {arubaWiredClientMac} on {arubaWiredifIndex} with reason {arubaWiredClientViolationReason} on {_HOSTNAME}.
+    description: Port security violation triggered on {{trap_interface}} by {{value "arubaWiredClientMac"}} on {{hostname}}.
     status: current
     varbinds:
       - arubaWiredifIndex

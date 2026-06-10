@@ -225,8 +225,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.1
     name: CERAGON-MIB::gnODUTrap
     category: diagnostic
-    severity: err
-    description: ODU alarm {gnGenCfgAlarmText} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    severity: warning
+    description: 'ODU alarm occurred: {{value "gnGenCfgAlarmText"}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -237,7 +237,7 @@ traps:
     name: CERAGON-MIB::gnIDUTrap
     category: diagnostic
     severity: warning
-    description: IDU alarm {gnGenCfgAlarmText} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'IDU alarm occurred{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -248,7 +248,7 @@ traps:
     name: CERAGON-MIB::gnSDHTrap
     category: diagnostic
     severity: warning
-    description: SONET/SDH Regenerator section alarm {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: SDH Regenerator alarm {{value "gnGenCfgAlarmText"}} on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -259,7 +259,7 @@ traps:
     name: CERAGON-MIB::gnACCESSTrap
     category: diagnostic
     severity: warning
-    description: Alarm {gnGenCfgAlarmText} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'Alarm occurred on Access line{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -267,9 +267,9 @@ traps:
       - gnGenCfgIDUSerialNumber
   - oid: 1.3.6.1.4.1.2281.0.5
     name: CERAGON-MIB::gnODUTrapCleared
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: ODU alarm cleared with status {gnGenStatDeviceODUStatus} and text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'ODU alarm cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -280,7 +280,7 @@ traps:
     name: CERAGON-MIB::gnIDUTrapCleared
     category: diagnostic
     severity: notice
-    description: IDU alarm cleared with status {gnGenDrawerXDeviceIDUStatus} on {_HOSTNAME}.
+    description: 'IDU alarm cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -289,9 +289,9 @@ traps:
       - gnGenCfgIDUSerialNumber
   - oid: 1.3.6.1.4.1.2281.0.7
     name: CERAGON-MIB::gnSDHTrapCleared
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: SDH alarm cleared with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'SDH alarm cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -300,9 +300,9 @@ traps:
       - gnGenCfgIDUSerialNumber
   - oid: 1.3.6.1.4.1.2281.0.8
     name: CERAGON-MIB::gnAccessTrapCleared
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: 'Alarm cleared: {gnGenCfgAlarmText} on {_HOSTNAME}.'
+    description: Alarm cleared on {{first (value "gnGenCfgIDUSerialNumber") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -311,8 +311,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.10
     name: CERAGON-MIB::gnLODUPowerFailTrap
     category: diagnostic
-    severity: crit
-    description: Local ODU power supply fault detected with status {gnOduStatusPowerSupply} on {_HOSTNAME}.
+    severity: alert
+    description: 'Local ODU power fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -322,8 +322,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.11
     name: CERAGON-MIB::gnLODUSynthUnLockTrap
     category: diagnostic
-    severity: err
-    description: Local ODU Hardware fault detected with status {gnOduStatusSynthesizerVCOLock} on {_HOSTNAME}.
+    severity: alert
+    description: 'Local ODU hardware fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -334,7 +334,7 @@ traps:
     name: CERAGON-MIB::gnLODUTxLevelOutOfRangeTrap
     category: diagnostic
     severity: warning
-    description: Local ODU TX signal level {gnOduStatusTransmitLevel} is out of range with alarm {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: Local ODU TX signal is out of range at {{value "gnOduStatusTransmitLevel"}} dBm on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -344,8 +344,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.13
     name: CERAGON-MIB::gnLODURxLevelOutOfRangeTrap
     category: diagnostic
-    severity: warning
-    description: Local ODU RX signal level {gnOduStatusReceiveLevel} out of range with alarm {gnGenCfgAlarmText} on {_HOSTNAME}.
+    severity: crit
+    description: Local ODU RX signal level is out of range ({{value "gnOduStatusReceiveLevel"}} dBm) on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -355,8 +355,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.14
     name: CERAGON-MIB::gnLODUExtremeTempTrap
     category: diagnostic
-    severity: crit
-    description: Extreme temperature {gnOduStatusFahrenheitTemp} detected on ODU {gnGenCfgCLLI} on {_HOSTNAME}.
+    severity: alert
+    description: Local ODU extreme temperature event detected at {{value "gnOduStatusFahrenheitTemp"}} degrees Fahrenheit on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -367,7 +367,7 @@ traps:
     name: CERAGON-MIB::gnLIDUPowerFailTrap
     category: diagnostic
     severity: alert
-    description: Local IDU power fault detected with status {gnGenStatDevicePowerSupply} on {_HOSTNAME}.
+    description: 'Local IDU power fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -377,8 +377,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.16
     name: CERAGON-MIB::gnLCableFaultTrap
     category: diagnostic
-    severity: err
-    description: Cable fault detected on {gnGenStatDeviceCable} with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    severity: alert
+    description: Cable fault detected on {{value "gnGenStatDeviceCable"}} on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -388,8 +388,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.17
     name: CERAGON-MIB::gnLModemFailTrap
     category: diagnostic
-    severity: err
-    description: Local modem fault reported with severity {gnGenCfgTrapSeverity.raw} and text {gnGenCfgAlarmText.raw} on {_HOSTNAME}.
+    severity: alert
+    description: 'Local modem fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -398,8 +398,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.18
     name: CERAGON-MIB::gnLIDUExtremeTempTrap
     category: diagnostic
-    severity: warning
-    description: Extreme temperature event detected with temperature {gnGenStatDeviceFahrenheitTemp} on {_HOSTNAME}.
+    severity: alert
+    description: Extreme temperature {{value "gnGenStatDeviceFahrenheitTemp"}} detected on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -410,7 +410,7 @@ traps:
     name: CERAGON-MIB::gnLLoopbackOnTrap
     category: state_change
     severity: notice
-    description: Local loopback activated with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    description: 'Local loopback activated{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -418,9 +418,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.20
     name: CERAGON-MIB::gnLRemoteCommFaultTrap
-    category: diagnostic
-    severity: warning
-    description: Remote communication disconnected with severity {gnGenCfgTrapSeverity} and text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    category: state_change
+    severity: crit
+    description: 'Remote communication disconnected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -430,7 +430,7 @@ traps:
     name: CERAGON-MIB::gnLTestRunningTrap
     category: diagnostic
     severity: notice
-    description: Local SDH/SONET test activated at {gnGenCfgCLLI} on {_HOSTNAME}.
+    description: 'Local SDH/SONET test activated{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -440,8 +440,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.22
     name: CERAGON-MIB::gnLLOFTrap
     category: diagnostic
-    severity: err
-    description: Local Loss of Frame alarm {gnGenCfgAlarmText} on {_HOSTNAME}.
+    severity: crit
+    description: 'Local Loss of Frame alarm detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -452,7 +452,7 @@ traps:
     name: CERAGON-MIB::gnLLOSTrap
     category: diagnostic
     severity: crit
-    description: Local Loss of Signal alarm on {ifIndex} with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    description: 'Local Loss of Signal alarm detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -463,7 +463,7 @@ traps:
     name: CERAGON-MIB::gnLTIMTrap
     category: diagnostic
     severity: warning
-    description: Local Trace Identifier Mismatch alarm {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: Local Trace Identifier Mismatch alarm {{value "gnGenCfgAlarmText"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -474,7 +474,7 @@ traps:
     name: CERAGON-MIB::gnLEXCTrap
     category: diagnostic
     severity: warning
-    description: Local excessive BER alarm on {gnGenCfgCLLI} with current BER {gnRstStatBERCur} on {_HOSTNAME}.
+    description: Local excessive BER alarm detected with current BER {{value "gnRstStatBERCur"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -486,7 +486,7 @@ traps:
     name: CERAGON-MIB::gnLSDTrap
     category: diagnostic
     severity: warning
-    description: Local Signal Degrade alarm raised with severity {gnGenCfgTrapSeverity} and text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Local Signal Degrade alarm raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -497,8 +497,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.27
     name: CERAGON-MIB::gnLRcvAisTrap
     category: diagnostic
-    severity: warning
-    description: Alarm Indication Signal (AIS) received on interface {ifIndex} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    severity: alert
+    description: 'Alarm Indication Signal received on {{first (value "ifIndex") "interface"}}{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -509,7 +509,7 @@ traps:
     name: CERAGON-MIB::gnLUnExpTrap
     category: diagnostic
     severity: warning
-    description: 'Unexpected signal received on interface {ifIndex} with severity {gnGenCfgTrapSeverity}: {gnGenCfgAlarmText} on {_HOSTNAME}.'
+    description: 'Local terminal received unexpected signal{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -519,8 +519,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.29
     name: CERAGON-MIB::gnLLocTrap
     category: diagnostic
-    severity: err
-    description: Local Loss of Clock alarm {gnGenCfgAlarmText} detected on {_HOSTNAME}.
+    severity: warning
+    description: 'Local Loss of Clock alarm detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -531,7 +531,7 @@ traps:
     name: CERAGON-MIB::gnLLopTrap
     category: diagnostic
     severity: warning
-    description: Local Loss of pointer alarm {gnGenCfgAlarmText} on {gnGenCfgCLLI} on {_HOSTNAME}.
+    description: Local Loss of pointer alarm {{value "gnGenCfgAlarmText"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -542,7 +542,7 @@ traps:
     name: CERAGON-MIB::gnLRdiTrap
     category: diagnostic
     severity: warning
-    description: Remote Defect Identifier (RDI) signal detected with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: Remote Defect Identifier signal received on {{first (value "gnGenCfgCLLI") (value "ifIndex")}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -553,7 +553,7 @@ traps:
     name: CERAGON-MIB::gnLSlmTrap
     category: diagnostic
     severity: warning
-    description: Local Signal Label Mismatch alarm {gnGenCfgAlarmText} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: Local Signal Label Mismatch alarm {{value "gnGenCfgAlarmText"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -564,7 +564,7 @@ traps:
     name: CERAGON-MIB::gnLUnqTrap
     category: diagnostic
     severity: warning
-    description: Unequipped signal detected on interface {ifIndex} with alarm {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Local unequipped signal received{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -575,7 +575,7 @@ traps:
     name: CERAGON-MIB::gnLExternalAlarm1OnTrap
     category: diagnostic
     severity: warning
-    description: External alarm 1 raised with severity {gnGenCfgTrapSeverity} and text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'External alarm 1 raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -586,7 +586,7 @@ traps:
     name: CERAGON-MIB::gnLExternalAlarm2OnTrap
     category: diagnostic
     severity: warning
-    description: External alarm 2 raised with text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'External alarm 2 raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -597,7 +597,7 @@ traps:
     name: CERAGON-MIB::gnLExternalAlarm3OnTrap
     category: diagnostic
     severity: warning
-    description: External alarm 3 raised with text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'External alarm 3 raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -608,7 +608,7 @@ traps:
     name: CERAGON-MIB::gnLExternalAlarm4OnTrap
     category: diagnostic
     severity: warning
-    description: External alarm 4 raised with severity {gnGenCfgTrapSeverity} on {gnGenCfgCLLI} on {_HOSTNAME}.
+    description: 'External alarm 4 raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -619,7 +619,7 @@ traps:
     name: CERAGON-MIB::gnLExternalAlarm5OnTrap
     category: diagnostic
     severity: warning
-    description: External alarm 5 raised with severity {gnGenCfgTrapSeverity} and text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'External alarm 5 raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -630,7 +630,7 @@ traps:
     name: CERAGON-MIB::gnLExternalAlarm6OnTrap
     category: diagnostic
     severity: warning
-    description: External alarm 6 raised with text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'External alarm 6 raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -641,7 +641,7 @@ traps:
     name: CERAGON-MIB::gnLExternalAlarm7OnTrap
     category: diagnostic
     severity: warning
-    description: External alarm 7 raised with severity {gnGenCfgTrapSeverity} and text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'External alarm 7 raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -652,7 +652,7 @@ traps:
     name: CERAGON-MIB::gnLExternalAlarm8OnTrap
     category: diagnostic
     severity: warning
-    description: External alarm 8 raised with text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'External alarm 8 raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -662,8 +662,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.42
     name: CERAGON-MIB::gnLSystemFaultTrap
     category: diagnostic
-    severity: err
-    description: Local system fault {gnGenCfgAlarmText} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    severity: alert
+    description: 'Local system fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -674,7 +674,7 @@ traps:
     name: CERAGON-MIB::gnLTftpFaultTrap
     category: diagnostic
     severity: err
-    description: Local TFTP download failed with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Local TFTP download failed{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -684,7 +684,7 @@ traps:
     name: CERAGON-MIB::gnLInternalDownloadFaultTrap
     category: diagnostic
     severity: err
-    description: Internal download fault {gnGenCfgAlarmText} with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    description: 'Internal download failed{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -694,7 +694,7 @@ traps:
     name: CERAGON-MIB::gnLIntralinkFaultTrap
     category: diagnostic
     severity: err
-    description: Local intra-link download failed with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Local intra-link download failed{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -704,7 +704,7 @@ traps:
     name: CERAGON-MIB::gnLConfMismatchTrap
     category: config_change
     severity: warning
-    description: Local configuration mismatch fault {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Local configuration mismatch fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -713,8 +713,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.47
     name: CERAGON-MIB::gnLProtectSwitchFaultTrap
     category: diagnostic
-    severity: err
-    description: Local protection fault {gnGenCfgAlarmText} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    severity: alert
+    description: 'Local protection fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -723,8 +723,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.48
     name: CERAGON-MIB::gnLProtectCableFaultTrap
     category: diagnostic
-    severity: err
-    description: 'Cable fault detected: {gnGenCfgAlarmText} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Local protection cable fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -734,7 +734,7 @@ traps:
     name: CERAGON-MIB::gnLHeartBeatTrap
     category: diagnostic
     severity: info
-    description: Heartbeat trap received with severity {gnGenCfgTrapSeverity} and text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Heartbeat received{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -744,7 +744,7 @@ traps:
     name: CERAGON-MIB::gnLLomTrap
     category: diagnostic
     severity: crit
-    description: Local Loss of Multi-frame alarm {gnGenCfgAlarmText} on {gnGenCfgCLLI} on {_HOSTNAME}.
+    description: 'Local Loss of Multi-frame alarm detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -754,8 +754,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.51
     name: CERAGON-MIB::gnLHitlessProblemTrap
     category: diagnostic
-    severity: warning
-    description: 'Local Hitless fault detected: {gnGenCfgAlarmText} on {_HOSTNAME}.'
+    severity: crit
+    description: 'Local Hitless fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -764,8 +764,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.52
     name: CERAGON-MIB::gnLHitlessRadioLofTrap
     category: diagnostic
-    severity: err
-    description: Local Hitless Radio LOF fault detected with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: 'Local Hitless RadioLOF fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -774,8 +774,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.53
     name: CERAGON-MIB::gnLHitlessCableDisconnectTrap
     category: diagnostic
-    severity: warning
-    description: Hitless cable fault detected with severity {gnGenCfgTrapSeverity.raw} and text {gnGenCfgAlarmText.raw} on {_HOSTNAME}.
+    severity: crit
+    description: 'Local hitless cable fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -785,7 +785,7 @@ traps:
     name: CERAGON-MIB::gnLPamTrap
     category: state_change
     severity: warning
-    description: MSP protection architecture mismatch detected on {_HOSTNAME}.
+    description: 'MSP protection architecture mismatch detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -794,9 +794,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.55
     name: CERAGON-MIB::gnLScmTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: MSP Selector Channel Mismatch detected with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'MSP Selector Channel mismatch detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -807,7 +807,7 @@ traps:
     name: CERAGON-MIB::gnLInvTrap
     category: diagnostic
     severity: warning
-    description: Invalid K1 byte detected on interface {ifIndex} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: Invalid K1 byte received on {{first (value "gnGenCfgCLLI") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -818,7 +818,7 @@ traps:
     name: CERAGON-MIB::gnLInbandTrap
     category: state_change
     severity: warning
-    description: Inband PPP link went down with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'Inband PPP link went down{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -828,8 +828,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.58
     name: CERAGON-MIB::gnWSLOSTrap
     category: diagnostic
-    severity: warning
-    description: Wayside channel link loss detected with alarm {gnGenCfgAlarmText} on {_HOSTNAME}.
+    severity: alert
+    description: 'Wayside channel lost state detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -838,8 +838,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.59
     name: CERAGON-MIB::gnODUtoODUCableFaultTrap
     category: diagnostic
-    severity: err
-    description: ODU to ODU cable fault detected with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    severity: crit
+    description: 'ODU to ODU cable fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -848,8 +848,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.60
     name: CERAGON-MIB::gnNoSignalReceivedFromODUTrap
     category: diagnostic
-    severity: err
-    description: No signal received from ODU with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    severity: crit
+    description: 'No signal received from ODU{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -859,7 +859,7 @@ traps:
     name: CERAGON-MIB::gnProtectionLockoutConfiguredTrap
     category: config_change
     severity: notice
-    description: Protection lockout configured at {gnGenCfgCLLI} on {_HOSTNAME}.
+    description: 'Protection lockout configured{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -869,7 +869,7 @@ traps:
     name: CERAGON-MIB::gnRFUPowerFailureTrap
     category: diagnostic
     severity: crit
-    description: 'Power supply failure detected: {gnGenCfgAlarmText} on {_HOSTNAME}.'
+    description: 'Power supply failure detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -879,7 +879,7 @@ traps:
     name: CERAGON-MIB::gnRFURxLevelPathOutOfRangeTrap
     category: diagnostic
     severity: warning
-    description: RF receive level path out of range with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: RF receive level path out of range on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -888,8 +888,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.64
     name: CERAGON-MIB::gnRFUExtremeTemperatureTrap
     category: diagnostic
-    severity: warning
-    description: RFU temperature alarm {gnGenCfgAlarmText} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: 'RFU temperature is too high or low{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -899,7 +899,7 @@ traps:
     name: CERAGON-MIB::gnRFUFanFailureTrap
     category: diagnostic
     severity: crit
-    description: Fan failure detected with severity {gnGenCfgTrapSeverity.raw} and text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: Fan failure detected on {{first (value "gnGenCfgCLLI") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -909,7 +909,7 @@ traps:
     name: CERAGON-MIB::gnLowSignalToRFUTrap
     category: diagnostic
     severity: warning
-    description: 'Low signal reception detected: {gnGenCfgAlarmText} on {_HOSTNAME}.'
+    description: 'Low signal reception detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -918,8 +918,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.67
     name: CERAGON-MIB::gnRFUXPICClockFailureTrap
     category: diagnostic
-    severity: crit
-    description: XPIC clock failure detected with severity {gnGenCfgTrapSeverity.raw} and text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    severity: alert
+    description: 'XPIC clock failure detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -929,7 +929,7 @@ traps:
     name: CERAGON-MIB::gnRFUDelayCalibrationFailure1Trap
     category: diagnostic
     severity: warning
-    description: RX AGC not locked reported by {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'RFU delay calibration failure: RX AGC not locked on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -939,7 +939,7 @@ traps:
     name: CERAGON-MIB::gnRFUDelayCalibrationFailure2Trap
     category: diagnostic
     severity: warning
-    description: Calibration failure due to wide/deep notch detected with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    description: 'RFU calibration failed due to wide or deep notch{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -948,8 +948,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.70
     name: CERAGON-MIB::gnLSFPFaultTrap
     category: diagnostic
-    severity: err
-    description: Gigabit ethernet SFP fault detected with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    severity: warning
+    description: 'Gigabit Ethernet SFP fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -960,7 +960,7 @@ traps:
     name: CERAGON-MIB::gnEncryptionFaultTrap
     category: diagnostic
     severity: err
-    description: Encryption fault detected with severity {gnGenCfgTrapSeverity} and text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Encryption fault occurred{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -971,7 +971,7 @@ traps:
     name: CERAGON-MIB::gnEncryptionSyncLosTrap
     category: diagnostic
     severity: warning
-    description: Encryption synchronization loss detected with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'Encryption synchronization loss detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -981,8 +981,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.73
     name: CERAGON-MIB::gnEncryptionKepTimout
     category: diagnostic
-    severity: err
-    description: Encryption KEP timeout fault detected with alarm text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    severity: crit
+    description: 'Encryption KEP timeout fault occurred{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -993,7 +993,7 @@ traps:
     name: CERAGON-MIB::gnEncryptionSkTimerElapsed
     category: diagnostic
     severity: warning
-    description: Encryption session key timer elapsed with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'Encryption session key timer elapsed{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1003,8 +1003,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.75
     name: CERAGON-MIB::gnEncryptionPowerUpSelfTestFail
     category: diagnostic
-    severity: alert
-    description: Encryption power-up self-test failed with severity {gnGenCfgTrapSeverity} and alarm {gnGenCfgAlarmText} on {_HOSTNAME}.
+    severity: crit
+    description: 'Encryption power up self-test fault occurred{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1014,8 +1014,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.76
     name: CERAGON-MIB::gnEncryptionConditionalTestFail
     category: diagnostic
-    severity: err
-    description: Encryption conditional test fault occurred with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    severity: warning
+    description: 'Encryption conditional test fault occurred{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1026,7 +1026,7 @@ traps:
     name: CERAGON-MIB::gnEncryptionWillTurnOffOnNextRest
     category: state_change
     severity: warning
-    description: Encryption will be turned off on next reset on {_HOSTNAME}.
+    description: 'Encryption will turn off on next reset{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1037,7 +1037,7 @@ traps:
     name: CERAGON-MIB::gnEncryptionEventReport
     category: diagnostic
     severity: warning
-    description: Encryption event report {gnGenCfgAlarmText} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: Encryption event report {{value "gnGenCfgAlarmText"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1048,7 +1048,7 @@ traps:
     name: CERAGON-MIB::gnEncryptionTechCardWasDetected
     category: diagnostic
     severity: notice
-    description: Encryption Technician card detected on {_HOSTNAME}.
+    description: 'Encryption technician card detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1059,7 +1059,7 @@ traps:
     name: CERAGON-MIB::gnAdminPasswordInDefaultState
     category: security
     severity: warning
-    description: Admin password is in default state on {_HOSTNAME}.
+    description: 'Admin password is in default state{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1068,9 +1068,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.81
     name: CERAGON-MIB::gnLinkGroupingProtectionFaultTrap
-    category: diagnostic
-    severity: err
-    description: 'Link Grouping Protection Fault: {gnGenCfgAlarmText} on {_HOSTNAME}.'
+    category: state_change
+    severity: crit
+    description: 'Link grouping protection fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1078,9 +1078,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.82
     name: CERAGON-MIB::gnLossOfProtectionTrap
-    category: diagnostic
+    category: state_change
     severity: alert
-    description: Loss of protection alarm {gnGenCfgAlarmText} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'Loss of protection detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1090,17 +1090,17 @@ traps:
     name: CERAGON-MIB::gnTempLicenseTrap
     category: license
     severity: notice
-    description: Temporary license enabled with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Temporary license is enabled{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
       - gnGenCfgAlarmText
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.84
-    name: CERAGON-MIB::gnMUXCfgXTempLicenseTrap
-    category: license
+    name: CERAGON-MIB::gnMultiRadioProblemTrap
+    category: diagnostic
     severity: warning
-    description: Temporary license enabled with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Multi radio fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1110,7 +1110,7 @@ traps:
     name: CERAGON-MIB::gnLODUPowerOkTrap
     category: diagnostic
     severity: notice
-    description: Local ODU power fault cleared with status {gnOduStatusPowerSupply} on {_HOSTNAME}.
+    description: 'Local ODU power fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1121,7 +1121,7 @@ traps:
     name: CERAGON-MIB::gnLODUSynthLockTrap
     category: diagnostic
     severity: notice
-    description: Local ODU hardware fault cleared with status {gnOduStatusSynthesizerVCOLock} on {_HOSTNAME}.
+    description: 'Local ODU hardware fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1132,7 +1132,7 @@ traps:
     name: CERAGON-MIB::gnLODUTxLevelInRangeTrap
     category: diagnostic
     severity: notice
-    description: Local ODU TX signal level {gnOduStatusTransmitLevel} is in range on {_HOSTNAME}.
+    description: Local ODU TX signal is in range with level {{value "gnOduStatusTransmitLevel"}} dBm on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1143,7 +1143,7 @@ traps:
     name: CERAGON-MIB::gnLODURxLevelInRangeTrap
     category: diagnostic
     severity: notice
-    description: Local ODU RX signal level {gnOduStatusReceiveLevel} is in range on {_HOSTNAME}.
+    description: Local ODU RX signal is in range with level {{value "gnOduStatusReceiveLevel"}} on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1154,7 +1154,7 @@ traps:
     name: CERAGON-MIB::gnLODUNormalTempTrap
     category: diagnostic
     severity: notice
-    description: Local ODU temperature returned to normal at {gnOduStatusFahrenheitTemp} degrees Fahrenheit on {_HOSTNAME}.
+    description: Local ODU returned to normal temperature {{value "gnOduStatusFahrenheitTemp"}}F on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1165,7 +1165,7 @@ traps:
     name: CERAGON-MIB::gnLIDUPowerOkTrap
     category: diagnostic
     severity: notice
-    description: Power fault cleared for {gnGenStatDevicePowerSupply} on {_HOSTNAME}.
+    description: Local IDU power fault cleared on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1176,7 +1176,7 @@ traps:
     name: CERAGON-MIB::gnLCableOkTrap
     category: state_change
     severity: notice
-    description: Local IDU-ODU cable fault cleared on {_HOSTNAME}.
+    description: Local IDU-ODU cable fault cleared on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1187,7 +1187,7 @@ traps:
     name: CERAGON-MIB::gnLModemOkTrap
     category: diagnostic
     severity: notice
-    description: Local modem fault cleared with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Local modem fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1197,7 +1197,7 @@ traps:
     name: CERAGON-MIB::gnLIDUNormalTempTrap
     category: diagnostic
     severity: notice
-    description: Local IDU returned to normal temperature {gnGenStatDeviceFahrenheitTemp} on {_HOSTNAME}.
+    description: Local IDU temperature returned to normal on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1208,7 +1208,7 @@ traps:
     name: CERAGON-MIB::gnLLoopbackOffTrap
     category: state_change
     severity: notice
-    description: Local loopback cleared on {_HOSTNAME}.
+    description: 'Local loopback cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1218,7 +1218,7 @@ traps:
     name: CERAGON-MIB::gnLRemoteCommOkTrap
     category: state_change
     severity: notice
-    description: Remote communication re-connected on {_HOSTNAME}.
+    description: 'Remote communication re-connected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1226,9 +1226,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.121
     name: CERAGON-MIB::gnLNoTestRunningTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Local SDH/SONET test cleared with status {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Local SDH/SONET test cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1239,7 +1239,7 @@ traps:
     name: CERAGON-MIB::gnLNoLOFTrap
     category: diagnostic
     severity: notice
-    description: Local Loss of Frame alarm cleared for {gnGenCfgCLLI} on {_HOSTNAME}.
+    description: 'Local Loss of Frame alarm cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1248,9 +1248,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.123
     name: CERAGON-MIB::gnLNoLOSTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Local Loss of Signal alarm cleared for {gnGenCfgCLLI} on {_HOSTNAME}.
+    description: 'Local Loss of Signal alarm cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1261,7 +1261,7 @@ traps:
     name: CERAGON-MIB::gnLNoTIMTrap
     category: diagnostic
     severity: notice
-    description: Local Trace Identifier Mismatch alarm cleared on {_HOSTNAME}.
+    description: 'Local Trace Identifier Mismatch alarm cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1272,7 +1272,7 @@ traps:
     name: CERAGON-MIB::gnLNoEXCTrap
     category: diagnostic
     severity: notice
-    description: Local Excessive BER alarm cleared with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Local excessive BER alarm cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1284,7 +1284,7 @@ traps:
     name: CERAGON-MIB::gnLNoSDTrap
     category: diagnostic
     severity: notice
-    description: Local Signal Degrade alarm cleared with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'Local Signal Degrade alarm cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1296,7 +1296,7 @@ traps:
     name: CERAGON-MIB::gnLNoAisTrap
     category: diagnostic
     severity: warning
-    description: Local terminal stopped receiving AIS with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    description: 'Alarm Indication Signal (AIS) received on {{first (value "ifIndex") "interface"}}{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1307,7 +1307,7 @@ traps:
     name: CERAGON-MIB::gnLNoUnExpTrap
     category: diagnostic
     severity: warning
-    description: Local terminal stopped receiving unexpected signal with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'Local terminal stopped receiving unexpected signal{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1318,7 +1318,7 @@ traps:
     name: CERAGON-MIB::gnLNoLocTrap
     category: state_change
     severity: notice
-    description: Local Loss of Carrier alarm cleared on interface {ifIndex} with text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: Local Loss of Carrier alarm cleared on interface {{first (value "ifIndex") "link"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1329,7 +1329,7 @@ traps:
     name: CERAGON-MIB::gnLNoLopTrap
     category: state_change
     severity: notice
-    description: Local Loss of pointer alarm cleared on {gnGenCfgCLLI} on {_HOSTNAME}.
+    description: 'Local Loss of pointer alarm cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1338,9 +1338,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.131
     name: CERAGON-MIB::gnLNoRdiTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Local terminal stopped receiving Remote Defect Identifier signal on {_HOSTNAME}.
+    description: Remote Defect Identifier signal lost on {{first (value "ifIndex") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1349,9 +1349,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.132
     name: CERAGON-MIB::gnLNoSlmTrap
-    category: diagnostic
-    severity: warning
-    description: Local Signal Label Mismatch alarm cleared with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Local Signal Label Mismatch alarm cleared on {{first (value "gnGenCfgCLLI") (value "ifIndex")}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1362,7 +1362,7 @@ traps:
     name: CERAGON-MIB::gnLNoUnqTrap
     category: state_change
     severity: notice
-    description: Local terminal started receiving equipped signal on {_HOSTNAME}.
+    description: Local terminal started receiving equipped signal on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1373,7 +1373,7 @@ traps:
     name: CERAGON-MIB::gnLExternalAlarm1OffTrap
     category: state_change
     severity: notice
-    description: External alarm 1 cleared on {_HOSTNAME}.
+    description: External alarm 1 cleared on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1382,9 +1382,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.135
     name: CERAGON-MIB::gnLExternalAlarm2OffTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: External alarm 2 cleared with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'External alarm 2 cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1393,9 +1393,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.136
     name: CERAGON-MIB::gnLExternalAlarm3OffTrap
-    category: diagnostic
-    severity: warning
-    description: Local External alarm 3 cleared with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: External alarm 3 cleared on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1406,7 +1406,7 @@ traps:
     name: CERAGON-MIB::gnLExternalAlarm4OffTrap
     category: state_change
     severity: notice
-    description: External alarm 4 cleared on {_HOSTNAME}.
+    description: 'External alarm 4 cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1417,7 +1417,7 @@ traps:
     name: CERAGON-MIB::gnLExternalAlarm5OffTrap
     category: state_change
     severity: notice
-    description: Local External alarm 5 cleared with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: External alarm 5 cleared on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1428,7 +1428,7 @@ traps:
     name: CERAGON-MIB::gnLExternalAlarm6OffTrap
     category: state_change
     severity: notice
-    description: External alarm 6 cleared on {_HOSTNAME}.
+    description: 'External alarm 6 cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1437,9 +1437,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.140
     name: CERAGON-MIB::gnLExternalAlarm7OffTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: External alarm 7 cleared on {_HOSTNAME}.
+    description: 'External alarm 7 cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1448,9 +1448,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.141
     name: CERAGON-MIB::gnLExternalAlarm8OffTrap
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: External alarm 8 cleared on {_HOSTNAME}.
+    description: External alarm 8 cleared on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1461,7 +1461,7 @@ traps:
     name: CERAGON-MIB::gnLSystemOkTrap
     category: diagnostic
     severity: notice
-    description: Local system fault cleared with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Local system fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1470,9 +1470,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.143
     name: CERAGON-MIB::gnLTftpOkTrap
-    category: config_change
+    category: diagnostic
     severity: info
-    description: Local TFTP download succeeded on {_HOSTNAME}.
+    description: Local TFTP download succeeded on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1480,9 +1480,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.144
     name: CERAGON-MIB::gnLInternalDownloadOkTrap
-    category: config_change
+    category: diagnostic
     severity: info
-    description: Internal download succeeded with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: Local internal download succeeded on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1491,8 +1491,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.145
     name: CERAGON-MIB::gnLIntralinkOkTrap
     category: diagnostic
-    severity: notice
-    description: Local intra-link download succeeded with status {gnGenCfgAlarmText} on {_HOSTNAME}.
+    severity: info
+    description: 'Local intra-link download succeeded{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1502,7 +1502,7 @@ traps:
     name: CERAGON-MIB::gnLNoConfMismatchTrap
     category: config_change
     severity: notice
-    description: Local configuration mismatch fault cleared with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Local configuration mismatch fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1510,9 +1510,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.147
     name: CERAGON-MIB::gnLProtectSwitchOkTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Protection switch recovered to OK state at {gnGenCfgCLLI} on {_HOSTNAME}.
+    description: 'Link protection switch recovered{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1520,9 +1520,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.148
     name: CERAGON-MIB::gnLProtectCableOkTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Local protection cable fault cleared on {_HOSTNAME}.
+    description: 'Local protection cable fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1532,7 +1532,7 @@ traps:
     name: CERAGON-MIB::gnLLomOkTrap
     category: state_change
     severity: notice
-    description: Local Loss of Multi-frame alarm cleared on {_HOSTNAME}.
+    description: 'Local Loss of Multi-frame alarm cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1543,7 +1543,7 @@ traps:
     name: CERAGON-MIB::gnLHitlessProblemOKTrap
     category: diagnostic
     severity: notice
-    description: Local Hitless fault cleared with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Local Hitless fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1551,9 +1551,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.152
     name: CERAGON-MIB::gnLHitlessRadioLofOKTrap
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Radio LOF fault cleared with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'Local Hitless RadioLOF fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1561,9 +1561,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.153
     name: CERAGON-MIB::gnLHitlessCableDisconnectOKTrap
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Local hitless cable fault cleared with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'Local hitless cable fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1571,9 +1571,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.154
     name: CERAGON-MIB::gnLPamOkTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: MSP Protection Architecture Mismatch detected with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    description: 'MSP protection architecture mismatch detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1582,9 +1582,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.155
     name: CERAGON-MIB::gnLScmOkTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: MSP Selector Channel Mismatch detected with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    description: 'MSP Selector Channel K1/K2 mismatch detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1595,7 +1595,7 @@ traps:
     name: CERAGON-MIB::gnLInvOkTrap
     category: diagnostic
     severity: warning
-    description: Invalid K1 byte detected on interface {ifIndex} with alarm {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Invalid K1 byte received on {{first (value "gnGenCfgCLLI") (value "ifIndex")}}: {{value "gnGenCfgAlarmText"}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1606,7 +1606,7 @@ traps:
     name: CERAGON-MIB::gnLInbandOkTrap
     category: state_change
     severity: notice
-    description: Inband PPP link up on {_HOSTNAME}.
+    description: Inband PPP link went up on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1617,7 +1617,7 @@ traps:
     name: CERAGON-MIB::gnWSNoLOSTrap
     category: diagnostic
     severity: warning
-    description: Wayside channel LOS state detected with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Wayside channel is in LOS state{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1627,7 +1627,7 @@ traps:
     name: CERAGON-MIB::gnODUtoODUCableOkTrap
     category: diagnostic
     severity: warning
-    description: 'ODU to ODU cable problem detected: {gnGenCfgAlarmText} on {_HOSTNAME}.'
+    description: 'ODU to ODU cable problem detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1637,7 +1637,7 @@ traps:
     name: CERAGON-MIB::gnSignalReceivedFromODUTrap
     category: diagnostic
     severity: warning
-    description: Signal received from ODU with severity {gnGenCfgTrapSeverity.raw} and text {gnGenCfgAlarmText.raw} on {_HOSTNAME}.
+    description: 'Signal received from ODU{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1647,7 +1647,7 @@ traps:
     name: CERAGON-MIB::gnProtectionLockoutClearededTrap
     category: state_change
     severity: notice
-    description: Protection lockout cleared with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    description: 'Protection lockout cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1657,7 +1657,7 @@ traps:
     name: CERAGON-MIB::gnRFUPowerFailureClearedTrap
     category: diagnostic
     severity: notice
-    description: 'Power supply failure cleared: {gnGenCfgAlarmText} on {_HOSTNAME}.'
+    description: 'Power supply failure cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1665,9 +1665,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.163
     name: CERAGON-MIB::gnRFURxLevelPathOutOfRangeClearedTrap
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: RF receive level path cleared for {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'RF receive level path out of range condition cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1677,7 +1677,7 @@ traps:
     name: CERAGON-MIB::gnRFUExtremeTemperatureClearedTrap
     category: diagnostic
     severity: notice
-    description: RFU temperature cleared for {gnGenCfgCLLI} on {_HOSTNAME}.
+    description: 'RFU extreme temperature condition cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1687,7 +1687,7 @@ traps:
     name: CERAGON-MIB::gnRFUFanFailureClearedTrap
     category: diagnostic
     severity: notice
-    description: Fan failure cleared with alarm text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Fan failure cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1697,7 +1697,7 @@ traps:
     name: CERAGON-MIB::gnLowSignalToRFUClearedTrap
     category: diagnostic
     severity: notice
-    description: 'Low signal alarm cleared: {gnGenCfgAlarmText} on {_HOSTNAME}.'
+    description: 'Low signal condition cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1707,7 +1707,7 @@ traps:
     name: CERAGON-MIB::gnRFUXPICClockFailureClearedTrap
     category: diagnostic
     severity: notice
-    description: XPIC clock failure cleared with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    description: 'XPIC clock failure cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1717,7 +1717,7 @@ traps:
     name: CERAGON-MIB::gnRFUDelayCalibrationFailure1ClearedTrap
     category: diagnostic
     severity: notice
-    description: RX AGC lock calibration cleared with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    description: RFU delay calibration failure cleared on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1727,7 +1727,7 @@ traps:
     name: CERAGON-MIB::gnRFUDelayCalibrationFailure2ClearedTrap
     category: diagnostic
     severity: notice
-    description: RFU delay calibration cleared with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'RFU delay calibration failure cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1737,7 +1737,7 @@ traps:
     name: CERAGON-MIB::gnLSFPOkTrap
     category: diagnostic
     severity: notice
-    description: Gigabit ethernet SFP fault cleared on {_HOSTNAME}.
+    description: Gigabit ethernet SFP fault cleared on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1748,7 +1748,7 @@ traps:
     name: CERAGON-MIB::gnEncryptionFaultClearedTrap
     category: diagnostic
     severity: notice
-    description: Encryption fault cleared on {_HOSTNAME}.
+    description: 'Encryption fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1759,7 +1759,7 @@ traps:
     name: CERAGON-MIB::gnEncryptionSyncLosClearedTrap
     category: diagnostic
     severity: notice
-    description: Encryption synchronization loss fault cleared on {_HOSTNAME}.
+    description: 'Encryption synchronization loss fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1770,7 +1770,7 @@ traps:
     name: CERAGON-MIB::gnEncryptionKepTimoutCleared
     category: diagnostic
     severity: notice
-    description: Encryption key timeout fault cleared on {_HOSTNAME}.
+    description: 'Encryption KEP timeout fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1781,7 +1781,7 @@ traps:
     name: CERAGON-MIB::gnEncryptionSkTimerElapsedCleared
     category: diagnostic
     severity: notice
-    description: Encryption session key timer elapsed fault cleared with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Encryption session key timer elapsed fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1792,7 +1792,7 @@ traps:
     name: CERAGON-MIB::gnEncryptionPowerUpSelfTestFailCleared
     category: diagnostic
     severity: notice
-    description: Encryption power-up self-test fault cleared on {_HOSTNAME}.
+    description: 'Encryption power up self-test fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1803,7 +1803,7 @@ traps:
     name: CERAGON-MIB::gnEncryptionConditionalTestFailCleared
     category: diagnostic
     severity: notice
-    description: Encryption conditional test fault cleared on {_HOSTNAME}.
+    description: 'Encryption conditional test fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1812,9 +1812,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.177
     name: CERAGON-MIB::gnEncryptionWillTurnOffOnNextRestCleared
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Encryption will be turned off on next reset on {_HOSTNAME}.
+    description: 'Encryption will turn off on next reset{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1823,9 +1823,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.178
     name: CERAGON-MIB::gnEncryptionEventReportCleared
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Encryption event report fault cleared with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'Encryption event report fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1836,7 +1836,7 @@ traps:
     name: CERAGON-MIB::gnEncryptionTechCardWasDetectedCleared
     category: diagnostic
     severity: notice
-    description: Encryption technician card detection cleared with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Encryption technician card detection cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -1847,7 +1847,7 @@ traps:
     name: CERAGON-MIB::gnAdminPasswordInDefaultStateCleared
     category: config_change
     severity: notice
-    description: Admin password default state cleared on {_HOSTNAME}.
+    description: Admin password default state cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1858,7 +1858,7 @@ traps:
     name: CERAGON-MIB::gnLinkGroupingProtectionFaultClearedTrap
     category: state_change
     severity: notice
-    description: Link Grouping Protection fault cleared on {_HOSTNAME}.
+    description: 'Link Grouping Protection Fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1868,7 +1868,7 @@ traps:
     name: CERAGON-MIB::gnLossOfProtectionClearedTrap
     category: state_change
     severity: notice
-    description: Loss of protection cleared with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    description: 'Loss of protection cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1878,17 +1878,17 @@ traps:
     name: CERAGON-MIB::gnTempLicenseClearedTrap
     category: license
     severity: notice
-    description: Temporary license cleared with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'Temporary license cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
       - gnGenCfgAlarmText
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.184
-    name: CERAGON-MIB::gnMUXCfgXTempLicenseClearedTrap
-    category: license
-    severity: warning
-    description: Temporary license cleared with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    name: CERAGON-MIB::gnMultiRadioProblemOKTrap
+    category: diagnostic
+    severity: notice
+    description: 'Multi radio fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1897,8 +1897,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.210
     name: CERAGON-MIB::gnRODUPowerFailTrap
     category: diagnostic
-    severity: crit
-    description: Remote ODU power supply fault detected with status {gnOduStatusPowerSupply} on {_HOSTNAME}.
+    severity: alert
+    description: 'Remote ODU power fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1909,7 +1909,7 @@ traps:
     name: CERAGON-MIB::gnRODUSynthUnLockTrap
     category: diagnostic
     severity: alert
-    description: Remote ODU Hardware fault reported with severity {gnGenCfgTrapSeverity} and text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Remote ODU hardware fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1920,7 +1920,7 @@ traps:
     name: CERAGON-MIB::gnRODUTxLevelOutOfRangeTrap
     category: diagnostic
     severity: warning
-    description: Remote ODU TX signal out of range with level {gnOduStatusTransmitLevel} on {_HOSTNAME}.
+    description: Remote ODU TX signal is out of range at {{value "gnOduStatusTransmitLevel"}} dBm on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1931,7 +1931,7 @@ traps:
     name: CERAGON-MIB::gnRODURxLevelOutOfRangeTrap
     category: diagnostic
     severity: warning
-    description: Remote ODU RX signal level {gnOduStatusReceiveLevel} is out of range on {_HOSTNAME}.
+    description: Remote ODU RX signal level {{value "gnOduStatusReceiveLevel"}} is out of range on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1941,8 +1941,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.214
     name: CERAGON-MIB::gnRODUExtremeTempTrap
     category: diagnostic
-    severity: warning
-    description: Remote ODU extreme temperature {gnOduStatusFahrenheitTemp} detected with alarm {gnGenCfgAlarmText} on {_HOSTNAME}.
+    severity: alert
+    description: Remote ODU extreme temperature event detected at {{value "gnGenCfgCLLI"}} on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1952,8 +1952,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.215
     name: CERAGON-MIB::gnRIDUPowerFailTrap
     category: diagnostic
-    severity: crit
-    description: Remote IDU power fault detected with status {gnGenStatDevicePowerSupply} on {_HOSTNAME}.
+    severity: alert
+    description: 'Remote IDU power fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1963,8 +1963,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.216
     name: CERAGON-MIB::gnRCableFaultTrap
     category: diagnostic
-    severity: err
-    description: 'Cable fault detected on {gnGenStatDeviceCable} with severity {gnGenCfgTrapSeverity.raw}: {gnGenCfgAlarmText} on {_HOSTNAME}.'
+    severity: crit
+    description: Remote IDU-ODU cable fault detected on {{first (value "gnGenStatDeviceCable") "link"}} on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1974,8 +1974,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.217
     name: CERAGON-MIB::gnRModemFailTrap
     category: diagnostic
-    severity: err
-    description: 'Remote modem fault detected: {gnGenCfgAlarmText} on {_HOSTNAME}.'
+    severity: crit
+    description: 'Remote modem fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1984,8 +1984,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.218
     name: CERAGON-MIB::gnRIDUExtremeTempTrap
     category: diagnostic
-    severity: alert
-    description: Extreme temperature {gnGenStatDeviceFahrenheitTemp} detected on {gnGenCfgCLLI} on {_HOSTNAME}.
+    severity: crit
+    description: Remote IDU extreme temperature event detected at {{value "gnGenStatDeviceFahrenheitTemp"}} degrees Fahrenheit on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -1995,8 +1995,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.219
     name: CERAGON-MIB::gnRLoopbackOnTrap
     category: state_change
-    severity: notice
-    description: Remote loopback activated with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    severity: warning
+    description: 'Remote loopback activated{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2006,7 +2006,7 @@ traps:
     name: CERAGON-MIB::gnRRemoteCommFaultTrap
     category: diagnostic
     severity: warning
-    description: Remote communication disconnected with alarm {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Remote communication disconnected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2014,9 +2014,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.221
     name: CERAGON-MIB::gnRTestRunningTrap
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Remote SDH/SONET test activated with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: Remote SDH/SONET test activated on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2026,8 +2026,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.222
     name: CERAGON-MIB::gnRLOFTrap
     category: diagnostic
-    severity: warning
-    description: Remote Loss of Frame alarm on {gnGenCfgCLLI} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: 'Remote Loss of Frame alarm detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -2037,8 +2037,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.223
     name: CERAGON-MIB::gnRLOSTrap
     category: diagnostic
-    severity: err
-    description: Remote loss of signal alarm {gnGenCfgAlarmText} on {_HOSTNAME}.
+    severity: alert
+    description: 'Remote Loss of signal alarm occurred{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -2049,7 +2049,7 @@ traps:
     name: CERAGON-MIB::gnRTIMTrap
     category: diagnostic
     severity: warning
-    description: Remote Trace Identifier Mismatch alarm on {gnGenCfgCLLI} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: Remote Trace Identifier Mismatch alarm {{value "gnGenCfgAlarmText"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2060,7 +2060,7 @@ traps:
     name: CERAGON-MIB::gnREXCTrap
     category: diagnostic
     severity: warning
-    description: Remote excessive BER alarm raised with severity {gnGenCfgTrapSeverity} and text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: Remote excessive BER alarm detected with current BER {{value "gnRstStatBERCur"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2072,7 +2072,7 @@ traps:
     name: CERAGON-MIB::gnRSDTrap
     category: diagnostic
     severity: warning
-    description: Remote signal degrade alarm {gnGenCfgAlarmText} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'Remote signal degrade alarm raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -2084,7 +2084,7 @@ traps:
     name: CERAGON-MIB::gnRAisTrap
     category: diagnostic
     severity: alert
-    description: Remote terminal received Alarm Indication Signal {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: Remote terminal received Alarm Indication Signal {{value "gnGenCfgAlarmText"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2095,7 +2095,7 @@ traps:
     name: CERAGON-MIB::gnRUnExpTrap
     category: diagnostic
     severity: warning
-    description: Unexpected signal received on interface {ifIndex} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'Unexpected signal received{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -2105,8 +2105,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.229
     name: CERAGON-MIB::gnRLocTrap
     category: diagnostic
-    severity: err
-    description: Remote Loss of Carrier alarm on interface {ifIndex} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: Remote Loss of Carrier alarm on interface {{first (value "ifIndex") "link"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2117,7 +2117,7 @@ traps:
     name: CERAGON-MIB::gnRLopTrap
     category: diagnostic
     severity: warning
-    description: Remote Loss of pointer alarm {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: Remote Loss of pointer alarm {{value "gnGenCfgAlarmText"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2128,7 +2128,7 @@ traps:
     name: CERAGON-MIB::gnRRdiTrap
     category: diagnostic
     severity: warning
-    description: Remote Defect Identifier signal received on {gnGenCfgCLLI} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: Remote Defect Identifier signal received on {{first (value "gnGenCfgCLLI") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2139,7 +2139,7 @@ traps:
     name: CERAGON-MIB::gnRSlmTrap
     category: diagnostic
     severity: warning
-    description: Remote Signal Label Mismatch alarm {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Remote Signal Label Mismatch alarm detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -2150,7 +2150,7 @@ traps:
     name: CERAGON-MIB::gnRUnqTrap
     category: diagnostic
     severity: warning
-    description: Remote unequipped signal received with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    description: 'Remote unequipped signal received{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -2161,7 +2161,7 @@ traps:
     name: CERAGON-MIB::gnRExternalAlarm1OnTrap
     category: diagnostic
     severity: warning
-    description: External alarm 1 raised with severity {gnGenCfgTrapSeverity.raw} and text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'External alarm 1 raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2172,7 +2172,7 @@ traps:
     name: CERAGON-MIB::gnRExternalAlarm2OnTrap
     category: diagnostic
     severity: warning
-    description: External alarm 2 raised with text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'External alarm 2 raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2183,7 +2183,7 @@ traps:
     name: CERAGON-MIB::gnRExternalAlarm3OnTrap
     category: diagnostic
     severity: warning
-    description: Remote external alarm 3 raised with severity {gnGenCfgTrapSeverity.raw} and text {gnGenCfgAlarmText.raw} on {_HOSTNAME}.
+    description: 'Remote external alarm 3 raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2194,7 +2194,7 @@ traps:
     name: CERAGON-MIB::gnRExternalAlarm4OnTrap
     category: diagnostic
     severity: warning
-    description: Remote external alarm 4 raised with text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'External alarm 4 raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2205,7 +2205,7 @@ traps:
     name: CERAGON-MIB::gnRExternalAlarm5OnTrap
     category: diagnostic
     severity: warning
-    description: External alarm 5 raised with severity {gnGenCfgTrapSeverity} and text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Remote external alarm 5 raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2216,7 +2216,7 @@ traps:
     name: CERAGON-MIB::gnRExternalAlarm6OnTrap
     category: diagnostic
     severity: warning
-    description: Remote external alarm 6 raised with text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'External alarm 6 raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2227,7 +2227,7 @@ traps:
     name: CERAGON-MIB::gnRExternalAlarm7OnTrap
     category: diagnostic
     severity: warning
-    description: External alarm 7 raised with severity {gnGenCfgTrapSeverity} and text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Remote external alarm 7 raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2238,7 +2238,7 @@ traps:
     name: CERAGON-MIB::gnRExternalAlarm8OnTrap
     category: diagnostic
     severity: warning
-    description: Remote external alarm 8 raised with text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'External alarm 8 raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2248,8 +2248,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.242
     name: CERAGON-MIB::gnRSystemFaultTrap
     category: diagnostic
-    severity: err
-    description: Remote system fault reported with severity {gnGenCfgTrapSeverity.raw} and text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    severity: crit
+    description: 'Remote system fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2260,7 +2260,7 @@ traps:
     name: CERAGON-MIB::gnRTftpFaultTrap
     category: diagnostic
     severity: err
-    description: Remote TFTP download failed with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Remote TFTP download failed{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2270,7 +2270,7 @@ traps:
     name: CERAGON-MIB::gnRInternalDownloadFaultTrap
     category: diagnostic
     severity: err
-    description: Remote internal download failed with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Remote internal download failed{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2280,7 +2280,7 @@ traps:
     name: CERAGON-MIB::gnRIntralinkFaultTrap
     category: diagnostic
     severity: err
-    description: Remote intra-link download failed with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Remote intra-link download failed{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2290,7 +2290,7 @@ traps:
     name: CERAGON-MIB::gnRConfMismatchTrap
     category: config_change
     severity: warning
-    description: Remote configuration mismatch fault detected with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Remote configuration mismatch fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2298,9 +2298,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.247
     name: CERAGON-MIB::gnRProtectSwitchFaultTrap
-    category: diagnostic
-    severity: err
-    description: Remote protection fault {gnGenCfgAlarmText} detected on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: 'Remote protection fault raised{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2309,8 +2309,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.248
     name: CERAGON-MIB::gnRProtectCableFaultTrap
     category: diagnostic
-    severity: err
-    description: 'Remote protection cable fault detected: {gnGenCfgAlarmText} on {_HOSTNAME}.'
+    severity: crit
+    description: 'Remote protection cable fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2319,8 +2319,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.249
     name: CERAGON-MIB::gnRHeartBeatTrap
     category: diagnostic
-    severity: notice
-    description: Heartbeat received with severity {gnGenCfgTrapSeverity.raw} and text {gnGenCfgAlarmText} on {_HOSTNAME}.
+    severity: info
+    description: 'Heartbeat received{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2329,8 +2329,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.250
     name: CERAGON-MIB::gnRLomTrap
     category: diagnostic
-    severity: err
-    description: Remote Loss of Multi-frame alarm {gnGenCfgAlarmText} on {_HOSTNAME}.
+    severity: crit
+    description: 'Remote Loss of Multi-frame alarm detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -2340,8 +2340,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.252
     name: CERAGON-MIB::gnRHitlessRadioLofTrap
     category: diagnostic
-    severity: err
-    description: Radio LOF fault {gnGenCfgAlarmText} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: 'Remote Hitless RadioLOF fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2350,8 +2350,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.253
     name: CERAGON-MIB::gnRHitlessCableDisconnectTrap
     category: diagnostic
-    severity: warning
-    description: Hitless cable fault detected with severity {gnGenCfgTrapSeverity.raw} and text {gnGenCfgAlarmText.raw} on {_HOSTNAME}.
+    severity: alert
+    description: 'Remote Hitless cable fault detected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2359,9 +2359,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.310
     name: CERAGON-MIB::gnRODUPowerOkTrap
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Remote ODU power fault cleared with status {gnOduStatusPowerSupply} on {_HOSTNAME}.
+    description: Remote ODU power fault cleared on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2372,7 +2372,7 @@ traps:
     name: CERAGON-MIB::gnRODUSynthLockTrap
     category: diagnostic
     severity: notice
-    description: Remote ODU hardware fault cleared for {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Remote ODU hardware fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2383,7 +2383,7 @@ traps:
     name: CERAGON-MIB::gnRODUTxLevelInRangeTrap
     category: diagnostic
     severity: notice
-    description: Remote ODU TX signal is in range with level {gnOduStatusTransmitLevel} on {_HOSTNAME}.
+    description: Remote ODU TX signal is in range on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2392,9 +2392,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.313
     name: CERAGON-MIB::gnRODURxLevelInRangeTrap
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Remote ODU RX signal level {gnOduStatusReceiveLevel} is in range on {_HOSTNAME}.
+    description: Remote ODU RX signal is in range on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2405,7 +2405,7 @@ traps:
     name: CERAGON-MIB::gnRODUNormalTempTrap
     category: diagnostic
     severity: notice
-    description: Remote ODU returned to normal temperature {gnOduStatusFahrenheitTemp} on {_HOSTNAME}.
+    description: Remote ODU temperature returned to normal ({{value "gnOduStatusFahrenheitTemp"}}°F) on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2416,7 +2416,7 @@ traps:
     name: CERAGON-MIB::gnRIDUPowerOkTrap
     category: diagnostic
     severity: notice
-    description: Remote IDU power fault cleared on {_HOSTNAME}.
+    description: 'Remote IDU power fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2425,9 +2425,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.316
     name: CERAGON-MIB::gnRCableOkTrap
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Remote IDU-ODU cable fault cleared on {gnGenStatDeviceCable} on {_HOSTNAME}.
+    description: Remote IDU-ODU cable fault cleared on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2438,7 +2438,7 @@ traps:
     name: CERAGON-MIB::gnRModemOkTrap
     category: diagnostic
     severity: notice
-    description: Remote modem fault cleared on {_HOSTNAME}.
+    description: 'Remote modem fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2448,7 +2448,7 @@ traps:
     name: CERAGON-MIB::gnRIDUNormalTempTrap
     category: diagnostic
     severity: notice
-    description: Remote IDU temperature returned to normal at {gnGenStatDeviceFahrenheitTemp}°F on {_HOSTNAME}.
+    description: Remote IDU temperature returned to normal at {{value "gnGenStatDeviceFahrenheitTemp"}}F on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2459,7 +2459,7 @@ traps:
     name: CERAGON-MIB::gnRLoopbackOffTrap
     category: state_change
     severity: notice
-    description: Remote loopback cleared on {_HOSTNAME}.
+    description: 'Remote loopback cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2469,7 +2469,7 @@ traps:
     name: CERAGON-MIB::gnRRemoteCommOkTrap
     category: state_change
     severity: notice
-    description: Remote communication re-connected on {_HOSTNAME}.
+    description: 'Remote communication re-connected{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2479,7 +2479,7 @@ traps:
     name: CERAGON-MIB::gnRNoTestRunningTrap
     category: diagnostic
     severity: notice
-    description: Remote SDH/SONET test cleared on {_HOSTNAME}.
+    description: 'Remote SDH/SONET test cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2488,9 +2488,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.322
     name: CERAGON-MIB::gnRNoLOFTrap
-    category: diagnostic
-    severity: warning
-    description: Remote Loss of Frame alarm cleared for {gnGenCfgCLLI} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: 'Remote Loss of Frame alarm cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -2500,8 +2500,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.323
     name: CERAGON-MIB::gnRNoLOSTrap
     category: diagnostic
-    severity: warning
-    description: Remote Loss of Signal alarm cleared for {gnGenCfgCLLI} on {_HOSTNAME}.
+    severity: notice
+    description: 'Remote Loss of Signal alarm cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -2510,9 +2510,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.324
     name: CERAGON-MIB::gnRNoTIMTrap
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Remote Trace Identifier Mismatch alarm cleared for {gnGenCfgCLLI} on {_HOSTNAME}.
+    description: 'Remote Trace Identifier Mismatch alarm cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -2522,8 +2522,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.325
     name: CERAGON-MIB::gnRNoEXCTrap
     category: diagnostic
-    severity: warning
-    description: Remote Excessive BER alarm cleared with current BER {gnRstStatBERCur} on {_HOSTNAME}.
+    severity: notice
+    description: 'Remote Excessive BER alarm cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -2533,9 +2533,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.326
     name: CERAGON-MIB::gnRNoSDTrap
-    category: diagnostic
-    severity: warning
-    description: Remote Signal Degrade alarm cleared for {gnGenCfgCLLI} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: 'Remote signal degrade alarm cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -2545,9 +2545,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.327
     name: CERAGON-MIB::gnRNoAisTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Remote terminal stopped receiving Alarm Indication Signal with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    description: Alarm Indication Signal (AIS) received on {{first (value "gnGenCfgCLLI") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2557,8 +2557,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.0.328
     name: CERAGON-MIB::gnRNoUnExpTrap
     category: diagnostic
-    severity: warning
-    description: Remote terminal stopped receiving unexpected signal with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    severity: alert
+    description: 'Remote terminal stopped receiving unexpected signal{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -2569,7 +2569,7 @@ traps:
     name: CERAGON-MIB::gnRNoLocTrap
     category: state_change
     severity: notice
-    description: Remote Loss of Carrier alarm cleared on interface {ifIndex} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: Remote Loss of Carrier alarm cleared on {{first (value "gnGenCfgCLLI") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2578,9 +2578,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.330
     name: CERAGON-MIB::gnRNoLopTrap
-    category: diagnostic
-    severity: warning
-    description: Remote Loss of pointer alarm cleared with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: 'Remote Loss of pointer alarm cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -2591,7 +2591,7 @@ traps:
     name: CERAGON-MIB::gnRNoRdiTrap
     category: diagnostic
     severity: warning
-    description: Remote Defect Identifier signal lost on interface {ifIndex} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'Remote Defect Identifier signal lost on {{first (value "ifIndex") "interface"}}{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -2600,9 +2600,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.332
     name: CERAGON-MIB::gnRNoSlmTrap
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Remote Signal Label Mismatch alarm cleared at {gnGenCfgCLLI} with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: Remote Signal Label Mismatch alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2613,7 +2613,7 @@ traps:
     name: CERAGON-MIB::gnRNoUnqTrap
     category: state_change
     severity: notice
-    description: Remote terminal started receiving signal at {gnGenCfgCLLI} on {_HOSTNAME}.
+    description: 'Remote terminal started receiving equipped signal{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -2624,7 +2624,7 @@ traps:
     name: CERAGON-MIB::gnRExternalAlarm1OffTrap
     category: state_change
     severity: notice
-    description: Remote external alarm 1 cleared with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'Remote external alarm 1 cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2633,9 +2633,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.335
     name: CERAGON-MIB::gnRExternalAlarm2OffTrap
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: External alarm 2 cleared with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'Remote External alarm 2 cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2646,7 +2646,7 @@ traps:
     name: CERAGON-MIB::gnRExternalAlarm3OffTrap
     category: state_change
     severity: notice
-    description: Remote External alarm 3 cleared on {_HOSTNAME}.
+    description: 'Remote external alarm 3 cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2655,9 +2655,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.337
     name: CERAGON-MIB::gnRExternalAlarm4OffTrap
-    category: diagnostic
-    severity: warning
-    description: External alarm 4 cleared with status {gnGenStatDeviceDryContact} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Remote External alarm 4 cleared on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2668,7 +2668,7 @@ traps:
     name: CERAGON-MIB::gnRExternalAlarm5OffTrap
     category: state_change
     severity: notice
-    description: Remote external alarm 5 cleared on {_HOSTNAME}.
+    description: 'Remote external alarm 5 cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2679,7 +2679,7 @@ traps:
     name: CERAGON-MIB::gnRExternalAlarm6OffTrap
     category: state_change
     severity: notice
-    description: Remote external alarm 6 cleared on {_HOSTNAME}.
+    description: 'Remote external alarm 6 cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2690,7 +2690,7 @@ traps:
     name: CERAGON-MIB::gnRExternalAlarm7OffTrap
     category: state_change
     severity: notice
-    description: Remote external alarm 7 cleared on {_HOSTNAME}.
+    description: 'Remote external alarm 7 cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2701,7 +2701,7 @@ traps:
     name: CERAGON-MIB::gnRExternalAlarm8OffTrap
     category: state_change
     severity: notice
-    description: Remote External alarm 8 cleared on {_HOSTNAME}.
+    description: 'Remote external alarm 8 cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2712,7 +2712,7 @@ traps:
     name: CERAGON-MIB::gnRSystemOkTrap
     category: diagnostic
     severity: notice
-    description: Remote system fault cleared with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    description: 'Remote system fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2721,9 +2721,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.343
     name: CERAGON-MIB::gnRTftpOkTrap
-    category: config_change
-    severity: notice
-    description: Remote TFTP download succeeded with severity {gnGenCfgTrapSeverity.raw} on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Remote TFTP download succeeded on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2731,9 +2731,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.344
     name: CERAGON-MIB::gnRInternalDownloadOkTrap
-    category: config_change
-    severity: notice
-    description: Remote internal download succeeded on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Remote internal download succeeded on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2741,9 +2741,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.345
     name: CERAGON-MIB::gnRIntralinkOkTrap
-    category: config_change
+    category: state_change
     severity: notice
-    description: Remote intra-link download succeeded on {_HOSTNAME}.
+    description: Remote intra-link download succeeded{{with value "gnGenCfgCLLI"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2753,7 +2753,7 @@ traps:
     name: CERAGON-MIB::gnRNoConfMismatchTrap
     category: config_change
     severity: notice
-    description: Remote configuration mismatch fault cleared with {gnGenCfgAlarmText} on {_HOSTNAME}.
+    description: 'Remote configuration mismatch fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2763,7 +2763,7 @@ traps:
     name: CERAGON-MIB::gnRProtectCableOkTrap
     category: state_change
     severity: notice
-    description: Remote protection cable fault cleared on {_HOSTNAME}.
+    description: 'Remote protection cable fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2771,9 +2771,9 @@ traps:
       - gnGenCfgCLLI
   - oid: 1.3.6.1.4.1.2281.0.350
     name: CERAGON-MIB::gnRLomOkTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Remote Loss of Multi-frame alarm cleared on {_HOSTNAME}.
+    description: 'Remote Loss of Multi-frame alarm cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ifIndex
@@ -2784,7 +2784,7 @@ traps:
     name: CERAGON-MIB::gnRHitlessRadioLofOKTrap
     category: diagnostic
     severity: notice
-    description: Remote Hitless RadioLOF fault cleared with severity {gnGenCfgTrapSeverity} on {_HOSTNAME}.
+    description: 'Remote Hitless Radio LOF fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2794,7 +2794,7 @@ traps:
     name: CERAGON-MIB::gnRHitlessCableDisconnectOKTrap
     category: state_change
     severity: notice
-    description: Hitless cable fault cleared on {_HOSTNAME}.
+    description: 'Remote hitless cable fault cleared{{with value "gnGenCfgAlarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gnGenCfgTrapSeverity
@@ -2804,7 +2804,7 @@ traps:
     name: MWRM-NETWORK-MIB::eventTrap
     category: diagnostic
     severity: warning
-    description: Alarm {genEquipCurrentAlarmDesc} with severity {genEquipCurrentAlarmSeverity} on {_HOSTNAME}.
+    description: Alarm {{value "genEquipCurrentAlarmDesc"}} raised on {{hostname}}.
     status: current
     varbinds:
       - genEquipCurrentAlarmCounter
@@ -2823,7 +2823,7 @@ traps:
     name: MWRM-NETWORK-MIB::eventTrapSTP
     category: state_change
     severity: notice
-    description: STP topology changed with port role {genEquipEthernetSwitchXSTPParamsEthernetPortsRole} and state {genEquipEthernetSwitchXSTPParamsEthernetPortsState} on {_HOSTNAME}.
+    description: STP event on {{trap_interface}} with state {{value "genEquipEthernetSwitchXSTPParamsEthernetPortsState"}} on {{hostname}}.
     status: current
     varbinds:
       - genEquipCurrentAlarmCounter
@@ -2846,7 +2846,7 @@ traps:
     name: MWRM-NETWORK-MIB::alarmTrap
     category: diagnostic
     severity: warning
-    description: Alarm {genEquipCurrentAlarmDesc} with severity {genEquipCurrentAlarmSeverity} raised on {_HOSTNAME}.
+    description: Alarm {{value "genEquipCurrentAlarmDesc"}} raised on {{hostname}}.
     status: current
     varbinds:
       - genEquipCurrentAlarmCounter
@@ -2866,7 +2866,7 @@ traps:
     name: MWRM-NETWORK-MIB::heartbeatTrap
     category: diagnostic
     severity: info
-    description: Heartbeat received from {genEquipTrapCfgMgrCLLI} on {_HOSTNAME}.
+    description: Heartbeat received from {{value "genEquipTrapCfgMgrCLLI"}} on {{hostname}}.
     status: current
     varbinds:
       - genEquipTrapCfgMgrCLLI
@@ -2874,7 +2874,7 @@ traps:
     name: MWRM-NETWORK-MIB::generalV3Trap
     category: diagnostic
     severity: warning
-    description: Alarm {genEquipCurrentAlarmDesc} with severity {genEquipCurrentAlarmSeverity} raised on {_HOSTNAME}.
+    description: General network alarm {{value "genEquipCurrentAlarmDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - genEquipCurrentAlarmCounter
@@ -2894,7 +2894,7 @@ traps:
     name: MWRM-NETWORK-MIB::eventV3Trap
     category: diagnostic
     severity: warning
-    description: Alarm {genEquipCurrentAlarmId} with severity {genEquipCurrentAlarmSeverity} on {genEquipCurrentAlarmModule} on {_HOSTNAME}.
+    description: Alarm {{value "genEquipCurrentAlarmDesc"}} raised on {{first (value "genEquipCurrentAlarmModule") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - genEquipCurrentAlarmCounter
@@ -2913,7 +2913,7 @@ traps:
     name: MWRM-NETWORK-MIB::heartbeatV3Trap
     category: diagnostic
     severity: info
-    description: Heartbeat received from {genEquipTrapCfgMgrCLLI} on {_HOSTNAME}.
+    description: Heartbeat received from {{value "genEquipTrapCfgMgrCLLI"}} on {{hostname}}.
     status: current
     varbinds:
       - genEquipTrapCfgMgrCLLI
@@ -2921,7 +2921,7 @@ traps:
     name: MWRM-NETWORK-MIB::eventv3TrapSTP
     category: state_change
     severity: notice
-    description: STP topology change detected with port role {genEquipEthernetSwitchXSTPParamsEthernetPortsRole} and state {genEquipEthernetSwitchXSTPParamsEthernetPortsState} on {_HOSTNAME}.
+    description: STP event on {{trap_interface}} with state {{value "genEquipEthernetSwitchXSTPParamsEthernetPortsState"}} on {{hostname}}.
     status: current
     varbinds:
       - genEquipCurrentAlarmCounter
@@ -2943,8 +2943,8 @@ traps:
   - oid: 1.3.6.1.4.1.2281.11.2000
     name: MWRM-NETWORK-MIB::generalNGV3Trap
     category: diagnostic
-    severity: err
-    description: Alarm {genEquipCurrentAlarmDesc} with severity {genEquipCurrentAlarmSeverity} and state {genEquipCurrentAlarmState} on {_HOSTNAME}.
+    severity: warning
+    description: Network alarm {{value "genEquipCurrentAlarmDesc"}} raised on {{hostname}}.
     status: current
     varbinds:
       - genEquipCurrentAlarmCounter
@@ -2963,7 +2963,7 @@ traps:
     name: MWRM-NETWORK-MIB::heartbeatNGV3Trap
     category: diagnostic
     severity: info
-    description: Heartbeat received with {genEquipCurrentAlarmCounter} open alarms on {_HOSTNAME}.
+    description: Heartbeat received on {{hostname}}.
     status: current
     varbinds:
       - genEquipCurrentAlarmCounter

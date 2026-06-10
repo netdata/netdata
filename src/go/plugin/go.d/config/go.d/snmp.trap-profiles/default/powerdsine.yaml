@@ -29,25 +29,25 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.7428.1.3.1
     name: MICROSEMI-PDSINE-MIB::powerBackupStatusNotification
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Power backup status changed to {powerBackupStatus} on {_HOSTNAME}.
+    description: Power backup status changed to {{value "powerBackupStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - powerBackupStatus
   - oid: 1.3.6.1.4.1.7428.1.3.2
     name: MICROSEMI-PDSINE-MIB::internalPowerSourceStatusNotification
     category: diagnostic
-    severity: err
-    description: Internal power source reported {internalPowerSourceStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Internal power source failure detected on {{hostname}}.
     status: current
     varbinds:
       - internalPowerSourceStatus
   - oid: 1.3.6.1.4.1.7428.1.3.3
     name: MICROSEMI-PDSINE-MIB::externalPowerSourceStatusNotification
     category: diagnostic
-    severity: err
-    description: External power source reported {externalPowerSourceStatus} on {_HOSTNAME}.
+    severity: crit
+    description: External power source failure detected on {{hostname}}.
     status: current
     varbinds:
       - externalPowerSourceStatus

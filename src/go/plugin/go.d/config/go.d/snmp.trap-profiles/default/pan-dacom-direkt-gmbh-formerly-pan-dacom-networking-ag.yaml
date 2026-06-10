@@ -22,7 +22,7 @@ traps:
     name: SPEEDCARRIER-MIB::coldStart
     category: state_change
     severity: notice
-    description: Device cold start detected on {_HOSTNAME}.
+    description: Device cold start detected{{with value "slot"}} on slot {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -31,7 +31,7 @@ traps:
     name: SPEEDCARRIER-MIB::reboot
     category: diagnostic
     severity: notice
-    description: Device rebooted on slot {slot} on {_HOSTNAME}.
+    description: Device rebooted{{with value "slot"}} in slot {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -39,8 +39,8 @@ traps:
   - oid: 1.3.6.1.4.1.3652.0.42
     name: SPEEDCARRIER-MIB::fanError
     category: diagnostic
-    severity: err
-    description: Fan error detected in slot {slot} with description {descr} on {_HOSTNAME}.
+    severity: alert
+    description: Fan error detected in slot {{value "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -49,7 +49,7 @@ traps:
     name: SPEEDCARRIER-MIB::fanOK
     category: diagnostic
     severity: notice
-    description: Fan in slot {slot} reported OK on {_HOSTNAME}.
+    description: Fan recovered to OK state in slot {{value "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -57,8 +57,8 @@ traps:
   - oid: 1.3.6.1.4.1.3652.0.44
     name: SPEEDCARRIER-MIB::powerFailure
     category: diagnostic
-    severity: crit
-    description: Power failure detected in slot {slot} on {_HOSTNAME}.
+    severity: alert
+    description: Power failure detected on slot {{value "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -67,7 +67,7 @@ traps:
     name: SPEEDCARRIER-MIB::powerOK
     category: diagnostic
     severity: notice
-    description: 'Power supply in slot {slot} reported OK: {descr} on {_HOSTNAME}.'
+    description: Power supply recovered to OK state on {{first (value "slot") "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -76,7 +76,7 @@ traps:
     name: SPEEDCARRIER-MIB::highTemp
     category: diagnostic
     severity: warning
-    description: High temperature detected on slot {slot} port {port} on {_HOSTNAME}.
+    description: High temperature detected on slot {{value "slot"}} port {{value "port"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -86,7 +86,7 @@ traps:
     name: SPEEDCARRIER-MIB::tempOK
     category: diagnostic
     severity: notice
-    description: Temperature OK for slot {slot} port {port} on {_HOSTNAME}.
+    description: Temperature condition returned to normal on slot {{value "slot"}} port {{value "port"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -96,7 +96,7 @@ traps:
     name: SPEEDCARRIER-MIB::transceiverRemoved
     category: diagnostic
     severity: warning
-    description: Transceiver removed from slot {slot} port {port} on {_HOSTNAME}.
+    description: Transceiver removed from slot {{value "slot"}} port {{value "port"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -106,7 +106,7 @@ traps:
     name: SPEEDCARRIER-MIB::transceiverInserted
     category: state_change
     severity: notice
-    description: Transceiver inserted on port {port} in slot {slot} on {_HOSTNAME}.
+    description: Transceiver inserted on port {{first (value "port") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -116,16 +116,16 @@ traps:
     name: SPEEDCARRIER-MIB::moduleInserted
     category: state_change
     severity: notice
-    description: Module inserted in slot {slot} on {_HOSTNAME}.
+    description: Module inserted in slot {{value "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
       - slot
   - oid: 1.3.6.1.4.1.3652.0.51
     name: SPEEDCARRIER-MIB::moduleRemoved
-    category: state_change
-    severity: notice
-    description: Module removed from slot {slot} on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: Module removed from slot {{value "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -134,7 +134,7 @@ traps:
     name: SPEEDCARRIER-MIB::portTxUp
     category: state_change
     severity: notice
-    description: Port {slot}/{port} ({descr}) transitioned to up state on {_HOSTNAME}.
+    description: Port {{value "port"}} on slot {{value "slot"}} went up on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -144,7 +144,7 @@ traps:
     name: SPEEDCARRIER-MIB::portTxDown
     category: state_change
     severity: warning
-    description: Port {slot}/{port} reported {descr} on {_HOSTNAME}.
+    description: Port {{value "port"}} on slot {{value "slot"}} went down on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -154,7 +154,7 @@ traps:
     name: SPEEDCARRIER-MIB::portUp
     category: state_change
     severity: notice
-    description: Port {port} on slot {slot} came up on {_HOSTNAME}.
+    description: Port {{first (value "port") "link"}} on slot {{first (value "slot") "unknown"}} went up on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -164,7 +164,7 @@ traps:
     name: SPEEDCARRIER-MIB::portDown
     category: state_change
     severity: warning
-    description: Port {port} in slot {slot} reported {descr} on {_HOSTNAME}.
+    description: Port {{value "port"}} on slot {{value "slot"}} went down on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -173,8 +173,8 @@ traps:
   - oid: 1.3.6.1.4.1.3652.0.56
     name: SPEEDCARRIER-MIB::txFault
     category: diagnostic
-    severity: err
-    description: Transmit fault detected on slot {slot}, port {port} on {_HOSTNAME}.
+    severity: warning
+    description: Transmitter fault detected on slot {{value "slot"}} port {{value "port"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -184,7 +184,7 @@ traps:
     name: SPEEDCARRIER-MIB::badPasswd
     category: auth
     severity: warning
-    description: BadPasswd authentication failure from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Bad password authentication attempt on {{first (value "slot") "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -193,7 +193,7 @@ traps:
     name: SPEEDCARRIER-MIB::softwareUpdateReady
     category: diagnostic
     severity: notice
-    description: Software update ready for slot {slot} on {_HOSTNAME}.
+    description: Software update is ready{{with value "slot"}} for slot {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -201,8 +201,8 @@ traps:
   - oid: 1.3.6.1.4.1.3652.0.59
     name: SPEEDCARRIER-MIB::hardwareTrap
     category: diagnostic
-    severity: err
-    description: Hardware trap reported for slot {slot} with description {descr} on {_HOSTNAME}.
+    severity: warning
+    description: 'Hardware trap detected in slot {{value "slot"}}: {{value "descr"}} on {{hostname}}.'
     status: current
     varbinds:
       - descr
@@ -211,7 +211,7 @@ traps:
     name: SPEEDCARRIER-MIB::cdrAlarm
     category: diagnostic
     severity: warning
-    description: Alarm triggered for slot {slot} with description {descr} on {_HOSTNAME}.
+    description: 'CDR alarm triggered on slot {{value "slot"}}: {{value "descr"}} on {{hostname}}.'
     status: current
     varbinds:
       - descr
@@ -220,7 +220,7 @@ traps:
     name: SPEEDCARRIER-MIB::protectionMain
     category: state_change
     severity: warning
-    description: Protection main event on slot {slot} port {port} on {_HOSTNAME}.
+    description: Protection main event occurred on slot {{value "slot"}} port {{value "port"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -229,8 +229,8 @@ traps:
   - oid: 1.3.6.1.4.1.3652.0.62
     name: SPEEDCARRIER-MIB::protectionBackup
     category: state_change
-    severity: notice
-    description: Protection backup activated for slot {slot} port {port} on {_HOSTNAME}.
+    severity: warning
+    description: Protection backup event occurred on slot {{value "slot"}} port {{value "port"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -240,7 +240,7 @@ traps:
     name: SPEEDCARRIER-MIB::optRxLevelWarning
     category: diagnostic
     severity: warning
-    description: Optical receive level warning on slot {slot} port {port} on {_HOSTNAME}.
+    description: Optical receive level warning on port {{value "port"}} of slot {{value "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -250,7 +250,7 @@ traps:
     name: SPEEDCARRIER-MIB::optRxLevelAlarm
     category: diagnostic
     severity: warning
-    description: Optical receive level alarm on slot {slot}, port {port} on {_HOSTNAME}.
+    description: Optical receive level alarm on port {{value "port"}} of slot {{value "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -260,7 +260,7 @@ traps:
     name: SPEEDCARRIER-MIB::optRxLevelOK
     category: diagnostic
     severity: notice
-    description: Optical receive level OK for slot {slot} port {port} on {_HOSTNAME}.
+    description: Optical receive level OK on port {{first (value "port") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -270,7 +270,7 @@ traps:
     name: SPEEDCARRIER-MIB::optTxLevelWarning
     category: diagnostic
     severity: warning
-    description: Optical transmit level warning on slot {slot}, port {port} on {_HOSTNAME}.
+    description: Optical transmit level warning on slot {{value "slot"}} port {{value "port"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -279,8 +279,8 @@ traps:
   - oid: 1.3.6.1.4.1.3652.0.67
     name: SPEEDCARRIER-MIB::optTxLevelAlarm
     category: diagnostic
-    severity: warning
-    description: Optical transmit level alarm on slot {slot}, port {port} on {_HOSTNAME}.
+    severity: crit
+    description: Optical transmit level alarm on slot {{value "slot"}} port {{value "port"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -290,7 +290,7 @@ traps:
     name: SPEEDCARRIER-MIB::optTxLevelOK
     category: diagnostic
     severity: notice
-    description: Optical transmit level OK on slot {slot} port {port} on {_HOSTNAME}.
+    description: Optical transmit level is OK on port {{first (value "port") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -300,7 +300,7 @@ traps:
     name: SPEEDCARRIER-MIB::optTxBiasAlarm
     category: diagnostic
     severity: warning
-    description: TX bias alarm on slot {slot} port {port} on {_HOSTNAME}.
+    description: TX bias alarm detected on slot {{value "slot"}} port {{value "port"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -310,7 +310,7 @@ traps:
     name: SPEEDCARRIER-MIB::optTxBiasOK
     category: diagnostic
     severity: notice
-    description: TX Bias OK on port {port} of slot {slot} on {_HOSTNAME}.
+    description: TX bias recovered to OK state on port {{value "port"}} of slot {{value "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -320,7 +320,7 @@ traps:
     name: SPEEDCARRIER-MIB::optRxPowerOverload
     category: diagnostic
     severity: warning
-    description: High optical input power alarm on port {slot}/{port} on {_HOSTNAME}.
+    description: High optical input power alarm on port {{value "port"}} of slot {{value "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -329,8 +329,8 @@ traps:
   - oid: 1.3.6.1.4.1.3652.0.72
     name: SPEEDCARRIER-MIB::configError
     category: config_change
-    severity: warning
-    description: 'Configuration error: set command or config file transfer failed on slot {slot}, port {port} on {_HOSTNAME}.'
+    severity: err
+    description: 'Configuration error: set or config file transfer failed{{with value "descr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - descr
@@ -340,7 +340,7 @@ traps:
     name: SPEEDCARRIER-MIB::configuration
     category: config_change
     severity: notice
-    description: Configuration file updated on slot {slot} port {port} on {_HOSTNAME}.
+    description: Configuration file information updated on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -348,9 +348,9 @@ traps:
       - port
   - oid: 1.3.6.1.4.1.3652.0.74
     name: SPEEDCARRIER-MIB::maintenance
-    category: state_change
+    category: config_change
     severity: notice
-    description: Maintenance change on slot {slot} port {port} on {_HOSTNAME}.
+    description: Maintenance change detected on slot {{value "slot"}} port {{value "port"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -360,7 +360,7 @@ traps:
     name: SPEEDCARRIER-MIB::ampFail
     category: diagnostic
     severity: err
-    description: AMP error occurred on slot {slot} port {port} on {_HOSTNAME}.
+    description: AMP error occurred on slot {{value "slot"}} port {{value "port"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -370,7 +370,7 @@ traps:
     name: SPEEDCARRIER-MIB::ampOk
     category: state_change
     severity: notice
-    description: AMP error cleared on slot {slot} port {port} on {_HOSTNAME}.
+    description: AMP error cleared on port {{value "port"}} of slot {{value "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -380,7 +380,7 @@ traps:
     name: SPEEDCARRIER-MIB::dwdmAlarm
     category: diagnostic
     severity: warning
-    description: DWDM transceiver alarm on slot {slot} port {port} on {_HOSTNAME}.
+    description: DWDM transceiver alarm on slot {{value "slot"}} port {{value "port"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -390,7 +390,7 @@ traps:
     name: SPEEDCARRIER-MIB::dwdmOk
     category: diagnostic
     severity: notice
-    description: DWDM transceiver alarm cleared on slot {slot}, port {port} on {_HOSTNAME}.
+    description: DWDM transceiver alarm cleared on slot {{value "slot"}} port {{value "port"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -400,7 +400,7 @@ traps:
     name: SPEEDCARRIER-MIB::firmwareError
     category: diagnostic
     severity: err
-    description: Firmware error on slot {slot} port {port} with description {descr} on {_HOSTNAME}.
+    description: Firmware or kernel transfer error on slot {{value "slot"}} port {{value "port"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -410,7 +410,7 @@ traps:
     name: SPEEDCARRIER-MIB::tuningError
     category: diagnostic
     severity: err
-    description: Transceiver tuning error on slot {slot}, port {port} on {_HOSTNAME}.
+    description: Transceiver tuning error on port {{value "port"}} of slot {{value "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -420,7 +420,7 @@ traps:
     name: SPEEDCARRIER-MIB::encryption
     category: diagnostic
     severity: err
-    description: Encryption error on slot {slot} port {port} on {_HOSTNAME}.
+    description: Encryption error detected on slot {{value "slot"}} port {{value "port"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
@@ -428,18 +428,18 @@ traps:
       - port
   - oid: 1.3.6.1.4.1.3652.0.82
     name: SPEEDCARRIER-MIB::emergencyShutdown
-    category: diagnostic
-    severity: crit
-    description: Carrier emergency shutdown detected on slot {slot} with description {descr} on {_HOSTNAME}.
+    category: state_change
+    severity: emerg
+    description: Carrier emergency shutdown detected on {{first (value "slot") "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - descr
       - slot
   - oid: 1.3.6.1.4.1.3652.0.255
     name: SPEEDCARRIER-MIB::unspecified
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Unspecified event on slot {slot} port {port} on {_HOSTNAME}.
+    description: 'Unspecified event on slot {{value "slot"}} port {{value "port"}}: {{value "descr"}} on {{hostname}}.'
     status: current
     varbinds:
       - descr

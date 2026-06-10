@@ -66,41 +66,41 @@ traps:
   - oid: 1.3.6.1.4.1.705.1.11.0.1
     name: MG-SNMP-UPS-MIB::upsmgBatteryFault
     category: diagnostic
-    severity: warning
-    description: UPS battery entered fault status on {_HOSTNAME}.
+    severity: alert
+    description: UPS battery entered fault status on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.2
     name: MG-SNMP-UPS-MIB::upsmgBatteryOK
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS battery returned to OK status on {_HOSTNAME}.
+    description: UPS battery returned to OK status on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.3
     name: MG-SNMP-UPS-MIB::upsmgBatteryReplacementIndicated
     category: diagnostic
     severity: warning
-    description: UPS battery replacement indicated on {_HOSTNAME}.
+    description: UPS battery needs to be replaced on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.4
     name: MG-SNMP-UPS-MIB::upsmgBatteryReplaceNotIndicated
     category: diagnostic
     severity: notice
-    description: UPS battery replacement not indicated on {_HOSTNAME}.
+    description: UPS battery replacement is no longer indicated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.5
     name: MG-SNMP-UPS-MIB::upsmgAtLowBattery
     category: diagnostic
     severity: warning
-    description: UPS battery reached low condition with level {upsmgBatteryLevel} on {_HOSTNAME}.
+    description: UPS battery reached low condition with {{value "upsmgBatteryLevel"}}% remaining on {{hostname}}.
     status: current
     varbinds:
       - upsmgBatteryRemainingTime
       - upsmgBatteryLevel
   - oid: 1.3.6.1.4.1.705.1.11.0.6
     name: MG-SNMP-UPS-MIB::upsmgFromLowBattery
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS battery returned from low condition with level {upsmgBatteryLevel} on {_HOSTNAME}.
+    description: UPS battery returned from low condition on {{hostname}}.
     status: current
     varbinds:
       - upsmgBatteryRemainingTime
@@ -109,19 +109,19 @@ traps:
     name: MG-SNMP-UPS-MIB::upsmgChargerFault
     category: diagnostic
     severity: warning
-    description: UPS battery charger is not active on {_HOSTNAME}.
+    description: UPS battery charger is not active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.8
     name: MG-SNMP-UPS-MIB::upsmgChargerOK
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS battery charger is active on {_HOSTNAME}.
+    description: UPS battery charger is active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.9
     name: MG-SNMP-UPS-MIB::upsmgAtLowCondition
     category: diagnostic
     severity: warning
-    description: UPS entering low condition with battery level {upsmgBatteryLevel} on {_HOSTNAME}.
+    description: UPS entering low condition with {{value "upsmgBatteryLevel"}}% battery on {{hostname}}.
     status: current
     varbinds:
       - upsmgBatteryRemainingTime
@@ -130,16 +130,16 @@ traps:
     name: MG-SNMP-UPS-MIB::upsmgFromLowCondition
     category: state_change
     severity: notice
-    description: UPS exiting low condition with battery level {upsmgBatteryLevel} on {_HOSTNAME}.
+    description: UPS exiting low condition on {{hostname}}.
     status: current
     varbinds:
       - upsmgBatteryRemainingTime
       - upsmgBatteryLevel
   - oid: 1.3.6.1.4.1.705.1.11.0.11
     name: MG-SNMP-UPS-MIB::upsmgOnBattery
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: UPS is on battery with remaining time {upsmgBatteryRemainingTime} and level {upsmgBatteryLevel} on {_HOSTNAME}.
+    description: UPS switched to battery power{{with value "upsmgBatteryRemainingTime"}} with {{.}} seconds remaining{{end}} on {{hostname}}.
     status: current
     varbinds:
       - upsmgBatteryRemainingTime
@@ -148,7 +148,7 @@ traps:
     name: MG-SNMP-UPS-MIB::upsmgReturnFromBattery
     category: state_change
     severity: notice
-    description: UPS returned from battery with {upsmgBatteryLevel}% charge on {_HOSTNAME}.
+    description: UPS returned from battery on {{hostname}}.
     status: current
     varbinds:
       - upsmgBatteryRemainingTime
@@ -157,79 +157,79 @@ traps:
     name: MG-SNMP-UPS-MIB::upsmgOnByPass
     category: diagnostic
     severity: warning
-    description: UPS is on bypass on {_HOSTNAME}.
+    description: UPS is on bypass on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.14
     name: MG-SNMP-UPS-MIB::upsmgReturnFromByPass
     category: state_change
     severity: notice
-    description: UPS returned from bypass on {_HOSTNAME}.
+    description: UPS returned from bypass mode on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.15
     name: MG-SNMP-UPS-MIB::upsmgByPassUnavailable
     category: diagnostic
     severity: warning
-    description: UPS bypass is unavailable on {_HOSTNAME}.
+    description: UPS bypass is unavailable on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.16
     name: MG-SNMP-UPS-MIB::upsmgByPassAvailable
     category: state_change
     severity: notice
-    description: UPS by-pass became available on {_HOSTNAME}.
+    description: UPS bypass available on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.17
     name: MG-SNMP-UPS-MIB::upsmgUtilityFailure
     category: diagnostic
-    severity: crit
-    description: UPS utility power failed on {_HOSTNAME}.
+    severity: alert
+    description: UPS utility power failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.18
     name: MG-SNMP-UPS-MIB::upsmgUtilityRestored
     category: state_change
     severity: notice
-    description: UPS utility power restored on {_HOSTNAME}.
+    description: UPS utility power restored on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.19
     name: MG-SNMP-UPS-MIB::upsmgOnBoost
     category: diagnostic
     severity: notice
-    description: UPS is on boost on {_HOSTNAME}.
+    description: UPS is on boost on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.20
     name: MG-SNMP-UPS-MIB::upsmgReturnFromBoost
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS has returned from boost mode on {_HOSTNAME}.
+    description: UPS has returned from boost on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.21
     name: MG-SNMP-UPS-MIB::upsmgOverLoad
     category: diagnostic
     severity: warning
-    description: UPS overload condition detected on {_HOSTNAME}.
+    description: UPS has an overload condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.22
     name: MG-SNMP-UPS-MIB::upsmgLoadOK
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS quit overload condition on {_HOSTNAME}.
+    description: UPS quit overload condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.23
     name: MG-SNMP-UPS-MIB::upsmgOverTemperature
     category: diagnostic
     severity: warning
-    description: UPS overtemperature condition detected on {_HOSTNAME}.
+    description: UPS has overtemperature condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.24
     name: MG-SNMP-UPS-MIB::upsmgTemperatureOK
     category: diagnostic
     severity: notice
-    description: UPS overtemperature condition cleared on {_HOSTNAME}.
+    description: UPS overtemperature condition cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.25
     name: MG-SNMP-UPS-MIB::upsmgOnToStart
     category: state_change
     severity: notice
-    description: UPS receptacle {mgreceptacleIndex} start sequence initiated with state {mgreceptacleState} on {_HOSTNAME}.
+    description: UPS receptacle {{value "mgreceptacleIndex"}} on-delay start sequence initiated on {{hostname}}.
     status: current
     varbinds:
       - mgreceptacleIndex
@@ -240,7 +240,7 @@ traps:
     name: MG-SNMP-UPS-MIB::upsmgOnAbort
     category: state_change
     severity: notice
-    description: UPS output sequence cancelled for receptacle {mgreceptacleIndex} on {_HOSTNAME}.
+    description: UPS receptacle on sequence cancelled{{with value "mgreceptacleIndex"}} for index {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - mgreceptacleIndex
@@ -249,7 +249,7 @@ traps:
     name: MG-SNMP-UPS-MIB::upsmgOnInProgress
     category: state_change
     severity: notice
-    description: UPS receptacle {mgreceptacleIndex} power sequence in progress with state {mgreceptacleState} on {_HOSTNAME}.
+    description: UPS on sequence in progress for receptacle {{value "mgreceptacleIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - mgreceptacleIndex
@@ -259,7 +259,7 @@ traps:
     name: MG-SNMP-UPS-MIB::upsmgOnComplete
     category: state_change
     severity: notice
-    description: UPS receptacle {mgreceptacleIndex} power-on sequence completed with delay {mgreceptacleOnDelay} on {_HOSTNAME}.
+    description: UPS receptacle {{value "mgreceptacleIndex"}} on-delay sequence completed on {{hostname}}.
     status: current
     varbinds:
       - mgreceptacleIndex
@@ -267,8 +267,8 @@ traps:
   - oid: 1.3.6.1.4.1.705.1.11.0.29
     name: MG-SNMP-UPS-MIB::upsmgOffToStart
     category: state_change
-    severity: notice
-    description: UPS off sequence started for receptacle {mgreceptacleIndex} on {_HOSTNAME}.
+    severity: warning
+    description: UPS off sequence started on {{hostname}}.
     status: current
     varbinds:
       - mgreceptacleIndex
@@ -280,7 +280,7 @@ traps:
     name: MG-SNMP-UPS-MIB::upsmgOffAbort
     category: state_change
     severity: notice
-    description: UPS off sequence cancelled for receptacle {mgreceptacleIndex} on {_HOSTNAME}.
+    description: UPS off sequence cancelled for receptacle {{value "mgreceptacleIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - mgreceptacleIndex
@@ -289,7 +289,7 @@ traps:
     name: MG-SNMP-UPS-MIB::upsmgOffInProgress
     category: state_change
     severity: notice
-    description: UPS off sequence in progress for receptacle {mgreceptacleIndex} on {_HOSTNAME}.
+    description: UPS off sequence in progress for receptacle {{value "mgreceptacleIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - mgreceptacleIndex
@@ -299,7 +299,7 @@ traps:
     name: MG-SNMP-UPS-MIB::upsmgOffComplete
     category: state_change
     severity: notice
-    description: UPS off sequence completed for receptacle {mgreceptacleIndex} with delay {mgreceptacleOffDelay} on {_HOSTNAME}.
+    description: UPS off sequence completed for receptacle {{value "mgreceptacleIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - mgreceptacleIndex
@@ -308,7 +308,7 @@ traps:
     name: MG-SNMP-UPS-MIB::upsmgToggleToStart
     category: state_change
     severity: notice
-    description: UPS toggle sequence started for receptacle {mgreceptacleIndex} with delay {mgreceptacleToggleDelay} on {_HOSTNAME}.
+    description: UPS toggle sequence started on receptacle {{value "mgreceptacleIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - mgreceptacleIndex
@@ -317,7 +317,7 @@ traps:
     name: MG-SNMP-UPS-MIB::upsmgToggleAbort
     category: state_change
     severity: notice
-    description: UPS toggle sequence cancelled on receptacle {mgreceptacleIndex} on {_HOSTNAME}.
+    description: UPS toggle sequence cancelled for receptacle {{value "mgreceptacleIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - mgreceptacleIndex
@@ -326,7 +326,7 @@ traps:
     name: MG-SNMP-UPS-MIB::upsmgToggleInProgress
     category: state_change
     severity: notice
-    description: UPS receptacle {mgreceptacleIndex} toggle sequence in progress for {mgreceptacleToggleDuration} seconds on {_HOSTNAME}.
+    description: UPS toggle sequence in progress for receptacle {{value "mgreceptacleIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - mgreceptacleIndex
@@ -335,7 +335,7 @@ traps:
     name: MG-SNMP-UPS-MIB::upsmgToggleComplete
     category: state_change
     severity: notice
-    description: UPS toggle sequence completed for receptacle {mgreceptacleIndex} on {_HOSTNAME}.
+    description: UPS receptacle {{value "mgreceptacleIndex"}} toggle sequence completed on {{hostname}}.
     status: current
     varbinds:
       - mgreceptacleIndex
@@ -343,44 +343,44 @@ traps:
   - oid: 1.3.6.1.4.1.705.1.11.0.37
     name: MG-SNMP-UPS-MIB::upsmgCommunicationFailure
     category: diagnostic
-    severity: err
-    description: UPS serial communication failure detected on {_HOSTNAME}.
+    severity: warning
+    description: UPS serial communication failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.38
     name: MG-SNMP-UPS-MIB::upsmgCommunicationRestored
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS serial communication restored on {_HOSTNAME}.
+    description: UPS serial communication restored on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.39
     name: MG-SNMP-UPS-MIB::upsmgInputBad
     category: diagnostic
     severity: warning
-    description: UPS input has bad condition on {_HOSTNAME}.
+    description: UPS input has bad condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.40
     name: MG-SNMP-UPS-MIB::upsmgInputOK
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS input power condition restored to OK on {_HOSTNAME}.
+    description: UPS input returned to normal condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.41
     name: MG-SNMP-UPS-MIB::upsmgBatteryUnavailable
     category: diagnostic
     severity: warning
-    description: UPS battery is unavailable on {_HOSTNAME}.
+    description: UPS battery is unavailable on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.42
     name: MG-SNMP-UPS-MIB::upsmgBatteryAvailable
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS battery returned from unavailable condition on {_HOSTNAME}.
+    description: UPS battery returned from unavailable condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.43
     name: MG-SNMP-UPS-MIB::upsmgAtLowRecharge
     category: diagnostic
     severity: warning
-    description: UPS battery level {upsmgBatteryLevel}% remaining with {upsmgBatteryRemainingTime} seconds left on {_HOSTNAME}.
+    description: UPS battery is low and waiting for recharge on {{hostname}}.
     status: current
     varbinds:
       - upsmgBatteryRemainingTime
@@ -389,7 +389,7 @@ traps:
     name: MG-SNMP-UPS-MIB::upsmgFromLowRecharge
     category: diagnostic
     severity: warning
-    description: UPS battery reached charging condition with level {upsmgBatteryLevel} on {_HOSTNAME}.
+    description: UPS reached battery charging condition{{with value "upsmgBatteryLevel"}} at {{.}}%{{end}} on {{hostname}}.
     status: current
     varbinds:
       - upsmgBatteryRemainingTime
@@ -397,41 +397,41 @@ traps:
   - oid: 1.3.6.1.4.1.705.1.11.0.45
     name: MG-SNMP-UPS-MIB::upsmgDiagnosticTestFail
     category: diagnostic
-    severity: err
-    description: UPS self test failed on {_HOSTNAME}.
+    severity: warning
+    description: UPS self test failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.46
     name: MG-SNMP-UPS-MIB::upsmgDiagnosticTestOK
     category: diagnostic
-    severity: notice
-    description: UPS self test succeeded on {_HOSTNAME}.
+    severity: info
+    description: UPS self test succeeded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.47
     name: MG-SNMP-UPS-MIB::upsmgBatteryTestOK
     category: diagnostic
-    severity: notice
-    description: UPS battery test passed on {_HOSTNAME}.
+    severity: info
+    description: UPS battery test passed successfully on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.48
     name: MG-SNMP-UPS-MIB::upsmgBatteryTestFail
     category: diagnostic
-    severity: err
-    description: UPS battery test failed on {_HOSTNAME}.
+    severity: alert
+    description: UPS battery test failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.49
     name: MG-SNMP-UPS-MIB::upsmgExternalAlarmActive
     category: diagnostic
     severity: warning
-    description: UPS external alarm {mgextAlarmUID} active on {_HOSTNAME}.
+    description: UPS external alarm {{value "mgextAlarmUID"}} active on {{hostname}}.
     status: current
     varbinds:
       - mgextAlarmIndex
       - mgextAlarmUID
   - oid: 1.3.6.1.4.1.705.1.11.0.50
     name: MG-SNMP-UPS-MIB::upsmgExternalAlarmInactive
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS external alarm {mgextAlarmUID} deactivated on {_HOSTNAME}.
+    description: UPS external alarm {{value "mgextAlarmUID"}} deactivated on {{hostname}}.
     status: current
     varbinds:
       - mgextAlarmIndex
@@ -440,107 +440,107 @@ traps:
     name: MG-SNMP-UPS-MIB::upsmgOnBuck
     category: diagnostic
     severity: notice
-    description: UPS is on buck on {_HOSTNAME}.
+    description: UPS is on buck power on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.52
     name: MG-SNMP-UPS-MIB::upsmgReturnFromBuck
     category: state_change
     severity: notice
-    description: UPS has returned from buck mode on {_HOSTNAME}.
+    description: UPS has returned from buck on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.53
     name: MG-SNMP-UPS-MIB::upsmgEnvironComFailure
     category: diagnostic
     severity: warning
-    description: Environment probe communication failure detected on {_HOSTNAME}.
+    description: UPS environment probe communication failure on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.54
     name: MG-SNMP-UPS-MIB::upsmgEnvironComOK
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Environment probe communication restored on {_HOSTNAME}.
+    description: UPS environment probe communication restored on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.55
     name: MG-SNMP-UPS-MIB::upsmgEnvironTemperatureLow
     category: diagnostic
     severity: warning
-    description: Temperature is below low threshold on {_HOSTNAME}.
+    description: UPS temperature is below low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.56
     name: MG-SNMP-UPS-MIB::upsmgEnvironTemperatureHigh
     category: diagnostic
     severity: warning
-    description: Temperature is above high threshold on {_HOSTNAME}.
+    description: UPS temperature is above high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.57
     name: MG-SNMP-UPS-MIB::upsmgEnvironTemperatureOK
     category: diagnostic
     severity: notice
-    description: Temperature is in normal range on {_HOSTNAME}.
+    description: UPS temperature is in normal range on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.58
     name: MG-SNMP-UPS-MIB::upsmgEnvironHumidityLow
     category: diagnostic
     severity: warning
-    description: Humidity is below low threshold on {_HOSTNAME}.
+    description: Humidity is below low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.59
     name: MG-SNMP-UPS-MIB::upsmgEnvironHumidityHigh
     category: diagnostic
     severity: warning
-    description: Humidity is above high threshold on {_HOSTNAME}.
+    description: Humidity is above high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.60
     name: MG-SNMP-UPS-MIB::upsmgEnvironHumidityOK
     category: diagnostic
     severity: notice
-    description: Humidity is in normal range on {_HOSTNAME}.
+    description: UPS humidity is in normal range on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.61
     name: MG-SNMP-UPS-MIB::upsmgEnvironInput1Closed
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: 'UPS input #1 is closed on {_HOSTNAME}.'
+    description: 'UPS input #1 is closed on {{hostname}}.'
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.62
     name: MG-SNMP-UPS-MIB::upsmgEnvironInput1Open
     category: state_change
     severity: notice
-    description: 'UPS input #1 state changed to Open on {_HOSTNAME}.'
+    description: 'UPS input #1 is open on {{hostname}}.'
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.63
     name: MG-SNMP-UPS-MIB::upsmgEnvironInput2Closed
     category: diagnostic
-    severity: notice
-    description: 'UPS input #2 is closed on {_HOSTNAME}.'
+    severity: warning
+    description: 'UPS input #2 is closed on {{hostname}}.'
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.64
     name: MG-SNMP-UPS-MIB::upsmgEnvironInput2Open
     category: state_change
     severity: notice
-    description: 'UPS input #2 state changed to Open on {_HOSTNAME}.'
+    description: 'UPS input #2 is open on {{hostname}}.'
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.65
     name: MG-SNMP-UPS-MIB::upsRedundancyLost
     category: state_change
     severity: alert
-    description: UPS redundancy lost on {_HOSTNAME}.
+    description: UPS redundancy lost on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.66
     name: MG-SNMP-UPS-MIB::upsRedundancyOK
     category: state_change
     severity: notice
-    description: UPS redundancy recovered on {_HOSTNAME}.
+    description: UPS redundancy recovered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.67
     name: MG-SNMP-UPS-MIB::upsProtectionLost
-    category: diagnostic
+    category: state_change
     severity: crit
-    description: UPS protection lost on {_HOSTNAME}.
+    description: UPS protection lost on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.705.1.11.0.68
     name: MG-SNMP-UPS-MIB::upsProtectionOK
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS protection recovered on {_HOSTNAME}.
+    description: UPS protection recovered on {{hostname}}.
     status: current

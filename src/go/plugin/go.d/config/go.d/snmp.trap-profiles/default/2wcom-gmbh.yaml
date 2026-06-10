@@ -312,7 +312,7 @@ traps:
     name: FLEXDSR04::tunerRfPowerEvent
     category: diagnostic
     severity: warning
-    description: Tuner RF power {rfPowerValue} deviated from reference {tunerRfPowerEventValue} with tolerance {tunerRfPowerEventTolerance} on {_HOSTNAME}.
+    description: Tuner RF power event detected with value {{value "rfPowerValue"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -330,7 +330,7 @@ traps:
     name: FLEXDSR04::tunerCnEvent
     category: diagnostic
     severity: warning
-    description: Tuner C/N value {cnValue} deviated from minimum threshold {tunerCnEventMinValue} with alarm {tunerAlarmActive} on {_HOSTNAME}.
+    description: Tuner C/N value {{value "cnValue"}} reported on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -347,7 +347,7 @@ traps:
     name: FLEXDSR04::tunerBerEvent
     category: diagnostic
     severity: warning
-    description: Tuner BER value {viterbiLdpcBerValue} triggered alarm {tunerAlarmType} on {_HOSTNAME}.
+    description: Tuner BER event with value {{value "viterbiLdpcBerValue"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -362,9 +362,9 @@ traps:
       - tunerAlarmActive
   - oid: 1.3.6.1.4.1.21529.3.2.4.0.4
     name: FLEXDSR04::tunerTsSyncEvent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Transport Stream sync state {tsSyncState} with alarm {tsSyncAlarmActive} on {_HOSTNAME}.
+    description: TS sync state changed to {{value "tsSyncState"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -378,9 +378,9 @@ traps:
       - tsSyncAlarmActive
   - oid: 1.3.6.1.4.1.21529.3.2.4.0.5
     name: FLEXDSR04::asiTsSyncEvent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: TS sync state {tsSyncState} with alarm {tsSyncAlarmActive} on {_HOSTNAME}.
+    description: ASI transport stream sync state changed to {{value "tsSyncState"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -394,9 +394,9 @@ traps:
       - tsSyncAlarmActive
   - oid: 1.3.6.1.4.1.21529.3.2.4.0.6
     name: FLEXDSR04::ipTsSyncEvent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Transport Stream sync state {tsSyncState} with alarm {tsSyncAlarmActive} on {_HOSTNAME}.
+    description: TS sync state changed to {{value "tsSyncState"}}{{with value "tsSyncAlarmActive"}} (alarm active){{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -412,7 +412,7 @@ traps:
     name: FLEXDSR04::etr290ConformityEvent
     category: diagnostic
     severity: warning
-    description: ETR 290 conformity status {etr290Conformity} with alarm {etr290ConformityAlarmActive} on {_HOSTNAME}.
+    description: ETR 290 conformity check reported status {{value "etr290Conformity"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - sysDescr
@@ -427,7 +427,7 @@ traps:
     name: FLEXDSR04::aoipUdpInputDataEvent
     category: diagnostic
     severity: warning
-    description: Audio over IP input data on channel {udpInputDataChannel} reported state {udpInputDataState} with alarm {udpInputDataAlarmActive} on {_HOSTNAME}.
+    description: AOIP UDP input data state {{value "udpInputDataState"}} on channel {{value "udpInputDataChannel"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -443,7 +443,7 @@ traps:
     name: FLEXDSR04::aoipIcecastInputDataEvent
     category: diagnostic
     severity: warning
-    description: Icecast input data server {icecastInputDataServer} state is {icecastInputDataState} with alarm {icecastInputDataAlarmActive} on {_HOSTNAME}.
+    description: Icecast input data state changed to {{value "icecastInputDataState"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -459,7 +459,7 @@ traps:
     name: FLEXDSR04::audioEvent
     category: diagnostic
     severity: warning
-    description: Audio status on channel {audioChannel} is {audioStatus} with alarm {audioAlarmActive} on {_HOSTNAME}.
+    description: Audio status changed to {{value "audioStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -475,7 +475,7 @@ traps:
     name: FLEXDSR04::audioLevelEvent
     category: diagnostic
     severity: warning
-    description: Audio silence detection alarm active on channel {audioChannel} with level {audioLevel} on {_HOSTNAME}.
+    description: Audio silence detection alarm {{value "audioLevelAlarmActive"}} on channel {{value "audioChannel"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -492,7 +492,7 @@ traps:
     name: FLEXDSR04::dteEvent
     category: diagnostic
     severity: warning
-    description: DTE port {dtePort} alarm active {dteAlarmActive} with data available {dteDataAvailable} on {_HOSTNAME}.
+    description: DTE alarm active on port {{value "dtePort"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -508,7 +508,7 @@ traps:
     name: FLEXDSR04::internalStorageEvent
     category: diagnostic
     severity: warning
-    description: Internal storage state is {internalStorageState} on {_HOSTNAME}.
+    description: Internal storage state changed to {{value "internalStorageState"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -522,7 +522,7 @@ traps:
     name: FLEXDSR04::caseTemperatureEvent
     category: diagnostic
     severity: warning
-    description: Case temperature {caseTemperature} exceeded maximum OK value {caseTemperatureEventMaxValue} with alarm {caseTemperatureAlarmActive} on {_HOSTNAME}.
+    description: Case temperature event triggered with value {{value "caseTemperature"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -538,7 +538,7 @@ traps:
     name: FLEXDSR04::inputSourceEvent
     category: state_change
     severity: notice
-    description: Input source changed to {currentInputSourceType} on {_HOSTNAME}.
+    description: Input source changed to {{value "currentInputSourceType"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -554,7 +554,7 @@ traps:
     name: FLEXDSR04::remoteControlUploadEvent
     category: config_change
     severity: notice
-    description: Remote control upload of {remoteControlUploadFile} completed on {_HOSTNAME}.
+    description: Remote control upload event for {{value "remoteControlUploadFile"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -571,7 +571,7 @@ traps:
     name: FLEXDSR04::optoInputEvent
     category: state_change
     severity: notice
-    description: Optical coupler input {optoInputNumber} state changed to {optoInputState} on {_HOSTNAME}.
+    description: Optical coupler input {{value "optoInputNumber"}} state changed to {{value "optoInputState"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -586,7 +586,7 @@ traps:
     name: FLEXDSR04::sfnClockEvent
     category: diagnostic
     severity: warning
-    description: SFN clock error state detected for 1PPS {sfn1ppsErrorState} and 10MHz {sfn10MHzErrorState} on {_HOSTNAME}.
+    description: SFN clock error detected{{with value "sfn1ppsErrorState"}} 1PPS{{end}}{{with value "sfn10MHzErrorState"}} 10MHz{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -601,7 +601,7 @@ traps:
     name: FLEXDSR04::ipPerEvent
     category: diagnostic
     severity: warning
-    description: IP PER value {ipPerEventValue} reported with mode {ipPerEventMode} on {_HOSTNAME}.
+    description: IP PER value {{value "ipPerEventValue"}} reported on {{hostname}}.
     status: current
     varbinds:
       - sysDescr

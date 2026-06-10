@@ -20,16 +20,16 @@ traps:
   - oid: 1.3.6.1.4.1.17022.1.2.2.1
     name: PLUG-POWER-ESERIES-MIB::fcsETrapMJAlarmEntryAdded
     category: diagnostic
-    severity: alert
-    description: Major alarm {fcsEAlarmDescr} inserted into alarm table on {_HOSTNAME}.
+    severity: crit
+    description: 'Major alarm inserted into alarm table{{with value "fcsEAlarmDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - fcsEAlarmDescr
   - oid: 1.3.6.1.4.1.17022.1.2.2.2
     name: PLUG-POWER-ESERIES-MIB::fcsETrapMJAlarmEntryRemoved
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Major alarm {fcsEAlarmDescr} removed on {_HOSTNAME}.
+    description: Major alarm {{value "fcsEAlarmDescr"}} removed on {{hostname}}.
     status: current
     varbinds:
       - fcsEAlarmDescr
@@ -37,15 +37,15 @@ traps:
     name: PLUG-POWER-ESERIES-MIB::fcsETrapMNAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: 'Minor alarm inserted: {fcsEAlarmDescr} on {_HOSTNAME}.'
+    description: 'Minor alarm inserted into alarm table{{with value "fcsEAlarmDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - fcsEAlarmDescr
   - oid: 1.3.6.1.4.1.17022.1.2.2.4
     name: PLUG-POWER-ESERIES-MIB::fcsETrapMNAlarmEntryRemoved
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Minor alarm {fcsEAlarmDescr} removed on {_HOSTNAME}.
+    description: 'Minor alarm removed{{with value "fcsEAlarmDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - fcsEAlarmDescr
@@ -53,7 +53,7 @@ traps:
     name: PLUG-POWER-ESERIES-MIB::fcsETrapRunning
     category: state_change
     severity: notice
-    description: Fuel Cell System entered run mode on {_HOSTNAME}.
+    description: Fuel Cell System entered run mode on {{hostname}}.
     status: current
     varbinds:
       - fcsEMainDate
@@ -62,16 +62,16 @@ traps:
     name: PLUG-POWER-ESERIES-MIB::fcsETrapExercising
     category: diagnostic
     severity: notice
-    description: Fuel cell system entered exercise mode on {_HOSTNAME}.
+    description: Fuel cell system is exercising on {{hostname}}.
     status: current
     varbinds:
       - fcsEMainDate
       - fcsEMainTime
   - oid: 1.3.6.1.4.1.17022.1.2.2.7
     name: PLUG-POWER-ESERIES-MIB::fcsETrapRunEnded
-    category: state_change
-    severity: alert
-    description: Fuel cell system shut down at {fcsEMainTime} on {fcsEMainDate} on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: Fuel Cell System shut down on {{hostname}}.
     status: current
     varbinds:
       - fcsEMainDate
@@ -80,7 +80,7 @@ traps:
     name: PLUG-POWER-ESERIES-MIB::fcsETrapLowH2FuelAlertOn
     category: diagnostic
     severity: warning
-    description: Low H2 Fuel alert is on at {fcsEMainTime} on {_HOSTNAME}.
+    description: Low H2 fuel alert is active on {{hostname}}.
     status: current
     varbinds:
       - fcsEMainDate
@@ -89,7 +89,7 @@ traps:
     name: PLUG-POWER-ESERIES-MIB::fcsETrapLowH2FuelAlertOff
     category: diagnostic
     severity: notice
-    description: Low H2 Fuel alert is off on {_HOSTNAME}.
+    description: Low H2 Fuel alert is off on {{hostname}}.
     status: current
     varbinds:
       - fcsEMainDate

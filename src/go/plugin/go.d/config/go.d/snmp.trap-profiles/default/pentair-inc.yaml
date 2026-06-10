@@ -49,8 +49,8 @@ traps:
   - oid: 1.3.6.1.4.1.26609.2.5.2.0.51
     name: COMM-BOARD-MIB::frostAlarmEV
     category: diagnostic
-    severity: warning
-    description: Frost alarm triggered with status {frostTrap} on {_HOSTNAME}.
+    severity: alert
+    description: 'Frost alarm triggered{{with value "frostTrap"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - frostTrap
@@ -58,7 +58,7 @@ traps:
     name: COMM-BOARD-MIB::startUpHiTempEV
     category: diagnostic
     severity: warning
-    description: High temperature alarm detected at start-up on {_HOSTNAME}.
+    description: High temperature alarm detected at startup on {{hostname}}.
     status: current
     varbinds:
       - startUpHiTempTrap
@@ -66,15 +66,15 @@ traps:
     name: COMM-BOARD-MIB::startUpLowTempEV
     category: diagnostic
     severity: warning
-    description: Low temperature alarm detected at startup on {_HOSTNAME}.
+    description: 'Startup low temperature alarm detected{{with value "startUpLowTempTrap"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - startUpLowTempTrap
   - oid: 1.3.6.1.4.1.26609.2.5.2.0.54
     name: COMM-BOARD-MIB::highTempAlarmEV
     category: diagnostic
-    severity: warning
-    description: High temperature alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: High temperature alarm detected with value {{value "highTempTrap"}} on {{hostname}}.
     status: current
     varbinds:
       - highTempTrap
@@ -82,23 +82,23 @@ traps:
     name: COMM-BOARD-MIB::lowTempAlarmEV
     category: diagnostic
     severity: warning
-    description: Low temperature alarm triggered on {_HOSTNAME}.
+    description: 'Low temperature alarm detected{{with value "lowTempTrap"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - lowTempTrap
   - oid: 1.3.6.1.4.1.26609.2.5.2.0.56
     name: COMM-BOARD-MIB::inletSensAlarmEV
     category: diagnostic
-    severity: err
-    description: Inlet sensor failure alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: 'Inlet sensor failure alarm detected{{with value "inletSensFailTrap"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - inletSensFailTrap
   - oid: 1.3.6.1.4.1.26609.2.5.2.0.57
     name: COMM-BOARD-MIB::outletSensAlarmEV
     category: diagnostic
-    severity: err
-    description: Outlet sensor failure alarm detected on {_HOSTNAME}.
+    severity: warning
+    description: 'Outlet sensor failure alarm triggered{{with value "outletSensFailTrap"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - outletSensFailTrap
@@ -106,7 +106,7 @@ traps:
     name: COMM-BOARD-MIB::doorSmokeEV
     category: security
     severity: alert
-    description: Door open or smoke alarm detected via {doorSmokeTrap} on {_HOSTNAME}.
+    description: 'Door smoke alarm detected{{with value "doorSmokeTrap"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - doorSmokeTrap
@@ -114,15 +114,15 @@ traps:
     name: COMM-BOARD-MIB::highPressureEV
     category: diagnostic
     severity: warning
-    description: High pressure alarm detected on {_HOSTNAME}.
+    description: 'High pressure alarm detected{{with value "highPressureTrap"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - highPressureTrap
   - oid: 1.3.6.1.4.1.26609.2.5.2.0.60
     name: COMM-BOARD-MIB::contcommfailEV
     category: diagnostic
-    severity: err
-    description: Controller communication failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Controller communication failure alarm detected on {{hostname}}.
     status: current
     varbinds:
       - contcommfailTrap

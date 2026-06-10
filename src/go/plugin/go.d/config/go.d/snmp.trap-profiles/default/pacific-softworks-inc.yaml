@@ -79,8 +79,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.1
     name: IBM-TS3500-MIBv1::ibm3584Trap001
     category: diagnostic
-    severity: err
-    description: Changer mechanism communication failure with drive reported on {_HOSTNAME}.
+    severity: warning
+    description: Changer mechanism communication failure with internal drive on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -94,8 +94,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.2
     name: IBM-TS3500-MIBv1::ibm3584Trap002
     category: diagnostic
-    severity: err
-    description: Changer mechanism hardware fault reported on {_HOSTNAME}.
+    severity: crit
+    description: Library hardware fault detected on {{first (value "ibm3584MIBObjectsFFFD") "changer mechanism"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -109,8 +109,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.3
     name: IBM-TS3500-MIBv1::ibm3584Trap003
     category: diagnostic
-    severity: err
-    description: Changer mechanism hardware fault detected with code {ibm3584MIBObjectsHECHECQ} on {_HOSTNAME}.
+    severity: crit
+    description: Library hardware fault detected on {{first (value "ibm3584MIBObjectsTD") "changer mechanism"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -124,8 +124,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.4
     name: IBM-TS3500-MIBv1::ibm3584Trap004
     category: diagnostic
-    severity: err
-    description: Changer mechanism hardware fault reported on {_HOSTNAME}.
+    severity: crit
+    description: Library hardware fault detected on {{first (value "ibm3584MIBObjectsFFFD") "changer mechanism"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -139,8 +139,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.5
     name: IBM-TS3500-MIBv1::ibm3584Trap005
     category: diagnostic
-    severity: err
-    description: Library mechanism hardware fault detected with TapeAlert {ibm3584MIBObjectsTA} on {_HOSTNAME}.
+    severity: warning
+    description: Library hardware fault detected requiring diagnostics on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -154,8 +154,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.6
     name: IBM-TS3500-MIBv1::ibm3584Trap006
     category: diagnostic
-    severity: err
-    description: Library host interface fault detected with TapeAlert {ibm3584MIBObjectsTA} on {_HOSTNAME}.
+    severity: warning
+    description: Library interface interfacing fault detected on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -170,7 +170,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap007
     category: diagnostic
     severity: warning
-    description: Predictive hardware failure detected on library on {_HOSTNAME}.
+    description: Predictive hardware failure detected on {{value "ibm3584MIBObjectsMTMNLSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -185,7 +185,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap008
     category: diagnostic
     severity: warning
-    description: Library preventive maintenance required on {_HOSTNAME}.
+    description: Library preventive maintenance required on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -200,7 +200,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap009
     category: diagnostic
     severity: warning
-    description: Library humidity limits exceeded on {_HOSTNAME}.
+    description: Library humidity limits exceeded on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -215,7 +215,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap010
     category: diagnostic
     severity: warning
-    description: Library temperature limits exceeded on {_HOSTNAME}.
+    description: Library temperature limits exceeded on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -229,8 +229,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.11
     name: IBM-TS3500-MIBv1::ibm3584Trap011
     category: diagnostic
-    severity: err
-    description: Library voltage limits exceeded on {_HOSTNAME}.
+    severity: warning
+    description: Library voltage limits exceeded on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -244,8 +244,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.12
     name: IBM-TS3500-MIBv1::ibm3584Trap012
     category: diagnostic
-    severity: err
-    description: Stray tape detected in library drive on {_HOSTNAME}.
+    severity: warning
+    description: Library stray tape detected with hardware error {{value "ibm3584MIBObjectsHECHECQ"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -260,7 +260,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap013
     category: diagnostic
     severity: warning
-    description: Library pick retry detected with excessive retries on {_HOSTNAME}.
+    description: Library pick retry excessive retries on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -275,7 +275,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap014
     category: diagnostic
     severity: warning
-    description: Library place retry detected with excessive retries on {_HOSTNAME}.
+    description: Library place retry occurred on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -290,7 +290,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap015
     category: diagnostic
     severity: warning
-    description: Library load retry detected with excessive retries on {_HOSTNAME}.
+    description: Library load retry excessive on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -305,7 +305,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap016
     category: diagnostic
     severity: warning
-    description: Library door open prevents functioning on {_HOSTNAME}.
+    description: Library door is open, preventing functioning on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -319,8 +319,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.17
     name: IBM-TS3500-MIBv1::ibm3584Trap017
     category: diagnostic
-    severity: err
-    description: Mechanical problem with import/export mail slot reported by {ibm3584MIBObjectsTD} on {_HOSTNAME}.
+    severity: warning
+    description: Library mail slot mechanical problem detected on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -334,8 +334,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.18
     name: IBM-TS3500-MIBv1::ibm3584Trap018
     category: diagnostic
-    severity: err
-    description: Library magazine missing, operation halted on {_HOSTNAME}.
+    severity: crit
+    description: Library magazine not present on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -350,7 +350,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap019
     category: security
     severity: warning
-    description: Library security mode triggered by door operation on {_HOSTNAME}.
+    description: Library security has been compromised due to door operation on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -363,9 +363,9 @@ traps:
       - ibm3584MIBObjectsSeverity
   - oid: 1.3.6.1.4.1.4484.1.0.20
     name: IBM-TS3500-MIBv1::ibm3584Trap020
-    category: state_change
+    category: security
     severity: notice
-    description: Library security mode changed on {_HOSTNAME}.
+    description: Library security mode changed on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -380,7 +380,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap021
     category: state_change
     severity: warning
-    description: Library manually turned offline on {_HOSTNAME}.
+    description: Library manually turned offline and unavailable on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -394,8 +394,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.22
     name: IBM-TS3500-MIBv1::ibm3584Trap022
     category: diagnostic
-    severity: warning
-    description: Library drive offline reported by {ibm3584MIBObjectsTD} on {_HOSTNAME}.
+    severity: notice
+    description: Library drive offline on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -410,7 +410,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap023
     category: diagnostic
     severity: warning
-    description: Barcode scan retry excessive on {_HOSTNAME}.
+    description: Barcode scan retry excessive on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -425,7 +425,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap024
     category: diagnostic
     severity: warning
-    description: Library inventory inconsistency detected on {_HOSTNAME}.
+    description: Library inventory inconsistency detected on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -440,7 +440,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap025
     category: diagnostic
     severity: warning
-    description: Library detected illegal operation with TapeAlert {ibm3584MIBObjectsTA} on {_HOSTNAME}.
+    description: Library detected an illegal operation on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -455,7 +455,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap026
     category: diagnostic
     severity: warning
-    description: Dual-port interface error detected on {ibm3584MIBObjectsMTMNLSN} on {_HOSTNAME}.
+    description: Dual-port interface error on library on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -470,7 +470,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap027
     category: diagnostic
     severity: warning
-    description: Cooling fan failure detected with severity {ibm3584MIBObjectsSeverity} on {_HOSTNAME}.
+    description: Library cooling fan failure detected on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -484,8 +484,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.28
     name: IBM-TS3500-MIBv1::ibm3584Trap028
     category: diagnostic
-    severity: err
-    description: Redundant power supply failed inside the library subsystem on {_HOSTNAME}.
+    severity: warning
+    description: Redundant power supply failure detected on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -500,7 +500,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap029
     category: diagnostic
     severity: warning
-    description: Power consumption outside specified range on {_HOSTNAME}.
+    description: Power consumption is outside specified range on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -514,8 +514,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.30
     name: IBM-TS3500-MIBv1::ibm3584Trap030
     category: diagnostic
-    severity: err
-    description: Pass-through mechanism failure detected with error code {ibm3584MIBObjectsHECHECQ} on {_HOSTNAME}.
+    severity: crit
+    description: Cartridge pass-through mechanism failure detected on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -530,7 +530,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap031
     category: diagnostic
     severity: warning
-    description: Cartridge left in pass-through mechanism on {_HOSTNAME}.
+    description: Cartridge left in pass-through mechanism on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -545,7 +545,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap032
     category: diagnostic
     severity: warning
-    description: TapeAlert {ibm3584MIBObjectsTA} unreadable barcode on cartridge {ibm3584MIBObjectsMTMNLSN} on {_HOSTNAME}.
+    description: Unable to read bar code label on cartridge during inventory on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -560,7 +560,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap201
     category: diagnostic
     severity: warning
-    description: Tape drive {ibm3584MIBObjectsDrvSN} reported read warning {ibm3584MIBObjectsTD} on {_HOSTNAME}.
+    description: Tape drive read warning detected{{with value "ibm3584MIBObjectsDrvSN"}} on drive {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -580,7 +580,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap202
     category: diagnostic
     severity: warning
-    description: Tape drive {ibm3584MIBObjectsDrvSN} reported write trouble with TapeAlert {ibm3584MIBObjectsTA} on {_HOSTNAME}.
+    description: Tape drive {{value "ibm3584MIBObjectsDrvSN"}} has severe trouble writing data on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -600,7 +600,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap203
     category: diagnostic
     severity: err
-    description: Drive {ibm3584MIBObjectsDrvSN} reported hard read/write error on {_HOSTNAME}.
+    description: Drive hard read/write error occurred on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -620,7 +620,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap204
     category: diagnostic
     severity: crit
-    description: Tape cartridge {ibm3584MIBObjectsVOLSER} reported unrecoverable read/write error on drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: Tape drive {{value "ibm3584MIBObjectsDrvSN"}} reports unrecoverable media error on {{value "ibm3584MIBObjectsVOLSER"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -639,8 +639,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.205
     name: IBM-TS3500-MIBv1::ibm3584Trap205
     category: diagnostic
-    severity: err
-    description: Drive {ibm3584MIBObjectsDrvSN} reported read failure TapeAlert {ibm3584MIBObjectsTA} on {_HOSTNAME}.
+    severity: crit
+    description: Tape drive read failure on {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -660,7 +660,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap206
     category: diagnostic
     severity: err
-    description: Drive write failure reported by {ibm3584MIBObjectsTD} on {_HOSTNAME}.
+    description: Tape drive write failure detected{{with value "ibm3584MIBObjectsDrvSN"}} on drive {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -680,7 +680,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap207
     category: diagnostic
     severity: warning
-    description: Tape cartridge {ibm3584MIBObjectsVOLSER} reached end of life on {_HOSTNAME}.
+    description: Tape cartridge {{value "ibm3584MIBObjectsVOLSER"}} reached end of life on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -700,7 +700,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap208
     category: diagnostic
     severity: warning
-    description: TapeAlert {ibm3584MIBObjectsTA} indicates non-data-grade cartridge {ibm3584MIBObjectsVOLSER} on drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: 'TapeAlert 008: cartridge is not data-grade on {{hostname}}.'
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -720,7 +720,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap209
     category: diagnostic
     severity: warning
-    description: Write command failed due to write-protected cartridge on drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: Write attempt to write-protected tape {{value "ibm3584MIBObjectsVOLSER"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -740,7 +740,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap210
     category: diagnostic
     severity: warning
-    description: Tape drive {ibm3584MIBObjectsDrvSN} rejected UNLOAD command due to prevent media removal on {_HOSTNAME}.
+    description: Tape drive rejected unload command due to media removal prevention on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -760,7 +760,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap211
     category: diagnostic
     severity: notice
-    description: Drive {ibm3584MIBObjectsDrvSN} cleaning cartridge detected on {_HOSTNAME}.
+    description: Cleaning tape loaded into drive {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -780,7 +780,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap212
     category: diagnostic
     severity: warning
-    description: Tape drive reported unsupported format error on {_HOSTNAME}.
+    description: Unsupported tape format detected on drive {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -799,8 +799,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.213
     name: IBM-TS3500-MIBv1::ibm3584Trap213
     category: diagnostic
-    severity: err
-    description: Tape snapped in drive {ibm3584MIBObjectsDrvSN} with TapeAlert {ibm3584MIBObjectsTA} on {_HOSTNAME}.
+    severity: warning
+    description: Tape snapped in drive {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -820,7 +820,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap214
     category: diagnostic
     severity: crit
-    description: Unrecoverable snapped tape detected on drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: Tape snapped in drive {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -840,7 +840,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap215
     category: diagnostic
     severity: warning
-    description: Tape cartridge memory chip failure reported on drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: Tape cartridge memory chip failure detected on {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -859,8 +859,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.216
     name: IBM-TS3500-MIBv1::ibm3584Trap216
     category: diagnostic
-    severity: err
-    description: Tape cartridge {ibm3584MIBObjectsVOLSER} ejected during active write on drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    severity: warning
+    description: Tape cartridge ejected during active write or read on {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -880,7 +880,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap217
     category: diagnostic
     severity: warning
-    description: Drive {ibm3584MIBObjectsDrvSN} loaded read-only cartridge {ibm3584MIBObjectsVOLSER} on {_HOSTNAME}.
+    description: TapeAlert 017 read-only format detected on {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -899,8 +899,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.218
     name: IBM-TS3500-MIBv1::ibm3584Trap218
     category: diagnostic
-    severity: err
-    description: Tape drive {ibm3584MIBObjectsDrvSN} reported corrupted tape directory on {_HOSTNAME}.
+    severity: warning
+    description: Tape directory corrupted on load{{with value "ibm3584MIBObjectsDrvSN"}} on drive {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -920,7 +920,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap219
     category: diagnostic
     severity: warning
-    description: Tape cartridge {ibm3584MIBObjectsVOLSER} nearing end of life on {_HOSTNAME}.
+    description: Tape cartridge {{value "ibm3584MIBObjectsVOLSER"}} is nearing end of life on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -940,7 +940,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap220
     category: diagnostic
     severity: warning
-    description: Tape drive {ibm3584MIBObjectsDrvSN} requires cleaning due to head clog on {_HOSTNAME}.
+    description: Tape drive {{value "ibm3584MIBObjectsDrvSN"}} requires cleaning due to head clog on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -959,8 +959,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.221
     name: IBM-TS3500-MIBv1::ibm3584Trap221
     category: diagnostic
-    severity: notice
-    description: Tape drive {ibm3584MIBObjectsDrvSN} requires routine cleaning on {_HOSTNAME}.
+    severity: warning
+    description: Tape drive {{value "ibm3584MIBObjectsDrvSN"}} requires routine cleaning on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -980,7 +980,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap222
     category: diagnostic
     severity: warning
-    description: Cleaning tape expired for drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: 'TapeAlert 022: Expired cleaning media detected on {{hostname}}.'
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1000,7 +1000,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap223
     category: diagnostic
     severity: warning
-    description: Invalid cleaning tape detected on drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: Invalid cleaning tape detected on drive {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1020,7 +1020,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap224
     category: diagnostic
     severity: warning
-    description: Tape drive {ibm3584MIBObjectsDrvSN} requested retention due to read/write trouble on {_HOSTNAME}.
+    description: Tape drive {{value "ibm3584MIBObjectsDrvSN"}} requested retention due to read/write trouble on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1040,7 +1040,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap225
     category: diagnostic
     severity: warning
-    description: Tape drive {ibm3584MIBObjectsDrvSN} reported dual-port interface error on {_HOSTNAME}.
+    description: Tape drive {{value "ibm3584MIBObjectsDrvSN"}} dual-port interface error on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1059,8 +1059,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.226
     name: IBM-TS3500-MIBv1::ibm3584Trap226
     category: diagnostic
-    severity: err
-    description: Cooling fan failure detected on drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    severity: warning
+    description: Cooling fan failure detected on drive {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1080,7 +1080,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap227
     category: diagnostic
     severity: warning
-    description: Redundant power supply failed inside the tape drive enclosure on {_HOSTNAME}.
+    description: Redundant power supply failure detected on {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1100,7 +1100,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap228
     category: diagnostic
     severity: warning
-    description: Tape drive {ibm3584MIBObjectsDrvSN} power consumption is outside specified range on {_HOSTNAME}.
+    description: Tape drive power consumption is outside specified range on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1120,7 +1120,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap229
     category: diagnostic
     severity: warning
-    description: Drive {ibm3584MIBObjectsDrvSN} requires preventative maintenance on {_HOSTNAME}.
+    description: Drive maintenance required for preventative service on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1139,8 +1139,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.230
     name: IBM-TS3500-MIBv1::ibm3584Trap230
     category: diagnostic
-    severity: err
-    description: Drive hardware fault detected with TapeAlert {ibm3584MIBObjectsTA} on {_HOSTNAME}.
+    severity: crit
+    description: Tape drive hardware fault detected{{with value "ibm3584MIBObjectsDrvSN"}} on drive {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1159,8 +1159,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.231
     name: IBM-TS3500-MIBv1::ibm3584Trap231
     category: diagnostic
-    severity: err
-    description: Tape drive {ibm3584MIBObjectsDrvSN} hardware fault detected on {_HOSTNAME}.
+    severity: crit
+    description: Tape drive {{value "ibm3584MIBObjectsDrvSN"}} failed internal Power-On Self Test on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1180,7 +1180,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap232
     category: diagnostic
     severity: err
-    description: Drive {ibm3584MIBObjectsDrvSN} reported interfacing fault {ibm3584MIBObjectsTD} on {_HOSTNAME}.
+    description: Tape drive interface fault detected on {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1199,8 +1199,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.233
     name: IBM-TS3500-MIBv1::ibm3584Trap233
     category: diagnostic
-    severity: err
-    description: TapeAlert {ibm3584MIBObjectsTA} indicates drive {ibm3584MIBObjectsDrvSN} requires media unload on {_HOSTNAME}.
+    severity: warning
+    description: TapeAlert 033 eject media error on drive {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1220,7 +1220,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap234
     category: diagnostic
     severity: err
-    description: Firmware download failed on drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: Firmware download failed on drive {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1240,7 +1240,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap235
     category: diagnostic
     severity: warning
-    description: Drive humidity limits exceeded on {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: Drive humidity limits exceeded on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1260,7 +1260,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap236
     category: diagnostic
     severity: warning
-    description: Drive {ibm3584MIBObjectsDrvSN} temperature exceeded limits on {_HOSTNAME}.
+    description: Drive temperature exceeded limits on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1280,7 +1280,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap237
     category: diagnostic
     severity: warning
-    description: Drive voltage limits exceeded on {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: Drive voltage limits exceeded on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1300,7 +1300,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap238
     category: diagnostic
     severity: warning
-    description: Predictive hardware failure detected on drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: Predictive hardware failure detected on tape drive {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1320,7 +1320,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap239
     category: diagnostic
     severity: warning
-    description: Drive {ibm3584MIBObjectsDrvSN} requires diagnostics due to failure on {_HOSTNAME}.
+    description: Drive {{value "ibm3584MIBObjectsDrvSN"}} requires diagnostics due to failure on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1339,8 +1339,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.240
     name: IBM-TS3500-MIBv1::ibm3584Trap240
     category: diagnostic
-    severity: err
-    description: Loader hardware A communication trouble with tape drive on {_HOSTNAME}.
+    severity: warning
+    description: Loader hardware communication error detected on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1360,7 +1360,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap241
     category: diagnostic
     severity: warning
-    description: Loader stray tape detected with TapeAlert {ibm3584MIBObjectsTA} on {_HOSTNAME}.
+    description: Loader stray tape detected on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1379,8 +1379,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.242
     name: IBM-TS3500-MIBv1::ibm3584Trap242
     category: diagnostic
-    severity: err
-    description: Loader hardware B reported hardware fault with TapeAlert {ibm3584MIBObjectsTA} on {_HOSTNAME}.
+    severity: warning
+    description: Loader hardware B has a hardware fault on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1400,7 +1400,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap243
     category: diagnostic
     severity: warning
-    description: TapeAlert {ibm3584MIBObjectsTA} indicates autoloader door is open on {_HOSTNAME}.
+    description: Autoloader door is open on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1419,8 +1419,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.244
     name: IBM-TS3500-MIBv1::ibm3584Trap244
     category: diagnostic
-    severity: err
-    description: Autoloader hardware fault reported on {_HOSTNAME}.
+    severity: crit
+    description: Autoloader hardware fault detected on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1439,8 +1439,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.245
     name: IBM-TS3500-MIBv1::ibm3584Trap245
     category: diagnostic
-    severity: err
-    description: Loader magazine missing, autoloader cannot operate on {_HOSTNAME}.
+    severity: warning
+    description: 'TapeAlert 045: Loader magazine not present on {{hostname}}.'
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1460,7 +1460,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap246
     category: diagnostic
     severity: warning
-    description: Loader predictive failure reported on {_HOSTNAME}.
+    description: Predictive failure of loader mechanism hardware detected on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1480,7 +1480,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap250
     category: diagnostic
     severity: warning
-    description: Drive {ibm3584MIBObjectsDrvSN} lost media statistics due to power down on {_HOSTNAME}.
+    description: 'TapeAlert 050: Media statistics lost due to drive/library power down on {{hostname}}.'
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1500,7 +1500,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap251
     category: diagnostic
     severity: warning
-    description: Tape directory invalid at unload on drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: Tape directory invalid at unload on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1519,8 +1519,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.252
     name: IBM-TS3500-MIBv1::ibm3584Trap252
     category: diagnostic
-    severity: err
-    description: Tape system area write failure detected on drive {ibm3584MIBObjectsDrvSN} with cartridge {ibm3584MIBObjectsVOLSER} on {_HOSTNAME}.
+    severity: warning
+    description: Tape system area write failure on drive {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1539,8 +1539,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.253
     name: IBM-TS3500-MIBv1::ibm3584Trap253
     category: diagnostic
-    severity: err
-    description: Tape system area read failure on drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    severity: warning
+    description: Tape system area read failure on drive {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1560,7 +1560,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap254
     category: diagnostic
     severity: err
-    description: 'TapeAlert {ibm3584MIBObjectsTA} detected on drive {ibm3584MIBObjectsDrvSN}: {ibm3584MIBObjectsTD} on {_HOSTNAME}.'
+    description: Tape drive reported No start of data on {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1580,7 +1580,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap255
     category: diagnostic
     severity: err
-    description: Tape drive {ibm3584MIBObjectsDrvSN} reported loading failure with TapeAlert {ibm3584MIBObjectsTA} on {_HOSTNAME}.
+    description: Tape drive operation failed due to media loading failure on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1600,7 +1600,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap256
     category: diagnostic
     severity: err
-    description: Drive {ibm3584MIBObjectsDrvSN} reported unrecoverable unload failure on {_HOSTNAME}.
+    description: Tape drive {{value "ibm3584MIBObjectsDrvSN"}} reported unrecoverable unload failure on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1620,7 +1620,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap257
     category: diagnostic
     severity: err
-    description: Automation interface failure reported by drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: Automation interface failure on drive {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1640,7 +1640,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap258
     category: diagnostic
     severity: err
-    description: Tape drive firmware fault detected on {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: Tape drive firmware fault detected on {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1660,7 +1660,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap259
     category: security
     severity: warning
-    description: WORM medium integrity check failed, possible tampering detected on drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: WORM medium integrity check failed, possible tampering detected on {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1680,7 +1680,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap260
     category: diagnostic
     severity: warning
-    description: WORM medium overwrite attempt detected on drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: WORM medium overwrite attempt detected on {{value "ibm3584MIBObjectsDrvSN"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1700,7 +1700,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap401
     category: diagnostic
     severity: warning
-    description: I/O station full reported for logical library {ibm3584MIBObjectsLL} on {_HOSTNAME}.
+    description: I/O station is full on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1713,7 +1713,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap402
     category: diagnostic
     severity: warning
-    description: Logical library {ibm3584MIBObjectsLL} is full with cartridge {ibm3584MIBObjectsVOLSER} on {_HOSTNAME}.
+    description: Logical library {{value "ibm3584MIBObjectsLL"}} is full on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1726,7 +1726,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap403
     category: diagnostic
     severity: warning
-    description: Library out of LTO cleaning cartridges on {ibm3584MIBObjectsLL} on {_HOSTNAME}.
+    description: Library is out of LTO cleaning cartridges on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1739,7 +1739,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap404
     category: diagnostic
     severity: warning
-    description: Library {ibm3584MIBObjectsLL} is out of cleaning cartridges on {_HOSTNAME}.
+    description: Library is out of DLT cleaning cartridges on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1752,7 +1752,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap405
     category: diagnostic
     severity: warning
-    description: I/O station door open for five minutes in Logical Library {ibm3584MIBObjectsLL} on {_HOSTNAME}.
+    description: Import/Export station door has been open for five minutes on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1765,7 +1765,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap406
     category: diagnostic
     severity: warning
-    description: LTO cleaning cartridge expired on logical library {ibm3584MIBObjectsLL} on {_HOSTNAME}.
+    description: LTO cleaning cartridge expired in logical library {{value "ibm3584MIBObjectsLL"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1778,7 +1778,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap407
     category: diagnostic
     severity: warning
-    description: DLT cleaning cartridge expired for logical library {ibm3584MIBObjectsLL} on {_HOSTNAME}.
+    description: DLT cleaning cartridge expired on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1791,7 +1791,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap408
     category: diagnostic
     severity: notice
-    description: Test initiated from operator panel on {_HOSTNAME}.
+    description: Diagnostic test initiated from operator panel on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1804,7 +1804,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap409
     category: diagnostic
     severity: warning
-    description: Library out of 3592 Enterprise Tape cleaning cartridges on {_HOSTNAME}.
+    description: Library out of 3592 Enterprise Tape cleaning cartridges on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1817,7 +1817,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap410
     category: diagnostic
     severity: warning
-    description: Cleaning cartridge expired on logical library {ibm3584MIBObjectsLL} on {_HOSTNAME}.
+    description: Tape cleaning cartridge expired on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1830,7 +1830,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap411
     category: diagnostic
     severity: warning
-    description: LTO slots approaching full capacity in logical library {ibm3584MIBObjectsLL} on {_HOSTNAME}.
+    description: LTO slots approaching full capacity on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1843,7 +1843,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap412
     category: diagnostic
     severity: warning
-    description: Tape library slots approaching full capacity on {_HOSTNAME}.
+    description: 3592 Enterprise Tape slots approaching full capacity on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1856,7 +1856,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap413
     category: diagnostic
     severity: warning
-    description: Host motion to shared drive failed because drive was in use by another logical library on {_HOSTNAME}.
+    description: Shared drive access conflict detected on {{value "ibm3584MIBObjectsLL"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1872,7 +1872,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap414
     category: diagnostic
     severity: warning
-    description: Barcode read failure for cartridge {ibm3584MIBObjectsVOLSER} in library {ibm3584MIBObjectsLL} on {_HOSTNAME}.
+    description: Barcode read failure on cartridge {{value "ibm3584MIBObjectsVOLSER"}} in logical library {{value "ibm3584MIBObjectsLL"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1885,7 +1885,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap415
     category: diagnostic
     severity: warning
-    description: Library call home failed for logical library {ibm3584MIBObjectsLL} on {_HOSTNAME}.
+    description: Library call home failed on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1898,7 +1898,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap416
     category: diagnostic
     severity: warning
-    description: Logical library {ibm3584MIBObjectsLL} is nearing full capacity on {_HOSTNAME}.
+    description: Logical library {{value "ibm3584MIBObjectsLL"}} is nearing full capacity on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1909,9 +1909,9 @@ traps:
       - ibm3584MIBObjectsSeverity
   - oid: 1.3.6.1.4.1.4484.1.0.417
     name: IBM-TS3500-MIBv1::ibm3584Trap417
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: All 3592 Enterprise Tape slots in logical library {ibm3584MIBObjectsLL} are allocated on {_HOSTNAME}.
+    description: All 3592 Enterprise Tape slots are allocated in logical library {{value "ibm3584MIBObjectsLL"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1924,7 +1924,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap418
     category: diagnostic
     severity: warning
-    description: All LTO Tape slots in logical library {ibm3584MIBObjectsLL} are allocated on {_HOSTNAME}.
+    description: All physical LTO Tape slots are allocated on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1936,8 +1936,8 @@ traps:
   - oid: 1.3.6.1.4.1.4484.1.0.419
     name: IBM-TS3500-MIBv1::ibm3584Trap419
     category: diagnostic
-    severity: err
-    description: Unable to reach associated EKM on {_HOSTNAME}.
+    severity: crit
+    description: Library is unable to communicate with the associated EKM on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1948,7 +1948,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap420
     category: diagnostic
     severity: warning
-    description: 'Encryption mismatch: non-encrypted cartridge {ibm3584MIBObjectsVOLSER} loaded in drive {ibm3584MIBObjectsTD} on {_HOSTNAME}.'
+    description: 'Encryption mismatch: non-encryptable cartridge {{value "ibm3584MIBObjectsVOLSER"}} loaded in drive {{value "ibm3584MIBObjectsTD"}} on {{hostname}}.'
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1961,7 +1961,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap421
     category: diagnostic
     severity: notice
-    description: Unassigned cartridge {ibm3584MIBObjectsVOLSER} detected in library {ibm3584MIBObjectsMTMNLSN} on {_HOSTNAME}.
+    description: New unassigned cartridge detected{{with value "ibm3584MIBObjectsVOLSER"}} with serial {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1971,9 +1971,9 @@ traps:
       - ibm3584MIBObjectsSeverity
   - oid: 1.3.6.1.4.1.4484.1.0.422
     name: IBM-TS3500-MIBv1::ibm3584Trap422
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Library doors closed and inventory resumed on {_HOSTNAME}.
+    description: Library doors closed and inventory resumed on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1984,7 +1984,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap440
     category: auth
     severity: notice
-    description: User {ibm3584MIBObjectsUserID} successfully logged in on {_HOSTNAME}.
+    description: User {{value "ibm3584MIBObjectsUserID"}} successfully logged in on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -1996,7 +1996,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap441
     category: auth
     severity: warning
-    description: Unsuccessful login attempt for user {ibm3584MIBObjectsUserID} on {_HOSTNAME}.
+    description: Unsuccessful login attempt by {{value "ibm3584MIBObjectsUserID"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -2008,7 +2008,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap442
     category: auth
     severity: notice
-    description: User {ibm3584MIBObjectsUserID} logged out of the web or operator panel on {_HOSTNAME}.
+    description: User {{value "ibm3584MIBObjectsUserID"}} logged out on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -2020,7 +2020,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap443
     category: config_change
     severity: notice
-    description: Library configuration setting changed by {ibm3584MIBObjectsUserID} on {_HOSTNAME}.
+    description: Library configuration setting changed{{with value "ibm3584MIBObjectsUserID"}} by {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -2032,7 +2032,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap444
     category: config_change
     severity: notice
-    description: Logical library configuration setting changed for {ibm3584MIBObjectsLL} on {_HOSTNAME}.
+    description: Logical library configuration setting changed on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -2045,7 +2045,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap445
     category: config_change
     severity: notice
-    description: Tape drive configuration setting changed for drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: Tape drive configuration setting changed on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -2061,7 +2061,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap446
     category: state_change
     severity: notice
-    description: Cartridge {ibm3584MIBObjectsVOLSER} modified by {ibm3584MIBObjectsUserID} on {_HOSTNAME}.
+    description: Cartridge {{value "ibm3584MIBObjectsVOLSER"}} modified via external UI on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -2076,7 +2076,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap447
     category: config_change
     severity: notice
-    description: Library or drive code load initiated by {ibm3584MIBObjectsUserID} on {_HOSTNAME}.
+    description: Library or drive code load initiated by {{value "ibm3584MIBObjectsUserID"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -2088,7 +2088,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap448
     category: diagnostic
     severity: notice
-    description: Accessor {ibm3584MIBObjectsTD} service state changed on {_HOSTNAME}.
+    description: Accessor service state changed to prepared or finished on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -2100,7 +2100,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap449
     category: diagnostic
     severity: notice
-    description: Drive {ibm3584MIBObjectsWWNN} at element {ibm3584MIBObjectsEA} entered prepared or finished state on {_HOSTNAME}.
+    description: Drive {{value "ibm3584MIBObjectsEA"}} entered prepared or finished state on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -2115,7 +2115,7 @@ traps:
     name: IBM-TS3500-MIBv1::ibm3584Trap450
     category: diagnostic
     severity: warning
-    description: Drive serial number changed for drive {ibm3584MIBObjectsDrvSN} on {_HOSTNAME}.
+    description: Drive serial number changed on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -2129,9 +2129,9 @@ traps:
       - ibm3584MIBObjectsSeverity
   - oid: 1.3.6.1.4.1.4484.1.0.451
     name: IBM-TS3500-MIBv1::ibm3584Trap451
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Drive {ibm3584MIBObjectsWWNN} at element {ibm3584MIBObjectsEA} was power cycled on {_HOSTNAME}.
+    description: Drive {{value "ibm3584MIBObjectsDrvSN"}} power cycled via Web UI on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN
@@ -2145,9 +2145,9 @@ traps:
       - ibm3584MIBObjectsSeverity
   - oid: 1.3.6.1.4.1.4484.1.0.452
     name: IBM-TS3500-MIBv1::ibm3584Trap452
-    category: config_change
+    category: state_change
     severity: notice
-    description: Node card reset via Web Specialist by {ibm3584MIBObjectsUserID} on {_HOSTNAME}.
+    description: Node card reset via Web UI by {{value "ibm3584MIBObjectsUserID"}} on {{hostname}}.
     status: current
     varbinds:
       - ibm3584MIBObjectsMTMNLSN

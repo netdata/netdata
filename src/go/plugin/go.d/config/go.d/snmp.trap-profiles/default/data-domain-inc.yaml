@@ -84,13 +84,13 @@ traps:
     name: DATA-DOMAIN-MIB::powerSupplyFailedAlarm
     category: diagnostic
     severity: crit
-    description: Power supply failure detected on {_HOSTNAME}.
+    description: Power supply failed on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.2
     name: DATA-DOMAIN-MIB::systemOverheatWarningAlarm
     category: diagnostic
     severity: warning
-    description: Temperature warning triggered for sensor {tempSensorDescription} on {_HOSTNAME}.
+    description: System overheat warning alarm triggered{{with value "tempSensorDescription"}} for {{.}}{{end}} on {{hostname}}.
     status: deprecated
     varbinds:
       - tempSensorDescription
@@ -98,7 +98,7 @@ traps:
     name: DATA-DOMAIN-MIB::systemOverheatAlertAlarm
     category: diagnostic
     severity: warning
-    description: High temperature alert from {tempSensorDescription} on {_HOSTNAME}.
+    description: System overheat alert triggered for {{value "tempSensorDescription"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - tempSensorDescription
@@ -106,35 +106,35 @@ traps:
     name: DATA-DOMAIN-MIB::systemOverheatShutdownAlarm
     category: diagnostic
     severity: emerg
-    description: System shutdown due to overheat alarm on {tempSensorDescription} on {_HOSTNAME}.
+    description: System shutdown due to overheat on {{value "tempSensorDescription"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - tempSensorDescription
   - oid: 1.3.6.1.4.1.19746.2.0.5
     name: DATA-DOMAIN-MIB::fanModuleFailedAlarm
     category: diagnostic
-    severity: err
-    description: Fan module {fanDescription} has failed on {_HOSTNAME}.
+    severity: alert
+    description: 'Fan module failed{{with value "fanDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: deprecated
     varbinds:
       - fanDescription
   - oid: 1.3.6.1.4.1.19746.2.0.6
     name: DATA-DOMAIN-MIB::nvramFailingAlarm
     category: diagnostic
-    severity: warning
-    description: NVRAM potentially failing due to excessive PCI or Memory errors on {_HOSTNAME}.
+    severity: alert
+    description: NVRAM potentially failing due to excessive PCI or memory errors on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.7
     name: DATA-DOMAIN-MIB::fileSystemFailedAlarm
     category: diagnostic
     severity: crit
-    description: File system process failed and restarted on {_HOSTNAME}.
+    description: File system process failed and restarted on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.8
     name: DATA-DOMAIN-MIB::fileSpaceMaintenanceAlarm
     category: diagnostic
     severity: warning
-    description: File system resource {fileSystemResourceName} is running low for maintenance on {_HOSTNAME}.
+    description: File system resource {{value "fileSystemResourceName"}} is running low for maintenance on {{hostname}}.
     status: deprecated
     varbinds:
       - fileSystemResourceName
@@ -142,7 +142,7 @@ traps:
     name: DATA-DOMAIN-MIB::fileSpacePreWarningAlarm
     category: diagnostic
     severity: warning
-    description: File system {fileSystemResourceName} space usage reached 80-85% on {_HOSTNAME}.
+    description: File system {{value "fileSystemResourceName"}} usage reached 80-85% on {{hostname}}.
     status: deprecated
     varbinds:
       - fileSystemResourceName
@@ -150,15 +150,15 @@ traps:
     name: DATA-DOMAIN-MIB::fileSpaceWarningAlarm
     category: diagnostic
     severity: warning
-    description: File system {fileSystemResourceName} reached 90% utilization on {_HOSTNAME}.
+    description: File system {{value "fileSystemResourceName"}} reached 90% utilization on {{hostname}}.
     status: deprecated
     varbinds:
       - fileSystemResourceName
   - oid: 1.3.6.1.4.1.19746.2.0.11
     name: DATA-DOMAIN-MIB::fileSpaceSevereAlarm
     category: diagnostic
-    severity: crit
-    description: File system resource {fileSystemResourceName} is 95% utilized on {_HOSTNAME}.
+    severity: alert
+    description: File system {{value "fileSystemResourceName"}} is 95% utilized on {{hostname}}.
     status: deprecated
     varbinds:
       - fileSystemResourceName
@@ -166,7 +166,7 @@ traps:
     name: DATA-DOMAIN-MIB::fileSpaceCriticalAlarm
     category: diagnostic
     severity: alert
-    description: File system {fileSystemResourceName} is 100% utilized on {_HOSTNAME}.
+    description: File system {{value "fileSystemResourceName"}} is 100% utilized on {{hostname}}.
     status: deprecated
     varbinds:
       - fileSystemResourceName
@@ -174,7 +174,7 @@ traps:
     name: DATA-DOMAIN-MIB::diskFailedAlarm
     category: diagnostic
     severity: crit
-    description: Disk failure detected for disk {diskSerialNumber} on {_HOSTNAME}.
+    description: Disk failure detected on disk {{value "diskSerialNumber"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - diskSerialNumber
@@ -182,7 +182,7 @@ traps:
     name: DATA-DOMAIN-MIB::diskOverheatWarningAlarm
     category: diagnostic
     severity: warning
-    description: Disk temperature {diskTemperature} exceeded warning threshold on {_HOSTNAME}.
+    description: Disk temperature warning at {{value "diskTemperature"}}°C on {{hostname}}.
     status: deprecated
     varbinds:
       - diskTemperature
@@ -190,67 +190,67 @@ traps:
     name: DATA-DOMAIN-MIB::diskOverheatAlertAlarm
     category: diagnostic
     severity: warning
-    description: Disk temperature {diskTemperature} exceeded warning threshold on {_HOSTNAME}.
+    description: Disk temperature {{value "diskTemperature"}}°C is overheating on {{hostname}}.
     status: deprecated
     varbinds:
       - diskTemperature
   - oid: 1.3.6.1.4.1.19746.2.0.17
     name: DATA-DOMAIN-MIB::diskOverheatShutdownAlarm
     category: diagnostic
-    severity: alert
-    description: Disk temperature {diskTemperature} caused shutdown on {_HOSTNAME}.
+    severity: crit
+    description: Disk overheat shutdown alarm triggered with temperature {{value "diskTemperature"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - diskTemperature
   - oid: 1.3.6.1.4.1.19746.2.0.18
     name: DATA-DOMAIN-MIB::raidReconSevereAlarm
     category: diagnostic
-    severity: alert
-    description: RAID group is MAX degraded with no reconstruction on {_HOSTNAME}.
+    severity: crit
+    description: RAID group is severely degraded with no reconstruction on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.19
     name: DATA-DOMAIN-MIB::raidReconCriticalAlarm
     category: diagnostic
     severity: crit
-    description: RAID group is MAX degraded with no reconstruction after 71 hours on {_HOSTNAME}.
+    description: RAID group is critically degraded with no reconstruction on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.20
     name: DATA-DOMAIN-MIB::raidReconCriticalShutdownAlarm
     category: diagnostic
-    severity: alert
-    description: RAID group is MAX degraded with no reconstruction after 71 hours on {_HOSTNAME}.
+    severity: crit
+    description: RAID group is critically degraded with no reconstruction on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.21
     name: DATA-DOMAIN-MIB::raidGroupMissingAlarm
     category: diagnostic
     severity: crit
-    description: RAID group missing alarm detected on {_HOSTNAME}.
+    description: RAID group missing alarm detected on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.22
     name: DATA-DOMAIN-MIB::diskNoSpareAlarm
     category: diagnostic
-    severity: warning
-    description: No spare disk available for RAID group on {_HOSTNAME}.
+    severity: alert
+    description: No spare disk available for RAID group on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.23
     name: DATA-DOMAIN-MIB::diskPathAlarm
     category: diagnostic
     severity: warning
-    description: Multipath configuration problem detected on disk {diskSerialNumber} on {_HOSTNAME}.
+    description: Multipath configuration problem detected on disk {{value "diskSerialNumber"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - diskSerialNumber
   - oid: 1.3.6.1.4.1.19746.2.0.24
     name: DATA-DOMAIN-MIB::diskSASAlarm
     category: diagnostic
-    severity: err
-    description: SAS configuration error detected on {_HOSTNAME}.
+    severity: crit
+    description: SAS configuration error detected on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.25
     name: DATA-DOMAIN-MIB::diskSASHBAAlarm
     category: diagnostic
     severity: warning
-    description: Unsupported multi-path setting enabled in HBA firmware for disk {diskSerialNumber} on {_HOSTNAME}.
+    description: Unsupported multi-path setting detected in HBA firmware on {{hostname}}.
     status: deprecated
     varbinds:
       - diskSerialNumber
@@ -258,31 +258,31 @@ traps:
     name: DATA-DOMAIN-MIB::snapshotFullAlarm
     category: diagnostic
     severity: warning
-    description: Maximum number of snapshots reached on {_HOSTNAME}.
+    description: Maximum number of snapshots reached on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.27
     name: DATA-DOMAIN-MIB::snapshotHWMAlarm
     category: diagnostic
     severity: warning
-    description: Snapshot count exceeded 90% of maximum capacity on {_HOSTNAME}.
+    description: Snapshot high watermark alarm triggered on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.28
     name: DATA-DOMAIN-MIB::clusterNodeAlarm
-    category: state_change
+    category: diagnostic
     severity: crit
-    description: Node is not reachable on any network interface on {_HOSTNAME}.
+    description: Cluster node is unreachable on all network interfaces on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.29
     name: DATA-DOMAIN-MIB::clusterInterfaceAlarm
     category: state_change
     severity: warning
-    description: Cluster interface is down on {_HOSTNAME}.
+    description: Cluster interface alarm triggered on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.30
     name: DATA-DOMAIN-MIB::replSyncAlarm
-    category: state_change
+    category: diagnostic
     severity: crit
-    description: Replication context disabled due to NVRAM loss with status {replStatus} on {_HOSTNAME}.
+    description: Replication context disabled due to NVRAM loss with status {{value "replStatus"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - replStatus
@@ -290,31 +290,31 @@ traps:
     name: DATA-DOMAIN-MIB::systemStartupAlarm
     category: state_change
     severity: notice
-    description: System has rebooted or started on {_HOSTNAME}.
+    description: System has rebooted or started on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.32
     name: DATA-DOMAIN-MIB::filesysRelaunchAlarm
     category: diagnostic
-    severity: warning
-    description: File system instability detected due to excessive relaunches on {_HOSTNAME}.
+    severity: alert
+    description: File system relaunch alarm triggered due to instability on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.33
     name: DATA-DOMAIN-MIB::filesysDDGCFailedAlarm
     category: diagnostic
     severity: err
-    description: DDGC cleaning process failed on {_HOSTNAME}.
+    description: DDGC cleaning process failed on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.34
     name: DATA-DOMAIN-MIB::filesysGeneralProblemAlarm
     category: diagnostic
-    severity: err
-    description: File system general problem detected on {_HOSTNAME}.
+    severity: crit
+    description: File system general problem detected on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.35
     name: DATA-DOMAIN-MIB::diskUnsupportedAlarm
     category: diagnostic
     severity: warning
-    description: Unsupported disk model detected with serial {diskSerialNumber} on {_HOSTNAME}.
+    description: Unsupported disk detected{{with value "diskSerialNumber"}} serial {{.}}{{end}} on {{hostname}}.
     status: deprecated
     varbinds:
       - diskSerialNumber
@@ -322,13 +322,13 @@ traps:
     name: DATA-DOMAIN-MIB::eventIPMIUnmanageAlarm
     category: diagnostic
     severity: warning
-    description: IPMI unmanaged alert detected on {_HOSTNAME}.
+    description: IPMI unmanaged alert detected on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.19746.2.0.5002
     name: DATA-DOMAIN-MIB::controllerUnreachableAlert
     category: diagnostic
     severity: crit
-    description: Master controller unreachable to Worker {systemSerialNumber} for more than 5 minutes on {_HOSTNAME}.
+    description: 'Worker controller unreachable from Master for over 5 minutes{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -336,8 +336,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5003
     name: DATA-DOMAIN-MIB::controllerIfaceUnreachableAlert
     category: diagnostic
-    severity: warning
-    description: Worker controller interface unreachable for more than 5 minutes on {_HOSTNAME}.
+    severity: crit
+    description: Worker controller interface unreachable from Master for over 5 minutes on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -346,7 +346,7 @@ traps:
     name: DATA-DOMAIN-MIB::correctableECCLimitReached
     category: diagnostic
     severity: warning
-    description: Correctable ECC limit reached with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Correctable ECC limit reached{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -354,8 +354,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5005
     name: DATA-DOMAIN-MIB::uncorrectableECCerror
     category: diagnostic
-    severity: err
-    description: Multi bit uncorrectable ECC error detected on {_HOSTNAME}.
+    severity: crit
+    description: 'Multi bit uncorrectable ECC error detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -364,7 +364,7 @@ traps:
     name: DATA-DOMAIN-MIB::legacyChassisTempWarning
     category: diagnostic
     severity: warning
-    description: Temperature sensor reading exceeds warning threshold with {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Temperature warning on {{first (value "systemSerialNumber") "system"}}: {{value "alertInfoDescription"}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -373,7 +373,7 @@ traps:
     name: DATA-DOMAIN-MIB::legacyChassisTempCritical
     category: diagnostic
     severity: crit
-    description: Temperature sensor reading exceeded critical threshold with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: Critical temperature sensor reading exceeded on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -381,8 +381,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5008
     name: DATA-DOMAIN-MIB::legacyPowerSupplyWarning
     category: diagnostic
-    severity: crit
-    description: Power supply {powerModuleDescription} failed or is absent on {_HOSTNAME}.
+    severity: alert
+    description: Power supply {{value "powerModuleDescription"}} failed or is absent on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -390,8 +390,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5009
     name: DATA-DOMAIN-MIB::legacyFanWarning
     category: diagnostic
-    severity: err
-    description: 'Fan failure detected: {alertInfoDescription} on {_HOSTNAME}.'
+    severity: warning
+    description: 'Fan failure detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -399,8 +399,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5010
     name: DATA-DOMAIN-MIB::powerSupplyWarning
     category: diagnostic
-    severity: err
-    description: Power supply failure reported with alert info {alertInfoDescription} on {_HOSTNAME}.
+    severity: alert
+    description: 'Power supply warning detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -409,7 +409,7 @@ traps:
     name: DATA-DOMAIN-MIB::fanWarning
     category: diagnostic
     severity: warning
-    description: 'Fan warning detected: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'Fan warning detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -418,7 +418,7 @@ traps:
     name: DATA-DOMAIN-MIB::voltageWarning
     category: diagnostic
     severity: warning
-    description: Voltage sensor reading exceeds warning threshold with {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Voltage sensor reading exceeds warning threshold{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -427,7 +427,7 @@ traps:
     name: DATA-DOMAIN-MIB::powerWarning
     category: diagnostic
     severity: warning
-    description: 'Power consumption warning: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'Power consumption exceeded warning threshold{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -436,7 +436,7 @@ traps:
     name: DATA-DOMAIN-MIB::correctECCWarning
     category: diagnostic
     severity: warning
-    description: Memory correctable ECC errors exceed warning threshold on {_HOSTNAME}.
+    description: Memory correctable ECC errors exceeded warning threshold on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -445,7 +445,7 @@ traps:
     name: DATA-DOMAIN-MIB::processorWarning
     category: diagnostic
     severity: warning
-    description: 'Processor status sensor alert: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'Processor status sensor alert{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -454,7 +454,7 @@ traps:
     name: DATA-DOMAIN-MIB::powerUnitWarning
     category: diagnostic
     severity: warning
-    description: 'Power unit warning: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'Power unit warning{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -462,8 +462,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5018
     name: DATA-DOMAIN-MIB::unCorrectECCWarning
     category: diagnostic
-    severity: err
-    description: Memory uncorrectable ECC error detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: alert
+    description: 'Memory uncorrectable ECC error detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -472,7 +472,7 @@ traps:
     name: DATA-DOMAIN-MIB::chassisSensorCritical
     category: diagnostic
     severity: crit
-    description: Sensor reading exceeded critical condition with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Critical sensor condition detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -481,7 +481,7 @@ traps:
     name: DATA-DOMAIN-MIB::chassisTempWarning
     category: diagnostic
     severity: warning
-    description: 'Temperature warning: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'Chassis temperature warning threshold exceeded{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -490,7 +490,7 @@ traps:
     name: DATA-DOMAIN-MIB::chassisTempCritical
     category: diagnostic
     severity: crit
-    description: Temperature sensor reading exceeded critical threshold with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Critical temperature threshold exceeded{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -498,8 +498,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5023
     name: DATA-DOMAIN-MIB::cPUFailureWarning
     category: diagnostic
-    severity: alert
-    description: CPU fault detected with alert info {alertInfoDescription} on {_HOSTNAME}.
+    severity: warning
+    description: 'CPU fault detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -508,7 +508,7 @@ traps:
     name: DATA-DOMAIN-MIB::legacyBMCHangCritical
     category: diagnostic
     severity: crit
-    description: BMC unresponsive, masking environmental monitoring on {_HOSTNAME}.
+    description: BMC is unresponsive, masking environmental monitoring on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -517,7 +517,7 @@ traps:
     name: DATA-DOMAIN-MIB::bMCHangCritical
     category: diagnostic
     severity: crit
-    description: BMC unresponsive, masking environmental monitoring on {_HOSTNAME}.
+    description: BMC is unresponsive, disabling environmental monitoring and remote access on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -526,7 +526,7 @@ traps:
     name: DATA-DOMAIN-MIB::abnormalShutdown
     category: diagnostic
     severity: warning
-    description: System shutdown via abnormal method detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'System shutdown by abnormal method{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -535,7 +535,7 @@ traps:
     name: DATA-DOMAIN-MIB::tooManyRelaunches
     category: diagnostic
     severity: crit
-    description: Filesystem failed to restart after multiple attempts on {_HOSTNAME}.
+    description: Filesystem failed to restart after multiple attempts on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -544,7 +544,7 @@ traps:
     name: DATA-DOMAIN-MIB::filesystemProblem
     category: diagnostic
     severity: crit
-    description: 'Filesystem problem detected: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'Filesystem problem detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -553,7 +553,7 @@ traps:
     name: DATA-DOMAIN-MIB::dDFSFailedInShutdown
     category: diagnostic
     severity: crit
-    description: Filesystem shutdown failed with error {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Filesystem shutdown failed{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -562,7 +562,7 @@ traps:
     name: DATA-DOMAIN-MIB::dDFSNoHeartbeat
     category: diagnostic
     severity: crit
-    description: Filesystem error forced restart with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: Filesystem error forced restart on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -571,7 +571,7 @@ traps:
     name: DATA-DOMAIN-MIB::dDFSDiedAfterReboot
     category: diagnostic
     severity: crit
-    description: Filesystem failed to startup after reboot with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: Filesystem failed to start after reboot on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -580,7 +580,7 @@ traps:
     name: DATA-DOMAIN-MIB::dDFSDied
     category: diagnostic
     severity: crit
-    description: Filesystem process failed and is restarting with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Filesystem process failed and is restarting{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -589,15 +589,15 @@ traps:
     name: DATA-DOMAIN-MIB::dDFSRebooted
     category: state_change
     severity: notice
-    description: System rebooted on {_HOSTNAME}.
+    description: System rebooted on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
   - oid: 1.3.6.1.4.1.19746.2.0.5039
     name: DATA-DOMAIN-MIB::dDFSRebootedDisabled
     category: state_change
-    severity: notice
-    description: System rebooted with filesystem disabled on {_HOSTNAME}.
+    severity: warning
+    description: Filesystem is disabled after reboot on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -605,7 +605,7 @@ traps:
     name: DATA-DOMAIN-MIB::indexRebuildComplete
     category: diagnostic
     severity: notice
-    description: Metadata rebuild operation completed on {_HOSTNAME}.
+    description: Metadata rebuild operation completed on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -613,8 +613,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5041
     name: DATA-DOMAIN-MIB::historicalDatabaseRecoverError
     category: diagnostic
-    severity: crit
-    description: Historical database recovery failed and data has been lost on {_HOSTNAME}.
+    severity: alert
+    description: Historical database recovery failed and all historical data is lost on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -622,15 +622,15 @@ traps:
     name: DATA-DOMAIN-MIB::historicalDatabaseBackupError
     category: diagnostic
     severity: warning
-    description: Historical database backup failed on {_HOSTNAME}.
+    description: Historical database backup failed on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
   - oid: 1.3.6.1.4.1.19746.2.0.5043
     name: DATA-DOMAIN-MIB::historicalDatabaseUpgradeError
     category: diagnostic
-    severity: err
-    description: Historical database upgrade failed with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: warning
+    description: 'Historical database upgrade failed{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -639,7 +639,7 @@ traps:
     name: DATA-DOMAIN-MIB::historicalDatabasePruneError
     category: diagnostic
     severity: err
-    description: Historical database pruning failed with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Historical database pruning failed{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -648,7 +648,7 @@ traps:
     name: DATA-DOMAIN-MIB::noHistoricalDatabaseError
     category: diagnostic
     severity: warning
-    description: Historical database error occurred on {_HOSTNAME}.
+    description: Historical database error occurred on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -656,7 +656,7 @@ traps:
     name: DATA-DOMAIN-MIB::hDTFileTransferFailed
     category: diagnostic
     severity: err
-    description: File transfer failed to Data Domain Management Center with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'File transfer to Data Domain Management Center failed{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -665,7 +665,7 @@ traps:
     name: DATA-DOMAIN-MIB::hDTSystemError
     category: diagnostic
     severity: err
-    description: System error occurred while sending historical data to Data Domain Management Center on {_HOSTNAME}.
+    description: 'System error occurred while sending historical data to Data Domain Management Center{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -673,8 +673,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5048
     name: DATA-DOMAIN-MIB::dIMMFailureAlert
     category: diagnostic
-    severity: err
-    description: DIMM failure detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: alert
+    description: DIMM failure detected on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -682,8 +682,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5049
     name: DATA-DOMAIN-MIB::memoryAlert
     category: diagnostic
-    severity: err
-    description: 'Memory alert: {alertInfoDescription} on {_HOSTNAME}.'
+    severity: crit
+    description: 'Memory alert: insufficient memory for DDFS{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -691,17 +691,17 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5050
     name: DATA-DOMAIN-MIB::portPathDisabled
     category: state_change
-    severity: warning
-    description: Path disabled, multipath failover affected by {alertInfoDescription} on {_HOSTNAME}.
+    severity: crit
+    description: 'Multipath path disabled, failover impaired{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
       - alertInfoDescription
   - oid: 1.3.6.1.4.1.19746.2.0.5051
     name: DATA-DOMAIN-MIB::diskPathRedundancy
-    category: diagnostic
-    severity: crit
-    description: Disk path redundancy lost due to single HBA controller detected on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: Disk path redundancy lost due to single HBA controller detected on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -709,8 +709,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5052
     name: DATA-DOMAIN-MIB::missingPortConnection
     category: diagnostic
-    severity: err
-    description: Port and attached storage disappeared with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: warning
+    description: 'Port and attached storage disappeared{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -719,7 +719,7 @@ traps:
     name: DATA-DOMAIN-MIB::missingLunPath
     category: state_change
     severity: warning
-    description: LUN path count changed with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Active LUN path count changed{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -727,8 +727,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5054
     name: DATA-DOMAIN-MIB::missingDiskPath
     category: diagnostic
-    severity: alert
-    description: Multipath redundancy lost for disk {diskSerialNumber} on {_HOSTNAME}.
+    severity: crit
+    description: Multipath redundancy lost due to decreased active disk paths on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -737,7 +737,7 @@ traps:
     name: DATA-DOMAIN-MIB::missingEnclosurePath
     category: diagnostic
     severity: warning
-    description: Multipath redundancy lost; active paths decreased on {_HOSTNAME}.
+    description: Multipath redundancy lost due to decreased active paths on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -745,8 +745,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5059
     name: DATA-DOMAIN-MIB::nvramWarning
     category: diagnostic
-    severity: crit
-    description: 'DDFS disabled due to NVRAM subsystem problem: {alertInfoDescription} on {_HOSTNAME}.'
+    severity: alert
+    description: 'DDFS disabled due to NVRAM subsystem problem{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -754,8 +754,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5060
     name: DATA-DOMAIN-MIB::nvramBatteryAlert
     category: diagnostic
-    severity: err
-    description: NVRAM card battery fault detected with status {nvramBatteryStatus} on {_HOSTNAME}.
+    severity: alert
+    description: NVRAM battery hardware fault detected{{with value "nvramBatteryStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -763,8 +763,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5061
     name: DATA-DOMAIN-MIB::nvramErrorAlert
     category: diagnostic
-    severity: err
-    description: NVRAM card fault detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: warning
+    description: NVRAM card fault detected with excessive correctable errors on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -772,8 +772,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5062
     name: DATA-DOMAIN-MIB::phyalert
     category: diagnostic
-    severity: err
-    description: 'Enclosure slot disabled due to failed drive: {alertInfoDescription} on {_HOSTNAME}.'
+    severity: crit
+    description: 'Enclosure slot disabled due to failed drive{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -782,7 +782,7 @@ traps:
     name: DATA-DOMAIN-MIB::replProgressThreshholdReached
     category: diagnostic
     severity: warning
-    description: Replication progress threshold reached with status {replStatus} on {_HOSTNAME}.
+    description: Replication progress threshold reached with status {{value "replStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -791,7 +791,7 @@ traps:
     name: DATA-DOMAIN-MIB::replNeedResync
     category: state_change
     severity: alert
-    description: Replication requires resynchronization for system {systemSerialNumber} with status {replStatus} on {_HOSTNAME}.
+    description: Replication requires resynchronization on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -800,16 +800,16 @@ traps:
     name: DATA-DOMAIN-MIB::replLogFull
     category: diagnostic
     severity: crit
-    description: Filesystem write blocked due to replication lag on {_HOSTNAME}.
+    description: Filesystem is read-only due to replication lag on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
       - alertInfoDescription
   - oid: 1.3.6.1.4.1.19746.2.0.5066
     name: DATA-DOMAIN-MIB::replIncompatibleWorm
-    category: diagnostic
-    severity: err
-    description: 'Replication resync blocked due to retention-locked files: {alertInfoDescription} on {_HOSTNAME}.'
+    category: state_change
+    severity: crit
+    description: Replication resync blocked by retention-locked files on {{value "systemSerialNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -817,8 +817,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5067
     name: DATA-DOMAIN-MIB::replDestNotConfigured
     category: config_change
-    severity: warning
-    description: Replication destination {replConfigDest} is not configured on {_HOSTNAME}.
+    severity: err
+    description: Replication destination {{value "replConfigDest"}} is not configured on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -827,7 +827,7 @@ traps:
     name: DATA-DOMAIN-MIB::replLagThreshholdReached
     category: diagnostic
     severity: warning
-    description: Replication lag threshold exceeded with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Replication lag threshold exceeded{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -836,7 +836,7 @@ traps:
     name: DATA-DOMAIN-MIB::sASEnclosureCheck
     category: diagnostic
     severity: warning
-    description: Enclosure count exceeded maximum limit with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: Enclosure count exceeded maximum limit on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -845,7 +845,7 @@ traps:
     name: DATA-DOMAIN-MIB::sASTopologyCheck
     category: diagnostic
     severity: warning
-    description: Invalid SAS cabling detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Invalid SAS cabling detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -853,8 +853,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5071
     name: DATA-DOMAIN-MIB::sASPortDisabled
     category: diagnostic
-    severity: err
-    description: 'Port disabled due to excessive errors: {alertInfoDescription} on {_HOSTNAME}.'
+    severity: warning
+    description: 'Port disabled due to excessive errors{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -863,16 +863,16 @@ traps:
     name: DATA-DOMAIN-MIB::sSLCertificateCorrupted
     category: security
     severity: alert
-    description: SSL certificate broken for mutual trust on {_HOSTNAME}.
+    description: SSL certificate broken for mutual trust on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
       - alertInfoDescription
   - oid: 1.3.6.1.4.1.19746.2.0.5075
     name: DATA-DOMAIN-MIB::snapshotOver90Percent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Snapshot count reached 90% capacity on {_HOSTNAME}.
+    description: Snapshot count reached 90% of maximum on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -881,7 +881,7 @@ traps:
     name: DATA-DOMAIN-MIB::snapshotLimitReached
     category: diagnostic
     severity: warning
-    description: Snapshot limit reached for Mtree on {_HOSTNAME}.
+    description: 'Snapshot limit reached for an Mtree{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -890,7 +890,7 @@ traps:
     name: DATA-DOMAIN-MIB::sNTZMultipleIterations
     category: diagnostic
     severity: warning
-    description: Sanitization will run in multiple iterations, impacting performance on {_HOSTNAME}.
+    description: Sanitization requires multiple iterations, impacting performance, on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -899,7 +899,7 @@ traps:
     name: DATA-DOMAIN-MIB::coredumpWarning
     category: diagnostic
     severity: warning
-    description: Core dump storage space low on {systemSerialNumber} on {_HOSTNAME}.
+    description: Core dump storage space is low on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -908,16 +908,16 @@ traps:
     name: DATA-DOMAIN-MIB::coredumpDisabled
     category: diagnostic
     severity: warning
-    description: Insufficient space for core dumps on {systemSerialNumber} on {_HOSTNAME}.
+    description: Core dump disabled due to insufficient space on {{value "alertInfoDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
       - alertInfoDescription
   - oid: 1.3.6.1.4.1.19746.2.0.5080
     name: DATA-DOMAIN-MIB::spaceOver80Percent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: File system space usage {fileSystemSpaceUsed} exceeded 80% threshold on {_HOSTNAME}.
+    description: File system space usage exceeded 80% on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -926,7 +926,7 @@ traps:
     name: DATA-DOMAIN-MIB::spaceOver90Percent
     category: diagnostic
     severity: warning
-    description: File system space usage {fileSystemSpaceUsed} exceeded 90% capacity on {_HOSTNAME}.
+    description: File system space usage exceeded 90% on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -934,8 +934,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5082
     name: DATA-DOMAIN-MIB::diskAccessError
     category: diagnostic
-    severity: err
-    description: Hardware fault detected on disk {diskSerialNumber} on {_HOSTNAME}.
+    severity: crit
+    description: Hardware fault detected on disk {{value "diskSerialNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -943,8 +943,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5083
     name: DATA-DOMAIN-MIB::diskFailure
     category: diagnostic
-    severity: err
-    description: Disk {diskSerialNumber} failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Disk {{value "diskSerialNumber"}} failure detected on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -953,7 +953,7 @@ traps:
     name: DATA-DOMAIN-MIB::diskTemperatureWarning
     category: diagnostic
     severity: warning
-    description: Disk temperature {diskTemperature} exceeded threshold on {_HOSTNAME}.
+    description: Disk temperature {{value "diskTemperature"}} exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -961,16 +961,16 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5085
     name: DATA-DOMAIN-MIB::diskTemperatureShutdown
     category: diagnostic
-    severity: alert
-    description: System shutting down due to disk temperature threshold exceeded on {_HOSTNAME}.
+    severity: emerg
+    description: System shutting down due to disk temperature threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
   - oid: 1.3.6.1.4.1.19746.2.0.5086
     name: DATA-DOMAIN-MIB::unsupportedHardwareSpareSize
     category: diagnostic
-    severity: err
-    description: Disk {diskSerialNumber} capacity too small for use on system {systemSerialNumber} on {_HOSTNAME}.
+    severity: crit
+    description: Disk capacity too small for use, replace disk {{value "diskSerialNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -979,7 +979,7 @@ traps:
     name: DATA-DOMAIN-MIB::missingDiskGroup
     category: diagnostic
     severity: crit
-    description: 'Critical disks or LUNs unavailable: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'Critical disks or LUNs unavailable{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -987,8 +987,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5088
     name: DATA-DOMAIN-MIB::diskGroupReconstructionNoProgress
     category: diagnostic
-    severity: err
-    description: Disk group reconstruction not progressing with failed disks on {_HOSTNAME}.
+    severity: crit
+    description: 'Disk group reconstruction stalled with failed disks{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -996,8 +996,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5089
     name: DATA-DOMAIN-MIB::diskGroupReconstruction
     category: diagnostic
-    severity: alert
-    description: Disk group reconstruction critical with failed disks on {_HOSTNAME}.
+    severity: crit
+    description: Disk group reconstruction critical due to failed disks on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1005,8 +1005,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5090
     name: DATA-DOMAIN-MIB::diskGroupReconstructionShutdown
     category: diagnostic
-    severity: alert
-    description: Disk group reconstruction shutdown due to critical RAID state on {_HOSTNAME}.
+    severity: crit
+    description: Disk group reconstruction shutdown due to critical RAID state on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1014,8 +1014,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5091
     name: DATA-DOMAIN-MIB::diskGroupReconstructionCritical
     category: diagnostic
-    severity: alert
-    description: Disk group reconstruction critical with failed disks on {_HOSTNAME}.
+    severity: crit
+    description: Disk group reconstruction critical with degraded RAID protection on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1024,7 +1024,7 @@ traps:
     name: DATA-DOMAIN-MIB::diskUnknown
     category: diagnostic
     severity: warning
-    description: Disk status reported as unknown with alert info {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Disk is unknown{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1032,8 +1032,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5094
     name: DATA-DOMAIN-MIB::lowSpares
     category: diagnostic
-    severity: err
-    description: Insufficient spare disks detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: warning
+    description: 'Low spare disk capacity detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1041,8 +1041,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5095
     name: DATA-DOMAIN-MIB::unsupportedConfigurationROL
     category: diagnostic
-    severity: err
-    description: 'Unsupported configuration detected: {alertInfoDescription} on {_HOSTNAME}.'
+    severity: crit
+    description: 'Unsupported RAID configuration on LUN detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1051,7 +1051,7 @@ traps:
     name: DATA-DOMAIN-MIB::cpismissing
     category: diagnostic
     severity: warning
-    description: Archive unit missing detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Archive unit missing detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1060,7 +1060,7 @@ traps:
     name: DATA-DOMAIN-MIB::containerMarkedInvalid
     category: diagnostic
     severity: alert
-    description: 'Data integrity check failure detected: {alertInfoDescription} on {_HOSTNAME}.'
+    description: Data integrity check failure detected on {{value "systemSerialNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1069,7 +1069,7 @@ traps:
     name: DATA-DOMAIN-MIB::smiMrc
     category: diagnostic
     severity: warning
-    description: BIOS SMI MRC interrupt detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'BIOS SMI MRC interrupt detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1078,7 +1078,7 @@ traps:
     name: DATA-DOMAIN-MIB::nvramBatteryLowChargeAlert
     category: diagnostic
     severity: warning
-    description: NVRAM battery charge below threshold with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: NVRAM battery charge is below threshold on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1086,8 +1086,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5527
     name: DATA-DOMAIN-MIB::ext3NvlogDisabled
     category: diagnostic
-    severity: warning
-    description: DDOS RAID log disabled due to NVRAM problem on {_HOSTNAME}.
+    severity: crit
+    description: DDOS RAID log disabled due to NVRAM subsystem problem on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1095,8 +1095,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.5528
     name: DATA-DOMAIN-MIB::enclosureMixType
     category: diagnostic
-    severity: err
-    description: Unsupported mix of enclosure models detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: crit
+    description: 'Unsupported enclosure mix detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1105,7 +1105,7 @@ traps:
     name: DATA-DOMAIN-MIB::replPathTooLong
     category: diagnostic
     severity: warning
-    description: 'Path is too long: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'Path is too long{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1114,16 +1114,16 @@ traps:
     name: DATA-DOMAIN-MIB::compromisedEncryptionKeys
     category: security
     severity: alert
-    description: Encrypted data at risk due to compromised keys {alertInfoDescription} on {_HOSTNAME}.
+    description: Compromised encryption keys detected; data at risk on {{value "systemSerialNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
       - alertInfoDescription
   - oid: 1.3.6.1.4.1.19746.2.0.6002
     name: DATA-DOMAIN-MIB::newEncryptionKey
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Encryption key change requires filesystem restart on {_HOSTNAME}.
+    description: New encryption key activated but requires filesystem restart on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1132,7 +1132,7 @@ traps:
     name: DATA-DOMAIN-MIB::encryptionKeyTableFull
     category: diagnostic
     severity: warning
-    description: Encryption key table is full, preventing new key additions on {_HOSTNAME}.
+    description: Encryption key table is full on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1141,7 +1141,7 @@ traps:
     name: DATA-DOMAIN-MIB::uncertifiedFirmware
     category: diagnostic
     severity: alert
-    description: Incompatible firmware detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: Incompatible firmware detected on {{first (value "systemSerialNumber") "system"}} requiring immediate update on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1150,15 +1150,15 @@ traps:
     name: DATA-DOMAIN-MIB::filesystemNVRAMDataLoss
     category: diagnostic
     severity: crit
-    description: Filesystem cannot be enabled due to NVRAM mismatch on {_HOSTNAME}.
+    description: Filesystem disabled due to NVRAM mismatch on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
   - oid: 1.3.6.1.4.1.19746.2.0.6007
     name: DATA-DOMAIN-MIB::mtreeQuotaSoftLimit
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Soft limit quota reached for MTree with alert info {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Soft quota limit reached for MTree{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1166,8 +1166,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6008
     name: DATA-DOMAIN-MIB::mtreeQuotaHardLimit
     category: diagnostic
-    severity: alert
-    description: Hard limit quota reached, data write stopped on {_HOSTNAME}.
+    severity: crit
+    description: MTree hard limit quota reached, preventing data writes on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1176,7 +1176,7 @@ traps:
     name: DATA-DOMAIN-MIB::interfaceConnectivityDown
     category: state_change
     severity: warning
-    description: Interface {ifDescr} connectivity is down on {_HOSTNAME}.
+    description: Network connectivity on interface {{first (value "ifDescr") "link"}} is down on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1184,9 +1184,9 @@ traps:
       - ifDescr
   - oid: 1.3.6.1.4.1.19746.2.0.6010
     name: DATA-DOMAIN-MIB::interfaceConnectivityIntermittent
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Interface {ifDescr} experienced intermittent connectivity on {_HOSTNAME}.
+    description: Intermittent network connectivity detected on interface {{value "ifDescr"}} on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1196,7 +1196,7 @@ traps:
     name: DATA-DOMAIN-MIB::interfaceMisconfiguration
     category: config_change
     severity: warning
-    description: Network interface configuration problem detected on {ifDescr} on {_HOSTNAME}.
+    description: Network interface configuration problem detected on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1206,7 +1206,7 @@ traps:
     name: DATA-DOMAIN-MIB::recoverFromNVRAMFailed
     category: diagnostic
     severity: crit
-    description: Filesystem disabled due to NVRAM failure on {_HOSTNAME}.
+    description: Filesystem disabled due to NVRAM failure on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1215,7 +1215,7 @@ traps:
     name: DATA-DOMAIN-MIB::cleaningError
     category: diagnostic
     severity: warning
-    description: Unable to reclaim unused space, impacting backup ability, on {_HOSTNAME}.
+    description: Cleaning error occurred, unable to reclaim unused space on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1224,7 +1224,7 @@ traps:
     name: DATA-DOMAIN-MIB::bMCPartialHang
     category: diagnostic
     severity: crit
-    description: BMC firmware is not responsive with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'BMC firmware is not responsive{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1233,7 +1233,7 @@ traps:
     name: DATA-DOMAIN-MIB::fileMigrationError
     category: diagnostic
     severity: warning
-    description: File migration suspended due to {alertInfoDescription} on {_HOSTNAME}.
+    description: 'File migration suspended{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1242,7 +1242,7 @@ traps:
     name: DATA-DOMAIN-MIB::unusableHostCertificate
     category: diagnostic
     severity: crit
-    description: Unusable host certificate detected; Enterprise Manager will not start with imported certificate on {_HOSTNAME}.
+    description: Unusable host certificate detected; Enterprise Manager started with default certificate on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1250,7 +1250,7 @@ traps:
     name: DATA-DOMAIN-MIB::missingHostCertificate
     category: security
     severity: warning
-    description: Missing host certificate detected on {_HOSTNAME}.
+    description: Missing host certificate; using default self-signed certificate on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1258,7 +1258,7 @@ traps:
     name: DATA-DOMAIN-MIB::foreignEnclosure
     category: diagnostic
     severity: crit
-    description: Enclosure {enclosureListNum} is unusable by the filesystem on {_HOSTNAME}.
+    description: Foreign enclosure {{value "enclosureListNum"}} is unusable by the filesystem on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1267,7 +1267,7 @@ traps:
     name: DATA-DOMAIN-MIB::interfaceConnectivityUpAndRunning
     category: state_change
     severity: notice
-    description: Network interface {ifDescr} is up and running on {_HOSTNAME}.
+    description: Network interface {{value "ifDescr"}} is up and running on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1277,7 +1277,7 @@ traps:
     name: DATA-DOMAIN-MIB::tcpZeroWindowAlert
     category: diagnostic
     severity: warning
-    description: 'TCP zero window detected: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'TCP zero window alert detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1286,7 +1286,7 @@ traps:
     name: DATA-DOMAIN-MIB::insecureEncryptedReplication
     category: security
     severity: warning
-    description: Insecure encrypted replication detected with {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Insecure encrypted replication detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1295,7 +1295,7 @@ traps:
     name: DATA-DOMAIN-MIB::nvramHWAlert
     category: diagnostic
     severity: crit
-    description: 'NVRAM card not in usable state: {alertInfoDescription} on {_HOSTNAME}.'
+    description: NVRAM card is not in a usable state, file system inaccessible on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1304,7 +1304,7 @@ traps:
     name: DATA-DOMAIN-MIB::nvramEnvAlert
     category: diagnostic
     severity: warning
-    description: 'Temperature warning on NVRAM card detected: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'NVRAM temperature exceeded warning threshold{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1312,8 +1312,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6506
     name: DATA-DOMAIN-MIB::nvramEventHWAlert
     category: diagnostic
-    severity: err
-    description: NVRAM card hardware fault detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: alert
+    description: NVRAM card hardware fault detected on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1321,8 +1321,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6507
     name: DATA-DOMAIN-MIB::nvramBattAlert
     category: diagnostic
-    severity: err
-    description: NVRAM remote battery not in usable state with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: crit
+    description: NVRAM remote battery is not in a usable state on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1331,7 +1331,7 @@ traps:
     name: DATA-DOMAIN-MIB::nvramCondAlert
     category: diagnostic
     severity: warning
-    description: 'NVRAM battery power or charging disabled: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'NVRAM battery power or charging disabled{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1340,16 +1340,16 @@ traps:
     name: DATA-DOMAIN-MIB::upgradeFailure
     category: diagnostic
     severity: emerg
-    description: Upgrade failed requiring manual intervention with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: System upgrade failed requiring manual intervention on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
       - alertInfoDescription
   - oid: 1.3.6.1.4.1.19746.2.0.6510
     name: DATA-DOMAIN-MIB::upgradeCompleted
-    category: config_change
+    category: state_change
     severity: notice
-    description: OS upgrade completed successfully on {_HOSTNAME}.
+    description: OS upgrade completed successfully on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1357,8 +1357,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6511
     name: DATA-DOMAIN-MIB::mailserverError
     category: diagnostic
-    severity: err
-    description: 'Mail server communication failure: {alertInfoDescription} on {_HOSTNAME}.'
+    severity: warning
+    description: 'Mail server communication failure{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1366,8 +1366,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6512
     name: DATA-DOMAIN-MIB::invalidNICSlot
     category: diagnostic
-    severity: err
-    description: 'Invalid NIC slot detected: {alertInfoDescription} on {_HOSTNAME}.'
+    severity: warning
+    description: 'Invalid NIC slot detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1375,8 +1375,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6513
     name: DATA-DOMAIN-MIB::unsupportedNIC
     category: diagnostic
-    severity: err
-    description: Unsupported network interface card detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: warning
+    description: 'Unsupported network interface card detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1385,7 +1385,7 @@ traps:
     name: DATA-DOMAIN-MIB::sASHBAFailure
     category: diagnostic
     severity: crit
-    description: 'Storage inaccessible via HBA: {alertInfoDescription} on {_HOSTNAME}.'
+    description: Storage is no longer accessible through HBA {{value "alertInfoDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1394,7 +1394,7 @@ traps:
     name: DATA-DOMAIN-MIB::sASHBAErrors
     category: diagnostic
     severity: warning
-    description: SAS HBA correctable errors exceeded threshold with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: SAS HBA correctable errors exceeded warning threshold on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1403,7 +1403,7 @@ traps:
     name: DATA-DOMAIN-MIB::unsupportedSASDevice
     category: diagnostic
     severity: warning
-    description: 'Unsupported SAS device detected: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'Unsupported SAS device detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1411,8 +1411,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6517
     name: DATA-DOMAIN-MIB::fanFault
     category: diagnostic
-    severity: err
-    description: Hardware fault detected in enclosure cooling fan with alert info {alertInfoDescription} on {_HOSTNAME}.
+    severity: alert
+    description: Hardware fault detected in enclosure cooling fan on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1420,8 +1420,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6518
     name: DATA-DOMAIN-MIB::powerSupplyInputFault
     category: diagnostic
-    severity: err
-    description: Power supply input fault detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: warning
+    description: 'Power supply input fault detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1429,8 +1429,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6519
     name: DATA-DOMAIN-MIB::powerSupplyFailure
     category: diagnostic
-    severity: err
-    description: Power supply failure detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: crit
+    description: 'Power supply failure detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1438,8 +1438,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6520
     name: DATA-DOMAIN-MIB::powerSupplyAbsent
     category: diagnostic
-    severity: err
-    description: Power supply absent with alert info {alertInfoDescription} on {_HOSTNAME}.
+    severity: crit
+    description: Power supply is absent on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1448,7 +1448,7 @@ traps:
     name: DATA-DOMAIN-MIB::unsupportedACVoltage
     category: diagnostic
     severity: warning
-    description: Power supply detected unsupported AC voltage on {_HOSTNAME}.
+    description: 'Unsupported AC voltage detected on power supply{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1456,8 +1456,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6522
     name: DATA-DOMAIN-MIB::iOModuleFault
     category: diagnostic
-    severity: err
-    description: I/O module fault detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: crit
+    description: 'I/O module fault detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1466,7 +1466,7 @@ traps:
     name: DATA-DOMAIN-MIB::iOModuleInserted
     category: state_change
     severity: notice
-    description: I/O module inserted on {_HOSTNAME}.
+    description: I/O module inserted on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1474,8 +1474,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6524
     name: DATA-DOMAIN-MIB::mgmtModuleFault
     category: diagnostic
-    severity: err
-    description: Management I/O module fault detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: crit
+    description: Management I/O module fault detected on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1484,7 +1484,7 @@ traps:
     name: DATA-DOMAIN-MIB::dIMMFailure
     category: diagnostic
     severity: alert
-    description: 'Memory card fault detected: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'Memory card fault detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1492,8 +1492,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6526
     name: DATA-DOMAIN-MIB::sPFault
     category: diagnostic
-    severity: err
-    description: Fault detected on storage processor with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: crit
+    description: 'Storage processor fault detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1501,8 +1501,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6527
     name: DATA-DOMAIN-MIB::chassisFailure
     category: diagnostic
-    severity: alert
-    description: Chassis component fault detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: crit
+    description: 'Chassis component fault detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1510,8 +1510,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6528
     name: DATA-DOMAIN-MIB::forcedControllerShutdown
     category: diagnostic
-    severity: alert
-    description: Environmental fault detected causing forced shutdown with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: emerg
+    description: Forced controller shutdown due to environmental condition or hardware fault on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1519,17 +1519,17 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6529
     name: DATA-DOMAIN-MIB::systemReset
     category: diagnostic
-    severity: alert
-    description: System reset due to critical failure on {_HOSTNAME}.
+    severity: crit
+    description: 'System reset due to critical failure{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
       - alertInfoDescription
   - oid: 1.3.6.1.4.1.19746.2.0.6530
     name: DATA-DOMAIN-MIB::duplicateAddressDetection
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Duplicate IP address detected on {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Duplicate IP address detected on the network on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1537,7 +1537,7 @@ traps:
     name: DATA-DOMAIN-MIB::spaceReclRestartFailed
     category: diagnostic
     severity: warning
-    description: Archive space reclamation failed to restart on {_HOSTNAME}.
+    description: Archive space reclamation failed to restart on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1545,17 +1545,17 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6532
     name: DATA-DOMAIN-MIB::spaceReclMissingUnit
     category: diagnostic
-    severity: warning
-    description: Archive units missing, space reclamation cannot run on {_HOSTNAME}.
+    severity: crit
+    description: Archive units are missing, preventing space reclamation on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
       - alertInfoDescription
   - oid: 1.3.6.1.4.1.19746.2.0.6533
     name: DATA-DOMAIN-MIB::spaceReclUnitReclaimed
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Archive unit space reclaimed on {_HOSTNAME}.
+    description: Archive unit space reclaimed and available for reuse on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1564,7 +1564,7 @@ traps:
     name: DATA-DOMAIN-MIB::spaceReclError
     category: diagnostic
     severity: warning
-    description: Archive space reclamation stopped due to error {alertInfoDescription} on {_HOSTNAME}.
+    description: Archive space reclamation stopped due to {{value "alertInfoDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1573,7 +1573,7 @@ traps:
     name: DATA-DOMAIN-MIB::enclosureHighTemp
     category: diagnostic
     severity: warning
-    description: Enclosure temperature exceeded warning threshold with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: Enclosure temperature exceeded warning threshold on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1581,8 +1581,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6536
     name: DATA-DOMAIN-MIB::unsupportedSystemType
     category: diagnostic
-    severity: err
-    description: Unsupported system type detected with serial {systemSerialNumber} on {_HOSTNAME}.
+    severity: warning
+    description: 'Unsupported system type detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1591,16 +1591,16 @@ traps:
     name: DATA-DOMAIN-MIB::bMCHangShutdown
     category: diagnostic
     severity: alert
-    description: BMC unresponsive causing loss of environmental monitoring and IPMI on {_HOSTNAME}.
+    description: BMC hang shutdown detected; environmental monitoring is down on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
       - alertInfoDescription
   - oid: 1.3.6.1.4.1.19746.2.0.6538
     name: DATA-DOMAIN-MIB::expiredHostCertificate
-    category: security
-    severity: warning
-    description: Host certificate expired on {_HOSTNAME}.
+    category: license
+    severity: alert
+    description: Host certificate expired, communication is vulnerable on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1608,7 +1608,7 @@ traps:
     name: DATA-DOMAIN-MIB::sCSITGTInvalidRegistry
     category: diagnostic
     severity: crit
-    description: SCSI Target registry entry invalid, services inaccessible on {_HOSTNAME}.
+    description: SCSI Target registry entry is invalid, making services inaccessible on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1616,8 +1616,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.6540
     name: DATA-DOMAIN-MIB::encryptionKeyExportFailed
     category: diagnostic
-    severity: err
-    description: Encryption key export failed with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: alert
+    description: 'Automatic encryption key export failed{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1626,7 +1626,7 @@ traps:
     name: DATA-DOMAIN-MIB::sSDEndOfLife
     category: diagnostic
     severity: alert
-    description: SSD reached end of life and may fail on system {systemSerialNumber} on {_HOSTNAME}.
+    description: SSD {{value "diskSerialNumber"}} reached end of life and may fail on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1635,7 +1635,7 @@ traps:
     name: DATA-DOMAIN-MIB::tapeReposition
     category: diagnostic
     severity: warning
-    description: Tape volume repositioned to last consistent data position with {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Tape volume repositioned to last consistent data position{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1644,7 +1644,7 @@ traps:
     name: DATA-DOMAIN-MIB::multipleDiskReadErrors
     category: diagnostic
     severity: alert
-    description: Multiple disk read errors detected in RAID group with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Multiple disk read errors detected in RAID group{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1653,7 +1653,7 @@ traps:
     name: DATA-DOMAIN-MIB::missingCreplUnits
     category: diagnostic
     severity: warning
-    description: Replication destination inconsistent due to missing retention units on {_HOSTNAME}.
+    description: Collection replication destination inconsistent due to missing retention units on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1662,7 +1662,7 @@ traps:
     name: DATA-DOMAIN-MIB::nvramBattEndOfLife
     category: diagnostic
     severity: warning
-    description: NVRAM battery approaching end of life with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: NVRAM battery approaching end of life on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1671,7 +1671,7 @@ traps:
     name: DATA-DOMAIN-MIB::bMCFailure
     category: diagnostic
     severity: crit
-    description: BMC is unresponsive with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: BMC is unresponsive or unable to access required information on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1679,8 +1679,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.7001
     name: DATA-DOMAIN-MIB::unsupportedDriveModel
     category: diagnostic
-    severity: crit
-    description: Unsupported drive model detected on system {systemSerialNumber} with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: warning
+    description: 'Unsupported drive model detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1689,7 +1689,7 @@ traps:
     name: DATA-DOMAIN-MIB::driveMixType
     category: diagnostic
     severity: warning
-    description: 'Drive type mismatch detected: {alertInfoDescription} on {_HOSTNAME}.'
+    description: Drive type mismatch detected in enclosure {{value "systemSerialNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1698,7 +1698,7 @@ traps:
     name: DATA-DOMAIN-MIB::sMSUnresponsive
     category: diagnostic
     severity: crit
-    description: System Management Service unresponsive due to max concurrent requests on {_HOSTNAME}.
+    description: System Management Service is unresponsive due to maximum concurrent requests on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1707,7 +1707,7 @@ traps:
     name: DATA-DOMAIN-MIB::nISCommFailure
     category: diagnostic
     severity: warning
-    description: 'Unable to query information from the NIS server: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'Unable to query information from the NIS server{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1716,7 +1716,7 @@ traps:
     name: DATA-DOMAIN-MIB::unsupportedHardwareConfig
     category: diagnostic
     severity: warning
-    description: Unsupported virtual machine hardware configuration detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Unsupported virtual machine hardware configuration detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1725,7 +1725,7 @@ traps:
     name: DATA-DOMAIN-MIB::unsupportedVirtualCPU
     category: diagnostic
     severity: crit
-    description: Virtual CPU configuration invalid for storage capacity on {_HOSTNAME}.
+    description: Virtual CPU configuration invalid for storage capacity on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1733,8 +1733,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.7504
     name: DATA-DOMAIN-MIB::dNSUnresponsive
     category: diagnostic
-    severity: warning
-    description: No DNS servers responded to a DNS query, affecting name resolution on {_HOSTNAME}.
+    severity: crit
+    description: No DNS servers responded to a DNS query on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1742,8 +1742,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.7505
     name: DATA-DOMAIN-MIB::nTPDFailed
     category: diagnostic
-    severity: warning
-    description: NTP daemon stopped due to time drift on {_HOSTNAME}.
+    severity: crit
+    description: NTP daemon is not running due to excessive time drift on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1752,7 +1752,7 @@ traps:
     name: DATA-DOMAIN-MIB::invalidEnclosureTopology
     category: diagnostic
     severity: crit
-    description: 'Invalid enclosure topology detected: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'Invalid enclosure topology detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1761,16 +1761,16 @@ traps:
     name: DATA-DOMAIN-MIB::diskPathSpeedDegraded
     category: diagnostic
     severity: warning
-    description: SAS connection speed degraded, check cable seating on {_HOSTNAME}.
+    description: SAS connection speed degraded, potentially reducing disk performance on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
       - alertInfoDescription
   - oid: 1.3.6.1.4.1.19746.2.0.7508
     name: DATA-DOMAIN-MIB::targetDriverPortOffline
-    category: state_change
-    severity: warning
-    description: Fibre Channel port offline with no connection detected on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: Fibre Channel port is offline on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1779,7 +1779,7 @@ traps:
     name: DATA-DOMAIN-MIB::targetDriverPortOnline
     category: state_change
     severity: notice
-    description: Fibre Channel Port is online on {_HOSTNAME}.
+    description: Fibre Channel port is online on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1787,8 +1787,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.7510
     name: DATA-DOMAIN-MIB::targetDriverPortCore
     category: diagnostic
-    severity: alert
-    description: 'Fibre Channel HBA core error: {alertInfoDescription} on {_HOSTNAME}.'
+    severity: crit
+    description: 'Fibre Channel HBA core dump occurred{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1796,8 +1796,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.7511
     name: DATA-DOMAIN-MIB::targetDriverPortMultipleCore
     category: diagnostic
-    severity: err
-    description: Fibre Channel Port disabled due to multiple HBA core errors on {systemSerialNumber} on {_HOSTNAME}.
+    severity: crit
+    description: Fibre Channel Port disabled due to multiple HBA core errors on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1806,7 +1806,7 @@ traps:
     name: DATA-DOMAIN-MIB::targetDriverPortFWLoadFailed
     category: diagnostic
     severity: crit
-    description: Fibre Channel Port firmware load failed, port disabled on {_HOSTNAME}.
+    description: Fibre Channel port firmware load failed and port is disabled on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1814,8 +1814,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.7513
     name: DATA-DOMAIN-MIB::targetDriverPortUnreadable
     category: diagnostic
-    severity: err
-    description: Fibre Channel Port disabled due to unreadable HBA resource {alertInfoDescription} on {_HOSTNAME}.
+    severity: crit
+    description: Fibre Channel HBA port disabled due to unreadable resources on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1824,7 +1824,7 @@ traps:
     name: DATA-DOMAIN-MIB::targetDriverPortTooManyOsc
     category: diagnostic
     severity: warning
-    description: Fibre Channel port flapping detected with {alertInfoDescription} on {_HOSTNAME}.
+    description: Fibre Channel port flapping detected on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1833,7 +1833,7 @@ traps:
     name: DATA-DOMAIN-MIB::insufficientSpaceForEncryption
     category: diagnostic
     severity: warning
-    description: Insufficient space for encryption on archive tier with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: Insufficient space for encryption on archive tier on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1841,8 +1841,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.7516
     name: DATA-DOMAIN-MIB::dDFSRequiresReboot
     category: diagnostic
-    severity: crit
-    description: File system abnormal condition requires reboot on {_HOSTNAME}.
+    severity: alert
+    description: File system failed to start due to abnormal internal condition requiring reboot on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1851,7 +1851,7 @@ traps:
     name: DATA-DOMAIN-MIB::storageUnitStreamSoftLimit
     category: diagnostic
     severity: warning
-    description: Storage stream soft limit quota exceeded with {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Storage unit stream soft limit quota exceeded{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1860,7 +1860,7 @@ traps:
     name: DATA-DOMAIN-MIB::spaceReclSuspended
     category: diagnostic
     severity: warning
-    description: Archive space reclamation suspended due to {alertInfoDescription} on {_HOSTNAME}.
+    description: Archive space reclamation suspended due to {{value "alertInfoDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1869,7 +1869,7 @@ traps:
     name: DATA-DOMAIN-MIB::metadataWarningThreshold
     category: diagnostic
     severity: warning
-    description: 'Filesystem metadata threshold exceeded, risk of read-only mode: {alertInfoDescription} on {_HOSTNAME}.'
+    description: Metadata warning threshold reached on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1877,8 +1877,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.7520
     name: DATA-DOMAIN-MIB::mtreeCascadeNeedResync
     category: state_change
-    severity: warning
-    description: Replication context requires resync due to cascaded source change with status {replStatus} on {_HOSTNAME}.
+    severity: alert
+    description: Replication context requires resync on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1887,7 +1887,7 @@ traps:
     name: DATA-DOMAIN-MIB::filesystemCorruption
     category: diagnostic
     severity: crit
-    description: Filesystem corruption detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Filesystem corruption detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1896,7 +1896,7 @@ traps:
     name: DATA-DOMAIN-MIB::missingTierStorage
     category: diagnostic
     severity: crit
-    description: Critical storage resources unavailable on {_HOSTNAME}.
+    description: Critical storage resources unavailable on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1904,8 +1904,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.7523
     name: DATA-DOMAIN-MIB::spaceReclUnitError
     category: diagnostic
-    severity: err
-    description: 'Space reclamation error on archive unit {systemSerialNumber}: {alertInfoDescription} on {_HOSTNAME}.'
+    severity: warning
+    description: 'Space reclamation error on archive unit{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1914,7 +1914,7 @@ traps:
     name: DATA-DOMAIN-MIB::bMCFailureSysBBU
     category: diagnostic
     severity: crit
-    description: BMC is unresponsive or unable to access required information on {_HOSTNAME}.
+    description: BMC is unresponsive or unable to access required information on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1923,7 +1923,7 @@ traps:
     name: DATA-DOMAIN-MIB::licenseExpiring
     category: license
     severity: warning
-    description: Temporary license expiring with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: Temporary license expiring for {{value "systemSerialNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1932,7 +1932,7 @@ traps:
     name: DATA-DOMAIN-MIB::licenseExpired
     category: license
     severity: alert
-    description: Temporary license expired, function stopped operating on {_HOSTNAME}.
+    description: 'Temporary license expired, function stopped{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1941,7 +1941,7 @@ traps:
     name: DATA-DOMAIN-MIB::unsupportedEnclosurePSU
     category: diagnostic
     severity: warning
-    description: Unsupported power supply detected in enclosure {systemSerialNumber} on {_HOSTNAME}.
+    description: Unsupported power supply detected in {{value "systemSerialNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1950,7 +1950,7 @@ traps:
     name: DATA-DOMAIN-MIB::unsupportedPowerSupply
     category: diagnostic
     severity: warning
-    description: Unsupported power supply detected with alert info {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Unsupported power supply detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1959,7 +1959,7 @@ traps:
     name: DATA-DOMAIN-MIB::openFanDrawer
     category: diagnostic
     severity: warning
-    description: Fan drawer not closed securely, risking overheating on {_HOSTNAME}.
+    description: Fan drawer is not closed securely on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -1967,8 +1967,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.10003
     name: DATA-DOMAIN-MIB::memoryRiserFault
     category: diagnostic
-    severity: alert
-    description: Memory riser fault detected with alert info {alertInfoDescription} on {_HOSTNAME}.
+    severity: crit
+    description: 'Critical memory riser fault detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1977,7 +1977,7 @@ traps:
     name: DATA-DOMAIN-MIB::pCILinkDegraded
     category: diagnostic
     severity: warning
-    description: PCI communication speed degraded with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'PCI communication speed is degraded{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1986,7 +1986,7 @@ traps:
     name: DATA-DOMAIN-MIB::invalidHardwareCritical
     category: diagnostic
     severity: crit
-    description: 'Invalid hardware detected: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'Invalid hardware detected, filesystem cannot be enabled{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -1995,7 +1995,7 @@ traps:
     name: DATA-DOMAIN-MIB::invalidHardwareWarning
     category: diagnostic
     severity: warning
-    description: Invalid hardware detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Invalid hardware detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -2004,7 +2004,7 @@ traps:
     name: DATA-DOMAIN-MIB::correctableErrorWarning
     category: diagnostic
     severity: warning
-    description: Correctable errors detected on {systemSerialNumber} on {_HOSTNAME}.
+    description: 'Correctable errors detected on component{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -2013,7 +2013,7 @@ traps:
     name: DATA-DOMAIN-MIB::spuriousInterruptDisabled
     category: diagnostic
     severity: warning
-    description: Spurious hardware messages detected indicating potential failure on {_HOSTNAME}.
+    description: Excessive spurious hardware messages detected, indicating potential hardware failure on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -2022,7 +2022,7 @@ traps:
     name: DATA-DOMAIN-MIB::corruptEncryptionKeys
     category: diagnostic
     severity: crit
-    description: File system locked due to corrupt encryption keys on {_HOSTNAME}.
+    description: File system locked due to corrupt encryption keys on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -2031,7 +2031,7 @@ traps:
     name: DATA-DOMAIN-MIB::duplicateVTLPoolNames
     category: config_change
     severity: warning
-    description: 'Duplicate VTL pool name detected: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'Duplicate VTL pool names detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -2040,7 +2040,7 @@ traps:
     name: DATA-DOMAIN-MIB::generalHardwareFailure
     category: diagnostic
     severity: crit
-    description: 'Critical hardware failure detected: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'Critical hardware failure detected{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -2048,8 +2048,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.10013
     name: DATA-DOMAIN-MIB::iOModuleMacFault
     category: diagnostic
-    severity: err
-    description: I/O module Mac fault detected with alert {alertInfoDescription} on {_HOSTNAME}.
+    severity: crit
+    description: I/O module MAC fault detected on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -2057,17 +2057,17 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.10500
     name: DATA-DOMAIN-MIB::storageMigrationCannotResume
     category: diagnostic
-    severity: warning
-    description: Storage migration suspended due to {alertInfoDescription} on {_HOSTNAME}.
+    severity: crit
+    description: Storage migration suspended due to error {{value "alertInfoDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
       - alertInfoDescription
   - oid: 1.3.6.1.4.1.19746.2.0.10501
     name: DATA-DOMAIN-MIB::storageMigrationCopyComplete
-    category: config_change
+    category: state_change
     severity: notice
-    description: Storage migration completed for {systemSerialNumber} on {_HOSTNAME}.
+    description: Storage migration copy completed on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -2076,7 +2076,7 @@ traps:
     name: DATA-DOMAIN-MIB::storageMigrationUserSuspend
     category: config_change
     severity: notice
-    description: Storage migration data copy suspended by administrator on {_HOSTNAME}.
+    description: 'Storage migration data copy suspended{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -2085,7 +2085,7 @@ traps:
     name: DATA-DOMAIN-MIB::cMTaskEnded
     category: diagnostic
     severity: notice
-    description: Long running task {alertInfoDescription} ended on {_HOSTNAME}.
+    description: 'Long running task ended{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -2093,8 +2093,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.10504
     name: DATA-DOMAIN-MIB::physicalCapacityMeasurementTasksLost
     category: diagnostic
-    severity: warning
-    description: Physical capacity measurement tasks lost due to disabled file system on {_HOSTNAME}.
+    severity: crit
+    description: Physical capacity measurement tasks lost due to file system disablement on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -2103,7 +2103,7 @@ traps:
     name: DATA-DOMAIN-MIB::physicalCapacityMeasurementTasksLostMTree
     category: diagnostic
     severity: warning
-    description: MTree replication issue caused physical capacity measurement tasks to be cancelled on {_HOSTNAME}.
+    description: MTree replication issue caused physical capacity measurement tasks to be lost on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -2111,8 +2111,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.10506
     name: DATA-DOMAIN-MIB::physicalCapacityMeasurementScheduleFailed
     category: diagnostic
-    severity: warning
-    description: Physical capacity measurement task failed to start with {alertInfoDescription} on {_HOSTNAME}.
+    severity: err
+    description: 'Physical capacity measurement scheduled task failed{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -2121,7 +2121,7 @@ traps:
     name: DATA-DOMAIN-MIB::historicalDatabaseFailoverError
     category: diagnostic
     severity: crit
-    description: Historical database failover failed with alert {alertInfoDescription} on {_HOSTNAME}.
+    description: 'Historical database failover failed{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -2129,17 +2129,17 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.10508
     name: DATA-DOMAIN-MIB::hAdegraded
     category: diagnostic
-    severity: alert
-    description: 'HA system degraded, failover will not succeed: {alertInfoDescription} on {_HOSTNAME}.'
+    severity: crit
+    description: 'HA system degraded, failover will not succeed{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
       - alertInfoDescription
   - oid: 1.3.6.1.4.1.19746.2.0.10509
     name: DATA-DOMAIN-MIB::upgradeInProgress
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: OS upgrade in progress; backup and restore unavailable on {_HOSTNAME}.
+    description: DD OS upgrade is in progress on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -2148,7 +2148,7 @@ traps:
     name: DATA-DOMAIN-MIB::hAofflineErrors
     category: diagnostic
     severity: crit
-    description: 'HA system offline due to critical errors: {alertInfoDescription} on {_HOSTNAME}.'
+    description: 'HA system offline due to critical errors{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -2156,8 +2156,8 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.10511
     name: DATA-DOMAIN-MIB::suspendedMReplMissingUnits
     category: diagnostic
-    severity: warning
-    description: 'Mtree replication suspended due to missing archive units: {alertInfoDescription} on {_HOSTNAME}.'
+    severity: crit
+    description: Mtree replication suspended due to missing archive units on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -2165,17 +2165,17 @@ traps:
   - oid: 1.3.6.1.4.1.19746.2.0.10512
     name: DATA-DOMAIN-MIB::foreignPack
     category: diagnostic
-    severity: err
-    description: Enclosure pack {enclosurePackID} is unusable on {_HOSTNAME}.
+    severity: crit
+    description: Enclosure pack {{value "enclosurePackID"}} is unusable by the file system on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
       - enclosurePackID
   - oid: 1.3.6.1.4.1.19746.2.0.10513
     name: DATA-DOMAIN-MIB::vDiskSCSITargetMismatch
-    category: diagnostic
-    severity: warning
-    description: 'VDisk configuration mismatch with SCSI Target: {alertInfoDescription} on {_HOSTNAME}.'
+    category: state_change
+    severity: crit
+    description: VDisk SCSI target mismatch detected on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -2184,7 +2184,7 @@ traps:
     name: DATA-DOMAIN-MIB::hATimeOutOfSync
     category: diagnostic
     severity: warning
-    description: HA node timestamps are out of sync on {_HOSTNAME}.
+    description: 'HA time synchronization lost{{with value "alertInfoDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemSerialNumber
@@ -2193,7 +2193,7 @@ traps:
     name: DATA-DOMAIN-MIB::enclosureMixDriveType
     category: diagnostic
     severity: warning
-    description: Unsupported mix of enclosures with different drive types detected on {_HOSTNAME}.
+    description: Unsupported mix of enclosures with different drive types detected on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -2202,7 +2202,7 @@ traps:
     name: DATA-DOMAIN-MIB::missingSlaveInterface
     category: state_change
     severity: warning
-    description: Bonded interface degraded performance due to missing slave on {_HOSTNAME}.
+    description: Bonded interface degraded due to missing slave on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -2211,7 +2211,7 @@ traps:
     name: DATA-DOMAIN-MIB::vTLEnabled
     category: state_change
     severity: notice
-    description: VTL functionality enabled on {_HOSTNAME}.
+    description: VTL functionality enabled on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -2220,7 +2220,7 @@ traps:
     name: DATA-DOMAIN-MIB::vTLDisabled
     category: diagnostic
     severity: warning
-    description: VTL functionality disabled; {alertInfoDescription} on {_HOSTNAME}.
+    description: VTL functionality is unavailable on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber

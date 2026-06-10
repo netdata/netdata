@@ -8,264 +8,264 @@ traps:
   - oid: 1.3.6.1.4.1.18642.0.0
     name: CCPOWER-MIB::breakerTrap
     category: diagnostic
-    severity: crit
-    description: Breaker has tripped on {_HOSTNAME}.
+    severity: alert
+    description: Breaker has tripped on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.1
     name: CCPOWER-MIB::fuseTrap
     category: diagnostic
-    severity: crit
-    description: Fuse has opened on {_HOSTNAME}.
+    severity: alert
+    description: Fuse has opened on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.2
     name: CCPOWER-MIB::batteryDisconnectTrap
     category: diagnostic
-    severity: warning
-    description: Battery disconnect event detected on {_HOSTNAME}.
+    severity: alert
+    description: Battery disconnect has operated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.3
     name: CCPOWER-MIB::programmableTrap
     category: diagnostic
     severity: warning
-    description: Programmable alarm has occurred on {_HOSTNAME}.
+    description: Programmable alarm has occurred on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.4
     name: CCPOWER-MIB::highVoltageTrap
     category: diagnostic
     severity: warning
-    description: High voltage alarm detected on {_HOSTNAME}.
+    description: High voltage alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.5
     name: CCPOWER-MIB::lowVoltageTrap
     category: diagnostic
     severity: warning
-    description: Low voltage alarm detected on {_HOSTNAME}.
+    description: Low voltage alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.6
     name: CCPOWER-MIB::loadOverCurrentTrap
     category: diagnostic
-    severity: warning
-    description: Load over current alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: Load over current alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.7
     name: CCPOWER-MIB::batteryFloatCurrentTrap
     category: diagnostic
     severity: warning
-    description: Battery float current exceeded preset value on {_HOSTNAME}.
+    description: Battery float current exceeded preset value on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.8
     name: CCPOWER-MIB::loadDisconnect1VoltageTrap
     category: diagnostic
     severity: warning
-    description: Load disconnect 1 voltage dropped below preset value on {_HOSTNAME}.
+    description: Load disconnect 1 voltage dropped below preset value on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.9
     name: CCPOWER-MIB::loadDisconnect2VoltageTrap
     category: diagnostic
     severity: warning
-    description: Load disconnect 2 voltage dropped below preset value on {_HOSTNAME}.
+    description: Load disconnect 2 voltage dropped below preset value on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.10
     name: CCPOWER-MIB::loadDisconnect3VoltageTrap
     category: diagnostic
     severity: warning
-    description: Load disconnect 3 voltage dropped below preset value on {_HOSTNAME}.
+    description: Load disconnect 3 voltage dropped below preset value on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.11
     name: CCPOWER-MIB::loadDisconnect1TemperatureTrap
     category: diagnostic
     severity: warning
-    description: Load disconnect 1 temperature exceeded preset value on {_HOSTNAME}.
+    description: Load disconnect 1 temperature exceeded preset value on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.12
     name: CCPOWER-MIB::loadDisconnect2TemperatureTrap
     category: diagnostic
     severity: warning
-    description: Load disconnect 2 temperature exceeded preset value on {_HOSTNAME}.
+    description: Load disconnect 2 temperature exceeded preset value on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.13
     name: CCPOWER-MIB::loadDisconnect3TemperatureTrap
     category: diagnostic
     severity: warning
-    description: Load disconnect 3 temperature exceeded preset value on {_HOSTNAME}.
+    description: Load disconnect 3 temperature exceeded preset value on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.14
     name: CCPOWER-MIB::rectifierFailureTrap
     category: diagnostic
-    severity: err
-    description: Rectifier failure detected on {_HOSTNAME}.
+    severity: alert
+    description: Rectifier failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.15
     name: CCPOWER-MIB::fanFailureTrap
     category: diagnostic
-    severity: err
-    description: Fan failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Rectifier fan has failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.16
     name: CCPOWER-MIB::acFailureTrap
     category: diagnostic
-    severity: err
-    description: Rectifier has lost AC input power on {_HOSTNAME}.
+    severity: alert
+    description: Rectifier has lost AC input power on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.17
     name: CCPOWER-MIB::majorFailureTrap
     category: diagnostic
     severity: crit
-    description: Multiple AC, fan, rectifier, or alarm failures detected on {_HOSTNAME}.
+    description: Multiple hardware failures detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.18
     name: CCPOWER-MIB::batteryResistanceTrap
     category: diagnostic
     severity: warning
-    description: Battery resistance alarm triggered on {_HOSTNAME}.
+    description: Battery resistance increased by a programmed percentage on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.19
     name: CCPOWER-MIB::batteryTestAbort1Trap
     category: diagnostic
-    severity: err
-    description: Battery resistance test aborted due to failure on {_HOSTNAME}.
+    severity: crit
+    description: Battery resistance test aborted due to failure on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.20
     name: CCPOWER-MIB::batteryTestAbort2Trap
     category: diagnostic
-    severity: err
-    description: Battery resistance test aborted due to failure on {_HOSTNAME}.
+    severity: alert
+    description: Battery resistance test aborted due to failure on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.21
     name: CCPOWER-MIB::batteryTestAbort3Trap
     category: diagnostic
-    severity: err
-    description: Battery resistance test aborted due to failure on {_HOSTNAME}.
+    severity: crit
+    description: Battery resistance test aborted due to failure on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.100
     name: CCPOWER-MIB::breakerTrapClear
     category: state_change
     severity: notice
-    description: Breaker alarm cleared on {_HOSTNAME}.
+    description: Breaker alarm cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.101
     name: CCPOWER-MIB::fuseTrapClear
     category: diagnostic
     severity: notice
-    description: Fuse alarm cleared on {_HOSTNAME}.
+    description: Fuse alarm has been cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.102
     name: CCPOWER-MIB::batteryDisconnectTrapClear
     category: diagnostic
     severity: notice
-    description: Battery disconnect alarm cleared on {_HOSTNAME}.
+    description: Battery disconnect alarm has been cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.103
     name: CCPOWER-MIB::programmableTrapClear
     category: state_change
     severity: notice
-    description: Programmable alarm cleared on {_HOSTNAME}.
+    description: Programmable alarm cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.104
     name: CCPOWER-MIB::highVoltageTrapClear
     category: diagnostic
     severity: notice
-    description: High voltage alarm cleared on {_HOSTNAME}.
+    description: High voltage alarm cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.105
     name: CCPOWER-MIB::lowVoltageTrapClear
     category: diagnostic
     severity: notice
-    description: Low voltage alarm cleared on {_HOSTNAME}.
+    description: Low voltage alarm cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.106
     name: CCPOWER-MIB::loadOverCurrentTrapClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Load over current alarm cleared on {_HOSTNAME}.
+    description: Load over current alarm has been cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.107
     name: CCPOWER-MIB::batteryFloatCurrentTrapClear
     category: diagnostic
     severity: notice
-    description: Battery float current alarm cleared on {_HOSTNAME}.
+    description: Battery float current alarm has been cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.108
     name: CCPOWER-MIB::loadDisconnect1VoltageTrapClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Load disconnect 1 voltage alarm cleared on {_HOSTNAME}.
+    description: Load disconnect 1 voltage alarm cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.109
     name: CCPOWER-MIB::loadDisconnect2VoltageTrapClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Load disconnect 2 voltage alarm cleared on {_HOSTNAME}.
+    description: Load disconnect 2 voltage alarm cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.110
     name: CCPOWER-MIB::loadDisconnect3VoltageTrapClear
     category: diagnostic
     severity: notice
-    description: Load disconnect 3 voltage alarm cleared on {_HOSTNAME}.
+    description: Load disconnect 3 voltage alarm cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.111
     name: CCPOWER-MIB::loadDisconnect1TemperatureTrapClear
     category: diagnostic
     severity: notice
-    description: Load disconnect 1 temperature alarm cleared on {_HOSTNAME}.
+    description: Load disconnect 1 temperature alarm cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.112
     name: CCPOWER-MIB::loadDisconnect2TemperatureTrapClear
     category: diagnostic
     severity: notice
-    description: Load disconnect 2 temperature alarm cleared on {_HOSTNAME}.
+    description: Load disconnect 2 temperature alarm cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.113
     name: CCPOWER-MIB::loadDisconnect3TemperatureTrapClear
     category: diagnostic
     severity: notice
-    description: Load disconnect 3 temperature alarm cleared on {_HOSTNAME}.
+    description: Load disconnect 3 temperature alarm cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.114
     name: CCPOWER-MIB::rectifierFailureTrapClear
     category: diagnostic
     severity: notice
-    description: Rectifier failure alarm cleared on {_HOSTNAME}.
+    description: Rectifier failure alarm cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.115
     name: CCPOWER-MIB::fanFailureTrapClear
     category: diagnostic
     severity: notice
-    description: Fan failure alarm cleared on {_HOSTNAME}.
+    description: Fan failure alarm has been cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.116
     name: CCPOWER-MIB::acFailureTrapClear
     category: diagnostic
     severity: notice
-    description: AC failure alarm cleared on {_HOSTNAME}.
+    description: AC power failure alarm cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.117
     name: CCPOWER-MIB::majorFailureTrapClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Major failure alarm cleared on {_HOSTNAME}.
+    description: Major failure alarm has been cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.118
     name: CCPOWER-MIB::batteryResistanceTrapClear
     category: diagnostic
     severity: notice
-    description: Battery resistance alarm cleared on {_HOSTNAME}.
+    description: Battery resistance alarm cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.119
     name: CCPOWER-MIB::batteryTestAbort1TrapClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Battery test abort 1 alarm cleared on {_HOSTNAME}.
+    description: Battery test abort 1 alarm cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.120
     name: CCPOWER-MIB::batteryTestAbort2TrapClear
     category: diagnostic
     severity: notice
-    description: Battery test abort 2 alarm cleared on {_HOSTNAME}.
+    description: Battery test abort 2 alarm has been cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18642.0.121
     name: CCPOWER-MIB::batteryTestAbort3TrapClear
     category: diagnostic
     severity: notice
-    description: Battery test abort 3 alarm cleared on {_HOSTNAME}.
+    description: Battery test abort 3 alarm cleared on {{hostname}}.
     status: current

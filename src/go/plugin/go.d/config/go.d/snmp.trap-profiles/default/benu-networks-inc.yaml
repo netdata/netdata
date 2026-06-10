@@ -676,7 +676,7 @@ traps:
     name: BENU-CHASSIS-MIB::benuChassisPowerFailure
     category: diagnostic
     severity: crit
-    description: Chassis power failure detected on card {benuChassisPowerFailureCardInfo} on {_HOSTNAME}.
+    description: Chassis power failure detected on {{first (value "benuChassisPowerFailureInfo") "card"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - benuChassisPowerFailureCardInfo
@@ -684,8 +684,8 @@ traps:
   - oid: 1.3.6.1.4.1.39406.1.1.0.2
     name: BENU-CHASSIS-MIB::benuChassisFanFailureTrap
     category: diagnostic
-    severity: err
-    description: Fan failure detected at {benuChassisFanFailureInfo} on {_HOSTNAME}.
+    severity: alert
+    description: Chassis fan failure detected{{with value "benuChassisFanFailureInfo"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - benuChassisFanFailureInfo
@@ -693,7 +693,7 @@ traps:
     name: BENU-CHASSIS-MIB::benuLinkUpTrap
     category: state_change
     severity: notice
-    description: Interface {ifDescr} link became operational on {_HOSTNAME}.
+    description: Interface {{first (value "ifDescr") "link"}} went up on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -705,7 +705,7 @@ traps:
     name: BENU-CHASSIS-MIB::benuLinkDownTrap
     category: state_change
     severity: warning
-    description: Interface {ifDescr} link down with operational status {ifOperStatus} on {_HOSTNAME}.
+    description: Interface {{first (value "ifDescr") "link"}} went down on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -717,7 +717,7 @@ traps:
     name: BENU-CHASSIS-MIB::benuSensorCritical
     category: diagnostic
     severity: crit
-    description: Sensor {benuSensorName} reported critical state with value {benuSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "benuSensorName"}} entered critical state on {{hostname}}.
     status: current
     varbinds:
       - benuSensorName
@@ -728,7 +728,7 @@ traps:
     name: BENU-CHASSIS-MIB::benuSensorNormal
     category: diagnostic
     severity: notice
-    description: Sensor {benuSensorName} state transitioned to normal on {_HOSTNAME}.
+    description: Sensor {{value "benuSensorName"}} returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - benuSensorName
@@ -738,8 +738,8 @@ traps:
   - oid: 1.3.6.1.4.1.39406.1.1.0.7
     name: BENU-CHASSIS-MIB::benuChassisPowerFault
     category: diagnostic
-    severity: err
-    description: Chassis power failure detected at {benuChassisPowerInfo} on {_HOSTNAME}.
+    severity: crit
+    description: Chassis power failure detected{{with value "benuChassisPowerInfo"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - benuChassisPowerInfo
@@ -747,15 +747,15 @@ traps:
     name: BENU-CHASSIS-MIB::benuChassisPowerRecovery
     category: diagnostic
     severity: notice
-    description: Power supply recovery detected at {benuChassisPowerInfo} on {_HOSTNAME}.
+    description: Power supply recovery detected{{with value "benuChassisPowerInfo"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - benuChassisPowerInfo
   - oid: 1.3.6.1.4.1.39406.1.1.0.9
     name: BENU-CHASSIS-MIB::benuChassisPowerPresent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Redundant power supply inserted at {benuChassisPowerInfo} on {_HOSTNAME}.
+    description: Redundant power supply inserted at {{value "benuChassisPowerInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - benuChassisPowerInfo
@@ -763,27 +763,27 @@ traps:
     name: BENU-CHASSIS-MIB::benuChassisPowerAbsent
     category: diagnostic
     severity: warning
-    description: Redundant power supply removed at {benuChassisPowerInfo} on {_HOSTNAME}.
+    description: Redundant power supply removed from {{value "benuChassisPowerInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - benuChassisPowerInfo
   - oid: 1.3.6.1.4.1.39406.1.4.0.1
     name: BENU-GENERAL-NOTIFICATION-MIB::bNotifyAgentShutDown
     category: state_change
-    severity: notice
-    description: SNMP agent is shutting down on {_HOSTNAME}.
+    severity: alert
+    description: SNMP agent is shutting down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.39406.1.4.0.2
     name: BENU-GENERAL-NOTIFICATION-MIB::bNotifyAgentRestart
     category: state_change
     severity: notice
-    description: Agent restarted on {_HOSTNAME}.
+    description: SNMP agent restarted on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.39406.1.5.0.1
     name: BENU-HOST-MIB::bSWTaskAvgCPUUsageLow
     category: diagnostic
     severity: notice
-    description: CPU usage for {bSWProcessName} fell below threshold {bSWProcessAvgCPUUsageLowThreshold} on {_HOSTNAME}.
+    description: Average CPU usage for {{value "bSWProcessName"}} fell below threshold on {{hostname}}.
     status: current
     varbinds:
       - bSWProcessName
@@ -793,7 +793,7 @@ traps:
     name: BENU-HOST-MIB::bSWTaskAvgCPUUsageHigh
     category: diagnostic
     severity: warning
-    description: Process {bSWProcessName} average CPU usage exceeded threshold {bSWProcessAvgCPUUsageHighThreshold} on {_HOSTNAME}.
+    description: High average CPU usage detected for process {{value "bSWProcessName"}} on {{hostname}}.
     status: current
     varbinds:
       - bSWProcessName
@@ -802,8 +802,8 @@ traps:
   - oid: 1.3.6.1.4.1.39406.1.5.0.3
     name: BENU-HOST-MIB::bSWTaskDied
     category: diagnostic
-    severity: err
-    description: Software process {bSWProcessName} (PID {bSWProcessID}) died with reason {bSWTaskDiedReason} on {_HOSTNAME}.
+    severity: alert
+    description: Software process {{value "bSWProcessName"}} died on {{hostname}}.
     status: current
     varbinds:
       - bSWProcessName
@@ -812,8 +812,8 @@ traps:
   - oid: 1.3.6.1.4.1.39406.1.5.0.4
     name: BENU-HOST-MIB::bSWTaskRestartLimitReached
     category: diagnostic
-    severity: alert
-    description: Process {bSWProcessName} (PID {bSWProcessID}) failed to restart after limit reached on {_HOSTNAME}.
+    severity: crit
+    description: Process {{value "bSWProcessName"}} failed to restart after reaching limit on {{hostname}}.
     status: current
     varbinds:
       - bSWProcessName
@@ -822,7 +822,7 @@ traps:
     name: BENU-SUB-TUNNEL-MIB::bWagSubHighThresholdReached
     category: diagnostic
     severity: warning
-    description: Subscriber count exceeded high threshold {bWagSubHighThreshold} on {_HOSTNAME}.
+    description: Subscriber count exceeded high threshold of {{value "bWagSubHighThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - bWagSubMaxNumOfSubscribers
@@ -831,7 +831,7 @@ traps:
     name: BENU-SUB-TUNNEL-MIB::bWagSubLowThresholdReached
     category: diagnostic
     severity: warning
-    description: Subscriber count fell below low threshold {bWagSubLowThreshold} on {_HOSTNAME}.
+    description: Subscriber count fell below low threshold of {{value "bWagSubLowThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - bWagSubMaxNumOfSubscribers
@@ -840,7 +840,7 @@ traps:
     name: BENU-SUB-TUNNEL-MIB::bWagTunHighThresholdReached
     category: diagnostic
     severity: warning
-    description: Tunnel count exceeded high threshold {bWagTunHighThreshold} on {_HOSTNAME}.
+    description: Tunnel count exceeded high threshold of {{value "bWagTunHighThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - bWagTunMaxNumOfTunnels
@@ -849,16 +849,16 @@ traps:
     name: BENU-SUB-TUNNEL-MIB::bWagTunLowThresholdReached
     category: diagnostic
     severity: warning
-    description: Tunnel count fell below low threshold {bWagTunLowThreshold} on {_HOSTNAME}.
+    description: Tunnel count fell below low threshold of {{value "bWagTunLowThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - bWagTunMaxNumOfTunnels
       - bWagTunLowThreshold
   - oid: 1.3.6.1.4.1.39406.2.1.3.0.1
     name: BENU-WAG-STATS-MIB::bWagCgnatAuthIpAddrHighThresholdReached
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: CGNAT authenticated IP usage {bWagCgnatAuthIpAddrUsedHighThreshold} exceeded high threshold on {_HOSTNAME}.
+    description: CGNAT authenticated IP address usage exceeded high threshold on {{hostname}}.
     status: current
     varbinds:
       - bWagCgnatProfileIPPoolGroup
@@ -868,7 +868,7 @@ traps:
     name: BENU-WAG-STATS-MIB::bWagCgnatAuthIpAddrLowThresholdReached
     category: diagnostic
     severity: warning
-    description: CGNAT authenticated IP address usage fell below low threshold on {_HOSTNAME}.
+    description: CGNAT authenticated IP address usage fell below low threshold on {{hostname}}.
     status: current
     varbinds:
       - bWagCgnatProfileIPPoolGroup
@@ -876,9 +876,9 @@ traps:
       - bWagCgnatAuthIpAddrUsedLowThreshold
   - oid: 1.3.6.1.4.1.39406.2.1.3.0.3
     name: BENU-WAG-STATS-MIB::bWagCgnatAuthIpAddressesExhausted
-    category: diagnostic
-    severity: alert
-    description: CGNAT IP address pool {bWagCgnatProfileIPPoolGroup} exhausted with {bWagCgnatTotalPoolIPAddresses} addresses on {_HOSTNAME}.
+    category: state_change
+    severity: warning
+    description: CGNAT IP address pool {{value "bWagCgnatProfileIPPoolGroup"}} exhausted on {{hostname}}.
     status: current
     varbinds:
       - bWagCgnatProfileIPPoolGroup
@@ -887,7 +887,7 @@ traps:
     name: BENU-WAG-STATS-MIB::bWagCgnatPortBlocksUsedHighThresholdReached
     category: diagnostic
     severity: warning
-    description: CGNAT port block usage for subscriber {bWagCgnatSubscriberMac} exceeded threshold {bWagCgnatPortBlocksUsedHighThreshold} on {_HOSTNAME}.
+    description: CGNAT port block usage exceeded high threshold for subscriber {{value "bWagCgnatSubscriberMac"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - bWagCgnatSubscriberMac
@@ -896,8 +896,8 @@ traps:
   - oid: 1.3.6.1.4.1.39406.2.1.3.0.5
     name: BENU-WAG-STATS-MIB::bWagCgnatPortBlocksUsedLowThresholdReached
     category: diagnostic
-    severity: warning
-    description: CGNAT subscriber {bWagCgnatSubscriberMac} port block usage fell below low threshold {bWagCgnatPortBlocksUsedLowThreshold} on {_HOSTNAME}.
+    severity: notice
+    description: CGNAT port block usage dropped below low threshold for {{value "bWagCgnatSubscriberMac"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - bWagCgnatSubscriberMac
@@ -905,9 +905,9 @@ traps:
       - bWagCgnatPortBlocksUsedLowThreshold
   - oid: 1.3.6.1.4.1.39406.2.1.3.0.6
     name: BENU-WAG-STATS-MIB::bWagDhcpTPSHighReached
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DHCP transaction rate {bWagDhcpTPS} exceeded high threshold on {_HOSTNAME}.
+    description: DHCP transaction rate exceeded threshold with {{value "bWagDhcpTPS"}} transactions on {{hostname}}.
     status: current
     varbinds:
       - bWagDhcpTPS
@@ -915,15 +915,15 @@ traps:
     name: BENU-WAG-STATS-MIB::bWagDhcpTPSLowReached
     category: diagnostic
     severity: warning
-    description: DHCP transaction count {bWagDhcpTPS} fell below threshold on {_HOSTNAME}.
+    description: DHCP transaction rate fell below threshold with {{value "bWagDhcpTPS"}} transactions on {{hostname}}.
     status: current
     varbinds:
       - bWagDhcpTPS
   - oid: 1.3.6.1.4.1.39406.2.1.3.0.8
     name: BENU-WAG-STATS-MIB::bWagVrgApiIpAddrUsedHighThresholdReached
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: IP address usage exceeded high threshold {bWagVrgApiIpAddrUsedHighThreshold} for pool {bWagrgApiIPPoolGroup} on {_HOSTNAME}.
+    description: IP address usage exceeded high threshold for pool {{value "bWagrgApiIPPoolGroup"}} on {{hostname}}.
     status: current
     varbinds:
       - bWagrgApiIPPoolGroup
@@ -933,7 +933,7 @@ traps:
     name: BENU-WAG-STATS-MIB::bWagVrgApiIpAddrUsedLowThresholdReached
     category: diagnostic
     severity: warning
-    description: IP address usage for {bWagrgApiIPPoolGroup} fell below low threshold {bWagVrgApiIpAddrUsedLowThreshold} on {_HOSTNAME}.
+    description: IP address usage for VRGAPI pool {{value "bWagrgApiIPPoolGroup"}} fell below low threshold on {{hostname}}.
     status: current
     varbinds:
       - bWagrgApiIPPoolGroup
@@ -942,17 +942,17 @@ traps:
   - oid: 1.3.6.1.4.1.39406.2.1.3.0.10
     name: BENU-WAG-STATS-MIB::bWagVrgApiIpAddressesExhausted
     category: diagnostic
-    severity: warning
-    description: IP pool {bWagrgApiIPPoolGroup} exhausted with {bWagVRGApiIPoolIPAddresses} addresses on {_HOSTNAME}.
+    severity: alert
+    description: IP address pool {{value "bWagrgApiIPPoolGroup"}} exhausted on {{hostname}}.
     status: current
     varbinds:
       - bWagrgApiIPPoolGroup
       - bWagVRGApiIPoolIPAddresses
   - oid: 1.3.6.1.4.1.39406.2.1.4.0.1
     name: BENU-RADIUS-MIB::bAAAGroupOutstandingAuthReqsLow
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: AAA group {bAAAGroupAuthName} outstanding requests dropped below threshold {bAAAGroupOutstandingAuthReqsLowThreshold} on {_HOSTNAME}.
+    description: AAA group {{value "bAAAGroupAuthName"}} outstanding auth requests fell below low threshold on {{hostname}}.
     status: current
     varbinds:
       - bAAAGroupAuthName
@@ -962,7 +962,7 @@ traps:
     name: BENU-RADIUS-MIB::bAAAGroupOutstandingAuthReqsHigh
     category: diagnostic
     severity: warning
-    description: AAA group {bAAAGroupAuthName} outstanding requests {bAAAGroupMaximumOutstandingAuthReqs} exceeded threshold {bAAAGroupOutstandingAuthReqsHighThreshold} on {_HOSTNAME}.
+    description: AAA group {{value "bAAAGroupAuthName"}} outstanding auth requests exceeded high threshold on {{hostname}}.
     status: current
     varbinds:
       - bAAAGroupAuthName
@@ -972,7 +972,7 @@ traps:
     name: BENU-RADIUS-MIB::bAAAGroupOutstandingAcctReqsLow
     category: diagnostic
     severity: notice
-    description: AAA group {bAAAGroupAcctName} outstanding requests fell below threshold {bAAAGroupOutstandingAcctReqsLowThreshold} on {_HOSTNAME}.
+    description: AAA group {{value "bAAAGroupAcctName"}} outstanding accounting requests fell below threshold on {{hostname}}.
     status: current
     varbinds:
       - bAAAGroupAcctName
@@ -982,7 +982,7 @@ traps:
     name: BENU-RADIUS-MIB::bAAAGroupOutstandingAcctReqsHigh
     category: diagnostic
     severity: warning
-    description: AAA group {bAAAGroupAcctName} outstanding requests {bAAAGroupMaximumOutstandingAcctReqs} exceeded threshold {bAAAGroupOutstandingAcctReqsHighThreshold} on {_HOSTNAME}.
+    description: AAA group {{value "bAAAGroupAcctName"}} outstanding accounting requests exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - bAAAGroupAcctName
@@ -992,7 +992,7 @@ traps:
     name: BENU-RADIUS-MIB::bAAAGroupOutstandingCoAReqsLow
     category: diagnostic
     severity: notice
-    description: AAA group {bAAAGroupCoAName} outstanding CoA requests fell below threshold {bAAAGroupOutstandingCoAReqsLowThreshold} on {_HOSTNAME}.
+    description: AAA group {{value "bAAAGroupCoAName"}} outstanding CoA requests fell below low threshold on {{hostname}}.
     status: current
     varbinds:
       - bAAAGroupCoAName
@@ -1002,7 +1002,7 @@ traps:
     name: BENU-RADIUS-MIB::bAAAGroupOutstandingCoAReqsHigh
     category: diagnostic
     severity: warning
-    description: AAA group {bAAAGroupCoAName} outstanding CoA requests exceeded threshold {bAAAGroupOutstandingCoAReqsHighThreshold} on {_HOSTNAME}.
+    description: AAA group {{value "bAAAGroupCoAName"}} outstanding CoA requests exceeded high threshold on {{hostname}}.
     status: current
     varbinds:
       - bAAAGroupCoAName
@@ -1012,7 +1012,7 @@ traps:
     name: BENU-RADIUS-MIB::bRadiusAuthServerMarkedDead
     category: diagnostic
     severity: warning
-    description: RADIUS server {bRadiusServerIPAddress} marked dead on {_HOSTNAME}.
+    description: RADIUS server {{value "bRadiusServerIPAddress"}} marked dead on {{hostname}}.
     status: current
     varbinds:
       - bRadiusServerIPAddrType
@@ -1021,7 +1021,7 @@ traps:
     name: BENU-RADIUS-MIB::bRadiusAuthServerMarkedAlive
     category: state_change
     severity: notice
-    description: RADIUS server {bRadiusServerIPAddress} marked alive on {_HOSTNAME}.
+    description: RADIUS server {{value "bRadiusServerIPAddress"}} marked alive on {{hostname}}.
     status: current
     varbinds:
       - bRadiusServerIPAddrType
@@ -1030,7 +1030,7 @@ traps:
     name: BENU-RADIUS-MIB::bRadiusAccountingServerMarkedDead
     category: diagnostic
     severity: warning
-    description: RADIUS accounting server {bRadiusServerIPAddress} marked dead on {_HOSTNAME}.
+    description: RADIUS accounting server {{value "bRadiusServerIPAddress"}} marked dead on {{hostname}}.
     status: current
     varbinds:
       - bRadiusServerIPAddrType
@@ -1039,7 +1039,7 @@ traps:
     name: BENU-RADIUS-MIB::bRadiusAccountingServerMarkedAlive
     category: state_change
     severity: notice
-    description: RADIUS accounting server {bRadiusServerIPAddress} marked alive on {_HOSTNAME}.
+    description: RADIUS accounting server {{value "bRadiusServerIPAddress"}} marked alive on {{hostname}}.
     status: current
     varbinds:
       - bRadiusServerIPAddrType
@@ -1048,7 +1048,7 @@ traps:
     name: BENU-RADIUS-MIB::bRadiusProxyAuthTPSLowReached
     category: diagnostic
     severity: warning
-    description: Radius Proxy transaction count {bRadiusProxyAuthTPS} fell below threshold on {_HOSTNAME}.
+    description: RADIUS proxy transaction rate dropped below threshold to {{value "bRadiusProxyAuthTPS"}} on {{hostname}}.
     status: current
     varbinds:
       - bRadiusProxyAuthTPS
@@ -1056,15 +1056,15 @@ traps:
     name: BENU-RADIUS-MIB::bRadiusProxyAuthTPSHighReached
     category: diagnostic
     severity: warning
-    description: RADIUS proxy transaction rate {bRadiusProxyAuthTPS} exceeded threshold on {_HOSTNAME}.
+    description: RADIUS proxy authentication TPS exceeded threshold {{value "bRadiusProxyAuthTPS"}} on {{hostname}}.
     status: current
     varbinds:
       - bRadiusProxyAuthTPS
   - oid: 1.3.6.1.4.1.39406.2.1.5.0.1
     name: BENU-IPPOOL-MIB::bIPPoolUsedAddrLow
     category: diagnostic
-    severity: warning
-    description: IP pool {bIPPoolName} used address count fell below low threshold {bIPPoolUsedAddrLowThreshold} on {_HOSTNAME}.
+    severity: notice
+    description: IP pool {{value "bIPPoolName"}} usage dropped below low threshold on {{hostname}}.
     status: current
     varbinds:
       - bIPPoolName
@@ -1072,9 +1072,9 @@ traps:
       - bIPPoolUsedAddrLowThreshold
   - oid: 1.3.6.1.4.1.39406.2.1.5.0.2
     name: BENU-IPPOOL-MIB::bIPPoolUsedAddrHigh
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: IP Pool {bIPPoolName} used address count exceeded high threshold {bIPPoolUsedAddrHighThreshold} on {_HOSTNAME}.
+    description: IP pool {{value "bIPPoolName"}} address usage exceeded high threshold on {{hostname}}.
     status: current
     varbinds:
       - bIPPoolName
@@ -1084,7 +1084,7 @@ traps:
     name: BENU-IPPOOL-MIB::bIPv6PoolUsedPrefixLow
     category: diagnostic
     severity: warning
-    description: IPv6 pool {bIPv6PoolName} used prefixes fell below threshold {bIPv6PoolUsedPrefixLowThreshold} on {_HOSTNAME}.
+    description: IPv6 pool {{value "bIPv6PoolName"}} used prefixes fell below low threshold on {{hostname}}.
     status: current
     varbinds:
       - bIPv6PoolName
@@ -1092,9 +1092,9 @@ traps:
       - bIPv6PoolUsedPrefixLowThreshold
   - oid: 1.3.6.1.4.1.39406.2.1.5.0.4
     name: BENU-IPPOOL-MIB::bIPv6PoolUsedPrefixHigh
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: IPv6 pool {bIPv6PoolName} used prefixes exceeded high threshold {bIPv6PoolUsedPrefixHighThreshold} on {_HOSTNAME}.
+    description: IPv6 pool {{value "bIPv6PoolName"}} used prefixes exceeded high threshold on {{hostname}}.
     status: current
     varbinds:
       - bIPv6PoolName
@@ -1102,27 +1102,27 @@ traps:
       - bIPv6PoolUsedPrefixHighThreshold
   - oid: 1.3.6.1.4.1.39406.2.1.5.0.5
     name: BENU-IPPOOL-MIB::bIPPoolAddrExhausted
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: IPv4 pool {bIPPoolName} with {bIPPoolTotalAddresses} addresses is exhausted on {_HOSTNAME}.
+    description: IPv4 pool {{value "bIPPoolName"}} address exhaustion detected on {{hostname}}.
     status: current
     varbinds:
       - bIPPoolName
       - bIPPoolTotalAddresses
   - oid: 1.3.6.1.4.1.39406.2.1.5.0.6
     name: BENU-IPPOOL-MIB::bIPv6PoolPrefixExhausted
-    category: diagnostic
-    severity: warning
-    description: IPv6 pool {bIPv6PoolName} exhausted with {bIPv6PoolTotalPrefixes} prefixes on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: IPv6 pool {{value "bIPv6PoolName"}} prefix exhaustion detected on {{hostname}}.
     status: current
     varbinds:
       - bIPv6PoolName
       - bIPv6PoolTotalPrefixes
   - oid: 1.3.6.1.4.1.39406.2.1.6.0.1
     name: BENU-DHCP-MIB::bDhcpSubnetUsedAddrLow
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DHCP subnet {bDhcpSubnetStartAddress} used address count fell below threshold {bDhcpSubnetUsedAddrLowThreshold} on {_HOSTNAME}.
+    description: DHCP subnet {{value "bDhcpSubnetStartAddress"}} used addresses fell below low threshold on {{hostname}}.
     status: current
     varbinds:
       - bDhcpSubnetStartAddress
@@ -1131,9 +1131,9 @@ traps:
       - bDhcpSubnetUsedAddrLowThreshold
   - oid: 1.3.6.1.4.1.39406.2.1.6.0.2
     name: BENU-DHCP-MIB::bDhcpSubnetUsedAddrHigh
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DHCP subnet address usage exceeded high threshold on {_HOSTNAME}.
+    description: DHCP subnet {{value "bDhcpSubnetStartAddress"}} address usage exceeded high threshold on {{hostname}}.
     status: current
     varbinds:
       - bDhcpSubnetStartAddress
@@ -1142,9 +1142,9 @@ traps:
       - bDhcpSubnetUsedAddrHighThreshold
   - oid: 1.3.6.1.4.1.39406.2.1.6.0.3
     name: BENU-DHCP-MIB::bDhcpHomeSubnetUsedAddrLow
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DHCP used addresses for subnet {bDhcpHomeSubnetHomeId} fell below low threshold {bDhcpHomeSubnetUsedAddrLowThreshold} on {_HOSTNAME}.
+    description: DHCP used address count fell below low threshold for subnet {{value "bDhcpHomeSubnetHomeId"}} on {{hostname}}.
     status: current
     varbinds:
       - bDhcpHomeSubnetHomeId
@@ -1154,9 +1154,9 @@ traps:
       - bDhcpHomeSubnetUsedAddrLowThreshold
   - oid: 1.3.6.1.4.1.39406.2.1.6.0.4
     name: BENU-DHCP-MIB::bDhcpHomeSubnetUsedAddrHigh
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DHCP used address count exceeded high threshold {bDhcpHomeSubnetUsedAddrHighThreshold} on {_HOSTNAME}.
+    description: DHCP address usage exceeded high threshold for subnet {{value "bDhcpHomeSubnetHomeId"}} on {{hostname}}.
     status: current
     varbinds:
       - bDhcpHomeSubnetHomeId
@@ -1166,18 +1166,18 @@ traps:
       - bDhcpHomeSubnetUsedAddrHighThreshold
   - oid: 1.3.6.1.4.1.39406.2.1.7.0.1
     name: BENU-TWAG-STATS-MIB::bTWagGTPHighThresholdReached
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: GTP-U tunnel count {bTWagGTPMaxNumOfTunnels} exceeded high threshold {bTWagGTPHighThreshold} on {_HOSTNAME}.
+    description: GTP-U tunnel count exceeded high threshold of {{value "bTWagGTPHighThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - bTWagGTPMaxNumOfTunnels
       - bTWagGTPHighThreshold
   - oid: 1.3.6.1.4.1.39406.2.1.7.0.2
     name: BENU-TWAG-STATS-MIB::bTWagGTPLowThresholdReached
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: GTP-U tunnel count fell below low threshold {bTWagGTPLowThreshold} on {_HOSTNAME}.
+    description: GTP-U tunnel count fell below threshold {{value "bTWagGTPLowThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - bTWagGTPMaxNumOfTunnels
@@ -1186,7 +1186,7 @@ traps:
     name: BENU-VLAN-MIB::bVlanEncapEnable
     category: config_change
     severity: notice
-    description: 802.1q encapsulation enabled on port {bVlanPortId} on {_HOSTNAME}.
+    description: 802.1Q encapsulation enabled on interface {{value "bVlanPortId"}} on {{hostname}}.
     status: current
     varbinds:
       - bVlanPortId
@@ -1194,7 +1194,7 @@ traps:
     name: BENU-VLAN-MIB::bVlanEncapDisable
     category: state_change
     severity: warning
-    description: Encapsulation 802.1q disabled on port {bVlanPortId} on {_HOSTNAME}.
+    description: 802.1Q encapsulation disabled on interface {{value "bVlanPortId"}} on {{hostname}}.
     status: current
     varbinds:
       - bVlanPortId
@@ -1202,7 +1202,7 @@ traps:
     name: BENU-VLAN-MIB::bVlanCreate
     category: config_change
     severity: notice
-    description: 'bVlanCreate: VLAN {bVlanId} created on port {bVlanPortId} on {_HOSTNAME}.'
+    description: VLAN {{value "bVlanId"}} created on port {{value "bVlanPortId"}} on {{hostname}}.
     status: current
     varbinds:
       - bVlanPortId
@@ -1211,16 +1211,16 @@ traps:
     name: BENU-VLAN-MIB::bVlanDelete
     category: config_change
     severity: notice
-    description: VLAN {bVlanId} deleted on port {bVlanPortId} on {_HOSTNAME}.
+    description: VLAN {{value "bVlanId"}} deleted on port {{value "bVlanPortId"}} on {{hostname}}.
     status: current
     varbinds:
       - bVlanPortId
       - bVlanId
   - oid: 1.3.6.1.4.1.39406.2.1.9.0.1
     name: BENU-CGNAT-STATS-MIB::bCgnatPortBlocksUsedHighThresholdReached
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: CGNAT port block usage for subscriber {bCgnatSubscriberMac} exceeded high threshold {bCgnatPortBlocksUsedHighThreshold} on {_HOSTNAME}.
+    description: CGNAT port block usage exceeded high threshold for {{value "bCgnatSubscriberMac"}} on {{hostname}}.
     status: current
     varbinds:
       - bCgnatSubscriberMac
@@ -1228,9 +1228,9 @@ traps:
       - bCgnatPortBlocksUsedHighThreshold
   - oid: 1.3.6.1.4.1.39406.2.1.9.0.2
     name: BENU-CGNAT-STATS-MIB::bCgnatPortBlocksUsedLowThresholdReached
-    category: diagnostic
-    severity: warning
-    description: CGNAT port blocks used by subscriber {bCgnatSubscriberMac} fell below low threshold {bCgnatPortBlocksUsedLowThreshold} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: CGNAT port block usage fell below low threshold for {{value "bCgnatSubscriberMac"}} on {{hostname}}.
     status: current
     varbinds:
       - bCgnatSubscriberMac
@@ -1238,9 +1238,9 @@ traps:
       - bCgnatPortBlocksUsedLowThreshold
   - oid: 1.3.6.1.4.1.39406.2.1.9.0.3
     name: BENU-CGNAT-STATS-MIB::bCgnatTunnelPortBlocksUsedHighThresholdReached
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: CGNAT tunnel {bCgnatThresholdTunnelId} port usage exceeded high threshold {bCgnatTunnelPortBlocksUsedHighThreshold} on {_HOSTNAME}.
+    description: CGNAT tunnel port block usage exceeded high threshold for tunnel {{value "bCgnatThresholdTunnelId"}} on {{hostname}}.
     status: current
     varbinds:
       - bCgnatThresholdTunnelId
@@ -1252,7 +1252,7 @@ traps:
     name: BENU-CGNAT-STATS-MIB::bCgnatTunnelPortBlocksUsedLowThresholdReached
     category: diagnostic
     severity: warning
-    description: CGNAT tunnel port usage for tunnel {bCgnatThresholdTunnelId} fell below low threshold {bCgnatTunnelPortBlocksUsedLowThreshold} on {_HOSTNAME}.
+    description: CGNAT tunnel port blocks usage fell below low threshold for tunnel {{value "bCgnatThresholdTunnelId"}} on {{hostname}}.
     status: current
     varbinds:
       - bCgnatThresholdTunnelId

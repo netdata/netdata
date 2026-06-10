@@ -392,7 +392,7 @@ traps:
     name: CADANT-CMTS-PROCESS-MIB::cardOverloadNotification
     category: diagnostic
     severity: warning
-    description: Card {cardNumber} overload status changed to {cadProcessOverloadStatus} on {_HOSTNAME}.
+    description: Card {{value "cardNumber"}} overload state changed to {{value "cadProcessOverloadStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -403,7 +403,7 @@ traps:
     name: CADANT-CMTS-PROCESS-MIB::sysOverloadNotification
     category: diagnostic
     severity: warning
-    description: System overload status changed to {cadProcessOverloadStatus.raw} on {_HOSTNAME}.
+    description: System overload state changed to {{value "cadProcessOverloadStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -411,9 +411,9 @@ traps:
       - cadProcessOverloadStatus
   - oid: 1.3.6.1.4.1.4998.1.1.6.1.1.0.1
     name: CADANT-CMTS-NOTIFICATION-MIB::aaaServerUnreachableTrap
-    category: auth
+    category: diagnostic
     severity: warning
-    description: AAA server unreachable, severity {trapSeverity.raw} on {_HOSTNAME}.
+    description: AAA server is unreachable on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -423,7 +423,7 @@ traps:
     name: CADANT-CMTS-NOTIFICATION-MIB::aaaServerGroupUnreachableTrap
     category: diagnostic
     severity: warning
-    description: AAA server group unreachable; all RADIUS/TACACS+ servers not responding on {_HOSTNAME}.
+    description: AAA server group unreachable on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -433,7 +433,7 @@ traps:
     name: CADANT-CMTS-NOTIFICATION-MIB::aaaServerAuthFailTrap
     category: auth
     severity: warning
-    description: AAA server rejected authentication request with {securityInfo} on {_HOSTNAME}.
+    description: 'AAA server rejected authentication request{{with value "securityInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapCounter
@@ -443,7 +443,7 @@ traps:
     name: CADANT-CMTS-NOTIFICATION-MIB::secuLocalAuthFailTrap
     category: auth
     severity: warning
-    description: Local password authentication failed with {securityInfo} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: 'Local password authentication failed{{with value "securityInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapCounter
@@ -453,7 +453,7 @@ traps:
     name: CADANT-CMTS-NOTIFICATION-MIB::secuLineAuthFailTrap
     category: auth
     severity: warning
-    description: Line password authentication failure {securityInfo} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: 'Line password authentication failed{{with value "securityInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapCounter
@@ -463,7 +463,7 @@ traps:
     name: CADANT-CMTS-NOTIFICATION-MIB::rip2AuthFailTrap
     category: auth
     severity: warning
-    description: RIP2 authentication failure reported by {securityInfo} on {_HOSTNAME}.
+    description: 'RIP2 authentication failure{{with value "securityInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapCounter
@@ -473,7 +473,7 @@ traps:
     name: CADANT-CMTS-NOTIFICATION-MIB::cadIpdrNoPrimaryCollector
     category: diagnostic
     severity: warning
-    description: IPDR streaming enabled but no primary collector connected with {ipdrInfo} on {_HOSTNAME}.
+    description: 'IPDR streaming enabled but no primary collector connected{{with value "ipdrInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapCounter
@@ -483,7 +483,7 @@ traps:
     name: CADANT-CMTS-NOTIFICATION-MIB::cadIpdrStreamingDisabled
     category: diagnostic
     severity: warning
-    description: IPDR Streaming function disabled on {_HOSTNAME}.
+    description: 'IPDR streaming function has been turned off{{with value "ipdrInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapCounter
@@ -493,7 +493,7 @@ traps:
     name: CADANT-CMTS-NOTIFICATION-MIB::cadIpdrReportCycleMissed
     category: diagnostic
     severity: warning
-    description: IPDR report cycle session missed due to {ipdrInfo} on {_HOSTNAME}.
+    description: 'IPDR report cycle missed{{with value "ipdrInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapCounter
@@ -503,7 +503,7 @@ traps:
     name: CADANT-CMTS-NOTIFICATION-MIB::cadLinkUp
     category: state_change
     severity: notice
-    description: Interface {ifDescr} link transitioned to operational state {ifOperStatus} on {_HOSTNAME}.
+    description: Link up detected on {{first (value "ifDescr") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -514,7 +514,7 @@ traps:
     name: CADANT-CMTS-EQUIPMENT-MIB::cardPrStateChange
     category: state_change
     severity: notice
-    description: Card {cardNumber} primary state changed to {cardPrState} on {_HOSTNAME}.
+    description: Card primary state changed to {{value "cardPrState"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -528,7 +528,7 @@ traps:
     name: CADANT-CMTS-EQUIPMENT-MIB::cardSecStateChange
     category: state_change
     severity: notice
-    description: Card {cardNumber} secondary state changed to {cardSecState} on {_HOSTNAME}.
+    description: Card secondary state changed to {{value "cardSecState"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -542,7 +542,7 @@ traps:
     name: CADANT-CMTS-EQUIPMENT-MIB::cardDetectedChange
     category: diagnostic
     severity: notice
-    description: New card {cardDetected} detected on shelf {shelfNumber} card {cardNumber} on {_HOSTNAME}.
+    description: New card {{value "cardDetected"}} detected on shelf {{value "shelfNumber"}} card {{value "cardNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -555,7 +555,7 @@ traps:
     name: CADANT-CMTS-EQUIPMENT-MIB::cardDplxStatusChange
     category: state_change
     severity: warning
-    description: Card {cardNumber} duplex status changed to {cardDplxStatus} on {_HOSTNAME}.
+    description: Card {{value "cardNumber"}} duplex status changed to {{value "cardDplxStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -568,8 +568,8 @@ traps:
   - oid: 1.3.6.1.4.1.4998.1.1.10.1.0.9
     name: CADANT-CMTS-EQUIPMENT-MIB::portPrStateChange
     category: state_change
-    severity: notice
-    description: Port {portNumber} primary state changed to {portPrState} on {_HOSTNAME}.
+    severity: warning
+    description: Port {{first (value "portDocsIfIndex") (value "portNumber")}} primary state changed to {{value "portPrState"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -584,8 +584,8 @@ traps:
   - oid: 1.3.6.1.4.1.4998.1.1.10.1.0.10
     name: CADANT-CMTS-EQUIPMENT-MIB::portSecStateChange
     category: state_change
-    severity: notice
-    description: Port secondary state {portSecState} changed on {_HOSTNAME}.
+    severity: warning
+    description: Port secondary state changed to {{value "portSecState"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -600,8 +600,8 @@ traps:
   - oid: 1.3.6.1.4.1.4998.1.1.10.1.0.11
     name: CADANT-CMTS-EQUIPMENT-MIB::portDplxStatusChange
     category: state_change
-    severity: notice
-    description: Port {portNumber} duplex status changed to {cardDplxStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Port duplex status changed to {{value "cardDplxStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -614,8 +614,8 @@ traps:
   - oid: 1.3.6.1.4.1.4998.1.1.10.1.0.13
     name: CADANT-CMTS-EQUIPMENT-MIB::cardTestResultNotification
     category: diagnostic
-    severity: notice
-    description: Card test {cardTestName} completed with result {cardTestResult} on {_HOSTNAME}.
+    severity: info
+    description: Card diagnostic test {{value "cardTestName"}} completed on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -631,7 +631,7 @@ traps:
     name: CADANT-CMTS-EQUIPMENT-MIB::cmResetClearNotification
     category: state_change
     severity: notice
-    description: Cable modem {cmMacAddress} on upstream channel {cmUChannelID} came online from previous flap on {_HOSTNAME}.
+    description: Cable modem {{value "cmMacAddress"}} came online on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -644,7 +644,7 @@ traps:
     name: CADANT-CMTS-EQUIPMENT-MIB::cmResetNotification
     category: state_change
     severity: notice
-    description: Cable modem {cmMacAddress} reset on {_HOSTNAME}.
+    description: Cable modem {{value "cmMacAddress"}} reset on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -663,7 +663,7 @@ traps:
     name: CADANT-CMTS-EQUIPMENT-MIB::diskVolumeUsageNotification
     category: diagnostic
     severity: warning
-    description: Disk volume {diskVolumeName} usage level {diskVolumeUsageLevel} exceeded threshold on {_HOSTNAME}.
+    description: Disk volume {{value "diskVolumeName"}} usage exceeded threshold at {{value "diskVolumeUsageLevel"}}% on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -678,7 +678,7 @@ traps:
     name: CADANT-CMTS-EQUIPMENT-MIB::diskVolumeAutoDeleteFileNotification
     category: diagnostic
     severity: warning
-    description: Disk file {diskVolumeFileName} auto-deleted due to volume usage threshold on {diskVolumeName} on {_HOSTNAME}.
+    description: Disk volume file {{value "diskVolumeFileName"}} auto-deleted due to critical usage on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -692,8 +692,8 @@ traps:
   - oid: 1.3.6.1.4.1.4998.1.1.10.1.0.19
     name: CADANT-CMTS-EQUIPMENT-MIB::cardTempOutOfRangeNotification
     category: diagnostic
-    severity: warning
-    description: Card {cardNumber} temperature is out of range with severity {trapSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: Card temperature out of range on card {{value "cardNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -703,7 +703,7 @@ traps:
     name: CADANT-CMTS-EQUIPMENT-MIB::cardTempNoReportNotification
     category: diagnostic
     severity: warning
-    description: Card temperature reporting missing on card {cardNumber} on {_HOSTNAME}.
+    description: No card temperature report received on card {{value "cardNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -712,8 +712,8 @@ traps:
   - oid: 1.3.6.1.4.1.4998.1.1.10.1.0.21
     name: CADANT-CMTS-EQUIPMENT-MIB::cardTempOverHeatNotification
     category: diagnostic
-    severity: crit
-    description: Card {cardNumber} overheat detected with severity {trapSeverity} on {_HOSTNAME}.
+    severity: alert
+    description: Card {{value "cardNumber"}} overheat and is shutting down on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -722,8 +722,8 @@ traps:
   - oid: 1.3.6.1.4.1.4998.1.1.10.1.0.22
     name: CADANT-CMTS-EQUIPMENT-MIB::downstreamPowerLoss
     category: diagnostic
-    severity: alert
-    description: Downstream power loss detected on card {cardNumber} port {portNumber} on {_HOSTNAME}.
+    severity: crit
+    description: Downstream power loss detected on port {{first (value "portNumber") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -734,7 +734,7 @@ traps:
     name: CADANT-CMTS-EQUIPMENT-MIB::cmRegistrationNotification
     category: state_change
     severity: notice
-    description: Cable modem {cmMacAddress} registered on upstream channel {cmUChannelID} on {_HOSTNAME}.
+    description: Cable modem {{value "cmMacAddress"}} registered on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -747,9 +747,9 @@ traps:
       - cmIpAddress
   - oid: 1.3.6.1.4.1.4998.1.1.100.1.0.1
     name: CADANT-CMTS-EXPORTIMPORT-MIB::cadCmtsExportNotification
-    category: config_change
-    severity: notice
-    description: Export operation {cadCmtsExportResult} completed with severity {trapSeverity} on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: CMTS export operation {{value "cadCmtsExportResult"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCounter
@@ -757,9 +757,9 @@ traps:
       - cadCmtsExportResult
   - oid: 1.3.6.1.4.1.4998.1.1.100.1.0.2
     name: CADANT-CMTS-EXPORTIMPORT-MIB::cadCmtsImportNotification
-    category: config_change
-    severity: notice
-    description: Import operation completed with result {cadCmtsImportResult} on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: CMTS import operation {{value "cadCmtsImportResult"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCounter

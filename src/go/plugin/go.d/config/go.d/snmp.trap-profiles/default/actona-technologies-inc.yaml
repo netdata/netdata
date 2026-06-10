@@ -22,8 +22,8 @@ traps:
   - oid: 1.3.6.1.4.1.17471.0.0
     name: ACTONA-ACTASTOR-MIB::acCsLogsTrap
     category: diagnostic
-    severity: notice
-    description: CoreServer log message {acLogMsgText} with severity {acLogSeverity} on {_HOSTNAME}.
+    severity: warning
+    description: CoreServer log message {{value "acLogMsgText"}} on {{hostname}}.
     status: current
     varbinds:
       - acLogSeverity
@@ -32,7 +32,7 @@ traps:
     name: ACTONA-ACTASTOR-MIB::acMgrLogsTrap
     category: diagnostic
     severity: warning
-    description: ActaStor log message {acLogMsgText} with severity {acLogSeverity} on {_HOSTNAME}.
+    description: Actastor log message {{value "acLogMsgText"}} with severity {{value "acLogSeverity"}} on {{hostname}}.
     status: current
     varbinds:
       - acLogSeverity
@@ -41,7 +41,7 @@ traps:
     name: ACTONA-ACTASTOR-MIB::acEsLogsTrap
     category: diagnostic
     severity: warning
-    description: EdgeServer log message {acLogMsgText} with severity {acLogSeverity} on {_HOSTNAME}.
+    description: 'EdgeServer log {{value "acLogSeverity"}}: {{value "acLogMsgText"}} on {{hostname}}.'
     status: current
     varbinds:
       - acLogSeverity
@@ -49,18 +49,18 @@ traps:
   - oid: 1.3.6.1.4.1.17471.1.2.2
     name: ACTONA-ACTASTOR-MIB::mgrLogsTrap
     category: diagnostic
-    severity: notice
-    description: ActaStor management log event received on {_HOSTNAME}.
+    severity: info
+    description: Management log event received from {{vendor}} on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.17471.1.3.3
     name: ACTONA-ACTASTOR-MIB::csLogsTrap
     category: diagnostic
-    severity: info
-    description: CoreServer log event {TRAP_NAME} received on {_HOSTNAME}.
+    severity: notice
+    description: CoreServer log trap received on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.17471.1.4.3
     name: ACTONA-ACTASTOR-MIB::esLogsTrap
     category: diagnostic
     severity: notice
-    description: ES log event received on {_HOSTNAME}.
+    description: EdgeServer log event received on {{hostname}}.
     status: deprecated

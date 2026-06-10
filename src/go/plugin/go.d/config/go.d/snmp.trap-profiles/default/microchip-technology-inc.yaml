@@ -114,7 +114,7 @@ traps:
     name: ServersCheck::sensorAlert
     category: diagnostic
     severity: warning
-    description: Sensor alert triggered with error message {sensor1TrapErrMsg} on {_HOSTNAME}.
+    description: 'Sensor alert triggered{{with value "sensor1TrapErrMsg"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - sensor1TrapErrMsg
@@ -127,7 +127,7 @@ traps:
     name: ServersCheck::iosensorAlert
     category: diagnostic
     severity: warning
-    description: Sensor alert triggered with error message on {_HOSTNAME}.
+    description: 'Sensor alert triggered{{with value "iosensorINPUT1trapErrMsg"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - iosensorINPUT1trapErrMsg
@@ -150,7 +150,7 @@ traps:
     name: CONTROLBOX-TH332-MIB::temperatureTrap
     category: diagnostic
     severity: warning
-    description: Temperature {temperature} state {temperatureState} for {deviceName} on {_HOSTNAME}.
+    description: Temperature {{value "temperatureState"}} on {{first (value "deviceName") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceName
@@ -160,7 +160,7 @@ traps:
     name: CONTROLBOX-TH332-MIB::humidityTrap
     category: diagnostic
     severity: warning
-    description: Humidity state {humidityState} reported as {humidity} for device {deviceName} on {_HOSTNAME}.
+    description: Humidity state {{value "humidityState"}} on {{first (value "deviceName") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceName
@@ -170,7 +170,7 @@ traps:
     name: CONTROLBOX-TH332-MIB::dewpointTrap
     category: diagnostic
     severity: warning
-    description: Dew point state {dewpointState} for device {deviceName} on {_HOSTNAME}.
+    description: Dew point state changed to {{value "dewpointState"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceName

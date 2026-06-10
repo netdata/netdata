@@ -37,7 +37,7 @@ traps:
     name: DIGIPDU-MIB::testTrap
     category: unknown
     severity: info
-    description: Received testTrap with argument {trapArg1} on {_HOSTNAME}.
+    description: Test trap received with argument {{value "trapArg1"}} on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -45,7 +45,7 @@ traps:
     name: DIGIPDU-MIB::inFeedOverloadTrap
     category: diagnostic
     severity: warning
-    description: Input feed overload detected with status {trapArg1} on {_HOSTNAME}.
+    description: Input feed overload detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -57,7 +57,7 @@ traps:
     name: DIGIPDU-MIB::inFeedHighCurrentTrap
     category: diagnostic
     severity: warning
-    description: Input feed load event with status {trapArg3} on {_HOSTNAME}.
+    description: Input feed high current detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -69,7 +69,7 @@ traps:
     name: DIGIPDU-MIB::inFeedLowCurrentTrap
     category: diagnostic
     severity: warning
-    description: Input feed load low current detected on {_HOSTNAME}.
+    description: Low current detected on input feed {{value "trapArg1"}} on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -81,7 +81,7 @@ traps:
     name: DIGIPDU-MIB::inFeedBranchOverloadTrap
     category: diagnostic
     severity: warning
-    description: Infeed overload detected with status {trapArg1} on {_HOSTNAME}.
+    description: Input feed overload detected on {{first (value "trapArg1") "feed"}} on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -93,7 +93,7 @@ traps:
     name: DIGIPDU-MIB::inFeedBranchHighCurrentTrap
     category: diagnostic
     severity: warning
-    description: Input feed load event with status {trapArg1} on {_HOSTNAME}.
+    description: High current detected on input feed {{value "trapArg1"}} branch {{value "trapArg2"}} on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -105,7 +105,7 @@ traps:
     name: DIGIPDU-MIB::inFeedBranchLowCurrentTrap
     category: diagnostic
     severity: warning
-    description: Input feed load event detected on {_HOSTNAME}.
+    description: Low current detected on input feed branch {{value "trapArg2"}} on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -117,7 +117,7 @@ traps:
     name: DIGIPDU-MIB::outWebOperationTrap
     category: state_change
     severity: notice
-    description: Outlet state changed to {trapArg1} on {_HOSTNAME}.
+    description: Outlet state changed on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -127,7 +127,7 @@ traps:
     name: DIGIPDU-MIB::outPanelOperationTrap
     category: state_change
     severity: notice
-    description: Outlet state changed on {_HOSTNAME}.
+    description: Outlet power state changed on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -137,7 +137,7 @@ traps:
     name: DIGIPDU-MIB::outAPIOperationTrap
     category: state_change
     severity: notice
-    description: Outlet state changed via {trapArg1} on {_HOSTNAME}.
+    description: Outlet state changed on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -147,7 +147,7 @@ traps:
     name: DIGIPDU-MIB::outScheduleTrap
     category: state_change
     severity: notice
-    description: Outlet state changed on {_HOSTNAME}.
+    description: Outlet power state changed on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -163,7 +163,7 @@ traps:
     name: DIGIPDU-MIB::outScheduleErrorTrap
     category: state_change
     severity: notice
-    description: Outlet state changed on {_HOSTNAME}.
+    description: Outlet power state changed on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -177,7 +177,7 @@ traps:
     name: DIGIPDU-MIB::outPingTrap
     category: state_change
     severity: notice
-    description: Outlet state changed on {_HOSTNAME}.
+    description: Outlet state changed on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -188,7 +188,7 @@ traps:
     name: DIGIPDU-MIB::outPingRebootTrap
     category: state_change
     severity: notice
-    description: Outlet state changed on {_HOSTNAME}.
+    description: Outlet power state changed on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -199,7 +199,7 @@ traps:
     name: DIGIPDU-MIB::outOverloadTrap
     category: diagnostic
     severity: warning
-    description: Outlet overload detected with status {trapArg3} on {_HOSTNAME}.
+    description: Outlet overload detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -211,7 +211,7 @@ traps:
     name: DIGIPDU-MIB::outHighCurrentTrap
     category: diagnostic
     severity: warning
-    description: Outlet load event with status {trapArg1} and current {trapArg2} on {_HOSTNAME}.
+    description: High current detected on outlet {{value "trapArg1"}} on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -223,7 +223,7 @@ traps:
     name: DIGIPDU-MIB::outLowCurrentTrap
     category: diagnostic
     severity: warning
-    description: Outlet load low current detected with status {trapArg3} on {_HOSTNAME}.
+    description: Low current detected on outlet {{value "trapArg1"}} on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -235,7 +235,7 @@ traps:
     name: DIGIPDU-MIB::outConditionCtrlTrap
     category: diagnostic
     severity: warning
-    description: Outlet load event {trapArg1} on {_HOSTNAME}.
+    description: Outlet load event detected on {{value "trapArg1"}} on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -247,7 +247,7 @@ traps:
     name: DIGIPDU-MIB::outUPSACFaultOffTrap
     category: diagnostic
     severity: warning
-    description: Outlet load error detected with status {trapArg1} on {_HOSTNAME}.
+    description: Outlet load fault detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -256,7 +256,7 @@ traps:
     name: DIGIPDU-MIB::outUPSBatteryLevelOffTrap
     category: diagnostic
     severity: warning
-    description: Outlet load error detected with status {trapArg1} on {_HOSTNAME}.
+    description: UPS battery level off detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -265,16 +265,16 @@ traps:
     name: DIGIPDU-MIB::outUPSBatteryLowOffTrap
     category: diagnostic
     severity: warning
-    description: Outlet load error detected with status {trapArg1} and value {trapArg2} on {_HOSTNAME}.
+    description: UPS battery low condition detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
       - trapArg2
   - oid: 1.3.6.1.4.1.10456.3.100.1.314
     name: DIGIPDU-MIB::outUPSACRecoveryOnTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Outlet load event {trapArg1} recovered to normal state on {_HOSTNAME}.
+    description: UPS outlet load event recovered to normal state on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -283,16 +283,16 @@ traps:
     name: DIGIPDU-MIB::outUPSBatteryLevelOnTrap
     category: diagnostic
     severity: warning
-    description: Outlet load event detected with status {trapArg1} on {_HOSTNAME}.
+    description: UPS battery level event detected with status {{value "trapArg1"}} on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
       - trapArg2
   - oid: 1.3.6.1.4.1.10456.3.100.1.316
     name: DIGIPDU-MIB::outUPSBatteryLowRecoveryOnTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Outlet load recovered from error state with {trapArg1} and {trapArg2} on {_HOSTNAME}.
+    description: UPS battery low condition recovered on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -301,7 +301,7 @@ traps:
     name: DIGIPDU-MIB::pduConnectTrap
     category: diagnostic
     severity: warning
-    description: PDU input feed load error detected with status {trapArg1} on {_HOSTNAME}.
+    description: PDU input feed load error detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -309,8 +309,8 @@ traps:
   - oid: 1.3.6.1.4.1.10456.3.100.1.402
     name: DIGIPDU-MIB::pduOverloadTrap
     category: diagnostic
-    severity: warning
-    description: PDU overload event detected with status {trapArg1} on {_HOSTNAME}.
+    severity: alert
+    description: PDU overload detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -322,7 +322,7 @@ traps:
     name: DIGIPDU-MIB::pduHighCurrentTrap
     category: diagnostic
     severity: warning
-    description: PDU input feed load warning detected with status {trapArg1} on {_HOSTNAME}.
+    description: PDU high current warning detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -334,7 +334,7 @@ traps:
     name: DIGIPDU-MIB::pduLowCurrentTrap
     category: diagnostic
     severity: warning
-    description: PDU current load warning triggered with status {trapArg1} on {_HOSTNAME}.
+    description: PDU input feed load error detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -345,8 +345,8 @@ traps:
   - oid: 1.3.6.1.4.1.10456.3.100.1.405
     name: DIGIPDU-MIB::pduBranchOverloadTrap
     category: diagnostic
-    severity: warning
-    description: PDU overload event detected with status {trapArg1} on {_HOSTNAME}.
+    severity: alert
+    description: PDU branch overload detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -358,7 +358,7 @@ traps:
     name: DIGIPDU-MIB::pduBranchHighCurrentTrap
     category: diagnostic
     severity: warning
-    description: PDU input feed load error detected with status {trapArg1} on {_HOSTNAME}.
+    description: PDU high current warning on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -370,7 +370,7 @@ traps:
     name: DIGIPDU-MIB::pduBranchLowCurrentTrap
     category: diagnostic
     severity: warning
-    description: PDU input feed load low current detected on {_HOSTNAME}.
+    description: PDU branch low current threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -382,7 +382,7 @@ traps:
     name: DIGIPDU-MIB::inbuiltTemperatureHighTrap
     category: diagnostic
     severity: warning
-    description: Input feed temperature {trapArg3} exceeded warning threshold on {_HOSTNAME}.
+    description: Temperature high alert on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -393,7 +393,7 @@ traps:
     name: DIGIPDU-MIB::inbuiltTemperatureLowTrap
     category: diagnostic
     severity: warning
-    description: Low input temperature detected with status {trapArg1} and value {trapArg2} on {_HOSTNAME}.
+    description: Input feed temperature low warning detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -404,7 +404,7 @@ traps:
     name: DIGIPDU-MIB::envConnectTrap
     category: diagnostic
     severity: warning
-    description: Input feed load error detected with status {trapArg1} on {_HOSTNAME}.
+    description: Environmental input feed load error detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -414,7 +414,7 @@ traps:
     name: DIGIPDU-MIB::envTemperatureConnectTrap
     category: diagnostic
     severity: warning
-    description: Environmental input feed load error detected on {_HOSTNAME}.
+    description: Environmental input feed load error detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -424,7 +424,7 @@ traps:
     name: DIGIPDU-MIB::envTemperatureHighTrap
     category: diagnostic
     severity: warning
-    description: High temperature detected on {_HOSTNAME}.
+    description: Environmental temperature high on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -437,7 +437,7 @@ traps:
     name: DIGIPDU-MIB::envTemperatureLowTrap
     category: diagnostic
     severity: warning
-    description: Low temperature warning detected on {_HOSTNAME}.
+    description: Low environmental temperature detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -450,7 +450,7 @@ traps:
     name: DIGIPDU-MIB::envRHConnectTrap
     category: diagnostic
     severity: warning
-    description: Input feed load error detected with status {trapArg3} on {_HOSTNAME}.
+    description: Environmental sensor load error detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -462,7 +462,7 @@ traps:
     name: DIGIPDU-MIB::envRHHighTrap
     category: diagnostic
     severity: warning
-    description: Environmental high humidity threshold exceeded on {_HOSTNAME}.
+    description: Environmental high humidity threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -474,7 +474,7 @@ traps:
     name: DIGIPDU-MIB::envRHLowTrap
     category: diagnostic
     severity: warning
-    description: Environmental sensor reported low input feed load on {_HOSTNAME}.
+    description: Environmental sensor {{value "trapArg1"}} reports low reading on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -486,7 +486,7 @@ traps:
     name: DIGIPDU-MIB::inputTimeOutTrap
     category: diagnostic
     severity: warning
-    description: Input feed load error detected with status {trapArg1} on {_HOSTNAME}.
+    description: Input feed load error detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -497,7 +497,7 @@ traps:
     name: DIGIPDU-MIB::inputTrap
     category: diagnostic
     severity: warning
-    description: Input feed load error detected with status {trapArg1} on {_HOSTNAME}.
+    description: Input feed load error detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -508,7 +508,7 @@ traps:
     name: DIGIPDU-MIB::upsConnectTrap
     category: diagnostic
     severity: warning
-    description: UPS input feed load error detected with status {trapArg1} on {_HOSTNAME}.
+    description: UPS input feed load error detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -517,7 +517,7 @@ traps:
     name: DIGIPDU-MIB::upsOnBatteryTrap
     category: diagnostic
     severity: warning
-    description: UPS input feed load error detected with status {trapArg1} on {_HOSTNAME}.
+    description: UPS on battery with input feed load error {{value "trapArg1"}} on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -526,7 +526,7 @@ traps:
     name: DIGIPDU-MIB::upsOverloadTrap
     category: diagnostic
     severity: warning
-    description: UPS overload detected with status {trapArg1} on {_HOSTNAME}.
+    description: UPS overload detected on input feed on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -535,7 +535,7 @@ traps:
     name: DIGIPDU-MIB::upsBatteryLowTrap
     category: diagnostic
     severity: warning
-    description: UPS battery low status reported with arguments {trapArg1} and {trapArg2} on {_HOSTNAME}.
+    description: UPS battery low condition detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -544,7 +544,7 @@ traps:
     name: DIGIPDU-MIB::upsBatteryReplace
     category: diagnostic
     severity: warning
-    description: UPS battery replacement required with status {trapArg1} on {_HOSTNAME}.
+    description: UPS battery replacement required on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -553,7 +553,7 @@ traps:
     name: DIGIPDU-MIB::daisyChainConnectTrap
     category: diagnostic
     severity: warning
-    description: Daisy chain input feed load error detected with status {trapArg1} on {_HOSTNAME}.
+    description: Daisy chain load status error detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -562,7 +562,7 @@ traps:
     name: DIGIPDU-MIB::micDetectOccurTrap
     category: diagnostic
     severity: warning
-    description: Input feed load event {trapArg1} on {_HOSTNAME}.
+    description: Power feed load error detected on {{hostname}}.
     status: current
     varbinds:
       - trapArg1
@@ -571,7 +571,7 @@ traps:
     name: DIGIPDU-MIB::vibrationDetectOccurTrap
     category: diagnostic
     severity: warning
-    description: Vibration detected with load status {trapArg1} on {_HOSTNAME}.
+    description: Vibration detection occurred with status {{value "trapArg1"}} on {{hostname}}.
     status: current
     varbinds:
       - trapArg1

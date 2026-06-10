@@ -27,7 +27,7 @@ traps:
     name: MYSTRO-VIDEOPORT-MIB::addService
     category: state_change
     severity: notice
-    description: New service {serviceID} with definition {definition} started on {_HOSTNAME}.
+    description: New video service {{value "serviceID"}} started on {{hostname}}.
     status: current
     varbinds:
       - serviceID
@@ -36,8 +36,8 @@ traps:
   - oid: 1.3.6.1.4.1.14373.2.1.500.2
     name: MYSTRO-VIDEOPORT-MIB::removeService
     category: state_change
-    severity: notice
-    description: Service {serviceID} with definition {definition} is no longer providing service on {_HOSTNAME}.
+    severity: warning
+    description: Video service {{value "serviceID"}} stopped providing service on {{hostname}}.
     status: current
     varbinds:
       - serviceID
@@ -45,9 +45,9 @@ traps:
       - transportType
   - oid: 1.3.6.1.4.1.14373.2.1.500.3
     name: MYSTRO-VIDEOPORT-MIB::updateService
-    category: state_change
+    category: config_change
     severity: notice
-    description: Service {serviceID} changed state on {_HOSTNAME}.
+    description: Service {{value "serviceID"}} changed on {{hostname}}.
     status: current
     varbinds:
       - serviceID

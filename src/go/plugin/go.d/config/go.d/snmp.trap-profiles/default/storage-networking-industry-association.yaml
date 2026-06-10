@@ -186,7 +186,7 @@ traps:
     name: SNIA-SML-MIB::driveAlert
     category: diagnostic
     severity: warning
-    description: Drive alert {trapDriveAlertSummary} with severity {trapPerceivedSeverity} on {_HOSTNAME}.
+    description: Drive alert {{value "trapDriveAlertSummary"}} on {{hostname}}.
     status: current
     varbinds:
       - trapDriveAlertSummary
@@ -196,7 +196,7 @@ traps:
     name: SNIA-SML-MIB::changerAlert
     category: diagnostic
     severity: warning
-    description: Changer device {trap-Association-ChangerDeviceIndex} alert {trapChangerAlertSummary} with severity {trapPerceivedSeverity} on {_HOSTNAME}.
+    description: Changer device alert {{value "trapChangerAlertSummary"}} on {{hostname}}.
     status: current
     varbinds:
       - trapChangerAlertSummary
@@ -204,9 +204,9 @@ traps:
       - trapPerceivedSeverity
   - oid: 1.3.6.1.4.1.14851.3.1.16.0.3
     name: SNIA-SML-MIB::libraryAddedTrap
-    category: config_change
+    category: state_change
     severity: notice
-    description: Storage library {storageLibrary-Name} added to the SMI-S agent on {_HOSTNAME}.
+    description: Storage library {{value "storageLibrary-Name"}} added on {{hostname}}.
     status: current
     varbinds:
       - storageLibrary-Name
@@ -214,7 +214,7 @@ traps:
     name: SNIA-SML-MIB::libraryDeletedTrap
     category: config_change
     severity: notice
-    description: Storage library {storageLibrary-Name} deleted on {_HOSTNAME}.
+    description: Storage library {{value "storageLibrary-Name"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - storageLibrary-Name
@@ -222,7 +222,7 @@ traps:
     name: SNIA-SML-MIB::libraryOpStatusChangedTrap
     category: state_change
     severity: notice
-    description: Library {storageLibrary-Name} operational status changed from {oldOperationalStatus} to {currentOperationalStatus} on {_HOSTNAME}.
+    description: Storage library {{value "storageLibrary-Name"}} operational status changed to {{value "currentOperationalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - storageLibrary-Name
@@ -230,9 +230,9 @@ traps:
       - oldOperationalStatus
   - oid: 1.3.6.1.4.1.14851.3.1.16.0.6
     name: SNIA-SML-MIB::driveAddedTrap
-    category: config_change
+    category: state_change
     severity: notice
-    description: Media access device {mediaAccessDevice-DeviceID} added to library {storageLibrary-Name} on {_HOSTNAME}.
+    description: Media access device {{value "mediaAccessDevice-DeviceID"}} added to library {{value "storageLibrary-Name"}} on {{hostname}}.
     status: current
     varbinds:
       - storageLibrary-Name
@@ -241,7 +241,7 @@ traps:
     name: SNIA-SML-MIB::driveDeletedTrap
     category: state_change
     severity: notice
-    description: Media access device {mediaAccessDevice-DeviceID} deleted from library {storageLibrary-Name} on {_HOSTNAME}.
+    description: Media access device {{value "mediaAccessDevice-DeviceID"}} deleted from library {{value "storageLibrary-Name"}} on {{hostname}}.
     status: current
     varbinds:
       - storageLibrary-Name
@@ -250,7 +250,7 @@ traps:
     name: SNIA-SML-MIB::driveOpStatusChangedTrap
     category: state_change
     severity: notice
-    description: Drive {mediaAccessDevice-DeviceID} operational status changed from {oldOperationalStatus} to {currentOperationalStatus} on {_HOSTNAME}.
+    description: Drive operational status changed to {{value "currentOperationalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - storageLibrary-Name
@@ -261,16 +261,16 @@ traps:
     name: SNIA-SML-MIB::changerAddedTrap
     category: state_change
     severity: notice
-    description: Changer device {changerDevice-DeviceID} added to library {storageLibrary-Name} on {_HOSTNAME}.
+    description: Changer device {{value "changerDevice-DeviceID"}} added to library {{value "storageLibrary-Name"}} on {{hostname}}.
     status: current
     varbinds:
       - storageLibrary-Name
       - changerDevice-DeviceID
   - oid: 1.3.6.1.4.1.14851.3.1.16.0.10
     name: SNIA-SML-MIB::changerDeletedTrap
-    category: config_change
+    category: state_change
     severity: notice
-    description: Changer device {changerDevice-DeviceID} deleted from library {storageLibrary-Name} on {_HOSTNAME}.
+    description: Changer device {{value "changerDevice-DeviceID"}} deleted from library {{value "storageLibrary-Name"}} on {{hostname}}.
     status: current
     varbinds:
       - storageLibrary-Name
@@ -279,7 +279,7 @@ traps:
     name: SNIA-SML-MIB::changerOpStatusChangedTrap
     category: state_change
     severity: notice
-    description: Changer operational status changed from {oldOperationalStatus} to {currentOperationalStatus} on {_HOSTNAME}.
+    description: Changer operational status changed to {{value "currentOperationalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - storageLibrary-Name
@@ -290,7 +290,7 @@ traps:
     name: SNIA-SML-MIB::physicalMediaAddedTrap
     category: state_change
     severity: notice
-    description: Physical media added at {storageMediaLocation-PhysicalMedia-Tag} on {_HOSTNAME}.
+    description: Physical media added to library{{with value "storageMediaLocation-PhysicalMedia-Tag"}} tagged {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - storageMediaLocation-PhysicalMedia-Tag
@@ -298,7 +298,7 @@ traps:
     name: SNIA-SML-MIB::physicalMediaDeletedTrap
     category: state_change
     severity: notice
-    description: Physical media deleted from library at {storageMediaLocation-PhysicalMedia-Tag} on {_HOSTNAME}.
+    description: Physical media deleted{{with value "storageMediaLocation-PhysicalMedia-Tag"}} tag {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - storageMediaLocation-PhysicalMedia-Tag

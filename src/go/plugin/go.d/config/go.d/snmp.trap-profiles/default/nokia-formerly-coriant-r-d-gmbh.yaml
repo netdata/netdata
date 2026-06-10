@@ -6789,7 +6789,7 @@ traps:
     name: CORIANT-GROOVE-MIB::alarmNotification
     category: diagnostic
     severity: warning
-    description: Alarm {notificationConditionDescription} on {notificationFmEntity} with severity {notificationSeverityLevel} on {_HOSTNAME}.
+    description: Alarm {{value "notificationConditionDescription"}} on {{value "notificationFmEntity"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationFmEntity
@@ -6809,7 +6809,7 @@ traps:
     name: CORIANT-GROOVE-MIB::notAlarmedEventNotification
     category: diagnostic
     severity: warning
-    description: Alarm condition {notificationConditionDescription} with severity {notificationSeverityLevel} on {_HOSTNAME}.
+    description: Fault condition {{value "notificationConditionDescription"}} cleared on {{hostname}}.
     status: current
     varbinds:
       - notificationFmEntity
@@ -6829,7 +6829,7 @@ traps:
     name: TNMS-NBI-MIB::enmsProxyStateChangeTrap
     category: state_change
     severity: notice
-    description: Proxy {enmsProxyName} operational state changed to {enmsProxyOpState} on {_HOSTNAME}.
+    description: Proxy {{value "enmsProxyName"}} state changed to {{value "enmsProxyOpState"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -6840,7 +6840,7 @@ traps:
     name: TNMS-NBI-MIB::enmsNEObjectCreationTrap
     category: config_change
     severity: notice
-    description: NE object created with name {enmsNeName} on {_HOSTNAME}.
+    description: NE object created{{with value "enmsNeName"}} as {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -6852,9 +6852,9 @@ traps:
       - enmsNeUserText
   - oid: 1.3.6.1.4.1.42229.6.22.5.3.2.2
     name: TNMS-NBI-MIB::enmsNEObjectDeletionTrap
-    category: state_change
+    category: config_change
     severity: notice
-    description: Network element {enmsNeName} deleted on {_HOSTNAME}.
+    description: Network element {{value "enmsNeName"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -6868,7 +6868,7 @@ traps:
     name: TNMS-NBI-MIB::enmsNEStateChangeTrap
     category: state_change
     severity: notice
-    description: NE {enmsNeName} state changed from {enmsTrapStateOldValue} to {enmsTrapStateNewValue} on {_HOSTNAME}.
+    description: Network element {{value "enmsNeName"}} state changed to {{value "enmsTrapStateNewValue"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -6887,7 +6887,7 @@ traps:
     name: TNMS-NBI-MIB::enmsNEAttributeChangeTrap
     category: config_change
     severity: notice
-    description: NE attribute {enmsTrapAttributeName} changed from {enmsTrapAttributeOldValue} to {enmsTrapAttributeNewValue} on {_HOSTNAME}.
+    description: NE attribute {{value "enmsTrapAttributeName"}} changed from {{value "enmsTrapAttributeOldValue"}} to {{value "enmsTrapAttributeNewValue"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -6906,7 +6906,7 @@ traps:
     name: TNMS-NBI-MIB::enmsNEAlarmTrap
     category: diagnostic
     severity: warning
-    description: NE alarm {enmsTrapEventProbableCauseString} with severity {enmsTrapEventSeverity} on {_HOSTNAME}.
+    description: NE alarm event {{value "enmsTrapEventDetails"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -6931,7 +6931,7 @@ traps:
     name: TNMS-NBI-MIB::enmsModuleObjectCreationTrap
     category: config_change
     severity: notice
-    description: Module {enmsMoModuleId} created on {_HOSTNAME}.
+    description: Module {{value "enmsMoModuleId"}} created on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -6942,7 +6942,7 @@ traps:
     name: TNMS-NBI-MIB::enmsModuleObjectDeletionTrap
     category: config_change
     severity: notice
-    description: Module {enmsMoModuleId} deleted on {_HOSTNAME}.
+    description: Module {{value "enmsMoModuleId"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -6953,7 +6953,7 @@ traps:
     name: TNMS-NBI-MIB::enmsModuleStateChangeTrap
     category: state_change
     severity: notice
-    description: Module {enmsMoModuleId} state changed from {enmsTrapStateOldValue} to {enmsTrapStateNewValue} on {_HOSTNAME}.
+    description: Module state changed from {{value "enmsTrapStateOldValue"}} to {{value "enmsTrapStateNewValue"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -6969,7 +6969,7 @@ traps:
     name: TNMS-NBI-MIB::enmsModuleAttributeChangeTrap
     category: config_change
     severity: notice
-    description: Module {enmsMoModuleId} attribute {enmsTrapAttributeName} changed from {enmsTrapAttributeOldValue} to {enmsTrapAttributeNewValue} on {_HOSTNAME}.
+    description: Module attribute {{value "enmsTrapAttributeName"}} changed from {{value "enmsTrapAttributeOldValue"}} to {{value "enmsTrapAttributeNewValue"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -6985,7 +6985,7 @@ traps:
     name: TNMS-NBI-MIB::enmsModuleAlarmTrap
     category: diagnostic
     severity: warning
-    description: Module alarm {enmsMoModuleId} reported {enmsTrapEventProbableCauseString} on {_HOSTNAME}.
+    description: Module alarm {{value "enmsTrapEventDetails"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7011,7 +7011,7 @@ traps:
     name: TNMS-NBI-MIB::enmsPortObjectCreationTrap
     category: config_change
     severity: notice
-    description: Port {enmsPtName} created on {_HOSTNAME}.
+    description: Port {{value "enmsPtName"}} created on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7023,7 +7023,7 @@ traps:
     name: TNMS-NBI-MIB::enmsPortObjectDeletionTrap
     category: state_change
     severity: notice
-    description: Port {enmsPtName} deleted on {_HOSTNAME}.
+    description: Port {{value "enmsPtName"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7035,7 +7035,7 @@ traps:
     name: TNMS-NBI-MIB::enmsPortStateChangeTrap
     category: state_change
     severity: notice
-    description: Port {enmsPtName} state changed from {enmsTrapStateOldValue} to {enmsTrapStateNewValue} on {_HOSTNAME}.
+    description: Port {{value "enmsPtName"}} state changed to {{value "enmsTrapStateNewValue"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7050,9 +7050,9 @@ traps:
       - enmsTrapStateNewValue
   - oid: 1.3.6.1.4.1.42229.6.22.5.3.4.4
     name: TNMS-NBI-MIB::enmsPortAttributeChangeTrap
-    category: config_change
+    category: state_change
     severity: notice
-    description: Port {enmsPtName} attribute {enmsTrapAttributeName} changed from {enmsTrapAttributeOldValue} to {enmsTrapAttributeNewValue} on {_HOSTNAME}.
+    description: Port {{first (value "enmsPtName") "port"}} attribute {{value "enmsTrapAttributeName"}} changed on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7069,7 +7069,7 @@ traps:
     name: TNMS-NBI-MIB::enmsPortAlarmTrap
     category: diagnostic
     severity: warning
-    description: Port alarm {enmsAlEntityString} with severity {enmsTrapEventSeverity} on {_HOSTNAME}.
+    description: Port alarm {{value "enmsTrapEventDetails"}} on {{first (value "enmsAlEntityString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7095,7 +7095,7 @@ traps:
     name: TNMS-NBI-MIB::enmsTPObjectCreationTrap
     category: config_change
     severity: notice
-    description: TP {enmsTpName} created on {_HOSTNAME}.
+    description: TP {{value "enmsTpName"}} created on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7110,7 +7110,7 @@ traps:
     name: TNMS-NBI-MIB::enmsTPObjectDeletionTrap
     category: config_change
     severity: notice
-    description: TP {enmsTpName} deleted on {_HOSTNAME}.
+    description: TP {{value "enmsTpName"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7125,7 +7125,7 @@ traps:
     name: TNMS-NBI-MIB::enmsTPStateChangeTrap
     category: state_change
     severity: notice
-    description: TP {enmsTpName} state changed from {enmsTrapStateOldValue} to {enmsTrapStateNewValue} on {_HOSTNAME}.
+    description: TP state changed to {{value "enmsTrapStateNewValue"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7145,7 +7145,7 @@ traps:
     name: TNMS-NBI-MIB::enmsTPAttributeChangeTrap
     category: config_change
     severity: notice
-    description: TP attribute {enmsTrapAttributeName} changed from {enmsTrapAttributeOldValue} to {enmsTrapAttributeNewValue} on {_HOSTNAME}.
+    description: TP attribute {{value "enmsTrapAttributeName"}} changed on {{value "enmsTpName"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7165,7 +7165,7 @@ traps:
     name: TNMS-NBI-MIB::enmsTPAlarmTrap
     category: diagnostic
     severity: warning
-    description: TP alarm {enmsTrapEventProbableCauseString} with severity {enmsTrapEventSeverity} on {_HOSTNAME}.
+    description: 'TP alarm received{{with value "enmsTrapEventDetails"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7193,7 +7193,7 @@ traps:
     name: TNMS-NBI-MIB::enmsPortConnObjectCreationTrap
     category: state_change
     severity: notice
-    description: Port connection {enmsPcName} created on {_HOSTNAME}.
+    description: Port connection {{value "enmsPcName"}} created on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7202,9 +7202,9 @@ traps:
       - enmsTrapEventDetails
   - oid: 1.3.6.1.4.1.42229.6.22.5.3.6.2
     name: TNMS-NBI-MIB::enmsPortConnObjectDeletionTrap
-    category: state_change
+    category: config_change
     severity: notice
-    description: Port connection {enmsPcName} deleted on {_HOSTNAME}.
+    description: Port connection {{value "enmsPcName"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7213,9 +7213,9 @@ traps:
       - enmsTrapEventDetails
   - oid: 1.3.6.1.4.1.42229.6.22.5.3.6.3
     name: TNMS-NBI-MIB::enmsPortConnAttributeChangeTrap
-    category: state_change
+    category: config_change
     severity: notice
-    description: Port connection {enmsPcName} attribute {enmsTrapAttributeName} changed from {enmsTrapAttributeOldValue} to {enmsTrapAttributeNewValue} on {_HOSTNAME}.
+    description: Port connection {{value "enmsPcName"}} attribute {{value "enmsTrapAttributeName"}} changed on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7229,9 +7229,9 @@ traps:
       - enmsTrapAttributeNewValue
   - oid: 1.3.6.1.4.1.42229.6.22.5.3.7.1
     name: TNMS-NBI-MIB::enmsSNCObjectCreationTrap
-    category: state_change
+    category: config_change
     severity: notice
-    description: SNC {enmsScName} created on {_HOSTNAME}.
+    description: SNC {{value "enmsScName"}} created on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7242,7 +7242,7 @@ traps:
     name: TNMS-NBI-MIB::enmsSNCObjectDeletionTrap
     category: state_change
     severity: notice
-    description: SNC {enmsScName} deleted on {_HOSTNAME}.
+    description: SNC {{value "enmsScName"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7253,7 +7253,7 @@ traps:
     name: TNMS-NBI-MIB::enmsSNCStateChangeTrap
     category: state_change
     severity: notice
-    description: SNC {enmsScName} state changed from {enmsTrapStateOldValue} to {enmsTrapStateNewValue} on {_HOSTNAME}.
+    description: SNC {{value "enmsScName"}} state changed to {{value "enmsTrapStateNewValue"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7267,9 +7267,9 @@ traps:
       - enmsTrapStateNewValue
   - oid: 1.3.6.1.4.1.42229.6.22.5.3.7.4
     name: TNMS-NBI-MIB::enmsSNCAttributeChangeTrap
-    category: state_change
+    category: config_change
     severity: notice
-    description: SNC {enmsScName} attribute {enmsTrapAttributeName} changed from {enmsTrapAttributeOldValue} to {enmsTrapAttributeNewValue} on {_HOSTNAME}.
+    description: SNC {{value "enmsScName"}} attribute {{value "enmsTrapAttributeName"}} changed from {{value "enmsTrapAttributeOldValue"}} to {{value "enmsTrapAttributeNewValue"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7285,7 +7285,7 @@ traps:
     name: TNMS-NBI-MIB::enmsSNCTPRelationshipChangeTrap
     category: state_change
     severity: notice
-    description: SNC {enmsScName} relationship changed with details {enmsTrapEventDetails} on {_HOSTNAME}.
+    description: SNCP relationship changed {{value "enmsTrapEventDetails"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7296,7 +7296,7 @@ traps:
     name: TNMS-NBI-MIB::enmsSubscriberObjectCreationTrap
     category: state_change
     severity: notice
-    description: Subscriber {enmsSbName} created on {_HOSTNAME}.
+    description: Subscriber {{first (value "enmsSbName") (value "enmsSbSubscriberId")}} created on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7307,7 +7307,7 @@ traps:
     name: TNMS-NBI-MIB::enmsSubscriberObjectDeletionTrap
     category: state_change
     severity: notice
-    description: Subscriber {enmsSbName} ({enmsSbSubscriberId}) deleted on {_HOSTNAME}.
+    description: Subscriber {{value "enmsSbName"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7316,9 +7316,9 @@ traps:
       - enmsTrapEventDetails
   - oid: 1.3.6.1.4.1.42229.6.22.5.3.8.3
     name: TNMS-NBI-MIB::enmsSubscriberAttributeChangeTrap
-    category: config_change
+    category: state_change
     severity: notice
-    description: Subscriber {enmsSbName} attribute {enmsTrapAttributeName} changed from {enmsTrapAttributeOldValue} to {enmsTrapAttributeNewValue} on {_HOSTNAME}.
+    description: Subscriber {{value "enmsSbName"}} attribute {{value "enmsTrapAttributeName"}} changed from {{value "enmsTrapAttributeOldValue"}} to {{value "enmsTrapAttributeNewValue"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7332,9 +7332,9 @@ traps:
       - enmsTrapAttributeNewValue
   - oid: 1.3.6.1.4.1.42229.6.22.5.3.9.1
     name: TNMS-NBI-MIB::enmsServiceObjectCreationTrap
-    category: state_change
+    category: config_change
     severity: notice
-    description: Service {enmsSvLabel} created on {_HOSTNAME}.
+    description: Service {{value "enmsSvLabel"}} created on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7343,9 +7343,9 @@ traps:
       - enmsTrapEventDetails
   - oid: 1.3.6.1.4.1.42229.6.22.5.3.9.2
     name: TNMS-NBI-MIB::enmsServiceObjectDeletionTrap
-    category: config_change
+    category: state_change
     severity: notice
-    description: Service {enmsSvLabel} ({enmsSvServiceId}) deleted on {_HOSTNAME}.
+    description: Service {{value "enmsSvLabel"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7355,8 +7355,8 @@ traps:
   - oid: 1.3.6.1.4.1.42229.6.22.5.3.9.3
     name: TNMS-NBI-MIB::enmsServiceStateChangeTrap
     category: state_change
-    severity: notice
-    description: Service {enmsSvLabel} state changed from {enmsTrapStateOldValue} to {enmsTrapStateNewValue} on {_HOSTNAME}.
+    severity: warning
+    description: Service {{value "enmsSvLabel"}} state changed from {{value "enmsTrapStateOldValue"}} to {{value "enmsTrapStateNewValue"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7372,7 +7372,7 @@ traps:
     name: TNMS-NBI-MIB::enmsServiceAttributeChangeTrap
     category: config_change
     severity: notice
-    description: Service {enmsSvServiceId} attribute {enmsTrapAttributeName} changed from {enmsTrapAttributeOldValue} to {enmsTrapAttributeNewValue} on {_HOSTNAME}.
+    description: Service attribute {{value "enmsTrapAttributeName"}} changed from {{value "enmsTrapAttributeOldValue"}} to {{value "enmsTrapAttributeNewValue"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7388,7 +7388,7 @@ traps:
     name: TNMS-NBI-MIB::enmsEMSAlarmTrap
     category: diagnostic
     severity: warning
-    description: EMS alarm {enmsAlClass} with severity {enmsTrapEventSeverity} on {enmsAlEntityString} on {_HOSTNAME}.
+    description: EMS alarm {{value "enmsTrapEventProbableCauseString"}} on {{value "enmsAlEntityString"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7404,8 +7404,8 @@ traps:
   - oid: 1.3.6.1.4.1.42229.6.22.5.3.11.1
     name: TNMS-NBI-MIB::enmsHeartbeatTrap
     category: diagnostic
-    severity: notice
-    description: Agent heartbeat received from proxy {enmsProxyName} on {_HOSTNAME}.
+    severity: info
+    description: Agent heartbeat received from proxy {{value "enmsProxyName"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsProxyName
@@ -7413,7 +7413,7 @@ traps:
     name: TNMS-NBI-MIB::enmsEthernetPathObjectCreationTrap
     category: config_change
     severity: notice
-    description: Ethernet Path {enmsEvcName} created on {_HOSTNAME}.
+    description: Ethernet path {{value "enmsEvcName"}} created on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7424,7 +7424,7 @@ traps:
     name: TNMS-NBI-MIB::enmsEthernetPathObjectDeletionTrap
     category: config_change
     severity: notice
-    description: Ethernet Path {enmsEvcName} deleted on {_HOSTNAME}.
+    description: Ethernet path {{value "enmsEvcName"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7434,8 +7434,8 @@ traps:
   - oid: 1.3.6.1.4.1.42229.6.22.5.3.12.3
     name: TNMS-NBI-MIB::enmsEthernetPathStateChangeTrap
     category: state_change
-    severity: notice
-    description: Ethernet Path {enmsEvcName} state changed from {enmsTrapStateOldValue} to {enmsTrapStateNewValue} on {_HOSTNAME}.
+    severity: warning
+    description: Ethernet Path {{value "enmsEvcName"}} state changed to {{value "enmsTrapStateNewValue"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7451,7 +7451,7 @@ traps:
     name: TNMS-NBI-MIB::enmsEthernetPathAttributeChangeTrap
     category: config_change
     severity: notice
-    description: Ethernet Path {enmsEvcName} attribute {enmsTrapAttributeName} changed from {enmsTrapAttributeOldValue} to {enmsTrapAttributeNewValue} on {_HOSTNAME}.
+    description: Ethernet Path {{value "enmsEvcName"}} attribute {{value "enmsTrapAttributeName"}} changed on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7467,7 +7467,7 @@ traps:
     name: TNMS-NBI-MIB::enmsPerfMonRequestStateChangeTrap
     category: state_change
     severity: notice
-    description: PerfMon request {enmsPmRequestName} state changed to {enmsPmRequestState} on {_HOSTNAME}.
+    description: PerfMon request {{value "enmsPmRequestName"}} state changed to {{value "enmsPmRequestState"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter
@@ -7479,7 +7479,7 @@ traps:
     name: TNMS-NBI-MIB::enmsOptPowerMonRequestStateChangeTrap
     category: state_change
     severity: notice
-    description: OptPowerMon request {enmsOpmRequestName} state changed to {enmsOpmRequestState} on {_HOSTNAME}.
+    description: OptPowerMon request {{value "enmsOpmRequestName"}} state changed to {{value "enmsOpmRequestState"}} on {{hostname}}.
     status: current
     varbinds:
       - enmsTrapCounter

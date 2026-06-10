@@ -1360,9 +1360,9 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.53973.1.1.1.2.1
     name: ABBMODULARUPS-MIB::upsTrapOnBattery
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: UPS is operating on battery with {upsEstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    description: UPS switched to battery power{{with value "upsEstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - upsEstimatedMinutesRemaining
@@ -1370,8 +1370,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.1.2.2
     name: ABBMODULARUPS-MIB::upsTrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {upsTestId} completed with result {upsTestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test {{value "upsTestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - upsTestId
@@ -1384,7 +1384,7 @@ traps:
     name: ABBMODULARUPS-MIB::upsTrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {upsAlarmId} ({upsAlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "upsAlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - upsAlarmId
@@ -1393,16 +1393,16 @@ traps:
     name: ABBMODULARUPS-MIB::upsTrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {upsAlarmId} removed from table on {_HOSTNAME}.
+    description: UPS alarm {{value "upsAlarmDescr"}} removed on {{hostname}}.
     status: current
     varbinds:
       - upsAlarmId
       - upsAlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.2.2.1
     name: ABBMODULARUPS-MIB::ups01TrapOnBattery
-    category: diagnostic
-    severity: warning
-    description: UPS operating on battery for {ups01SecondsOnBattery} seconds with {ups01EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: UPS switched to battery power{{with value "ups01EstimatedMinutesRemaining"}} for {{.}} minutes remaining{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups01EstimatedMinutesRemaining
@@ -1411,7 +1411,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups01TrapTestCompleted
     category: diagnostic
     severity: info
-    description: UPS diagnostic test {ups01TestId} completed with result {ups01TestResultsSummary} on {_HOSTNAME}.
+    description: UPS diagnostic test {{value "ups01TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups01TestId
@@ -1424,25 +1424,25 @@ traps:
     name: ABBMODULARUPS-MIB::ups01TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups01AlarmId} ({ups01AlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups01AlarmDescr"}} inserted on {{hostname}}.
     status: current
     varbinds:
       - ups01AlarmId
       - ups01AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.2.2.4
     name: ABBMODULARUPS-MIB::ups01TrapAlarmEntryRemoved
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Alarm {ups01AlarmId} ({ups01AlarmDescr}) removed on {_HOSTNAME}.
+    description: Alarm {{value "ups01AlarmId"}} removed from the alarm table on {{hostname}}.
     status: current
     varbinds:
       - ups01AlarmId
       - ups01AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.3.2.1
     name: ABBMODULARUPS-MIB::ups02TrapOnBattery
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: UPS operating on battery for {ups02SecondsOnBattery} seconds with {ups02EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    description: UPS is operating on battery power{{with value "ups02EstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups02EstimatedMinutesRemaining
@@ -1450,8 +1450,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.3.2.2
     name: ABBMODULARUPS-MIB::ups02TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups02TestId} completed with status {ups02TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test completed on {{hostname}}.
     status: current
     varbinds:
       - ups02TestId
@@ -1464,16 +1464,16 @@ traps:
     name: ABBMODULARUPS-MIB::ups02TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups02AlarmId} ({ups02AlarmDescr}) inserted on {_HOSTNAME}.
+    description: UPS alarm {{value "ups02AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups02AlarmId
       - ups02AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.3.2.4
     name: ABBMODULARUPS-MIB::ups02TrapAlarmEntryRemoved
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Alarm {ups02AlarmId} ({ups02AlarmDescr}) removed on {_HOSTNAME}.
+    description: Alarm {{value "ups02AlarmId"}} removed on {{hostname}}.
     status: current
     varbinds:
       - ups02AlarmId
@@ -1482,7 +1482,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups03TrapOnBattery
     category: state_change
     severity: warning
-    description: UPS switched to battery power with {ups03EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    description: UPS switched to battery power{{with value "ups03EstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups03EstimatedMinutesRemaining
@@ -1491,7 +1491,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups03TrapTestCompleted
     category: diagnostic
     severity: notice
-    description: UPS diagnostic test {ups03TestId} completed with result {ups03TestResultsSummary} on {_HOSTNAME}.
+    description: UPS diagnostic test {{value "ups03TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups03TestId
@@ -1504,7 +1504,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups03TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups03AlarmId} ({ups03AlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups03AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups03AlarmId
@@ -1513,16 +1513,16 @@ traps:
     name: ABBMODULARUPS-MIB::ups03TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups03AlarmId} ({ups03AlarmDescr}) removed from alarm table on {_HOSTNAME}.
+    description: UPS alarm {{value "ups03AlarmDescr"}} removed on {{hostname}}.
     status: current
     varbinds:
       - ups03AlarmId
       - ups03AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.5.2.1
     name: ABBMODULARUPS-MIB::ups04TrapOnBattery
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: UPS operating on battery for {ups04SecondsOnBattery} seconds with {ups04EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    description: UPS is operating on battery power{{with value "ups04EstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups04EstimatedMinutesRemaining
@@ -1530,8 +1530,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.5.2.2
     name: ABBMODULARUPS-MIB::ups04TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups04TestId} completed with result {ups04TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test completed on {{hostname}}.
     status: current
     varbinds:
       - ups04TestId
@@ -1544,7 +1544,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups04TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups04AlarmId} with description {ups04AlarmDescr} detected on {_HOSTNAME}.
+    description: UPS alarm {{value "ups04AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups04AlarmId
@@ -1553,7 +1553,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups04TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups04AlarmId} ({ups04AlarmDescr}) removed from alarm table on {_HOSTNAME}.
+    description: UPS alarm {{value "ups04AlarmDescr"}} removed on {{hostname}}.
     status: current
     varbinds:
       - ups04AlarmId
@@ -1562,7 +1562,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups05TrapOnBattery
     category: state_change
     severity: warning
-    description: UPS switched to battery power with {ups05EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    description: UPS switched to battery power{{with value "ups05EstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups05EstimatedMinutesRemaining
@@ -1570,8 +1570,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.6.2.2
     name: ABBMODULARUPS-MIB::ups05TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups05TestId} completed with result {ups05TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test {{value "ups05TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups05TestId
@@ -1584,25 +1584,25 @@ traps:
     name: ABBMODULARUPS-MIB::ups05TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups05AlarmId} ({ups05AlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups05AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups05AlarmId
       - ups05AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.6.2.4
     name: ABBMODULARUPS-MIB::ups05TrapAlarmEntryRemoved
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Alarm {ups05AlarmId} ({ups05AlarmDescr}) removed on {_HOSTNAME}.
+    description: Alarm {{value "ups05AlarmId"}} removed from the alarm table on {{hostname}}.
     status: current
     varbinds:
       - ups05AlarmId
       - ups05AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.7.2.1
     name: ABBMODULARUPS-MIB::ups06TrapOnBattery
-    category: diagnostic
-    severity: warning
-    description: UPS operating on battery for {ups06SecondsOnBattery} seconds with {ups06EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: UPS is operating on battery power{{with value "ups06EstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups06EstimatedMinutesRemaining
@@ -1610,8 +1610,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.7.2.2
     name: ABBMODULARUPS-MIB::ups06TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups06TestId} completed with result {ups06TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test {{value "ups06TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups06TestId
@@ -1624,7 +1624,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups06TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups06AlarmDescr} with ID {ups06AlarmId} added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups06AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups06AlarmId
@@ -1633,7 +1633,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups06TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups06AlarmId} removed from alarm table on {_HOSTNAME}.
+    description: Alarm {{value "ups06AlarmId"}} removed from alarm table on {{hostname}}.
     status: current
     varbinds:
       - ups06AlarmId
@@ -1642,7 +1642,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups07TrapOnBattery
     category: state_change
     severity: warning
-    description: UPS operating on battery with {ups07EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    description: UPS switched to battery power{{with value "ups07EstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups07EstimatedMinutesRemaining
@@ -1650,8 +1650,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.8.2.2
     name: ABBMODULARUPS-MIB::ups07TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups07TestId} completed with status {ups07TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test completed on {{hostname}}.
     status: current
     varbinds:
       - ups07TestId
@@ -1664,7 +1664,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups07TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups07AlarmId} ({ups07AlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups07AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups07AlarmId
@@ -1673,7 +1673,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups07TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups07AlarmId} removed from UPS on {_HOSTNAME}.
+    description: Alarm {{value "ups07AlarmId"}} removed from alarm table on {{hostname}}.
     status: current
     varbinds:
       - ups07AlarmId
@@ -1682,7 +1682,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups08TrapOnBattery
     category: state_change
     severity: warning
-    description: UPS switched to battery power with {ups08EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    description: UPS is operating on battery power{{with value "ups08EstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups08EstimatedMinutesRemaining
@@ -1690,8 +1690,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.9.2.2
     name: ABBMODULARUPS-MIB::ups08TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups08TestId} completed with result {ups08TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test {{value "ups08TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups08TestId
@@ -1704,16 +1704,16 @@ traps:
     name: ABBMODULARUPS-MIB::ups08TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups08AlarmDescr} with ID {ups08AlarmId} inserted on {_HOSTNAME}.
+    description: UPS alarm {{value "ups08AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups08AlarmId
       - ups08AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.9.2.4
     name: ABBMODULARUPS-MIB::ups08TrapAlarmEntryRemoved
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Alarm {ups08AlarmId} ({ups08AlarmDescr}) removed on {_HOSTNAME}.
+    description: 'Alarm {{value "ups08AlarmId"}} removed{{with value "ups08AlarmDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ups08AlarmId
@@ -1721,8 +1721,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.10.2.1
     name: ABBMODULARUPS-MIB::ups09TrapOnBattery
     category: state_change
-    severity: warning
-    description: UPS switched to battery power with {ups09EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    severity: alert
+    description: UPS is operating on battery power on {{hostname}}.
     status: current
     varbinds:
       - ups09EstimatedMinutesRemaining
@@ -1730,8 +1730,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.10.2.2
     name: ABBMODULARUPS-MIB::ups09TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups09TestId} completed with result {ups09TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test completed on {{hostname}}.
     status: current
     varbinds:
       - ups09TestId
@@ -1744,7 +1744,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups09TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups09AlarmId} ({ups09AlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups09AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups09AlarmId
@@ -1753,7 +1753,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups09TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups09AlarmId} ({ups09AlarmDescr}) removed on {_HOSTNAME}.
+    description: Alarm {{value "ups09AlarmId"}} removed from alarm table on {{hostname}}.
     status: current
     varbinds:
       - ups09AlarmId
@@ -1761,8 +1761,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.11.2.1
     name: ABBMODULARUPS-MIB::ups10TrapOnBattery
     category: state_change
-    severity: warning
-    description: UPS switched to battery power with {ups10EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    severity: alert
+    description: UPS switched to battery power{{with value "ups10EstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups10EstimatedMinutesRemaining
@@ -1771,7 +1771,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups10TrapTestCompleted
     category: diagnostic
     severity: info
-    description: UPS diagnostic test {ups10TestId} completed with result {ups10TestResultsSummary} on {_HOSTNAME}.
+    description: UPS diagnostic test {{value "ups10TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups10TestId
@@ -1784,16 +1784,16 @@ traps:
     name: ABBMODULARUPS-MIB::ups10TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups10AlarmId} ({ups10AlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups10AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups10AlarmId
       - ups10AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.11.2.4
     name: ABBMODULARUPS-MIB::ups10TrapAlarmEntryRemoved
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Alarm {ups10AlarmId} ({ups10AlarmDescr}) removed on {_HOSTNAME}.
+    description: UPS alarm {{value "ups10AlarmDescr"}} removed on {{hostname}}.
     status: current
     varbinds:
       - ups10AlarmId
@@ -1801,8 +1801,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.12.2.1
     name: ABBMODULARUPS-MIB::ups11TrapOnBattery
     category: state_change
-    severity: warning
-    description: UPS switched to battery power with {ups11EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    severity: alert
+    description: UPS switched to battery power{{with value "ups11EstimatedMinutesRemaining"}} with {{.}} minutes remaining{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups11EstimatedMinutesRemaining
@@ -1810,8 +1810,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.12.2.2
     name: ABBMODULARUPS-MIB::ups11TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups11TestId} completed with result {ups11TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test completed on {{hostname}}.
     status: current
     varbinds:
       - ups11TestId
@@ -1824,7 +1824,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups11TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups11AlarmId} ({ups11AlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups11AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups11AlarmId
@@ -1833,16 +1833,16 @@ traps:
     name: ABBMODULARUPS-MIB::ups11TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups11AlarmId} ({ups11AlarmDescr}) removed on {_HOSTNAME}.
+    description: UPS alarm {{value "ups11AlarmId"}} removed on {{hostname}}.
     status: current
     varbinds:
       - ups11AlarmId
       - ups11AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.13.2.1
     name: ABBMODULARUPS-MIB::ups12TrapOnBattery
-    category: diagnostic
-    severity: warning
-    description: UPS operating on battery for {ups12SecondsOnBattery} seconds with {ups12EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: UPS switched to battery power{{with value "ups12EstimatedMinutesRemaining"}} with {{.}} minutes remaining{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups12EstimatedMinutesRemaining
@@ -1850,8 +1850,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.13.2.2
     name: ABBMODULARUPS-MIB::ups12TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups12TestId} completed with result {ups12TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test {{value "ups12TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups12TestId
@@ -1864,7 +1864,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups12TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups12AlarmId} ({ups12AlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups12AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups12AlarmId
@@ -1873,16 +1873,16 @@ traps:
     name: ABBMODULARUPS-MIB::ups12TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups12AlarmId} ({ups12AlarmDescr}) removed on {_HOSTNAME}.
+    description: Alarm {{value "ups12AlarmId"}} removed from the alarm table on {{hostname}}.
     status: current
     varbinds:
       - ups12AlarmId
       - ups12AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.14.2.1
     name: ABBMODULARUPS-MIB::ups13TrapOnBattery
-    category: diagnostic
-    severity: warning
-    description: UPS operating on battery for {ups13SecondsOnBattery} seconds with {ups13EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: UPS switched to battery power{{with value "ups13EstimatedMinutesRemaining"}} with {{.}} minutes remaining{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups13EstimatedMinutesRemaining
@@ -1891,7 +1891,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups13TrapTestCompleted
     category: diagnostic
     severity: info
-    description: UPS diagnostic test {ups13TestId} completed with summary {ups13TestResultsSummary} on {_HOSTNAME}.
+    description: UPS diagnostic test completed on {{hostname}}.
     status: current
     varbinds:
       - ups13TestId
@@ -1904,7 +1904,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups13TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups13AlarmId} ({ups13AlarmDescr}) detected on {_HOSTNAME}.
+    description: UPS alarm {{value "ups13AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups13AlarmId
@@ -1913,16 +1913,16 @@ traps:
     name: ABBMODULARUPS-MIB::ups13TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups13AlarmId} ({ups13AlarmDescr}) removed on {_HOSTNAME}.
+    description: Alarm {{value "ups13AlarmId"}} removed from the alarm table on {{hostname}}.
     status: current
     varbinds:
       - ups13AlarmId
       - ups13AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.15.2.1
     name: ABBMODULARUPS-MIB::ups14TrapOnBattery
-    category: diagnostic
-    severity: warning
-    description: UPS is operating on battery power for {ups14SecondsOnBattery} seconds with {ups14EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: UPS switched to battery power{{with value "ups14EstimatedMinutesRemaining"}} with {{.}} minutes remaining{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups14EstimatedMinutesRemaining
@@ -1931,7 +1931,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups14TrapTestCompleted
     category: diagnostic
     severity: info
-    description: UPS diagnostic test {ups14TestId} completed with result {ups14TestResultsSummary} on {_HOSTNAME}.
+    description: UPS diagnostic test {{value "ups14TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups14TestId
@@ -1944,7 +1944,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups14TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: Alarm {ups14AlarmId} ({ups14AlarmDescr}) added to alarm table on {_HOSTNAME}.
+    description: UPS alarm {{value "ups14AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups14AlarmId
@@ -1953,7 +1953,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups14TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups14AlarmId} ({ups14AlarmDescr}) removed on {_HOSTNAME}.
+    description: Alarm {{value "ups14AlarmId"}} removed from the alarm table on {{hostname}}.
     status: current
     varbinds:
       - ups14AlarmId
@@ -1961,8 +1961,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.16.2.1
     name: ABBMODULARUPS-MIB::ups15TrapOnBattery
     category: state_change
-    severity: warning
-    description: UPS switched to battery power with {ups15EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    severity: alert
+    description: UPS switched to battery power with {{value "ups15EstimatedMinutesRemaining"}} minutes remaining on {{hostname}}.
     status: current
     varbinds:
       - ups15EstimatedMinutesRemaining
@@ -1970,8 +1970,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.16.2.2
     name: ABBMODULARUPS-MIB::ups15TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups15TestId} completed with result {ups15TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test completed on {{hostname}}.
     status: current
     varbinds:
       - ups15TestId
@@ -1984,7 +1984,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups15TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups15AlarmId} ({ups15AlarmDescr}) inserted on {_HOSTNAME}.
+    description: UPS alarm {{value "ups15AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups15AlarmId
@@ -1993,7 +1993,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups15TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups15AlarmId} ({ups15AlarmDescr}) removed on {_HOSTNAME}.
+    description: UPS alarm {{value "ups15AlarmDescr"}} removed on {{hostname}}.
     status: current
     varbinds:
       - ups15AlarmId
@@ -2001,8 +2001,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.17.2.1
     name: ABBMODULARUPS-MIB::ups16TrapOnBattery
     category: state_change
-    severity: warning
-    description: UPS switched to battery power with {ups16EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    severity: alert
+    description: UPS is operating on battery power{{with value "ups16EstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups16EstimatedMinutesRemaining
@@ -2011,7 +2011,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups16TrapTestCompleted
     category: diagnostic
     severity: info
-    description: UPS diagnostic test {ups16TestId} completed with result {ups16TestResultsSummary} on {_HOSTNAME}.
+    description: UPS diagnostic test {{value "ups16TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups16TestId
@@ -2024,7 +2024,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups16TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups16AlarmId} ({ups16AlarmDescr}) inserted on {_HOSTNAME}.
+    description: UPS alarm {{value "ups16AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups16AlarmId
@@ -2033,16 +2033,16 @@ traps:
     name: ABBMODULARUPS-MIB::ups16TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups16AlarmId} ({ups16AlarmDescr}) removed on {_HOSTNAME}.
+    description: Alarm {{value "ups16AlarmId"}} removed on {{hostname}}.
     status: current
     varbinds:
       - ups16AlarmId
       - ups16AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.18.2.1
     name: ABBMODULARUPS-MIB::ups17TrapOnBattery
-    category: diagnostic
-    severity: warning
-    description: UPS switched to battery power with {ups17EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: UPS is operating on battery power{{with value "ups17EstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups17EstimatedMinutesRemaining
@@ -2050,8 +2050,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.18.2.2
     name: ABBMODULARUPS-MIB::ups17TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups17TestId} completed with result {ups17TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test {{value "ups17TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups17TestId
@@ -2064,7 +2064,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups17TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups17AlarmId} ({ups17AlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups17AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups17AlarmId
@@ -2073,7 +2073,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups17TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups17AlarmId} removed from table on {_HOSTNAME}.
+    description: Alarm {{value "ups17AlarmId"}} removed from UPS on {{hostname}}.
     status: current
     varbinds:
       - ups17AlarmId
@@ -2082,7 +2082,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups18TrapOnBattery
     category: state_change
     severity: warning
-    description: UPS switched to battery power with {ups18EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    description: UPS is operating on battery power{{with value "ups18EstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups18EstimatedMinutesRemaining
@@ -2090,8 +2090,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.19.2.2
     name: ABBMODULARUPS-MIB::ups18TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups18TestId} completed with status {ups18TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test {{value "ups18TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups18TestId
@@ -2104,7 +2104,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups18TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups18AlarmId} with description {ups18AlarmDescr} detected on {_HOSTNAME}.
+    description: UPS alarm {{value "ups18AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups18AlarmId
@@ -2113,7 +2113,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups18TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups18AlarmId} ({ups18AlarmDescr}) removed on {_HOSTNAME}.
+    description: Alarm {{value "ups18AlarmId"}} removed from alarm table on {{hostname}}.
     status: current
     varbinds:
       - ups18AlarmId
@@ -2121,8 +2121,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.20.2.1
     name: ABBMODULARUPS-MIB::ups19TrapOnBattery
     category: state_change
-    severity: warning
-    description: UPS switched to battery power with {ups19EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    severity: alert
+    description: UPS is operating on battery power for {{value "ups19SecondsOnBattery"}} seconds on {{hostname}}.
     status: current
     varbinds:
       - ups19EstimatedMinutesRemaining
@@ -2130,8 +2130,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.20.2.2
     name: ABBMODULARUPS-MIB::ups19TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups19TestId} completed with result {ups19TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test {{value "ups19TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups19TestId
@@ -2144,7 +2144,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups19TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups19AlarmId} ({ups19AlarmDescr}) inserted on {_HOSTNAME}.
+    description: UPS alarm {{value "ups19AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups19AlarmId
@@ -2153,7 +2153,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups19TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups19AlarmId} removed from table on {_HOSTNAME}.
+    description: UPS alarm {{value "ups19AlarmDescr"}} removed on {{hostname}}.
     status: current
     varbinds:
       - ups19AlarmId
@@ -2161,8 +2161,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.21.2.1
     name: ABBMODULARUPS-MIB::ups20TrapOnBattery
     category: state_change
-    severity: warning
-    description: UPS operating on battery power with {ups20EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    severity: alert
+    description: UPS switched to battery power{{with value "ups20EstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups20EstimatedMinutesRemaining
@@ -2170,8 +2170,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.21.2.2
     name: ABBMODULARUPS-MIB::ups20TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups20TestId} completed on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test completed on {{hostname}}.
     status: current
     varbinds:
       - ups20TestId
@@ -2184,25 +2184,25 @@ traps:
     name: ABBMODULARUPS-MIB::ups20TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups20AlarmId} ({ups20AlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups20AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups20AlarmId
       - ups20AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.21.2.4
     name: ABBMODULARUPS-MIB::ups20TrapAlarmEntryRemoved
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Alarm {ups20AlarmId} ({ups20AlarmDescr}) removed on {_HOSTNAME}.
+    description: UPS alarm {{value "ups20AlarmDescr"}} removed on {{hostname}}.
     status: current
     varbinds:
       - ups20AlarmId
       - ups20AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.22.2.1
     name: ABBMODULARUPS-MIB::ups21TrapOnBattery
-    category: diagnostic
-    severity: warning
-    description: UPS operating on battery for {ups21SecondsOnBattery} seconds with {ups21EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: UPS switched to battery power with {{value "ups21EstimatedMinutesRemaining"}} minutes remaining on {{hostname}}.
     status: current
     varbinds:
       - ups21EstimatedMinutesRemaining
@@ -2210,8 +2210,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.22.2.2
     name: ABBMODULARUPS-MIB::ups21TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups21TestId} completed with status {ups21TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test completed on {{hostname}}.
     status: current
     varbinds:
       - ups21TestId
@@ -2224,7 +2224,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups21TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups21AlarmId} ({ups21AlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups21AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups21AlarmId
@@ -2233,16 +2233,16 @@ traps:
     name: ABBMODULARUPS-MIB::ups21TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups21AlarmId} ({ups21AlarmDescr}) removed on {_HOSTNAME}.
+    description: Alarm {{value "ups21AlarmId"}} removed from the alarm table on {{hostname}}.
     status: current
     varbinds:
       - ups21AlarmId
       - ups21AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.23.2.1
     name: ABBMODULARUPS-MIB::ups22TrapOnBattery
-    category: diagnostic
-    severity: warning
-    description: UPS operating on battery for {ups22SecondsOnBattery} seconds with {ups22EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: UPS switched to battery power{{with value "ups22EstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups22EstimatedMinutesRemaining
@@ -2250,8 +2250,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.23.2.2
     name: ABBMODULARUPS-MIB::ups22TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups22TestId} completed with result {ups22TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test {{value "ups22TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups22TestId
@@ -2264,7 +2264,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups22TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups22AlarmId} ({ups22AlarmDescr}) inserted on {_HOSTNAME}.
+    description: UPS alarm {{value "ups22AlarmDescr"}} inserted on {{hostname}}.
     status: current
     varbinds:
       - ups22AlarmId
@@ -2273,16 +2273,16 @@ traps:
     name: ABBMODULARUPS-MIB::ups22TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups22AlarmId} ({ups22AlarmDescr}) removed on {_HOSTNAME}.
+    description: Alarm {{value "ups22AlarmId"}} removed from UPS on {{hostname}}.
     status: current
     varbinds:
       - ups22AlarmId
       - ups22AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.24.2.1
     name: ABBMODULARUPS-MIB::ups23TrapOnBattery
-    category: diagnostic
-    severity: warning
-    description: UPS operating on battery for {ups23SecondsOnBattery} seconds with {ups23EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: UPS is operating on battery power for {{value "ups23SecondsOnBattery"}} seconds on {{hostname}}.
     status: current
     varbinds:
       - ups23EstimatedMinutesRemaining
@@ -2290,8 +2290,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.24.2.2
     name: ABBMODULARUPS-MIB::ups23TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups23TestId} completed with result {ups23TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test completed on {{hostname}}.
     status: current
     varbinds:
       - ups23TestId
@@ -2304,25 +2304,25 @@ traps:
     name: ABBMODULARUPS-MIB::ups23TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups23AlarmId} ({ups23AlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups23AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups23AlarmId
       - ups23AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.24.2.4
     name: ABBMODULARUPS-MIB::ups23TrapAlarmEntryRemoved
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Alarm {ups23AlarmId} ({ups23AlarmDescr}) removed on {_HOSTNAME}.
+    description: Alarm {{value "ups23AlarmId"}} removed from the alarm table on {{hostname}}.
     status: current
     varbinds:
       - ups23AlarmId
       - ups23AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.25.2.1
     name: ABBMODULARUPS-MIB::ups24TrapOnBattery
-    category: diagnostic
-    severity: warning
-    description: UPS operating on battery with {ups24EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: UPS is operating on battery power{{with value "ups24EstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups24EstimatedMinutesRemaining
@@ -2330,8 +2330,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.25.2.2
     name: ABBMODULARUPS-MIB::ups24TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups24TestId} completed with result {ups24TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test {{value "ups24TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups24TestId
@@ -2344,25 +2344,25 @@ traps:
     name: ABBMODULARUPS-MIB::ups24TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups24AlarmId} ({ups24AlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups24AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups24AlarmId
       - ups24AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.25.2.4
     name: ABBMODULARUPS-MIB::ups24TrapAlarmEntryRemoved
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Alarm {ups24AlarmId} ({ups24AlarmDescr}) removed on {_HOSTNAME}.
+    description: Alarm {{value "ups24AlarmId"}} removed from the alarm table on {{hostname}}.
     status: current
     varbinds:
       - ups24AlarmId
       - ups24AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.26.2.1
     name: ABBMODULARUPS-MIB::ups25TrapOnBattery
-    category: diagnostic
-    severity: warning
-    description: UPS switched to battery power for {ups25SecondsOnBattery} seconds with {ups25EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: UPS switched to battery power{{with value "ups25EstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups25EstimatedMinutesRemaining
@@ -2370,8 +2370,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.26.2.2
     name: ABBMODULARUPS-MIB::ups25TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups25TestId} completed with result {ups25TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test {{value "ups25TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups25TestId
@@ -2384,7 +2384,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups25TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups25AlarmId} ({ups25AlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups25AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups25AlarmId
@@ -2393,16 +2393,16 @@ traps:
     name: ABBMODULARUPS-MIB::ups25TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups25AlarmId} ({ups25AlarmDescr}) removed on {_HOSTNAME}.
+    description: Alarm {{value "ups25AlarmId"}} removed from the alarm table on {{hostname}}.
     status: current
     varbinds:
       - ups25AlarmId
       - ups25AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.27.2.1
     name: ABBMODULARUPS-MIB::ups26TrapOnBattery
-    category: diagnostic
-    severity: warning
-    description: UPS operating on battery for {ups26SecondsOnBattery} seconds with {ups26EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: UPS switched to battery power{{with value "ups26EstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups26EstimatedMinutesRemaining
@@ -2410,8 +2410,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.27.2.2
     name: ABBMODULARUPS-MIB::ups26TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups26TestId} completed with status {ups26TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test completed on {{hostname}}.
     status: current
     varbinds:
       - ups26TestId
@@ -2424,25 +2424,25 @@ traps:
     name: ABBMODULARUPS-MIB::ups26TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups26AlarmId} with description {ups26AlarmDescr} added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups26AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups26AlarmId
       - ups26AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.27.2.4
     name: ABBMODULARUPS-MIB::ups26TrapAlarmEntryRemoved
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Alarm {ups26AlarmId} ({ups26AlarmDescr}) removed on {_HOSTNAME}.
+    description: Alarm {{value "ups26AlarmId"}} removed from alarm table on {{hostname}}.
     status: current
     varbinds:
       - ups26AlarmId
       - ups26AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.28.2.1
     name: ABBMODULARUPS-MIB::ups27TrapOnBattery
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: UPS operating on battery for {ups27SecondsOnBattery} seconds with {ups27EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    description: UPS switched to battery power{{with value "ups27EstimatedMinutesRemaining"}} for {{.}} minutes remaining{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups27EstimatedMinutesRemaining
@@ -2450,8 +2450,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.28.2.2
     name: ABBMODULARUPS-MIB::ups27TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups27TestId} completed with result {ups27TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test {{value "ups27TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups27TestId
@@ -2464,7 +2464,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups27TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups27AlarmId} ({ups27AlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups27AlarmDescr"}} inserted on {{hostname}}.
     status: current
     varbinds:
       - ups27AlarmId
@@ -2473,7 +2473,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups27TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups27AlarmDescr} removed from UPS on {_HOSTNAME}.
+    description: Alarm {{value "ups27AlarmId"}} removed on {{hostname}}.
     status: current
     varbinds:
       - ups27AlarmId
@@ -2481,8 +2481,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.29.2.1
     name: ABBMODULARUPS-MIB::ups28TrapOnBattery
     category: state_change
-    severity: warning
-    description: UPS switched to battery power with {ups28EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    severity: alert
+    description: UPS is operating on battery power for {{value "ups28SecondsOnBattery"}} seconds on {{hostname}}.
     status: current
     varbinds:
       - ups28EstimatedMinutesRemaining
@@ -2490,8 +2490,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.29.2.2
     name: ABBMODULARUPS-MIB::ups28TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups28TestId} completed with status {ups28TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test {{value "ups28TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups28TestId
@@ -2504,7 +2504,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups28TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups28AlarmId} ({ups28AlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups28AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups28AlarmId
@@ -2513,7 +2513,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups28TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups28AlarmId} ({ups28AlarmDescr}) removed on {_HOSTNAME}.
+    description: UPS alarm {{value "ups28AlarmDescr"}} removed on {{hostname}}.
     status: current
     varbinds:
       - ups28AlarmId
@@ -2521,8 +2521,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.30.2.1
     name: ABBMODULARUPS-MIB::ups29TrapOnBattery
     category: state_change
-    severity: warning
-    description: UPS switched to battery power with {ups29EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    severity: alert
+    description: UPS switched to battery power{{with value "ups29EstimatedMinutesRemaining"}} with {{.}} minutes remaining{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups29EstimatedMinutesRemaining
@@ -2531,7 +2531,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups29TrapTestCompleted
     category: diagnostic
     severity: info
-    description: UPS diagnostic test {ups29TestId} completed with result {ups29TestResultsSummary} on {_HOSTNAME}.
+    description: UPS diagnostic test {{value "ups29TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups29TestId
@@ -2544,7 +2544,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups29TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups29AlarmId} ({ups29AlarmDescr}) inserted on {_HOSTNAME}.
+    description: UPS alarm {{value "ups29AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups29AlarmId
@@ -2553,7 +2553,7 @@ traps:
     name: ABBMODULARUPS-MIB::ups29TrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm {ups29AlarmId} ({ups29AlarmDescr}) removed from alarm table on {_HOSTNAME}.
+    description: Alarm {{value "ups29AlarmId"}} removed from UPS on {{hostname}}.
     status: current
     varbinds:
       - ups29AlarmId
@@ -2561,8 +2561,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.31.2.1
     name: ABBMODULARUPS-MIB::ups30TrapOnBattery
     category: state_change
-    severity: warning
-    description: UPS switched to battery power with {ups30EstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    severity: alert
+    description: UPS switched to battery power{{with value "ups30EstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ups30EstimatedMinutesRemaining
@@ -2570,8 +2570,8 @@ traps:
   - oid: 1.3.6.1.4.1.53973.1.1.31.2.2
     name: ABBMODULARUPS-MIB::ups30TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test {ups30TestId} completed with result {ups30TestResultsSummary} on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test {{value "ups30TestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - ups30TestId
@@ -2584,16 +2584,16 @@ traps:
     name: ABBMODULARUPS-MIB::ups30TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {ups30AlarmId} ({ups30AlarmDescr}) added on {_HOSTNAME}.
+    description: UPS alarm {{value "ups30AlarmDescr"}} added on {{hostname}}.
     status: current
     varbinds:
       - ups30AlarmId
       - ups30AlarmDescr
   - oid: 1.3.6.1.4.1.53973.1.1.31.2.4
     name: ABBMODULARUPS-MIB::ups30TrapAlarmEntryRemoved
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Alarm {ups30AlarmId} ({ups30AlarmDescr}) removed from table on {_HOSTNAME}.
+    description: Alarm {{value "ups30AlarmId"}} removed on {{hostname}}.
     status: current
     varbinds:
       - ups30AlarmId

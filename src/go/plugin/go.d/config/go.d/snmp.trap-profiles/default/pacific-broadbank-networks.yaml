@@ -164,7 +164,7 @@ traps:
     name: PBN-MIB::module15
     category: diagnostic
     severity: warning
-    description: PBN module alarm on slot {ocmSlot} for parameter {ocmParamString} with status {ocmParamStatus} on {_HOSTNAME}.
+    description: PBN module {{value "ocmSlot"}} parameter {{value "ocmParamString"}} alarm on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -175,7 +175,7 @@ traps:
     name: PBN-MIB::module16
     category: diagnostic
     severity: warning
-    description: PBN Module 16 parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module alarm on slot {{value "ocmSlot"}} parameter {{value "ocmParamString"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -186,7 +186,7 @@ traps:
     name: PBN-MIB::module17
     category: diagnostic
     severity: warning
-    description: PBN Module 1 parameter {ocmParamString} alarm on slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module alarm on slot {{value "ocmSlot"}} parameter {{value "ocmParamString"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -197,7 +197,7 @@ traps:
     name: PBN-MIB::module18
     category: diagnostic
     severity: warning
-    description: PBN module alarm on slot {ocmSlot} for parameter {ocmParamString} with status {ocmParamStatus} on {_HOSTNAME}.
+    description: PBN module alarm on slot {{value "ocmSlot"}} parameter {{value "ocmParamString"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -207,8 +207,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.19
     name: PBN-MIB::module19
     category: diagnostic
-    severity: warning
-    description: PBN Module 1 Param 9 notification for slot {ocmSlot} parameter {ocmParamString} with status {ocmParamStatus} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -218,8 +218,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.25
     name: PBN-MIB::module25
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} in slot {{value "ocmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -230,7 +230,7 @@ traps:
     name: PBN-MIB::module26
     category: diagnostic
     severity: warning
-    description: PBN Module 2 parameter {ocmParamString} status changed to {ocmParamStatus} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -240,8 +240,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.27
     name: PBN-MIB::module27
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter 7 notification for slot {{value "ocmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -252,7 +252,7 @@ traps:
     name: PBN-MIB::module28
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -263,7 +263,7 @@ traps:
     name: PBN-MIB::module29
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} reported on slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -273,8 +273,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.35
     name: PBN-MIB::module35
     category: diagnostic
-    severity: warning
-    description: PBN module {ocmSlot} parameter {ocmParamString} status {ocmParamStatus} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} changed on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -284,8 +284,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.36
     name: PBN-MIB::module36
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status is {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -295,8 +295,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.37
     name: PBN-MIB::module37
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} changed on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -307,7 +307,7 @@ traps:
     name: PBN-MIB::module38
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} in slot {{value "ocmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -318,7 +318,7 @@ traps:
     name: PBN-MIB::module39
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status is {ocmParamStatus} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -329,7 +329,7 @@ traps:
     name: PBN-MIB::module45
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status is {ocmParamStatus} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -340,7 +340,7 @@ traps:
     name: PBN-MIB::module46
     category: diagnostic
     severity: notice
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -351,7 +351,7 @@ traps:
     name: PBN-MIB::module47
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -362,7 +362,7 @@ traps:
     name: PBN-MIB::module48
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -373,7 +373,7 @@ traps:
     name: PBN-MIB::module49
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status is {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -383,8 +383,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.110
     name: PBN-MIB::module110
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status changed to {ocmParamStatus} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -394,8 +394,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.111
     name: PBN-MIB::module111
     category: diagnostic
-    severity: warning
-    description: PBN Module 111 parameter {ocmParamString} status is {ocmParamStatus} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} changed on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -405,8 +405,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.112
     name: PBN-MIB::module112
     category: diagnostic
-    severity: notice
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    severity: warning
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -417,7 +417,7 @@ traps:
     name: PBN-MIB::module113
     category: diagnostic
     severity: notice
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -427,8 +427,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.114
     name: PBN-MIB::module114
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} changed on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -439,7 +439,7 @@ traps:
     name: PBN-MIB::module115
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -449,8 +449,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.116
     name: PBN-MIB::module116
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -460,8 +460,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.117
     name: PBN-MIB::module117
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -472,7 +472,7 @@ traps:
     name: PBN-MIB::module118
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -483,7 +483,7 @@ traps:
     name: PBN-MIB::module119
     category: diagnostic
     severity: notice
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -494,7 +494,7 @@ traps:
     name: PBN-MIB::module120
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} in slot {ocmSlot} reported status {ocmParamStatus} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} in slot {{value "ocmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -505,7 +505,7 @@ traps:
     name: PBN-MIB::module121
     category: diagnostic
     severity: warning
-    description: PBN Module 1 Param 21 notification for slot {ocmSlot} parameter {ocmParamString} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -515,8 +515,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.122
     name: PBN-MIB::module122
     category: diagnostic
-    severity: warning
-    description: PBN Module 122 parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -526,8 +526,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.123
     name: PBN-MIB::module123
     category: diagnostic
-    severity: notice
-    description: PBN Module 1 Param 23 notification for slot {ocmSlot} with parameter {ocmParamString} on {_HOSTNAME}.
+    severity: warning
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} in slot {{value "ocmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -537,8 +537,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.124
     name: PBN-MIB::module124
     category: diagnostic
-    severity: warning
-    description: PBN Module 1 parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} changed on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -548,8 +548,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.125
     name: PBN-MIB::module125
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} changed on slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} in slot {{value "ocmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -559,8 +559,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.126
     name: PBN-MIB::module126
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -570,8 +570,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.127
     name: PBN-MIB::module127
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -581,8 +581,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.128
     name: PBN-MIB::module128
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} changed on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -593,7 +593,7 @@ traps:
     name: PBN-MIB::module129
     category: diagnostic
     severity: notice
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} changed in slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -604,7 +604,7 @@ traps:
     name: PBN-MIB::module130
     category: diagnostic
     severity: notice
-    description: PBN Module 1 Param 30 notification for slot {ocmSlot} with parameter {ocmParamString} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} in slot {{value "ocmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -614,8 +614,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.131
     name: PBN-MIB::module131
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status is {ocmParamStatus} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -625,8 +625,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.210
     name: PBN-MIB::module210
     category: diagnostic
-    severity: notice
-    description: PBN module parameter {ocmParamString} in slot {ocmSlot} status changed to {ocmParamStatus} on {_HOSTNAME}.
+    severity: warning
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} in slot {{value "ocmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -637,7 +637,7 @@ traps:
     name: PBN-MIB::module211
     category: diagnostic
     severity: notice
-    description: PBN module {ocmSlot} parameter {ocmParamString} status {ocmParamStatus} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -647,8 +647,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.212
     name: PBN-MIB::module212
     category: diagnostic
-    severity: notice
-    description: PBN module parameter {ocmParamString} status changed to {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    severity: warning
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -658,8 +658,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.213
     name: PBN-MIB::module213
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} changed on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -670,7 +670,7 @@ traps:
     name: PBN-MIB::module214
     category: diagnostic
     severity: warning
-    description: PBN Module 214 parameter {ocmParamString} status {ocmParamStatus} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -680,8 +680,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.215
     name: PBN-MIB::module215
     category: diagnostic
-    severity: notice
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} reported on {_HOSTNAME}.
+    severity: warning
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -691,8 +691,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.216
     name: PBN-MIB::module216
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -702,8 +702,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.217
     name: PBN-MIB::module217
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} changed on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -714,7 +714,7 @@ traps:
     name: PBN-MIB::module218
     category: diagnostic
     severity: notice
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} changed on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -725,7 +725,7 @@ traps:
     name: PBN-MIB::module219
     category: diagnostic
     severity: warning
-    description: PBN module alarm on slot {ocmSlot} for parameter {ocmParamString} with status {ocmParamStatus} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParam"}} alarm on slot {{value "ocmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -736,7 +736,7 @@ traps:
     name: PBN-MIB::module220
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} in slot {{value "ocmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -746,8 +746,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.221
     name: PBN-MIB::module221
     category: diagnostic
-    severity: notice
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    severity: warning
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -757,8 +757,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.222
     name: PBN-MIB::module222
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} in slot {{value "ocmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -769,7 +769,7 @@ traps:
     name: PBN-MIB::module223
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} changed on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} in slot {{value "ocmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -779,8 +779,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.224
     name: PBN-MIB::module224
     category: diagnostic
-    severity: notice
-    description: PBN Module 2 parameter {ocmParamString} status {ocmParamStatus} changed on {_HOSTNAME}.
+    severity: warning
+    description: PBN module parameter {{value "ocmParamString"}} status changed to {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -791,7 +791,7 @@ traps:
     name: PBN-MIB::module225
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -801,8 +801,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.226
     name: PBN-MIB::module226
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status changed to {ocmParamStatus} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -813,7 +813,7 @@ traps:
     name: PBN-MIB::module227
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} in slot {{value "ocmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -824,7 +824,7 @@ traps:
     name: PBN-MIB::module228
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} in slot {{value "ocmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -835,7 +835,7 @@ traps:
     name: PBN-MIB::module229
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} changed in slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -845,8 +845,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.230
     name: PBN-MIB::module230
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -857,7 +857,7 @@ traps:
     name: PBN-MIB::module231
     category: diagnostic
     severity: notice
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -868,7 +868,7 @@ traps:
     name: PBN-MIB::module310
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} in slot {{value "ocmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -878,8 +878,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.311
     name: PBN-MIB::module311
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status changed to {ocmParamStatus} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} changed on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -890,7 +890,7 @@ traps:
     name: PBN-MIB::module312
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} in slot {ocmSlot} reported status {ocmParamStatus} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status changed to {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -901,7 +901,7 @@ traps:
     name: PBN-MIB::module313
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -911,8 +911,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.314
     name: PBN-MIB::module314
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status is {ocmParamStatus} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} changed on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -922,8 +922,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.315
     name: PBN-MIB::module315
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -933,8 +933,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.316
     name: PBN-MIB::module316
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status changed to {ocmParamStatus} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} changed on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -945,7 +945,7 @@ traps:
     name: PBN-MIB::module317
     category: diagnostic
     severity: warning
-    description: PBN Module 3 parameter {ocmParamString} status is {ocmParamStatus} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -955,8 +955,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.318
     name: PBN-MIB::module318
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status is {ocmParamStatus} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -967,7 +967,7 @@ traps:
     name: PBN-MIB::module319
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -977,8 +977,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.320
     name: PBN-MIB::module320
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} changed on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -989,7 +989,7 @@ traps:
     name: PBN-MIB::module321
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status is {ocmParamStatus} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -999,8 +999,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.322
     name: PBN-MIB::module322
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} changed on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -1011,7 +1011,7 @@ traps:
     name: PBN-MIB::module323
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status is {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParamString"}} status is {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -1021,8 +1021,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.324
     name: PBN-MIB::module324
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -1032,8 +1032,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.325
     name: PBN-MIB::module325
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -1043,8 +1043,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.326
     name: PBN-MIB::module326
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} changed in slot {{value "ocmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -1054,8 +1054,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.327
     name: PBN-MIB::module327
     category: diagnostic
-    severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} changed in slot {ocmSlot} on {_HOSTNAME}.
+    severity: notice
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -1065,8 +1065,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.328
     name: PBN-MIB::module328
     category: diagnostic
-    severity: notice
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} changed on {_HOSTNAME}.
+    severity: warning
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -1077,7 +1077,7 @@ traps:
     name: PBN-MIB::module329
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -1088,7 +1088,7 @@ traps:
     name: PBN-MIB::module330
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} in slot {{value "ocmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -1098,8 +1098,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.331
     name: PBN-MIB::module331
     category: diagnostic
-    severity: notice
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} on slot {ocmSlot} on {_HOSTNAME}.
+    severity: warning
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -1110,7 +1110,7 @@ traps:
     name: PBN-MIB::module410
     category: diagnostic
     severity: warning
-    description: PBN module parameter {ocmParamString} status is {ocmParamStatus} in slot {ocmSlot} on {_HOSTNAME}.
+    description: PBN module parameter {{value "ocmParam"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -1120,8 +1120,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.0.0.411
     name: PBN-MIB::module411
     category: diagnostic
-    severity: notice
-    description: PBN module parameter {ocmParamString} status {ocmParamStatus} changed on {_HOSTNAME}.
+    severity: warning
+    description: PBN module parameter {{value "ocmParamString"}} status {{value "ocmParamStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ocmSlot
@@ -1132,7 +1132,7 @@ traps:
     name: PBN-MIB::mauStatus5VTrap
     category: diagnostic
     severity: warning
-    description: MAU +5V supply voltage is {mauStatus5V} on {_HOSTNAME}.
+    description: MAU +5V supply voltage is {{value "mauStatus5V"}} on {{hostname}}.
     status: current
     varbinds:
       - mauProductMAC
@@ -1142,7 +1142,7 @@ traps:
     name: PBN-MIB::mauStatus12VTrap
     category: diagnostic
     severity: warning
-    description: +12V supply voltage {mauStatus12V} reported on {_HOSTNAME}.
+    description: MAU +12V supply voltage is {{value "mauStatus12V"}} on {{hostname}}.
     status: current
     varbinds:
       - mauProductMAC
@@ -1152,7 +1152,7 @@ traps:
     name: PBN-MIB::mauStatus24VTrap
     category: diagnostic
     severity: warning
-    description: 24V supply voltage {mauStatus24V} reported for {mauProductMAC} on {_HOSTNAME}.
+    description: 24V supply voltage status changed to {{value "mauStatus24V"}} on {{hostname}}.
     status: current
     varbinds:
       - mauProductMAC
@@ -1162,7 +1162,7 @@ traps:
     name: PBN-MIB::mauStatusInputOpticalPowerTrap
     category: diagnostic
     severity: warning
-    description: Optical input power {mauStatusInputOpticalPower} on {mauProductMAC} reported {mauTrapMessageDescr} on {_HOSTNAME}.
+    description: Optical input power level {{value "mauStatusInputOpticalPower"}} on {{hostname}}.
     status: current
     varbinds:
       - mauProductMAC
@@ -1172,7 +1172,7 @@ traps:
     name: PBN-MIB::mauStatusOutputOpticalPowerTrap
     category: diagnostic
     severity: warning
-    description: Optical power level {mauStatusOutputOpticalPower} reported for {mauProductMAC} with message {mauTrapMessageDescr} on {_HOSTNAME}.
+    description: Optical output power level {{value "mauStatusOutputOpticalPower"}} on {{hostname}}.
     status: current
     varbinds:
       - mauProductMAC
@@ -1182,7 +1182,7 @@ traps:
     name: PBN-MIB::mauStatusRFOutputTrap
     category: diagnostic
     severity: warning
-    description: RF output power {mauStatusRFOutputPower} reported for {mauProductMAC} on {_HOSTNAME}.
+    description: 'MAU RF output status event{{with value "mauTrapMessageDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mauProductMAC
@@ -1192,7 +1192,7 @@ traps:
     name: PBN-MIB::mauStatusTemperatureTrap
     category: diagnostic
     severity: warning
-    description: Module internal temperature {mauStatusTemperature} reported on {_HOSTNAME}.
+    description: MAU module temperature alert {{value "mauStatusTemperature"}} on {{hostname}}.
     status: current
     varbinds:
       - mauProductMAC
@@ -1202,7 +1202,7 @@ traps:
     name: PBN-MIB::mauStatusLidTrap
     category: security
     severity: alert
-    description: 'Tamper event detected: {mauTrapMessageDescr} on {_HOSTNAME}.'
+    description: 'Tamper alert: device lid status changed to {{value "mauStatusLid"}} on {{hostname}}.'
     status: current
     varbinds:
       - mauProductMAC
@@ -1211,8 +1211,8 @@ traps:
   - oid: 1.3.6.1.4.1.11606.2.0.0.412
     name: PBN-MIB::cpon100ContactInput
     category: security
-    severity: warning
-    description: Tamper alarm triggered with status {cpon100TrapStatus} on {_HOSTNAME}.
+    severity: alert
+    description: Tamper alarm detected on CPON-100 device on {{hostname}}.
     status: current
     varbinds:
       - cpon100TrapMsg
@@ -1223,7 +1223,7 @@ traps:
     name: PBN-MIB::cpon100sensingInput
     category: diagnostic
     severity: warning
-    description: Battery alarm {cpon100TrapMsg} with status {cpon100TrapStatus} on {_HOSTNAME}.
+    description: 'CPON-100 battery alarm triggered{{with value "cpon100TrapMsg"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - cpon100TrapMsg
@@ -1234,7 +1234,7 @@ traps:
     name: PBN-MIB::cpon100CATVAlarm
     category: diagnostic
     severity: warning
-    description: CATV alarm {cpon100TrapStatus} with message {cpon100TrapMsg} on {_HOSTNAME}.
+    description: 'CATV alarm detected{{with value "cpon100TrapMsg"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - catvStatus
@@ -1244,14 +1244,14 @@ traps:
   - oid: 1.3.6.1.4.1.11606.7.1.45.0.0
     name: PBN-MIB::transmitterNoAlarmsPresent
     category: diagnostic
-    severity: notice
-    description: Transmitter reports no alarms present on {_HOSTNAME}.
+    severity: info
+    description: Transmitter alarms cleared; no alarms are present on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11606.7.1.45.0.1
     name: PBN-MIB::transmitterSystemTemperatureHigh
     category: diagnostic
     severity: warning
-    description: System temperature {systemTemp} exceeded normal operating value on {_HOSTNAME}.
+    description: Transmitter system temperature exceeded normal value {{value "systemTemp"}} on {{hostname}}.
     status: current
     varbinds:
       - systemTemp
@@ -1259,7 +1259,7 @@ traps:
     name: PBN-MIB::transmitterSystemTemperatureLow
     category: diagnostic
     severity: warning
-    description: System temperature {systemTemp} is low on {_HOSTNAME}.
+    description: Transmitter system temperature is low at {{value "systemTemp"}} on {{hostname}}.
     status: current
     varbinds:
       - systemTemp
@@ -1267,7 +1267,7 @@ traps:
     name: PBN-MIB::transmitterLaserCurrentHigh
     category: diagnostic
     severity: warning
-    description: Transmitter laser current {laserCurrent} exceeded normal operating value on {_HOSTNAME}.
+    description: Transmitter laser current exceeded normal value {{value "laserCurrent"}} on {{hostname}}.
     status: current
     varbinds:
       - laserCurrent
@@ -1275,7 +1275,7 @@ traps:
     name: PBN-MIB::transmitterLaserCurrentLow
     category: diagnostic
     severity: warning
-    description: Transmitter laser current {laserCurrent} exceeded normal operating value on {_HOSTNAME}.
+    description: Transmitter laser current is low at {{value "laserCurrent"}} on {{hostname}}.
     status: current
     varbinds:
       - laserCurrent
@@ -1283,7 +1283,7 @@ traps:
     name: PBN-MIB::transmitterLaserTemperatureHigh
     category: diagnostic
     severity: warning
-    description: Laser temperature {laserTemperature} exceeded normal operating value on {_HOSTNAME}.
+    description: Transmitter laser temperature is high at {{value "laserTemperature"}} on {{hostname}}.
     status: current
     varbinds:
       - laserTemperature
@@ -1291,13 +1291,13 @@ traps:
     name: PBN-MIB::transmitterLaserTemperatureLow
     category: diagnostic
     severity: warning
-    description: Transmitter laser temperature is low on {_HOSTNAME}.
+    description: Transmitter laser temperature is low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11606.7.1.45.0.7
     name: PBN-MIB::transmitterInputRFLevelHigh
     category: diagnostic
     severity: warning
-    description: Input RF level {inputRFLevel} exceeded normal operating value on {_HOSTNAME}.
+    description: Transmitter input RF level exceeded normal value {{value "inputRFLevel"}} on {{hostname}}.
     status: current
     varbinds:
       - inputRFLevel
@@ -1305,7 +1305,7 @@ traps:
     name: PBN-MIB::transmitterInputRFLevelLow
     category: diagnostic
     severity: warning
-    description: Input RF level {inputRFLevel} exceeded normal operating value on {_HOSTNAME}.
+    description: Transmitter input RF level is low at {{value "inputRFLevel"}} on {{hostname}}.
     status: current
     varbinds:
       - inputRFLevel
@@ -1313,7 +1313,7 @@ traps:
     name: PBN-MIB::transmitterOpticalPowerOutputHigh
     category: diagnostic
     severity: warning
-    description: Transmitter optical power output {opticalPowerOut1} exceeded normal operating value on {_HOSTNAME}.
+    description: Optical power output exceeded normal value on {{hostname}}.
     status: current
     varbinds:
       - opticalPowerOut1
@@ -1321,7 +1321,7 @@ traps:
     name: PBN-MIB::transmitterOpticalPowerOutputLow
     category: diagnostic
     severity: warning
-    description: Transmitter optical power output {opticalPowerOut1} exceeded normal operating value on {_HOSTNAME}.
+    description: Transmitter optical power output low on {{hostname}}.
     status: current
     varbinds:
       - opticalPowerOut1
@@ -1329,7 +1329,7 @@ traps:
     name: PBN-MIB::transmitterTECCurrentHigh
     category: diagnostic
     severity: warning
-    description: Thermoelectric cooler current {tecCurrent} exceeded normal operating value on {_HOSTNAME}.
+    description: Transmitter TEC current exceeded normal value {{value "tecCurrent"}} on {{hostname}}.
     status: current
     varbinds:
       - tecCurrent
@@ -1337,7 +1337,7 @@ traps:
     name: PBN-MIB::transmitterAGCUnlocked
     category: diagnostic
     severity: warning
-    description: Transmitter AGC unlocked with composite RF level {compositeRFLevel} on {_HOSTNAME}.
+    description: Transmitter AGC unlocked, composite RF level {{value "compositeRFLevel"}} on {{hostname}}.
     status: current
     varbinds:
       - compositeRFLevel
@@ -1345,21 +1345,21 @@ traps:
     name: PBN-MIB::transmitterKeySwitchOffPosition
     category: state_change
     severity: notice
-    description: Key switch status changed to {keyswitch} on {_HOSTNAME}.
+    description: Transmitter key switch is in the OFF position on {{hostname}}.
     status: current
     varbinds:
       - keyswitch
   - oid: 1.3.6.1.4.1.11606.7.1.45.0.14
     name: PBN-MIB::transmitterRemoteLaserOffMode
-    category: state_change
-    severity: notice
-    description: Transmitter remote laser control switched to OFF mode on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: Transmitter remote laser is in OFF mode on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11606.7.1.45.0.15
     name: PBN-MIB::transmitter2GHzSBSPowerHigh
     category: diagnostic
     severity: warning
-    description: 2GHz SBS output power {sbs2GHzPower} exceeded normal operating value on {_HOSTNAME}.
+    description: 2GHz SBS output power exceeded normal value {{value "sbs2GHzPower"}} on {{hostname}}.
     status: current
     varbinds:
       - sbs2GHzPower
@@ -1367,7 +1367,7 @@ traps:
     name: PBN-MIB::transmitter2GHzSBSPowerLow
     category: diagnostic
     severity: warning
-    description: 2GHz SBS output power {sbs2GHzPower} exceeded normal operating value on {_HOSTNAME}.
+    description: 2GHz SBS output power is low at {{value "sbs2GHzPower"}} on {{hostname}}.
     status: current
     varbinds:
       - sbs2GHzPower
@@ -1375,7 +1375,7 @@ traps:
     name: PBN-MIB::transmitter6GHzSBSPowerHigh
     category: diagnostic
     severity: warning
-    description: 6GHz SBS output power {sbs6GHzPower} exceeded normal operating value on {_HOSTNAME}.
+    description: 6GHz SBS output power exceeded normal value {{value "sbs6GHzPower"}} on {{hostname}}.
     status: current
     varbinds:
       - sbs6GHzPower
@@ -1383,7 +1383,7 @@ traps:
     name: PBN-MIB::transmitter6GHzSBSPowerLow
     category: diagnostic
     severity: warning
-    description: 6GHz SBS output power {sbs6GHzPower} exceeded normal operating value on {_HOSTNAME}.
+    description: 6GHz SBS output power is low at {{value "sbs6GHzPower"}} on {{hostname}}.
     status: current
     varbinds:
       - sbs6GHzPower
@@ -1391,7 +1391,7 @@ traps:
     name: PBN-MIB::transmitterSystem5VPowerHigh
     category: diagnostic
     severity: warning
-    description: +5V power supply voltage {monitor5v} exceeded normal operating value on {_HOSTNAME}.
+    description: +5V power supply voltage is high at {{value "monitor5v"}} on {{hostname}}.
     status: current
     varbinds:
       - monitor5v
@@ -1399,7 +1399,7 @@ traps:
     name: PBN-MIB::transmitterSystem5VPowerLow
     category: diagnostic
     severity: warning
-    description: +5V power supply voltage {monitor5v} exceeded normal operating value on {_HOSTNAME}.
+    description: +5V power supply voltage is low at {{value "monitor5v"}} on {{hostname}}.
     status: current
     varbinds:
       - monitor5v
@@ -1407,7 +1407,7 @@ traps:
     name: PBN-MIB::transmitterSystem12VPowerHigh
     category: diagnostic
     severity: warning
-    description: +12V power supply voltage {monitor12v} exceeded normal operating value on {_HOSTNAME}.
+    description: +12V power supply voltage exceeded normal value {{value "monitor12v"}} on {{hostname}}.
     status: current
     varbinds:
       - monitor12v
@@ -1415,7 +1415,7 @@ traps:
     name: PBN-MIB::transmitterSystem12VPowerLow
     category: diagnostic
     severity: warning
-    description: +12V power supply voltage {monitor12v} exceeded normal operating value on {_HOSTNAME}.
+    description: +12V power supply voltage is low at {{value "monitor12v"}} on {{hostname}}.
     status: current
     varbinds:
       - monitor12v
@@ -1423,7 +1423,7 @@ traps:
     name: PBN-MIB::transmitterSystem24VPowerHigh
     category: diagnostic
     severity: warning
-    description: +24V power supply voltage {monitor24v} exceeded normal operating value on {_HOSTNAME}.
+    description: +24V power supply voltage exceeded normal value {{value "monitor24v"}} on {{hostname}}.
     status: current
     varbinds:
       - monitor24v
@@ -1431,7 +1431,7 @@ traps:
     name: PBN-MIB::transmitterSystem24VPowerLow
     category: diagnostic
     severity: warning
-    description: +24V power supply voltage {monitor24v} exceeded normal operating value on {_HOSTNAME}.
+    description: +24V power supply voltage is low at {{value "monitor24v"}} on {{hostname}}.
     status: current
     varbinds:
       - monitor24v
@@ -1439,7 +1439,7 @@ traps:
     name: PBN-MIB::transmitterSystemM5VPowerHigh
     category: diagnostic
     severity: warning
-    description: -5V power supply voltage {monitorM5v} exceeded normal operating value on {_HOSTNAME}.
+    description: -5V power supply exceeded normal value {{value "monitorM5v"}} on {{hostname}}.
     status: current
     varbinds:
       - monitorM5v
@@ -1447,7 +1447,7 @@ traps:
     name: PBN-MIB::transmitterSystemM5VPowerLow
     category: diagnostic
     severity: warning
-    description: -5V power supply voltage {monitorM5v} exceeded normal operating value on {_HOSTNAME}.
+    description: -5V power supply voltage is low at {{value "monitorM5v"}} on {{hostname}}.
     status: current
     varbinds:
       - monitorM5v
@@ -1455,7 +1455,7 @@ traps:
     name: PBN-MIB::transmitterSystemM12VPowerHigh
     category: diagnostic
     severity: warning
-    description: -12V power supply value {monitorM12v} exceeded normal operating range on {_HOSTNAME}.
+    description: -12V power supply voltage is high at {{value "monitorM12v"}} on {{hostname}}.
     status: current
     varbinds:
       - monitorM12v
@@ -1463,7 +1463,7 @@ traps:
     name: PBN-MIB::transmitterSystemM12VPowerLow
     category: diagnostic
     severity: warning
-    description: -12V power supply value {monitorM12v} exceeded normal operating range on {_HOSTNAME}.
+    description: -12V power supply voltage is low ({{value "monitorM12v"}}) on {{hostname}}.
     status: current
     varbinds:
       - monitorM12v
@@ -1471,63 +1471,63 @@ traps:
     name: PBN-MIB::transmitterCommunicationFailure
     category: diagnostic
     severity: err
-    description: Transmitter communication failure detected on {_HOSTNAME}.
+    description: Transmitter communication failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11606.7.1.45.0.30
     name: PBN-MIB::transmitterPowerSupplyAFailure
     category: diagnostic
-    severity: err
-    description: Power supply module A failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Power supply module A failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11606.7.1.45.0.31
     name: PBN-MIB::transmitterPowerSupplyBFailure
     category: diagnostic
-    severity: err
-    description: Power supply module B failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Transmitter power supply module B failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11606.7.1.45.0.32
     name: PBN-MIB::transmitterCoolingFanAFailure
     category: diagnostic
-    severity: err
-    description: Cooling fan A failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Cooling fan A failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11606.7.1.45.0.33
     name: PBN-MIB::transmitterCoolingFanBFailure
     category: diagnostic
-    severity: warning
-    description: Cooling fan B failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Cooling fan B failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11606.7.2.8.0.0
     name: PBN-MIB::powerSupplyNoAlarmsPresent
     category: diagnostic
     severity: notice
-    description: No alarms are present on {_HOSTNAME}.
+    description: Power supply alarms cleared; no alarms are present on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11606.7.2.8.0.1
     name: PBN-MIB::powerSupplyPowerSupplyFailureA
     category: diagnostic
-    severity: err
-    description: Power supply module A failure detected with status {powerSupplyStatusA} on {_HOSTNAME}.
+    severity: crit
+    description: Power supply module A failure detected{{with value "powerSupplyStatusA"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - powerSupplyStatusA
   - oid: 1.3.6.1.4.1.11606.7.2.8.0.2
     name: PBN-MIB::powerSupplyPowerSupplyFailureB
     category: diagnostic
-    severity: err
-    description: Power supply module B reported failure status {powerSupplyStatusB} on {_HOSTNAME}.
+    severity: crit
+    description: Power supply module B failure detected{{with value "powerSupplyStatusB"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - powerSupplyStatusB
   - oid: 1.3.6.1.4.1.11606.7.2.8.0.3
     name: PBN-MIB::powerSupplyCoolingFanFailureA
     category: diagnostic
-    severity: err
-    description: Chassis cooling fan A failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Chassis cooling fan A failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11606.7.2.8.0.4
     name: PBN-MIB::powerSupplyCoolingFanFailureB
     category: diagnostic
-    severity: err
-    description: Chassis cooling fan B failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Chassis cooling fan B failure detected on {{hostname}}.
     status: current

@@ -9,17 +9,17 @@ traps:
     name: BARCO-CLICKSHARE-MIB::alarmCpuTemperature
     category: diagnostic
     severity: warning
-    description: CPU temperature exceeded threshold on {_HOSTNAME}.
+    description: CPU temperature exceeded threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7312.2468.0.2
     name: BARCO-CLICKSHARE-MIB::alarmCaseFanSpeed
     category: diagnostic
     severity: warning
-    description: Case fan speed alarm detected on {_HOSTNAME}.
+    description: Case fan is spinning too slow on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7312.2468.0.3
     name: BARCO-CLICKSHARE-MIB::alarmProcessNotRunning
     category: diagnostic
-    severity: crit
-    description: Monitored process is not running on {_HOSTNAME}.
+    severity: alert
+    description: Monitored process is not running on {{hostname}}.
     status: current

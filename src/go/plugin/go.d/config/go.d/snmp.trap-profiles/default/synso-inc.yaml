@@ -4,52 +4,46 @@
 vendor: synso-inc
 mib_count: 1
 trap_count: 7
-varbinds:
-  upsBatteryTemperature:
-    oid: 1.3.6.1.4.1.6574.4.3.5
-    type: Float
 traps:
   - oid: 1.3.6.1.4.1.9557.1.7.1
     name: SYNSO-UPSMIB::syupsTrapOverTemperature
     category: diagnostic
     severity: warning
-    description: UPS battery temperature {upsBatteryTemperature} is too high on {_HOSTNAME}.
+    description: UPS battery temperature is too high on {{hostname}}.
     status: current
-    varbinds:
-      - upsBatteryTemperature
   - oid: 1.3.6.1.4.1.9557.1.7.2
     name: SYNSO-UPSMIB::syupsTrapOverCurrent
     category: diagnostic
-    severity: warning
-    description: Over current condition detected on {_HOSTNAME}.
+    severity: alert
+    description: UPS over current condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9557.1.7.3
     name: SYNSO-UPSMIB::syupsTrapOverVoltage
     category: diagnostic
     severity: alert
-    description: Over voltage condition detected on {_HOSTNAME}.
+    description: Over voltage condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9557.1.7.4
     name: SYNSO-UPSMIB::syupsTrapUnderVoltage
     category: diagnostic
     severity: alert
-    description: UPS reported under-voltage condition on {_HOSTNAME}.
+    description: UPS under voltage condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9557.1.7.5
     name: SYNSO-UPSMIB::syupsOffFrequency
     category: diagnostic
     severity: warning
-    description: UPS frequency is abnormal on {_HOSTNAME}.
+    description: UPS frequency is abnormal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9557.1.7.6
     name: SYNSO-UPSMIB::syupsLowBattery
     category: diagnostic
     severity: warning
-    description: UPS battery level is low on {_HOSTNAME}.
+    description: UPS battery level is too low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9557.1.7.7
     name: SYNSO-UPSMIB::syupsBadBattery
     category: diagnostic
-    severity: warning
-    description: UPS battery reported as bad on {_HOSTNAME}.
+    severity: alert
+    description: UPS battery is bad on {{hostname}}.
     status: current

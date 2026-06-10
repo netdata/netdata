@@ -137,7 +137,7 @@ traps:
     name: TEMPAGER-MIB::alarmstart1-t4
     category: diagnostic
     severity: warning
-    description: Temperature sensor 1 reading {tempreading1c}C triggered alarm {alarmmessage} on {_HOSTNAME}.
+    description: Temperature sensor 1 reading {{value "tempreading1c"}}C is outside threshold on {{hostname}}.
     status: current
     varbinds:
       - alarmmessage
@@ -147,7 +147,7 @@ traps:
     name: TEMPAGER-MIB::tempager-snmp-trap
     category: diagnostic
     severity: warning
-    description: Temperature alarm condition detected with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Temperature alarm condition detected{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmmessage
@@ -163,7 +163,7 @@ traps:
     name: TEMPAGER-MIB::alarmstart2-t4
     category: diagnostic
     severity: warning
-    description: Temperature sensor 2 reading {tempreading2c} outside threshold on {_HOSTNAME}.
+    description: Temperature sensor 2 threshold exceeded ({{value "tempreading2c"}}°C) on {{hostname}}.
     status: current
     varbinds:
       - alarmmessage
@@ -173,7 +173,7 @@ traps:
     name: TEMPAGER-MIB::alarmclear2-t4
     category: diagnostic
     severity: notice
-    description: Temperature sensor 2 returned to normal condition with reading {tempreading2c} on {_HOSTNAME}.
+    description: Temperature sensor 2 returned to normal condition on {{hostname}}.
     status: current
     varbinds:
       - alarmmessage
@@ -183,7 +183,7 @@ traps:
     name: TEMPAGER-MIB::alarmstart3-t4
     category: diagnostic
     severity: warning
-    description: 'Temperature sensor 3 reading {tempreading3c}C triggered threshold alarm: {alarmmessage} on {_HOSTNAME}.'
+    description: Temperature sensor 3 threshold exceeded with reading {{value "tempreading3c"}}C on {{hostname}}.
     status: current
     varbinds:
       - alarmmessage
@@ -193,7 +193,7 @@ traps:
     name: TEMPAGER-MIB::alarmclear3-t4
     category: diagnostic
     severity: notice
-    description: Temperature sensor 3 returned to normal condition with reading {tempreading3c} on {_HOSTNAME}.
+    description: Temperature sensor 3 returned to normal condition on {{hostname}}.
     status: current
     varbinds:
       - alarmmessage
@@ -203,7 +203,7 @@ traps:
     name: TEMPAGER-MIB::alarmstart4-t4
     category: diagnostic
     severity: warning
-    description: Temperature sensor 4 reading {tempreading4c}C triggered alarm {alarmmessage} on {_HOSTNAME}.
+    description: Temperature sensor 4 threshold exceeded ({{value "tempreading4c"}}°C) on {{hostname}}.
     status: current
     varbinds:
       - alarmmessage
@@ -213,7 +213,7 @@ traps:
     name: TEMPAGER-MIB::alarmclear4-t4
     category: diagnostic
     severity: notice
-    description: Temperature sensor 4 returned to normal condition with reading {tempreading4c} on {_HOSTNAME}.
+    description: Temperature sensor 4 returned to normal condition on {{hostname}}.
     status: current
     varbinds:
       - alarmmessage
@@ -223,7 +223,7 @@ traps:
     name: ROOMALERT7E-MIB::alarmstart1-7e
     category: diagnostic
     severity: warning
-    description: Temperature sensor 1 reading {tempreading1c}C triggered alarm {alarmmessage} on {_HOSTNAME}.
+    description: Temperature sensor 1 threshold exceeded with reading {{value "tempreading1c"}}C on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -238,8 +238,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.2.0.2
     name: ROOMALERT7E-MIB::room-alert-7e-snmp-trap
     category: diagnostic
-    severity: warning
-    description: 'Sensor alarm condition reported: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Sensor alarm condition detected: {{value "alarmmessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -249,7 +249,7 @@ traps:
     name: ROOMALERT7E-MIB::alarmstart2-7e
     category: diagnostic
     severity: warning
-    description: Temperature sensor 2 reading {tempreading2c}C triggered alarm {alarmmessage} on {_HOSTNAME}.
+    description: Temperature sensor 2 threshold exceeded with {{value "alarmmessage"}} on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -265,7 +265,7 @@ traps:
     name: ROOMALERT7E-MIB::alarmclear2-7e
     category: diagnostic
     severity: notice
-    description: Temperature sensor 2 returned to normal condition with reading {tempreading2c} on {_HOSTNAME}.
+    description: Temperature sensor 2 returned to normal condition on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -281,7 +281,7 @@ traps:
     name: ROOMALERT7E-MIB::alarmstart3-7e
     category: diagnostic
     severity: warning
-    description: Temperature sensor 3 reading {tempreading3c}C triggered alarm {alarmmessage} on {_HOSTNAME}.
+    description: Temperature sensor 3 threshold exceeded with reading {{value "tempreading3c"}}C on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -297,7 +297,7 @@ traps:
     name: ROOMALERT7E-MIB::alarmclear3-7e
     category: diagnostic
     severity: notice
-    description: Temperature sensor 3 returned to normal condition on {_HOSTNAME}.
+    description: Temperature sensor 3 returned to normal condition on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -313,7 +313,7 @@ traps:
     name: ROOMALERT7E-MIB::alarmstart4-7e
     category: diagnostic
     severity: warning
-    description: Temperature sensor 4 reading {tempreading4c} triggered alarm {alarmmessage} on {_HOSTNAME}.
+    description: Temperature sensor 4 threshold exceeded ({{value "tempreading4c"}}°C) on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -329,7 +329,7 @@ traps:
     name: ROOMALERT7E-MIB::alarmclear4-7e
     category: diagnostic
     severity: notice
-    description: Temperature sensor 4 returned to normal condition with reading {tempreading4c} on {_HOSTNAME}.
+    description: Temperature on sensor 4 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -345,7 +345,7 @@ traps:
     name: ROOMALERT7E-MIB::alarmstart5-7e
     category: diagnostic
     severity: warning
-    description: Sensor 1 status {switch1.raw} triggered threshold alarm {alarmmessage} on {_HOSTNAME}.
+    description: Sensor 1 status changed to {{value "switch1"}} with message {{value "alarmmessage"}} on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -355,9 +355,9 @@ traps:
       - switch1
   - oid: 1.3.6.1.4.1.20916.1.2.0.10
     name: ROOMALERT7E-MIB::alarmclear5-7e
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Sensor 1 alarm cleared with status {switch1} and message {alarmmessage} on {_HOSTNAME}.
+    description: Sensor 1 alarm cleared (status {{value "switch1"}}) on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -369,7 +369,7 @@ traps:
     name: ROOMALERT7E-MIB::alarmstart6-7e
     category: diagnostic
     severity: warning
-    description: Sensor 2 status changed to {switch2} with message {alarmmessage} on {_HOSTNAME}.
+    description: Sensor 2 status changed to {{value "switch2"}} with message {{value "alarmmessage"}} on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -379,9 +379,9 @@ traps:
       - switch2
   - oid: 1.3.6.1.4.1.20916.1.2.0.12
     name: ROOMALERT7E-MIB::alarmclear6-7e
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Sensor 2 status changed to {switch2} with message {alarmmessage} on {_HOSTNAME}.
+    description: Sensor 2 alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -393,7 +393,7 @@ traps:
     name: ROOMALERT7E-MIB::alarmstart7-7e
     category: diagnostic
     severity: warning
-    description: Sensor 3 status {switch3.raw} triggered alarm {alarmmessage} on {_HOSTNAME}.
+    description: Sensor 3 status changed to {{value "switch3"}} with message {{value "alarmmessage"}} on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -403,9 +403,9 @@ traps:
       - switch3
   - oid: 1.3.6.1.4.1.20916.1.2.0.14
     name: ROOMALERT7E-MIB::alarmclear7-7e
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Sensor 3 status cleared from alarm state on {_HOSTNAME}.
+    description: Sensor 3 alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -417,7 +417,7 @@ traps:
     name: ROOMALERT11E-MIB::tempAlarm1-11e
     category: diagnostic
     severity: warning
-    description: Temperature alarm on external sensor 1 with reading {sensor2-1} on {_HOSTNAME}.
+    description: Temperature alarm on sensor 2-1 with value {{value "sensor2-1"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage2
@@ -427,8 +427,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.3.0.2
     name: ROOMALERT11E-MIB::room-alert-11E-SNMP-trap
     category: diagnostic
-    severity: warning
-    description: 'Sensor alarm condition detected: {alarmMessage1} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Room Alert 11E alarm condition detected{{with value "alarmMessage1"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmMessage1
@@ -439,7 +439,7 @@ traps:
     name: ROOMALERT11E-MIB::tempAlarm2-11e
     category: diagnostic
     severity: warning
-    description: Temperature alarm on sensor 3-1 with message {alarmMessage3} on {_HOSTNAME}.
+    description: Temperature threshold exceeded on sensor 3-1 ({{value "sensor3-1"}}°C) on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage3
@@ -450,7 +450,7 @@ traps:
     name: ROOMALERT11E-MIB::tempClear2-11e
     category: diagnostic
     severity: notice
-    description: Temperature on external sensor 2 returned to normal condition on {_HOSTNAME}.
+    description: Temperature on sensor 3-1 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage3
@@ -461,7 +461,7 @@ traps:
     name: ROOMALERT11E-MIB::tempAlarm3-11e
     category: diagnostic
     severity: warning
-    description: Temperature alarm on sensor 4-1 with reading {sensor4-1} on {_HOSTNAME}.
+    description: Temperature alarm on external sensor 3, current reading {{value "sensor4-1"}} Celsius on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage4
@@ -472,7 +472,7 @@ traps:
     name: ROOMALERT11E-MIB::tempClear3-11e
     category: diagnostic
     severity: notice
-    description: Temperature on sensor 3 returned to normal condition on {_HOSTNAME}.
+    description: Temperature on external sensor 3 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage4
@@ -483,7 +483,7 @@ traps:
     name: ROOMALERT11E-MIB::humidityAlarm1-11e
     category: diagnostic
     severity: warning
-    description: Humidity threshold exceeded on sensor 2-3 with message {alarmMessage2} on {_HOSTNAME}.
+    description: Humidity threshold alarm on sensor 2-3 with value {{value "sensor2-3"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage2
@@ -494,7 +494,7 @@ traps:
     name: ROOMALERT11E-MIB::humidityClear1-11e
     category: diagnostic
     severity: notice
-    description: Humidity on sensor 2-1 returned to normal condition on {_HOSTNAME}.
+    description: Humidity on external sensor 1 returned to normal condition on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage2
@@ -505,7 +505,7 @@ traps:
     name: ROOMALERT11E-MIB::humidityAlarm2-11e
     category: diagnostic
     severity: warning
-    description: Humidity threshold alarm on sensor 3 with message {alarmMessage3} on {_HOSTNAME}.
+    description: Humidity threshold alarm on external sensor 3 on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage3
@@ -516,7 +516,7 @@ traps:
     name: ROOMALERT11E-MIB::humidityClear2-11e
     category: diagnostic
     severity: notice
-    description: Humidity on external sensor 2 returned to normal condition on {_HOSTNAME}.
+    description: Humidity on external sensor 2 returned to normal condition on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage3
@@ -527,7 +527,7 @@ traps:
     name: ROOMALERT11E-MIB::humidityAlarm3-11e
     category: diagnostic
     severity: warning
-    description: Humidity threshold alarm on external sensor 3 with message {alarmMessage4} on {_HOSTNAME}.
+    description: 'Humidity threshold exceeded on external sensor 3{{with value "alarmMessage4"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmMessage4
@@ -538,7 +538,7 @@ traps:
     name: ROOMALERT11E-MIB::humidityClear3-11e
     category: diagnostic
     severity: notice
-    description: Humidity on sensor 3 returned to normal condition on {_HOSTNAME}.
+    description: Humidity on external sensor 3 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage4
@@ -549,7 +549,7 @@ traps:
     name: ROOMALERT11E-MIB::switchAlarm1-11e
     category: diagnostic
     severity: warning
-    description: Sensor 1 alarm triggered with message {alarmMessage1} on {_HOSTNAME}.
+    description: 'Sensor 1 alarm triggered{{with value "alarmMessage1"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmMessage1
@@ -560,7 +560,7 @@ traps:
     name: ROOMALERT11E-MIB::switchClear1-11e
     category: diagnostic
     severity: notice
-    description: Switch sensor 1 returned to normal state on {_HOSTNAME}.
+    description: Switch sensor 1 returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage1
@@ -571,7 +571,7 @@ traps:
     name: ROOMALERT11E-MIB::switchAlarm2-11e
     category: diagnostic
     severity: warning
-    description: Sensor 2 alarm state detected with message {alarmMessage1} on {_HOSTNAME}.
+    description: 'Sensor 2 alarm state detected{{with value "alarmMessage1"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmMessage1
@@ -580,9 +580,9 @@ traps:
       - sensor1-2
   - oid: 1.3.6.1.4.1.20916.1.3.0.16
     name: ROOMALERT11E-MIB::switchClear2-11e
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Switch sensor 2 returned to normal state on {_HOSTNAME}.
+    description: Switch sensor 2 returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage1
@@ -592,8 +592,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.3.0.17
     name: ROOMALERT11E-MIB::switchAlarm3-11e
     category: diagnostic
-    severity: warning
-    description: Sensor alarm triggered with message {alarmMessage1} on {_HOSTNAME}.
+    severity: alert
+    description: 'Sensor 1 alarm triggered{{with value "alarmMessage1"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmMessage1
@@ -602,9 +602,9 @@ traps:
       - sensor1-3
   - oid: 1.3.6.1.4.1.20916.1.3.0.18
     name: ROOMALERT11E-MIB::switchClear3-11e
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Switch sensor 3 returned to normal state on {_HOSTNAME}.
+    description: Switch sensor 3 returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage1
@@ -615,7 +615,7 @@ traps:
     name: ROOMALERT11E-MIB::switchAlarm4-11e
     category: diagnostic
     severity: warning
-    description: Sensor 4 alarm state detected with message {alarmMessage1} on {_HOSTNAME}.
+    description: 'Switch sensor 4 is in an alarm state{{with value "alarmMessage1"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmMessage1
@@ -626,7 +626,7 @@ traps:
     name: ROOMALERT11E-MIB::switchClear4-11e
     category: diagnostic
     severity: notice
-    description: Switch sensor 4 returned to normal state on {_HOSTNAME}.
+    description: Switch sensor 4 returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage1
@@ -637,7 +637,7 @@ traps:
     name: ROOMALERT11E-MIB::switchAlarm5-11e
     category: diagnostic
     severity: warning
-    description: Sensor 5 alarm state detected with message {alarmMessage1} on {_HOSTNAME}.
+    description: 'Switch sensor 5 alarm state detected{{with value "alarmMessage1"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmMessage1
@@ -646,9 +646,9 @@ traps:
       - sensor1-5
   - oid: 1.3.6.1.4.1.20916.1.3.0.22
     name: ROOMALERT11E-MIB::switchClear5-11e
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Sensor 5 returned to normal state with alarm message {alarmMessage1} on {_HOSTNAME}.
+    description: Switch sensor 5 returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage1
@@ -659,7 +659,7 @@ traps:
     name: ROOMALERT11E-MIB::switchAlarm6-11e
     category: diagnostic
     severity: warning
-    description: Sensor 6 alarm state detected with message {alarmMessage1} on {_HOSTNAME}.
+    description: 'Sensor 6 alarm state detected{{with value "alarmMessage1"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmMessage1
@@ -668,9 +668,9 @@ traps:
       - sensor1-6
   - oid: 1.3.6.1.4.1.20916.1.3.0.24
     name: ROOMALERT11E-MIB::switchClear6-11e
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Switch sensor 6 returned to normal state on {_HOSTNAME}.
+    description: Switch sensor 6 returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage1
@@ -681,7 +681,7 @@ traps:
     name: ROOMALERT11E-MIB::switchAlarm7-11e
     category: diagnostic
     severity: warning
-    description: Sensor 7 reported alarm state with message {alarmMessage1} on {_HOSTNAME}.
+    description: 'Sensor 7 alarm state detected{{with value "alarmMessage1"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmMessage1
@@ -690,9 +690,9 @@ traps:
       - sensor1-7
   - oid: 1.3.6.1.4.1.20916.1.3.0.26
     name: ROOMALERT11E-MIB::switchClear7-11e
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Switch sensor 7 returned to normal state on {_HOSTNAME}.
+    description: Switch sensor 7 returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage1
@@ -703,7 +703,7 @@ traps:
     name: ROOMALERT11E-MIB::switchAlarm8-11e
     category: diagnostic
     severity: warning
-    description: Sensor 8 alarm state detected with message {alarmMessage1} on {_HOSTNAME}.
+    description: 'Switch sensor 8 is in an alarm state{{with value "alarmMessage1"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmMessage1
@@ -712,9 +712,9 @@ traps:
       - sensor1-8
   - oid: 1.3.6.1.4.1.20916.1.3.0.28
     name: ROOMALERT11E-MIB::switchClear8-11e
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Sensor 8 returned to normal state on {_HOSTNAME}.
+    description: Switch sensor 8 returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - alarmMessage1
@@ -725,7 +725,7 @@ traps:
     name: ROOMALERT26W-MIB::tempalarm1-26w
     category: diagnostic
     severity: warning
-    description: 'Temperature alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    description: 'Temperature alarm on external sensor 1{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -734,8 +734,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.4.0.2
     name: ROOMALERT26W-MIB::room-alert-26w-snmp-trap
     category: diagnostic
-    severity: warning
-    description: 'Alarm condition detected: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Sensor alarm condition triggered: {{value "alarmmessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -745,7 +745,7 @@ traps:
     name: ROOMALERT26W-MIB::tempalarm2-26w
     category: diagnostic
     severity: warning
-    description: Temperature alarm triggered with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Temperature alarm on external sensor 2{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -755,7 +755,7 @@ traps:
     name: ROOMALERT26W-MIB::tempclear2-26w
     category: diagnostic
     severity: notice
-    description: Temperature on external sensor 2 returned to normal with message {alarmmessage} on {_HOSTNAME}.
+    description: Temperature on external sensor 2 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -765,7 +765,7 @@ traps:
     name: ROOMALERT26W-MIB::tempalarm3-26w
     category: diagnostic
     severity: warning
-    description: Temperature alarm on external sensor 3 with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Temperature alarm on external sensor 3{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -775,7 +775,7 @@ traps:
     name: ROOMALERT26W-MIB::tempclear3-26w
     category: diagnostic
     severity: notice
-    description: Temperature sensor 3 returned to normal condition with message {alarmmessage} on {_HOSTNAME}.
+    description: Temperature on external sensor 3 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -785,7 +785,7 @@ traps:
     name: ROOMALERT26W-MIB::humidityalarm1-26w
     category: diagnostic
     severity: warning
-    description: 'Humidity alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    description: 'Humidity alarm on external sensor 1{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -795,7 +795,7 @@ traps:
     name: ROOMALERT26W-MIB::humidityclear1-26w
     category: diagnostic
     severity: notice
-    description: Humidity sensor returned to normal condition on {_HOSTNAME}.
+    description: Humidity sensor 1 returned to normal condition on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -805,7 +805,7 @@ traps:
     name: ROOMALERT26W-MIB::humidityalarm2-26w
     category: diagnostic
     severity: warning
-    description: 'Humidity alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    description: 'Humidity alarm on external sensor 2{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -813,9 +813,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.4.0.10
     name: ROOMALERT26W-MIB::humidityclear2-26w
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Humidity sensor 2 returned to normal condition on {_HOSTNAME}.
+    description: Humidity on external sensor 2 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -825,7 +825,7 @@ traps:
     name: ROOMALERT26W-MIB::humidityalarm3-26w
     category: diagnostic
     severity: warning
-    description: Humidity alarm on external sensor 3 with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Humidity alarm on external sensor 3{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -835,7 +835,7 @@ traps:
     name: ROOMALERT26W-MIB::humidityclear3-26w
     category: diagnostic
     severity: notice
-    description: 'Humidity sensor 3 returned to normal condition: {alarmmessage} on {_HOSTNAME}.'
+    description: Humidity on external sensor 3 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -844,8 +844,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.4.0.13
     name: ROOMALERT26W-MIB::switchalarm1-26w
     category: diagnostic
-    severity: warning
-    description: Sensor alarm triggered with message {alarmmessage} on {_HOSTNAME}.
+    severity: alert
+    description: 'Switch sensor 1 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -855,7 +855,7 @@ traps:
     name: ROOMALERT26W-MIB::switchclear1-26w
     category: diagnostic
     severity: notice
-    description: Sensor 1 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 1 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -865,7 +865,7 @@ traps:
     name: ROOMALERT26W-MIB::switchalarm2-26w
     category: diagnostic
     severity: warning
-    description: 'Sensor 2 alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    description: 'Switch sensor 2 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -873,9 +873,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.4.0.16
     name: ROOMALERT26W-MIB::switchclear2-26w
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Sensor 2 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: Switch sensor 2 returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -884,8 +884,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.4.0.17
     name: ROOMALERT26W-MIB::switchalarm3-26w
     category: diagnostic
-    severity: warning
-    description: 'Sensor 3 alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Switch sensor 3 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -893,9 +893,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.4.0.18
     name: ROOMALERT26W-MIB::switchclear3-26w
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Switch sensor 3 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: Switch sensor 3 returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -904,8 +904,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.4.0.19
     name: ROOMALERT26W-MIB::switchalarm4-26w
     category: diagnostic
-    severity: warning
-    description: 'Sensor 4 alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Switch sensor 4 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -915,7 +915,7 @@ traps:
     name: ROOMALERT26W-MIB::switchclear4-26w
     category: diagnostic
     severity: notice
-    description: Sensor 4 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 4 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -924,8 +924,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.4.0.21
     name: ROOMALERT26W-MIB::switchalarm5-26w
     category: diagnostic
-    severity: warning
-    description: 'Switch sensor 5 alarm state detected: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Switch sensor 5 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -935,7 +935,7 @@ traps:
     name: ROOMALERT26W-MIB::switchclear5-26w
     category: diagnostic
     severity: notice
-    description: Switch sensor 5 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 5 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -944,8 +944,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.4.0.23
     name: ROOMALERT26W-MIB::switchalarm6-26w
     category: diagnostic
-    severity: warning
-    description: Sensor alarm triggered with message {alarmmessage} on {_HOSTNAME}.
+    severity: alert
+    description: 'Switch sensor 6 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -953,9 +953,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.4.0.24
     name: ROOMALERT26W-MIB::switchclear6-26w
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Switch sensor 6 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 6 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -964,8 +964,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.4.0.25
     name: ROOMALERT26W-MIB::switchalarm7-26w
     category: diagnostic
-    severity: warning
-    description: 'Sensor 7 alarm state detected: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Switch sensor 7 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -973,9 +973,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.4.0.26
     name: ROOMALERT26W-MIB::switchclear7-26w
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Sensor 7 returned to normal state on {_HOSTNAME}.
+    description: 'Sensor 7 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -984,8 +984,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.4.0.27
     name: ROOMALERT26W-MIB::switchalarm8-26w
     category: diagnostic
-    severity: warning
-    description: 'Sensor alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Switch sensor 8 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -995,7 +995,7 @@ traps:
     name: ROOMALERT26W-MIB::switchclear8-26w
     category: diagnostic
     severity: notice
-    description: Sensor 8 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 8 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1005,7 +1005,7 @@ traps:
     name: ROOMALERT24E-MIB::tempalarm1-24e
     category: diagnostic
     severity: warning
-    description: 'Temperature alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    description: 'Temperature alarm on external sensor 1{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1014,8 +1014,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.5.0.2
     name: ROOMALERT24E-MIB::room-alert-24e-snmp-trap
     category: diagnostic
-    severity: warning
-    description: 'Sensor alarm condition detected: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Room alert alarm condition triggered: {{value "alarmmessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1025,7 +1025,7 @@ traps:
     name: ROOMALERT24E-MIB::tempalarm2-24e
     category: diagnostic
     severity: warning
-    description: Temperature alarm on external sensor 2 with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Temperature alarm on external sensor 2{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1035,7 +1035,7 @@ traps:
     name: ROOMALERT24E-MIB::tempclear2-24e
     category: diagnostic
     severity: notice
-    description: Temperature sensor 2 returned to normal condition with message {alarmmessage} on {_HOSTNAME}.
+    description: Temperature on external sensor 2 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1045,7 +1045,7 @@ traps:
     name: ROOMALERT24E-MIB::tempalarm3-24e
     category: diagnostic
     severity: warning
-    description: Temperature alarm on external sensor 3 with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Temperature alarm on external sensor 3{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1055,7 +1055,7 @@ traps:
     name: ROOMALERT24E-MIB::tempclear3-24e
     category: diagnostic
     severity: notice
-    description: External sensor 3 temperature cleared to normal condition on {_HOSTNAME}.
+    description: Temperature on external sensor 3 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1065,7 +1065,7 @@ traps:
     name: ROOMALERT24E-MIB::humidityalarm1-24e
     category: diagnostic
     severity: warning
-    description: Humidity alarm triggered with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Humidity alarm on external sensor 1{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1075,7 +1075,7 @@ traps:
     name: ROOMALERT24E-MIB::humidityclear1-24e
     category: diagnostic
     severity: notice
-    description: Humidity sensor 1 returned to normal condition with message {alarmmessage} on {_HOSTNAME}.
+    description: Humidity sensor 1 returned to normal condition on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1085,7 +1085,7 @@ traps:
     name: ROOMALERT24E-MIB::humidityalarm2-24e
     category: diagnostic
     severity: warning
-    description: 'Humidity threshold alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    description: 'Humidity alarm on external sensor 2{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1095,7 +1095,7 @@ traps:
     name: ROOMALERT24E-MIB::humidityclear2-24e
     category: diagnostic
     severity: notice
-    description: Humidity sensor 2 returned to normal condition on {_HOSTNAME}.
+    description: Humidity on external sensor 2 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1105,7 +1105,7 @@ traps:
     name: ROOMALERT24E-MIB::humidityalarm3-24e
     category: diagnostic
     severity: warning
-    description: Humidity alarm triggered on external sensor 3 with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Humidity alarm on external sensor 3{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1115,7 +1115,7 @@ traps:
     name: ROOMALERT24E-MIB::humidityclear3-24e
     category: diagnostic
     severity: notice
-    description: Humidity sensor 3 returned to normal condition on {_HOSTNAME}.
+    description: Humidity sensor 3 returned to normal condition on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1124,8 +1124,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.5.0.13
     name: ROOMALERT24E-MIB::switchalarm1-24e
     category: diagnostic
-    severity: warning
-    description: Sensor alarm triggered with message {alarmmessage} on {_HOSTNAME}.
+    severity: alert
+    description: 'Switch sensor 1 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1133,9 +1133,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.5.0.14
     name: ROOMALERT24E-MIB::switchclear1-24e
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Sensor 1 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: Switch sensor 1 returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1144,8 +1144,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.5.0.15
     name: ROOMALERT24E-MIB::switchalarm2-24e
     category: diagnostic
-    severity: warning
-    description: 'Sensor 2 alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Switch sensor 2 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1155,7 +1155,7 @@ traps:
     name: ROOMALERT24E-MIB::switchclear2-24e
     category: diagnostic
     severity: notice
-    description: Sensor 2 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 2 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1164,8 +1164,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.5.0.17
     name: ROOMALERT24E-MIB::switchalarm3-24e
     category: diagnostic
-    severity: warning
-    description: 'Sensor alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Switch sensor 1 alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1173,9 +1173,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.5.0.18
     name: ROOMALERT24E-MIB::switchclear3-24e
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Switch sensor 3 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: Switch sensor 3 returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1185,7 +1185,7 @@ traps:
     name: ROOMALERT24E-MIB::switchalarm4-24e
     category: diagnostic
     severity: warning
-    description: 'Sensor 4 alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    description: 'Switch sensor 4 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1195,7 +1195,7 @@ traps:
     name: ROOMALERT24E-MIB::switchclear4-24e
     category: diagnostic
     severity: notice
-    description: Sensor 4 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 4 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1205,7 +1205,7 @@ traps:
     name: ROOMALERT24E-MIB::switchalarm5-24e
     category: diagnostic
     severity: warning
-    description: 'Sensor alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    description: 'Switch sensor 5 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1213,9 +1213,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.5.0.22
     name: ROOMALERT24E-MIB::switchclear5-24e
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Switch sensor 5 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 5 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1224,8 +1224,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.5.0.23
     name: ROOMALERT24E-MIB::switchalarm6-24e
     category: diagnostic
-    severity: warning
-    description: Sensor 6 alarm state triggered with message {alarmmessage} on {_HOSTNAME}.
+    severity: alert
+    description: 'Switch sensor 6 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1235,7 +1235,7 @@ traps:
     name: ROOMALERT24E-MIB::switchclear6-24e
     category: diagnostic
     severity: notice
-    description: Sensor 6 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Sensor 6 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1245,7 +1245,7 @@ traps:
     name: ROOMALERT24E-MIB::switchalarm7-24e
     category: diagnostic
     severity: warning
-    description: 'Switch sensor 7 alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    description: 'Switch sensor 7 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1253,9 +1253,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.5.0.26
     name: ROOMALERT24E-MIB::switchclear7-24e
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Sensor 7 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 7 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1264,8 +1264,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.5.0.27
     name: ROOMALERT24E-MIB::switchalarm8-24e
     category: diagnostic
-    severity: warning
-    description: 'Sensor alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Switch sensor 8 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1275,7 +1275,7 @@ traps:
     name: ROOMALERT24E-MIB::switchclear8-24e
     category: diagnostic
     severity: notice
-    description: Sensor 8 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 8 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1284,8 +1284,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.6.0.2
     name: ROOMALERT4E-MIB::room-alert-4e-snmp-trap
     category: diagnostic
-    severity: warning
-    description: 'Alarm condition detected: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Sensor alarm condition detected: {{value "alarmmessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1295,7 +1295,7 @@ traps:
     name: TEMPAGER3E-MIB::tempager3e-snmp-trap
     category: diagnostic
     severity: warning
-    description: Sensor alarm {alarmmessage} detected on {_HOSTNAME}.
+    description: 'Sensor alarm condition occurred: {{value "alarmmessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1305,7 +1305,7 @@ traps:
     name: ROOMALERT32E-MIB::tempalarm1-32E
     category: diagnostic
     severity: warning
-    description: Temperature alarm on external sensor 1 with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Temperature alarm on external sensor 1{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1315,7 +1315,7 @@ traps:
     name: ROOMALERT32E-MIB::room-alert-32E-snmp-trap
     category: diagnostic
     severity: alert
-    description: 'Alarm condition detected: {alarmmessage} on {_HOSTNAME}.'
+    description: 'Sensor alarm condition occurred: {{value "alarmmessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1325,7 +1325,7 @@ traps:
     name: ROOMALERT32E-MIB::tempalarm2-32E
     category: diagnostic
     severity: warning
-    description: Temperature alarm on external sensor 2 triggered with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Temperature alarm on external sensor 2{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1335,7 +1335,7 @@ traps:
     name: ROOMALERT32E-MIB::tempclear2-32E
     category: diagnostic
     severity: notice
-    description: Temperature sensor 2 returned to normal condition with message {alarmmessage} on {_HOSTNAME}.
+    description: Temperature on external sensor 2 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1345,7 +1345,7 @@ traps:
     name: ROOMALERT32E-MIB::tempalarm3-32E
     category: diagnostic
     severity: warning
-    description: Temperature alarm on external sensor 3 with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Temperature alarm on external sensor 3{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1355,7 +1355,7 @@ traps:
     name: ROOMALERT32E-MIB::tempclear3-32E
     category: diagnostic
     severity: notice
-    description: External sensor 3 temperature cleared to normal condition on {_HOSTNAME}.
+    description: External sensor 3 temperature returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1365,7 +1365,7 @@ traps:
     name: ROOMALERT32E-MIB::humidityalarm1-32E
     category: diagnostic
     severity: warning
-    description: Humidity alarm triggered on external sensor 1 with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Humidity alarm on external sensor 1{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1373,9 +1373,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.8.0.8
     name: ROOMALERT32E-MIB::humidityclear1-32E
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Humidity sensor 1 returned to normal condition on {_HOSTNAME}.
+    description: Humidity on external sensor 1 returned to normal condition on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1385,7 +1385,7 @@ traps:
     name: ROOMALERT32E-MIB::humidityalarm2-32E
     category: diagnostic
     severity: warning
-    description: 'Humidity threshold alarm on external sensor 2: {alarmmessage} on {_HOSTNAME}.'
+    description: 'Humidity alarm on external sensor 2{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1393,9 +1393,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.8.0.10
     name: ROOMALERT32E-MIB::humidityclear2-32E
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Humidity sensor 2 returned to normal condition on {_HOSTNAME}.
+    description: Humidity on external sensor 2 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1405,7 +1405,7 @@ traps:
     name: ROOMALERT32E-MIB::humidityalarm3-32E
     category: diagnostic
     severity: warning
-    description: 'Humidity threshold alarm on external sensor 3: {alarmmessage} on {_HOSTNAME}.'
+    description: 'Humidity alarm on external sensor 3{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1413,9 +1413,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.8.0.12
     name: ROOMALERT32E-MIB::humidityclear3-32E
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Humidity on external sensor 3 returned to normal on {_HOSTNAME}.
+    description: Humidity on external sensor 3 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1424,8 +1424,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.8.0.13
     name: ROOMALERT32E-MIB::switchalarm1-32E
     category: diagnostic
-    severity: warning
-    description: 'Sensor alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Switch sensor 1 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1433,9 +1433,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.8.0.14
     name: ROOMALERT32E-MIB::switchclear1-32E
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Switch sensor 1 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 1 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1444,8 +1444,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.8.0.15
     name: ROOMALERT32E-MIB::switchalarm2-32E
     category: diagnostic
-    severity: warning
-    description: 'Sensor 2 alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Switch sensor 2 is in alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1453,9 +1453,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.8.0.16
     name: ROOMALERT32E-MIB::switchclear2-32E
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Sensor 2 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 2 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1464,8 +1464,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.8.0.17
     name: ROOMALERT32E-MIB::switchalarm3-32E
     category: diagnostic
-    severity: warning
-    description: Sensor 3 alarm state triggered with message {alarmmessage} on {_HOSTNAME}.
+    severity: alert
+    description: 'Switch sensor 3 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1473,9 +1473,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.8.0.18
     name: ROOMALERT32E-MIB::switchclear3-32E
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Sensor 3 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 3 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1484,8 +1484,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.8.0.19
     name: ROOMALERT32E-MIB::switchalarm4-32E
     category: diagnostic
-    severity: warning
-    description: 'Sensor alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Switch sensor 4 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1495,7 +1495,7 @@ traps:
     name: ROOMALERT32E-MIB::switchclear4-32E
     category: diagnostic
     severity: notice
-    description: Sensor 4 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 4 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1504,8 +1504,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.8.0.21
     name: ROOMALERT32E-MIB::switchalarm5-32E
     category: diagnostic
-    severity: warning
-    description: 'Sensor 5 alarm state detected: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Switch sensor 5 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1515,7 +1515,7 @@ traps:
     name: ROOMALERT32E-MIB::switchclear5-32E
     category: diagnostic
     severity: notice
-    description: Switch sensor 5 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 5 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1524,8 +1524,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.8.0.23
     name: ROOMALERT32E-MIB::switchalarm6-32E
     category: diagnostic
-    severity: warning
-    description: Sensor 6 alarm triggered with message {alarmmessage} on {_HOSTNAME}.
+    severity: alert
+    description: 'Switch sensor 6 is in alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1533,9 +1533,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.8.0.24
     name: ROOMALERT32E-MIB::switchclear6-32E
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Switch sensor 6 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: Switch sensor 6 returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1545,7 +1545,7 @@ traps:
     name: ROOMALERT32E-MIB::switchalarm7-32E
     category: diagnostic
     severity: warning
-    description: 'Sensor 7 alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    description: 'Switch sensor 7 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1555,7 +1555,7 @@ traps:
     name: ROOMALERT32E-MIB::switchclear7-32E
     category: diagnostic
     severity: notice
-    description: Sensor 7 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 7 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1564,8 +1564,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.8.0.27
     name: ROOMALERT32E-MIB::switchalarm8-32E
     category: diagnostic
-    severity: warning
-    description: Sensor 8 alarm state detected with message {alarmmessage} on {_HOSTNAME}.
+    severity: alert
+    description: 'Switch sensor 8 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1575,7 +1575,7 @@ traps:
     name: ROOMALERT32E-MIB::switchclear8-32E
     category: diagnostic
     severity: notice
-    description: Switch sensor 8 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 8 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1585,7 +1585,7 @@ traps:
     name: ROOMALERT12E-MIB::tempalarm1-12E
     category: diagnostic
     severity: warning
-    description: 'Temperature alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    description: 'Temperature alarm on external sensor 1{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1594,8 +1594,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.9.0.2
     name: ROOMALERT12E-MIB::room-alert-12E-snmp-trap
     category: diagnostic
-    severity: warning
-    description: 'Sensor alarm condition detected: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Sensor alarm condition triggered: {{value "alarmmessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1605,7 +1605,7 @@ traps:
     name: ROOMALERT12E-MIB::tempalarm2-12E
     category: diagnostic
     severity: warning
-    description: Temperature alarm on external sensor 2 with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Temperature alarm on external sensor 2{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1615,7 +1615,7 @@ traps:
     name: ROOMALERT12E-MIB::tempclear2-12E
     category: diagnostic
     severity: notice
-    description: Temperature sensor 2 returned to normal condition on {_HOSTNAME}.
+    description: Temperature on external sensor 2 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1625,7 +1625,7 @@ traps:
     name: ROOMALERT12E-MIB::tempalarm3-12E
     category: diagnostic
     severity: warning
-    description: Temperature alarm on external sensor 3 reported {alarmmessage} on {_HOSTNAME}.
+    description: 'Temperature alarm on external sensor 3{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1633,9 +1633,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.9.0.6
     name: ROOMALERT12E-MIB::tempclear3-12E
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Temperature sensor 3 returned to normal condition with message {alarmmessage} on {_HOSTNAME}.
+    description: Temperature on external sensor 3 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1645,7 +1645,7 @@ traps:
     name: ROOMALERT12E-MIB::humidityalarm1-12E
     category: diagnostic
     severity: warning
-    description: Humidity alarm triggered with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Humidity alarm on external sensor 1{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1653,9 +1653,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.9.0.8
     name: ROOMALERT12E-MIB::humidityclear1-12E
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Humidity sensor 1 returned to normal condition on {_HOSTNAME}.
+    description: Humidity on external sensor 1 returned to normal condition on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1665,7 +1665,7 @@ traps:
     name: ROOMALERT12E-MIB::humidityalarm2-12E
     category: diagnostic
     severity: warning
-    description: Humidity alarm on external sensor 2 triggered with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Humidity alarm on external sensor 2{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1673,9 +1673,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.9.0.10
     name: ROOMALERT12E-MIB::humidityclear2-12E
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Humidity sensor 2 returned to normal condition with message {alarmmessage} on {_HOSTNAME}.
+    description: Humidity on external sensor 2 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1685,7 +1685,7 @@ traps:
     name: ROOMALERT12E-MIB::humidityalarm3-12E
     category: diagnostic
     severity: warning
-    description: Humidity alarm on external sensor 3 triggered with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Humidity alarm on external sensor 3{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1693,9 +1693,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.9.0.12
     name: ROOMALERT12E-MIB::humidityclear3-12E
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Humidity on external sensor 3 returned to normal condition on {_HOSTNAME}.
+    description: Humidity on external sensor 3 returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1704,8 +1704,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.9.0.13
     name: ROOMALERT12E-MIB::switchalarm1-12E
     category: diagnostic
-    severity: warning
-    description: 'Sensor 1 alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Switch sensor 1 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1715,7 +1715,7 @@ traps:
     name: ROOMALERT12E-MIB::switchclear1-12E
     category: diagnostic
     severity: notice
-    description: Switch sensor 1 returned to normal state on {_HOSTNAME}.
+    description: 'Switch sensor 1 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1725,7 +1725,7 @@ traps:
     name: ROOMALERT12E-MIB::switchalarm2-12E
     category: diagnostic
     severity: warning
-    description: 'Sensor 2 alarm triggered: {alarmmessage} on {_HOSTNAME}.'
+    description: 'Switch sensor 2 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1735,7 +1735,7 @@ traps:
     name: ROOMALERT12E-MIB::switchclear2-12E
     category: diagnostic
     severity: notice
-    description: Sensor 2 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 2 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1744,8 +1744,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.9.0.17
     name: ROOMALERT12E-MIB::switchalarm3-12E
     category: diagnostic
-    severity: warning
-    description: Sensor 3 alarm state triggered with message {alarmmessage} on {_HOSTNAME}.
+    severity: alert
+    description: 'Switch sensor 3 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1753,9 +1753,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.9.0.18
     name: ROOMALERT12E-MIB::switchclear3-12E
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Switch sensor 3 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: Switch sensor 3 returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - name: alarmmessage
@@ -1764,8 +1764,8 @@ traps:
   - oid: 1.3.6.1.4.1.20916.1.9.0.19
     name: ROOMALERT12E-MIB::switchalarm4-12E
     category: diagnostic
-    severity: warning
-    description: 'Switch sensor 4 alarm state detected: {alarmmessage} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Switch sensor 4 is in an alarm state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1773,9 +1773,9 @@ traps:
         type: OCTET STRING
   - oid: 1.3.6.1.4.1.20916.1.9.0.20
     name: ROOMALERT12E-MIB::switchclear4-12E
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Sensor 4 returned to normal state with message {alarmmessage} on {_HOSTNAME}.
+    description: 'Switch sensor 4 returned to normal state{{with value "alarmmessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage
@@ -1785,7 +1785,7 @@ traps:
     name: ROOMALERT3S-MIB::alarmmessage
     category: diagnostic
     severity: warning
-    description: 'Alarm condition detected: {alarmmessage} on {_HOSTNAME}.'
+    description: 'Alarm condition detected: {{value "alarmmessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - name: alarmmessage

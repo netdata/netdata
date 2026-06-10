@@ -44,7 +44,7 @@ traps:
     name: NOVELSAT-COMMON-MIB::nsCommonMonitorEventNotification
     category: diagnostic
     severity: warning
-    description: Event {nsCommonMonitorEventsEvent} with severity {nsCommonMonitorEventsSeverity} triggered on {_HOSTNAME}.
+    description: 'Event {{value "nsCommonMonitorEventsEvent"}} detected{{with value "nsCommonMonitorEventsDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - nsCommonMonitorEventsDateAndTime

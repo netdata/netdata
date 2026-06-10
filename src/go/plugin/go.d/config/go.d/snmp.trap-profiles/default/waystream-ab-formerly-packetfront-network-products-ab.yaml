@@ -159,7 +159,7 @@ traps:
     name: WAYSTREAM-MIB::wsIbosTempLow
     category: diagnostic
     severity: warning
-    description: Temperature sensor {wsTempSensor} measured {wsTempMeasured} below low threshold {wsTempThresholdLow} on {_HOSTNAME}.
+    description: Temperature sensor {{value "wsTempSensor"}} reading {{value "wsTempMeasured"}} is below low threshold on {{hostname}}.
     status: current
     varbinds:
       - wsTempSensor
@@ -170,7 +170,7 @@ traps:
     name: WAYSTREAM-MIB::wsIbosTempHigh
     category: diagnostic
     severity: warning
-    description: Temperature sensor {wsTempSensor} measured {wsTempMeasured} exceeded high threshold {wsTempThresholdHigh} on {_HOSTNAME}.
+    description: Temperature sensor {{value "wsTempSensor"}} exceeded high threshold on {{hostname}}.
     status: current
     varbinds:
       - wsTempSensor
@@ -181,7 +181,7 @@ traps:
     name: WAYSTREAM-MIB::wsIbosVoltLow
     category: diagnostic
     severity: warning
-    description: Voltage channel {wsVoltChannel} measured {wsVoltMeasured} mV is below low threshold {wsVoltThresholdLow} mV on {_HOSTNAME}.
+    description: Voltage on channel {{value "wsVoltChannel"}} is below low threshold on {{hostname}}.
     status: current
     varbinds:
       - wsVoltChannel
@@ -192,7 +192,7 @@ traps:
     name: WAYSTREAM-MIB::wsIbosVoltHigh
     category: diagnostic
     severity: warning
-    description: Voltage channel {wsVoltChannel} measured {wsVoltMeasured} mV exceeded high threshold {wsVoltThresholdHigh} mV on {_HOSTNAME}.
+    description: Voltage on channel {{value "wsVoltChannel"}} exceeded high threshold on {{hostname}}.
     status: current
     varbinds:
       - wsVoltChannel
@@ -203,7 +203,7 @@ traps:
     name: WAYSTREAM-MIB::wsIbosFanRPMLow
     category: diagnostic
     severity: warning
-    description: Fan {wsFanNumber} RPM {wsFanRPM} is below threshold on {_HOSTNAME}.
+    description: Fan {{value "wsFanNumber"}} RPM {{value "wsFanRPM"}} is below threshold on {{hostname}}.
     status: current
     varbinds:
       - wsFanNumber
@@ -212,15 +212,15 @@ traps:
     name: WAYSTREAM-MIB::wsIbosFanOutVoltLow
     category: diagnostic
     severity: warning
-    description: Fan output voltage {wsFanVoltage} mV is below threshold on {_HOSTNAME}.
+    description: Fan output voltage is low ({{value "wsFanVoltage"}} mV) on {{hostname}}.
     status: current
     varbinds:
       - wsFanVoltage
   - oid: 1.3.6.1.4.1.9303.4.3.0.1
     name: PACKETFRONT-DRG-MIB::notifyRestart
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: System reboot notification received on {_HOSTNAME}.
+    description: System restarted and is initializing management communication on {{hostname}}.
     status: current
     varbinds:
       - productMacAddress
@@ -233,7 +233,7 @@ traps:
     name: PACKETFRONT-DRG-MIB::notifyDownloadResult
     category: config_change
     severity: notice
-    description: Firmware or configuration download result {downloadResultCode} for device {productIdentity} on {_HOSTNAME}.
+    description: Firmware or configuration download completed with result {{value "downloadResultCode"}} on {{hostname}}.
     status: current
     varbinds:
       - productMacAddress
@@ -243,7 +243,7 @@ traps:
     name: PACKETFRONT-DRG-MIB::notifyConfigSaveResult
     category: config_change
     severity: notice
-    description: Configuration save result {downloadResultCode} on {_HOSTNAME}.
+    description: Configuration save completed on {{hostname}}.
     status: current
     varbinds:
       - productMacAddress
@@ -253,7 +253,7 @@ traps:
     name: WAYSTREAM-RPM-MIB::notifyWsRpmRtpSeqError
     category: diagnostic
     severity: warning
-    description: RTP sequence error count {wsRpmGrpRtpPeriodSeqErrors} exceeded threshold {wsRpmRtpSeqErrThreshold} on {_HOSTNAME}.
+    description: RTP packet sequence error detected with {{value "wsRpmGrpRtpPeriodSeqErrors"}} errors on {{hostname}}.
     status: current
     varbinds:
       - wsRpmGrpRtpPeriodSeqErrors
@@ -263,7 +263,7 @@ traps:
     name: WAYSTREAM-RPM-MIB::notifyWsRpmRtpJitter
     category: diagnostic
     severity: warning
-    description: RTP packet jitter {wsRpmGrpRtpPeriodMaxJitter} exceeded threshold {wsRpmRtpJitterThreshold} on {_HOSTNAME}.
+    description: RTP packet jitter reached {{value "wsRpmGrpRtpPeriodMaxJitter"}} on {{hostname}}.
     status: current
     varbinds:
       - wsRpmGrpRtpPeriodMaxJitter
@@ -273,7 +273,7 @@ traps:
     name: WAYSTREAM-RPM-MIB::notifyWsRpmTSMpegMissSync
     category: diagnostic
     severity: warning
-    description: MPEG TS missing-sync count {wsRpmTSMpegPeriodMissingSync} exceeded threshold {wsRpmTSMpegMissSyncThreshold} on {_HOSTNAME}.
+    description: MPEG transport stream missing sync detected with {{value "wsRpmTSMpegPeriodMissingSync"}} errors on {{hostname}}.
     status: current
     varbinds:
       - wsRpmTSMpegPeriodMissingSync
@@ -283,7 +283,7 @@ traps:
     name: WAYSTREAM-RPM-MIB::notifyWsRpmTSMpegMisalign
     category: diagnostic
     severity: warning
-    description: Transport stream misalignment count {wsRpmTSMpegPeriodMisalignments} reached threshold {wsRpmTSMpegMisalignThreshold} on {_HOSTNAME}.
+    description: Transport stream MPEG misalignments reached threshold on {{hostname}}.
     status: current
     varbinds:
       - wsRpmTSMpegPeriodMisalignments

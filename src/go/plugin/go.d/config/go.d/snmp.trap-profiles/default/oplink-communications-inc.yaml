@@ -14,7 +14,7 @@ traps:
     name: OPLINK-BTI-OPS-MIB::oplinkemuTemperatureAbnormal
     category: diagnostic
     severity: warning
-    description: EMU temperature abnormal on {_HOSTNAME}.
+    description: EMU temperature is abnormal on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
@@ -22,7 +22,7 @@ traps:
     name: OPLINK-BTI-OPS-MIB::oplinkemuTemperatureResume
     category: diagnostic
     severity: notice
-    description: EMU temperature abnormal alarm cleared on {_HOSTNAME}.
+    description: EMU temperature abnormal alarm is clear on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
@@ -30,7 +30,7 @@ traps:
     name: OPLINK-BTI-OPS-MIB::oplinkemuFanRemove
     category: diagnostic
     severity: warning
-    description: Emu fan card removed on {_HOSTNAME}.
+    description: EMU fan card removed on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
@@ -38,15 +38,15 @@ traps:
     name: OPLINK-BTI-OPS-MIB::oplinkemuFanInsert
     category: diagnostic
     severity: notice
-    description: Emu fan remove alarm cleared on {_HOSTNAME}.
+    description: EMU fan remove alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
   - oid: 1.3.6.1.4.1.19547.1.7.1.1001.1.0.5
     name: OPLINK-BTI-OPS-MIB::oplinkemuPowerRemove
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Power card removal detected on {_HOSTNAME}.
+    description: EMU power card removed on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
@@ -54,7 +54,7 @@ traps:
     name: OPLINK-BTI-OPS-MIB::oplinkemuPowerInsert
     category: diagnostic
     severity: notice
-    description: Power insert alarm cleared on {_HOSTNAME}.
+    description: Emulator power remove alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
@@ -62,7 +62,7 @@ traps:
     name: OPLINK-BTI-OPS-MIB::oplinkemuVoltageAbnormal
     category: diagnostic
     severity: warning
-    description: EMU voltage abnormal detected on {_HOSTNAME}.
+    description: EMU voltage abnormal on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
@@ -70,7 +70,7 @@ traps:
     name: OPLINK-BTI-OPS-MIB::oplinkemuVoltageResume
     category: diagnostic
     severity: notice
-    description: EMU voltage abnormal alarm cleared on {_HOSTNAME}.
+    description: EMU voltage abnormal alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
@@ -78,31 +78,31 @@ traps:
     name: OPLINK-BTI-OPS-MIB::oplinkemuSubCardDelete
     category: state_change
     severity: notice
-    description: EMU sub-card deleted on {_HOSTNAME}.
+    description: EMU sub-card deleted on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
   - oid: 1.3.6.1.4.1.19547.1.7.1.1001.1.0.10
     name: OPLINK-BTI-OPS-MIB::oplinkemuSubCardAdd
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: EMU sub-card delete alarm cleared with trap code {oplinkTrapCode} on {_HOSTNAME}.
+    description: EMU sub-card delete alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
   - oid: 1.3.6.1.4.1.19547.1.7.1.1001.1.0.11
     name: OPLINK-BTI-OPS-MIB::oplinkemuSubCardUnmatch
     category: diagnostic
-    severity: err
-    description: EMU sub-card mismatch detected with error code {oplinkTrapCode} on {_HOSTNAME}.
+    severity: warning
+    description: EMU sub-card mismatch with configuration detected on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
   - oid: 1.3.6.1.4.1.19547.1.7.1.1001.1.0.12
     name: OPLINK-BTI-OPS-MIB::oplinkemuSubCardMatch
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: EMU sub-card unmatch alarm cleared on {_HOSTNAME}.
+    description: Emulation sub-card unmatch alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
@@ -110,23 +110,23 @@ traps:
     name: OPLINK-BTI-OPS-MIB::oplinkopsmInputLosRPI1
     category: diagnostic
     severity: crit
-    description: Input power loss alarm on CH1 primary path detected on {_HOSTNAME}.
+    description: Optical input loss of signal alarm on CH1 primary path on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
   - oid: 1.3.6.1.4.1.19547.1.7.1.1001.2.0.2
     name: OPLINK-BTI-OPS-MIB::oplinkopsmInputLosResumeRPI1
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Input power LOS alarm cleared on CH1 primary path on {_HOSTNAME}.
+    description: Optical input loss of signal alarm cleared on CH1 primary path on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
   - oid: 1.3.6.1.4.1.19547.1.7.1.1001.2.0.3
     name: OPLINK-BTI-OPS-MIB::oplinkopsmInputLosRSI1
     category: diagnostic
-    severity: warning
-    description: Input power loss alarm on CH1 secondary path on {_HOSTNAME}.
+    severity: crit
+    description: Optical input loss of signal alarm on CH1 secondary path on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
@@ -134,15 +134,15 @@ traps:
     name: OPLINK-BTI-OPS-MIB::oplinkopsmInputLosResumeRSI1
     category: diagnostic
     severity: notice
-    description: Input power LOS alarm cleared on CH1 secondary path on {_HOSTNAME}.
+    description: Optical input loss of signal alarm cleared on CH1 secondary path on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
   - oid: 1.3.6.1.4.1.19547.1.7.1.1001.2.0.5
     name: OPLINK-BTI-OPS-MIB::oplinkopsmInputLosRPI2
     category: diagnostic
-    severity: warning
-    description: Input power loss alarm on CH2 primary path detected on {_HOSTNAME}.
+    severity: crit
+    description: Optical input loss alarm on CH2 primary path on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
@@ -150,15 +150,15 @@ traps:
     name: OPLINK-BTI-OPS-MIB::oplinkopsmInputLosResumeRPI2
     category: diagnostic
     severity: notice
-    description: Input LOS alarm cleared on CH2 primary path on {_HOSTNAME}.
+    description: Optical input loss of signal alarm cleared on CH2 primary path on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
   - oid: 1.3.6.1.4.1.19547.1.7.1.1001.2.0.7
     name: OPLINK-BTI-OPS-MIB::oplinkopsmInputLosRSI2
     category: diagnostic
-    severity: alert
-    description: Input power loss alarm on CH2 secondary path detected on {_HOSTNAME}.
+    severity: crit
+    description: Optical input loss of signal alarm on CH2 secondary path on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
@@ -166,7 +166,7 @@ traps:
     name: OPLINK-BTI-OPS-MIB::oplinkopsmInputLosResumeRSI2
     category: diagnostic
     severity: notice
-    description: Input power LOS alarm cleared on CH2 secondary path on {_HOSTNAME}.
+    description: Optical input loss of signal alarm cleared on CH2 secondary path on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
@@ -174,7 +174,7 @@ traps:
     name: OPLINK-BTI-OPS-MIB::oplinkopsmPowerDiffChannel1
     category: diagnostic
     severity: warning
-    description: Input power difference alarm on CH1 detected on {_HOSTNAME}.
+    description: OPlink CH1 input power difference alarm is active on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
@@ -182,7 +182,7 @@ traps:
     name: OPLINK-BTI-OPS-MIB::oplinkopsmPowerDiffResumeChannel1
     category: diagnostic
     severity: notice
-    description: Power difference alarm cleared on CH1 on {_HOSTNAME}.
+    description: Input power difference alarm on channel 1 is clear on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
@@ -190,7 +190,7 @@ traps:
     name: OPLINK-BTI-OPS-MIB::oplinkopsmPowerDiffChannel2
     category: diagnostic
     severity: warning
-    description: Input power difference alarm on CH2 detected on {_HOSTNAME}.
+    description: OPlink opsm input power difference alarm on CH2 detected on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
@@ -198,31 +198,31 @@ traps:
     name: OPLINK-BTI-OPS-MIB::oplinkopsmPowerDiffResumeChannel2
     category: diagnostic
     severity: notice
-    description: Power difference alarm on CH2 cleared on {_HOSTNAME}.
+    description: OPSM input power difference alarm on CH2 is clear on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
   - oid: 1.3.6.1.4.1.19547.1.7.1.1001.2.0.13
     name: OPLINK-BTI-OPS-MIB::oplinkopsmSwitchFailChannel1
     category: diagnostic
-    severity: crit
-    description: Switch fail alarm on CH1 detected on {_HOSTNAME}.
+    severity: alert
+    description: OPS switch fail alarm on channel 1 detected on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
   - oid: 1.3.6.1.4.1.19547.1.7.1.1001.2.0.14
     name: OPLINK-BTI-OPS-MIB::oplinkopsmSwitchSuccessChannel1
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: opsm switch fail alarm on CH1 cleared on {_HOSTNAME}.
+    description: Switch fail alarm on channel 1 is clear on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
   - oid: 1.3.6.1.4.1.19547.1.7.1.1001.2.0.15
     name: OPLINK-BTI-OPS-MIB::oplinkopsmSwitchFailChannel2
     category: diagnostic
-    severity: err
-    description: Oplink switch fail alarm on CH2 detected on {_HOSTNAME}.
+    severity: crit
+    description: OpsM switch fail alarm on channel 2 detected on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode
@@ -230,7 +230,7 @@ traps:
     name: OPLINK-BTI-OPS-MIB::oplinkopsmSwitchSuccessChannel2
     category: state_change
     severity: notice
-    description: Switch fail alarm on CH2 cleared on {_HOSTNAME}.
+    description: Opswitch fail alarm on CH2 is clear on {{hostname}}.
     status: current
     varbinds:
       - oplinkTrapCode

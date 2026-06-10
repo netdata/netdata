@@ -302,15 +302,15 @@ traps:
     name: TAIT-TN9300-MIB::tn9300NodeActivationEvent
     category: state_change
     severity: notice
-    description: Node entered active state {tn9300State} on {_HOSTNAME}.
+    description: Node activated and entered active state on {{hostname}}.
     status: current
     varbinds:
       - tn9300State
   - oid: 1.3.6.1.4.1.3570.3.6.3.0.2
     name: TAIT-TN9300-MIB::tn9300SiteFailureEvent
-    category: diagnostic
+    category: state_change
     severity: crit
-    description: Site {tn9300SiteName} reported failure status {tn9300SiteOk} on {_HOSTNAME}.
+    description: Site {{value "tn9300SiteName"}} has failed on {{hostname}}.
     status: current
     varbinds:
       - tn9300SiteOk
@@ -319,7 +319,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300SiteOkEvent
     category: state_change
     severity: notice
-    description: Site {tn9300SiteName} recovered and is OK on {_HOSTNAME}.
+    description: Site {{value "tn9300SiteName"}} has recovered on {{hostname}}.
     status: current
     varbinds:
       - tn9300SiteOk
@@ -328,7 +328,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300ChannelMinorAlarmEvent
     category: diagnostic
     severity: warning
-    description: Channel minor alarm raised on base station {tn9300EventBaseStationNumber} at site {tn9300SiteName} on {_HOSTNAME}.
+    description: Channel minor alarm raised on base station {{value "tn9300EventBaseStationNumber"}} at {{value "tn9300SiteName"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300ChannelMinorAlarm
@@ -337,8 +337,8 @@ traps:
   - oid: 1.3.6.1.4.1.3570.3.6.3.0.5
     name: TAIT-TN9300-MIB::tn9300ChannelMajorAlarmEvent
     category: diagnostic
-    severity: err
-    description: Channel major alarm on site {tn9300SiteName} base station {tn9300EventBaseStationNumber} on {_HOSTNAME}.
+    severity: crit
+    description: Channel major alarm raised on base station {{value "tn9300EventBaseStationNumber"}} at {{value "tn9300SiteName"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300ChannelMajorAlarm
@@ -347,8 +347,8 @@ traps:
   - oid: 1.3.6.1.4.1.3570.3.6.3.0.6
     name: TAIT-TN9300-MIB::tn9300ChannelFailureEvent
     category: diagnostic
-    severity: err
-    description: Channel {tn9300ChannelState} failed on base station {tn9300EventBaseStationNumber} at {tn9300SiteName} on {_HOSTNAME}.
+    severity: crit
+    description: Channel failed on base station {{value "tn9300EventBaseStationNumber"}} at {{value "tn9300SiteName"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300ChannelState
@@ -358,7 +358,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300ChannelOkEvent
     category: state_change
     severity: notice
-    description: Channel {tn9300ChannelState} recovered on site {tn9300SiteName} on {_HOSTNAME}.
+    description: Channel recovered to {{value "tn9300ChannelState"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300ChannelState
@@ -368,7 +368,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300ChannelJammedEvent
     category: diagnostic
     severity: warning
-    description: Channel {tn9300EventChannelNumber} on base station {tn9300EventBaseStationNumber} is jammed on {_HOSTNAME}.
+    description: Channel {{value "tn9300EventChannelNumber"}} is jammed at {{value "tn9300SiteName"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300ChannelJammed
@@ -379,7 +379,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300ChannelUnjammedEvent
     category: state_change
     severity: notice
-    description: Channel {tn9300EventChannelNumber} on base station {tn9300EventBaseStationNumber} at {tn9300SiteName} is no longer jammed on {_HOSTNAME}.
+    description: Channel {{value "tn9300EventChannelNumber"}} unjammed at {{value "tn9300SiteName"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300ChannelJammed
@@ -390,7 +390,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300SipLinkUpEvent
     category: state_change
     severity: notice
-    description: SIP link up with state {tn9300SipLineState} on {_HOSTNAME}.
+    description: SIP link up on {{hostname}}.
     status: current
     varbinds:
       - tn9300SipLineState
@@ -400,7 +400,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300SipLinkDownEvent
     category: state_change
     severity: warning
-    description: SIP link down with state {tn9300SipLineState} on {_HOSTNAME}.
+    description: SIP link down{{with value "tn9300SipLineState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300SipLineState
@@ -408,7 +408,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300DipLinkUpEvent
     category: state_change
     severity: notice
-    description: DIP link up with state {tn9300DipLineState} on {_HOSTNAME}.
+    description: DIP link went up on {{hostname}}.
     status: current
     varbinds:
       - tn9300DipLineState
@@ -419,7 +419,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300DipLinkDownEvent
     category: state_change
     severity: warning
-    description: DIP link down with state {tn9300DipLineState} on {_HOSTNAME}.
+    description: DIP link went down on {{hostname}}.
     status: current
     varbinds:
       - tn9300DipLineState
@@ -430,7 +430,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300ControlChannelEvent
     category: diagnostic
     severity: warning
-    description: Too few control channels {tn9300SiteNControlChannels} at site {tn9300SiteName} on {_HOSTNAME}.
+    description: Too few control channels {{value "tn9300SiteNControlChannels"}} at {{value "tn9300SiteName"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300SiteNControlChannels
@@ -439,7 +439,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300NetworkErrorEvent
     category: diagnostic
     severity: warning
-    description: Network check failed on {_HOSTNAME}.
+    description: Network check failed{{with value "tn9300NetCheckAddressA"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300NetCheckStateA
@@ -452,7 +452,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300RemoteNodeUpEvent
     category: state_change
     severity: notice
-    description: Remote node {tn9300RemoteNodeIpAddr} is up with state {tn9300RemoteNodeState} on {_HOSTNAME}.
+    description: Remote node {{value "tn9300RemoteNodeIpAddr"}} is up on {{hostname}}.
     status: current
     varbinds:
       - tn9300RemoteNodeState
@@ -462,7 +462,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300RemoteNodeDownEvent
     category: state_change
     severity: crit
-    description: Remote node {tn9300RemoteNodeIpAddr} reported state {tn9300RemoteNodeState} on {_HOSTNAME}.
+    description: Remote node {{value "tn9300RemoteNodeIpAddr"}} is down on {{hostname}}.
     status: current
     varbinds:
       - tn9300RemoteNodeState
@@ -472,31 +472,31 @@ traps:
     name: TAIT-TN9300-MIB::tn9300LowDiskSpaceEvent
     category: diagnostic
     severity: warning
-    description: Low disk space detected on {_HOSTNAME}.
+    description: Low disk space condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3570.3.6.3.0.23
     name: TAIT-TN9300-MIB::tn9300LicenseCheckFailedEvent
     category: license
     severity: alert
-    description: 'License check failed: no valid license installed on {_HOSTNAME}.'
+    description: License check failed; no valid license installed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3570.3.6.3.0.24
     name: TAIT-TN9300-MIB::tn9300NetworkGatewayUpEvent
     category: state_change
     severity: notice
-    description: Network gateway connection established on {_HOSTNAME}.
+    description: Network gateway connection established on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3570.3.6.3.0.25
     name: TAIT-TN9300-MIB::tn9300NetworkGatewayDownEvent
     category: state_change
     severity: crit
-    description: Network gateway disconnected on {_HOSTNAME}.
+    description: Network gateway disconnected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3570.3.6.3.0.26
     name: TAIT-TN9300-MIB::tn9300NodeFailedEvent
     category: diagnostic
     severity: crit
-    description: All network checks failed with state {tn9300NetCheckStateA} on {_HOSTNAME}.
+    description: All network checks failed on {{hostname}}.
     status: current
     varbinds:
       - tn9300NetCheckStateA
@@ -507,9 +507,9 @@ traps:
       - tn9300NetCheckAddressB
   - oid: 1.3.6.1.4.1.3570.3.6.3.0.27
     name: TAIT-TN9300-MIB::tn9300NetworkUpEvent
-    category: state_change
+    category: diagnostic
     severity: info
-    description: Network check succeeded on {_HOSTNAME}.
+    description: Network check succeeded on {{hostname}}.
     status: current
     varbinds:
       - tn9300NetCheckStateA
@@ -522,28 +522,28 @@ traps:
     name: TAIT-TN9300-MIB::tn9300AuthenticationOkEvent
     category: auth
     severity: notice
-    description: Radio authentication check passed on {_HOSTNAME}.
+    description: Radio authentication successful on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3570.3.6.3.0.29
     name: TAIT-TN9300-MIB::tn9300AuthenticationFailureEvent
     category: auth
     severity: warning
-    description: SNMP authentication failure from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Radio authentication failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3570.3.6.3.0.30
     name: TAIT-TN9300-MIB::tn9300UnitStatusMessageEvent
     category: diagnostic
-    severity: err
-    description: Unit {tn9300EventUnitAddress} alarm {tn9300UnitStatusMessageId} on {_HOSTNAME}.
+    severity: warning
+    description: Terminal alarm {{value "tn9300UnitStatusMessageId"}} on unit {{value "tn9300EventUnitAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300UnitStatusMessageId
       - tn9300EventUnitAddress
   - oid: 1.3.6.1.4.1.3570.3.6.3.0.31
     name: TAIT-TN9300-MIB::tn9300RemoteNodeSyncFailedEvent
-    category: diagnostic
-    severity: err
-    description: Remote node database sync failed for {tn9300RemoteNodeIpAddr} on {_HOSTNAME}.
+    category: state_change
+    severity: crit
+    description: Remote node database sync failed for {{value "tn9300RemoteNodeIpAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300RemoteNodeState
@@ -553,7 +553,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300RemoteNodeSyncOkEvent
     category: state_change
     severity: notice
-    description: Remote node database synced with {tn9300RemoteNodeIpAddr} on {_HOSTNAME}.
+    description: Remote node database synced with this node on {{hostname}}.
     status: current
     varbinds:
       - tn9300RemoteNodeState
@@ -563,7 +563,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300UnitDeregisteredBySystemEvent
     category: state_change
     severity: warning
-    description: Unit {tn9300EventUnitAddress} deregistered by system on {_HOSTNAME}.
+    description: Unit {{value "tn9300EventUnitAddress"}} deregistered by system on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventUnitAddress
@@ -571,16 +571,16 @@ traps:
     name: TAIT-TN9300-MIB::tn9300NodeStateEvent
     category: state_change
     severity: warning
-    description: Node state changed to {tn9300State} with severity {tn9300EventSeverity} on {_HOSTNAME}.
+    description: Node state changed to {{value "tn9300State"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
       - tn9300State
   - oid: 1.3.6.1.4.1.3570.3.6.3.0.35
     name: TAIT-TN9300-MIB::tn9300NodeIpNetworkStateEvent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Network check state changed to {tn9300NetCheckStateA} for {tn9300NetCheckAddressA} on {_HOSTNAME}.
+    description: Network check state changed{{with value "tn9300NetCheckAddressA"}} to {{value "tn9300NetCheckStateA"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
@@ -594,7 +594,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300NodeDiskSpaceEvent
     category: diagnostic
     severity: warning
-    description: Disk space threshold crossed with severity {tn9300EventSeverity} and status {tn9300DiskSpaceOk} on {_HOSTNAME}.
+    description: Disk space threshold crossed on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
@@ -603,7 +603,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300NodeLicenseEvent
     category: license
     severity: warning
-    description: License validity changed to {tn9300LicenseValidity} on {_HOSTNAME}.
+    description: License validity changed to {{value "tn9300LicenseValidity"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
@@ -612,7 +612,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300SiteStateEvent
     category: state_change
     severity: warning
-    description: Site {tn9300SiteName} state changed to {tn9300SiteOk} with severity {tn9300EventSeverity} on {_HOSTNAME}.
+    description: Site {{value "tn9300SiteName"}} state changed to {{value "tn9300EventSeverity"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
@@ -620,9 +620,9 @@ traps:
       - tn9300SiteName
   - oid: 1.3.6.1.4.1.3570.3.6.3.0.39
     name: TAIT-TN9300-MIB::tn9300SiteControlChCountEvent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Site {tn9300SiteName} control channel count {tn9300SiteNControlChannels} is {tn9300SiteControlChCountOk} on {_HOSTNAME}.
+    description: Site {{value "tn9300SiteName"}} control channel count is below required on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
@@ -633,7 +633,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300BSMinorAlarmStateEvent
     category: diagnostic
     severity: warning
-    description: Minor alarm state changed for base station {tn9300EventBaseStationNumber} at site {tn9300SiteName} on {_HOSTNAME}.
+    description: Minor alarm state changed on base station {{value "tn9300EventBaseStationNumber"}} at {{value "tn9300SiteName"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
@@ -644,7 +644,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300BSMajorAlarmStateEvent
     category: diagnostic
     severity: crit
-    description: Major alarm state changed for base station {tn9300EventBaseStationNumber} at site {tn9300SiteName} on {_HOSTNAME}.
+    description: Major alarm state changed on base station {{value "tn9300EventBaseStationNumber"}} at {{value "tn9300SiteName"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
@@ -655,7 +655,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300BSStateEvent
     category: state_change
     severity: warning
-    description: Base station {tn9300EventBaseStationNumber} at {tn9300SiteName} changed state to {tn9300ChannelState} on {_HOSTNAME}.
+    description: Base station {{value "tn9300EventBaseStationNumber"}} state changed at {{value "tn9300SiteName"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
@@ -666,7 +666,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300ChannelJammedStateEvent
     category: state_change
     severity: warning
-    description: Channel jammed state changed to {tn9300ChannelJammed} on base station {tn9300EventBaseStationNumber} channel {tn9300EventChannelNumber} on {_HOSTNAME}.
+    description: Channel jammed state changed on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
@@ -678,7 +678,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300ChannelStuckMuteEvent
     category: diagnostic
     severity: warning
-    description: Channel {tn9300EventChannelNumber} on base station {tn9300EventBaseStationNumber} at {tn9300SiteName} reached mute timeout on {_HOSTNAME}.
+    description: Channel {{value "tn9300EventChannelNumber"}} on base station {{value "tn9300EventBaseStationNumber"}} reached mute timeout on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
@@ -689,7 +689,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300SipLinkStateEvent
     category: state_change
     severity: warning
-    description: SIP link {tn9300SipLineName} changed state to {tn9300SipLineState} on {_HOSTNAME}.
+    description: SIP link {{value "tn9300SipLineState"}} on {{first (value "tn9300SipLineName") "unknown line"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
@@ -701,7 +701,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300DipLinkStateEvent
     category: state_change
     severity: warning
-    description: DIP link {tn9300DipLineName} state changed to {tn9300DipLineState} on {_HOSTNAME}.
+    description: DIP link {{value "tn9300DipLineName"}} state changed to {{value "tn9300DipLineState"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
@@ -714,7 +714,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300RemoteNodeStateEvent
     category: state_change
     severity: warning
-    description: Remote node {tn9300RemoteNodeName} changed state to {tn9300RemoteNodeState} on {_HOSTNAME}.
+    description: Remote node {{value "tn9300RemoteNodeName"}} state changed to {{value "tn9300RemoteNodeState"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
@@ -726,7 +726,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300RemoteNodeSyncEvent
     category: state_change
     severity: warning
-    description: Remote node {tn9300RemoteNodeName} sync state changed to {tn9300RemoteNodeSynced} on {_HOSTNAME}.
+    description: Remote node {{value "tn9300RemoteNodeName"}} sync state changed to {{value "tn9300RemoteNodeSynced"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
@@ -738,7 +738,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300NetworkGwConnEvent
     category: state_change
     severity: warning
-    description: Network gateway {tn9300EventNetworkGwId} at {tn9300NetworkGwIpAddr} connection state changed to {tn9300NetworkGwConnOk} on {_HOSTNAME}.
+    description: Network gateway {{value "tn9300EventNetworkGwId"}} connection state changed to {{value "tn9300NetworkGwConnOk"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
@@ -750,7 +750,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300UnitAuthenticationEvent
     category: auth
     severity: warning
-    description: Unit {tn9300EventUnitAddress} authentication state changed to {tn9300UnitAuthentication} on {_HOSTNAME}.
+    description: Unit authentication state changed to {{value "tn9300UnitAuthentication"}} on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
@@ -760,7 +760,7 @@ traps:
     name: TAIT-TN9300-MIB::tn9300UnitStatusMsgEvent
     category: diagnostic
     severity: warning
-    description: Unit status event {tn9300UnitStatusMessageId} with severity {tn9300EventSeverity} on {_HOSTNAME}.
+    description: Unit status message {{value "tn9300UnitStatusMessageId"}} received on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity
@@ -768,9 +768,9 @@ traps:
       - tn9300EventUnitAddress
   - oid: 1.3.6.1.4.1.3570.3.6.3.0.52
     name: TAIT-TN9300-MIB::tn9300UnitRegTimeoutEvent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Unit {tn9300EventUnitAddress} registration timed out on {_HOSTNAME}.
+    description: Unit {{value "tn9300EventUnitAddress"}} deregistered due to registration timeout on {{hostname}}.
     status: current
     varbinds:
       - tn9300EventSeverity

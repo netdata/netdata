@@ -754,308 +754,308 @@ traps:
   - oid: 1.3.6.1.4.1.7800.2.100.2.0.1
     name: UBIQUOSS-SYSINFO-MIB::ubiSysAlarmNotification
     category: diagnostic
-    severity: notice
-    description: System restart detected on {_HOSTNAME}.
+    severity: alert
+    description: System restart detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.102.2.0.1
     name: UBIQUOSS-INTERFACE-MIB::ubiPortAlarmNotification
     category: diagnostic
-    severity: err
-    description: Port functional failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Port function failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.102.2.0.2
     name: UBIQUOSS-INTERFACE-MIB::ubiPortOperStatusChangeNotification
     category: state_change
     severity: notice
-    description: Port operational status changed on {_HOSTNAME}.
+    description: Port operational status changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.102.2.0.3
     name: UBIQUOSS-INTERFACE-MIB::ubiPortAdminStatusChangeNotification
     category: state_change
     severity: notice
-    description: Port administrative status changed on {_HOSTNAME}.
+    description: Port administrative status changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.102.2.0.4
     name: UBIQUOSS-INTERFACE-MIB::ubiPortBlockStatusChangeNotification
     category: state_change
     severity: notice
-    description: Port administrative status changed on {_HOSTNAME}.
+    description: Port administrative status changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.102.2.0.5
     name: UBIQUOSS-INTERFACE-MIB::ubiPortGbicStatusChangeNotification
     category: state_change
     severity: notice
-    description: Port administrative status changed on {_HOSTNAME}.
+    description: Port GBIC status changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.102.2.0.6
     name: UBIQUOSS-INTERFACE-MIB::ubiPortSelfLoopDetectNotification
     category: state_change
     severity: warning
-    description: Port operational status change detected on {_HOSTNAME}.
+    description: Port self-loop detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.102.2.0.7
     name: UBIQUOSS-INTERFACE-MIB::ubiChampConnectorStatusChangeNotification
     category: state_change
     severity: notice
-    description: Champ connector status changed on {_HOSTNAME}.
+    description: Champ connector equipment status changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.102.2.0.8
     name: UBIQUOSS-INTERFACE-MIB::ubiPortLoopBackStatusChangeNotification
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Port loopback status changed on {_HOSTNAME}.
+    description: Port loopback test status changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.102.2.0.9
     name: UBIQUOSS-INTERFACE-MIB::ubiPortLoopBackFailNotification
     category: diagnostic
     severity: warning
-    description: Port loopback test failed on {_HOSTNAME}.
+    description: Port loopback test failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.201.2.0.1
     name: UBIQUOSS-MAC-MIB::ubiSysMacThresholdAlarmNotification
     category: diagnostic
     severity: warning
-    description: MAC threshold alarm triggered on {_HOSTNAME}.
+    description: MAC threshold alarm indicating port function failure on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.201.2.0.2
     name: UBIQUOSS-MAC-MIB::ubiSysMacRisingThresholdNotification
     category: diagnostic
     severity: warning
-    description: System MAC count reached rising threshold on {_HOSTNAME}.
+    description: MAC address count reached rising threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.201.2.0.3
     name: UBIQUOSS-MAC-MIB::ubiSysMacFallingThresholdNotification
     category: diagnostic
     severity: warning
-    description: MAC address count reached rising threshold on {_HOSTNAME}.
+    description: MAC address count reached falling threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.400.2.0.1
     name: UBIQUOSS-EPON-MIB::ubiEponOltAlarmNotification
     category: diagnostic
     severity: warning
-    description: OLT alarm notification received on {_HOSTNAME}.
+    description: EPON OLT alarm notification received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.400.2.0.2
     name: UBIQUOSS-EPON-MIB::ubiEponOltOperStatusChangeNotification
     category: state_change
     severity: notice
-    description: OLT operational status changed on {_HOSTNAME}.
+    description: OLT operational status changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.400.2.0.3
     name: UBIQUOSS-EPON-MIB::ubiEponOltAdminStatusChangeNotification
     category: state_change
     severity: notice
-    description: OLT administrative status changed on {_HOSTNAME}.
+    description: OLT administrative status changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.400.2.0.4
     name: UBIQUOSS-EPON-MIB::ubiEponOnuAlarmNotification
-    category: config_change
+    category: diagnostic
     severity: notice
-    description: ONU upgrade notification received on {_HOSTNAME}.
+    description: ONU upgrade notification received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.400.2.0.5
     name: UBIQUOSS-EPON-MIB::ubiEponOnuOperStatusChangeNotification
     category: state_change
     severity: notice
-    description: ONU operational status changed on {_HOSTNAME}.
+    description: ONU upgrade notification received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.400.2.0.6
     name: UBIQUOSS-EPON-MIB::ubiEponOnuAdminStatusChangeNotification
     category: state_change
     severity: notice
-    description: ONU administrative status changed on {_HOSTNAME}.
+    description: ONU administrative status changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.400.2.0.7
     name: UBIQUOSS-EPON-MIB::ubiEponOamLinkDisconnectNotification
     category: state_change
     severity: warning
-    description: OAM link disconnect detected on {_HOSTNAME}.
+    description: EPON OAM link disconnected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.400.2.0.8
     name: UBIQUOSS-EPON-MIB::ubiEponOnuRegistrationErrorNotification
     category: diagnostic
     severity: warning
-    description: ONU registration error detected on {_HOSTNAME}.
+    description: ONU registration error occurred on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.400.2.0.9
     name: UBIQUOSS-EPON-MIB::ubiEponOnuRegistrationOverloadNotification
     category: diagnostic
     severity: warning
-    description: ONU registration overload detected on {_HOSTNAME}.
+    description: EPON ONU registration overload detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.400.2.0.10
     name: UBIQUOSS-EPON-MIB::ubiEponSoftwareErrorNotification
     category: diagnostic
     severity: warning
-    description: ONU registration limit exceeded on {_HOSTNAME}.
+    description: 'EPON software error: ONU registration limit exceeded on {{hostname}}.'
     status: current
   - oid: 1.3.6.1.4.1.7800.2.400.2.0.11
     name: UBIQUOSS-EPON-MIB::ubiEponBadEncriptionKeyNotification
     category: security
     severity: warning
-    description: EPON encryption key mismatch detected on {_HOSTNAME}.
+    description: EPON bad encryption key notification detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.400.2.0.12
     name: UBIQUOSS-EPON-MIB::ubiEponOnuImageUpgradeNotification
-    category: config_change
+    category: state_change
     severity: notice
-    description: ONU image upgrade notification received on {_HOSTNAME}.
+    description: ONU image upgrade notification received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.400.2.0.13
     name: UBIQUOSS-EPON-MIB::ubiEponOnuImageUpgradeFailNotification
     category: diagnostic
     severity: err
-    description: ONU image upgrade failed on {_HOSTNAME}.
+    description: ONU image upgrade failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.400.2.0.14
     name: UBIQUOSS-EPON-MIB::ubiEponOntDyingGaspNotification
     category: diagnostic
-    severity: warning
-    description: ONU reported dying gasp event on {_HOSTNAME}.
+    severity: alert
+    description: ONT dying gasp detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.401.2.0.1
     name: UBIQUOSS-EPON-PM-MIB::ubiFerThreshNotification
     category: diagnostic
     severity: warning
-    description: Fiber threshold reached on {_HOSTNAME}.
+    description: Fiber threshold reached on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.401.2.0.2
     name: UBIQUOSS-EPON-PM-MIB::ubiBerPerfLossThreshNotification
     category: diagnostic
     severity: warning
-    description: Bit error rate threshold reached on {_HOSTNAME}.
+    description: Bit error rate threshold reached on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.1
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponOltAlarmNotification
     category: diagnostic
     severity: warning
-    description: EPON OLT alarm notification received on {_HOSTNAME}.
+    description: EPON OLT alarm notification received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.2
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponOltOperStatusChangeNotification
     category: state_change
-    severity: notice
-    description: OLT operational status changed on {_HOSTNAME}.
+    severity: warning
+    description: EPON OLT operational status changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.3
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponOltAdminStatusChangeNotification
     category: state_change
     severity: notice
-    description: OLT administrative status changed on {_HOSTNAME}.
+    description: OLT administrative status changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.4
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponOnuAlarmNotification
     category: state_change
     severity: notice
-    description: ONU upgrade notification received on {_HOSTNAME}.
+    description: ONU upgrade notification received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.5
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponOnuOperStatusChangeNotification
     category: state_change
     severity: notice
-    description: ONU operational status changed on {_HOSTNAME}.
+    description: ONU operational status changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.6
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponOnuAdminStatusChangeNotification
     category: state_change
     severity: notice
-    description: ONU administrative status changed on {_HOSTNAME}.
+    description: ONU administrative status changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.7
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponOamLinkStatusChangeNotification
     category: state_change
-    severity: notice
-    description: EPON OAM link status changed on {_HOSTNAME}.
+    severity: warning
+    description: EPON OAM link status changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.8
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponOnuRegistrationErrorNotification
     category: diagnostic
     severity: warning
-    description: ONU registration error detected on {_HOSTNAME}.
+    description: ONU registration error occurred on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.9
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponOnuRegistrationOverloadNotification
     category: diagnostic
     severity: warning
-    description: ONU registration overload detected on {_HOSTNAME}.
+    description: ONU registration overload detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.10
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponLinkStatusChangeNotification
     category: state_change
     severity: notice
-    description: EPoN link status changed on {_HOSTNAME}.
+    description: EPON link status changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.11
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponLinkRegisterNotification
     category: state_change
     severity: notice
-    description: EPON link registration event on {_HOSTNAME}.
+    description: EPON link registered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.12
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponOntLoopDetectNotification
     category: diagnostic
     severity: warning
-    description: EPON loop detected on {_HOSTNAME}.
+    description: EPON loop detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.13
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponOnuLdShutdownNotification
     category: state_change
     severity: warning
-    description: EPON ONU link down shutdown detected on {_HOSTNAME}.
+    description: EPON ONU link shutdown detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.14
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponOnuUnAdminMacRegisterationNotification
-    category: state_change
-    severity: notice
-    description: EPON ONU unadmin MAC registration detected on {_HOSTNAME}.
+    category: security
+    severity: warning
+    description: EPON ONU unadmin MAC registration detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.15
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponDuplacatedMacRegisterationNotification
     category: security
     severity: warning
-    description: Duplicated MAC registration detected on {_HOSTNAME}.
+    description: Epon duplicated MAC registration detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.16
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponOnuTypeMisMatchNotification
     category: security
     severity: warning
-    description: Epon ONU type mismatch detected on {_HOSTNAME}.
+    description: EPON ONU type mismatch detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.17
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponRegisterdSubMacNotification
     category: state_change
     severity: notice
-    description: EPON subscriber MAC registration detected on {_HOSTNAME}.
+    description: EPON subscriber MAC registered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.20
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponOltLinkFaultNotification
     category: diagnostic
-    severity: err
-    description: EPON OLT link fault alarm detected on {_HOSTNAME}.
+    severity: crit
+    description: EPON OLT link fault alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.21
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponOltCableDownNotification
     category: state_change
     severity: warning
-    description: EPON OLT cable down alarm detected on {_HOSTNAME}.
+    description: EPON OLT cable down alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.22
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponRedSlaveLinkFaultNotification
     category: state_change
     severity: warning
-    description: Epon redundancy slave-port link fault detected on {_HOSTNAME}.
+    description: EPON redundancy slave-port link fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.1.2.0.23
     name: UBIQUOSS-EPON-PON-MAC-GROUP-MIB::ubiEponRedundancySwitchoverNotification
     category: state_change
-    severity: notice
-    description: EPON redundancy switchover occurred on {_HOSTNAME}.
+    severity: alert
+    description: EPON redundancy switchover occurred on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.5.2.0.1
     name: UBIQUOSS-EPON-PM-GROUP-MIB::ubiPmCRC32MonitoringNotification
     category: diagnostic
     severity: warning
-    description: CRC32 monitoring threshold status {pmCRC32TCAStatusCurValue} detected on port {ubiPortIndex} on {_HOSTNAME}.
+    description: CRC32 monitoring notification received for port {{value "ubiPortIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiPortIndex
@@ -1064,31 +1064,31 @@ traps:
     name: UBIQUOSS-EPON-SOFTWARE-MANAGEMENT-GROUP-MIB::ubiEponOltImageUpgradeNotification
     category: config_change
     severity: notice
-    description: OLT image upgrade notification received on {_HOSTNAME}.
+    description: OLT image upgrade notification received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.6.2.0.2
     name: UBIQUOSS-EPON-SOFTWARE-MANAGEMENT-GROUP-MIB::ubiEponOltImageUpgradeFailNotification
     category: diagnostic
-    severity: err
-    description: OLT image upgrade failed on {_HOSTNAME}.
+    severity: crit
+    description: OLT image upgrade failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.6.2.0.3
     name: UBIQUOSS-EPON-SOFTWARE-MANAGEMENT-GROUP-MIB::ubiEponOnuImageUpgradeNotification
     category: config_change
     severity: notice
-    description: ONU image upgrade notification received on {_HOSTNAME}.
+    description: ONU image upgrade notification received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.2.500.6.2.0.4
     name: UBIQUOSS-EPON-SOFTWARE-MANAGEMENT-GROUP-MIB::ubiEponOnuImageUpgradeFailNotification
     category: diagnostic
     severity: err
-    description: ONU image upgrade failed on {_HOSTNAME}.
+    description: ONU image upgrade failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.100.1.2.0.1
     name: UBQS-SYSRSC-MIB::ubiSysRscCpuRisingNotification
     category: diagnostic
     severity: warning
-    description: CPU utilization {ubiCpuAlarmValue} exceeded rising threshold {ubiCpuRisingThreshold} on {_HOSTNAME}.
+    description: CPU utilization exceeded rising threshold of {{value "ubiCpuRisingThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiCpuLoadTimePeriod
@@ -1099,7 +1099,7 @@ traps:
     name: UBQS-SYSRSC-MIB::ubiSysRscCpuFallingNotification
     category: diagnostic
     severity: warning
-    description: CPU utilization {ubiCpuAlarmValue} fell below threshold {ubiCpuFallingThreshold} on {_HOSTNAME}.
+    description: CPU utilization fell below threshold {{value "ubiCpuFallingThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiCpuLoadTimePeriod
@@ -1110,7 +1110,7 @@ traps:
     name: UBQS-SYSRSC-MIB::ubiSysRscMemoryRisingNotification
     category: diagnostic
     severity: warning
-    description: Memory free percentage {ubiMemoryFreePercentage} below threshold {ubiMemoryThreshold} on {_HOSTNAME}.
+    description: Memory utilization exceeded threshold {{value "ubiMemoryThreshold"}}% with {{value "ubiMemoryFreePercentage"}}% free on {{hostname}}.
     status: current
     varbinds:
       - ubiMemoryFreePercentage
@@ -1119,7 +1119,7 @@ traps:
     name: UBQS-SYSRSC-MIB::ubiSysRscMemoryFallingNotification
     category: diagnostic
     severity: warning
-    description: Memory utilization fell below threshold {ubiMemoryThreshold} with {ubiMemoryFreePercentage}% free on {_HOSTNAME}.
+    description: Memory utilization threshold exceeded with {{value "ubiMemoryFreePercentage"}}% free on {{hostname}}.
     status: current
     varbinds:
       - ubiMemoryFreePercentage
@@ -1128,7 +1128,7 @@ traps:
     name: UBQS-ENVMON-MIB::ubiEnvMonTempStatusChange
     category: diagnostic
     severity: warning
-    description: Temperature {ubiEnvMonTemperatureDescr} changed state to {ubiEnvMonTemperatureState} on {_HOSTNAME}.
+    description: Temperature state changed to {{value "ubiEnvMonTemperatureState"}} for {{value "ubiEnvMonTemperatureDescr"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiEnvMonTemperatureDescr
@@ -1138,7 +1138,7 @@ traps:
     name: UBQS-ENVMON-MIB::ubiEnvMonFanStatusChange
     category: diagnostic
     severity: warning
-    description: Fan {ubiEnvMonFanDescr} state changed to {ubiEnvMonFanState} on {_HOSTNAME}.
+    description: Fan {{first (value "ubiEnvMonFanDescr") "fan"}} state changed to {{value "ubiEnvMonFanState"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiEnvMonFanDescr
@@ -1147,7 +1147,7 @@ traps:
     name: UBQS-ENVMON-MIB::ubiEnvMonSupplyStatusChange
     category: diagnostic
     severity: warning
-    description: Power supply {ubiEnvMonSupplyDescr} reported state {ubiEnvMonSupplyState} on {_HOSTNAME}.
+    description: Power supply {{value "ubiEnvMonSupplyDescr"}} state changed to {{value "ubiEnvMonSupplyState"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiEnvMonSupplyDescr
@@ -1156,7 +1156,7 @@ traps:
     name: UBQS-ENVMON-MIB::ubiEnvMonSupplyChannelStatusChange
     category: diagnostic
     severity: warning
-    description: Power supply {ubiEnvMonSupplyDescr} state changed to {ubiEnvMonSupplyChannelState} on {_HOSTNAME}.
+    description: Power supply {{value "ubiEnvMonSupplyDescr"}} state changed to {{value "ubiEnvMonSupplyChannelState"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiEnvMonSupplyDescr
@@ -1164,9 +1164,9 @@ traps:
       - ubiEnvMonSupplyChannelState
   - oid: 1.3.6.1.4.1.7800.100.3.2.0.1
     name: UBQS-ENTITY-MIB::ubiFRUInserted
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: FRU {entPhysicalDescr} inserted into container {entPhysicalContainedIn} on {_HOSTNAME}.
+    description: FRU {{value "entPhysicalName"}} inserted on {{hostname}}.
     status: current
     varbinds:
       - entPhysicalContainedIn
@@ -1176,7 +1176,7 @@ traps:
     name: UBQS-ENTITY-MIB::ubiFRURemoved
     category: state_change
     severity: notice
-    description: FRU {entPhysicalName} removed from container {entPhysicalContainedIn} on {_HOSTNAME}.
+    description: FRU {{value "entPhysicalName"}} removed on {{hostname}}.
     status: current
     varbinds:
       - entPhysicalContainedIn
@@ -1186,7 +1186,7 @@ traps:
     name: UBQS-ENTITY-MIB::ubiEntSensorThreshold
     category: diagnostic
     severity: warning
-    description: Transceiver sensor {entPhysicalDescr} reported {ubiEntSensorEventStatus} with value {ubiEntSensorValue} on {_HOSTNAME}.
+    description: Sensor status changed for {{value "entPhysicalDescr"}} on {{hostname}}.
     status: current
     varbinds:
       - entPhysicalDescr
@@ -1200,7 +1200,7 @@ traps:
     name: UBQS-INTERFACE-MIB::ubiPortAutoNegoFault
     category: state_change
     severity: warning
-    description: Auto negotiation failure on port {ubiPortName} with state {ubiPortAutoNegoFaultState} on {_HOSTNAME}.
+    description: Auto negotiation failure on {{first (value "ubiPortName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiPortName
@@ -1209,7 +1209,7 @@ traps:
     name: UBQS-INTERFACE-MIB::ubiLoadMonitorRisingAlarm
     category: diagnostic
     severity: warning
-    description: Load monitor {ubiPortName} value {ubiLoadMonitorValue} exceeded threshold {ubiLoadMonitorCriticalThreshold} on {_HOSTNAME}.
+    description: Load monitor value {{value "ubiLoadMonitorValue"}} {{value "ubiLoadMonitorUnit"}} exceeded threshold on {{first (value "ubiPortName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiPortName
@@ -1225,7 +1225,7 @@ traps:
     name: UBQS-INTERFACE-MIB::ubiLoadMonitorFallingAlarm
     category: diagnostic
     severity: warning
-    description: Load monitor {ubiLoadMonitorVariable} value {ubiLoadMonitorValue} fell below threshold on {_HOSTNAME}.
+    description: Load monitor value {{value "ubiLoadMonitorValue"}} {{value "ubiLoadMonitorUnit"}} fell below threshold on {{first (value "ubiPortName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiPortName
@@ -1239,9 +1239,9 @@ traps:
       - ubiLoadMonitorAlarmZone
   - oid: 1.3.6.1.4.1.7800.100.4.0.1.3
     name: UBQS-INTERFACE-MIB::ubiTrafficControlRisingAlarm
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Traffic rate {ubiTrafficControlOneMinRate} exceeded threshold on {ubiPortName} on {_HOSTNAME}.
+    description: Traffic control rising alarm on {{first (value "ubiPortName") "port"}} with rate {{value "ubiTrafficControlOneMinRate"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiPortName
@@ -1258,7 +1258,7 @@ traps:
     name: UBQS-INTERFACE-MIB::ubiTrafficControlFallingAlarm
     category: diagnostic
     severity: warning
-    description: Traffic rate {ubiTrafficControlOneMinRate} fell below threshold on port {ubiPortName} on {_HOSTNAME}.
+    description: Traffic rate {{value "ubiTrafficControlOneMinRate"}} fell below threshold on {{first (value "ubiPortName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiPortName
@@ -1275,15 +1275,15 @@ traps:
     name: UBQS-DOT1BRIDGE-MIB::ubiVlanCreated
     category: config_change
     severity: notice
-    description: VLAN {ubiVlanName} was created on {_HOSTNAME}.
+    description: VLAN {{value "ubiVlanName"}} created on {{hostname}}.
     status: current
     varbinds:
       - ubiVlanName
   - oid: 1.3.6.1.4.1.7800.100.5.0.0.2
     name: UBQS-DOT1BRIDGE-MIB::ubiVlanDeleted
-    category: state_change
+    category: config_change
     severity: notice
-    description: VLAN {ubiVlanName} deleted on {_HOSTNAME}.
+    description: VLAN {{value "ubiVlanName"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - ubiVlanName
@@ -1291,31 +1291,31 @@ traps:
     name: UBQS-DOT1BRIDGE-MIB::ubiFdbAlarmAsserted
     category: diagnostic
     severity: warning
-    description: FDB entry count exceeded high threshold on {_HOSTNAME}.
+    description: FDB entry count exceeded high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.100.5.0.1.2
     name: UBQS-DOT1BRIDGE-MIB::ubiFdbAlarmCleared
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: FDB alarm cleared as entry count met low threshold on {_HOSTNAME}.
+    description: FDB alarm cleared as entry count met low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.100.6.0.0.1
     name: UBQS-DHCP-MIB::ubiDhcpServerInUseAddressHighNotification
     category: diagnostic
     severity: warning
-    description: DHCP server address usage reached high threshold on {_HOSTNAME}.
+    description: DHCP server address usage reached high threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.100.6.0.0.2
     name: UBQS-DHCP-MIB::ubiDhcpServerInUseAddressLowNotification
     category: diagnostic
     severity: warning
-    description: DHCP server address in use reached low threshold on {_HOSTNAME}.
+    description: DHCP server address pool reached low threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.100.7.3.1
     name: UBQS-AFSMGR-MIB::sysWarmStartNoti
     category: diagnostic
-    severity: warning
-    description: System warm-start notification received on {_HOSTNAME}.
+    severity: notice
+    description: System warm start completed on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1330,9 +1330,9 @@ traps:
       - alarmStatus
   - oid: 1.3.6.1.4.1.7800.100.7.3.2
     name: UBQS-AFSMGR-MIB::sysColdStartNoti
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: System cold start detected on {_HOSTNAME}.
+    description: System cold start detected on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1349,7 +1349,7 @@ traps:
     name: UBQS-AFSMGR-MIB::linkUpNoti
     category: state_change
     severity: notice
-    description: Link up notification received on {_HOSTNAME}.
+    description: Link up notification received on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1366,7 +1366,7 @@ traps:
     name: UBQS-AFSMGR-MIB::linkDownNoti
     category: state_change
     severity: warning
-    description: Link down alarm {alarmId} detected at {alarmPhysicalLoc} on {_HOSTNAME}.
+    description: Link down alarm {{value "alarmId"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1383,7 +1383,7 @@ traps:
     name: UBQS-AFSMGR-MIB::cpuOverloadFallingNoti
     category: diagnostic
     severity: warning
-    description: CPU overload condition falling on {_HOSTNAME}.
+    description: CPU overload condition is falling on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1400,7 +1400,7 @@ traps:
     name: UBQS-AFSMGR-MIB::cpuOverloadRisingNoti
     category: diagnostic
     severity: warning
-    description: CPU overload rising detected with severity {alarmSeverity.raw} on {_HOSTNAME}.
+    description: CPU overload rising detected{{with value "alarmLogicalLoc"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1417,7 +1417,7 @@ traps:
     name: UBQS-AFSMGR-MIB::gbicOperNoti
     category: diagnostic
     severity: warning
-    description: GBIC equipment state change detected with alarm {alarmId} on {_HOSTNAME}.
+    description: 'GBIC equipment status change detected{{with value "alarmId"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmIndex
@@ -1433,8 +1433,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.8
     name: UBQS-AFSMGR-MIB::memoryOverloadNoti
     category: diagnostic
-    severity: warning
-    description: Memory overload alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: 'Memory overload detected{{with value "alarmId"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmIndex
@@ -1451,7 +1451,7 @@ traps:
     name: UBQS-AFSMGR-MIB::slotOperNoti
     category: diagnostic
     severity: warning
-    description: Slot equipment status change {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: Slot equipment operation notification {{value "alarmId"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1468,7 +1468,7 @@ traps:
     name: UBQS-AFSMGR-MIB::tempLowNoti
     category: diagnostic
     severity: warning
-    description: Temperature low alarm {alarmId} reported on {_HOSTNAME}.
+    description: Temperature low alarm {{value "alarmId"}} detected on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1485,7 +1485,7 @@ traps:
     name: UBQS-AFSMGR-MIB::tempHighNoti
     category: diagnostic
     severity: crit
-    description: Temperature high alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: Temperature high alarm detected{{with value "alarmPhysicalLoc"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1501,8 +1501,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.12
     name: UBQS-AFSMGR-MIB::fanAlarmNoti
     category: diagnostic
-    severity: err
-    description: Fan alarm {alarmId} with severity {alarmSeverity} detected on {_HOSTNAME}.
+    severity: crit
+    description: 'Fan alarm detected{{with value "alarmId"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmIndex
@@ -1519,7 +1519,7 @@ traps:
     name: UBQS-AFSMGR-MIB::fmuEquipStatusNoti
     category: diagnostic
     severity: warning
-    description: Fan module equipment status change detected with severity {alarmSeverity} on {_HOSTNAME}.
+    description: 'Fan module status notification received{{with value "alarmId"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmIndex
@@ -1536,7 +1536,7 @@ traps:
     name: UBQS-AFSMGR-MIB::psuAlarmNoti
     category: diagnostic
     severity: crit
-    description: Power supply alarm {alarmId} with severity {alarmSeverity} reported on {_HOSTNAME}.
+    description: Power supply alarm {{value "alarmId"}} detected on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1553,7 +1553,7 @@ traps:
     name: UBQS-AFSMGR-MIB::psuEquipStatusNoti
     category: diagnostic
     severity: warning
-    description: Power supply unit {alarmId} reported {alarmCurStatus} status on {_HOSTNAME}.
+    description: 'Power supply unit status change detected{{with value "alarmId"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmIndex
@@ -1570,7 +1570,7 @@ traps:
     name: UBQS-AFSMGR-MIB::portAdminNoti
     category: state_change
     severity: warning
-    description: Port administration status changed to {alarmCurStatus} on {_HOSTNAME}.
+    description: Port administration status changed to {{value "alarmCurStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1587,7 +1587,7 @@ traps:
     name: UBQS-AFSMGR-MIB::fanOperStatusNoti
     category: diagnostic
     severity: warning
-    description: Fan operational status {alarmCurStatus} reported by {alarmPhysicalLoc} on {_HOSTNAME}.
+    description: Fan operational status alarm {{value "alarmId"}} detected on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1604,7 +1604,7 @@ traps:
     name: UBQS-AFSMGR-MIB::rmonRisingNoti
     category: diagnostic
     severity: warning
-    description: RMON alarm {alarmId} with severity {alarmSeverity} triggered on {_HOSTNAME}.
+    description: RMON alarm rising event {{value "alarmId"}} triggered on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1621,7 +1621,7 @@ traps:
     name: UBQS-AFSMGR-MIB::rmonFallingNoti
     category: diagnostic
     severity: warning
-    description: RMON alarm {alarmId} with severity {alarmSeverity} triggered on {_HOSTNAME}.
+    description: RMON alarm {{value "alarmId"}} transitioned to falling state on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1638,7 +1638,7 @@ traps:
     name: UBQS-AFSMGR-MIB::portSLDNoti
     category: diagnostic
     severity: warning
-    description: Port self-loop detected at {alarmPhysicalLoc} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: Port self-loop detected{{with value "alarmLogicalLoc"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1654,8 +1654,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.30
     name: UBQS-AFSMGR-MIB::remoteConnection
     category: diagnostic
-    severity: warning
-    description: Remote connection alarm {alarmId} with severity {alarmSeverity} reported on {_HOSTNAME}.
+    severity: crit
+    description: Remote connection alarm {{value "alarmId"}} is active on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1672,7 +1672,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponDriftWindowNoti
     category: diagnostic
     severity: warning
-    description: PON drift window alarm {alarmId} with severity {alarmSeverity} detected on {_HOSTNAME}.
+    description: 'ONU drift window detected{{with value "alarmId"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmIndex
@@ -1688,8 +1688,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.42
     name: UBQS-AFSMGR-MIB::ponGemChannelLossNoti
     category: diagnostic
-    severity: warning
-    description: Loss of GEM channel delineation detected with status {alarmCurStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Loss of GEM channel delineation detected on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1705,8 +1705,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.43
     name: UBQS-AFSMGR-MIB::ponAckLossNoti
     category: diagnostic
-    severity: warning
-    description: PON acknowledge loss alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: PON acknowledge loss detected on {{first (value "alarmLogicalLoc") "link"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1723,7 +1723,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponSigDegradeNoti
     category: diagnostic
     severity: warning
-    description: Signal degraded alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: Signal degraded on ONUi{{with value "alarmLogicalLoc"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1740,7 +1740,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponSigFailNoti
     category: diagnostic
     severity: crit
-    description: Signal fail alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: Signal fail on ONUi detected{{with value "alarmPhysicalLoc"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1756,8 +1756,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.46
     name: UBQS-AFSMGR-MIB::ponPhysEquipErrNoti
     category: diagnostic
-    severity: err
-    description: Physical equipment error {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: Physical equipment error on ONUi{{with value "alarmPhysicalLoc"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1774,7 +1774,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponKeySyncLossNoti
     category: diagnostic
     severity: crit
-    description: PON key sync loss detected on {_HOSTNAME}.
+    description: PON key sync loss detected on {{first (value "alarmLogicalLoc") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1791,7 +1791,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponTransIfWarmNoti
     category: diagnostic
     severity: warning
-    description: Transmission interference warning {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: Transmission interference warning {{value "alarmId"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1808,7 +1808,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponTransIfAlarmNoti
     category: diagnostic
     severity: crit
-    description: Transmission interference alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: Transmission interference alarm {{value "alarmId"}} detected on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1825,7 +1825,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponRemoDefectIndNoti
     category: diagnostic
     severity: crit
-    description: Remote Defect Indication alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: Remote Defect Indication alarm {{value "alarmId"}} active on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1840,9 +1840,9 @@ traps:
       - alarmStatus
   - oid: 1.3.6.1.4.1.7800.100.7.3.51
     name: UBQS-AFSMGR-MIB::onuOperStatusNoti
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: ONU operation status alarm {alarmId} with severity {alarmSeverity} reported on {_HOSTNAME}.
+    description: ONU operation status changed to {{value "alarmCurStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1859,7 +1859,7 @@ traps:
     name: UBQS-AFSMGR-MIB::oltAlarmNoti
     category: diagnostic
     severity: crit
-    description: Alarm {alarmId} with severity {alarmSeverity.raw} detected at {alarmPhysicalLoc} on {_HOSTNAME}.
+    description: OLT alarm {{value "alarmId"}} with severity {{value "alarmSeverity"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1876,7 +1876,7 @@ traps:
     name: UBQS-AFSMGR-MIB::oltLinkFaultNoti
     category: diagnostic
     severity: crit
-    description: OLT link fault {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: 'OLT link fault detected{{with value "alarmId"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmIndex
@@ -1893,7 +1893,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ontDyingGaspNoti
     category: diagnostic
     severity: crit
-    description: Ont device reported dying gasp alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: 'ONT dying gasp detected{{with value "alarmId"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmIndex
@@ -1910,7 +1910,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponLinkStatusNoti
     category: state_change
     severity: warning
-    description: PON link status changed to {alarmCurStatus} at {alarmPhysicalLoc} on {_HOSTNAME}.
+    description: PON link status changed to {{value "alarmCurStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1927,7 +1927,7 @@ traps:
     name: UBQS-AFSMGR-MIB::linkLoopbackTestNoti
     category: diagnostic
     severity: warning
-    description: Link loopback test notification {alarmId} with status {alarmStatus} on {_HOSTNAME}.
+    description: 'Link loopback test notification received{{with value "alarmId"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmIndex
@@ -1942,9 +1942,9 @@ traps:
       - alarmStatus
   - oid: 1.3.6.1.4.1.7800.100.7.3.68
     name: UBQS-AFSMGR-MIB::ponOltOperStatusNoti
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: PON OLT operational status alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: PON OLT operational status changed to {{value "alarmCurStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1961,7 +1961,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponOltAdminStatusNoti
     category: state_change
     severity: warning
-    description: PON OLT administrative status changed to {alarmCurStatus} on {_HOSTNAME}.
+    description: PON OLT administrative status changed to {{value "alarmCurStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1976,9 +1976,9 @@ traps:
       - alarmStatus
   - oid: 1.3.6.1.4.1.7800.100.7.3.70
     name: UBQS-AFSMGR-MIB::ponOnuAdminStatusNoti
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: ONu admin status alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: ONU administrative status changed to {{value "alarmCurStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1995,7 +1995,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponOnuRegisterSubMacNoti
     category: state_change
     severity: notice
-    description: ONU subscriber MAC registration event {alarmId} with status {alarmCurStatus} on {_HOSTNAME}.
+    description: ONU subscriber MAC registration detected on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2012,7 +2012,7 @@ traps:
     name: UBQS-AFSMGR-MIB::linkLoopbackTestFailNoti
     category: diagnostic
     severity: crit
-    description: Link loopback test failed for {alarmId} at {alarmPhysicalLoc} on {_HOSTNAME}.
+    description: Link loopback test failed on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2028,8 +2028,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.93
     name: UBQS-AFSMGR-MIB::ponOnuRegOverloadNoti
     category: diagnostic
-    severity: warning
-    description: PON ONU registration overload detected with status {alarmCurStatus} on {_HOSTNAME}.
+    severity: crit
+    description: PON ONU registration overload detected on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2045,8 +2045,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.96
     name: UBQS-AFSMGR-MIB::ponLinkRegNoti
     category: state_change
-    severity: warning
-    description: PON link registered with status {alarmCurStatus} and severity {alarmSeverity} on {_HOSTNAME}.
+    severity: notice
+    description: PON link registered{{with value "alarmLogicalLoc"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2062,8 +2062,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.97
     name: UBQS-AFSMGR-MIB::ponOnuLoopDetectNoti
     category: diagnostic
-    severity: warning
-    description: ONU loop detected at {alarmPhysicalLoc} with status {alarmCurStatus} on {_HOSTNAME}.
+    severity: crit
+    description: ONU loop detected{{with value "alarmPhysicalLoc"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2079,8 +2079,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.98
     name: UBQS-AFSMGR-MIB::ponOltImageUpgrageNoti
     category: diagnostic
-    severity: warning
-    description: Olt Image Upgrade Notification with alarm severity {alarmSeverity} on {_HOSTNAME}.
+    severity: notice
+    description: OLT image upgrade notification received on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2096,8 +2096,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.99
     name: UBQS-AFSMGR-MIB::ponOltImageUpgrageFailNoti
     category: diagnostic
-    severity: err
-    description: OLT image upgrade failed with alarm {alarmId} on {_HOSTNAME}.
+    severity: crit
+    description: OLT image upgrade failed on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2114,7 +2114,7 @@ traps:
     name: UBQS-AFSMGR-MIB::onuImageUpgradeNoti
     category: diagnostic
     severity: warning
-    description: ONU image upgrade notification received with alarm status {alarmStatus} on {_HOSTNAME}.
+    description: 'ONU image upgrade notification received{{with value "alarmId"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmIndex
@@ -2130,8 +2130,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.101
     name: UBQS-AFSMGR-MIB::onuImageUpgradeFailNoti
     category: diagnostic
-    severity: err
-    description: ONU image upgrade failed with alarm {alarmId} on {_HOSTNAME}.
+    severity: crit
+    description: ONU image upgrade failed on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2148,7 +2148,7 @@ traps:
     name: UBQS-AFSMGR-MIB::onuLdShutdownNoti
     category: diagnostic
     severity: crit
-    description: ONU LD shutdown alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: 'ONU LD shutdown detected{{with value "alarmId"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmIndex
@@ -2163,9 +2163,9 @@ traps:
       - alarmStatus
   - oid: 1.3.6.1.4.1.7800.100.7.3.103
     name: UBQS-AFSMGR-MIB::ponUnadminMacRegNoti
-    category: state_change
-    severity: notice
-    description: Unadmin Mac-address Register Notification received on {_HOSTNAME}.
+    category: security
+    severity: warning
+    description: Unadministered MAC address registered{{with value "alarmLogicalLoc"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2180,9 +2180,9 @@ traps:
       - alarmStatus
   - oid: 1.3.6.1.4.1.7800.100.7.3.104
     name: UBQS-AFSMGR-MIB::ponDupMacRegNoti
-    category: diagnostic
+    category: security
     severity: warning
-    description: Duplicated Mac-address register detected at {alarmPhysicalLoc} on {_HOSTNAME}.
+    description: Duplicated MAC address registration detected{{with value "alarmLogicalLoc"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2199,7 +2199,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponOnuTypeMismatchNoti
     category: diagnostic
     severity: warning
-    description: ONU type mismatch alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: ONU type mismatch detected{{with value "alarmLogicalLoc"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2216,7 +2216,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponOltDyingGaspNoti
     category: diagnostic
     severity: crit
-    description: PON OLT dying gasp alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: 'PON OLT dying gasp event detected{{with value "alarmId"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmIndex
@@ -2231,9 +2231,9 @@ traps:
       - alarmStatus
   - oid: 1.3.6.1.4.1.7800.100.7.3.107
     name: UBQS-AFSMGR-MIB::ponOltCableDownNoti
-    category: diagnostic
-    severity: err
-    description: PON OLT cable down alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    category: state_change
+    severity: crit
+    description: OLT cable down detected{{with value "alarmPhysicalLoc"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2250,7 +2250,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponPMCcrc32MonitorNoti
     category: diagnostic
     severity: warning
-    description: PMC CRC32 monitor alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: PMC CRC32 monitor alarm {{value "alarmId"}} detected on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2267,7 +2267,7 @@ traps:
     name: UBQS-AFSMGR-MIB::imageUpDownloadStatusNoti
     category: diagnostic
     severity: warning
-    description: Image upload/download status {alarmStatus} for {alarmId} on {_HOSTNAME}.
+    description: Image upload or download status notification received on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2283,8 +2283,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.110
     name: UBQS-AFSMGR-MIB::imageUpDownloadFailNoti
     category: diagnostic
-    severity: err
-    description: Image upload/download failed with alarm {alarmId} on {_HOSTNAME}.
+    severity: crit
+    description: Image upload or download failed on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2301,7 +2301,7 @@ traps:
     name: UBQS-AFSMGR-MIB::configUpDownloadStatusNoti
     category: config_change
     severity: notice
-    description: Configuration upload/download status notification received on {_HOSTNAME}.
+    description: Configuration upload/download status notification received on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2318,7 +2318,7 @@ traps:
     name: UBQS-AFSMGR-MIB::sysRebootMaxTempNoti
     category: diagnostic
     severity: crit
-    description: System rebooted due to max temperature on {_HOSTNAME}.
+    description: System rebooted due to maximum temperature threshold on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2335,7 +2335,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponRogueOnuLdShutdown
     category: security
     severity: crit
-    description: Rogue ONU detected and shutdown at {alarmPhysicalLoc} on {_HOSTNAME}.
+    description: Rogue ONU link shutdown detected{{with value "alarmPhysicalLoc"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2352,7 +2352,7 @@ traps:
     name: UBQS-AFSMGR-MIB::scuOperStatusNoti
     category: diagnostic
     severity: warning
-    description: SCU operation status alarm {alarmId} with severity {alarmSeverity} reported on {_HOSTNAME}.
+    description: SCU operation status changed to {{value "alarmCurStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2367,9 +2367,9 @@ traps:
       - alarmStatus
   - oid: 1.3.6.1.4.1.7800.100.7.3.115
     name: UBQS-AFSMGR-MIB::configUpDownloadFailNoti
-    category: diagnostic
+    category: config_change
     severity: err
-    description: Config upload/download failed with alarm {alarmId} on {_HOSTNAME}.
+    description: Configuration upload or download failed on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2385,8 +2385,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.116
     name: UBQS-AFSMGR-MIB::ponOntRxPowerStatusNoti
     category: diagnostic
-    severity: warning
-    description: PON ONT Rx optical alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: PON ONT optical receive alarm on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2403,7 +2403,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponOltRxPowerStatusNoti
     category: diagnostic
     severity: crit
-    description: PON optical alarm {alarmId} with severity {alarmSeverity} detected on {_HOSTNAME}.
+    description: PON OLT Rx optical alarm detected on {{first (value "alarmLogicalLoc") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2420,7 +2420,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponOntTxPowerStatusNoti
     category: diagnostic
     severity: crit
-    description: PON ONT TX optical alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: PON ONT TX optical alarm detected on {{first (value "alarmPhysicalLoc") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2437,7 +2437,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponOntTemperatureStatusNoti
     category: diagnostic
     severity: crit
-    description: PON ONT temperature alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: ONT temperature alarm on {{first (value "alarmPhysicalLoc") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2453,8 +2453,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.120
     name: UBQS-AFSMGR-MIB::ponOntVoltageStatusNoti
     category: diagnostic
-    severity: err
-    description: PON ONT voltage alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: 'PON ONT voltage alarm detected{{with value "alarmId"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmIndex
@@ -2470,8 +2470,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.121
     name: UBQS-AFSMGR-MIB::ponOntBiasStatusNoti
     category: diagnostic
-    severity: warning
-    description: PON ONT bias alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: PON ONT bias alarm {{value "alarmId"}} detected on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2486,9 +2486,9 @@ traps:
       - alarmStatus
   - oid: 1.3.6.1.4.1.7800.100.7.3.122
     name: UBQS-AFSMGR-MIB::ponOltRedSlaveFaultNoti
-    category: diagnostic
-    severity: err
-    description: PON OTDR redundancy slave link fault detected with severity {alarmSeverity} on {_HOSTNAME}.
+    category: state_change
+    severity: crit
+    description: PON OLT redundancy slave link fault detected on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2505,7 +2505,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponOltRedSwitchoverNoti
     category: state_change
     severity: alert
-    description: PON OLT redundancy switchover occurred at {alarmPhysicalLoc} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: PON OLT redundancy switchover occurred on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2522,7 +2522,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponOnuOpticRxPowerOnusNoti
     category: diagnostic
     severity: warning
-    description: Pon Onus low optical Rx power alarm {alarmId} on {_HOSTNAME}.
+    description: PON ONU low optical receive power detected on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2538,8 +2538,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.127
     name: UBQS-AFSMGR-MIB::ponOnuDownThresholdNoti
     category: diagnostic
-    severity: warning
-    description: PON ONU down threshold notification {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: PON ONU down threshold reached for {{value "alarmId"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2556,7 +2556,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponOnuFanStatusNoti
     category: diagnostic
     severity: warning
-    description: Fan status alarm {alarmId} with severity {alarmSeverity} reported on {_HOSTNAME}.
+    description: Fan status alarm reported on {{first (value "alarmLogicalLoc") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2573,7 +2573,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ExternalACAlarm
     category: diagnostic
     severity: crit
-    description: External AC alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: External AC alarm {{value "alarmId"}} detected on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2590,7 +2590,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ExternalUnitAlarm
     category: diagnostic
     severity: crit
-    description: External unit alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: External unit alarm {{value "alarmId"}} detected on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2606,8 +2606,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.131
     name: UBQS-AFSMGR-MIB::ponLoopCntThresholdNoti
     category: diagnostic
-    severity: warning
-    description: Loop count threshold alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: Loop count threshold alarm triggered on {{first (value "alarmPhysicalLoc") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2624,7 +2624,7 @@ traps:
     name: UBQS-AFSMGR-MIB::scuUnequipNoti
     category: diagnostic
     severity: crit
-    description: Equipment alarm {alarmId} with severity {alarmSeverity.raw} reported on {_HOSTNAME}.
+    description: Equipment alarm triggered on {{first (value "alarmLogicalLoc") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2641,7 +2641,7 @@ traps:
     name: UBQS-AFSMGR-MIB::liuUnequipNoti
     category: diagnostic
     severity: crit
-    description: Equipment alarm {alarmId} with severity {alarmSeverity} reported on {_HOSTNAME}.
+    description: Equipment unequip alarm {{value "alarmId"}} detected on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2658,7 +2658,7 @@ traps:
     name: UBQS-AFSMGR-MIB::fmuUnequipNoti
     category: diagnostic
     severity: crit
-    description: Equipment unequip alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: FMU unequip alarm detected at {{value "alarmPhysicalLoc"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2674,8 +2674,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.135
     name: UBQS-AFSMGR-MIB::ponOltLineCodeErrorMonitorNoti
     category: diagnostic
-    severity: warning
-    description: OLT line code error alarm {alarmId} with severity {alarmSeverity} detected on {_HOSTNAME}.
+    severity: crit
+    description: OLT line code errors detected{{with value "alarmPhysicalLoc"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2691,8 +2691,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.136
     name: UBQS-AFSMGR-MIB::ponOltAlignmentErrorMonitorNoti
     category: diagnostic
-    severity: warning
-    description: OLT alignment error alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: OLT alignment error alarm detected on {{first (value "alarmLogicalLoc") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2709,7 +2709,7 @@ traps:
     name: UBQS-AFSMGR-MIB::scuEjectorAlarmNoti
     category: diagnostic
     severity: crit
-    description: SCU ejector alarm {alarmId} with severity {alarmSeverity} detected at {alarmPhysicalLoc} on {_HOSTNAME}.
+    description: SCU ejector alarm {{value "alarmId"}} detected on {{first (value "alarmPhysicalLoc") (value "alarmLogicalLoc") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2725,8 +2725,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.138
     name: UBQS-AFSMGR-MIB::systemCheckAlarm
     category: diagnostic
-    severity: warning
-    description: System check alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: System check alarm {{value "alarmId"}} detected on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2743,7 +2743,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ponOnuRegThreshOverNoti
     category: diagnostic
     severity: warning
-    description: PON ONU registration threshold exceeded with alarm {alarmId} on {_HOSTNAME}.
+    description: PON ONU registration threshold exceeded{{with value "alarmLogicalLoc"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2759,8 +2759,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.140
     name: UBQS-AFSMGR-MIB::dcTempHighNoti
     category: diagnostic
-    severity: warning
-    description: Temperature high alarm {alarmId} at {alarmPhysicalLoc} on {_HOSTNAME}.
+    severity: crit
+    description: DC board temperature high threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2777,7 +2777,7 @@ traps:
     name: UBQS-AFSMGR-MIB::dcTempLowNoti
     category: diagnostic
     severity: warning
-    description: DC board temperature low threshold alarm {alarmId} on {_HOSTNAME}.
+    description: DC board temperature low threshold alarm on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2794,7 +2794,7 @@ traps:
     name: UBQS-AFSMGR-MIB::humidityHighNoti
     category: diagnostic
     severity: warning
-    description: High humidity threshold reached at {alarmPhysicalLoc} with status {alarmCurStatus} on {_HOSTNAME}.
+    description: Mainboard humidity high threshold notification on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2811,7 +2811,7 @@ traps:
     name: UBQS-AFSMGR-MIB::humidityLowNoti
     category: diagnostic
     severity: warning
-    description: Humidity low threshold alarm {alarmId} detected at {alarmPhysicalLoc} on {_HOSTNAME}.
+    description: Mainboard humidity low threshold notification on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2828,7 +2828,7 @@ traps:
     name: UBQS-AFSMGR-MIB::dcHumidityHighNoti
     category: diagnostic
     severity: warning
-    description: DC board humidity high threshold alarm {alarmId} on {_HOSTNAME}.
+    description: DC board humidity high threshold alarm on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2845,7 +2845,7 @@ traps:
     name: UBQS-AFSMGR-MIB::dcHumidityLowNoti
     category: diagnostic
     severity: warning
-    description: DC board humidity low threshold alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: DC board humidity low threshold notification on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2862,7 +2862,7 @@ traps:
     name: UBQS-AFSMGR-MIB::sysRebootMaxDcTempNoti
     category: diagnostic
     severity: crit
-    description: System rebooted due to maximum DC board temperature on {_HOSTNAME}.
+    description: System rebooted due to maximum DC board temperature on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2879,7 +2879,7 @@ traps:
     name: UBQS-AFSMGR-MIB::sysRebootMaxHumidNoti
     category: diagnostic
     severity: warning
-    description: System reboot triggered by max humidity alarm {alarmId} on {_HOSTNAME}.
+    description: System reboot triggered by maximum humidity alarm on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2895,8 +2895,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.148
     name: UBQS-AFSMGR-MIB::sysRebootMaxDcHumidNoti
     category: diagnostic
-    severity: warning
-    description: System reboot triggered by high DC board humidity on {_HOSTNAME}.
+    severity: crit
+    description: System rebooted due to maximum DC board humidity on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2913,7 +2913,7 @@ traps:
     name: UBQS-AFSMGR-MIB::fanSpeedHighNoti
     category: diagnostic
     severity: warning
-    description: Fan speed high alarm {alarmId} at {alarmPhysicalLoc} reported on {_HOSTNAME}.
+    description: Fan speed high alarm detected{{with value "alarmPhysicalLoc"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2929,8 +2929,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.7.3.150
     name: UBQS-AFSMGR-MIB::psuUnequipNoti
     category: diagnostic
-    severity: err
-    description: Power supply equipment alarm {alarmId} with status {alarmCurStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Power supply unit unequipped{{with value "alarmPhysicalLoc"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2947,7 +2947,7 @@ traps:
     name: UBQS-AFSMGR-MIB::doorOpenAlarmNoti
     category: diagnostic
     severity: warning
-    description: Door open alarm {alarmId} detected at {alarmPhysicalLoc} with status {alarmCurStatus} on {_HOSTNAME}.
+    description: Door open alarm detected at {{value "alarmPhysicalLoc"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2964,7 +2964,7 @@ traps:
     name: UBQS-AFSMGR-MIB::ExternalMajorAlarm
     category: diagnostic
     severity: crit
-    description: External power major alarm {alarmId} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: External power major alarm {{value "alarmId"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2981,7 +2981,7 @@ traps:
     name: UBQS-AFSMGR-MIB::Piu10gFanFailAlarm
     category: diagnostic
     severity: crit
-    description: Fan failure alarm {alarmId} detected on {_HOSTNAME}.
+    description: 10G PIU fan failure alarm detected on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -2998,7 +2998,7 @@ traps:
     name: UBQS-CFM-MIB::ubiCfmRemoteMepStatusChange
     category: state_change
     severity: warning
-    description: Remote MEP {ubiCfmRmepRemoteMacAddr} status changed to {ubiCfmRmepStatus} on {_HOSTNAME}.
+    description: Remote MEP {{value "ubiCfmRmepStatus"}} on {{value "ubiCfmMdName"}}/{{value "ubiCfmMaName"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -3012,7 +3012,7 @@ traps:
     name: UBQS-CFM-MIB::ubiCfmAggPortRemoteMepStatusChange
     category: state_change
     severity: warning
-    description: Remote MEP {ubiCfmRmepId} status changed to {ubiCfmRmepStatus} on port {ubiAggId} on {_HOSTNAME}.
+    description: Remote MEP {{value "ubiCfmRmepStatus"}} on {{value "ubiCfmRmepId"}} in {{value "ubiCfmMaName"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiAggId
@@ -3025,9 +3025,9 @@ traps:
       - ubiCfmRmepStatus
   - oid: 1.3.6.1.4.1.7800.100.10.0.0.3
     name: UBQS-CFM-MIB::ubiCfmPmFrameDelayEvent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: MEP {ubiCfmMepId} on {ubiCfmMepIfname} delay {ubiCfmMepPmDelayAvg} exceeded threshold {ubiCfmMaPmDelayThreshold} on {_HOSTNAME}.
+    description: CFM PM delay exceeded threshold on {{first (value "ubiCfmMepIfname") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiCfmMepId
@@ -3041,7 +3041,7 @@ traps:
     name: UBQS-CFM-MIB::ubiCfmPmFrameLossEvent
     category: diagnostic
     severity: warning
-    description: Frame loss exceeded threshold {ubiCfmMaPmLossThreshold} with state {ubiCfmMepPmLossState} on {_HOSTNAME}.
+    description: CFM frame loss exceeded threshold on {{value "ubiCfmMepIfname"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiCfmMepId
@@ -3054,7 +3054,7 @@ traps:
     name: UBQS-CFM-MIB::ubiCfmMepEtherPingSendResult
     category: diagnostic
     severity: warning
-    description: CFM Ether Ping result {ubiCfmMepOamResultEtherPing} for MEP {ubiCfmMepOamSendMepId} on {_HOSTNAME}.
+    description: CFM EtherPing result {{value "ubiCfmMepOamResultEtherPing"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiCfmMepOamSendBridgeId
@@ -3070,8 +3070,8 @@ traps:
   - oid: 1.3.6.1.4.1.7800.100.10.0.0.6
     name: UBQS-CFM-MIB::ubiCfmMepLinkTraceSendResult
     category: diagnostic
-    severity: notice
-    description: Link trace result relay action {ubiCfmMepOamResultLinkTraceRelayAction} with hop count {ubiCfmMepOamResultLinkTraceHopCount} on {_HOSTNAME}.
+    severity: info
+    description: Link trace result received on {{value "ubiCfmMepOamSendMdIndex"}}/{{value "ubiCfmMepOamSendMaIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiCfmMepOamSendBridgeId
@@ -3086,7 +3086,7 @@ traps:
     name: UBQS-CFM-MIB::ubiCfmCCConfigDefectAlarm
     category: diagnostic
     severity: warning
-    description: CCM Config defect {ubiCfmMepCCConfigDefectState} detected on MEP {ubiCfmMepId} in MA {ubiCfmMaName} on {_HOSTNAME}.
+    description: CFM config defect {{value "ubiCfmMepCCConfigDefect"}} detected on MEP {{value "ubiCfmMepId"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiCfmMdName
@@ -3098,7 +3098,7 @@ traps:
     name: UBQS-ERPS-MIB::ubiErpsRingStateChange
     category: state_change
     severity: notice
-    description: ERPS ring state changed to {ubiErpsSwitchCurrentState} on {_HOSTNAME}.
+    description: ERPS ring state changed to {{value "ubiErpsSwitchCurrentState"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiErpsSwitchBridgeId
@@ -3112,7 +3112,7 @@ traps:
     name: UBQS-ERPS-MIB::ubiErpsRingEastIfStateChange
     category: state_change
     severity: notice
-    description: ERPS east ring port {ubiErpsSwitchEastIf} state changed to {ubiErpsSwitchEastIfState} on {_HOSTNAME}.
+    description: East ring port {{value "ubiErpsSwitchEastIf"}} state changed to {{value "ubiErpsSwitchEastIfState"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiErpsSwitchBridgeId
@@ -3123,7 +3123,7 @@ traps:
     name: UBQS-ERPS-MIB::ubiErpsRingWestIfStateChange
     category: state_change
     severity: notice
-    description: West ring port {ubiErpsSwitchWestIf} state changed to {ubiErpsSwitchWestIfState} on ring {ubiErpsSwitchRingId} on {_HOSTNAME}.
+    description: West ring port {{value "ubiErpsSwitchWestIf"}} state changed to {{value "ubiErpsSwitchWestIfState"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiErpsSwitchBridgeId
@@ -3134,7 +3134,7 @@ traps:
     name: UBQS-IP-MIB::ubiPingSendCompletion
     category: diagnostic
     severity: info
-    description: Ping sequence completed with {ubiPingSendCompleted} status on {_HOSTNAME}.
+    description: Ping sequence completed with {{value "ubiPingReceivedPackets"}}/{{value "ubiPingSendPackets"}} packets on {{hostname}}.
     status: current
     varbinds:
       - ubiPingSendCompleted
@@ -3144,7 +3144,7 @@ traps:
     name: UBQS-LAG-MIB::ubiBackupIntfSwitchover
     category: state_change
     severity: notice
-    description: Backup interface {ubiReduIfName} switchover event on {_HOSTNAME}.
+    description: Backup interface switchover occurred on {{hostname}}.
     status: current
     varbinds:
       - ubiReduIfIndex
@@ -3158,7 +3158,7 @@ traps:
     name: UBQS-MULTICAST-MIB::ubiIgmpSnoopVlanNotification
     category: config_change
     severity: notice
-    description: IGMP Snooping state changed on VLAN {ubiIgmpSnoopVlanIndex} on {_HOSTNAME}.
+    description: IGMP Snooping {{value "ubiIgmpSnoopVlanEnabled"}} on VLAN {{value "ubiIgmpSnoopVlanIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiIgmpSnoopVlanIndex
@@ -3167,13 +3167,13 @@ traps:
     name: UBQS-MPLS-MIB::ubiLspTraceSendCompletion
     category: diagnostic
     severity: info
-    description: LSP trace send completion reported by {TRAP_NAME} on {_HOSTNAME}.
+    description: LSP trace send completion event on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7800.100.25.0.1
     name: UBQS-SLD-MIB::ubiSelfLoopDetectStateChange
     category: state_change
     severity: warning
-    description: Self-loop detection state changed on interface {ifDescr} with state {ubiSldIfState} on {_HOSTNAME}.
+    description: Self-loop detection state changed to {{value "ubiSldIfState"}} on {{first (value "ifDescr") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - ifDescr
@@ -3183,7 +3183,7 @@ traps:
     name: UBQS-SYSTEM-ACCESS-MIB::ubiSystemRemoteConnectStateChange
     category: state_change
     severity: notice
-    description: Remote connect state changed for user {ubiSystemRemoteConnectUserName} from {ubiSystemRemoteConnectAddress} on {_HOSTNAME}.
+    description: System remote connect state changed for {{value "ubiSystemRemoteConnectUserName"}} from {{value "ubiSystemRemoteConnectAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiSystemRemoteConnectUserName
@@ -3193,7 +3193,7 @@ traps:
     name: UBQS-AUTO-RESET-MIB::ubiAutoResetCpuNotification
     category: diagnostic
     severity: warning
-    description: CPU usage {ubiAutoResetCpuUsage} triggered auto-reset action {ubiAutoResetCpuAction} on {_HOSTNAME}.
+    description: CPU auto-reset triggered by {{value "ubiAutoResetCpuResetReason"}} with usage {{value "ubiAutoResetCpuUsage"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiAutoResetCpuAction
@@ -3208,7 +3208,7 @@ traps:
     name: UBQS-AUTO-RESET-MIB::ubiAutoResetMemoryNotification
     category: diagnostic
     severity: warning
-    description: Memory auto-reset action {ubiAutoResetMemoryAction} triggered due to free memory {ubiAutoResetMemoryfree} on {_HOSTNAME}.
+    description: Memory auto-reset triggered via {{value "ubiAutoResetMemoryAction"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiAutoResetMemoryAction
@@ -3222,7 +3222,7 @@ traps:
     name: UBQS-AUTO-RESET-MIB::ubiAutoResetIcmpNotification
     category: diagnostic
     severity: warning
-    description: ICMP auto-reset action {ubiAutoResetIcmpAction} triggered due to {ubiAutoResetIcmpResetReason} on {_HOSTNAME}.
+    description: ICMP auto-reset triggered by {{value "ubiAutoResetIcmpResetReason"}} with {{value "ubiAutoResetIcmpFailCount"}} failures on {{hostname}}.
     status: current
     varbinds:
       - ubiAutoResetIcmpAction
@@ -3237,7 +3237,7 @@ traps:
     name: UBQS-ENTITY-ALARM-MIB::ubiAlarmAsserted
     category: diagnostic
     severity: crit
-    description: Physical entity alarm asserted with severity {ubiAlarmContactSeverity.raw} on {_HOSTNAME}.
+    description: 'Physical entity alarm asserted{{with value "ubiAlarmContactDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ubiAlarmContactIndex
@@ -3248,7 +3248,7 @@ traps:
     name: UBQS-ENTITY-ALARM-MIB::ubiAlarmCleared
     category: state_change
     severity: notice
-    description: Alarm cleared for {ubiAlarmContactDescr} on {_HOSTNAME}.
+    description: Alarm cleared for {{value "ubiAlarmContactDescr"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiAlarmContactIndex
@@ -3259,7 +3259,7 @@ traps:
     name: UBQS-REDUNDANCY-MIB::ubiSwitchOverNotification
     category: state_change
     severity: alert
-    description: Redundancy switchover occurred with reason {ubiLastSwitchOverReason} and sync state {ubiSwitchOverRedundancySyncState} on {_HOSTNAME}.
+    description: Redundancy switchover occurred{{with value "ubiSwitchOverRedundancySyncState"}} sync state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ubiLastSwitchOverTime
@@ -3269,7 +3269,7 @@ traps:
     name: UBQS-REDUNDANCY-MIB::ubiRedundancyConnectionStateNotification
     category: state_change
     severity: notice
-    description: Redundancy connection state changed to {ubiRedundancyConnectionState} on {_HOSTNAME}.
+    description: Standby appliance redundancy connection state changed to {{value "ubiRedundancyConnectionState"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiRedundancyConnectionState
@@ -3277,7 +3277,7 @@ traps:
     name: UBQS-REDUNDANCY-MIB::ubiRedundancySyncNotification
     category: state_change
     severity: notice
-    description: Redundancy synchronization with standby SCU completed with state {ubiRedundancySyncState} on {_HOSTNAME}.
+    description: Redundancy synchronization with standby SCU completed on {{hostname}}.
     status: current
     varbinds:
       - ubiRedundancySyncState
@@ -3285,7 +3285,7 @@ traps:
     name: UBQS-REDUNDANCY-MIB::ubiRedundancySyncStateChangeNotification
     category: state_change
     severity: notice
-    description: Redundancy synchronization state changed to {ubiRedundancySyncState} on {_HOSTNAME}.
+    description: Redundancy synchronization state changed to {{value "ubiRedundancySyncState"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiRedundancySyncState
@@ -3293,7 +3293,7 @@ traps:
     name: UBQS-CPU-MAC-FILTER-MIB::ubiCpuMacFilterNotification
     category: security
     severity: warning
-    description: CPU-MAC filter event blocked MAC {ubiCpuMacFilterStatsMacAddr} on port {ubiCpuMacFilterStatsPortIndex} on {_HOSTNAME}.
+    description: CPU-MAC filter event {{value "ubiCpuMacFilterStatsBlocked"}} MAC {{value "ubiCpuMacFilterStatsMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - ubiCpuMacFilterStatsVlanIfIndex

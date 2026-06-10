@@ -50,7 +50,7 @@ traps:
     name: DB7001-MIB::notifTest
     category: unknown
     severity: info
-    description: Trap {TRAP_NAME} received with alias {alias} and agent ID {snmpaid} on {_HOSTNAME}.
+    description: Trap notifTest received on {{hostname}}.
     status: current
     varbinds:
       - alias
@@ -59,7 +59,7 @@ traps:
     name: DB7001-MIB::notifRflvlOk
     category: diagnostic
     severity: notice
-    description: RFLVL status OK with value {mntrRflvlValue} on {_HOSTNAME}.
+    description: RFLVL monitoring value is OK{{with value "mntrRflvlValue"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - mntrRflvlValue
@@ -69,7 +69,7 @@ traps:
     name: DB7001-MIB::notifRflvlLow
     category: diagnostic
     severity: warning
-    description: RFLVL value {mntrRflvlValue} is low on {_HOSTNAME}.
+    description: RF level low value {{value "mntrRflvlValue"}} on {{hostname}}.
     status: current
     varbinds:
       - mntrRflvlValue
@@ -79,7 +79,7 @@ traps:
     name: DB7001-MIB::notifRflvlHigh
     category: diagnostic
     severity: warning
-    description: RFLVL value {mntrRflvlValue} exceeded threshold on {_HOSTNAME}.
+    description: RF level high value {{value "mntrRflvlValue"}} detected on {{hostname}}.
     status: current
     varbinds:
       - mntrRflvlValue
@@ -87,9 +87,9 @@ traps:
       - snmpaid
   - oid: 1.3.6.1.4.1.35833.37.254.0.5
     name: DB7001-MIB::notifMpxtOk
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: MPXT status OK with value {mntrMpxtValue} on {_HOSTNAME}.
+    description: Multiplexer status is OK{{with value "alias"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - mntrMpxtValue
@@ -99,7 +99,7 @@ traps:
     name: DB7001-MIB::notifMpxtLow
     category: diagnostic
     severity: warning
-    description: MPXT value {mntrMpxtValue} is low on {_HOSTNAME}.
+    description: Multiplexer value {{value "mntrMpxtValue"}} is low on {{hostname}}.
     status: current
     varbinds:
       - mntrMpxtValue
@@ -109,7 +109,7 @@ traps:
     name: DB7001-MIB::notifMpxtHigh
     category: diagnostic
     severity: warning
-    description: MPXT value {mntrMpxtValue} is high on {alias} on {_HOSTNAME}.
+    description: Multiplexer value {{value "mntrMpxtValue"}} is high on {{hostname}}.
     status: current
     varbinds:
       - mntrMpxtValue
@@ -119,7 +119,7 @@ traps:
     name: DB7001-MIB::notifPilotOk
     category: diagnostic
     severity: notice
-    description: Pilot value {mntrPilotValue} is OK on {_HOSTNAME}.
+    description: Pilot signal restored to {{value "mntrPilotValue"}} on {{hostname}}.
     status: current
     varbinds:
       - mntrPilotValue
@@ -129,7 +129,7 @@ traps:
     name: DB7001-MIB::notifPilotLow
     category: diagnostic
     severity: warning
-    description: Pilot value {mntrPilotValue} is low on {_HOSTNAME}.
+    description: PILOT value is low ({{value "mntrPilotValue"}}) on {{hostname}}.
     status: current
     varbinds:
       - mntrPilotValue
@@ -139,7 +139,7 @@ traps:
     name: DB7001-MIB::notifPilotHigh
     category: diagnostic
     severity: warning
-    description: Pilot value {mntrPilotValue} is high on {_HOSTNAME}.
+    description: Pilot value {{value "mntrPilotValue"}} is high on {{hostname}}.
     status: current
     varbinds:
       - mntrPilotValue
@@ -149,7 +149,7 @@ traps:
     name: DB7001-MIB::notifRdsOk
     category: diagnostic
     severity: notice
-    description: RDS monitoring value {mntrRdsValue} reported OK on {_HOSTNAME}.
+    description: RDS status is OK with value {{value "mntrRdsValue"}} on {{hostname}}.
     status: current
     varbinds:
       - mntrRdsValue
@@ -159,7 +159,7 @@ traps:
     name: DB7001-MIB::notifRdsLow
     category: diagnostic
     severity: warning
-    description: RDS value {mntrRdsValue} is low on {_HOSTNAME}.
+    description: RDS value is low ({{value "mntrRdsValue"}}) on {{hostname}}.
     status: current
     varbinds:
       - mntrRdsValue
@@ -169,7 +169,7 @@ traps:
     name: DB7001-MIB::notifRdsHigh
     category: diagnostic
     severity: warning
-    description: RDS value {mntrRdsValue} exceeded threshold on {_HOSTNAME}.
+    description: RDS value {{value "mntrRdsValue"}} is high on {{hostname}}.
     status: current
     varbinds:
       - mntrRdsValue
@@ -179,7 +179,7 @@ traps:
     name: DB7001-MIB::notifLeftOk
     category: state_change
     severity: notice
-    description: Monitoring left value {mntrLeftValue} changed on {_HOSTNAME}.
+    description: Device {{first (value "alias") "monitor"}} left OK on {{hostname}}.
     status: current
     varbinds:
       - mntrLeftValue
@@ -189,7 +189,7 @@ traps:
     name: DB7001-MIB::notifLeftLow
     category: diagnostic
     severity: warning
-    description: Low left value {mntrLeftValue} detected on {alias} on {_HOSTNAME}.
+    description: Left sensor value {{value "mntrLeftValue"}} is low on {{hostname}}.
     status: current
     varbinds:
       - mntrLeftValue
@@ -199,7 +199,7 @@ traps:
     name: DB7001-MIB::notifLeftHigh
     category: diagnostic
     severity: warning
-    description: LEFT value {mntrLeftValue} exceeded high threshold on {_HOSTNAME}.
+    description: Left channel value {{value "mntrLeftValue"}} is high on {{first (value "alias") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - mntrLeftValue
@@ -207,9 +207,9 @@ traps:
       - snmpaid
   - oid: 1.3.6.1.4.1.35833.37.254.0.17
     name: DB7001-MIB::notifRightOk
-    category: state_change
-    severity: notice
-    description: Right value {mntrRightValue} for alias {alias} is OK on {_HOSTNAME}.
+    category: auth
+    severity: info
+    description: SNMP authentication success for {{value "snmpaid"}} on {{hostname}}.
     status: current
     varbinds:
       - mntrRightValue
@@ -219,7 +219,7 @@ traps:
     name: DB7001-MIB::notifRightLow
     category: diagnostic
     severity: warning
-    description: Monitoring right value {mntrRightValue} is low on {_HOSTNAME}.
+    description: RIGHT value is low ({{value "mntrRightValue"}}) on {{hostname}}.
     status: current
     varbinds:
       - mntrRightValue
@@ -229,7 +229,7 @@ traps:
     name: DB7001-MIB::notifRightHigh
     category: diagnostic
     severity: warning
-    description: Right value {mntrRightValue} exceeded threshold on {alias} on {_HOSTNAME}.
+    description: RIGHT sensor value {{value "mntrRightValue"}} is high on {{hostname}}.
     status: current
     varbinds:
       - mntrRightValue
@@ -239,7 +239,7 @@ traps:
     name: DB7001-MIB::notifTempcOk
     category: diagnostic
     severity: notice
-    description: Temperature monitor {mntrTempcValue} reported OK on {_HOSTNAME}.
+    description: Temperature sensor returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - mntrTempcValue
@@ -249,7 +249,7 @@ traps:
     name: DB7001-MIB::notifTempcLow
     category: diagnostic
     severity: warning
-    description: Temperature value {mntrTempcValue} is low on {_HOSTNAME}.
+    description: Temperature sensor value {{value "mntrTempcValue"}} is low on {{hostname}}.
     status: current
     varbinds:
       - mntrTempcValue
@@ -259,7 +259,7 @@ traps:
     name: DB7001-MIB::notifTempcHigh
     category: diagnostic
     severity: warning
-    description: Temperature value {mntrTempcValue} exceeded high threshold on {_HOSTNAME}.
+    description: Temperature threshold exceeded with value {{value "mntrTempcValue"}} on {{hostname}}.
     status: current
     varbinds:
       - mntrTempcValue
@@ -269,7 +269,7 @@ traps:
     name: DB7001-MIB::notifFanrpmOk
     category: diagnostic
     severity: notice
-    description: Fan RPM value {mntrFanrpmValue} is within normal range on {_HOSTNAME}.
+    description: Fan RPM returned to normal on {{hostname}}.
     status: current
     varbinds:
       - mntrFanrpmValue
@@ -279,7 +279,7 @@ traps:
     name: DB7001-MIB::notifFanrpmLow
     category: diagnostic
     severity: warning
-    description: Fan RPM value {mntrFanrpmValue} is low on {_HOSTNAME}.
+    description: Fan RPM is low ({{value "mntrFanrpmValue"}}) on {{hostname}}.
     status: current
     varbinds:
       - mntrFanrpmValue
@@ -289,7 +289,7 @@ traps:
     name: DB7001-MIB::notifFanrpmHigh
     category: diagnostic
     severity: warning
-    description: Fan RPM value {mntrFanrpmValue} exceeded high threshold on {_HOSTNAME}.
+    description: Fan RPM value {{value "mntrFanrpmValue"}} is high on {{hostname}}.
     status: current
     varbinds:
       - mntrFanrpmValue
@@ -299,7 +299,7 @@ traps:
     name: DB7001-MIB::notifAudiomuteActive
     category: state_change
     severity: notice
-    description: Audio mute status activated on {alias} on {_HOSTNAME}.
+    description: Audio mute activated{{with value "alias"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alias
@@ -308,7 +308,7 @@ traps:
     name: DB7001-MIB::notifAudiomuteInactive
     category: state_change
     severity: notice
-    description: Audio mute state changed to Inactive on {_HOSTNAME}.
+    description: Audio mute is inactive on {{hostname}}.
     status: current
     varbinds:
       - alias
@@ -316,8 +316,8 @@ traps:
   - oid: 1.3.6.1.4.1.35833.37.254.0.28
     name: DB7001-MIB::notifMpxmuteActive
     category: state_change
-    severity: notice
-    description: MPXMute active state detected on {_HOSTNAME}.
+    severity: warning
+    description: MPXMUTE active state detected on {{hostname}}.
     status: current
     varbinds:
       - alias
@@ -325,8 +325,8 @@ traps:
   - oid: 1.3.6.1.4.1.35833.37.254.0.29
     name: DB7001-MIB::notifMpxmuteInactive
     category: state_change
-    severity: notice
-    description: MPXMUTE inactive state detected on {_HOSTNAME}.
+    severity: warning
+    description: MPXMute inactive state detected on {{hostname}}.
     status: current
     varbinds:
       - alias
@@ -335,7 +335,7 @@ traps:
     name: DB7001-MIB::notifPiprotectionActive
     category: state_change
     severity: notice
-    description: PI protection activated on {alias} on {_HOSTNAME}.
+    description: PI protection became active{{with value "alias"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alias
@@ -344,7 +344,7 @@ traps:
     name: DB7001-MIB::notifPiprotectionInactive
     category: state_change
     severity: warning
-    description: PI protection is inactive on {_HOSTNAME}.
+    description: PI Protection is inactive on {{hostname}}.
     status: current
     varbinds:
       - alias
@@ -353,7 +353,7 @@ traps:
     name: DB7001-MIB::notifSwitchMainstation
     category: state_change
     severity: notice
-    description: Switch MainStation {alias} status changed on {_HOSTNAME}.
+    description: Switch mainstation event {{value "alias"}} on {{hostname}}.
     status: current
     varbinds:
       - alias
@@ -362,7 +362,7 @@ traps:
     name: DB7001-MIB::notifSwitchBackupstation
     category: state_change
     severity: notice
-    description: Switch backup station activated for {alias} on {_HOSTNAME}.
+    description: Switch backup station activated on {{hostname}}.
     status: current
     varbinds:
       - alias

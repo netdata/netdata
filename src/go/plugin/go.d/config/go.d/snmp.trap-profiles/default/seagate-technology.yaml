@@ -26,7 +26,7 @@ traps:
     name: SEAGATESYSTEMTRAP-MIB::seagateEventInfoTrap
     category: diagnostic
     severity: info
-    description: Storage array event {connUnitEventId} ({connUnitEventDescr}) on {_HOSTNAME}.
+    description: Storage array event {{value "connUnitEventDescr"}} on {{hostname}}.
     status: current
     varbinds:
       - connUnitEventId
@@ -36,7 +36,7 @@ traps:
     name: SEAGATESYSTEMTRAP-MIB::seagateEventWarningTrap
     category: diagnostic
     severity: warning
-    description: 'Storage array event {connUnitEventType} occurred: {connUnitEventDescr} on {_HOSTNAME}.'
+    description: Storage array event {{value "connUnitEventDescr"}} on {{hostname}}.
     status: current
     varbinds:
       - connUnitEventId
@@ -46,7 +46,7 @@ traps:
     name: SEAGATESYSTEMTRAP-MIB::seagateEventErrorTrap
     category: diagnostic
     severity: err
-    description: Storage array event {connUnitEventId} reported {connUnitEventDescr} on {_HOSTNAME}.
+    description: Storage array event {{value "connUnitEventDescr"}} on {{hostname}}.
     status: current
     varbinds:
       - connUnitEventId
@@ -56,7 +56,7 @@ traps:
     name: SEAGATESYSTEMTRAP-MIB::seagateEventCriticalTrap
     category: diagnostic
     severity: crit
-    description: Storage array event {connUnitEventId} ({connUnitEventDescr}) on {_HOSTNAME}.
+    description: Critical storage array event {{value "connUnitEventDescr"}} on {{hostname}}.
     status: current
     varbinds:
       - connUnitEventId
@@ -65,8 +65,8 @@ traps:
   - oid: 1.3.6.1.4.1.347.0.5
     name: SEAGATESYSTEMTRAP-MIB::seagateEventResolvedTrap
     category: diagnostic
-    severity: notice
-    description: Resolved event {connUnitEventDescr} on {_HOSTNAME}.
+    severity: info
+    description: Resolved event {{value "connUnitEventDescr"}} on {{hostname}}.
     status: current
     varbinds:
       - connUnitEventId

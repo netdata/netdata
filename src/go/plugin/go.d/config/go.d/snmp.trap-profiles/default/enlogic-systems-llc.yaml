@@ -626,9 +626,9 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.38446.1.8.2
     name: ENLOGIC-PDU2-MIB::networkCardStart
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Network card {pduNamePlateName} started on {_HOSTNAME}.
+    description: Network card has started on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -640,9 +640,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.1.8.3
     name: ENLOGIC-PDU2-MIB::networkCardReset
-    category: config_change
+    category: state_change
     severity: notice
-    description: Network card reset initiated by {userName} on {pduNamePlateName} on {_HOSTNAME}.
+    description: Network card was reset on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -657,7 +657,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::userLogin
     category: auth
     severity: notice
-    description: User {userName} logged in to PDU {pduNamePlateName} from {pduNamePlateIPAddress} on {_HOSTNAME}.
+    description: User {{value "userName"}} logged in on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -672,7 +672,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::userLogoff
     category: auth
     severity: notice
-    description: User {userName} logged off from {pduNamePlateName} on {_HOSTNAME}.
+    description: User {{value "userName"}} logged off on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -687,7 +687,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::userAuthenticationFailed
     category: auth
     severity: warning
-    description: User authentication failed for {userName} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: User authentication failed for {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -702,7 +702,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::userSessionTimeout
     category: auth
     severity: notice
-    description: User session timed out for {userName} on PDU {pduNamePlateName} on {_HOSTNAME}.
+    description: User session timed out for {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -717,7 +717,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::userAdded
     category: config_change
     severity: notice
-    description: User account {userName} added to PDU {pduNamePlateName} by {userUpdated} on {_HOSTNAME}.
+    description: User account {{value "userName"}} added to system on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -733,7 +733,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::userModified
     category: config_change
     severity: notice
-    description: User account {userName} modified by {userUpdated} on PDU {pduNamePlateName} on {_HOSTNAME}.
+    description: User account {{value "userName"}} modified on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -747,9 +747,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.1.8.10
     name: ENLOGIC-PDU2-MIB::userDeleted
-    category: auth
+    category: config_change
     severity: notice
-    description: User account {userName} deleted on PDU {pduNamePlateName} by {userUpdated} on {_HOSTNAME}.
+    description: User account {{value "userName"}} was deleted on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -765,7 +765,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::roleAdded
     category: config_change
     severity: notice
-    description: User role {roleUpdated} added for user {userName} on PDU {pduNamePlateName} on {_HOSTNAME}.
+    description: User role {{value "roleUpdated"}} added for {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -781,7 +781,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::roleModified
     category: config_change
     severity: notice
-    description: User role {roleUpdated} modified for user {userName} on PDU {pduNamePlateName} on {_HOSTNAME}.
+    description: User role {{value "roleUpdated"}} modified for {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -797,7 +797,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::roleDeleted
     category: config_change
     severity: notice
-    description: User role {roleUpdated} deleted by {userName} on PDU {pduNamePlateName} on {_HOSTNAME}.
+    description: User role deleted{{with value "userName"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -811,9 +811,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.1.8.14
     name: ENLOGIC-PDU2-MIB::firmwareUpdateStarted
-    category: config_change
+    category: state_change
     severity: notice
-    description: Firmware update started for {pduNamePlateName} by {userName} on {_HOSTNAME}.
+    description: Firmware update started on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -827,9 +827,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.1.8.15
     name: ENLOGIC-PDU2-MIB::firmwareUpdateCompleted
-    category: config_change
-    severity: notice
-    description: Firmware update completed with version {firmwareVersion} on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Firmware update completed on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -845,7 +845,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::userBlocked
     category: security
     severity: warning
-    description: User {userName} blocked on PDU {pduNamePlateName} from {pduNamePlateIPAddress} on {_HOSTNAME}.
+    description: User {{value "userName"}} is blocked on {{value "pduNamePlateName"}} on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -858,9 +858,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.1.8.17
     name: ENLOGIC-PDU2-MIB::outletControl
-    category: state_change
+    category: config_change
     severity: notice
-    description: Outlet {pduOutletSwitchedControlNumber} control operation applied with state {pduOutletSwitchedStatusState} on {_HOSTNAME}.
+    description: Outlet {{value "pduOutletSwitchedControlNumber"}} control operation applied on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -878,7 +878,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::userPasswordChange
     category: auth
     severity: notice
-    description: User password changed for {userName} on {pduNamePlateName} by {userUpdated} on {_HOSTNAME}.
+    description: User password changed for {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -894,7 +894,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::passwordSettingsChange
     category: config_change
     severity: notice
-    description: Password policy settings changed for user {userName} on PDU {pduNamePlateName} on {_HOSTNAME}.
+    description: Password policy settings changed for user {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -907,9 +907,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.1.8.21
     name: ENLOGIC-PDU2-MIB::logFileCleared
-    category: config_change
+    category: diagnostic
     severity: notice
-    description: Log file cleared by {userName} on {_HOSTNAME}.
+    description: Log file cleared on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -924,7 +924,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::pduConfigurationFileImported
     category: config_change
     severity: notice
-    description: PDU configuration file imported by {userName} on {_HOSTNAME}.
+    description: PDU configuration file imported{{with value "userName"}} by {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -939,7 +939,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::pduConfigurationFileExported
     category: config_change
     severity: notice
-    description: PDU configuration file exported by {userName} on {_HOSTNAME}.
+    description: PDU configuration file exported by {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -954,7 +954,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::pduUnitActivePowerStateChange
     category: state_change
     severity: notice
-    description: PDU {pduNamePlateName} active power state changed to {pduUnitStatusLoadState} on {_HOSTNAME}.
+    description: PDU {{value "pduNamePlateName"}} active power state changed on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -968,9 +968,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.1.8.25
     name: ENLOGIC-PDU2-MIB::pduInputphaseVoltageStateChange
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: PDU {pduNamePlateName} input phase voltage state changed to {pduInputPhaseStatusVoltageState} on {_HOSTNAME}.
+    description: PDU {{value "pduNamePlateName"}} input phase voltage state changed to {{value "pduInputPhaseStatusVoltageState"}} on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -986,8 +986,8 @@ traps:
   - oid: 1.3.6.1.4.1.38446.1.8.26
     name: ENLOGIC-PDU2-MIB::pduInputphaseCurrentStateChange
     category: state_change
-    severity: notice
-    description: PDU input phase {pduInputPhaseStatusCurrentState} state changed on {_HOSTNAME}.
+    severity: warning
+    description: PDU input phase current state changed to {{value "pduInputPhaseStatusCurrentState"}} on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1004,7 +1004,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::pduCircuitBreakerCurrentStateChange
     category: state_change
     severity: notice
-    description: PDU circuit breaker {pduCircuitBreakerStatusLoadState} state changed on {_HOSTNAME}.
+    description: PDU circuit breaker state changed on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1021,7 +1021,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::pduOutletActivePowerStateChange
     category: state_change
     severity: notice
-    description: PDU outlet active power state changed for {pduOutletMeteredStatusLoadState} on {_HOSTNAME}.
+    description: PDU outlet {{value "pduOutletMeteredStatusIndex"}} active power state changed to {{value "pduOutletMeteredStatusLoadState"}} on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1038,7 +1038,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::pduExternalSensorStateChange
     category: diagnostic
     severity: warning
-    description: PDU external sensor {pduExternalSensorStatusName} state changed to {pduExternalSensorStatusState} on {_HOSTNAME}.
+    description: PDU external sensor {{value "pduExternalSensorStatusName"}} state changed to {{value "pduExternalSensorStatusState"}} on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1059,7 +1059,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::smtpTransmissionFailure
     category: diagnostic
     severity: err
-    description: SMTP message transmission failed to {smtpServer} on {_HOSTNAME}.
+    description: SMTP message transmission failed to {{value "smtpServer"}} on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1075,7 +1075,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::ldapError
     category: diagnostic
     severity: err
-    description: LDAP error occurred on PDU {pduNamePlateName} with description {errorDescription} on {_HOSTNAME}.
+    description: 'LDAP error occurred{{with value "errorDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pduIndex
@@ -1090,7 +1090,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::firmwareUpdateFailed
     category: diagnostic
     severity: err
-    description: Firmware update failed for PDU {pduNamePlateName} version {firmwareVersion} on {_HOSTNAME}.
+    description: Firmware update failed on {{first (value "pduNamePlateName") (value "sysName")}} on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1104,9 +1104,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.1.8.33
     name: ENLOGIC-PDU2-MIB::serverPingState
-    category: config_change
+    category: state_change
     severity: notice
-    description: Ping feature enabled for PDU {pduNamePlateName} by user {userName} on {_HOSTNAME}.
+    description: Server ping has been enabled on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1122,8 +1122,8 @@ traps:
   - oid: 1.3.6.1.4.1.38446.1.8.34
     name: ENLOGIC-PDU2-MIB::bootloaderState
     category: diagnostic
-    severity: warning
-    description: PDU {pduNamePlateName} entered bootloader mode on {_HOSTNAME}.
+    severity: alert
+    description: Device entered bootloader mode on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1137,7 +1137,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::daisyChainState
     category: state_change
     severity: notice
-    description: Daisy chain member {daisyChain} connected or disconnected on {_HOSTNAME}.
+    description: Daisy chain member connected or disconnected on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1152,7 +1152,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::systemInternalCommunicationLost
     category: diagnostic
     severity: crit
-    description: Network management card lost contact with internal boards on {_HOSTNAME}.
+    description: Network management card lost contact with internal boards on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1167,7 +1167,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::smartCabinetLockUnlocked
     category: security
     severity: warning
-    description: Cabinet lock unlocked on PDU {pduNamePlateName} on {_HOSTNAME}.
+    description: Smart cabinet door unlocked on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1183,7 +1183,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::smartCabinetLockLocked
     category: security
     severity: notice
-    description: Cabinet lock is locked on {_HOSTNAME}.
+    description: Smart cabinet lock is locked on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1197,9 +1197,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.1.8.39
     name: ENLOGIC-PDU2-MIB::smartCabinetSwapCard
-    category: state_change
+    category: config_change
     severity: notice
-    description: Smart cabinet card {pduUnitSmartCabinetCardID} swapped on {pduNamePlateName} on {_HOSTNAME}.
+    description: Smart cabinet card {{value "pduUnitSmartCabinetCardID"}} swapped on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1216,7 +1216,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::smartCabinetLockerLockDoorOpen
     category: security
     severity: warning
-    description: Locker locked but door open on {_HOSTNAME}.
+    description: Smart cabinet door is open on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1231,8 +1231,8 @@ traps:
   - oid: 1.3.6.1.4.1.38446.1.8.41
     name: ENLOGIC-PDU2-MIB::smartCabinetLockerUnlockDoorClose
     category: security
-    severity: notice
-    description: Smart cabinet locker unlocked and door closed on {_HOSTNAME}.
+    severity: warning
+    description: Smart cabinet door unlocked on {{value "pduUnitSmartCabinetDoor"}} on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1248,7 +1248,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::pdusmartCabinetLockerAutolock
     category: state_change
     severity: notice
-    description: Cabinet locker auto-locked on {pduNamePlateName} on {_HOSTNAME}.
+    description: Cabinet locker locked automatically on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1263,7 +1263,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::pdusmartCabinetDoorOpen
     category: security
     severity: warning
-    description: Cabinet door open detected on PDU {pduNamePlateName} at {sysLocation} on {_HOSTNAME}.
+    description: Cabinet door is open on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1278,7 +1278,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::pdusmartCabinetDoorLock
     category: security
     severity: notice
-    description: Cabinet door lock status changed on {_HOSTNAME}.
+    description: Cabinet door is locked on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1293,7 +1293,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::pdusmartCabinetDoorUnlock
     category: security
     severity: warning
-    description: Cabinet door unlocked on PDU {pduNamePlateName} on {_HOSTNAME}.
+    description: Cabinet door unlocked on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1307,8 +1307,8 @@ traps:
   - oid: 1.3.6.1.4.1.38446.1.8.46
     name: ENLOGIC-PDU2-MIB::pdusmartCabinetAllDoorLock
     category: security
-    severity: warning
-    description: Cabinet door lock status changed on {_HOSTNAME}.
+    severity: notice
+    description: All cabinet doors are locked on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1323,7 +1323,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::systemReboot
     category: state_change
     severity: notice
-    description: System rebooted on {_HOSTNAME}.
+    description: System has rebooted on {{hostname}}.
     status: current
     varbinds:
       - pduIndex
@@ -1337,7 +1337,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::trapCritical
     category: diagnostic
     severity: crit
-    description: Critical alarm {trapDescription} (code {trapCode}) detected on {_HOSTNAME}.
+    description: Critical alarm {{value "trapDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCode
@@ -1348,7 +1348,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::trapWarning
     category: diagnostic
     severity: warning
-    description: Warning alarm {trapDescription} on {_HOSTNAME}.
+    description: Warning alarm {{value "trapDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCode
@@ -1358,8 +1358,8 @@ traps:
   - oid: 1.3.6.1.4.1.38446.1.8.53
     name: ENLOGIC-PDU2-MIB::trapInformation
     category: diagnostic
-    severity: notice
-    description: Informational alarm {trapDescription} on {_HOSTNAME}.
+    severity: info
+    description: Informational alarm {{value "trapDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCode
@@ -1369,7 +1369,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::trapCleared
     category: state_change
     severity: notice
-    description: Alarm cleared with code {trapCode} on {_HOSTNAME}.
+    description: 'Alarm cleared{{with value "trapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapCode
@@ -1380,7 +1380,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::trapTest
     category: diagnostic
     severity: info
-    description: Diagnostic test trap {trapCode} ({trapDescription}) received from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Diagnostic test trap received with code {{value "trapCode"}} on {{hostname}}.
     status: current
     varbinds:
       - trapCode
@@ -1391,7 +1391,7 @@ traps:
     name: ENLOGIC-PDU-MIB::networkCardStart
     category: state_change
     severity: notice
-    description: Network card {pduNamePlateName} started on {_HOSTNAME}.
+    description: Network card started on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1409,7 +1409,7 @@ traps:
     name: ENLOGIC-PDU-MIB::networkCardReset
     category: state_change
     severity: notice
-    description: Network card reset on PDU {pduNamePlateName} by user {userName} on {_HOSTNAME}.
+    description: Network card was reset on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1430,7 +1430,7 @@ traps:
     name: ENLOGIC-PDU-MIB::userLogin
     category: auth
     severity: notice
-    description: User {userName} logged in to {pduNamePlateName} from {pduNamePlateIPAddress} on {_HOSTNAME}.
+    description: User {{value "userName"}} logged in on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1451,7 +1451,7 @@ traps:
     name: ENLOGIC-PDU-MIB::userLogoff
     category: auth
     severity: notice
-    description: User {userName} logged off from PDU {pduNamePlateName} on {_HOSTNAME}.
+    description: User {{value "userName"}} logged off on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1472,7 +1472,7 @@ traps:
     name: ENLOGIC-PDU-MIB::userAuthenticationFailed
     category: auth
     severity: warning
-    description: User authentication failed for {userName} from {pduNamePlateIPAddress} on {_HOSTNAME}.
+    description: User authentication failed for {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1491,9 +1491,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.1.9.7
     name: ENLOGIC-PDU-MIB::userSessionTimeout
-    category: state_change
+    category: auth
     severity: notice
-    description: User session timed out for {userName} on PDU {pduNamePlateName} on {_HOSTNAME}.
+    description: User session timed out for {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1514,7 +1514,7 @@ traps:
     name: ENLOGIC-PDU-MIB::userAdded
     category: config_change
     severity: notice
-    description: User account {userName} added to PDU {pduNamePlateName} on {_HOSTNAME}.
+    description: User account {{value "userName"}} added to system on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1538,7 +1538,7 @@ traps:
     name: ENLOGIC-PDU-MIB::userModified
     category: config_change
     severity: notice
-    description: User account modified by {userName} on PDU {pduNamePlateName} on {_HOSTNAME}.
+    description: User account {{value "userName"}} modified on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1560,9 +1560,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.1.9.10
     name: ENLOGIC-PDU-MIB::userDeleted
-    category: auth
+    category: config_change
     severity: notice
-    description: User account {userName} deleted by {userUpdated} on {_HOSTNAME}.
+    description: User account {{value "userName"}} was deleted on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1586,7 +1586,7 @@ traps:
     name: ENLOGIC-PDU-MIB::roleAdded
     category: config_change
     severity: notice
-    description: User role {roleUpdated} added for user {userName} on {_HOSTNAME}.
+    description: User role {{value "roleUpdated"}} added for {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1610,7 +1610,7 @@ traps:
     name: ENLOGIC-PDU-MIB::roleModified
     category: config_change
     severity: notice
-    description: User role {roleUpdated} modified for user {userName} on {_HOSTNAME}.
+    description: User role modified for {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1634,7 +1634,7 @@ traps:
     name: ENLOGIC-PDU-MIB::roleDeleted
     category: config_change
     severity: notice
-    description: User role {roleUpdated} deleted by {userName} on {_HOSTNAME}.
+    description: User role deleted{{with value "userName"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1658,7 +1658,7 @@ traps:
     name: ENLOGIC-PDU-MIB::firmwareUpdateStarted
     category: config_change
     severity: notice
-    description: Firmware update started for PDU {pduNamePlateName} by {userName} on {_HOSTNAME}.
+    description: Firmware update started on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1680,9 +1680,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.1.9.15
     name: ENLOGIC-PDU-MIB::firmwareUpdateCompleted
-    category: config_change
-    severity: notice
-    description: Firmware update completed for PDU {pduNamePlateName} on {_HOSTNAME}.
+    category: state_change
+    severity: info
+    description: Firmware update completed on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1706,7 +1706,7 @@ traps:
     name: ENLOGIC-PDU-MIB::userBlocked
     category: security
     severity: warning
-    description: User {userName} blocked on PDU {pduNamePlateName} from {pduNamePlateIPAddress} on {_HOSTNAME}.
+    description: User {{value "userName"}} is blocked on {{value "pduNamePlateName"}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1727,7 +1727,7 @@ traps:
     name: ENLOGIC-PDU-MIB::outletControl
     category: config_change
     severity: notice
-    description: Outlet control operation applied on {pduNamePlateName} for outlet {pduOutletSwitchedControlNumber} by {userName} on {_HOSTNAME}.
+    description: Outlet {{value "pduOutletSwitchedControlNumber"}} control operation applied by {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1751,7 +1751,7 @@ traps:
     name: ENLOGIC-PDU-MIB::userPasswordChange
     category: auth
     severity: notice
-    description: User password changed for {userName} on PDU {pduNamePlateName} on {_HOSTNAME}.
+    description: User password changed for {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1775,7 +1775,7 @@ traps:
     name: ENLOGIC-PDU-MIB::passwordSettingsChange
     category: config_change
     severity: notice
-    description: Password policy settings changed by {userName} on {_HOSTNAME}.
+    description: Password policy settings changed{{with value "userName"}} by {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1796,7 +1796,7 @@ traps:
     name: ENLOGIC-PDU-MIB::logFileCleared
     category: config_change
     severity: notice
-    description: Log file cleared by {userName} on {pduNamePlateName} on {_HOSTNAME}.
+    description: Log file cleared{{with value "userName"}} by {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1817,7 +1817,7 @@ traps:
     name: ENLOGIC-PDU-MIB::pduConfigurationFileImported
     category: config_change
     severity: notice
-    description: PDU configuration file imported by {userName} on {_HOSTNAME}.
+    description: PDU configuration file was imported on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1838,7 +1838,7 @@ traps:
     name: ENLOGIC-PDU-MIB::pduConfigurationFileExported
     category: config_change
     severity: notice
-    description: PDU configuration file exported by {userName} for {pduNamePlateName} on {_HOSTNAME}.
+    description: PDU configuration file exported by {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1859,7 +1859,7 @@ traps:
     name: ENLOGIC-PDU-MIB::pduUnitActivePowerStateChange
     category: state_change
     severity: notice
-    description: PDU {pduNamePlateName} active power state changed on {_HOSTNAME}.
+    description: PDU {{value "pduNamePlateName"}} active power state changed on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1877,9 +1877,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.1.9.25
     name: ENLOGIC-PDU-MIB::pduInputphaseVoltageStateChange
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: PDU {pduNamePlateName} input phase voltage state changed to {pduInputPhaseStatusVoltageState} on {_HOSTNAME}.
+    description: PDU {{value "pduNamePlateName"}} input phase voltage state changed to {{value "pduInputPhaseStatusVoltageState"}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1899,8 +1899,8 @@ traps:
   - oid: 1.3.6.1.4.1.38446.1.9.26
     name: ENLOGIC-PDU-MIB::pduInputphaseCurrentStateChange
     category: state_change
-    severity: notice
-    description: PDU input phase {pduInputPhaseStatusCurrentState} state changed on {_HOSTNAME}.
+    severity: warning
+    description: PDU input phase current state changed to {{value "pduInputPhaseStatusCurrentState"}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1920,8 +1920,8 @@ traps:
   - oid: 1.3.6.1.4.1.38446.1.9.27
     name: ENLOGIC-PDU-MIB::pduCircuitBreakerCurrentStateChange
     category: state_change
-    severity: warning
-    description: PDU circuit breaker state changed on {_HOSTNAME}.
+    severity: notice
+    description: PDU circuit breaker state changed on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1942,7 +1942,7 @@ traps:
     name: ENLOGIC-PDU-MIB::pduOutletActivePowerStateChange
     category: state_change
     severity: notice
-    description: PDU outlet active power state changed on {_HOSTNAME}.
+    description: PDU outlet {{value "pduOutletMeteredStatusIndex"}} active power state changed on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1963,7 +1963,7 @@ traps:
     name: ENLOGIC-PDU-MIB::pduExternalSensorStateChange
     category: diagnostic
     severity: warning
-    description: PDU external sensor {pduNamePlateName} state changed to {pduExternalSensorStatusState} on {_HOSTNAME}.
+    description: PDU external sensor {{value "pduExternalSensorStatusName"}} state changed to {{value "pduExternalSensorStatusState"}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -1987,8 +1987,8 @@ traps:
   - oid: 1.3.6.1.4.1.38446.1.9.30
     name: ENLOGIC-PDU-MIB::smtpTransmissionFailure
     category: diagnostic
-    severity: err
-    description: SMTP message transmission failed to {smtpServer} on {_HOSTNAME}.
+    severity: warning
+    description: SMTP message transmission failed to {{value "smtpServer"}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -2012,7 +2012,7 @@ traps:
     name: ENLOGIC-PDU-MIB::ldapError
     category: diagnostic
     severity: err
-    description: LDAP error {errorDescription} on PDU {pduNamePlateName} on {_HOSTNAME}.
+    description: 'LDAP error occurred{{with value "errorDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: pduIndex
@@ -2033,7 +2033,7 @@ traps:
     name: ENLOGIC-PDU-MIB::firmwareUpdateFailed
     category: diagnostic
     severity: err
-    description: Firmware update failed on PDU {pduNamePlateName} for version {firmwareVersion} on {_HOSTNAME}.
+    description: Firmware update failed on {{first (value "pduNamePlateName") "PDU"}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -2055,9 +2055,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.1.9.33
     name: ENLOGIC-PDU-MIB::serverPingState
-    category: state_change
+    category: config_change
     severity: notice
-    description: Server ping enabled on PDU {pduNamePlateName} at {pduServerPingServerIPAddress} on {_HOSTNAME}.
+    description: Server ping feature has been enabled on {{first (value "pduNamePlateName") "PDU"}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -2082,7 +2082,7 @@ traps:
     name: ENLOGIC-PDU-MIB::bootloaderState
     category: diagnostic
     severity: alert
-    description: Device entered Bootloader mode on {_HOSTNAME}.
+    description: Device entered bootloader mode on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -2100,7 +2100,7 @@ traps:
     name: ENLOGIC-PDU-MIB::daisyChainState
     category: state_change
     severity: notice
-    description: Daisy chain member {daisyChain} state changed for PDU {pduNamePlateName} on {_HOSTNAME}.
+    description: Daisy chain member connected or disconnected on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -2121,7 +2121,7 @@ traps:
     name: ENLOGIC-PDU-MIB::systemInternalCommunicationLost
     category: diagnostic
     severity: crit
-    description: Network management card lost contact with internal boards on {_HOSTNAME}.
+    description: Network management card lost contact with internal boards on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -2142,7 +2142,7 @@ traps:
     name: ENLOGIC-PDU-MIB::SmartCabinetLockUnlocked
     category: security
     severity: warning
-    description: Cabinet lock is unlocked on {_HOSTNAME}.
+    description: Smart cabinet door unlocked on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -2164,7 +2164,7 @@ traps:
     name: ENLOGIC-PDU-MIB::SmartCabinetLockLocked
     category: security
     severity: warning
-    description: Smart cabinet lock is locked on {_HOSTNAME}.
+    description: Smart cabinet lock is locked on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -2184,9 +2184,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.1.9.39
     name: ENLOGIC-PDU-MIB::SmartCabinetSwapCard
-    category: config_change
+    category: state_change
     severity: notice
-    description: SmartCabinet card swap detected for PDU {pduNamePlateName} on {_HOSTNAME}.
+    description: Smart cabinet card {{value "pduUnitSmartCabinetCardID"}} swapped on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -2211,7 +2211,7 @@ traps:
     name: ENLOGIC-PDU-MIB::SmartCabinetLockerLockDoorOpen
     category: security
     severity: warning
-    description: Smart cabinet door open on PDU {pduNamePlateName} on {_HOSTNAME}.
+    description: Smart cabinet door is open on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -2231,9 +2231,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.1.9.41
     name: ENLOGIC-PDU-MIB::SmartCabinetLockerUnlockDoorClose
-    category: state_change
-    severity: notice
-    description: Smart cabinet door closed on PDU {pduNamePlateName} on {_HOSTNAME}.
+    category: security
+    severity: warning
+    description: Smart cabinet door was unlocked on {{value "pduNamePlateName"}} on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -2255,7 +2255,7 @@ traps:
     name: ENLOGIC-PDU-MIB::systemReboot
     category: state_change
     severity: notice
-    description: System rebooted on {_HOSTNAME}.
+    description: System has rebooted on {{hostname}}.
     status: current
     varbinds:
       - name: pduIndex
@@ -2271,9 +2271,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.2.9.8
     name: ENLOGIC-PDU-MIB::espNetworkCardStart
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Network card started on {_HOSTNAME}.
+    description: Network card started on {{hostname}}.
     status: current
     varbinds:
       - espIndex
@@ -2287,7 +2287,7 @@ traps:
     name: ENLOGIC-PDU-MIB::espNetworkCardReset
     category: state_change
     severity: notice
-    description: Network card reset via interface on {_HOSTNAME}.
+    description: Network card reset on {{first (value "espNamePlateName") "PDU"}} by {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - espIndex
@@ -2302,9 +2302,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.2.9.10
     name: ENLOGIC-PDU-MIB::espFirmwareUpdateCompleted
-    category: config_change
-    severity: notice
-    description: Firmware update completed for {espNamePlateName} version {firmwareVersion} on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Firmware update completed for {{value "espNamePlateName"}} on {{hostname}}.
     status: current
     varbinds:
       - espIndex
@@ -2324,7 +2324,7 @@ traps:
     name: ENLOGIC-PDU-MIB::espUserPasswordChange
     category: auth
     severity: notice
-    description: User password changed for {userName} on {_HOSTNAME}.
+    description: User password changed for {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - espIndex
@@ -2344,7 +2344,7 @@ traps:
     name: ENLOGIC-PDU-MIB::espLogFileCleared
     category: config_change
     severity: notice
-    description: Log file cleared by user {userName} on {_HOSTNAME}.
+    description: Log file cleared{{with value "userName"}} by {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - espIndex
@@ -2361,7 +2361,7 @@ traps:
     name: ENLOGIC-PDU-MIB::espConfigurationFileExported
     category: config_change
     severity: notice
-    description: PDU configuration file exported by {userName} on {_HOSTNAME}.
+    description: PDU configuration file exported by {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - espIndex
@@ -2378,7 +2378,7 @@ traps:
     name: ENLOGIC-PDU-MIB::espUnitActivePowerStateChange
     category: state_change
     severity: notice
-    description: PDU unit active power state changed on {_HOSTNAME}.
+    description: PDU unit active power state changed to {{value "espUnitStatusLoadState"}} on {{hostname}}.
     status: current
     varbinds:
       - espIndex
@@ -2392,9 +2392,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.2.9.15
     name: ENLOGIC-PDU-MIB::espInputphaseVoltageStateChange
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: PDU input phase voltage state changed to {espInputPhaseStatusVoltageState} on {_HOSTNAME}.
+    description: PDU input phase voltage state changed to {{value "espInputPhaseStatusVoltageState"}} on {{hostname}}.
     status: current
     varbinds:
       - espIndex
@@ -2410,8 +2410,8 @@ traps:
   - oid: 1.3.6.1.4.1.38446.2.9.16
     name: ENLOGIC-PDU-MIB::espInputphaseCurrentStateChange
     category: state_change
-    severity: notice
-    description: PDU input phase {espInputPhaseStatusCurrentState} state changed on {_HOSTNAME}.
+    severity: warning
+    description: PDU input phase {{value "espInputPhaseStatusCurrentState"}} state changed on {{hostname}}.
     status: current
     varbinds:
       - espIndex
@@ -2427,8 +2427,8 @@ traps:
   - oid: 1.3.6.1.4.1.38446.2.9.17
     name: ENLOGIC-PDU-MIB::espCircuitBreakerCurrentStateChange
     category: state_change
-    severity: notice
-    description: PDU circuit breaker {espCircuitBreakerStatusLoadState} state changed on {_HOSTNAME}.
+    severity: warning
+    description: PDU circuit breaker load state changed to {{value "espCircuitBreakerStatusLoadState"}} on {{hostname}}.
     status: current
     varbinds:
       - espIndex
@@ -2445,7 +2445,7 @@ traps:
     name: ENLOGIC-PDU-MIB::espExternalSensorStateChange
     category: diagnostic
     severity: warning
-    description: External sensor {espExternalSensorStatusName} state changed to {espExternalSensorStatusState} on {_HOSTNAME}.
+    description: External sensor {{value "espExternalSensorStatusName"}} state changed to {{value "espExternalSensorStatusState"}} on {{hostname}}.
     status: current
     varbinds:
       - espIndex
@@ -2466,7 +2466,7 @@ traps:
     name: ENLOGIC-PDU-MIB::espConfigurationFileImported
     category: config_change
     severity: notice
-    description: PDU configuration file imported by {userName} on {_HOSTNAME}.
+    description: PDU configuration file was imported by {{value "userName"}} on {{hostname}}.
     status: current
     varbinds:
       - espIndex
@@ -2483,7 +2483,7 @@ traps:
     name: ENLOGIC-PDU-MIB::espNetworkUp
     category: state_change
     severity: notice
-    description: PDU {espNamePlateName} network is up on {_HOSTNAME}.
+    description: PDU {{value "espNamePlateName"}} network is up on {{hostname}}.
     status: current
     varbinds:
       - espIndex
@@ -2498,9 +2498,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.3.9.2
     name: ENLOGIC-PDU2-MIB::podnetworkCardStart
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Network card {podNamePlateName} started on {_HOSTNAME}.
+    description: Network card started on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2512,9 +2512,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.3.9.3
     name: ENLOGIC-PDU2-MIB::podnetworkCardReset
-    category: config_change
+    category: state_change
     severity: notice
-    description: Network card reset by user {poduserName} on PDU {podNamePlateName} on {_HOSTNAME}.
+    description: Network card was reset on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2529,7 +2529,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::poduserLogin
     category: auth
     severity: notice
-    description: User {poduserName} logged in to {podNamePlateName} from {podNamePlateIPAddress} on {_HOSTNAME}.
+    description: User {{value "poduserName"}} logged in on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2544,7 +2544,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::poduserLogoff
     category: auth
     severity: notice
-    description: User {poduserName} logged off from PDU {podNamePlateName} on {_HOSTNAME}.
+    description: User {{value "poduserName"}} logged off on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2559,7 +2559,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::poduserAuthenticationFailed
     category: auth
     severity: warning
-    description: User authentication failed for {poduserName} from {podNamePlateIPAddress} on {_HOSTNAME}.
+    description: User authentication failed for {{value "poduserName"}} on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2572,9 +2572,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.3.9.7
     name: ENLOGIC-PDU2-MIB::poduserSessionTimeout
-    category: state_change
+    category: auth
     severity: notice
-    description: User session for {poduserName} timed out on {podNamePlateIPAddress} on {_HOSTNAME}.
+    description: User {{value "poduserName"}} session timed out on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2589,7 +2589,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::poduserAdded
     category: config_change
     severity: notice
-    description: User account {poduserName} added to PDU {podNamePlateName} by {poduserUpdated} on {_HOSTNAME}.
+    description: User account {{value "poduserName"}} added to system on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2605,7 +2605,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::poduserModified
     category: config_change
     severity: notice
-    description: User account {poduserName} modified by {poduserUpdated} on {_HOSTNAME}.
+    description: User account {{value "poduserName"}} modified on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2621,7 +2621,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::poduserDeleted
     category: config_change
     severity: notice
-    description: User account {poduserName} deleted on PDU {podNamePlateName} on {_HOSTNAME}.
+    description: User account {{value "poduserName"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2637,7 +2637,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podroleAdded
     category: config_change
     severity: notice
-    description: User role {podroleUpdated} added for user {poduserName} on PDU {podNamePlateName} on {_HOSTNAME}.
+    description: User role {{value "podroleUpdated"}} added for {{value "poduserName"}} on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2653,7 +2653,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podroleModified
     category: config_change
     severity: notice
-    description: User role modified for {poduserName} on PDU {podNamePlateName} with role {podroleUpdated} on {_HOSTNAME}.
+    description: User role {{value "podroleUpdated"}} modified for {{value "poduserName"}} on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2669,7 +2669,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podroleDeleted
     category: config_change
     severity: notice
-    description: User role deleted for {poduserName} on PDU {podNamePlateName} on {_HOSTNAME}.
+    description: User role deleted for {{value "poduserName"}} on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2685,7 +2685,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podfirmwareUpdateStarted
     category: config_change
     severity: notice
-    description: Firmware update started for PDU {podNamePlateName} by {poduserName} on {_HOSTNAME}.
+    description: Firmware update started on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2699,9 +2699,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.3.9.15
     name: ENLOGIC-PDU2-MIB::podfirmwareUpdateCompleted
-    category: config_change
-    severity: notice
-    description: Firmware update completed for pod {podNamePlateName} on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Firmware update completed on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2717,7 +2717,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::poduserBlocked
     category: security
     severity: warning
-    description: User {poduserName} blocked on PDU {podNamePlateName} at {podNamePlateIPAddress} on {_HOSTNAME}.
+    description: User {{value "poduserName"}} is blocked on {{value "podNamePlateName"}} on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2732,7 +2732,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podoutletControl
     category: config_change
     severity: notice
-    description: Outlet control operation applied on {_HOSTNAME}.
+    description: Outlet {{value "podOutletSwitchedControlNumber"}} control operation applied by {{value "poduserName"}} on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2750,7 +2750,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::poduserPasswordChange
     category: auth
     severity: notice
-    description: User password changed for {poduserName} on {podNamePlateName} on {_HOSTNAME}.
+    description: User password changed for {{value "poduserName"}} on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2766,7 +2766,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podpasswordSettingsChange
     category: config_change
     severity: notice
-    description: Password policy settings changed by {poduserName} on {_HOSTNAME}.
+    description: Password policy settings changed for user {{value "poduserName"}} on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2779,9 +2779,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.3.9.21
     name: ENLOGIC-PDU2-MIB::podlogFileCleared
-    category: config_change
+    category: diagnostic
     severity: notice
-    description: Log file cleared by user {poduserName} on {_HOSTNAME}.
+    description: Log file cleared{{with value "poduserName"}} by {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2796,7 +2796,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podConfigurationFileImported
     category: config_change
     severity: notice
-    description: PDU configuration file imported by {poduserName} on {_HOSTNAME}.
+    description: PDU configuration file was imported by {{value "poduserName"}} on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2811,7 +2811,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podConfigurationFileExported
     category: config_change
     severity: notice
-    description: PDU configuration file exported by {poduserName} on {_HOSTNAME}.
+    description: PDU configuration file exported by {{value "poduserName"}} on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2826,7 +2826,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podUnitActivePowerStateChange
     category: state_change
     severity: notice
-    description: PDU active power state changed for {podNamePlateName} on {_HOSTNAME}.
+    description: PDU {{value "podNamePlateName"}} active power state changed on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2842,7 +2842,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podInputphaseVoltageStateChange
     category: diagnostic
     severity: warning
-    description: PDU {podNamePlateName} input phase voltage state changed to {podInputPhaseStatusVoltageState} on {_HOSTNAME}.
+    description: PDU input phase voltage state changed on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2858,8 +2858,8 @@ traps:
   - oid: 1.3.6.1.4.1.38446.3.9.26
     name: ENLOGIC-PDU2-MIB::podInputphaseCurrentStateChange
     category: state_change
-    severity: notice
-    description: PDU input phase state changed on {_HOSTNAME}.
+    severity: warning
+    description: PDU input phase current state changed on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2876,7 +2876,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podCircuitBreakerCurrentStateChange
     category: state_change
     severity: notice
-    description: PDU circuit breaker state changed on {_HOSTNAME}.
+    description: PDU circuit breaker state changed on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2893,7 +2893,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podOutletActivePowerStateChange
     category: state_change
     severity: notice
-    description: PDU outlet {podOutletMeteredStatusIndex} active power state changed on {_HOSTNAME}.
+    description: PDU outlet {{value "podOutletMeteredStatusIndex"}} active power state changed on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2910,7 +2910,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podExternalSensorStateChange
     category: diagnostic
     severity: warning
-    description: External sensor {podExternalSensorStatusName} state changed to {podExternalSensorStatusState} on {_HOSTNAME}.
+    description: External sensor {{value "podExternalSensorStatusName"}} state changed to {{value "podExternalSensorStatusState"}} on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2931,7 +2931,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podsmtpTransmissionFailure
     category: diagnostic
     severity: err
-    description: SMTP message transmission failed to {podsmtpServer} on {_HOSTNAME}.
+    description: SMTP message transmission failed to {{value "podsmtpServer"}} on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2947,7 +2947,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podldapError
     category: diagnostic
     severity: err
-    description: LDAP error {errorDescription} on PDU {podNamePlateName} at {podNamePlateIPAddress} on {_HOSTNAME}.
+    description: 'LDAP error occurred on {{value "podNamePlateName"}}: {{value "errorDescription"}} on {{hostname}}.'
     status: current
     varbinds:
       - podIndex
@@ -2962,7 +2962,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podfirmwareUpdateFailed
     category: diagnostic
     severity: err
-    description: Firmware update failed for PDU {podNamePlateName} on {_HOSTNAME}.
+    description: Firmware update failed on {{first (value "podNamePlateName") "PDU"}} on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2978,7 +2978,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podserverPingState
     category: state_change
     severity: notice
-    description: Server ping enabled for {podServerPingServerIPAddress} on {_HOSTNAME}.
+    description: Pod server ping enabled on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -2995,7 +2995,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podbootloaderState
     category: diagnostic
     severity: warning
-    description: PDU {podNamePlateName} entered Bootloader mode on {_HOSTNAME}.
+    description: PDU {{value "podNamePlateName"}} entered bootloader mode on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -3009,7 +3009,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::poddaisyChainState
     category: state_change
     severity: notice
-    description: Daisy chain member {poddaisyChain} connected or disconnected on PDU {podNamePlateName} on {_HOSTNAME}.
+    description: Daisy chain member connected or disconnected on {{value "podNamePlateName"}} on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -3024,7 +3024,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podsystemInternalCommunicationLost
     category: diagnostic
     severity: crit
-    description: Internal communication lost with PDU {podNamePlateName} at {podNamePlateIPAddress} on {_HOSTNAME}.
+    description: Network management card lost communication with internal boards on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -3039,7 +3039,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podsmartCabinetLockerUnlock
     category: security
     severity: warning
-    description: Cabinet lock is unlocked on {_HOSTNAME}.
+    description: Cabinet lock is unlocked on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -3056,7 +3056,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podsmartCabinetLockerLock
     category: state_change
     severity: notice
-    description: Cabinet lock is locked on {_HOSTNAME}.
+    description: Cabinet locker is locked on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -3071,9 +3071,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.3.9.39
     name: ENLOGIC-PDU2-MIB::podsmartCabinetSwapCard
-    category: state_change
+    category: config_change
     severity: notice
-    description: Card swapped on PDU {podNamePlateName} on {_HOSTNAME}.
+    description: Control card swapped on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -3091,7 +3091,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podsmartCabinetLockerLockDoorOpen
     category: security
     severity: warning
-    description: Locker locked but door open on {podNamePlateName} on {_HOSTNAME}.
+    description: Cabinet locker door is open on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -3108,7 +3108,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podsmartCabinetLockerUnlockDoorClose
     category: security
     severity: warning
-    description: Cabinet door unlocked on pod {podNamePlateName} on {_HOSTNAME}.
+    description: Cabinet locker unlocked and door closed on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -3125,7 +3125,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podsmartCabinetLockerAutolock
     category: state_change
     severity: notice
-    description: Cabinet locker automatically locked on {_HOSTNAME}.
+    description: Cabinet locker locked automatically on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -3142,7 +3142,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podsmartCabinetDoorOpen
     category: security
     severity: warning
-    description: Cabinet door open detected on {podUnitSmartCabinetHidSerial} on {_HOSTNAME}.
+    description: Cabinet door is open on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -3157,9 +3157,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.3.9.44
     name: ENLOGIC-PDU2-MIB::podsmartCabinetDoorLock
-    category: state_change
+    category: security
     severity: notice
-    description: Cabinet door locked on {_HOSTNAME}.
+    description: Cabinet door is locked on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -3176,7 +3176,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podsmartCabinetDoorUnlock
     category: security
     severity: warning
-    description: Cabinet door unlocked on {podNamePlateName} at {sysLocation} on {_HOSTNAME}.
+    description: Cabinet door unlocked on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -3191,9 +3191,9 @@ traps:
       - sysLocation
   - oid: 1.3.6.1.4.1.38446.3.9.46
     name: ENLOGIC-PDU2-MIB::podsmartCabinetAllDoorLock
-    category: security
-    severity: warning
-    description: Cabinet door lock triggered for {podNamePlateName} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Cabinet door is locked on {{hostname}}.
     status: current
     varbinds:
       - podIndex
@@ -3210,7 +3210,7 @@ traps:
     name: ENLOGIC-PDU2-MIB::podsystemReboot
     category: state_change
     severity: notice
-    description: System rebooted on {_HOSTNAME}.
+    description: System has rebooted on {{hostname}}.
     status: current
     varbinds:
       - podIndex

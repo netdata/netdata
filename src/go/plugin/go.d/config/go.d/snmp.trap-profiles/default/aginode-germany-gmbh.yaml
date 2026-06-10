@@ -162,8 +162,8 @@ traps:
   - oid: 1.3.6.1.4.1.266.20.0.1
     name: NEXANS-BM-MIB::switchTemperatureFailure
     category: diagnostic
-    severity: warning
-    description: Temperature failure detected with temperature {infoTemperature} on {_HOSTNAME}.
+    severity: crit
+    description: Switch hardware temperature failure detected at {{value "infoTemperature"}} degrees Celsius on {{hostname}}.
     status: current
     varbinds:
       - infoTemperature
@@ -171,7 +171,7 @@ traps:
     name: NEXANS-BM-MIB::portLinkChange
     category: state_change
     severity: warning
-    description: Port {portName} link state changed to {portLinkState} on {_HOSTNAME}.
+    description: Port {{first (value "portName") (value "portDescr") "link"}} link state changed to {{value "portLinkState"}} on {{hostname}}.
     status: current
     varbinds:
       - portIndex
@@ -182,7 +182,7 @@ traps:
     name: NEXANS-BM-MIB::portNewMacAddress
     category: security
     severity: warning
-    description: New MAC address {infoNewMacAddr} detected on port {portName} on {_HOSTNAME}.
+    description: New MAC address {{value "infoNewMacAddr"}} detected on {{first (value "portName") (value "portDescr") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - portIndex
@@ -193,7 +193,7 @@ traps:
     name: NEXANS-BM-MIB::portSecurityFailure
     category: security
     severity: warning
-    description: Port security violation detected on {portName} with unauthorized MAC {infoSecurityFailMacAddr} on {_HOSTNAME}.
+    description: Port security failure detected on {{first (value "portName") (value "portDescr") "port"}} with MAC {{value "infoSecurityFailMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - portIndex
@@ -204,7 +204,7 @@ traps:
     name: NEXANS-BM-MIB::portErrorCountFailure
     category: diagnostic
     severity: warning
-    description: Port error counter incremented on {portDescr} on {_HOSTNAME}.
+    description: Port error counter incremented on {{first (value "portName") (value "portDescr") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - portIndex
@@ -215,7 +215,7 @@ traps:
     name: NEXANS-BM-MIB::switchMgmtAuthFailure
     category: auth
     severity: warning
-    description: SNMP authentication failure from {infoUnauthIpAddr} on {_HOSTNAME}.
+    description: SNMP authentication failure from {{value "infoUnauthIpAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - infoUnauthIpAddr
@@ -223,7 +223,7 @@ traps:
     name: NEXANS-BM-MIB::radiusMgmtAuthReject
     category: auth
     severity: warning
-    description: RADIUS authentication rejected for station {infoUnauthIpAddr} on {_HOSTNAME}.
+    description: RADIUS authentication rejected for {{value "infoUnauthIpAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - infoUnauthIpAddr
@@ -231,7 +231,7 @@ traps:
     name: NEXANS-BM-MIB::radiusPortSecurityReject
     category: security
     severity: warning
-    description: Port security rejection for MAC {infoSecurityFailMacAddr} on port {portDescr} on {_HOSTNAME}.
+    description: Radius port security rejected station {{value "infoSecurityFailMacAddr"}} on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - portIndex
@@ -242,7 +242,7 @@ traps:
     name: NEXANS-BM-MIB::portLoopBcastFailure
     category: diagnostic
     severity: warning
-    description: Excessive broadcast/multicast traffic detected on port {portDescr} on {_HOSTNAME}.
+    description: Port {{first (value "portName") (value "portDescr") "port"}} broadcast/multicast loop detected on {{hostname}}.
     status: current
     varbinds:
       - portIndex
@@ -251,16 +251,16 @@ traps:
   - oid: 1.3.6.1.4.1.266.20.0.10
     name: NEXANS-BM-MIB::switchPoeVoltageFailure
     category: diagnostic
-    severity: err
-    description: PoE voltage failure detected with input voltage {infoPoeInputVoltage} on {_HOSTNAME}.
+    severity: warning
+    description: PoE voltage failure detected{{with value "infoPoeInputVoltage"}} at {{.}}V{{end}} on {{hostname}}.
     status: current
     varbinds:
       - infoPoeInputVoltage
   - oid: 1.3.6.1.4.1.266.20.0.11
     name: NEXANS-BM-MIB::switchPoeOverloadFailure
     category: diagnostic
-    severity: warning
-    description: PoE power supply overload detected with input power {infoPoeInputPower} on {_HOSTNAME}.
+    severity: crit
+    description: PoE power supply overload detected on {{hostname}}.
     status: current
     varbinds:
       - infoPoeInputPower
@@ -268,7 +268,7 @@ traps:
     name: NEXANS-BM-MIB::portPoeOverloadFailure
     category: diagnostic
     severity: warning
-    description: PoE overload detected on port {portName} with power {portPoePower} on {_HOSTNAME}.
+    description: PoE overload detected on port {{first (value "portName") (value "portDescr") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - portIndex
@@ -279,7 +279,7 @@ traps:
     name: NEXANS-BM-MIB::portActiveLoopDetectionFailure
     category: state_change
     severity: warning
-    description: Port loop protection disabled port {portIndex} on {_HOSTNAME}.
+    description: Active loop detection failure disabled port {{first (value "portName") (value "portDescr") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - portIndex
@@ -289,7 +289,7 @@ traps:
     name: NEXANS-BM-MIB::switchIndustrialAlarmM1
     category: state_change
     severity: warning
-    description: Industrial alarm {adminAlarmNameM1} state changed to {infoAlarmStateM1} on {_HOSTNAME}.
+    description: Industrial alarm output {{value "adminAlarmNameM1"}} state changed to {{value "infoAlarmStateM1"}} on {{hostname}}.
     status: current
     varbinds:
       - infoAlarmStateM1
@@ -298,7 +298,7 @@ traps:
     name: NEXANS-BM-MIB::switchIndustrialAlarmM2
     category: state_change
     severity: warning
-    description: Industrial alarm {adminAlarmNameM2} state changed to {infoAlarmStateM2} on {_HOSTNAME}.
+    description: Industrial alarm output {{value "adminAlarmNameM2"}} state changed to {{value "infoAlarmStateM2"}} on {{hostname}}.
     status: current
     varbinds:
       - infoAlarmStateM2
@@ -307,7 +307,7 @@ traps:
     name: NEXANS-BM-MIB::switchInternalVoltageFailure
     category: diagnostic
     severity: crit
-    description: Internal voltage failure detected with {infoPowerVoltage2500} and {infoPowerVoltage3300} on {_HOSTNAME}.
+    description: Internal over- or undervoltage detected on {{hostname}}.
     status: current
     varbinds:
       - infoPowerVoltage2500
@@ -315,16 +315,16 @@ traps:
   - oid: 1.3.6.1.4.1.266.20.0.17
     name: NEXANS-BM-MIB::tftpMessage
     category: diagnostic
-    severity: warning
-    description: TFTP transfer status {infoLastTftpMessage} on {_HOSTNAME}.
+    severity: info
+    description: 'TFTP transfer status: {{value "infoLastTftpMessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - infoLastTftpMessage
   - oid: 1.3.6.1.4.1.266.20.0.18
     name: NEXANS-BM-MIB::sfpEvent
-    category: state_change
-    severity: notice
-    description: SFP event {infoLastSfpEventMessage} detected on port {portDescr} on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: SFP event {{value "infoLastSfpEventMessage"}} on {{first (value "portName") (value "portDescr") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - portIndex
@@ -333,9 +333,9 @@ traps:
       - infoLastSfpEventMessage
   - oid: 1.3.6.1.4.1.266.20.0.19
     name: NEXANS-BM-MIB::clientRemoved
-    category: state_change
-    severity: warning
-    description: Client removed from port {portName} due to link down timeout on {_HOSTNAME}.
+    category: mobility
+    severity: notice
+    description: Client removed from {{first (value "portName") (value "portDescr") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - portIndex
@@ -345,15 +345,15 @@ traps:
     name: NEXANS-BM-MIB::internalMgmtWarning
     category: diagnostic
     severity: warning
-    description: Internal management warning {infoLastInternalMgmtWarning} detected on {_HOSTNAME}.
+    description: 'Internal management warning detected: {{value "infoLastInternalMgmtWarning"}} on {{hostname}}.'
     status: current
     varbinds:
       - infoLastInternalMgmtWarning
   - oid: 1.3.6.1.4.1.266.20.0.21
     name: NEXANS-BM-MIB::switchFunctionInputAlarm
     category: state_change
-    severity: notice
-    description: Function input {adminFunctionInputNameF1} state changed to {infoFunctionInputStateF1} on {_HOSTNAME}.
+    severity: warning
+    description: Function input {{value "adminFunctionInputNameF1"}} state changed to {{value "infoFunctionInputStateF1"}} on {{hostname}}.
     status: current
     varbinds:
       - infoFunctionInputStateF1
@@ -362,7 +362,7 @@ traps:
     name: NEXANS-BM-MIB::switchConfigurationChanged
     category: config_change
     severity: notice
-    description: Switch configuration changed with total count {infoTotalConfigChanges} on {_HOSTNAME}.
+    description: 'Switch configuration changed (total changes: {{value "infoTotalConfigChanges"}}) on {{hostname}}.'
     status: current
     varbinds:
       - infoTotalConfigChanges
@@ -370,7 +370,7 @@ traps:
     name: NEXANS-BM-MIB::portErrorDisabled
     category: state_change
     severity: warning
-    description: Port {portName} has been error disabled on {_HOSTNAME}.
+    description: Port {{first (value "portName") (value "portDescr") "link"}} is error disabled on {{hostname}}.
     status: current
     varbinds:
       - portIndex

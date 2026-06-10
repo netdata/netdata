@@ -38,13 +38,13 @@ traps:
     name: RMCU::trap-auth
     category: auth
     severity: warning
-    description: Authorization failure detected from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: SNMP authorization failure on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.15117.1.3.2
     name: RMCU::trap-analog-over1
     category: diagnostic
     severity: warning
-    description: 'Analog input #1 value {analog1val} exceeded threshold on {_HOSTNAME}.'
+    description: 'Analog input #1 value {{value "analog1val"}} exceeded threshold on {{hostname}}.'
     status: current
     varbinds:
       - name
@@ -53,7 +53,7 @@ traps:
     name: RMCU::trap-analog-over2
     category: diagnostic
     severity: warning
-    description: 'Analog input #2 value {analog2val} exceeded threshold on {_HOSTNAME}.'
+    description: 'Analog input #2 value {{value "analog2val"}} exceeded threshold on {{hostname}}.'
     status: current
     varbinds:
       - name
@@ -62,7 +62,7 @@ traps:
     name: RMCU::trap-analog-over3
     category: diagnostic
     severity: warning
-    description: 'Analog input #3 value {analog3val} exceeded threshold on {_HOSTNAME}.'
+    description: 'Analog input #3 value {{value "analog3val"}} exceeded threshold on {{hostname}}.'
     status: current
     varbinds:
       - name
@@ -71,7 +71,7 @@ traps:
     name: RMCU::trap-analog-over4
     category: diagnostic
     severity: warning
-    description: 'Analog input #4 value {analog4val} exceeded threshold on {_HOSTNAME}.'
+    description: 'Analog input #4 value {{value "analog4val"}} exceeded threshold on {{hostname}}.'
     status: current
     varbinds:
       - name
@@ -80,7 +80,7 @@ traps:
     name: RMCU::trap-analog-over5
     category: diagnostic
     severity: warning
-    description: 'Analog input #5 value {analog5val} exceeded threshold on {_HOSTNAME}.'
+    description: 'Analog input #5 value {{value "analog5val"}} exceeded threshold on {{hostname}}.'
     status: current
     varbinds:
       - name
@@ -89,7 +89,7 @@ traps:
     name: RMCU::trap-analog-over6
     category: diagnostic
     severity: warning
-    description: 'Analog input #6 value {analog6val} exceeded threshold on {_HOSTNAME}.'
+    description: 'Analog input #6 value {{value "analog6val"}} exceeded threshold on {{hostname}}.'
     status: current
     varbinds:
       - name
@@ -98,16 +98,16 @@ traps:
     name: RMCU::trap-analog-under6
     category: diagnostic
     severity: warning
-    description: 'Analog input #6 value {analog6val} is under threshold on {_HOSTNAME}.'
+    description: 'Analog input #6 value {{value "analog6val"}} is under threshold on {{hostname}}.'
     status: current
     varbinds:
       - name
       - analog6val
   - oid: 1.3.6.1.4.1.15117.1.3.34
     name: RMCU::trap-poweron
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Power-on event detected for unit {name} on {_HOSTNAME}.
+    description: Power-on event detected for {{value "name"}} on {{hostname}}.
     status: current
     varbinds:
       - name
@@ -115,23 +115,23 @@ traps:
     name: RMCU::trap-test
     category: state_change
     severity: notice
-    description: Unit {name} triggered test trap on {_HOSTNAME}.
+    description: Trap caused by user test for unit {{value "name"}} on {{hostname}}.
     status: current
     varbinds:
       - name
   - oid: 1.3.6.1.4.1.15117.1.3.72
     name: RMCU::trap-digout-inactive1
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Digitout output 1 went inactive on {_HOSTNAME}.
+    description: 'Digitout output #1 went inactive on {{hostname}}.'
     status: current
     varbinds:
       - name
   - oid: 1.3.6.1.4.1.15117.1.3.73
     name: RMCU::trap-digout-inactive2
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: 'Digitout output #2 went inactive on {_HOSTNAME}.'
+    description: 'Digitout output #2 went inactive on {{hostname}}.'
     status: current
     varbinds:
       - name
@@ -139,23 +139,23 @@ traps:
     name: RMCU::trap-digout-inactive3
     category: diagnostic
     severity: warning
-    description: 'Digitout output #3 on {name} went inactive on {_HOSTNAME}.'
+    description: 'Digitout output #3 went inactive on {{hostname}}.'
     status: current
     varbinds:
       - name
   - oid: 1.3.6.1.4.1.15117.1.3.75
     name: RMCU::trap-digout-inactive4
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: 'Digitout output #4 on {name} went inactive on {_HOSTNAME}.'
+    description: 'Digitout output #4 went inactive on {{hostname}}.'
     status: current
     varbinds:
       - name
   - oid: 1.3.6.1.4.1.15117.1.3.76
     name: RMCU::trap-digout-inactive5
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: 'Digitout output #5 went inactive on {_HOSTNAME}.'
+    description: 'Digitout output #5 went inactive on {{hostname}}.'
     status: current
     varbinds:
       - name
@@ -163,7 +163,7 @@ traps:
     name: RMCU::trap-digout-active1
     category: state_change
     severity: notice
-    description: 'Digitout output #1 went active on {_HOSTNAME}.'
+    description: 'Digitout output #1 went active on {{hostname}}.'
     status: current
     varbinds:
       - name
@@ -171,7 +171,7 @@ traps:
     name: RMCU::trap-digout-active2
     category: state_change
     severity: notice
-    description: 'Digitout output #2 went active on {_HOSTNAME}.'
+    description: 'Digitout output #2 went active on {{hostname}}.'
     status: current
     varbinds:
       - name
@@ -179,7 +179,7 @@ traps:
     name: RMCU::trap-digout-active3
     category: state_change
     severity: notice
-    description: 'Digitout output #3 went active on {_HOSTNAME}.'
+    description: 'Digitout output #3 went active on {{hostname}}.'
     status: current
     varbinds:
       - name
@@ -187,7 +187,7 @@ traps:
     name: RMCU::trap-digout-active4
     category: state_change
     severity: notice
-    description: 'Digitout output #4 went active on {_HOSTNAME}.'
+    description: 'Digitout output #4 went active on {{hostname}}.'
     status: current
     varbinds:
       - name
@@ -195,15 +195,15 @@ traps:
     name: RMCU::trap-digout-active5
     category: state_change
     severity: notice
-    description: 'Digitout output #5 went active on {_HOSTNAME}.'
+    description: 'Digitout output #5 went active on {{hostname}}.'
     status: current
     varbinds:
       - name
   - oid: 1.3.6.1.4.1.15117.1.3.109
     name: RMCU::trap-analog-urecover6
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: 'Analog input #6 recovered from under alarm with value {analog6val} on {_HOSTNAME}.'
+    description: 'Analog input #6 recovered from under alarm with value {{value "analog6val"}} on {{hostname}}.'
     status: current
     varbinds:
       - name
@@ -212,16 +212,16 @@ traps:
     name: RMCU::trap-analog-orecover1
     category: diagnostic
     severity: notice
-    description: 'Analog input #1 recovered from over alarm with value {analog1val} on {_HOSTNAME}.'
+    description: 'Analog input #1 recovered from over alarm on {{hostname}}.'
     status: current
     varbinds:
       - name
       - analog1val
   - oid: 1.3.6.1.4.1.15117.1.3.121
     name: RMCU::trap-analog-orecover2
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: 'Analog input #2 recovered from over alarm with value {analog2val} on {_HOSTNAME}.'
+    description: 'Analog input #2 recovered from over alarm on {{hostname}}.'
     status: current
     varbinds:
       - name
@@ -230,7 +230,7 @@ traps:
     name: RMCU::trap-analog-orecover3
     category: diagnostic
     severity: notice
-    description: 'Analog input #3 recovered from over alarm with value {analog3val} on {_HOSTNAME}.'
+    description: 'Analog input #3 recovered from over alarm with value {{value "analog3val"}} on {{hostname}}.'
     status: current
     varbinds:
       - name
@@ -239,7 +239,7 @@ traps:
     name: RMCU::trap-analog-orecover4
     category: diagnostic
     severity: notice
-    description: 'Analog input #4 recovered from over alarm with value {analog4val} on {_HOSTNAME}.'
+    description: 'Analog input #4 recovered from over alarm with value {{value "analog4val"}} on {{hostname}}.'
     status: current
     varbinds:
       - name
@@ -248,7 +248,7 @@ traps:
     name: RMCU::trap-analog-orecover5
     category: diagnostic
     severity: notice
-    description: 'Analog input #5 recovered from over alarm with value {analog5val} on {_HOSTNAME}.'
+    description: 'Analog input #5 recovered from over alarm with value {{value "analog5val"}} on {{hostname}}.'
     status: current
     varbinds:
       - name
@@ -257,7 +257,7 @@ traps:
     name: RMCU::trap-analog-orecover6
     category: diagnostic
     severity: notice
-    description: 'Analog input #6 recovered from over alarm with value {analog6val} on {_HOSTNAME}.'
+    description: 'Analog input #6 recovered from over alarm on {{hostname}}.'
     status: current
     varbinds:
       - name

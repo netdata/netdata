@@ -36,7 +36,7 @@ traps:
     name: WATCHGUARD-SYSTEM-CONFIG-MIB::wgAlarmTrap
     category: diagnostic
     severity: warning
-    description: Alarm {wgAlarmLabel} with level {wgAlarmLevel} raised on {_HOSTNAME}.
+    description: 'Alarm {{value "wgAlarmLabel"}} triggered{{with value "wgAlarmMsg"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - wgAlarmId
@@ -48,12 +48,12 @@ traps:
   - oid: 1.3.6.1.4.1.3097.2.3.0.2
     name: WATCHGUARD-SYSTEM-CONFIG-MIB::wgSnmpShutdown
     category: diagnostic
-    severity: crit
-    description: SNMP service terminated on {_HOSTNAME}.
+    severity: alert
+    description: SNMP service terminated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3097.2.3.0.3
     name: WATCHGUARD-SYSTEM-CONFIG-MIB::wgSnmpStart
     category: state_change
     severity: notice
-    description: SNMP service started on {_HOSTNAME}.
+    description: SNMP agent started on {{hostname}}.
     status: current

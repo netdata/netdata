@@ -373,8 +373,8 @@ traps:
   - oid: 1.3.6.1.4.1.26928.1.1.1.1.1.1
     name: AH-TRAP-MIB::ahFailureTrap
     category: diagnostic
-    severity: err
-    description: Equipment or software failure {ahTrapDesc} on {ahAPName} on {_HOSTNAME}.
+    severity: crit
+    description: Equipment or software failure detected on {{value "ahObjectName"}} on {{hostname}}.
     status: current
     varbinds:
       - ahAPId
@@ -389,7 +389,7 @@ traps:
     name: AH-TRAP-MIB::ahThresholdCrossingEvent
     category: diagnostic
     severity: warning
-    description: Threshold crossed for {ahObjectName} with value {ahCurValue} on {_HOSTNAME}.
+    description: Threshold crossed for {{value "ahObjectName"}} on {{hostname}}.
     status: current
     varbinds:
       - ahAPId
@@ -404,7 +404,7 @@ traps:
     name: AH-TRAP-MIB::ahStateChangeEvent
     category: state_change
     severity: notice
-    description: Object {ahObjectName} on {ahAPName} changed from {ahPreviousState} to {ahCurrentState} on {_HOSTNAME}.
+    description: Object {{value "ahObjectName"}} state changed from {{value "ahPreviousState"}} to {{value "ahCurrentState"}} on {{hostname}}.
     status: current
     varbinds:
       - ahAPId
@@ -418,7 +418,7 @@ traps:
     name: AH-TRAP-MIB::ahConnectionChangeEvent
     category: mobility
     severity: notice
-    description: Connection state changed for {ahObjectType} {ahRemoteId} on {_HOSTNAME}.
+    description: Wireless connection state changed to {{value "ahCurrentState"}} on {{hostname}}.
     status: current
     varbinds:
       - ahAPId
@@ -448,8 +448,8 @@ traps:
   - oid: 1.3.6.1.4.1.26928.1.1.1.1.1.5
     name: AH-TRAP-MIB::ahIDPStationEvent
     category: security
-    severity: warning
-    description: IDP detected AP {ahRemoteId} on channel {ahIDPChannel} with RSSI {ahIDPRSSI} on {_HOSTNAME}.
+    severity: notice
+    description: IDP detected an AP on channel {{value "ahIDPChannel"}} with RSSI {{value "ahIDPRSSI"}} on {{hostname}}.
     status: current
     varbinds:
       - ahAPId
@@ -472,7 +472,7 @@ traps:
     name: AH-TRAP-MIB::ahClientInfoEvent
     category: mobility
     severity: notice
-    description: Wireless client {ahClientMAC} associated with SSID {ahSSID} on AP {ahAPName} on {_HOSTNAME}.
+    description: Wireless client {{value "ahClientMAC"}} associated on {{value "ahSSID"}} on {{hostname}}.
     status: current
     varbinds:
       - ahAPId
@@ -487,9 +487,9 @@ traps:
       - ahTrapDesc
   - oid: 1.3.6.1.4.1.26928.1.1.1.1.1.7
     name: AH-TRAP-MIB::ahPoEEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: HiveAP {ahAPName} booted or changed power levels on {_HOSTNAME}.
+    description: PoE event occurred on {{value "ahObjectName"}} for {{value "ahAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - ahAPId
@@ -511,7 +511,7 @@ traps:
     name: AH-TRAP-MIB::ahChannelPowerChangeEvent
     category: state_change
     severity: notice
-    description: Radio channel {ahRadioChannel} and transmit power {ahRadioTxPower} changed on {ahAPName} on {_HOSTNAME}.
+    description: Radio channel or power changed on {{value "ahAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - ahAPId
@@ -527,7 +527,7 @@ traps:
     name: AH-TRAP-MIB::ahIDPMitigateEvent
     category: security
     severity: alert
-    description: IDP detected rogue client {ahRemoteId} connecting to rogue AP {ahAPName} on {_HOSTNAME}.
+    description: IDP detected rogue client {{value "ahRemoteId"}} on rogue AP {{value "ahAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - ahAPId
@@ -545,7 +545,7 @@ traps:
     name: AH-TRAP-MIB::ahInterferenceMapAlertEvent
     category: diagnostic
     severity: warning
-    description: Interference alert on {ahAPName} with {ahRunningAverageInterference} on {_HOSTNAME}.
+    description: Interference or CRC error threshold exceeded on {{value "ahAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - ahAPId
@@ -564,9 +564,9 @@ traps:
       - ahTrapDesc
   - oid: 1.3.6.1.4.1.26928.1.1.1.1.1.11
     name: AH-TRAP-MIB::ahBandwidthSentinelEvent
-    category: diagnostic
+    category: security
     severity: warning
-    description: Bandwidth sentinel alert for client {ahClientMAC} on AP {ahAPName} on {_HOSTNAME}.
+    description: Bandwidth sentinel violation by client {{value "ahClientMAC"}} on {{hostname}}.
     status: current
     varbinds:
       - ahAPId
@@ -584,7 +584,7 @@ traps:
     name: AH-TRAP-MIB::ahAlarmMsgMapAlertEvent
     category: diagnostic
     severity: warning
-    description: Alert {ahAlarmAlertType.raw} on {ahObjectName} at {ahShortTermValue}% on {_HOSTNAME}.
+    description: Wireless alert {{value "ahAlarmAlertType"}} on {{first (value "ahObjectName") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - ahAPId

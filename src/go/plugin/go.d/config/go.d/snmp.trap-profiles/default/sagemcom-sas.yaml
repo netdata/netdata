@@ -77,8 +77,8 @@ traps:
   - oid: 1.3.6.1.4.1.1038.102.0.2
     name: PERFORMANCE-MIB::qualityTrap
     category: diagnostic
-    severity: warning
-    description: Performance quality record for {cptName} reported {cptSES} severely errored seconds on {_HOSTNAME}.
+    severity: notice
+    description: Quality record captured for {{value "cptName"}} on {{hostname}}.
     status: current
     varbinds:
       - cptObject
@@ -93,7 +93,7 @@ traps:
     name: LOG-MIB::logTrap
     category: diagnostic
     severity: warning
-    description: Log event {logEvent} with probable cause {logPC} on {_HOSTNAME}.
+    description: Log event {{value "logEvent"}} occurred on {{value "logName"}} on {{hostname}}.
     status: current
     varbinds:
       - logIndex
@@ -106,7 +106,7 @@ traps:
     name: LOG-MIB::thresholdTrap
     category: diagnostic
     severity: warning
-    description: Threshold crossed for {logName} with cause {logPC} on {_HOSTNAME}.
+    description: Threshold crossed for {{value "logName"}} on {{hostname}}.
     status: current
     varbinds:
       - logIndex

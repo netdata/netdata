@@ -478,9 +478,9 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.9694.1.1.3.0.1
     name: PEAKFLOW-DOS-MIB::bandwidthAnomaly
-    category: security
-    severity: alert
-    description: Bandwidth anomaly {pdosAnomalyClassification} detected on {pdosAnomalyResource} on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: Bandwidth anomaly detected on {{first (value "pdosAnomalyRouterInterfaces") "link"}} on {{hostname}}.
     status: current
     varbinds:
       - pdosAnomalyId
@@ -496,8 +496,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.1.3.0.2
     name: PEAKFLOW-DOS-MIB::tcpflagsAnomaly
     category: security
-    severity: alert
-    description: TCP flags anomaly {pdosAnomalyClassification} detected on {pdosAnomalyResource} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    severity: warning
+    description: TCP flags anomaly detected{{with value "pdosAnomalyClassification"}} severity {{.}}{{end}} on {{hostname}}.
     status: obsolete
     varbinds:
       - pdosAnomalyId
@@ -515,7 +515,7 @@ traps:
     name: PEAKFLOW-DOS-MIB::protocolAnomaly
     category: security
     severity: alert
-    description: Protocol anomaly {pdosAnomalyClassification} detected on {pdosAnomalyResource} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Protocol anomaly detected{{with value "pdosAnomalyClassification"}} ({{.}}){{end}} on {{hostname}}.
     status: current
     varbinds:
       - pdosAnomalyId
@@ -533,24 +533,24 @@ traps:
     name: PEAKFLOW-DOS-MIB::heartbeatLoss
     category: diagnostic
     severity: alert
-    description: Missing heartbeat from {pdosHeartbeatSource} on {_HOSTNAME}.
+    description: Missing heartbeat from {{value "pdosHeartbeatSource"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - pdosHeartbeatSource
   - oid: 1.3.6.1.4.1.9694.1.1.3.0.5
     name: PEAKFLOW-DOS-MIB::internalError
     category: diagnostic
-    severity: err
-    description: Internal error {internalErrorReason} at {internalErrorLocation} on {_HOSTNAME}.
+    severity: crit
+    description: Internal error {{value "internalErrorReason"}} at {{value "internalErrorLocation"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - internalErrorLocation
       - internalErrorReason
   - oid: 1.3.6.1.4.1.9694.1.1.3.0.6
     name: PEAKFLOW-DOS-MIB::anomalyDone
-    category: security
+    category: state_change
     severity: notice
-    description: Anomaly {pdosAnomalyId} ({pdosAnomalyClassification}) is no longer active on {_HOSTNAME}.
+    description: Anomaly {{value "pdosAnomalyId"}} is no longer active on {{hostname}}.
     status: current
     varbinds:
       - pdosAnomalyId
@@ -567,7 +567,7 @@ traps:
     name: PEAKFLOW-DOS-MIB::netflowMissing
     category: diagnostic
     severity: warning
-    description: NetFlow data missing from router {pdosAnomalyRouter} on {_HOSTNAME}.
+    description: NetFlow data missing from {{value "pdosAnomalyRouter"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - pdosAnomalyRouter
@@ -575,7 +575,7 @@ traps:
     name: PEAKFLOW-DOS-MIB::netflowMissingDone
     category: diagnostic
     severity: notice
-    description: NetFlow resumed from router {pdosAnomalyRouter} on {_HOSTNAME}.
+    description: NetFlow resumed from {{value "pdosAnomalyRouter"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - pdosAnomalyRouter
@@ -583,7 +583,7 @@ traps:
     name: PEAKFLOW-DOS-MIB::icmpMisuseAnomaly
     category: security
     severity: alert
-    description: ICMP misuse anomaly detected with classification {pdosAnomalyClassification} on {_HOSTNAME}.
+    description: ICMP misuse anomaly detected on {{hostname}}.
     status: current
     varbinds:
       - pdosAnomalyId
@@ -601,7 +601,7 @@ traps:
     name: PEAKFLOW-DOS-MIB::tcpNullMisuseAnomaly
     category: security
     severity: alert
-    description: TCP Null misuse anomaly detected on {_HOSTNAME}.
+    description: TCP Null misuse anomaly detected{{with value "pdosAnomalyClassification"}} severity {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - pdosAnomalyId
@@ -619,8 +619,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.1.3.0.11
     name: PEAKFLOW-DOS-MIB::tcpSynMisuseAnomaly
     category: security
-    severity: warning
-    description: TCP SYN misuse anomaly detected with classification {pdosAnomalyClassification} on {_HOSTNAME}.
+    severity: alert
+    description: TCP SYN misuse anomaly detected on {{hostname}}.
     status: current
     varbinds:
       - pdosAnomalyId
@@ -638,8 +638,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.1.3.0.12
     name: PEAKFLOW-DOS-MIB::ipNullMisuseAnomaly
     category: security
-    severity: warning
-    description: IP Null misuse anomaly detected with classification {pdosAnomalyClassification} on {_HOSTNAME}.
+    severity: alert
+    description: IP Null misuse anomaly detected{{with value "pdosAnomalyClassification"}} severity {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - pdosAnomalyId
@@ -656,7 +656,7 @@ traps:
     name: PEAKFLOW-DOS-MIB::ipFragMisuseAnomaly
     category: security
     severity: alert
-    description: IP Fragment misuse anomaly detected by {pdosAnomalyClassification} on {_HOSTNAME}.
+    description: IP fragment misuse anomaly detected on {{hostname}}.
     status: current
     varbinds:
       - pdosAnomalyId
@@ -673,8 +673,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.1.3.0.14
     name: PEAKFLOW-DOS-MIB::ipPrivateMisuseAnomaly
     category: security
-    severity: warning
-    description: IP Private misuse anomaly detected on {_HOSTNAME}.
+    severity: alert
+    description: IP private misuse anomaly detected{{with value "pdosAnomalyClassification"}} severity {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - pdosAnomalyId
@@ -691,7 +691,7 @@ traps:
     name: PEAKFLOW-DOS-MIB::heartbeatLossDone
     category: state_change
     severity: notice
-    description: Heartbeat from {pdosHeartbeatSource} restored on {_HOSTNAME}.
+    description: Heartbeat from {{value "pdosHeartbeatSource"}} restored on {{hostname}}.
     status: obsolete
     varbinds:
       - pdosHeartbeatSource
@@ -699,7 +699,7 @@ traps:
     name: PEAKFLOW-DOS-MIB::tcpRstMisuseAnomaly
     category: security
     severity: alert
-    description: TCP RST misuse anomaly detected with classification {pdosAnomalyClassification} on {_HOSTNAME}.
+    description: TCP RST misuse anomaly detected{{with value "pdosAnomalyClassification"}} severity {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - pdosAnomalyId
@@ -718,7 +718,7 @@ traps:
     name: PEAKFLOW-DOS-MIB::totalTrafficMisuseAnomaly
     category: security
     severity: alert
-    description: Total traffic misuse anomaly {pdosAnomalyClassification} detected on {pdosAnomalyResource} on {_HOSTNAME}.
+    description: Total traffic misuse anomaly detected{{with value "pdosAnomalyClassification"}} severity {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - pdosAnomalyId
@@ -735,7 +735,7 @@ traps:
     name: PEAKFLOW-DOS-MIB::fingerprintAnomaly
     category: security
     severity: alert
-    description: Fingerprint anomaly {pdosAnomalyClassification} detected on {pdosAnomalyResource} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Fingerprint anomaly detected{{with value "pdosAnomalyClassification"}} severity {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - pdosAnomalyId
@@ -752,7 +752,7 @@ traps:
     name: PEAKFLOW-DOS-MIB::dnsMisuseAnomaly
     category: security
     severity: warning
-    description: DNS misuse anomaly detected with classification {pdosAnomalyClassification} on {_HOSTNAME}.
+    description: DNS misuse anomaly detected{{with value "pdosAnomalyClassification"}} severity {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - pdosAnomalyId
@@ -770,7 +770,7 @@ traps:
     name: PEAKFLOW-DOS-MIB::udpMisuseAnomaly
     category: security
     severity: alert
-    description: UDP misuse anomaly {pdosAnomalyClassification} detected on {pdosAnomalyResource} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: UDP misuse anomaly detected on {{hostname}}.
     status: current
     varbinds:
       - pdosAnomalyId
@@ -786,9 +786,9 @@ traps:
       - pdosAnomalyProto
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.1
     name: PEAKFLOW-SP-MIB::flowDown
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Flow data not received from router {spRouter} on {_HOSTNAME}.
+    description: Flow data stopped from router {{value "spRouter"}} on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -797,7 +797,7 @@ traps:
     name: PEAKFLOW-SP-MIB::flowUp
     category: state_change
     severity: notice
-    description: Flow data resumed from router {spRouter} on {_HOSTNAME}.
+    description: Flow data resumed from {{value "spRouter"}} on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -805,8 +805,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.3
     name: PEAKFLOW-SP-MIB::snmpDown
     category: diagnostic
-    severity: err
-    description: SNMP requests are not being answered by {spRouter} on {_HOSTNAME}.
+    severity: crit
+    description: SNMP requests are not being answered by {{first (value "spRouter") "router"}} on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -815,7 +815,7 @@ traps:
     name: PEAKFLOW-SP-MIB::snmpUp
     category: state_change
     severity: notice
-    description: SNMP service became active again on {_HOSTNAME}.
+    description: SNMP service is now active on {{value "spRouter"}} on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -824,7 +824,7 @@ traps:
     name: PEAKFLOW-SP-MIB::bgpDown
     category: state_change
     severity: crit
-    description: BGP session with router {spRouter} has transitioned down on {_HOSTNAME}.
+    description: BGP session with {{value "spRouter"}} went down on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -833,16 +833,16 @@ traps:
     name: PEAKFLOW-SP-MIB::bgpUp
     category: state_change
     severity: notice
-    description: BGP session with router {spRouter} transitioned up on {_HOSTNAME}.
+    description: BGP session with {{value "spRouter"}} went up on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
       - spRouter
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.7
     name: PEAKFLOW-SP-MIB::collectorDown
-    category: state_change
+    category: diagnostic
     severity: alert
-    description: SP device {spCollector} is down and heartbeats are missing on {_HOSTNAME}.
+    description: SP collector {{value "spCollector"}} is down and heartbeats are missing on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -852,16 +852,16 @@ traps:
     name: PEAKFLOW-SP-MIB::collectorUp
     category: state_change
     severity: notice
-    description: Collector {spCollector} is up and heartbeats have resumed on {_HOSTNAME}.
+    description: SP collector {{value "spCollector"}} is up and heartbeats have resumed on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
       - spCollector
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.9
     name: PEAKFLOW-SP-MIB::collectorStart
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: SP device {spCollector} started and heartbeats received on {_HOSTNAME}.
+    description: SP device started and heartbeats received on {{hostname}}.
     status: obsolete
     varbinds:
       - spAlertID
@@ -870,7 +870,7 @@ traps:
     name: PEAKFLOW-SP-MIB::bgpInstability
     category: state_change
     severity: warning
-    description: BGP session instability detected with {spRouter} on {_HOSTNAME}.
+    description: BGP session instability detected with count {{value "spBGPInstability"}} on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -880,7 +880,7 @@ traps:
     name: PEAKFLOW-SP-MIB::bgpInstabilityDone
     category: state_change
     severity: notice
-    description: BGP instability ended for {spRouter} on {_HOSTNAME}.
+    description: BGP instability ended on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -889,7 +889,7 @@ traps:
     name: PEAKFLOW-SP-MIB::bgpTrap
     category: state_change
     severity: warning
-    description: BGP event {spBGPTrapEvent} for prefix {spBGPTrapPrefix} changed attributes on {_HOSTNAME}.
+    description: BGP event {{value "spBGPTrapEvent"}} for prefix {{value "spBGPTrapPrefix"}} on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -900,9 +900,9 @@ traps:
       - spBGPTrapNewAttributes
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.13
     name: PEAKFLOW-SP-MIB::interfaceUsage
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Interface {spInterface} usage {spInterfaceUsageHC} exceeded threshold on {_HOSTNAME}.
+    description: Interface {{value "spInterface"}} exceeded traffic rate threshold on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -918,7 +918,7 @@ traps:
     name: PEAKFLOW-SP-MIB::interfaceUsageDone
     category: state_change
     severity: notice
-    description: Interface {spInterface} traffic returned within configured thresholds on {_HOSTNAME}.
+    description: Interface {{value "spInterface"}} traffic usage returned to normal on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -930,7 +930,7 @@ traps:
     name: PEAKFLOW-SP-MIB::autoclassifyStart
     category: diagnostic
     severity: notice
-    description: Autoclassification started on {_HOSTNAME}.
+    description: Autoclassification started on {{first (value "spCollector") "this Peakflow SP leader"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - spAlertID
@@ -940,7 +940,7 @@ traps:
     name: PEAKFLOW-SP-MIB::configChange
     category: config_change
     severity: notice
-    description: Configuration updated by {spUsername} on {_HOSTNAME}.
+    description: Configuration updated on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -951,7 +951,7 @@ traps:
     name: PEAKFLOW-SP-MIB::notificationLimit
     category: diagnostic
     severity: warning
-    description: Alert suppression triggered due to notification limit on {spCollector} on {_HOSTNAME}.
+    description: Alert notification limit reached, alerts suppressed on {{hostname}}.
     status: obsolete
     varbinds:
       - spAlertID
@@ -959,8 +959,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.18
     name: PEAKFLOW-SP-MIB::reportDone
     category: diagnostic
-    severity: notice
-    description: Report {spReportName} generation completed and available at {spReportURL} on {_HOSTNAME}.
+    severity: info
+    description: Report {{value "spReportName"}} completed and available on {{hostname}}.
     status: obsolete
     varbinds:
       - spReportName
@@ -970,7 +970,7 @@ traps:
     name: PEAKFLOW-SP-MIB::bgpHijack
     category: security
     severity: alert
-    description: BGP hijack detected for route {spHijackRoute} on {_HOSTNAME}.
+    description: BGP hijack detected for prefix {{value "spHijackRoute"}} on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -980,9 +980,9 @@ traps:
       - spHijackLocal
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.20
     name: PEAKFLOW-SP-MIB::managedObjectUsage
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Managed object {spManagedObject} usage {spUsage} {spUnit} exceeded threshold {spThreshold} on {_HOSTNAME}.
+    description: Managed object {{value "spManagedObject"}} exceeded traffic threshold on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -994,9 +994,9 @@ traps:
       - spUnit
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.21
     name: PEAKFLOW-SP-MIB::managedObjectUsageDone
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Managed object {spManagedObject} traffic rate threshold cleared on {_HOSTNAME}.
+    description: Managed object {{value "spManagedObject"}} traffic rate threshold cleared on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1007,8 +1007,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.22
     name: PEAKFLOW-SP-MIB::hardwareFailure
     category: diagnostic
-    severity: err
-    description: 'Hardware failure detected: {spHardwareFailureDescription} on {_HOSTNAME}.'
+    severity: crit
+    description: 'Hardware failure detected{{with value "spHardwareFailureDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - spAlertID
@@ -1018,7 +1018,7 @@ traps:
     name: PEAKFLOW-SP-MIB::hardwareFailureDone
     category: diagnostic
     severity: notice
-    description: Hardware failure {spHardwareFailureDescription} cleared on {_HOSTNAME}.
+    description: 'Hardware failure cleared{{with value "spHardwareFailureDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - spAlertID
@@ -1027,8 +1027,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.24
     name: PEAKFLOW-SP-MIB::fingerprintFeedback
     category: diagnostic
-    severity: notice
-    description: Fingerprint feedback {spFingerprintFeedback} received for {spFingerprintName} on {_HOSTNAME}.
+    severity: info
+    description: Fingerprint feedback received for {{value "spFingerprintName"}} on {{hostname}}.
     status: current
     varbinds:
       - spMitigationID
@@ -1037,8 +1037,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.25
     name: PEAKFLOW-SP-MIB::fingerprintReceive
     category: security
-    severity: info
-    description: Shared fingerprint received from {spFingerprintSender} with ID {spMitigationID} on {_HOSTNAME}.
+    severity: notice
+    description: Shared fingerprint received from {{value "spFingerprintSender"}} on {{hostname}}.
     status: current
     varbinds:
       - spMitigationID
@@ -1049,7 +1049,7 @@ traps:
     name: PEAKFLOW-SP-MIB::dnsBaseline
     category: security
     severity: warning
-    description: Excessive DNS queries for {spDNSName} detected with {spDNSObserved} observed on {_HOSTNAME}.
+    description: Excessive DNS queries for {{value "spDNSName"}} detected on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1059,9 +1059,9 @@ traps:
       - spDNSObserved
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.27
     name: PEAKFLOW-SP-MIB::dnsBaselineDone
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: DNS query count for {spDNSName} returned to normal levels on {_HOSTNAME}.
+    description: DNS query count for {{value "spDNSName"}} returned to normal levels on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1073,8 +1073,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.28
     name: PEAKFLOW-SP-MIB::alertScript
     category: diagnostic
-    severity: info
-    description: Alert script {spScriptCommand} executed on {spScriptHost} on {_HOSTNAME}.
+    severity: notice
+    description: Alert script {{value "spScriptCommand"}} executed on {{value "spScriptHost"}} on {{hostname}}.
     status: current
     varbinds:
       - spMitigationID
@@ -1088,7 +1088,7 @@ traps:
     name: PEAKFLOW-SP-MIB::mitigationDone
     category: security
     severity: notice
-    description: Mitigation {spMitigationID} for alert {spAlertID} completed on {_HOSTNAME}.
+    description: Mitigation has completed for alert {{value "spAlertID"}} on {{hostname}}.
     status: current
     varbinds:
       - spMitigationID
@@ -1098,7 +1098,7 @@ traps:
     name: PEAKFLOW-SP-MIB::mitigationTMSStart
     category: security
     severity: notice
-    description: Mitigation {spMitigationName} started for {spManagedObject} on {_HOSTNAME}.
+    description: TMS mitigation started for {{value "spMitigationName"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - spMitigationID
@@ -1114,7 +1114,7 @@ traps:
     name: PEAKFLOW-SP-MIB::mitigationThirdPartyStart
     category: security
     severity: notice
-    description: Third party mitigation started for {spMitigationName} on {_HOSTNAME}.
+    description: Third party mitigation started for {{value "spMitigationName"}} on {{hostname}}.
     status: current
     varbinds:
       - spMitigationID
@@ -1127,8 +1127,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.32
     name: PEAKFLOW-SP-MIB::mitigationBlackholeStart
     category: security
-    severity: notice
-    description: Blackhole mitigation started for prefix {spBlackholePrefix} on {_HOSTNAME}.
+    severity: alert
+    description: Blackhole mitigation started for prefix {{value "spBlackholePrefix"}} on {{hostname}}.
     status: current
     varbinds:
       - spMitigationID
@@ -1143,7 +1143,7 @@ traps:
     name: PEAKFLOW-SP-MIB::mitigationFlowspecStart
     category: security
     severity: notice
-    description: Flowspec mitigation {spMitigationName} started on {_HOSTNAME}.
+    description: Flowspec mitigation started{{with value "spMitigationName"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - spMitigationID
@@ -1155,8 +1155,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.34
     name: PEAKFLOW-SP-MIB::spcommFailure
     category: diagnostic
-    severity: err
-    description: SP internal communication failure to {spCommFailureDestination} on {_HOSTNAME}.
+    severity: crit
+    description: SP internal communication failure to {{value "spCommFailureDestination"}} on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1167,7 +1167,7 @@ traps:
     name: PEAKFLOW-SP-MIB::spcommFailureDone
     category: diagnostic
     severity: warning
-    description: SP internal communication failure ended at {spCommFailureDestination} on {_HOSTNAME}.
+    description: 'SP internal communication failure ended{{with value "spCommFailureDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - spAlertID
@@ -1178,7 +1178,7 @@ traps:
     name: PEAKFLOW-SP-MIB::greDown
     category: state_change
     severity: warning
-    description: GRE tunnel {spGreTunnelName} to {spGreTunnelDestination} is down on {_HOSTNAME}.
+    description: GRE tunnel {{value "spGreTunnelName"}} is down on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1188,7 +1188,7 @@ traps:
     name: PEAKFLOW-SP-MIB::greDownDone
     category: state_change
     severity: notice
-    description: GRE tunnel {spGreTunnelName} is back up on {_HOSTNAME}.
+    description: GRE tunnel {{value "spGreTunnelName"}} is back up on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1197,8 +1197,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.38
     name: PEAKFLOW-SP-MIB::deviceSystemError
     category: diagnostic
-    severity: err
-    description: System error {spSystemErrorType} with description {spSystemErrorDescription} on {_HOSTNAME}.
+    severity: alert
+    description: System error alert {{value "spSystemErrorType"}} on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1210,7 +1210,7 @@ traps:
     name: PEAKFLOW-SP-MIB::deviceSystemErrorDone
     category: diagnostic
     severity: notice
-    description: System error alert {spSystemErrorType} ended on {_HOSTNAME}.
+    description: System error alert {{value "spSystemErrorType"}} ended on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1220,9 +1220,9 @@ traps:
       - spSystemErrorDescription
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.40
     name: PEAKFLOW-SP-MIB::fingerprintUsage
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Fingerprint {spFingerprintName} usage {spUsage} {spUnit} exceeded threshold {spThreshold} on {_HOSTNAME}.
+    description: Fingerprint {{value "spFingerprintName"}} exceeded traffic threshold on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1233,9 +1233,9 @@ traps:
       - spUnit
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.41
     name: PEAKFLOW-SP-MIB::fingerprintUsageDone
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Fingerprint {spFingerprintName} traffic rate returned to normal on {_HOSTNAME}.
+    description: Fingerprint {{value "spFingerprintName"}} traffic rate returned below threshold on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1244,9 +1244,9 @@ traps:
       - spUnit
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.42
     name: PEAKFLOW-SP-MIB::serviceUsage
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Service {spServiceName} usage {spUsage} exceeded threshold {spThreshold} on {_HOSTNAME}.
+    description: Service {{value "spServiceName"}} exceeded traffic threshold on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1258,9 +1258,9 @@ traps:
       - spUsage
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.43
     name: PEAKFLOW-SP-MIB::serviceUsageDone
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Service {spServiceName} traffic rate returned below threshold on {_HOSTNAME}.
+    description: Service {{value "spServiceName"}} traffic rate threshold exceeded condition cleared on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1268,8 +1268,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.44
     name: PEAKFLOW-SP-MIB::dosNetworkProfiledAlert
     category: security
-    severity: warning
-    description: DoS anomaly detected on {spManagedObject} with {spImpactBps} bps impact on {_HOSTNAME}.
+    severity: alert
+    description: DoS anomaly detected with {{value "pdosAnomalyClassification"}} severity on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1284,9 +1284,9 @@ traps:
       - spDetectedCountries
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.45
     name: PEAKFLOW-SP-MIB::dosNetworkProfiledAlertDone
-    category: security
+    category: state_change
     severity: notice
-    description: DoS anomaly alert cleared for {spManagedObject} on {_HOSTNAME}.
+    description: DoS anomaly alert ended for {{value "spManagedObject"}} on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1303,7 +1303,7 @@ traps:
     name: PEAKFLOW-SP-MIB::dosHostDetectionAlert
     category: security
     severity: alert
-    description: DoS host detection alert triggered with {pdosAnomalyClassification} classification on {_HOSTNAME}.
+    description: DoS host detection alert triggered for {{value "spInetAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1322,7 +1322,7 @@ traps:
     name: PEAKFLOW-SP-MIB::dosHostDetectionAlertDone
     category: security
     severity: notice
-    description: DoS host detection alert {spAlertID} ended on {_HOSTNAME}.
+    description: DoS host detection alert ended for {{value "spInetAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1340,8 +1340,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.48
     name: PEAKFLOW-SP-MIB::routingFailover
     category: state_change
-    severity: alert
-    description: Routing failover event detected on collector {spCollector} on {_HOSTNAME}.
+    severity: warning
+    description: Routing failover event occurred on collector {{value "spCollector"}} on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1350,8 +1350,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.49
     name: PEAKFLOW-SP-MIB::routingFailoverInterfaceDownAlert
     category: state_change
-    severity: crit
-    description: Routing failover interfaces {spRoutingFailoverInterfaces} are down on {_HOSTNAME}.
+    severity: alert
+    description: Routing failover interfaces {{value "spRoutingFailoverInterfaces"}} are down on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1362,7 +1362,7 @@ traps:
     name: PEAKFLOW-SP-MIB::routingFailoverInterfaceDownAlertDone
     category: state_change
     severity: notice
-    description: Routing failover interface down alert {spAlertID} finished on {_HOSTNAME}.
+    description: Routing failover interface down alert {{value "spAlertID"}} finished on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1372,7 +1372,7 @@ traps:
     name: PEAKFLOW-SP-MIB::trafficAutoMitigation
     category: security
     severity: notice
-    description: Traffic auto-mitigation triggered for managed object {spManagedObject} on {_HOSTNAME}.
+    description: Traffic auto-mitigation triggered for {{value "spManagedObject"}} on {{hostname}}.
     status: current
     varbinds:
       - spManagedObject
@@ -1380,7 +1380,7 @@ traps:
     name: PEAKFLOW-SP-MIB::cloudSignalingMitigationRequest
     category: security
     severity: alert
-    description: Cloud signaling mitigation request detected for {spManagedObject} on {_HOSTNAME}.
+    description: Cloud signaling mitigation request detected on {{hostname}}.
     status: current
     varbinds:
       - spManagedObject
@@ -1388,8 +1388,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.53
     name: PEAKFLOW-SP-MIB::licenseError
     category: license
-    severity: warning
-    description: License error {spLicenseErrType} with count {spLicenseErrCount} on {_HOSTNAME}.
+    severity: alert
+    description: 'SP Deployment License error alert started{{with value "spLicenseErrDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - spAlertID
@@ -1401,7 +1401,7 @@ traps:
     name: PEAKFLOW-SP-MIB::licenseErrorDone
     category: license
     severity: notice
-    description: License error alert {spLicenseErrDescription} ended on {_HOSTNAME}.
+    description: License error alert {{value "spLicenseErrType"}} has ended on {{hostname}}.
     status: current
     varbinds:
       - spAlertID
@@ -1412,17 +1412,17 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.55
     name: PEAKFLOW-SP-MIB::cloudSignalingFault
     category: diagnostic
-    severity: err
-    description: 'Cloud signaling fault detected: {spCloudSignalFaultDescription} on device {spPravail} on {_HOSTNAME}.'
+    severity: warning
+    description: 'Cloud signaling fault detected{{with value "spCloudSignalFaultDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - spPravail
       - spCloudSignalFaultDescription
   - oid: 1.3.6.1.4.1.9694.1.4.3.0.56
     name: PEAKFLOW-SP-MIB::cloudSignalingFaultDone
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Cloud signaling fault cleared for {spPravail} on {_HOSTNAME}.
+    description: 'Cloud signaling fault cleared{{with value "spCloudSignalFaultDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - spPravail
@@ -1431,7 +1431,7 @@ traps:
     name: PEAKFLOW-SP-MIB::mitigationTMSStartV2
     category: security
     severity: notice
-    description: TMS mitigation {spMitigationName} started for {spManagedObject} on {_HOSTNAME}.
+    description: TMS mitigation started for {{value "spMitigationName"}} on {{hostname}}.
     status: current
     varbinds:
       - spMitigationID
@@ -1447,8 +1447,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.5.3.0.1
     name: PEAKFLOW-TMS-MIB::hostFault
     category: diagnostic
-    severity: err
-    description: Host fault reported as {tmsHostFault} on {_HOSTNAME}.
+    severity: crit
+    description: 'Host fault detected: {{value "tmsHostFault"}} on {{hostname}}.'
     status: obsolete
     varbinds:
       - sysName
@@ -1457,7 +1457,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::greTunnelDown
     category: state_change
     severity: warning
-    description: GRE tunnel from {tmsTrapGreSource} to {tmsTrapGreDestination} went down on {_HOSTNAME}.
+    description: GRE tunnel to {{value "tmsTrapGreDestination"}} went down on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1469,7 +1469,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::greTunnelUp
     category: state_change
     severity: notice
-    description: GRE tunnel {tmsTrapGreSource} to {tmsTrapGreDestination} is up on {_HOSTNAME}.
+    description: GRE tunnel to {{value "tmsTrapGreDestination"}} is up on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1481,7 +1481,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsLinkUp
     category: state_change
     severity: notice
-    description: Link up event reported by {tmsTrapString} on {_HOSTNAME}.
+    description: Link went up on {{hostname}}.
     status: obsolete
     varbinds:
       - sysName
@@ -1490,7 +1490,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsLinkDown
     category: state_change
     severity: warning
-    description: Link down event reported by {tmsTrapString} on {_HOSTNAME}.
+    description: 'Link down detected{{with value "tmsTrapString"}}: {{.}}{{end}} on {{hostname}}.'
     status: obsolete
     varbinds:
       - sysName
@@ -1499,7 +1499,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::subHostUp
     category: state_change
     severity: notice
-    description: Subhost {tmsTrapSubhostName} transitioned to active state on {_HOSTNAME}.
+    description: Subhost {{value "tmsTrapSubhostName"}} transitioned to active on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1510,7 +1510,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::subHostDown
     category: state_change
     severity: warning
-    description: Subhost {tmsTrapSubhostName} transitioned to inactive on {_HOSTNAME}.
+    description: Subhost {{value "tmsTrapSubhostName"}} transitioned to inactive on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1521,7 +1521,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsBgpNeighborDown
     category: state_change
     severity: warning
-    description: BGP neighbor {tmsTrapBgpPeer} transitioned out of ESTABLISHED state on {_HOSTNAME}.
+    description: BGP neighbor {{value "tmsTrapBgpPeer"}} transitioned out of ESTABLISHED state on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1532,7 +1532,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsBgpNeighborUp
     category: state_change
     severity: notice
-    description: BGP neighbor {tmsTrapBgpPeer} transitioned to ESTABLISHED state on {_HOSTNAME}.
+    description: BGP neighbor {{value "tmsTrapBgpPeer"}} transitioned to ESTABLISHED on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1543,7 +1543,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsNexthopDown
     category: state_change
     severity: warning
-    description: Nexthop {tmsTrapNexthop} on interface {ifName} is unreachable on {_HOSTNAME}.
+    description: Nexthop {{value "tmsTrapNexthop"}} is unreachable on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1555,7 +1555,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsNexthopUp
     category: state_change
     severity: warning
-    description: Nexthop {tmsTrapNexthop} on interface {ifName} became unreachable on {_HOSTNAME}.
+    description: Nexthop {{value "tmsTrapNexthop"}} became unreachable on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1566,8 +1566,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.5.3.0.12
     name: PEAKFLOW-TMS-MIB::tmsMitigationError
     category: diagnostic
-    severity: err
-    description: Mitigation {tmsMitigationName} failed due to configuration error on {_HOSTNAME}.
+    severity: warning
+    description: Mitigation {{value "tmsMitigationName"}} failed due to configuration error on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1577,9 +1577,9 @@ traps:
       - tmsMitigationName
   - oid: 1.3.6.1.4.1.9694.1.5.3.0.13
     name: PEAKFLOW-TMS-MIB::tmsMitigationSuspended
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Mitigation {tmsMitigationName} suspended due to external problem on {_HOSTNAME}.
+    description: Mitigation {{value "tmsMitigationName"}} suspended on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1591,7 +1591,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsMitigationRunning
     category: state_change
     severity: notice
-    description: Mitigation {tmsMitigationName} cleared and is now running on {_HOSTNAME}.
+    description: Mitigation {{value "tmsMitigationName"}} is now running on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1601,9 +1601,9 @@ traps:
       - tmsMitigationName
   - oid: 1.3.6.1.4.1.9694.1.5.3.0.15
     name: PEAKFLOW-TMS-MIB::tmsConfigMissing
-    category: diagnostic
-    severity: err
-    description: TMS configuration file missing with detail {tmsTrapDetail} on {_HOSTNAME}.
+    category: config_change
+    severity: warning
+    description: TMS configuration file missing{{with value "tmsTrapComponentName"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1614,7 +1614,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsConfigError
     category: config_change
     severity: warning
-    description: 'TMS configuration error detected: {tmsTrapString} on {_HOSTNAME}.'
+    description: 'TMS configuration error detected{{with value "tmsTrapString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - sysName
@@ -1625,7 +1625,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsConfigOk
     category: config_change
     severity: notice
-    description: Configuration problems corrected by {tmsTrapString} on {_HOSTNAME}.
+    description: 'Configuration problems corrected{{with value "tmsTrapDetail"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - sysName
@@ -1636,7 +1636,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsHwDeviceDown
     category: diagnostic
     severity: crit
-    description: Hardware device {tmsTrapComponentName} failed with detail {tmsTrapDetail} on {_HOSTNAME}.
+    description: Hardware device {{value "tmsTrapComponentName"}} has failed on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1647,7 +1647,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsHwDeviceUp
     category: diagnostic
     severity: notice
-    description: Hardware device failure corrected on {_HOSTNAME}.
+    description: Hardware device failure corrected{{with value "tmsTrapComponentName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1658,7 +1658,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsHwSensorCritical
     category: diagnostic
     severity: crit
-    description: Hardware sensor reported alarm condition with detail {tmsTrapDetail} on {_HOSTNAME}.
+    description: Hardware sensor alarm condition detected{{with value "tmsTrapComponentName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1669,7 +1669,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsHwSensorOk
     category: diagnostic
     severity: notice
-    description: Hardware sensor alarm cleared for {tmsTrapComponentName} on {_HOSTNAME}.
+    description: Hardware sensor alarm condition cleared{{with value "tmsTrapComponentName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1679,8 +1679,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.5.3.0.22
     name: PEAKFLOW-TMS-MIB::tmsSwComponentDown
     category: diagnostic
-    severity: err
-    description: Software component {tmsTrapComponentName} failed with detail {tmsTrapDetail} on {_HOSTNAME}.
+    severity: crit
+    description: Software component {{value "tmsTrapComponentName"}} has failed on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1692,7 +1692,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsSwComponentUp
     category: diagnostic
     severity: notice
-    description: Software program failure corrected for component {tmsTrapComponentName} on {_HOSTNAME}.
+    description: Software program failure corrected for {{value "tmsTrapComponentName"}} on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1704,7 +1704,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsSystemStatusCritical
     category: diagnostic
     severity: crit
-    description: TMS system critical failure reported with detail {tmsTrapDetail} on {_HOSTNAME}.
+    description: 'TMS system is experiencing a critical failure{{with value "tmsTrapDetail"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - sysName
@@ -1715,7 +1715,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsSystemStatusDegraded
     category: diagnostic
     severity: warning
-    description: TMS system experiencing degraded performance with detail {tmsTrapDetail} on {_HOSTNAME}.
+    description: System experiencing degraded performance{{with value "tmsTrapComponentName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1726,7 +1726,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsSystemStatusNominal
     category: state_change
     severity: notice
-    description: System status returned to nominal on {_HOSTNAME}.
+    description: TMS system returned to normal behavior on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1736,8 +1736,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.5.3.0.27
     name: PEAKFLOW-TMS-MIB::tmsFilesystemCritical
     category: diagnostic
-    severity: warning
-    description: Filesystem near capacity reported by {tmsTrapComponentName} on {_HOSTNAME}.
+    severity: crit
+    description: Filesystem near capacity on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1746,9 +1746,9 @@ traps:
       - tmsTrapComponentName
   - oid: 1.3.6.1.4.1.9694.1.5.3.0.28
     name: PEAKFLOW-TMS-MIB::tmsFilesystemNominal
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Filesystem capacity returned to nominal state on {_HOSTNAME}.
+    description: Filesystem capacity returned to nominal state{{with value "tmsTrapComponentName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1759,7 +1759,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsHwSensorUnknown
     category: diagnostic
     severity: warning
-    description: Hardware sensor {tmsTrapComponentName} is in an unknown state on {_HOSTNAME}.
+    description: Hardware sensor is in an unknown state{{with value "tmsTrapComponentName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1770,7 +1770,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsSpCommunicationUp
     category: state_change
     severity: notice
-    description: Communication with SP host is up on {_HOSTNAME}.
+    description: Communication with SP host is up on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1781,7 +1781,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsSpCommunicationDown
     category: state_change
     severity: crit
-    description: Communication with SP host is down on {_HOSTNAME}.
+    description: Communication with SP host is down{{with value "tmsTrapComponentName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1791,8 +1791,8 @@ traps:
   - oid: 1.3.6.1.4.1.9694.1.5.3.0.32
     name: PEAKFLOW-TMS-MIB::tmsSystemStatusError
     category: diagnostic
-    severity: err
-    description: TMS system error reported with {tmsTrapString} on {_HOSTNAME}.
+    severity: crit
+    description: TMS system error {{value "tmsTrapString"}} on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1803,7 +1803,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsAutomitigationBgpEnabled
     category: state_change
     severity: notice
-    description: Automitigation BGP announcements resumed on {_HOSTNAME}.
+    description: Automitigation BGP announcements resumed after problem cleared on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1814,7 +1814,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsAutomitigationBgpDisabled
     category: config_change
     severity: notice
-    description: Automitigation BGP announcements were administratively disabled on {_HOSTNAME}.
+    description: Automitigation BGP announcements disabled{{with value "tmsTrapComponentName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1825,7 +1825,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsAutomitigationBgpSuspended
     category: state_change
     severity: warning
-    description: BGP announcements suspended due to external problem on {_HOSTNAME}.
+    description: 'Automitigation BGP announcements suspended{{with value "tmsTrapDetail"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - sysName
@@ -1836,7 +1836,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsIpv6GreTunnelDown
     category: state_change
     severity: warning
-    description: IPv6 GRE tunnel to {tmsTrapIpv6GreDestination} went down on {_HOSTNAME}.
+    description: IPv6 GRE tunnel to {{value "tmsTrapIpv6GreDestination"}} went down on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1848,7 +1848,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsIpv6GreTunnelUp
     category: state_change
     severity: notice
-    description: IPv6 GRE tunnel up with source {tmsTrapIpv6GreSource} and destination {tmsTrapIpv6GreDestination} on {_HOSTNAME}.
+    description: IPv6 GRE tunnel to {{value "tmsTrapIpv6GreDestination"}} is up on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1860,7 +1860,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsIpv6BgpNeighborDown
     category: state_change
     severity: warning
-    description: BGP neighbor {tmsTrapIpv6BgpPeer} transitioned out of ESTABLISHED state on {_HOSTNAME}.
+    description: BGP neighbor {{value "tmsTrapIpv6BgpPeer"}} transitioned out of ESTABLISHED state on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1871,7 +1871,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsIpv6BgpNeighborUp
     category: state_change
     severity: notice
-    description: BGP neighbor {tmsTrapIpv6BgpPeer} reached ESTABLISHED state on {_HOSTNAME}.
+    description: BGP neighbor {{value "tmsTrapIpv6BgpPeer"}} transitioned to ESTABLISHED on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1882,7 +1882,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsIpv6NexthopDown
     category: state_change
     severity: warning
-    description: IPv6 nexthop {tmsTrapIpv6Nexthop} became unreachable on {_HOSTNAME}.
+    description: IPv6 nexthop {{value "tmsTrapIpv6Nexthop"}} became unreachable on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1894,7 +1894,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsIpv6NexthopUp
     category: state_change
     severity: notice
-    description: IPv6 nexthop {tmsTrapIpv6Nexthop} became reachable on {_HOSTNAME}.
+    description: IPv6 nexthop {{value "tmsTrapIpv6Nexthop"}} became reachable on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1906,7 +1906,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsPerformanceOk
     category: diagnostic
     severity: info
-    description: Processed traffic rate matches offered rate on {_HOSTNAME}.
+    description: Processed traffic rate matches offered traffic rate on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1917,7 +1917,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsPerformanceLossy
     category: diagnostic
     severity: warning
-    description: Traffic rate lower than offered rate on {_HOSTNAME}.
+    description: 'Performance lossy condition detected{{with value "tmsTrapDetail"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - sysName
@@ -1928,7 +1928,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsSystemPrefixesOk
     category: state_change
     severity: notice
-    description: BGP advertising all mitigation prefixes on {_HOSTNAME}.
+    description: BGP is advertising all mitigation prefixes on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -1937,9 +1937,9 @@ traps:
       - tmsTrapComponentName
   - oid: 1.3.6.1.4.1.9694.1.5.3.0.45
     name: PEAKFLOW-TMS-MIB::tmsSystemPrefixesMissing
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: BGP mitigation prefixes missing on {_HOSTNAME}.
+    description: 'BGP is not advertising all mitigation prefixes{{with value "tmsTrapDetail"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - sysName
@@ -1950,7 +1950,7 @@ traps:
     name: PEAKFLOW-TMS-MIB::tmsSpCommunicationDegraded
     category: diagnostic
     severity: warning
-    description: Communication with SP host is degraded on {_HOSTNAME}.
+    description: 'Communication with SP host is degraded{{with value "tmsTrapDetail"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - sysName

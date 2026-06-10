@@ -33,7 +33,7 @@ traps:
     name: XMUX4-PLUS::channelLocalRxChange
     category: state_change
     severity: notice
-    description: Channel {trapchannelIndex} local reception changed to {trapValue} on {_HOSTNAME}.
+    description: Channel {{value "trapchannelIndex"}} local reception changed to {{value "trapValue"}} on {{hostname}}.
     status: current
     varbinds:
       - trapmuxIndex
@@ -45,7 +45,7 @@ traps:
     name: XMUX4-PLUS::channelRemoteRxChange
     category: state_change
     severity: notice
-    description: Channel {trapchannelIndex} remote reception changed to {trapValue} on {_HOSTNAME}.
+    description: Channel {{value "trapchannelIndex"}} remote reception changed to {{value "trapValue"}} on {{hostname}}.
     status: current
     varbinds:
       - trapmuxIndex
@@ -57,7 +57,7 @@ traps:
     name: XMUX4-PLUS::alarmaStatusChange
     category: diagnostic
     severity: warning
-    description: ALARM LED state changed to {trapValue} on channel {trapchannelIndex} on {_HOSTNAME}.
+    description: ALARM LED state changed to {{value "trapValue"}} on channel {{value "trapchannelIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - trapmuxIndex
@@ -69,7 +69,7 @@ traps:
     name: XMUX4-PLUS::channelActivoChange
     category: state_change
     severity: notice
-    description: Channel {trapchannelIndex} active status changed to {trapValue} on {_HOSTNAME}.
+    description: Channel {{value "trapchannelIndex"}} active status changed to {{value "trapValue"}} on {{hostname}}.
     status: current
     varbinds:
       - trapmuxIndex
@@ -81,7 +81,7 @@ traps:
     name: XMUX4-PLUS::powerLeftChange
     category: diagnostic
     severity: warning
-    description: Power supply on left changed state to {trapValue} on {_HOSTNAME}.
+    description: Power supply on the left changed state to {{value "trapValue"}} on {{hostname}}.
     status: current
     varbinds:
       - trapmuxIndex
@@ -93,7 +93,7 @@ traps:
     name: XMUX4-PLUS::powerRightChange
     category: diagnostic
     severity: warning
-    description: Power supply state changed to {trapValue} on channel {trapchannelIndex} on {_HOSTNAME}.
+    description: Power supply status changed to {{value "trapValue"}} on channel {{value "trapchannelIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - trapmuxIndex
@@ -105,7 +105,7 @@ traps:
     name: XMUX4-PLUS::configChange
     category: config_change
     severity: notice
-    description: Device configuration changed on {_HOSTNAME}.
+    description: Device configuration changed on {{hostname}}.
     status: current
     varbinds:
       - trapmuxIndex

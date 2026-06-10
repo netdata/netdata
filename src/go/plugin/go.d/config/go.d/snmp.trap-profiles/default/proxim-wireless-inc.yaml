@@ -14,31 +14,31 @@ traps:
     name: PROXIM-MIB::wirelessInterfaceCardInitFailure
     category: diagnostic
     severity: crit
-    description: Wireless interface card initialization failure reported on {_HOSTNAME}.
+    description: Wireless interface card initialization failure on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
   - oid: 1.3.6.1.4.1.841.1.1.3.6.1.2
     name: PROXIM-MIB::wirelessInterfaceCardRadarInterferenceDetected
     category: diagnostic
-    severity: warning
-    description: Radar interference detected on channel {genericTrap} on {_HOSTNAME}.
+    severity: crit
+    description: Radar interference detected on wireless interface on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
   - oid: 1.3.6.1.4.1.841.1.1.3.6.1.3
     name: PROXIM-MIB::wirelessInterfaceInvalidRegDomain
-    category: diagnostic
-    severity: err
-    description: Invalid Regulatory Domain detected on {_HOSTNAME}.
+    category: security
+    severity: crit
+    description: Wireless interface invalid regulatory domain detected on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
   - oid: 1.3.6.1.4.1.841.1.1.3.6.1.4
     name: PROXIM-MIB::wirelessInterfaceWorldModeCCNotSet
     category: config_change
-    severity: alert
-    description: Wireless interface WorldModeCountryCode is not set on {_HOSTNAME}.
+    severity: warning
+    description: Wireless interface WorldModeCountryCode is not set on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -46,7 +46,7 @@ traps:
     name: PROXIM-MIB::wirelessInterfaceChannelChanged
     category: state_change
     severity: notice
-    description: Wireless interface channel changed on {_HOSTNAME}.
+    description: Wireless interface channel changed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -54,15 +54,15 @@ traps:
     name: PROXIM-MIB::wirelessInterfaceStationDissAssociation
     category: mobility
     severity: notice
-    description: Wireless station disassociation detected on {_HOSTNAME}.
+    description: Wireless station disassociated from {{first (value "genericTrap") "base station"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - genericTrap
   - oid: 1.3.6.1.4.1.841.1.1.3.6.2.1
     name: PROXIM-MIB::radiusSrvNotResponding
-    category: diagnostic
-    severity: crit
-    description: RADIUS server not responding to authentication requests on {_HOSTNAME}.
+    category: auth
+    severity: warning
+    description: RADIUS server not responding to authentication requests on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -70,7 +70,7 @@ traps:
     name: PROXIM-MIB::authenticationFailure
     category: auth
     severity: warning
-    description: Authentication failure from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: 'Client authentication failure occurred{{with value "genericTrap"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - genericTrap
@@ -78,7 +78,7 @@ traps:
     name: PROXIM-MIB::masterAgentExited
     category: diagnostic
     severity: crit
-    description: SNMP master agent exited on {_HOSTNAME}.
+    description: SNMP master agent exited or killed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -86,7 +86,7 @@ traps:
     name: PROXIM-MIB::imageDownloadFailed
     category: diagnostic
     severity: crit
-    description: Image download failed on {_HOSTNAME}.
+    description: Image download failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -94,7 +94,7 @@ traps:
     name: PROXIM-MIB::signatureCheckFailed
     category: security
     severity: crit
-    description: Signature check failed during image download on {_HOSTNAME}.
+    description: Image signature check failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -102,7 +102,7 @@ traps:
     name: PROXIM-MIB::configurationAppliedSuccessfully
     category: config_change
     severity: notice
-    description: Configuration applied successfully on {_HOSTNAME}.
+    description: Configuration applied successfully on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -110,7 +110,7 @@ traps:
     name: PROXIM-MIB::moduleNotInitialized
     category: diagnostic
     severity: crit
-    description: Module failed to initialize on {_HOSTNAME}.
+    description: Module failed to initialize {{value "genericTrap"}} on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -118,7 +118,7 @@ traps:
     name: PROXIM-MIB::deviceRebooting
     category: state_change
     severity: notice
-    description: Device rebooting initiated on {_HOSTNAME}.
+    description: Device rebooting on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -126,7 +126,7 @@ traps:
     name: PROXIM-MIB::suEthernetStatusUp
     category: state_change
     severity: info
-    description: Ethernet interface status changed to UP on {_HOSTNAME}.
+    description: Ethernet interface came up on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -134,7 +134,7 @@ traps:
     name: PROXIM-MIB::suEthernetStatusDown
     category: state_change
     severity: warning
-    description: Ethernet interface went down on {_HOSTNAME}.
+    description: Ethernet interface went down on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -142,7 +142,7 @@ traps:
     name: PROXIM-MIB::invalidConfigFile
     category: diagnostic
     severity: crit
-    description: Invalid configuration file detected on {_HOSTNAME}.
+    description: Invalid configuration file loaded on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -150,7 +150,7 @@ traps:
     name: PROXIM-MIB::cpuUsageThresholdExceeded
     category: diagnostic
     severity: crit
-    description: CPU usage threshold exceeded on {_HOSTNAME}.
+    description: CPU usage threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -158,7 +158,7 @@ traps:
     name: PROXIM-MIB::flashMemoryThresholdExceeded
     category: diagnostic
     severity: crit
-    description: Flash memory threshold exceeded on {_HOSTNAME}.
+    description: Flash memory threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -166,7 +166,7 @@ traps:
     name: PROXIM-MIB::ramMemoryThresholdExceeded
     category: diagnostic
     severity: crit
-    description: RAM memory threshold exceeded on {_HOSTNAME}.
+    description: RAM memory threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -174,15 +174,15 @@ traps:
     name: PROXIM-MIB::invalidLicenseFile
     category: license
     severity: crit
-    description: Invalid license file detected on {_HOSTNAME}.
+    description: Invalid license file loaded on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
   - oid: 1.3.6.1.4.1.841.1.1.3.6.4.6
     name: PROXIM-MIB::pxmModulesInitSuccess
     category: diagnostic
-    severity: warning
-    description: PXM modules initialization success reported on {_HOSTNAME}.
+    severity: notice
+    description: All PXM modules initialized successfully on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -190,7 +190,7 @@ traps:
     name: PROXIM-MIB::sysMgmtModulesInitFailure
     category: diagnostic
     severity: crit
-    description: SYSMGMT module initialization failed on {_HOSTNAME}.
+    description: SYSMGMT module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -198,7 +198,7 @@ traps:
     name: PROXIM-MIB::vlanModuleInitFailure
     category: diagnostic
     severity: crit
-    description: VLAN module initialization failed on {_HOSTNAME}.
+    description: VLAN module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -206,7 +206,7 @@ traps:
     name: PROXIM-MIB::filteringModuleInitFailure
     category: diagnostic
     severity: crit
-    description: Filtering module initialization failed on {_HOSTNAME}.
+    description: Filtering module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -214,7 +214,7 @@ traps:
     name: PROXIM-MIB::sysutilsModuleInitFailure
     category: diagnostic
     severity: crit
-    description: SYSUTILS module initialization failed on {_HOSTNAME}.
+    description: SYSUTILS module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -222,7 +222,7 @@ traps:
     name: PROXIM-MIB::tftpModuleInitFailure
     category: diagnostic
     severity: crit
-    description: TFTP module initialization failed on {_HOSTNAME}.
+    description: TFTP module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -230,7 +230,7 @@ traps:
     name: PROXIM-MIB::sntpModuleInitFailure
     category: diagnostic
     severity: crit
-    description: SNTP module initialization failed on {_HOSTNAME}.
+    description: SNTP module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -238,7 +238,7 @@ traps:
     name: PROXIM-MIB::syslogModuleInitFailure
     category: diagnostic
     severity: crit
-    description: SYSLOG module initialization failed on {_HOSTNAME}.
+    description: SYSLOG module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -246,7 +246,7 @@ traps:
     name: PROXIM-MIB::wlanModuleInitFailure
     category: diagnostic
     severity: crit
-    description: WLAN module initialization failed on {_HOSTNAME}.
+    description: WLAN module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -254,7 +254,7 @@ traps:
     name: PROXIM-MIB::flashModuleInitFailure
     category: diagnostic
     severity: crit
-    description: FLASH module initialization failed on {_HOSTNAME}.
+    description: FLASH module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -262,7 +262,7 @@ traps:
     name: PROXIM-MIB::snmpModuleInitFailure
     category: diagnostic
     severity: crit
-    description: SNMP module initialization failed on {_HOSTNAME}.
+    description: SNMP module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -270,7 +270,7 @@ traps:
     name: PROXIM-MIB::systemTempReachedLimits
     category: diagnostic
     severity: crit
-    description: System temperature reached limits on {_HOSTNAME}.
+    description: System temperature reached limits on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -278,7 +278,7 @@ traps:
     name: PROXIM-MIB::dhcpRelayModuleInitFailure
     category: diagnostic
     severity: crit
-    description: DHCP Relay module initialization failed on {_HOSTNAME}.
+    description: DHCP Relay module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -286,7 +286,7 @@ traps:
     name: PROXIM-MIB::dhcpServerModuleInitFailure
     category: diagnostic
     severity: crit
-    description: DHCP server module initialization failed on {_HOSTNAME}.
+    description: DHCP Server module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -294,7 +294,7 @@ traps:
     name: PROXIM-MIB::staticNATModuleInitFailure
     category: diagnostic
     severity: crit
-    description: Static NAT module initialization failed on {_HOSTNAME}.
+    description: Static NAT module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -302,7 +302,7 @@ traps:
     name: PROXIM-MIB::licenseModuleInitFailure
     category: license
     severity: crit
-    description: License module initialization failed on {_HOSTNAME}.
+    description: License module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -310,7 +310,7 @@ traps:
     name: PROXIM-MIB::systemFeatureModuleInitFailure
     category: diagnostic
     severity: crit
-    description: System Features module initialization failed on {_HOSTNAME}.
+    description: System Features module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -318,7 +318,7 @@ traps:
     name: PROXIM-MIB::mgmtAccessModuleInitFailure
     category: diagnostic
     severity: crit
-    description: Management Access module initialization failed on {_HOSTNAME}.
+    description: Management Access module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -326,15 +326,15 @@ traps:
     name: PROXIM-MIB::routingModuleInitFailure
     category: diagnostic
     severity: crit
-    description: Routing module initialization failed on {_HOSTNAME}.
+    description: Routing module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
   - oid: 1.3.6.1.4.1.841.1.1.3.6.4.25
     name: PROXIM-MIB::pppoeModuleSessionConnected
     category: state_change
-    severity: warning
-    description: PPPoE session connected on {_HOSTNAME}.
+    severity: notice
+    description: PPPoE session connected on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -342,7 +342,7 @@ traps:
     name: PROXIM-MIB::pppoeModuleSessionDisconnected
     category: state_change
     severity: warning
-    description: PPPoE session disconnected on {_HOSTNAME}.
+    description: 'PPPoE session disconnected{{with value "genericTrap"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - genericTrap
@@ -350,7 +350,7 @@ traps:
     name: PROXIM-MIB::pppoeModuleInitFailure
     category: diagnostic
     severity: crit
-    description: PPPoE module initialization failed on {_HOSTNAME}.
+    description: PPPoE module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -358,23 +358,23 @@ traps:
     name: PROXIM-MIB::autoConfigRecoveryTrap
     category: diagnostic
     severity: crit
-    description: Auto recovery feature triggered with status {genericTrap} on {_HOSTNAME}.
+    description: Auto recovery feature triggered on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
   - oid: 1.3.6.1.4.1.841.1.1.3.6.5.1
     name: PROXIM-MIB::sntpFailure
     category: diagnostic
-    severity: err
-    description: SNTP failed to synchronize time on {_HOSTNAME}.
+    severity: crit
+    description: SNTP failed to synchronize time from server on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
   - oid: 1.3.6.1.4.1.841.1.1.3.6.6.1
     name: PROXIM-MIB::invalidImage
     category: diagnostic
-    severity: err
-    description: Invalid or incompatible image detected on {_HOSTNAME}.
+    severity: crit
+    description: 'Invalid or incompatible image detected{{with value "genericTrap"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - genericTrap
@@ -382,39 +382,39 @@ traps:
     name: PROXIM-MIB::firmwareUpgradedSuccessfully
     category: config_change
     severity: info
-    description: Firmware upgrade completed successfully on {_HOSTNAME}.
+    description: Firmware upgrade completed successfully on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
   - oid: 1.3.6.1.4.1.841.1.1.3.6.7.6
     name: PROXIM-MIB::pppoeIPAddress
     category: state_change
-    severity: warning
-    description: PPPoE interface came up with IP address on {_HOSTNAME}.
+    severity: notice
+    description: PPPoE interface came up on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
   - oid: 1.3.6.1.4.1.841.1.1.3.6.8.1
     name: PROXIM-MIB::tftpFailedOperation
     category: diagnostic
-    severity: err
-    description: TFTP operation failed with {genericTrap} on {_HOSTNAME}.
+    severity: crit
+    description: TFTP operation failed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
   - oid: 1.3.6.1.4.1.841.1.1.3.6.8.2
     name: PROXIM-MIB::tftpOperationInitiated
-    category: config_change
+    category: diagnostic
     severity: info
-    description: TFTP operation initiated on {_HOSTNAME}.
+    description: TFTP operation initiated on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
   - oid: 1.3.6.1.4.1.841.1.1.3.6.8.3
     name: PROXIM-MIB::tftpOperationCompleted
-    category: config_change
+    category: unknown
     severity: info
-    description: TFTP operation completed on {_HOSTNAME}.
+    description: TFTP operation completed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -422,15 +422,15 @@ traps:
     name: PROXIM-MIB::worpStationRegister
     category: mobility
     severity: info
-    description: WORP satellite registered on interface on {_HOSTNAME}.
+    description: WORP satellite registered on an interface on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
   - oid: 1.3.6.1.4.1.841.1.1.3.6.9.2
     name: PROXIM-MIB::worpStationDeregister
-    category: state_change
-    severity: notice
-    description: WORP satellite deRegistered from base interface on {_HOSTNAME}.
+    category: mobility
+    severity: info
+    description: WORP satellite deRegistered from an interface on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -438,7 +438,7 @@ traps:
     name: PROXIM-MIB::worpErrorCountThresholdReached
     category: diagnostic
     severity: warning
-    description: WORP error count reached configurable threshold on {_HOSTNAME}.
+    description: WORP error count threshold reached on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -446,15 +446,15 @@ traps:
     name: PROXIM-MIB::rssiDropThresholdReached
     category: diagnostic
     severity: warning
-    description: RSSI level drop exceeded threshold on {_HOSTNAME}.
+    description: RSSI level drop exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
   - oid: 1.3.6.1.4.1.841.1.1.3.6.9.5
     name: PROXIM-MIB::worpBSURegistrationStatus
     category: state_change
-    severity: notice
-    description: BSU registration status changed on {_HOSTNAME}.
+    severity: info
+    description: BSU registration status changed on {{hostname}}.
     status: current
     varbinds:
       - genericTrap
@@ -462,7 +462,7 @@ traps:
     name: PROXIM-MIB::spectrumAnalyzerStartAndStop
     category: diagnostic
     severity: info
-    description: Spectrum analyzer {genericTrap} status changed on {_HOSTNAME}.
+    description: Spectrum analyzer started or stopped on {{hostname}}.
     status: current
     varbinds:
       - genericTrap

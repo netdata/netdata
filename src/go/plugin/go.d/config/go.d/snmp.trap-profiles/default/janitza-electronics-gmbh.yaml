@@ -9,95 +9,95 @@ traps:
     name: JANITZA-MIB-UMG96::userTrap1
     category: unknown
     severity: notice
-    description: Received unclassified trap {TRAP_NAME} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Jasic Trap userTrap1 received with type 6 and subtype 6 on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.34278.0.7
     name: JANITZA-MIB-UMG96::userTrap2
     category: unknown
     severity: info
-    description: JANITZA-MIB-UMG96 trap {TRAP_NAME} received on {_HOSTNAME}.
+    description: Received unclassified trap userTrap2 on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.34278.0.8
     name: JANITZA-MIB-UMG96::userTrap3
     category: unknown
     severity: info
-    description: Received generic trap {TRAP_NAME} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Jasic Trap userTrap3 received with type 6 and subtype 8 on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.34278.0.9
     name: JANITZA-MIB-UMG96::userTrap4
     category: unknown
-    severity: debug
-    description: Unclassified trap {TRAP_NAME} received on {_HOSTNAME}.
+    severity: notice
+    description: Unclassified trap userTrap4 received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.34278.0.10
     name: JANITZA-MIB-UMG96::userTrap5
     category: unknown
-    severity: notice
-    description: Unclassified trap {TRAP_NAME} received from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    severity: info
+    description: Jasic Trap userTrap5 received with type 6 and subtype 10 on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.34278.0.11
     name: JANITZA-MIB-UMG96::userTrap6
     category: unknown
     severity: info
-    description: Received unclassified trap {TRAP_NAME} on {_HOSTNAME}.
+    description: Jasic Trap userTrap6 received with type 6 and subtype 11 on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.34278.0.12
     name: JANITZA-MIB-UMG96::userTrap7
     category: unknown
-    severity: info
-    description: Received generic trap {TRAP_NAME} with no varbind context on {_HOSTNAME}.
+    severity: notice
+    description: JANITZA MIB trap userTrap7 received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.34278.0.13
     name: JANITZA-MIB-UMG96::userTrap8
     category: unknown
-    severity: debug
-    description: Unclassified trap {TRAP_NAME} received on {_HOSTNAME}.
+    severity: info
+    description: JANITZA MIB trap userTrap8 received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.34278.0.14
     name: JANITZA-MIB-UMG96::userTrap9
     category: unknown
     severity: info
-    description: Trap {TRAP_NAME} received with no varbind context on {_HOSTNAME}.
+    description: Jasic Trap userTrap9 received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.34278.0.15
     name: JANITZA-MIB-UMG96::userTrap10
     category: unknown
     severity: notice
-    description: Trap {TRAP_NAME} received with no varbind context on {_HOSTNAME}.
+    description: Jasic Trap userTrap10 received with type 6 and subtype 15 on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.34278.0.16
     name: JANITZA-MIB-UMG96::userTrap11
     category: unknown
     severity: info
-    description: Received unclassified trap {TRAP_NAME} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: JANITZA MIB trap userTrap11 received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.34278.0.17
     name: JANITZA-MIB-UMG96::userTrap12
     category: unknown
-    severity: info
-    description: Received unclassified trap {TRAP_NAME} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    severity: notice
+    description: Jasic Trap userTrap12 received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.34278.0.18
     name: JANITZA-MIB-UMG96::userTrap13
     category: unknown
     severity: notice
-    description: Received unclassified trap {TRAP_NAME} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Jasic Trap userTrap13 received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.34278.0.19
     name: JANITZA-MIB-UMG96::userTrap14
     category: unknown
     severity: info
-    description: Received unclassified trap {TRAP_NAME} on {_HOSTNAME}.
+    description: JANITZA MIB trap userTrap14 received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.34278.0.20
     name: JANITZA-MIB-UMG96::userTrap15
     category: unknown
     severity: info
-    description: Received unclassified trap {TRAP_NAME} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: JANITZA-MIB-UMG96 trap userTrap15 received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.34278.0.21
     name: JANITZA-MIB-UMG96::userTrap16
     category: unknown
-    severity: info
-    description: Received generic trap {TRAP_NAME} on {_HOSTNAME}.
+    severity: notice
+    description: Jasic Trap userTrap16 received with type 6 and subtype 21 on {{hostname}}.
     status: current

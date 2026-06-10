@@ -56,17 +56,17 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.2427.0.1
     name: NuView-MIB::NuViewTrapStr
-    category: unknown
-    severity: info
-    description: Generic SNMP trap received with custom string {clxTrapDataString01} on {_HOSTNAME}.
+    category: diagnostic
+    severity: notice
+    description: 'NuView generic trap received{{with value "clxTrapDataString01"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - clxTrapDataString01
   - oid: 1.3.6.1.4.1.2427.2.0.1
     name: NuView-MIB::ClusterXTrapStr
     category: diagnostic
-    severity: info
-    description: NuView ClusterX trap received with data {clxTrapDataString01} on {_HOSTNAME}.
+    severity: notice
+    description: NuView ClusterX generic trap received with data {{value "clxTrapDataString01"}} on {{hostname}}.
     status: current
     varbinds:
       - clxTrapDataString01
@@ -74,7 +74,7 @@ traps:
     name: NuView-MIB::ClusterXTrapNodeFail
     category: state_change
     severity: alert
-    description: Cluster node {clxTrapDataNodeName} failed in cluster {clxTrapDataClusterName} on {_HOSTNAME}.
+    description: Cluster node {{value "clxTrapDataNodeName"}} failed in cluster {{value "clxTrapDataClusterName"}} on {{hostname}}.
     status: current
     varbinds:
       - clxTrapDataClusterName
@@ -83,15 +83,15 @@ traps:
     name: NuView-MIB::ClusterXTrapClusterFail
     category: state_change
     severity: alert
-    description: MSCS cluster {clxTrapDataClusterName} detected failure on {_HOSTNAME}.
+    description: MSCS cluster {{value "clxTrapDataClusterName"}} failure detected on {{hostname}}.
     status: current
     varbinds:
       - clxTrapDataClusterName
   - oid: 1.3.6.1.4.1.2427.2.0.4
     name: NuView-MIB::ClusterXTrapResourceFail
-    category: diagnostic
-    severity: err
-    description: ClusterX resource {clxTrapDataResourceName} failed on node {clxTrapDataNodeName} in cluster {clxTrapDataClusterName} on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: Cluster resource {{value "clxTrapDataResourceName"}} failed on node {{value "clxTrapDataNodeName"}} in cluster {{value "clxTrapDataClusterName"}} on {{hostname}}.
     status: current
     varbinds:
       - clxTrapDataClusterName
@@ -101,7 +101,7 @@ traps:
     name: NuView-MIB::ClusterXTrapNodeJoins
     category: state_change
     severity: notice
-    description: Node {clxTrapDataNodeName} joined cluster {clxTrapDataClusterName} on {_HOSTNAME}.
+    description: Cluster node {{value "clxTrapDataNodeName"}} joined cluster {{value "clxTrapDataClusterName"}} on {{hostname}}.
     status: current
     varbinds:
       - clxTrapDataClusterName
@@ -110,7 +110,7 @@ traps:
     name: NuView-MIB::ClusterXTrapNetworkFail
     category: state_change
     severity: crit
-    description: Cluster interconnect failure detected for cluster {clxTrapDataClusterName} on network {clxTrapDataNetworkName} on {_HOSTNAME}.
+    description: Cluster interconnect failure detected for cluster {{value "clxTrapDataClusterName"}} on {{hostname}}.
     status: current
     varbinds:
       - clxTrapDataClusterName
@@ -118,8 +118,8 @@ traps:
   - oid: 1.3.6.1.4.1.2427.2.0.7
     name: NuView-MIB::ClusterXTrapNormalClusterServiceLog
     category: diagnostic
-    severity: notice
-    description: ClusterX service log event {clxTrapEventID} from {clxTrapEventSource} on {_HOSTNAME}.
+    severity: info
+    description: ClusterX service log event {{value "clxTrapEventID"}} detected on {{hostname}}.
     status: current
     varbinds:
       - clxTrapEventDate
@@ -133,7 +133,7 @@ traps:
     name: NuView-MIB::ClusterXTrapWarningClusterServiceLog
     category: diagnostic
     severity: notice
-    description: Cluster service log event {clxTrapEventID} from {clxTrapEventSource} detected on {_HOSTNAME}.
+    description: ClusterX service log event {{value "clxTrapEventID"}} detected on {{hostname}}.
     status: current
     varbinds:
       - clxTrapEventDate
@@ -146,8 +146,8 @@ traps:
   - oid: 1.3.6.1.4.1.2427.2.0.9
     name: NuView-MIB::ClusterXTrapCriticalClusterServiceLog
     category: diagnostic
-    severity: warning
-    description: ClusterX service log event {clxTrapEventID} from {clxTrapEventSource} detected on {_HOSTNAME}.
+    severity: crit
+    description: ClusterX critical cluster service event detected on {{hostname}}.
     status: current
     varbinds:
       - clxTrapEventDate

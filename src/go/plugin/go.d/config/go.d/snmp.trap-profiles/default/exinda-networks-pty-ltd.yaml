@@ -9,137 +9,137 @@ traps:
     name: EXINDA-MIB::cpuUtilHigh
     category: diagnostic
     severity: warning
-    description: CPU utilization exceeded threshold on {_HOSTNAME}.
+    description: CPU utilization has risen too high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.2
     name: EXINDA-MIB::diskUsage
     category: diagnostic
     severity: warning
-    description: Disk space on the system is low on {_HOSTNAME}.
+    description: Disk space on the system is low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.3
     name: EXINDA-MIB::memoryPaging
     category: diagnostic
     severity: warning
-    description: System experiencing excessive memory paging on {_HOSTNAME}.
+    description: System is paging excessively on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.4
     name: EXINDA-MIB::nicCollisions
     category: diagnostic
     severity: warning
-    description: High NIC collision rate detected on {_HOSTNAME}.
+    description: High NIC collision rate detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.5
     name: EXINDA-MIB::nicNegotiation
     category: state_change
     severity: warning
-    description: Auto negotiation has failed on {_HOSTNAME}.
+    description: Auto negotiation has failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.6
     name: EXINDA-MIB::nicDroppedPackets
     category: diagnostic
     severity: warning
-    description: NIC dropped packets detected on {_HOSTNAME}.
+    description: NIC dropped packets detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.7
     name: EXINDA-MIB::nicProblemsRx
     category: diagnostic
     severity: warning
-    description: NIC RX errors detected on {_HOSTNAME}.
+    description: NIC RX errors detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.8
     name: EXINDA-MIB::nicProblemsTx
     category: diagnostic
     severity: warning
-    description: NIC transmission errors detected on {_HOSTNAME}.
+    description: NIC transmission errors detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.9
     name: EXINDA-MIB::bridgeLink
     category: state_change
     severity: crit
-    description: Bridge link has failed on {_HOSTNAME}.
+    description: Bridge link has failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.10
     name: EXINDA-MIB::systemStartup
     category: state_change
     severity: notice
-    description: System startup detected on {_HOSTNAME}.
+    description: System startup detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.11
     name: EXINDA-MIB::cifsSignedConn
     category: security
     severity: notice
-    description: CIFS signed connection event detected on {_HOSTNAME}.
+    description: CIFS signed connection established on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.12
     name: EXINDA-MIB::acceleratedConnLimit
     category: diagnostic
     severity: warning
-    description: Accelerated connection limit reached on {_HOSTNAME}.
+    description: Accelerated connection limit reached on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.13
     name: EXINDA-MIB::slaLatencyAlert
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: SLA latency threshold exceeded on {_HOSTNAME}.
+    description: SLA latency threshold exceeded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.14
     name: EXINDA-MIB::slaLossAlert
     category: diagnostic
     severity: warning
-    description: SLA packet loss threshold exceeded on {_HOSTNAME}.
+    description: SLA packet loss threshold exceeded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.17
     name: EXINDA-MIB::systemPowerLostRedundancy
     category: diagnostic
-    severity: crit
-    description: Power supply redundancy lost on {_HOSTNAME}.
+    severity: alert
+    description: Power supply redundancy lost on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.18
     name: EXINDA-MIB::systemStorageLostRedundancy
-    category: state_change
-    severity: alert
-    description: Storage redundancy lost on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: Storage redundancy lost on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.19
     name: EXINDA-MIB::systemBridgeDirection
     category: diagnostic
     severity: warning
-    description: Bridge direction mismatch detected on {_HOSTNAME}.
+    description: Bridge direction mismatch detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.20
     name: EXINDA-MIB::apsAlert
     category: diagnostic
     severity: warning
-    description: APS threshold exceeded on {_HOSTNAME}.
+    description: APS threshold exceeded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.21
     name: EXINDA-MIB::apmAlert
     category: diagnostic
     severity: warning
-    description: APM threshold exceeded on {_HOSTNAME}.
+    description: APM threshold exceeded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.22
     name: EXINDA-MIB::licenseExpired
     category: license
     severity: alert
-    description: Appliance license expired on {_HOSTNAME}.
+    description: Appliance license expired on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.23
     name: EXINDA-MIB::invalidAppliance
     category: security
     severity: alert
-    description: Invalid appliance detected from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Invalid appliance detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.24
     name: EXINDA-MIB::retryFailure
     category: license
     severity: warning
-    description: Failed to connect to Exinda license server on {_HOSTNAME}.
+    description: Failed to connect to Exinda license server on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21091.5.0.25
     name: EXINDA-MIB::asymmetryDetection
     category: state_change
-    severity: notice
-    description: Asymmetric route detected on {_HOSTNAME}.
+    severity: warning
+    description: Asymmetric route detected on appliance on {{hostname}}.
     status: current

@@ -70,7 +70,7 @@ traps:
     name: EXAGRID-MIB::egTrap
     category: diagnostic
     severity: notice
-    description: Exagrid event {egEventParamsName} ({egEventParamsText}) reported on {_HOSTNAME}.
+    description: Exagrid event {{value "egEventParamsName"}} reported on {{hostname}}.
     status: current
     varbinds:
       - egEventParamsName

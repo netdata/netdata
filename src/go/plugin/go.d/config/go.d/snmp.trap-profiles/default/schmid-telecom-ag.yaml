@@ -139,7 +139,7 @@ traps:
     name: PEGASUS-LEAN-TRAP-MIB::pegasusAlarm
     category: diagnostic
     severity: warning
-    description: Alarm {probableCauseText} severity changed to {perceivedSeverityText} for {senderDescription} on {_HOSTNAME}.
+    description: Alarm severity changed to {{value "perceivedSeverityText"}} for {{value "probableCauseText"}} on {{hostname}}.
     status: current
     varbinds:
       - sender

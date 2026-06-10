@@ -573,7 +573,7 @@ traps:
     name: L-AM3440-A-Private::v3LocalTrap
     category: diagnostic
     severity: warning
-    description: Local alarm triggered with severity {ccAlarmSeverity} on {ccAlarmLink} on {_HOSTNAME}.
+    description: Local alarm {{value "ccAlarmType"}} detected on {{first (value "ccAlarmSlot") (value "ccAlarmPort") (value "ccAlarmLink")}} on {{hostname}}.
     status: current
     varbinds:
       - ccAlarmQueueString
@@ -588,7 +588,7 @@ traps:
     name: L-AM3440-A-Private::v3RemoveTrap
     category: diagnostic
     severity: warning
-    description: Local alarm {ccAlarmType} with severity {ccAlarmSeverity} detected on {_HOSTNAME}.
+    description: Local alarm {{value "ccAlarmType"}} detected on {{first (value "ccAlarmModel") (value "ccAlarmSlot") (value "ccAlarmPort") (value "ccAlarmLink") (value "ccAlarmSubrack")}} on {{hostname}}.
     status: current
     varbinds:
       - ccAlarmQueueString
@@ -603,7 +603,7 @@ traps:
     name: L-AM3440-A-Private::localTrap
     category: diagnostic
     severity: warning
-    description: Local alarm {ccAlarmType} with severity {ccAlarmSeverity} on port {ccAlarmSlot} on {_HOSTNAME}.
+    description: Local alarm {{value "ccAlarmType"}} detected on {{first (value "ccAlarmSlot") (value "ccAlarmPort") (value "ccAlarmLink")}} on {{hostname}}.
     status: current
     varbinds:
       - ccAlarmQueueString
@@ -618,7 +618,7 @@ traps:
     name: L-AM3440-A-Private::remoteTrap
     category: diagnostic
     severity: warning
-    description: Remote alarm triggered with queue string {ccAlarmQueueString} on {_HOSTNAME}.
+    description: 'Remote alarm received{{with value "ccAlarmQueueString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ccAlarmQueueString
@@ -626,7 +626,7 @@ traps:
     name: L-AM3440-A-Private::remove2Trap
     category: diagnostic
     severity: notice
-    description: Alarm removed for {ccAlarmType} on {ccAlarmLink} on {_HOSTNAME}.
+    description: Local alarm removed for {{first (value "ccAlarmType") "alarm"}} on {{hostname}}.
     status: current
     varbinds:
       - ccAlarmQueueString
@@ -639,9 +639,9 @@ traps:
       - ccAlarmSubrack
   - oid: 1.3.6.1.4.1.823.34441.0.9
     name: L-AM3440-A-Private::removeTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Alarm {ccAlarmQueueString} removed on {_HOSTNAME}.
+    description: 'Local alarm removed{{with value "ccAlarmQueueString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ccAlarmQueueString

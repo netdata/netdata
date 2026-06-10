@@ -374,8 +374,8 @@ traps:
   - oid: 1.3.6.1.4.1.13191.0.1
     name: ONEACCESS-EVENTS-MIB::oacEvent
     category: diagnostic
-    severity: warning
-    description: Event {oacEventText} reported on {_HOSTNAME}.
+    severity: notice
+    description: 'Event notification received{{with value "oacEventText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - oacEventText
@@ -383,180 +383,180 @@ traps:
     name: ONEACCESS-NAT-MIB::oacNatNotificationMaximumSessionReached
     category: diagnostic
     severity: warning
-    description: Maximum NAT session limit reached on {_HOSTNAME}.
+    description: NAT maximum session limit reached on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.1.2.2
     name: ONEACCESS-NAT-MIB::oacNatNotificationWarningSessionReachingLimit
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: NAT session count approaching configured limit on {_HOSTNAME}.
+    description: NAT session count is reaching its maximum configured limit on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.2.2.1
     name: ONEACCESS-ACL-MIB::oacAclNotificationMaximumSessionReached
-    category: diagnostic
+    category: security
     severity: warning
-    description: ACL maximum session limit reached on {_HOSTNAME}.
+    description: ACL maximum session limit reached on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.2.2.2
     name: ONEACCESS-ACL-MIB::oacAclNotificationWarningSessionReachingLimit
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: ACL session count is nearing the maximum configured limit on {_HOSTNAME}.
+    description: ACL session count is reaching the configured limit on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.2.2.3
     name: ONEACCESS-ACL-MIB::oacAclNotificationMaximumHalfSessionReached
-    category: diagnostic
+    category: security
     severity: warning
-    description: ACL half-session limit reached on {_HOSTNAME}.
+    description: ACL maximum half-session limit reached on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.2.2.4
     name: ONEACCESS-ACL-MIB::oacAclNotificationWarningHalfSessionReachingLimit
     category: diagnostic
     severity: warning
-    description: ACL half-session limit approaching on {_HOSTNAME}.
+    description: ACL half-session limit is being reached on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.2.2.5
     name: ONEACCESS-ACL-MIB::oacAclNotificationMaximumSessionReachedPerHost
-    category: diagnostic
+    category: security
     severity: warning
-    description: ACL maximum session per host reached with {oacEventText} on {_HOSTNAME}.
+    description: ACL maximum session per host reached on {{hostname}}.
     status: current
     varbinds:
       - oacEventText
       - oacEventSeverityLevel
   - oid: 1.3.6.1.4.1.13191.10.3.1.2.2.6
     name: ONEACCESS-ACL-MIB::oacAclNotificationMaximumHalfSessionReachedPerHost
-    category: diagnostic
+    category: security
     severity: warning
-    description: ACL half-session limit reached for host on {_HOSTNAME}.
+    description: ACL maximum half-session per host reached on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.4.1.1
     name: ONEACCESS-IPSEC-MIB::oacIPSecSAcreated
     category: state_change
     severity: notice
-    description: IPSec security association created on {_HOSTNAME}.
+    description: IPSec security association created on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.4.1.2
     name: ONEACCESS-IPSEC-MIB::oacIPSecSAremoved
     category: state_change
     severity: notice
-    description: IPSec security association removed on {_HOSTNAME}.
+    description: IPSec security association removed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.4.1.3
     name: ONEACCESS-IPSEC-MIB::oacIPSecCmapEnabled
     category: state_change
     severity: notice
-    description: IPSec crypto map enabled on {_HOSTNAME}.
+    description: IPSec crypto map enabled on {{trap_interface}} on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.4.1.4
     name: ONEACCESS-IPSEC-MIB::oacIPSecCmapDisabled
     category: state_change
     severity: warning
-    description: IPSec crypto map disabled on {_HOSTNAME}.
+    description: IPSec crypto map disabled on {{trap_interface}} on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.4.1.5
     name: ONEACCESS-IPSEC-MIB::oacIPSecCpolEnabled
     category: state_change
     severity: notice
-    description: IPSec crypto map policy enabled on {_HOSTNAME}.
+    description: IPSec crypto map policy enabled on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.4.1.6
     name: ONEACCESS-IPSEC-MIB::oacIPSecCpolDisabled
     category: security
-    severity: alert
-    description: IPSec crypto map policy disabled on {_HOSTNAME}.
+    severity: crit
+    description: IPSec crypto map policy disabled on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.4.1.7
     name: ONEACCESS-IPSEC-MIB::oacIPSecHwModuleDown
     category: diagnostic
     severity: crit
-    description: IPSec hardware module is down on {_HOSTNAME}.
+    description: IPSec hardware module is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.4.2.1
     name: ONEACCESS-IPSEC-MIB::oacISAKMPBadProposal
     category: security
     severity: warning
-    description: ISAKMP bad proposal detected from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: ISAKMP bad proposal detected from {{source_ip}} on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.4.2.2
     name: ONEACCESS-IPSEC-MIB::oacISAKMPNoResponse
-    category: diagnostic
+    category: security
     severity: warning
-    description: ISAKMP no response from peer on {_HOSTNAME}.
+    description: ISAKMP no response from remote peer on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.4.2.3
     name: ONEACCESS-IPSEC-MIB::oacISAKMPConnectionEstablished
     category: state_change
     severity: notice
-    description: ISAKMP connection established on {_HOSTNAME}.
+    description: ISAKMP connection established on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.4.2.4
     name: ONEACCESS-IPSEC-MIB::oacISAKMPConnectionRemoved
     category: state_change
     severity: notice
-    description: ISAKMP connection removed on {_HOSTNAME}.
+    description: ISAKMP connection removed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.4.2.5
     name: ONEACCESS-IPSEC-MIB::oacISAMPIPSecConnectionEstablished
     category: state_change
     severity: notice
-    description: ISAKMP IPSec connection established on {_HOSTNAME}.
+    description: ISAKMP IPSec connection established on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.4.2.6
     name: ONEACCESS-IPSEC-MIB::oacISAKMPIPSecConnectionRemoved
     category: state_change
     severity: notice
-    description: ISAKMP IPSec connection removed on {_HOSTNAME}.
+    description: ISAKMP IPSec connection removed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.4.2.7
     name: ONEACCESS-IPSEC-MIB::oacISAKMPUnknownPeer
     category: security
     severity: warning
-    description: ISAKMP unknown peer request received from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: ISAKMP unknown peer request received from {{source_ip}} on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.4.2.8
     name: ONEACCESS-IPSEC-MIB::oacISAKMPNotificationMsgReceived
-    category: security
+    category: state_change
     severity: notice
-    description: ISAKMP notification message received from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: ISAKMP notification message received from known peer on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.4.2.9
     name: ONEACCESS-IPSEC-MIB::oacISAKMPNotificationMsgSent
-    category: security
+    category: diagnostic
     severity: warning
-    description: ISAKMP notification message sent to peer on {_HOSTNAME}.
+    description: ISAKMP notification message sent to peer on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.4.2.10
     name: ONEACCESS-IPSEC-MIB::oacISAKMPDeadPeerDetected
-    category: state_change
+    category: security
     severity: warning
-    description: ISAKMP Dead Peer detection detected on {_HOSTNAME}.
+    description: ISAKMP Dead Peer Detection triggered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.1.5.1.1
     name: ONEACCESS-VRRP-MIB::vrrpTrapNewBackup
     category: state_change
     severity: notice
-    description: VRRP group transitioned to Backup state on {_HOSTNAME}.
+    description: 'VRRP transitioned to Backup state{{with value "oacEventText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - oacEventText
   - oid: 1.3.6.1.4.1.13191.10.3.3.3.2.0.1
     name: ONEACCESS-SHDSL-MIB::oacSHDSLHardDownTrap
     category: state_change
-    severity: warning
-    description: SHDSL line speed dropped below threshold causing interface shutdown on {_HOSTNAME}.
+    severity: crit
+    description: SHDSL line hard down caused interface shutdown on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.4.6.1.3.1
     name: ONEACCESS-CONFIGMGMT-MIB::oacCMRunningConfigSaved
     category: config_change
     severity: notice
-    description: Running configuration saved on {_HOSTNAME}.
+    description: Running configuration saved on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13191.10.3.4.1223.2.0.1
     name: OneAccess-RoundTripTime-MIB::oacRttConnectionChangeNotification
     category: diagnostic
     severity: warning
-    description: RTT connection loss occurred for {oacRttControlTag} at {oacRttHistoryCollectionAddress} on {_HOSTNAME}.
+    description: RTT connection loss occurred for {{value "oacRttControlTag"}} on {{hostname}}.
     status: current
     varbinds:
       - oacRttControlTag
@@ -566,7 +566,7 @@ traps:
     name: OneAccess-RoundTripTime-MIB::oacRttTimeoutNotification
     category: diagnostic
     severity: warning
-    description: RTT control timeout occurred for {oacRttControlTag} at {oacRttHistoryCollectionAddress} on {_HOSTNAME}.
+    description: RTT control timeout occurred for {{value "oacRttControlTag"}} on {{hostname}}.
     status: current
     varbinds:
       - oacRttControlTag
@@ -574,9 +574,9 @@ traps:
       - oacRttControlOperTimeoutOccurred
   - oid: 1.3.6.1.4.1.13191.10.3.4.1223.2.0.3
     name: OneAccess-RoundTripTime-MIB::oacRttThresholdNotification
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: RTT threshold exceeded for {oacRttControlTag} at {oacRttHistoryCollectionAddress} on {_HOSTNAME}.
+    description: RTT threshold exceeded for {{value "oacRttControlTag"}} on {{hostname}}.
     status: current
     varbinds:
       - oacRttControlTag
@@ -586,15 +586,15 @@ traps:
     name: ONEACCESS-UPS-MIB::oacUpsTrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm {oacUpsAlarmDescr} detected on {_HOSTNAME}.
+    description: 'UPS alarm inserted{{with value "oacUpsAlarmDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - oacUpsAlarmDescr
   - oid: 1.3.6.1.4.1.13191.10.3.4.1225.2.1
     name: ONEACCESS-UPS-MIB::oacUpsTrapAlarmEntryRemoved
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS alarm {oacUpsAlarmDescr} removed on {_HOSTNAME}.
+    description: 'UPS alarm removed{{with value "oacUpsAlarmDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - oacUpsAlarmDescr
@@ -602,7 +602,7 @@ traps:
     name: ONEACCESS-PSTN-MIB::dialDown
     category: state_change
     severity: warning
-    description: PSTN link {ifName} is about to enter down state on {_HOSTNAME}.
+    description: PSTN link {{first (value "ifName") "link"}} went down on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -616,7 +616,7 @@ traps:
     name: ONEACCESS-PSTN-MIB::dialUp
     category: state_change
     severity: notice
-    description: Interface {ifName} link transitioned from down to {ifOperStatus} on {_HOSTNAME}.
+    description: Interface {{first (value "ifName") "link"}} went up on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -630,7 +630,7 @@ traps:
     name: ONEACCESS-ISDN-MIB::dialDown
     category: state_change
     severity: warning
-    description: ISDN link {ifName} (index {ifIndex}) is going down on {_HOSTNAME}.
+    description: ISDN link {{first (value "ifName") "interface"}} went down on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -644,7 +644,7 @@ traps:
     name: ONEACCESS-ISDN-MIB::dialUp
     category: state_change
     severity: notice
-    description: ISDN link {ifName} transitioned from down state to {ifOperStatus} on {_HOSTNAME}.
+    description: ISDN link {{first (value "ifName") "interface"}} transitioned from down state on {{hostname}}.
     status: current
     varbinds:
       - ifIndex

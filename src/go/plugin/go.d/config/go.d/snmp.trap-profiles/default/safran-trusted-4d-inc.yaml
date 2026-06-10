@@ -98,15 +98,15 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2TimeSync
     category: state_change
     severity: notice
-    description: Time synchronization state changed to {ssSysStaSyncState} on {_HOSTNAME}.
+    description: Time synchronization state changed to {{value "ssSysStaSyncState"}} on {{hostname}}.
     status: current
     varbinds:
       - ssSysStaSyncState
   - oid: 1.3.6.1.4.1.18837.3.2.3.0.2
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2Holdover
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Unit entered holdover state {ssSysStaHoldoverState} on {_HOSTNAME}.
+    description: Synchronization holdover state changed to {{value "ssSysStaHoldoverState"}} on {{hostname}}.
     status: current
     varbinds:
       - ssSysStaHoldoverState
@@ -114,7 +114,7 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2FrequencyError
     category: diagnostic
     severity: warning
-    description: Frequency error {ssSysStaEstFreqError} exceeds specifications on {_HOSTNAME}.
+    description: Frequency output error exceeds specifications with estimated error {{value "ssSysStaEstFreqError"}} on {{hostname}}.
     status: current
     varbinds:
       - ssSysStaEstFreqError
@@ -122,7 +122,7 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2FrequencyOK
     category: diagnostic
     severity: notice
-    description: Frequency error {ssSysStaEstFreqError} meets specifications on {_HOSTNAME}.
+    description: Frequency output error meets specifications on {{hostname}}.
     status: current
     varbinds:
       - ssSysStaEstFreqError
@@ -130,7 +130,7 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2UserMinorAlarm
     category: diagnostic
     severity: warning
-    description: Minor alarm asserted for GPS reference with {ssGpsRefNumSats} satellites on {_HOSTNAME}.
+    description: Minor alarm asserted for GPS reference with {{value "ssGpsRefNumSats"}} satellites on {{hostname}}.
     status: current
     varbinds:
       - ssGpsRefNumSats
@@ -138,15 +138,15 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2UserMinorClear
     category: diagnostic
     severity: notice
-    description: Minor alarm timeout reset with {ssGpsRefNumSats} satellites on {_HOSTNAME}.
+    description: User-programmable minor alarm timeout has been reset on {{hostname}}.
     status: current
     varbinds:
       - ssGpsRefNumSats
   - oid: 1.3.6.1.4.1.18837.3.2.3.0.7
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2UserMajorAlarm
     category: diagnostic
-    severity: warning
-    description: Major alarm asserted with {ssGpsRefNumSats} satellites on {_HOSTNAME}.
+    severity: alert
+    description: User-programmable major alarm timeout asserted on {{hostname}}.
     status: current
     varbinds:
       - ssGpsRefNumSats
@@ -154,7 +154,7 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2UserMajorClear
     category: diagnostic
     severity: notice
-    description: User-programmable major alarm timeout reset on {_HOSTNAME}.
+    description: User-programmable major alarm timeout has been reset on {{hostname}}.
     status: current
     varbinds:
       - ssGpsRefNumSats
@@ -162,7 +162,7 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2GpsAntenna
     category: diagnostic
     severity: warning
-    description: GPS antenna state changed to {ssGpsRefAntennaState} on {_HOSTNAME}.
+    description: GPS antenna state changed to {{value "ssGpsRefAntennaState"}} on {{hostname}}.
     status: current
     varbinds:
       - ssGpsRefAntennaState
@@ -170,15 +170,15 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2MinorAlarm
     category: diagnostic
     severity: warning
-    description: Minor alarm state changed to {ssSysStaMinorAlarm} on {_HOSTNAME}.
+    description: Minor alarm condition is active on {{hostname}}.
     status: current
     varbinds:
       - ssSysStaMinorAlarm
   - oid: 1.3.6.1.4.1.18837.3.2.3.0.11
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2MajorAlarm
     category: diagnostic
-    severity: crit
-    description: Major alarm state {ssSysStaMajorAlarm} active on {_HOSTNAME}.
+    severity: alert
+    description: System major alarm is active on {{hostname}}.
     status: current
     varbinds:
       - ssSysStaMajorAlarm
@@ -186,7 +186,7 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2RefChange
     category: state_change
     severity: notice
-    description: Time reference changed to {ssSysStaTimeReference} on {_HOSTNAME}.
+    description: Time reference changed to {{value "ssSysStaTimeReference"}} on {{hostname}}.
     status: current
     varbinds:
       - ssSysStaTimeReference
@@ -195,7 +195,7 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV21ppsError
     category: diagnostic
     severity: warning
-    description: 1PPS output error on reference {ssSysSta1PPSReference} on {_HOSTNAME}.
+    description: 1PPS output error exceeds specifications on {{hostname}}.
     status: current
     varbinds:
       - ssSysStaTimeReference
@@ -203,8 +203,8 @@ traps:
   - oid: 1.3.6.1.4.1.18837.3.2.3.0.14
     name: SPECTRACOM-XSYNC-MIB::ssEvtV21ppsOK
     category: diagnostic
-    severity: notice
-    description: 1PPS output error meets specifications for reference {ssSysSta1PPSReference} on {_HOSTNAME}.
+    severity: info
+    description: 1PPS output error meets specifications on {{hostname}}.
     status: current
     varbinds:
       - ssSysStaTimeReference
@@ -213,7 +213,7 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2HwError
     category: diagnostic
     severity: warning
-    description: Timing system hardware impaired with reference {ssSysStaTimeReference} on {_HOSTNAME}.
+    description: Timing system hardware is impaired on {{hostname}}.
     status: current
     varbinds:
       - ssSysStaTimeReference
@@ -222,7 +222,7 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2OscillatorAlarm
     category: diagnostic
     severity: warning
-    description: Oscillator requires maintenance with estimated frequency error {ssSysStaEstFreqError} on {_HOSTNAME}.
+    description: Oscillator requires maintenance, estimated frequency error {{value "ssSysStaEstFreqError"}} on {{hostname}}.
     status: current
     varbinds:
       - ssSysStaEstFreqError
@@ -230,7 +230,7 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2OscillatorOK
     category: diagnostic
     severity: notice
-    description: Oscillator maintenance no longer required with estimated frequency error {ssSysStaEstFreqError} on {_HOSTNAME}.
+    description: Oscillator maintenance no longer required with estimated frequency error {{value "ssSysStaEstFreqError"}} on {{hostname}}.
     status: current
     varbinds:
       - ssSysStaEstFreqError
@@ -238,13 +238,13 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2Reboot
     category: state_change
     severity: notice
-    description: System rebooted on {_HOSTNAME}.
+    description: System rebooted on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18837.3.2.3.0.19
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2MaxTempMinorAlarm
     category: diagnostic
     severity: warning
-    description: CPU temperature {ssSysStaCpuTemp} triggered minor alarm on {_HOSTNAME}.
+    description: Maximum temperature minor alarm asserted (CPU {{value "ssSysStaCpuTemp"}}°C) on {{hostname}}.
     status: current
     varbinds:
       - ssSysStaCpuTemp
@@ -252,7 +252,7 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2MaxTempMinorClear
     category: diagnostic
     severity: notice
-    description: Maximum temperature minor alarm cleared for CPU temperature {ssSysStaCpuTemp} on {_HOSTNAME}.
+    description: Maximum temperature minor alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - ssSysStaCpuTemp
@@ -260,7 +260,7 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2MaxTempMajorAlarm
     category: diagnostic
     severity: crit
-    description: Maximum temperature major alarm asserted with CPU temperature {ssSysStaCpuTemp} on {_HOSTNAME}.
+    description: Maximum temperature major alarm asserted with CPU temperature {{value "ssSysStaCpuTemp"}} on {{hostname}}.
     status: current
     varbinds:
       - ssSysStaCpuTemp
@@ -268,15 +268,15 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2MaxTempMajorClear
     category: diagnostic
     severity: notice
-    description: Maximum temperature major alarm cleared for CPU temperature {ssSysStaCpuTemp} on {_HOSTNAME}.
+    description: Maximum temperature major alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - ssSysStaCpuTemp
   - oid: 1.3.6.1.4.1.18837.3.2.3.0.23
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2BshMajorAlarm
-    category: security
+    category: diagnostic
     severity: crit
-    description: Broadshield major alarm triggered with jamming state {ssSysStaBshJammingState} and spoofing state {ssSysStaBshSpoofingState} on {_HOSTNAME}.
+    description: Broadshield major alarm triggered on {{hostname}}.
     status: current
     varbinds:
       - ssSysStaBshJammingState
@@ -285,7 +285,7 @@ traps:
     name: SPECTRACOM-XSYNC-MIB::ssEvtV2HSHealth
     category: diagnostic
     severity: warning
-    description: Hot swap health changed to {ssHotSwapOverallHealth} on {_HOSTNAME}.
+    description: Hot swap health changed{{with value "ssHotSwapOverallHealth"}} to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ssHotSwapOverallHealth

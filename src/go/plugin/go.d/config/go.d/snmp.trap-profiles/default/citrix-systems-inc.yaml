@@ -293,7 +293,7 @@ traps:
     name: MFAGENT-MIB::trapSessionLogoff
     category: auth
     severity: notice
-    description: User {tvUserLogoff} logged off session {tvSidLogoff} on {_HOSTNAME}.
+    description: User {{value "tvUserLogoff"}} logged off session {{value "tvSidLogoff"}} on {{hostname}}.
     status: current
     varbinds:
       - tvSidLogoff
@@ -302,7 +302,7 @@ traps:
     name: MFAGENT-MIB::trapSessionLogon
     category: auth
     severity: notice
-    description: User {tvUserLogon} with session ID {tvSidLogon} logged on on {_HOSTNAME}.
+    description: User {{value "tvUserLogon"}} logged on with session ID {{value "tvSidLogon"}} on {{hostname}}.
     status: current
     varbinds:
       - tvSidLogon
@@ -311,16 +311,16 @@ traps:
     name: MFAGENT-MIB::trapSessionDisc
     category: state_change
     severity: notice
-    description: Session {tvUserDisc} (ID {tvSidDisc}) disconnected on {_HOSTNAME}.
+    description: Session {{value "tvSidDisc"}} for user {{value "tvUserDisc"}} disconnected on {{hostname}}.
     status: current
     varbinds:
       - tvSidDisc
       - tvUserDisc
   - oid: 1.3.6.1.4.1.3845.3.1.1.0.4
     name: MFAGENT-MIB::trapSessionLimitThreshold
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Session count exceeded threshold {tvSessThreshold} on {_HOSTNAME}.
+    description: Session limit threshold reached with {{value "tvSessThreshold"}} sessions on {{hostname}}.
     status: current
     varbinds:
       - tvSessThreshold
@@ -328,7 +328,7 @@ traps:
     name: MFAGENT-MIB::trapLicLowThreshold
     category: license
     severity: warning
-    description: License {tvLicOut} remaining count {tvLicThreshold} reached low threshold on {_HOSTNAME}.
+    description: Connection license low threshold reached with {{value "tvLicThreshold"}} remaining on {{hostname}}.
     status: current
     varbinds:
       - tvLicThreshold
@@ -336,16 +336,16 @@ traps:
   - oid: 1.3.6.1.4.1.3845.3.1.1.0.6
     name: MFAGENT-MIB::trapLicOut
     category: license
-    severity: warning
-    description: Server farm out of connection licenses for {tvLicOut} on {_HOSTNAME}.
+    severity: alert
+    description: Server farm is out of connection licenses {{value "tvLicOut"}} on {{hostname}}.
     status: current
     varbinds:
       - tvLicOut
   - oid: 1.3.6.1.4.1.3845.3.1.1.0.7
     name: MFAGENT-MIB::trapLicDenied
     category: license
-    severity: warning
-    description: License request denied for license ID {tvLicDenied} on {_HOSTNAME}.
+    severity: alert
+    description: License request denied for {{value "tvLicDenied"}} on {{hostname}}.
     status: current
     varbinds:
       - tvLicDenied
@@ -353,13 +353,13 @@ traps:
     name: MFAGENT-MIB::trapMfAgentUp
     category: state_change
     severity: notice
-    description: MetaFrame SNMP agent started on {_HOSTNAME}.
+    description: MetaFrame SNMP agent started on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3845.3.1.1.0.9
     name: MFAGENT-MIB::trapSessionThresholdNormal
     category: state_change
     severity: notice
-    description: Session threshold exceeded condition resolved at {tvSessThreshold} on {_HOSTNAME}.
+    description: Session threshold condition resolved with {{value "tvSessThreshold"}} sessions on {{hostname}}.
     status: current
     varbinds:
       - tvSessThreshold
@@ -367,7 +367,7 @@ traps:
     name: MFAGENT-MIB::trapLicLowThresholdNormal
     category: license
     severity: notice
-    description: License low threshold condition resolved with {tvLicOut} on {_HOSTNAME}.
+    description: License low threshold condition resolved on {{hostname}}.
     status: current
     varbinds:
       - tvLicThreshold
@@ -376,15 +376,15 @@ traps:
     name: MFAGENT-MIB::trapLicOutNormal
     category: license
     severity: notice
-    description: License {tvLicOut} out-of-license condition resolved on {_HOSTNAME}.
+    description: License {{value "tvLicOut"}} out-of-license condition resolved on {{hostname}}.
     status: current
     varbinds:
       - tvLicOut
   - oid: 1.3.6.1.4.1.3845.30.5.1.1
     name: APPACCELERATION-STATUS-MIB::wsNotifyStart
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Agent started running on {_HOSTNAME}.
+    description: App acceleration agent started running on {{hostname}}.
     status: current
     varbinds:
       - wsActiveAlarmSeverity
@@ -396,7 +396,7 @@ traps:
     name: APPACCELERATION-STATUS-MIB::wsNotifyShutdown
     category: state_change
     severity: notice
-    description: Agent shutdown initiated on {_HOSTNAME}.
+    description: Agent is shutting down on {{hostname}}.
     status: current
     varbinds:
       - wsActiveAlarmSeverity
@@ -406,9 +406,9 @@ traps:
       - wsPrimaryIp
   - oid: 1.3.6.1.4.1.3845.30.5.1.3
     name: APPACCELERATION-STATUS-MIB::wsNotifyRestart
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Agent restart detected on {_HOSTNAME}.
+    description: App Acceleration agent restarted on {{hostname}}.
     status: deprecated
     varbinds:
       - wsActiveAlarmSeverity
@@ -419,7 +419,7 @@ traps:
     name: APPACCELERATION-STATUS-MIB::wsHANotifyNewMaster
     category: state_change
     severity: notice
-    description: Device transitioned to Master state on {_HOSTNAME}.
+    description: High availability transitioned to Master state on {{hostname}}.
     status: current
     varbinds:
       - wsActiveAlarmSeverity
@@ -431,8 +431,8 @@ traps:
   - oid: 1.3.6.1.4.1.3845.30.5.1.5
     name: APPACCELERATION-STATUS-MIB::wsNotifyAvailBWChange
     category: diagnostic
-    severity: warning
-    description: Available bandwidth changed with alarm {wsActiveAlarmDesc} on {_HOSTNAME}.
+    severity: notice
+    description: Available bandwidth changed on {{hostname}}.
     status: deprecated
     varbinds:
       - wsActiveAlarmSeverity
@@ -443,7 +443,7 @@ traps:
     name: APPACCELERATION-STATUS-MIB::wsNotifyUnexpectedRestart
     category: diagnostic
     severity: alert
-    description: Agent unexpectedly restarted on {_HOSTNAME}.
+    description: Agent unexpectedly restarted on {{hostname}}.
     status: current
     varbinds:
       - wsActiveAlarmSeverity
@@ -454,8 +454,8 @@ traps:
   - oid: 1.3.6.1.4.1.3845.30.5.1.7
     name: APPACCELERATION-STATUS-MIB::wsNotifyPersistentError
     category: diagnostic
-    severity: err
-    description: Persistent internal error {wsActiveAlarmDesc} with severity {wsActiveAlarmSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: 'Persistent internal error detected{{with value "wsActiveAlarmDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - wsActiveAlarmSeverity
@@ -467,7 +467,7 @@ traps:
     name: APPACCELERATION-STATUS-MIB::wsNotifyAlert
     category: diagnostic
     severity: warning
-    description: App acceleration alert {wsAlertMsg} with severity {wsActiveAlarmSeverity} on {_HOSTNAME}.
+    description: App acceleration alert {{value "wsAlertMsg"}} on {{hostname}}.
     status: current
     varbinds:
       - wsActiveAlarmSeverity
@@ -482,7 +482,7 @@ traps:
     name: APPACCELERATION-STATUS-MIB::wsNotifyConfigurationChanged
     category: config_change
     severity: notice
-    description: Configuration changed on {_HOSTNAME}.
+    description: Configuration changed on {{hostname}}.
     status: current
     varbinds:
       - wsActiveAlarmSeverity
@@ -494,7 +494,7 @@ traps:
     name: CITRIX-NetScaler-SD-WAN-MIB::sdWANEventNotification
     category: state_change
     severity: warning
-    description: SD-WAN event {sdWANEventID} ({sdWANEventDescription}) on {_HOSTNAME}.
+    description: SD-WAN event {{value "sdWANEventDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - sdWANEventIndex
@@ -510,7 +510,7 @@ traps:
     name: CITRIX-NetScaler-SD-WAN-MIB::sdWANNetworkEventNotification
     category: state_change
     severity: warning
-    description: SD-WAN event {sdWANEventType} on {sdWANEventObjectName} at {sdWANNetworkEventSiteName} on {_HOSTNAME}.
+    description: SD-WAN event {{value "sdWANEventObjectType"}} {{value "sdWANEventObjectName"}} changed state on {{hostname}}.
     status: current
     varbinds:
       - sdWANNetworkEventSiteName

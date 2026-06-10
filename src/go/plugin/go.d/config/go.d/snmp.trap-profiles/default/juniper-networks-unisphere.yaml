@@ -1000,7 +1000,7 @@ traps:
     name: Juniper-System-MIB::juniSystemHighMemUtil
     category: diagnostic
     severity: warning
-    description: System memory utilization {juniSystemMemUtilPct}% exceeded threshold {juniSystemHighMemUtilThreshold}% on {_HOSTNAME}.
+    description: High memory utilization {{value "juniSystemMemUtilPct"}}% reached on {{hostname}}.
     status: current
     varbinds:
       - juniSystemMemCapacity
@@ -1012,7 +1012,7 @@ traps:
     name: Juniper-System-MIB::juniSystemAbatedMemUtil
     category: diagnostic
     severity: warning
-    description: System memory utilization {juniSystemMemUtilPct}% exceeded threshold {juniSystemAbatedMemUtilThreshold}% on {_HOSTNAME}.
+    description: System memory utilization has abated on {{hostname}}.
     status: current
     varbinds:
       - juniSystemMemCapacity
@@ -1024,7 +1024,7 @@ traps:
     name: Juniper-System-MIB::juniSystemModuleOperStatusChange
     category: state_change
     severity: warning
-    description: Module {juniSystemModuleDescr} operational status changed to {juniSystemModuleOperStatus} on {_HOSTNAME}.
+    description: System module {{value "juniSystemModuleDescr"}} operational status changed to {{value "juniSystemModuleOperStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - juniSystemModuleCurrentType
@@ -1036,7 +1036,7 @@ traps:
     name: Juniper-System-MIB::juniSystemPowerStatusChange
     category: diagnostic
     severity: warning
-    description: Power element {entPhysicalDescr} status changed to {juniSystemPowerStatus} on {_HOSTNAME}.
+    description: Power element {{value "entPhysicalDescr"}} status changed to {{value "juniSystemPowerStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - entPhysicalDescr
@@ -1044,8 +1044,8 @@ traps:
   - oid: 1.3.6.1.4.1.4874.2.2.2.0.5
     name: Juniper-System-MIB::juniSystemFanStatusChange
     category: diagnostic
-    severity: warning
-    description: Fan subsystem {entPhysicalDescr} status changed to {juniSystemFanStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Fan subsystem {{value "juniSystemFanStatus"}} on {{first (value "entPhysicalDescr") "fan"}} on {{hostname}}.
     status: current
     varbinds:
       - entPhysicalDescr
@@ -1053,8 +1053,8 @@ traps:
   - oid: 1.3.6.1.4.1.4874.2.2.2.0.6
     name: Juniper-System-MIB::juniSystemTempStatusChange
     category: diagnostic
-    severity: warning
-    description: Temperature status changed to {juniSystemTempStatus} on {_HOSTNAME}.
+    severity: alert
+    description: System temperature status changed to {{value "juniSystemTempStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - juniSystemTempStatus
@@ -1062,7 +1062,7 @@ traps:
     name: Juniper-System-MIB::juniSystemTempProtectionStatusChange
     category: diagnostic
     severity: warning
-    description: Thermal protection status changed to {juniSystemTempProtectionStatus} on {_HOSTNAME}.
+    description: Thermal protection status changed to {{value "juniSystemTempProtectionStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - juniSystemTempProtectionStatus
@@ -1071,13 +1071,13 @@ traps:
     name: Juniper-System-MIB::juniSystemReloadCommand
     category: state_change
     severity: notice
-    description: System reload command initiated on {_HOSTNAME}.
+    description: System reload command received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4874.2.2.2.0.9
     name: Juniper-System-MIB::juniSystemUtilizationThreshold
     category: diagnostic
     severity: warning
-    description: System resource utilization exceeded threshold with current value {juniSystemUtilizationCurrentValue} on {_HOSTNAME}.
+    description: System resource utilization threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - juniSystemUtilizationThresholdDirection
@@ -1090,15 +1090,15 @@ traps:
     name: Juniper-System-MIB::juniSystemIssuStateChange
     category: state_change
     severity: notice
-    description: ISSU upgrade state changed to {juniSystemIssuState} on {_HOSTNAME}.
+    description: ISSU upgrade state changed to {{value "juniSystemIssuState"}} on {{hostname}}.
     status: current
     varbinds:
       - juniSystemIssuState
   - oid: 1.3.6.1.4.1.4874.2.2.7.6.0.1
     name: Juniper-UNI-SONET-MIB::juniSonetPathEvents
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: SONET path event {juniSonetPathEventStatus} on interface {ifAlias} on {_HOSTNAME}.
+    description: SONET path event {{value "juniSonetPathEventStatus"}} on {{first (value "ifAlias") (value "juniSonetPathEventIfIndex")}} on {{hostname}}.
     status: current
     varbinds:
       - juniSonetPathEventIfIndex
@@ -1108,7 +1108,7 @@ traps:
     name: Juniper-UNI-ATM-MIB::juniAtmVpPingTestCompleted
     category: diagnostic
     severity: info
-    description: ATM VP ping test {atmfM4VpTestId} completed with result {atmfM4VpTestResult} on {_HOSTNAME}.
+    description: ATM VP ping test completed on {{hostname}}.
     status: current
     varbinds:
       - atmfM4VpTestId
@@ -1124,8 +1124,8 @@ traps:
   - oid: 1.3.6.1.4.1.4874.2.2.8.3.0.2
     name: Juniper-UNI-ATM-MIB::juniAtmVcPingTestCompleted
     category: diagnostic
-    severity: notice
-    description: ATM VC ping test {atmfM4VcTestId} completed with result {atmfM4VcTestResult} on {_HOSTNAME}.
+    severity: info
+    description: ATM VC ping test {{value "atmfM4VcTestId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - atmfM4VcTestId
@@ -1142,25 +1142,25 @@ traps:
     name: Juniper-IP-MIB::juniIpRouteTableTrapRouteLimitExceeded
     category: diagnostic
     severity: warning
-    description: Route table limit {juniIpRouteTableLimit} exceeded with {ipCidrRouteNumber} routes on {_HOSTNAME}.
+    description: Route table limit exceeded with {{value "ipCidrRouteNumber"}} routes on {{hostname}}.
     status: current
     varbinds:
       - juniIpRouteTableLimit
       - ipCidrRouteNumber
   - oid: 1.3.6.1.4.1.4874.2.2.12.3.0.2
     name: Juniper-IP-MIB::juniIpRouteTableTrapRouteLimitRemove
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Route table limit no longer violated with {ipCidrRouteNumber} routes on {_HOSTNAME}.
+    description: Route table limit violation cleared on {{hostname}}.
     status: current
     varbinds:
       - juniIpRouteTableLimit
       - ipCidrRouteNumber
   - oid: 1.3.6.1.4.1.4874.2.2.12.3.0.3
     name: Juniper-IP-MIB::juniIpRouteTableTrapWarnThresholdExceeded
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: VRF route count {ipCidrRouteNumber} exceeded warning threshold {juniIpRouteTableWarnThreshold} on {_HOSTNAME}.
+    description: IP route table warning threshold exceeded with {{value "ipCidrRouteNumber"}} routes on {{hostname}}.
     status: current
     varbinds:
       - juniIpRouteTableLimit
@@ -1170,7 +1170,7 @@ traps:
     name: Juniper-IP-MIB::juniIpTrapSaValidationFailure
     category: security
     severity: warning
-    description: Source address validation failure from {juniIpIfSaValFailSrcIpAddr} to {juniIpIfSaValFailDestIpAddr} on {_HOSTNAME}.
+    description: Source address validation failure detected on {{trap_interface}} from {{value "juniIpIfSaValFailSrcIpAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1179,8 +1179,8 @@ traps:
   - oid: 1.3.6.1.4.1.4874.2.2.17.0.1
     name: Juniper-ERX-System-MIB::juniERXSysSlotOperStatusChange
     category: state_change
-    severity: notice
-    description: Slot {juniERXSysSlotDescr} operational status changed to {juniERXSysSlotOperStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Slot {{value "juniERXSysSlotDescr"}} operational status changed to {{value "juniERXSysSlotOperStatus"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - juniERXSysSlotCurrentCardType
@@ -1192,25 +1192,25 @@ traps:
       - juniERXSysSlotDescr
   - oid: 1.3.6.1.4.1.4874.2.2.17.0.2
     name: Juniper-ERX-System-MIB::juniERXSysPowerStatusChange
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Power element status changed to {juniERXSysPowerStatus} on {_HOSTNAME}.
+    description: Power element status changed to {{value "juniERXSysPowerStatus"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - juniERXSysPowerStatus
   - oid: 1.3.6.1.4.1.4874.2.2.17.0.3
     name: Juniper-ERX-System-MIB::juniERXSysTempFanStatusChange
     category: diagnostic
-    severity: warning
-    description: Fan subsystem status changed to {juniERXSysTempFanStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Fan subsystem status changed to {{value "juniERXSysTempFanStatus"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - juniERXSysTempFanStatus
   - oid: 1.3.6.1.4.1.4874.2.2.17.0.4
     name: Juniper-ERX-System-MIB::juniERXSysTempStatusChange
     category: diagnostic
-    severity: warning
-    description: System temperature status changed to {juniERXSysTempStatus} on {_HOSTNAME}.
+    severity: alert
+    description: System temperature status changed to {{value "juniERXSysTempStatus"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - juniERXSysTempStatus
@@ -1218,7 +1218,7 @@ traps:
     name: Juniper-ERX-System-MIB::juniERXSysHighMemUtil
     category: diagnostic
     severity: warning
-    description: System memory utilization {juniERXSysMemUtilPct}% exceeded threshold {juniERXSysHighMemUtilThreshold}% on {_HOSTNAME}.
+    description: System memory utilization reached {{value "juniERXSysHighMemUtilThreshold"}}% on {{hostname}}.
     status: deprecated
     varbinds:
       - juniERXSysMemCapacity
@@ -1228,8 +1228,8 @@ traps:
   - oid: 1.3.6.1.4.1.4874.2.2.17.0.6
     name: Juniper-ERX-System-MIB::juniERXSysAbatedMemUtil
     category: diagnostic
-    severity: warning
-    description: System memory utilization {juniERXSysMemUtilPct}% met abated threshold {juniERXSysAbatedMemUtilThreshold}% on {_HOSTNAME}.
+    severity: notice
+    description: System memory utilization has abated below {{value "juniERXSysAbatedMemUtilThreshold"}}% on {{hostname}}.
     status: deprecated
     varbinds:
       - juniERXSysMemCapacity
@@ -1240,31 +1240,31 @@ traps:
     name: Juniper-ERX-System-MIB::juniERXSysTempProtectionStatusChange
     category: diagnostic
     severity: warning
-    description: Thermal protection status changed to {juniERXSysTempProtectionStatus} on {_HOSTNAME}.
+    description: Thermal protection status changed to {{value "juniERXSysTempProtectionStatus"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - juniERXSysTempProtectionStatus
       - juniERXSysTempProtectionHoldOffTimeRemaining
   - oid: 1.3.6.1.4.1.4874.2.2.19.3.0.1
     name: Juniper-RADIUS-CLIENT-MIB::juniRadiusAuthClientServerUnavailable
-    category: diagnostic
+    category: auth
     severity: warning
-    description: RADIUS authentication server {juniRadiusAuthClientUnavailableServer} unavailable, next available server is {juniRadiusAuthClientNextAvailableServer} on {_HOSTNAME}.
+    description: RADIUS authentication server {{value "juniRadiusAuthClientUnavailableServer"}} unavailable, using {{value "juniRadiusAuthClientNextAvailableServer"}} on {{hostname}}.
     status: current
     varbinds:
       - juniRadiusAuthClientUnavailableServer
       - juniRadiusAuthClientNextAvailableServer
   - oid: 1.3.6.1.4.1.4874.2.2.19.3.0.2
     name: Juniper-RADIUS-CLIENT-MIB::juniRadiusAuthClientNoServerAvailable
-    category: diagnostic
-    severity: err
-    description: All RADIUS servers unavailable on {_HOSTNAME}.
+    category: auth
+    severity: crit
+    description: RADIUS authentication failed because no servers were available on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4874.2.2.19.3.0.3
     name: Juniper-RADIUS-CLIENT-MIB::juniRadiusAcctClientServerUnavailable
     category: diagnostic
     severity: warning
-    description: RADIUS accounting server {juniRadiusAcctClientUnavailableServer} unavailable, switching to {juniRadiusAcctClientNextAvailableServer} on {_HOSTNAME}.
+    description: RADIUS accounting server {{value "juniRadiusAcctClientUnavailableServer"}} unavailable, switching to {{value "juniRadiusAcctClientNextAvailableServer"}} on {{hostname}}.
     status: current
     varbinds:
       - juniRadiusAcctClientUnavailableServer
@@ -1273,13 +1273,13 @@ traps:
     name: Juniper-RADIUS-CLIENT-MIB::juniRadiusAcctClientNoServerAvailable
     category: diagnostic
     severity: warning
-    description: RADIUS server pool unavailable with no servers available on {_HOSTNAME}.
+    description: RADIUS client has no available servers on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4874.2.2.19.3.0.5
     name: Juniper-RADIUS-CLIENT-MIB::juniRadiusAuthClientServerAvailable
     category: state_change
     severity: notice
-    description: RADIUS authentication server {juniRadiusAuthClientAvailableServer} became available on {_HOSTNAME}.
+    description: RADIUS authentication server {{value "juniRadiusAuthClientAvailableServer"}} became available on {{hostname}}.
     status: current
     varbinds:
       - juniRadiusAuthClientAvailableServer
@@ -1287,15 +1287,15 @@ traps:
     name: Juniper-RADIUS-CLIENT-MIB::juniRadiusAcctClientServerAvailable
     category: state_change
     severity: notice
-    description: RADIUS accounting server {juniRadiusAcctClientAvailableServer} became available on {_HOSTNAME}.
+    description: RADIUS accounting server {{value "juniRadiusAcctClientAvailableServer"}} became available on {{hostname}}.
     status: current
     varbinds:
       - juniRadiusAcctClientAvailableServer
   - oid: 1.3.6.1.4.1.4874.2.2.21.3.0.1
     name: Juniper-ADDRESS-POOL-MIB::juniAddressPoolHighAddrUtil
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Address pool {juniAddressPoolName} utilization reached high threshold at {juniAddressPoolUtilPct}% on {_HOSTNAME}.
+    description: Address pool {{value "juniAddressPoolName"}} utilization reached high threshold on {{hostname}}.
     status: current
     varbinds:
       - juniRouterName
@@ -1305,9 +1305,9 @@ traps:
       - juniAddressPoolUtilPct
   - oid: 1.3.6.1.4.1.4874.2.2.21.3.0.2
     name: Juniper-ADDRESS-POOL-MIB::juniAddressPoolAbatedAddrUtil
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Address pool {juniAddressPoolName} utilization abated to {juniAddressPoolUtilPct}% on {_HOSTNAME}.
+    description: Address pool {{value "juniAddressPoolName"}} utilization abated on {{hostname}}.
     status: current
     varbinds:
       - juniRouterName
@@ -1317,9 +1317,9 @@ traps:
       - juniAddressPoolUtilPct
   - oid: 1.3.6.1.4.1.4874.2.2.21.3.0.3
     name: Juniper-ADDRESS-POOL-MIB::juniAddressPoolNoAddresses
-    category: diagnostic
-    severity: warning
-    description: Address pool {juniAddressPoolName} exhausted on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: Address pool {{value "juniAddressPoolName"}} has exhausted its supply of addresses on {{hostname}}.
     status: current
     varbinds:
       - juniRouterName
@@ -1327,9 +1327,9 @@ traps:
       - juniAddressPoolSize
   - oid: 1.3.6.1.4.1.4874.2.2.22.1.3.0.1
     name: Juniper-DHCP-MIB::juniDhcpLocalServerPoolHighAddrUtil
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DHCP pool utilization reached high threshold with {juniDhcpLocalServerPoolUtilPct}% usage on {_HOSTNAME}.
+    description: DHCP pool utilization reached high threshold at {{value "juniDhcpLocalServerPoolUtilPct"}}% on {{hostname}}.
     status: current
     varbinds:
       - juniRouterName
@@ -1338,9 +1338,9 @@ traps:
       - juniDhcpLocalServerPoolUtilPct
   - oid: 1.3.6.1.4.1.4874.2.2.22.1.3.0.2
     name: Juniper-DHCP-MIB::juniDhcpLocalServerPoolAbatedAddrUtil
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: DHCP pool utilization dropped to {juniDhcpLocalServerPoolUtilPct}% on {_HOSTNAME}.
+    description: DHCP pool utilization abated to threshold on {{hostname}}.
     status: current
     varbinds:
       - juniRouterName
@@ -1349,9 +1349,9 @@ traps:
       - juniDhcpLocalServerPoolUtilPct
   - oid: 1.3.6.1.4.1.4874.2.2.22.1.3.0.3
     name: Juniper-DHCP-MIB::juniDhcpLocalServerPoolNoAddresses
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DHCP pool exhausted, no addresses available for {juniRouterName} on {_HOSTNAME}.
+    description: DHCP address pool exhausted on {{hostname}}.
     status: current
     varbinds:
       - juniRouterName
@@ -1360,7 +1360,7 @@ traps:
     name: Juniper-DHCP-MIB::juniDhcpLocalServerHealth
     category: diagnostic
     severity: warning
-    description: DHCP local server health event {juniDhcpLocalServerEventString} on {juniRouterName} on {_HOSTNAME}.
+    description: DHCP local server health event {{value "juniDhcpLocalServerEventString"}} on {{hostname}}.
     status: current
     varbinds:
       - juniRouterName
@@ -1368,9 +1368,9 @@ traps:
       - juniDhcpLocalServerEventString
   - oid: 1.3.6.1.4.1.4874.2.2.22.1.3.0.5
     name: Juniper-DHCP-MIB::juniDhcpLocalServerPoolGroupHighAddrUtil
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DHCP pool group utilization reached high threshold at {juniDhcpLocalServerPoolGroupUtilPct}% on {_HOSTNAME}.
+    description: DHCP pool group utilization reached high threshold at {{value "juniDhcpLocalServerPoolGroupUtilPct"}}% on {{hostname}}.
     status: current
     varbinds:
       - juniRouterName
@@ -1379,9 +1379,9 @@ traps:
       - juniDhcpLocalServerPoolGroupUtilPct
   - oid: 1.3.6.1.4.1.4874.2.2.22.1.3.0.6
     name: Juniper-DHCP-MIB::juniDhcpLocalServerPoolGroupAbatedAddrUtil
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: DHCP pool group utilization abated to {juniDhcpLocalServerPoolGroupUtilPct}% on {_HOSTNAME}.
+    description: DHCP pool group utilization abated to threshold on {{hostname}}.
     status: current
     varbinds:
       - juniRouterName
@@ -1392,16 +1392,16 @@ traps:
     name: Juniper-DHCP-MIB::juniDhcpLocalServerPoolGroupNoAddresses
     category: diagnostic
     severity: warning
-    description: DHCP pool group exhausted addresses with size {juniDhcpLocalServerPoolGroupSize} on {_HOSTNAME}.
+    description: DHCP address pool group exhausted on {{hostname}}.
     status: current
     varbinds:
       - juniRouterName
       - juniDhcpLocalServerPoolGroupSize
   - oid: 1.3.6.1.4.1.4874.2.2.22.1.3.0.8
     name: Juniper-DHCP-MIB::juniDhcpLocalServerInterfaceLimitExceeded
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Subinterface {juniDhcpLocalServerSubInterfaceName} exceeded client limit {juniDhcpLocalServerSubInterfaceLimit} on {_HOSTNAME}.
+    description: DHCP client limit exceeded on subinterface {{value "juniDhcpLocalServerSubInterfaceName"}} on {{hostname}}.
     status: current
     varbinds:
       - juniRouterName
@@ -1411,7 +1411,7 @@ traps:
     name: Juniper-DHCP-MIB::juniDhcpLocalServerInterfaceLimitAbated
     category: state_change
     severity: notice
-    description: DHCP client count on subinterface {juniDhcpLocalServerSubInterfaceName} fell below limit {juniDhcpLocalServerSubInterfaceLimit} on {_HOSTNAME}.
+    description: DHCP client count on {{value "juniDhcpLocalServerSubInterfaceName"}} fell below limit {{value "juniDhcpLocalServerSubInterfaceLimit"}} on {{hostname}}.
     status: current
     varbinds:
       - juniRouterName
@@ -1420,8 +1420,8 @@ traps:
   - oid: 1.3.6.1.4.1.4874.2.2.22.1.3.0.10
     name: Juniper-DHCP-MIB::juniDhcpLocalServerDuplicateClient
     category: state_change
-    severity: notice
-    description: DHCP client {juniDhcpLocalServerMacAddress} changed interfaces to {juniDhcpLocalServerInterfaceString} on {_HOSTNAME}.
+    severity: warning
+    description: DHCP client {{value "juniDhcpLocalServerMacAddress"}} detected on interface {{value "juniDhcpLocalServerInterfaceString"}} on {{hostname}}.
     status: current
     varbinds:
       - juniRouterName
@@ -1432,7 +1432,7 @@ traps:
     name: Juniper-FILE-XFER-MIB::juniFileXferTrap
     category: state_change
     severity: notice
-    description: File transfer status changed to {juniFileXferStatus} on {_HOSTNAME}.
+    description: File transfer status changed to {{value "juniFileXferStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - juniFileXferStatus
@@ -1440,8 +1440,8 @@ traps:
   - oid: 1.3.6.1.4.1.4874.2.2.28.0.1
     name: Juniper-LOG-MIB::juniLogMsgThresholdTrap
     category: diagnostic
-    severity: notice
-    description: Log message count reached threshold {juniLogMsgThreshold}% of capacity on {_HOSTNAME}.
+    severity: warning
+    description: Log message table reached {{value "juniLogMsgThreshold"}}% capacity on {{hostname}}.
     status: current
     varbinds:
       - juniLogMsgCapacity
@@ -1451,7 +1451,7 @@ traps:
     name: Juniper-CLI-MIB::juniCliSecurityAlert
     category: security
     severity: warning
-    description: CLI security alert {juniCliSecurityAlertMessage} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: CLI security alert {{value "juniCliSecurityAlertMessage"}} on {{hostname}}.
     status: current
     varbinds:
       - juniCliSecurityAlertPriority
@@ -1461,13 +1461,13 @@ traps:
     name: Juniper-DVMRP-MIB::juniDvmrpRouteHogNotificationTrap
     category: diagnostic
     severity: warning
-    description: DVMRP route hog limit exceeded on {_HOSTNAME}.
+    description: DVMRP route hog limit exceeded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4874.2.2.56.2.0.1
     name: Juniper-System-Clock-MIB::juniNtpFrequencyCalibrationStart
     category: diagnostic
     severity: notice
-    description: NTP frequency calibration started with error {juniNtpSysClockFrequencyError} on {_HOSTNAME}.
+    description: NTP frequency calibration started{{with value "juniNtpSysClockFrequencyError"}} with error {{.}} ppm{{end}} on {{hostname}}.
     status: current
     varbinds:
       - juniNtpSysClockFrequencyError
@@ -1475,7 +1475,7 @@ traps:
     name: Juniper-System-Clock-MIB::juniNtpFrequencyCalibrationEnd
     category: diagnostic
     severity: notice
-    description: NTP frequency synchronization completed with error {juniNtpSysClockFrequencyError} on {_HOSTNAME}.
+    description: NTP frequency calibration completed successfully on {{hostname}}.
     status: current
     varbinds:
       - juniNtpSysClockFrequencyError
@@ -1483,27 +1483,27 @@ traps:
     name: Juniper-System-Clock-MIB::juniNtpTimeSynUp
     category: state_change
     severity: notice
-    description: NTP time synchronization started on {_HOSTNAME}.
+    description: NTP time synchronization started on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4874.2.2.56.2.0.4
     name: Juniper-System-Clock-MIB::juniNtpTimeSynDown
     category: diagnostic
     severity: warning
-    description: NTP time synchronization failed on {_HOSTNAME}.
+    description: NTP time synchronization failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4874.2.2.56.2.0.5
     name: Juniper-System-Clock-MIB::juniNtpTimeServerSynUp
     category: state_change
     severity: notice
-    description: NTP time synchronization started with preferred server {juniNtpPeerCfgIsPreferred} on {_HOSTNAME}.
+    description: NTP time synchronization started with server on {{hostname}}.
     status: current
     varbinds:
       - juniNtpPeerCfgIsPreferred
   - oid: 1.3.6.1.4.1.4874.2.2.56.2.0.6
     name: Juniper-System-Clock-MIB::juniNtpTimeServerSynDown
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: NTP time synchronization lost with server {juniNtpPeerCfgIsPreferred} on {_HOSTNAME}.
+    description: NTP time synchronization lost with configured server on {{hostname}}.
     status: current
     varbinds:
       - juniNtpPeerCfgIsPreferred
@@ -1511,7 +1511,7 @@ traps:
     name: Juniper-System-Clock-MIB::juniNtpFirstSystemClockSet
     category: state_change
     severity: notice
-    description: System clock synchronized with offset error {juniNtpSysClockOffsetError} on {_HOSTNAME}.
+    description: System clock synchronized for the first time with offset {{value "juniNtpSysClockOffsetError"}} on {{hostname}}.
     status: current
     varbinds:
       - juniNtpSysClockOffsetError
@@ -1520,7 +1520,7 @@ traps:
     name: Juniper-System-Clock-MIB::juniNtpClockOffSetLimitCrossed
     category: diagnostic
     severity: warning
-    description: System clock offset error {juniNtpSysClockOffsetError} exceeded limit on {_HOSTNAME}.
+    description: System clock offset error exceeded limit with {{value "juniNtpSysClockOffsetError"}} seconds on {{hostname}}.
     status: current
     varbinds:
       - juniNtpSysClockOffsetError
@@ -1529,7 +1529,7 @@ traps:
     name: Juniper-MROUTER-MIB::juniMRoutePortBwExceded
     category: diagnostic
     severity: warning
-    description: Port bandwidth limit exceeded on interface {juniMRouteIfLocIndex} on {_HOSTNAME}.
+    description: Multicast port bandwidth exceeded on {{first (value "juniMRouteIfLocIndex") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - juniMRouteIfLocIndex
@@ -1537,7 +1537,7 @@ traps:
     name: Juniper-MROUTER-MIB::juniMRoutePortBwReceded
     category: state_change
     severity: warning
-    description: Port {juniMRouteIfLocIndex} admission limit receded below threshold on {_HOSTNAME}.
+    description: Multicast port bandwidth admission limit receded on {{value "juniMRouteIfLocIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - juniMRouteIfLocIndex
@@ -1545,7 +1545,7 @@ traps:
     name: Juniper-MROUTER-MIB::juniMRoutePortPriorityBwExceded
     category: diagnostic
     severity: warning
-    description: Port priority admission limit exceeded on interface {juniMRouteIfLocIndex} on {_HOSTNAME}.
+    description: Port priority admission limit exceeded on interface {{value "juniMRouteIfLocIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - juniMRouteIfLocIndex
@@ -1553,7 +1553,7 @@ traps:
     name: Juniper-MROUTER-MIB::juniMRoutePortPriorityBwReceded
     category: state_change
     severity: warning
-    description: Port priority admission limit receded on interface {juniMRouteIfLocIndex} on {_HOSTNAME}.
+    description: Multicast port priority admission limit receded on interface {{value "juniMRouteIfLocIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - juniMRouteIfLocIndex
@@ -1561,7 +1561,7 @@ traps:
     name: Juniper-REDUNDANCY-MIB::juniRedundancyColdSwitchoverNotification
     category: state_change
     severity: alert
-    description: Control plane switchover occurred on active slot {juniRedundancyActiveSlot} on {_HOSTNAME}.
+    description: Redundancy cold switchover occurred to slot {{value "juniRedundancyActiveSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - juniRedundancyActiveSlot
@@ -1570,7 +1570,7 @@ traps:
     name: Juniper-REDUNDANCY-MIB::juniRedundancyWarmSwitchoverNotification
     category: state_change
     severity: notice
-    description: Control plane switchover to slot {juniRedundancyActiveSlot} completed on {_HOSTNAME}.
+    description: Redundancy switchover occurred to slot {{value "juniRedundancyActiveSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - juniRedundancyActiveSlot
@@ -1579,23 +1579,23 @@ traps:
     name: Juniper-REDUNDANCY-MIB::juniRedundancyStateEnabledNotification
     category: state_change
     severity: notice
-    description: Redundancy state changed to active on slot {juniRedundancyActiveSlot} on {_HOSTNAME}.
+    description: Redundancy state changed to active on slot {{value "juniRedundancyActiveSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - juniRedundancyActiveSlot
   - oid: 1.3.6.1.4.1.4874.2.2.74.0.4
     name: Juniper-REDUNDANCY-MIB::juniRedundancyStateDisabledNotification
     category: state_change
-    severity: notice
-    description: Redundancy state changed to disabled on active slot {juniRedundancyActiveSlot} on {_HOSTNAME}.
+    severity: alert
+    description: Redundancy state disabled on active slot {{value "juniRedundancyActiveSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - juniRedundancyActiveSlot
   - oid: 1.3.6.1.4.1.4874.2.2.74.0.5
     name: Juniper-REDUNDANCY-MIB::juniRedundancyStatePendingNotification
     category: state_change
-    severity: notice
-    description: Redundancy state changed to pending on active slot {juniRedundancyActiveSlot} on {_HOSTNAME}.
+    severity: warning
+    description: Redundancy state entered pending on {{hostname}}.
     status: current
     varbinds:
       - juniRedundancyActiveSlot
@@ -1603,7 +1603,7 @@ traps:
     name: Juniper-REDUNDANCY-MIB::juniRedundancyModeNotification
     category: state_change
     severity: notice
-    description: Redundancy mode changed to {juniRedundancyCfgRedundancyMode} on active slot {juniRedundancyActiveSlot} on {_HOSTNAME}.
+    description: Redundancy mode changed to {{value "juniRedundancyCfgRedundancyMode"}} on {{hostname}}.
     status: current
     varbinds:
       - juniRedundancyActiveSlot
@@ -1612,7 +1612,7 @@ traps:
     name: Juniper-PACKET-MIRROR-MIB::juniPacketMirrorRadiusBasedMirroringFailure
     category: diagnostic
     severity: err
-    description: RADIUS-based packet mirroring failed with error {juniPacketMirrorErrorString} on {_HOSTNAME}.
+    description: 'RADIUS-based packet mirroring failed{{with value "juniPacketMirrorErrorString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - juniPacketMirrorDateAndTime
@@ -1630,7 +1630,7 @@ traps:
     name: Juniper-PACKET-MIRROR-MIB::juniPacketMirrorCliTriggerBasedMirroringFailure
     category: diagnostic
     severity: err
-    description: Packet mirroring failed due to {juniPacketMirrorErrorCause} on {_HOSTNAME}.
+    description: Packet mirroring operation failed on {{hostname}}.
     status: current
     varbinds:
       - juniPacketMirrorDateAndTime
@@ -1647,7 +1647,7 @@ traps:
     name: Juniper-PACKET-MIRROR-MIB::juniPacketMirrorInterfaceDeleted
     category: state_change
     severity: notice
-    description: Packet mirror interface deleted on {_HOSTNAME}.
+    description: Packet mirror interface deleted on {{hostname}}.
     status: current
     varbinds:
       - juniPacketMirrorDateAndTime
@@ -1663,8 +1663,8 @@ traps:
   - oid: 1.3.6.1.4.1.4874.2.2.77.3.0.4
     name: Juniper-PACKET-MIRROR-MIB::juniPacketMirrorAnalyzerUnreachable
     category: diagnostic
-    severity: err
-    description: Packet mirror analyzer {juniPacketMirrorAnalyzerAddress} is unreachable on {_HOSTNAME}.
+    severity: warning
+    description: Packet mirror analyzer {{value "juniPacketMirrorAnalyzerAddress"}} is unreachable on {{hostname}}.
     status: current
     varbinds:
       - juniPacketMirrorDateAndTime
@@ -1674,7 +1674,7 @@ traps:
     name: Juniper-PACKET-MIRROR-MIB::juniPacketMirrorSessionStart
     category: state_change
     severity: notice
-    description: Packet mirroring session {juniPacketMirrorSessionIdentifier} started on {_HOSTNAME}.
+    description: Packet mirroring session started on {{hostname}}.
     status: current
     varbinds:
       - juniPacketMirrorDateAndTime
@@ -1693,7 +1693,7 @@ traps:
     name: Juniper-PACKET-MIRROR-MIB::juniPacketMirrorSessionEnd
     category: state_change
     severity: notice
-    description: Packet mirroring session {juniPacketMirrorSessionIdentifier} ended on {_HOSTNAME}.
+    description: Packet mirroring session ended{{with value "juniPacketMirrorTerminationReason"}} reason {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - juniPacketMirrorDateAndTime
@@ -1713,7 +1713,7 @@ traps:
     name: Juniper-PACKET-MIRROR-MIB::juniPacketMirrorInterfaceSessionActivated
     category: state_change
     severity: notice
-    description: Packet mirroring session {juniPacketMirrorSessionIdentifier} activated on {_HOSTNAME}.
+    description: Packet mirroring session started on {{hostname}}.
     status: current
     varbinds:
       - juniPacketMirrorDateAndTime
@@ -1732,7 +1732,7 @@ traps:
     name: Juniper-PACKET-MIRROR-MIB::juniPacketMirrorInterfaceSessionDeactivated
     category: state_change
     severity: notice
-    description: Packet mirroring session {juniPacketMirrorSessionIdentifier} deactivated on {_HOSTNAME}.
+    description: Packet mirror session ended on {{hostname}}.
     status: current
     varbinds:
       - juniPacketMirrorDateAndTime
@@ -1751,7 +1751,7 @@ traps:
     name: Juniper-PACKET-MIRROR-MIB::juniPacketMirrorSessionReject
     category: security
     severity: warning
-    description: Mirrored session rejected due to unauthorized access on {_HOSTNAME}.
+    description: Packet mirror session rejected due to unauthorized access on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - juniPacketMirrorDateAndTime
@@ -1767,8 +1767,8 @@ traps:
   - oid: 1.3.6.1.4.1.4874.2.2.77.3.0.10
     name: Juniper-PACKET-MIRROR-MIB::juniPacketMirrorSessionFailed
     category: diagnostic
-    severity: err
-    description: Packet mirror session {juniPacketMirrorSessionIdentifier} failed due to {juniPacketMirrorTerminationReason} on {_HOSTNAME}.
+    severity: warning
+    description: Packet mirror session {{value "juniPacketMirrorSessionIdentifier"}} failed on {{hostname}}.
     status: current
     varbinds:
       - juniPacketMirrorDateAndTime
@@ -1787,8 +1787,8 @@ traps:
   - oid: 1.3.6.1.4.1.4874.2.2.81.0.0.1
     name: Juniper-DOS-PROTECTION-PLATFORM-MIB::juniDosProtectionScfdsSuspiciousControlFlow
     category: security
-    severity: warning
-    description: Suspicious control flow detected on interface {juniDosProtectionIfIndex} using protocol {juniDosProtectionProtocol} on {_HOSTNAME}.
+    severity: alert
+    description: Suspicious control flow detected on {{first (value "juniDosProtectionIfIndex") "interface"}} using {{value "juniDosProtectionProtocol"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - juniDosProtectionIfIndex
@@ -1797,7 +1797,7 @@ traps:
     name: Juniper-DOS-PROTECTION-PLATFORM-MIB::juniDosProtectionScfdsNonSuspiciousControlFlow
     category: security
     severity: notice
-    description: Suspicious control flow cleared for {juniDosProtectionProtocol} on interface {juniDosProtectionIfIndex} on {_HOSTNAME}.
+    description: Control flow no longer suspicious on {{first (value "juniDosProtectionIfIndex") "interface"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - juniDosProtectionIfIndex
@@ -1805,8 +1805,8 @@ traps:
   - oid: 1.3.6.1.4.1.4874.2.2.81.0.0.3
     name: Juniper-DOS-PROTECTION-PLATFORM-MIB::juniDosProtectionScfdsSuspiciousControlFlowGroup
     category: security
-    severity: warning
-    description: Suspicious control flow group detected for protocol {juniDosProtectionProtocol} in slot {juniDosProtectionScfdsSlot} on {_HOSTNAME}.
+    severity: alert
+    description: Suspicious control flow group detected on slot {{value "juniDosProtectionScfdsSlot"}} for protocol {{value "juniDosProtectionProtocol"}} on {{hostname}}.
     status: current
     varbinds:
       - juniDosProtectionScfdsSlot
@@ -1814,9 +1814,9 @@ traps:
       - juniDosProtectionProtocol
   - oid: 1.3.6.1.4.1.4874.2.2.81.0.0.4
     name: Juniper-DOS-PROTECTION-PLATFORM-MIB::juniDosProtectionScfdsNonSuspiciousControlFlowGroup
-    category: diagnostic
-    severity: notice
-    description: Control flow group {juniDosProtectionGroupId} on protocol {juniDosProtectionProtocol} in slot {juniDosProtectionScfdsSlot} is no longer suspicious on {_HOSTNAME}.
+    category: security
+    severity: info
+    description: Control flow group {{value "juniDosProtectionGroupId"}} on slot {{value "juniDosProtectionScfdsSlot"}} is no longer suspicious on {{hostname}}.
     status: current
     varbinds:
       - juniDosProtectionScfdsSlot
@@ -1825,8 +1825,8 @@ traps:
   - oid: 1.3.6.1.4.1.4874.2.2.81.0.0.5
     name: Juniper-DOS-PROTECTION-PLATFORM-MIB::juniDosProtectionScfdsTableFull
     category: diagnostic
-    severity: warning
-    description: Suspicious flow control table full on slot {juniDosProtectionScfdsSlot} on {_HOSTNAME}.
+    severity: crit
+    description: Suspicious flow control table is full on slot {{value "juniDosProtectionScfdsSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - juniDosProtectionScfdsSlot
@@ -1834,7 +1834,7 @@ traps:
     name: Juniper-DOS-PROTECTION-PLATFORM-MIB::juniDosProtectionScfdsTableNotFull
     category: diagnostic
     severity: notice
-    description: Suspicious flow control table on slot {juniDosProtectionScfdsSlot} is no longer full on {_HOSTNAME}.
+    description: Suspicious flow control table is no longer full on slot {{value "juniDosProtectionScfdsSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - juniDosProtectionScfdsSlot
@@ -1842,7 +1842,7 @@ traps:
     name: Juniper-DOS-PROTECTION-PLATFORM-MIB::juniDosProtectionScfdsGroupingInUse
     category: diagnostic
     severity: warning
-    description: Suspicious flow control table full, grouping flows on slot {juniDosProtectionScfdsSlot} on {_HOSTNAME}.
+    description: Suspicious flow control grouping triggered on slot {{value "juniDosProtectionScfdsSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - juniDosProtectionScfdsSlot
@@ -1850,7 +1850,7 @@ traps:
     name: Juniper-DOS-PROTECTION-PLATFORM-MIB::juniDosProtectionScfdsSuspiciousProtocol
     category: security
     severity: warning
-    description: Suspicious control protocol {juniDosProtectionProtocol} detected on slot {juniDosProtectionScfdsSlot} on {_HOSTNAME}.
+    description: Suspicious control protocol {{value "juniDosProtectionProtocol"}} detected on slot {{value "juniDosProtectionScfdsSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - juniDosProtectionScfdsSlot
@@ -1859,16 +1859,16 @@ traps:
     name: Juniper-DOS-PROTECTION-PLATFORM-MIB::juniDosProtectionScfdsNonSuspiciousProtocol
     category: diagnostic
     severity: notice
-    description: Control protocol {juniDosProtectionProtocol} on slot {juniDosProtectionScfdsSlot} is no longer suspicious on {_HOSTNAME}.
+    description: Suspicious control flow monitoring cleared for {{value "juniDosProtectionProtocol"}} on slot {{value "juniDosProtectionScfdsSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - juniDosProtectionScfdsSlot
       - juniDosProtectionProtocol
   - oid: 1.3.6.1.4.1.4874.2.2.81.0.0.10
     name: Juniper-DOS-PROTECTION-PLATFORM-MIB::juniDosProtectionScfdsSuspiciousPriority
-    category: security
+    category: diagnostic
     severity: warning
-    description: Suspicious control priority {juniDosProtectionPriority} detected on slot {juniDosProtectionScfdsSlot} on {_HOSTNAME}.
+    description: Suspicious control priority {{value "juniDosProtectionPriority"}} on slot {{value "juniDosProtectionScfdsSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - juniDosProtectionScfdsSlot
@@ -1877,7 +1877,7 @@ traps:
     name: Juniper-DOS-PROTECTION-PLATFORM-MIB::juniDosProtectionScfdsNonSuspiciousPriority
     category: diagnostic
     severity: notice
-    description: Control priority {juniDosProtectionPriority} on slot {juniDosProtectionScfdsSlot} is no longer suspicious on {_HOSTNAME}.
+    description: Control priority {{value "juniDosProtectionPriority"}} on slot {{value "juniDosProtectionScfdsSlot"}} is no longer suspicious on {{hostname}}.
     status: current
     varbinds:
       - juniDosProtectionScfdsSlot
@@ -1885,8 +1885,8 @@ traps:
   - oid: 1.3.6.1.4.1.4874.2.2.81.0.0.12
     name: Juniper-DOS-PROTECTION-PLATFORM-MIB::juniDosProtectionScfdsSuspiciousControlFlowMac
     category: security
-    severity: warning
-    description: Suspicious control flow detected from {juniDosProtectionSrcPhysAddr} on {_HOSTNAME}.
+    severity: alert
+    description: Suspicious control flow detected on {{first (value "juniDosProtectionIfIndex") "interface"}} from {{value "juniDosProtectionSrcPhysAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - juniDosProtectionIfIndex
@@ -1897,7 +1897,7 @@ traps:
     name: Juniper-DOS-PROTECTION-PLATFORM-MIB::juniDosProtectionScfdsNonSuspiciousControlFlowMac
     category: security
     severity: notice
-    description: Control flow from {juniDosProtectionSrcPhysAddr} on {juniDosProtectionProtocol} is no longer suspicious on {_HOSTNAME}.
+    description: Control flow no longer suspicious for {{value "juniDosProtectionProtocol"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - juniDosProtectionIfIndex
@@ -1907,7 +1907,7 @@ traps:
     name: DVMRP-STD-MIB-JUNI::junidDvmrpNeighborLoss
     category: state_change
     severity: warning
-    description: DVMRP neighbor adjacency lost with state {junidDvmrpNeighborState} on interface {junidDvmrpInterfaceLocalAddress} on {_HOSTNAME}.
+    description: DVMRP neighbor adjacency lost on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - junidDvmrpInterfaceLocalAddress
@@ -1916,7 +1916,7 @@ traps:
     name: DVMRP-STD-MIB-JUNI::junidDvmrpNeighborNotPruning
     category: state_change
     severity: notice
-    description: Non-pruning DVMRP neighbor detected on {junidDvmrpInterfaceLocalAddress} on {_HOSTNAME}.
+    description: DVMRP neighbor detected as non-pruning on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - junidDvmrpInterfaceLocalAddress
@@ -1924,26 +1924,26 @@ traps:
   - oid: 1.3.6.1.4.1.4874.3.2.2.1.2.0.1
     name: APS-MIB-JUNI::junidApsEventSwitchover
     category: state_change
-    severity: notice
-    description: APS channel switchover count {junidApsChanStatusSwitchovers} incremented on {_HOSTNAME}.
+    severity: warning
+    description: APS channel switchover occurred {{with value "junidApsChanStatusSwitchovers"}}count {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - junidApsChanStatusSwitchovers
       - junidApsChanStatusCurrent
   - oid: 1.3.6.1.4.1.4874.3.2.2.1.2.0.2
     name: APS-MIB-JUNI::junidApsEventModeMismatch
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: APS mode mismatch detected with count {junidApsStatusModeMismatches} on {_HOSTNAME}.
+    description: APS mode mismatch detected on {{hostname}}.
     status: current
     varbinds:
       - junidApsStatusModeMismatches
       - junidApsStatusCurrent
   - oid: 1.3.6.1.4.1.4874.3.2.2.1.2.0.3
     name: APS-MIB-JUNI::junidApsEventChannelMismatch
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: APS channel mismatch detected with count {junidApsStatusChannelMismatches} on {_HOSTNAME}.
+    description: APS channel mismatch detected with {{value "junidApsStatusChannelMismatches"}} occurrences on {{hostname}}.
     status: current
     varbinds:
       - junidApsStatusChannelMismatches
@@ -1952,7 +1952,7 @@ traps:
     name: APS-MIB-JUNI::junidApsEventPSBF
     category: diagnostic
     severity: warning
-    description: APS byte failure count {junidApsStatusPSBFs} detected with status {junidApsStatusCurrent} on {_HOSTNAME}.
+    description: APS protection switch byte failure detected (count {{value "junidApsStatusPSBFs"}}) on {{hostname}}.
     status: current
     varbinds:
       - junidApsStatusPSBFs
@@ -1961,7 +1961,7 @@ traps:
     name: APS-MIB-JUNI::junidApsEventFEPLF
     category: state_change
     severity: warning
-    description: Far-End Protection-Line Failure count {junidApsStatusFEPLFs} incremented on {_HOSTNAME}.
+    description: Far-End Protection-Line Failure count incremented to {{value "junidApsStatusFEPLFs"}} on {{hostname}}.
     status: current
     varbinds:
       - junidApsStatusFEPLFs

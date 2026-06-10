@@ -31,7 +31,7 @@ traps:
     name: SILVERPEAK-MGMT-MIB::spsNotifyAlarm
     category: diagnostic
     severity: warning
-    description: Active alarm {spsActiveAlarmDescr} with severity {spsActiveAlarmSeverity} from {spsActiveAlarmSource} on {_HOSTNAME}.
+    description: Active alarm {{value "spsActiveAlarmDescr"}} from {{value "spsActiveAlarmSource"}} on {{hostname}}.
     status: current
     varbinds:
       - spsActiveAlarmSource

@@ -9,11 +9,11 @@ traps:
     name: MIKROTIK-MIB::mtxrTrap
     category: unknown
     severity: info
-    description: Generic MikroTik trap received on {_HOSTNAME}.
+    description: MikroTik generic trap received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.14988.1.1.9.0.2
     name: MIKROTIK-MIB::mtxrTemperatureException
     category: diagnostic
-    severity: warning
-    description: CPU temperature exception detected on {_HOSTNAME}.
+    severity: alert
+    description: CPU temperature exception detected on {{hostname}}.
     status: current

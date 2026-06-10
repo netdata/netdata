@@ -81,8 +81,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.1.0.1
     name: NetBotz50-MIB::netBotzTempError
     category: diagnostic
-    severity: err
-    description: Temperature sensor error reported by sensor {netBotzTrapSensorLabel} on {_HOSTNAME}.
+    severity: warning
+    description: Temperature sensor error detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -105,7 +105,7 @@ traps:
     name: NetBotz50-MIB::netBotzTempTooHigh
     category: diagnostic
     severity: warning
-    description: Temperature sensor {netBotzTrapSensorLabel} value {netBotzTrapSensorValueInt} too high on {_HOSTNAME}.
+    description: Temperature sensor value too high on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -128,7 +128,7 @@ traps:
     name: NetBotz50-MIB::netBotzTempTooLow
     category: diagnostic
     severity: warning
-    description: Temperature sensor value too low on {_HOSTNAME}.
+    description: Temperature sensor value too low on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -151,7 +151,7 @@ traps:
     name: NetBotz50-MIB::netBotzTempUnplugged
     category: diagnostic
     severity: warning
-    description: Temperature sensor unplugged on {_HOSTNAME}.
+    description: Temperature sensor unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -174,7 +174,7 @@ traps:
     name: NetBotz50-MIB::netBotzTempErrorRTN
     category: diagnostic
     severity: notice
-    description: Temperature sensor error resolved on {_HOSTNAME}.
+    description: Temperature sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -197,7 +197,7 @@ traps:
     name: NetBotz50-MIB::netBotzTempTooHighRTN
     category: diagnostic
     severity: notice
-    description: Temperature sensor {netBotzTrapSensorLabel} resolved high temperature condition on {_HOSTNAME}.
+    description: Temperature sensor value is no longer too high on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -220,7 +220,7 @@ traps:
     name: NetBotz50-MIB::netBotzTempTooLowRTN
     category: diagnostic
     severity: notice
-    description: Temperature sensor {netBotzTrapSensorLabel} value returned to normal on {_HOSTNAME}.
+    description: Temperature sensor value is no longer too low on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -243,7 +243,7 @@ traps:
     name: NetBotz50-MIB::netBotzTempReplugged
     category: diagnostic
     severity: notice
-    description: Temperature sensor reconnected on {_HOSTNAME}.
+    description: Temperature sensor reconnected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -266,7 +266,7 @@ traps:
     name: NetBotz50-MIB::netBotzHumidityError
     category: diagnostic
     severity: warning
-    description: Humidity sensor error reported on {_HOSTNAME}.
+    description: Humidity sensor error detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -289,7 +289,7 @@ traps:
     name: NetBotz50-MIB::netBotzHumidityTooHigh
     category: diagnostic
     severity: warning
-    description: Humidity sensor value too high on {_HOSTNAME}.
+    description: Humidity sensor value too high on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -312,7 +312,7 @@ traps:
     name: NetBotz50-MIB::netBotzHumidityTooLow
     category: diagnostic
     severity: warning
-    description: Humidity sensor value too low on {_HOSTNAME}.
+    description: Humidity sensor value too low on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -335,7 +335,7 @@ traps:
     name: NetBotz50-MIB::netBotzHumidityUnplugged
     category: diagnostic
     severity: warning
-    description: Humidity sensor unplugged on {_HOSTNAME}.
+    description: Humidity sensor unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -358,7 +358,7 @@ traps:
     name: NetBotz50-MIB::netBotzHumidityErrorRTN
     category: diagnostic
     severity: notice
-    description: Humidity sensor error resolved on {_HOSTNAME}.
+    description: Humidity sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -381,7 +381,7 @@ traps:
     name: NetBotz50-MIB::netBotzHumidityTooHighRTN
     category: diagnostic
     severity: notice
-    description: Humidity sensor {netBotzTrapSensorLabel} value returned to normal on {_HOSTNAME}.
+    description: Humidity sensor value is no longer too high on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -404,7 +404,7 @@ traps:
     name: NetBotz50-MIB::netBotzHumidityTooLowRTN
     category: diagnostic
     severity: notice
-    description: Humidity sensor {netBotzTrapSensorLabel} returned to normal state on {_HOSTNAME}.
+    description: Humidity sensor value is no longer too low on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -427,7 +427,7 @@ traps:
     name: NetBotz50-MIB::netBotzHumidityReplugged
     category: diagnostic
     severity: notice
-    description: Humidity sensor reconnected on {_HOSTNAME}.
+    description: Humidity sensor reconnected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -449,8 +449,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.3.0.1
     name: NetBotz50-MIB::netBotzDewPointError
     category: diagnostic
-    severity: err
-    description: Dew point sensor error detected on {_HOSTNAME}.
+    severity: warning
+    description: DewPoint sensor error detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -473,7 +473,7 @@ traps:
     name: NetBotz50-MIB::netBotzDewPointTooHigh
     category: diagnostic
     severity: warning
-    description: Dew point sensor value {netBotzTrapSensorValue} is too high on {_HOSTNAME}.
+    description: Dew point sensor value too high on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -496,7 +496,7 @@ traps:
     name: NetBotz50-MIB::netBotzDewPointTooLow
     category: diagnostic
     severity: warning
-    description: Dew point sensor value is too low on {_HOSTNAME}.
+    description: Dew point sensor value is too low on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -519,7 +519,7 @@ traps:
     name: NetBotz50-MIB::netBotzDewPointUnplugged
     category: diagnostic
     severity: warning
-    description: DewPoint sensor unplugged on {_HOSTNAME}.
+    description: DewPoint sensor unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -542,7 +542,7 @@ traps:
     name: NetBotz50-MIB::netBotzDewPointErrorRTN
     category: diagnostic
     severity: notice
-    description: Dew point sensor error resolved on {_HOSTNAME}.
+    description: DewPoint sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -565,7 +565,7 @@ traps:
     name: NetBotz50-MIB::netBotzDewPointTooHighRTN
     category: diagnostic
     severity: notice
-    description: Dew point sensor value returned to normal on {_HOSTNAME}.
+    description: Dew point sensor value returned to normal on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -588,7 +588,7 @@ traps:
     name: NetBotz50-MIB::netBotzDewPointTooLowRTN
     category: diagnostic
     severity: notice
-    description: Dew point sensor value returned to normal range on {_HOSTNAME}.
+    description: Dew point sensor value is no longer too low on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -611,7 +611,7 @@ traps:
     name: NetBotz50-MIB::netBotzDewPointReplugged
     category: diagnostic
     severity: notice
-    description: DewPoint sensor reconnected on {_HOSTNAME}.
+    description: DewPoint sensor is no longer unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -633,8 +633,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.4.0.1
     name: NetBotz50-MIB::netBotzAirFlowError
     category: diagnostic
-    severity: err
-    description: AirFlow sensor error detected on {_HOSTNAME}.
+    severity: warning
+    description: AirFlow sensor error detected on {{first (value "netBotzTrapSensorLabel") "sensor"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -657,7 +657,7 @@ traps:
     name: NetBotz50-MIB::netBotzAirFlowTooHigh
     category: diagnostic
     severity: warning
-    description: AirFlow sensor value too high on {_HOSTNAME}.
+    description: Airflow sensor value too high on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -680,7 +680,7 @@ traps:
     name: NetBotz50-MIB::netBotzAirFlowTooLow
     category: diagnostic
     severity: warning
-    description: AirFlow sensor value too low detected on {_HOSTNAME}.
+    description: Air flow sensor value is too low on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -703,7 +703,7 @@ traps:
     name: NetBotz50-MIB::netBotzAirFlowUnplugged
     category: diagnostic
     severity: warning
-    description: AirFlow sensor unplugged on {_HOSTNAME}.
+    description: AirFlow sensor unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -726,7 +726,7 @@ traps:
     name: NetBotz50-MIB::netBotzAirFlowErrorRTN
     category: diagnostic
     severity: notice
-    description: AirFlow sensor error resolved on {_HOSTNAME}.
+    description: AirFlow sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -749,7 +749,7 @@ traps:
     name: NetBotz50-MIB::netBotzAirFlowTooHighRTN
     category: diagnostic
     severity: notice
-    description: AirFlow sensor condition resolved on {_HOSTNAME}.
+    description: Airflow sensor value returned to normal on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -772,7 +772,7 @@ traps:
     name: NetBotz50-MIB::netBotzAirFlowTooLowRTN
     category: diagnostic
     severity: notice
-    description: Air flow sensor {netBotzTrapSensorLabel} value returned to normal on {_HOSTNAME}.
+    description: Airflow sensor value is no longer too low on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -793,9 +793,9 @@ traps:
       - netBotzTrapSensorValueFraction
   - oid: 1.3.6.1.4.1.52674.500.10.1.4.0.106
     name: NetBotz50-MIB::netBotzAirFlowReplugged
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: AirFlow sensor reconnected on {_HOSTNAME}.
+    description: AirFlow sensor reconnected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -817,8 +817,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.5.0.1
     name: NetBotz50-MIB::netBotzAmpDetectError
     category: diagnostic
-    severity: err
-    description: Amp Detect sensor error detected on {_HOSTNAME}.
+    severity: warning
+    description: Amp detect sensor error detected on {{first (value "netBotzTrapSensorLabel") "sensor"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -841,7 +841,7 @@ traps:
     name: NetBotz50-MIB::netBotzAmpDetectTooHigh
     category: diagnostic
     severity: warning
-    description: Amp sensor value too high on {_HOSTNAME}.
+    description: Amp sensor value too high on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -864,7 +864,7 @@ traps:
     name: NetBotz50-MIB::netBotzAmpDetectTooLow
     category: diagnostic
     severity: warning
-    description: Sensor value too low detected on {_HOSTNAME}.
+    description: Amp detect sensor value too low on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -887,7 +887,7 @@ traps:
     name: NetBotz50-MIB::netBotzAmpDetectUnplugged
     category: diagnostic
     severity: warning
-    description: Amp Detect sensor unplugged on {_HOSTNAME}.
+    description: Amp detection sensor unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -910,7 +910,7 @@ traps:
     name: NetBotz50-MIB::netBotzAmpDetectErrorRTN
     category: diagnostic
     severity: notice
-    description: Amp Detect sensor error resolved on {_HOSTNAME}.
+    description: Amp detect sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -933,7 +933,7 @@ traps:
     name: NetBotz50-MIB::netBotzAmpDetectTooHighRTN
     category: diagnostic
     severity: notice
-    description: Amp sensor value returned to normal on {_HOSTNAME}.
+    description: Amp detect sensor value returned to normal on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -956,7 +956,7 @@ traps:
     name: NetBotz50-MIB::netBotzAmpDetectTooLowRTN
     category: diagnostic
     severity: notice
-    description: Amp Detect sensor value returned to normal range on {_HOSTNAME}.
+    description: Amp detect sensor value is no longer too low on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -977,9 +977,9 @@ traps:
       - netBotzTrapSensorValueFraction
   - oid: 1.3.6.1.4.1.52674.500.10.1.5.0.106
     name: NetBotz50-MIB::netBotzAmpDetectReplugged
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Amp Detect sensor {netBotzTrapSensorLabel} is no longer unplugged on {_HOSTNAME}.
+    description: Amp Detect sensor is no longer unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1002,7 +1002,7 @@ traps:
     name: NetBotz50-MIB::netBotzDryContactError
     category: diagnostic
     severity: warning
-    description: Dry contact sensor error detected on {_HOSTNAME}.
+    description: Dry contact sensor error detected on {{first (value "netBotzTrapSensorLabel") "sensor"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1025,7 +1025,7 @@ traps:
     name: NetBotz50-MIB::netBotzDryContactUnplugged
     category: diagnostic
     severity: warning
-    description: Dry contact sensor unplugged on {_HOSTNAME}.
+    description: Dry contact sensor unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1048,7 +1048,7 @@ traps:
     name: NetBotz50-MIB::netBotzDryContactValueError
     category: diagnostic
     severity: warning
-    description: Dry contact sensor value error reported on {_HOSTNAME}.
+    description: Dry contact sensor value error on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1071,7 +1071,7 @@ traps:
     name: NetBotz50-MIB::netBotzDryContactErrorRTN
     category: diagnostic
     severity: notice
-    description: Dry contact sensor error resolved on {_HOSTNAME}.
+    description: Dry contact sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1094,7 +1094,7 @@ traps:
     name: NetBotz50-MIB::netBotzDryContactReplugged
     category: state_change
     severity: notice
-    description: Dry contact sensor reconnected on {_HOSTNAME}.
+    description: Dry contact sensor reconnected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1117,7 +1117,7 @@ traps:
     name: NetBotz50-MIB::netBotzDryContactValueErrorRTN
     category: diagnostic
     severity: notice
-    description: Dry contact sensor value error resolved for {netBotzTrapSensorLabel} on {_HOSTNAME}.
+    description: Dry contact sensor value error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1139,8 +1139,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.7.0.1
     name: NetBotz50-MIB::netBotzCameraMotionSensorError
     category: diagnostic
-    severity: err
-    description: Camera motion sensor error {netBotzTrapErrorTypeLabel} on {_HOSTNAME}.
+    severity: warning
+    description: Camera motion sensor error detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1163,7 +1163,7 @@ traps:
     name: NetBotz50-MIB::netBotzCameraMotionSensorUnplugged
     category: diagnostic
     severity: warning
-    description: Camera motion sensor unplugged on {_HOSTNAME}.
+    description: Camera motion sensor unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1186,7 +1186,7 @@ traps:
     name: NetBotz50-MIB::netBotzCameraMotionSensorValueError
     category: diagnostic
     severity: warning
-    description: Camera motion sensor reported value error on {_HOSTNAME}.
+    description: Camera motion sensor value error on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1209,7 +1209,7 @@ traps:
     name: NetBotz50-MIB::netBotzCameraMotionSensorErrorRTN
     category: diagnostic
     severity: notice
-    description: Camera motion sensor error resolved on {_HOSTNAME}.
+    description: Camera motion sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1232,7 +1232,7 @@ traps:
     name: NetBotz50-MIB::netBotzCameraMotionSensorReplugged
     category: state_change
     severity: notice
-    description: Camera motion sensor reconnected on {_HOSTNAME}.
+    description: Camera motion sensor is no longer unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1255,7 +1255,7 @@ traps:
     name: NetBotz50-MIB::netBotzCameraMotionSensorValueErrorRTN
     category: diagnostic
     severity: notice
-    description: Camera Motion Sensor value error resolved on {_HOSTNAME}.
+    description: Camera motion sensor value error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1277,8 +1277,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.8.0.1
     name: NetBotz50-MIB::netBotzDoorSensorError
     category: diagnostic
-    severity: err
-    description: Door sensor error detected on {_HOSTNAME}.
+    severity: warning
+    description: Door sensor error detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1301,7 +1301,7 @@ traps:
     name: NetBotz50-MIB::netBotzDoorSensorUnplugged
     category: diagnostic
     severity: warning
-    description: Door sensor unplugged detected on {_HOSTNAME}.
+    description: Door sensor unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1324,7 +1324,7 @@ traps:
     name: NetBotz50-MIB::netBotzDoorSensorValueError
     category: diagnostic
     severity: warning
-    description: Door sensor {netBotzTrapSensorLabel} reported value error with ID {netBotzTrapErrorID} on {_HOSTNAME}.
+    description: Door sensor value error detected on {{first (value "netBotzTrapSensorLabel") "sensor"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1345,9 +1345,9 @@ traps:
       - netBotzTrapSensorValueFraction
   - oid: 1.3.6.1.4.1.52674.500.10.1.8.0.101
     name: NetBotz50-MIB::netBotzDoorSensorErrorRTN
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Door sensor error resolved on {_HOSTNAME}.
+    description: Door sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1370,7 +1370,7 @@ traps:
     name: NetBotz50-MIB::netBotzDoorSensorReplugged
     category: state_change
     severity: notice
-    description: Door sensor {netBotzTrapSensorLabel} state changed to plugged on {_HOSTNAME}.
+    description: Door sensor {{value "netBotzTrapSensorLabel"}} is no longer unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1391,9 +1391,9 @@ traps:
       - netBotzTrapSensorValueFraction
   - oid: 1.3.6.1.4.1.52674.500.10.1.8.0.110
     name: NetBotz50-MIB::netBotzDoorSensorValueErrorRTN
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Door sensor error resolved on {_HOSTNAME}.
+    description: Door sensor value error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1416,7 +1416,7 @@ traps:
     name: NetBotz50-MIB::netBotzWirelessStatusSensorError
     category: diagnostic
     severity: err
-    description: Wireless Status Sensor error detected on {_HOSTNAME}.
+    description: Wireless status sensor error {{value "netBotzTrapErrorTypeLabel"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1439,7 +1439,7 @@ traps:
     name: NetBotz50-MIB::netBotzWirelessStatusSensorUnplugged
     category: diagnostic
     severity: warning
-    description: Wireless Status Sensor unplugged on {_HOSTNAME}.
+    description: Wireless status sensor unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1462,7 +1462,7 @@ traps:
     name: NetBotz50-MIB::netBotzWirelessStatusSensorValueError
     category: diagnostic
     severity: warning
-    description: Wireless status sensor value error reported on {_HOSTNAME}.
+    description: Wireless status sensor value error on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1485,7 +1485,7 @@ traps:
     name: NetBotz50-MIB::netBotzWirelessStatusSensorErrorRTN
     category: diagnostic
     severity: notice
-    description: Wireless status sensor error resolved on {_HOSTNAME}.
+    description: Wireless status sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1508,7 +1508,7 @@ traps:
     name: NetBotz50-MIB::netBotzWirelessStatusSensorReplugged
     category: state_change
     severity: notice
-    description: Wireless status sensor reconnected on {_HOSTNAME}.
+    description: Wireless status sensor is no longer unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1531,7 +1531,7 @@ traps:
     name: NetBotz50-MIB::netBotzWirelessStatusSensorValueErrorRTN
     category: diagnostic
     severity: notice
-    description: Wireless status sensor value error resolved on {_HOSTNAME}.
+    description: Wireless status sensor value error resolved for {{value "netBotzTrapSensorLabel"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1553,8 +1553,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.10.0.1
     name: NetBotz50-MIB::netBotzOutputControlSensorError
     category: diagnostic
-    severity: warning
-    description: Output control sensor error detected on {_HOSTNAME}.
+    severity: err
+    description: Output control sensor error detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1577,7 +1577,7 @@ traps:
     name: NetBotz50-MIB::netBotzOutputControlSensorUnplugged
     category: diagnostic
     severity: warning
-    description: Output control sensor unplugged on {_HOSTNAME}.
+    description: Output control sensor unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1599,8 +1599,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.10.0.10
     name: NetBotz50-MIB::netBotzOutputControlSensorValueError
     category: diagnostic
-    severity: err
-    description: Output control sensor value error detected on {_HOSTNAME}.
+    severity: warning
+    description: Output control sensor value error on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1623,7 +1623,7 @@ traps:
     name: NetBotz50-MIB::netBotzOutputControlSensorErrorRTN
     category: diagnostic
     severity: notice
-    description: Output control sensor error resolved on {_HOSTNAME}.
+    description: Output control sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1646,7 +1646,7 @@ traps:
     name: NetBotz50-MIB::netBotzOutputControlSensorReplugged
     category: state_change
     severity: notice
-    description: Output Control Sensor {netBotzTrapSensorLabel} was replugged on {_HOSTNAME}.
+    description: Output Control Sensor is no longer unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1669,7 +1669,7 @@ traps:
     name: NetBotz50-MIB::netBotzOutputControlSensorValueErrorRTN
     category: diagnostic
     severity: notice
-    description: Output control sensor value error resolved on {_HOSTNAME}.
+    description: Output control sensor value error resolved for {{value "netBotzTrapSensorLabel"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1691,8 +1691,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.11.0.1
     name: NetBotz50-MIB::netBotzLoopVoltageError
     category: diagnostic
-    severity: err
-    description: Loop voltage sensor error detected on {_HOSTNAME}.
+    severity: warning
+    description: Loop voltage sensor error detected on {{first (value "netBotzTrapSensorLabel") "sensor"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1715,7 +1715,7 @@ traps:
     name: NetBotz50-MIB::netBotzLoopVoltageTooHigh
     category: diagnostic
     severity: warning
-    description: Loop voltage sensor value {netBotzTrapSensorValue} too high on {_HOSTNAME}.
+    description: Loop voltage sensor value too high on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1738,7 +1738,7 @@ traps:
     name: NetBotz50-MIB::netBotzLoopVoltageTooLow
     category: diagnostic
     severity: warning
-    description: Loop voltage sensor value too low on {_HOSTNAME}.
+    description: Loop voltage sensor value too low on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1761,7 +1761,7 @@ traps:
     name: NetBotz50-MIB::netBotzLoopVoltageUnplugged
     category: diagnostic
     severity: warning
-    description: Loop voltage sensor unplugged on {_HOSTNAME}.
+    description: Loop Voltage sensor unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1784,7 +1784,7 @@ traps:
     name: NetBotz50-MIB::netBotzLoopVoltageErrorRTN
     category: diagnostic
     severity: notice
-    description: Loop Voltage sensor error resolved on {_HOSTNAME}.
+    description: Loop voltage sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1807,7 +1807,7 @@ traps:
     name: NetBotz50-MIB::netBotzLoopVoltageTooHighRTN
     category: diagnostic
     severity: notice
-    description: Loop voltage sensor {netBotzTrapSensorLabel} returned to normal state on {_HOSTNAME}.
+    description: Loop voltage sensor condition resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1830,7 +1830,7 @@ traps:
     name: NetBotz50-MIB::netBotzLoopVoltageTooLowRTN
     category: diagnostic
     severity: notice
-    description: Loop voltage sensor value returned to normal on {_HOSTNAME}.
+    description: Loop voltage sensor condition resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1853,7 +1853,7 @@ traps:
     name: NetBotz50-MIB::netBotzLoopVoltageReplugged
     category: diagnostic
     severity: notice
-    description: Loop Voltage sensor {netBotzTrapSensorLabel} no longer unplugged on {_HOSTNAME}.
+    description: Loop Voltage sensor is no longer unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1875,8 +1875,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.12.0.1
     name: NetBotz50-MIB::netBotzSpotLeakSensorError
     category: diagnostic
-    severity: err
-    description: Spot leak sensor error detected on {_HOSTNAME}.
+    severity: warning
+    description: Spot leak sensor error detected on {{first (value "netBotzTrapSensorLabel") "sensor"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1899,7 +1899,7 @@ traps:
     name: NetBotz50-MIB::netBotzSpotLeakSensorUnplugged
     category: diagnostic
     severity: warning
-    description: Spot leak sensor unplugged on {_HOSTNAME}.
+    description: Spot leak sensor unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1922,7 +1922,7 @@ traps:
     name: NetBotz50-MIB::netBotzSpotLeakSensorValueError
     category: diagnostic
     severity: warning
-    description: Spot leak sensor value error reported on {_HOSTNAME}.
+    description: Spot leak sensor value error on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1945,7 +1945,7 @@ traps:
     name: NetBotz50-MIB::netBotzSpotLeakSensorErrorRTN
     category: diagnostic
     severity: notice
-    description: Spot leak sensor error resolved on {_HOSTNAME}.
+    description: Spot leak sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1966,9 +1966,9 @@ traps:
       - netBotzTrapSensorValueFraction
   - oid: 1.3.6.1.4.1.52674.500.10.1.12.0.106
     name: NetBotz50-MIB::netBotzSpotLeakSensorReplugged
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Spot leak sensor {netBotzTrapSensorLabel} reconnected on {_HOSTNAME}.
+    description: Spot leak sensor is no longer unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -1991,7 +1991,7 @@ traps:
     name: NetBotz50-MIB::netBotzSpotLeakSensorValueErrorRTN
     category: diagnostic
     severity: notice
-    description: Spot leak sensor error resolved on {_HOSTNAME}.
+    description: Spot leak sensor value error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2013,8 +2013,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.13.0.1
     name: NetBotz50-MIB::netBotzRopeLeakSensorError
     category: diagnostic
-    severity: err
-    description: Rope leak sensor error detected on {_HOSTNAME}.
+    severity: warning
+    description: Rope leak sensor error detected on {{first (value "netBotzTrapSensorLabel") "sensor"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2037,7 +2037,7 @@ traps:
     name: NetBotz50-MIB::netBotzRopeLeakSensorUnplugged
     category: diagnostic
     severity: warning
-    description: Rope leak sensor unplugged on {_HOSTNAME}.
+    description: Rope leak sensor unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2059,8 +2059,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.13.0.10
     name: NetBotz50-MIB::netBotzRopeLeakSensorValueError
     category: diagnostic
-    severity: err
-    description: Rope leak sensor value error detected on {_HOSTNAME}.
+    severity: warning
+    description: Rope leak sensor value error detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2083,7 +2083,7 @@ traps:
     name: NetBotz50-MIB::netBotzRopeLeakSensorErrorRTN
     category: diagnostic
     severity: notice
-    description: Rope leak sensor error resolved on {_HOSTNAME}.
+    description: Rope leak sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2106,7 +2106,7 @@ traps:
     name: NetBotz50-MIB::netBotzRopeLeakSensorReplugged
     category: state_change
     severity: notice
-    description: Rope leak sensor reconnected on {_HOSTNAME}.
+    description: Rope leak sensor is no longer unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2129,7 +2129,7 @@ traps:
     name: NetBotz50-MIB::netBotzRopeLeakSensorValueErrorRTN
     category: diagnostic
     severity: notice
-    description: Rope leak sensor error resolved on {_HOSTNAME}.
+    description: Rope leak sensor value error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2152,7 +2152,7 @@ traps:
     name: NetBotz50-MIB::netBotzRSSITooLow
     category: diagnostic
     severity: warning
-    description: RSSI sensor value too low on {_HOSTNAME}.
+    description: RSSI sensor value too low on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2175,7 +2175,7 @@ traps:
     name: NetBotz50-MIB::netBotzRSSISensorValueError
     category: diagnostic
     severity: warning
-    description: RSSI sensor value error detected on {_HOSTNAME}.
+    description: RSSI sensor value error detected on {{first (value "netBotzTrapSensorLabel") "sensor"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2198,7 +2198,7 @@ traps:
     name: NetBotz50-MIB::netBotzRSSITooLowRTN
     category: diagnostic
     severity: notice
-    description: RSSI sensor value returned to normal on {_HOSTNAME}.
+    description: RSSI sensor value is no longer too low on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2221,7 +2221,7 @@ traps:
     name: NetBotz50-MIB::netBotzRSSISensorValueErrorRTN
     category: diagnostic
     severity: notice
-    description: RSSI sensor value error resolved on {_HOSTNAME}.
+    description: RSSI sensor value error resolved for {{value "netBotzTrapSensorLabel"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2243,8 +2243,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.15.0.1
     name: NetBotz50-MIB::netBotzBatterySensorError
     category: diagnostic
-    severity: err
-    description: Battery sensor error detected on {_HOSTNAME}.
+    severity: warning
+    description: Battery sensor error detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2267,7 +2267,7 @@ traps:
     name: NetBotz50-MIB::netBotzBatteryTooLow
     category: diagnostic
     severity: warning
-    description: Battery sensor value too low on {_HOSTNAME}.
+    description: Battery sensor value too low on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2289,8 +2289,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.15.0.10
     name: NetBotz50-MIB::netBotzBatterySensorValueError
     category: diagnostic
-    severity: err
-    description: Battery sensor value error reported on {_HOSTNAME}.
+    severity: warning
+    description: Battery sensor value error detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2313,7 +2313,7 @@ traps:
     name: NetBotz50-MIB::netBotzBatterySensorErrorRTN
     category: diagnostic
     severity: notice
-    description: Battery sensor error resolved on {_HOSTNAME}.
+    description: Battery sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2336,7 +2336,7 @@ traps:
     name: NetBotz50-MIB::netBotzBatteryTooLowRTN
     category: diagnostic
     severity: notice
-    description: Battery sensor value is no longer too low on {_HOSTNAME}.
+    description: Battery sensor value is no longer too low on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2359,7 +2359,7 @@ traps:
     name: NetBotz50-MIB::netBotzBatterySensorValueErrorRTN
     category: diagnostic
     severity: notice
-    description: Battery sensor value error resolved on {_HOSTNAME}.
+    description: Battery sensor value error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2382,7 +2382,7 @@ traps:
     name: NetBotz50-MIB::netBotzOutletSensorError
     category: diagnostic
     severity: warning
-    description: Outlet sensor error reported on {_HOSTNAME}.
+    description: Outlet sensor error detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2405,7 +2405,7 @@ traps:
     name: NetBotz50-MIB::netBotzOutletSensorValueError
     category: diagnostic
     severity: warning
-    description: Outlet sensor value error reported on {_HOSTNAME}.
+    description: Outlet sensor value error detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2428,7 +2428,7 @@ traps:
     name: NetBotz50-MIB::netBotzOutletSensorErrorRTN
     category: diagnostic
     severity: notice
-    description: Outlet sensor error resolved on {_HOSTNAME}.
+    description: Outlet sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2451,7 +2451,7 @@ traps:
     name: NetBotz50-MIB::netBotzOutletSensorValueErrorRTN
     category: diagnostic
     severity: notice
-    description: Outlet sensor value error resolved for {netBotzTrapSensorLabel} on {_HOSTNAME}.
+    description: Outlet sensor value error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2473,8 +2473,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.17.0.1
     name: NetBotz50-MIB::netBotzBeaconError
     category: diagnostic
-    severity: err
-    description: Beacon error reported by sensor {netBotzTrapSensorLabel} on {_HOSTNAME}.
+    severity: warning
+    description: Beacon error detected on {{first (value "netBotzTrapSensorLabel") "sensor"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2497,7 +2497,7 @@ traps:
     name: NetBotz50-MIB::netBotzBeaconUnplugged
     category: diagnostic
     severity: warning
-    description: Beacon unplugged detected on {_HOSTNAME}.
+    description: Beacon unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2520,7 +2520,7 @@ traps:
     name: NetBotz50-MIB::netBotzBeaconValueError
     category: diagnostic
     severity: warning
-    description: Beacon value error detected on sensor {netBotzTrapSensorLabel} with value {netBotzTrapSensorValue} on {_HOSTNAME}.
+    description: Beacon value error detected on {{first (value "netBotzTrapSensorLabel") "sensor"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2543,7 +2543,7 @@ traps:
     name: NetBotz50-MIB::netBotzBeaconErrorRTN
     category: diagnostic
     severity: notice
-    description: Beacon error resolved on {_HOSTNAME}.
+    description: Beacon error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2566,7 +2566,7 @@ traps:
     name: NetBotz50-MIB::netBotzBeaconReplugged
     category: state_change
     severity: notice
-    description: Beacon reconnected on {_HOSTNAME}.
+    description: Beacon was reconnected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2589,7 +2589,7 @@ traps:
     name: NetBotz50-MIB::netBotzBeaconValueErrorRTN
     category: diagnostic
     severity: notice
-    description: Beacon value error resolved for sensor {netBotzTrapSensorLabel} on {_HOSTNAME}.
+    description: Beacon value error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2611,8 +2611,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.18.0.1
     name: NetBotz50-MIB::netBotzSmokeSensorError
     category: diagnostic
-    severity: err
-    description: Smoke sensor error detected with ID {netBotzTrapErrorID} on {_HOSTNAME}.
+    severity: warning
+    description: Smoke sensor error detected on {{first (value "netBotzTrapSensorLabel") "sensor"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2635,7 +2635,7 @@ traps:
     name: NetBotz50-MIB::netBotzSmokeSensorUnplugged
     category: diagnostic
     severity: warning
-    description: Smoke sensor unplugged on {_HOSTNAME}.
+    description: Smoke sensor unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2658,7 +2658,7 @@ traps:
     name: NetBotz50-MIB::netBotzSmokeSensorValueError
     category: diagnostic
     severity: warning
-    description: Smoke sensor value error reported on {_HOSTNAME}.
+    description: Smoke sensor value error detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2681,7 +2681,7 @@ traps:
     name: NetBotz50-MIB::netBotzSmokeSensorErrorRTN
     category: diagnostic
     severity: notice
-    description: Smoke sensor error resolved on {_HOSTNAME}.
+    description: Smoke sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2702,9 +2702,9 @@ traps:
       - netBotzTrapSensorValueFraction
   - oid: 1.3.6.1.4.1.52674.500.10.1.18.0.106
     name: NetBotz50-MIB::netBotzSmokeSensorReplugged
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Smoke sensor replugged on {_HOSTNAME}.
+    description: Smoke sensor replugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2727,7 +2727,7 @@ traps:
     name: NetBotz50-MIB::netBotzSmokeSensorValueErrorRTN
     category: diagnostic
     severity: notice
-    description: Smoke sensor value error resolved on {_HOSTNAME}.
+    description: Smoke sensor value error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2749,8 +2749,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.19.0.1
     name: NetBotz50-MIB::netBotzVibrationSensorError
     category: diagnostic
-    severity: err
-    description: Vibration sensor error detected on {_HOSTNAME}.
+    severity: warning
+    description: Vibration sensor error detected on {{first (value "netBotzTrapSensorLabel") "sensor"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2773,7 +2773,7 @@ traps:
     name: NetBotz50-MIB::netBotzVibrationSensorUnplugged
     category: diagnostic
     severity: warning
-    description: Vibration sensor unplugged on {_HOSTNAME}.
+    description: Vibration sensor unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2796,7 +2796,7 @@ traps:
     name: NetBotz50-MIB::netBotzVibrationSensorValueError
     category: diagnostic
     severity: warning
-    description: Vibration sensor value error detected on {_HOSTNAME}.
+    description: Vibration sensor value error detected on {{first (value "netBotzTrapSensorLabel") "sensor"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2819,7 +2819,7 @@ traps:
     name: NetBotz50-MIB::netBotzVibrationSensorErrorRTN
     category: diagnostic
     severity: notice
-    description: Vibration sensor error resolved on {_HOSTNAME}.
+    description: Vibration sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2842,7 +2842,7 @@ traps:
     name: NetBotz50-MIB::netBotzVibrationSensorReplugged
     category: state_change
     severity: notice
-    description: Vibration sensor replugged on {_HOSTNAME}.
+    description: Vibration sensor replugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2865,7 +2865,7 @@ traps:
     name: NetBotz50-MIB::netBotzVibrationSensorValueErrorRTN
     category: diagnostic
     severity: notice
-    description: Vibration sensor value error resolved on {_HOSTNAME}.
+    description: Vibration sensor value error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2888,7 +2888,7 @@ traps:
     name: NetBotz50-MIB::netBotzDoorSensorForcedEntryError
     category: security
     severity: alert
-    description: Forced entry detected on door sensor {netBotzTrapSensorLabel} on {_HOSTNAME}.
+    description: Forced entry detected on {{first (value "netBotzTrapSensorLabel") "sensor"}} on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2911,7 +2911,7 @@ traps:
     name: NetBotz50-MIB::netBotzRackHandleSensorOpenError
     category: diagnostic
     severity: warning
-    description: Rack handle sensor open error reported on {_HOSTNAME}.
+    description: Rack handle sensor open error detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2934,7 +2934,7 @@ traps:
     name: NetBotz50-MIB::netBotzCardReaderLocalAuthorizationError
     category: security
     severity: warning
-    description: Card reader local authorization failure on {_HOSTNAME}.
+    description: Card reader local authorization failure on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2957,7 +2957,7 @@ traps:
     name: NetBotz50-MIB::netBotzCardReaderLdapAuthorizationError
     category: security
     severity: warning
-    description: Card reader LDAP authorization failure for {netBotzTrapErrorTypeLabel} on {_HOSTNAME}.
+    description: Card reader LDAP authorization failure on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -2980,7 +2980,7 @@ traps:
     name: NetBotz50-MIB::netBotzCardReaderUnplugged
     category: diagnostic
     severity: warning
-    description: Card reader unplugged detected on {_HOSTNAME}.
+    description: Card reader unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3001,9 +3001,9 @@ traps:
       - netBotzTrapSensorValueFraction
   - oid: 1.3.6.1.4.1.52674.500.10.1.20.0.15
     name: NetBotz50-MIB::netBotzCardReaderReplugged
-    category: security
+    category: state_change
     severity: notice
-    description: Card reader replugged with error type {netBotzTrapErrorTypeLabel} on {_HOSTNAME}.
+    description: Card reader replugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3026,7 +3026,7 @@ traps:
     name: NetBotz50-MIB::netBotzCardReaderError
     category: diagnostic
     severity: warning
-    description: Card reader error reported with type {netBotzTrapErrorTypeLabel} on {_HOSTNAME}.
+    description: 'Card reader error detected{{with value "netBotzTrapErrorTypeLabel"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3049,7 +3049,7 @@ traps:
     name: NetBotz50-MIB::netBotzCardReaderErrorRTN
     category: diagnostic
     severity: notice
-    description: Card reader error {netBotzTrapErrorTypeLabel} resolved on {_HOSTNAME}.
+    description: Card reader error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3072,7 +3072,7 @@ traps:
     name: NetBotz50-MIB::netBotzCardReaderValueError
     category: diagnostic
     severity: warning
-    description: Card reader value error detected on {_HOSTNAME}.
+    description: 'Card reader value error detected{{with value "netBotzTrapErrorTypeLabel"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3095,7 +3095,7 @@ traps:
     name: NetBotz50-MIB::netBotzCardReaderValueErrorRTN
     category: diagnostic
     severity: notice
-    description: Card reader value error resolved with label {netBotzTrapErrorTypeLabel} on {_HOSTNAME}.
+    description: Card reader value error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3116,9 +3116,9 @@ traps:
       - netBotzTrapSensorValueFraction
   - oid: 1.3.6.1.4.1.52674.500.10.1.20.0.20
     name: NetBotz50-MIB::netBotzRackHandleSensorUnplugged
-    category: diagnostic
+    category: security
     severity: warning
-    description: Rack handle sensor unplugged with error type {netBotzTrapErrorTypeLabel} on {_HOSTNAME}.
+    description: 'Rack handle sensor unplugged{{with value "netBotzTrapErrorTypeLabel"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3141,7 +3141,7 @@ traps:
     name: NetBotz50-MIB::netBotzRackHandleSensorReplugged
     category: diagnostic
     severity: notice
-    description: Rack handle sensor replugged on {_HOSTNAME}.
+    description: Rack handle sensor replugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3163,8 +3163,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.20.0.22
     name: NetBotz50-MIB::netBotzRackHandleSensorError
     category: diagnostic
-    severity: err
-    description: Rack handle sensor error detected with error type {netBotzTrapErrorTypeLabel} on {_HOSTNAME}.
+    severity: warning
+    description: Rack handle sensor error detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3187,7 +3187,7 @@ traps:
     name: NetBotz50-MIB::netBotzRackHandleSensorErrorRTN
     category: diagnostic
     severity: notice
-    description: Rack handle sensor error resolved for {netBotzTrapSensorLabel} on {_HOSTNAME}.
+    description: Rack handle sensor error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3209,8 +3209,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.1.20.0.24
     name: NetBotz50-MIB::netBotzRackHandleSensorValueError
     category: diagnostic
-    severity: err
-    description: Rack handle sensor value error detected on {_HOSTNAME}.
+    severity: warning
+    description: Rack handle sensor value error on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3233,7 +3233,7 @@ traps:
     name: NetBotz50-MIB::netBotzRackHandleSensorValueErrorRTN
     category: diagnostic
     severity: notice
-    description: Rack handle sensor value error resolved on {_HOSTNAME}.
+    description: Rack handle sensor value error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3256,7 +3256,7 @@ traps:
     name: NetBotz50-MIB::netBotzLockSensorUnplugged
     category: diagnostic
     severity: warning
-    description: Lock sensor unplugged detected on {_HOSTNAME}.
+    description: Lock sensor unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3277,9 +3277,9 @@ traps:
       - netBotzTrapSensorValueFraction
   - oid: 1.3.6.1.4.1.52674.500.10.1.20.0.27
     name: NetBotz50-MIB::netBotzLockSensorReplugged
-    category: state_change
+    category: security
     severity: notice
-    description: Lock sensor replugged on {_HOSTNAME}.
+    description: Lock sensor replugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3302,7 +3302,7 @@ traps:
     name: NetBotz50-MIB::netBotzLockSensorError
     category: diagnostic
     severity: warning
-    description: Lock sensor error detected on {_HOSTNAME}.
+    description: 'Lock sensor error detected{{with value "netBotzTrapErrorTypeLabel"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3323,9 +3323,9 @@ traps:
       - netBotzTrapSensorValueFraction
   - oid: 1.3.6.1.4.1.52674.500.10.1.20.0.29
     name: NetBotz50-MIB::netBotzLockSensorErrorRTN
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Lock sensor error resolved for {netBotzTrapSensorLabel} on {_HOSTNAME}.
+    description: 'Lock sensor error resolved{{with value "netBotzTrapErrorTypeLabel"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3348,7 +3348,7 @@ traps:
     name: NetBotz50-MIB::netBotzLockSensorValueError
     category: diagnostic
     severity: warning
-    description: Lock sensor value error detected on {_HOSTNAME}.
+    description: 'Lock sensor value error detected{{with value "netBotzTrapErrorTypeLabel"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3371,7 +3371,7 @@ traps:
     name: NetBotz50-MIB::netBotzLockSensorValueErrorRTN
     category: diagnostic
     severity: notice
-    description: Lock sensor value error resolved on {_HOSTNAME}.
+    description: Lock sensor value error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3394,7 +3394,7 @@ traps:
     name: NetBotz50-MIB::netBotzDoorSensorForcedEntryErrorRTN
     category: security
     severity: warning
-    description: Door sensor forced entry returned to normal on {_HOSTNAME}.
+    description: 'Door sensor forced entry returned to normal{{with value "netBotzTrapErrorTypeLabel"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3417,7 +3417,7 @@ traps:
     name: NetBotz50-MIB::netBotzRackHandleSensorOpenErrorRTN
     category: diagnostic
     severity: notice
-    description: Rack handle sensor open error returned to normal on {_HOSTNAME}.
+    description: Rack handle sensor open condition resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3440,7 +3440,7 @@ traps:
     name: NetBotz50-MIB::netBotzCardReaderLocalAuthorizationErrorRTN
     category: security
     severity: warning
-    description: Card reader local authorization error {netBotzTrapErrorTypeLabel} on {_HOSTNAME}.
+    description: Card reader local authorization error on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3463,7 +3463,7 @@ traps:
     name: NetBotz50-MIB::netBotzCardReaderLdapAuthorizationErrorRTN
     category: security
     severity: warning
-    description: LDAP authorization error for rack access user {netBotzTrapErrorTypeLabel} on {_HOSTNAME}.
+    description: Card reader LDAP authorization error on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3486,7 +3486,7 @@ traps:
     name: NetBotz50-MIB::netBotzTestNotification
     category: diagnostic
     severity: notice
-    description: Diagnostic test trap received with data {netBotzTrapData} on {_HOSTNAME}.
+    description: 'Diagnostic test notification received{{with value "netBotzTrapData"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - netBotzTrapNotifyTime
@@ -3495,7 +3495,7 @@ traps:
     name: NetBotz50-MIB::netBotzPodUnplugged
     category: diagnostic
     severity: warning
-    description: Pod unplugged detected on {_HOSTNAME}.
+    description: Pod unplugged detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3513,7 +3513,7 @@ traps:
     name: NetBotz50-MIB::netBotzLogonError
     category: auth
     severity: warning
-    description: Multiple failed logon attempts detected on {_HOSTNAME}.
+    description: Multiple failed logon attempts detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3535,8 +3535,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.2.0.13
     name: NetBotz50-MIB::netBotzRmtLinkError
     category: state_change
-    severity: err
-    description: Remote link failure detected with error ID {netBotzTrapErrorID} on {_HOSTNAME}.
+    severity: warning
+    description: Configured remote link has failed on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3559,7 +3559,7 @@ traps:
     name: NetBotz50-MIB::netBotzPodReplugged
     category: state_change
     severity: notice
-    description: Pod re-plugged event resolved on {_HOSTNAME}.
+    description: Pod reconnected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3575,9 +3575,9 @@ traps:
       - netBotzTrapSeverity
   - oid: 1.3.6.1.4.1.52674.500.10.2.0.111
     name: NetBotz50-MIB::netBotzLogonErrorResolved
-    category: auth
+    category: security
     severity: notice
-    description: Failed logon attempts stopped or logon succeeded on {_HOSTNAME}.
+    description: Logon error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3600,7 +3600,7 @@ traps:
     name: NetBotz50-MIB::netBotzRmtLinkErrorResolved
     category: state_change
     severity: notice
-    description: Remote link error resolved for {netBotzTrapSensorLabel} on {_HOSTNAME}.
+    description: Remote link error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3623,7 +3623,7 @@ traps:
     name: NetBotz50-MIB::netBotzSensorPodUnplugged
     category: diagnostic
     severity: warning
-    description: Sensor {netBotzTrapSensorLabel} unplugged on {_HOSTNAME}.
+    description: Sensor pod unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3646,7 +3646,7 @@ traps:
     name: NetBotz50-MIB::netBotzSensorPodReplugged
     category: state_change
     severity: notice
-    description: Sensor pod replugged on {_HOSTNAME}.
+    description: Sensor pod reconnected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3669,7 +3669,7 @@ traps:
     name: NetBotz50-MIB::netBotzCameraUnplugged
     category: diagnostic
     severity: warning
-    description: Camera Pod unplugged detected on {_HOSTNAME}.
+    description: Camera Pod unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3687,7 +3687,7 @@ traps:
     name: NetBotz50-MIB::netBotzCameraReplugged
     category: state_change
     severity: notice
-    description: Camera pod reconnected on {_HOSTNAME}.
+    description: Camera pod reconnected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3704,8 +3704,8 @@ traps:
   - oid: 1.3.6.1.4.1.52674.500.10.2.3.0.1
     name: NetBotz50-MIB::netBotzFourToTwentymAPodError
     category: diagnostic
-    severity: err
-    description: 4-20mA Pod error detected on {_HOSTNAME}.
+    severity: warning
+    description: 4-20mA pod error detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3728,7 +3728,7 @@ traps:
     name: NetBotz50-MIB::netBotzFourToTwentymAPodTooHigh
     category: diagnostic
     severity: warning
-    description: 4-20mA sensor {netBotzTrapSensorLabel} value {netBotzTrapSensorValue} too high on {_HOSTNAME}.
+    description: 4-20mA sensor value too high on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3751,7 +3751,7 @@ traps:
     name: NetBotz50-MIB::netBotzFourToTwentymAPodUnplugged
     category: diagnostic
     severity: warning
-    description: 4-20mA sensor {netBotzTrapSensorLabel} unplugged on {_HOSTNAME}.
+    description: 4-20mA sensor pod unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3774,7 +3774,7 @@ traps:
     name: NetBotz50-MIB::netBotzFourToTwentymAPodTooLow
     category: diagnostic
     severity: warning
-    description: 4-20mA sensor value {netBotzTrapSensorValue} reported too low on {_HOSTNAME}.
+    description: 4-20mA sensor value too low on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3797,7 +3797,7 @@ traps:
     name: NetBotz50-MIB::netBotzFourToTwentymAPodErrorRTN
     category: diagnostic
     severity: notice
-    description: 4-20mA Pod error resolved on {_HOSTNAME}.
+    description: 4-20mA Pod error resolved on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3820,7 +3820,7 @@ traps:
     name: NetBotz50-MIB::netBotzFourToTwentymAPodTooHighRTN
     category: diagnostic
     severity: notice
-    description: 4-20mA pod sensor value returned to normal range on {_HOSTNAME}.
+    description: 4-20mA pod sensor value returned to normal range on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3841,9 +3841,9 @@ traps:
       - netBotzTrapSensorValueFraction
   - oid: 1.3.6.1.4.1.52674.500.10.2.3.0.107
     name: NetBotz50-MIB::netBotzFourToTwentymAPodReplugged
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: 4-20mA pod {netBotzTrapSensorLabel} replugged on {_HOSTNAME}.
+    description: 4-20mA pod reconnected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3866,7 +3866,7 @@ traps:
     name: NetBotz50-MIB::netBotzFourToTwentymAPodTooLowRTN
     category: diagnostic
     severity: notice
-    description: 4-20mA sensor value recovered from too low state on {_HOSTNAME}.
+    description: 4-20mA pod value is no longer too low on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3889,7 +3889,7 @@ traps:
     name: NetBotz50-MIB::netBotzRpduUnplugged
     category: diagnostic
     severity: warning
-    description: RPDU unplugged detected on {_HOSTNAME}.
+    description: RPDU unplugged detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3907,7 +3907,7 @@ traps:
     name: NetBotz50-MIB::netBotzRpduReplugged
     category: state_change
     severity: notice
-    description: RPDU port {netBotzTrapPortLabel} is no longer unplugged on {_HOSTNAME}.
+    description: RPDU port {{value "netBotzTrapPortLabel"}} plugged in on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3925,7 +3925,7 @@ traps:
     name: NetBotz50-MIB::netBotzUpsUnplugged
     category: diagnostic
     severity: warning
-    description: UPS unplugged event detected on {_HOSTNAME}.
+    description: UPS unplugged on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3943,7 +3943,7 @@ traps:
     name: NetBotz50-MIB::netBotzUpsReplugged
     category: state_change
     severity: notice
-    description: UPS reconnected and is no longer unplugged on {_HOSTNAME}.
+    description: UPS reconnected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID
@@ -3961,7 +3961,7 @@ traps:
     name: NetBotz50-MIB::netBotzGenericNotification
     category: diagnostic
     severity: warning
-    description: Generic trap {netBotzTrapErrorTypeLabel} with severity {netBotzTrapSeverity} on {_HOSTNAME}.
+    description: Generic NetBotz error {{value "netBotzTrapErrorTypeLabel"}} detected on {{hostname}}.
     status: current
     varbinds:
       - netBotzTrapErrorID

@@ -42,7 +42,7 @@ traps:
     name: VUTLAN-SYSTEM-MIB::ctlUnitTrapNotification
     category: diagnostic
     severity: warning
-    description: Sensor {macroSensorName} state {macroSensorState} triggered logic {macroLogicName} on {_HOSTNAME}.
+    description: Logic scheme {{value "macroLogicName"}} triggered by sensor {{value "macroSensorName"}} on {{hostname}}.
     status: current
     varbinds:
       - macroLogicDefinition

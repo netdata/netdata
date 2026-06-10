@@ -305,7 +305,7 @@ traps:
     name: FE-FIREEYE-MIB::fireeyeAlert
     category: security
     severity: alert
-    description: Execution anomaly detected with attack type {eventAttackType} and signature {eventSignatureName} on {_HOSTNAME}.
+    description: 'Execution anomaly detected{{with value "eventAttackType"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eventIndex
@@ -352,7 +352,7 @@ traps:
     name: FE-FIREEYE-MIB::executionAnomaly
     category: security
     severity: alert
-    description: Execution anomaly detected with attack type {eventAttackType} from {eventSrcIp} on {_HOSTNAME}.
+    description: 'Execution anomaly detected{{with value "eventAttackType"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eventIndex
@@ -381,7 +381,7 @@ traps:
     name: FE-FIREEYE-MIB::networkAnomaly
     category: security
     severity: alert
-    description: Network anomaly detected with event type {eventType} on {_HOSTNAME}.
+    description: Network anomaly detected{{with value "eventType"}} type {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventIndex
@@ -410,7 +410,7 @@ traps:
     name: FE-FIREEYE-MIB::signatureMatch
     category: security
     severity: alert
-    description: Signature match detected by {eventSignatureName} from {eventSrcIp} on {_HOSTNAME}.
+    description: 'Signature match detected{{with value "eventSignatureName"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eventIndex
@@ -437,7 +437,7 @@ traps:
     name: FE-FIREEYE-MIB::ccConnect
     category: security
     severity: alert
-    description: CC connect detected from {eventSrcIp} on {_HOSTNAME}.
+    description: CC connect detected from {{value "eventSrcIp"}} on {{hostname}}.
     status: current
     varbinds:
       - eventIndex
@@ -461,7 +461,7 @@ traps:
     name: FE-FIREEYE-MIB::ccSigmatch
     category: security
     severity: alert
-    description: Signature match detected for event {eventId} from {eventSrcIp} on {_HOSTNAME}.
+    description: CC sigmatch detected from {{value "eventSrcIp"}} on {{hostname}}.
     status: current
     varbinds:
       - eventIndex
@@ -484,8 +484,8 @@ traps:
   - oid: 1.3.6.1.4.1.25597.3.0.11
     name: FE-FIREEYE-MIB::osChange
     category: security
-    severity: warning
-    description: OS change anomaly detected with event ID {eventId} on {_HOSTNAME}.
+    severity: alert
+    description: OS change anomaly detected on {{hostname}}.
     status: current
     varbinds:
       - eventIndex
@@ -509,8 +509,8 @@ traps:
   - oid: 1.3.6.1.4.1.25597.3.0.12
     name: FE-FIREEYE-MIB::ipsAlert
     category: security
-    severity: alert
-    description: IPS anomaly detected with signature {ipsSignatureName} and severity {ipsSeverity} from {eventSrcAddr} on {_HOSTNAME}.
+    severity: warning
+    description: IPS anomaly detected by {{value "alertSensorHost"}} on {{hostname}}.
     status: current
     varbinds:
       - eventIndex
@@ -541,7 +541,7 @@ traps:
     name: FE-FIREEYE-MIB::feExcessiveTemperature
     category: diagnostic
     severity: warning
-    description: Excessive temperature detected with status {feTemperatureIsHealthy} on {_HOSTNAME}.
+    description: Excessive temperature detected on {{hostname}}.
     status: current
     varbinds:
       - feTemperatureIsHealthy
@@ -549,7 +549,7 @@ traps:
     name: FE-FIREEYE-MIB::feNormalTemperature
     category: diagnostic
     severity: notice
-    description: Temperature status is {feTemperatureIsHealthy} on {_HOSTNAME}.
+    description: Temperature is normal on {{hostname}}.
     status: current
     varbinds:
       - feTemperatureIsHealthy
@@ -557,7 +557,7 @@ traps:
     name: FE-FIREEYE-MIB::feIfLinkChange
     category: state_change
     severity: notice
-    description: Interface {feIfLinkChangeIfname} link state changed from {feIfLinkChangeOldLinkUp} to {feIfLinkChangeNewLinkUp} on {_HOSTNAME}.
+    description: Interface {{first (value "feIfLinkChangeIfname") "link"}} speed changed on {{hostname}}.
     status: current
     varbinds:
       - feIfLinkChangeIfname
@@ -574,8 +574,8 @@ traps:
   - oid: 1.3.6.1.4.1.25597.11.2.0.1
     name: FE-FIREEYE-MIB::feRaidFailure
     category: diagnostic
-    severity: err
-    description: RAID error detected with health status {feRaidIsHealthy} on {_HOSTNAME}.
+    severity: crit
+    description: RAID error has occurred on {{hostname}}.
     status: current
     varbinds:
       - feRaidIsHealthy
@@ -583,15 +583,15 @@ traps:
     name: FE-FIREEYE-MIB::feRaidRecover
     category: diagnostic
     severity: notice
-    description: RAID has recovered with health status {feRaidIsHealthy} on {_HOSTNAME}.
+    description: RAID has recovered on {{hostname}}.
     status: current
     varbinds:
       - feRaidIsHealthy
   - oid: 1.3.6.1.4.1.25597.11.2.0.3
     name: FE-FIREEYE-MIB::fePhysicalDiskFailure
     category: diagnostic
-    severity: err
-    description: Physical disk failure detected with health status {fePhysicalDiskIsHealthy} on {_HOSTNAME}.
+    severity: crit
+    description: Physical disk failure detected on {{hostname}}.
     status: current
     varbinds:
       - fePhysicalDiskIsHealthy
@@ -599,15 +599,15 @@ traps:
     name: FE-FIREEYE-MIB::fePhysicalDiskRecover
     category: diagnostic
     severity: notice
-    description: Physical disk recovered to healthy state on {_HOSTNAME}.
+    description: Physical disk recovered to healthy state on {{hostname}}.
     status: current
     varbinds:
       - fePhysicalDiskIsHealthy
   - oid: 1.3.6.1.4.1.25597.11.3.0.1
     name: FE-FIREEYE-MIB::fePowerSupplyFailure
     category: diagnostic
-    severity: err
-    description: Power supply reported {fePowerSupplyOverallIsHealthy} on {_HOSTNAME}.
+    severity: crit
+    description: Power supply failure detected on {{hostname}}.
     status: current
     varbinds:
       - fePowerSupplyOverallIsHealthy
@@ -615,15 +615,15 @@ traps:
     name: FE-FIREEYE-MIB::fePowerSupplyRecover
     category: diagnostic
     severity: notice
-    description: Power supply recovered and is healthy on {_HOSTNAME}.
+    description: Power supply has recovered on {{hostname}}.
     status: current
     varbinds:
       - fePowerSupplyOverallIsHealthy
   - oid: 1.3.6.1.4.1.25597.11.4.0.1
     name: FE-FIREEYE-MIB::feFanFailure
     category: diagnostic
-    severity: err
-    description: Fan failure detected with health status {feFanOverallIsHealthy} on {_HOSTNAME}.
+    severity: alert
+    description: Fan failure detected on {{hostname}}.
     status: current
     varbinds:
       - feFanOverallIsHealthy
@@ -631,7 +631,7 @@ traps:
     name: FE-FIREEYE-MIB::feFanRecover
     category: diagnostic
     severity: notice
-    description: Fan recovered with status {feFanOverallIsHealthy} on {_HOSTNAME}.
+    description: Fan has recovered on {{hostname}}.
     status: current
     varbinds:
       - feFanOverallIsHealthy
@@ -639,7 +639,7 @@ traps:
     name: FE-FIREEYE-MIB::feLicenseStateChanged
     category: license
     severity: notice
-    description: License state for {feLicenseFeatureName} changed from {feLicenseOldActiveState} to {feLicenseNewActiveState} on {_HOSTNAME}.
+    description: License state changed for {{value "feLicenseFeatureName"}} on {{hostname}}.
     status: current
     varbinds:
       - feLicenseFeatureName
@@ -648,26 +648,26 @@ traps:
   - oid: 1.3.6.1.4.1.25597.11.5.0.2
     name: FE-FIREEYE-MIB::feSecurityUpdateFailed
     category: diagnostic
-    severity: err
-    description: Security update has failed on {_HOSTNAME}.
+    severity: warning
+    description: Security update has failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.25597.12.0.1
     name: FE-FIREEYE-MIB::feCMSHAUnexpectedFailover
     category: state_change
     severity: alert
-    description: Unexpected CMS-HA failover detected on {_HOSTNAME}.
+    description: Unexpected CMS-HA failover occurred on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.25597.12.0.2
     name: FE-FIREEYE-MIB::feCMSHAManualFailover
     category: state_change
     severity: notice
-    description: Manual fail-over on CMS-HA occurred on {_HOSTNAME}.
+    description: Manual CMS-HA failover occurred on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.25597.13.0.1
     name: FE-FIREEYE-MIB::feDeferredQueueThreshold
     category: diagnostic
     severity: warning
-    description: Deferred email count {feDeferredEmailCount} exceeded threshold on {_HOSTNAME}.
+    description: Deferred queue email count {{value "feDeferredEmailCount"}} exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - feDeferredEmailCount
@@ -675,49 +675,49 @@ traps:
     name: FE-FIREEYE-MIB::feBypassCountThreshold
     category: diagnostic
     severity: warning
-    description: Bypass count exceeded threshold on {_HOSTNAME}.
+    description: FireEye bypass count exceeded threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.25597.13.0.3
     name: FE-FIREEYE-MIB::feSmtpInterfaceRefuseConnection
     category: diagnostic
     severity: warning
-    description: SMTP interface refused connections due to congestion on {_HOSTNAME}.
+    description: SMTP interface set to refuse connections due to congestion on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.25597.13.0.4
     name: FE-FIREEYE-MIB::feSmtpInterfaceRecover
     category: state_change
     severity: notice
-    description: SMTP interface re-enabled after recover on {_HOSTNAME}.
+    description: SMTP interface re-enabled after recovery on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.25597.13.0.5
     name: FE-FIREEYE-MIB::feEMPSBypassStateEntered
     category: security
-    severity: notice
-    description: Email bypass state entered on {_HOSTNAME}.
+    severity: alert
+    description: FireEye email bypass state entered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.25597.13.0.6
     name: FE-FIREEYE-MIB::feEMPSBypassStateExited
     category: security
     severity: notice
-    description: Email bypass state exited on {_HOSTNAME}.
+    description: Email bypass state exited on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.25597.14.0.1
     name: FE-FIREEYE-MIB::feHttpThroughputNotIncrease
     category: diagnostic
     severity: warning
-    description: HTTP throughput has not increased for a specified time on {_HOSTNAME}.
+    description: HTTP throughput has not increased for a specified time on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.25597.14.0.2
     name: FE-FIREEYE-MIB::feHardwareBypassEntered
     category: diagnostic
-    severity: warning
-    description: Permanent hardware bypass mode entered on {_HOSTNAME}.
+    severity: alert
+    description: Permanent hardware bypass mode entered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.25597.15.0.1
     name: FE-FIREEYE-MIB::feMaliciousMaid
     category: security
     severity: alert
-    description: Malicious URL or file detected with ID {feMaid} on {_HOSTNAME}.
+    description: Malicious URL or file detected (ID {{value "feMaid"}}) on {{hostname}}.
     status: current
     varbinds:
       - feMaid

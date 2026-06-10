@@ -118,7 +118,7 @@ traps:
     name: MSERIES-ALARM-MIB::alarmNotificationCleared
     category: state_change
     severity: notice
-    description: Alarm cleared for {alarmText} on {_HOSTNAME}.
+    description: Alarm cleared on {{first (value "alarmPortName") (value "alarmUnit")}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -137,7 +137,7 @@ traps:
     name: MSERIES-ALARM-MIB::alarmNotificationWarning
     category: diagnostic
     severity: warning
-    description: Warning alarm activated on {alarmUnit} {alarmPortName} with text {alarmText} on {_HOSTNAME}.
+    description: Alarm warning activated on {{first (value "alarmPortName") (value "alarmUnit")}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -156,7 +156,7 @@ traps:
     name: MSERIES-ALARM-MIB::alarmNotificationMinor
     category: diagnostic
     severity: warning
-    description: Minor alarm activated on {alarmUnit} with text {alarmText} on {_HOSTNAME}.
+    description: Minor alarm activated on {{first (value "alarmPortName") (value "alarmUnit")}} on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -175,7 +175,7 @@ traps:
     name: MSERIES-ALARM-MIB::alarmNotificationMajor
     category: diagnostic
     severity: crit
-    description: Major alarm activated on {alarmUnit} {alarmPortName} with text {alarmText} on {_HOSTNAME}.
+    description: 'Major alarm activated{{with value "alarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmIndex
@@ -194,7 +194,7 @@ traps:
     name: MSERIES-ALARM-MIB::alarmNotificationCritical
     category: diagnostic
     severity: crit
-    description: Critical alarm {alarmText} on {alarmUnit} at {alarmPort} on {_HOSTNAME}.
+    description: 'Critical alarm activated{{with value "alarmText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmIndex
@@ -213,7 +213,7 @@ traps:
     name: DCP-ALARM-MIB::dcpAlarmNotificationCleared
     category: state_change
     severity: notice
-    description: Alarm {dcpAlarmLogListText} cleared at {dcpAlarmLogListLocation} on {_HOSTNAME}.
+    description: 'Alarm cleared{{with value "dcpAlarmLogListText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - dcpAlarmLogListIndex
@@ -229,7 +229,7 @@ traps:
     name: DCP-ALARM-MIB::dcpAlarmNotificationCritical
     category: diagnostic
     severity: crit
-    description: Critical alarm {dcpAlarmLogListText} activated at {dcpAlarmLogListLocation} on {_HOSTNAME}.
+    description: Critical alarm {{value "dcpAlarmLogListText"}} on {{hostname}}.
     status: current
     varbinds:
       - dcpAlarmLogListIndex
@@ -244,7 +244,7 @@ traps:
     name: DCP-ALARM-MIB::dcpAlarmNotificationMajor
     category: diagnostic
     severity: crit
-    description: Major alarm activated with text {dcpAlarmLogListText} on {_HOSTNAME}.
+    description: 'Major alarm activated{{with value "dcpAlarmLogListText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - dcpAlarmLogListIndex
@@ -259,7 +259,7 @@ traps:
     name: DCP-ALARM-MIB::dcpAlarmNotificationMinor
     category: diagnostic
     severity: warning
-    description: Minor alarm activated with text {dcpAlarmLogListText} on {_HOSTNAME}.
+    description: 'Minor alarm activated{{with value "dcpAlarmLogListText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - dcpAlarmLogListIndex
@@ -274,7 +274,7 @@ traps:
     name: DCP-ALARM-MIB::dcpAlarmNotificationWarning
     category: diagnostic
     severity: warning
-    description: Alarm {dcpAlarmLogListText} with severity {dcpAlarmLogListSeverity} activated on {_HOSTNAME}.
+    description: 'Alarm warning activated{{with value "dcpAlarmLogListText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - dcpAlarmLogListIndex

@@ -71,8 +71,8 @@ traps:
   - oid: 1.3.6.1.4.1.22420.1.1.0.1
     name: ACD-DESC-MIB::acdPowerLost
     category: diagnostic
-    severity: crit
-    description: Power loss detected on {acdDescIdentifier} on {_HOSTNAME}.
+    severity: alert
+    description: Power lost detected on {{first (value "acdDescIdentifier") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - acdDescCommercialName
@@ -84,7 +84,7 @@ traps:
     name: ACD-ALARM-MIB::acdAlarmActiveState
     category: diagnostic
     severity: warning
-    description: Alarm {acdAlarmCfgDesc} with severity {acdAlarmCfgSeverity} triggered on {_HOSTNAME}.
+    description: Alarm {{value "acdAlarmCfgDesc"}} triggered on {{hostname}}.
     status: current
     varbinds:
       - acdAlarmCfgID
@@ -101,7 +101,7 @@ traps:
     name: ACD-ALARM-MIB::acdAlarmClearState
     category: state_change
     severity: notice
-    description: Alarm {acdAlarmCfgDesc} cleared on {_HOSTNAME}.
+    description: Alarm {{value "acdAlarmCfgDesc"}} cleared on {{hostname}}.
     status: current
     varbinds:
       - acdAlarmCfgID

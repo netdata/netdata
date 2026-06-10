@@ -8,516 +8,516 @@ traps:
   - oid: 1.3.6.1.4.1.9839.2.1.100.1
     name: KELVIN-pCOWeb-Chiller-MIB::high-pressure-switch-1-alarm
     category: diagnostic
-    severity: err
-    description: High pressure switch 1 alarm triggered on {_HOSTNAME}.
+    severity: alert
+    description: High pressure switch 1 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.2
     name: KELVIN-pCOWeb-Chiller-MIB::high-pressure-switch-2-alarm
     category: diagnostic
-    severity: warning
-    description: High pressure switch 2 alarm triggered on {_HOSTNAME}.
+    severity: alert
+    description: High pressure switch 2 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.3
     name: KELVIN-pCOWeb-Chiller-MIB::low-pressure-switch-1-alarm
     category: diagnostic
-    severity: warning
-    description: Low pressure switch 1 alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: Low pressure switch 1 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.4
     name: KELVIN-pCOWeb-Chiller-MIB::low-pressure-switch-2-alarm
     category: diagnostic
-    severity: warning
-    description: Low pressure switch 2 alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: Low pressure switch 2 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.6
     name: KELVIN-pCOWeb-Chiller-MIB::water-level-alarm
     category: diagnostic
-    severity: warning
-    description: Water level alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: Water level alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.8
     name: KELVIN-pCOWeb-Chiller-MIB::flow-switch-alarm
     category: diagnostic
-    severity: warning
-    description: Flow switch alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: Flow switch alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.9
     name: KELVIN-pCOWeb-Chiller-MIB::water-static-pressure-alarm
     category: diagnostic
-    severity: warning
-    description: Water static pressure alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: Water static pressure alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.10
     name: KELVIN-pCOWeb-Chiller-MIB::water-static-pressure-warning
     category: diagnostic
     severity: warning
-    description: Water static pressure warning detected on {_HOSTNAME}.
+    description: Water static pressure warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.11
     name: KELVIN-pCOWeb-Chiller-MIB::flow-rate-alarm
     category: diagnostic
     severity: warning
-    description: Flow rate alarm detected on {_HOSTNAME}.
+    description: Flow rate alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.12
     name: KELVIN-pCOWeb-Chiller-MIB::overload-compressor1-circuit1-alarm
     category: diagnostic
-    severity: warning
-    description: Compressor 1 circuit 1 overload alarm detected on {_HOSTNAME}.
+    severity: crit
+    description: Compressor 1 circuit 1 overload alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.13
     name: KELVIN-pCOWeb-Chiller-MIB::overload-compressor2-circuit1-alarm
     category: diagnostic
     severity: warning
-    description: Overload alarm on compressor 2 circuit 1 detected on {_HOSTNAME}.
+    description: Compressor 2 circuit 1 overload alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.14
     name: KELVIN-pCOWeb-Chiller-MIB::overload-compressor3-circuit1-alarm
     category: diagnostic
-    severity: warning
-    description: Compressor 3 circuit 1 overload alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: Compressor 3 circuit 1 overload alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.15
     name: KELVIN-pCOWeb-Chiller-MIB::overload-compressor1-circuit2-alarm
     category: diagnostic
     severity: warning
-    description: Overload alarm on compressor 1 circuit 2 detected on {_HOSTNAME}.
+    description: Overload alarm on compressor 1 circuit 2 on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.16
     name: KELVIN-pCOWeb-Chiller-MIB::overload-compressor2-circuit2-alarm
     category: diagnostic
-    severity: warning
-    description: Compressor overload alarm triggered on circuit 2 on {_HOSTNAME}.
+    severity: alert
+    description: Overload alarm on compressor 2 circuit 2 detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.17
     name: KELVIN-pCOWeb-Chiller-MIB::overload-compressor3-circuit2-alarm
     category: diagnostic
-    severity: warning
-    description: Compressor 3 circuit 2 overload alarm detected on {_HOSTNAME}.
+    severity: crit
+    description: Compressor 3 circuit 2 overload alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.18
     name: KELVIN-pCOWeb-Chiller-MIB::overload-fans-circuit1
     category: diagnostic
     severity: warning
-    description: Overload detected on fans circuit 1 on {_HOSTNAME}.
+    description: Overload detected on fans circuit 1 on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.19
     name: KELVIN-pCOWeb-Chiller-MIB::overload-fans-circuit2
     category: diagnostic
     severity: warning
-    description: Fan circuit 2 overload detected on {_HOSTNAME}.
+    description: Overload detected on fans circuit 2 on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.20
     name: KELVIN-pCOWeb-Chiller-MIB::overload-fan1-circuit1-alarm
     category: diagnostic
     severity: warning
-    description: Overload alarm on fan 1 circuit 1 detected on {_HOSTNAME}.
+    description: Overload fan 1 circuit 1 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.21
     name: KELVIN-pCOWeb-Chiller-MIB::overload-fan2-circuit1-alarm
     category: diagnostic
-    severity: err
-    description: Overload alarm on fan 2 circuit 1 detected on {_HOSTNAME}.
+    severity: warning
+    description: Overload fan 2 circuit 1 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.22
     name: KELVIN-pCOWeb-Chiller-MIB::overload-fan3-circuit1-alarm
     category: diagnostic
     severity: warning
-    description: Overload fan 3 circuit 1 alarm detected on {_HOSTNAME}.
+    description: Overload fan 3 circuit 1 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.23
     name: KELVIN-pCOWeb-Chiller-MIB::overload-fan4-circuit1-alarm
     category: diagnostic
-    severity: warning
-    description: Overload fan 4 circuit 1 alarm detected on {_HOSTNAME}.
+    severity: crit
+    description: Overload alarm on fan 4 circuit 1 detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.24
     name: KELVIN-pCOWeb-Chiller-MIB::overload-fan1-circuit-2-alarm
     category: diagnostic
-    severity: warning
-    description: Overload alarm for fan 1 circuit 2 detected on {_HOSTNAME}.
+    severity: alert
+    description: Overload alarm on fan 1 circuit 2 detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.25
     name: KELVIN-pCOWeb-Chiller-MIB::overload-fan2-circuit2-alarm
     category: diagnostic
     severity: warning
-    description: Overload alarm on fan 2 circuit 2 detected on {_HOSTNAME}.
+    description: Overload fan 2 circuit 2 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.26
     name: KELVIN-pCOWeb-Chiller-MIB::overload-fan3-circuit2-alarm
     category: diagnostic
     severity: warning
-    description: Overload fan 3 circuit 2 alarm detected on {_HOSTNAME}.
+    description: Overload fan 3 circuit 2 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.27
     name: KELVIN-pCOWeb-Chiller-MIB::overload-fan4-circuit2-alarm
     category: diagnostic
     severity: warning
-    description: Overload fan 4 circuit 2 alarm on {_HOSTNAME}.
+    description: Overload alarm on fan 4 circuit 2 detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.28
     name: KELVIN-pCOWeb-Chiller-MIB::overload-pump1-alarm
     category: diagnostic
     severity: warning
-    description: Overload pump 1 alarm detected on {_HOSTNAME}.
+    description: Overload pump 1 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.29
     name: KELVIN-pCOWeb-Chiller-MIB::overload-pump2-alarm
     category: diagnostic
     severity: warning
-    description: Overload pump 2 alarm detected on {_HOSTNAME}.
+    description: Overload alarm on pump 2 detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.30
     name: KELVIN-pCOWeb-Chiller-MIB::wrong-phase-rotation-alarm
     category: diagnostic
-    severity: warning
-    description: Wrong phase rotation alarm detected on {_HOSTNAME}.
+    severity: crit
+    description: Wrong phase rotation alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.31
     name: KELVIN-pCOWeb-Chiller-MIB::back-Door-open-alarm
     category: security
     severity: warning
-    description: Back door open alarm detected on {_HOSTNAME}.
+    description: Back door open alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.75
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-idrofrigo-pump-c-1
     category: diagnostic
     severity: warning
-    description: Condensation pump 1 breaker switch alarm detected on {_HOSTNAME}.
+    description: Condensation pump 1 breaker switch alarm on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.76
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-idrofrigo-pump-c-2
     category: diagnostic
     severity: warning
-    description: Condensation pump 2 breaker switch alarm on {_HOSTNAME}.
+    description: Condensation pump 2 breaker switch alarm on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.80
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-idrofrigo-fl-C
     category: diagnostic
     severity: warning
-    description: Condensation flow switch alarm triggered on {_HOSTNAME}.
+    description: Condensation flow switch alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.130
     name: KELVIN-pCOWeb-Chiller-MIB::remote-on-off
     category: state_change
     severity: notice
-    description: Remote on-off state change on {_HOSTNAME}.
+    description: Remote on-off state changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.131
     name: KELVIN-pCOWeb-Chiller-MIB::chiller-ON-OFF
     category: state_change
     severity: notice
-    description: Chiller ON/OFF state change detected on {_HOSTNAME}.
+    description: Chiller state changed to ON or OFF on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.148
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-disch-scw-1
     category: diagnostic
-    severity: warning
-    description: Discharge screw compressor 1 alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: Discharge screw compressor 1 alarm triggered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.149
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-disch-scw-2
     category: diagnostic
-    severity: warning
-    description: Discharge screw compressor 2 alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: Discharge screw compressor 2 alarm triggered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.150
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-probe-inlet
     category: diagnostic
     severity: warning
-    description: Inlet probe alarm (broken or disconnected) on {_HOSTNAME}.
+    description: Inlet probe alarm (broken or disconnected) on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.151
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-probe-amb
     category: diagnostic
     severity: warning
-    description: Ambient probe alarm detected on {_HOSTNAME}.
+    description: Ambient probe alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.152
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-frigo-fl1
     category: diagnostic
-    severity: warning
-    description: Flow switch alarm triggered on {_HOSTNAME}.
+    severity: alert
+    description: Flow switch alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.153
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-idro-pump1
     category: diagnostic
     severity: warning
-    description: Pump 1 hydraulic alarm detected on {_HOSTNAME}.
+    description: Pump 1 hydraulic alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.154
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-idro-pump2
     category: diagnostic
     severity: warning
-    description: Pump 2 hydraulic alarm detected on {_HOSTNAME}.
+    description: Pump 2 hydraulic alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.155
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-idro-fl1
     category: diagnostic
     severity: warning
-    description: Flow switch alarm reported on {_HOSTNAME}.
+    description: Flow switch alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.156
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-warning-fl1
     category: diagnostic
     severity: warning
-    description: Flow switch alarm warning detected on {_HOSTNAME}.
+    description: Flow switch warning alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.157
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-hi-water-temp
     category: diagnostic
     severity: warning
-    description: High temperature alarm triggered on {_HOSTNAME}.
+    description: High temperature alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.158
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-lo-water-temp
     category: diagnostic
     severity: warning
-    description: Low temperature alarm triggered on {_HOSTNAME}.
+    description: Low water temperature alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.159
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-ta-probe1
     category: diagnostic
     severity: warning
-    description: Antifreeze/evaporator probe 1 alarm detected on {_HOSTNAME}.
+    description: Antifreeze/evaporator probe 1 alarm on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.160
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-hi-press
     category: diagnostic
     severity: warning
-    description: High condensation pressure alarm detected on {_HOSTNAME}.
+    description: High condensation pressure alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.161
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-lo-press
     category: diagnostic
     severity: warning
-    description: Low condensation pressure alarm triggered on {_HOSTNAME}.
+    description: Low condensation pressure alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.162
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-probe-evap-1
     category: diagnostic
     severity: warning
-    description: Antifreeze/evaporator probe 1 alarm (broken or disconnected) on {_HOSTNAME}.
+    description: Antifreeze/evaporator probe 1 alarm (broken or disconnected) on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.163
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-probe-evap-2
     category: diagnostic
     severity: warning
-    description: Antifreeze/evaporator probe 2 alarm triggered on {_HOSTNAME}.
+    description: Antifreeze/evaporator probe 2 alarm (broken or disconnected) on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.164
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-hi-press-1
     category: diagnostic
     severity: warning
-    description: High condensation pressure alarm detected on {_HOSTNAME}.
+    description: High condensation pressure 1 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.165
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-hi-press-2
     category: diagnostic
     severity: warning
-    description: High condensation pressure 2 alarm detected on {_HOSTNAME}.
+    description: High condensation pressure 2 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.166
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-lo-press-1
     category: diagnostic
     severity: warning
-    description: Low condensation pressure alarm triggered on {_HOSTNAME}.
+    description: Low condensation pressure 1 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.167
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-lo-press-2
     category: diagnostic
     severity: warning
-    description: Low condensation pressure 2 alarm detected on {_HOSTNAME}.
+    description: Low condensation pressure 2 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.168
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-probe-tank
     category: diagnostic
     severity: warning
-    description: Tank/Out probe alarm (broken or disconnected) on {_HOSTNAME}.
+    description: Tank/Out probe alarm (broken or disconnected) on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.169
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-off-line-1
     category: diagnostic
-    severity: warning
-    description: Chiller 1 reported offline status on {_HOSTNAME}.
+    severity: crit
+    description: Chiller 1 is offline on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.170
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-off-line-2
     category: diagnostic
-    severity: err
-    description: Chiller 2 reported offline status on {_HOSTNAME}.
+    severity: crit
+    description: Chiller 2 is offline on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.171
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-off-line-3
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Chiller 3 went offline on {_HOSTNAME}.
+    description: Chiller 3 is offline on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.172
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-off-line-4
-    category: state_change
-    severity: warning
-    description: Chiller 4 went offline on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: Chiller 4 is offline on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.173
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-off-line-5
     category: diagnostic
     severity: warning
-    description: Chiller 5 reported offline status on {_HOSTNAME}.
+    description: Chiller 5 is offline on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.174
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-off-line-6
     category: diagnostic
-    severity: warning
-    description: Chiller 6 reported offline status on {_HOSTNAME}.
+    severity: alert
+    description: Chiller 6 is offline on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.175
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-off-line-7
-    category: state_change
-    severity: warning
-    description: Chiller 7 is offline on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: Chiller 7 is offline on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.176
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-off-line-8
     category: diagnostic
-    severity: warning
-    description: Chiller 8 is offline on {_HOSTNAME}.
+    severity: crit
+    description: Chiller 8 is offline on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.177
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-ta-probe2
     category: diagnostic
     severity: warning
-    description: Antifreeze/evaporator probe 2 alarm detected on {_HOSTNAME}.
+    description: Antifreeze/evaporator probe 2 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.178
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-sms
     category: diagnostic
     severity: warning
-    description: SMS alarm received from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: SMS alarm received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.179
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-modem
     category: diagnostic
     severity: warning
-    description: Modem alarm reported on {_HOSTNAME}.
+    description: Modem alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.180
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-sms-coda
     category: diagnostic
     severity: warning
-    description: SMS coda alarm reported on {_HOSTNAME}.
+    description: SMS coda alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.181
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-probe-fc
     category: diagnostic
     severity: warning
-    description: Freecooling probe alarm detected on {_HOSTNAME}.
+    description: Freecooling probe alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.182
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-maint-pw1
     category: diagnostic
     severity: warning
-    description: Maintenance pump 1 alarm triggered on {_HOSTNAME}.
+    description: Maintenance pump 1 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.183
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-maint-pw2
     category: diagnostic
     severity: warning
-    description: Maintenance pump 2 alarm triggered on {_HOSTNAME}.
+    description: Maintenance pump 2 alarm on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.184
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-hi-temp-rid
     category: diagnostic
-    severity: warning
-    description: High temperature alarm triggered on {_HOSTNAME}.
+    severity: alert
+    description: High temperature alarm on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.185
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-q-fc-sep
     category: diagnostic
     severity: warning
-    description: DryCooler breaker switch alarm detected on {_HOSTNAME}.
+    description: DryCooler breaker switch alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.186
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-p-wat2
     category: diagnostic
     severity: warning
-    description: Water pressure 2 alarm detected on {_HOSTNAME}.
+    description: Water pressure 2 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.187
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-p-wat1
     category: diagnostic
     severity: warning
-    description: Water pressure 1 alarm detected on {_HOSTNAME}.
+    description: Water pressure 1 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.188
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-foult-flow-p1
     category: diagnostic
     severity: warning
-    description: Pump 1 flow alarm detected on {_HOSTNAME}.
+    description: Pump 1 flow alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.189
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-foult-flow-p2
     category: diagnostic
     severity: warning
-    description: Pump 2 flow alarm detected on {_HOSTNAME}.
+    description: Pump 2 flow alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.190
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-foult-fl1-p1
     category: diagnostic
     severity: warning
-    description: Pump 1 flow-switch alarm detected on {_HOSTNAME}.
+    description: Pump 1 flow-switch alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.191
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-foult-fl1-p2
     category: diagnostic
     severity: warning
-    description: Pump 2 flow-switch alarm triggered on {_HOSTNAME}.
+    description: Pump 2 flow-switch alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.192
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-warning-le
     category: diagnostic
     severity: warning
-    description: Water level warning detected on {_HOSTNAME}.
+    description: Water level warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.193
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-frigo-fl-C
     category: diagnostic
     severity: warning
-    description: Flow switch condensation alarm detected on {_HOSTNAME}.
+    description: Flow switch condensation alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.194
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-idro-pump-c-1
     category: diagnostic
     severity: warning
-    description: Pump 1 condensation hydraulic alarm detected on {_HOSTNAME}.
+    description: Pump 1 condensation hydraulic alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.195
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-idro-pump-c-2
     category: diagnostic
     severity: warning
-    description: Pump 2 condensation hydraulic alarm detected on {_HOSTNAME}.
+    description: Pump 2 condensation hydraulic alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.196
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-idro-fl-C
     category: diagnostic
     severity: warning
-    description: Flow switch condensation alarm triggered on {_HOSTNAME}.
+    description: Flow switch condensation alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.197
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-warning-fl-C
     category: diagnostic
     severity: warning
-    description: Flow switch condensation alarm triggered on {_HOSTNAME}.
+    description: Flow switch condensation alarm triggered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.198
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-foul-fl-C-p1
     category: diagnostic
     severity: warning
-    description: Pump 1 condensation flow-switch alarm triggered on {_HOSTNAME}.
+    description: Pump 1 condensation flow-switch alarm on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.9839.2.1.100.199
     name: KELVIN-pCOWeb-Chiller-MIB::alarm-foul-fl-C-p2
     category: diagnostic
     severity: warning
-    description: Pump 2 condensation flow-switch alarm on {_HOSTNAME}.
+    description: Pump 2 condensation flow-switch alarm on {{hostname}}.
     status: current

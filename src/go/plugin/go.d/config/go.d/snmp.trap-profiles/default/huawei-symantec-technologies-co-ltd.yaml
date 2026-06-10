@@ -35,9 +35,9 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.34774.4.1.4.2
     name: ISM-TRAP-MIB::eventType
-    category: diagnostic
+    category: unknown
     severity: notice
-    description: Event {hwIsmTrapEventID} with level {hwIsmTrapEventLevel} occurred on {_HOSTNAME}.
+    description: ISM trap received on {{hostname}}.
     status: current
     varbinds:
       - hwIsmTrapEventType

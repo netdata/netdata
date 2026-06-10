@@ -226,8 +226,8 @@ traps:
   - oid: 1.3.6.1.4.1.18418.1.3.0.1
     name: ENDACE-SYSTEM-MIB::procCrash
     category: diagnostic
-    severity: err
-    description: Process {procName} crashed on {_HOSTNAME}.
+    severity: alert
+    description: Process {{value "procName"}} crashed on {{hostname}}.
     status: current
     varbinds:
       - procIndex
@@ -235,8 +235,8 @@ traps:
   - oid: 1.3.6.1.4.1.18418.1.3.0.2
     name: ENDACE-SYSTEM-MIB::procExit
     category: diagnostic
-    severity: err
-    description: Process {procName} exited unexpectedly on {_HOSTNAME}.
+    severity: alert
+    description: Process {{value "procName"}} exited unexpectedly on {{hostname}}.
     status: current
     varbinds:
       - procIndex
@@ -245,7 +245,7 @@ traps:
     name: ENDACE-SYSTEM-MIB::procNormal
     category: diagnostic
     severity: warning
-    description: Process {procName} was restarted after failure on {_HOSTNAME}.
+    description: Process {{value "procName"}} restarted after crash on {{hostname}}.
     status: current
     varbinds:
       - procIndex
@@ -254,7 +254,7 @@ traps:
     name: ENDACE-SYSTEM-MIB::cpuUtilHigh
     category: diagnostic
     severity: warning
-    description: CPU utilization exceeded threshold on CPU index {cpuIndex} on {_HOSTNAME}.
+    description: CPU utilization exceeded threshold on {{first (value "cpuIndex") "CPU"}} on {{hostname}}.
     status: current
     varbinds:
       - cpuIndex
@@ -262,7 +262,7 @@ traps:
     name: ENDACE-SYSTEM-MIB::cpuUtilNormal
     category: diagnostic
     severity: notice
-    description: CPU {cpuIndex} utilization returned to normal range on {_HOSTNAME}.
+    description: CPU utilization returned to normal on {{hostname}}.
     status: current
     varbinds:
       - cpuIndex
@@ -270,31 +270,31 @@ traps:
     name: ENDACE-SYSTEM-MIB::pagingActivityHigh
     category: diagnostic
     severity: warning
-    description: System paging activity is excessively high indicating thrashing on {_HOSTNAME}.
+    description: System paging excessively, indicating memory thrashing on {{hostname}}.
     status: obsolete
   - oid: 1.3.6.1.4.1.18418.1.3.0.7
     name: ENDACE-SYSTEM-MIB::pagingActivityNormal
     category: diagnostic
     severity: notice
-    description: System paging activity returned to normal limits on {_HOSTNAME}.
+    description: System paging activity returned to normal limits on {{hostname}}.
     status: obsolete
   - oid: 1.3.6.1.4.1.18418.1.3.0.8
     name: ENDACE-SYSTEM-MIB::smartError
     category: diagnostic
     severity: warning
-    description: SMART reported a possible disk error on {_HOSTNAME}.
+    description: SMART reported a possible disk error on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.1.3.0.9
     name: ENDACE-SYSTEM-MIB::unexpectedShutdown
     category: diagnostic
     severity: alert
-    description: System unexpected shutdown detected on {_HOSTNAME}.
+    description: System has shut down unexpectedly on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.1.3.0.10
     name: ENDACE-SYSTEM-MIB::diskSpaceLow
     category: diagnostic
     severity: warning
-    description: Disk space is low on mount point {mountPoint} on {_HOSTNAME}.
+    description: Disk space is low on mount point {{value "mountPoint"}} on {{hostname}}.
     status: current
     varbinds:
       - mountPoint
@@ -302,15 +302,15 @@ traps:
     name: ENDACE-SYSTEM-MIB::diskSpaceNormal
     category: diagnostic
     severity: notice
-    description: Disk space on {mountPoint} returned to normal on {_HOSTNAME}.
+    description: Disk space on {{value "mountPoint"}} returned to normal on {{hostname}}.
     status: current
     varbinds:
       - mountPoint
   - oid: 1.3.6.1.4.1.18418.1.3.0.12
     name: ENDACE-SYSTEM-MIB::procLivenessFailure
     category: diagnostic
-    severity: err
-    description: Process {procName} hung and triggered restart on {_HOSTNAME}.
+    severity: alert
+    description: Process {{value "procName"}} hung and is restarting on {{hostname}}.
     status: current
     varbinds:
       - procIndex
@@ -318,16 +318,16 @@ traps:
   - oid: 1.3.6.1.4.1.18418.1.3.0.13
     name: ENDACE-SYSTEM-MIB::cmcStatusFailure
     category: diagnostic
-    severity: err
-    description: Status failure detected on appliance {applName} on {_HOSTNAME}.
+    severity: crit
+    description: CMC status failure detected{{with value "applName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - applName
   - oid: 1.3.6.1.4.1.18418.1.3.0.14
     name: ENDACE-SYSTEM-MIB::cmcStatusNormal
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Appliance {applName} status check passed on {_HOSTNAME}.
+    description: Appliance {{value "applName"}} status check passed on {{hostname}}.
     status: current
     varbinds:
       - applName
@@ -335,25 +335,25 @@ traps:
     name: ENDACE-SYSTEM-MIB::memUtilizationHigh
     category: diagnostic
     severity: warning
-    description: Memory utilization is high on {_HOSTNAME}.
+    description: Memory utilization on the system is high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.1.3.0.16
     name: ENDACE-SYSTEM-MIB::netUtilizationHigh
     category: diagnostic
     severity: warning
-    description: Network utilization is high on {_HOSTNAME}.
+    description: Network utilization on the system is high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.1.3.0.17
     name: ENDACE-SYSTEM-MIB::diskIOHigh
     category: diagnostic
     severity: warning
-    description: Disk I/O on the system is high on {_HOSTNAME}.
+    description: Disk I/O on the system is high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.1.3.0.18
     name: ENDACE-SYSTEM-MIB::cmcVersionMismatch
-    category: diagnostic
+    category: config_change
     severity: warning
-    description: System software version mismatch detected on appliance {applName} on {_HOSTNAME}.
+    description: System software version mismatch detected on appliance {{value "applName"}} on {{hostname}}.
     status: current
     varbinds:
       - applName
@@ -361,13 +361,13 @@ traps:
     name: ENDACE-SYSTEM-MIB::raidStatusOk
     category: diagnostic
     severity: notice
-    description: RAID array status is optimal on {_HOSTNAME}.
+    description: RAID array is in optimal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.1.3.0.20
     name: ENDACE-SYSTEM-MIB::raidStatusNotOk
     category: diagnostic
-    severity: err
-    description: RAID array reported suboptimal state with code {raidStatusCode} on {_HOSTNAME}.
+    severity: warning
+    description: RAID array is in a suboptimal state with code {{value "raidStatusCode"}} on {{hostname}}.
     status: current
     varbinds:
       - raidStatusCode
@@ -375,7 +375,7 @@ traps:
     name: ENDACE-SYSTEM-MIB::userLogin
     category: auth
     severity: notice
-    description: User {username} logged in from {remoteAddr} on {_HOSTNAME}.
+    description: User {{value "username"}} logged in from {{value "remoteAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - username
@@ -387,7 +387,7 @@ traps:
     name: ENDACE-SYSTEM-MIB::userLogout
     category: auth
     severity: notice
-    description: User {username} logged out from {remoteAddr} on {_HOSTNAME}.
+    description: User {{value "username"}} logged out from {{value "remoteAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - username
@@ -397,15 +397,15 @@ traps:
       - clientDescr
   - oid: 1.3.6.1.4.1.18418.1.3.0.23
     name: ENDACE-SYSTEM-MIB::sysDiskRaidStatusOk
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: System disk RAID array is in optimal state on {_HOSTNAME}.
+    description: System disk RAID array is in optimal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.1.3.0.24
     name: ENDACE-SYSTEM-MIB::sysDiskRaidStatusNotOk
     category: diagnostic
-    severity: err
-    description: System disk RAID array reported suboptimal status code {sysDiskRaidStatusCode} on {_HOSTNAME}.
+    severity: crit
+    description: System disk RAID array is in a suboptimal state with code {{value "sysDiskRaidStatusCode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDiskRaidStatusCode
@@ -413,13 +413,13 @@ traps:
     name: ENDACE-SYSTEM-MIB::raidDiskStatusOk
     category: diagnostic
     severity: notice
-    description: RAID disk health status is OK on {_HOSTNAME}.
+    description: RAID disk health is OK on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.1.3.0.26
     name: ENDACE-SYSTEM-MIB::raidDiskStatusNotOk
     category: diagnostic
-    severity: err
-    description: RAID disk health is not OK with status code {raidDiskStatusCode} on {_HOSTNAME}.
+    severity: crit
+    description: RAID disk health is not OK with status code {{value "raidDiskStatusCode"}} on {{hostname}}.
     status: current
     varbinds:
       - raidDiskStatusCode
@@ -427,7 +427,7 @@ traps:
     name: ENDACE-SYSTEM-MIB::raidDrvWearWarning
     category: diagnostic
     severity: warning
-    description: SSD wearout warning for drive {raidDrvId} on {_HOSTNAME}.
+    description: SSD wearout warning for drive {{value "raidDrvId"}} on {{hostname}}.
     status: current
     varbinds:
       - raidDrvId
@@ -435,7 +435,7 @@ traps:
     name: ENDACE-SYSTEM-MIB::raidDrvWearCritical
     category: diagnostic
     severity: crit
-    description: SSD wearout critical for drive {raidDrvId} on {_HOSTNAME}.
+    description: SSD wearout exceeded critical level on drive {{value "raidDrvId"}} on {{hostname}}.
     status: current
     varbinds:
       - raidDrvId
@@ -443,7 +443,7 @@ traps:
     name: ENDACE-SYSTEM-MIB::raidBbuOk
     category: diagnostic
     severity: notice
-    description: Battery Backup Unit {raidBbuId} status is back to normal on {_HOSTNAME}.
+    description: Battery Backup Unit {{value "raidBbuId"}} status is back to normal on {{hostname}}.
     status: current
     varbinds:
       - raidBbuId
@@ -451,15 +451,15 @@ traps:
     name: ENDACE-SYSTEM-MIB::raidBbuWarning
     category: diagnostic
     severity: warning
-    description: Battery Backup Unit {raidBbuId} status went into warning state on {_HOSTNAME}.
+    description: Battery Backup Unit {{value "raidBbuId"}} status went into warning state on {{hostname}}.
     status: current
     varbinds:
       - raidBbuId
   - oid: 1.3.6.1.4.1.18418.1.3.0.31
     name: ENDACE-SYSTEM-MIB::raidBbuError
     category: diagnostic
-    severity: err
-    description: Battery Backup Unit {raidBbuId} reported alarm state on {_HOSTNAME}.
+    severity: warning
+    description: Battery Backup Unit {{value "raidBbuId"}} went into alarm state on {{hostname}}.
     status: current
     varbinds:
       - raidBbuId
@@ -467,23 +467,23 @@ traps:
     name: ENDACE-SYSTEM-MIB::raidDiskWarning
     category: diagnostic
     severity: warning
-    description: Disk health warning for drive {raidDrvId} on {_HOSTNAME}.
+    description: Disk health warning on drive {{value "raidDrvId"}} on {{hostname}}.
     status: current
     varbinds:
       - raidDrvId
   - oid: 1.3.6.1.4.1.18418.1.3.0.33
     name: ENDACE-SYSTEM-MIB::raidDiskError
     category: diagnostic
-    severity: err
-    description: Disk health error on drive {raidDrvId} on {_HOSTNAME}.
+    severity: crit
+    description: RAID disk error detected on drive {{value "raidDrvId"}} on {{hostname}}.
     status: current
     varbinds:
       - raidDrvId
   - oid: 1.3.6.1.4.1.18418.1.3.0.34
     name: ENDACE-SYSTEM-MIB::cmcConnectionDown
     category: state_change
-    severity: warning
-    description: Connection to appliance {applName} is down on {_HOSTNAME}.
+    severity: crit
+    description: Connection to CMC-managed appliance {{value "applName"}} is down on {{hostname}}.
     status: current
     varbinds:
       - applName
@@ -491,7 +491,7 @@ traps:
     name: ENDACE-SYSTEM-MIB::cmcConnectionUp
     category: state_change
     severity: notice
-    description: Connection to appliance {applName} is up on {_HOSTNAME}.
+    description: Connection to appliance {{value "applName"}} is up on {{hostname}}.
     status: current
     varbinds:
       - applName
@@ -499,59 +499,59 @@ traps:
     name: ENDACE-SYSTEM-MIB::ipfixEngineStart
     category: state_change
     severity: notice
-    description: IPFIX engine started on {_HOSTNAME}.
+    description: IPFIX engine started on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.1.3.0.41
     name: ENDACE-SYSTEM-MIB::ipfixEngineStop
     category: state_change
     severity: notice
-    description: IPFIX engine stopped on {_HOSTNAME}.
+    description: IPFIX engine stopped on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.1.3.0.42
     name: ENDACE-SYSTEM-MIB::diskIONormal
     category: diagnostic
     severity: notice
-    description: Disk I/O on system is back to normal on {_HOSTNAME}.
+    description: Disk I/O on system is back to normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.1.3.0.43
     name: ENDACE-SYSTEM-MIB::memUtilizationNormal
     category: diagnostic
     severity: notice
-    description: Memory utilization returned to normal on {_HOSTNAME}.
+    description: Memory utilization on the system is back to normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.1.3.0.44
     name: ENDACE-SYSTEM-MIB::netUtilizationNormal
     category: state_change
     severity: notice
-    description: Network utilization returned to normal on {_HOSTNAME}.
+    description: Network utilization returned to normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.1.3.0.45
     name: ENDACE-SYSTEM-MIB::systemServiceLevelChanged
     category: state_change
     severity: notice
-    description: System service level changed to {systemServiceLevel} on {_HOSTNAME}.
+    description: System service level changed to {{value "systemServiceLevel"}} on {{hostname}}.
     status: current
     varbinds:
       - systemServiceLevel
   - oid: 1.3.6.1.4.1.18418.1.3.0.46
     name: ENDACE-SYSTEM-MIB::fipsStatusChanged
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: FIPS status changed to {fipsStatus} on {_HOSTNAME}.
+    description: FIPS status changed to {{value "fipsStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - fipsStatus
   - oid: 1.3.6.1.4.1.18418.1.3.0.100
     name: ENDACE-SYSTEM-MIB::testTrap
-    category: unknown
+    category: diagnostic
     severity: info
-    description: Test trap received on {_HOSTNAME}.
+    description: Diagnostic test trap received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.2.1.3.1
     name: ENDACE-MODULE-MIB::modlinkUp
     category: state_change
     severity: notice
-    description: Module {modifName} link transitioned to up state on {_HOSTNAME}.
+    description: Module {{first (value "modifName") "link"}} went up on {{hostname}}.
     status: current
     varbinds:
       - modifModIndex
@@ -562,7 +562,7 @@ traps:
     name: ENDACE-MODULE-MIB::modlinkDown
     category: state_change
     severity: warning
-    description: Module {modifName} link transitioned to down state on {_HOSTNAME}.
+    description: Module {{first (value "modifName") "link"}} went down on {{hostname}}.
     status: current
     varbinds:
       - modifModIndex
@@ -573,7 +573,7 @@ traps:
     name: ENDACE-MODULE-MIB::dropFault
     category: diagnostic
     severity: warning
-    description: Packet drop threshold exceeded on module {modifName} on {_HOSTNAME}.
+    description: Packet drop threshold exceeded on {{first (value "modifUserLabel") (value "modifName")}} on {{hostname}}.
     status: current
     varbinds:
       - modifModIndex
@@ -582,9 +582,9 @@ traps:
       - moduleIndex
   - oid: 1.3.6.1.4.1.18418.2.1.3.6
     name: ENDACE-MODULE-MIB::dropNormal
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Drop condition cleared for module {modifName} on {_HOSTNAME}.
+    description: Drop condition cleared for {{first (value "modifUserLabel") (value "modifName")}} on {{hostname}}.
     status: current
     varbinds:
       - modifModIndex
@@ -595,7 +595,7 @@ traps:
     name: ENDACE-MODULE-MIB::fcsFault
     category: diagnostic
     severity: warning
-    description: FCS error count exceeded threshold for interface {modifName} on {_HOSTNAME}.
+    description: FCS error threshold exceeded on {{first (value "modifUserLabel") (value "modifName")}} on {{hostname}}.
     status: current
     varbinds:
       - modifModIndex
@@ -606,7 +606,7 @@ traps:
     name: ENDACE-MODULE-MIB::fcsNormal
     category: diagnostic
     severity: notice
-    description: FCS error count for module {modifName} returned to normal on {_HOSTNAME}.
+    description: FCS error condition cleared on {{first (value "modifUserLabel") (value "modifName")}} on {{hostname}}.
     status: current
     varbinds:
       - modifModIndex
@@ -615,9 +615,9 @@ traps:
       - moduleIndex
   - oid: 1.3.6.1.4.1.18418.2.1.3.9
     name: ENDACE-MODULE-MIB::remoteFault
-    category: state_change
-    severity: warning
-    description: Remote fault detected for module {modifName} on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: Remote fault detected on module {{first (value "modifModIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - modifModIndex
@@ -628,7 +628,7 @@ traps:
     name: ENDACE-MODULE-MIB::timestampConvDropFault
     category: diagnostic
     severity: warning
-    description: Timestamp conversion fault detected on module {modifName} on {_HOSTNAME}.
+    description: Timestamp conversion module dropped out-of-order packets on {{first (value "modifName") "module"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - modifModIndex
@@ -639,7 +639,7 @@ traps:
     name: ENDACE-MODULE-MIB::timestampConvDropNormal
     category: diagnostic
     severity: notice
-    description: Timestamp conversion module {modifName} recovered from fault condition on {_HOSTNAME}.
+    description: Timestamp conversion module recovered from fault condition on {{first (value "modifName") "module"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - modifModIndex
@@ -650,16 +650,16 @@ traps:
     name: ENDACE-MODULE-MIB::syncLoss
     category: diagnostic
     severity: warning
-    description: Synchronization lost for DAG module {moduleName} on {_HOSTNAME}.
+    description: Synchronization lost for module {{value "moduleName"}} on {{hostname}}.
     status: current
     varbinds:
       - moduleIndex
       - moduleName
   - oid: 1.3.6.1.4.1.18418.2.1.3.14
     name: ENDACE-MODULE-MIB::syncReturn
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: DAG module {moduleName} synchronization restored on {_HOSTNAME}.
+    description: DAG module {{value "moduleName"}} synchronization returned on {{hostname}}.
     status: current
     varbinds:
       - moduleIndex
@@ -668,7 +668,7 @@ traps:
     name: ENDACE-MODULE-MIB::inErrorFault
     category: diagnostic
     severity: warning
-    description: RX error count exceeded threshold for interface {modifName} on {_HOSTNAME}.
+    description: RX error count exceeded threshold on {{first (value "modifUserLabel") (value "modifName")}} on {{hostname}}.
     status: current
     varbinds:
       - modifModIndex
@@ -677,9 +677,9 @@ traps:
       - moduleIndex
   - oid: 1.3.6.1.4.1.18418.2.1.3.16
     name: ENDACE-MODULE-MIB::inErrorNormal
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Interface {modifName} RX error count returned to normal on {_HOSTNAME}.
+    description: RX error count on {{first (value "modifUserLabel") (value "modifName")}} returned to normal on {{hostname}}.
     status: current
     varbinds:
       - modifModIndex
@@ -690,7 +690,7 @@ traps:
     name: ENDACE-EDA-MIB::eventNotification
     category: diagnostic
     severity: warning
-    description: Event {eventId} ({eventDescr}) generated by agent {agentId} on {_HOSTNAME}.
+    description: 'Event {{value "eventId"}} occurred: {{value "eventDescr"}} on {{hostname}}.'
     status: current
     varbinds:
       - agentId
@@ -700,7 +700,7 @@ traps:
     name: ENDACE-EDA-MIB::alarmRaisedNotification
     category: diagnostic
     severity: warning
-    description: Alarm {alarmName} with severity {alarmSeverity} raised on {_HOSTNAME}.
+    description: 'Alarm {{value "alarmName"}} raised{{with value "alarmDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alarmCriteria
@@ -713,7 +713,7 @@ traps:
     name: ENDACE-EDA-MIB::alarmClearedNotification
     category: state_change
     severity: notice
-    description: Alarm {alarmName} cleared on {_HOSTNAME}.
+    description: Alarm {{value "alarmName"}} cleared on {{hostname}}.
     status: current
     varbinds:
       - alarmCriteria
@@ -726,7 +726,7 @@ traps:
     name: ENDACE-STREAM-MIB::streamInDropFault
     category: diagnostic
     severity: warning
-    description: Stream {streamInName} dropped packets exceeding threshold on {_HOSTNAME}.
+    description: Stream {{value "streamInName"}} dropped packets exceeding threshold on {{hostname}}.
     status: current
     varbinds:
       - streamInNum
@@ -734,8 +734,8 @@ traps:
   - oid: 1.3.6.1.4.1.18418.10.0.2
     name: ENDACE-STREAM-MIB::streamInDropNormal
     category: diagnostic
-    severity: warning
-    description: Stream {streamInName} dropped packets below threshold on {_HOSTNAME}.
+    severity: notice
+    description: Stream {{value "streamInName"}} recovered from drop fault condition on {{hostname}}.
     status: current
     varbinds:
       - streamInNum
@@ -744,7 +744,7 @@ traps:
     name: ENDACE-ERFSTREAM-MIB::pipeDropFault
     category: diagnostic
     severity: warning
-    description: Data pipe {pipeName} drop count exceeded threshold on {_HOSTNAME}.
+    description: Data pipe {{value "pipeName"}} drop count exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - pipeName
@@ -752,7 +752,7 @@ traps:
     name: ENDACE-ERFSTREAM-MIB::pipeDropNormal
     category: diagnostic
     severity: notice
-    description: Data Pipe {pipeName} drop count is below threshold on {_HOSTNAME}.
+    description: Data pipe {{value "pipeName"}} drop count is below threshold on {{hostname}}.
     status: current
     varbinds:
       - pipeName
@@ -760,7 +760,7 @@ traps:
     name: ENDACE-ERFSTREAM-MIB::pilotDropFault
     category: diagnostic
     severity: warning
-    description: Data Pipe {pipeName} drop count exceeded threshold on {_HOSTNAME}.
+    description: Pilot drop threshold exceeded on {{value "pipeName"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - pipeName
@@ -768,7 +768,7 @@ traps:
     name: ENDACE-ERFSTREAM-MIB::pilotDropNormal
     category: diagnostic
     severity: notice
-    description: Pilot drop count for {pipeName} is below threshold on {_HOSTNAME}.
+    description: Data pipe {{value "pipeName"}} drop count returned to normal on {{hostname}}.
     status: obsolete
     varbinds:
       - pipeName
@@ -776,15 +776,15 @@ traps:
     name: ENDACE-ERFSTREAM-MIB::visionDropFault
     category: diagnostic
     severity: warning
-    description: Data pipe {pipeName} drop count exceeded threshold on {_HOSTNAME}.
+    description: Vision drop count exceeded threshold on {{first (value "pipeName") "pipe"}} on {{hostname}}.
     status: current
     varbinds:
       - pipeName
   - oid: 1.3.6.1.4.1.18418.12.2.0.6
     name: ENDACE-ERFSTREAM-MIB::visionDropNormal
     category: diagnostic
-    severity: warning
-    description: Data pipe {pipeName} drop count is below threshold on {_HOSTNAME}.
+    severity: notice
+    description: Vision drop count is below threshold on {{first (value "pipeName") "pipe"}} on {{hostname}}.
     status: current
     varbinds:
       - pipeName
@@ -792,7 +792,7 @@ traps:
     name: ENDACE-ERFSTREAM-MIB::visionMetadataDBFull
     category: diagnostic
     severity: warning
-    description: Vision Metadata DB for {visionDBRotfileName} is full on {_HOSTNAME}.
+    description: Vision Metadata DB is full for rotation file {{value "visionDBRotfileName"}} on {{hostname}}.
     status: current
     varbinds:
       - visionDBRotfileName
@@ -800,7 +800,7 @@ traps:
     name: ENDACE-ERFSTREAM-MIB::visionMetadataDBThreshold
     category: diagnostic
     severity: warning
-    description: Vision Metadata DB size exceeded threshold for rotation file {visionDBRotfileName} on {_HOSTNAME}.
+    description: Vision Metadata DB size exceeded threshold for {{value "visionDBRotfileName"}} on {{hostname}}.
     status: current
     varbinds:
       - visionDBRotfileName
@@ -808,7 +808,7 @@ traps:
     name: ENDACE-ERFSTREAM-MIB::visionMetadataDBNormal
     category: diagnostic
     severity: notice
-    description: Vision Metadata DB size for {visionDBRotfileName} is below threshold on {_HOSTNAME}.
+    description: Vision metadata DB size is below threshold for {{value "visionDBRotfileName"}} on {{hostname}}.
     status: current
     varbinds:
       - visionDBRotfileName
@@ -816,7 +816,7 @@ traps:
     name: ENDACE-ERFSTREAM-MIB::visionMetadataDBBelowFull
     category: diagnostic
     severity: notice
-    description: Vision metadata DB for {visionDBRotfileName} is below full on {_HOSTNAME}.
+    description: Vision metadata DB size is below full for {{value "visionDBRotfileName"}} on {{hostname}}.
     status: current
     varbinds:
       - visionDBRotfileName
@@ -824,15 +824,15 @@ traps:
     name: ENDACE-ERFSTREAM-MIB::rotationFilePrematureLossFault
     category: diagnostic
     severity: warning
-    description: Premature rotation of file {rotationFileName} on {_HOSTNAME}.
+    description: Premature rotation file loss detected for {{value "rotationFileName"}} on {{hostname}}.
     status: current
     varbinds:
       - rotationFileName
   - oid: 1.3.6.1.4.1.18418.12.2.0.12
     name: ENDACE-ERFSTREAM-MIB::rotationFilePrematureLossNormal
     category: diagnostic
-    severity: warning
-    description: Rotation file {rotationFileName} premature loss normal on {_HOSTNAME}.
+    severity: notice
+    description: Rotation file {{value "rotationFileName"}} retention period ended on {{hostname}}.
     status: current
     varbinds:
       - rotationFileName
@@ -840,7 +840,7 @@ traps:
     name: ENDACE-ERFSTREAM-MIB::rotationFilePrematureLossWarning
     category: diagnostic
     severity: warning
-    description: Premature rotation file loss warning for {rotationFileName} on {_HOSTNAME}.
+    description: Premature rotation file loss warning for {{value "rotationFileName"}} on {{hostname}}.
     status: current
     varbinds:
       - rotationFileName
@@ -848,7 +848,7 @@ traps:
     name: ENDACE-ERFSTREAM-MIB::nicInDropFault
     category: diagnostic
     severity: warning
-    description: NIC {nicInfoInterface} dropped packets due to internal processing limits on {_HOSTNAME}.
+    description: NIC dropped packets due to internal processing overload on {{first (value "nicInfoInterface") "the NIC"}} on {{hostname}}.
     status: current
     varbinds:
       - nicInfoInterface
@@ -856,24 +856,24 @@ traps:
     name: ENDACE-ERFSTREAM-MIB::nicInDropNormal
     category: diagnostic
     severity: notice
-    description: NIC {nicInfoInterface} stopped dropping packets on {_HOSTNAME}.
+    description: Packet drops on {{first (value "nicInfoInterface") "NIC"}} have returned to normal on {{hostname}}.
     status: current
     varbinds:
       - nicInfoInterface
   - oid: 1.3.6.1.4.1.18418.12.2.0.16
     name: ENDACE-ERFSTREAM-MIB::pipeCurrentFlowsHigh
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Data Pipe {pipeName} flow count {pipeCurrentFlows} exceeded configured threshold on {_HOSTNAME}.
+    description: Data pipe {{value "pipeName"}} flow count {{value "pipeCurrentFlows"}} exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - pipeName
       - pipeCurrentFlows
   - oid: 1.3.6.1.4.1.18418.12.2.0.17
     name: ENDACE-ERFSTREAM-MIB::pipeCurrentFlowsNormal
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Data pipe {pipeName} flow count {pipeCurrentFlows} returned to normal on {_HOSTNAME}.
+    description: Data pipe {{value "pipeName"}} flow count returned to normal on {{hostname}}.
     status: current
     varbinds:
       - pipeName
@@ -882,7 +882,7 @@ traps:
     name: ENDACE-ERFSTREAM-MIB::pipeFlowRateHigh
     category: diagnostic
     severity: warning
-    description: Flow creation rate {pipeFlowRate} exceeded threshold on Data Pipe {pipeName} on {_HOSTNAME}.
+    description: Flow creation rate {{value "pipeFlowRate"}} exceeded threshold on {{first (value "pipeName") "pipe"}} on {{hostname}}.
     status: current
     varbinds:
       - pipeName
@@ -890,8 +890,8 @@ traps:
   - oid: 1.3.6.1.4.1.18418.12.2.0.19
     name: ENDACE-ERFSTREAM-MIB::pipeFlowRateNormal
     category: diagnostic
-    severity: warning
-    description: Flow rate {pipeFlowRate} on {pipeName} is within normal threshold on {_HOSTNAME}.
+    severity: notice
+    description: Data pipe {{value "pipeName"}} flow rate is within normal limits on {{hostname}}.
     status: current
     varbinds:
       - pipeName
@@ -900,7 +900,7 @@ traps:
     name: ENDACE-ERFSTREAM-MIB::pipeRunningStatusChange
     category: state_change
     severity: notice
-    description: ERFstream pipe {pipeName} running status changed to {pipeRunningStatus} on {_HOSTNAME}.
+    description: ERFstream pipe {{value "pipeName"}} status changed to {{value "pipeRunningStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - pipeName
@@ -909,7 +909,7 @@ traps:
     name: ENDACE-HBA-MIB::hbaFcStateLinkUp
     category: state_change
     severity: notice
-    description: Fibre Channel link on port {hbaFcPort} went up on {_HOSTNAME}.
+    description: Fibre Channel link on port {{value "hbaFcPort"}} went up on {{hostname}}.
     status: current
     varbinds:
       - hbaFcPort
@@ -917,7 +917,7 @@ traps:
     name: ENDACE-HBA-MIB::hbaFcStateLinkDown
     category: state_change
     severity: warning
-    description: Fibre Channel link down on port {hbaFcPort} on {_HOSTNAME}.
+    description: Fibre Channel link went down on port {{value "hbaFcPort"}} on {{hostname}}.
     status: current
     varbinds:
       - hbaFcPort
@@ -925,7 +925,7 @@ traps:
     name: ENDACE-HBA-MIB::hbaPathStateOk
     category: state_change
     severity: notice
-    description: HBA path {hbaPathScsiId} (WWN {hbaPathWwn}) is OK on {_HOSTNAME}.
+    description: HBA path is OK on {{hostname}}.
     status: current
     varbinds:
       - hbaPathScsiId
@@ -933,8 +933,8 @@ traps:
   - oid: 1.3.6.1.4.1.18418.14.0.4
     name: ENDACE-HBA-MIB::hbaPathStateError
     category: diagnostic
-    severity: err
-    description: Host Bus Adapter path {hbaPathScsiId} reported error state on {_HOSTNAME}.
+    severity: warning
+    description: HBA path error detected{{with value "hbaPathScsiId"}} on SCSI ID {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - hbaPathScsiId
@@ -943,7 +943,7 @@ traps:
     name: ENDACE-INVMGR-MIB::invmgrConnectionChanged
     category: state_change
     severity: notice
-    description: Investigation appliance {invmgrApplStateName} connection state changed to {invmgrApplStateConnected} on {_HOSTNAME}.
+    description: Investigation source connection changed to {{value "invmgrApplStateConnected"}} for {{value "invmgrApplStateName"}} on {{hostname}}.
     status: current
     varbinds:
       - invmgrApplStateName
@@ -951,44 +951,44 @@ traps:
   - oid: 1.3.6.1.4.1.18418.16.0.1
     name: ENDACE-HWMON-MIB::hwmonFanFault
     category: diagnostic
-    severity: err
-    description: Fan fault detected on {_HOSTNAME}.
+    severity: alert
+    description: Hardware fan fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.16.0.2
     name: ENDACE-HWMON-MIB::hwmonFanNormal
     category: diagnostic
-    severity: notice
-    description: Hardware monitoring reports all fans operate normally on {_HOSTNAME}.
+    severity: info
+    description: All fans operate normally on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.16.0.3
     name: ENDACE-HWMON-MIB::hwmonPSUFault
     category: diagnostic
-    severity: err
-    description: Power supply fault detected on {_HOSTNAME}.
+    severity: crit
+    description: Power supply fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.16.0.4
     name: ENDACE-HWMON-MIB::hwmonPSUNormal
     category: diagnostic
     severity: notice
-    description: Power supply status reported normal on {_HOSTNAME}.
+    description: All power supplies operate normally on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.16.0.5
     name: ENDACE-HWMON-MIB::hwmonIntrusionAlarm
     category: security
     severity: alert
-    description: Chassis intrusion detected on {_HOSTNAME}.
+    description: Chassis intrusion alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.16.0.6
     name: ENDACE-HWMON-MIB::hwmonIntrusionNormal
     category: security
     severity: notice
-    description: Chassis intrusion cleared to normal state on {_HOSTNAME}.
+    description: Chassis intrusion cleared to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.18418.16.0.7
     name: ENDACE-HWMON-MIB::hwmonSystemTempHigh
     category: diagnostic
     severity: warning
-    description: System temperature {hwmonSystemTemp} exceeded upper threshold on {_HOSTNAME}.
+    description: System temperature {{value "hwmonSystemTemp"}}°C exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - hwmonSystemTemp
@@ -996,7 +996,7 @@ traps:
     name: ENDACE-HWMON-MIB::hwmonSystemTempNormal
     category: diagnostic
     severity: notice
-    description: System temperature {hwmonSystemTemp} is within normal range on {_HOSTNAME}.
+    description: System temperature is normal at {{value "hwmonSystemTemp"}} degrees C on {{hostname}}.
     status: current
     varbinds:
       - hwmonSystemTemp
@@ -1004,7 +1004,7 @@ traps:
     name: ENDACE-HWMON-MIB::hwmonSystemTempLow
     category: diagnostic
     severity: warning
-    description: System temperature {hwmonSystemTemp} is below the lower threshold on {_HOSTNAME}.
+    description: System temperature {{value "hwmonSystemTemp"}} is below the lower threshold on {{hostname}}.
     status: current
     varbinds:
       - hwmonSystemTemp

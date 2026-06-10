@@ -108,8 +108,8 @@ traps:
   - oid: 1.3.6.1.4.1.4818.1.1
     name: OPMANTEK-MIB::omkEvent
     category: state_change
-    severity: notice
-    description: Event {omkEventName} state changed to {omkState} on {_HOSTNAME}.
+    severity: warning
+    description: Opmantek event {{value "omkEventName"}} with state {{value "omkState"}} on {{hostname}}.
     status: current
     varbinds:
       - omkId
@@ -133,9 +133,9 @@ traps:
       - omkNodeProperty
   - oid: 1.3.6.1.4.1.4818.1.2
     name: OPMANTEK-MIB::nmisEvent
-    category: unknown
-    severity: info
-    description: NMIS event {nmisEvent} with level {nmisLevel} on {_HOSTNAME}.
+    category: diagnostic
+    severity: notice
+    description: NMIS event {{value "nmisEvent"}} received on {{hostname}}.
     status: current
     varbinds:
       - nmisTime

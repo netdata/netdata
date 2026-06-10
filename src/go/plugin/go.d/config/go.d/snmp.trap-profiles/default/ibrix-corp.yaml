@@ -363,7 +363,7 @@ traps:
     name: IBRIX-MIB::ibrixGenericEvent
     category: diagnostic
     severity: warning
-    description: Generic Ibrix event {eventText} with severity {eventSeverity} on {_HOSTNAME}.
+    description: Generic Ibrix event {{value "eventText"}} on {{hostname}}.
     status: current
     varbinds:
       - eventIndex

@@ -3,7 +3,7 @@
 # operator overrides belong in /etc/netdata/go.d/snmp.trap-profiles/.
 vendor: ericsson-ab
 mib_count: 43
-trap_count: 272
+trap_count: 393
 varbinds:
   agentxSessionDescr:
     oid: 1.3.6.1.2.1.74.1.3.2.1.3
@@ -16,10 +16,44 @@ varbinds:
   alarmActiveResourceId:
     oid: 1.3.6.1.2.1.118.1.2.2.1.10
     type: ResourceId
+  alarmInformation:
+    oid: 1.3.6.1.4.1.193.96.115.7.15
+    type: DisplayString
+    constraints: SIZE(0..255)
   alarmModelDescription:
     oid: 1.3.6.1.2.1.118.1.1.2.1.6
     type: SnmpAdminString
     constraints: SIZE(0..255)
+  alarmSeverity:
+    oid: 1.3.6.1.4.1.193.96.115.7.13
+    type: AlarmSeverity
+    enum:
+      "0": indeterminate
+      "1": critical
+      "2": major
+      "3": minor
+      "4": warning
+      "5": cleared
+  alarmTime:
+    oid: 1.3.6.1.4.1.193.96.115.7.14
+    type: DateAndTime
+    constraints: SIZE(8|11)
+  alarmType:
+    oid: 1.3.6.1.4.1.193.96.115.7.12
+    type: AlarmType
+    enum:
+      "0": undefined
+      "1": communications
+      "2": qos
+      "3": processing
+      "4": equipment
+      "5": environmental
+  alarmingObject:
+    oid: 1.3.6.1.4.1.193.96.115.7.11
+    type: InstancePointer
+  ansIdentifier:
+    oid: 1.3.6.1.4.1.193.96.115.7.1
+    type: RowPointer
   dot1dStpPortState:
     oid: 1.3.6.1.2.1.17.2.15.1.3
     type: INTEGER
@@ -1781,32 +1815,6 @@ varbinds:
     oid: 1.3.6.1.4.1.193.218.2.108.1.1.1
     type: Unsigned32
     constraints: (1..3)
-  eriRouterBRMAlarmActiveIndex:
-    oid: 1.3.6.1.4.1.193.218.2.116.1.1.1
-    type: Unsigned32
-    constraints: (1..65535)
-  eriRouterBRMAlarmDateAndTime:
-    oid: 1.3.6.1.4.1.193.218.2.116.1.1.2
-    type: DateAndTime
-    constraints: SIZE(8|11)
-  eriRouterBRMAlarmDescription:
-    oid: 1.3.6.1.4.1.193.218.2.116.1.1.5
-    type: DisplayString
-    constraints: SIZE(0..255)
-  eriRouterBRMAlarmSeverity:
-    oid: 1.3.6.1.4.1.193.218.2.116.1.1.4
-    type: ItuPerceivedSeverity
-    enum:
-      "1": cleared
-      "2": indeterminate
-      "3": critical
-      "4": major
-      "5": minor
-      "6": warning
-  eriRouterBRMEriAlarmType:
-    oid: 1.3.6.1.4.1.193.218.2.116.1.1.3
-    type: EriAlarmType
-    constraints: (0..4294967295)
   eriRouterBridgeCircuitDescriptor:
     oid: 1.3.6.1.4.1.193.218.2.42.1.1.3
     type: SnmpAdminString
@@ -5100,6 +5108,10 @@ varbinds:
       "4": major
       "5": minor
       "6": warning
+  eventTime:
+    oid: 1.3.6.1.4.1.193.96.115.7.17
+    type: DateAndTime
+    constraints: SIZE(8|11)
   ifAdminStatus:
     oid: 1.3.6.1.2.1.2.2.1.7
     type: INTEGER
@@ -5339,6 +5351,10 @@ varbinds:
       "614": unauthorizedAccessAttempt
       "615": unexpectedInformation
       "1024": other
+  ntId:
+    oid: 1.3.6.1.4.1.193.96.115.7.18
+    type: DisplayString
+    constraints: SIZE(0..32)
   pt3080NotifLocalTime:
     oid: 1.3.6.1.4.1.193.223.2.3080.64.3
     type: DateAndTime
@@ -6239,16 +6255,1561 @@ varbinds:
     oid: 1.3.6.1.2.1.67.1.2.1.1.3.1.2
     type: IpAddress
     constraints: SIZE(4)
+  sysContact:
+    oid: 1.3.6.1.2.1.1.4
+    type: DisplayString
+    constraints: SIZE(0..255)
+  sysDescr:
+    oid: 1.3.6.1.2.1.1.1
+    type: DisplayString
+    constraints: SIZE(0..255)
+  sysLocation:
+    oid: 1.3.6.1.2.1.1.6
+    type: DisplayString
+    constraints: SIZE(0..255)
   sysName:
     oid: 1.3.6.1.2.1.1.5
     type: DisplayString
     constraints: SIZE(0..255)
 traps:
-  - oid: 1.3.6.1.4.1.193.110.2.10.2.0.1
-    name: ERICSSON-SNF-ALARM-MIB::snfAlarmActiveState
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.0
+    name: ANS-TRAPS-MIB::systemUp
+    category: state_change
+    severity: notice
+    description: System has initialized and is operational on {{hostname}}.
+    status: current
+    varbinds:
+      - sysName
+      - sysDescr
+      - sysLocation
+      - sysContact
+      - eventTime
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.1
+    name: ANS-TRAPS-MIB::los
+    category: diagnostic
+    severity: crit
+    description: 'Loss of signal detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.2
+    name: ANS-TRAPS-MIB::lof
     category: diagnostic
     severity: warning
-    description: Active alarm {ituAlarmEventType} on {alarmActiveResourceId} reported by {alarmActiveDescription} on {_HOSTNAME}.
+    description: 'Loss of frame detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.3
+    name: ANS-TRAPS-MIB::lop
+    category: diagnostic
+    severity: warning
+    description: 'Loss of pointer detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.4
+    name: ANS-TRAPS-MIB::ais
+    category: diagnostic
+    severity: warning
+    description: 'Alarm Indication Signal detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.6
+    name: ANS-TRAPS-MIB::rai
+    category: diagnostic
+    severity: warning
+    description: Remote Alarm Indication detected on {{first (value "alarmingObject") "component"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.8
+    name: ANS-TRAPS-MIB::lossOfCellDelineation
+    category: diagnostic
+    severity: crit
+    description: 'Loss of cell delineation detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.10
+    name: ANS-TRAPS-MIB::protectionSchemeNotRespected
+    category: diagnostic
+    severity: warning
+    description: Protection scheme not respected due to non-compliant boards on {{hostname}}.
+    status: current
+    varbinds:
+      - sysName
+      - sysDescr
+      - sysLocation
+      - sysContact
+      - eventTime
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.11
+    name: ANS-TRAPS-MIB::rnSwitched
+    category: state_change
+    severity: notice
+    description: Redundancy switch from providing to cold standby service occurred on {{hostname}}.
+    status: current
+    varbinds:
+      - sysName
+      - sysDescr
+      - sysLocation
+      - sysContact
+      - eventTime
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.31
+    name: ANS-TRAPS-MIB::subrackMismatch
+    category: diagnostic
+    severity: warning
+    description: 'Subrack configuration mismatch detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.32
+    name: ANS-TRAPS-MIB::subrackCreated
+    category: state_change
+    severity: notice
+    description: A new subrack was created{{with value "ansIdentifier"}} at {{.}}{{end}} on {{hostname}}.
+    status: current
+    varbinds:
+      - ansIdentifier
+      - eventTime
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.33
+    name: ANS-TRAPS-MIB::systemNodeCreated
+    category: state_change
+    severity: notice
+    description: New system node created with identifier {{value "ansIdentifier"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - ansIdentifier
+      - eventTime
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.34
+    name: ANS-TRAPS-MIB::systemNodeDeleted
+    category: state_change
+    severity: notice
+    description: System node {{value "ansIdentifier"}} deleted on {{hostname}}.
+    status: current
+    varbinds:
+      - ansIdentifier
+      - eventTime
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.35
+    name: ANS-TRAPS-MIB::subrackDeleted
+    category: state_change
+    severity: notice
+    description: Subrack {{value "ansIdentifier"}} deleted on {{hostname}}.
+    status: current
+    varbinds:
+      - ansIdentifier
+      - eventTime
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.36
+    name: ANS-TRAPS-MIB::cbrQueueFull
+    category: diagnostic
+    severity: warning
+    description: Temporary buffer overflow detected on {{first (value "ansIdentifier") "entity"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - ansIdentifier
+      - eventTime
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.37
+    name: ANS-TRAPS-MIB::signOnComplete
+    category: state_change
+    severity: notice
+    description: Sign on completed for {{value "ntId"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - ansIdentifier
+      - eventTime
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.38
+    name: ANS-TRAPS-MIB::alarmDisturbance
+    category: diagnostic
+    severity: warning
+    description: Alarm disturbance detected for {{value "ansIdentifier"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - ansIdentifier
+      - eventTime
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.39
+    name: ANS-TRAPS-MIB::selfTestOk
+    category: diagnostic
+    severity: notice
+    description: Self-test passed for {{first (value "ansIdentifier") "entity"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - ansIdentifier
+      - eventTime
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.40
+    name: ANS-TRAPS-MIB::selfTestFailedOnRadio
+    category: diagnostic
+    severity: crit
+    description: Self-test failed on radio {{value "ansIdentifier"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - ansIdentifier
+      - eventTime
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.52
+    name: ANS-TRAPS-MIB::radioTxOffFail
+    category: diagnostic
+    severity: warning
+    description: Radio transmission failure detected on {{trap_interface}} on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.53
+    name: ANS-TRAPS-MIB::radioRestart
+    category: diagnostic
+    severity: notice
+    description: Radio DP restarted on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.54
+    name: ANS-TRAPS-MIB::swDownloadFailureRadio
+    category: diagnostic
+    severity: crit
+    description: Radio firmware download failed on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.55
+    name: ANS-TRAPS-MIB::swDownloadFailureModem
+    category: diagnostic
+    severity: err
+    description: Modem firmware download failed on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.56
+    name: ANS-TRAPS-MIB::incorrectSwVersModem
+    category: diagnostic
+    severity: crit
+    description: 'Modem active LM has incorrect software version{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.57
+    name: ANS-TRAPS-MIB::systemAudit
+    category: state_change
+    severity: notice
+    description: Control plane start or restart is ongoing on {{hostname}}.
+    status: current
+    varbinds:
+      - sysName
+      - sysDescr
+      - sysLocation
+      - sysContact
+      - eventTime
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.58
+    name: ANS-TRAPS-MIB::incorrectSwVersRadio
+    category: diagnostic
+    severity: warning
+    description: 'Radio software version mismatch detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.59
+    name: ANS-TRAPS-MIB::swdlFromActiveToModemInProgress
+    category: diagnostic
+    severity: notice
+    description: Modem firmware download from active to passive area is in progress on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.60
+    name: ANS-TRAPS-MIB::mcnWarning
+    category: diagnostic
+    severity: warning
+    description: Alarm {{value "alarmType"}} detected on {{first (value "alarmingObject") "object"}} with severity {{value "alarmSeverity"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.61
+    name: ANS-TRAPS-MIB::lossOfNetSync
+    category: diagnostic
+    severity: crit
+    description: Loss of network synchronization detected on {{first (value "alarmingObject") "board"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.62
+    name: ANS-TRAPS-MIB::externalAlarm1
+    category: diagnostic
+    severity: warning
+    description: 'External alarm detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.63
+    name: ANS-TRAPS-MIB::atControlChannel
+    category: diagnostic
+    severity: crit
+    description: No communication with modem processor on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.64
+    name: ANS-TRAPS-MIB::externalAlarm2
+    category: diagnostic
+    severity: warning
+    description: External alarm detected on {{first (value "alarmingObject") "subrack"}} with severity {{value "alarmSeverity"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.65
+    name: ANS-TRAPS-MIB::suMismatch
+    category: diagnostic
+    severity: warning
+    description: 'Wrong type SU inserted in configured slot{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.66
+    name: ANS-TRAPS-MIB::suPowerFailure
+    category: diagnostic
+    severity: alert
+    description: 'Power failure on a SU detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.67
+    name: ANS-TRAPS-MIB::suInitFailure
+    category: diagnostic
+    severity: crit
+    description: 'SU initialization failed{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.68
+    name: ANS-TRAPS-MIB::suUnsupportedType
+    category: diagnostic
+    severity: warning
+    description: 'Unsupported SU type inserted{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.69
+    name: ANS-TRAPS-MIB::suHwFailure
+    category: diagnostic
+    severity: crit
+    description: 'Hardware failure detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.70
+    name: ANS-TRAPS-MIB::radioTxLos
+    category: diagnostic
+    severity: warning
+    description: Radio transmission loss detected due to low modem input level on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.71
+    name: ANS-TRAPS-MIB::radioRfOut
+    category: diagnostic
+    severity: warning
+    description: 'RF output level to antenna too low{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.72
+    name: ANS-TRAPS-MIB::radioTxFreq
+    category: diagnostic
+    severity: warning
+    description: 'Radio transmit frequency is incorrect{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.73
+    name: ANS-TRAPS-MIB::radioRxIfc
+    category: diagnostic
+    severity: warning
+    description: 'Radio Rx intermediate IF PLL unlocked{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.74
+    name: ANS-TRAPS-MIB::radioRxFreq
+    category: diagnostic
+    severity: warning
+    description: 'Radio receive frequency incorrect{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.75
+    name: ANS-TRAPS-MIB::swdlFromActiveToRadioInProgress
+    category: diagnostic
+    severity: notice
+    description: Radio firmware download from active to passive area is in progress on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.76
+    name: ANS-TRAPS-MIB::radioHighTemperature
+    category: diagnostic
+    severity: warning
+    description: 'Radio high temperature alarm detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.77
+    name: ANS-TRAPS-MIB::radioTxOn
+    category: diagnostic
+    severity: notice
+    description: Radio transmitter is always on on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.78
+    name: ANS-TRAPS-MIB::radioVco
+    category: diagnostic
+    severity: warning
+    description: 'Radio VCO has a reduced margin{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.79
+    name: ANS-TRAPS-MIB::radioTxLevel
+    category: diagnostic
+    severity: warning
+    description: 'Unable to adjust radio output power level{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.80
+    name: ANS-TRAPS-MIB::swdlFromPassiveToModemInProgress
+    category: diagnostic
+    severity: info
+    description: Modem firmware download from passive to active area is in progress on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.81
+    name: ANS-TRAPS-MIB::swdlFromPassiveToRadioInProgress
+    category: diagnostic
+    severity: notice
+    description: Radio firmware download from passive to active area is in progress on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.82
+    name: ANS-TRAPS-MIB::modemRauPow
+    category: diagnostic
+    severity: crit
+    description: 'RAU power supply failure detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.83
+    name: ANS-TRAPS-MIB::modemLofTdm
+    category: diagnostic
+    severity: crit
+    description: Loss of synchronization detected on {{first (value "ntId") "modem"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.84
+    name: ANS-TRAPS-MIB::radioMismatch
+    category: state_change
+    severity: warning
+    description: 'Radio mismatch detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.85
+    name: ANS-TRAPS-MIB::modemModInd
+    category: diagnostic
+    severity: warning
+    description: 'Unable to adjust modulation index{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.86
+    name: ANS-TRAPS-MIB::modemSwException
+    category: diagnostic
+    severity: crit
+    description: 'Software exception detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.87
+    name: ANS-TRAPS-MIB::modemHwException
+    category: diagnostic
+    severity: warning
+    description: 'Hardware error detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.88
+    name: ANS-TRAPS-MIB::modemControlChannel
+    category: diagnostic
+    severity: crit
+    description: No communication with radio unit processor on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.89
+    name: ANS-TRAPS-MIB::modemRestart
+    category: state_change
+    severity: notice
+    description: Modem restart completed for {{value "ntId"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - ansIdentifier
+      - eventTime
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.90
+    name: ANS-TRAPS-MIB::ethernetLossOfCarrier
+    category: state_change
+    severity: warning
+    description: Ethernet port detected loss of carrier on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.91
+    name: ANS-TRAPS-MIB::aal1Starvation
+    category: diagnostic
+    severity: warning
+    description: 'AAL1 starvation detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.92
+    name: ANS-TRAPS-MIB::lossOfRefClock
+    category: diagnostic
+    severity: crit
+    description: 'Loss of reference clock detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.94
+    name: ANS-TRAPS-MIB::radioIrsLoss
+    category: diagnostic
+    severity: warning
+    description: 'Radio IRS loss detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.95
+    name: ANS-TRAPS-MIB::lofMf
+    category: diagnostic
+    severity: warning
+    description: 'Loss of Multiframe detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.96
+    name: ANS-TRAPS-MIB::selfTestFailedOnModem
+    category: diagnostic
+    severity: err
+    description: Self-test failed on modem {{value "ansIdentifier"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - ansIdentifier
+      - eventTime
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.97
+    name: ANS-TRAPS-MIB::diskFull
+    category: diagnostic
+    severity: warning
+    description: 'Filesystem on disk is almost full{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.98
+    name: ANS-TRAPS-MIB::hwFailure
+    category: diagnostic
+    severity: alert
+    description: 'Hardware fault detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.99
+    name: ANS-TRAPS-MIB::suRemoved
+    category: state_change
+    severity: notice
+    description: 'SU removed{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.100
+    name: ANS-TRAPS-MIB::modemEberUp
+    category: diagnostic
+    severity: warning
+    description: 'Modem uplink alarm detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.101
+    name: ANS-TRAPS-MIB::modemEberDown
+    category: diagnostic
+    severity: warning
+    description: 'Downlink Eber received in modem is above limit{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.102
+    name: ANS-TRAPS-MIB::modemRxlFinUp
+    category: diagnostic
+    severity: warning
+    description: 'Uplink IF input level from RAU too low{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.103
+    name: ANS-TRAPS-MIB::modemRxlFinDown
+    category: diagnostic
+    severity: warning
+    description: Downlink IF input level from RAU is too low on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.104
+    name: ANS-TRAPS-MIB::radioTxVco
+    category: diagnostic
+    severity: warning
+    description: 'Radio TX VCO reduced action margin{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.106
+    name: ANS-TRAPS-MIB::aal1SarFailure
+    category: diagnostic
+    severity: err
+    description: 'AAL1 SAR failure detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.107
+    name: ANS-TRAPS-MIB::masterLinkSwitched
+    category: state_change
+    severity: notice
+    description: Master link switched synchronization on {{hostname}}.
+    status: current
+    varbinds:
+      - sysName
+      - sysDescr
+      - sysLocation
+      - sysContact
+      - eventTime
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.108
+    name: ANS-TRAPS-MIB::licenseCapacityEvent
+    category: license
+    severity: warning
+    description: License capacity threshold reached on {{hostname}}.
+    status: current
+    varbinds:
+      - sysName
+      - sysDescr
+      - sysLocation
+      - sysContact
+      - eventTime
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.109
+    name: ANS-TRAPS-MIB::licenseExpirationEvent
+    category: license
+    severity: warning
+    description: License expiration event triggered on {{hostname}}.
+    status: current
+    varbinds:
+      - sysName
+      - sysDescr
+      - sysLocation
+      - sysContact
+      - eventTime
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.110
+    name: ANS-TRAPS-MIB::hostidMismatch
+    category: config_change
+    severity: warning
+    description: Host ID mismatch detected after system restart on {{hostname}}.
+    status: current
+    varbinds:
+      - sysName
+      - sysDescr
+      - sysLocation
+      - sysContact
+      - eventTime
+  - oid: 1.3.6.1.4.1.193.96.115.1.0.111
+    name: ANS-TRAPS-MIB::radioFrequencyMismatch
+    category: diagnostic
+    severity: warning
+    description: 'Radio frequency mismatch detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.2.0.5
+    name: ANS-TRAPS-MIB::cellbusFailure
+    category: diagnostic
+    severity: crit
+    description: Cellbus defect detected for {{value "alarmingObject"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.2.0.6
+    name: ANS-TRAPS-MIB::fanFailure
+    category: diagnostic
+    severity: crit
+    description: 'Fan failure detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.2.0.7
+    name: ANS-TRAPS-MIB::powerFailure
+    category: diagnostic
+    severity: crit
+    description: 'Power failure detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.3.0.1
+    name: ANS-TRAPS-MIB::communicationLost
+    category: diagnostic
+    severity: crit
+    description: 'Communication to subrack lost{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.3.0.2
+    name: ANS-TRAPS-MIB::boardReplaced
+    category: state_change
+    severity: notice
+    description: Circuit board replaced in slot {{value "ansIdentifier"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - ansIdentifier
+      - eventTime
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.3.0.4
+    name: ANS-TRAPS-MIB::boardRemovedAlarm
+    category: diagnostic
+    severity: alert
+    description: Board removed alarm detected on {{first (value "alarmingObject") "slot"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.3.0.6
+    name: ANS-TRAPS-MIB::boardMismatch
+    category: diagnostic
+    severity: crit
+    description: Board mismatch detected in slot on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.3.0.7
+    name: ANS-TRAPS-MIB::boardUnrecognized
+    category: diagnostic
+    severity: crit
+    description: Unrecognized circuit board detected in slot on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.3.0.8
+    name: ANS-TRAPS-MIB::powerLoss
+    category: diagnostic
+    severity: alert
+    description: 'Power loss detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.3.0.9
+    name: ANS-TRAPS-MIB::interfaceFailure
+    category: diagnostic
+    severity: crit
+    description: 'Interface failure detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.3.0.12
+    name: ANS-TRAPS-MIB::macSignonFailed
+    category: security
+    severity: warning
+    description: 'MAC sign-on failed{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.9
+    name: ANS-TRAPS-MIB::communicationError
+    category: diagnostic
+    severity: warning
+    description: 'Communication error on {{first (value "alarmingObject") "circuit board"}}{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.12
+    name: ANS-TRAPS-MIB::startError
+    category: diagnostic
+    severity: crit
+    description: Start error condition on {{first (value "alarmingObject") "circuit board"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.13
+    name: ANS-TRAPS-MIB::laserPower
+    category: diagnostic
+    severity: warning
+    description: 'Laser power failure detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.15
+    name: ANS-TRAPS-MIB::dpSoftwareFailure
+    category: diagnostic
+    severity: crit
+    description: 'Data plane software failure detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.16
+    name: ANS-TRAPS-MIB::bufferOverflow
+    category: diagnostic
+    severity: warning
+    description: 'Buffer overflow detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.17
+    name: ANS-TRAPS-MIB::bufferUnderflow
+    category: diagnostic
+    severity: warning
+    description: 'Buffer underflow detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.18
+    name: ANS-TRAPS-MIB::macModemSwDownloadFailure
+    category: diagnostic
+    severity: err
+    description: 'MAC modem software download failed{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.19
+    name: ANS-TRAPS-MIB::downLoadLmFailed
+    category: diagnostic
+    severity: err
+    description: Load module download failed on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.20
+    name: ANS-TRAPS-MIB::macRadioSwDownloadFailure
+    category: diagnostic
+    severity: crit
+    description: MAC radio software download failed on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.21
+    name: ANS-TRAPS-MIB::incorrectSwVersion
+    category: diagnostic
+    severity: warning
+    description: 'Board loaded with incorrect software version{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.22
+    name: ANS-TRAPS-MIB::loopBackFailure
+    category: diagnostic
+    severity: crit
+    description: Loopback failure detected on {{first (value "alarmingObject") "device"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.23
+    name: ANS-TRAPS-MIB::vpAis
+    category: diagnostic
+    severity: crit
+    description: VP AIS alarm detected on {{first (value "alarmingObject") "entity"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.24
+    name: ANS-TRAPS-MIB::vpRdi
+    category: diagnostic
+    severity: warning
+    description: 'VP RDI alarm detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.25
+    name: ANS-TRAPS-MIB::softwareDownloadInProgress
+    category: diagnostic
+    severity: info
+    description: Software download in progress on {{hostname}}.
+    status: current
+    varbinds:
+      - ansIdentifier
+      - eventTime
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.26
+    name: ANS-TRAPS-MIB::softwareDownloadDone
+    category: diagnostic
+    severity: info
+    description: Software download completed on {{hostname}}.
+    status: current
+    varbinds:
+      - ansIdentifier
+      - eventTime
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.27
+    name: ANS-TRAPS-MIB::msAis
+    category: diagnostic
+    severity: crit
+    description: Alarm Indication Signal received on {{first (value "alarmingObject") "link"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.28
+    name: ANS-TRAPS-MIB::msRdi
+    category: diagnostic
+    severity: warning
+    description: Remote Defect Indication received on {{first (value "alarmingObject") "link"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.29
+    name: ANS-TRAPS-MIB::pathRdi
+    category: diagnostic
+    severity: crit
+    description: Remote Defect Indication received on {{first (value "alarmInformation") "path"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.30
+    name: ANS-TRAPS-MIB::pathAis
+    category: diagnostic
+    severity: crit
+    description: Alarm Indication Signal received on {{first (value "alarmingObject") "path"}} on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.37
+    name: ANS-TRAPS-MIB::macControlChannel
+    category: diagnostic
+    severity: crit
+    description: 'No communication with modem processor{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.38
+    name: ANS-TRAPS-MIB::macRclFailure
+    category: security
+    severity: warning
+    description: 'MAC RCL failure: {{value "alarmInformation"}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.39
+    name: ANS-TRAPS-MIB::macCbrOverflow
+    category: diagnostic
+    severity: warning
+    description: 'CBR buffer overflow detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.40
+    name: ANS-TRAPS-MIB::macSwException
+    category: diagnostic
+    severity: crit
+    description: 'Software exception on MAC DP detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.41
+    name: ANS-TRAPS-MIB::macHwException
+    category: diagnostic
+    severity: crit
+    description: 'Hardware exception detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.42
+    name: ANS-TRAPS-MIB::macIncorrSwVersModem
+    category: diagnostic
+    severity: err
+    description: Modem active loadmodule has incorrect software version on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.43
+    name: ANS-TRAPS-MIB::macIncorrSwVersRadio
+    category: diagnostic
+    severity: err
+    description: Radio load module has incorrect software version on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.44
+    name: ANS-TRAPS-MIB::macSwdlFromActiveToModemInProgress
+    category: diagnostic
+    severity: notice
+    description: MAC firmware download from active to passive area is in progress on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.45
+    name: ANS-TRAPS-MIB::macSwdlFromActiveToRadioInProgress
+    category: diagnostic
+    severity: notice
+    description: MAC firmware download from active to radio area is in progress on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.46
+    name: ANS-TRAPS-MIB::atRollbacked
+    category: config_change
+    severity: notice
+    description: Configuration rolled back to previous version on {{hostname}}.
+    status: current
+    varbinds:
+      - ansIdentifier
+      - eventTime
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.47
+    name: ANS-TRAPS-MIB::macSwdlFromPassiveToModemInProgress
+    category: diagnostic
+    severity: notice
+    description: MAC firmware download from passive to active area is in progress on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.48
+    name: ANS-TRAPS-MIB::macSwdlFromPassiveToRadioInProgress
+    category: diagnostic
+    severity: info
+    description: Radio firmware download from passive to active area is in progress on {{hostname}}.
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.49
+    name: ANS-TRAPS-MIB::macKeepAliveFail
+    category: diagnostic
+    severity: warning
+    description: 'MAC radio communication link failure detected{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.50
+    name: ANS-TRAPS-MIB::macRestart
+    category: diagnostic
+    severity: warning
+    description: 'MAC DP restarted{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.96.115.3.4.0.51
+    name: ANS-TRAPS-MIB::macModemRestart
+    category: diagnostic
+    severity: notice
+    description: 'Modem DP restarted{{with value "alarmInformation"}}: {{.}}{{end}} on {{hostname}}.'
+    status: current
+    varbinds:
+      - alarmingObject
+      - alarmType
+      - alarmSeverity
+      - alarmTime
+      - alarmInformation
+      - ntId
+  - oid: 1.3.6.1.4.1.193.110.2.10.2.0.1
+    name: ERICSSON-SNF-ALARM-MIB::snfAlarmActiveState
+    category: state_change
+    severity: warning
+    description: Active alarm {{value "alarmActiveDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmModelDescription
@@ -6260,7 +7821,7 @@ traps:
     name: ERICSSON-SNF-ALARM-MIB::snfAlarmClearState
     category: state_change
     severity: notice
-    description: Alarm {alarmActiveDescription} cleared for resource {alarmActiveResourceId} on {_HOSTNAME}.
+    description: Alarm cleared for {{first (value "alarmActiveDescription") "resource"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmModelDescription
@@ -6272,7 +7833,7 @@ traps:
     name: ERICSSON-SNF-EVENT-MIB::snfEvent
     category: diagnostic
     severity: warning
-    description: SNF event {ituAlarmEventType} with probable cause {ituAlarmProbableCause} on resource {alarmActiveResourceId} on {_HOSTNAME}.
+    description: SNF alarm {{value "alarmActiveDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmModelDescription
@@ -6284,7 +7845,7 @@ traps:
     name: ERICSSON-ALARM-MIB::eriAlarmIndeterminate
     category: diagnostic
     severity: warning
-    description: Indeterminate alarm detected on {eriAlarmActiveManagedObject} with cause {eriAlarmActiveProbableCause} on {_HOSTNAME}.
+    description: Resource {{value "eriAlarmActiveManagedObject"}} reported indeterminate alarm state on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmActiveManagedObject
@@ -6307,7 +7868,7 @@ traps:
     name: ERICSSON-ALARM-MIB::eriAlarmWarning
     category: diagnostic
     severity: warning
-    description: Alarm {eriAlarmActiveManagedObject} reported {eriAlarmActiveSpecificProblem} on {_HOSTNAME}.
+    description: Alarm warning detected on {{value "eriAlarmActiveManagedObject"}} with cause {{value "eriAlarmActiveProbableCause"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmActiveManagedObject
@@ -6330,7 +7891,7 @@ traps:
     name: ERICSSON-ALARM-MIB::eriAlarmMinor
     category: diagnostic
     severity: warning
-    description: Minor alarm detected on {eriAlarmActiveManagedObject} with type {eriAlarmActiveMajorType} on {_HOSTNAME}.
+    description: Minor alarm detected on {{value "eriAlarmActiveManagedObject"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmActiveManagedObject
@@ -6353,7 +7914,7 @@ traps:
     name: ERICSSON-ALARM-MIB::eriAlarmMajor
     category: diagnostic
     severity: crit
-    description: Major alarm detected on {eriAlarmActiveManagedObject} with type {eriAlarmActiveSpecificProblem} on {_HOSTNAME}.
+    description: Major alarm detected on {{value "eriAlarmActiveManagedObject"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmActiveManagedObject
@@ -6376,7 +7937,7 @@ traps:
     name: ERICSSON-ALARM-MIB::eriAlarmCritical
     category: diagnostic
     severity: crit
-    description: Critical alarm on {eriAlarmActiveManagedObject} with type {eriAlarmActiveSpecificProblem} on {_HOSTNAME}.
+    description: Critical alarm detected on {{value "eriAlarmActiveManagedObject"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmActiveManagedObject
@@ -6397,9 +7958,9 @@ traps:
       - eriAlarmNObjSourceIdentifier
   - oid: 1.3.6.1.4.1.193.183.4.2.0.7
     name: ERICSSON-ALARM-MIB::eriAlarmCleared
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Alarm cleared for {eriAlarmActiveManagedObject} on {_HOSTNAME}.
+    description: Alarm cleared for {{value "eriAlarmActiveManagedObject"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmActiveManagedObject
@@ -6420,8 +7981,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.183.4.2.0.8
     name: ERICSSON-ALARM-MIB::eriAlarmAppendInfo
     category: diagnostic
-    severity: warning
-    description: Alarm append info for {eriAlarmActiveManagedObject} with {eriAlarmNObjAppendedAdditionalInfo} on {_HOSTNAME}.
+    severity: notice
+    description: Alarm info appended for {{value "eriAlarmActiveMajorType"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmActiveManagedObject
@@ -6436,7 +7997,7 @@ traps:
     name: ERICSSON-ALARM-MIB::eriAlarmIndAlert
     category: diagnostic
     severity: warning
-    description: New alert detected for {eriAlarmAlertManagedObject} with probable cause {eriAlarmAlertProbableCause} on {_HOSTNAME}.
+    description: Resource alert received for {{value "eriAlarmAlertSpecificProblem"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmAlertManagedObject
@@ -6458,7 +8019,7 @@ traps:
     name: ERICSSON-ALARM-MIB::eriAlarmWarnAlert
     category: diagnostic
     severity: warning
-    description: Resource {eriAlarmAlertManagedObject} reported warning alert {eriAlarmAlertSpecificProblem} on {_HOSTNAME}.
+    description: Resource alert warning {{value "eriAlarmAlertSpecificProblem"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmAlertManagedObject
@@ -6480,7 +8041,7 @@ traps:
     name: ERICSSON-ALARM-MIB::eriAlarmMinorAlert
     category: diagnostic
     severity: warning
-    description: Minor alert {eriAlarmAlertSpecificProblem} detected on {eriAlarmAlertManagedObject} on {_HOSTNAME}.
+    description: Minor alert detected for {{value "eriAlarmAlertSpecificProblem"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmAlertManagedObject
@@ -6502,7 +8063,7 @@ traps:
     name: ERICSSON-ALARM-MIB::eriAlarmMajorAlert
     category: diagnostic
     severity: crit
-    description: Major alarm {eriAlarmAlertSpecificProblem} detected on {_HOSTNAME}.
+    description: Major alarm detected on {{value "eriAlarmAlertManagedObject"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmAlertManagedObject
@@ -6524,7 +8085,7 @@ traps:
     name: ERICSSON-ALARM-MIB::eriAlarmCriticalAlert
     category: diagnostic
     severity: crit
-    description: Critical alert {eriAlarmAlertSpecificProblem} detected on {eriAlarmAlertManagedObject} on {_HOSTNAME}.
+    description: Critical alert detected on {{value "eriAlarmAlertManagedObject"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmAlertManagedObject
@@ -6546,7 +8107,7 @@ traps:
     name: ERICSSON-ALARM-MIB::eriAlarmAppendAlertInfo
     category: diagnostic
     severity: warning
-    description: Alarm append info for {eriAlarmAlertManagedObject} with {eriAlarmNObjAppendedAdditionalInfo} on {_HOSTNAME}.
+    description: Alarm info appended for {{value "eriAlarmAlertMajorType"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmAlertManagedObject
@@ -6561,7 +8122,7 @@ traps:
     name: ERICSSON-ALARM-MIB::eriAlarmHeartBeatNotif
     category: diagnostic
     severity: info
-    description: Heartbeat notification received with last sequence numbers on {_HOSTNAME}.
+    description: Heartbeat notification received on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmActiveLastSequenceNo
@@ -6574,7 +8135,7 @@ traps:
     name: ERICSSON-ALARM-MIB::eriAlarmAlarmListRebuilt
     category: diagnostic
     severity: notice
-    description: Alarm list rebuilt and stabilized after restart on {_HOSTNAME}.
+    description: Active alarm list rebuilt and stable on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmActiveTableURL
@@ -6582,9 +8143,9 @@ traps:
       - eriAlarmNObjSourceIdentifier
   - oid: 1.3.6.1.4.1.193.183.5.4.0.1
     name: ERICSSON-DISCOVERY-MIB::eriDiscoveryEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Node discovery event received with ID {eriDiscoveryNodeIdValue} on {_HOSTNAME}.
+    description: Node discovered via auto-discovery with ID {{value "eriDiscoveryNodeIdValue"}} on {{hostname}}.
     status: current
     varbinds:
       - eriDiscoveryNodeIdType
@@ -6599,7 +8160,7 @@ traps:
     name: ERICSSON-ALARM-XPATH-MIB::eriAlarmXIndeterminate
     category: diagnostic
     severity: warning
-    description: Indeterminate alarm detected on {eriAlarmXActiveYangNodeInstance} with type {eriAlarmXActiveSpecificProblem} on {_HOSTNAME}.
+    description: Indeterminate alarm detected for {{value "eriAlarmXActiveSpecificProblem"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmXActiveYangNodeInstance
@@ -6622,7 +8183,7 @@ traps:
     name: ERICSSON-ALARM-XPATH-MIB::eriAlarmXWarning
     category: diagnostic
     severity: warning
-    description: Resource {eriAlarmXActiveYangNodeInstance} reported warning alarm {eriAlarmXActiveSpecificProblem} on {_HOSTNAME}.
+    description: Resource alarm warning {{value "eriAlarmXActiveSpecificProblem"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmXActiveYangNodeInstance
@@ -6645,7 +8206,7 @@ traps:
     name: ERICSSON-ALARM-XPATH-MIB::eriAlarmXMinor
     category: diagnostic
     severity: warning
-    description: Minor alarm detected on {eriAlarmXActiveYangNodeInstance} with type {eriAlarmXActiveSpecificProblem} on {_HOSTNAME}.
+    description: Minor alarm {{value "eriAlarmXActiveSpecificProblem"}} detected on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmXActiveYangNodeInstance
@@ -6668,7 +8229,7 @@ traps:
     name: ERICSSON-ALARM-XPATH-MIB::eriAlarmXMajor
     category: diagnostic
     severity: crit
-    description: Major alarm detected on {eriAlarmXActiveYangNodeInstance} with type {eriAlarmXActiveSpecificProblem} on {_HOSTNAME}.
+    description: 'Major alarm detected{{with value "eriAlarmXActiveSpecificProblem"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eriAlarmXActiveYangNodeInstance
@@ -6691,7 +8252,7 @@ traps:
     name: ERICSSON-ALARM-XPATH-MIB::eriAlarmXCritical
     category: diagnostic
     severity: crit
-    description: Critical alarm {eriAlarmXActiveSpecificProblem} detected on {eriAlarmXActiveYangNodeInstance} on {_HOSTNAME}.
+    description: Critical alarm {{value "eriAlarmXActiveSpecificProblem"}} detected on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmXActiveYangNodeInstance
@@ -6712,9 +8273,9 @@ traps:
       - eriAlarmXNObjSourceIdentifier
   - oid: 1.3.6.1.4.1.193.183.6.2.0.7
     name: ERICSSON-ALARM-XPATH-MIB::eriAlarmXCleared
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Alarm cleared for {eriAlarmXActiveSpecificProblem} on {_HOSTNAME}.
+    description: Alarm cleared for {{value "eriAlarmXActiveSpecificProblem"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmXActiveYangNodeInstance
@@ -6735,8 +8296,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.183.6.2.0.8
     name: ERICSSON-ALARM-XPATH-MIB::eriAlarmXAppendInfo
     category: diagnostic
-    severity: warning
-    description: Alarm appended with {eriAlarmXNObjAdditionalText} for {eriAlarmXActiveYangNodeInstance} on {_HOSTNAME}.
+    severity: notice
+    description: 'Alarm info appended{{with value "eriAlarmXNObjAppendedAdditionalInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eriAlarmXActiveYangNodeInstance
@@ -6751,7 +8312,7 @@ traps:
     name: ERICSSON-ALARM-XPATH-MIB::eriAlarmXIndAlert
     category: diagnostic
     severity: warning
-    description: Indeterminate alert {eriAlarmXAlertSpecificProblem} detected on {_HOSTNAME}.
+    description: Indeterminate alert detected for {{value "eriAlarmXAlertSpecificProblem"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmXAlertYangNodeInstance
@@ -6773,7 +8334,7 @@ traps:
     name: ERICSSON-ALARM-XPATH-MIB::eriAlarmXWarnAlert
     category: diagnostic
     severity: warning
-    description: New warning alert {eriAlarmXAlertSpecificProblem} detected on {_HOSTNAME}.
+    description: 'Resource alert warning detected{{with value "eriAlarmXAlertSpecificProblem"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eriAlarmXAlertYangNodeInstance
@@ -6795,7 +8356,7 @@ traps:
     name: ERICSSON-ALARM-XPATH-MIB::eriAlarmXMinorAlert
     category: diagnostic
     severity: warning
-    description: Minor alert {eriAlarmXAlertSpecificProblem} detected on {_HOSTNAME}.
+    description: Minor alert detected on {{value "eriAlarmXAlertYangNodeInstance"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmXAlertYangNodeInstance
@@ -6817,7 +8378,7 @@ traps:
     name: ERICSSON-ALARM-XPATH-MIB::eriAlarmXMajorAlert
     category: diagnostic
     severity: crit
-    description: Major alert detected for {eriAlarmXAlertSpecificProblem} on {_HOSTNAME}.
+    description: Major resource alert detected on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmXAlertYangNodeInstance
@@ -6839,7 +8400,7 @@ traps:
     name: ERICSSON-ALARM-XPATH-MIB::eriAlarmXCriticalAlert
     category: diagnostic
     severity: crit
-    description: Critical alert {eriAlarmXAlertSpecificProblem} detected on {_HOSTNAME}.
+    description: Critical alert detected on {{value "eriAlarmXAlertYangNodeInstance"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmXAlertYangNodeInstance
@@ -6860,8 +8421,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.183.6.2.0.15
     name: ERICSSON-ALARM-XPATH-MIB::eriAlarmXAppendAlertInfo
     category: diagnostic
-    severity: notice
-    description: Alert info appended for {eriAlarmXAlertMajorType} on {_HOSTNAME}.
+    severity: warning
+    description: Alarm info appended for {{value "eriAlarmXAlertMajorType"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmXAlertYangNodeInstance
@@ -6876,7 +8437,7 @@ traps:
     name: ERICSSON-ALARM-XPATH-MIB::eriAlarmXHeartBeatNotif
     category: diagnostic
     severity: info
-    description: Heartbeat notification received with last sequence numbers {eriAlarmXActiveLastSequenceNo} and {eriAlarmXAlertLastSequenceNo} on {_HOSTNAME}.
+    description: Heartbeat notification received with sequence {{value "eriAlarmXActiveLastSequenceNo"}} on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmXActiveLastSequenceNo
@@ -6887,9 +8448,9 @@ traps:
       - eriAlarmXNObjSourceIdentifier
   - oid: 1.3.6.1.4.1.193.183.6.2.0.30
     name: ERICSSON-ALARM-XPATH-MIB::eriAlarmXAlarmListRebuilt
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Active alarm list stabilized after restart on {_HOSTNAME}.
+    description: Active alarm list rebuilt and stable on {{hostname}}.
     status: current
     varbinds:
       - eriAlarmXActiveTableURL
@@ -6898,49 +8459,49 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.4.0.1
     name: ERICSSON-ROUTER-ENVMON-MIB::eriRouterFanFailChange
     category: diagnostic
-    severity: err
-    description: Fan failure detected with status {eriRouterFanFail} on {_HOSTNAME}.
+    severity: alert
+    description: Fan failure detected on {{first (value "eriRouterFanFail") "device"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - eriRouterFanFail
   - oid: 1.3.6.1.4.1.193.218.2.4.0.2
     name: ERICSSON-ROUTER-ENVMON-MIB::eriRouterPowerFailChange
     category: diagnostic
-    severity: crit
-    description: Power supply failure detected via {eriRouterPowerFail} on {_HOSTNAME}.
+    severity: alert
+    description: Power supply failure detected on {{first (value "eriRouterPowerFail") "test point"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - eriRouterPowerFail
   - oid: 1.3.6.1.4.1.193.218.2.4.0.3
     name: ERICSSON-ROUTER-ENVMON-MIB::eriRouterFanStatusChange
     category: diagnostic
-    severity: err
-    description: Fan status changed to {eriRouterFanStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Router fan status changed to {{value "eriRouterFanStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterFanStatus
   - oid: 1.3.6.1.4.1.193.218.2.4.0.4
     name: ERICSSON-ROUTER-ENVMON-MIB::eriRouterPowerStatusChange
     category: diagnostic
-    severity: err
-    description: Power status changed to {eriRouterPowerStatus} on {_HOSTNAME}.
+    severity: alert
+    description: Router power status changed to {{value "eriRouterPowerStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterPowerStatus
   - oid: 1.3.6.1.4.1.193.218.2.13.0.1
     name: ERICSSON-ROUTER-CONFIG-FILE-MIB::eriRouterCfJobCompleted
     category: config_change
-    severity: notice
-    description: Configuration job completed with result {eriRouterCfJobResult} on {_HOSTNAME}.
+    severity: info
+    description: Configuration job completed{{with value "eriRouterCfJobResult"}} with result {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterCfJobResult
       - eriRouterCfJobErrorMsgs
   - oid: 1.3.6.1.4.1.193.218.2.15.0.1
     name: ERICSSON-ROUTER-IPPOOL-MIB::eriRouterIpPoolThresholdMet
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: IP pool {eriRouterIpPoolContextName} available addresses {eriRouterIpPoolAvailable} reached threshold {eriRouterIpPoolThreshold} on {_HOSTNAME}.
+    description: IP pool {{value "eriRouterIpPoolContextName"}} available addresses reached threshold on {{hostname}}.
     status: current
     varbinds:
       - eriRouterIpPoolContextName
@@ -6952,7 +8513,7 @@ traps:
     name: ERICSSON-ROUTER-IPPOOL-MIB::eriRouterIpPoolContextThresholdMet
     category: diagnostic
     severity: warning
-    description: IP pool context {eriRouterIpPoolContextName} available addresses {eriRouterIpPoolContextAvailable} reached threshold {eriRouterIpPoolContextThreshold} on {_HOSTNAME}.
+    description: IP pool context {{value "eriRouterIpPoolContextName"}} available addresses {{value "eriRouterIpPoolContextAvailable"}} reached threshold on {{hostname}}.
     status: current
     varbinds:
       - eriRouterIpPoolContextName
@@ -6962,7 +8523,7 @@ traps:
     name: ERICSSON-ROUTER-IPPOOL-MIB::eriRouterIpPoolContextThresholdPercentageMet
     category: diagnostic
     severity: warning
-    description: IP pool context {eriRouterIpPoolContextName} available addresses {eriRouterIpPoolContextAvailable} fell below threshold {eriRouterIpPoolContextThresholdPercentage}% on {_HOSTNAME}.
+    description: IP pool context {{value "eriRouterIpPoolContextName"}} available addresses fell below threshold on {{hostname}}.
     status: current
     varbinds:
       - eriRouterIpPoolContextName
@@ -6971,9 +8532,9 @@ traps:
       - eriRouterIpPoolContextThresholdPercentage
   - oid: 1.3.6.1.4.1.193.218.2.15.0.4
     name: ERICSSON-ROUTER-IPPOOL-MIB::eriRouterInetIpPoolHiFallingThrshMet
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: IP pool {eriRouterInetIpPoolName} available count fell below high threshold {eriRouterInetIpPoolHiFallingThrsh} on {_HOSTNAME}.
+    description: IP pool {{value "eriRouterInetIpPoolName"}} available prefixes fell to threshold on {{hostname}}.
     status: current
     varbinds:
       - eriRouterInetIpPoolEndPrefixType
@@ -6987,9 +8548,9 @@ traps:
       - eriRouterInetIpPoolHiFallingThrsh
   - oid: 1.3.6.1.4.1.193.218.2.15.0.5
     name: ERICSSON-ROUTER-IPPOOL-MIB::eriRouterInetIpPoolLoFallingThrshMet
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: IP Pool {eriRouterInetIpPoolName} available count {eriRouterInetIpPoolAvailable} fell below threshold {eriRouterInetIpPoolLoFallingThrsh} on {_HOSTNAME}.
+    description: IP pool {{value "eriRouterInetIpPoolName"}} available prefixes fell below low threshold on {{hostname}}.
     status: current
     varbinds:
       - eriRouterInetIpPoolEndPrefixType
@@ -7003,9 +8564,9 @@ traps:
       - eriRouterInetIpPoolLoFallingThrsh
   - oid: 1.3.6.1.4.1.193.218.2.15.0.6
     name: ERICSSON-ROUTER-IPPOOL-MIB::eriRouterInetIpPoolCtxHiFallingThrshMet
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: IP Pool {eriRouterInetIpPoolCtxName} available count {eriRouterInetIpPoolCtxAvailable} fell below high threshold {eriRouterInetIpPoolCtxHiFallingThrsh} on {_HOSTNAME}.
+    description: IP pool {{value "eriRouterInetIpPoolCtxName"}} available addresses fell below high threshold on {{hostname}}.
     status: current
     varbinds:
       - eriRouterInetIpPoolCtxName
@@ -7017,7 +8578,7 @@ traps:
     name: ERICSSON-ROUTER-IPPOOL-MIB::eriRouterInetIpPoolCtxLoFallingThrshMet
     category: diagnostic
     severity: warning
-    description: IP Pool {eriRouterInetIpPoolCtxName} available count {eriRouterInetIpPoolCtxAvailable} reached low falling threshold {eriRouterInetIpPoolCtxLoFallingThrsh} on {_HOSTNAME}.
+    description: IP pool {{value "eriRouterInetIpPoolCtxName"}} available prefixes fell below low threshold on {{hostname}}.
     status: current
     varbinds:
       - eriRouterInetIpPoolCtxName
@@ -7029,7 +8590,7 @@ traps:
     name: ERICSSON-ROUTER-BULKSTATS-MIB::eriRouterBulkStatsTrfrFail
     category: diagnostic
     severity: warning
-    description: Bulk statistics transfer failed to {eriRouterBulkStatsLastTrfrIpAddr} with status {eriRouterBulkStatsLastTrfrStatus} on {_HOSTNAME}.
+    description: Bulk statistics transfer failed to {{value "eriRouterBulkStatsLastTrfrIpAddr"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - eriRouterBulkStatsLastTrfrIpAddrType
@@ -7039,7 +8600,7 @@ traps:
     name: ERICSSON-ROUTER-BULKSTATS-MIB::eriRouterBulkStatsTrfrFail2
     category: diagnostic
     severity: err
-    description: Bulk statistics transfer failed to {eriRouterBulkStatsLastTrfrIpAddr2} with status {eriRouterBulkStatsLastTrfrStatus2} on {_HOSTNAME}.
+    description: Bulk statistics transfer failed to {{value "eriRouterBulkStatsLastTrfrIpAddr2"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterBulkStatsLastTrfrIpAddrType2
@@ -7049,8 +8610,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.21.0.3
     name: ERICSSON-ROUTER-BULKSTATS-MIB::eriRouterBulkStatsFileWrapped
     category: diagnostic
-    severity: notice
-    description: Bulk statistics file wrapped event on {_HOSTNAME}.
+    severity: warning
+    description: Bulk statistics file wrapped on {{hostname}}.
     status: current
     varbinds:
       - eriRouterBulkStatsLastTrfrIpAddrType2
@@ -7061,7 +8622,7 @@ traps:
     name: ERICSSON-ROUTER-SYS-RESOURCES-MIB::eriRouterSRProcessEvent
     category: diagnostic
     severity: warning
-    description: Process {eriRouterSRProcessNotifyEventType} event detected for PID {eriRouterSRProcessNotifyPID} on {_HOSTNAME}.
+    description: Router process {{value "eriRouterSRProcessNotifyEventType"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSRProcessNotifyPID
@@ -7071,14 +8632,14 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.24.0.2
     name: ERICSSON-ROUTER-SYS-RESOURCES-MIB::eriRouterSRSwitchoverEvent
     category: state_change
-    severity: notice
-    description: Router switchover event occurred on {_HOSTNAME}.
+    severity: alert
+    description: Router switchover occurred from main to backup processor on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.193.218.2.24.0.3
     name: ERICSSON-ROUTER-SYS-RESOURCES-MIB::eriRouterSRStorageFailedEvent
     category: diagnostic
-    severity: err
-    description: Storage device {eriRouterSRStorageDescr} in slot {eriRouterSRStorageSlot} reported failed status on {_HOSTNAME}.
+    severity: crit
+    description: Storage device {{value "eriRouterSRStorageDescr"}} failed on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSRStorageDescr
@@ -7088,7 +8649,7 @@ traps:
     name: ERICSSON-ROUTER-SYS-RESOURCES-MIB::eriRouterSRPowerExceededEvent
     category: diagnostic
     severity: warning
-    description: Controller card power draw exceeded recommendation with status {eriRouterSRPowerExceededStatus} on {_HOSTNAME}.
+    description: Controller card power exceeded recommended limit{{with value "eriRouterSRPowerExceededStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSRPowerExceededStatus
@@ -7096,7 +8657,7 @@ traps:
     name: ERICSSON-ROUTER-SYS-RESOURCES-MIB::eriRouterSseDiskHealthDegradedAlarm
     category: diagnostic
     severity: warning
-    description: Hard disk health degraded with severity {eriRouterSseDiskAlarmSeverity.raw} on {_HOSTNAME}.
+    description: Disk health degraded on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSseDiskAlarmDateAndTime
@@ -7109,7 +8670,7 @@ traps:
     name: ERICSSON-ROUTER-SYS-RESOURCES-MIB::eriRouterSseDiskFailedAlarm
     category: diagnostic
     severity: crit
-    description: Hard disk failure detected with severity {eriRouterSseDiskAlarmSeverity.raw} on {_HOSTNAME}.
+    description: Hard disk failed on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSseDiskAlarmDateAndTime
@@ -7121,8 +8682,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.24.0.7
     name: ERICSSON-ROUTER-SYS-RESOURCES-MIB::eriRouterSseDiskMissingAlarm
     category: diagnostic
-    severity: err
-    description: Hard disk missing alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: Hard disk missing alarm detected on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSseDiskAlarmDateAndTime
@@ -7134,8 +8695,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.24.0.8
     name: ERICSSON-ROUTER-SYS-RESOURCES-MIB::eriRouterSseDiskUnsupportedAlarm
     category: diagnostic
-    severity: err
-    description: Unsupported hard disk detected with state {eriRouterSseDiskState} on {_HOSTNAME}.
+    severity: warning
+    description: Hard disk unsupported alarm detected on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSseDiskAlarmDateAndTime
@@ -7148,7 +8709,7 @@ traps:
     name: ERICSSON-ROUTER-SYS-RESOURCES-MIB::eriRouterSseDiskOOSAlarm
     category: diagnostic
     severity: crit
-    description: Hard disk is out of service with state {eriRouterSseDiskState} on {_HOSTNAME}.
+    description: Hard disk is out of service on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSseDiskAlarmDateAndTime
@@ -7161,7 +8722,7 @@ traps:
     name: ERICSSON-ROUTER-SYS-RESOURCES-MIB::eriRouterSseDiskVoltageFailureAlarm
     category: diagnostic
     severity: crit
-    description: Hard disk voltage failure detected on {_HOSTNAME}.
+    description: Hard disk voltage failure detected on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSseDiskAlarmDateAndTime
@@ -7173,8 +8734,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.24.0.11
     name: ERICSSON-ROUTER-SYS-RESOURCES-MIB::eriRouterSseDiskOverHeatAlarm
     category: diagnostic
-    severity: err
-    description: Hard disk overheating alarm detected with severity {eriRouterSseDiskAlarmSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: Hard disk overheating detected on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSseDiskAlarmDateAndTime
@@ -7186,8 +8747,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.24.0.12
     name: ERICSSON-ROUTER-SYS-RESOURCES-MIB::eriRouterSseDiskReadFailureAlarm
     category: diagnostic
-    severity: err
-    description: Hard disk read failure detected with severity {eriRouterSseDiskAlarmSeverity.raw} on {_HOSTNAME}.
+    severity: crit
+    description: Hard disk read failure detected on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSseDiskAlarmDateAndTime
@@ -7200,15 +8761,15 @@ traps:
     name: ERICSSON-ROUTER-SYS-RESOURCES-MIB::eriRouterIssuStateChange
     category: state_change
     severity: notice
-    description: ISSU state changed to {eriRouterIssuState} on {_HOSTNAME}.
+    description: ISSU state changed to {{value "eriRouterIssuState"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterIssuState
   - oid: 1.3.6.1.4.1.193.218.2.24.0.14
     name: ERICSSON-ROUTER-SYS-RESOURCES-MIB::eriRouterChassisAlarm
     category: diagnostic
-    severity: warning
-    description: Chassis alarm {eriRouterChassisAlarmId} raised with probable cause {eriRouterChassisAlarmProbableCause} on {_HOSTNAME}.
+    severity: crit
+    description: Chassis alarm raised on {{hostname}}.
     status: current
     varbinds:
       - eriRouterChassisAlarmId
@@ -7219,9 +8780,9 @@ traps:
       - eriRouterChassisAlarmSeverity
   - oid: 1.3.6.1.4.1.193.218.2.27.3.0.1
     name: ERICSSON-ROUTER-SUBSCRIBER-ACTIVE-MIB::eriRouterSubsConfigErrorEvent
-    category: config_change
+    category: state_change
     severity: warning
-    description: 'Subscriber session {eriRouterSubsActiveCircuitHandle} has configuration mismatch: {eriRouterSubsConfigErrorMsgs} on {_HOSTNAME}.'
+    description: Subscriber session has configuration errors {{value "eriRouterSubsConfigErrorMsgs"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSubsActiveCircuitHandle
@@ -7230,7 +8791,7 @@ traps:
     name: ERICSSON-ROUTER-L2TP-MIB::eriRouterL2tpMibTunnelStateChange
     category: state_change
     severity: warning
-    description: L2TP tunnel state changed to {eriRouterL2tpMibTunnelTrapState} in context {eriRouterL2tpMibTunnelTrapContext} on {_HOSTNAME}.
+    description: L2TP tunnel {{value "eriRouterL2tpMibTunnelTrapContext"}} state changed to {{value "eriRouterL2tpMibTunnelTrapState"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - eriRouterL2tpMibTunnelTrapContext
@@ -7239,7 +8800,7 @@ traps:
     name: ERICSSON-ROUTER-L2TP-MIB::eriRouterL2tpMibTunnelStateChange2
     category: state_change
     severity: warning
-    description: L2TP tunnel {eriRouterL2tpTCfgTunnelContext} state changed to {eriRouterL2tpMibTunnelState} on {_HOSTNAME}.
+    description: L2TP tunnel state changed to {{value "eriRouterL2tpMibTunnelState"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterL2tpTCfgTunnelContext
@@ -7247,9 +8808,9 @@ traps:
       - eriRouterL2tpTCfgRemoteTunnelID
   - oid: 1.3.6.1.4.1.193.218.2.30.0.1
     name: ERICSSON-ROUTER-DHCP-MIB::eriRouterDhcpIntfThresholdFallingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DHCP interface {eriRouterDhcpIntfThresholdContextName} available leases {eriRouterDhcpIntfThresholdAvailable} reached falling threshold {eriRouterDhcpIntfThresholdFallingThreshold} on {_HOSTNAME}.
+    description: DHCP lease count dropped to falling threshold of {{value "eriRouterDhcpIntfThresholdFallingThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterDhcpIntfThresholdContextName
@@ -7257,9 +8818,9 @@ traps:
       - eriRouterDhcpIntfThresholdFallingThreshold
   - oid: 1.3.6.1.4.1.193.218.2.30.0.2
     name: ERICSSON-ROUTER-DHCP-MIB::eriRouterDhcpIntfThresholdRisingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DHCP interface {eriRouterDhcpIntfThresholdContextName} available leases {eriRouterDhcpIntfThresholdAvailable} reached rising threshold {eriRouterDhcpIntfThresholdRisingThreshold} on {_HOSTNAME}.
+    description: DHCP rising threshold reached for {{value "eriRouterDhcpIntfThresholdContextName"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterDhcpIntfThresholdContextName
@@ -7267,9 +8828,9 @@ traps:
       - eriRouterDhcpIntfThresholdRisingThreshold
   - oid: 1.3.6.1.4.1.193.218.2.30.0.3
     name: ERICSSON-ROUTER-DHCP-MIB::eriRouterDhcpCtxThresholdFallingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DHCP context {eriRouterDhcpCtxThresholdName} available leases {eriRouterDhcpCtxThresholdAvailable} fell below threshold {eriRouterDhcpCtxThresholdFallingThreshold} on {_HOSTNAME}.
+    description: DHCP context {{value "eriRouterDhcpCtxThresholdName"}} falling threshold reached on {{hostname}}.
     status: current
     varbinds:
       - eriRouterDhcpCtxThresholdName
@@ -7277,9 +8838,9 @@ traps:
       - eriRouterDhcpCtxThresholdFallingThreshold
   - oid: 1.3.6.1.4.1.193.218.2.30.0.4
     name: ERICSSON-ROUTER-DHCP-MIB::eriRouterDhcpCtxThresholdRisingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DHCP context {eriRouterDhcpCtxThresholdName} available leases {eriRouterDhcpCtxThresholdAvailable} reached rising threshold {eriRouterDhcpCtxThresholdRisingThreshold} on {_HOSTNAME}.
+    description: DHCP context {{value "eriRouterDhcpCtxThresholdName"}} rising threshold met on {{hostname}}.
     status: current
     varbinds:
       - eriRouterDhcpCtxThresholdName
@@ -7287,9 +8848,9 @@ traps:
       - eriRouterDhcpCtxThresholdRisingThreshold
   - oid: 1.3.6.1.4.1.193.218.2.30.0.5
     name: ERICSSON-ROUTER-DHCP-MIB::eriRouterDhcpRangeThresholdFallingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DHCP available leases {eriRouterDhcpRangeThresholdAvailable} reached falling threshold {eriRouterDhcpRangeThresholdFallingThreshold} on interface {eriRouterDhcpRangeThresholdInterfaceName} on {_HOSTNAME}.
+    description: DHCP lease count reached falling threshold of {{value "eriRouterDhcpRangeThresholdFallingThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterDhcpRangeThresholdContextName
@@ -7299,9 +8860,9 @@ traps:
       - eriRouterDhcpRangeThresholdFallingThreshold
   - oid: 1.3.6.1.4.1.193.218.2.30.0.6
     name: ERICSSON-ROUTER-DHCP-MIB::eriRouterDhcpRangeThresholdRisingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DHCP range on {eriRouterDhcpRangeThresholdInterfaceName} available leases {eriRouterDhcpRangeThresholdAvailable} reached rising threshold {eriRouterDhcpRangeThresholdRisingThreshold} on {_HOSTNAME}.
+    description: DHCP range threshold reached for {{value "eriRouterDhcpRangeThresholdInterfaceName"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterDhcpRangeThresholdContextName
@@ -7312,8 +8873,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.30.0.7
     name: ERICSSON-ROUTER-DHCP-MIB::eriRouterDhcpLeaseFileFailure
     category: diagnostic
-    severity: err
-    description: DHCP lease file failure on storage slot {eriRouterDhcpLeaseFileStorageSlot} with error type {eriRouterDhcpLeaseFileErrorType} on {_HOSTNAME}.
+    severity: warning
+    description: 'DHCP lease file update failure{{with value "eriRouterDhcpLeaseFileErrorType"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eriRouterDhcpLeaseFileStorageSlot
@@ -7322,7 +8883,7 @@ traps:
     name: ERICSSON-ROUTER-CARDMON-MIB::eriRouterCardAlarm
     category: diagnostic
     severity: warning
-    description: Card alarm raised on slot {eriRouterCardAlarmSlot} with type {eriRouterCardAlarmType} on {_HOSTNAME}.
+    description: Router card alarm raised on slot {{value "eriRouterCardAlarmSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterCardAlarmSlot
@@ -7337,7 +8898,7 @@ traps:
     name: ERICSSON-ROUTER-RADIUS-MIB::eriRouterRadiusAuthStateChange
     category: state_change
     severity: warning
-    description: RADIUS server {radiusAuthServerAddress} state changed to {eriRouterRadiusAuthSrvState} on {_HOSTNAME}.
+    description: RADIUS authorization server {{value "radiusAuthServerAddress"}} state changed to {{value "eriRouterRadiusAuthSrvState"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterRadiusAuthSrvState
@@ -7351,7 +8912,7 @@ traps:
     name: ERICSSON-ROUTER-RADIUS-MIB::eriRouterRadiusAcctStateChange
     category: state_change
     severity: warning
-    description: RADIUS accounting server {radiusAccServerAddress} state changed to {eriRouterRadiusAcctSrvState} on {_HOSTNAME}.
+    description: RADIUS accounting server {{value "radiusAccServerAddress"}} state changed to {{value "eriRouterRadiusAcctSrvState"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterRadiusAcctSrvState
@@ -7365,7 +8926,7 @@ traps:
     name: ERICSSON-ROUTER-TACACS-MIB::eriRouterTacacsStateChange
     category: state_change
     severity: warning
-    description: TACACS+ server {eriRouterTacacsServerAddress} state changed to {eriRouterTacacsServerState} on {_HOSTNAME}.
+    description: TACACS+ server {{value "eriRouterTacacsServerAddress"}} state changed to {{value "eriRouterTacacsServerState"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterTacacsContext
@@ -7381,7 +8942,7 @@ traps:
     name: ERICSSON-ROUTER-NOTIFY-ENHANCE-MIB::eriRouterNEentConfigChange
     category: config_change
     severity: notice
-    description: Entity configuration changed on slot {eriRouterNESlot} card {eriRouterNECardName} with operation {eriRouterNECardOp} on {_HOSTNAME}.
+    description: Router entity configuration changed on {{hostname}}.
     status: current
     varbinds:
       - eriRouterNESlot
@@ -7391,8 +8952,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.36.0.2
     name: ERICSSON-ROUTER-NOTIFY-ENHANCE-MIB::eriRouterNECardAlarm
     category: diagnostic
-    severity: warning
-    description: Card {eriRouterNECardName} alarm {eriRouterCardAlarmType} with severity {eriRouterCardAlarmSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: 'Router card alarm on {{value "eriRouterNECardName"}}: {{value "eriRouterCardAlarmDescription"}} on {{hostname}}.'
     status: current
     varbinds:
       - eriRouterCardAlarmId
@@ -7408,7 +8969,7 @@ traps:
     name: ERICSSON-ROUTER-NOTIFY-ENHANCE-MIB::eriRouterNElinkDown
     category: state_change
     severity: warning
-    description: Interface {ifIndex} link down with circuit {eriRouterNECircuitId} on {_HOSTNAME}.
+    description: Link down on interface {{first (value "eriRouterNECircuitId") "link"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -7423,7 +8984,7 @@ traps:
     name: ERICSSON-ROUTER-NOTIFY-ENHANCE-MIB::eriRouterNElinkUp
     category: state_change
     severity: notice
-    description: Interface {ifIndex} link up with circuit {eriRouterNECircuitId} on {_HOSTNAME}.
+    description: Interface link up on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -7438,7 +8999,7 @@ traps:
     name: ERICSSON-ROUTER-L2VPN-MIB::eriRouterMplsL2VpnLdpPwStateChange
     category: state_change
     severity: warning
-    description: PW state changed to {eriRouterMplsL2VpnLdpPwState} on {_HOSTNAME}.
+    description: LDP PW state changed to {{value "eriRouterMplsL2VpnLdpPwState"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterMplsL2VpnLdpPwState
@@ -7446,7 +9007,7 @@ traps:
     name: ERICSSON-ROUTER-BRIDGE-MIB::eriRouterBridgeCctStateEvent
     category: state_change
     severity: warning
-    description: Bridge circuit {eriRouterBridgeCircuitDescriptor} blocked due to loop detection with status {eriRouterBridgeCircuitStatus} on {_HOSTNAME}.
+    description: Bridge circuit {{value "eriRouterBridgeCircuitDescriptor"}} blocked due to loop detection on {{hostname}}.
     status: current
     varbinds:
       - eriRouterBridgeGroupName
@@ -7457,7 +9018,7 @@ traps:
     name: ERICSSON-ROUTER-BRIDGE-MIB::eriRouterBridgeNewRootEvent
     category: state_change
     severity: notice
-    description: Bridge elected as new Spanning Tree root on {_HOSTNAME}.
+    description: Device elected as new Spanning Tree root bridge {{value "eriRouterBridgeId"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterBridgeId
@@ -7466,7 +9027,7 @@ traps:
     name: ERICSSON-ROUTER-BRIDGE-MIB::eriRouterBridgeTopologyChangeEvent
     category: state_change
     severity: notice
-    description: Bridge port state changed from {eriRouterBridgePortPreviousState} to {dot1dStpPortState} on {_HOSTNAME}.
+    description: Bridge port state changed to {{value "dot1dStpPortState"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterBridgeId
@@ -7476,7 +9037,7 @@ traps:
     name: ERICSSON-ROUTER-SFP-MIB::eriRouterSfpAlarm
     category: diagnostic
     severity: warning
-    description: SFP alarm {eriRouterSfpAlarmType} on card slot {eriRouterSfpAlarmCardSlot} port {eriRouterSfpAlarmPort} on {_HOSTNAME}.
+    description: SFP alarm {{value "eriRouterSfpAlarmType"}} on slot {{value "eriRouterSfpAlarmCardSlot"}} port {{value "eriRouterSfpAlarmPort"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSfpAlarmCardSlot
@@ -7490,8 +9051,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.49.0.2
     name: ERICSSON-ROUTER-OPTICAL-TRANSCEIVER-MIB::eriRouterOpticalTransceiverAlarm
     category: diagnostic
-    severity: err
-    description: Optical transceiver alarm {eriRouterSfpAlarmId} on slot {eriRouterOpticalTransceiverCardSlot} port {eriRouterOpticalTransceiverPort} on {_HOSTNAME}.
+    severity: warning
+    description: Optical transceiver alarm {{value "eriRouterSfpAlarmType"}} on port {{value "eriRouterOpticalTransceiverPort"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -7508,7 +9069,7 @@ traps:
     name: ERICSSON-ROUTER-OPTICAL-TRANSCEIVER-MIB::eriRouterOpticalTransceiverLaneAlarm
     category: diagnostic
     severity: warning
-    description: Optical transceiver lane alarm on slot {eriRouterOpticalTransceiverCardSlot} port {eriRouterOpticalTransceiverPort} on {_HOSTNAME}.
+    description: Optical transceiver lane alarm on slot {{value "eriRouterOpticalTransceiverCardSlot"}} port {{value "eriRouterOpticalTransceiverPort"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -7526,7 +9087,7 @@ traps:
     name: ERICSSON-ROUTER-MEDIA-GATEWAY-MIB::eriRouterH248LinkStatusAlarm
     category: state_change
     severity: crit
-    description: H.248 link down for more than configured timeout on {_HOSTNAME}.
+    description: H.248 link to Media Gateway Controller is down on {{hostname}}.
     status: current
     varbinds:
       - eriRouterMGEventDateAndTime
@@ -7539,7 +9100,7 @@ traps:
     name: ERICSSON-ROUTER-IP-SECURITY-MIB::eriRouterIpSecTunnelStatusChangeAlarm
     category: state_change
     severity: warning
-    description: IPSec tunnel {eriRouterIpSecTunnelName} state changed to {eriRouterIpSecTunnelState} on {_HOSTNAME}.
+    description: IPSec tunnel {{value "eriRouterIpSecTunnelName"}} state changed to {{value "eriRouterIpSecTunnelState"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterIpSecEventDateAndTime
@@ -7562,7 +9123,7 @@ traps:
     name: ERICSSON-ROUTER-IP-SECURITY-MIB::eriRouterIpSecNoValidRSASelfCertificateAlarm
     category: diagnostic
     severity: crit
-    description: Missing valid RSA self-certificate detected at {eriRouterIpSecEventDateAndTime} on {_HOSTNAME}.
+    description: No valid RSA self-certificate available on {{hostname}}.
     status: current
     varbinds:
       - eriRouterIpSecEventDateAndTime
@@ -7573,7 +9134,7 @@ traps:
     name: ERICSSON-ROUTER-IP-SECURITY-MIB::eriRouterIpSecNoValidRSATrustedCertificateAlarm
     category: security
     severity: crit
-    description: Missing valid RSA trusted certificate detected on {_HOSTNAME}.
+    description: No valid RSA trusted certificate for IPsec context on {{hostname}}.
     status: current
     varbinds:
       - eriRouterIpSecEventDateAndTime
@@ -7584,7 +9145,7 @@ traps:
     name: ERICSSON-ROUTER-IP-SECURITY-MIB::eriRouterIpSecRSASelfCertificateNearingExpiryAlarm
     category: license
     severity: warning
-    description: RSA self certificate {eriRouterIpSecSelfCertificateIdentifier} nearing expiration at {eriRouterIpSecExpiryDateAndTime} on {_HOSTNAME}.
+    description: RSA self certificate nearing expiry on {{hostname}}.
     status: current
     varbinds:
       - eriRouterIpSecEventDateAndTime
@@ -7598,7 +9159,7 @@ traps:
     name: ERICSSON-ROUTER-IP-SECURITY-MIB::eriRouterIpSecRSATrustedCertificateNearingExpiryAlarm
     category: license
     severity: warning
-    description: RSA self certificate {eriRouterIpSecCertificateSubjectName} nearing expiration at {eriRouterIpSecExpiryDateAndTime} on {_HOSTNAME}.
+    description: RSA self certificate nearing expiry on {{hostname}}.
     status: current
     varbinds:
       - eriRouterIpSecEventDateAndTime
@@ -7612,7 +9173,7 @@ traps:
     name: ERICSSON-ROUTER-IP-SECURITY-MIB::eriRouterIpSecRSACrlNearingExpiryAlarm
     category: diagnostic
     severity: warning
-    description: IPsec CRL {eriRouterIpSecCrlIdentifier} nearing expiration at {eriRouterIpSecExpiryDateAndTime} on {_HOSTNAME}.
+    description: IPsec CRL nearing expiry for {{value "eriRouterIpSecCrlIdentifier"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterIpSecEventDateAndTime
@@ -7626,7 +9187,7 @@ traps:
     name: ERICSSON-ROUTER-ICR-MIB::eriRouterIcrNewActive
     category: state_change
     severity: notice
-    description: ICR node state changed to active on {_HOSTNAME}.
+    description: ICR node state changed to active on {{hostname}}.
     status: current
     varbinds:
       - eriRouterIcrLocalAddressType
@@ -7637,7 +9198,7 @@ traps:
     name: ERICSSON-ROUTER-ICR-MIB::eriRouterIcrNewStandby
     category: state_change
     severity: notice
-    description: ICR node state changed to {eriRouterIcrState} on {_HOSTNAME}.
+    description: ICR node state changed to standby on {{hostname}}.
     status: current
     varbinds:
       - eriRouterIcrLocalAddressType
@@ -7651,7 +9212,7 @@ traps:
     name: ERICSSON-ROUTER-ICR-MIB::eriRouterIcrNewPendingStandby
     category: state_change
     severity: notice
-    description: ICR node state changed to pendingStandby on {_HOSTNAME}.
+    description: ICR node state changed to pendingStandby on {{hostname}}.
     status: current
     varbinds:
       - eriRouterIcrLocalAddressType
@@ -7664,8 +9225,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.101.0.4
     name: ERICSSON-ROUTER-ICR-MIB::eriRouterIcrInconsistency
     category: diagnostic
-    severity: err
-    description: ICR inconsistency error {eriRouterIcrInconsistencyError} detected on {_HOSTNAME}.
+    severity: warning
+    description: ICR inconsistency error {{value "eriRouterIcrInconsistencyError"}} detected on {{hostname}}.
     status: current
     varbinds:
       - eriRouterIcrLocalAddressType
@@ -7679,7 +9240,7 @@ traps:
     name: ERICSSON-ROUTER-ICR-MIB::eriRouterIcrVrrpInconsistency
     category: state_change
     severity: warning
-    description: VRRP master/master split inconsistency detected on {_HOSTNAME}.
+    description: VRRP master/master split inconsistency detected on {{hostname}}.
     status: current
     varbinds:
       - eriRouterIcrLocalAddressType
@@ -7692,8 +9253,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.102.0.1
     name: ERICSSON-ROUTER-MC-LAG-MIB::eriRouterMcLagSwitchOverEvent
     category: state_change
-    severity: notice
-    description: MC-LAG switch-over occurred with reason {eriRouterMcLagSwitchOverReason} on {_HOSTNAME}.
+    severity: warning
+    description: MC-LAG switch-over occurred{{with value "eriRouterMcLagSwitchOverReason"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterMcLagOperState
@@ -7702,7 +9263,7 @@ traps:
     name: ERICSSON-ROUTER-MC-LAG-MIB::eriRouterMcLagOperFailed
     category: state_change
     severity: crit
-    description: MC-LAG failed with state {eriRouterMcLagOperState} and error code {eriRouterMcLagOperErrorCode} on {_HOSTNAME}.
+    description: MC-LAG failed with error {{value "eriRouterMcLagOperErrorCode"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterMcLagOperState
@@ -7711,7 +9272,7 @@ traps:
     name: ERICSSON-ROUTER-MC-LAG-MIB::eriRouterMcLagOperFailureCleared
     category: state_change
     severity: notice
-    description: MC-LAG recovered from failure with state {eriRouterMcLagOperState} on {_HOSTNAME}.
+    description: MC-LAG recovered from failure and is now {{value "eriRouterMcLagOperState"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterMcLagOperState
@@ -7719,7 +9280,7 @@ traps:
     name: ERICSSON-ROUTER-MC-LAG-MIB::eriRouterMcLagConstituentPortUp
     category: state_change
     severity: notice
-    description: MC-LAG constituent port {eriRouterMcLagConstituentPortIfIndex} link became active on {_HOSTNAME}.
+    description: MC-LAG constituent port link up on {{hostname}}.
     status: current
     varbinds:
       - eriRouterMcLagConstituentPortPriority
@@ -7727,8 +9288,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.102.0.5
     name: ERICSSON-ROUTER-MC-LAG-MIB::eriRouterMcLagConstituentPortDown
     category: state_change
-    severity: warning
-    description: LACP failed on constituent port {eriRouterMcLagConstituentPortIfIndex} with error {eriRouterMcLagConstituentLACPErrorCode} on {_HOSTNAME}.
+    severity: crit
+    description: LACP on constituent link {{first (value "eriRouterMcLagConstituentPortIfIndex") "link"}} failed on {{hostname}}.
     status: current
     varbinds:
       - eriRouterMcLagConstituentPortPriority
@@ -7738,7 +9299,7 @@ traps:
     name: ERICSSON-ROUTER-MASTER-MIB::eriRouterSubAgentLost
     category: state_change
     severity: warning
-    description: AgentX sub-agent session lost with reason {eriRouterAgentxSessionCloseReason} on {_HOSTNAME}.
+    description: AgentX sub-agent session lost{{with value "eriRouterAgentxSessionCloseReason"}} reason {{.}}{{end}} on {{hostname}}.
     status: deprecated
     varbinds:
       - eriRouterAgentxSessionCloseReason
@@ -7746,7 +9307,7 @@ traps:
     name: ERICSSON-ROUTER-LICENSE-MGR-MIB::eriRouterLicenseMgrAutonomousModeActivatedAlarm
     category: license
     severity: warning
-    description: License Manager switched to Autonomous mode on {_HOSTNAME}.
+    description: License Manager entered Autonomous mode on {{hostname}}.
     status: current
     varbinds:
       - eriRouterLicenseMgrEventDateAndTime
@@ -7756,7 +9317,7 @@ traps:
     name: ERICSSON-ROUTER-LICENSE-MGR-MIB::eriRouterLicenseMgrAutonomousModeActivatedAlarmCleared
     category: license
     severity: notice
-    description: License Manager autonomous mode cleared at {eriRouterLicenseMgrEventDateAndTime} on {_HOSTNAME}.
+    description: License Manager autonomous mode activation cleared on {{hostname}}.
     status: current
     varbinds:
       - eriRouterLicenseMgrEventDateAndTime
@@ -7765,7 +9326,7 @@ traps:
     name: ERICSSON-ROUTER-LICENSE-MGR-MIB::eriRouterLicenseMgrCapacityUsageThresholdReachedAlarm
     category: license
     severity: warning
-    description: License capacity usage threshold reached for {eriRouterLicenseMgrLicenseKey} with severity {eriRouterLicenseMgrEventSeverity} on {_HOSTNAME}.
+    description: License capacity usage threshold reached{{with value "eriRouterLicenseMgrEventSeverity"}} severity {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterLicenseMgrLicenseKey
@@ -7776,7 +9337,7 @@ traps:
     name: ERICSSON-ROUTER-LICENSE-MGR-MIB::eriRouterLicenseMgrCapacityUsageThresholdReachedAlarmCleared
     category: license
     severity: notice
-    description: License capacity usage cleared for {eriRouterLicenseMgrLicenseKey} on {_HOSTNAME}.
+    description: License capacity usage threshold cleared on {{hostname}}.
     status: current
     varbinds:
       - eriRouterLicenseMgrLicenseKey
@@ -7786,7 +9347,7 @@ traps:
     name: ERICSSON-ROUTER-LICENSE-MGR-MIB::eriRouterLicenseMgrEmergencyUnlockResetKeyRequiredAlarm
     category: license
     severity: warning
-    description: Emergency unlock reset key required; severity {eriRouterLicenseMgrEventSeverity} on {_HOSTNAME}.
+    description: Emergency unlock reset key required on {{hostname}}.
     status: current
     varbinds:
       - eriRouterLicenseMgrEventDateAndTime
@@ -7796,7 +9357,7 @@ traps:
     name: ERICSSON-ROUTER-LICENSE-MGR-MIB::eriRouterLicenseMgrEmergencyUnlockResetKeyRequiredAlarmCleared
     category: license
     severity: notice
-    description: Emergency unlock reset key required alarm cleared on {_HOSTNAME}.
+    description: 'Emergency unlock reset key required alarm cleared{{with value "eriRouterLicenseMgrEventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eriRouterLicenseMgrEventDateAndTime
@@ -7804,8 +9365,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.106.0.7
     name: ERICSSON-ROUTER-LICENSE-MGR-MIB::eriRouterLicenseMgrKeyFileFault
     category: license
-    severity: crit
-    description: License key file unavailable, License Manager locked at {eriRouterLicenseMgrEventDateAndTime} on {_HOSTNAME}.
+    severity: alert
+    description: License key file unavailable and License Manager entered Locked mode on {{hostname}}.
     status: current
     varbinds:
       - eriRouterLicenseMgrEventDateAndTime
@@ -7815,7 +9376,7 @@ traps:
     name: ERICSSON-ROUTER-LICENSE-MGR-MIB::eriRouterLicenseMgrKeyFileFaultCleared
     category: license
     severity: notice
-    description: License key file successfully installed on {_HOSTNAME}.
+    description: 'License key file fault cleared{{with value "eriRouterLicenseMgrEventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eriRouterLicenseMgrEventDateAndTime
@@ -7823,8 +9384,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.106.0.9
     name: ERICSSON-ROUTER-LICENSE-MGR-MIB::eriRouterLicenseMgrLicenseKeyNotAvailableAlarm
     category: license
-    severity: warning
-    description: License key {eriRouterLicenseMgrLicenseKey} unavailable on {_HOSTNAME}.
+    severity: crit
+    description: License key unavailable, features disabled{{with value "eriRouterLicenseMgrEventSeverity"}} severity {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterLicenseMgrLicenseKey
@@ -7835,7 +9396,7 @@ traps:
     name: ERICSSON-ROUTER-LICENSE-MGR-MIB::eriRouterLicenseMgrLicenseKeyNotAvailableAlarmCleared
     category: license
     severity: notice
-    description: License key {eriRouterLicenseMgrLicenseKey} availability cleared on {_HOSTNAME}.
+    description: 'License key availability alarm cleared{{with value "eriRouterLicenseMgrEventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eriRouterLicenseMgrLicenseKey
@@ -7844,8 +9405,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.106.0.11
     name: ERICSSON-ROUTER-LICENSE-MGR-MIB::eriRouterLicenseMgrPortDisabledDueToCapacityExceededAlarm
     category: license
-    severity: alert
-    description: Port {eriRouterLicenseMgrEventPort} disabled due to license capacity exceeded on {_HOSTNAME}.
+    severity: crit
+    description: Port {{value "eriRouterLicenseMgrEventPort"}} disabled due to insufficient license capacity on {{hostname}}.
     status: current
     varbinds:
       - eriRouterLicenseMgrEventCardSlot
@@ -7856,7 +9417,7 @@ traps:
     name: ERICSSON-ROUTER-LICENSE-MGR-MIB::eriRouterLicenseMgrPortDisabledDueToCapacityExceededAlarmCleared
     category: license
     severity: notice
-    description: License capacity alarm cleared for slot {eriRouterLicenseMgrEventCardSlot} port {eriRouterLicenseMgrEventPort} on {_HOSTNAME}.
+    description: License capacity exceeded alarm cleared for port {{value "eriRouterLicenseMgrEventPort"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterLicenseMgrEventCardSlot
@@ -7865,8 +9426,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.106.0.13
     name: ERICSSON-ROUTER-LICENSE-MGR-MIB::eriRouterLicenseMgrBasePackageLicenseIsMissing
     category: license
-    severity: warning
-    description: Base package license expired or invalid, grace period active at {eriRouterLicenseMgrEventDateAndTime} on {_HOSTNAME}.
+    severity: alert
+    description: Base package license is expired or invalid on {{hostname}}.
     status: current
     varbinds:
       - eriRouterLicenseMgrEventDateAndTime
@@ -7876,7 +9437,7 @@ traps:
     name: ERICSSON-ROUTER-LICENSE-MGR-MIB::eriRouterLicenseMgrBasePackageLicenseIsMissingCleared
     category: license
     severity: notice
-    description: License missing cleared with severity {eriRouterLicenseMgrEventSeverity} on {_HOSTNAME}.
+    description: Missing license cleared on {{hostname}}.
     status: current
     varbinds:
       - eriRouterLicenseMgrEventDateAndTime
@@ -7886,7 +9447,7 @@ traps:
     name: ERICSSON-ROUTER-ALARMIO-MIB::eriRouterAlarmioAlarm
     category: diagnostic
     severity: warning
-    description: Alarmio alarm triggered with severity {eriRouterAlarmioAlarmSeverity.raw} on port {eriRouterAlarmioPortId} on {_HOSTNAME}.
+    description: 'Alarmio alarm triggered{{with value "eriRouterAlarmioDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eriRouterAlarmioAlarmActiveIndex
@@ -7897,8 +9458,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.109.1.2
     name: ERICSSON-ROUTER-MASTER-AGENT-MIB::eriRouterSubAgentLost
     category: state_change
-    severity: warning
-    description: AgentX sub-agent session {agentxSessionDescr} lost with reason {eriRouterAgentxSessionCloseReason} on {_HOSTNAME}.
+    severity: alert
+    description: AgentX sub-agent session lost{{with value "eriRouterAgentxSessionCloseReason"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - agentxSessionDescr
@@ -7909,7 +9470,7 @@ traps:
     name: ERICSSON-ROUTER-LAG-MIB::eriRouterLAGUp
     category: state_change
     severity: notice
-    description: Link aggregation group {eriRouterLAGName} (ID {eriRouterLAGId}) is up on {_HOSTNAME}.
+    description: Link aggregation group {{value "eriRouterLAGName"}} is up on {{hostname}}.
     status: current
     varbinds:
       - eriRouterLAGName
@@ -7918,7 +9479,7 @@ traps:
     name: ERICSSON-ROUTER-LAG-MIB::eriRouterLAGDown
     category: state_change
     severity: warning
-    description: Link aggregation group {eriRouterLAGName} (ID {eriRouterLAGId}) went down on {_HOSTNAME}.
+    description: Link aggregation group {{first (value "eriRouterLAGName") (value "eriRouterLAGId")}} went down on {{hostname}}.
     status: current
     varbinds:
       - eriRouterLAGName
@@ -7927,7 +9488,7 @@ traps:
     name: ERICSSON-ROUTER-LAG-MIB::eriRouterLAGConstituentUp
     category: state_change
     severity: notice
-    description: Constituent circuit up for LAG {eriRouterLAGName} on {_HOSTNAME}.
+    description: LAG constituent circuit up on {{first (value "eriRouterLAGName") "LAG"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterLAGName
@@ -7938,7 +9499,7 @@ traps:
     name: ERICSSON-ROUTER-LAG-MIB::eriRouterLAGConstituentDown
     category: state_change
     severity: warning
-    description: Constituent circuit down on LAG {eriRouterLAGName} slot {eriRouterLAGConstituentSlot} port {eriRouterLAGConstituentPort} on {_HOSTNAME}.
+    description: LAG {{value "eriRouterLAGName"}} constituent port {{value "eriRouterLAGConstituentPort"}} on slot {{value "eriRouterLAGConstituentSlot"}} went down on {{hostname}}.
     status: current
     varbinds:
       - eriRouterLAGName
@@ -7949,7 +9510,7 @@ traps:
     name: ERICSSON-ROUTER-HW-RES-MGMT-MIB::eriRouterHWResMgmtAlarm
     category: diagnostic
     severity: warning
-    description: HW-Resource-Management alarm {eriRouterHWResMgmtAlarmSeverity} for {eriRouterHWResMgmtAlarmDescription} on {_HOSTNAME}.
+    description: Hardware resource management alarm {{value "eriRouterHWResMgmtEriAlarmType"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterHWResMgmtAlarmActiveIndex
@@ -7961,7 +9522,7 @@ traps:
     name: ERICSSON-ROUTER-TWAMP-MIB::eriRouterTwampAlarm
     category: diagnostic
     severity: warning
-    description: Twamp alarm {eriRouterTwampAlarmDescription} with severity {eriRouterTwampAlarmSeverity} on {_HOSTNAME}.
+    description: Twamp alarm {{value "eriRouterTwampEriAlarmType"}} raised on {{hostname}}.
     status: current
     varbinds:
       - eriRouterTwampAlarmActiveIndex
@@ -7973,7 +9534,7 @@ traps:
     name: ERICSSON-ROUTER-ERP-MIB::eriRouterERPRplUnblocked
     category: state_change
     severity: notice
-    description: ERP instance {eriRouterERPName} unblocked on {_HOSTNAME}.
+    description: ERP instance {{value "eriRouterERPName"}} unblocked on {{hostname}}.
     status: current
     varbinds:
       - eriRouterERPName
@@ -7981,15 +9542,15 @@ traps:
     name: ERICSSON-ROUTER-ERP-MIB::eriRouterERPRplOwnerConfErr
     category: config_change
     severity: warning
-    description: ERP instance {eriRouterERPName} configuration conflict detected on {_HOSTNAME}.
+    description: ERP instance {{value "eriRouterERPName"}} RPL configuration conflict on {{hostname}}.
     status: current
     varbinds:
       - eriRouterERPName
   - oid: 1.3.6.1.4.1.193.218.2.116.0.1
     name: ERICSSON-ROUTER-YANG-SERVER-MIB::eriRouterYangServerInconsistentAlarm
     category: diagnostic
-    severity: err
-    description: CDB and RDB inconsistency detected with severity {eriRouterYangServerEventSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: 'CDB and RDB inconsistency detected{{with value "eriRouterYangServerEventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eriRouterYangServerEventDateAndTime
@@ -7999,7 +9560,7 @@ traps:
     name: ERICSSON-ROUTER-YANG-SERVER-MIB::eriRouterYangServerInconsistentAlarmCleared
     category: diagnostic
     severity: notice
-    description: Yang server inconsistency cleared with severity {eriRouterYangServerEventSeverity} on {_HOSTNAME}.
+    description: 'Router Yang server inconsistency cleared{{with value "eriRouterYangServerEventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eriRouterYangServerEventDateAndTime
@@ -8008,8 +9569,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.218.2.116.0.3
     name: ERICSSON-ROUTER-YANG-SERVER-MIB::eriRouterYangServerBootFail
     category: diagnostic
-    severity: err
-    description: Yang server boot failed with severity {eriRouterYangServerEventSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: 'Yang server boot failed{{with value "eriRouterYangServerEventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eriRouterYangServerEventDateAndTime
@@ -8019,7 +9580,7 @@ traps:
     name: ERICSSON-ROUTER-YANG-SERVER-MIB::eriRouterYangServerFatalError
     category: diagnostic
     severity: emerg
-    description: Yang server fatal error with severity {eriRouterYangServerEventSeverity} on {_HOSTNAME}.
+    description: 'Yang server encountered fatal error{{with value "eriRouterYangServerEventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eriRouterYangServerEventDateAndTime
@@ -8029,7 +9590,7 @@ traps:
     name: ERICSSON-ROUTER-YANG-SERVER-MIB::eriRouterYangServerCommitFail
     category: config_change
     severity: err
-    description: Configuration commit failed with severity {eriRouterYangServerEventSeverity} on {_HOSTNAME}.
+    description: 'Configuration commit failed{{with value "eriRouterYangServerEventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eriRouterYangServerEventDateAndTime
@@ -8039,29 +9600,17 @@ traps:
     name: ERICSSON-ROUTER-YANG-SERVER-MIB::eriRouterYangServerSlaveFailure
     category: diagnostic
     severity: crit
-    description: Yang server slave failure due to CDB corruption on {_HOSTNAME}.
+    description: Yang server slave failure due to CDB corruption on {{hostname}}.
     status: current
     varbinds:
       - eriRouterYangServerEventDateAndTime
       - eriRouterYangServerEventAdditionalText
       - eriRouterYangServerEventSeverity
-  - oid: 1.3.6.1.4.1.193.218.2.116.2
-    name: ERICSSON-ROUTER-BRM-MIB::eriRouterBRMAlarm
-    category: diagnostic
-    severity: warning
-    description: BRM alarm {eriRouterBRMEriAlarmType} with severity {eriRouterBRMAlarmSeverity} reported on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - eriRouterBRMAlarmActiveIndex
-      - eriRouterBRMAlarmDateAndTime
-      - eriRouterBRMEriAlarmType
-      - eriRouterBRMAlarmSeverity
-      - eriRouterBRMAlarmDescription
   - oid: 1.3.6.1.4.1.193.218.2.117.1.1
     name: ERICSSON-ROUTER-STACKING-ALARM-MIB::eriRouterStackingIdMismatchAlarm
-    category: diagnostic
-    severity: warning
-    description: Stacking ID mismatch detected between chassis {eriRouterStackingAlarmEventChassisUID} on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: Router stacking ID mismatch detected on {{hostname}}.
     status: current
     varbinds:
       - eriRouterStackingAlarmEventStackId
@@ -8073,9 +9622,9 @@ traps:
       - eriRouterStackingAlarmEventMinorType
   - oid: 1.3.6.1.4.1.193.218.2.117.1.2
     name: ERICSSON-ROUTER-STACKING-ALARM-MIB::eriRouterStackingChassisNumberMismatchAlarm
-    category: diagnostic
-    severity: warning
-    description: Chassis number mismatch detected in stack {eriRouterStackingAlarmEventStackId} on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: Chassis number mismatch detected in stack {{value "eriRouterStackingAlarmEventStackId"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterStackingAlarmEventStackId
@@ -8089,7 +9638,7 @@ traps:
     name: ERICSSON-ROUTER-STACKING-ALARM-MIB::eriRouterStackingChassisNotFoundAlarm
     category: diagnostic
     severity: warning
-    description: Configured chassis {eriRouterStackingAlarmEventChassisUID} not found in stack {eriRouterStackingAlarmEventStackId} on {_HOSTNAME}.
+    description: Configured chassis {{value "eriRouterStackingAlarmEventChassisUID"}} not found on {{hostname}}.
     status: current
     varbinds:
       - eriRouterStackingAlarmEventStackId
@@ -8101,9 +9650,9 @@ traps:
       - eriRouterStackingAlarmEventMinorType
   - oid: 1.3.6.1.4.1.193.218.2.117.1.4
     name: ERICSSON-ROUTER-STACKING-ALARM-MIB::eriRouterStackingChassisTypeMismatchAlarm
-    category: diagnostic
-    severity: warning
-    description: Chassis type mismatch detected in stack {eriRouterStackingAlarmEventStackId} on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: Stacking chassis type mismatch detected on {{hostname}}.
     status: current
     varbinds:
       - eriRouterStackingAlarmEventStackId
@@ -8115,9 +9664,9 @@ traps:
       - eriRouterStackingAlarmEventMinorType
   - oid: 1.3.6.1.4.1.193.218.2.117.1.5
     name: ERICSSON-ROUTER-STACKING-ALARM-MIB::eriRouterStackingChassisUIDFormatMismatchAlarm
-    category: diagnostic
+    category: config_change
     severity: warning
-    description: Chassis UID format mismatch detected for stack {eriRouterStackingAlarmEventStackId} on {_HOSTNAME}.
+    description: Chassis UID format mismatch detected in stack {{value "eriRouterStackingAlarmEventStackId"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterStackingAlarmEventStackId
@@ -8131,7 +9680,7 @@ traps:
     name: ERICSSON-ROUTER-STACKING-ALARM-MIB::eriRouterStackingLicenseNotAvailableAlarm
     category: license
     severity: warning
-    description: Stacking license missing or unavailable for stack {eriRouterStackingAlarmEventStackId} on {_HOSTNAME}.
+    description: Stacking license missing or unavailable on {{hostname}}.
     status: current
     varbinds:
       - eriRouterStackingAlarmEventStackId
@@ -8145,7 +9694,7 @@ traps:
     name: ERICSSON-ROUTER-PTP-MIB::eriRouterPTPAlarm
     category: diagnostic
     severity: warning
-    description: PTP alarm {eriRouterPTPAlarmDescription} with severity {eriRouterPTPAlarmSeverity} on {_HOSTNAME}.
+    description: PTP alarm {{value "eriRouterPTPEriAlarmType"}} detected on {{hostname}}.
     status: current
     varbinds:
       - eriRouterPTPAlarmActiveIndex
@@ -8155,18 +9704,18 @@ traps:
       - eriRouterPTPAlarmDescription
   - oid: 1.3.6.1.4.1.193.218.2.120.2.1
     name: ERICSSON-ROUTER-ACL-MIB::eriRouterACLBuildFailed
-    category: diagnostic
+    category: security
     severity: err
-    description: ACL build failed for context {eriRouterACLContextName} on interface {eriRouterACLInterfaceName} on {_HOSTNAME}.
+    description: ACL build failed for context {{value "eriRouterACLContextName"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterACLContextName
       - eriRouterACLInterfaceName
   - oid: 1.3.6.1.4.1.193.218.2.120.2.2
     name: ERICSSON-ROUTER-ACL-MIB::eriRouterACLBuildFailClear
-    category: diagnostic
-    severity: warning
-    description: ACL build failure cleared for context {eriRouterACLContextName} on interface {eriRouterACLInterfaceName} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: ACL build failure cleared for {{first (value "eriRouterACLInterfaceName") (value "eriRouterACLContextName") "ACL"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterACLContextName
@@ -8175,7 +9724,7 @@ traps:
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaNearEndDelayRisingThresholdMet
     category: diagnostic
     severity: warning
-    description: SLA job {eriRouterSlaJobID} near end delay rising threshold met on {_HOSTNAME}.
+    description: SLA near-end delay threshold exceeded for job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8183,9 +9732,9 @@ traps:
       - eriRouterSlaThresholdType
   - oid: 1.3.6.1.4.1.193.218.2.121.0.2
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaNearEndDelayFallingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: SLA near end delay threshold violation cleared for job {eriRouterSlaJobID} on {_HOSTNAME}.
+    description: Near end delay threshold violation cleared for SLA job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8195,7 +9744,7 @@ traps:
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaFarEndDelayRisingThresholdMet
     category: diagnostic
     severity: warning
-    description: Far end delay threshold exceeded for SLA job {eriRouterSlaJobID} on {_HOSTNAME}.
+    description: Far end delay threshold exceeded for SLA job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8203,9 +9752,9 @@ traps:
       - eriRouterSlaThresholdType
   - oid: 1.3.6.1.4.1.193.218.2.121.0.4
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaFarEndDelayFallingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Far end delay threshold violation cleared for job {eriRouterSlaJobID} on {_HOSTNAME}.
+    description: Far end delay threshold violation cleared for SLA job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8213,9 +9762,9 @@ traps:
       - eriRouterSlaThresholdType
   - oid: 1.3.6.1.4.1.193.218.2.121.0.5
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaTwoWayDelayRisingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Two-way delay threshold exceeded for SLA job {eriRouterSlaJobID} on {_HOSTNAME}.
+    description: Two-way delay threshold exceeded for SLA job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8223,9 +9772,9 @@ traps:
       - eriRouterSlaThresholdType
   - oid: 1.3.6.1.4.1.193.218.2.121.0.6
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaTwoWayDelayFallingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Two-way delay threshold violation cleared for job {eriRouterSlaJobID} on {_HOSTNAME}.
+    description: Two-way delay threshold violation cleared for SLA job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8235,7 +9784,7 @@ traps:
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaNearEndDelayVariationRisingThresholdMet
     category: diagnostic
     severity: warning
-    description: SLA job {eriRouterSlaJobID} near-end delay variation threshold exceeded on {_HOSTNAME}.
+    description: SLA near-end delay variation threshold exceeded for job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8243,9 +9792,9 @@ traps:
       - eriRouterSlaThresholdType
   - oid: 1.3.6.1.4.1.193.218.2.121.0.8
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaNearEndDelayVariationFallingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: SLA near-end delay variation threshold cleared for job {eriRouterSlaJobID} on {_HOSTNAME}.
+    description: SLA near end delay variation threshold violation cleared for job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8255,7 +9804,7 @@ traps:
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaFarEndDelayVariationRisingThresholdMet
     category: diagnostic
     severity: warning
-    description: Far end delay variation threshold exceeded for SLA job {eriRouterSlaJobID} on {_HOSTNAME}.
+    description: Far end delay variation threshold exceeded for SLA job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8263,9 +9812,9 @@ traps:
       - eriRouterSlaThresholdType
   - oid: 1.3.6.1.4.1.193.218.2.121.0.10
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaFarEndDelayVariationFallingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: SLA far end delay variation threshold violation cleared for job {eriRouterSlaJobID} on {_HOSTNAME}.
+    description: Far end delay variation threshold violation cleared for SLA job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8273,9 +9822,9 @@ traps:
       - eriRouterSlaThresholdType
   - oid: 1.3.6.1.4.1.193.218.2.121.0.11
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaTwoWayDelayVariationRisingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: SLA job {eriRouterSlaJobID} two-way delay variation exceeded threshold on {_HOSTNAME}.
+    description: Two-way delay variation threshold exceeded for SLA job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8283,9 +9832,9 @@ traps:
       - eriRouterSlaThresholdType
   - oid: 1.3.6.1.4.1.193.218.2.121.0.12
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaTwoWayDelayVariationFallingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Two-way delay variation threshold violation cleared for SLA job {eriRouterSlaJobID} on {_HOSTNAME}.
+    description: Two-way delay variation threshold violation cleared for SLA job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8293,9 +9842,9 @@ traps:
       - eriRouterSlaThresholdType
   - oid: 1.3.6.1.4.1.193.218.2.121.0.13
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaNearEndLostPacketsRisingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: SLA job {eriRouterSlaJobID} near-end lost packets threshold exceeded on {_HOSTNAME}.
+    description: SLA near-end lost packets threshold exceeded for job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8303,9 +9852,9 @@ traps:
       - eriRouterSlaThresholdType
   - oid: 1.3.6.1.4.1.193.218.2.121.0.14
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaNearEndLostPacketsFallingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: SLA threshold violation cleared for job {eriRouterSlaJobID} on {_HOSTNAME}.
+    description: SLA near-end lost packets threshold violation cleared for job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8313,9 +9862,9 @@ traps:
       - eriRouterSlaThresholdType
   - oid: 1.3.6.1.4.1.193.218.2.121.0.15
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaFarEndLostPacketsRisingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: SLA job {eriRouterSlaJobID} type {eriRouterSlaJobType} far-end lost packets threshold exceeded on {_HOSTNAME}.
+    description: Far end lost packets threshold exceeded for SLA job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8323,9 +9872,9 @@ traps:
       - eriRouterSlaThresholdType
   - oid: 1.3.6.1.4.1.193.218.2.121.0.16
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaFarEndLostPacketsFallingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Far end lost packets threshold violation cleared for job {eriRouterSlaJobID} on {_HOSTNAME}.
+    description: Far end lost packets threshold violation cleared for SLA job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8333,9 +9882,9 @@ traps:
       - eriRouterSlaThresholdType
   - oid: 1.3.6.1.4.1.193.218.2.121.0.17
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaTwoWayLostPacketsRisingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Two-way lost packets threshold exceeded for SLA job {eriRouterSlaJobID} on {_HOSTNAME}.
+    description: Two-way lost packets threshold exceeded for SLA job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8343,9 +9892,9 @@ traps:
       - eriRouterSlaThresholdType
   - oid: 1.3.6.1.4.1.193.218.2.121.0.18
     name: ERICSSON-ROUTER-SLA-MIB::eriRouterSlaTwoWayLostPacketsFallingThresholdMet
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: SLA threshold violation cleared for job {eriRouterSlaJobID} on {_HOSTNAME}.
+    description: Two-way lost packets threshold violation cleared for SLA job {{value "eriRouterSlaJobID"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterSlaJobID
@@ -8355,7 +9904,7 @@ traps:
     name: ERICSSON-ROUTER-LDAP-MIB::eriRouterLdapServerAuthenticationFailed
     category: auth
     severity: warning
-    description: LDAP authentication failed for user {eriRouterLdapUserName} on {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: LDAP authentication failed for user {{value "eriRouterLdapUserName"}} on {{hostname}}.
     status: current
     varbinds:
       - eriRouterLdapContextName
@@ -8367,7 +9916,7 @@ traps:
     name: ERICSSON-ROUTER-LDAP-MIB::eriRouterLdapServerUnavailable
     category: diagnostic
     severity: warning
-    description: LDAP server {eriRouterLdapServerName} at {eriRouterLdapServerIPAddress}:{eriRouterLdapServerPort} is unavailable on {_HOSTNAME}.
+    description: LDAP server {{value "eriRouterLdapServerName"}} is unavailable on {{hostname}}.
     status: current
     varbinds:
       - eriRouterLdapContextName
@@ -8378,13 +9927,13 @@ traps:
     name: ERICSSON-ROUTER-SYS-SECURITY-MIB::eriRouterMaliciousPktThresholdHiExceeded
     category: security
     severity: warning
-    description: Malicious packet threshold exceeded on {_HOSTNAME}.
+    description: Malicious packet threshold exceeded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.193.218.5.54.0.2
     name: ERICSSON-ROUTER-SYS-SECURITY-MIB::eriRouterMaliciousPktThresholdLowExceeded
-    category: diagnostic
+    category: security
     severity: warning
-    description: Malicious packet threshold low exceeded at {eriRouterThresholdNotifyTime} on {_HOSTNAME}.
+    description: Malicious packet threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - eriRouterThresholdNotifyTime
@@ -8392,7 +9941,7 @@ traps:
     name: PT-TRAP-MIB::ptTrapAlarmNotificationClear
     category: state_change
     severity: notice
-    description: Alarm cleared for {ptTrapContentsManagedObjectId} with severity {ptTrapContentsSeverity} on {_HOSTNAME}.
+    description: Alarm notification cleared for {{value "ptTrapContentsManagedObjectId"}} on {{hostname}}.
     status: current
     varbinds:
       - ptTrapContentsTimeStamp
@@ -8409,8 +9958,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.2.1.2
     name: PT-TRAP-MIB::ptTrapAlarmNotificationNonClear
     category: diagnostic
-    severity: warning
-    description: Non-clearable alarm {ptTrapContentsProbableCause} with severity {ptTrapContentsSeverity} on {ptTrapContentsManagedObjectId} on {_HOSTNAME}.
+    severity: crit
+    description: Non-clearable alarm condition occurred on {{hostname}}.
     status: current
     varbinds:
       - ptTrapContentsTimeStamp
@@ -8426,9 +9975,9 @@ traps:
       - ptTrapContentsDateAndTime
   - oid: 1.3.6.1.4.1.193.223.2.2.1.3
     name: PT-TRAP-MIB::ptTrapEventNotification
-    category: unknown
-    severity: info
-    description: Generic event notification received on {_HOSTNAME}.
+    category: diagnostic
+    severity: notice
+    description: Event notification received{{with value "ptTrapContentsEventType"}} type {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ptTrapContentsTimeStamp
@@ -8444,7 +9993,7 @@ traps:
     name: PT-TRAP-MIB::ptTrapProtectionSwitchNotification
     category: state_change
     severity: notice
-    description: Protection switch from {ptTrapContentsSwitchAwayFromMo} to {ptTrapContentsSwitchToMo} on {_HOSTNAME}.
+    description: Protection switch occurred from {{value "ptTrapContentsSwitchAwayFromMo"}} to {{value "ptTrapContentsSwitchToMo"}} on {{hostname}}.
     status: current
     varbinds:
       - ptTrapContentsTimeStamp
@@ -8462,7 +10011,7 @@ traps:
     name: PT-TRAP-MIB::ptTrapObjectCreateNotification
     category: config_change
     severity: notice
-    description: Object {ptTrapContentsManagedObjectId} created on {_HOSTNAME}.
+    description: Object {{value "ptTrapContentsManagedObjectId"}} created on {{hostname}}.
     status: current
     varbinds:
       - ptTrapContentsTimeStamp
@@ -8476,7 +10025,7 @@ traps:
     name: PT-TRAP-MIB::ptTrapObjectDeleteNotification
     category: config_change
     severity: notice
-    description: Managed object {ptTrapContentsManagedObjectId} deleted on {_HOSTNAME}.
+    description: Managed object {{value "ptTrapContentsManagedObjectId"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - ptTrapContentsTimeStamp
@@ -8490,7 +10039,7 @@ traps:
     name: PT-TRAP-MIB::ptTrapAvcNotification
     category: config_change
     severity: notice
-    description: Attribute value change notification received with AVC {ptTrapContentsAvc} on {_HOSTNAME}.
+    description: Attribute value changed{{with value "ptTrapContentsManagedObjectId"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ptTrapContentsTimeStamp
@@ -8505,7 +10054,7 @@ traps:
     name: PT3080-MIB::pt3080NotifModulatorAlarm
     category: diagnostic
     severity: warning
-    description: Modulator alarm {pt3080NotifState} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    description: Modulator alarm {{value "pt3080NotifMessage"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8514,8 +10063,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.5
     name: PT3080-MIB::pt3080NotifTSPrimaryAlarm
     category: diagnostic
-    severity: err
-    description: Primary alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    severity: alert
+    description: ASI TS primary alarm {{value "pt3080NotifMessage"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8525,7 +10074,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSSecondaryAlarm
     category: diagnostic
     severity: warning
-    description: Secondary alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    description: ASI TS secondary alarm {{value "pt3080NotifMessage"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8534,8 +10083,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.7
     name: PT3080-MIB::pt3080NotifSFNAlarm
     category: diagnostic
-    severity: warning
-    description: SFN alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    severity: alert
+    description: SFN alarm {{value "pt3080NotifMessage"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8545,7 +10094,7 @@ traps:
     name: PT3080-MIB::pt3080NotifRefenceClockAlarm
     category: diagnostic
     severity: warning
-    description: Reference clock alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    description: Reference clock alarm {{value "pt3080NotifState"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8554,8 +10103,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.9
     name: PT3080-MIB::pt3080NotifRFAlarm
     category: diagnostic
-    severity: warning
-    description: RF alarm {pt3080NotifState} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    severity: alert
+    description: 'RF alarm triggered{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8565,7 +10114,7 @@ traps:
     name: PT3080-MIB::pt3080NotifGNSSAlarm
     category: diagnostic
     severity: warning
-    description: GNSS alarm {pt3080NotifState} with message {pt3080NotifMessage} at {pt3080NotifLocalTime} on {_HOSTNAME}.
+    description: 'GNSS alarm {{value "pt3080NotifState"}}: {{value "pt3080NotifMessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8575,7 +10124,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSoIPAlarm
     category: diagnostic
     severity: warning
-    description: TSoIP alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    description: Alarm {{value "pt3080NotifMessage"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8585,7 +10134,7 @@ traps:
     name: PT3080-MIB::pt3080NotifExternalAlarm
     category: diagnostic
     severity: warning
-    description: External alarm {pt3080NotifState} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    description: External alarm {{value "pt3080NotifMessage"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8595,7 +10144,7 @@ traps:
     name: PT3080-MIB::pt3080NotifHWMonitorAlarm
     category: diagnostic
     severity: warning
-    description: 'Hardware monitor alarm {pt3080NotifState}: {pt3080NotifMessage} at {pt3080NotifLocalTime} on {_HOSTNAME}.'
+    description: Hardware monitor alarm {{value "pt3080NotifMessage"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8605,7 +10154,7 @@ traps:
     name: PT3080-MIB::pt3080NotifCommAlarm
     category: diagnostic
     severity: warning
-    description: Communication alarm {pt3080NotifState} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    description: 'Communications alarm {{value "pt3080NotifState"}}: {{value "pt3080NotifMessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8615,7 +10164,7 @@ traps:
     name: PT3080-MIB::pt3080NotifASIAlarm
     category: diagnostic
     severity: warning
-    description: ASI alarm {pt3080NotifState} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    description: 'ASI alarm {{value "pt3080NotifState"}}: {{value "pt3080NotifMessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8625,7 +10174,7 @@ traps:
     name: PT3080-MIB::pt3080NotifInternalAlarm
     category: diagnostic
     severity: warning
-    description: Internal alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    description: Internal alarm {{value "pt3080NotifMessage"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8634,8 +10183,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.21
     name: PT3080-MIB::pt3080NotifTSPrimarySyncLossAlarm
     category: diagnostic
-    severity: warning
-    description: TS Primary Sync Loss alarm reported with state {pt3080NotifState} on {_HOSTNAME}.
+    severity: crit
+    description: TS primary sync loss detected on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8644,8 +10193,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.22
     name: PT3080-MIB::pt3080NotifTSPrimarySyncErrorAlarm
     category: diagnostic
-    severity: warning
-    description: TS Primary Sync Error alarm {pt3080NotifMessage} on {_HOSTNAME}.
+    severity: crit
+    description: TS Primary Sync Error alarm active on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8654,8 +10203,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.23
     name: PT3080-MIB::pt3080NotifTSPrimaryPCRErrorAlarm
     category: diagnostic
-    severity: err
-    description: TS Primary PCR Error alarm reported on {_HOSTNAME}.
+    severity: crit
+    description: TS Primary PCR Error alarm detected on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8664,8 +10213,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.24
     name: PT3080-MIB::pt3080NotifTSPrimaryPATLossAlarm
     category: diagnostic
-    severity: warning
-    description: TS Primary PAT Loss alarm {pt3080NotifState} on {_HOSTNAME}.
+    severity: crit
+    description: TS Primary PAT Loss alarm detected on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8674,8 +10223,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.25
     name: PT3080-MIB::pt3080NotifTSPrimaryTSIDWrongAlarm
     category: diagnostic
-    severity: warning
-    description: TS Primary Transport Stream ID mismatch detected with state {pt3080NotifState} on {_HOSTNAME}.
+    severity: crit
+    description: TS Primary Transport Stream ID alarm on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8685,7 +10234,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSPrimaryNWIDWrongAlarm
     category: diagnostic
     severity: warning
-    description: 'Alarm {pt3080NotifState}: {pt3080NotifMessage} on {_HOSTNAME}.'
+    description: 'TS Primary Network ID mismatch detected{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8695,7 +10244,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSPrimaryStuffingRateExceededAlarm
     category: diagnostic
     severity: warning
-    description: TS Primary Stuffing rate exceeded with state {pt3080NotifState} on {_HOSTNAME}.
+    description: 'TS Primary Stuffing Rate exceeded{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8705,7 +10254,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSPrimaryBufferPoolExceededAlarm
     category: diagnostic
     severity: warning
-    description: 'Primary buffer pool alarm {pt3080NotifState} triggered: {pt3080NotifMessage} on {_HOSTNAME}.'
+    description: TS Primary Buffer Pool alarm {{value "pt3080NotifState"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8715,7 +10264,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSPrimarySTSJitterExceededAlarm
     category: diagnostic
     severity: warning
-    description: TS Primary STS Jitter alarm {pt3080NotifState} on {_HOSTNAME}.
+    description: 'TS Primary STS Jitter alarm triggered{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8724,8 +10273,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.30
     name: PT3080-MIB::pt3080NotifTSPrimaryMIPDataMissingAlarm
     category: diagnostic
-    severity: warning
-    description: TS Primary MIP data missing with state {pt3080NotifState} on {_HOSTNAME}.
+    severity: crit
+    description: TS Primary MIP Data Missing alarm active on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8735,7 +10284,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSPrimaryMIPPriorityBadAlarm
     category: diagnostic
     severity: warning
-    description: MIP priority alarm triggered with state {pt3080NotifState.raw} on {_HOSTNAME}.
+    description: 'TS Primary Bad Priority in MIP detected{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8744,8 +10293,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.32
     name: PT3080-MIB::pt3080NotifTSSecondarySyncLossAlarm
     category: diagnostic
-    severity: warning
-    description: TS Secondary Sync Loss alarm {pt3080NotifState} on {_HOSTNAME}.
+    severity: crit
+    description: TS Secondary Sync Loss alarm detected on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8754,8 +10303,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.33
     name: PT3080-MIB::pt3080NotifTSSecondarySyncErrorAlarm
     category: diagnostic
-    severity: err
-    description: TS Secondary Sync Error alarm reported with state {pt3080NotifState} on {_HOSTNAME}.
+    severity: warning
+    description: 'TS Secondary Sync Error alarm triggered{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8765,7 +10314,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSSecondaryPCRErrorAlarm
     category: diagnostic
     severity: warning
-    description: TS Secondary PCR error detected with state {pt3080NotifState} on {_HOSTNAME}.
+    description: 'TS Secondary PCR error detected{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8775,7 +10324,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSSecondaryPATLossAlarm
     category: diagnostic
     severity: warning
-    description: TS Secondary PAT Loss alarm active with state {pt3080NotifState} on {_HOSTNAME}.
+    description: 'TS Secondary PAT Loss alarm detected{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8785,7 +10334,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSSecondaryTSIDWrongAlarm
     category: diagnostic
     severity: warning
-    description: TS Secondary Transport Stream ID mismatch alarm {pt3080NotifMessage} on {_HOSTNAME}.
+    description: TS Secondary Transport Stream ID alarm {{value "pt3080NotifState"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8795,7 +10344,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSSecondaryNWIDWrongAlarm
     category: diagnostic
     severity: warning
-    description: Alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    description: 'TS Secondary Network ID mismatch detected{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8805,7 +10354,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSSecondaryStuffingRateExceededAlarm
     category: diagnostic
     severity: warning
-    description: TS Secondary Stuffing Rate alarm {pt3080NotifState} triggered with message {pt3080NotifMessage} on {_HOSTNAME}.
+    description: 'TS Secondary Stuffing Rate exceeded alarm{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8815,7 +10364,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSSecondaryBufferPoolExceededAlarm
     category: diagnostic
     severity: warning
-    description: Secondary buffer pool alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    description: TS Secondary Buffer Pool alarm {{value "pt3080NotifState"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8825,7 +10374,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSSecondarySTSJitterExceededAlarm
     category: diagnostic
     severity: warning
-    description: TS Secondary STS Jitter alarm {pt3080NotifState} detected on {_HOSTNAME}.
+    description: TS Secondary STS Jitter alarm {{value "pt3080NotifState"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8835,7 +10384,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSSecondaryMIPDataMissingAlarm
     category: diagnostic
     severity: warning
-    description: TS Secondary MIP Data Missing alarm reported with state {pt3080NotifState} on {_HOSTNAME}.
+    description: TS Secondary MIP Data Missing alarm active on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8845,7 +10394,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSSecondaryMIPPriorityBadAlarm
     category: diagnostic
     severity: warning
-    description: MIP secondary priority alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    description: TS Secondary Bad Priority in MIP alarm on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8855,7 +10404,7 @@ traps:
     name: PT3080-MIB::pt3080NotifRFOverloadProtectionAlarm
     category: diagnostic
     severity: warning
-    description: RF overload protection alarm {pt3080NotifState} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    description: 'RF overload protection alarm triggered{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8863,9 +10412,9 @@ traps:
       - pt3080NotifLocalTime
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.55
     name: PT3080-MIB::pt3080NotifCommeth0Alarm
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: ETH0 connection state changed to {pt3080NotifState} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    description: 'ETH0 connection alarm {{value "pt3080NotifState"}}: {{value "pt3080NotifMessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8875,7 +10424,7 @@ traps:
     name: PT3080-MIB::pt3080NotifCommeth1Alarm
     category: diagnostic
     severity: warning
-    description: ETH1 connection state changed to {pt3080NotifState} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    description: 'ETH1 connection alarm {{value "pt3080NotifState"}}: {{value "pt3080NotifMessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8883,9 +10432,9 @@ traps:
       - pt3080NotifLocalTime
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.57
     name: PT3080-MIB::pt3080NotifCommeth2Alarm
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: ETH2 connection state changed to {pt3080NotifState} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    description: 'ETH2 connection alarm {{value "pt3080NotifState"}}: {{value "pt3080NotifMessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8894,8 +10443,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.58
     name: PT3080-MIB::pt3080NotifCommeth3Alarm
     category: diagnostic
-    severity: warning
-    description: ETH3 connection alarm state {pt3080NotifState.raw} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    severity: alert
+    description: 'ETH3 connection alarm {{value "pt3080NotifState"}}: {{value "pt3080NotifMessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8903,9 +10452,9 @@ traps:
       - pt3080NotifLocalTime
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.59
     name: PT3080-MIB::pt3080NotifCommeth4Alarm
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: ETH4 connection state changed to {pt3080NotifState.raw} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    description: 'ETH4 connection alarm {{value "pt3080NotifState"}}: {{value "pt3080NotifMessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8915,7 +10464,7 @@ traps:
     name: PT3080-MIB::pt3080NotifExternalInput1Alarm
     category: diagnostic
     severity: warning
-    description: External input alarm triggered with state {pt3080NotifState} on {_HOSTNAME}.
+    description: 'Alarm Input 1 triggered{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8925,7 +10474,7 @@ traps:
     name: PT3080-MIB::pt3080NotifExternalInput2Alarm
     category: diagnostic
     severity: warning
-    description: Alarm Input 2 state {pt3080NotifState} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    description: 'Alarm Input 2 triggered{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8935,7 +10484,7 @@ traps:
     name: PT3080-MIB::pt3080NotifExternalInput3Alarm
     category: diagnostic
     severity: warning
-    description: Alarm Input 3 state {pt3080NotifState} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    description: 'Alarm Input 3 triggered{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8945,7 +10494,7 @@ traps:
     name: PT3080-MIB::pt3080NotifExternalInput4Alarm
     category: diagnostic
     severity: warning
-    description: Alarm Input 4 state {pt3080NotifState.raw} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    description: 'Alarm Input 4 triggered{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8954,8 +10503,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.76
     name: PT3080-MIB::pt3080NotifRefenceClockExtern1PPSLossAlarm
     category: diagnostic
-    severity: crit
-    description: External 1PPS reference clock loss alarm active on {_HOSTNAME}.
+    severity: alert
+    description: External 1PPS reference clock loss detected on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8964,8 +10513,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.77
     name: PT3080-MIB::pt3080NotifRefenceClockIntern1PPSLossAlarm
     category: diagnostic
-    severity: warning
-    description: Internal 10MHz reference clock loss alarm on {_HOSTNAME}.
+    severity: alert
+    description: Internal 10MHz reference clock loss detected on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8974,8 +10523,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.78
     name: PT3080-MIB::pt3080NotifRefenceClockExtern10MHzLossAlarm
     category: diagnostic
-    severity: warning
-    description: External 10MHz reference clock loss alarm {pt3080NotifMessage} on {_HOSTNAME}.
+    severity: alert
+    description: External 10MHz reference clock loss detected on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8985,7 +10534,7 @@ traps:
     name: PT3080-MIB::pt3080NotifRFAlcRangeAlarm
     category: diagnostic
     severity: warning
-    description: ALC range alarm {pt3080NotifState} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    description: ALC range alarm {{value "pt3080NotifMessage"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -8994,8 +10543,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.80
     name: PT3080-MIB::pt3080NotifSFNResyncAlarm
     category: diagnostic
-    severity: warning
-    description: SFN Resync Error detected with state {pt3080NotifState} on {_HOSTNAME}.
+    severity: crit
+    description: SFN Resync Error {{value "pt3080NotifMessage"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9005,7 +10554,7 @@ traps:
     name: PT3080-MIB::pt3080NotifSFNTSPrimaryMaxDelayOffsetExceededAlarm
     category: diagnostic
     severity: warning
-    description: Primary SFN Max Delay + Offset OOR alarm triggered with state {pt3080NotifState} on {_HOSTNAME}.
+    description: 'Primary SFN Max Delay + Offset out of range{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9015,7 +10564,7 @@ traps:
     name: PT3080-MIB::pt3080NotifSFNTSPrimaryNetworkDelayExceededAlarm
     category: diagnostic
     severity: warning
-    description: Primary SFN network delay exceeded maximum threshold with state {pt3080NotifState} on {_HOSTNAME}.
+    description: Primary SFN network delay exceeded maximum on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9025,7 +10574,7 @@ traps:
     name: PT3080-MIB::pt3080NotifSFNTSSecondaryMaxDelayOffsetExceededAlarm
     category: diagnostic
     severity: warning
-    description: Secondary SFN Max Delay Offset exceeded alarm triggered with state {pt3080NotifState} on {_HOSTNAME}.
+    description: Secondary SFN Max Delay Offset exceeded alarm triggered on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9035,7 +10584,7 @@ traps:
     name: PT3080-MIB::pt3080NotifSFNTSSecondaryNetworkDelayExceededAlarm
     category: diagnostic
     severity: warning
-    description: Secondary SFN network delay exceeded maximum on {_HOSTNAME}.
+    description: Secondary SFN network delay exceeded maximum on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9045,7 +10594,7 @@ traps:
     name: PT3080-MIB::pt3080NotifRFLevelOutOfRangeAlarm
     category: diagnostic
     severity: warning
-    description: RF level out of range alarm {pt3080NotifState} on {_HOSTNAME}.
+    description: 'RF level out of range{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9055,7 +10604,7 @@ traps:
     name: PT3080-MIB::pt3080NotifRefenceClockNTPSyncLossAlarm
     category: diagnostic
     severity: warning
-    description: NTP synchronization loss detected with state {pt3080NotifState} on {_HOSTNAME}.
+    description: 'NTP synchronization loss detected{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9065,7 +10614,7 @@ traps:
     name: PT3080-MIB::pt3080NotifSFNTSPrimarySeamlessDelayTooSmallAlarm
     category: diagnostic
     severity: warning
-    description: Primary delay margin too small for seamless operation on {_HOSTNAME}.
+    description: Primary delay margin too small for seamless and holdover on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9073,9 +10622,9 @@ traps:
       - pt3080NotifLocalTime
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.93
     name: PT3080-MIB::pt3080NotifSFNTSPrimaryMIPConfigErrorAlarm
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Primary SFN and MIP configuration mismatch detected with state {pt3080NotifState} on {_HOSTNAME}.
+    description: Primary SFN and MIP configuration differ on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9085,7 +10634,7 @@ traps:
     name: PT3080-MIB::pt3080NotifSFNTSSecondarySeamlessDelayTooSmallAlarm
     category: diagnostic
     severity: warning
-    description: Secondary delay margin too small for seamless operation on {_HOSTNAME}.
+    description: Secondary delay margin too small for seamless and holdover on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9095,7 +10644,7 @@ traps:
     name: PT3080-MIB::pt3080NotifSFNTSSecondaryMIPConfigErrorAlarm
     category: diagnostic
     severity: warning
-    description: Secondary SFN and MIP config mismatch alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    description: Secondary SFN and MIP configuration mismatch detected on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9105,7 +10654,7 @@ traps:
     name: PT3080-MIB::pt3080NotifGNSSUnlockedAlarm
     category: diagnostic
     severity: warning
-    description: GNSS signal lost, state {pt3080NotifState.raw} on {_HOSTNAME}.
+    description: GNSS signal unlocked on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9114,8 +10663,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.107
     name: PT3080-MIB::pt3080NotifGNSSAntennaFaultAlarm
     category: diagnostic
-    severity: err
-    description: GNSS antenna fault reported with state {pt3080NotifState} on {_HOSTNAME}.
+    severity: warning
+    description: 'GNSS antenna fault detected{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9125,7 +10674,7 @@ traps:
     name: PT3080-MIB::pt3080NotifGNSSHoldOverAlarm
     category: diagnostic
     severity: warning
-    description: GNSS Holdover alarm triggered with state {pt3080NotifState} on {_HOSTNAME}.
+    description: 'GNSS holdover alarm detected{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9135,7 +10684,7 @@ traps:
     name: PT3080-MIB::pt3080NotifRefenceClockExternal10MHzHoldOverAlarm
     category: diagnostic
     severity: warning
-    description: External 10MHz reference holdover alarm on {_HOSTNAME}.
+    description: External 10MHz reference clock holdover alarm on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9145,7 +10694,7 @@ traps:
     name: PT3080-MIB::pt3080NotifRefenceClockExternal1PPSHoldOverAlarm
     category: diagnostic
     severity: warning
-    description: External 1PPS reference holdover alarm detected with state {pt3080NotifState} on {_HOSTNAME}.
+    description: External 1PPS reference holdover alarm on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9155,7 +10704,7 @@ traps:
     name: PT3080-MIB::pt3080NotifASIASI1ErrorRateEceeededAlarm
     category: diagnostic
     severity: warning
-    description: ASI-IN1 error rate exceeded alarm {pt3080NotifState} on {_HOSTNAME}.
+    description: 'ASI-IN1 error rate exceeded alarm triggered{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9165,7 +10714,7 @@ traps:
     name: PT3080-MIB::pt3080NotifASIASI2ErrorRateEceeededAlarm
     category: diagnostic
     severity: warning
-    description: ASI-IN2 error rate exceeded alarm triggered with state {pt3080NotifState} on {_HOSTNAME}.
+    description: 'ASI-IN2 error rate exceeded alarm triggered{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9175,7 +10724,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSoIPRx1PackageErrorRationExceededAlarm
     category: diagnostic
     severity: warning
-    description: TSoIP RX1 package error ratio exceeded with state {pt3080NotifState} on {_HOSTNAME}.
+    description: 'TSoIP RX1 package error ratio exceeded{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9185,7 +10734,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSoIPRx2PackageErrorRationExceededAlarm
     category: diagnostic
     severity: warning
-    description: TSoIP RX2 package error ratio exceeded with state {pt3080NotifState} on {_HOSTNAME}.
+    description: 'TSoIP RX2 package error ratio exceeded{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9194,8 +10743,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.119
     name: PT3080-MIB::pt3080NotifTSoIPRx1SyncLossAlarm
     category: diagnostic
-    severity: err
-    description: TSoIP RX1 signal loss alarm reported with state {pt3080NotifState} on {_HOSTNAME}.
+    severity: crit
+    description: TSoIP RX1 signal loss detected on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9205,7 +10754,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSoIPRx2SyncLossAlarm
     category: diagnostic
     severity: crit
-    description: TSoIP RX2 signal loss alarm {pt3080NotifState} on {_HOSTNAME}.
+    description: TSoIP RX2 signal loss detected on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9214,8 +10763,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.129
     name: PT3080-MIB::pt3080NotifInternalBackplaneAlarm
     category: diagnostic
-    severity: warning
-    description: Backplane alarm {pt3080NotifState} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    severity: alert
+    description: Backplane alarm {{value "pt3080NotifMessage"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9225,7 +10774,7 @@ traps:
     name: PT3080-MIB::pt3080NotifInternalReferenceClockAlarm
     category: diagnostic
     severity: warning
-    description: Internal reference clock alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    description: Internal reference clock alarm {{value "pt3080NotifState"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9234,8 +10783,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.134
     name: PT3080-MIB::pt3080NotifInternalUpConverterAlarm
     category: diagnostic
-    severity: warning
-    description: Upconverter alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    severity: alert
+    description: Upconverter alarm triggered with state {{value "pt3080NotifState"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9244,8 +10793,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.135
     name: PT3080-MIB::pt3080NotifInternalDownConverterAlarm
     category: diagnostic
-    severity: err
-    description: Downconverter alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    severity: crit
+    description: Downconverter alarm triggered with state {{value "pt3080NotifState"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9254,8 +10803,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.136
     name: PT3080-MIB::pt3080NotifInternalMainboardAlarm
     category: diagnostic
-    severity: warning
-    description: Main board alarm {pt3080NotifState} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    severity: alert
+    description: Main board alarm {{value "pt3080NotifMessage"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9265,7 +10814,7 @@ traps:
     name: PT3080-MIB::pt3080NotifInternalBatteryAlarm
     category: diagnostic
     severity: warning
-    description: Main Board Battery alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    description: Main board battery alarm {{value "pt3080NotifState"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9275,7 +10824,7 @@ traps:
     name: PT3080-MIB::pt3080NotifInternalFirmware1Alarm
     category: diagnostic
     severity: warning
-    description: 'Firmware 1 alarm {pt3080NotifState}: {pt3080NotifMessage} on {_HOSTNAME}.'
+    description: Firmware 1 alarm {{value "pt3080NotifMessage"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9285,7 +10834,7 @@ traps:
     name: PT3080-MIB::pt3080NotifInternalGNSSAlarm
     category: diagnostic
     severity: warning
-    description: GNSS alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    description: GNSS alarm {{value "pt3080NotifState"}} {{value "pt3080NotifMessage"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9295,7 +10844,7 @@ traps:
     name: PT3080-MIB::pt3080NotifInternalSatelliteAlarm
     category: diagnostic
     severity: warning
-    description: Satellite alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    description: 'Satrecv alarm {{value "pt3080NotifState"}}: {{value "pt3080NotifMessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9304,8 +10853,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.146
     name: PT3080-MIB::pt3080NotifInternalEthAlarm
     category: diagnostic
-    severity: err
-    description: Ethernet port failure detected with state {pt3080NotifState} on {_HOSTNAME}.
+    severity: crit
+    description: 'Ethernet port failure detected{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9315,7 +10864,7 @@ traps:
     name: PT3080-MIB::pt3080NotifHWMonitorFPGAAlarm
     category: diagnostic
     severity: warning
-    description: Main Board FPGA temperature alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    description: FPGA temperature alarm {{value "pt3080NotifMessage"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9324,8 +10873,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.157
     name: PT3080-MIB::pt3080NotifHWMonitorMainBoardCPUTemperatureAlarm
     category: diagnostic
-    severity: warning
-    description: Main Board CPU temperature alarm triggered with state {pt3080NotifState} on {_HOSTNAME}.
+    severity: alert
+    description: 'Main board CPU temperature alarm triggered{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9335,7 +10884,7 @@ traps:
     name: PT3080-MIB::pt3080NotifHWMonitorMainBoardTemperatureAlarm
     category: diagnostic
     severity: warning
-    description: Main board temperature alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    description: Main board temperature alarm {{value "pt3080NotifState"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9344,8 +10893,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.159
     name: PT3080-MIB::pt3080NotifHWMonitorLeftFanAlarm
     category: diagnostic
-    severity: warning
-    description: Left Chassis Fan alarm {pt3080NotifState} reported on {_HOSTNAME}.
+    severity: alert
+    description: Left chassis fan alarm triggered on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9354,8 +10903,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.160
     name: PT3080-MIB::pt3080NotifHWMonitorRightFan2Alarm
     category: diagnostic
-    severity: warning
-    description: Right Chassis Fan alarm reported with state {pt3080NotifState} on {_HOSTNAME}.
+    severity: alert
+    description: Right chassis fan alarm triggered on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9365,7 +10914,7 @@ traps:
     name: PT3080-MIB::pt3080NotifHWMonitorBackplaneTemperatureAlarm
     category: diagnostic
     severity: warning
-    description: Backplane temperature alarm {pt3080NotifState} on {_HOSTNAME}.
+    description: Backplane temperature alarm {{value "pt3080NotifState"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9375,7 +10924,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSPrimaryInputTSHoldOverAlarm
     category: diagnostic
     severity: warning
-    description: Input TS holdover alarm state {pt3080NotifState.raw} reported on {_HOSTNAME}.
+    description: 'Input TS holdover alarm triggered{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9384,8 +10933,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.182
     name: PT3080-MIB::pt3080NotifInternalPLLUnlockedAlarm
     category: diagnostic
-    severity: err
-    description: PLL out of lock alarm reported with state {pt3080NotifState} on {_HOSTNAME}.
+    severity: crit
+    description: Internal PLL unlocked alarm on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9395,7 +10944,7 @@ traps:
     name: PT3080-MIB::pt3080NotifExternalInput5Alarm
     category: diagnostic
     severity: warning
-    description: Alarm Input 5 triggered with state {pt3080NotifState.raw} on {_HOSTNAME}.
+    description: 'Alarm Input 5 triggered{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9405,7 +10954,7 @@ traps:
     name: PT3080-MIB::pt3080NotifSFNUntimedModeAlarm
     category: diagnostic
     severity: warning
-    description: SFN Mode Untimed alarm state {pt3080NotifState} reported on {_HOSTNAME}.
+    description: SFN mode untimed alarm {{value "pt3080NotifMessage"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9415,7 +10964,7 @@ traps:
     name: PT3080-MIB::pt3080NotifSFNFreeRunningModeAlarm
     category: diagnostic
     severity: warning
-    description: SFN mode alarm {pt3080NotifMessage} reported {pt3080NotifState} on {_HOSTNAME}.
+    description: 'SFN free running mode alarm detected{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9425,7 +10974,7 @@ traps:
     name: PT3080-MIB::pt3080NotifExternalInput6Alarm
     category: diagnostic
     severity: warning
-    description: Alarm Input 6 triggered with state {pt3080NotifState.raw} on {_HOSTNAME}.
+    description: 'Alarm Input 6 triggered{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9435,7 +10984,7 @@ traps:
     name: PT3080-MIB::pt3080NotifExternalInput7Alarm
     category: diagnostic
     severity: warning
-    description: Alarm Input 7 state {pt3080NotifState} with message {pt3080NotifMessage} on {_HOSTNAME}.
+    description: 'Alarm Input 7 triggered{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9444,8 +10993,8 @@ traps:
   - oid: 1.3.6.1.4.1.193.223.2.3080.64.0.188
     name: PT3080-MIB::pt3080NotifExternalInput8Alarm
     category: diagnostic
-    severity: warning
-    description: Alarm Input 8 triggered with state {pt3080NotifState} and message {pt3080NotifMessage} on {_HOSTNAME}.
+    severity: alert
+    description: 'Alarm Input 8 triggered{{with value "pt3080NotifMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9455,7 +11004,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSPrimaryDelayMarginAlarm
     category: diagnostic
     severity: warning
-    description: TS Primary Delay Margin alarm {pt3080NotifState} on {_HOSTNAME}.
+    description: TS Primary Delay Margin alarm {{value "pt3080NotifState"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage
@@ -9465,7 +11014,7 @@ traps:
     name: PT3080-MIB::pt3080NotifTSSecondaryDelayMarginAlarm
     category: diagnostic
     severity: warning
-    description: TS Secondary Delay Margin alarm {pt3080NotifMessage} with state {pt3080NotifState} on {_HOSTNAME}.
+    description: TS Secondary Delay Margin alarm {{value "pt3080NotifState"}} on {{hostname}}.
     status: current
     varbinds:
       - pt3080NotifMessage

@@ -13,15 +13,15 @@ traps:
     name: ESI-MIB::trapPrinterOnline
     category: state_change
     severity: notice
-    description: Printer output port {outputIndex} is back online on {_HOSTNAME}.
+    description: Printer output port {{value "outputIndex"}} is back online on {{hostname}}.
     status: current
     varbinds:
       - outputIndex
   - oid: 1.3.6.1.4.1.683.6.0.2
     name: ESI-MIB::trapPrinterOffline
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Printer output port {outputIndex} went offline on {_HOSTNAME}.
+    description: Printer is offline on output port {{value "outputIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - outputIndex
@@ -29,7 +29,7 @@ traps:
     name: ESI-MIB::trapNoPrinterAttached
     category: diagnostic
     severity: warning
-    description: No printer attached to output port {outputIndex} on {_HOSTNAME}.
+    description: No printer is attached to output port {{value "outputIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - outputIndex
@@ -37,7 +37,7 @@ traps:
     name: ESI-MIB::trapPrinterTonerLow
     category: diagnostic
     severity: warning
-    description: Printer toner level low on output port {outputIndex} on {_HOSTNAME}.
+    description: Printer toner is low on output port {{value "outputIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - outputIndex
@@ -45,7 +45,7 @@ traps:
     name: ESI-MIB::trapPrinterPaperOut
     category: diagnostic
     severity: warning
-    description: Printer output {outputIndex} is out of paper on {_HOSTNAME}.
+    description: Printer paper out on output {{value "outputIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - outputIndex
@@ -53,7 +53,7 @@ traps:
     name: ESI-MIB::trapPrinterPaperJam
     category: diagnostic
     severity: warning
-    description: Printer paper jam detected on {_HOSTNAME}.
+    description: Paper jam detected on output port {{value "outputIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - outputIndex
@@ -61,15 +61,15 @@ traps:
     name: ESI-MIB::trapPrinterDoorOpen
     category: diagnostic
     severity: warning
-    description: Printer door is open on {_HOSTNAME}.
+    description: Printer door is open on {{hostname}}.
     status: current
     varbinds:
       - outputIndex
   - oid: 1.3.6.1.4.1.683.6.0.16
     name: ESI-MIB::trapPrinterError
     category: diagnostic
-    severity: err
-    description: Printer error detected on output port {outputIndex} on {_HOSTNAME}.
+    severity: warning
+    description: Printer error detected on output port {{value "outputIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - outputIndex

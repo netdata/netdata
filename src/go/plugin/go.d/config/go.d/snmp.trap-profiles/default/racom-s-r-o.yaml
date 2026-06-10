@@ -208,7 +208,7 @@ traps:
     name: RAY-MIB::airDisconnect
     category: state_change
     severity: warning
-    description: Radio link disconnected with status {lineStatus} on {_HOSTNAME}.
+    description: Air line disconnected{{with value "lineStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - lineStatus
@@ -216,7 +216,7 @@ traps:
     name: RAY-MIB::airConnect
     category: state_change
     severity: notice
-    description: Air line connected after being disconnected on {_HOSTNAME}.
+    description: Air line connected after being disconnected on {{hostname}}.
     status: current
     varbinds:
       - lineStatus
@@ -224,7 +224,7 @@ traps:
     name: RAY-MIB::airWdog
     category: diagnostic
     severity: warning
-    description: Radio link status {lineStatus} reported by airWdog on {_HOSTNAME}.
+    description: Air watchdog event detected{{with value "lineStatus"}} with line status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - lineStatus
@@ -232,7 +232,7 @@ traps:
     name: RAY-MIB::tempAlarm
     category: diagnostic
     severity: warning
-    description: Temperature exceeded threshold at {temperatureModem} on {_HOSTNAME}.
+    description: Temperature exceeded the threshold at {{value "temperatureModem"}} on {{hostname}}.
     status: current
     varbinds:
       - temperatureModem
@@ -240,7 +240,7 @@ traps:
     name: RAY-MIB::powerAlarm
     category: diagnostic
     severity: warning
-    description: Power voltage out of thresholds with unit {voltageUnit} on {_HOSTNAME}.
+    description: Power voltage is out of thresholds on {{hostname}}.
     status: current
     varbinds:
       - voltageUnit
@@ -248,7 +248,7 @@ traps:
     name: RAY-MIB::memoryAlarm
     category: diagnostic
     severity: warning
-    description: Memory usage {useMemory}% exceeded threshold on {_HOSTNAME}.
+    description: Memory usage exceeded threshold at {{value "useMemory"}}% on {{hostname}}.
     status: current
     varbinds:
       - useMemory
@@ -256,7 +256,7 @@ traps:
     name: RAY-MIB::rssAlarm
     category: diagnostic
     severity: warning
-    description: RSS value {rss} exceeded threshold on {_HOSTNAME}.
+    description: RSS indicator {{value "rss"}} dBm exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - rss
@@ -264,7 +264,7 @@ traps:
     name: RAY-MIB::snrAlarm
     category: diagnostic
     severity: warning
-    description: SNR value {snr} exceeded threshold on {_HOSTNAME}.
+    description: SNR exceeded threshold at {{value "snr"}} dB on {{hostname}}.
     status: current
     varbinds:
       - snr
@@ -272,7 +272,7 @@ traps:
     name: RAY-MIB::berAlarm
     category: diagnostic
     severity: warning
-    description: BER exceeded threshold with {fecUncorrectBlockCounter} uncorrect blocks on {_HOSTNAME}.
+    description: BER exceeded threshold{{with value "fecUncorrectBlockCounter"}} with {{.}} uncorrected blocks{{end}} on {{hostname}}.
     status: current
     varbinds:
       - fecUncorrectBlockCounter
@@ -280,8 +280,8 @@ traps:
   - oid: 1.3.6.1.4.1.33555.1.10.10
     name: RAY-MIB::rfPowerFail
     category: diagnostic
-    severity: err
-    description: RF Power amplifier reported {rfPowerStatus} on {_HOSTNAME}.
+    severity: crit
+    description: RF power amplifier failure detected{{with value "rfPowerStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - rfPowerStatus
@@ -289,7 +289,7 @@ traps:
     name: RAY-MIB::peerEthLinkDown
     category: state_change
     severity: warning
-    description: Peer station Ethernet link {ethPeer} went down on {_HOSTNAME}.
+    description: Peer Ethernet link went down for {{value "ethPeer"}} on {{hostname}}.
     status: current
     varbinds:
       - ethPeer
@@ -297,7 +297,7 @@ traps:
     name: RAY-MIB::tr2TemperatureAlarm
     category: diagnostic
     severity: warning
-    description: Temperature alarm triggered with value {alarmTemperature} on {_HOSTNAME}.
+    description: Temperature alarm triggered at {{value "temperatureModem"}} on {{hostname}}.
     status: current
     varbinds:
       - temperatureModem
@@ -306,7 +306,7 @@ traps:
     name: RAY-MIB::tr2VoltageLowAlarm
     category: diagnostic
     severity: warning
-    description: Low voltage alarm {alarmVoltageLow} detected at {alarmVoltageLow.raw} on {_HOSTNAME}.
+    description: Supply voltage below minimal threshold {{value "alarmVoltageLow"}} on {{hostname}}.
     status: current
     varbinds:
       - voltageUnit
@@ -315,7 +315,7 @@ traps:
     name: RAY-MIB::tr2VoltageHighAlarm
     category: diagnostic
     severity: warning
-    description: Supply voltage {voltageUnit} exceeded high threshold {alarmVoltageHigh} on {_HOSTNAME}.
+    description: Supply voltage high alarm detected at {{value "alarmVoltageHigh"}} on {{hostname}}.
     status: current
     varbinds:
       - voltageUnit
@@ -324,7 +324,7 @@ traps:
     name: RAY-MIB::tr2RssAlarm
     category: diagnostic
     severity: warning
-    description: RSS level {rss} triggered alarm state {alarmRss} on {_HOSTNAME}.
+    description: RSS exceeded the threshold with value {{value "rss"}} on {{hostname}}.
     status: current
     varbinds:
       - rss
@@ -333,7 +333,7 @@ traps:
     name: RAY-MIB::tr2SnrAlarm
     category: diagnostic
     severity: warning
-    description: SNR alarm state {alarmSnr} with value {snr} exceeded threshold on {_HOSTNAME}.
+    description: SNR exceeded threshold with value {{value "snr"}} on {{hostname}}.
     status: current
     varbinds:
       - snr
@@ -342,7 +342,7 @@ traps:
     name: RAY-MIB::tr2BerAlarm
     category: diagnostic
     severity: warning
-    description: BER {alarmBer} exceeded threshold with value {ber} on {_HOSTNAME}.
+    description: Bit Error Rate exceeded threshold with value {{value "ber"}} on {{hostname}}.
     status: current
     varbinds:
       - ber
@@ -351,7 +351,7 @@ traps:
     name: RAY-MIB::tr2AirDisconnect
     category: state_change
     severity: alert
-    description: Radio link disconnected with status {lineStatusII} on {_HOSTNAME}.
+    description: Radio air line disconnected on {{hostname}}.
     status: current
     varbinds:
       - lineStatusII
@@ -359,8 +359,8 @@ traps:
   - oid: 1.3.6.1.4.1.33555.1.11.8
     name: RAY-MIB::tr2AirConnect
     category: state_change
-    severity: warning
-    description: Air line connected after being disconnected with status {lineStatusII} on {_HOSTNAME}.
+    severity: notice
+    description: Air line connected after being disconnected on {{hostname}}.
     status: current
     varbinds:
       - lineStatusII
@@ -369,7 +369,7 @@ traps:
     name: RAY-MIB::tr2Eth1LinkDown
     category: state_change
     severity: warning
-    description: Ethernet 1 link status changed to {eth1Link} on {_HOSTNAME}.
+    description: Ethernet 1 link went down on {{hostname}}.
     status: current
     varbinds:
       - eth1Link
@@ -378,7 +378,7 @@ traps:
     name: RAY-MIB::tr2Eth21LinkDown
     category: state_change
     severity: warning
-    description: Ethernet 2 link status {eth2Link} changed to {alarmEth2Down} on {_HOSTNAME}.
+    description: Ethernet 2 link went down on {{hostname}}.
     status: current
     varbinds:
       - eth2Link
@@ -386,8 +386,8 @@ traps:
   - oid: 1.3.6.1.4.1.33555.1.11.11
     name: RAY-MIB::tr2RfPowerFail
     category: diagnostic
-    severity: err
-    description: RF power amplifier failure detected with status {rfPowerStatus} on {_HOSTNAME}.
+    severity: crit
+    description: RF power amplifier failure detected{{with value "rfPowerStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - rfPowerStatus
@@ -396,7 +396,7 @@ traps:
     name: RAY-MIB::tr2NetBitrate
     category: diagnostic
     severity: warning
-    description: Air speed below threshold with net bitrate {netBitrate} on {_HOSTNAME}.
+    description: Air speed below threshold with bitrate {{value "netBitrate"}} kbps on {{hostname}}.
     status: current
     varbinds:
       - netBitrate
@@ -405,7 +405,7 @@ traps:
     name: RAY-MIB::tr2WifiOn
     category: state_change
     severity: notice
-    description: WiFi Host Access Point {wifiHAP} is on on {_HOSTNAME}.
+    description: WiFi Host Access Point is on on {{hostname}}.
     status: current
     varbinds:
       - wifiHAP
@@ -414,7 +414,7 @@ traps:
     name: RAY3-MIB::tr3TemperatureAlarm
     category: diagnostic
     severity: warning
-    description: Temperature alarm state {alarmTemperature} detected at {temperatureModem} on {_HOSTNAME}.
+    description: Temperature alarm triggered at {{value "alarmTemperature"}} on {{hostname}}.
     status: current
     varbinds:
       - name: temperatureModem
@@ -427,7 +427,7 @@ traps:
     name: RAY3-MIB::tr3VoltageLowAlarm
     category: diagnostic
     severity: warning
-    description: Supply voltage below minimal threshold with {alarmVoltageLow} on {_HOSTNAME}.
+    description: Power supply voltage below minimal threshold of {{value "alarmVoltageLow"}} {{value "voltageUnit"}} on {{hostname}}.
     status: current
     varbinds:
       - name: voltageUnit
@@ -440,7 +440,7 @@ traps:
     name: RAY3-MIB::tr3VoltageHighAlarm
     category: diagnostic
     severity: warning
-    description: High voltage alarm state {alarmVoltageHigh} with value {alarmVoltageHigh.raw} {voltageUnit} on {_HOSTNAME}.
+    description: Power supply voltage exceeded high threshold {{value "alarmVoltageHigh"}} {{value "voltageUnit"}} on {{hostname}}.
     status: current
     varbinds:
       - name: voltageUnit
@@ -453,7 +453,7 @@ traps:
     name: RAY3-MIB::tr3RssAlarm
     category: diagnostic
     severity: warning
-    description: RSS level {rss} exceeded threshold with state {alarmRss} on {_HOSTNAME}.
+    description: RSS exceeded the threshold ({{value "rss"}}) on {{hostname}}.
     status: current
     varbinds:
       - name: rss
@@ -466,7 +466,7 @@ traps:
     name: RAY3-MIB::tr3MseAlarm
     category: diagnostic
     severity: warning
-    description: MSE value {alarmMse} exceeded threshold on {_HOSTNAME}.
+    description: MSE threshold exceeded with value {{value "mse"}} on {{hostname}}.
     status: current
     varbinds:
       - mse
@@ -475,7 +475,7 @@ traps:
     name: RAY3-MIB::tr3BerAlarm
     category: diagnostic
     severity: warning
-    description: Bit Error Rate {ber} exceeded threshold with state {alarmBer} on {_HOSTNAME}.
+    description: BER exceeded threshold with value {{value "ber"}} on {{hostname}}.
     status: current
     varbinds:
       - name: ber
@@ -488,7 +488,7 @@ traps:
     name: RAY3-MIB::tr3AirDisconnect
     category: state_change
     severity: warning
-    description: Radio link disconnected with peer alarm {alarmPeerDisconnected} on {_HOSTNAME}.
+    description: Air line disconnected{{with value "lineStatusII"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - name: lineStatusII
@@ -501,7 +501,7 @@ traps:
     name: RAY3-MIB::tr3AirConnect
     category: state_change
     severity: notice
-    description: Air line connected after being disconnected on {_HOSTNAME}.
+    description: Air line connected after being disconnected on {{hostname}}.
     status: current
     varbinds:
       - name: lineStatusII
@@ -514,7 +514,7 @@ traps:
     name: RAY3-MIB::tr3Eth1LinkDown
     category: state_change
     severity: warning
-    description: Ethernet 1 link status changed to {eth1Link} on {_HOSTNAME}.
+    description: Ethernet 1 link went down on {{hostname}}.
     status: current
     varbinds:
       - name: eth1Link
@@ -527,7 +527,7 @@ traps:
     name: RAY3-MIB::tr3Eth21LinkDown
     category: state_change
     severity: warning
-    description: Ethernet 2 link status {eth2Link} changed to down on {_HOSTNAME}.
+    description: Ethernet 2 link went down on {{hostname}}.
     status: current
     varbinds:
       - name: eth2Link
@@ -540,7 +540,7 @@ traps:
     name: RAY3-MIB::tr3NetBitrate
     category: diagnostic
     severity: warning
-    description: Air speed below threshold with net bitrate {netBitrate} on {_HOSTNAME}.
+    description: Air speed below threshold with bitrate {{value "netBitrate"}} kbps on {{hostname}}.
     status: current
     varbinds:
       - name: netBitrate
@@ -553,7 +553,7 @@ traps:
     name: RAY3-MIB::tr3WifiOn
     category: state_change
     severity: notice
-    description: WiFi Host Access Point {wifiHAP} changed state to on on {_HOSTNAME}.
+    description: WiFi Host Access Point {{value "alarmWifiOn"}} on {{hostname}}.
     status: current
     varbinds:
       - name: wifiHAP
@@ -564,9 +564,9 @@ traps:
         type: AlarmState
   - oid: 1.3.6.1.4.1.33555.4.12.0.101
     name: RAY3-MIB::tr3EventAirCapacity
-    category: diagnostic
-    severity: warning
-    description: Air channel capacity changed to {netBitrate} kbps on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Air channel capacity changed to {{value "netBitrate"}} kbps on {{hostname}}.
     status: current
     varbinds:
       - name: netBitrate

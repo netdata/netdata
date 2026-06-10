@@ -167,15 +167,15 @@ traps:
     name: XXX-MIB::shelf-Detected
     category: state_change
     severity: notice
-    description: Slave shelf {shelfIdx} detected on {_HOSTNAME}.
+    description: Slave shelf {{value "shelfIdx"}} detected on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
   - oid: 1.3.6.1.4.1.34592.1.1.2.2
     name: XXX-MIB::shelf-Lost
     category: diagnostic
-    severity: err
-    description: Shelf {shelfIdx} lost on {_HOSTNAME}.
+    severity: crit
+    description: Shelf {{value "shelfIdx"}} is lost on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
@@ -183,15 +183,15 @@ traps:
     name: XXX-MIB::shelf-psuA-On
     category: diagnostic
     severity: notice
-    description: PSU A detected on shelf {shelfIdx} on {_HOSTNAME}.
+    description: PSU A detected on shelf {{value "shelfIdx"}} on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
   - oid: 1.3.6.1.4.1.34592.1.1.2.4
     name: XXX-MIB::shelf-psuA-Off
     category: diagnostic
-    severity: crit
-    description: Power supply unit A is lost on chassis {shelfIdx} on {_HOSTNAME}.
+    severity: alert
+    description: Power supply unit A is lost on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
@@ -199,15 +199,15 @@ traps:
     name: XXX-MIB::shelf-psuB-On
     category: diagnostic
     severity: notice
-    description: PSU B detected on shelf {shelfIdx} on {_HOSTNAME}.
+    description: PSU B detected on shelf {{value "shelfIdx"}} on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
   - oid: 1.3.6.1.4.1.34592.1.1.2.6
     name: XXX-MIB::shelf-psuB-Off
     category: diagnostic
-    severity: err
-    description: Power supply B lost on shelf {shelfIdx} on {_HOSTNAME}.
+    severity: crit
+    description: Power supply unit B is lost on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
@@ -215,15 +215,15 @@ traps:
     name: XXX-MIB::shelf-fan-On
     category: diagnostic
     severity: notice
-    description: Fan A detected on shelf index {shelfIdx} on {_HOSTNAME}.
+    description: Fan A detected on shelf {{value "shelfIdx"}} on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
   - oid: 1.3.6.1.4.1.34592.1.1.2.8
     name: XXX-MIB::shelf-fan-Off
     category: diagnostic
-    severity: err
-    description: Fan A is lost on chassis {shelfIdx} on {_HOSTNAME}.
+    severity: crit
+    description: Fan A is lost on shelf {{value "shelfIdx"}} on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
@@ -231,7 +231,7 @@ traps:
     name: XXX-MIB::card-Detected
     category: diagnostic
     severity: notice
-    description: Card detected at shelf {shelfIdx} slot {slotIdx} on {_HOSTNAME}.
+    description: Card detected in slot {{value "slotIdx"}} on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
@@ -240,7 +240,7 @@ traps:
     name: XXX-MIB::card-Lost
     category: diagnostic
     severity: crit
-    description: Card lost at shelf {shelfIdx} slot {slotIdx} on {_HOSTNAME}.
+    description: Card lost in slot {{value "slotIdx"}} on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
@@ -249,16 +249,16 @@ traps:
     name: XXX-MIB::card-MC-Co-Tx-Up
     category: state_change
     severity: notice
-    description: TX link on shelf {shelfIdx} slot {slotIdx} is up on {_HOSTNAME}.
+    description: Transmit link of MC in center side is up on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
       - slotIdx
   - oid: 1.3.6.1.4.1.34592.1.1.2.31
     name: XXX-MIB::card-MC-Co-Tx-Down
-    category: state_change
-    severity: err
-    description: TX link of MC in slot {slotIdx} of shelf {shelfIdx} is broken on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: Transmitter link of module in slot {{value "slotIdx"}} on shelf {{value "shelfIdx"}} is down on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
@@ -267,16 +267,16 @@ traps:
     name: XXX-MIB::card-MC-Co-Fx-Up
     category: state_change
     severity: notice
-    description: FX link on slot {slotIdx} of shelf {shelfIdx} is up on {_HOSTNAME}.
+    description: FX link of MC in center side is up on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
       - slotIdx
   - oid: 1.3.6.1.4.1.34592.1.1.2.33
     name: XXX-MIB::card-MC-Co-Fx-Down
-    category: state_change
+    category: diagnostic
     severity: crit
-    description: FX link of MC in center side is broken on slot {slotIdx} of shelf {shelfIdx} on {_HOSTNAME}.
+    description: FX link on slot {{value "slotIdx"}} is broken on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
@@ -285,16 +285,16 @@ traps:
     name: XXX-MIB::card-MC-Rmt-Tx-Up
     category: state_change
     severity: notice
-    description: Transmitter link on shelf {shelfIdx} slot {slotIdx} is up on {_HOSTNAME}.
+    description: TX link of MC in customer side is up on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
       - slotIdx
   - oid: 1.3.6.1.4.1.34592.1.1.2.35
     name: XXX-MIB::card-MC-Rmt-Tx-Down
-    category: state_change
+    category: diagnostic
     severity: crit
-    description: TX link of MC on shelf {shelfIdx} slot {slotIdx} is down on {_HOSTNAME}.
+    description: Transmitter link failure on slot {{value "slotIdx"}} on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
@@ -302,8 +302,8 @@ traps:
   - oid: 1.3.6.1.4.1.34592.1.1.2.36
     name: XXX-MIB::card-MC-Rmt-PwrDown
     category: diagnostic
-    severity: crit
-    description: Remote power down detected on shelf {shelfIdx} slot {slotIdx} on {_HOSTNAME}.
+    severity: alert
+    description: Remote module power down detected on slot {{value "slotIdx"}} on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
@@ -312,34 +312,34 @@ traps:
     name: XXX-MIB::card-MC-Co-Ntw-SFP-Inserted
     category: state_change
     severity: notice
-    description: SFP inserted at shelf {shelfIdx} slot {slotIdx} on {_HOSTNAME}.
+    description: SFP inserted in slot {{value "slotIdx"}} on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
       - slotIdx
   - oid: 1.3.6.1.4.1.34592.1.1.2.38
     name: XXX-MIB::card-MC-Co-Ntw-SFP-Removed
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: SFP removed from slot {slotIdx} on shelf {shelfIdx} on {_HOSTNAME}.
+    description: SFP removed from slot {{value "slotIdx"}} on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
       - slotIdx
   - oid: 1.3.6.1.4.1.34592.1.1.2.39
     name: XXX-MIB::card-MC-Co-Acc-SFP-Inserted
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: SFP inserted on slot {slotIdx} of shelf {shelfIdx} on {_HOSTNAME}.
+    description: SFP inserted in slot {{value "slotIdx"}} on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
       - slotIdx
   - oid: 1.3.6.1.4.1.34592.1.1.2.40
     name: XXX-MIB::card-MC-Co-Acc-SFP-Removed
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: SFP removed from slot {slotIdx} on shelf {shelfIdx} on {_HOSTNAME}.
+    description: SFP removed from slot {{value "slotIdx"}} on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
@@ -348,25 +348,25 @@ traps:
     name: XXX-MIB::card-MC-Rmt-Acc-SFP-Inserted
     category: state_change
     severity: notice
-    description: Remote access port SFP inserted at shelf {shelfIdx} slot {slotIdx} on {_HOSTNAME}.
+    description: Remote access port SFP inserted on slot {{value "slotIdx"}} on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
       - slotIdx
   - oid: 1.3.6.1.4.1.34592.1.1.2.42
     name: XXX-MIB::card-MC-Rmt-Acc-SFP-Removed
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Remote access SFP removed from shelf {shelfIdx} slot {slotIdx} on {_HOSTNAME}.
+    description: Remote access port SFP removed on slot {{value "slotIdx"}} of shelf {{value "shelfIdx"}} on {{hostname}}.
     status: current
     varbinds:
       - shelfIdx
       - slotIdx
   - oid: 1.3.6.1.4.1.34592.1.3.6.0.1
     name: FD-TRAP-MIB::sniSFPStatusChange
-    category: diagnostic
-    severity: warning
-    description: SFP status changed to {sfpPlugStauts} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: SFP plug status changed to {{value "sfpPlugStauts"}} on {{hostname}}.
     status: current
     varbinds:
       - sfpPlugStauts
@@ -374,15 +374,15 @@ traps:
     name: FD-TRAP-MIB::sniPortLinkChange
     category: state_change
     severity: warning
-    description: Port link state changed to {swPortLinkState} on {_HOSTNAME}.
+    description: Port link state changed to {{value "swPortLinkState"}} on {{hostname}}.
     status: current
     varbinds:
       - swPortLinkState
   - oid: 1.3.6.1.4.1.34592.1.3.6.0.3
     name: FD-TRAP-MIB::powerStatusChange
-    category: diagnostic
-    severity: warning
-    description: Power status changed to {powerStatusBit} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Power status changed to {{value "powerStatusBit"}} on {{hostname}}.
     status: current
     varbinds:
       - powerStatusBit
@@ -390,15 +390,15 @@ traps:
     name: FD-TRAP-MIB::fanStatusChange
     category: diagnostic
     severity: warning
-    description: Fan status changed to {fanStatusBit} on {_HOSTNAME}.
+    description: Fan status changed to {{value "fanStatusBit"}} on {{hostname}}.
     status: current
     varbinds:
       - fanStatusBit
   - oid: 1.3.6.1.4.1.34592.1.3.6.0.5
     name: FD-TRAP-MIB::ponRunningStatusChange
     category: state_change
-    severity: notice
-    description: PON card running status changed to {ponCardRunningStatus} on {_HOSTNAME}.
+    severity: warning
+    description: PON card running status changed to {{value "ponCardRunningStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ponCardRunningStatus
@@ -406,7 +406,7 @@ traps:
     name: FD-TRAP-MIB::onuLinkStatusChange
     category: state_change
     severity: warning
-    description: ONU link status changed to {linkOnLineStatus} on {_HOSTNAME}.
+    description: ONU link status changed to {{value "linkOnLineStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - linkOnLineStatus
@@ -414,7 +414,7 @@ traps:
     name: FD-TRAP-MIB::onuOnlineStatusChange
     category: state_change
     severity: notice
-    description: ONU online status changed to {onuOnLineStatus} on {_HOSTNAME}.
+    description: ONU online status changed to {{value "onuOnLineStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - onuOnLineStatus
@@ -422,47 +422,47 @@ traps:
     name: FD-TRAP-MIB::onuPortStatusChange
     category: state_change
     severity: notice
-    description: ONU port status changed for {uniPortLink} on {_HOSTNAME}.
+    description: ONU port status changed to {{value "uniPortLink"}} on {{hostname}}.
     status: current
     varbinds:
       - uniPortLink
   - oid: 1.3.6.1.4.1.34592.1.3.6.0.9
     name: FD-TRAP-MIB::swSniPortTrafficChange
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Port traffic state changed to {swSniPortTrafficChangeVal} on {_HOSTNAME}.
+    description: SNMP port traffic change detected with value {{value "swSniPortTrafficChangeVal"}} on {{hostname}}.
     status: current
     varbinds:
       - swSniPortTrafficChangeVal
   - oid: 1.3.6.1.4.1.34592.1.3.6.0.10
     name: FD-TRAP-MIB::oltTrafficChange
     category: diagnostic
-    severity: info
-    description: OLT traffic change detected with value {oltTrafficChangeVal} on {_HOSTNAME}.
+    severity: warning
+    description: OLT traffic change detected with value {{value "oltTrafficChangeVal"}} on {{hostname}}.
     status: current
     varbinds:
       - oltTrafficChangeVal
   - oid: 1.3.6.1.4.1.34592.1.3.6.0.11
     name: FD-TRAP-MIB::onuTrafficChange
-    category: diagnostic
-    severity: warning
-    description: ONU traffic change value {onuTrafficChangeVal} detected on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: ONU traffic changed to {{value "onuTrafficChangeVal"}} on {{hostname}}.
     status: current
     varbinds:
       - onuTrafficChangeVal
   - oid: 1.3.6.1.4.1.34592.1.3.6.0.12
     name: FD-TRAP-MIB::linkIdResourceExhaust
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Link ID resource exhaustion indicated by {linkIdExhaust} on {_HOSTNAME}.
+    description: Link ID resource exhaustion detected{{with value "linkIdExhaust"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - linkIdExhaust
   - oid: 1.3.6.1.4.1.34592.1.3.6.0.13
     name: FD-TRAP-MIB::onuIdResourceExhaust
     category: diagnostic
-    severity: warning
-    description: ONU ID resource exhaustion detected with value {onuIdExhaust} on {_HOSTNAME}.
+    severity: alert
+    description: ONU ID resource exhaustion detected{{with value "onuIdExhaust"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - onuIdExhaust
@@ -470,7 +470,7 @@ traps:
     name: FD-TRAP-MIB::illegalRegisterAlarm
     category: security
     severity: warning
-    description: Unauthorized ONU MAC {nonAuthOnuMac} attempted registration on {_HOSTNAME}.
+    description: Illegal ONU registration attempt by {{value "nonAuthOnuMac"}} on {{hostname}}.
     status: current
     varbinds:
       - nonAuthOnuMac
@@ -478,15 +478,15 @@ traps:
     name: FD-TRAP-MIB::onuPortRstpStateChange
     category: state_change
     severity: notice
-    description: ONU port RSTP state changed to {uniPortRstpState} on {_HOSTNAME}.
+    description: ONU port RSTP state changed to {{value "uniPortRstpState"}} on {{hostname}}.
     status: current
     varbinds:
       - uniPortRstpState
   - oid: 1.3.6.1.4.1.34592.1.3.6.0.16
     name: FD-TRAP-MIB::rmonEventThreshold
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Threshold alarm triggered with value {alarmValue} on {_HOSTNAME}.
+    description: RMON threshold alarm triggered with value {{value "alarmValue"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmValue
@@ -494,23 +494,23 @@ traps:
     name: FD-TRAP-MIB::onuDyingGasp
     category: diagnostic
     severity: crit
-    description: ONU reported dying gasp with status {onuOnLineStatus} on {_HOSTNAME}.
+    description: ONT reported a dying gasp event with status {{value "onuOnLineStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - onuOnLineStatus
   - oid: 1.3.6.1.4.1.34592.1.3.6.0.18
     name: FD-TRAP-MIB::onuPortLoopBack
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Port loopback detected on {uniPortLink} on {_HOSTNAME}.
+    description: Port loopback detected on {{value "uniPortLink"}} on {{hostname}}.
     status: current
     varbinds:
       - uniPortLink
   - oid: 1.3.6.1.4.1.34592.1.3.6.0.19
     name: FD-TRAP-MIB::oltSystemReboot
     category: state_change
-    severity: alert
-    description: OLT system rebooted on {_HOSTNAME}.
+    severity: emerg
+    description: OLT system rebooted on {{hostname}}.
     status: current
     varbinds:
       - userName
@@ -518,7 +518,7 @@ traps:
     name: CDATA-GPON-MIB2::gponAlarmNotification
     category: security
     severity: alert
-    description: Rogue ONU detected with SN {gponTrapRogueOnuSn} on {_HOSTNAME}.
+    description: GPON alarm detected on {{trap_interface}} with state {{value "gponTrapState"}} on {{hostname}}.
     status: current
     varbinds:
       - gponTrapId

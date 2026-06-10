@@ -9,131 +9,131 @@ traps:
     name: InterSeptor-MIB::inSeptCommunicationRestored
     category: state_change
     severity: notice
-    description: Communication between interSeptor and sensor has been established on {_HOSTNAME}.
+    description: Communication with sensor established on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.2
     name: InterSeptor-MIB::inSeptCommunicationLost
     category: diagnostic
     severity: crit
-    description: Communication with sensor lost on {_HOSTNAME}.
+    description: Communication with sensor lost on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.3
     name: InterSeptor-MIB::inSeptAlarm1Inactive
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Sensor alarm 1 returned from active state on {_HOSTNAME}.
+    description: Sensor Alarm1 returned from active state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.4
     name: InterSeptor-MIB::inSeptAlarm1Active
     category: diagnostic
     severity: warning
-    description: Alarm1 has become active on {_HOSTNAME}.
+    description: Alarm1 has become active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.5
     name: InterSeptor-MIB::inSeptAlarm2Inactive
     category: diagnostic
     severity: notice
-    description: Sensor alarm 2 returned from active state on {_HOSTNAME}.
+    description: Sensor alarm 2 returned from active state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.6
     name: InterSeptor-MIB::inSeptAlarm2Active
     category: diagnostic
     severity: warning
-    description: Alarm2 has become active on {_HOSTNAME}.
+    description: Alarm2 has become active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.7
     name: InterSeptor-MIB::inSeptTemperatureNotHighWarning
     category: diagnostic
     severity: notice
-    description: Temperature sensor returned to normal state on {_HOSTNAME}.
+    description: Temperature sensor returned to normal from high warning on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.8
     name: InterSeptor-MIB::inSeptTemperatureHighWarning
     category: diagnostic
     severity: warning
-    description: Temperature warning triggered on {_HOSTNAME}.
+    description: Temperature sensor high warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.9
     name: InterSeptor-MIB::inSeptTemperatureNotLowWarning
     category: diagnostic
     severity: notice
-    description: Temperature sensor returned from low warning to normal on {_HOSTNAME}.
+    description: Temperature sensor returned to normal from low warning on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.10
     name: InterSeptor-MIB::inSeptTemperatureLowWarning
     category: diagnostic
     severity: warning
-    description: Temperature sensor reported low warning on {_HOSTNAME}.
+    description: Temperature sensor reading is lower than low warning set point on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.11
     name: InterSeptor-MIB::inSeptTemperatureNotHighCritical
     category: diagnostic
     severity: warning
-    description: Sensor temperature is lower than high critical set point on {_HOSTNAME}.
+    description: Sensor temperature is lower than high critical set point on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.12
     name: InterSeptor-MIB::inSeptTemperatureHighCritical
     category: diagnostic
     severity: crit
-    description: Temperature sensor reported critical high temperature on {_HOSTNAME}.
+    description: Temperature sensor exceeded high critical threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.13
     name: InterSeptor-MIB::inSeptTemperatureNotLowCritical
     category: diagnostic
-    severity: crit
-    description: Temperature sensor reported high critical threshold on {_HOSTNAME}.
+    severity: warning
+    description: Temperature sensor exceeded low critical threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.14
     name: InterSeptor-MIB::inSeptTemperatureLowCritical
     category: diagnostic
     severity: crit
-    description: Sensor temperature is lower than low critical set point on {_HOSTNAME}.
+    description: Sensor temperature is below low critical threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.15
     name: InterSeptor-MIB::inSeptHumidityNotHighWarning
     category: diagnostic
     severity: notice
-    description: Humidity sensor returned to normal state on {_HOSTNAME}.
+    description: Humidity sensor returned to normal from high warning on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.16
     name: InterSeptor-MIB::inSeptHumidityHighWarning
     category: diagnostic
     severity: warning
-    description: Humidity sensor reported high warning condition on {_HOSTNAME}.
+    description: 'Humidity sensor warning: humidity exceeded high set point on {{hostname}}.'
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.17
     name: InterSeptor-MIB::inSeptHumidityNotLowWarning
     category: diagnostic
     severity: notice
-    description: Humidity sensor returned to normal state on {_HOSTNAME}.
+    description: Sensor humidity returned from low warning to normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.18
     name: InterSeptor-MIB::inSeptHumidityLowWarning
     category: diagnostic
     severity: warning
-    description: Humidity sensor reported low warning condition on {_HOSTNAME}.
+    description: Sensor humidity is lower than the low warning set point on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.19
     name: InterSeptor-MIB::inSeptHumidityNotHighCritical
     category: diagnostic
     severity: warning
-    description: Sensor humidity is lower than high critical set point on {_HOSTNAME}.
+    description: Humidity sensor value is lower than high critical set point on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.20
     name: InterSeptor-MIB::inSeptHumidityHighCritical
     category: diagnostic
-    severity: warning
-    description: Sensor humidity exceeded high critical threshold on {_HOSTNAME}.
+    severity: crit
+    description: Critical humidity threshold exceeded on sensor on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.21
     name: InterSeptor-MIB::inSeptHumidityNotLowCritical
     category: diagnostic
     severity: warning
-    description: Humidity sensor reported high critical condition on {_HOSTNAME}.
+    description: Humidity sensor exceeded low critical threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.19011.1.3.1.2.0.22
     name: InterSeptor-MIB::inSeptHumidityLowCritical
     category: diagnostic
-    severity: warning
-    description: Sensor humidity below low critical threshold on {_HOSTNAME}.
+    severity: crit
+    description: Sensor humidity is below low critical set point on {{hostname}}.
     status: current

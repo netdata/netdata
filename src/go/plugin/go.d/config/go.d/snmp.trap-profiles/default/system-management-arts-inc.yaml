@@ -45,7 +45,7 @@ traps:
     name: DFM-MIB::smTrapCertaintyChange
     category: diagnostic
     severity: warning
-    description: DFM notification certainty changed to {smNotifCertainty} for {smNotifDescription} on {_HOSTNAME}.
+    description: DFM notification certainty changed to {{value "smNotifCertainty"}} for {{value "smNotifEventName"}} on {{hostname}}.
     status: current
     varbinds:
       - smNotifTimestamp
@@ -61,7 +61,7 @@ traps:
     name: DFM-MIB::smTrapSeverityChange
     category: diagnostic
     severity: warning
-    description: DFM notification severity changed to {smNotifSeverity.raw} for {smNotifDescription} on {_HOSTNAME}.
+    description: DFM notification severity changed to {{value "smNotifSeverity"}} for {{value "smNotifEventName"}} on {{hostname}}.
     status: current
     varbinds:
       - smNotifTimestamp
@@ -76,8 +76,8 @@ traps:
   - oid: 1.3.6.1.4.1.733.0.4
     name: DFM-MIB::smTrapNotification
     category: diagnostic
-    severity: err
-    description: DFM root cause notification {smNotifEventName} with description {smNotifDescription} on {_HOSTNAME}.
+    severity: warning
+    description: 'DFM root cause notification {{value "smNotifEventName"}}: {{value "smNotifDescription"}} on {{hostname}}.'
     status: current
     varbinds:
       - smNotifTimestamp
@@ -93,7 +93,7 @@ traps:
     name: DFM-MIB::smTrapNotificationClear
     category: state_change
     severity: notice
-    description: DFM notification cleared for {smNotifEventName} on {_HOSTNAME}.
+    description: DFM notification cleared for {{value "smNotifEventName"}} on {{hostname}}.
     status: current
     varbinds:
       - smNotifTimestamp

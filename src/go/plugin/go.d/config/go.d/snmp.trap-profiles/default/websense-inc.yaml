@@ -198,15 +198,15 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.23365.10000.0.10
     name: WBSN-APPLIANCE-MIB::testEvent
-    category: unknown
-    severity: debug
-    description: Test event {TRAP_NAME} received on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Test event received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.23365.10000.0.1000
     name: WBSN-APPLIANCE-MIB::cpuMaxUsageExceed
     category: diagnostic
     severity: warning
-    description: High CPU usage detected with {ssCpuUser}% user and {ssCpuSystem}% system on {_HOSTNAME}.
+    description: High CPU usage detected{{with value "ssCpuIdle"}} idle {{.}}%{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ssErrorName
@@ -217,7 +217,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::memMaxUsageExceed
     category: diagnostic
     severity: warning
-    description: High memory usage detected with {memAvailReal} available on {_HOSTNAME}.
+    description: High memory usage detected on {{hostname}}.
     status: current
     varbinds:
       - memTotalReal
@@ -230,9 +230,9 @@ traps:
       - memAvailSwap
   - oid: 1.3.6.1.4.1.23365.10000.0.1002
     name: WBSN-APPLIANCE-MIB::networkMaxBandwidthExceed
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Heavy network traffic detected on interface {ifaName} with speed {ifaSpeed} on {_HOSTNAME}.
+    description: Network bandwidth exceeded on interface {{first (value "ifaName") "link"}} on {{hostname}}.
     status: current
     varbinds:
       - ifaName
@@ -243,7 +243,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::diskFreeMinSizeExceed
     category: diagnostic
     severity: warning
-    description: Low free disk space detected on {dskPath} with message {dskErrorMsg} on {_HOSTNAME}.
+    description: 'Low free disk space detected on {{value "dskPath"}}: {{value "dskErrorMsg"}} on {{hostname}}.'
     status: current
     varbinds:
       - dskPath
@@ -252,7 +252,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::swapMinFreeExceed
     category: diagnostic
     severity: warning
-    description: 'Low free swap space detected: {memSwapErrorMsg} on {_HOSTNAME}.'
+    description: 'Low free swap space detected{{with value "memSwapErrorMsg"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - memErrorName
@@ -261,7 +261,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::systemLoad
     category: diagnostic
     severity: warning
-    description: 'Heavy system load detected: {loadName} - {loadErrorMessage} on {_HOSTNAME}.'
+    description: 'Heavy system load detected{{with value "loadErrorMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - loadName
@@ -270,7 +270,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::logFileMaxSizeExceed
     category: diagnostic
     severity: warning
-    description: Log file {fileName} reached maximum size with error {fileErrorMsg} on {_HOSTNAME}.
+    description: Log file {{value "fileName"}} exceeded maximum size on {{hostname}}.
     status: current
     varbinds:
       - fileName
@@ -279,15 +279,15 @@ traps:
     name: WBSN-APPLIANCE-MIB::logCacheMinFreeExceed
     category: diagnostic
     severity: warning
-    description: 'Low free log cache space detected: {wsAlertMessage} on {_HOSTNAME}.'
+    description: 'Low free log cache space detected{{with value "wsAlertMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - wsAlertMessage
   - oid: 1.3.6.1.4.1.23365.10000.0.1050
     name: WBSN-APPLIANCE-MIB::moduleDown
     category: diagnostic
-    severity: err
-    description: Appliance module {vmName} is down on {_HOSTNAME}.
+    severity: crit
+    description: Appliance module {{first (value "vmName") "module"}} is down on {{hostname}}.
     status: current
     varbinds:
       - vmName
@@ -295,7 +295,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::serviceDown
     category: diagnostic
     severity: crit
-    description: Appliance service {svcName} reported status {svcStatus} on {_HOSTNAME}.
+    description: Appliance service {{value "svcName"}} is down on {{hostname}}.
     status: current
     varbinds:
       - svcStatus
@@ -303,8 +303,8 @@ traps:
   - oid: 1.3.6.1.4.1.23365.10000.0.1052
     name: WBSN-APPLIANCE-MIB::backupFailure
     category: diagnostic
-    severity: err
-    description: 'Appliance backup failure reported: {wsAlertMessage} on {_HOSTNAME}.'
+    severity: crit
+    description: 'Appliance backup failure: {{value "wsAlertMessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - wsAlertMessage
@@ -312,7 +312,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::logServerConnectionLost
     category: diagnostic
     severity: warning
-    description: 'Log server connection lost: {wsAlertMessage} on {_HOSTNAME}.'
+    description: 'Log server connection lost{{with value "wsAlertMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - wsAlertMessage
@@ -320,7 +320,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::hostnameChange
     category: config_change
     severity: notice
-    description: Appliance hostname changed from {prevHostname} to {currHostname} on {_HOSTNAME}.
+    description: Appliance hostname changed from {{value "prevHostname"}} to {{value "currHostname"}} on {{hostname}}.
     status: current
     varbinds:
       - prevHostname
@@ -329,7 +329,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::ipAddressChange
     category: config_change
     severity: notice
-    description: IP address changed from {ifaPrevAddress} to {ifaCurrAddress} on {_HOSTNAME}.
+    description: IP address changed from {{value "ifaPrevAddress"}} to {{value "ifaCurrAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - ifaName
@@ -341,7 +341,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::powerSupply
     category: diagnostic
     severity: warning
-    description: Power supply sensor {evtSensor} reported {evtDesc} on {_HOSTNAME}.
+    description: 'Power supply warning detected{{with value "evtDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - evtTimestamp
@@ -350,9 +350,9 @@ traps:
       - evtDesc
   - oid: 1.3.6.1.4.1.23365.10000.0.2002
     name: WBSN-APPLIANCE-MIB::redundancy
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Appliance redundancy warning detected with event {evtDesc} on {_HOSTNAME}.
+    description: 'Appliance redundancy warning {{with value "evtDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - evtTimestamp
@@ -363,7 +363,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::temps
     category: diagnostic
     severity: warning
-    description: Temperature warning on sensor {evtSensor} with reading {triggerReading} exceeding threshold {triggerThreshold} on {_HOSTNAME}.
+    description: Appliance temperature warning on sensor {{value "evtSensor"}} with reading {{value "triggerReading"}} on {{hostname}}.
     status: current
     varbinds:
       - evtTimestamp
@@ -376,7 +376,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::fans
     category: diagnostic
     severity: warning
-    description: Fan sensor {evtSensor} reported warning with reading {triggerReading} on {_HOSTNAME}.
+    description: Appliance fan warning detected on {{hostname}}.
     status: current
     varbinds:
       - evtTimestamp
@@ -389,7 +389,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::volt
     category: diagnostic
     severity: warning
-    description: Voltage warning on {evtSensor} with reading {triggerReading} on {_HOSTNAME}.
+    description: Appliance voltage warning on sensor {{value "evtSensor"}} on {{hostname}}.
     status: current
     varbinds:
       - evtTimestamp
@@ -402,7 +402,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::logs
     category: diagnostic
     severity: warning
-    description: 'Appliance log warning: {evtDesc} from sensor {evtSensor} on {_HOSTNAME}.'
+    description: 'Appliance logs warning: {{value "evtDesc"}} on {{hostname}}.'
     status: current
     varbinds:
       - evtTimestamp
@@ -413,7 +413,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::mem
     category: diagnostic
     severity: warning
-    description: Appliance memory warning detected with event {evtDesc} on {_HOSTNAME}.
+    description: Appliance memory warning {{value "evtDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - evtTimestamp
@@ -423,8 +423,8 @@ traps:
   - oid: 1.3.6.1.4.1.23365.10000.0.2008
     name: WBSN-APPLIANCE-MIB::intrusion
     category: security
-    severity: crit
-    description: Chassis intrusion detected by sensor {evtSensor} at {evtTimestamp} on {_HOSTNAME}.
+    severity: alert
+    description: Appliance chassis intrusion detected on {{hostname}}.
     status: current
     varbinds:
       - evtTimestamp
@@ -435,7 +435,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::battery
     category: diagnostic
     severity: warning
-    description: Appliance battery warning detected on {_HOSTNAME}.
+    description: Appliance battery warning detected on {{hostname}}.
     status: current
     varbinds:
       - evtTimestamp
@@ -446,7 +446,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::raid
     category: diagnostic
     severity: warning
-    description: RAID controller warning with {dskFailedNr} failed disks on {_HOSTNAME}.
+    description: RAID controller warning with {{value "dskPhysErrMsg"}} on {{hostname}}.
     status: current
     varbinds:
       - dskPhysicalNr
@@ -460,7 +460,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::cpuMaxUsageExceedClear
     category: diagnostic
     severity: notice
-    description: High CPU usage threshold cleared on {_HOSTNAME}.
+    description: High CPU usage threshold cleared on {{hostname}}.
     status: current
     varbinds:
       - ssErrorName
@@ -471,7 +471,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::memMaxUsageExceedClear
     category: diagnostic
     severity: notice
-    description: High memory usage threshold cleared on {_HOSTNAME}.
+    description: High memory usage alert cleared on {{hostname}}.
     status: current
     varbinds:
       - memTotalReal
@@ -486,7 +486,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::networkMaxBandwidthExceedClear
     category: state_change
     severity: notice
-    description: Network bandwidth threshold cleared on interface {ifaName} on {_HOSTNAME}.
+    description: Network bandwidth exceed condition cleared on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - ifaName
@@ -497,7 +497,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::diskFreeMinSizeExceedClear
     category: diagnostic
     severity: notice
-    description: Low free disk space cleared for {dskPath} on {_HOSTNAME}.
+    description: Low free disk space cleared for {{value "dskPath"}} on {{hostname}}.
     status: current
     varbinds:
       - dskPath
@@ -506,7 +506,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::swapMinFreeExceedClear
     category: diagnostic
     severity: notice
-    description: Low free swap space condition cleared on {_HOSTNAME}.
+    description: Low free swap space condition cleared on {{hostname}}.
     status: current
     varbinds:
       - memErrorName
@@ -515,7 +515,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::systemLoadClear
     category: diagnostic
     severity: notice
-    description: System load {loadName} cleared on {_HOSTNAME}.
+    description: Heavy system load condition cleared for {{value "loadName"}} on {{hostname}}.
     status: current
     varbinds:
       - loadName
@@ -524,7 +524,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::logFileMaxSizeExceedClear
     category: diagnostic
     severity: notice
-    description: Log file size alert cleared for {fileName} on {_HOSTNAME}.
+    description: Log file size alert cleared for {{value "fileName"}} on {{hostname}}.
     status: current
     varbinds:
       - fileName
@@ -533,15 +533,15 @@ traps:
     name: WBSN-APPLIANCE-MIB::logCacheMinFreeExceedClear
     category: diagnostic
     severity: notice
-    description: Low free log cache space alert cleared on {_HOSTNAME}.
+    description: Low free log cache space condition cleared on {{hostname}}.
     status: current
     varbinds:
       - wsAlertMessage
   - oid: 1.3.6.1.4.1.23365.10000.10000.0.1050
     name: WBSN-APPLIANCE-MIB::moduleDownClear
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Appliance module {vmName} down event cleared on {_HOSTNAME}.
+    description: Appliance module down condition cleared for {{value "vmName"}} on {{hostname}}.
     status: current
     varbinds:
       - vmName
@@ -549,16 +549,16 @@ traps:
     name: WBSN-APPLIANCE-MIB::serviceDownClear
     category: state_change
     severity: notice
-    description: Service {svcName} status cleared to {svcStatus} on {_HOSTNAME}.
+    description: Service {{value "svcName"}} is back up on {{hostname}}.
     status: current
     varbinds:
       - svcStatus
       - svcName
   - oid: 1.3.6.1.4.1.23365.10000.10000.0.1053
     name: WBSN-APPLIANCE-MIB::logServerConnectionLostClear
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Log server connection lost alert cleared on {_HOSTNAME}.
+    description: 'Log server connection lost alert cleared{{with value "wsAlertMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - wsAlertMessage
@@ -566,7 +566,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::powerSupplyClear
     category: diagnostic
     severity: notice
-    description: Power supply warning cleared for sensor {evtSensor} on {_HOSTNAME}.
+    description: Power supply warning cleared for {{value "evtSensor"}} on {{hostname}}.
     status: current
     varbinds:
       - evtTimestamp
@@ -577,7 +577,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::redundancyClear
     category: state_change
     severity: notice
-    description: Redundancy warning cleared for {evtSensor} on {_HOSTNAME}.
+    description: Appliance redundancy warning cleared on {{hostname}}.
     status: current
     varbinds:
       - evtTimestamp
@@ -588,7 +588,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::tempsClear
     category: diagnostic
     severity: notice
-    description: Temperature warning cleared for sensor {evtSensor} on {_HOSTNAME}.
+    description: Temperature warning cleared for {{value "evtSensor"}} on {{hostname}}.
     status: current
     varbinds:
       - evtTimestamp
@@ -601,7 +601,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::fansClear
     category: diagnostic
     severity: notice
-    description: Fan warning cleared for sensor {evtSensor} on {_HOSTNAME}.
+    description: Appliance fan warning cleared for {{value "evtSensor"}} on {{hostname}}.
     status: current
     varbinds:
       - evtTimestamp
@@ -614,7 +614,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::voltClear
     category: diagnostic
     severity: notice
-    description: Voltage warning cleared for sensor {evtSensor} on {_HOSTNAME}.
+    description: Voltage warning cleared for {{value "evtSensor"}} on {{hostname}}.
     status: current
     varbinds:
       - evtTimestamp
@@ -627,7 +627,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::logsClear
     category: diagnostic
     severity: notice
-    description: Event {evtDesc} cleared on {_HOSTNAME}.
+    description: 'Appliance logs warning cleared{{with value "evtDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - evtTimestamp
@@ -638,7 +638,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::memClear
     category: diagnostic
     severity: notice
-    description: Appliance memory warning cleared on {_HOSTNAME}.
+    description: 'Appliance memory warning cleared{{with value "evtDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - evtTimestamp
@@ -649,7 +649,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::intrusionClear
     category: security
     severity: notice
-    description: Chassis intrusion cleared by {evtSensor} on {_HOSTNAME}.
+    description: Chassis intrusion detected event cleared on {{hostname}}.
     status: current
     varbinds:
       - evtTimestamp
@@ -660,7 +660,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::batteryClear
     category: diagnostic
     severity: notice
-    description: Appliance battery warning cleared on {_HOSTNAME}.
+    description: Battery warning cleared for {{value "evtSensor"}} on {{hostname}}.
     status: current
     varbinds:
       - evtTimestamp
@@ -671,7 +671,7 @@ traps:
     name: WBSN-APPLIANCE-MIB::raidClear
     category: diagnostic
     severity: notice
-    description: RAID controller warning cleared for {dskPhysicalNr} physical disks on {_HOSTNAME}.
+    description: RAID controller warning cleared on {{hostname}}.
     status: current
     varbinds:
       - dskPhysicalNr

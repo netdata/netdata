@@ -1682,7 +1682,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::diskNotHealthyNotif
     category: diagnostic
     severity: warning
-    description: Disk health check reported {diskNotHealthyEvent} on {_HOSTNAME}.
+    description: 'Disk is not healthy{{with value "diskNotHealthyEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - diskNotHealthyEvent
@@ -1690,7 +1690,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::nodePingFailedNotif
     category: diagnostic
     severity: crit
-    description: Node is not pingable on {_HOSTNAME}.
+    description: Node is not pingable on {{hostname}}.
     status: current
     varbinds:
       - nodePingFailedEvent
@@ -1698,15 +1698,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::markDiskForRemovalNotif
     category: diagnostic
     severity: warning
-    description: 'Disk marked for removal: {markDiskForRemovalEvent} on {_HOSTNAME}.'
+    description: Disk marked for removal {{value "markDiskForRemovalEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - markDiskForRemovalEvent
   - oid: 1.3.6.1.4.1.47421.0.4
     name: COHESITY-APPLIANCE-MIB::upgradeFailedNotif
     category: diagnostic
-    severity: err
-    description: Node failed to upgrade with event {upgradeFailedEvent} on {_HOSTNAME}.
+    severity: crit
+    description: Node upgrade failed on {{hostname}}.
     status: current
     varbinds:
       - upgradeFailedEvent
@@ -1714,7 +1714,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::newDiskFoundNotif
     category: diagnostic
     severity: notice
-    description: New disk detected via {newDiskFoundEvent} on {_HOSTNAME}.
+    description: New disk found on {{hostname}}.
     status: current
     varbinds:
       - newDiskFoundEvent
@@ -1722,7 +1722,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::diskSpaceLowNotif
     category: diagnostic
     severity: warning
-    description: Disk free space is low with event {diskSpaceLowEvent} on {_HOSTNAME}.
+    description: Disk free space is low on {{hostname}}.
     status: current
     varbinds:
       - diskSpaceLowEvent
@@ -1730,15 +1730,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::timeServiceNotif
     category: diagnostic
     severity: warning
-    description: Time synchronization failure reported on {_HOSTNAME}.
+    description: 'Time synchronization failure detected{{with value "timeServiceEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - timeServiceEvent
   - oid: 1.3.6.1.4.1.47421.0.8
     name: COHESITY-APPLIANCE-MIB::missingDiskNotif
     category: diagnostic
-    severity: err
-    description: One or more disks are missing {missingDiskEvent} on {_HOSTNAME}.
+    severity: warning
+    description: One or more disks are missing on {{hostname}}.
     status: current
     varbinds:
       - missingDiskEvent
@@ -1746,7 +1746,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::writeLimitNotif
     category: diagnostic
     severity: warning
-    description: SSD write limit reached with event {writeLimitEvent} on {_HOSTNAME}.
+    description: SSD is reaching its write limit on {{hostname}}.
     status: current
     varbinds:
       - writeLimitEvent
@@ -1754,23 +1754,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::memUncorrectableEccNotif
     category: diagnostic
     severity: crit
-    description: Memory uncorrectable ECC error detected with {memUncorrectableEccEvent} on {_HOSTNAME}.
+    description: Memory found uncorrectable ECC on {{hostname}}.
     status: current
     varbinds:
       - memUncorrectableEccEvent
   - oid: 1.3.6.1.4.1.47421.0.12
     name: COHESITY-APPLIANCE-MIB::watchdogTriggeredNotif
     category: diagnostic
-    severity: warning
-    description: IPMI watchdog triggered event on {_HOSTNAME}.
+    severity: alert
+    description: IPMI watchdog triggered on {{hostname}}.
     status: current
     varbinds:
       - watchdogTriggeredEvent
   - oid: 1.3.6.1.4.1.47421.0.13
     name: COHESITY-APPLIANCE-MIB::tempOutOfHighRangeNotif
     category: diagnostic
-    severity: warning
-    description: Temperature sensor reported out of high range with {tempOutOfHighRangeEvent} on {_HOSTNAME}.
+    severity: alert
+    description: Temperature sensor out of high range {{value "tempOutOfHighRangeEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - tempOutOfHighRangeEvent
@@ -1778,15 +1778,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::tempOutOfLowRangeNotif
     category: diagnostic
     severity: warning
-    description: Temperature sensor reported out of low range event {tempOutOfLowRangeEvent} on {_HOSTNAME}.
+    description: Temperature sensor out of low range {{value "tempOutOfLowRangeEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - tempOutOfLowRangeEvent
   - oid: 1.3.6.1.4.1.47421.0.15
     name: COHESITY-APPLIANCE-MIB::voltOutOfHighRangeNotif
     category: diagnostic
-    severity: warning
-    description: Voltage sensor reported out of high range event on {_HOSTNAME}.
+    severity: alert
+    description: Voltage sensor out of high range on {{hostname}}.
     status: current
     varbinds:
       - voltOutOfHighRangeEvent
@@ -1794,15 +1794,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::voltOutOfLowRangeNotif
     category: diagnostic
     severity: warning
-    description: Voltage sensor reported out of low range status {voltOutOfLowRangeEvent} on {_HOSTNAME}.
+    description: Voltage sensor out of low range detected on {{hostname}}.
     status: current
     varbinds:
       - voltOutOfLowRangeEvent
   - oid: 1.3.6.1.4.1.47421.0.17
     name: COHESITY-APPLIANCE-MIB::driveRemovedNotif
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Drive removal event detected on {_HOSTNAME}.
+    description: Drive removed event detected on {{hostname}}.
     status: current
     varbinds:
       - driveRemovedEvent
@@ -1810,15 +1810,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::drivePresentNotif
     category: diagnostic
     severity: notice
-    description: Drive present event detected on {_HOSTNAME}.
+    description: Drive detected on {{first (value "drivePresentEvent") "unknown drive"}} on {{hostname}}.
     status: current
     varbinds:
       - drivePresentEvent
   - oid: 1.3.6.1.4.1.47421.0.19
     name: COHESITY-APPLIANCE-MIB::driveFaultNotif
     category: diagnostic
-    severity: err
-    description: 'Drive fault detected: {driveFaultEvent} on {_HOSTNAME}.'
+    severity: crit
+    description: Drive fault detected on {{hostname}}.
     status: current
     varbinds:
       - driveFaultEvent
@@ -1826,7 +1826,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::powerSupplyRemovedNotif
     category: diagnostic
     severity: warning
-    description: Power supply removal event detected on {_HOSTNAME}.
+    description: 'Power supply removed{{with value "powerSupplyRemovedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - powerSupplyRemovedEvent
@@ -1834,7 +1834,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::powerSupplyInsertedNotif
     category: diagnostic
     severity: notice
-    description: Power supply inserted event detected on {_HOSTNAME}.
+    description: Power supply inserted on {{hostname}}.
     status: current
     varbinds:
       - powerSupplyInsertedEvent
@@ -1842,7 +1842,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::linkIsDownNotif
     category: state_change
     severity: warning
-    description: Link down event {linkIsDownEvent} on {_HOSTNAME}.
+    description: Link is down on {{hostname}}.
     status: current
     varbinds:
       - linkIsDownEvent
@@ -1850,7 +1850,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::linkIsUpNotif
     category: state_change
     severity: notice
-    description: Link state changed to up on {_HOSTNAME}.
+    description: Interface link is up on {{hostname}}.
     status: current
     varbinds:
       - linkIsUpEvent
@@ -1858,7 +1858,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::ipmiSelClearedNotif
     category: diagnostic
     severity: notice
-    description: IPMI SEL log cleared on {_HOSTNAME}.
+    description: IPMI SEL log cleared on {{hostname}}.
     status: current
     varbinds:
       - ipmiSelClearedEvent
@@ -1866,23 +1866,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::nodeRebootedNotif
     category: state_change
     severity: notice
-    description: Node rebooted on {_HOSTNAME}.
+    description: Node rebooted on {{hostname}}.
     status: current
     varbinds:
       - nodeRebootedEvent
   - oid: 1.3.6.1.4.1.47421.0.26
     name: COHESITY-APPLIANCE-MIB::thermalTripTriggeredNotif
     category: diagnostic
-    severity: crit
-    description: Thermal trip triggered event {thermalTripTriggeredEvent} on {_HOSTNAME}.
+    severity: alert
+    description: 'Thermal trip triggered{{with value "thermalTripTriggeredEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - thermalTripTriggeredEvent
   - oid: 1.3.6.1.4.1.47421.0.27
     name: COHESITY-APPLIANCE-MIB::powerSupplyAcLostNotif
     category: diagnostic
-    severity: crit
-    description: Power supply AC lost event detected on {_HOSTNAME}.
+    severity: alert
+    description: Power supply AC lost event detected on {{hostname}}.
     status: current
     varbinds:
       - powerSupplyAcLostEvent
@@ -1890,15 +1890,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::nodeChassisChangedNotif
     category: state_change
     severity: notice
-    description: Chassis change event detected on {_HOSTNAME}.
+    description: Chassis changed event {{value "nodeChassisChangedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - nodeChassisChangedEvent
   - oid: 1.3.6.1.4.1.47421.0.29
     name: COHESITY-APPLIANCE-MIB::raidDegradedNotif
     category: diagnostic
-    severity: warning
-    description: RAID is degraded {raidDegradedEvent} on {_HOSTNAME}.
+    severity: crit
+    description: RAID is degraded on {{hostname}}.
     status: current
     varbinds:
       - raidDegradedEvent
@@ -1906,7 +1906,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::diskAddedToClusterNotif
     category: state_change
     severity: notice
-    description: Disk added to cluster and ready for use on {_HOSTNAME}.
+    description: Disk added to cluster and ready for use on {{hostname}}.
     status: current
     varbinds:
       - diskAddedToClusterEvent
@@ -1914,7 +1914,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::systemLedAmberNotif
     category: diagnostic
     severity: warning
-    description: System amber LED event {systemLedAmberEvent} on {_HOSTNAME}.
+    description: 'System amber LED is on{{with value "systemLedAmberEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - systemLedAmberEvent
@@ -1922,7 +1922,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::cpuThrottledNotif
     category: diagnostic
     severity: warning
-    description: CPU throttling event detected on {_HOSTNAME}.
+    description: 'CPU is throttled{{with value "cpuThrottledEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - cpuThrottledEvent
@@ -1930,7 +1930,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::fanRemovedNotif
     category: diagnostic
     severity: warning
-    description: Fan removal detected via {fanRemovedEvent} on {_HOSTNAME}.
+    description: Fan removed event detected on {{hostname}}.
     status: current
     varbinds:
       - fanRemovedEvent
@@ -1938,7 +1938,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::fanInsertedNotif
     category: diagnostic
     severity: notice
-    description: Fan inserted event detected on {_HOSTNAME}.
+    description: Fan inserted on {{hostname}}.
     status: current
     varbinds:
       - fanInsertedEvent
@@ -1946,15 +1946,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::fanSpeedOutOfLowRangeNotif
     category: diagnostic
     severity: warning
-    description: Fan speed out of low range detected with event {fanSpeedOutOfLowRangeEvent} on {_HOSTNAME}.
+    description: Fan speed is out of low range on {{hostname}}.
     status: current
     varbinds:
       - fanSpeedOutOfLowRangeEvent
   - oid: 1.3.6.1.4.1.47421.0.36
     name: COHESITY-APPLIANCE-MIB::chassisDownNotif
-    category: diagnostic
-    severity: alert
-    description: Chassis event {chassisDownEvent} indicates all nodes are unreachable on {_HOSTNAME}.
+    category: state_change
+    severity: crit
+    description: All nodes in the chassis are unreachable on {{hostname}}.
     status: current
     varbinds:
       - chassisDownEvent
@@ -1962,7 +1962,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::ipmiUnreachableNotif
     category: diagnostic
     severity: warning
-    description: IPMI unreachable event detected on {_HOSTNAME}.
+    description: IPMI unreachable event detected on {{hostname}}.
     status: current
     varbinds:
       - ipmiUnreachableEvent
@@ -1970,15 +1970,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::ipmiNetworkConfigFailedNotif
     category: diagnostic
     severity: err
-    description: IPMI network configuration failed with event {ipmiNetworkConfigFailedEvent} on {_HOSTNAME}.
+    description: IPMI network configuration failed on {{hostname}}.
     status: current
     varbinds:
       - ipmiNetworkConfigFailedEvent
   - oid: 1.3.6.1.4.1.47421.0.39
     name: COHESITY-APPLIANCE-MIB::ipmiUserUpdateFailedNotif
-    category: config_change
+    category: security
     severity: warning
-    description: IPMI user update failed with event {ipmiUserUpdateFailedEvent} on {_HOSTNAME}.
+    description: 'IPMI user update failed{{with value "ipmiUserUpdateFailedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ipmiUserUpdateFailedEvent
@@ -1986,7 +1986,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::ipmiConfigAbsentNotif
     category: diagnostic
     severity: warning
-    description: IPMI configuration absent detected on {_HOSTNAME}.
+    description: IPMI configuration is absent in cluster on {{hostname}}.
     status: current
     varbinds:
       - ipmiConfigAbsentEvent
@@ -1994,7 +1994,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::ipmiEventNotif
     category: diagnostic
     severity: warning
-    description: IPMI event notification {ipmiEventEvent} received on {_HOSTNAME}.
+    description: 'IPMI event notification received{{with value "ipmiEventEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ipmiEventEvent
@@ -2002,15 +2002,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::storageDomainQuotaNotif
     category: diagnostic
     severity: warning
-    description: Storage domain usage exceeded quota limit with event {storageDomainQuotaEvent} on {_HOSTNAME}.
+    description: Storage domain usage exceeded quota alert limit {{value "storageDomainQuotaEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - storageDomainQuotaEvent
   - oid: 1.3.6.1.4.1.47421.0.43
     name: COHESITY-APPLIANCE-MIB::yodaAgentUnhealthyNotif
     category: diagnostic
-    severity: err
-    description: Yoda agent health check failed with {yodaAgentUnhealthyEvent} on {_HOSTNAME}.
+    severity: warning
+    description: 'Yoda agent health check failed{{with value "yodaAgentUnhealthyEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - yodaAgentUnhealthyEvent
@@ -2018,23 +2018,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::searchIndexManualMigrationNeededNotif
     category: diagnostic
     severity: warning
-    description: Manual migration to Librarian required for {searchIndexManualMigrationNeededEvent} on {_HOSTNAME}.
+    description: 'Manual migration to Librarian is required{{with value "searchIndexManualMigrationNeededEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - searchIndexManualMigrationNeededEvent
   - oid: 1.3.6.1.4.1.47421.0.45
     name: COHESITY-APPLIANCE-MIB::searchIndexMigrationFinishedNotif
     category: diagnostic
-    severity: notice
-    description: Search index migration to Librarian finished with event {searchIndexMigrationFinishedEvent} on {_HOSTNAME}.
+    severity: info
+    description: Search index migration to Librarian finished on {{hostname}}.
     status: current
     varbinds:
       - searchIndexMigrationFinishedEvent
   - oid: 1.3.6.1.4.1.47421.0.46
     name: COHESITY-APPLIANCE-MIB::searchIndexMigrationTriggeredNotif
-    category: config_change
+    category: diagnostic
     severity: notice
-    description: Search index migration to Librarian triggered by {searchIndexMigrationTriggeredEvent} on {_HOSTNAME}.
+    description: 'Search index migration to Librarian triggered{{with value "searchIndexMigrationTriggeredEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - searchIndexMigrationTriggeredEvent
@@ -2042,15 +2042,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::searchIndexMigrationBacklogNotif
     category: diagnostic
     severity: warning
-    description: Search index migration backlog event detected on {_HOSTNAME}.
+    description: Search index migration to Librarian is delayed on {{hostname}}.
     status: current
     varbinds:
       - searchIndexMigrationBacklogEvent
   - oid: 1.3.6.1.4.1.47421.0.48
     name: COHESITY-APPLIANCE-MIB::vMOptimizedXFSVolumeIndexingSkippedNotif
     category: diagnostic
-    severity: notice
-    description: Optimized XFS indexing skipped volumes with event {vMOptimizedXFSVolumeIndexingSkippedEvent} on {_HOSTNAME}.
+    severity: warning
+    description: 'Optimized XFS indexing skipped volumes{{with value "vMOptimizedXFSVolumeIndexingSkippedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - vMOptimizedXFSVolumeIndexingSkippedEvent
@@ -2058,15 +2058,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::vMOptimizedNTFSVolumeIndexingSkippedNotif
     category: diagnostic
     severity: notice
-    description: Optimized NTFS indexing skipped volumes with event {vMOptimizedNTFSVolumeIndexingSkippedEvent} on {_HOSTNAME}.
+    description: 'Optimized NTFS indexing skipped volumes{{with value "vMOptimizedNTFSVolumeIndexingSkippedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - vMOptimizedNTFSVolumeIndexingSkippedEvent
   - oid: 1.3.6.1.4.1.47421.0.50
     name: COHESITY-APPLIANCE-MIB::aVThreatFoundNotif
     category: security
-    severity: warning
-    description: Virus detected by antivirus on {_HOSTNAME}.
+    severity: alert
+    description: Virus found by antivirus provider on {{hostname}}.
     status: current
     varbinds:
       - aVThreatFoundEvent
@@ -2074,7 +2074,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::corruptFileSystemNotIndexedNotif
     category: diagnostic
     severity: warning
-    description: Corrupt filesystem indexing skipped for {corruptFileSystemNotIndexedEvent} on {_HOSTNAME}.
+    description: Filesystem corruption detected, indexing skipped for {{value "corruptFileSystemNotIndexedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - corruptFileSystemNotIndexedEvent
@@ -2082,23 +2082,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::indexingPausedNotif
     category: diagnostic
     severity: warning
-    description: Indexing of object contents paused with event {indexingPausedEvent} on {_HOSTNAME}.
+    description: 'Indexing of object contents paused{{with value "indexingPausedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - indexingPausedEvent
   - oid: 1.3.6.1.4.1.47421.0.53
     name: COHESITY-APPLIANCE-MIB::viewQuotaNotif
-    category: diagnostic
+    category: license
     severity: warning
-    description: View usage exceeded quota alert limit {viewQuotaEvent} on {_HOSTNAME}.
+    description: 'View usage exceeded quota alert limit{{with value "viewQuotaEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - viewQuotaEvent
   - oid: 1.3.6.1.4.1.47421.0.54
     name: COHESITY-APPLIANCE-MIB::usersExceededQuotaNotif
-    category: diagnostic
+    category: license
     severity: warning
-    description: Users exceeded quota limit with event {usersExceededQuotaEvent} on {_HOSTNAME}.
+    description: Users exceeded quota limit {{value "usersExceededQuotaEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - usersExceededQuotaEvent
@@ -2106,7 +2106,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::notEnoughNodesNotif
     category: diagnostic
     severity: warning
-    description: 'Capacity threshold reached: {notEnoughNodesEvent} on {_HOSTNAME}.'
+    description: 'Not enough nodes available{{with value "notEnoughNodesEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - notEnoughNodesEvent
@@ -2114,7 +2114,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::aVServerLicenseErrorNotif
     category: license
     severity: warning
-    description: 'Antivirus provider license expired: {aVServerLicenseErrorEvent} on {_HOSTNAME}.'
+    description: Antivirus provider license is expired on {{hostname}}.
     status: current
     varbinds:
       - aVServerLicenseErrorEvent
@@ -2122,7 +2122,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::internalSchedulingWarningNotif
     category: diagnostic
     severity: warning
-    description: Internal scheduling issue {internalSchedulingWarningEvent} detected on {_HOSTNAME}.
+    description: 'Internal scheduling issue detected{{with value "internalSchedulingWarningEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - internalSchedulingWarningEvent
@@ -2130,7 +2130,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::cloudTierWarningNotif
     category: diagnostic
     severity: warning
-    description: Cloud tier warning {cloudTierWarningEvent} on {_HOSTNAME}.
+    description: Cloud tier warning {{value "cloudTierWarningEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - cloudTierWarningEvent
@@ -2138,7 +2138,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::switchCongestionNotif
     category: diagnostic
     severity: warning
-    description: Ethernet traffic congestion detected via {switchCongestionEvent} on {_HOSTNAME}.
+    description: Ethernet traffic congestion detected on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - switchCongestionEvent
@@ -2146,7 +2146,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::nodeVirtualizationSupportDisabledNotif
     category: diagnostic
     severity: warning
-    description: Virtualization support disabled on node {nodeVirtualizationSupportDisabledEvent} on {_HOSTNAME}.
+    description: Virtualization support is disabled on node {{value "nodeVirtualizationSupportDisabledEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - nodeVirtualizationSupportDisabledEvent
@@ -2154,7 +2154,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::sshTimeoutChangedNotif
     category: config_change
     severity: notice
-    description: SSH timeout configuration changed on {_HOSTNAME}.
+    description: SSH timeout configuration changed on {{hostname}}.
     status: current
     varbinds:
       - sshTimeoutChangedEvent
@@ -2162,39 +2162,39 @@ traps:
     name: COHESITY-APPLIANCE-MIB::bondUnhealthyNotif
     category: diagnostic
     severity: warning
-    description: Bond interface reported unhealthy status {bondUnhealthyEvent} on {_HOSTNAME}.
+    description: Bond interface is unhealthy on {{hostname}}.
     status: current
     varbinds:
       - bondUnhealthyEvent
   - oid: 1.3.6.1.4.1.47421.0.63
     name: COHESITY-APPLIANCE-MIB::bondSlavesSpeedInconsistentNotif
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: 'Bond slaves speed inconsistency detected: {bondSlavesSpeedInconsistentEvent} on {_HOSTNAME}.'
+    description: Bond slaves' speed are inconsistent on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - bondSlavesSpeedInconsistentEvent
   - oid: 1.3.6.1.4.1.47421.0.64
     name: COHESITY-APPLIANCE-MIB::unexpectedInterfaceIpSettingNotif
-    category: config_change
+    category: state_change
     severity: warning
-    description: 'Static IP configuration mismatch detected: {unexpectedInterfaceIpSettingEvent} on {_HOSTNAME}.'
+    description: 'Unexpected interface IP setting detected{{with value "unexpectedInterfaceIpSettingEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - unexpectedInterfaceIpSettingEvent
   - oid: 1.3.6.1.4.1.47421.0.65
     name: COHESITY-APPLIANCE-MIB::scriptRunErrorNotif
     category: diagnostic
-    severity: err
-    description: Health check script reported error {scriptRunErrorEvent} on {_HOSTNAME}.
+    severity: warning
+    description: 'Health check script has errors{{with value "scriptRunErrorEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - scriptRunErrorEvent
   - oid: 1.3.6.1.4.1.47421.0.66
     name: COHESITY-APPLIANCE-MIB::diskIsBadNotif
     category: diagnostic
-    severity: crit
-    description: 'Disk failure detected: {diskIsBadEvent} on {_HOSTNAME}.'
+    severity: warning
+    description: Disk is bad detected on {{hostname}}.
     status: current
     varbinds:
       - diskIsBadEvent
@@ -2202,7 +2202,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::adDomainControllersNotReachableNotif
     category: diagnostic
     severity: warning
-    description: Active directory domain controller is not reachable on {_HOSTNAME}.
+    description: 'Active Directory domain controller is not reachable{{with value "adDomainControllersNotReachableEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - adDomainControllersNotReachableEvent
@@ -2210,23 +2210,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::upgradeStuckNotif
     category: diagnostic
     severity: warning
-    description: Upgrade process is taking longer than usual with {upgradeStuckEvent} on {_HOSTNAME}.
+    description: 'Upgrade is taking longer than usual{{with value "upgradeStuckEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - upgradeStuckEvent
   - oid: 1.3.6.1.4.1.47421.0.69
     name: COHESITY-APPLIANCE-MIB::productModelIncompatibleNotif
     category: diagnostic
-    severity: warning
-    description: Product model incompatibility detected on node {productModelIncompatibleEvent} on {_HOSTNAME}.
+    severity: crit
+    description: Product model incompatibility detected on node {{value "productModelIncompatibleEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - productModelIncompatibleEvent
   - oid: 1.3.6.1.4.1.47421.0.70
     name: COHESITY-APPLIANCE-MIB::directoriesExceededQuotaNotif
-    category: diagnostic
+    category: license
     severity: warning
-    description: Directories exceeded logical alert limit on {_HOSTNAME}.
+    description: Directories exceeded quota limit {{value "directoriesExceededQuotaEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - directoriesExceededQuotaEvent
@@ -2234,7 +2234,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::algorithmBacklogAlertNotif
     category: diagnostic
     severity: warning
-    description: Background system algorithm backlog detected with event {algorithmBacklogAlertEvent} on {_HOSTNAME}.
+    description: Background system algorithm is backlogged {{value "algorithmBacklogAlertEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - algorithmBacklogAlertEvent
@@ -2242,7 +2242,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::clearStaleMountPointsTimeoutNotif
     category: diagnostic
     severity: warning
-    description: Timeout clearing stale mount points on {_HOSTNAME}.
+    description: 'Timeout clearing stale mount points{{with value "clearStaleMountPointsTimeoutEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - clearStaleMountPointsTimeoutEvent
@@ -2250,7 +2250,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::addNodeFailedNotif
     category: state_change
     severity: crit
-    description: Node failed to join the cluster with event {addNodeFailedEvent} on {_HOSTNAME}.
+    description: Node failed to join the cluster {{value "addNodeFailedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - addNodeFailedEvent
@@ -2258,7 +2258,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::directoryExceededQuotaAlertLimitNotif
     category: diagnostic
     severity: warning
-    description: Directory exceeded the logical alert limit {directoryExceededQuotaAlertLimitEvent} on {_HOSTNAME}.
+    description: Directory exceeded the logical alert limit on {{hostname}}.
     status: current
     varbinds:
       - directoryExceededQuotaAlertLimitEvent
@@ -2266,7 +2266,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::clusterBringupErrorNotif
     category: diagnostic
     severity: crit
-    description: Cluster bring-up error {clusterBringupErrorEvent} detected on {_HOSTNAME}.
+    description: Cluster bring-up error {{value "clusterBringupErrorEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - clusterBringupErrorEvent
@@ -2274,7 +2274,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::chunkFileBadStateNotif
     category: diagnostic
     severity: warning
-    description: Chunk file in Storage domain is in bad state for long time {chunkFileBadStateEvent} on {_HOSTNAME}.
+    description: Chunk file in storage domain is in bad state on {{hostname}}.
     status: current
     varbinds:
       - chunkFileBadStateEvent
@@ -2282,7 +2282,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::tablesLargerThanExpectedNotif
     category: diagnostic
     severity: warning
-    description: Table size exceeded expected fraction of disk metadata capacity on {_HOSTNAME}.
+    description: Table size exceeded expected disk metadata capacity on {{hostname}}.
     status: current
     varbinds:
       - tablesLargerThanExpectedEvent
@@ -2290,7 +2290,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::keyRotationPolicyChangedNotif
     category: config_change
     severity: notice
-    description: Key rotation policy changed with event {keyRotationPolicyChangedEvent} on {_HOSTNAME}.
+    description: Key rotation policy changed on {{hostname}}.
     status: current
     varbinds:
       - keyRotationPolicyChangedEvent
@@ -2298,15 +2298,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::potentialClusterErrorNotif
     category: diagnostic
     severity: alert
-    description: 'Cluster internal error detected: {potentialClusterErrorEvent} on {_HOSTNAME}.'
+    description: 'Potential cluster internal error detected{{with value "potentialClusterErrorEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - potentialClusterErrorEvent
   - oid: 1.3.6.1.4.1.47421.0.80
     name: COHESITY-APPLIANCE-MIB::clusterGatewayUnReachableNotif
     category: diagnostic
-    severity: err
-    description: Cluster gateway is not reachable on {_HOSTNAME}.
+    severity: crit
+    description: Cluster gateway is not reachable on {{hostname}}.
     status: current
     varbinds:
       - clusterGatewayUnReachableEvent
@@ -2314,15 +2314,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::dnsServerUnReachableNotif
     category: diagnostic
     severity: warning
-    description: DNS server unreachable event detected on {_HOSTNAME}.
+    description: DNS server is not reachable on {{hostname}}.
     status: current
     varbinds:
       - dnsServerUnReachableEvent
   - oid: 1.3.6.1.4.1.47421.0.82
     name: COHESITY-APPLIANCE-MIB::verifyVlanHostNameNotif
     category: diagnostic
-    severity: err
-    description: DNS hostname verification failed for interface group on {_HOSTNAME}.
+    severity: warning
+    description: 'DNS hostname verification failed for interface group{{with value "verifyVlanHostNameEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - verifyVlanHostNameEvent
@@ -2330,7 +2330,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::lowFaultTolerantStorageDomainNotif
     category: diagnostic
     severity: warning
-    description: Low fault tolerant storage domain event {lowFaultTolerantStorageDomainEvent.raw} detected on {_HOSTNAME}.
+    description: Low fault tolerant storage domain {{value "lowFaultTolerantStorageDomainEvent"}} detected on {{hostname}}.
     status: current
     varbinds:
       - lowFaultTolerantStorageDomainEvent
@@ -2338,7 +2338,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::securityPolicyDenialNotif
     category: security
     severity: warning
-    description: Security policy denial detected on {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: 'Security policy denial detected{{with value "securityPolicyDenialEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - securityPolicyDenialEvent
@@ -2346,7 +2346,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::bondModeAutoMigratedNotif
     category: state_change
     severity: notice
-    description: Bond mode auto-migration event occurred on {_HOSTNAME}.
+    description: Bond mode auto-migrated to {{value "bondModeAutoMigratedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - bondModeAutoMigratedEvent
@@ -2354,15 +2354,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::nisDomainNotReachableNotif
     category: diagnostic
     severity: warning
-    description: NIS domain is not reachable as reported by {nisDomainNotReachableEvent} on {_HOSTNAME}.
+    description: NIS domain is not reachable on {{hostname}}.
     status: current
     varbinds:
       - nisDomainNotReachableEvent
   - oid: 1.3.6.1.4.1.47421.0.87
     name: COHESITY-APPLIANCE-MIB::nodeRemovedNotif
     category: state_change
-    severity: warning
-    description: Node {nodeRemovedEvent} disconnected or removed on {_HOSTNAME}.
+    severity: notice
+    description: Node {{value "nodeRemovedEvent"}} was disconnected or removed on {{hostname}}.
     status: current
     varbinds:
       - nodeRemovedEvent
@@ -2370,23 +2370,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::nodeInsertedNotif
     category: state_change
     severity: notice
-    description: Node insertion event {nodeInsertedEvent} detected on {_HOSTNAME}.
+    description: Node was inserted on {{hostname}}.
     status: current
     varbinds:
       - nodeInsertedEvent
   - oid: 1.3.6.1.4.1.47421.0.89
     name: COHESITY-APPLIANCE-MIB::inconsistentStaticRoutesNotif
-    category: state_change
+    category: config_change
     severity: warning
-    description: Inconsistent static routes detected with cluster config on {_HOSTNAME}.
+    description: 'Inconsistent static routes detected{{with value "inconsistentStaticRoutesEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - inconsistentStaticRoutesEvent
   - oid: 1.3.6.1.4.1.47421.0.90
     name: COHESITY-APPLIANCE-MIB::chunkFileInconsistencyNotif
     category: diagnostic
-    severity: err
-    description: 'Internal error detected: {chunkFileInconsistencyEvent} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Chunk file inconsistency detected{{with value "chunkFileInconsistencyEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - chunkFileInconsistencyEvent
@@ -2394,7 +2394,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::accessToExternalTargetFailedNotif
     category: security
     severity: warning
-    description: Access to external target failed with event {accessToExternalTargetFailedEvent} on {_HOSTNAME}.
+    description: 'Access to external target failed{{with value "accessToExternalTargetFailedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - accessToExternalTargetFailedEvent
@@ -2402,7 +2402,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::remoteReplicationBackupUserQuotaSkippedNotif
     category: diagnostic
     severity: warning
-    description: Remote replication backup skipped due to user quota on {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Remote replication backup skipped due to user quota on {{value "remoteReplicationBackupUserQuotaSkippedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - remoteReplicationBackupUserQuotaSkippedEvent
@@ -2410,7 +2410,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::remoteReplicationRestoreUserQuotaSkippedNotif
     category: diagnostic
     severity: warning
-    description: Replication skipped user quota data restore event {remoteReplicationRestoreUserQuotaSkippedEvent} on {_HOSTNAME}.
+    description: 'Replication skipped user quota data restore{{with value "remoteReplicationRestoreUserQuotaSkippedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - remoteReplicationRestoreUserQuotaSkippedEvent
@@ -2418,23 +2418,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::remoteReplicationFileSkippedNotif
     category: diagnostic
     severity: warning
-    description: Remote replication skipped unsupported file {remoteReplicationFileSkippedEvent} on {_HOSTNAME}.
+    description: Remote replication skipped unsupported file {{value "remoteReplicationFileSkippedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - remoteReplicationFileSkippedEvent
   - oid: 1.3.6.1.4.1.47421.0.95
     name: COHESITY-APPLIANCE-MIB::chunkFileReplicaBadStateNotif
     category: diagnostic
-    severity: crit
-    description: 'Internal error detected: {chunkFileReplicaBadStateEvent} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Internal error detected requiring support action{{with value "chunkFileReplicaBadStateEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - chunkFileReplicaBadStateEvent
   - oid: 1.3.6.1.4.1.47421.0.96
     name: COHESITY-APPLIANCE-MIB::remoteReplicationSetupIncompatibleNotif
     category: diagnostic
-    severity: err
-    description: Remote replication setup is incompatible with {remoteReplicationSetupIncompatibleEvent} on {_HOSTNAME}.
+    severity: warning
+    description: Replication setup is incompatible {{value "remoteReplicationSetupIncompatibleEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - remoteReplicationSetupIncompatibleEvent
@@ -2442,7 +2442,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::taskProgressHungNotif
     category: diagnostic
     severity: warning
-    description: Root task has hung sub tasks reported by {taskProgressHungEvent} on {_HOSTNAME}.
+    description: Root task has hung sub tasks {{value "taskProgressHungEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - taskProgressHungEvent
@@ -2450,7 +2450,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::missingDiskFilesNotif
     category: diagnostic
     severity: warning
-    description: Disk files missing for indexing reported by {missingDiskFilesEvent} on {_HOSTNAME}.
+    description: Disk files missing for indexing detected on {{hostname}}.
     status: current
     varbinds:
       - missingDiskFilesEvent
@@ -2458,7 +2458,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::nodePoweredOffNotif
     category: diagnostic
     severity: alert
-    description: Node was powered off on {_HOSTNAME}.
+    description: Node was powered off on {{hostname}}.
     status: current
     varbinds:
       - nodePoweredOffEvent
@@ -2466,15 +2466,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::metadataInconsistencyAlertNotif
     category: diagnostic
     severity: crit
-    description: Internal error detected for cluster with event {metadataInconsistencyAlertEvent} on {_HOSTNAME}.
+    description: Internal metadata inconsistency error detected on {{hostname}}.
     status: current
     varbinds:
       - metadataInconsistencyAlertEvent
   - oid: 1.3.6.1.4.1.47421.0.101
     name: COHESITY-APPLIANCE-MIB::diskMarkedOfflineNotif
     category: diagnostic
-    severity: err
-    description: Disk marked offline event {diskMarkedOfflineEvent} on {_HOSTNAME}.
+    severity: crit
+    description: Disk marked offline on {{hostname}}.
     status: current
     varbinds:
       - diskMarkedOfflineEvent
@@ -2482,7 +2482,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::activeDirectoryNotReachableNotif
     category: diagnostic
     severity: warning
-    description: Active directory is not reachable on {_HOSTNAME}.
+    description: Active directory is not reachable on {{hostname}}.
     status: current
     varbinds:
       - activeDirectoryNotReachableEvent
@@ -2490,7 +2490,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::kernelPanicNotif
     category: diagnostic
     severity: emerg
-    description: Node crashed from a kernel panic on {_HOSTNAME}.
+    description: Node crashed from a kernel panic on {{hostname}}.
     status: current
     varbinds:
       - kernelPanicEvent
@@ -2498,7 +2498,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::clusterSpaceUsageHighNotif
     category: diagnostic
     severity: warning
-    description: Cluster space usage is high with event {clusterSpaceUsageHighEvent} on {_HOSTNAME}.
+    description: Cluster space usage is high on {{hostname}}.
     status: current
     varbinds:
       - clusterSpaceUsageHighEvent
@@ -2506,23 +2506,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::storageDomainSpaceUsageHighNotif
     category: diagnostic
     severity: warning
-    description: Storage domain space usage is high on {_HOSTNAME}.
+    description: Storage domain space usage is high on {{hostname}}.
     status: current
     varbinds:
       - storageDomainSpaceUsageHighEvent
   - oid: 1.3.6.1.4.1.47421.0.106
     name: COHESITY-APPLIANCE-MIB::nodeFailureIsNotToleratedNotif
-    category: diagnostic
+    category: state_change
     severity: alert
-    description: Cluster cannot tolerate node failure on {_HOSTNAME}.
+    description: Cluster cannot tolerate node failure on {{hostname}}.
     status: current
     varbinds:
       - nodeFailureIsNotToleratedEvent
   - oid: 1.3.6.1.4.1.47421.0.107
     name: COHESITY-APPLIANCE-MIB::searchClusterHealthNotif
     category: diagnostic
-    severity: crit
-    description: Search cluster health event {searchClusterHealthEvent} indicates unhealthy state on {_HOSTNAME}.
+    severity: alert
+    description: 'Search cluster is not healthy{{with value "searchClusterHealthEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - searchClusterHealthEvent
@@ -2530,7 +2530,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::protectionGroupFailedNotif
     category: diagnostic
     severity: err
-    description: Backup job failed with event {protectionGroupFailedEvent} on {_HOSTNAME}.
+    description: Backup job protection group failed on {{hostname}}.
     status: current
     varbinds:
       - protectionGroupFailedEvent
@@ -2538,7 +2538,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::protectedObjectFailedNotif
     category: diagnostic
     severity: err
-    description: Backup run of object failed with event {protectedObjectFailedEvent} on {_HOSTNAME}.
+    description: Backup run of object failed {{value "protectedObjectFailedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - protectedObjectFailedEvent
@@ -2546,7 +2546,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::metadataServerUnreachableNotif
     category: diagnostic
     severity: crit
-    description: Metadata server unreachable for long time on {_HOSTNAME}.
+    description: Metadata server unreachable for long time on {{hostname}}.
     status: current
     varbinds:
       - metadataServerUnreachableEvent
@@ -2554,7 +2554,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::metadataUnavailableNotif
     category: diagnostic
     severity: crit
-    description: Metadata unavailable due to multiple failures on {_HOSTNAME}.
+    description: Metadata is unavailable due to multiple failures on {{hostname}}.
     status: current
     varbinds:
       - metadataUnavailableEvent
@@ -2562,7 +2562,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::metadataShuffleNotProgressingNotif
     category: diagnostic
     severity: warning
-    description: Metadata shuffle not progressing due to load constraint on {_HOSTNAME}.
+    description: Metadata shuffle not progressing due to load constraint on {{hostname}}.
     status: current
     varbinds:
       - metadataShuffleNotProgressingEvent
@@ -2570,7 +2570,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::searchIndexSizeExceedsThresholdNotif
     category: diagnostic
     severity: warning
-    description: Search index size approaching threshold with event {searchIndexSizeExceedsThresholdEvent} on {_HOSTNAME}.
+    description: Search index size is approaching threshold on {{hostname}}.
     status: current
     varbinds:
       - searchIndexSizeExceedsThresholdEvent
@@ -2578,7 +2578,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::searchIndexShuffleNotProgressingNotif
     category: diagnostic
     severity: warning
-    description: Search index data shuffle is not progressing on {_HOSTNAME}.
+    description: Search index data shuffle is not progressing on {{hostname}}.
     status: current
     varbinds:
       - searchIndexShuffleNotProgressingEvent
@@ -2586,15 +2586,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::metadataCannotTolerateAnymoreFailuresNotif
     category: diagnostic
     severity: crit
-    description: Metadata cannot tolerate anymore failures with event {metadataCannotTolerateAnymoreFailuresEvent} on {_HOSTNAME}.
+    description: Metadata cannot tolerate anymore failures on {{hostname}}.
     status: current
     varbinds:
       - metadataCannotTolerateAnymoreFailuresEvent
   - oid: 1.3.6.1.4.1.47421.0.116
     name: COHESITY-APPLIANCE-MIB::metadataCannotAchieveConfiguredFaultToleranceFactorNotif
     category: diagnostic
-    severity: crit
-    description: Metadata cannot achieve configured fault tolerance factor on {_HOSTNAME}.
+    severity: alert
+    description: Metadata cannot achieve configured fault tolerance factor on {{hostname}}.
     status: current
     varbinds:
       - metadataCannotAchieveConfiguredFaultToleranceFactorEvent
@@ -2602,7 +2602,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::searchIndexUnavailableNotif
     category: diagnostic
     severity: warning
-    description: Search index fault tolerance factor not met on {_HOSTNAME}.
+    description: Search index cannot achieve configured fault tolerance factor on {{hostname}}.
     status: current
     varbinds:
       - searchIndexUnavailableEvent
@@ -2610,7 +2610,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::metadataCanRunOutOfSpaceUponFailureNotif
     category: diagnostic
     severity: warning
-    description: Metadata storage space warning {metadataCanRunOutOfSpaceUponFailureEvent} on {_HOSTNAME}.
+    description: 'Metadata storage warning: {{value "metadataCanRunOutOfSpaceUponFailureEvent"}} on {{hostname}}.'
     status: current
     varbinds:
       - metadataCanRunOutOfSpaceUponFailureEvent
@@ -2618,7 +2618,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::diskAddedToBlacklistNotif
     category: diagnostic
     severity: warning
-    description: Disk added to blacklist event {diskAddedToBlacklistEvent} on {_HOSTNAME}.
+    description: Disk {{value "diskAddedToBlacklistEvent"}} added to blacklist on {{hostname}}.
     status: current
     varbinds:
       - diskAddedToBlacklistEvent
@@ -2626,23 +2626,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::diskSlotAvailableNotif
     category: diagnostic
     severity: notice
-    description: Disk slot availability event {diskSlotAvailableEvent} on {_HOSTNAME}.
+    description: Unused disk slots are available on {{hostname}}.
     status: current
     varbinds:
       - diskSlotAvailableEvent
   - oid: 1.3.6.1.4.1.47421.0.121
     name: COHESITY-APPLIANCE-MIB::protectionGroupSlaViolatedNotif
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Backup job SLA violation detected on {_HOSTNAME}.
+    description: 'Backup job SLA violation detected{{with value "protectionGroupSlaViolatedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - protectionGroupSlaViolatedEvent
   - oid: 1.3.6.1.4.1.47421.0.122
     name: COHESITY-APPLIANCE-MIB::protectionGroupcanceledBlackoutWindowNotif
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Backup job cancelled due to blackout window {protectionGroupcanceledBlackoutWindowEvent} on {_HOSTNAME}.
+    description: Backup job protection group canceled due to blackout window on {{hostname}}.
     status: current
     varbinds:
       - protectionGroupcanceledBlackoutWindowEvent
@@ -2650,15 +2650,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::policyFieldsDeprecatedNotif
     category: config_change
     severity: notice
-    description: Policy settings deprecated via {policyFieldsDeprecatedEvent} on {_HOSTNAME}.
+    description: 'Policy settings deprecated{{with value "policyFieldsDeprecatedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - policyFieldsDeprecatedEvent
   - oid: 1.3.6.1.4.1.47421.0.124
     name: COHESITY-APPLIANCE-MIB::protectedObjectCancelledBlackoutWindowNotif
-    category: diagnostic
-    severity: warning
-    description: Backup object cancelled due to blackout window {protectedObjectCancelledBlackoutWindowEvent} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Backup of protected object cancelled due to blackout window on {{hostname}}.
     status: current
     varbinds:
       - protectedObjectCancelledBlackoutWindowEvent
@@ -2666,7 +2666,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::protectionGroupArchivalBacklogNotif
     category: diagnostic
     severity: warning
-    description: Backup job archival backlog event {protectionGroupArchivalBacklogEvent} on {_HOSTNAME}.
+    description: Backup job archival backlog with high queue wait times on {{hostname}}.
     status: current
     varbinds:
       - protectionGroupArchivalBacklogEvent
@@ -2674,7 +2674,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::archiveJobFailedNotif
     category: diagnostic
     severity: err
-    description: Archive task failed with event {archiveJobFailedEvent} on {_HOSTNAME}.
+    description: Archive task failed on {{hostname}}.
     status: current
     varbinds:
       - archiveJobFailedEvent
@@ -2682,7 +2682,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::archiveJobStuckNotif
     category: diagnostic
     severity: warning
-    description: Archive task stuck with event {archiveJobStuckEvent} on {_HOSTNAME}.
+    description: 'Archive task is not making progress{{with value "archiveJobStuckEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - archiveJobStuckEvent
@@ -2690,7 +2690,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::restoreJobFailedNotif
     category: diagnostic
     severity: err
-    description: Restore job failed with event {restoreJobFailedEvent} on {_HOSTNAME}.
+    description: Restore job failed on {{hostname}}.
     status: current
     varbinds:
       - restoreJobFailedEvent
@@ -2698,15 +2698,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::restoreJobStuckNotif
     category: diagnostic
     severity: warning
-    description: Restore job stuck with event {restoreJobStuckEvent} on {_HOSTNAME}.
+    description: Restore task is not making progress on {{hostname}}.
     status: current
     varbinds:
       - restoreJobStuckEvent
   - oid: 1.3.6.1.4.1.47421.0.130
     name: COHESITY-APPLIANCE-MIB::protectedObjectSlaViolatedNotif
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Backup SLA violation detected for {protectedObjectSlaViolatedEvent} on {_HOSTNAME}.
+    description: Backup SLA violation detected for object {{value "protectedObjectSlaViolatedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - protectedObjectSlaViolatedEvent
@@ -2714,7 +2714,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::protectionGroupReplicationBacklogNotif
     category: diagnostic
     severity: warning
-    description: Replication backlog event {protectionGroupReplicationBacklogEvent} detected on {_HOSTNAME}.
+    description: 'Replication backlog detected{{with value "protectionGroupReplicationBacklogEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - protectionGroupReplicationBacklogEvent
@@ -2722,7 +2722,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::missingVMBackupNotif
     category: diagnostic
     severity: warning
-    description: Missing VM backup event detected on {_HOSTNAME}.
+    description: 'Missing VM backup detected{{with value "missingVMBackupEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - missingVMBackupEvent
@@ -2730,7 +2730,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::vMCrackingSkippedNotif
     category: diagnostic
     severity: notice
-    description: VM contents not indexed due to skipped cracking event on {_HOSTNAME}.
+    description: 'VM contents not indexed{{with value "vMCrackingSkippedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - vMCrackingSkippedEvent
@@ -2738,7 +2738,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::vMWareMountFailureNotif
     category: diagnostic
     severity: warning
-    description: VMware mount failure event {vMWareMountFailureEvent} detected on {_HOSTNAME}.
+    description: VMware mount failure event detected on {{hostname}}.
     status: current
     varbinds:
       - vMWareMountFailureEvent
@@ -2746,7 +2746,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::vMVolumeIndexingSkippedNotif
     category: diagnostic
     severity: warning
-    description: Volume indexing skipped for {vMVolumeIndexingSkippedEvent} on {_HOSTNAME}.
+    description: 'VM volume indexing skipped{{with value "vMVolumeIndexingSkippedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - vMVolumeIndexingSkippedEvent
@@ -2754,7 +2754,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::remoteReplicationTaskStuckNotif
     category: diagnostic
     severity: warning
-    description: Remote replication task stuck for {remoteReplicationTaskStuckEvent} on {_HOSTNAME}.
+    description: Remote replication task is stuck{{with value "remoteReplicationTaskStuckEvent"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - remoteReplicationTaskStuckEvent
@@ -2762,7 +2762,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::remoteReplicationTaskFailedNotif
     category: diagnostic
     severity: err
-    description: Remote replication task failed on {_HOSTNAME}.
+    description: Remote replication task failed on {{hostname}}.
     status: current
     varbinds:
       - remoteReplicationTaskFailedEvent
@@ -2770,7 +2770,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::frequentProcessRestartsNotif
     category: diagnostic
     severity: warning
-    description: 'Frequent process restarts detected: {frequentProcessRestartsEvent} on {_HOSTNAME}.'
+    description: 'Frequent process restarts detected{{with value "frequentProcessRestartsEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - frequentProcessRestartsEvent
@@ -2778,23 +2778,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::protectionGroupProgressingSlowlyNotif
     category: diagnostic
     severity: warning
-    description: Protection group is progressing slowly on {_HOSTNAME}.
+    description: Protection group is progressing slowly on {{hostname}}.
     status: current
     varbinds:
       - protectionGroupProgressingSlowlyEvent
   - oid: 1.3.6.1.4.1.47421.0.140
     name: COHESITY-APPLIANCE-MIB::mtuUnexpectedNotif
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: 'MTU mismatch detected: {mtuUnexpectedEvent} on {_HOSTNAME}.'
+    description: MTU mismatch detected on {{value "mtuUnexpectedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - mtuUnexpectedEvent
   - oid: 1.3.6.1.4.1.47421.0.141
     name: COHESITY-APPLIANCE-MIB::gatewayUnexpectedNotif
-    category: diagnostic
+    category: config_change
     severity: warning
-    description: 'Gateway mismatch detected: {gatewayUnexpectedEvent} on {_HOSTNAME}.'
+    description: 'Gateway configuration mismatch detected{{with value "gatewayUnexpectedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - gatewayUnexpectedEvent
@@ -2802,31 +2802,31 @@ traps:
     name: COHESITY-APPLIANCE-MIB::linkStatsIsNotNormalNotif
     category: diagnostic
     severity: warning
-    description: 'Physical layer errors detected: {linkStatsIsNotNormalEvent} on {_HOSTNAME}.'
+    description: 'Network physical layer errors detected{{with value "linkStatsIsNotNormalEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - linkStatsIsNotNormalEvent
   - oid: 1.3.6.1.4.1.47421.0.143
     name: COHESITY-APPLIANCE-MIB::upgradeSucceededNotif
-    category: config_change
-    severity: notice
-    description: Upgrade succeeded on the node to {upgradeSucceededEvent} on {_HOSTNAME}.
+    category: state_change
+    severity: info
+    description: Upgrade succeeded on the node to {{value "upgradeSucceededEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - upgradeSucceededEvent
   - oid: 1.3.6.1.4.1.47421.0.144
     name: COHESITY-APPLIANCE-MIB::upgradeStartedNotif
-    category: config_change
+    category: state_change
     severity: notice
-    description: Upgrade started on the node on {_HOSTNAME}.
+    description: Upgrade started on the node on {{hostname}}.
     status: current
     varbinds:
       - upgradeStartedEvent
   - oid: 1.3.6.1.4.1.47421.0.145
     name: COHESITY-APPLIANCE-MIB::bondingModeUnexpectedNotif
-    category: diagnostic
+    category: config_change
     severity: warning
-    description: 'Bonding mode mismatch detected: {bondingModeUnexpectedEvent} on {_HOSTNAME}.'
+    description: 'Bonding mode mismatch detected{{with value "bondingModeUnexpectedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - bondingModeUnexpectedEvent
@@ -2834,7 +2834,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::vLANUnexpectedNotif
     category: security
     severity: warning
-    description: Unexpected VLAN event detected on {_HOSTNAME}.
+    description: Unexpected VLAN {{value "vLANUnexpectedEvent"}} detected on {{hostname}}.
     status: current
     varbinds:
       - vLANUnexpectedEvent
@@ -2842,7 +2842,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::kIntegralVolumeReachingMaxCapacityNotif
     category: diagnostic
     severity: warning
-    description: Integral volume reaching max capacity limit on {_HOSTNAME}.
+    description: Integral volume reached max capacity limit on {{hostname}}.
     status: current
     varbinds:
       - kIntegralVolumeReachingMaxCapacityEvent
@@ -2850,7 +2850,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::mediaErrorDuringRestoreNotif
     category: diagnostic
     severity: warning
-    description: 'Restore task reported media error: {mediaErrorDuringRestoreEvent} on {_HOSTNAME}.'
+    description: 'Media error during restore detected: {{value "mediaErrorDuringRestoreEvent"}} on {{hostname}}.'
     status: current
     varbinds:
       - mediaErrorDuringRestoreEvent
@@ -2858,7 +2858,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::mediaErrorDuringArchivalNotif
     category: diagnostic
     severity: warning
-    description: 'Archival job encountered media error: {mediaErrorDuringArchivalEvent} on {_HOSTNAME}.'
+    description: Archival job encountered a media error waiting for correction on {{hostname}}.
     status: current
     varbinds:
       - mediaErrorDuringArchivalEvent
@@ -2866,15 +2866,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::diskWithTooManyDeltaRecordsNotif
     category: diagnostic
     severity: warning
-    description: Disk has too many internal metadata records {diskWithTooManyDeltaRecordsEvent} on {_HOSTNAME}.
+    description: Disk has too many internal metadata records on {{hostname}}.
     status: current
     varbinds:
       - diskWithTooManyDeltaRecordsEvent
   - oid: 1.3.6.1.4.1.47421.0.151
     name: COHESITY-APPLIANCE-MIB::unresponsiveChildDeathNotif
     category: diagnostic
-    severity: warning
-    description: Unresponsive process detected via {unresponsiveChildDeathEvent} on {_HOSTNAME}.
+    severity: alert
+    description: 'Unresponsive process detected: {{value "unresponsiveChildDeathEvent"}} on {{hostname}}.'
     status: current
     varbinds:
       - unresponsiveChildDeathEvent
@@ -2882,7 +2882,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::encryptionKeyRotatedNotif
     category: config_change
     severity: notice
-    description: Encryption key rotation event {encryptionKeyRotatedEvent} on {_HOSTNAME}.
+    description: Encryption key has been rotated on {{hostname}}.
     status: current
     varbinds:
       - encryptionKeyRotatedEvent
@@ -2890,7 +2890,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::encryptionKeyCreatedNotif
     category: config_change
     severity: notice
-    description: Encryption key created event {encryptionKeyCreatedEvent} on {_HOSTNAME}.
+    description: Encryption key created{{with value "encryptionKeyCreatedEvent"}} event {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - encryptionKeyCreatedEvent
@@ -2898,15 +2898,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::newUpgradePackagesAvailableNotif
     category: diagnostic
     severity: notice
-    description: New upgrade packages available on {_HOSTNAME}.
+    description: New upgrade packages available on {{hostname}}.
     status: current
     varbinds:
       - newUpgradePackagesAvailableEvent
   - oid: 1.3.6.1.4.1.47421.0.155
     name: COHESITY-APPLIANCE-MIB::invalidStateNotif
     category: diagnostic
-    severity: warning
-    description: Node entered invalid state {invalidStateEvent} on {_HOSTNAME}.
+    severity: crit
+    description: Node entered an invalid state {{value "invalidStateEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - invalidStateEvent
@@ -2914,23 +2914,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::metadataSizeExceedsThresholdNotif
     category: diagnostic
     severity: warning
-    description: Metadata size on disk exceeded threshold {metadataSizeExceedsThresholdEvent} on {_HOSTNAME}.
+    description: Metadata size on disk exceeded threshold {{value "metadataSizeExceedsThresholdEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - metadataSizeExceedsThresholdEvent
   - oid: 1.3.6.1.4.1.47421.0.157
     name: COHESITY-APPLIANCE-MIB::keystoneNotReachableNotif
     category: diagnostic
-    severity: warning
-    description: Keystone service is not reachable on {_HOSTNAME}.
+    severity: crit
+    description: Keystone is not reachable on {{hostname}}.
     status: current
     varbinds:
       - keystoneNotReachableEvent
   - oid: 1.3.6.1.4.1.47421.0.158
     name: COHESITY-APPLIANCE-MIB::dataResilienceAtRiskNotif
     category: diagnostic
-    severity: warning
-    description: Data resilience at risk event {dataResilienceAtRiskEvent.raw} detected on {_HOSTNAME}.
+    severity: alert
+    description: Data resilience at risk event {{value "dataResilienceAtRiskEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - dataResilienceAtRiskEvent
@@ -2938,15 +2938,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::diskAwaitHighNotif
     category: diagnostic
     severity: warning
-    description: Disk await time exceeded threshold for {diskAwaitHighEvent} on {_HOSTNAME}.
+    description: Disk await time is too high for {{value "diskAwaitHighEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - diskAwaitHighEvent
   - oid: 1.3.6.1.4.1.47421.0.160
     name: COHESITY-APPLIANCE-MIB::raidInactiveNotif
     category: diagnostic
-    severity: err
-    description: 'Inactive RAID disks detected: {raidInactiveEvent} on {_HOSTNAME}.'
+    severity: alert
+    description: RAID disks are inactive on {{value "raidInactiveEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - raidInactiveEvent
@@ -2954,47 +2954,47 @@ traps:
     name: COHESITY-APPLIANCE-MIB::removeNodeSuccessNotif
     category: state_change
     severity: notice
-    description: Node removal completed successfully on {_HOSTNAME}.
+    description: Node removal completed successfully on {{hostname}}.
     status: current
     varbinds:
       - removeNodeSuccessEvent
   - oid: 1.3.6.1.4.1.47421.0.162
     name: COHESITY-APPLIANCE-MIB::routesMigrationOnBondFailedNotif
     category: state_change
-    severity: err
-    description: IP routes migration to bond failed on {_HOSTNAME}.
+    severity: warning
+    description: IP routes migration to bond failed on {{hostname}}.
     status: current
     varbinds:
       - routesMigrationOnBondFailedEvent
   - oid: 1.3.6.1.4.1.47421.0.163
     name: COHESITY-APPLIANCE-MIB::serviceDownNotif
-    category: state_change
+    category: diagnostic
     severity: crit
-    description: Service {serviceDownEvent} is down on {_HOSTNAME}.
+    description: Service down event detected on {{hostname}}.
     status: current
     varbinds:
       - serviceDownEvent
   - oid: 1.3.6.1.4.1.47421.0.164
     name: COHESITY-APPLIANCE-MIB::configureVipFailedNotif
-    category: diagnostic
+    category: state_change
     severity: err
-    description: Failed to configure VIP with event {configureVipFailedEvent} on {_HOSTNAME}.
+    description: Failed to configure VIP on {{hostname}}.
     status: current
     varbinds:
       - configureVipFailedEvent
   - oid: 1.3.6.1.4.1.47421.0.165
     name: COHESITY-APPLIANCE-MIB::ipMigrationOnBondFailedNotif
-    category: diagnostic
+    category: state_change
     severity: err
-    description: IP migration to bond failed with event {ipMigrationOnBondFailedEvent} on {_HOSTNAME}.
+    description: IP migration to bond failed for {{value "ipMigrationOnBondFailedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - ipMigrationOnBondFailedEvent
   - oid: 1.3.6.1.4.1.47421.0.166
     name: COHESITY-APPLIANCE-MIB::firewallErrorNotif
     category: security
-    severity: err
-    description: 'Firewall error detected: {firewallErrorEvent} on {_HOSTNAME}.'
+    severity: warning
+    description: 'Cluster firewall error detected{{with value "firewallErrorEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - firewallErrorEvent
@@ -3002,7 +3002,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::usbDiskFoundNotif
     category: diagnostic
     severity: notice
-    description: USB disk detected on node with IP {usbDiskFoundEvent} on {_HOSTNAME}.
+    description: USB disk detected on {{hostname}}.
     status: current
     varbinds:
       - usbDiskFoundEvent
@@ -3010,15 +3010,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::bootDiskHealthNotif
     category: diagnostic
     severity: warning
-    description: Boot disk health event {bootDiskHealthEvent} detected on {_HOSTNAME}.
+    description: Boot disk health event detected on {{hostname}}.
     status: current
     varbinds:
       - bootDiskHealthEvent
   - oid: 1.3.6.1.4.1.47421.0.169
     name: COHESITY-APPLIANCE-MIB::etcHostsFileErrorNotif
     category: diagnostic
-    severity: err
-    description: Etc hosts file error detected on {_HOSTNAME}.
+    severity: warning
+    description: Etc hosts file error detected on {{value "etcHostsFileErrorEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - etcHostsFileErrorEvent
@@ -3026,15 +3026,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::smallMemorySizeNotif
     category: diagnostic
     severity: warning
-    description: 'Node memory size insufficient: {smallMemorySizeEvent} on {_HOSTNAME}.'
+    description: 'Node memory size below minimum requirements{{with value "smallMemorySizeEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - smallMemorySizeEvent
   - oid: 1.3.6.1.4.1.47421.0.171
     name: COHESITY-APPLIANCE-MIB::userExceededQuotaAlertLimitNotif
-    category: diagnostic
+    category: license
     severity: warning
-    description: User exceeded the logical alert limit with event {userExceededQuotaAlertLimitEvent} on {_HOSTNAME}.
+    description: User exceeded the logical alert limit on {{hostname}}.
     status: current
     varbinds:
       - userExceededQuotaAlertLimitEvent
@@ -3042,15 +3042,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::addNodeSuccessNotif
     category: state_change
     severity: notice
-    description: Node joined the cluster on {_HOSTNAME}.
+    description: Node joined the cluster on {{hostname}}.
     status: current
     varbinds:
       - addNodeSuccessEvent
   - oid: 1.3.6.1.4.1.47421.0.173
     name: COHESITY-APPLIANCE-MIB::forcefulRemoveNodeWarningNotif
     category: state_change
-    severity: notice
-    description: Node removal event {forcefulRemoveNodeWarningEvent} on {_HOSTNAME}.
+    severity: warning
+    description: Node is being removed from the cluster forcefully on {{hostname}}.
     status: current
     varbinds:
       - forcefulRemoveNodeWarningEvent
@@ -3058,7 +3058,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::aVServerConnectionFailedNotif
     category: diagnostic
     severity: warning
-    description: Antivirus provider connection failed with event {aVServerConnectionFailedEvent} on {_HOSTNAME}.
+    description: Antivirus provider is not reachable on {{hostname}}.
     status: current
     varbinds:
       - aVServerConnectionFailedEvent
@@ -3066,7 +3066,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::adPreferredDomainControllerNotReachableNotif
     category: diagnostic
     severity: warning
-    description: Preferred domain controller is not reachable on {_HOSTNAME}.
+    description: Preferred Active Directory domain controller is unreachable on {{hostname}}.
     status: current
     varbinds:
       - adPreferredDomainControllerNotReachableEvent
@@ -3074,7 +3074,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::blobJournalInconsistencyNotif
     category: diagnostic
     severity: alert
-    description: 'Internal error detected: {blobJournalInconsistencyEvent} on {_HOSTNAME}.'
+    description: 'Blob journal inconsistency detected{{with value "blobJournalInconsistencyEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - blobJournalInconsistencyEvent
@@ -3082,7 +3082,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::viewLatencyHighNotif
     category: diagnostic
     severity: warning
-    description: View latency threshold exceeded with event {viewLatencyHighEvent} on {_HOSTNAME}.
+    description: View latency exceeds threshold on {{hostname}}.
     status: current
     varbinds:
       - viewLatencyHighEvent
@@ -3090,7 +3090,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::potentialMinorClusterErrorNotif
     category: diagnostic
     severity: warning
-    description: 'Cluster internal error detected: {potentialMinorClusterErrorEvent} on {_HOSTNAME}.'
+    description: 'Potential minor cluster error detected{{with value "potentialMinorClusterErrorEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - potentialMinorClusterErrorEvent
@@ -3098,7 +3098,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::iceboxDedupCacheFullNotif
     category: diagnostic
     severity: warning
-    description: Icebox dedup cache is full on {_HOSTNAME}.
+    description: Icebox deduplication cache is full on {{hostname}}.
     status: current
     varbinds:
       - iceboxDedupCacheFullEvent
@@ -3106,7 +3106,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::clusterServiceGflagsFoundNotif
     category: diagnostic
     severity: notice
-    description: Cluster service gflags found event {clusterServiceGflagsFoundEvent} on {_HOSTNAME}.
+    description: Cluster service gflags found event {{value "clusterServiceGflagsFoundEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - clusterServiceGflagsFoundEvent
@@ -3114,31 +3114,31 @@ traps:
     name: COHESITY-APPLIANCE-MIB::virtualApplianceResourcesUnexpectedNotif
     category: diagnostic
     severity: warning
-    description: 'Virtual appliance resources mismatch detected: {virtualApplianceResourcesUnexpectedEvent} on {_HOSTNAME}.'
+    description: 'Virtual appliance resources mismatch detected{{with value "virtualApplianceResourcesUnexpectedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - virtualApplianceResourcesUnexpectedEvent
   - oid: 1.3.6.1.4.1.47421.0.182
     name: COHESITY-APPLIANCE-MIB::clusterPartitionCreateFailedNotif
-    category: diagnostic
-    severity: err
-    description: Cluster partition creation failed with event {clusterPartitionCreateFailedEvent} on {_HOSTNAME}.
+    category: state_change
+    severity: crit
+    description: Cluster partition creation failed on {{hostname}}.
     status: current
     varbinds:
       - clusterPartitionCreateFailedEvent
   - oid: 1.3.6.1.4.1.47421.0.183
     name: COHESITY-APPLIANCE-MIB::proxyServerUnreachableNotif
     category: diagnostic
-    severity: warning
-    description: Proxy server unreachable event detected on {_HOSTNAME}.
+    severity: crit
+    description: Proxy server is unreachable on node {{value "proxyServerUnreachableEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - proxyServerUnreachableEvent
   - oid: 1.3.6.1.4.1.47421.0.184
     name: COHESITY-APPLIANCE-MIB::serviceVersionsMismatchedNotif
-    category: diagnostic
+    category: config_change
     severity: warning
-    description: Software version mismatch detected among cluster nodes on {_HOSTNAME}.
+    description: Service versions mismatched across cluster nodes on {{hostname}}.
     status: current
     varbinds:
       - serviceVersionsMismatchedEvent
@@ -3146,7 +3146,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::firmwareIncompatibleNotif
     category: diagnostic
     severity: warning
-    description: 'Firmware incompatibility detected: {firmwareIncompatibleEvent} on {_HOSTNAME}.'
+    description: 'Firmware incompatibility detected: {{value "firmwareIncompatibleEvent"}} on {{hostname}}.'
     status: current
     varbinds:
       - firmwareIncompatibleEvent
@@ -3154,15 +3154,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::nodeRebootedForYodaStuckNotif
     category: diagnostic
     severity: alert
-    description: Node rebooted due to stuck Yoda process {nodeRebootedForYodaStuckEvent} on {_HOSTNAME}.
+    description: Node rebooted due to Yoda stuck event {{value "nodeRebootedForYodaStuckEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - nodeRebootedForYodaStuckEvent
   - oid: 1.3.6.1.4.1.47421.0.187
     name: COHESITY-APPLIANCE-MIB::protectionGroupSucceededNotif
-    category: config_change
-    severity: notice
-    description: Backup run of protection group completed successfully on {_HOSTNAME}.
+    category: state_change
+    severity: info
+    description: Protection group backup run completed successfully on {{hostname}}.
     status: current
     varbinds:
       - protectionGroupSucceededEvent
@@ -3170,7 +3170,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::unregisterExternalTargetFailedNotif
     category: diagnostic
     severity: err
-    description: Unregistration for external target failed with event {unregisterExternalTargetFailedEvent} on {_HOSTNAME}.
+    description: 'External target unregistration failed{{with value "unregisterExternalTargetFailedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - unregisterExternalTargetFailedEvent
@@ -3178,23 +3178,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::licenseServerUnreachableNotif
     category: license
     severity: warning
-    description: License server is unreachable on {_HOSTNAME}.
+    description: License server is unreachable on {{hostname}}.
     status: current
     varbinds:
       - licenseServerUnreachableEvent
   - oid: 1.3.6.1.4.1.47421.0.190
     name: COHESITY-APPLIANCE-MIB::invalidLicenseNotif
     category: license
-    severity: err
-    description: Invalid license event {invalidLicenseEvent} detected on {_HOSTNAME}.
+    severity: alert
+    description: Invalid license detected on {{hostname}}.
     status: current
     varbinds:
       - invalidLicenseEvent
   - oid: 1.3.6.1.4.1.47421.0.191
     name: COHESITY-APPLIANCE-MIB::unlicensedClusterNotif
     category: license
-    severity: warning
-    description: License status indicates cluster is unlicensed with event {unlicensedClusterEvent} on {_HOSTNAME}.
+    severity: alert
+    description: Cluster is unlicensed on {{hostname}}.
     status: current
     varbinds:
       - unlicensedClusterEvent
@@ -3202,7 +3202,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::verifyRemoteClusterConnectionNotif
     category: state_change
     severity: notice
-    description: Remote cluster connection state changed to {verifyRemoteClusterConnectionEvent} on {_HOSTNAME}.
+    description: Remote cluster connection status changed to {{value "verifyRemoteClusterConnectionEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - verifyRemoteClusterConnectionEvent
@@ -3210,23 +3210,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::sysSrvcErrorsNotif
     category: diagnostic
     severity: warning
-    description: 'System service errors detected: {sysSrvcErrorsEvent} on {_HOSTNAME}.'
+    description: 'System service errors detected{{with value "sysSrvcErrorsEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - sysSrvcErrorsEvent
   - oid: 1.3.6.1.4.1.47421.0.194
     name: COHESITY-APPLIANCE-MIB::bridgeMigrationFailedNotif
     category: state_change
-    severity: err
-    description: Bridge migration failed on node with IP {bridgeMigrationFailedEvent} on {_HOSTNAME}.
+    severity: crit
+    description: Bridge migration failed on node {{value "bridgeMigrationFailedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - bridgeMigrationFailedEvent
   - oid: 1.3.6.1.4.1.47421.0.195
     name: COHESITY-APPLIANCE-MIB::bridgeMigrationRevertFailedNotif
     category: diagnostic
-    severity: err
-    description: Bridge migration revert failed on {_HOSTNAME}.
+    severity: crit
+    description: Bridge migration revert failed on {{value "bridgeMigrationRevertFailedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - bridgeMigrationRevertFailedEvent
@@ -3234,15 +3234,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::productModelInterfacesInconsistencyNotif
     category: diagnostic
     severity: warning
-    description: Network interfaces inconsistency detected on cluster nodes on {_HOSTNAME}.
+    description: Network interfaces inconsistency detected on cluster nodes on {{hostname}}.
     status: current
     varbinds:
       - productModelInterfacesInconsistencyEvent
   - oid: 1.3.6.1.4.1.47421.0.197
     name: COHESITY-APPLIANCE-MIB::clusterInterfacesInconsistencyNotif
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Cluster interfaces inconsistency detected on {_HOSTNAME}.
+    description: Network interfaces inconsistency detected on {{value "clusterInterfacesInconsistencyEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - clusterInterfacesInconsistencyEvent
@@ -3250,7 +3250,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::ntpServerUnReachableNotif
     category: diagnostic
     severity: warning
-    description: NTP server unreachable event detected on {_HOSTNAME}.
+    description: NTP server is not reachable on {{hostname}}.
     status: current
     varbinds:
       - ntpServerUnReachableEvent
@@ -3258,15 +3258,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::externalTargetNotReachableNotif
     category: diagnostic
     severity: warning
-    description: 'External target not reachable: {externalTargetNotReachableEvent} on {_HOSTNAME}.'
+    description: External target not reachable from node {{value "externalTargetNotReachableEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - externalTargetNotReachableEvent
   - oid: 1.3.6.1.4.1.47421.0.200
     name: COHESITY-APPLIANCE-MIB::appInstanceUnhealthyNotif
     category: diagnostic
-    severity: err
-    description: Unhealthy instance detected at {appInstanceUnhealthyEvent} on {_HOSTNAME}.
+    severity: warning
+    description: Unhealthy application instance detected at {{value "appInstanceUnhealthyEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - appInstanceUnhealthyEvent
@@ -3274,7 +3274,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::indexingBacklogNotif
     category: diagnostic
     severity: warning
-    description: Indexing backlog event {indexingBacklogEvent} detected on {_HOSTNAME}.
+    description: Indexing backlog detected for VM contents {{value "indexingBacklogEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - indexingBacklogEvent
@@ -3282,7 +3282,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::searchNodeBusyNotif
     category: diagnostic
     severity: warning
-    description: Search node CPU usage exceeded 80% threshold on {_HOSTNAME}.
+    description: Search node CPU usage exceeded 80% on {{hostname}}.
     status: current
     varbinds:
       - searchNodeBusyEvent
@@ -3290,15 +3290,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::nonEmptyUnmountedDirectoryNotif
     category: diagnostic
     severity: warning
-    description: Unmounted directory is not empty on {_HOSTNAME}.
+    description: Unmounted directory is not empty on {{hostname}}.
     status: current
     varbinds:
       - nonEmptyUnmountedDirectoryEvent
   - oid: 1.3.6.1.4.1.47421.0.204
     name: COHESITY-APPLIANCE-MIB::rhinoUnhealthyNotif
     category: diagnostic
-    severity: warning
-    description: 'Health check failure detected: {rhinoUnhealthyEvent} on {_HOSTNAME}.'
+    severity: alert
+    description: Too many Rhino healthchecks failed on {{hostname}}.
     status: current
     varbinds:
       - rhinoUnhealthyEvent
@@ -3306,7 +3306,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::lessCPUCoreNotif
     category: diagnostic
     severity: warning
-    description: 'CPU core count requirement not met: {lessCPUCoreEvent} on {_HOSTNAME}.'
+    description: Node {{value "lessCPUCoreEvent"}} does not meet minimum CPU core count requirements on {{hostname}}.
     status: current
     varbinds:
       - lessCPUCoreEvent
@@ -3314,7 +3314,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::licenseExpiredNotif
     category: license
     severity: alert
-    description: License has expired on {_HOSTNAME}.
+    description: License has expired on {{hostname}}.
     status: current
     varbinds:
       - licenseExpiredEvent
@@ -3322,7 +3322,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::licenseAboutToExpireNotif
     category: license
     severity: warning
-    description: License is about to expire on {_HOSTNAME}.
+    description: License is about to expire on {{hostname}}.
     status: current
     varbinds:
       - licenseAboutToExpireEvent
@@ -3330,7 +3330,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::biosAndBmcVersionMismatchNotif
     category: diagnostic
     severity: warning
-    description: Incompatible BIOS/BMC version detected on {_HOSTNAME}.
+    description: 'BIOS/BMC version mismatch detected{{with value "biosAndBmcVersionMismatchEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - biosAndBmcVersionMismatchEvent
@@ -3338,7 +3338,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::unusedGflagsNotif
     category: diagnostic
     severity: notice
-    description: 'Unused gflags detected: {unusedGflagsEvent} on {_HOSTNAME}.'
+    description: Unused gflags detected on node {{value "unusedGflagsEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - unusedGflagsEvent
@@ -3346,7 +3346,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::supportChannelAboutToCloseNotif
     category: diagnostic
     severity: warning
-    description: Support channel about to close on cluster {supportChannelAboutToCloseEvent} on {_HOSTNAME}.
+    description: Cohesity support channel about to close on cluster {{value "supportChannelAboutToCloseEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - supportChannelAboutToCloseEvent
@@ -3354,15 +3354,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::licenseAccountOverUseNotif
     category: license
     severity: warning
-    description: Licensed account overuse detected with event {licenseAccountOverUseEvent} on {_HOSTNAME}.
+    description: Licensed account is overused on {{hostname}}.
     status: current
     varbinds:
       - licenseAccountOverUseEvent
   - oid: 1.3.6.1.4.1.47421.0.212
     name: COHESITY-APPLIANCE-MIB::licenseIdentityInvalidNotif
     category: license
-    severity: err
-    description: License identity invalid event {licenseIdentityInvalidEvent} on {_HOSTNAME}.
+    severity: alert
+    description: License identity is invalid on {{hostname}}.
     status: current
     varbinds:
       - licenseIdentityInvalidEvent
@@ -3370,23 +3370,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::kMSCertificateWillExpireNotif
     category: license
     severity: warning
-    description: KMS server certificate will expire soon on {_HOSTNAME}.
+    description: KMS server certificate will expire soon on {{hostname}}.
     status: current
     varbinds:
       - kMSCertificateWillExpireEvent
   - oid: 1.3.6.1.4.1.47421.0.214
     name: COHESITY-APPLIANCE-MIB::kMSCertificateExpirationNotif
     category: license
-    severity: warning
-    description: KMS server certificate expired at {kMSCertificateExpirationEvent} on {_HOSTNAME}.
+    severity: alert
+    description: KMS server certificate has expired on {{hostname}}.
     status: current
     varbinds:
       - kMSCertificateExpirationEvent
   - oid: 1.3.6.1.4.1.47421.0.215
     name: COHESITY-APPLIANCE-MIB::kMSErrorNotif
     category: diagnostic
-    severity: err
-    description: Key management server communication error {kMSErrorEvent} on {_HOSTNAME}.
+    severity: warning
+    description: Key management server communication error {{value "kMSErrorEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - kMSErrorEvent
@@ -3394,15 +3394,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::keyObjectCreatedNotif
     category: config_change
     severity: notice
-    description: Key object created event {keyObjectCreatedEvent} on {_HOSTNAME}.
+    description: Key object created on {{hostname}}.
     status: current
     varbinds:
       - keyObjectCreatedEvent
   - oid: 1.3.6.1.4.1.47421.0.217
     name: COHESITY-APPLIANCE-MIB::keyObjectDestroyedNotif
-    category: config_change
-    severity: notice
-    description: Key object destroyed event {keyObjectDestroyedEvent} on {_HOSTNAME}.
+    category: security
+    severity: alert
+    description: Security key object destroyed {{value "keyObjectDestroyedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - keyObjectDestroyedEvent
@@ -3410,7 +3410,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::kMSUnreachableNotif
     category: diagnostic
     severity: warning
-    description: KMS server unreachable event detected on {_HOSTNAME}.
+    description: KMS server is unreachable on {{hostname}}.
     status: current
     varbinds:
       - kMSUnreachableEvent
@@ -3418,7 +3418,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::diskMarkedForRemovalNotif
     category: diagnostic
     severity: notice
-    description: Disk marked for removal event {diskMarkedForRemovalEvent} on {_HOSTNAME}.
+    description: Disk marked for removal {{value "diskMarkedForRemovalEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - diskMarkedForRemovalEvent
@@ -3426,7 +3426,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::nodeMarkedForRemovalNotif
     category: state_change
     severity: notice
-    description: Node marked for removal from cluster on {_HOSTNAME}.
+    description: Node {{value "nodeMarkedForRemovalEvent"}} marked for removal from cluster on {{hostname}}.
     status: current
     varbinds:
       - nodeMarkedForRemovalEvent
@@ -3434,7 +3434,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::addNodesStartedNotif
     category: state_change
     severity: notice
-    description: Node joining cluster event {addNodesStartedEvent} on {_HOSTNAME}.
+    description: Node is joining the cluster on {{hostname}}.
     status: current
     varbinds:
       - addNodesStartedEvent
@@ -3442,15 +3442,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::diskRemovedNotif
     category: diagnostic
     severity: warning
-    description: Disk removed from node on {_HOSTNAME}.
+    description: Disk removed from node{{with value "diskRemovedEvent"}} {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - diskRemovedEvent
   - oid: 1.3.6.1.4.1.47421.0.223
     name: COHESITY-APPLIANCE-MIB::sshKeyMismatchNotif
     category: security
-    severity: warning
-    description: 'SSH key mismatch detected: {sshKeyMismatchEvent} on {_HOSTNAME}.'
+    severity: alert
+    description: SSH key mismatch detected across cluster nodes on {{hostname}}.
     status: current
     varbinds:
       - sshKeyMismatchEvent
@@ -3458,15 +3458,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::bMCModuleNotAvailableNotif
     category: diagnostic
     severity: warning
-    description: BMC module is not available on node with ip {bMCModuleNotAvailableEvent} on {_HOSTNAME}.
+    description: BMC module is not available on node {{value "bMCModuleNotAvailableEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - bMCModuleNotAvailableEvent
   - oid: 1.3.6.1.4.1.47421.0.225
     name: COHESITY-APPLIANCE-MIB::outOfMemoryRestartNotif
     category: diagnostic
-    severity: crit
-    description: Process restarted due to out of memory on {_HOSTNAME}.
+    severity: alert
+    description: Process restarted due to out of memory on {{hostname}}.
     status: current
     varbinds:
       - outOfMemoryRestartEvent
@@ -3474,23 +3474,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::metadataInstanceHasUnrecoverableErrorNotif
     category: diagnostic
     severity: crit
-    description: 'Unrecoverable disk corruption detected: {metadataInstanceHasUnrecoverableErrorEvent} on {_HOSTNAME}.'
+    description: Unrecoverable metadata corruption detected on disk on {{hostname}}.
     status: current
     varbinds:
       - metadataInstanceHasUnrecoverableErrorEvent
   - oid: 1.3.6.1.4.1.47421.0.227
     name: COHESITY-APPLIANCE-MIB::metadataDiskRanOutOfSpaceNotif
     category: diagnostic
-    severity: err
-    description: Metadata disk space event {metadataDiskRanOutOfSpaceEvent} on {_HOSTNAME}.
+    severity: crit
+    description: Metadata disk ran out of space on {{hostname}}.
     status: current
     varbinds:
       - metadataDiskRanOutOfSpaceEvent
   - oid: 1.3.6.1.4.1.47421.0.228
     name: COHESITY-APPLIANCE-MIB::licenseStatsHistoryCollectionNotif
     category: license
-    severity: notice
-    description: License stats history collection event {licenseStatsHistoryCollectionEvent} on {_HOSTNAME}.
+    severity: info
+    description: License stats history collection event on {{hostname}}.
     status: current
     varbinds:
       - licenseStatsHistoryCollectionEvent
@@ -3498,7 +3498,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::dnsServerConnectionFailedNotif
     category: diagnostic
     severity: warning
-    description: 'DNS server connection failed: {dnsServerConnectionFailedEvent} on {_HOSTNAME}.'
+    description: DNS server is not reachable on {{hostname}}.
     status: current
     varbinds:
       - dnsServerConnectionFailedEvent
@@ -3506,7 +3506,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::nASVaultIsFullNotif
     category: diagnostic
     severity: warning
-    description: NAS external target is full with event {nASVaultIsFullEvent} on {_HOSTNAME}.
+    description: NAS external target is full on {{hostname}}.
     status: current
     varbinds:
       - nASVaultIsFullEvent
@@ -3514,23 +3514,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::protectionGroupReplicationFailedNotif
     category: diagnostic
     severity: err
-    description: Replication to remote cluster failed with event {protectionGroupReplicationFailedEvent} on {_HOSTNAME}.
+    description: Replication to remote cluster failed on {{hostname}}.
     status: current
     varbinds:
       - protectionGroupReplicationFailedEvent
   - oid: 1.3.6.1.4.1.47421.0.232
     name: COHESITY-APPLIANCE-MIB::diskIdMismatchNotif
     category: diagnostic
-    severity: err
-    description: 'Metadata disk re-addition error due to disk ID mismatch: {diskIdMismatchEvent} on {_HOSTNAME}.'
+    severity: warning
+    description: Metadata disk re-addition error due to improper removal on {{hostname}}.
     status: current
     varbinds:
       - diskIdMismatchEvent
   - oid: 1.3.6.1.4.1.47421.0.233
     name: COHESITY-APPLIANCE-MIB::continuousDataProtectionDisabledNotif
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Continuous data protection disabled for {continuousDataProtectionDisabledEvent} on {_HOSTNAME}.
+    description: Continuous data protection disabled for {{value "continuousDataProtectionDisabledEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - continuousDataProtectionDisabledEvent
@@ -3538,7 +3538,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::protectionPolicyDeletedNotif
     category: config_change
     severity: notice
-    description: Protection policy deleted event {protectionPolicyDeletedEvent} on {_HOSTNAME}.
+    description: 'Protection policy deleted{{with value "protectionPolicyDeletedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - protectionPolicyDeletedEvent
@@ -3546,7 +3546,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::objectBackupSlaViolatedNotif
     category: diagnostic
     severity: warning
-    description: Object backup SLA violation detected on {_HOSTNAME}.
+    description: 'Object backup SLA violation detected{{with value "objectBackupSlaViolatedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - objectBackupSlaViolatedEvent
@@ -3554,7 +3554,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::objectBackupFailedNotif
     category: diagnostic
     severity: err
-    description: Backup operation failed with error {objectBackupFailedEvent} on {_HOSTNAME}.
+    description: Backup operation failed with error {{value "objectBackupFailedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - objectBackupFailedEvent
@@ -3562,7 +3562,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::auditLogFailureNotif
     category: diagnostic
     severity: warning
-    description: 'Audit log processing risk detected: {auditLogFailureEvent} on {_HOSTNAME}.'
+    description: 'Audit log processing failure risk detected{{with value "auditLogFailureEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - auditLogFailureEvent
@@ -3570,15 +3570,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::silicomNicFoundNotif
     category: diagnostic
     severity: notice
-    description: 'Silicom NIC detected: {silicomNicFoundEvent} on {_HOSTNAME}.'
+    description: Silicom NIC detected on node {{value "silicomNicFoundEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - silicomNicFoundEvent
   - oid: 1.3.6.1.4.1.47421.0.239
     name: COHESITY-APPLIANCE-MIB::diskRemovalCancelledNotif
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Disk removal cancelled event {diskRemovalCancelledEvent} on {_HOSTNAME}.
+    description: 'Disk removal cancelled{{with value "diskRemovalCancelledEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - diskRemovalCancelledEvent
@@ -3586,7 +3586,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::metadataMigrationsNotProgressingNotif
     category: diagnostic
     severity: warning
-    description: 'Metadata migrations not progressing: {metadataMigrationsNotProgressingEvent} on {_HOSTNAME}.'
+    description: Metadata migrations are not progressing on {{hostname}}.
     status: current
     varbinds:
       - metadataMigrationsNotProgressingEvent
@@ -3594,7 +3594,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::manualBackgroundSystemThrottlingAppliedNotif
     category: diagnostic
     severity: notice
-    description: Manual background system throttling applied via {manualBackgroundSystemThrottlingAppliedEvent} on {_HOSTNAME}.
+    description: Manual background system throttling applied on {{hostname}}.
     status: current
     varbinds:
       - manualBackgroundSystemThrottlingAppliedEvent
@@ -3602,15 +3602,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::remoteStorageUsageHighNotif
     category: diagnostic
     severity: warning
-    description: Remote storage usage is high with event {remoteStorageUsageHighEvent} on {_HOSTNAME}.
+    description: Remote storage usage is high on {{hostname}}.
     status: current
     varbinds:
       - remoteStorageUsageHighEvent
   - oid: 1.3.6.1.4.1.47421.0.243
     name: COHESITY-APPLIANCE-MIB::remoteStorageCapacityChangedNotif
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Remote storage capacity changed event {remoteStorageCapacityChangedEvent} on {_HOSTNAME}.
+    description: Remote storage capacity changed on {{hostname}}.
     status: current
     varbinds:
       - remoteStorageCapacityChangedEvent
@@ -3618,7 +3618,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::routingDaemonDownNotif
     category: diagnostic
     severity: crit
-    description: Routing daemon is down on {_HOSTNAME}.
+    description: Routing daemon is down on {{hostname}}.
     status: current
     varbinds:
       - routingDaemonDownEvent
@@ -3626,7 +3626,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::remoteStorageManagementIpUnreachableNotif
     category: diagnostic
     severity: warning
-    description: Remote storage management IP unreachable event triggered on {_HOSTNAME}.
+    description: Remote storage management IP is unreachable on {{hostname}}.
     status: current
     varbinds:
       - remoteStorageManagementIpUnreachableEvent
@@ -3634,15 +3634,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::remoteStorageFileSystemMountFailedNotif
     category: diagnostic
     severity: err
-    description: 'Remote storage file system mount failed: {remoteStorageFileSystemMountFailedEvent} on {_HOSTNAME}.'
+    description: Failed to mount NFS file system on {{hostname}}.
     status: current
     varbinds:
       - remoteStorageFileSystemMountFailedEvent
   - oid: 1.3.6.1.4.1.47421.0.247
     name: COHESITY-APPLIANCE-MIB::remoteStorageFileSystemDeletedNotif
-    category: config_change
+    category: state_change
     severity: notice
-    description: File system deleted event {remoteStorageFileSystemDeletedEvent} on {_HOSTNAME}.
+    description: 'Remote storage file system deleted{{with value "remoteStorageFileSystemDeletedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - remoteStorageFileSystemDeletedEvent
@@ -3650,7 +3650,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::remoteStorageFileSystemUsageHighNotif
     category: diagnostic
     severity: warning
-    description: 'File system usage is high: {remoteStorageFileSystemUsageHighEvent} on {_HOSTNAME}.'
+    description: File system usage is high on {{hostname}}.
     status: current
     varbinds:
       - remoteStorageFileSystemUsageHighEvent
@@ -3658,7 +3658,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::nfsShareNotHealthyNotif
     category: diagnostic
     severity: warning
-    description: NFS share health check failed with event {nfsShareNotHealthyEvent} on {_HOSTNAME}.
+    description: 'NFS share health is degraded{{with value "nfsShareNotHealthyEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - nfsShareNotHealthyEvent
@@ -3666,7 +3666,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::scribeBackgroundOpsStallingNotif
     category: diagnostic
     severity: warning
-    description: Background operations stalling detected with event {scribeBackgroundOpsStallingEvent} on {_HOSTNAME}.
+    description: Background operations stalling on {{hostname}}.
     status: current
     varbinds:
       - scribeBackgroundOpsStallingEvent
@@ -3674,7 +3674,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::eSDiskUsageExceedsThresholdNotif
     category: diagnostic
     severity: warning
-    description: ES disk usage exceeded threshold with event {eSDiskUsageExceedsThresholdEvent} on {_HOSTNAME}.
+    description: ES disk usage exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - eSDiskUsageExceedsThresholdEvent
@@ -3682,31 +3682,31 @@ traps:
     name: COHESITY-APPLIANCE-MIB::dnsServerUnassignedNotif
     category: diagnostic
     severity: warning
-    description: DNS server not assigned on node {dnsServerUnassignedEvent} on {_HOSTNAME}.
+    description: DNS server is not assigned on node {{value "dnsServerUnassignedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - dnsServerUnassignedEvent
   - oid: 1.3.6.1.4.1.47421.0.253
     name: COHESITY-APPLIANCE-MIB::insufficientResourcesToLaunchSysSrvPodNotif
     category: diagnostic
-    severity: err
-    description: Failed to launch system service pod due to insufficient resources on {_HOSTNAME}.
+    severity: crit
+    description: Failed to launch system service pod due to insufficient resources on {{hostname}}.
     status: current
     varbinds:
       - insufficientResourcesToLaunchSysSrvPodEvent
   - oid: 1.3.6.1.4.1.47421.0.254
     name: COHESITY-APPLIANCE-MIB::userDefaultPasswordNotif
     category: security
-    severity: warning
-    description: Default password detected on node {userDefaultPasswordEvent} on {_HOSTNAME}.
+    severity: alert
+    description: Cluster is using default password on node {{value "userDefaultPasswordEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - userDefaultPasswordEvent
   - oid: 1.3.6.1.4.1.47421.0.255
     name: COHESITY-APPLIANCE-MIB::vMMigrationIdentifiedNotif
-    category: state_change
-    severity: notice
-    description: VM migration event {vMMigrationIdentifiedEvent} detected on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: VM migration event identified on {{hostname}}.
     status: current
     varbinds:
       - vMMigrationIdentifiedEvent
@@ -3714,7 +3714,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::wormChangeForGroupAlertNotif
     category: security
     severity: warning
-    description: Protection group settings changed indicating potential security risk via {wormChangeForGroupAlertEvent} on {_HOSTNAME}.
+    description: Protection group settings changed, cluster at potential security risk on {{hostname}}.
     status: current
     varbinds:
       - wormChangeForGroupAlertEvent
@@ -3722,15 +3722,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::wormChangeForPolicyAlertNotif
     category: security
     severity: warning
-    description: Policy settings changed indicating potential security risk on {_HOSTNAME}.
+    description: Security policy settings changed on {{hostname}}.
     status: current
     varbinds:
       - wormChangeForPolicyAlertEvent
   - oid: 1.3.6.1.4.1.47421.0.258
     name: COHESITY-APPLIANCE-MIB::inconsistentInterfaceGroupSpeedNotif
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Interface speed mismatch detected in a group on {_HOSTNAME}.
+    description: Interface speed mismatch detected in a group on {{hostname}}.
     status: current
     varbinds:
       - inconsistentInterfaceGroupSpeedEvent
@@ -3738,15 +3738,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::atomNodeMemoryAboveThresholdNotif
     category: diagnostic
     severity: warning
-    description: Atom node memory usage exceeded threshold with event {atomNodeMemoryAboveThresholdEvent} on {_HOSTNAME}.
+    description: Atom node memory usage is above threshold on {{hostname}}.
     status: current
     varbinds:
       - atomNodeMemoryAboveThresholdEvent
   - oid: 1.3.6.1.4.1.47421.0.260
     name: COHESITY-APPLIANCE-MIB::diskWithCorruptedPartitionTableNotif
     category: diagnostic
-    severity: err
-    description: Disk with corrupted partition table detected on {_HOSTNAME}.
+    severity: crit
+    description: VM disk has corrupted partition table {{value "diskWithCorruptedPartitionTableEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - diskWithCorruptedPartitionTableEvent
@@ -3754,7 +3754,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::remoteStorageDataIpUnreachableNotif
     category: diagnostic
     severity: warning
-    description: Remote storage Data IP unreachable event {remoteStorageDataIpUnreachableEvent} on {_HOSTNAME}.
+    description: Remote storage Data IP is unreachable on {{hostname}}.
     status: current
     varbinds:
       - remoteStorageDataIpUnreachableEvent
@@ -3762,7 +3762,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::nodeTcpOrphanConnectionsExceededNotif
     category: diagnostic
     severity: warning
-    description: TCP orphan connections exceeded threshold {nodeTcpOrphanConnectionsExceededEvent} on {_HOSTNAME}.
+    description: TCP orphan connections exceeded the threshold on {{hostname}}.
     status: current
     varbinds:
       - nodeTcpOrphanConnectionsExceededEvent
@@ -3770,7 +3770,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::appNetworkMasterUnhealthyNotif
     category: diagnostic
     severity: crit
-    description: App Network Master status is unhealthy on {_HOSTNAME}.
+    description: App Network Master status is unhealthy on {{hostname}}.
     status: current
     varbinds:
       - appNetworkMasterUnhealthyEvent
@@ -3778,15 +3778,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::appNetworkNodeUnhealthyNotif
     category: diagnostic
     severity: warning
-    description: App Network Node reported unhealthy status {appNetworkNodeUnhealthyEvent} on {_HOSTNAME}.
+    description: App network node status is unhealthy {{value "appNetworkNodeUnhealthyEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - appNetworkNodeUnhealthyEvent
   - oid: 1.3.6.1.4.1.47421.0.265
     name: COHESITY-APPLIANCE-MIB::lowReplicationFactorNotif
     category: diagnostic
-    severity: crit
-    description: Replication factor degraded to 1 with no disk failure resiliency on {_HOSTNAME}.
+    severity: alert
+    description: Replication factor is 1 with no disk failure resiliency on {{hostname}}.
     status: current
     varbinds:
       - lowReplicationFactorEvent
@@ -3794,7 +3794,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::duplicateIpDetectedNotif
     category: security
     severity: warning
-    description: Duplicate IP detected event {duplicateIpDetectedEvent.raw} on {_HOSTNAME}.
+    description: Duplicate IP address {{value "duplicateIpDetectedEvent"}} detected on {{hostname}}.
     status: current
     varbinds:
       - duplicateIpDetectedEvent
@@ -3802,15 +3802,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::powerSupplyAcRestoredNotif
     category: diagnostic
     severity: notice
-    description: Power supply AC restored event detected on {_HOSTNAME}.
+    description: 'Power supply AC restored{{with value "powerSupplyAcRestoredEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - powerSupplyAcRestoredEvent
   - oid: 1.3.6.1.4.1.47421.0.268
     name: COHESITY-APPLIANCE-MIB::remoteClusterNotReachableNotif
     category: state_change
-    severity: err
-    description: Remote cluster {remoteClusterNotReachableEvent} is not reachable on {_HOSTNAME}.
+    severity: crit
+    description: Remote cluster {{value "remoteClusterNotReachableEvent"}} is not reachable on {{hostname}}.
     status: current
     varbinds:
       - remoteClusterNotReachableEvent
@@ -3818,7 +3818,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::remoteStorageUnexpectedNfsExportRulesNotif
     category: security
     severity: warning
-    description: 'NFS export rule mismatch detected: {remoteStorageUnexpectedNfsExportRulesEvent} on {_HOSTNAME}.'
+    description: NFS export rule mismatch detected on Pure FlashBlade file system on {{hostname}}.
     status: current
     varbinds:
       - remoteStorageUnexpectedNfsExportRulesEvent
@@ -3826,15 +3826,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::unregisteredClusterNotif
     category: state_change
     severity: alert
-    description: Cluster is unregistered on {_HOSTNAME}.
+    description: 'Cluster is unregistered{{with value "unregisteredClusterEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - unregisteredClusterEvent
   - oid: 1.3.6.1.4.1.47421.0.271
     name: COHESITY-APPLIANCE-MIB::clusterPendingAuditReportUploadNotif
     category: diagnostic
-    severity: warning
-    description: 'Audit report upload pending: {clusterPendingAuditReportUploadEvent} on {_HOSTNAME}.'
+    severity: notice
+    description: Pending audit report upload event detected on {{hostname}}.
     status: current
     varbinds:
       - clusterPendingAuditReportUploadEvent
@@ -3842,7 +3842,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::appNetworkResourceUnhealthyNotif
     category: diagnostic
     severity: warning
-    description: App network resources reported unhealthy status via {appNetworkResourceUnhealthyEvent} on {_HOSTNAME}.
+    description: 'App network resources status is unhealthy{{with value "appNetworkResourceUnhealthyEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - appNetworkResourceUnhealthyEvent
@@ -3850,7 +3850,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::entityWithTooManyOpenHandlesNotif
     category: diagnostic
     severity: warning
-    description: Too many open handles detected for entity {entityWithTooManyOpenHandlesEvent} on {_HOSTNAME}.
+    description: Too many open handles detected for {{value "entityWithTooManyOpenHandlesEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - entityWithTooManyOpenHandlesEvent
@@ -3858,7 +3858,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::viewSlowProtocolOpNotif
     category: diagnostic
     severity: warning
-    description: Slow protocol operation detected from view {viewSlowProtocolOpEvent} on {_HOSTNAME}.
+    description: Slow protocol operation detected from view {{value "viewSlowProtocolOpEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - viewSlowProtocolOpEvent
@@ -3866,7 +3866,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::policyDatalockDurationChangedNotif
     category: config_change
     severity: notice
-    description: Protection policy datalock duration changed by {policyDatalockDurationChangedEvent} on {_HOSTNAME}.
+    description: 'Protection policy datalock duration changed{{with value "policyDatalockDurationChangedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - policyDatalockDurationChangedEvent
@@ -3874,7 +3874,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::protectionPolicyModifiedNotif
     category: config_change
     severity: notice
-    description: Protection policy modified by {protectionPolicyModifiedEvent} on {_HOSTNAME}.
+    description: 'Protection policy modified{{with value "protectionPolicyModifiedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - protectionPolicyModifiedEvent
@@ -3882,7 +3882,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::protectionGroupModifiedNotif
     category: config_change
     severity: notice
-    description: Protection group modified event {protectionGroupModifiedEvent} on {_HOSTNAME}.
+    description: 'Protection group modified{{with value "protectionGroupModifiedEvent"}} event: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - protectionGroupModifiedEvent
@@ -3890,55 +3890,55 @@ traps:
     name: COHESITY-APPLIANCE-MIB::protectionRunModifiedNotif
     category: config_change
     severity: notice
-    description: Protection run configuration modified via {protectionRunModifiedEvent} on {_HOSTNAME}.
+    description: 'Protection run modified{{with value "protectionRunModifiedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - protectionRunModifiedEvent
   - oid: 1.3.6.1.4.1.47421.0.279
     name: COHESITY-APPLIANCE-MIB::viewFailoverDuplicateViewUIDNotif
-    category: diagnostic
+    category: config_change
     severity: warning
-    description: 'Duplicate view ID detected: {viewFailoverDuplicateViewUIDEvent} on {_HOSTNAME}.'
+    description: 'Duplicate universal view ID detected{{with value "viewFailoverDuplicateViewUIDEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - viewFailoverDuplicateViewUIDEvent
   - oid: 1.3.6.1.4.1.47421.0.280
     name: COHESITY-APPLIANCE-MIB::viewFailoverReplicationFailedNotif
-    category: diagnostic
-    severity: err
-    description: View failover replication failed with event {viewFailoverReplicationFailedEvent} on {_HOSTNAME}.
+    category: state_change
+    severity: crit
+    description: Planned failover view replication failed on {{hostname}}.
     status: current
     varbinds:
       - viewFailoverReplicationFailedEvent
   - oid: 1.3.6.1.4.1.47421.0.281
     name: COHESITY-APPLIANCE-MIB::viewFailoverStuckNotif
     category: state_change
-    severity: warning
-    description: Planned view failover is stuck with event {viewFailoverStuckEvent} on {_HOSTNAME}.
+    severity: alert
+    description: Planned view failover is stuck on {{hostname}}.
     status: current
     varbinds:
       - viewFailoverStuckEvent
   - oid: 1.3.6.1.4.1.47421.0.282
     name: COHESITY-APPLIANCE-MIB::viewFailoverFailedNotif
-    category: diagnostic
-    severity: err
-    description: View failover failed with event {viewFailoverFailedEvent} on {_HOSTNAME}.
+    category: state_change
+    severity: crit
+    description: View failover failed on {{hostname}}.
     status: current
     varbinds:
       - viewFailoverFailedEvent
   - oid: 1.3.6.1.4.1.47421.0.283
     name: COHESITY-APPLIANCE-MIB::viewFailoverStateUpdateFailedNotif
     category: diagnostic
-    severity: err
-    description: 'View failover state update failed: {viewFailoverStateUpdateFailedEvent} on {_HOSTNAME}.'
+    severity: crit
+    description: Failover view state update failed on {{hostname}}.
     status: current
     varbinds:
       - viewFailoverStateUpdateFailedEvent
   - oid: 1.3.6.1.4.1.47421.0.284
     name: COHESITY-APPLIANCE-MIB::vaultConfigValidationFailedNotif
     category: diagnostic
-    severity: err
-    description: Vault config validation failed with event {vaultConfigValidationFailedEvent} on {_HOSTNAME}.
+    severity: warning
+    description: 'Vault config validation failed{{with value "vaultConfigValidationFailedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - vaultConfigValidationFailedEvent
@@ -3946,7 +3946,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::remoteReplicationTrackingViewUpdateFailedNotif
     category: diagnostic
     severity: err
-    description: Remote replication tracking view update failed with event {remoteReplicationTrackingViewUpdateFailedEvent} on {_HOSTNAME}.
+    description: 'Replication tracking view update failed: {{value "remoteReplicationTrackingViewUpdateFailedEvent"}} on {{hostname}}.'
     status: current
     varbinds:
       - remoteReplicationTrackingViewUpdateFailedEvent
@@ -3954,15 +3954,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::remoteIndexingFallbackNotif
     category: diagnostic
     severity: warning
-    description: Remote indexing failed, falling back to local indexing on {_HOSTNAME}.
+    description: Remote indexing failed, falling back to local indexing on {{hostname}}.
     status: current
     varbinds:
       - remoteIndexingFallbackEvent
   - oid: 1.3.6.1.4.1.47421.0.287
     name: COHESITY-APPLIANCE-MIB::archiveObjectGCFailedAlertNotif
     category: diagnostic
-    severity: err
-    description: Archive object garbage collection failed on external target on {_HOSTNAME}.
+    severity: warning
+    description: Archive object garbage collection in external target failed on {{hostname}}.
     status: current
     varbinds:
       - archiveObjectGCFailedAlertEvent
@@ -3970,7 +3970,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::highRPCLatenciesNotif
     category: diagnostic
     severity: warning
-    description: High RPC latency detected for metadata service on {_HOSTNAME}.
+    description: High RPC latency detected for metadata service on {{hostname}}.
     status: current
     varbinds:
       - highRPCLatenciesEvent
@@ -3978,7 +3978,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::unexpectedIpAddressNotif
     category: security
     severity: warning
-    description: Unexpected IP address detected on interface {unexpectedIpAddressEvent} on {_HOSTNAME}.
+    description: Unexpected IP address {{value "unexpectedIpAddressEvent"}} detected on {{hostname}}.
     status: current
     varbinds:
       - unexpectedIpAddressEvent
@@ -3986,7 +3986,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::policyDatalockChangedNotif
     category: config_change
     severity: notice
-    description: Datalock policy change event {policyDatalockChangedEvent} on {_HOSTNAME}.
+    description: Datalock policy and target changed{{with value "policyDatalockChangedEvent"}} to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - policyDatalockChangedEvent
@@ -3994,15 +3994,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::protectionGroupDeletedNotif
     category: config_change
     severity: notice
-    description: Protection group deleted event {protectionGroupDeletedEvent} on {_HOSTNAME}.
+    description: 'Protection group deleted{{with value "protectionGroupDeletedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - protectionGroupDeletedEvent
   - oid: 1.3.6.1.4.1.47421.0.292
     name: COHESITY-APPLIANCE-MIB::sourceConnectivityFailureNotif
     category: diagnostic
-    severity: err
-    description: Source connectivity verification failed with {sourceConnectivityFailureEvent} on {_HOSTNAME}.
+    severity: warning
+    description: 'Source connectivity verification failed{{with value "sourceConnectivityFailureEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - sourceConnectivityFailureEvent
@@ -4010,7 +4010,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::diskOkToRemoveNotif
     category: diagnostic
     severity: notice
-    description: Disk OK to remove event {diskOkToRemoveEvent} on {_HOSTNAME}.
+    description: 'Disk is OK to remove{{with value "diskOkToRemoveEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - diskOkToRemoveEvent
@@ -4018,15 +4018,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::systemServiceAppInstallationFailedNotif
     category: diagnostic
     severity: err
-    description: System service installation failed with event {systemServiceAppInstallationFailedEvent} on {_HOSTNAME}.
+    description: System service application installation failed on {{hostname}}.
     status: current
     varbinds:
       - systemServiceAppInstallationFailedEvent
   - oid: 1.3.6.1.4.1.47421.0.295
     name: COHESITY-APPLIANCE-MIB::nexusFaultIsolationRecoveryNotif
     category: diagnostic
-    severity: notice
-    description: Nexus executing recovery actions {nexusFaultIsolationRecoveryEvent} on {_HOSTNAME}.
+    severity: warning
+    description: Nexus executing recovery actions {{value "nexusFaultIsolationRecoveryEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - nexusFaultIsolationRecoveryEvent
@@ -4034,7 +4034,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::continuousDataProtectionAlertNotif
     category: diagnostic
     severity: warning
-    description: Continuous data protection alert triggered for {continuousDataProtectionAlertEvent} on {_HOSTNAME}.
+    description: CDP alert raised for {{value "continuousDataProtectionAlertEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - continuousDataProtectionAlertEvent
@@ -4042,7 +4042,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::hostShellAccessExpiryNotif
     category: license
     severity: warning
-    description: Host shell access is about to expire on {_HOSTNAME}.
+    description: Host shell access is about to expire on {{hostname}}.
     status: current
     varbinds:
       - hostShellAccessExpiryEvent
@@ -4050,7 +4050,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::bucketMetadataModifiedNotif
     category: config_change
     severity: notice
-    description: Bucket metadata modified event {bucketMetadataModifiedEvent} on {_HOSTNAME}.
+    description: 'Bucket metadata modified{{with value "bucketMetadataModifiedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - bucketMetadataModifiedEvent
@@ -4058,7 +4058,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::bucketACLUpdatedNotif
     category: config_change
     severity: notice
-    description: S3 view ACL updated via {bucketACLUpdatedEvent} on {_HOSTNAME}.
+    description: S3 view Access Control List updated on {{hostname}}.
     status: current
     varbinds:
       - bucketACLUpdatedEvent
@@ -4066,7 +4066,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::bucketCreatedNotif
     category: config_change
     severity: notice
-    description: Bucket view created with event {bucketCreatedEvent} on {_HOSTNAME}.
+    description: Bucket view created with name {{value "bucketCreatedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - bucketCreatedEvent
@@ -4074,7 +4074,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::bucketDeletedNotif
     category: config_change
     severity: notice
-    description: Bucket view deleted by {bucketDeletedEvent} on {_HOSTNAME}.
+    description: Bucket view {{value "bucketDeletedEvent"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - bucketDeletedEvent
@@ -4082,7 +4082,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::serviceGflagsChangedNotif
     category: config_change
     severity: notice
-    description: Service gflags changed event {serviceGflagsChangedEvent} on {_HOSTNAME}.
+    description: Service gflags changed on {{hostname}}.
     status: current
     varbinds:
       - serviceGflagsChangedEvent
@@ -4090,7 +4090,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::algorithmFrequentlyTimeOutAlertNotif
     category: diagnostic
     severity: warning
-    description: 'Algorithm frequently timing out: {algorithmFrequentlyTimeOutAlertEvent} on {_HOSTNAME}.'
+    description: Algorithm frequently timing out and behind schedule on {{hostname}}.
     status: current
     varbinds:
       - algorithmFrequentlyTimeOutAlertEvent
@@ -4098,7 +4098,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::successfulFailoverOpAlertNotif
     category: state_change
     severity: notice
-    description: Failover operation completed successfully on {_HOSTNAME}.
+    description: Failover operation completed successfully on {{hostname}}.
     status: current
     varbinds:
       - successfulFailoverOpAlertEvent
@@ -4106,7 +4106,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::successfulFailbackOpAlertNotif
     category: state_change
     severity: notice
-    description: Successful failback operation completed on {_HOSTNAME}.
+    description: Failback operation triggered from cluster using runbook is successful on {{hostname}}.
     status: current
     varbinds:
       - successfulFailbackOpAlertEvent
@@ -4114,7 +4114,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::successfulTestAndDevOpAlertNotif
     category: diagnostic
     severity: info
-    description: Test and Dev operation {successfulTestAndDevOpAlertEvent} completed successfully on {_HOSTNAME}.
+    description: Test and Dev operation successful on {{hostname}}.
     status: current
     varbinds:
       - successfulTestAndDevOpAlertEvent
@@ -4122,47 +4122,47 @@ traps:
     name: COHESITY-APPLIANCE-MIB::successfulPrepareFailbackOpAlertNotif
     category: state_change
     severity: notice
-    description: Prepare failback operation completed successfully on {_HOSTNAME}.
+    description: Prepare failback operation completed successfully on {{hostname}}.
     status: current
     varbinds:
       - successfulPrepareFailbackOpAlertEvent
   - oid: 1.3.6.1.4.1.47421.0.308
     name: COHESITY-APPLIANCE-MIB::successfulTeardownOpAlertNotif
-    category: config_change
-    severity: notice
-    description: Teardown operation completed successfully on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Teardown operation triggered from cluster using runbook is successful on {{hostname}}.
     status: current
     varbinds:
       - successfulTeardownOpAlertEvent
   - oid: 1.3.6.1.4.1.47421.0.309
     name: COHESITY-APPLIANCE-MIB::failedFailoverOpAlertNotif
-    category: diagnostic
-    severity: err
-    description: Failover operation triggered from cluster using runbook has failed on {_HOSTNAME}.
+    category: state_change
+    severity: crit
+    description: Failover operation triggered from cluster using runbook has failed on {{hostname}}.
     status: current
     varbinds:
       - failedFailoverOpAlertEvent
   - oid: 1.3.6.1.4.1.47421.0.310
     name: COHESITY-APPLIANCE-MIB::failedFailbackOpAlertNotif
     category: diagnostic
-    severity: err
-    description: Failback operation failed with event {failedFailbackOpAlertEvent} on {_HOSTNAME}.
+    severity: alert
+    description: Failback operation triggered from cluster using runbook has failed on {{hostname}}.
     status: current
     varbinds:
       - failedFailbackOpAlertEvent
   - oid: 1.3.6.1.4.1.47421.0.311
     name: COHESITY-APPLIANCE-MIB::failedTestAndDevOpAlertNotif
     category: diagnostic
-    severity: err
-    description: Test and Dev operation {failedTestAndDevOpAlertEvent} failed on {_HOSTNAME}.
+    severity: warning
+    description: 'Test and Dev operation failed{{with value "failedTestAndDevOpAlertEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - failedTestAndDevOpAlertEvent
   - oid: 1.3.6.1.4.1.47421.0.312
     name: COHESITY-APPLIANCE-MIB::failedPrepareFailbackOpAlertNotif
     category: diagnostic
-    severity: err
-    description: Prepare failback operation failed on {_HOSTNAME}.
+    severity: alert
+    description: Prepare failback operation has failed on {{hostname}}.
     status: current
     varbinds:
       - failedPrepareFailbackOpAlertEvent
@@ -4170,15 +4170,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::failedTeardownOpAlertNotif
     category: diagnostic
     severity: err
-    description: Teardown operation failed with event {failedTeardownOpAlertEvent} on {_HOSTNAME}.
+    description: Teardown operation failed on {{hostname}}.
     status: current
     varbinds:
       - failedTeardownOpAlertEvent
   - oid: 1.3.6.1.4.1.47421.0.314
     name: COHESITY-APPLIANCE-MIB::ssdMediaErrorNotif
     category: diagnostic
-    severity: err
-    description: SSD media error detected with event {ssdMediaErrorEvent} on {_HOSTNAME}.
+    severity: warning
+    description: 'SSD media error detected{{with value "ssdMediaErrorEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ssdMediaErrorEvent
@@ -4186,7 +4186,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::diskNeedFirmwareUpgradeNotif
     category: diagnostic
     severity: warning
-    description: Disk {diskNeedFirmwareUpgradeEvent} requires firmware upgrade on {_HOSTNAME}.
+    description: Disk firmware upgrade needed for {{value "diskNeedFirmwareUpgradeEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - diskNeedFirmwareUpgradeEvent
@@ -4194,7 +4194,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::metadataMovedToFlashbladeNotif
     category: state_change
     severity: notice
-    description: Metadata moved to flashblade {metadataMovedToFlashbladeEvent} on {_HOSTNAME}.
+    description: 'Metadata moved to Flashblade{{with value "metadataMovedToFlashbladeEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - metadataMovedToFlashbladeEvent
@@ -4202,23 +4202,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::viewCloneMetadataBloatNotif
     category: diagnostic
     severity: warning
-    description: Metadata journal bloat detected with event {viewCloneMetadataBloatEvent} on {_HOSTNAME}.
+    description: 'Metadata cloning journal bloat detected{{with value "viewCloneMetadataBloatEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - viewCloneMetadataBloatEvent
   - oid: 1.3.6.1.4.1.47421.0.318
     name: COHESITY-APPLIANCE-MIB::chunkFileContainerInconsistencyNotif
     category: diagnostic
-    severity: alert
-    description: 'Chunk File Container inconsistency detected: {chunkFileContainerInconsistencyEvent} on {_HOSTNAME}.'
+    severity: crit
+    description: Chunk File Container inconsistency detected on {{hostname}}.
     status: current
     varbinds:
       - chunkFileContainerInconsistencyEvent
   - oid: 1.3.6.1.4.1.47421.0.319
     name: COHESITY-APPLIANCE-MIB::apolloIssuedActionVersionMismatchNotif
-    category: diagnostic
+    category: config_change
     severity: warning
-    description: 'API version mismatch detected: {apolloIssuedActionVersionMismatchEvent} on {_HOSTNAME}.'
+    description: API version mismatch caused action to be ignored on {{hostname}}.
     status: current
     varbinds:
       - apolloIssuedActionVersionMismatchEvent
@@ -4226,7 +4226,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::networkStatsIsNotNormalNotif
     category: diagnostic
     severity: warning
-    description: Network statistics anomaly detected with event {networkStatsIsNotNormalEvent} on {_HOSTNAME}.
+    description: Network statistics anomaly detected on {{value "networkStatsIsNotNormalEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - networkStatsIsNotNormalEvent
@@ -4234,7 +4234,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::highClusterUtilizationNotif
     category: diagnostic
     severity: warning
-    description: Cluster utilization is high (>=85%) reported by {highClusterUtilizationEvent} on {_HOSTNAME}.
+    description: Cluster utilization is high (>=85%) on {{hostname}}.
     status: current
     varbinds:
       - highClusterUtilizationEvent
@@ -4242,15 +4242,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::createSnapshotSucceededNotif
     category: config_change
     severity: notice
-    description: Snapshot creation succeeded on {_HOSTNAME}.
+    description: 'Snapshot creation succeeded{{with value "createSnapshotSucceededEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - createSnapshotSucceededEvent
   - oid: 1.3.6.1.4.1.47421.0.323
     name: COHESITY-APPLIANCE-MIB::nodeConnectivityFailedNotif
     category: diagnostic
-    severity: err
-    description: 'Node connectivity failed: {nodeConnectivityFailedEvent} on {_HOSTNAME}.'
+    severity: crit
+    description: 'Node connectivity failure detected{{with value "nodeConnectivityFailedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - nodeConnectivityFailedEvent
@@ -4258,15 +4258,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::deferScheduleNotif
     category: config_change
     severity: notice
-    description: Deferred schedule event {deferScheduleEvent} on {_HOSTNAME}.
+    description: Deferred schedule event triggered to resolve conflicts on {{hostname}}.
     status: current
     varbinds:
       - deferScheduleEvent
   - oid: 1.3.6.1.4.1.47421.0.325
     name: COHESITY-APPLIANCE-MIB::cloudDataOpFailureNotif
     category: diagnostic
-    severity: err
-    description: 'Cloud operation failure detected: {cloudDataOpFailureEvent} on {_HOSTNAME}.'
+    severity: warning
+    description: Cloud operation failure detected on external target {{value "cloudDataOpFailureEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - cloudDataOpFailureEvent
@@ -4274,7 +4274,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::objectStorePortalInitializationFailureNotif
     category: diagnostic
     severity: crit
-    description: Bridge S3 Http Server initialization failed with reason {objectStorePortalInitializationFailureEvent} on {_HOSTNAME}.
+    description: 'Bridge S3 Http Server failed to initialize{{with value "objectStorePortalInitializationFailureEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - objectStorePortalInitializationFailureEvent
@@ -4282,23 +4282,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::kubernetesObjectsCleanupAlertNotif
     category: diagnostic
     severity: warning
-    description: Failed to cleanup kubernetes objects on stale incarnation id on {_HOSTNAME}.
+    description: Failed to cleanup Kubernetes objects on stale incarnation id on {{hostname}}.
     status: current
     varbinds:
       - kubernetesObjectsCleanupAlertEvent
   - oid: 1.3.6.1.4.1.47421.0.328
     name: COHESITY-APPLIANCE-MIB::nodeNotPresentInKubernetesClusterNotif
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Node(s) {nodeNotPresentInKubernetesClusterEvent} are not part of kubernetes cluster on {_HOSTNAME}.
+    description: Node(s) {{value "nodeNotPresentInKubernetesClusterEvent"}} are not part of Kubernetes cluster on {{hostname}}.
     status: current
     varbinds:
       - nodeNotPresentInKubernetesClusterEvent
   - oid: 1.3.6.1.4.1.47421.0.329
     name: COHESITY-APPLIANCE-MIB::objectDeletionRejectedNotif
-    category: config_change
+    category: diagnostic
     severity: warning
-    description: Object deletion rejected due to run expiry constraints on {_HOSTNAME}.
+    description: Object deletion rejected due to run expiry constraints on {{hostname}}.
     status: current
     varbinds:
       - objectDeletionRejectedEvent
@@ -4306,7 +4306,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::rpmPackageVersionMismatchedNotif
     category: config_change
     severity: warning
-    description: 'RPM package version mismatch detected: {rpmPackageVersionMismatchedEvent} on {_HOSTNAME}.'
+    description: 'RPM package version mismatch detected{{with value "rpmPackageVersionMismatchedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - rpmPackageVersionMismatchedEvent
@@ -4314,7 +4314,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::baseOSVersionMismatchedNotif
     category: config_change
     severity: warning
-    description: BaseOS version mismatch detected on {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: BaseOS version mismatch detected{{with value "baseOSVersionMismatchedEvent"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - baseOSVersionMismatchedEvent
@@ -4322,15 +4322,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::createSnapshotFailedNotif
     category: diagnostic
     severity: err
-    description: Snapshot creation failed with event {createSnapshotFailedEvent} on {_HOSTNAME}.
+    description: Create Snapshot version failed on the cluster on {{hostname}}.
     status: current
     varbinds:
       - createSnapshotFailedEvent
   - oid: 1.3.6.1.4.1.47421.0.333
     name: COHESITY-APPLIANCE-MIB::restoreSnapshotStartedNotif
-    category: config_change
+    category: diagnostic
     severity: notice
-    description: Restore snapshot operation started on {_HOSTNAME}.
+    description: Restore snapshot started on {{hostname}}.
     status: current
     varbinds:
       - restoreSnapshotStartedEvent
@@ -4338,7 +4338,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::restoreSnapshotSucceededNotif
     category: config_change
     severity: notice
-    description: Restore snapshot operation succeeded with event {restoreSnapshotSucceededEvent} on {_HOSTNAME}.
+    description: Snapshot restore succeeded on {{hostname}}.
     status: current
     varbinds:
       - restoreSnapshotSucceededEvent
@@ -4346,7 +4346,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::restoreSnapshotFailedNotif
     category: diagnostic
     severity: err
-    description: Restore Snapshot version failed on the cluster {restoreSnapshotFailedEvent} on {_HOSTNAME}.
+    description: Restore Snapshot version failed on the cluster on {{hostname}}.
     status: current
     varbinds:
       - restoreSnapshotFailedEvent
@@ -4354,7 +4354,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::createSnapshotStartedNotif
     category: config_change
     severity: notice
-    description: Snapshot creation started by {createSnapshotStartedEvent} on {_HOSTNAME}.
+    description: 'Snapshot creation started{{with value "createSnapshotStartedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - createSnapshotStartedEvent
@@ -4362,23 +4362,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::principalWithNonViewerRoleNotif
     category: security
     severity: warning
-    description: Principal with non-viewer role detected on cluster on {_HOSTNAME}.
+    description: Principal with non-viewer role detected on {{hostname}}.
     status: current
     varbinds:
       - principalWithNonViewerRoleEvent
   - oid: 1.3.6.1.4.1.47421.0.338
     name: COHESITY-APPLIANCE-MIB::azureCEHostCachingEnabledNotif
     category: diagnostic
-    severity: warning
-    description: Azure Host Caching mismatch detected on {azureCEHostCachingEnabledEvent} on {_HOSTNAME}.
+    severity: alert
+    description: Azure Host Caching misconfiguration detected on node {{value "azureCEHostCachingEnabledEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - azureCEHostCachingEnabledEvent
   - oid: 1.3.6.1.4.1.47421.0.339
     name: COHESITY-APPLIANCE-MIB::recentLogBeingRotatedNotif
     category: diagnostic
-    severity: notice
-    description: Log rotation event {recentLogBeingRotatedEvent} occurred on {_HOSTNAME}.
+    severity: info
+    description: Log rotation event occurred on {{hostname}}.
     status: current
     varbinds:
       - recentLogBeingRotatedEvent
@@ -4386,7 +4386,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::repeatedlyFailingShardAlertNotif
     category: diagnostic
     severity: warning
-    description: Apollo shards are failing more often than expected on {_HOSTNAME}.
+    description: Apollo shards are failing repeatedly causing background task slowness on {{hostname}}.
     status: current
     varbinds:
       - repeatedlyFailingShardAlertEvent
@@ -4394,7 +4394,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::backlogDuringBlackOutNotif
     category: diagnostic
     severity: warning
-    description: Apollo backlog state detected during blackout window on {_HOSTNAME}.
+    description: Apollo is in backlog state for more than a threshold number of days on {{hostname}}.
     status: current
     varbinds:
       - backlogDuringBlackOutEvent
@@ -4402,7 +4402,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::timeConsumingShardAlertNotif
     category: diagnostic
     severity: warning
-    description: Apollo shard runtime exceeded average threshold with event {timeConsumingShardAlertEvent} on {_HOSTNAME}.
+    description: Apollo shard runtime exceeded threshold {{value "timeConsumingShardAlertEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - timeConsumingShardAlertEvent
@@ -4410,23 +4410,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::highNonDedupToDedupPercentNotif
     category: diagnostic
     severity: warning
-    description: High non-dedup to dedup percent event detected on {_HOSTNAME}.
+    description: High non-dedup to dedup percent {{value "highNonDedupToDedupPercentEvent"}} observed on {{hostname}}.
     status: current
     varbinds:
       - highNonDedupToDedupPercentEvent
   - oid: 1.3.6.1.4.1.47421.0.344
     name: COHESITY-APPLIANCE-MIB::appsModeDisabledDueToSubnetClashNotif
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Apps mode disabled due to subnet clash on {_HOSTNAME}.
+    description: Apps mode disabled due to subnet clash on {{hostname}}.
     status: current
     varbinds:
       - appsModeDisabledDueToSubnetClashEvent
   - oid: 1.3.6.1.4.1.47421.0.345
     name: COHESITY-APPLIANCE-MIB::oracleMountFailureNotif
     category: diagnostic
-    severity: err
-    description: 'Oracle mount failure detected: {oracleMountFailureEvent} on {_HOSTNAME}.'
+    severity: warning
+    description: 'Oracle mount failure detected{{with value "oracleMountFailureEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - oracleMountFailureEvent
@@ -4434,15 +4434,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::protectionServiceNotInitializedNotif
     category: diagnostic
     severity: warning
-    description: Protection Service is not initialized on {_HOSTNAME}.
+    description: Protection Service is not initialized on {{hostname}}.
     status: current
     varbinds:
       - protectionServiceNotInitializedEvent
   - oid: 1.3.6.1.4.1.47421.0.347
     name: COHESITY-APPLIANCE-MIB::fragmentActionsRepeatedlyFailingAlertNotif
     category: diagnostic
-    severity: err
-    description: Fragment actions repeatedly failing with event {fragmentActionsRepeatedlyFailingAlertEvent} on {_HOSTNAME}.
+    severity: warning
+    description: Fragment background actions repeatedly failing on {{hostname}}.
     status: current
     varbinds:
       - fragmentActionsRepeatedlyFailingAlertEvent
@@ -4450,7 +4450,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::userTuningsStuckAlertIdNotif
     category: diagnostic
     severity: warning
-    description: 'User tuned gflags stuck: {userTuningsStuckAlertIdEvent} on {_HOSTNAME}.'
+    description: User tuned gflags are stuck on {{value "userTuningsStuckAlertIdEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - userTuningsStuckAlertIdEvent
@@ -4458,7 +4458,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::kBrickMetadataInconsistentStateNotif
     category: diagnostic
     severity: warning
-    description: 'Brick metadata inconsistency detected: {kBrickMetadataInconsistentStateEvent} on {_HOSTNAME}.'
+    description: 'Brick metadata inconsistent state detected{{with value "kBrickMetadataInconsistentStateEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - kBrickMetadataInconsistentStateEvent
@@ -4466,7 +4466,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::eCConversionBackloggedNotif
     category: diagnostic
     severity: warning
-    description: Erasure coding conversion backlog detected with event {eCConversionBackloggedEvent} on {_HOSTNAME}.
+    description: Erasure coding algorithm is backlogged due to old un-encoded chunk file on {{hostname}}.
     status: current
     varbinds:
       - eCConversionBackloggedEvent
@@ -4474,7 +4474,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::diskSwappedNotif
     category: diagnostic
     severity: warning
-    description: 'Disk swap event detected: {diskSwappedEvent} on {_HOSTNAME}.'
+    description: Disk swap event detected on {{hostname}}.
     status: current
     varbinds:
       - diskSwappedEvent
@@ -4482,7 +4482,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::remoteStorageConfigureFailedNotif
     category: diagnostic
     severity: err
-    description: Remote storage configuration failed with event {remoteStorageConfigureFailedEvent} on {_HOSTNAME}.
+    description: 'Failed to configure remote storage{{with value "remoteStorageConfigureFailedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - remoteStorageConfigureFailedEvent
@@ -4490,7 +4490,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::aVHighRequestQueueSizeNotif
     category: diagnostic
     severity: warning
-    description: Antivirus scan queue size exceeded threshold with event {aVHighRequestQueueSizeEvent} on {_HOSTNAME}.
+    description: Antivirus scan queue is too long on {{hostname}}.
     status: current
     varbinds:
       - aVHighRequestQueueSizeEvent
@@ -4498,7 +4498,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::aVHighResponseTimeNotif
     category: diagnostic
     severity: warning
-    description: Antivirus scan slowness detected with event {aVHighResponseTimeEvent} on {_HOSTNAME}.
+    description: Antivirus scan slowness detected on {{hostname}}.
     status: current
     varbinds:
       - aVHighResponseTimeEvent
@@ -4506,7 +4506,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::orphanEntityValueVersionMismatchNotif
     category: diagnostic
     severity: warning
-    description: Orphan entity value version mismatch detected with event {orphanEntityValueVersionMismatchEvent} on {_HOSTNAME}.
+    description: 'Orphan entity value version mismatch detected{{with value "orphanEntityValueVersionMismatchEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - orphanEntityValueVersionMismatchEvent
@@ -4514,31 +4514,31 @@ traps:
     name: COHESITY-APPLIANCE-MIB::heavyFileOperationContentionNotif
     category: diagnostic
     severity: warning
-    description: 'Heavy file operation contention detected: {heavyFileOperationContentionEvent} on {_HOSTNAME}.'
+    description: Heavy file operation contention rejected on {{hostname}}.
     status: current
     varbinds:
       - heavyFileOperationContentionEvent
   - oid: 1.3.6.1.4.1.47421.0.357
     name: COHESITY-APPLIANCE-MIB::verifyNonExistentBrickFailedNotif
     category: diagnostic
-    severity: crit
-    description: Verify Non Existent Brick failed with cluster internal error {verifyNonExistentBrickFailedEvent} on {_HOSTNAME}.
+    severity: alert
+    description: Verify Non Existent Brick failed with cluster internal error on {{hostname}}.
     status: current
     varbinds:
       - verifyNonExistentBrickFailedEvent
   - oid: 1.3.6.1.4.1.47421.0.358
     name: COHESITY-APPLIANCE-MIB::chunkMigrationVerifyChunkInCfmFailedNotif
     category: diagnostic
-    severity: alert
-    description: Chunk migration failed with internal error {chunkMigrationVerifyChunkInCfmFailedEvent} on {_HOSTNAME}.
+    severity: crit
+    description: Chunk migration failed with cluster internal error on {{hostname}}.
     status: current
     varbinds:
       - chunkMigrationVerifyChunkInCfmFailedEvent
   - oid: 1.3.6.1.4.1.47421.0.359
     name: COHESITY-APPLIANCE-MIB::chunkMigrationVerifyBrickOwnedNDDChunksFailedNotif
     category: diagnostic
-    severity: crit
-    description: Chunk migration failed with internal error {chunkMigrationVerifyBrickOwnedNDDChunksFailedEvent} on {_HOSTNAME}.
+    severity: alert
+    description: Chunk migration failed due to cluster internal error on {{hostname}}.
     status: current
     varbinds:
       - chunkMigrationVerifyBrickOwnedNDDChunksFailedEvent
@@ -4546,7 +4546,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::gCStalledAlertNotif
     category: diagnostic
     severity: alert
-    description: Garbage collection stalled with event {gCStalledAlertEvent} on {_HOSTNAME}.
+    description: Garbage collection has stalled on the cluster on {{hostname}}.
     status: current
     varbinds:
       - gCStalledAlertEvent
@@ -4554,15 +4554,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::upgradeCancelledNotif
     category: config_change
     severity: notice
-    description: Upgrade to target version canceled from node {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Upgrade to target version canceled from node {{value "upgradeCancelledEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - upgradeCancelledEvent
   - oid: 1.3.6.1.4.1.47421.0.362
     name: COHESITY-APPLIANCE-MIB::oracleRestoreChainBreakNotif
     category: diagnostic
-    severity: warning
-    description: Oracle Restore Chain Break detected on {_HOSTNAME}.
+    severity: alert
+    description: 'Oracle restore chain break detected{{with value "oracleRestoreChainBreakEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - oracleRestoreChainBreakEvent
@@ -4570,7 +4570,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::nasSourceSnapshotDeletionFailedNotif
     category: diagnostic
     severity: err
-    description: NAS source snapshot deletion failed with event {nasSourceSnapshotDeletionFailedEvent} on {_HOSTNAME}.
+    description: NAS source snapshot deletion failed on {{hostname}}.
     status: current
     varbinds:
       - nasSourceSnapshotDeletionFailedEvent
@@ -4578,15 +4578,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::isilonChangelistCleanupFailedNotif
     category: diagnostic
     severity: warning
-    description: Cohesity changelist cleanup failed with event {isilonChangelistCleanupFailedEvent} on {_HOSTNAME}.
+    description: 'Cohesity changelist cleanup failed{{with value "isilonChangelistCleanupFailedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - isilonChangelistCleanupFailedEvent
   - oid: 1.3.6.1.4.1.47421.0.365
     name: COHESITY-APPLIANCE-MIB::nodeRemovalStuckNotif
     category: diagnostic
-    severity: warning
-    description: Node removal process is stuck for {nodeRemovalStuckEvent} on {_HOSTNAME}.
+    severity: alert
+    description: Node removal is stuck for node {{value "nodeRemovalStuckEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - nodeRemovalStuckEvent
@@ -4594,7 +4594,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::diskRemovalStuckNotif
     category: diagnostic
     severity: warning
-    description: Disk removal stuck for {diskRemovalStuckEvent} on {_HOSTNAME}.
+    description: Disk removal is stuck for disk {{value "diskRemovalStuckEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - diskRemovalStuckEvent
@@ -4602,7 +4602,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::kMSFailoverNotif
     category: state_change
     severity: warning
-    description: KMS failover to backup server detected on {_HOSTNAME}.
+    description: KMS failed over to backup server on {{hostname}}.
     status: current
     varbinds:
       - kMSFailoverEvent
@@ -4610,7 +4610,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::restoreTaskWarningNotif
     category: diagnostic
     severity: warning
-    description: 'Restore task completed with warnings: {restoreTaskWarningEvent} on {_HOSTNAME}.'
+    description: 'Restore job succeeded with warnings{{with value "restoreTaskWarningEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - restoreTaskWarningEvent
@@ -4618,7 +4618,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::restoreTaskFailedNotif
     category: diagnostic
     severity: err
-    description: Restore task failed with event {restoreTaskFailedEvent} on {_HOSTNAME}.
+    description: Restore task failed for object in job on {{hostname}}.
     status: current
     varbinds:
       - restoreTaskFailedEvent
@@ -4626,15 +4626,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::overwriteThrottlingScheduleAlertNotif
     category: diagnostic
     severity: warning
-    description: Background clean up task backlog observed with event {overwriteThrottlingScheduleAlertEvent} on {_HOSTNAME}.
+    description: Background clean up backlog observed, potentially impacting SmartFiles workloads on {{hostname}}.
     status: current
     varbinds:
       - overwriteThrottlingScheduleAlertEvent
   - oid: 1.3.6.1.4.1.47421.0.371
     name: COHESITY-APPLIANCE-MIB::uIUserLockoutNotif
-    category: auth
+    category: security
     severity: warning
-    description: UI user locked out due to {uIUserLockoutEvent} on {_HOSTNAME}.
+    description: UI user locked out{{with value "uIUserLockoutEvent"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - uIUserLockoutEvent
@@ -4642,15 +4642,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::uILoginFailureNotif
     category: auth
     severity: warning
-    description: UI login failed from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: 'UI login failed{{with value "uILoginFailureEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - uILoginFailureEvent
   - oid: 1.3.6.1.4.1.47421.0.373
     name: COHESITY-APPLIANCE-MIB::uILoginSuccessNotif
     category: auth
-    severity: notice
-    description: UI login successful on {_HOSTNAME}.
+    severity: info
+    description: UI login successful on {{hostname}}.
     status: current
     varbinds:
       - uILoginSuccessEvent
@@ -4658,7 +4658,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::inactivityUITimeoutChangedNotif
     category: config_change
     severity: notice
-    description: UI inactivity timeout configuration changed via {inactivityUITimeoutChangedEvent} on {_HOSTNAME}.
+    description: UI inactivity timeout changed to {{value "inactivityUITimeoutChangedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - inactivityUITimeoutChangedEvent
@@ -4666,7 +4666,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::absoluteUITimeoutChangedNotif
     category: config_change
     severity: notice
-    description: UI absolute timeout changed to {absoluteUITimeoutChangedEvent} on {_HOSTNAME}.
+    description: UI absolute timeout changed to {{value "absoluteUITimeoutChangedEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - absoluteUITimeoutChangedEvent
@@ -4674,7 +4674,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::sSHLoginSuccessNotif
     category: auth
     severity: notice
-    description: SSH login successful for {sSHLoginSuccessEvent} on {_HOSTNAME}.
+    description: SSH login success on {{hostname}}.
     status: current
     varbinds:
       - sSHLoginSuccessEvent
@@ -4682,7 +4682,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::sSHLoginFailureNotif
     category: auth
     severity: warning
-    description: SSH login failure from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: SSH login failure on {{hostname}}.
     status: current
     varbinds:
       - sSHLoginFailureEvent
@@ -4690,7 +4690,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::clusterServicesManuallyStoppedNotif
     category: state_change
     severity: alert
-    description: Cluster services manually stopped via {clusterServicesManuallyStoppedEvent} on {_HOSTNAME}.
+    description: Cluster services were manually stopped on {{hostname}}.
     status: current
     varbinds:
       - clusterServicesManuallyStoppedEvent
@@ -4698,23 +4698,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::clusterServicesManuallyStartedNotif
     category: state_change
     severity: notice
-    description: Cluster services manually started via {clusterServicesManuallyStartedEvent} on {_HOSTNAME}.
+    description: Cluster services were manually started on {{hostname}}.
     status: current
     varbinds:
       - clusterServicesManuallyStartedEvent
   - oid: 1.3.6.1.4.1.47421.0.380
     name: COHESITY-APPLIANCE-MIB::cloneBackupCleanupIssuesNotif
     category: diagnostic
-    severity: err
-    description: Clone backup cleanup failed with event {cloneBackupCleanupIssuesEvent} on {_HOSTNAME}.
+    severity: warning
+    description: 'Clone backup directory cleanup failed{{with value "cloneBackupCleanupIssuesEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - cloneBackupCleanupIssuesEvent
   - oid: 1.3.6.1.4.1.47421.0.381
     name: COHESITY-APPLIANCE-MIB::tenantIndexingConfigMissingNotif
-    category: diagnostic
+    category: config_change
     severity: warning
-    description: Tenant Indexing cloud config is missing on {_HOSTNAME}.
+    description: Tenant indexing cloud config is missing on {{hostname}}.
     status: current
     varbinds:
       - tenantIndexingConfigMissingEvent
@@ -4722,23 +4722,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::staleDirsFoundInYodaCloneBackupViewsNotif
     category: diagnostic
     severity: warning
-    description: Stale directories found in yoda clone backup views requiring cleanup on {_HOSTNAME}.
+    description: Stale directories found in Yoda clone backup views requiring cleanup on {{hostname}}.
     status: current
     varbinds:
       - staleDirsFoundInYodaCloneBackupViewsEvent
   - oid: 1.3.6.1.4.1.47421.0.383
     name: COHESITY-APPLIANCE-MIB::archiveValidationFailedAlertNotif
     category: diagnostic
-    severity: err
-    description: Archive validation failed with event {archiveValidationFailedAlertEvent} on {_HOSTNAME}.
+    severity: crit
+    description: Archive validation failed due to inconsistency on {{value "archiveValidationFailedAlertEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - archiveValidationFailedAlertEvent
   - oid: 1.3.6.1.4.1.47421.0.384
     name: COHESITY-APPLIANCE-MIB::remoteReplicationEncryptionKeyMismatchNotif
     category: security
-    severity: warning
-    description: Encryption key mismatch for remote replication detected on {_HOSTNAME}.
+    severity: alert
+    description: Encryption key mismatch for remote replication detected on {{hostname}}.
     status: current
     varbinds:
       - remoteReplicationEncryptionKeyMismatchEvent
@@ -4746,7 +4746,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::morphedGarbageThresholdExceededAlertNotif
     category: diagnostic
     severity: warning
-    description: Garbage collection threshold exceeded for chunkfiles on {_HOSTNAME}.
+    description: Garbage collection threshold exceeded for chunkfiles on {{hostname}}.
     status: current
     varbinds:
       - morphedGarbageThresholdExceededAlertEvent
@@ -4754,7 +4754,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::switchedToSpaceModeNotif
     category: diagnostic
     severity: warning
-    description: Metadata space conservation mode activated on {_HOSTNAME}.
+    description: Metadata moved to space conserve mode, potentially impacting performance on {{hostname}}.
     status: current
     varbinds:
       - switchedToSpaceModeEvent
@@ -4762,7 +4762,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::imbalanceThresholdExceededAlertNotif
     category: diagnostic
     severity: warning
-    description: Imbalance threshold exceeded for chunkfiles on {_HOSTNAME}.
+    description: Imbalance threshold exceeded for chunkfiles on {{hostname}}.
     status: current
     varbinds:
       - imbalanceThresholdExceededAlertEvent
@@ -4770,7 +4770,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::possibleMetadataInconsistencyNotif
     category: diagnostic
     severity: warning
-    description: 'Possible metadata inconsistency detected: {possibleMetadataInconsistencyEvent} on {_HOSTNAME}.'
+    description: 'Possible metadata inconsistency detected: {{value "possibleMetadataInconsistencyEvent"}} on {{hostname}}.'
     status: current
     varbinds:
       - possibleMetadataInconsistencyEvent
@@ -4778,7 +4778,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::awsESIndexingErrorsNotif
     category: diagnostic
     severity: warning
-    description: ES indexing error event {awsESIndexingErrorsEvent} detected on {_HOSTNAME}.
+    description: 'AWS Elasticsearch indexing errors detected{{with value "awsESIndexingErrorsEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - awsESIndexingErrorsEvent
@@ -4786,7 +4786,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::corruptMFTErrorNotif
     category: diagnostic
     severity: err
-    description: 'Corrupt MFT error detected: {corruptMFTErrorEvent} on {_HOSTNAME}.'
+    description: 'Corrupt MFT error detected{{with value "corruptMFTErrorEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - corruptMFTErrorEvent
@@ -4794,15 +4794,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::protectionGroupWarningNotif
     category: diagnostic
     severity: warning
-    description: Protection group warning {protectionGroupWarningEvent} detected on {_HOSTNAME}.
+    description: Protection group warning event {{value "protectionGroupWarningEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - protectionGroupWarningEvent
   - oid: 1.3.6.1.4.1.47421.0.392
     name: COHESITY-APPLIANCE-MIB::magnetoUnableToReachYodaNotif
     category: diagnostic
-    severity: err
-    description: Protection service unable to contact indexing service {magnetoUnableToReachYodaEvent} on {_HOSTNAME}.
+    severity: crit
+    description: Protection service is unable to contact indexing service on {{hostname}}.
     status: current
     varbinds:
       - magnetoUnableToReachYodaEvent
@@ -4810,15 +4810,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::secureShellEnabledNotif
     category: config_change
     severity: notice
-    description: Secure shell enabled event occurred on {_HOSTNAME}.
+    description: Secure shell enabled on {{hostname}}.
     status: current
     varbinds:
       - secureShellEnabledEvent
   - oid: 1.3.6.1.4.1.47421.0.394
     name: COHESITY-APPLIANCE-MIB::secureShellDisabledNotif
-    category: security
-    severity: warning
-    description: Secure shell disabled event {secureShellDisabledEvent} on {_HOSTNAME}.
+    category: config_change
+    severity: notice
+    description: Secure shell disabled on {{hostname}}.
     status: current
     varbinds:
       - secureShellDisabledEvent
@@ -4826,15 +4826,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::protectionRunExpiringNotif
     category: license
     severity: warning
-    description: Protection run expiring with failed copies detected on {_HOSTNAME}.
+    description: Protection run close to expiry with failed copies on {{hostname}}.
     status: current
     varbinds:
       - protectionRunExpiringEvent
   - oid: 1.3.6.1.4.1.47421.0.396
     name: COHESITY-APPLIANCE-MIB::vipPingFailedNotif
     category: diagnostic
-    severity: err
-    description: VIP ping failed with event {vipPingFailedEvent} on {_HOSTNAME}.
+    severity: warning
+    description: 'VIP ping failed event detected{{with value "vipPingFailedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - vipPingFailedEvent
@@ -4842,31 +4842,31 @@ traps:
     name: COHESITY-APPLIANCE-MIB::oracleUnresponsiveProgressQueryNotif
     category: diagnostic
     severity: warning
-    description: Oracle unresponsive progress query event detected on {_HOSTNAME}.
+    description: 'Oracle unresponsive progress query detected{{with value "oracleUnresponsiveProgressQueryEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - oracleUnresponsiveProgressQueryEvent
   - oid: 1.3.6.1.4.1.47421.0.398
     name: COHESITY-APPLIANCE-MIB::abacServerNotReachableNotif
     category: diagnostic
-    severity: warning
-    description: S3 ABAC server is not reachable on {_HOSTNAME}.
+    severity: crit
+    description: S3 ABAC server is not reachable on {{hostname}}.
     status: current
     varbinds:
       - abacServerNotReachableEvent
   - oid: 1.3.6.1.4.1.47421.0.399
     name: COHESITY-APPLIANCE-MIB::abacServerCertExpiredNotif
     category: security
-    severity: warning
-    description: ABAC server certificate expired on {_HOSTNAME}.
+    severity: alert
+    description: S3 ABAC server certificate has expired on {{hostname}}.
     status: current
     varbinds:
       - abacServerCertExpiredEvent
   - oid: 1.3.6.1.4.1.47421.0.400
     name: COHESITY-APPLIANCE-MIB::failedToChangeAuthForBackupViewNotif
     category: security
-    severity: err
-    description: Failed to change authentication for backup views {failedToChangeAuthForBackupViewEvent} on {_HOSTNAME}.
+    severity: warning
+    description: Failed to set or unset service auth config for backup views on {{hostname}}.
     status: current
     varbinds:
       - failedToChangeAuthForBackupViewEvent
@@ -4874,23 +4874,23 @@ traps:
     name: COHESITY-APPLIANCE-MIB::agentCertIsAboutToExpireNotif
     category: license
     severity: warning
-    description: Agent certificate is about to expire on {_HOSTNAME}.
+    description: Agent certificate is about to expire on {{hostname}}.
     status: current
     varbinds:
       - agentCertIsAboutToExpireEvent
   - oid: 1.3.6.1.4.1.47421.0.402
     name: COHESITY-APPLIANCE-MIB::replicationHandshakeStuckNotif
-    category: diagnostic
+    category: state_change
     severity: crit
-    description: Replication handshake stuck for {replicationHandshakeStuckEvent} on {_HOSTNAME}.
+    description: Replication handshake is stuck between local and remote cluster on {{hostname}}.
     status: current
     varbinds:
       - replicationHandshakeStuckEvent
   - oid: 1.3.6.1.4.1.47421.0.403
     name: COHESITY-APPLIANCE-MIB::highUnreclaimedGarbageAlertNotif
     category: diagnostic
-    severity: warning
-    description: Critically high amount of unclaimed garbage detected with event {highUnreclaimedGarbageAlertEvent} on {_HOSTNAME}.
+    severity: crit
+    description: Critically high amount of unclaimed garbage detected on the cluster on {{hostname}}.
     status: current
     varbinds:
       - highUnreclaimedGarbageAlertEvent
@@ -4898,15 +4898,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::certificateIsAboutToExpireNotif
     category: license
     severity: warning
-    description: Certificate expiration alert {certificateIsAboutToExpireEvent} on {_HOSTNAME}.
+    description: Certificate is about to expire on {{hostname}}.
     status: current
     varbinds:
       - certificateIsAboutToExpireEvent
   - oid: 1.3.6.1.4.1.47421.0.405
     name: COHESITY-APPLIANCE-MIB::clockSkewBetweenClusterAndDCNotif
-    category: diagnostic
+    category: security
     severity: warning
-    description: Clock skew detected between cluster and DC, risking authentication on {_HOSTNAME}.
+    description: Clock skew detected between cluster and Domain Controller, risking authentication on {{hostname}}.
     status: current
     varbinds:
       - clockSkewBetweenClusterAndDCEvent
@@ -4914,15 +4914,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::insecureClientDetectedNotif
     category: security
     severity: warning
-    description: Insecure client detected not using mTSL connecting to cluster on {_HOSTNAME}.
+    description: Insecure client detected connecting without mTLS on {{hostname}}.
     status: current
     varbinds:
       - insecureClientDetectedEvent
   - oid: 1.3.6.1.4.1.47421.0.407
     name: COHESITY-APPLIANCE-MIB::teamsPublicChannelsIndexingAlertNotif
     category: diagnostic
-    severity: notice
-    description: Teams public channel indexing skipped due to high channel count on {_HOSTNAME}.
+    severity: info
+    description: O365 public channel indexing skipped due to high channel count on {{hostname}}.
     status: current
     varbinds:
       - teamsPublicChannelsIndexingAlertEvent
@@ -4930,7 +4930,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::knownIssueDetectedAlertNotif
     category: diagnostic
     severity: warning
-    description: Known issue detected alert {knownIssueDetectedAlertEvent} on {_HOSTNAME}.
+    description: Cohesity alert notification {{value "knownIssueDetectedAlertEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - knownIssueDetectedAlertEvent
@@ -4938,7 +4938,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::knownIssueDetectedCommandNotif
     category: diagnostic
     severity: warning
-    description: Cohesity alert notification {knownIssueDetectedCommandEvent} detected on {_HOSTNAME}.
+    description: Cohesity alert notification {{value "knownIssueDetectedCommandEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - knownIssueDetectedCommandEvent
@@ -4946,7 +4946,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::knownIssueDetectedGflagNotif
     category: diagnostic
     severity: warning
-    description: 'Known issue detected: {knownIssueDetectedGflagEvent} on {_HOSTNAME}.'
+    description: Cohesity alert notification {{value "knownIssueDetectedGflagEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - knownIssueDetectedGflagEvent
@@ -4954,7 +4954,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::knownIssueDetectedPatchNotif
     category: diagnostic
     severity: warning
-    description: 'Known issue detected: {knownIssueDetectedPatchEvent} on {_HOSTNAME}.'
+    description: Cohesity alert notification {{value "knownIssueDetectedPatchEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - knownIssueDetectedPatchEvent
@@ -4962,15 +4962,15 @@ traps:
     name: COHESITY-APPLIANCE-MIB::importantAwarenessCommunicationNotif
     category: diagnostic
     severity: notice
-    description: Important awareness communication {importantAwarenessCommunicationEvent} received on {_HOSTNAME}.
+    description: Important awareness communication event {{value "importantAwarenessCommunicationEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - importantAwarenessCommunicationEvent
   - oid: 1.3.6.1.4.1.47421.0.413
     name: COHESITY-APPLIANCE-MIB::newPatchAvailableNotif
-    category: diagnostic
+    category: license
     severity: notice
-    description: New software patch available for download on {_HOSTNAME}.
+    description: 'New software patch available{{with value "newPatchAvailableEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - newPatchAvailableEvent
@@ -4978,7 +4978,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::knownIssueDetectedDocNotif
     category: diagnostic
     severity: warning
-    description: Known issue detected with event {knownIssueDetectedDocEvent} on {_HOSTNAME}.
+    description: Cohesity alert notification {{value "knownIssueDetectedDocEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - knownIssueDetectedDocEvent
@@ -4986,7 +4986,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::knownIssueDetectedHotfixNotif
     category: diagnostic
     severity: warning
-    description: Known issue detected with event {knownIssueDetectedHotfixEvent} on {_HOSTNAME}.
+    description: Cohesity alert notification {{value "knownIssueDetectedHotfixEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - knownIssueDetectedHotfixEvent
@@ -4994,7 +4994,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::highUnreachableChunksAlertNotif
     category: diagnostic
     severity: warning
-    description: High unreachable chunks alert {highUnreachableChunksAlertEvent} on {_HOSTNAME}.
+    description: 'High unreachable chunks alert triggered{{with value "highUnreachableChunksAlertEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - highUnreachableChunksAlertEvent
@@ -5002,7 +5002,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::remoteStorageRegistrationInvalidNotif
     category: diagnostic
     severity: err
-    description: Remote storage registration invalid event {remoteStorageRegistrationInvalidEvent} on {_HOSTNAME}.
+    description: Remote storage registration information is invalid on {{hostname}}.
     status: current
     varbinds:
       - remoteStorageRegistrationInvalidEvent
@@ -5010,7 +5010,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::userAccountIsAboutToBeLockedNotif
     category: auth
     severity: warning
-    description: User account is about to be locked due to {userAccountIsAboutToBeLockedEvent} on {_HOSTNAME}.
+    description: 'User account is about to be locked{{with value "userAccountIsAboutToBeLockedEvent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - userAccountIsAboutToBeLockedEvent
@@ -5018,7 +5018,7 @@ traps:
     name: COHESITY-APPLIANCE-MIB::cohesitySnmpTestNotif
     category: diagnostic
     severity: info
-    description: SNMP test notification {cohesitySnmpTestEvent} received on {_HOSTNAME}.
+    description: Cohesity SNMP test notification received on {{hostname}}.
     status: current
     varbinds:
       - cohesitySnmpTestEvent

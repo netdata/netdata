@@ -63,7 +63,7 @@ traps:
     name: V1600D::dataAlarmTrap
     category: diagnostic
     severity: warning
-    description: Alarm {dataAlarmType} with level {dateAlarmLevel} on port {dataUpLinkPort} on {_HOSTNAME}.
+    description: Data alarm triggered on {{first (value "dataTrapClass") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - dataUpLinkPort

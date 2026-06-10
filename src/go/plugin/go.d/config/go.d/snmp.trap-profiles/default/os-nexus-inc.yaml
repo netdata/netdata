@@ -9,5 +9,5 @@ traps:
     name: QUANTASTOR-SYS-STATS::quantastor-notif
     category: unknown
     severity: info
-    description: Notification received from {TRAP_NAME} on {_HOSTNAME}.
+    description: Quantastor notification received on {{hostname}}.
     status: current

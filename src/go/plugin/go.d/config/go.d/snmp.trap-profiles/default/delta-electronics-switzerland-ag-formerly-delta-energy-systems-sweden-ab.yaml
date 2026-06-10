@@ -71,7 +71,7 @@ traps:
     name: ORION-BASE-MIB::systemNonUrgentAlarm
     category: diagnostic
     severity: warning
-    description: Non-urgent alarm {dcNonUrgentAlarmName} active with value {dcNonUrgentAlarmValue} on {_HOSTNAME}.
+    description: Non-urgent alarm {{value "dcNonUrgentAlarmName"}} active on {{hostname}}.
     status: current
     varbinds:
       - dcSystemDateTime
@@ -83,7 +83,7 @@ traps:
     name: ORION-BASE-MIB::systemUrgentAlarm
     category: diagnostic
     severity: alert
-    description: Urgent alarm {dcUrgentAlarmName} active with {dcNumberUrgentAlarms} urgent alarms on {_HOSTNAME}.
+    description: Urgent alarm {{value "dcUrgentAlarmName"}} active on {{hostname}}.
     status: current
     varbinds:
       - dcSystemDateTime
@@ -95,7 +95,7 @@ traps:
     name: ORION-BASE-MIB::systemCriticalAlarm
     category: diagnostic
     severity: crit
-    description: Critical alarm {dcCriticalAlarmName} with identifier {dcCriticalAlarmIdentifier} active on {_HOSTNAME}.
+    description: Critical alarm {{value "dcCriticalAlarmName"}} detected on {{hostname}}.
     status: current
     varbinds:
       - dcSystemDateTime

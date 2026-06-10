@@ -3,7 +3,7 @@
 # operator overrides belong in /etc/netdata/go.d/snmp.trap-profiles/.
 vendor: viptela-inc
 mib_count: 1
-trap_count: 113
+trap_count: 110
 varbinds:
   eventTime:
     oid: 1.3.6.1.4.1.41916.100.1.1
@@ -121,7 +121,6 @@ varbinds:
       "3": timeout
       "4": na
       "5": not-known
-      "6": ondemand-idle-timeout-delete
   viptelaBfdLocalColor:
     oid: 1.3.6.1.4.1.41916.100.1.10
     type: OCTET STRING
@@ -323,9 +322,6 @@ varbinds:
     oid: 1.3.6.1.4.1.41916.100.1.169
     type: VpnId
     constraints: (0..65530)
-  viptelaPolicyDevicePolicyName:
-    oid: 1.3.6.1.4.1.41916.100.1.185
-    type: OCTET STRING
   viptelaPolicyDscp:
     oid: 1.3.6.1.4.1.41916.100.1.122
     type: Unsigned32
@@ -620,9 +616,6 @@ varbinds:
       "20": private4
       "21": private5
       "22": private6
-  viptelaSecuritySubjectSerialNumber:
-    oid: 1.3.6.1.4.1.41916.100.1.187
-    type: OCTET STRING
   viptelaSecurityUptime:
     oid: 1.3.6.1.4.1.41916.100.1.38
     type: OCTET STRING
@@ -930,7 +923,7 @@ varbinds:
     oid: 1.3.6.1.4.1.41916.100.1.159
     type: OCTET STRING
   viptelaWwanQosState:
-    oid: 1.3.6.1.4.1.41916.100.1.186
+    oid: 1.3.6.1.4.1.41916.100.1.185
     type: WwanQosStatusEnum
     enum:
       "1": activated
@@ -962,9 +955,9 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.41916.100.2.1
     name: VIPTELA-TRAPS::viptelaActionsSystemSoftwareInstallStatus
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Software install {viptelaActionsInstallId} status {viptelaActionsStatus} on {_HOSTNAME}.
+    description: System software installation status {{value "viptelaActionsStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -975,8 +968,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.2
     name: VIPTELA-TRAPS::viptelaActionsSystemRebootIssued
     category: state_change
-    severity: alert
-    description: System reboot issued with reason {viptelaActionsRebootReason} on {_HOSTNAME}.
+    severity: notice
+    description: System reboot issued{{with value "viptelaActionsRebootReason"}} reason {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -986,7 +979,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaActionsSystemRebootComplete
     category: state_change
     severity: notice
-    description: System reboot completed on {_HOSTNAME}.
+    description: System reboot completed on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -995,7 +988,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaBfdBfdStateChange
     category: state_change
     severity: warning
-    description: BFD session state changed to {viptelaBfdNewState} on {_HOSTNAME}.
+    description: BFD session state changed to {{value "viptelaBfdNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1015,8 +1008,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.5
     name: VIPTELA-TRAPS::viptelaHardwareFlashFault
     category: diagnostic
-    severity: err
-    description: Hardware fault detected with new state {viptelaHardwareNewState} on {_HOSTNAME}.
+    severity: crit
+    description: Hardware flash fault detected with new state {{value "viptelaHardwareNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1025,8 +1018,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.6
     name: VIPTELA-TRAPS::viptelaHardwareEmmcFault
     category: diagnostic
-    severity: err
-    description: Hardware EMMC fault detected with state {viptelaHardwareNewState} on {_HOSTNAME}.
+    severity: alert
+    description: Hardware eMMC fault detected with new state {{value "viptelaHardwareNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1035,8 +1028,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.7
     name: VIPTELA-TRAPS::viptelaHardwareSdcardFault
     category: diagnostic
-    severity: err
-    description: SD card fault detected with new state {viptelaHardwareNewState} on {_HOSTNAME}.
+    severity: crit
+    description: SD card fault detected on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1045,8 +1038,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.8
     name: VIPTELA-TRAPS::viptelaHardwareTempsensorFault
     category: diagnostic
-    severity: err
-    description: Hardware sensor {viptelaHardwareName} reported fault state {viptelaHardwareNewState} on {_HOSTNAME}.
+    severity: warning
+    description: Hardware sensor {{value "viptelaHardwareName"}} fault detected on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1059,7 +1052,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaHardwareTempsensorState
     category: diagnostic
     severity: warning
-    description: Hardware sensor {viptelaHardwareName} state changed to {viptelaHardwareSensorNewState} with temperature {viptelaHardwareTemp} on {_HOSTNAME}.
+    description: Hardware temperature sensor {{value "viptelaHardwareName"}} state changed to {{value "viptelaHardwareSensorNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1072,8 +1065,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.10
     name: VIPTELA-TRAPS::viptelaHardwareFanFault
     category: diagnostic
-    severity: err
-    description: Fan {viptelaHardwareFanId} in tray {viptelaHardwareFantrayId} reported fault state {viptelaHardwareNewState} on {_HOSTNAME}.
+    severity: crit
+    description: Hardware fan fault detected on fan {{value "viptelaHardwareFanId"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1084,8 +1077,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.11
     name: VIPTELA-TRAPS::viptelaHardwareFantrayFault
     category: diagnostic
-    severity: err
-    description: Fan tray {viptelaHardwareFantrayId} reported fault state {viptelaHardwareNewState} on {_HOSTNAME}.
+    severity: alert
+    description: Hardware fantray fault detected on {{first (value "viptelaHardwareFantrayId") "fantray"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1095,8 +1088,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.12
     name: VIPTELA-TRAPS::viptelaHardwarePemFault
     category: diagnostic
-    severity: err
-    description: Hardware PEM {viptelaHardwarePemId} faulted with state {viptelaHardwareNewState} on {_HOSTNAME}.
+    severity: crit
+    description: Hardware PEM fault detected on {{value "viptelaHardwarePemId"}} with state {{value "viptelaHardwareNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1107,7 +1100,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaHardwarePemStateChange
     category: diagnostic
     severity: warning
-    description: Hardware PEM {viptelaHardwarePemId} state changed to {viptelaHardwareNewState} on {_HOSTNAME}.
+    description: Hardware PEM {{value "viptelaHardwarePemId"}} state changed to {{value "viptelaHardwareNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1117,8 +1110,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.14
     name: VIPTELA-TRAPS::viptelaHardwarePimFault
     category: diagnostic
-    severity: err
-    description: PIM hardware fault {viptelaHardwarePimId} reported state {viptelaHardwareNewState} on {_HOSTNAME}.
+    severity: warning
+    description: Viptela hardware PIM fault detected on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1127,9 +1120,9 @@ traps:
       - viptelaHardwareNewState
   - oid: 1.3.6.1.4.1.41916.100.2.15
     name: VIPTELA-TRAPS::viptelaHardwarePimStateChange
-    category: diagnostic
-    severity: warning
-    description: PIM hardware {viptelaHardwarePimId} state changed to {viptelaHardwareNewState} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Viptela hardware PIM state changed to {{value "viptelaHardwareNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1140,7 +1133,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaHardwareSfpStateChange
     category: diagnostic
     severity: warning
-    description: SFP {viptelaHardwareSfpName} state changed to {viptelaHardwareNewState} on {_HOSTNAME}.
+    description: SFP {{value "viptelaHardwareSfpName"}} state changed to {{value "viptelaHardwareNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1151,7 +1144,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaHardwareUsbStateChange
     category: diagnostic
     severity: warning
-    description: USB state change to {viptelaHardwareNewState} on slot {viptelaHardwareUsbSlot} on {_HOSTNAME}.
+    description: USB state changed to {{value "viptelaHardwareNewState"}} on slot {{value "viptelaHardwareUsbSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1162,7 +1155,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaOmpOmpNumberOfVsmartsChange
     category: state_change
     severity: notice
-    description: Number of VSmart controllers changed to {viptelaOmpNumberOfVsmarts} on {_HOSTNAME}.
+    description: Number of VSmart controllers changed to {{value "viptelaOmpNumberOfVsmarts"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1172,7 +1165,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaOmpOmpStateChange
     category: state_change
     severity: notice
-    description: OMP state changed to {viptelaOmpNewState} on {_HOSTNAME}.
+    description: Viptela OMP state changed to {{value "viptelaOmpNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1182,7 +1175,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaOmpOmpPeerStateChange
     category: state_change
     severity: notice
-    description: OMP peer {viptelaOmpPeer} state changed to {viptelaOmpPeerNewState} on {_HOSTNAME}.
+    description: OMP peer {{value "viptelaOmpPeer"}} state changed to {{value "viptelaOmpPeerNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1193,7 +1186,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaOmpOmpTlocStateChange
     category: state_change
     severity: notice
-    description: OMP TLOC state changed for address family {viptelaOmpOmpAddressFamily} on {_HOSTNAME}.
+    description: Viptela OMP TLOC state changed{{with value "viptelaOmpOmpAddressFamily"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1203,7 +1196,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaOmpOmpPolicy
     category: state_change
     severity: notice
-    description: OMP policy {viptelaOmpPolicy} state changed on peer {viptelaOmpVsmartPeer} on {_HOSTNAME}.
+    description: Viptela OMP policy state changed to {{value "viptelaOmpPolicy"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1214,7 +1207,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSecurityControlConnectionStateChange
     category: state_change
     severity: notice
-    description: Security control connection state changed to {viptelaSecurityNewState} on {_HOSTNAME}.
+    description: Security control connection state changed to {{value "viptelaSecurityNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1233,7 +1226,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSecurityControlConnectionAuthFail
     category: auth
     severity: warning
-    description: Authentication failure on {viptelaSecurityPeerSystemIp} reason {viptelaSecurityReason} on {_HOSTNAME}.
+    description: 'Security control authentication failure{{with value "viptelaSecurityReason"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eventTime
@@ -1248,7 +1241,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSecurityControlVbondStateChange
     category: state_change
     severity: notice
-    description: Viptela security control {viptelaSecurityPersonality} state changed to {viptelaSecurityNewState} on {_HOSTNAME}.
+    description: Vbond state changed to {{value "viptelaSecurityNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1259,7 +1252,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSecurityControlConnectionTlocIpChange
     category: state_change
     severity: notice
-    description: Security control TLOC IP changed from {viptelaSecurityOldPublicIp}:{viptelaSecurityOldPublicPort} to {viptelaSecurityNewPublicIp}:{viptelaSecurityNewPublicPort} on {_HOSTNAME}.
+    description: Security control TLOC IP changed from {{value "viptelaSecurityOldPublicIp"}} to {{value "viptelaSecurityNewPublicIp"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1273,7 +1266,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSecurityControlNoActiveVsmart
     category: security
     severity: alert
-    description: No active vSmart controller for {viptelaSecurityPersonality} on {_HOSTNAME}.
+    description: No active vSmart controller detected{{with value "viptelaSecurityPersonality"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1283,7 +1276,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSecurityControlNoActiveVbond
     category: security
     severity: alert
-    description: No active vBond detected for {viptelaSecurityPersonality} on {_HOSTNAME}.
+    description: No active vBond detected for {{value "viptelaSecurityPersonality"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1291,9 +1284,9 @@ traps:
       - viptelaSecurityPersonality
   - oid: 1.3.6.1.4.1.41916.100.2.29
     name: VIPTELA-TRAPS::viptelaSecurityTunnelIpsecRekey
-    category: security
-    severity: warning
-    description: IPsec tunnel rekey event on {viptelaSecurityPersonality} with color {viptelaSecurityColor} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: IPsec tunnel rekeyed for {{value "viptelaSecurityPersonality"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1302,9 +1295,9 @@ traps:
       - viptelaSecurityColor
   - oid: 1.3.6.1.4.1.41916.100.2.30
     name: VIPTELA-TRAPS::viptelaSecurityTunnelIpsecManualRekey
-    category: state_change
+    category: security
     severity: notice
-    description: IPsec tunnel manual rekey initiated for {viptelaSecurityPersonality} on {_HOSTNAME}.
+    description: IPsec manual rekey triggered on {{value "viptelaSecurityPersonality"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1313,18 +1306,18 @@ traps:
       - viptelaSecurityColor
   - oid: 1.3.6.1.4.1.41916.100.2.31
     name: VIPTELA-TRAPS::viptelaSecuritySecurityRootCertChainInstalled
-    category: config_change
+    category: security
     severity: notice
-    description: Security root certificate chain installed on {_HOSTNAME}.
+    description: Security root certificate chain installed on {{hostname}}.
     status: current
     varbinds:
       - eventTime
       - netconfNotificationSeverity
   - oid: 1.3.6.1.4.1.41916.100.2.32
     name: VIPTELA-TRAPS::viptelaSecuritySecurityCertificateInstalled
-    category: config_change
+    category: security
     severity: notice
-    description: Security certificate installed on {_HOSTNAME}.
+    description: Security certificate installed on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1333,7 +1326,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSecuritySecurityNewCsrGenerated
     category: security
     severity: notice
-    description: New CSR generated for security on {_HOSTNAME}.
+    description: New CSR generated on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1342,7 +1335,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSecuritySecurityRootCertChainUninstalled
     category: security
     severity: alert
-    description: Root certificate chain uninstalled on {_HOSTNAME}.
+    description: Security root certificate chain uninstalled on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1351,25 +1344,25 @@ traps:
     name: VIPTELA-TRAPS::viptelaSecuritySecurityClearInstalledCertificate
     category: security
     severity: notice
-    description: Security certificate installed on {_HOSTNAME}.
+    description: Security clear installed certificate event detected on {{hostname}}.
     status: current
     varbinds:
       - eventTime
       - netconfNotificationSeverity
   - oid: 1.3.6.1.4.1.41916.100.2.36
     name: VIPTELA-TRAPS::viptelaSecuritySecurityVedgeSerialFileUploaded
-    category: config_change
+    category: security
     severity: notice
-    description: VEdge serial file uploaded on {_HOSTNAME}.
+    description: VEdge serial file uploaded on {{hostname}}.
     status: current
     varbinds:
       - eventTime
       - netconfNotificationSeverity
   - oid: 1.3.6.1.4.1.41916.100.2.37
     name: VIPTELA-TRAPS::viptelaSecuritySecurityVsmartSerialFileUploaded
-    category: config_change
+    category: security
     severity: notice
-    description: VSmart serial file uploaded on {_HOSTNAME}.
+    description: VSmart serial file uploaded on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1378,7 +1371,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSecuritySecurityVedgeEntryAdded
     category: security
     severity: notice
-    description: Security entry added with UUID {viptelaSecurityUuid} and serial {viptelaSecuritySerial} on {_HOSTNAME}.
+    description: VEdge security entry added with UUID {{value "viptelaSecurityUuid"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1389,7 +1382,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSecuritySecurityVedgeEntryRemoved
     category: security
     severity: notice
-    description: Security entry {viptelaSecurityUuid} removed on {_HOSTNAME}.
+    description: Security vEdge entry removed with UUID {{value "viptelaSecurityUuid"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1397,9 +1390,9 @@ traps:
       - viptelaSecurityUuid
   - oid: 1.3.6.1.4.1.41916.100.2.40
     name: VIPTELA-TRAPS::viptelaSecuritySecurityVsmartEntryAdded
-    category: config_change
+    category: security
     severity: notice
-    description: VSmart entry added for serial {viptelaSecuritySerial} on {_HOSTNAME}.
+    description: VSmart entry added to security policy on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1409,7 +1402,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSecuritySecurityVsmartEntryRemoved
     category: security
     severity: notice
-    description: VSmart entry removed for serial {viptelaSecuritySerial} on {_HOSTNAME}.
+    description: VSmart entry removed from security policy on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1419,7 +1412,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSystemProcessRestart
     category: diagnostic
     severity: warning
-    description: Process {viptelaSystemProcessName} restarted on {_HOSTNAME}.
+    description: System process {{value "viptelaSystemProcessName"}} restarted on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1431,7 +1424,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSystemDiskUsage
     category: diagnostic
     severity: warning
-    description: 'Disk usage warning: {viptelaSystemFreeMb}MB free of {viptelaSystemTotalMb}MB on {_HOSTNAME}.'
+    description: System disk usage warning on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1443,7 +1436,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSystemMemoryUsage
     category: diagnostic
     severity: warning
-    description: 'System memory warning: {viptelaSystemWarning} with {viptelaSystemFreeMb}MB free of {viptelaSystemTotalMb}MB on {_HOSTNAME}.'
+    description: 'System memory warning: {{value "viptelaSystemWarning"}} on {{hostname}}.'
     status: current
     varbinds:
       - eventTime
@@ -1453,9 +1446,9 @@ traps:
       - viptelaSystemFreeMb
   - oid: 1.3.6.1.4.1.41916.100.2.45
     name: VIPTELA-TRAPS::viptelaSystemAaaAdminPwdChange
-    category: auth
+    category: config_change
     severity: notice
-    description: Admin password changed on {_HOSTNAME}.
+    description: Viptela system AAA admin password changed on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1464,7 +1457,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSystemSiteIdChange
     category: config_change
     severity: notice
-    description: Site ID changed from {viptelaSystemOldSiteId} to {viptelaSystemNewSiteId} on {_HOSTNAME}.
+    description: System site ID changed from {{value "viptelaSystemOldSiteId"}} to {{value "viptelaSystemNewSiteId"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1475,7 +1468,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSystemDomainIdChange
     category: config_change
     severity: notice
-    description: System domain ID changed from {viptelaSystemOldDomainId} to {viptelaSystemNewDomainId} on {_HOSTNAME}.
+    description: System domain ID changed from {{value "viptelaSystemOldDomainId"}} to {{value "viptelaSystemNewDomainId"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1486,7 +1479,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSystemSystemIpChange
     category: state_change
     severity: notice
-    description: System IP changed from {viptelaSystemOldSystemIp} to {viptelaSystemNewSystemIp} on {_HOSTNAME}.
+    description: System IP changed from {{value "viptelaSystemOldSystemIp"}} to {{value "viptelaSystemNewSystemIp"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1497,7 +1490,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSystemOrgNameChange
     category: config_change
     severity: notice
-    description: Organization name changed from {viptelaSystemOldOrganizationName} to {viptelaSystemNewOrganizationName} on {_HOSTNAME}.
+    description: Organization name changed from {{value "viptelaSystemOldOrganizationName"}} to {{value "viptelaSystemNewOrganizationName"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1508,7 +1501,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSystemSystemLoginChange
     category: auth
     severity: notice
-    description: User {viptelaSystemUserName} login state changed on {_HOSTNAME}.
+    description: User {{value "viptelaSystemUserName"}} login state changed on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1519,7 +1512,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSystemSystemLogoutChange
     category: auth
     severity: notice
-    description: User {viptelaSystemUserName} logged out on {_HOSTNAME}.
+    description: User {{value "viptelaSystemUserName"}} logged out on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1530,7 +1523,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSystemSystemAaaLoginFail
     category: auth
     severity: warning
-    description: AAA login failure for user {viptelaSystemUserName} from {viptelaSystemRemoteHost} on {_HOSTNAME}.
+    description: AAA login failure for user {{value "viptelaSystemUserName"}} from {{value "viptelaSystemRemoteHost"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1541,7 +1534,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSystemSystemCommit
     category: config_change
     severity: notice
-    description: System configuration committed by {viptelaSystemUserName} on {_HOSTNAME}.
+    description: System configuration committed{{with value "viptelaSystemUserName"}} by {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1551,7 +1544,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaVpnBgpPeerStateChange
     category: state_change
     severity: warning
-    description: BGP peer {viptelaVpnPeer} state changed to {viptelaVpnBgpNewState} on {_HOSTNAME}.
+    description: BGP peer {{value "viptelaVpnPeer"}} state changed to {{value "viptelaVpnBgpNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1566,7 +1559,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaVpnInterfaceStateChange
     category: state_change
     severity: warning
-    description: VPN interface {viptelaVpnIfName} state changed to {viptelaVpnNewState} on {_HOSTNAME}.
+    description: VVPN interface {{value "viptelaVpnIfName"}} state changed to {{value "viptelaVpnNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1577,8 +1570,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.56
     name: VIPTELA-TRAPS::viptelaVpnVrrpGroupStateChange
     category: state_change
-    severity: notice
-    description: VRRP group {viptelaVpnGrpId} on interface {viptelaVpnIfName} changed state to {viptelaVpnVrrpGroupState} on {_HOSTNAME}.
+    severity: warning
+    description: VRRP group {{value "viptelaVpnGrpId"}} state changed to {{value "viptelaVpnVrrpGroupState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1589,9 +1582,9 @@ traps:
       - viptelaVpnVrrpGroupState
   - oid: 1.3.6.1.4.1.41916.100.2.57
     name: VIPTELA-TRAPS::viptelaVpnRouteInstallFail
-    category: diagnostic
-    severity: err
-    description: VPN route installation failed for {viptelaVpnIpPrefix} due to {viptelaVpnFailureReason} on {_HOSTNAME}.
+    category: state_change
+    severity: warning
+    description: VPN route installation failed for {{value "viptelaVpnIpPrefix"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1600,9 +1593,9 @@ traps:
       - viptelaVpnFailureReason
   - oid: 1.3.6.1.4.1.41916.100.2.58
     name: VIPTELA-TRAPS::viptelaVpnTunnelInstallFail
-    category: diagnostic
-    severity: err
-    description: Viptela VPN tunnel installation failed for {viptelaVpnFarEndSystemIp} with reason {viptelaVpnFailureReason} on {_HOSTNAME}.
+    category: state_change
+    severity: crit
+    description: 'Viptela VPN tunnel installation failed{{with value "viptelaVpnFailureReason"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eventTime
@@ -1612,9 +1605,9 @@ traps:
       - viptelaVpnFailureReason
   - oid: 1.3.6.1.4.1.41916.100.2.59
     name: VIPTELA-TRAPS::viptelaVpnDhcpAddressAssigned
-    category: state_change
-    severity: notice
-    description: DHCP address {viptelaVpnIp} assigned to client {viptelaVpnClientMac} on interface {viptelaVpnIfName} on {_HOSTNAME}.
+    category: mobility
+    severity: info
+    description: DHCP address {{value "viptelaVpnIp"}} assigned to client {{value "viptelaVpnClientMac"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1627,7 +1620,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaVpnDhcpAddressRenewed
     category: state_change
     severity: notice
-    description: DHCP address renewed for client {viptelaVpnClientMac} on interface {viptelaVpnIfName} on {_HOSTNAME}.
+    description: Viptela VPN DHCP address renewed for client {{value "viptelaVpnClientMac"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1640,7 +1633,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaVpnDhcpAddressReleased
     category: state_change
     severity: notice
-    description: DHCP address released for client {viptelaVpnClientMac} on interface {viptelaVpnIfName} on {_HOSTNAME}.
+    description: VPN DHCP address released for client {{value "viptelaVpnClientMac"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1654,7 +1647,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaVpnDhcpRequestRejected
     category: security
     severity: warning
-    description: DHCP request rejected for client {viptelaVpnClientMac} on interface {viptelaVpnIfName} with reason {viptelaVpnReason} on {_HOSTNAME}.
+    description: Viptela VPN DHCP request rejected for client {{value "viptelaVpnClientMac"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1668,7 +1661,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaVpnDhcpServerStateChange
     category: state_change
     severity: notice
-    description: VPN {viptelaVpnIfName} state changed to {viptelaVpnState} on {_HOSTNAME}.
+    description: Viptela VPN DHCP server state changed to {{value "viptelaVpnState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1680,7 +1673,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaVpnPimNeighborStateChange
     category: state_change
     severity: notice
-    description: PIM neighbor {viptelaVpnNeighbor} state changed to {viptelaVpnPimNewState} on {_HOSTNAME}.
+    description: PIM neighbor {{value "viptelaVpnNeighbor"}} state changed to {{value "viptelaVpnPimNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1692,7 +1685,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaVpnPimInterfaceStateChange
     category: state_change
     severity: notice
-    description: Vpn interface {viptelaVpnInterface} state changed to {viptelaVpnOperState} on {_HOSTNAME}.
+    description: Viptela VPN PIM interface state changed on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1706,7 +1699,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaVpnPimTunnelStateChange
     category: state_change
     severity: notice
-    description: PIM tunnel {viptelaVpnTunnelAddress} state changed to {viptelaVpnPimNewState} on {_HOSTNAME}.
+    description: Viptela PIM tunnel state changed to {{value "viptelaVpnPimNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1717,7 +1710,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaVpnOspfNeighborStateChange
     category: state_change
     severity: notice
-    description: OSPF neighbor {viptelaVpnNeighbor} state changed to {viptelaVpnOspfNewState} on {_HOSTNAME}.
+    description: OSPF neighbor {{value "viptelaVpnNeighbor"}} state changed to {{value "viptelaVpnOspfNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1731,7 +1724,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaVpnOspfInterfaceStateChange
     category: state_change
     severity: notice
-    description: OSPF interface {viptelaVpnInterface} on VPN {viptelaVpnVpnId} changed state to {viptelaVpnOspfInterfaceNewState} on {_HOSTNAME}.
+    description: OSPF interface {{value "viptelaVpnInterface"}} state changed to {{value "viptelaVpnOspfInterfaceNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1742,8 +1735,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.69
     name: VIPTELA-TRAPS::viptelaSystemPseudoCommitStatus
     category: state_change
-    severity: notice
-    description: System pseudo-commit status changed to {viptelaSystemStatusStr} on {_HOSTNAME}.
+    severity: warning
+    description: Viptela system pseudo-commit status changed to {{value "viptelaSystemStatusStr"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1753,7 +1746,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaAppRouteSlaChange
     category: state_change
     severity: notice
-    description: Application route SLA changed from {viptelaAppRouteOldSlaClasses} to {viptelaAppRouteSlaClasses} on {_HOSTNAME}.
+    description: Application route SLA changed from {{value "viptelaAppRouteOldSlaClasses"}} to {{value "viptelaAppRouteSlaClasses"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1775,8 +1768,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.71
     name: VIPTELA-TRAPS::viptelaSecuritySecurityCertificateExpired
     category: security
-    severity: warning
-    description: Security certificate expired on {_HOSTNAME}.
+    severity: alert
+    description: Security certificate expired on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1784,8 +1777,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.72
     name: VIPTELA-TRAPS::viptelaVpnFibStateChange
     category: state_change
-    severity: warning
-    description: Viptela VPN {viptelaVpnVpnId} FIB state changed on {_HOSTNAME}.
+    severity: notice
+    description: Viptela VPN FIB state changed for VPN {{value "viptelaVpnVpnId"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1797,7 +1790,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaBridgeCreation
     category: state_change
     severity: notice
-    description: Viptela bridge {viptelaBridgeId} creation event on {_HOSTNAME}.
+    description: Viptela bridge {{value "viptelaBridgeId"}} created on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1807,7 +1800,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaBridgeDeletion
     category: state_change
     severity: notice
-    description: Viptela bridge {viptelaBridgeId} was deleted on {_HOSTNAME}.
+    description: Viptela bridge {{value "viptelaBridgeId"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1815,9 +1808,9 @@ traps:
       - viptelaBridgeId
   - oid: 1.3.6.1.4.1.41916.100.2.75
     name: VIPTELA-TRAPS::viptelaBridgeMaxMacReached
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Bridge {viptelaBridgeId} reached maximum MAC limit of {viptelaNumMacs} on {_HOSTNAME}.
+    description: Bridge {{value "viptelaBridgeId"}} reached maximum MAC address limit on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1828,7 +1821,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSecurityControlVedgeListRequest
     category: security
     severity: notice
-    description: Security control list request from peer {viptelaSecurityPeerSystemIp} on {_HOSTNAME}.
+    description: Viptela security control vEdge list request received from {{value "viptelaSecurityPeerSystemIp"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1838,9 +1831,9 @@ traps:
       - viptelaSecurityUuid
   - oid: 1.3.6.1.4.1.41916.100.2.77
     name: VIPTELA-TRAPS::viptelaPolicySlaViolation
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: SLA violation detected for {viptelaPolicyApplication} on {_HOSTNAME}.
+    description: Policy SLA violation detected{{with value "viptelaPolicySlaStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1857,9 +1850,9 @@ traps:
       - viptelaPolicySlaStatus
   - oid: 1.3.6.1.4.1.41916.100.2.78
     name: VIPTELA-TRAPS::viptelaPolicySlaViolationPktDrop
-    category: security
+    category: state_change
     severity: warning
-    description: Policy SLA violation packet drop detected for {viptelaPolicyApplication} on {_HOSTNAME}.
+    description: Policy SLA violation packet drop detected{{with value "viptelaPolicySlaStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1877,8 +1870,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.79
     name: VIPTELA-TRAPS::viptelaVpnInterfacePcsFaultDetected
     category: state_change
-    severity: err
-    description: VPN interface {viptelaVpnIfName} fault detected with new state {viptelaVpnNewState} on {_HOSTNAME}.
+    severity: warning
+    description: Viptela VPN interface {{value "viptelaVpnIfName"}} fault detected on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1889,8 +1882,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.80
     name: VIPTELA-TRAPS::viptelaSystemAppDpiFlowsOutOfMemory
     category: diagnostic
-    severity: crit
-    description: DPI flows out of memory state {viptelaSystemDpiOutOfMemoryState} on {_HOSTNAME}.
+    severity: alert
+    description: DPI flows out of memory condition detected on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1899,8 +1892,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.81
     name: VIPTELA-TRAPS::viptelaSecurityGreStateUpdate
     category: state_change
-    severity: notice
-    description: GRE tunnel {viptelaSecurityGreIfName} state changed from {viptelaSecurityGreOldOperState} to {viptelaSecurityGreNewOperState} on {_HOSTNAME}.
+    severity: warning
+    description: GRE tunnel {{value "viptelaSecurityGreIfName"}} state changed from {{value "viptelaSecurityGreOldOperState"}} to {{value "viptelaSecurityGreNewOperState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1916,7 +1909,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaVpnInterfaceBw
     category: diagnostic
     severity: warning
-    description: VPN interface {viptelaVpnIfName} bandwidth threshold reached on {_HOSTNAME}.
+    description: Viptela VPN interface bandwidth alert on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1930,7 +1923,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaHardwareSfpSupportState
     category: diagnostic
     severity: warning
-    description: SFP {viptelaHardwareSfpName} state changed to {viptelaHardwareNewState} on {_HOSTNAME}.
+    description: SFP {{value "viptelaHardwareSfpName"}} state changed to {{value "viptelaHardwareNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1940,8 +1933,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.84
     name: VIPTELA-TRAPS::viptelaPolicyDataPolicyAssociationStatus
     category: state_change
-    severity: warning
-    description: Policy {viptelaPolicyName} status changed to {viptelaPolicyStatus} on {_HOSTNAME}.
+    severity: notice
+    description: Policy {{value "viptelaPolicyName"}} status changed to {{value "viptelaPolicyStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1953,7 +1946,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaPolicyAccessListAssociationStatus
     category: state_change
     severity: notice
-    description: Policy access list {viptelaPolicyAccessListName} status changed to {viptelaPolicyStatus} on {_HOSTNAME}.
+    description: Viptela policy access list {{value "viptelaPolicyAccessListName"}} status changed to {{value "viptelaPolicyStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1962,9 +1955,9 @@ traps:
       - viptelaPolicyStatus
   - oid: 1.3.6.1.4.1.41916.100.2.86
     name: VIPTELA-TRAPS::viptelaSecurityVmanageConnectionPreferenceChanged
-    category: state_change
+    category: config_change
     severity: notice
-    description: Vmanage connection preference changed to {viptelaSecurityVmanageConnectionPreference} on {_HOSTNAME}.
+    description: VManage connection preference changed to {{value "viptelaSecurityVmanageConnectionPreference"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1975,7 +1968,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaVpnCloudExpressMaxLocalExitExceeded
     category: diagnostic
     severity: warning
-    description: Local exit exceeded maximum threshold on {_HOSTNAME}.
+    description: Viptela VPN Cloud Express local exit capacity exceeded on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -1984,7 +1977,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaVpnCloudExpressApplicationChange
     category: state_change
     severity: notice
-    description: Cloud Express application {viptelaCloudExpressApplication} changed state on {_HOSTNAME}.
+    description: Cloud Express application changed for VPN {{value "viptelaVpnVpnId"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2000,9 +1993,9 @@ traps:
       - viptelaExitRemoteColor
   - oid: 1.3.6.1.4.1.41916.100.2.89
     name: VIPTELA-TRAPS::viptelaVpnCloudExpressScoreChange
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Viptela Cloud Express score changed for application {viptelaCloudExpressApplication} on {_HOSTNAME}.
+    description: Viptela Cloud Express score changed for VPN {{value "viptelaVpnVpnId"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2020,7 +2013,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaWwanSimStateChange
     category: state_change
     severity: notice
-    description: WWAN SIM state changed on slot {viptelaWwanSimSlot} to {viptelaWwanSimState} on {_HOSTNAME}.
+    description: WWAN SIM state changed to {{value "viptelaWwanSimState"}} on slot {{value "viptelaWwanSimSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2030,8 +2023,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.91
     name: VIPTELA-TRAPS::viptelaSystemAppDpiFlowsWriteFailedVedge
     category: diagnostic
-    severity: err
-    description: DPI flow write failure reported on {_HOSTNAME}.
+    severity: warning
+    description: DPI flows write failed on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2040,7 +2033,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaVpnInterfaceAdminStateChange
     category: state_change
     severity: notice
-    description: VPN interface {viptelaVpnIfName} administrative state changed to {viptelaVpnNewAdminState} on {_HOSTNAME}.
+    description: VPN interface {{value "viptelaVpnIfName"}} admin state changed to {{value "viptelaVpnNewAdminState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2052,7 +2045,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaWwanDomainStateChange
     category: state_change
     severity: notice
-    description: WWAN domain {viptelaWwanIfname} state changed to {viptelaWwanDomainState} on {_HOSTNAME}.
+    description: WWAN domain state changed to {{value "viptelaWwanDomainState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2063,7 +2056,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaWwanRegStateChange
     category: state_change
     severity: notice
-    description: WWAN interface {viptelaWwanIfname} registration state changed to {viptelaWwanRegState} on {_HOSTNAME}.
+    description: WWAN registration state changed to {{value "viptelaWwanRegState"}} on {{first (value "viptelaWwanIfname") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2074,7 +2067,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaWwanBearerChange
     category: state_change
     severity: notice
-    description: WWAN bearer state changed on interface {viptelaWwanIfname} on {_HOSTNAME}.
+    description: WWAN bearer changed on {{first (value "viptelaWwanIfname") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2085,7 +2078,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSystemProcessDown
     category: diagnostic
     severity: crit
-    description: 'System process {viptelaSystemProcessName} (ID {viptelaSystemProcessId}) is down: {viptelaSystemReason} on {_HOSTNAME}.'
+    description: System process {{value "viptelaSystemProcessName"}} is down on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2096,8 +2089,8 @@ traps:
   - oid: 1.3.6.1.4.1.41916.100.2.97
     name: VIPTELA-TRAPS::viptelaActionsSystemRebootAborted
     category: state_change
-    severity: notice
-    description: System reboot aborted with reason {viptelaActionsReason} on {_HOSTNAME}.
+    severity: warning
+    description: System reboot was aborted{{with value "viptelaActionsReason"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2107,7 +2100,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSecurityVbondRejectVedgeConnection
     category: security
     severity: alert
-    description: Vedge connection rejected by {viptelaSecurityOrganizationName} with reason {viptelaSecurityReason} on {_HOSTNAME}.
+    description: 'Vbond rejected VEdge connection{{with value "viptelaSecurityReason"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eventTime
@@ -2120,7 +2113,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSecurityDeviceTemplateMissing
     category: security
     severity: warning
-    description: Security device template missing for UUID {viptelaSecurityUuid} on {_HOSTNAME}.
+    description: Security device template missing for {{value "viptelaSecurityUuid"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2131,7 +2124,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaSecurityDeviceTemplateAttachedDuringZtp
     category: config_change
     severity: notice
-    description: Security device template attached during ZTP for {viptelaSecurityUuid} on {_HOSTNAME}.
+    description: Security device template attached during ZTP for {{value "viptelaSecurityUuid"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2142,7 +2135,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaPolicyZbfFlowCreation
     category: config_change
     severity: notice
-    description: ZBF flow created for zone pair {viptelaPolicyZonePair} on {_HOSTNAME}.
+    description: ZBF flow created for zone pair {{value "viptelaPolicyZonePair"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2159,9 +2152,9 @@ traps:
       - viptelaPolicyState
   - oid: 1.3.6.1.4.1.41916.100.2.102
     name: VIPTELA-TRAPS::viptelaPolicyZbfFlowDeletion
-    category: config_change
+    category: security
     severity: notice
-    description: ZBF flow policy deleted for zone pair {viptelaPolicyZonePair} on {_HOSTNAME}.
+    description: ZBF flow deletion event for zone pair {{value "viptelaPolicyZonePair"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2180,7 +2173,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaPolicyZbfFlowTableFull
     category: diagnostic
     severity: warning
-    description: 'Flow table full: current {viptelaPolicyCurrFlows} flows exceeded high threshold {viptelaPolicyHthreshFlows} on {_HOSTNAME}.'
+    description: Policy zone-based firewall flow table is full on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2192,7 +2185,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaPolicyZbfClearFlowTableFull
     category: diagnostic
     severity: warning
-    description: Flow table full with {viptelaPolicyCurrFlows} flows on {_HOSTNAME}.
+    description: ZBF flow table full threshold reached with {{value "viptelaPolicyCurrFlows"}} current flows on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2204,7 +2197,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaPolicyZbfPktLog
     category: security
     severity: warning
-    description: Policy zone pair {viptelaPolicyZonePair} action {viptelaPolicyAction} on {viptelaPolicyProtocol} from {viptelaPolicySourceIp} on {_HOSTNAME}.
+    description: Policy zone pair {{value "viptelaPolicyZonePair"}} action {{value "viptelaPolicyAction"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2221,9 +2214,9 @@ traps:
       - viptelaPolicyAction
   - oid: 1.3.6.1.4.1.41916.100.2.106
     name: VIPTELA-TRAPS::viptelaPolicyZbfHalfOpenHit
-    category: security
+    category: diagnostic
     severity: warning
-    description: Half-open connection hit threshold {viptelaPolicyCurrHalfOpenFlows} on {_HOSTNAME}.
+    description: Half-open flow threshold hit with {{value "viptelaPolicyCurrHalfOpenFlows"}} current flows on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2235,7 +2228,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaPolicyZbfClearHalfOpenHit
     category: diagnostic
     severity: warning
-    description: Half-open flow count {viptelaPolicyCurrHalfOpenFlows} exceeded threshold {viptelaPolicyLthreshHalfOpenFlows} on {_HOSTNAME}.
+    description: Half-open hit cleared for policy {{value "viptelaPolicyCurrHalfOpenFlows"}} flows on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2247,7 +2240,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaPolicySlaConfig
     category: config_change
     severity: notice
-    description: SLA configuration {viptelaPolicySlaOperation} for {viptelaPolicySlaName} on {_HOSTNAME}.
+    description: Viptela SLA configuration {{value "viptelaPolicySlaOperation"}} for {{value "viptelaPolicySlaName"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2261,7 +2254,7 @@ traps:
     name: VIPTELA-TRAPS::viptelaVpnLastResortStateChange
     category: state_change
     severity: notice
-    description: VPN {viptelaVpnVpnId} interface {viptelaVpnIfName} last resort state changed to {viptelaVpnNewState} on {_HOSTNAME}.
+    description: VVPN {{value "viptelaVpnVpnId"}} state changed to {{value "viptelaVpnNewState"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
@@ -2270,47 +2263,13 @@ traps:
       - viptelaVpnIfName
       - viptelaVpnNewState
   - oid: 1.3.6.1.4.1.41916.100.2.110
-    name: VIPTELA-TRAPS::viptelaPolicyDevicePolicyAssociationStatus
-    category: state_change
-    severity: notice
-    description: Policy {viptelaPolicyDevicePolicyName} status changed to {viptelaPolicyStatus} on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - eventTime
-      - netconfNotificationSeverity
-      - viptelaPolicyDevicePolicyName
-      - viptelaPolicyStatus
-  - oid: 1.3.6.1.4.1.41916.100.2.111
     name: VIPTELA-TRAPS::viptelaWwanQosStateChange
     category: state_change
     severity: notice
-    description: WWAN QoS state changed to {viptelaWwanQosState} on interface {viptelaWwanIfname} on {_HOSTNAME}.
+    description: WWAN QoS state changed to {{value "viptelaWwanQosState"}} on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - eventTime
       - netconfNotificationSeverity
       - viptelaWwanIfname
       - viptelaWwanQosState
-  - oid: 1.3.6.1.4.1.41916.100.2.112
-    name: VIPTELA-TRAPS::viptelaCdbUnlocked
-    category: security
-    severity: warning
-    description: Security context unlocked on {viptelaSecurityPersonality} on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - eventTime
-      - netconfNotificationSeverity
-      - viptelaSecurityPersonality
-  - oid: 1.3.6.1.4.1.41916.100.2.113
-    name: VIPTELA-TRAPS::viptelaSecuritySecurityUnclaimedVedgeEntryAdded
-    category: security
-    severity: notice
-    description: Unclaimed vEdge entry added with UUID {viptelaSecurityUuid} on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - eventTime
-      - netconfNotificationSeverity
-      - viptelaSecurityUuid
-      - viptelaSecuritySerial
-      - viptelaSecuritySubjectSerialNumber
-      - viptelaSecurityOrganizationName

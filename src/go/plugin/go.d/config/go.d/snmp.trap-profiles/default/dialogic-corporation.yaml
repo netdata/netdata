@@ -58,7 +58,7 @@ traps:
     name: DLGHWINF-MIB::dlgHiServiceChanged
     category: state_change
     severity: notice
-    description: Dialogic service status changed to {dlgHiIdentServiceStatus} on {_HOSTNAME}.
+    description: Dialogic service status changed to {{value "dlgHiIdentServiceStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -66,8 +66,8 @@ traps:
   - oid: 1.3.6.1.4.1.3028.0.1002
     name: DLGHWINF-MIB::dlgHiCardStatusChanged
     category: diagnostic
-    severity: err
-    description: Dialogic card {dlgHiIdentIndex} operational status changed to {dlgHiIdentOperStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Dialogic card {{value "dlgHiIdentModel"}} status changed to {{value "dlgHiIdentOperStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - sysName

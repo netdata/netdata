@@ -9,371 +9,371 @@ traps:
     name: PROBE-MIB::probeTemperatureOver
     category: diagnostic
     severity: warning
-    description: Temperature probe threshold exceeded on {_HOSTNAME}.
+    description: Probe temperature exceeded threshold on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.2
     name: PROBE-MIB::probeTemperatureDown
     category: diagnostic
     severity: warning
-    description: Temperature probe reported down state on {_HOSTNAME}.
+    description: Temperature probe is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.3
     name: PROBE-MIB::probeTemperatureNormal
     category: diagnostic
     severity: notice
-    description: Temperature probe returned to normal state on {_HOSTNAME}.
+    description: Probe temperature returned to normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.4
     name: PROBE-MIB::probeHumidityOver
     category: diagnostic
     severity: warning
-    description: Humidity probe detected over-threshold condition on {_HOSTNAME}.
+    description: Humidity probe threshold exceeded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.5
     name: PROBE-MIB::probeHumidityDown
     category: diagnostic
     severity: warning
-    description: Humidity probe reported down state on {_HOSTNAME}.
+    description: Humidity probe is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.6
     name: PROBE-MIB::probeHumidityNormal
     category: diagnostic
     severity: info
-    description: Humidity probe status is normal on {_HOSTNAME}.
+    description: Humidity probe returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.7
     name: PROBE-MIB::analogInputGroup1Over
     category: diagnostic
     severity: warning
-    description: Analog input group 1 over-range condition detected on {_HOSTNAME}.
+    description: Analog input group 1 is over its limit on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.8
     name: PROBE-MIB::analogInputGroup1Down
     category: diagnostic
-    severity: warning
-    description: Analog input group 1 is down on {_HOSTNAME}.
+    severity: crit
+    description: Analog input group 1 is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.9
     name: PROBE-MIB::analogInputGroup1Normal
-    category: diagnostic
-    severity: info
-    description: Analog input group 1 status normal on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Analog input group 1 returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.10
     name: PROBE-MIB::analogInputGroup2Over
     category: diagnostic
-    severity: warning
-    description: Analog input group 2 over threshold detected on {_HOSTNAME}.
+    severity: alert
+    description: Analog input group 2 over-range condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.11
     name: PROBE-MIB::analogInputGroup2Down
     category: diagnostic
-    severity: warning
-    description: Analog input group reported down state on {_HOSTNAME}.
+    severity: alert
+    description: Analog input group 2 is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.12
     name: PROBE-MIB::analogInputGroup2Normal
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Analog input group 2 returned to normal state on {_HOSTNAME}.
+    description: Analog input group 2 returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.13
     name: PROBE-MIB::analogInputGroup3Over
     category: diagnostic
     severity: warning
-    description: Analog input group 3 over threshold detected on {_HOSTNAME}.
+    description: Analog input group 3 over threshold detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.14
     name: PROBE-MIB::analogInputGroup3Down
     category: diagnostic
-    severity: err
-    description: Analog input group 3 reported down state on {_HOSTNAME}.
+    severity: alert
+    description: Analog input group 3 is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.15
     name: PROBE-MIB::analogInputGroup3Normal
     category: diagnostic
-    severity: info
-    description: Analog input group 3 status reported as normal on {_HOSTNAME}.
+    severity: notice
+    description: Analog input group 3 returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.16
     name: PROBE-MIB::analogInputGroup4Over
     category: diagnostic
     severity: warning
-    description: Analog input group 4 exceeded operational threshold on {_HOSTNAME}.
+    description: Analog input group 4 exceeded operational limits on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.17
     name: PROBE-MIB::analogInputGroup4Down
     category: diagnostic
-    severity: warning
-    description: Analog input group 4 reported down state on {_HOSTNAME}.
+    severity: crit
+    description: Analog input group 4 is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.18
     name: PROBE-MIB::analogInputGroup4Normal
     category: diagnostic
     severity: notice
-    description: Analog input group 4 status normal on {_HOSTNAME}.
+    description: Analog input group 4 returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.19
     name: PROBE-MIB::analogInputGroup5Over
     category: diagnostic
-    severity: warning
-    description: Analog input group 5 over-range condition detected on {_HOSTNAME}.
+    severity: alert
+    description: Analog input group 5 over condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.20
     name: PROBE-MIB::analogInputGroup5Down
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Analog input group 5 went down on {_HOSTNAME}.
+    description: Analog input group 5 went down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.21
     name: PROBE-MIB::analogInputGroup5Normal
     category: diagnostic
-    severity: info
-    description: Analog input group 5 normal status reported on {_HOSTNAME}.
+    severity: notice
+    description: Analog input group 5 returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.22
     name: PROBE-MIB::analogInputGroup6Over
     category: diagnostic
     severity: warning
-    description: Analog input group 6 over threshold detected on {_HOSTNAME}.
+    description: Analog input group 6 over threshold detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.23
     name: PROBE-MIB::analogInputGroup6Down
     category: diagnostic
     severity: warning
-    description: Analog input group 6 reported down state on {_HOSTNAME}.
+    description: Analog input group 6 is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.24
     name: PROBE-MIB::analogInputGroup6Normal
     category: diagnostic
     severity: notice
-    description: Analog input group 6 normal status reported on {_HOSTNAME}.
+    description: Analog input group 6 normal status reported on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.25
     name: PROBE-MIB::analogInputGroup7Over
     category: diagnostic
-    severity: warning
-    description: Analog input group 7 over-range condition detected on {_HOSTNAME}.
+    severity: alert
+    description: Analog input group 7 over threshold detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.26
     name: PROBE-MIB::analogInputGroup7Down
-    category: state_change
-    severity: warning
-    description: Analog input group 7 went down on {_HOSTNAME}.
+    category: diagnostic
+    severity: alert
+    description: Analog input group 7 is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.27
     name: PROBE-MIB::analogInputGroup7Normal
     category: diagnostic
     severity: notice
-    description: Analog input group 7 reported normal status on {_HOSTNAME}.
+    description: Analog input group 7 returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.28
     name: PROBE-MIB::analogInputGroup8Over
     category: diagnostic
-    severity: warning
-    description: Analog input group 8 over-range condition detected on {_HOSTNAME}.
+    severity: alert
+    description: Analog input group 8 over threshold detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.29
     name: PROBE-MIB::analogInputGroup8Down
     category: diagnostic
-    severity: warning
-    description: Analog input group 8 reported down on {_HOSTNAME}.
+    severity: crit
+    description: Analog input group 8 is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.30
     name: PROBE-MIB::analogInputGroup8Normal
     category: diagnostic
-    severity: notice
-    description: Analog input group 8 normal status reported on {_HOSTNAME}.
+    severity: info
+    description: Analog input group 8 is in normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.31
     name: PROBE-MIB::differentialSignalInputBipolarGroup1Over
     category: diagnostic
-    severity: warning
-    description: Differential signal input bipolar group 1 over threshold detected on {_HOSTNAME}.
+    severity: crit
+    description: Differential signal input bipolar group 1 over detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.32
     name: PROBE-MIB::differentialSignalInputBipolarGroup1Down
     category: diagnostic
-    severity: warning
-    description: Differential signal input bipolar group 1 is down on {_HOSTNAME}.
+    severity: crit
+    description: Differential signal input bipolar group 1 is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.33
     name: PROBE-MIB::differentialSignalInputBipolarGroup1Normal
     category: diagnostic
-    severity: info
-    description: Differential signal input bipolar group 1 status reported on {_HOSTNAME}.
+    severity: notice
+    description: Differential signal input bipolar group 1 is normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.34
     name: PROBE-MIB::differentialSignalInputBipolarGroup2Over
     category: diagnostic
-    severity: warning
-    description: Differential signal input bipolar group 2 over condition detected on {_HOSTNAME}.
+    severity: crit
+    description: Differential signal input bipolar group 2 over detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.35
     name: PROBE-MIB::differentialSignalInputBipolarGroup2Down
-    category: state_change
-    severity: warning
-    description: Differential signal input bipolar group 2 went down on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: Differential signal input bipolar group 2 is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.36
     name: PROBE-MIB::differentialSignalInputBipolarGroup2Normal
     category: diagnostic
     severity: notice
-    description: Differential signal input bipolar group 2 status normal on {_HOSTNAME}.
+    description: Differential signal input bipolar group 2 returned to normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.37
     name: PROBE-MIB::differentialSignalInputBipolarGroup3Over
     category: diagnostic
-    severity: warning
-    description: Differential signal input bipolar group 3 over detected on {_HOSTNAME}.
+    severity: crit
+    description: Differential signal input bipolar group 3 over condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.38
     name: PROBE-MIB::differentialSignalInputBipolarGroup3Down
     category: diagnostic
     severity: crit
-    description: Differential signal input bipolar group 3 is down on {_HOSTNAME}.
+    description: Differential signal input bipolar group 3 is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.39
     name: PROBE-MIB::differentialSignalInputBipolarGroup3Normal
     category: diagnostic
     severity: notice
-    description: Differential signal input bipolar group 3 status normal on {_HOSTNAME}.
+    description: Differential signal input bipolar group 3 is normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.40
     name: PROBE-MIB::differentialSignalInputBipolarGroup4Over
     category: diagnostic
     severity: crit
-    description: Differential signal input group 4 bipolar over condition detected on {_HOSTNAME}.
+    description: Differential signal input bipolar group 4 over detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.41
     name: PROBE-MIB::differentialSignalInputBipolarGroup4Down
-    category: state_change
-    severity: warning
-    description: Differential signal input bipolar group 4 went down on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: Differential signal input bipolar group 4 is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.42
     name: PROBE-MIB::differentialSignalInputBipolarGroup4Normal
-    category: unknown
-    severity: info
-    description: Trap {TRAP_NAME} received on {_HOSTNAME}.
+    category: diagnostic
+    severity: notice
+    description: Differential signal input bipolar group 4 is normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.43
     name: PROBE-MIB::differentialSignalInputUnipolarGroup1Over
     category: diagnostic
     severity: warning
-    description: Differential signal input group 1 over threshold detected on {_HOSTNAME}.
+    description: Differential signal input unipolar group 1 over condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.44
     name: PROBE-MIB::differentialSignalInputUnipolarGroup1Down
-    category: state_change
-    severity: warning
-    description: Differential signal input group 1 is down on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: Differential signal input group 1 is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.45
     name: PROBE-MIB::differentialSignalInputUnipolarGroup1Normal
     category: diagnostic
     severity: notice
-    description: Differential signal input group 1 status normal on {_HOSTNAME}.
+    description: Differential signal input unipolar group 1 is normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.46
     name: PROBE-MIB::differentialSignalInputUnipolarGroup2Over
     category: diagnostic
-    severity: warning
-    description: Differential signal input group 2 over condition detected on {_HOSTNAME}.
+    severity: crit
+    description: Differential signal input unipolar group 2 over detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.47
     name: PROBE-MIB::differentialSignalInputUnipolarGroup2Down
     category: diagnostic
-    severity: err
-    description: Differential signal input group 2 is down on {_HOSTNAME}.
+    severity: warning
+    description: Differential signal input unipolar group 2 is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.48
     name: PROBE-MIB::differentialSignalInputUnipolarGroup2Normal
-    category: unknown
-    severity: warning
-    description: Trap {TRAP_NAME} received with no varbind context on {_HOSTNAME}.
+    category: diagnostic
+    severity: notice
+    description: Differential signal input unipolar group 2 is normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.49
     name: PROBE-MIB::differentialSignalInputUnipolarGroup3Over
     category: diagnostic
-    severity: warning
-    description: Differential signal input group 3 over threshold detected on {_HOSTNAME}.
+    severity: crit
+    description: Differential signal input unipolar group 3 over condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.50
     name: PROBE-MIB::differentialSignalInputUnipolarGroup3Down
     category: diagnostic
-    severity: warning
-    description: Differential signal input group 3 is down on {_HOSTNAME}.
+    severity: crit
+    description: Differential signal input unipolar group 3 is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.51
     name: PROBE-MIB::differentialSignalInputUnipolarGroup3Normal
     category: diagnostic
     severity: notice
-    description: Differential signal input group 3 status changed on {_HOSTNAME}.
+    description: Differential signal input unipolar group 3 returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.52
     name: PROBE-MIB::differentialSignalInputUnipolarGroup4Over
     category: diagnostic
-    severity: warning
-    description: Differential signal input group 4 over threshold detected on {_HOSTNAME}.
+    severity: crit
+    description: Differential signal input unipolar group 4 over detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.53
     name: PROBE-MIB::differentialSignalInputUnipolarGroup4Down
     category: diagnostic
-    severity: warning
-    description: Differential signal input group 4 is down on {_HOSTNAME}.
+    severity: crit
+    description: Differential signal input unipolar group 4 is down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.54
     name: PROBE-MIB::differentialSignalInputUnipolarGroup4Normal
     category: diagnostic
     severity: notice
-    description: Differential signal input group 4 status changed on {_HOSTNAME}.
+    description: Differential signal input unipolar group 4 is normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.55
     name: PROBE-MIB::contactClosureInputGroup1Open
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Contact closure input group 1 state changed to open on {_HOSTNAME}.
+    description: Contact closure input group 1 is open on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.56
     name: PROBE-MIB::contactClosureInputGroup1Close
     category: state_change
     severity: notice
-    description: Contact closure group 1 closed on {_HOSTNAME}.
+    description: Contact closure input group 1 closed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.57
     name: PROBE-MIB::contactClosureInputGroup2Open
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Contact closure input group 2 state changed to open on {_HOSTNAME}.
+    description: Contact closure input group 2 is open on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.58
     name: PROBE-MIB::contactClosureInputGroup2Close
     category: state_change
     severity: notice
-    description: Contact closure input group 2 closed on {_HOSTNAME}.
+    description: Contact closure input group 2 closed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.59
     name: PROBE-MIB::contactClosureInputGroup3Open
     category: state_change
-    severity: notice
-    description: Contact closure input group 3 state changed to open on {_HOSTNAME}.
+    severity: warning
+    description: Contact closure input group 3 is open on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.60
     name: PROBE-MIB::contactClosureInputGroup3Close
     category: state_change
     severity: notice
-    description: Contact closure group 3 state changed to closed on {_HOSTNAME}.
+    description: Contact closure input group 3 closed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.61
     name: PROBE-MIB::contactClosureInputGroup4Open
     category: diagnostic
     severity: warning
-    description: Contact closure input group 4 triggered open state on {_HOSTNAME}.
+    description: Contact closure input group 4 is open on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13409.1.3.62
     name: PROBE-MIB::contactClosureInputGroup4Close
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Contact closure group 4 closed on {_HOSTNAME}.
+    description: Contact closure input group 4 closed on {{hostname}}.
     status: current

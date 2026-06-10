@@ -163,8 +163,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.1
     name: AcBoard::acBoardFatalError
     category: diagnostic
-    severity: alert
-    description: Board fatal error reported on {_HOSTNAME}.
+    severity: crit
+    description: Board fatal error detected on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -181,8 +181,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.2
     name: AcBoard::acBoardConfigurationError
     category: diagnostic
-    severity: err
-    description: Configuration error detected with probable cause {acBoardTrapGlobalsProbableCause} on {_HOSTNAME}.
+    severity: warning
+    description: 'Configuration error detected{{with value "acBoardTrapGlobalsTextualDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -199,8 +199,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.3
     name: AcBoard::acBoardTemperatureAlarm
     category: diagnostic
-    severity: err
-    description: Temperature alarm triggered on {acBoardTrapGlobalsSource} with severity {acBoardTrapGlobalsSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: Temperature alarm triggered on {{first (value "acBoardTrapGlobalsSource") "board"}} on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -216,9 +216,9 @@ traps:
       - acBoardTrapGlobalsDateAndTime
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.4
     name: AcBoard::acBoardEvBoardStarted
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Board initialization ended on {_HOSTNAME}.
+    description: Board initialization ended on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -234,9 +234,9 @@ traps:
       - acBoardTrapGlobalsDateAndTime
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.5
     name: AcBoard::acBoardEvResettingBoard
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Board reset process initiated on {_HOSTNAME}.
+    description: Board reset process started following software reset on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -253,8 +253,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.6
     name: AcBoard::acFeatureKeyError
     category: diagnostic
-    severity: err
-    description: Feature key error reported with probable cause {acBoardTrapGlobalsProbableCause} on {_HOSTNAME}.
+    severity: warning
+    description: 'Feature key error detected{{with value "acBoardTrapGlobalsTextualDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -272,7 +272,7 @@ traps:
     name: AcBoard::acgwAdminStateChange
     category: state_change
     severity: notice
-    description: Administrative state of gateway {acBoardTrapGlobalsSource} changed on {_HOSTNAME}.
+    description: Administrative state of the gateway changed on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -290,7 +290,7 @@ traps:
     name: AcBoard::acBoardCallResourcesAlarm
     category: diagnostic
     severity: crit
-    description: No free channels available on {_HOSTNAME}.
+    description: No free channels available on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -308,7 +308,7 @@ traps:
     name: AcBoard::acBoardControllerFailureAlarm
     category: diagnostic
     severity: crit
-    description: Board controller failure alarm triggered with probable cause {acBoardTrapGlobalsProbableCause} on {_HOSTNAME}.
+    description: Board controller failure alarm on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -326,7 +326,7 @@ traps:
     name: AcBoard::acBoardEthernetLinkAlarm
     category: state_change
     severity: crit
-    description: Ethernet link down on {acBoardTrapGlobalsSource} on {_HOSTNAME}.
+    description: Ethernet link is down on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -343,8 +343,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.11
     name: AcBoard::acBoardOverloadAlarm
     category: diagnostic
-    severity: warning
-    description: System component overload detected on {_HOSTNAME}.
+    severity: crit
+    description: System component overload detected on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -361,8 +361,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.12
     name: AcBoard::acActiveAlarmTableOverflow
     category: diagnostic
-    severity: warning
-    description: Active alarm table overflow detected on {_HOSTNAME}.
+    severity: crit
+    description: Active alarm table overflow detected; alarms may be lost on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -380,7 +380,7 @@ traps:
     name: AcBoard::acAtmPortAlarm
     category: diagnostic
     severity: warning
-    description: ATM port alarm {acBoardTrapGlobalsTextualDescription} with severity {acBoardTrapGlobalsSeverity} on {_HOSTNAME}.
+    description: ATM port alarm {{value "acBoardTrapGlobalsTextualDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -398,7 +398,7 @@ traps:
     name: AcBoard::acAudioProvisioningAlarm
     category: diagnostic
     severity: crit
-    description: Audio provisioning failed on {_HOSTNAME}.
+    description: Audio provisioning alarm raised on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -416,7 +416,7 @@ traps:
     name: AcBoard::acOperationalStateChange
     category: state_change
     severity: warning
-    description: Node operational state changed to disabled on {_HOSTNAME}.
+    description: Node operational state changed to disabled on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -434,7 +434,7 @@ traps:
     name: AcBoard::acKeepAlive
     category: diagnostic
     severity: info
-    description: NAT Traversal keep alive detected from {acBoardTrapGlobalsAdditionalInfo1} on {_HOSTNAME}.
+    description: NAT traversal keep alive received on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -452,7 +452,7 @@ traps:
     name: AcBoard::acNATTraversalAlarm
     category: diagnostic
     severity: warning
-    description: Symmetric NAT detected by {acBoardTrapGlobalsSource} on {_HOSTNAME}.
+    description: Symmetric NAT detected on {{first (value "acBoardTrapGlobalsSource") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -470,7 +470,7 @@ traps:
     name: AcBoard::acEnhancedBITStatus
     category: diagnostic
     severity: warning
-    description: Built-in test status reported for {acBoardTrapGlobalsSource} with severity {acBoardTrapGlobalsSeverity} on {_HOSTNAME}.
+    description: 'BIT status report received{{with value "acBoardTrapGlobalsTextualDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -488,7 +488,7 @@ traps:
     name: AcBoard::acSS7LinkStateChangeAlarm
     category: state_change
     severity: warning
-    description: SS7 link operational state changed to {acBoardTrapGlobalsTextualDescription} on {_HOSTNAME}.
+    description: SS7 link state changed to {{value "acBoardTrapGlobalsTextualDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -506,7 +506,7 @@ traps:
     name: AcBoard::acSS7LinkInhibitStateChangeAlarm
     category: state_change
     severity: warning
-    description: SS7 link inhibited state changed on {_HOSTNAME}.
+    description: SS7 link inhibited on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -524,7 +524,7 @@ traps:
     name: AcBoard::acSS7LinkBlockStateChangeAlarm
     category: state_change
     severity: warning
-    description: SS7 link blocked state change detected on {_HOSTNAME}.
+    description: SS7 link blocked on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -540,9 +540,9 @@ traps:
       - acBoardTrapGlobalsDateAndTime
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.22
     name: AcBoard::acSS7LinkCongestionStateChangeAlarm
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: SS7 link congestion detected on {_HOSTNAME}.
+    description: SS7 link congestion state changed on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -560,7 +560,7 @@ traps:
     name: AcBoard::acSS7LinkSetStateChangeAlarm
     category: state_change
     severity: warning
-    description: SS7 linkset {acBoardTrapGlobalsName} became BUSY on {_HOSTNAME}.
+    description: SS7 linkset state changed to BUSY on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -578,7 +578,7 @@ traps:
     name: AcBoard::acSS7RouteSetStateChangeAlarm
     category: state_change
     severity: warning
-    description: SS7 routeset operational state changed to BUSY on {_HOSTNAME}.
+    description: SS7 routeset state changed to BUSY on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -596,7 +596,7 @@ traps:
     name: AcBoard::acSS7SNSetStateChangeAlarm
     category: state_change
     severity: warning
-    description: SS7 node {acBoardTrapGlobalsName} operational state changed to BUSY on {_HOSTNAME}.
+    description: SS7 node state changed to BUSY on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -613,8 +613,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.26
     name: AcBoard::acSS7RedundancyAlarm
     category: state_change
-    severity: warning
-    description: SS7 redundancy degraded on {_HOSTNAME}.
+    severity: alert
+    description: SS7 redundancy degraded on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -632,7 +632,7 @@ traps:
     name: AcBoard::acPerformanceMonitoringThresholdCrossing
     category: diagnostic
     severity: warning
-    description: Performance threshold crossed for {acBoardTrapGlobalsSource} with severity {acBoardTrapGlobalsSeverity} on {_HOSTNAME}.
+    description: Performance threshold crossed for {{value "acBoardTrapGlobalsSource"}} on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -650,7 +650,7 @@ traps:
     name: AcBoard::acHTTPDownloadResult
     category: diagnostic
     severity: warning
-    description: HTTP download result reported with severity {acBoardTrapGlobalsSeverity} on {_HOSTNAME}.
+    description: 'HTTP file download result reported{{with value "acBoardTrapGlobalsTextualDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -667,8 +667,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.29
     name: AcBoard::acFanTrayAlarm
     category: diagnostic
-    severity: err
-    description: Fan tray alarm reported on {_HOSTNAME}.
+    severity: warning
+    description: 'Fan tray alarm detected{{with value "acBoardTrapGlobalsTextualDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -685,8 +685,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.30
     name: AcBoard::acPowerSupplyAlarm
     category: diagnostic
-    severity: err
-    description: Power supply unit reported faulty status on {_HOSTNAME}.
+    severity: crit
+    description: Power supply unit fault detected on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -704,7 +704,7 @@ traps:
     name: AcBoard::acPEMAlarm
     category: diagnostic
     severity: crit
-    description: HA PEM alarm with severity {acBoardTrapGlobalsSeverity} reported on {_HOSTNAME}.
+    description: HA PEM alarm raised{{with value "acBoardTrapGlobalsProbableCause"}} cause {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -721,8 +721,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.32
     name: AcBoard::acSAMissingAlarm
     category: diagnostic
-    severity: alert
-    description: SA module missing alarm on {_HOSTNAME}.
+    severity: crit
+    description: SA module is missing on {{first (value "acBoardTrapGlobalsSource") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -738,9 +738,9 @@ traps:
       - acBoardTrapGlobalsDateAndTime
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.33
     name: AcBoard::acHASystemFaultAlarm
-    category: diagnostic
+    category: state_change
     severity: crit
-    description: HA system fault detected with severity {acBoardTrapGlobalsSeverity} on {_HOSTNAME}.
+    description: HA system fault detected, redundancy is lost on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -758,7 +758,7 @@ traps:
     name: AcBoard::acHASystemConfigMismatchAlarm
     category: config_change
     severity: warning
-    description: HA configuration mismatch detected, system usability may be affected on {_HOSTNAME}.
+    description: HA configuration mismatch detected, potentially impacting high availability on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -775,8 +775,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.35
     name: AcBoard::acHASystemSwitchOverAlarm
     category: state_change
-    severity: crit
-    description: HA switchover due to failure or reset on {_HOSTNAME}.
+    severity: alert
+    description: HA switchover occurred due to failure or reset on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -794,7 +794,7 @@ traps:
     name: AcBoard::acUserInputAlarm
     category: diagnostic
     severity: warning
-    description: Input dry contact short circuit alarm detected on {_HOSTNAME}.
+    description: Input dry contact short circuit alarm on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -812,7 +812,7 @@ traps:
     name: AcBoard::acDChannelStatus
     category: state_change
     severity: notice
-    description: LAPD link status changed to {acBoardTrapGlobalsTextualDescription} on {_HOSTNAME}.
+    description: D-channel {{value "acBoardTrapGlobalsTextualDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -830,7 +830,7 @@ traps:
     name: AcBoard::acSonetSectionLOFAlarm
     category: diagnostic
     severity: crit
-    description: SONET section Loss of Frame alarm reported on {_HOSTNAME}.
+    description: SONET section Loss of Frame alarm detected on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -848,7 +848,7 @@ traps:
     name: AcBoard::acSonetSectionLOSAlarm
     category: diagnostic
     severity: crit
-    description: SONET section Loss of Signal alarm detected on {_HOSTNAME}.
+    description: SONET section Loss of Signal alarm detected on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -866,7 +866,7 @@ traps:
     name: AcBoard::acSonetLineAISAlarm
     category: diagnostic
     severity: crit
-    description: SONET Line AIS alarm detected on {_HOSTNAME}.
+    description: SONET Line AIS alarm detected on {{first (value "acBoardTrapGlobalsSource") "the device"}} on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -884,7 +884,7 @@ traps:
     name: AcBoard::acSonetLineRDIAlarm
     category: diagnostic
     severity: crit
-    description: SONET Line RDI alarm reported with severity {acBoardTrapGlobalsSeverity} on {_HOSTNAME}.
+    description: SONET Line RDI alarm detected on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -902,7 +902,7 @@ traps:
     name: AcBoard::acSonetIfHwFailureAlarm
     category: diagnostic
     severity: crit
-    description: SONET or SDH interface hardware failure detected on {_HOSTNAME}.
+    description: SONET or SDH interface hardware failure detected on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -919,8 +919,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.43
     name: AcBoard::acHwFailureAlarm
     category: diagnostic
-    severity: err
-    description: HW failure alarm reported on {_HOSTNAME}.
+    severity: crit
+    description: 'Hardware failure alarm detected{{with value "acBoardTrapGlobalsTextualDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -936,9 +936,9 @@ traps:
       - acBoardTrapGlobalsDateAndTime
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.44
     name: AcBoard::acH248LostConnectionWithCA
-    category: diagnostic
+    category: state_change
     severity: crit
-    description: H.248 connection to call agent lost on {_HOSTNAME}.
+    description: H.248 connection to call agent lost on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -956,7 +956,7 @@ traps:
     name: AcBoard::acDialPlanFileReplaced
     category: config_change
     severity: notice
-    description: Dial plan file replaced on {_HOSTNAME}.
+    description: Dial plan file replaced on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -973,8 +973,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.46
     name: AcBoard::acAnalogPortSPIOutOfService
     category: diagnostic
-    severity: err
-    description: Analog port {acBoardTrapGlobalsSource} is out of service on {_HOSTNAME}.
+    severity: warning
+    description: Analog port is out of service on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -992,7 +992,7 @@ traps:
     name: AcBoard::acAnalogPortHighTemperature
     category: diagnostic
     severity: warning
-    description: Analog port high temperature detected on {_HOSTNAME}.
+    description: Analog port high temperature detected on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1008,9 +1008,9 @@ traps:
       - acBoardTrapGlobalsDateAndTime
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.48
     name: AcBoard::acHitlessUpdateStatus
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Hitless software update status reported by {acBoardTrapGlobalsSource} on {_HOSTNAME}.
+    description: 'Hitless software update status changed{{with value "acBoardTrapGlobalsTextualDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1027,8 +1027,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.49
     name: AcBoard::acTrunksAlarmNearEndLOS
     category: diagnostic
-    severity: err
-    description: Loss of signal detected at trunk near end on {_HOSTNAME}.
+    severity: crit
+    description: Loss of signal at trunk near end on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1046,7 +1046,7 @@ traps:
     name: AcBoard::acTrunksAlarmNearEndLOF
     category: diagnostic
     severity: crit
-    description: Loss of frame detected at trunk near end on {_HOSTNAME}.
+    description: Loss of frame at trunk near end detected on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1063,8 +1063,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.51
     name: AcBoard::acTrunksAlarmRcvAIS
     category: diagnostic
-    severity: warning
-    description: Received AIS signal from trunk on {_HOSTNAME}.
+    severity: crit
+    description: Received AIS signal from far end on {{value "acBoardTrapGlobalsSource"}} on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1081,8 +1081,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.52
     name: AcBoard::acTrunksAlarmFarEndLOF
     category: diagnostic
-    severity: err
-    description: Loss of frame at trunk's far end detected on {_HOSTNAME}.
+    severity: crit
+    description: Loss of frame at trunk's far end detected on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1100,7 +1100,7 @@ traps:
     name: AcBoard::acIPv6ErrorAlarm
     category: diagnostic
     severity: warning
-    description: IPv6 error alarm {acBoardTrapGlobalsProbableCause} detected on {_HOSTNAME}.
+    description: 'IPv6 error alarm detected{{with value "acBoardTrapGlobalsTextualDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1118,7 +1118,7 @@ traps:
     name: AcBoard::acAMSProcedureResult
     category: diagnostic
     severity: warning
-    description: AMS procedure event {acBoardTrapGlobalsTextualDescription} with probable cause {acBoardTrapGlobalsProbableCause} on {_HOSTNAME}.
+    description: 'AMS procedure result reported{{with value "acBoardTrapGlobalsTextualDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1136,7 +1136,7 @@ traps:
     name: AcBoard::acWeakRedundancy
     category: state_change
     severity: warning
-    description: System entered weak redundancy mode on {_HOSTNAME}.
+    description: System entered weak redundancy mode on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1154,7 +1154,7 @@ traps:
     name: AcBoard::acTMInconsistentRemoteAndLocalPLLStatus
     category: diagnostic
     severity: warning
-    description: Inconsistent Remote And Local PLL Status detected on {_HOSTNAME}.
+    description: 'Inconsistent Remote And Local PLL status detected{{with value "acBoardTrapGlobalsTextualDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1172,7 +1172,7 @@ traps:
     name: AcBoard::acTMReferenceStatus
     category: diagnostic
     severity: warning
-    description: Timing manager reference status changed on {_HOSTNAME}.
+    description: Timing manager reference status event reported on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1188,9 +1188,9 @@ traps:
       - acBoardTrapGlobalsDateAndTime
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.58
     name: AcBoard::acTMReferenceChange
-    category: config_change
+    category: state_change
     severity: notice
-    description: Timing manager reference changed on {_HOSTNAME}.
+    description: Timing manager reference changed on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1208,7 +1208,7 @@ traps:
     name: AcBoard::acGWSASEmergencyModeAlarm
     category: diagnostic
     severity: alert
-    description: SAS entered Emergency Mode on {_HOSTNAME}.
+    description: SAS entered Emergency Mode on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1226,7 +1226,7 @@ traps:
     name: AcBoard::acV52InterfaceAlarm
     category: diagnostic
     severity: warning
-    description: V5.2 interface alarm {acBoardTrapGlobalsTextualDescription} with probable cause {acBoardTrapGlobalsProbableCause} on {_HOSTNAME}.
+    description: V5.2 interface alarm {{value "acBoardTrapGlobalsProbableCause"}} on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1243,8 +1243,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.61
     name: AcBoard::acSonetPathSTSLOPAlarm
     category: diagnostic
-    severity: warning
-    description: Sonet Path STS LOP alarm detected on {_HOSTNAME}.
+    severity: crit
+    description: Sonet Path STS LOP alarm detected on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1261,8 +1261,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.62
     name: AcBoard::acSonetPathSTSAISAlarm
     category: diagnostic
-    severity: err
-    description: Sonet Path STS AIS alarm detected on {_HOSTNAME}.
+    severity: crit
+    description: Sonet Path STS AIS alarm detected on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1280,7 +1280,7 @@ traps:
     name: AcBoard::acSonetPathSTSRDIAlarm
     category: diagnostic
     severity: crit
-    description: Sonet Path STS RDI alarm detected on {_HOSTNAME}.
+    description: Sonet Path STS RDI alarm detected on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1297,8 +1297,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.64
     name: AcBoard::acSonetPathUnequippedAlarm
     category: diagnostic
-    severity: warning
-    description: Sonet Path Unequipped alarm reported on {_HOSTNAME}.
+    severity: crit
+    description: Sonet Path Unequipped alarm detected on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1314,9 +1314,9 @@ traps:
       - acBoardTrapGlobalsDateAndTime
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.65
     name: AcBoard::acSonetPathSignalLabelMismatchAlarm
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Sonet Path Signal Label Mismatch alarm detected on {_HOSTNAME}.
+    description: Sonet Path Signal Label Mismatch alarm detected on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1333,8 +1333,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.66
     name: AcBoard::acDS3RAIAlarm
     category: diagnostic
-    severity: warning
-    description: DS3 RAI alarm detected on {_HOSTNAME}.
+    severity: crit
+    description: DS3 RAI alarm detected on {{first (value "acBoardTrapGlobalsSource") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1351,8 +1351,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.67
     name: AcBoard::acDS3AISAlarm
     category: diagnostic
-    severity: warning
-    description: DS3 AIS alarm detected on {_HOSTNAME}.
+    severity: crit
+    description: DS3 AIS alarm detected on {{first (value "acBoardTrapGlobalsSource") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1369,8 +1369,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.68
     name: AcBoard::acDS3LOFAlarm
     category: diagnostic
-    severity: alert
-    description: DS3 Loss of Frame alarm detected on {_HOSTNAME}.
+    severity: crit
+    description: DS3 LOF alarm detected on {{first (value "acBoardTrapGlobalsSource") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1388,7 +1388,7 @@ traps:
     name: AcBoard::acDS3LOSAlarm
     category: diagnostic
     severity: crit
-    description: DS3 LOS alarm detected on {_HOSTNAME}.
+    description: DS3 LOS alarm detected on {{first (value "acBoardTrapGlobalsSource") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1406,7 +1406,7 @@ traps:
     name: AcBoard::acSWUpgradeAlarm
     category: diagnostic
     severity: err
-    description: Software upgrade process error reported by {acBoardTrapGlobalsSource} on {_HOSTNAME}.
+    description: Software upgrade process error {{value "acBoardTrapGlobalsTextualDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1424,7 +1424,7 @@ traps:
     name: AcBoard::acNTPServerStatusAlarm
     category: diagnostic
     severity: warning
-    description: NTP server connection lost on {_HOSTNAME}.
+    description: NTP server connection lost on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1442,7 +1442,7 @@ traps:
     name: AcBoard::acThreeWayConferenceOutOfResources
     category: diagnostic
     severity: warning
-    description: Three way conference out of resources on {_HOSTNAME}.
+    description: Three-way conference out of resources on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1460,7 +1460,7 @@ traps:
     name: AcBoard::acSS7AliasPcStateChangeAlarm
     category: state_change
     severity: warning
-    description: Alias PC state changed to BUSY on {_HOSTNAME}.
+    description: Alias PC state changed to BUSY on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1478,7 +1478,7 @@ traps:
     name: AcBoard::acSS7UalGroupStateChangeAlarm
     category: state_change
     severity: warning
-    description: Ual Group Asp state changed to not ACTIVE on {_HOSTNAME}.
+    description: Ual Group Asp state is not ACTIVE on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1496,7 +1496,7 @@ traps:
     name: AcBoard::acLDAPLostConnection
     category: diagnostic
     severity: warning
-    description: LDAP connection lost on {_HOSTNAME}.
+    description: LDAP connection lost on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1513,8 +1513,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.76
     name: AcBoard::acAnalogPortGroundFaultOutOfService
     category: diagnostic
-    severity: err
-    description: Ground fault detected on port {acBoardTrapGlobalsSource} causing out-of-service state on {_HOSTNAME}.
+    severity: warning
+    description: Analog port is out of service due to ground fault on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1532,7 +1532,7 @@ traps:
     name: AcBoard::acSSHConnectionStatus
     category: auth
     severity: notice
-    description: SSH connection status reported by {acBoardTrapGlobalsSource} on {_HOSTNAME}.
+    description: SSH connection status event reported on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1550,7 +1550,7 @@ traps:
     name: AcBoard::acOCSPServerStatusAlarm
     category: diagnostic
     severity: warning
-    description: OCSP connection is not available on {_HOSTNAME}.
+    description: OCSP connection is not available on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1567,8 +1567,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.79
     name: AcBoard::acBoardWanLinkAlarm
     category: state_change
-    severity: err
-    description: Wan Link is down on {_HOSTNAME}.
+    severity: crit
+    description: WAN link is down on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1586,7 +1586,7 @@ traps:
     name: AcBoard::acPowerOverEthernetStatus
     category: diagnostic
     severity: warning
-    description: PEO resources over allocated on {_HOSTNAME}.
+    description: PEO resources are over allocated on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1604,7 +1604,7 @@ traps:
     name: AcBoard::acMediaProcessOverloadAlarm
     category: diagnostic
     severity: alert
-    description: Media process overload detected with severity {acBoardTrapGlobalsSeverity} on {_HOSTNAME}.
+    description: Media process overload detected{{with value "acBoardTrapGlobalsSource"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1621,8 +1621,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.82
     name: AcBoard::acWirelessCellularModemAlarm
     category: diagnostic
-    severity: warning
-    description: Wireless modem alarm raised on {_HOSTNAME}.
+    severity: crit
+    description: Wireless cellular modem is down or in backup mode on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1639,8 +1639,8 @@ traps:
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.83
     name: AcBoard::acDataInterfaceStatus
     category: state_change
-    severity: notice
-    description: DSL interface state changed on {_HOSTNAME}.
+    severity: warning
+    description: DSL interface status changed on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1656,9 +1656,9 @@ traps:
       - acBoardTrapGlobalsDateAndTime
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.84
     name: AcBoard::acNFASGroupAlarm
-    category: diagnostic
-    severity: err
-    description: NFAS group {acBoardTrapGlobalsName} went Out-Of-Service on {_HOSTNAME}.
+    category: state_change
+    severity: crit
+    description: NFAS group went Out-Of-Service on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1676,7 +1676,7 @@ traps:
     name: AcBoard::acBChannelAlarm
     category: state_change
     severity: warning
-    description: B-Channel service state changed on {_HOSTNAME}.
+    description: B-Channel service state changed on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1692,9 +1692,9 @@ traps:
       - acBoardTrapGlobalsDateAndTime
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.86
     name: AcBoard::acEthernetGroupAlarm
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Ethernet group link down on {_HOSTNAME}.
+    description: Ethernet group has no link up on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1712,7 +1712,7 @@ traps:
     name: AcBoard::acMediaRealmBWThresholdAlarm
     category: diagnostic
     severity: warning
-    description: BW threshold crossed on {_HOSTNAME}.
+    description: 'Bandwidth threshold alarm triggered{{with value "acBoardTrapGlobalsTextualDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1728,9 +1728,9 @@ traps:
       - acBoardTrapGlobalsDateAndTime
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.88
     name: AcBoard::acNqmConnectivityAlarm
-    category: diagnostic
-    severity: err
-    description: Connectivity with NQM probe destination is lost on {_HOSTNAME}.
+    category: state_change
+    severity: crit
+    description: Connectivity with NQM probe destination is lost on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1748,7 +1748,7 @@ traps:
     name: AcBoard::acNqmRttAlarm
     category: diagnostic
     severity: warning
-    description: High Round Trip Time detected towards NQM probe destination on {_HOSTNAME}.
+    description: High Round Trip Time detected towards NQM probe destination on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1766,7 +1766,7 @@ traps:
     name: AcBoard::acNqmJitterAlarm
     category: diagnostic
     severity: warning
-    description: High jitter detected towards NQM probe destination on {_HOSTNAME}.
+    description: High jitter detected towards NQM probe destination on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1784,7 +1784,7 @@ traps:
     name: AcBoard::acNqmPacketLossAlarm
     category: diagnostic
     severity: warning
-    description: High packet loss detected towards NQM probe destination on {_HOSTNAME}.
+    description: High packet loss detected towards NQM probe destination on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1802,7 +1802,7 @@ traps:
     name: AcBoard::acCertificateExpiryNotifiaction
     category: license
     severity: warning
-    description: Certificate expiration notification received on {_HOSTNAME}.
+    description: Installed credentials will expire soon on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1818,9 +1818,9 @@ traps:
       - acBoardTrapGlobalsDateAndTime
   - oid: 1.3.6.1.4.1.5003.9.10.1.21.2.0.93
     name: AcBoard::acWEBUserAccessDisabled
-    category: config_change
+    category: auth
     severity: notice
-    description: Web user was disabled due to inactivity on {_HOSTNAME}.
+    description: Web user was disabled due to inactivity on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1838,7 +1838,7 @@ traps:
     name: AcBoard::acProxyConnectionLost
     category: diagnostic
     severity: crit
-    description: All proxy connections are down on {_HOSTNAME}.
+    description: All proxy connections are down on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1856,7 +1856,7 @@ traps:
     name: AcBoard::acNqmCqMosAlarm
     category: diagnostic
     severity: warning
-    description: Low conversational voice quality detected towards NQM probe destination on {_HOSTNAME}.
+    description: Low conversational voice quality detected towards NQM probe destination on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1874,7 +1874,7 @@ traps:
     name: AcBoard::acNqmLqMosAlarm
     category: diagnostic
     severity: warning
-    description: Low listening voice quality detected towards NQM probe destination on {_HOSTNAME}.
+    description: Low listening voice quality detected towards NQM probe destination on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1892,7 +1892,7 @@ traps:
     name: AcBoard::acRedundantBoardAlarm
     category: diagnostic
     severity: warning
-    description: Redundant board alarm reported for {acBoardTrapGlobalsName} with severity {acBoardTrapGlobalsSeverity} on {_HOSTNAME}.
+    description: Redundant board alarm raised on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1910,7 +1910,7 @@ traps:
     name: AcBoard::acHANetworkWatchdogStatusAlarm
     category: diagnostic
     severity: warning
-    description: Module {acBoardTrapGlobalsName} is enabled but not running on {_HOSTNAME}.
+    description: Network watchdog module is enabled but not running on {{hostname}}.
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1928,7 +1928,7 @@ traps:
     name: AcBoard::acIDSPolicyAlarm
     category: security
     severity: warning
-    description: IDS Policy Alarm triggered on {_HOSTNAME}.
+    description: 'IDS policy alarm triggered{{with value "acBoardTrapGlobalsTextualDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1946,7 +1946,7 @@ traps:
     name: AcBoard::acIDSThresholdCrossNotification
     category: diagnostic
     severity: warning
-    description: IDS threshold crossed with severity {acBoardTrapGlobalsSeverity.raw} on {_HOSTNAME}.
+    description: 'IDS threshold crossed{{with value "acBoardTrapGlobalsTextualDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - acBoardTrapGlobalsName
@@ -1964,7 +1964,7 @@ traps:
     name: AclV5::acV5Alarm
     category: state_change
     severity: warning
-    description: V5 Interface Group status changed due to {acV5AlarmReportCause} on {_HOSTNAME}.
+    description: V5 Interface Group alarm status changed{{with value "acV5AlarmReportCause"}} cause {{.}}{{end}} on {{hostname}}.
     status: obsolete
     varbinds:
       - acV5AlarmReportCause

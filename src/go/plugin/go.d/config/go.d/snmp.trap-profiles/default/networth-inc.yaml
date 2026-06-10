@@ -28,17 +28,17 @@ traps:
   - oid: 1.3.6.1.4.1.215.0.11
     name: NETWORTH-FASTPIPES-MIB::nwfpPowerSupplyDown
     category: diagnostic
-    severity: err
-    description: Power supply {nwfpPowerSupplyIndex} reported {nwfpPowerSupplyStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Power supply {{value "nwfpPowerSupplyIndex"}} has stopped running on {{hostname}}.
     status: current
     varbinds:
       - nwfpPowerSupplyIndex
       - nwfpPowerSupplyStatus
   - oid: 1.3.6.1.4.1.215.0.12
     name: NETWORTH-FASTPIPES-MIB::nwfpPowerSupplyUp
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Power supply {nwfpPowerSupplyIndex} status changed to {nwfpPowerSupplyStatus} on {_HOSTNAME}.
+    description: Power supply {{value "nwfpPowerSupplyIndex"}} is up and running on {{hostname}}.
     status: current
     varbinds:
       - nwfpPowerSupplyIndex
@@ -46,8 +46,8 @@ traps:
   - oid: 1.3.6.1.4.1.215.0.13
     name: NETWORTH-FASTPIPES-MIB::nwfpfanDown
     category: diagnostic
-    severity: err
-    description: System fan {nwfpFanIndex} reported status {nwfpFanStatus} on {_HOSTNAME}.
+    severity: alert
+    description: System fan {{value "nwfpFanIndex"}} has stopped running on {{hostname}}.
     status: current
     varbinds:
       - nwfpFanIndex
@@ -56,7 +56,7 @@ traps:
     name: NETWORTH-FASTPIPES-MIB::nwfpfanUp
     category: diagnostic
     severity: notice
-    description: System fan {nwfpFanIndex} status changed to {nwfpFanStatus} on {_HOSTNAME}.
+    description: System fan {{value "nwfpFanIndex"}} is up and running on {{hostname}}.
     status: current
     varbinds:
       - nwfpFanIndex

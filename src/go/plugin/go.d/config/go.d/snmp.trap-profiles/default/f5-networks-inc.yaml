@@ -42,8 +42,8 @@ traps:
   - oid: 1.3.6.1.4.1.12276.1.1.1.65536
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::hardware-device-fault
     category: diagnostic
-    severity: err
-    description: Hardware device fault detected with severity {alertSeverity.raw} on {_HOSTNAME}.
+    severity: crit
+    description: 'Hardware device fault detected{{with value "alertDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alertSource
@@ -54,8 +54,8 @@ traps:
   - oid: 1.3.6.1.4.1.12276.1.1.1.65537
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::firmware-fault
     category: diagnostic
-    severity: err
-    description: Firmware diagnostic state fault detected with severity {alertSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: Firmware diagnostic state fault detected on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -67,7 +67,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::unknown-alarm
     category: diagnostic
     severity: warning
-    description: Unregistered alarm detected with severity {alertSeverity} from {alertSource} on {_HOSTNAME}.
+    description: 'Unregistered alarm detected{{with value "alertDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alertSource
@@ -78,8 +78,8 @@ traps:
   - oid: 1.3.6.1.4.1.12276.1.1.1.65539
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::memory-fault
     category: diagnostic
-    severity: err
-    description: Memory fault detected with severity {alertSeverity.raw} on {_HOSTNAME}.
+    severity: crit
+    description: Memory fault detected on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -90,8 +90,8 @@ traps:
   - oid: 1.3.6.1.4.1.12276.1.1.1.65540
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::drive-fault
     category: diagnostic
-    severity: err
-    description: Drive fault detected with severity {alertSeverity.raw} on {_HOSTNAME}.
+    severity: crit
+    description: Drive fault detected on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -103,7 +103,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::cpu-fault
     category: diagnostic
     severity: crit
-    description: CPU fault detected with severity {alertSeverity.raw} on {_HOSTNAME}.
+    description: 'CPU fault detected{{with value "alertDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alertSource
@@ -114,8 +114,8 @@ traps:
   - oid: 1.3.6.1.4.1.12276.1.1.1.65542
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::pcie-fault
     category: diagnostic
-    severity: err
-    description: PCIe device fault detected with severity {alertSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: PCIe device fault detected on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -126,8 +126,8 @@ traps:
   - oid: 1.3.6.1.4.1.12276.1.1.1.65543
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::aom-fault
     category: diagnostic
-    severity: err
-    description: Fault detected in the AOM with severity {alertSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: 'Fault detected in the AOM{{with value "alertDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alertSource
@@ -139,7 +139,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::drive-capacity-fault
     category: diagnostic
     severity: warning
-    description: Drive capacity fault detected with severity {alertSeverity} on {_HOSTNAME}.
+    description: 'Drive capacity fault detected{{with value "alertDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alertSource
@@ -150,8 +150,8 @@ traps:
   - oid: 1.3.6.1.4.1.12276.1.1.1.65545
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::power-fault
     category: diagnostic
-    severity: err
-    description: Power fault detected with severity {alertSeverity.raw} on {_HOSTNAME}.
+    severity: crit
+    description: Power fault detected in hardware on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -163,7 +163,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::thermal-fault
     category: diagnostic
     severity: crit
-    description: Thermal fault detected with severity {alertSeverity} on {_HOSTNAME}.
+    description: Thermal fault detected in hardware on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -175,7 +175,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::drive-thermal-throttle
     category: diagnostic
     severity: warning
-    description: Drive thermal throttle condition detected with severity {alertSeverity} on {_HOSTNAME}.
+    description: Drive thermal throttle condition detected on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -187,7 +187,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::blade-thermal-fault
     category: diagnostic
     severity: crit
-    description: Thermal fault detected in blade with severity {alertSeverity} on {_HOSTNAME}.
+    description: Thermal fault detected in blade on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -198,8 +198,8 @@ traps:
   - oid: 1.3.6.1.4.1.12276.1.1.1.65549
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::blade-hardware-fault
     category: diagnostic
-    severity: err
-    description: Hardware fault detected in blade on {_HOSTNAME}.
+    severity: crit
+    description: 'Hardware fault detected in blade{{with value "alertDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alertSource
@@ -210,8 +210,8 @@ traps:
   - oid: 1.3.6.1.4.1.12276.1.1.1.65550
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::firmware-update-status
     category: diagnostic
-    severity: warning
-    description: Firmware update status {alertDescription} with severity {alertSeverity} on {_HOSTNAME}.
+    severity: notice
+    description: Firmware update status {{value "alertDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -223,7 +223,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::drive-utilization
     category: diagnostic
     severity: warning
-    description: Drive utilization growth rate is high with alert {alertDescription} on {_HOSTNAME}.
+    description: Drive utilization growth rate is high on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -235,7 +235,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::service-health
     category: diagnostic
     severity: warning
-    description: Service health alert {alertDescription} with severity {alertSeverity} on {_HOSTNAME}.
+    description: Service health alert {{value "alertDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -246,8 +246,8 @@ traps:
   - oid: 1.3.6.1.4.1.12276.1.1.1.66304
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::module-present
     category: state_change
-    severity: warning
-    description: Appliance module presence changed with severity {alertSeverity} on {_HOSTNAME}.
+    severity: notice
+    description: Appliance module presence changed{{with value "alertEffect"}} to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -258,8 +258,8 @@ traps:
   - oid: 1.3.6.1.4.1.12276.1.1.1.66305
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::psu-fault
     category: diagnostic
-    severity: err
-    description: PSU fault detected with severity {alertSeverity.raw} on {_HOSTNAME}.
+    severity: crit
+    description: 'PSU fault detected{{with value "alertDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alertSource
@@ -270,8 +270,8 @@ traps:
   - oid: 1.3.6.1.4.1.12276.1.1.1.66306
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::lcd-fault
     category: diagnostic
-    severity: err
-    description: Fault detected in LCD module on {_HOSTNAME}.
+    severity: warning
+    description: Fault detected in LCD module on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -282,8 +282,8 @@ traps:
   - oid: 1.3.6.1.4.1.12276.1.1.1.66307
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::module-communication-error
     category: diagnostic
-    severity: err
-    description: Module communication error detected with severity {alertSeverity} from {alertSource} on {_HOSTNAME}.
+    severity: warning
+    description: 'Module communication error detected{{with value "alertDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alertSource
@@ -294,8 +294,8 @@ traps:
   - oid: 1.3.6.1.4.1.12276.1.1.1.196608
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::fipsError
     category: diagnostic
-    severity: err
-    description: Crypto error identified in one or more services on {_HOSTNAME}.
+    severity: crit
+    description: Crypto error identified in one or more services on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -307,7 +307,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::backplane
     category: diagnostic
     severity: crit
-    description: Backplane link failure detected with system controllers on {_HOSTNAME}.
+    description: Backplane link failure with system controllers detected on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -319,7 +319,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::txPwrHiAlarm
     category: diagnostic
     severity: warning
-    description: Transmitter power high alarm {alertDescription} from {alertSource} on {_HOSTNAME}.
+    description: Transmitter power high alarm {{value "alertDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -331,7 +331,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::txPwrHiWarn
     category: diagnostic
     severity: warning
-    description: Transmitter power high warning {alertDescription} on {_HOSTNAME}.
+    description: Transmitter power high warning {{value "alertDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -343,7 +343,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::txPwrLoAlarm
     category: diagnostic
     severity: warning
-    description: Transmitter power low alarm {alertDescription} with severity {alertSeverity} on {_HOSTNAME}.
+    description: Transmitter power low alarm {{value "alertDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -355,7 +355,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::txPwrLoWarn
     category: diagnostic
     severity: warning
-    description: Transmitter power low warning {alertDescription} on {_HOSTNAME}.
+    description: Transmitter power low warning {{value "alertDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -367,7 +367,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::rxPwrHiAlarm
     category: diagnostic
     severity: warning
-    description: Receiver power high alarm {alertDescription} on {_HOSTNAME}.
+    description: Receiver power high alarm {{value "alertDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -379,7 +379,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::rxPwrHiWarn
     category: diagnostic
     severity: warning
-    description: Receiver power high warning {alertDescription} on {_HOSTNAME}.
+    description: Receiver power high warning {{value "alertDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -391,7 +391,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::rxPwrLoAlarm
     category: diagnostic
     severity: warning
-    description: Receiver power low alarm {alertDescription} on {_HOSTNAME}.
+    description: Receiver power low alarm detected on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -403,7 +403,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::rxPwrLoWarn
     category: diagnostic
     severity: warning
-    description: Receiver power low warning {alertDescription} on {_HOSTNAME}.
+    description: Receiver power low warning detected on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -414,8 +414,8 @@ traps:
   - oid: 1.3.6.1.4.1.12276.1.1.1.262408
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::txBiasHiAlarm
     category: diagnostic
-    severity: err
-    description: Transmitter bias high alarm {alertDescription} with severity {alertSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: Transmitter bias high alarm detected on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -427,7 +427,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::txBiasHiWarn
     category: diagnostic
     severity: warning
-    description: Transmitter bias high warning {alertDescription} from {alertSource} on {_HOSTNAME}.
+    description: Transmitter bias high warning detected on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -439,7 +439,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::txBiasLoAlarm
     category: diagnostic
     severity: warning
-    description: Transmitter bias low alarm {alertDescription} from {alertSource} on {_HOSTNAME}.
+    description: 'Transmitter bias low alarm detected{{with value "alertDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alertSource
@@ -451,7 +451,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::txBiasLoWarn
     category: diagnostic
     severity: warning
-    description: Transmitter bias low warning {alertDescription} with severity {alertSeverity} on {_HOSTNAME}.
+    description: 'Transmitter bias low warning detected{{with value "alertDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alertSource
@@ -463,7 +463,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::ddmTempHiAlarm
     category: diagnostic
     severity: warning
-    description: Optic temperature high alarm {alertDescription} with severity {alertSeverity} on {_HOSTNAME}.
+    description: 'Optic temperature high alarm detected{{with value "alertDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alertSource
@@ -475,7 +475,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::ddmTempHiWarn
     category: diagnostic
     severity: warning
-    description: Optic temperature high warning {alertDescription} on {_HOSTNAME}.
+    description: 'Optic temperature high warning {{with value "alertDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alertSource
@@ -487,7 +487,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::ddmTempLoAlarm
     category: diagnostic
     severity: warning
-    description: Optic temperature low alarm {alertDescription} on {_HOSTNAME}.
+    description: Optic temperature low alarm {{value "alertDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -499,7 +499,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::ddmTempLoWarn
     category: diagnostic
     severity: warning
-    description: Optic temperature low warning {alertDescription} on {_HOSTNAME}.
+    description: Optic temperature low warning detected on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -511,7 +511,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::ddmVccHiAlarm
     category: diagnostic
     severity: warning
-    description: Optic voltage high alarm {alertDescription} on {_HOSTNAME}.
+    description: 'Optic voltage high alarm detected{{with value "alertDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alertSource
@@ -523,7 +523,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::ddmVccHiWarn
     category: diagnostic
     severity: warning
-    description: Optic voltage high warning {alertDescription} from {alertSource} on {_HOSTNAME}.
+    description: Optic voltage high warning detected on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -535,7 +535,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::ddmVccLoAlarm
     category: diagnostic
     severity: warning
-    description: Optic voltage low alarm {alertDescription} with severity {alertSeverity} on {_HOSTNAME}.
+    description: 'Optic voltage low alarm detected{{with value "alertDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - alertSource
@@ -547,7 +547,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::ddmVccLoWarn
     category: diagnostic
     severity: warning
-    description: Optic voltage low warning {alertDescription} on {_HOSTNAME}.
+    description: Optic voltage low warning detected on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -558,8 +558,8 @@ traps:
   - oid: 1.3.6.1.4.1.12276.1.1.1.327680
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::core-dump
     category: diagnostic
-    severity: alert
-    description: Process crash detected with severity {alertSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: Process crash detected on {{hostname}}.
     status: current
     varbinds:
       - alertSource
@@ -571,7 +571,7 @@ traps:
     name: F5OS-APPLIANCE-ALERT-NOTIF-MIB::raidEvent
     category: diagnostic
     severity: warning
-    description: RAID event {alertDescription} with severity {alertSeverity} on {_HOSTNAME}.
+    description: RAID event {{value "alertDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - alertSource

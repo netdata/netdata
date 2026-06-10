@@ -74,7 +74,7 @@ traps:
     name: SIXNET-MIB::swPowerStatusChangeTrap
     category: diagnostic
     severity: warning
-    description: Power unit {swIndivPowerUnitIndex} status changed to {swIndivPowerStatus} on {_HOSTNAME}.
+    description: Power status changed to {{value "swIndivPowerStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - swIndivPowerUnitIndex
@@ -84,7 +84,7 @@ traps:
     name: SIXNET-MIB::swPortSecurityTrap
     category: security
     severity: warning
-    description: Port security intrusion detected on interface {ifIndex} on {_HOSTNAME}.
+    description: Port security intrusion detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -92,7 +92,7 @@ traps:
     name: SIXNET-MIB::swAuthenticationFailure
     category: auth
     severity: warning
-    description: Authentication failed for user {trapVarLoginUserName} from {trapVarLoginIPAddress} on {_HOSTNAME}.
+    description: SNMP authentication failure for user {{value "trapVarLoginUserName"}} from {{value "trapVarLoginIPAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - trapVarLoginUserName
@@ -103,7 +103,7 @@ traps:
     name: SIXNET-MIB::swAuthenticationSuccess
     category: auth
     severity: notice
-    description: User {trapVarLoginUserName} logged in via {trapVarLoginMethod} from {trapVarLoginIPAddress} on {_HOSTNAME}.
+    description: Successful authentication for user {{value "trapVarLoginUserName"}} on {{hostname}}.
     status: current
     varbinds:
       - trapVarLoginUserName
@@ -114,7 +114,7 @@ traps:
     name: SIXNET-MIB::swLoopbackDetectionTrap
     category: security
     severity: warning
-    description: Loopback BPDU detected on interface {staLoopbackDetectionPortIfIndex} on {_HOSTNAME}.
+    description: Loopback BPDU detected on {{first (value "staLoopbackDetectionPortIfIndex") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - staLoopbackDetectionPortIfIndex
@@ -122,7 +122,7 @@ traps:
     name: SIXNET-MIB::autoUpgradeTrap
     category: config_change
     severity: notice
-    description: Auto upgrade executed with result {trapAutoUpgradeResult} to version {trapAutoUpgradeNewVer} on {_HOSTNAME}.
+    description: Auto upgrade executed{{with value "trapAutoUpgradeResult"}} with result {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - fileCopyFileType
@@ -132,11 +132,11 @@ traps:
     name: SIXNET-MIB::fallbackFirmware
     category: diagnostic
     severity: alert
-    description: Switch booted into backup firmware due to default firmware failure on {_HOSTNAME}.
+    description: Switch booted fallback firmware due to default firmware failure on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.20540.5.0.2
     name: SIXNET-MIB::firmwareUpdateComplete
-    category: config_change
+    category: state_change
     severity: notice
-    description: Firmware update completed on {_HOSTNAME}.
+    description: Firmware update completed on {{hostname}}.
     status: current

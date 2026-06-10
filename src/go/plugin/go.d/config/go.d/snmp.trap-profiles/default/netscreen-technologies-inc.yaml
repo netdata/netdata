@@ -405,8 +405,8 @@ traps:
   - oid: 1.3.6.1.4.1.3224.0.100
     name: NETSCREEN-TRAP-MIB::netscreenTrapHw
     category: diagnostic
-    severity: err
-    description: Hardware problem reported as {netscreenTrapDesc} on {_HOSTNAME}.
+    severity: warning
+    description: 'Hardware problem detected{{with value "netscreenTrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - netscreenTrapType
@@ -415,7 +415,7 @@ traps:
     name: NETSCREEN-TRAP-MIB::netscreenTrapFw
     category: security
     severity: warning
-    description: 'Firewall function triggered: {netscreenTrapDesc} on {_HOSTNAME}.'
+    description: 'Firewall function triggered{{with value "netscreenTrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - netscreenTrapType
@@ -424,7 +424,7 @@ traps:
     name: NETSCREEN-TRAP-MIB::netscreenTrapSw
     category: diagnostic
     severity: warning
-    description: 'Software problem detected: {netscreenTrapDesc} on {_HOSTNAME}.'
+    description: 'Software problem detected{{with value "netscreenTrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - netscreenTrapType
@@ -433,7 +433,7 @@ traps:
     name: NETSCREEN-TRAP-MIB::netscreenTrapTrf
     category: diagnostic
     severity: warning
-    description: Traffic condition {netscreenTrapType} ({netscreenTrapDesc}) triggered on {_HOSTNAME}.
+    description: Traffic condition alarm {{value "netscreenTrapDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -442,7 +442,7 @@ traps:
     name: NETSCREEN-TRAP-MIB::netscreenTrapVpn
     category: state_change
     severity: warning
-    description: 'VPN tunnel status changed: {netscreenTrapDesc} on {_HOSTNAME}.'
+    description: VPN tunnel status changed {{value "netscreenTrapDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -451,7 +451,7 @@ traps:
     name: NETSCREEN-TRAP-MIB::netscreenTrapNsrp
     category: state_change
     severity: warning
-    description: NSRP status change {netscreenTrapDesc} on {_HOSTNAME}.
+    description: NSRP status event {{value "netscreenTrapDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -460,7 +460,7 @@ traps:
     name: NETSCREEN-TRAP-MIB::netscreenTrapGPRO
     category: diagnostic
     severity: warning
-    description: Global PRO problem {netscreenTrapDesc} detected on {_HOSTNAME}.
+    description: 'Global PRO problem detected: {{value "netscreenTrapDesc"}} on {{hostname}}.'
     status: current
     varbinds:
       - netscreenTrapType
@@ -469,7 +469,7 @@ traps:
     name: NETSCREEN-TRAP-MIB::netscreenTrapDrp
     category: diagnostic
     severity: warning
-    description: Drp status alarm {netscreenTrapDesc} on {_HOSTNAME}.
+    description: 'Drp status occurred{{with value "netscreenTrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - netscreenTrapType
@@ -478,7 +478,7 @@ traps:
     name: NETSCREEN-TRAP-MIB::netscreenTrapIFFailover
     category: state_change
     severity: warning
-    description: Interface failover occurred with status {netscreenTrapDesc} on {_HOSTNAME}.
+    description: 'Interface failover occurred{{with value "netscreenTrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - netscreenTrapType
@@ -487,7 +487,7 @@ traps:
     name: NETSCREEN-TRAP-MIB::netscreenTrapIDPAttack
     category: security
     severity: alert
-    description: IDP attack detected with {netscreenTrapDesc} on {_HOSTNAME}.
+    description: 'IDP attack detected{{with value "netscreenTrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - netscreenTrapType
@@ -496,7 +496,7 @@ traps:
     name: NETSCREEN-OSPF-TRAP-MIB::nsOspfVirtIfStateChange
     category: state_change
     severity: warning
-    description: OSPF virtual interface {nsOspfVirtIfNeighbor} state changed to {nsOspfVirtIfState} on {_HOSTNAME}.
+    description: OSPF virtual interface state changed to {{value "nsOspfVirtIfState"}} on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -510,7 +510,7 @@ traps:
     name: NETSCREEN-OSPF-TRAP-MIB::nsOspfNbrStateChange
     category: state_change
     severity: warning
-    description: OSPF neighbor {nsOspfNbrIpAddr} state changed to {nsOspfNbrState} on {_HOSTNAME}.
+    description: OSPF neighbor {{value "nsOspfNbrRtrId"}} state changed to {{value "nsOspfNbrState"}} on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -525,7 +525,7 @@ traps:
     name: NETSCREEN-OSPF-TRAP-MIB::nsOspfVirtNbrStateChange
     category: state_change
     severity: warning
-    description: OSPF virtual neighbor {nsOspfVirtNbrRtrId} in area {nsOspfVirtNbrArea} changed state to {nsOspfVirtNbrState} on {_HOSTNAME}.
+    description: OSPF virtual neighbor state changed to {{value "nsOspfVirtNbrState"}} on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -539,7 +539,7 @@ traps:
     name: NETSCREEN-OSPF-TRAP-MIB::nsOspfIfConfigError
     category: state_change
     severity: warning
-    description: OSPF adjacency formation prevented due to configuration conflict on interface {nsOspfIfIpAddress} from {nsOspfPacketSrc} on {_HOSTNAME}.
+    description: OSPF configuration conflict detected on interface {{value "nsOspfIfIpAddress"}} from {{value "nsOspfPacketSrc"}} on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -553,9 +553,9 @@ traps:
       - nsOspfIfVRID
   - oid: 1.3.6.1.4.1.3224.18.2.16.2.5
     name: NETSCREEN-OSPF-TRAP-MIB::nsOspfVirtIfConfigError
-    category: diagnostic
-    severity: err
-    description: OSPF virtual interface configuration error {nsOspfConfigErrorType} detected on {nsOspfVirtIfNeighbor} on {_HOSTNAME}.
+    category: state_change
+    severity: warning
+    description: OSPF virtual interface configuration error with neighbor {{value "nsOspfVirtIfNeighbor"}} on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -570,7 +570,7 @@ traps:
     name: NETSCREEN-OSPF-TRAP-MIB::nsOspfIfAuthFailure
     category: security
     severity: warning
-    description: OSPF authentication failure from {nsOspfPacketSrc} on {_HOSTNAME}.
+    description: OSPF authentication failure from {{value "nsOspfPacketSrc"}} on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -586,7 +586,7 @@ traps:
     name: NETSCREEN-OSPF-TRAP-MIB::nsOspfVirtIfAuthFailure
     category: security
     severity: warning
-    description: OSPF authentication failure on virtual interface {nsOspfVirtIfAreaId} neighbor {nsOspfVirtIfNeighbor} on {_HOSTNAME}.
+    description: OSPF authentication failure on virtual interface from {{value "nsOspfVirtIfNeighbor"}} on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -601,7 +601,7 @@ traps:
     name: NETSCREEN-OSPF-TRAP-MIB::nsOspfIfRxBadPacket
     category: diagnostic
     severity: warning
-    description: OSPF bad packet received on interface {nsOspfIfIpAddress} from {nsOspfPacketSrc} on {_HOSTNAME}.
+    description: Received unparseable OSPF packet on interface {{value "nsOspfIfIpAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -616,7 +616,7 @@ traps:
     name: NETSCREEN-OSPF-TRAP-MIB::nsOspfVirtIfRxBadPacket
     category: diagnostic
     severity: warning
-    description: OSPF bad packet received on virtual interface {nsOspfVirtIfAreaId} neighbor {nsOspfVirtIfNeighbor} on {_HOSTNAME}.
+    description: OSPF bad packet received on virtual interface area {{value "nsOspfVirtIfAreaId"}} neighbor {{value "nsOspfVirtIfNeighbor"}} on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -630,7 +630,7 @@ traps:
     name: NETSCREEN-OSPF-TRAP-MIB::nsOspfTxRetransmit
     category: diagnostic
     severity: warning
-    description: OSPF packet retransmission on interface {nsOspfIfIpAddress} on {_HOSTNAME}.
+    description: OSPF packet retransmitted on interface {{value "nsOspfIfIpAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -646,9 +646,9 @@ traps:
       - nsOspfLsdbVRID
   - oid: 1.3.6.1.4.1.3224.18.2.16.2.11
     name: NETSCREEN-OSPF-TRAP-MIB::nsOspfVirtIfTxRetransmit
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: OSPF packet retransmission on virtual interface area {nsOspfVirtIfAreaId} neighbor {nsOspfVirtIfNeighbor} on {_HOSTNAME}.
+    description: OSPF packet retransmitted on virtual interface to neighbor {{value "nsOspfVirtIfNeighbor"}} on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -665,7 +665,7 @@ traps:
     name: NETSCREEN-OSPF-TRAP-MIB::nsOspfOriginateLsa
     category: state_change
     severity: notice
-    description: OSPF LSA originated for area {nsOspfLsdbAreaId} on {_HOSTNAME}.
+    description: OSPF LSA originated due to topology change on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -680,7 +680,7 @@ traps:
     name: NETSCREEN-OSPF-TRAP-MIB::nsOspfMaxAgeLsa
     category: diagnostic
     severity: warning
-    description: LSA MaxAge reached for type {nsOspfLsdbType} LSID {nsOspfLsdbLsid} in area {nsOspfLsdbAreaId} on {_HOSTNAME}.
+    description: OSPF LSA aged to MaxAge in area {{value "nsOspfLsdbAreaId"}} on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -695,7 +695,7 @@ traps:
     name: NETSCREEN-OSPF-TRAP-MIB::nsOspfLsdbOverflow
     category: diagnostic
     severity: warning
-    description: OSPF LSDB overflow detected with {nsOspfRouterId} exceeding limit {nsOspfExtLsdbLimit} on {_HOSTNAME}.
+    description: OSPF LSDB overflow detected on router {{value "nsOspfRouterId"}} on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -707,7 +707,7 @@ traps:
     name: NETSCREEN-OSPF-TRAP-MIB::nsOspfLsdbApproachingOverflow
     category: diagnostic
     severity: warning
-    description: OSPF LSA database approaching limit on {_HOSTNAME}.
+    description: OSPF LSDB approaching overflow limit on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -718,8 +718,8 @@ traps:
   - oid: 1.3.6.1.4.1.3224.18.2.16.2.16
     name: NETSCREEN-OSPF-TRAP-MIB::nsOspfIfStateChange
     category: state_change
-    severity: notice
-    description: OSPF interface {nsOspfIfIpAddress} state changed to {nsOspfIfState} on {_HOSTNAME}.
+    severity: warning
+    description: OSPF interface {{value "nsOspfIfIpAddress"}} state changed to {{value "nsOspfIfState"}} on {{hostname}}.
     status: current
     varbinds:
       - netscreenTrapType
@@ -733,7 +733,7 @@ traps:
     name: NETSCREEN-BGP4-MIB::nsBgpEstablished
     category: state_change
     severity: notice
-    description: BGP peer {nsBgpPeerIdentifier} in VR {nsBgpPeerVRID} entered ESTABLISHED state on {_HOSTNAME}.
+    description: BGP session established with peer {{value "nsBgpPeerIdentifier"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - netscreenTrapType
@@ -746,7 +746,7 @@ traps:
     name: NETSCREEN-VR-BGP4-MIB::nsVrBgpEstablished
     category: state_change
     severity: notice
-    description: BGP peer {nsVrBgpPeerIdentifier} established on VR {nsVrBgp4PathAttrVRID} on {_HOSTNAME}.
+    description: BGP session established with peer {{value "nsVrBgpPeerIdentifier"}} on {{hostname}}.
     status: current
     varbinds:
       - nsVrBgp4PathAttrVRID

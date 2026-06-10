@@ -128,49 +128,49 @@ traps:
     name: HHMSAGENT-MIB::hhmsUnknownStatus
     category: diagnostic
     severity: warning
-    description: Device status changed to Unknown on {_HOSTNAME}.
+    description: HHMS agent status went to Unknown on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3854.1.0.1
     name: HHMSAGENT-MIB::hhmsNormalStatus
     category: diagnostic
-    severity: notice
-    description: Device health status reported as Normal on {_HOSTNAME}.
+    severity: info
+    description: HHMS agent status is Normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3854.1.0.2
     name: HHMSAGENT-MIB::hhmsWarningStatus
     category: diagnostic
     severity: warning
-    description: Device status changed to Warning on {_HOSTNAME}.
+    description: HHMS agent status went to Warning on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3854.1.0.3
     name: HHMSAGENT-MIB::hhmsCriticalStatus
     category: diagnostic
     severity: crit
-    description: Device status reported as Critical on {_HOSTNAME}.
+    description: HHMS agent status went to Critical on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3854.1.0.4
     name: HHMSAGENT-MIB::hhmsDownStatus
-    category: state_change
-    severity: warning
-    description: HHMS agent status changed to Disabled on {_HOSTNAME}.
+    category: diagnostic
+    severity: alert
+    description: HHMS agent status went to Disabled on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3854.1.0.5
     name: SPAGENT-MIB::spKeepAliveTrap
     category: diagnostic
-    severity: info
-    description: Sensor keep alive received on {_HOSTNAME}.
+    severity: notice
+    description: Sensor probe keep alive received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3854.1.0.7
     name: SPAGENT-MIB::spUnknownStatus
     category: diagnostic
     severity: warning
-    description: Sensor probe status changed to Unknown on {_HOSTNAME}.
+    description: Sensor probe status went to Unknown on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3854.1.0.10
     name: HHMSAGENT-MIB::hhmsTemperatureStatus
     category: diagnostic
     severity: warning
-    description: Temperature sensor {hhmsSensorName} status {hhmsSensorStatus} with value {hhmsSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "hhmsSensorName"}} exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - hhmsSensorStatus
@@ -183,7 +183,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray1Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -196,7 +196,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray2Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -209,7 +209,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray3Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -222,7 +222,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray4Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -235,7 +235,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray5Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} exceeded level {spSensorLevelExceeded} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -248,7 +248,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray6Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -261,7 +261,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray7Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -274,7 +274,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray8Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -287,7 +287,7 @@ traps:
     name: HHMSAGENT-MIB::hhmsHumidityStatus
     category: diagnostic
     severity: warning
-    description: Humidity sensor {hhmsSensorName} reported status {hhmsSensorStatus} with value {hhmsSensorValue} on {_HOSTNAME}.
+    description: Humidity sensor {{value "hhmsSensorName"}} exceeded level {{value "hhmsSensorLevelExceeded"}} on {{hostname}}.
     status: current
     varbinds:
       - hhmsSensorStatus
@@ -300,7 +300,7 @@ traps:
     name: HHMSAGENT-MIB::hhmsSwitchStatus
     category: diagnostic
     severity: warning
-    description: Sensor {hhmsSensorName} status {hhmsSensorStatus} with value {hhmsSensorValue} exceeded level {hhmsSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "hhmsSensorName"}} status changed to {{value "hhmsSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - hhmsSensorStatus
@@ -313,7 +313,7 @@ traps:
     name: HHMSAGENT-MIB::hhmsPowerMonitorStatus
     category: diagnostic
     severity: warning
-    description: Sensor {hhmsSensorName} status {hhmsSensorStatus} with value {hhmsSensorValue} exceeded level {hhmsSensorLevelExceeded} on {_HOSTNAME}.
+    description: Power monitor sensor {{value "hhmsSensorName"}} status changed to {{value "hhmsSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - hhmsSensorStatus
@@ -326,7 +326,7 @@ traps:
     name: SPAGENT-MIB::spVRMSStatus
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: VRMS sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -339,7 +339,7 @@ traps:
     name: SPAGENT-MIB::spSenUnknownStatus
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status changed to Unknown on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status went to Unknown on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -352,7 +352,7 @@ traps:
     name: SPAGENT-MIB::spSenNormalStatus
     category: diagnostic
     severity: notice
-    description: Sensor {spSensorName} status is Normal on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status returned to Normal on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -365,7 +365,7 @@ traps:
     name: SPAGENT-MIB::spSenWarningStatus
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported warning status {spSensorStatus} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status went to Warning on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -378,7 +378,7 @@ traps:
     name: SPAGENT-MIB::spSenCriticalStatus
     category: diagnostic
     severity: crit
-    description: Sensor {spSensorName} reported critical status {spSensorStatus} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status went to Critical on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -391,7 +391,7 @@ traps:
     name: SPAGENT-MIB::spSenDownStatus
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status changed to Disabled on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status went to Disabled on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -404,7 +404,7 @@ traps:
     name: SPAGENT-MIB::spWattStatus
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} value {spSensorValue} exceeded threshold {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Energy sensor {{value "spSensorName"}} exceeded level {{value "spSensorLevelExceeded"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -417,7 +417,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray1Status
     category: diagnostic
     severity: warning
-    description: Relay sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -430,7 +430,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray2Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported {spSensorStatus} with value {spSensorValue} exceeding level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -443,7 +443,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray3Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Relay array sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -456,7 +456,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray4Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Relay array sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -469,7 +469,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray5Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Relay array sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -482,7 +482,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray6Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Relay array sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -495,7 +495,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray8Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -508,7 +508,7 @@ traps:
     name: SPAGENT-MIB::spVirtualStatus
     category: diagnostic
     severity: warning
-    description: Virtual sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Virtual sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -521,7 +521,7 @@ traps:
     name: SPAGENT-MIB::spTemperature1Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -534,7 +534,7 @@ traps:
     name: SPAGENT-MIB::spTemperature2Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -547,7 +547,7 @@ traps:
     name: SPAGENT-MIB::spTemperature3Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -560,7 +560,7 @@ traps:
     name: SPAGENT-MIB::spTemperature4Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -573,7 +573,7 @@ traps:
     name: SPAGENT-MIB::spTemperature5Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -586,7 +586,7 @@ traps:
     name: SPAGENT-MIB::spTemperature6Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -599,7 +599,7 @@ traps:
     name: SPAGENT-MIB::spTemperature7Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -612,7 +612,7 @@ traps:
     name: SPAGENT-MIB::spTemperature8Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -625,7 +625,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray1-1Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -638,7 +638,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray1-2Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -651,7 +651,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray1-3Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -664,7 +664,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray1-4Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -677,7 +677,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray1-5Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -690,7 +690,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray1-6Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -703,7 +703,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray1-7Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -716,7 +716,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray1-8Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -729,7 +729,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray2-1Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -742,7 +742,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray2-2Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -755,7 +755,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray2-3Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -768,7 +768,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray2-4Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} exceeded threshold level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -781,7 +781,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray2-5Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -794,7 +794,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray2-6Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -807,7 +807,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray2-7Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -820,7 +820,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray2-8Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -833,7 +833,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray3-1Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -846,7 +846,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray3-2Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -859,7 +859,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray3-3Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -872,7 +872,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray3-4Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -885,7 +885,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray3-5Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -898,7 +898,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray3-6Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} exceeded level {spSensorLevelExceeded} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -911,7 +911,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray3-7Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -924,7 +924,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray3-8Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -937,7 +937,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray4-1Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -950,7 +950,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray4-2Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -963,7 +963,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray4-3Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -976,7 +976,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray4-4Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -989,7 +989,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray4-5Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1002,7 +1002,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray4-6Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1015,7 +1015,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray4-7Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1028,7 +1028,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray4-8Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1041,7 +1041,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray5-1Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1054,7 +1054,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray5-2Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1067,7 +1067,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray5-3Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1080,7 +1080,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray5-4Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1093,7 +1093,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray5-5Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1106,7 +1106,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray5-6Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} exceeded level {spSensorLevelExceeded} with status {spSensorStatus} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1119,7 +1119,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray5-7Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1132,7 +1132,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray5-8Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1145,7 +1145,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray6-1Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1158,7 +1158,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray6-2Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} exceeded level {spSensorLevelExceeded} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1171,7 +1171,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray6-3Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1184,7 +1184,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray6-4Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1197,7 +1197,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray6-5Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1210,7 +1210,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray6-6Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1223,7 +1223,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray6-7Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1236,7 +1236,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray6-8Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} exceeded level {spSensorLevelExceeded} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1249,7 +1249,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray7-1Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1262,7 +1262,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray7-2Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1275,7 +1275,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray7-3Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1288,7 +1288,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray7-4Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1301,7 +1301,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray7-5Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1314,7 +1314,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray7-6Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1327,7 +1327,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray7-7Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1340,7 +1340,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray7-8Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1353,7 +1353,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray8-1Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1366,7 +1366,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray8-2Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1379,7 +1379,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray8-3Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1392,7 +1392,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray8-4Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1405,7 +1405,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray8-5Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1418,7 +1418,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray8-6Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1431,7 +1431,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray8-7Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1444,7 +1444,7 @@ traps:
     name: SPAGENT-MIB::spTemperatureArray8-8Status
     category: diagnostic
     severity: warning
-    description: Temperature sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1457,7 +1457,7 @@ traps:
     name: SPAGENT-MIB::spAnalogue1Status
     category: diagnostic
     severity: warning
-    description: Analogue sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Analogue sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1470,7 +1470,7 @@ traps:
     name: SPAGENT-MIB::spAnalogue2Status
     category: diagnostic
     severity: warning
-    description: Analogue sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Analogue sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1483,7 +1483,7 @@ traps:
     name: SPAGENT-MIB::spAnalogue3Status
     category: diagnostic
     severity: warning
-    description: Analogue sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Analogue sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1496,7 +1496,7 @@ traps:
     name: SPAGENT-MIB::spAnalogue4Status
     category: diagnostic
     severity: warning
-    description: Analogue sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Analogue sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1509,7 +1509,7 @@ traps:
     name: SPAGENT-MIB::spAnalogue5Status
     category: diagnostic
     severity: warning
-    description: Analogue sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Analogue sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1522,7 +1522,7 @@ traps:
     name: SPAGENT-MIB::spAnalogue6Status
     category: diagnostic
     severity: warning
-    description: Analogue sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Analogue sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1535,7 +1535,7 @@ traps:
     name: SPAGENT-MIB::spAnalogue7Status
     category: diagnostic
     severity: warning
-    description: Analogue sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Analogue sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1548,7 +1548,7 @@ traps:
     name: SPAGENT-MIB::spAnalogue8Status
     category: diagnostic
     severity: warning
-    description: Analogue sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Analogue sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1561,7 +1561,7 @@ traps:
     name: SPAGENT-MIB::spSwitch1Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1574,7 +1574,7 @@ traps:
     name: SPAGENT-MIB::spSwitch2Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Switch sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1587,7 +1587,7 @@ traps:
     name: SPAGENT-MIB::spSwitch3Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1600,7 +1600,7 @@ traps:
     name: SPAGENT-MIB::spSwitch4Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1613,7 +1613,7 @@ traps:
     name: SPAGENT-MIB::spSwitch5Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1626,7 +1626,7 @@ traps:
     name: SPAGENT-MIB::spSwitch6Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1639,7 +1639,7 @@ traps:
     name: SPAGENT-MIB::spSwitch7Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1652,7 +1652,7 @@ traps:
     name: SPAGENT-MIB::spSwitch8Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1665,7 +1665,7 @@ traps:
     name: SPAGENT-MIB::spSwitch9Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1678,7 +1678,7 @@ traps:
     name: SPAGENT-MIB::spSwitch10Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1691,7 +1691,7 @@ traps:
     name: SPAGENT-MIB::spSwitch11Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1704,7 +1704,7 @@ traps:
     name: SPAGENT-MIB::spSwitch12Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1717,7 +1717,7 @@ traps:
     name: SPAGENT-MIB::spSwitch13Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1730,7 +1730,7 @@ traps:
     name: SPAGENT-MIB::spSwitch14Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1743,7 +1743,7 @@ traps:
     name: SPAGENT-MIB::spSwitch15Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1756,7 +1756,7 @@ traps:
     name: SPAGENT-MIB::spSwitch16Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1769,7 +1769,7 @@ traps:
     name: SPAGENT-MIB::spSwitch17Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1782,7 +1782,7 @@ traps:
     name: SPAGENT-MIB::spSwitch18Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1795,7 +1795,7 @@ traps:
     name: SPAGENT-MIB::spSwitch19Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1808,7 +1808,7 @@ traps:
     name: SPAGENT-MIB::spSwitch20Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1821,7 +1821,7 @@ traps:
     name: SPAGENT-MIB::spSwitch21Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1834,7 +1834,7 @@ traps:
     name: SPAGENT-MIB::spSwitch22Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1847,7 +1847,7 @@ traps:
     name: SPAGENT-MIB::spSwitch23Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1860,7 +1860,7 @@ traps:
     name: SPAGENT-MIB::spSwitch24Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1873,7 +1873,7 @@ traps:
     name: SPAGENT-MIB::spSwitch25Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1886,7 +1886,7 @@ traps:
     name: SPAGENT-MIB::spSwitch26Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1899,7 +1899,7 @@ traps:
     name: SPAGENT-MIB::spSwitch27Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1912,7 +1912,7 @@ traps:
     name: SPAGENT-MIB::spSwitch28Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1925,7 +1925,7 @@ traps:
     name: SPAGENT-MIB::spSwitch29Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1938,7 +1938,7 @@ traps:
     name: SPAGENT-MIB::spSwitch30Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1951,7 +1951,7 @@ traps:
     name: SPAGENT-MIB::spSwitch31Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1964,7 +1964,7 @@ traps:
     name: SPAGENT-MIB::spSwitch32Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1977,7 +1977,7 @@ traps:
     name: SPAGENT-MIB::spSwitch33Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -1990,7 +1990,7 @@ traps:
     name: SPAGENT-MIB::spSwitch34Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2003,7 +2003,7 @@ traps:
     name: SPAGENT-MIB::spSwitch35Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2016,7 +2016,7 @@ traps:
     name: SPAGENT-MIB::spSwitch36Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2029,7 +2029,7 @@ traps:
     name: SPAGENT-MIB::spSwitch37Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2042,7 +2042,7 @@ traps:
     name: SPAGENT-MIB::spSwitch38Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2055,7 +2055,7 @@ traps:
     name: SPAGENT-MIB::spSwitch39Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2068,7 +2068,7 @@ traps:
     name: SPAGENT-MIB::spSwitch40Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2081,7 +2081,7 @@ traps:
     name: SPAGENT-MIB::spSwitch41Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2094,7 +2094,7 @@ traps:
     name: SPAGENT-MIB::spSwitch42Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2107,7 +2107,7 @@ traps:
     name: SPAGENT-MIB::spSwitch43Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2120,7 +2120,7 @@ traps:
     name: SPAGENT-MIB::spSwitch44Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2133,7 +2133,7 @@ traps:
     name: SPAGENT-MIB::spSwitch45Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2146,7 +2146,7 @@ traps:
     name: SPAGENT-MIB::spSwitch46Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2159,7 +2159,7 @@ traps:
     name: SPAGENT-MIB::spSwitch47Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2172,7 +2172,7 @@ traps:
     name: SPAGENT-MIB::spSwitch48Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2185,7 +2185,7 @@ traps:
     name: SPAGENT-MIB::spSwitch49Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2198,7 +2198,7 @@ traps:
     name: SPAGENT-MIB::spSwitch50Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2211,7 +2211,7 @@ traps:
     name: SPAGENT-MIB::spSwitch51Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2224,7 +2224,7 @@ traps:
     name: SPAGENT-MIB::spSwitch52Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2237,7 +2237,7 @@ traps:
     name: SPAGENT-MIB::spSwitch53Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2250,7 +2250,7 @@ traps:
     name: SPAGENT-MIB::spSwitch54Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2263,7 +2263,7 @@ traps:
     name: SPAGENT-MIB::spSwitch55Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2276,7 +2276,7 @@ traps:
     name: SPAGENT-MIB::spSwitch56Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2289,7 +2289,7 @@ traps:
     name: SPAGENT-MIB::spSwitch57Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2302,7 +2302,7 @@ traps:
     name: SPAGENT-MIB::spSwitch58Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2315,7 +2315,7 @@ traps:
     name: SPAGENT-MIB::spSwitch59Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2328,7 +2328,7 @@ traps:
     name: SPAGENT-MIB::spSwitch60Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} exceeding level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2341,7 +2341,7 @@ traps:
     name: SPAGENT-MIB::spSwitch61Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2354,7 +2354,7 @@ traps:
     name: SPAGENT-MIB::spSwitch62Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2367,7 +2367,7 @@ traps:
     name: SPAGENT-MIB::spSwitch63Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2380,7 +2380,7 @@ traps:
     name: SPAGENT-MIB::spSwitch64Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2393,7 +2393,7 @@ traps:
     name: SPAGENT-MIB::spSwitch65Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2406,7 +2406,7 @@ traps:
     name: SPAGENT-MIB::spSwitch66Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2419,7 +2419,7 @@ traps:
     name: SPAGENT-MIB::spSwitch67Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2432,7 +2432,7 @@ traps:
     name: SPAGENT-MIB::spSwitch68Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2445,7 +2445,7 @@ traps:
     name: SPAGENT-MIB::spIRMS1Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: IRMS sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2458,7 +2458,7 @@ traps:
     name: SPAGENT-MIB::spIRMS2Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: IRMS sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2471,7 +2471,7 @@ traps:
     name: SPAGENT-MIB::spIRMS3Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: IRMS sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2484,7 +2484,7 @@ traps:
     name: SPAGENT-MIB::spIRMS4Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: IRMS sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2497,7 +2497,7 @@ traps:
     name: SPAGENT-MIB::spIRMS5Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: IRMS sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2510,7 +2510,7 @@ traps:
     name: SPAGENT-MIB::spIRMS6Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} exceeding level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: IRMS sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2523,7 +2523,7 @@ traps:
     name: SPAGENT-MIB::spIRMS7Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} exceeded level {spSensorLevelExceeded} with status {spSensorStatus} on {_HOSTNAME}.
+    description: IRMS sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2536,7 +2536,7 @@ traps:
     name: SPAGENT-MIB::spIRMS8Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: IRMS sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2549,7 +2549,7 @@ traps:
     name: SPAGENT-MIB::spVRMS1Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: VRMS sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2562,7 +2562,7 @@ traps:
     name: SPAGENT-MIB::spVRMS2Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: VRMS sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2575,7 +2575,7 @@ traps:
     name: SPAGENT-MIB::spVRMS3Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: VRMS sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2588,7 +2588,7 @@ traps:
     name: SPAGENT-MIB::spVRMS4Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: VRMS sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2601,7 +2601,7 @@ traps:
     name: SPAGENT-MIB::spVRMS5Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: VRMS sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2614,7 +2614,7 @@ traps:
     name: SPAGENT-MIB::spVRMS6Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: VRMS sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2627,7 +2627,7 @@ traps:
     name: SPAGENT-MIB::spVRMS7Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: VRMS sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2640,7 +2640,7 @@ traps:
     name: SPAGENT-MIB::spVRMS8Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: VRMS sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2653,7 +2653,7 @@ traps:
     name: SPAGENT-MIB::spEnergy1Status
     category: diagnostic
     severity: warning
-    description: Energy sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Energy sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2666,7 +2666,7 @@ traps:
     name: SPAGENT-MIB::spEnergy2Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Energy sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2679,7 +2679,7 @@ traps:
     name: SPAGENT-MIB::spEnergy3Status
     category: diagnostic
     severity: warning
-    description: Energy sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Energy sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2692,7 +2692,7 @@ traps:
     name: SPAGENT-MIB::spEnergy4Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Energy sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2705,7 +2705,7 @@ traps:
     name: SPAGENT-MIB::spEnergy5Status
     category: diagnostic
     severity: warning
-    description: Energy sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Energy sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2718,7 +2718,7 @@ traps:
     name: SPAGENT-MIB::spEnergy6Status
     category: diagnostic
     severity: warning
-    description: Energy sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Energy sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2731,7 +2731,7 @@ traps:
     name: SPAGENT-MIB::spEnergy7Status
     category: diagnostic
     severity: warning
-    description: Energy sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Energy sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2744,7 +2744,7 @@ traps:
     name: SPAGENT-MIB::spEnergy8Status
     category: diagnostic
     severity: warning
-    description: Energy sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Energy sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2757,7 +2757,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray1-1Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2770,7 +2770,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray1-2Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported {spSensorStatus} with value {spSensorValue} exceeding level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2783,7 +2783,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray1-3Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2796,7 +2796,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray1-4Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2809,7 +2809,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray1-5Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2822,7 +2822,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray1-6Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2835,7 +2835,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray1-7Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2848,7 +2848,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray1-8Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2861,7 +2861,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray2-1Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2874,7 +2874,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray2-2Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2887,7 +2887,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray2-3Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2900,7 +2900,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray2-4Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2913,7 +2913,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray2-5Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2926,7 +2926,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray2-6Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2939,7 +2939,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray2-7Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2952,7 +2952,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray2-8Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2965,7 +2965,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray3-1Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2978,7 +2978,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray3-2Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -2991,7 +2991,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray3-3Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3004,7 +3004,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray3-4Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3017,7 +3017,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray3-5Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3030,7 +3030,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray3-6Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3043,7 +3043,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray3-7Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3056,7 +3056,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray3-8Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} exceeded level {spSensorLevelExceeded} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3069,7 +3069,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray4-1Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3082,7 +3082,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray4-2Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} exceeded level {spSensorLevelExceeded} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3095,7 +3095,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray4-3Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3108,7 +3108,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray4-4Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3121,7 +3121,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray4-5Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3134,7 +3134,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray4-6Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3147,7 +3147,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray4-7Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3160,7 +3160,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray4-8Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3173,7 +3173,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray5-1Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3186,7 +3186,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray5-2Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3199,7 +3199,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray5-3Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3212,7 +3212,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray5-4Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3225,7 +3225,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray5-5Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3238,7 +3238,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray5-6Status
     category: diagnostic
     severity: warning
-    description: RelayArray5.6 sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3251,7 +3251,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray5-7Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} exceeded level {spSensorLevelExceeded} with status {spSensorStatus} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3264,7 +3264,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray5-8Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3277,7 +3277,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray6-1Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3290,7 +3290,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray6-2Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3303,7 +3303,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray6-3Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3316,7 +3316,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray6-4Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3329,7 +3329,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray6-5Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3342,7 +3342,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray6-6Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3355,7 +3355,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray6-7Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} exceeded level {spSensorLevelExceeded} with status {spSensorStatus} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3368,7 +3368,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray6-8Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3381,7 +3381,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray7-1Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3394,7 +3394,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray7-2Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3407,7 +3407,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray7-3Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3420,7 +3420,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray7-4Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3433,7 +3433,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray7-5Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3446,7 +3446,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray7-6Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3459,7 +3459,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray7-7Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3472,7 +3472,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray7-8Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3485,7 +3485,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray8-1Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3498,7 +3498,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray8-2Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3511,7 +3511,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray8-3Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3524,7 +3524,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray8-4Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3537,7 +3537,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray8-5Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3550,7 +3550,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray8-6Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3563,7 +3563,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray8-7Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3576,7 +3576,7 @@ traps:
     name: SPAGENT-MIB::spRelayArray8-8Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3589,7 +3589,7 @@ traps:
     name: SPAGENT-MIB::spVirtual1Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3602,7 +3602,7 @@ traps:
     name: SPAGENT-MIB::spVirtual2Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3615,7 +3615,7 @@ traps:
     name: SPAGENT-MIB::spVirtual3Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Virtual3 sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3628,7 +3628,7 @@ traps:
     name: SPAGENT-MIB::spVirtual4Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3641,7 +3641,7 @@ traps:
     name: SPAGENT-MIB::spVirtual5Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3654,7 +3654,7 @@ traps:
     name: SPAGENT-MIB::spVirtual6Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3667,7 +3667,7 @@ traps:
     name: SPAGENT-MIB::spVirtual7Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3680,7 +3680,7 @@ traps:
     name: SPAGENT-MIB::spVirtual8Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Virtual8 sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3693,7 +3693,7 @@ traps:
     name: SPAGENT-MIB::spVirtual9Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3706,7 +3706,7 @@ traps:
     name: SPAGENT-MIB::spVirtual10Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3719,7 +3719,7 @@ traps:
     name: SPAGENT-MIB::spVirtual11Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Virtual11 sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3732,7 +3732,7 @@ traps:
     name: SPAGENT-MIB::spVirtual12Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3745,7 +3745,7 @@ traps:
     name: SPAGENT-MIB::spVirtual13Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3758,7 +3758,7 @@ traps:
     name: SPAGENT-MIB::spVirtual14Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Virtual14 sensor status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3771,7 +3771,7 @@ traps:
     name: SPAGENT-MIB::spVirtual15Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3784,7 +3784,7 @@ traps:
     name: SPAGENT-MIB::spVirtual16Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3797,7 +3797,7 @@ traps:
     name: SPAGENT-MIB::spVirtual17Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3810,7 +3810,7 @@ traps:
     name: SPAGENT-MIB::spVirtual18Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatus} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3823,7 +3823,7 @@ traps:
     name: SPAGENT-MIB::spVirtual19Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3836,7 +3836,7 @@ traps:
     name: SPAGENT-MIB::spVirtual20Status
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} status {spSensorStatus} with value {spSensorValue} exceeded level {spSensorLevelExceeded} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus
@@ -3849,7 +3849,7 @@ traps:
     name: SPAGENT-MIB::spCustomStatus
     category: diagnostic
     severity: warning
-    description: Sensor {spSensorName} reported status {spSensorStatusName} with value {spSensorValue} on {_HOSTNAME}.
+    description: Sensor {{value "spSensorName"}} status changed to {{value "spSensorStatusName"}} on {{hostname}}.
     status: current
     varbinds:
       - spSensorStatus

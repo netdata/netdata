@@ -117,398 +117,398 @@ traps:
   - oid: 1.3.6.1.4.1.935.0.1
     name: XPPC-MIB::communicationLost
     category: diagnostic
-    severity: crit
-    description: Communication to the UPS has been lost on {_HOSTNAME}.
+    severity: alert
+    description: Communication to the UPS has been lost on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.2
     name: XPPC-MIB::upsOverLoad
     category: diagnostic
-    severity: warning
-    description: UPS load exceeded 100 percent of rated capacity on {_HOSTNAME}.
+    severity: alert
+    description: UPS overload detected, load exceeded 100 percent of rated capacity on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.3
     name: XPPC-MIB::upsDiagnosticsFailed
     category: diagnostic
     severity: crit
-    description: UPS internal diagnostic self-test failed on {_HOSTNAME}.
+    description: UPS internal diagnostic self-test failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.4
     name: XPPC-MIB::upsDischarged
     category: diagnostic
-    severity: warning
-    description: UPS runtime calibration discharge started on {_HOSTNAME}.
+    severity: alert
+    description: UPS runtime calibration discharge started on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.5
     name: XPPC-MIB::upsOnBattery
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: UPS has switched to battery backup power on {_HOSTNAME}.
+    description: UPS has switched to battery backup power on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.6
     name: XPPC-MIB::boostOn
     category: diagnostic
     severity: notice
-    description: UPS has enabled Boost on {_HOSTNAME}.
+    description: UPS has enabled Boost mode on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.7
     name: XPPC-MIB::lowBattery
     category: diagnostic
-    severity: warning
-    description: UPS batteries are low and will soon be exhausted on {_HOSTNAME}.
+    severity: alert
+    description: UPS batteries are low and will soon be exhausted on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.8
     name: XPPC-MIB::communicationEstablished
     category: state_change
     severity: notice
-    description: Communication with the UPS has been established on {_HOSTNAME}.
+    description: Communication with the UPS has been established on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.9
     name: XPPC-MIB::powerRestored
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Utility power has been restored on {_HOSTNAME}.
+    description: Utility power has been restored on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.10
     name: XPPC-MIB::upsDiagnosticsPassed
     category: diagnostic
-    severity: notice
-    description: UPS internal self-test passed on {_HOSTNAME}.
+    severity: info
+    description: UPS internal self-test passed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.11
     name: XPPC-MIB::returnFromLowBattery
     category: diagnostic
     severity: notice
-    description: UPS returned from low battery condition on {_HOSTNAME}.
+    description: UPS has returned from a low battery condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.12
     name: XPPC-MIB::upsTurnedOff
     category: state_change
-    severity: notice
-    description: UPS has been turned off on {_HOSTNAME}.
+    severity: warning
+    description: UPS has been turned off on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.13
     name: XPPC-MIB::upsSleeping
     category: diagnostic
     severity: warning
-    description: UPS entering sleep mode and cutting power to load on {_HOSTNAME}.
+    description: UPS is entering sleep mode and will cut power to the load on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.14
     name: XPPC-MIB::upsWokeUp
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS woke up from sleep mode on {_HOSTNAME}.
+    description: UPS woke up from sleep mode and power to the load has been restored on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.15
     name: XPPC-MIB::upsRebootStarted
     category: state_change
-    severity: notice
-    description: UPS reboot sequence started on {_HOSTNAME}.
+    severity: alert
+    description: UPS reboot sequence started on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.16
     name: XPPC-MIB::envOverTemperature
     category: diagnostic
-    severity: warning
-    description: Environment temperature exceeded normal value on {_HOSTNAME}.
+    severity: crit
+    description: Environment temperature exceeded normal value on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.17
     name: XPPC-MIB::envTemperatureNormal
     category: diagnostic
     severity: notice
-    description: Environment temperature is normal on {_HOSTNAME}.
+    description: Environment temperature is normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.18
     name: XPPC-MIB::envOverHumidity
     category: diagnostic
     severity: warning
-    description: Environmental humidity exceeded normal value on {_HOSTNAME}.
+    description: Environmental humidity exceeded normal value on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.19
     name: XPPC-MIB::envHumidityNormal
     category: diagnostic
     severity: info
-    description: Environment humidity is normal on {_HOSTNAME}.
+    description: Environment humidity is normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.20
     name: XPPC-MIB::envSmokeAbnormal
     category: diagnostic
-    severity: alert
-    description: Smoke sensor reported abnormal condition on {_HOSTNAME}.
+    severity: warning
+    description: Smoke sensor reports abnormal condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.21
     name: XPPC-MIB::envWaterAbnormal
     category: diagnostic
     severity: warning
-    description: Water sensor reported abnormal condition on {_HOSTNAME}.
+    description: Water sensor reports abnormal condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.22
     name: XPPC-MIB::envSecurityAbnormal
     category: security
     severity: warning
-    description: Security abnormality detected on {_HOSTNAME}.
+    description: Security status is abnormal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.24
     name: XPPC-MIB::envWaterNormal
     category: diagnostic
-    severity: notice
-    description: Water sensor reports normal status on {_HOSTNAME}.
+    severity: info
+    description: Water sensor reports normal status on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.26
     name: XPPC-MIB::envGasAbnormal
     category: diagnostic
-    severity: warning
-    description: Gas alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: Gas alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.27
     name: XPPC-MIB::upsTemp
     category: diagnostic
     severity: warning
-    description: UPS temperature overrun detected on {_HOSTNAME}.
+    description: UPS temperature overrun detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.28
     name: XPPC-MIB::upsLoadNormal
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS load returned to normal state on {_HOSTNAME}.
+    description: UPS load returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.29
     name: XPPC-MIB::upsTempNormal
     category: diagnostic
     severity: notice
-    description: UPS temperature returned to normal state on {_HOSTNAME}.
+    description: UPS temperature returned to normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.30
     name: XPPC-MIB::envUnderTemperature
     category: diagnostic
     severity: warning
-    description: Environment temperature below normal value on {_HOSTNAME}.
+    description: Environment temperature is below normal value on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.31
     name: XPPC-MIB::envUnderHumidity
     category: diagnostic
     severity: warning
-    description: Environment humidity below normal value on {_HOSTNAME}.
+    description: Environment humidity is below normal value on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.32
     name: XPPC-MIB::upsBypass
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: UPS entering bypass mode on {_HOSTNAME}.
+    description: UPS is entering bypass mode on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.33
     name: XPPC-MIB::envSecurity1
     category: security
-    severity: warning
-    description: Security1 alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: Security1 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.34
     name: XPPC-MIB::envSecurity2
     category: security
     severity: alert
-    description: Security2 alarm detected on {_HOSTNAME}.
+    description: Security2 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.35
     name: XPPC-MIB::envSecurity3
-    category: security
-    severity: warning
-    description: Security3 alarm triggered on {_HOSTNAME}.
+    category: diagnostic
+    severity: alert
+    description: Security3 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.36
     name: XPPC-MIB::envSecurity4
     category: security
-    severity: warning
-    description: Security4 alarm triggered on {_HOSTNAME}.
+    severity: alert
+    description: Security4 alarm triggered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.37
     name: XPPC-MIB::envSecurity5
     category: security
     severity: warning
-    description: Security5 alarm detected on {_HOSTNAME}.
+    description: Security5 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.38
     name: XPPC-MIB::envSecurity6
     category: security
-    severity: warning
-    description: Security6 alarm triggered on {_HOSTNAME}.
+    severity: alert
+    description: Security6 alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.39
     name: XPPC-MIB::envSecurity7
     category: security
-    severity: warning
-    description: Security7 alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: Security7 alarm triggered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.47
     name: XPPC-MIB::upsRecroterror
     category: diagnostic
-    severity: err
-    description: Rectifier rotation error detected on {_HOSTNAME}.
+    severity: warning
+    description: Rectifier rotation error detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.48
     name: XPPC-MIB::upsBypassFreFail
     category: diagnostic
-    severity: warning
-    description: UPS bypass frequency failure detected on {_HOSTNAME}.
+    severity: crit
+    description: UPS bypass frequency failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.49
     name: XPPC-MIB::upsBypassacnormal
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: UPS bypass AC normal condition detected on {_HOSTNAME}.
+    description: UPS bypass AC normal condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.50
     name: XPPC-MIB::upsBypassacabnormal
     category: diagnostic
     severity: warning
-    description: UPS bypass AC abnormal condition detected on {_HOSTNAME}.
+    description: UPS bypass AC abnormal condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.51
     name: XPPC-MIB::upsTest
     category: diagnostic
     severity: notice
-    description: UPS test initiated on {_HOSTNAME}.
+    description: UPS self-test initiated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.52
     name: XPPC-MIB::upsScheduleShutdown
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: UPS scheduled shutdown initiated on {_HOSTNAME}.
+    description: UPS scheduled shutdown event triggered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.53
     name: XPPC-MIB::upsBypassReturn
     category: state_change
     severity: notice
-    description: UPS returned from Bypass Mode on {_HOSTNAME}.
+    description: UPS returned from Bypass Mode on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.54
     name: XPPC-MIB::upsShortCircuitShutdown
     category: diagnostic
     severity: crit
-    description: UPS short circuit shutdown detected on {_HOSTNAME}.
+    description: UPS short circuit shutdown occurred on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.55
     name: XPPC-MIB::upsInverterOutputFailShutdown
     category: diagnostic
     severity: alert
-    description: UPS inverter output failure caused shutdown on {_HOSTNAME}.
+    description: UPS inverter output failure caused shutdown on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.56
     name: XPPC-MIB::upsBypassBreadkerOnShutdown
     category: state_change
-    severity: notice
-    description: UPS manual bypass breaker activated on shutdown on {_HOSTNAME}.
+    severity: alert
+    description: UPS manual bypass breaker on shutdown detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.57
     name: XPPC-MIB::upsHighDCShutdown
     category: diagnostic
-    severity: crit
-    description: UPS high DC shutdown event detected on {_HOSTNAME}.
+    severity: alert
+    description: UPS high DC shutdown event detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.58
     name: XPPC-MIB::upsEmergencyStop
     category: diagnostic
     severity: alert
-    description: UPS emergency stop triggered on {_HOSTNAME}.
+    description: UPS emergency stop triggered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.59
     name: XPPC-MIB::upsInverterMode
     category: state_change
     severity: notice
-    description: UPS static switch changed to inverter mode on {_HOSTNAME}.
+    description: UPS switched to inverter mode on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.60
     name: XPPC-MIB::upsBypassMode
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: UPS static switch entered bypass mode on {_HOSTNAME}.
+    description: UPS static switch entered bypass mode on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.61
     name: XPPC-MIB::upsOverTemperatureShutdown
     category: diagnostic
-    severity: alert
-    description: UPS over temperature shutdown detected on {_HOSTNAME}.
+    severity: crit
+    description: UPS over temperature shutdown occurred on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.62
     name: XPPC-MIB::upsOverLoadShutdown
     category: diagnostic
     severity: alert
-    description: UPS entered overload shutdown condition on {_HOSTNAME}.
+    description: UPS overload shutdown occurred on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.63
     name: XPPC-MIB::upsCapacityUnderrun
     category: diagnostic
-    severity: warning
-    description: UPS capacity underrun detected on {_HOSTNAME}.
+    severity: alert
+    description: UPS capacity underrun detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.64
     name: XPPC-MIB::upsCapacityNormal
     category: state_change
     severity: notice
-    description: UPS capacity returned to normal state on {_HOSTNAME}.
+    description: UPS capacity returned to normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.67
     name: XPPC-MIB::upsLowBatteryShutdown
     category: diagnostic
     severity: alert
-    description: UPS low battery shutdown event detected on {_HOSTNAME}.
+    description: UPS low battery shutdown event detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.68
     name: XPPC-MIB::buckOn
     category: state_change
     severity: notice
-    description: UPS Buck state changed to enabled on {_HOSTNAME}.
+    description: UPS Buck mode enabled on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.69
     name: XPPC-MIB::returnFromBuck
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS returned from Buck state on {_HOSTNAME}.
+    description: UPS has returned from Buck state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.0.70
     name: XPPC-MIB::returnFromBoost
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS has returned from Boost mode on {_HOSTNAME}.
+    description: UPS has returned from Boost on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.1
     name: EPPC-MIB::upsEPowerFail
     category: diagnostic
     severity: warning
-    description: Utility power not available on {_HOSTNAME}.
+    description: Utility power not available on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.2
     name: EPPC-MIB::upsEPowerRestored
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Utility power restored on {_HOSTNAME}.
+    description: UPS utility power has been restored on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.3
     name: EPPC-MIB::upsELowBattery
     category: diagnostic
-    severity: warning
-    description: UPS batteries are low and will soon be exhausted on {_HOSTNAME}.
+    severity: alert
+    description: UPS batteries are low and will soon be exhausted on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.4
     name: EPPC-MIB::upsEReturnFromLowBattery
     category: state_change
     severity: notice
-    description: UPS returned from low battery condition on {_HOSTNAME}.
+    description: UPS returned from low battery condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.5
     name: EPPC-MIB::upsEFailed
     category: diagnostic
-    severity: crit
-    description: UPS reported severe failure on {_HOSTNAME}.
+    severity: alert
+    description: UPS severe failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.6
     name: EPPC-MIB::upsEOk
-    category: diagnostic
+    category: state_change
     severity: info
-    description: UPS reported normal operational status on {_HOSTNAME}.
+    description: UPS is working fine on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.7
     name: EPPC-MIB::upsEOnBattery
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: UPS switched to battery backup with {upsEBatteryEstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    description: UPS switched to battery backup{{with value "upsEBatteryEstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - upsEBatteryEstimatedMinutesRemaining
@@ -517,19 +517,19 @@ traps:
     name: EPPC-MIB::upsENotOnBattery
     category: state_change
     severity: notice
-    description: UPS switched off battery power on {_HOSTNAME}.
+    description: UPS is not on battery power on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.9
     name: EPPC-MIB::upsETestInProgress
     category: diagnostic
-    severity: notice
-    description: UPS self-test in progress on {_HOSTNAME}.
+    severity: info
+    description: UPS self-test is in progress on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.10
     name: EPPC-MIB::upsETestOver
     category: diagnostic
-    severity: notice
-    description: UPS battery test completed on {_HOSTNAME}.
+    severity: info
+    description: UPS battery test completed on {{hostname}}.
     status: current
     varbinds:
       - upsEBatteryTestStart
@@ -540,67 +540,67 @@ traps:
     name: EPPC-MIB::upsEBypassOn
     category: state_change
     severity: notice
-    description: UPS bypass mode enabled on {_HOSTNAME}.
+    description: UPS has enabled bypass on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.12
     name: EPPC-MIB::upsEOnline
     category: state_change
-    severity: notice
-    description: UPS returned to normal online status on {_HOSTNAME}.
+    severity: info
+    description: UPS returned to normal online status on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.13
     name: EPPC-MIB::upsECommunicationLost
     category: diagnostic
-    severity: crit
-    description: Communication to the UPS has been lost on {_HOSTNAME}.
+    severity: alert
+    description: Communication to the UPS has been lost on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.14
     name: EPPC-MIB::upsECommunicationEstablished
     category: state_change
     severity: notice
-    description: Communication with the UPS has been established on {_HOSTNAME}.
+    description: UPS communication established on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.15
     name: EPPC-MIB::upsEGoingShutdown
     category: diagnostic
-    severity: warning
-    description: UPS is going to shutdown output on {_HOSTNAME}.
+    severity: alert
+    description: UPS is going to shutdown output on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.16
     name: EPPC-MIB::upsEShutdownCancelled
     category: state_change
     severity: notice
-    description: UPS shutdown cancelled on {_HOSTNAME}.
+    description: UPS shutdown cancelled, output remains active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.17
     name: EPPC-MIB::upsEOutlet1GoingShutdown
     category: diagnostic
     severity: warning
-    description: UPS outlet 1 is going to shutdown on {_HOSTNAME}.
+    description: UPS outlet 1 is going to shutdown on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.18
     name: EPPC-MIB::upsEOutlet1ShutdownCancelled
     category: state_change
     severity: notice
-    description: UPS outlet shutdown cancelled on {_HOSTNAME}.
+    description: UPS outlet 1 shutdown cancelled on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.19
     name: EPPC-MIB::upsEOutlet2GoingShutdown
     category: diagnostic
-    severity: warning
-    description: UPS is going to shutdown outlet 2 on {_HOSTNAME}.
+    severity: alert
+    description: UPS is going to shutdown outlet 2 on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.20
     name: EPPC-MIB::upsEOutlet2ShutdownCancelled
     category: state_change
     severity: notice
-    description: UPS outlet 2 shutdown cancelled on {_HOSTNAME}.
+    description: UPS outlet 2 shutdown cancelled on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.21
     name: EPPC-MIB::upsESleeping
     category: state_change
     severity: warning
-    description: UPS has entered sleep mode and power to load has been cut off on {_HOSTNAME}.
+    description: UPS has entered sleep mode and power to load has been cut off on {{hostname}}.
     status: current
     varbinds:
       - upsEControlOutputOnDelay
@@ -608,13 +608,13 @@ traps:
     name: EPPC-MIB::upsEWokeUp
     category: state_change
     severity: notice
-    description: UPS woke up from sleep mode and power restored on {_HOSTNAME}.
+    description: UPS woke up from sleep mode and power to load has been restored on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.23
     name: EPPC-MIB::upsEOverTemperature
     category: diagnostic
     severity: warning
-    description: UPS temperature {upsESystemTemperature} exceeded setpoint {upsESystemConfigOverTemperatureSetPoint} on {_HOSTNAME}.
+    description: UPS temperature {{value "upsESystemTemperature"}} exceeded limit {{value "upsESystemConfigOverTemperatureSetPoint"}} on {{hostname}}.
     status: current
     varbinds:
       - upsESystemTemperature
@@ -622,8 +622,8 @@ traps:
   - oid: 1.3.6.1.4.1.935.10.1.2.0.24
     name: EPPC-MIB::upsENotOverTemperature
     category: diagnostic
-    severity: notice
-    description: UPS temperature {upsESystemTemperature} is within limit {upsESystemConfigOverTemperatureSetPoint} on {_HOSTNAME}.
+    severity: info
+    description: UPS temperature {{value "upsESystemTemperature"}} is within limits on {{hostname}}.
     status: current
     varbinds:
       - upsESystemTemperature
@@ -632,37 +632,37 @@ traps:
     name: EPPC-MIB::upsEOverLoad
     category: diagnostic
     severity: warning
-    description: UPS output load {upsESystemOutputLoad} exceeded high setpoint {upsESystemConfigOutputLoadHighSetPoint} on {_HOSTNAME}.
+    description: UPS output load {{value "upsESystemOutputLoad"}}% exceeded set point {{value "upsESystemConfigOutputLoadHighSetPoint"}}% on {{hostname}}.
     status: current
     varbinds:
       - upsESystemOutputLoad
       - upsESystemConfigOutputLoadHighSetPoint
   - oid: 1.3.6.1.4.1.935.10.1.2.0.26
     name: EPPC-MIB::upsENotOverLoad
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS load {upsESystemOutputLoad} is within limit {upsESystemConfigOutputLoadHighSetPoint} on {_HOSTNAME}.
+    description: UPS load returned to normal ({{value "upsESystemOutputLoad"}}%) on {{hostname}}.
     status: current
     varbinds:
       - upsESystemOutputLoad
       - upsESystemConfigOutputLoadHighSetPoint
   - oid: 1.3.6.1.4.1.935.10.1.2.0.27
     name: EPPC-MIB::upsEModuleInserted
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS module or charger module plug-in detected on {_HOSTNAME}.
+    description: UPS module or charger module inserted on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.28
     name: EPPC-MIB::upsEModuleRemoved
     category: diagnostic
     severity: warning
-    description: UPS module unplugged on {_HOSTNAME}.
+    description: UPS module or charger module unplugged on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.29
     name: EPPC-MIB::sensorTemperatureTooHigh
     category: diagnostic
     severity: warning
-    description: Sensor temperature {upsEEnvironmentCurrentTemperature} exceeded high set point {upsEEnvironmentTemperatureHighSetPoint} on {_HOSTNAME}.
+    description: Sensor temperature {{value "upsEEnvironmentCurrentTemperature"}} exceeded high set point {{value "upsEEnvironmentTemperatureHighSetPoint"}} on {{hostname}}.
     status: current
     varbinds:
       - upsEEnvironmentTemperatureHighSetPoint
@@ -671,7 +671,7 @@ traps:
     name: EPPC-MIB::sensorTemperatureNotHigh
     category: diagnostic
     severity: notice
-    description: Sensor temperature {upsEEnvironmentCurrentTemperature} is not over high set point {upsEEnvironmentTemperatureHighSetPoint} on {_HOSTNAME}.
+    description: Sensor temperature is not over high set point {{value "upsEEnvironmentTemperatureHighSetPoint"}} on {{hostname}}.
     status: current
     varbinds:
       - upsEEnvironmentTemperatureHighSetPoint
@@ -680,7 +680,7 @@ traps:
     name: EPPC-MIB::sensorTemperatureTooLow
     category: diagnostic
     severity: warning
-    description: Sensor temperature {upsEEnvironmentCurrentTemperature} is below low set point {upsEEnvironmentTemperatureLowSetPoint} on {_HOSTNAME}.
+    description: Sensor temperature is below low set point of {{value "upsEEnvironmentTemperatureLowSetPoint"}} on {{hostname}}.
     status: current
     varbinds:
       - upsEEnvironmentTemperatureLowSetPoint
@@ -689,7 +689,7 @@ traps:
     name: EPPC-MIB::sensorTemperatureNotLow
     category: diagnostic
     severity: warning
-    description: Sensor temperature {upsEEnvironmentCurrentTemperature} is not below low set point {upsEEnvironmentTemperatureLowSetPoint} on {_HOSTNAME}.
+    description: Sensor temperature is not under low set point ({{value "upsEEnvironmentCurrentTemperature"}}) on {{hostname}}.
     status: current
     varbinds:
       - upsEEnvironmentTemperatureLowSetPoint
@@ -698,7 +698,7 @@ traps:
     name: EPPC-MIB::sensorHumidityTooHigh
     category: diagnostic
     severity: warning
-    description: Sensor humidity {upsEEnvironmentCurrentHumidity}% exceeded high set point {upsEEnvironmentHumidityHighSetPoint}% on {_HOSTNAME}.
+    description: Sensor humidity {{value "upsEEnvironmentCurrentHumidity"}}% exceeded high set point {{value "upsEEnvironmentHumidityHighSetPoint"}}% on {{hostname}}.
     status: current
     varbinds:
       - upsEEnvironmentHumidityHighSetPoint
@@ -707,7 +707,7 @@ traps:
     name: EPPC-MIB::sensorHumidityNotHigh
     category: diagnostic
     severity: notice
-    description: Sensor humidity {upsEEnvironmentCurrentHumidity}% is not over high set point {upsEEnvironmentHumidityHighSetPoint}% on {_HOSTNAME}.
+    description: Sensor humidity is not over high set point {{value "upsEEnvironmentHumidityHighSetPoint"}}% on {{hostname}}.
     status: current
     varbinds:
       - upsEEnvironmentHumidityHighSetPoint
@@ -716,7 +716,7 @@ traps:
     name: EPPC-MIB::sensorHumidityTooLow
     category: diagnostic
     severity: warning
-    description: Humidity {upsEEnvironmentCurrentHumidity}% is below low threshold {upsEEnvironmentHumidityLowSetPoint}% on {_HOSTNAME}.
+    description: 'Sensor humidity is below low set point of {{value "upsEEnvironmentHumidityLowSetPoint"}}% (current: {{value "upsEEnvironmentCurrentHumidity"}}%) on {{hostname}}.'
     status: current
     varbinds:
       - upsEEnvironmentHumidityLowSetPoint
@@ -725,7 +725,7 @@ traps:
     name: EPPC-MIB::sensorHumidityNotLow
     category: diagnostic
     severity: warning
-    description: Humidity {upsEEnvironmentCurrentHumidity}% is not below low set point {upsEEnvironmentHumidityLowSetPoint}% on {_HOSTNAME}.
+    description: Sensor humidity is not under low set point ({{value "upsEEnvironmentCurrentHumidity"}}% vs {{value "upsEEnvironmentHumidityLowSetPoint"}}%) on {{hostname}}.
     status: current
     varbinds:
       - upsEEnvironmentHumidityLowSetPoint
@@ -734,16 +734,16 @@ traps:
     name: EPPC-MIB::contactAlarm1Active
     category: diagnostic
     severity: warning
-    description: Contact alarm activated for {upsEEnvironmentContactDescription} on {_HOSTNAME}.
+    description: Contact alarm activated{{with value "upsEEnvironmentContactDescription"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - upsEEnvironmentContactType
       - upsEEnvironmentContactDescription
   - oid: 1.3.6.1.4.1.935.10.1.2.0.38
     name: EPPC-MIB::concactAlarm1Normal
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Contact alarm {upsEEnvironmentContactDescription} is not active on {_HOSTNAME}.
+    description: Contact Alarm-1 is not active on {{hostname}}.
     status: current
     varbinds:
       - upsEEnvironmentContactType
@@ -752,7 +752,7 @@ traps:
     name: EPPC-MIB::contactAlarm2Active
     category: diagnostic
     severity: warning
-    description: Contact alarm activated for {upsEEnvironmentContactDescription} on {_HOSTNAME}.
+    description: Contact alarm activated{{with value "upsEEnvironmentContactDescription"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - upsEEnvironmentContactType
@@ -761,7 +761,7 @@ traps:
     name: EPPC-MIB::contactAlarm2Normal
     category: diagnostic
     severity: notice
-    description: Contact alarm {upsEEnvironmentContactDescription} is not active on {_HOSTNAME}.
+    description: Contact alarm cleared for {{first (value "upsEEnvironmentContactDescription") "environment contact"}} on {{hostname}}.
     status: current
     varbinds:
       - upsEEnvironmentContactType
@@ -770,355 +770,355 @@ traps:
     name: EPPC-MIB::upsEInternalwarning
     category: diagnostic
     severity: warning
-    description: Internal warning reported on {_HOSTNAME}.
+    description: UPS internal warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.42
     name: EPPC-MIB::upsEReturnFromInternalwarning
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS returned from internal warning on {_HOSTNAME}.
+    description: UPS returned from internal warning on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.43
     name: EPPC-MIB::upsEEPOActive
     category: diagnostic
-    severity: warning
-    description: EPO active state detected on {_HOSTNAME}.
+    severity: alert
+    description: Emergency Power Off (EPO) is active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.44
     name: EPPC-MIB::upsEReturnFromEPOActive
     category: state_change
     severity: notice
-    description: UPS returned from EPO active state on {_HOSTNAME}.
+    description: UPS returned from EPO active state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.45
     name: EPPC-MIB::upsEModuleUnlock
-    category: diagnostic
+    category: security
     severity: warning
-    description: UPS module unlock detected on {_HOSTNAME}.
+    description: UPS module unlock detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.46
     name: EPPC-MIB::upsEReturnFromModuleUnlock
     category: state_change
     severity: notice
-    description: UPS module unlock event occurred on {_HOSTNAME}.
+    description: UPS module unlock event returned on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.47
     name: EPPC-MIB::upsEMain1Neutralloss
     category: diagnostic
     severity: crit
-    description: Main 1 neutral loss detected on {_HOSTNAME}.
+    description: Main 1 neutral loss detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.48
     name: EPPC-MIB::upsEReturnFromMain1Neutralloss
     category: diagnostic
     severity: warning
-    description: UPS returned from Main 1 neutral loss on {_HOSTNAME}.
+    description: UPS returned from Main 1 neutral loss on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.49
     name: EPPC-MIB::upsEMain1phaseerror
     category: diagnostic
-    severity: err
-    description: UPS main 1 phase error detected on {_HOSTNAME}.
+    severity: warning
+    description: UPS main 1 phase error detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.50
     name: EPPC-MIB::upsEReturnFromMain1phaseerror
     category: diagnostic
     severity: warning
-    description: UPS returned from Main 1 phase error on {_HOSTNAME}.
+    description: UPS returned from main 1-phase error on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.51
     name: EPPC-MIB::upsESitefault
     category: diagnostic
-    severity: warning
-    description: UPS site fault detected on {_HOSTNAME}.
+    severity: alert
+    description: UPS site fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.52
     name: EPPC-MIB::upsEReturnFromSitefault
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS returned from site fault on {_HOSTNAME}.
+    description: UPS returned from site fault on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.53
     name: EPPC-MIB::upsEBypassAbnormal
     category: diagnostic
     severity: warning
-    description: UPS bypass abnormal condition detected on {_HOSTNAME}.
+    description: UPS bypass abnormal condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.54
     name: EPPC-MIB::upsEReturnFromBypassAbnormal
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: UPS returned from bypass abnormal state on {_HOSTNAME}.
+    description: UPS returned from bypass abnormal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.55
     name: EPPC-MIB::upsEBypassPhaseError
     category: diagnostic
-    severity: err
-    description: Bypass phase error detected on {_HOSTNAME}.
+    severity: crit
+    description: UPS bypass phase error detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.56
     name: EPPC-MIB::upsEReturnFromBypassPhaseError
-    category: diagnostic
-    severity: notice
-    description: UPS returned from bypass phase error on {_HOSTNAME}.
+    category: state_change
+    severity: warning
+    description: UPS returned from bypass phase error on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.57
     name: EPPC-MIB::upsEBatteryOpen
     category: diagnostic
-    severity: warning
-    description: Battery open condition detected on {_HOSTNAME}.
+    severity: alert
+    description: UPS battery open detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.58
     name: EPPC-MIB::upsEReturnFromBatteryOpen
     category: state_change
     severity: notice
-    description: UPS returned from battery open state on {_HOSTNAME}.
+    description: UPS returned from battery open state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.59
     name: EPPC-MIB::upsEBatteryOverCharge
     category: diagnostic
-    severity: warning
-    description: Battery over charge condition detected on {_HOSTNAME}.
+    severity: alert
+    description: UPS battery over charge condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.60
     name: EPPC-MIB::upsEReturnFromBatteryOverCharge
     category: diagnostic
     severity: notice
-    description: UPS returned from battery over charge state on {_HOSTNAME}.
+    description: UPS returned from battery over charge condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.61
     name: EPPC-MIB::upsEBatteryReverse
     category: diagnostic
-    severity: warning
-    description: Battery reverse condition detected on {_HOSTNAME}.
+    severity: alert
+    description: UPS battery reverse condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.62
     name: EPPC-MIB::upsEReturnFromBatteryReverse
-    category: diagnostic
-    severity: warning
-    description: UPS returned from battery reverse state on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: UPS returned from battery reverse state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.63
     name: EPPC-MIB::upsEOverloadforewarning
     category: diagnostic
     severity: warning
-    description: UPS overload forewarning detected on {_HOSTNAME}.
+    description: UPS overload forewarning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.64
     name: EPPC-MIB::upsEReturnFromOverloadforewarning
     category: diagnostic
     severity: notice
-    description: UPS returned from overload forewarning on {_HOSTNAME}.
+    description: UPS returned from overload forewarning on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.65
     name: EPPC-MIB::upsEOverloadWarning
     category: diagnostic
     severity: warning
-    description: UPS overload warning detected on {_HOSTNAME}.
+    description: UPS overload warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.66
     name: EPPC-MIB::upsEReturnFromOverloadWarning
     category: diagnostic
     severity: notice
-    description: UPS returned from overload warning on {_HOSTNAME}.
+    description: UPS returned from overload warning on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.67
     name: EPPC-MIB::upsEFanLock
     category: diagnostic
-    severity: err
-    description: Fan lock detected on {_HOSTNAME}.
+    severity: crit
+    description: UPS fan lock detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.68
     name: EPPC-MIB::upsEReturnFromFanLock
     category: diagnostic
     severity: warning
-    description: Fan lock condition cleared on {_HOSTNAME}.
+    description: UPS fan lock condition resolved on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.69
     name: EPPC-MIB::upsEMaintaincoverisopen
     category: diagnostic
     severity: warning
-    description: UPS maintenance cover is open on {_HOSTNAME}.
+    description: UPS maintenance cover is open on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.70
     name: EPPC-MIB::upsEReturnFromMaintaincoverisopen
     category: diagnostic
-    severity: warning
-    description: UPS maintenance cover is open on {_HOSTNAME}.
+    severity: notice
+    description: UPS maintenance cover is open on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.71
     name: EPPC-MIB::upsEChargerfault
     category: diagnostic
-    severity: err
-    description: UPS charger fault detected on {_HOSTNAME}.
+    severity: crit
+    description: UPS charger fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.72
     name: EPPC-MIB::upsEReturnFromChargerfault
     category: diagnostic
     severity: notice
-    description: UPS returned from charger fault on {_HOSTNAME}.
+    description: UPS returned from charger fault on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.73
     name: EPPC-MIB::upsEModulelocationerror
     category: diagnostic
     severity: warning
-    description: Module location error detected on {_HOSTNAME}.
+    description: UPS module location error detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.74
     name: EPPC-MIB::upsEReturnFromModulelocationerror
     category: diagnostic
     severity: warning
-    description: UPS module location error cleared on {_HOSTNAME}.
+    description: UPS module location error cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.75
     name: EPPC-MIB::upsETurnonabnormal
     category: diagnostic
     severity: warning
-    description: UPS reported abnormal turn-on event on {_HOSTNAME}.
+    description: UPS turn-on abnormal event detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.76
     name: EPPC-MIB::upsEReturnFromTurnonabnormal
     category: diagnostic
     severity: warning
-    description: UPS returned from abnormal turn-on event on {_HOSTNAME}.
+    description: UPS returned from abnormal turn-on event on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.77
     name: EPPC-MIB::upsERedundancyloss
     category: state_change
-    severity: alert
-    description: Redundancy loss detected on {_HOSTNAME}.
+    severity: crit
+    description: UPS redundancy loss detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.78
     name: EPPC-MIB::upsEReturnFromRedundancyloss
     category: state_change
     severity: notice
-    description: UPS returned from redundancy loss on {_HOSTNAME}.
+    description: UPS returned from redundancy loss on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.79
     name: EPPC-MIB::upsEHotSwapActived
     category: diagnostic
     severity: warning
-    description: Hot swap active on {_HOSTNAME}.
+    description: Hot swap active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.80
     name: EPPC-MIB::upsEReturnFromHotSwapActived
     category: state_change
     severity: notice
-    description: UPS returned from hot swap active state on {_HOSTNAME}.
+    description: UPS returned from hot swap active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.81
     name: EPPC-MIB::upsEBatteryInform
     category: diagnostic
     severity: warning
-    description: UPS battery inform event received on {_HOSTNAME}.
+    description: UPS battery inform warning on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.82
     name: EPPC-MIB::upsEReturnFromBatteryInform
     category: state_change
     severity: notice
-    description: UPS returned from battery power on {_HOSTNAME}.
+    description: UPS returned from battery power on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.83
     name: EPPC-MIB::upsEInspectionInform
     category: diagnostic
-    severity: notice
-    description: UPS inspection inform received on {_HOSTNAME}.
+    severity: warning
+    description: UPS inspection inform event detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.84
     name: EPPC-MIB::upsEReturnFromInspectionInform
     category: diagnostic
     severity: notice
-    description: UPS return from inspection on {_HOSTNAME}.
+    description: UPS inspection completed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.85
     name: EPPC-MIB::upsEGuaranteeInform
     category: diagnostic
     severity: warning
-    description: UPS guarantee warning triggered on {_HOSTNAME}.
+    description: UPS guarantee warning triggered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.86
     name: EPPC-MIB::upsEReturnFromGuaranteeInform
     category: state_change
     severity: notice
-    description: UPS returned from guarantee inform state on {_HOSTNAME}.
+    description: UPS returned from guarantee inform state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.87
     name: EPPC-MIB::upsETemperatureLow
     category: diagnostic
     severity: warning
-    description: Low temperature warning detected on {_HOSTNAME}.
+    description: UPS temperature low warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.88
     name: EPPC-MIB::upsEReturnFromTemperatureLow
     category: diagnostic
     severity: notice
-    description: UPS returned from low temperature state on {_HOSTNAME}.
+    description: UPS returned from low temperature condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.89
     name: EPPC-MIB::upsETemperatureHigh
     category: diagnostic
     severity: warning
-    description: High temperature warning detected on {_HOSTNAME}.
+    description: UPS temperature high warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.90
     name: EPPC-MIB::upsEReturnFromTemperatureHigh
     category: diagnostic
     severity: notice
-    description: UPS returned from high temperature state on {_HOSTNAME}.
+    description: UPS returned from high temperature condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.91
     name: EPPC-MIB::upsEBatteryOverTemperature
     category: diagnostic
     severity: warning
-    description: Battery over temperature detected on {_HOSTNAME}.
+    description: UPS battery over temperature condition detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.92
     name: EPPC-MIB::upsEReturnFromBatteryOverTemperature
     category: diagnostic
-    severity: warning
-    description: UPS returned from battery over temperature condition on {_HOSTNAME}.
+    severity: notice
+    description: UPS returned from battery over temperature condition on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.93
     name: EPPC-MIB::upsEFanMaintainInform
     category: diagnostic
     severity: warning
-    description: Fan maintenance warning received on {_HOSTNAME}.
+    description: UPS fan maintenance warning on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.94
     name: EPPC-MIB::upsEReturnFromFanMaintainInform
     category: diagnostic
     severity: notice
-    description: UPS fan maintenance completed on {_HOSTNAME}.
+    description: UPS fan maintenance mode ended on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.95
     name: EPPC-MIB::upsEBusCapacitanceMaintainInform
     category: diagnostic
     severity: warning
-    description: UPS bus capacitance maintenance warning on {_HOSTNAME}.
+    description: UPS bus capacitance maintenance warning on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.96
     name: EPPC-MIB::upsEReturnFromBusCapacitanceMaintainInform
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS returned from bus capacitance maintenance on {_HOSTNAME}.
+    description: UPS returned from bus capacitance maintenance on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.97
     name: EPPC-MIB::upsESystemOverCapacity
     category: diagnostic
-    severity: warning
-    description: System over capacity detected on {_HOSTNAME}.
+    severity: alert
+    description: UPS system over capacity detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.98
     name: EPPC-MIB::upsEReturnFromSystemOverCapacity
-    category: diagnostic
-    severity: warning
-    description: UPS returned from system over capacity on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: UPS returned from system over capacity on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.123
     name: EPPC-MIB::upsEBelowCapacityLimit
     category: diagnostic
     severity: warning
-    description: UPS battery charge {upsEBatteryEstimatedChargeRemaining}% is below configured limit {upsESystemConfigBelowCapacityLimit}% on {_HOSTNAME}.
+    description: UPS battery capacity is below configured limit of {{value "upsESystemConfigBelowCapacityLimit"}}% on {{hostname}}.
     status: current
     varbinds:
       - upsEBatteryEstimatedChargeRemaining
@@ -1126,14 +1126,14 @@ traps:
   - oid: 1.3.6.1.4.1.935.10.1.2.0.124
     name: EPPC-MIB::upsENotBelowCapacityLimit
     category: diagnostic
-    severity: notice
-    description: UPS battery capacity is not below the configured limit on {_HOSTNAME}.
+    severity: info
+    description: UPS battery capacity is not below the limit on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.125
     name: EPPC-MIB::upsEBelowRemainTimeLimit
     category: diagnostic
     severity: warning
-    description: UPS battery estimated runtime {upsEBatteryEstimatedMinutesRemaining} minutes is below configured limit {upsESystemConfigBelowRemainTimeLimit} minutes on {_HOSTNAME}.
+    description: UPS battery estimated runtime {{value "upsEBatteryEstimatedMinutesRemaining"}} is below configured limit on {{hostname}}.
     status: current
     varbinds:
       - upsEBatteryEstimatedMinutesRemaining
@@ -1142,53 +1142,53 @@ traps:
     name: EPPC-MIB::upsENotBelowRemainTimeLimit
     category: diagnostic
     severity: notice
-    description: UPS battery backup time is not below the setting limit on {_HOSTNAME}.
+    description: UPS battery backup time is not below the set limit on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.127
     name: EPPC-MIB::upsELoadSegment1Off
     category: diagnostic
     severity: warning
-    description: UPS load segment 1 is off on {_HOSTNAME}.
+    description: UPS load segment 1 is off on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.128
     name: EPPC-MIB::upsELoadSegment1On
     category: state_change
     severity: notice
-    description: UPS load segment 1 is on on {_HOSTNAME}.
+    description: UPS load segment 1 is on on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.129
     name: EPPC-MIB::upsELoadSegment2Off
     category: diagnostic
     severity: warning
-    description: UPS load segment 2 is off on {_HOSTNAME}.
+    description: UPS load segment 2 is off on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.1.2.0.130
     name: EPPC-MIB::upsELoadSegment2On
     category: state_change
     severity: notice
-    description: UPS load segment 2 is on on {_HOSTNAME}.
+    description: UPS load segment 2 is on on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.2.2.0.1
     name: TELECOM-MIB::matInvFault
     category: diagnostic
     severity: crit
-    description: Inverter fault detected on serial number {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter fault detected on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.2
     name: TELECOM-MIB::matReturnFromInvFault
     category: diagnostic
-    severity: err
-    description: Inverter fault cleared for serial number {matInvSerialNum} on {_HOSTNAME}.
+    severity: notice
+    description: Inverter fault cleared{{with value "matInvSerialNum"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.3
     name: TELECOM-MIB::matInvOverLoad
     category: diagnostic
-    severity: warning
-    description: Inverter over-loading detected on serial {matInvSerialNum} on {_HOSTNAME}.
+    severity: crit
+    description: Inverter overloading detected on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1196,7 +1196,7 @@ traps:
     name: TELECOM-MIB::matReturnFromInvOverLoad
     category: diagnostic
     severity: warning
-    description: Inverter over-loading condition cleared for {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter over-loading condition cleared on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1204,7 +1204,7 @@ traps:
     name: TELECOM-MIB::matInvFanFault
     category: diagnostic
     severity: crit
-    description: Inverter fan fault detected for module {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter fan fault detected on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1212,15 +1212,15 @@ traps:
     name: TELECOM-MIB::matReturnFromInvFanFault
     category: diagnostic
     severity: warning
-    description: Inverter fan fault cleared for module {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter fan fault cleared{{with value "matInvSerialNum"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.7
     name: TELECOM-MIB::matInvTempPowerLimit
     category: diagnostic
-    severity: alert
-    description: Inverter power limit reached for module {matInvSerialNum} on {_HOSTNAME}.
+    severity: crit
+    description: Inverter power limit reached on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1228,7 +1228,7 @@ traps:
     name: TELECOM-MIB::matReturnFromInvTempPowerLimit
     category: diagnostic
     severity: notice
-    description: Inverter {matInvSerialNum} returned from power limit on {_HOSTNAME}.
+    description: Inverter returned from power limit state{{with value "matInvSerialNum"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1236,7 +1236,7 @@ traps:
     name: TELECOM-MIB::matInvInputAbnormal
     category: diagnostic
     severity: crit
-    description: Inverter input abnormal for module {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter input abnormal detected on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1244,7 +1244,7 @@ traps:
     name: TELECOM-MIB::matReturnFromInvInputAbnormal
     category: diagnostic
     severity: warning
-    description: Inverter input abnormal detected on {_HOSTNAME}.
+    description: Inverter input abnormal detected on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1252,7 +1252,7 @@ traps:
     name: TELECOM-MIB::matInvLowInputShutdown
     category: diagnostic
     severity: crit
-    description: Inverter {matInvSerialNum} shut down due to low input voltage on {_HOSTNAME}.
+    description: Inverter shut down due to low input voltage on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1260,7 +1260,7 @@ traps:
     name: TELECOM-MIB::matReturnFromInvLowInputShutdown
     category: diagnostic
     severity: warning
-    description: Inverter {matInvSerialNum} returned from shutdown due to low input voltage on {_HOSTNAME}.
+    description: Inverter {{value "matInvSerialNum"}} returned from shutdown due to low input voltage on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1268,7 +1268,7 @@ traps:
     name: TELECOM-MIB::matInvNotRespond
     category: diagnostic
     severity: crit
-    description: Inverter {matInvSerialNum} disconnected on {_HOSTNAME}.
+    description: Inverter disconnected (serial {{value "matInvSerialNum"}}) on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1276,15 +1276,15 @@ traps:
     name: TELECOM-MIB::matReturnFromInvNotRespond
     category: diagnostic
     severity: notice
-    description: Inverter connected with serial number {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter connected on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.15
     name: TELECOM-MIB::matInvBusVoltageOverLimit
     category: diagnostic
-    severity: crit
-    description: Inverter bus voltage over limit for module {matInvSerialNum} on {_HOSTNAME}.
+    severity: alert
+    description: Inverter bus voltage exceeded maximum limit on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1292,7 +1292,7 @@ traps:
     name: TELECOM-MIB::matReturnFromInvBusVoltOverLimit
     category: diagnostic
     severity: warning
-    description: Inverter bus voltage returned from over-limit state for {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter bus voltage returned from over-limit state{{with value "matInvSerialNum"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1300,7 +1300,7 @@ traps:
     name: TELECOM-MIB::matInvBusVoltageUnderLimit
     category: diagnostic
     severity: crit
-    description: Inverter bus voltage under limit for module {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter bus voltage is under the minimal level on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1308,7 +1308,7 @@ traps:
     name: TELECOM-MIB::matReturnFromInvBusVoltUnderLimit
     category: diagnostic
     severity: warning
-    description: Inverter bus voltage returned from under-limit state for module {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter bus voltage returned from under-limit state on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1316,15 +1316,15 @@ traps:
     name: TELECOM-MIB::matInvBusSoftFail
     category: diagnostic
     severity: crit
-    description: Inverter bus soft start failure detected on {_HOSTNAME}.
+    description: Inverter bus soft start failure detected on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.20
     name: TELECOM-MIB::matReturnFromInvBusSoftFail
     category: diagnostic
-    severity: err
-    description: Inverter bus soft start failure detected for serial number {matInvSerialNum} on {_HOSTNAME}.
+    severity: crit
+    description: Inverter bus soft start failure detected on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1332,15 +1332,15 @@ traps:
     name: TELECOM-MIB::matInvOutputShort
     category: diagnostic
     severity: crit
-    description: Inverter output short detected on serial {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter output short detected on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.22
     name: TELECOM-MIB::matReturnFromInvOutputShort
     category: diagnostic
-    severity: err
-    description: Inverter output short detected on module {matInvSerialNum} on {_HOSTNAME}.
+    severity: alert
+    description: Inverter output short detected on {{value "matInvSerialNum"}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1348,7 +1348,7 @@ traps:
     name: TELECOM-MIB::matInvOutputVoltLow
     category: diagnostic
     severity: crit
-    description: Inverter output voltage low on {_HOSTNAME}.
+    description: Inverter output voltage low on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1356,15 +1356,15 @@ traps:
     name: TELECOM-MIB::matReturnFromInvOutputVoltLow
     category: diagnostic
     severity: warning
-    description: Inverter output voltage low detected for module {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter output voltage returned to normal{{with value "matInvSerialNum"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.25
     name: TELECOM-MIB::matInvOutputVoltHigh
     category: diagnostic
-    severity: alert
-    description: Inverter output voltage high for module {matInvSerialNum} on {_HOSTNAME}.
+    severity: crit
+    description: Inverter output voltage high on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1372,7 +1372,7 @@ traps:
     name: TELECOM-MIB::matReturnFromInvOutputVoltHigh
     category: diagnostic
     severity: warning
-    description: Inverter output voltage high detected on module {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter output voltage returned to normal{{with value "matInvSerialNum"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1380,7 +1380,7 @@ traps:
     name: TELECOM-MIB::matInvTemperatureHigh
     category: diagnostic
     severity: crit
-    description: Inverter temperature high for module {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter temperature high on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1388,7 +1388,7 @@ traps:
     name: TELECOM-MIB::matReturnFromInvTemperatureHigh
     category: diagnostic
     severity: warning
-    description: Inverter temperature high condition cleared for serial {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter temperature high condition resolved{{with value "matInvSerialNum"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1396,7 +1396,7 @@ traps:
     name: TELECOM-MIB::matInvNegativePowerProtect
     category: diagnostic
     severity: crit
-    description: Inverter negative power protection triggered for module {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter negative power protection triggered on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1404,29 +1404,29 @@ traps:
     name: TELECOM-MIB::matReturnFromInvNegativePowerProtect
     category: diagnostic
     severity: warning
-    description: Inverter negative power protection triggered for serial {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter negative power protection triggered for {{value "matInvSerialNum"}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.31
     name: TELECOM-MIB::matInvPulseFault
     category: diagnostic
-    severity: alert
-    description: Inverter sync pulse fault detected for module {matInvSerialNum} on {_HOSTNAME}.
+    severity: crit
+    description: Inverter sync pulse fault detected on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.32
     name: TELECOM-MIB::matReturnFromInvPulseFault
     category: diagnostic
-    severity: warning
-    description: Inverter sync pulse fault cleared on {_HOSTNAME}.
+    severity: alert
+    description: Inverter sync pulse fault cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.935.10.2.2.0.33
     name: TELECOM-MIB::matInvEPOShutdown
     category: diagnostic
     severity: alert
-    description: Inverter EPO shutdown detected on {_HOSTNAME}.
+    description: Inverter EPO shutdown detected{{with value "matInvSerialNum"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1434,7 +1434,7 @@ traps:
     name: TELECOM-MIB::matReturnFromInvEPOShutdown
     category: diagnostic
     severity: notice
-    description: Inverter {matInvSerialNum} returned from EPO shutdown on {_HOSTNAME}.
+    description: Inverter returned from EPO shutdown{{with value "matInvSerialNum"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1442,15 +1442,15 @@ traps:
     name: TELECOM-MIB::matInvSoftStartFail
     category: diagnostic
     severity: crit
-    description: Inverter soft start failure detected on {_HOSTNAME}.
+    description: Inverter soft start failure detected on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.36
     name: TELECOM-MIB::matReturnFromInvSoftStartFail
     category: diagnostic
-    severity: err
-    description: Inverter soft start failed for module {matInvSerialNum} on {_HOSTNAME}.
+    severity: crit
+    description: Inverter soft start failure detected{{with value "matInvSerialNum"}} on module {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1458,15 +1458,15 @@ traps:
     name: TELECOM-MIB::matInvEEPROMFault
     category: diagnostic
     severity: crit
-    description: Inverter EEPROM fault detected for module {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter EEPROM fault detected on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.38
     name: TELECOM-MIB::matReturnFromInvEEPROMFault
     category: diagnostic
-    severity: err
-    description: Inverter EEPROM fault cleared for module {matInvSerialNum} on {_HOSTNAME}.
+    severity: crit
+    description: Inverter EEPROM fault cleared for module {{value "matInvSerialNum"}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1474,15 +1474,15 @@ traps:
     name: TELECOM-MIB::matInvBypassSCRShort
     category: diagnostic
     severity: crit
-    description: Inverter bypass SCR short detected on module {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter bypass SCR short detected on {{value "matInvSerialNum"}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.40
     name: TELECOM-MIB::matReturnFromInvBypassSCRShort
     category: diagnostic
-    severity: err
-    description: Inverter bypass SCR short detected on module {matInvSerialNum} on {_HOSTNAME}.
+    severity: alert
+    description: Inverter bypass SCR short detected on inverter {{value "matInvSerialNum"}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1490,15 +1490,15 @@ traps:
     name: TELECOM-MIB::matInvMBSPosError
     category: diagnostic
     severity: crit
-    description: Inverter MBS position error detected on module {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter MBS position error detected on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.42
     name: TELECOM-MIB::matReturnFromInvMBSPosError
     category: diagnostic
-    severity: err
-    description: Inverter {matInvSerialNum} returned from MBS position error on {_HOSTNAME}.
+    severity: crit
+    description: Inverter MBS position error occurred on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1506,15 +1506,15 @@ traps:
     name: TELECOM-MIB::matInvBackfeedRelayOpen
     category: diagnostic
     severity: alert
-    description: Inverter backfeed relay open on {_HOSTNAME}.
+    description: Inverter backfeed relay is open on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.44
     name: TELECOM-MIB::matReturnFromInvBackfeedRelayOpen
     category: diagnostic
-    severity: warning
-    description: Inverter backfeed relay open detected for serial {matInvSerialNum} on {_HOSTNAME}.
+    severity: alert
+    description: Inverter backfeed relay open condition resolved for {{value "matInvSerialNum"}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1522,23 +1522,23 @@ traps:
     name: TELECOM-MIB::matInvHardwareError
     category: diagnostic
     severity: crit
-    description: Inverter hardware detection error for module {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter hardware detection error on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.46
     name: TELECOM-MIB::matReturnFromInvHardwareError
     category: diagnostic
-    severity: err
-    description: Inverter hardware detection error detected for serial number {matInvSerialNum} on {_HOSTNAME}.
+    severity: warning
+    description: Inverter hardware detection error resolved{{with value "matInvSerialNum"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.47
     name: TELECOM-MIB::matInvMainUnavailable
     category: diagnostic
-    severity: crit
-    description: Inverter mains power unavailable for module {matInvSerialNum} on {_HOSTNAME}.
+    severity: alert
+    description: Inverter mains unavailable on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1546,23 +1546,23 @@ traps:
     name: TELECOM-MIB::matReturnFromInvMainUnavailable
     category: diagnostic
     severity: warning
-    description: Inverter {matInvSerialNum} returned from mains unavailable state on {_HOSTNAME}.
+    description: Inverter mains power unavailable, returning to battery on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.49
     name: TELECOM-MIB::matInvMaintenaceBypass
     category: diagnostic
-    severity: crit
-    description: Inverter maintenance bypass activated for module {matInvSerialNum} on {_HOSTNAME}.
+    severity: alert
+    description: Inverter maintenance bypass activated{{with value "matInvSerialNum"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.50
     name: TELECOM-MIB::matReturnFromInvMaintenaceBypass
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Inverter maintenance bypass bypassed for {matInvSerialNum} on {_HOSTNAME}.
+    description: Inverter returned from maintenance bypass on {{hostname}}.
     status: current
     varbinds:
       - matInvSerialNum
@@ -1570,7 +1570,7 @@ traps:
     name: TELECOM-MIB::matStsBypassUnavailable
     category: diagnostic
     severity: crit
-    description: STS Bypass unavailable on module {matStsSerialNum} on {_HOSTNAME}.
+    description: STS bypass unavailable on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1578,7 +1578,7 @@ traps:
     name: TELECOM-MIB::matReturnFromStsBypassUnavailable
     category: state_change
     severity: notice
-    description: STS bypass unavailable cleared for module {matStsSerialNum} on {_HOSTNAME}.
+    description: STS bypass unavailable resolved for module {{value "matStsSerialNum"}} on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1586,31 +1586,31 @@ traps:
     name: TELECOM-MIB::matStsBackfeedRelayOpen
     category: diagnostic
     severity: crit
-    description: STS back-feed relay open on module {matStsSerialNum} on {_HOSTNAME}.
+    description: STS back-feed relay is open on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.54
     name: TELECOM-MIB::matReturnFromStsBackfeedRelayOpen
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: STS back-feed relay returned to normal state on module {matStsSerialNum} on {_HOSTNAME}.
+    description: STS back-feed relay returned from open state on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.55
     name: TELECOM-MIB::matStsScr1ShortCurcuit
     category: diagnostic
-    severity: alert
-    description: STS SCR1 short circuit detected on module {matStsSerialNum} on {_HOSTNAME}.
+    severity: crit
+    description: STS SCR1 short circuit detected on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.56
     name: TELECOM-MIB::matReturnFromStsScr1ShortCurcuit
     category: diagnostic
-    severity: alert
-    description: STS SCR1 short circuit cleared on module {matStsSerialNum} on {_HOSTNAME}.
+    severity: warning
+    description: STS SCR1 short circuit condition cleared on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1618,15 +1618,15 @@ traps:
     name: TELECOM-MIB::matStsScr2ShortCurcuit
     category: diagnostic
     severity: crit
-    description: STS SCR2 short circuit detected on {_HOSTNAME}.
+    description: STS SCR2 short circuit detected on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.58
     name: TELECOM-MIB::matReturnFromStsScr2ShortCurcuit
     category: diagnostic
-    severity: crit
-    description: STS SCR2 short circuit detected on module {matStsSerialNum} on {_HOSTNAME}.
+    severity: warning
+    description: STS SCR2 short circuit condition cleared on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1634,23 +1634,23 @@ traps:
     name: TELECOM-MIB::matStsFaultMode
     category: diagnostic
     severity: crit
-    description: STS running in fault mode on {_HOSTNAME}.
+    description: STS module is running in fault mode on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.60
     name: TELECOM-MIB::matReturnFromStsFaultMode
-    category: diagnostic
-    severity: warning
-    description: STS module {matStsSerialNum} returned from fault mode on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: STS module {{value "matStsSerialNum"}} returned from fault mode on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.61
     name: TELECOM-MIB::matStsFanFault
     category: diagnostic
-    severity: err
-    description: Fan fault detected on module {matStsSerialNum} on {_HOSTNAME}.
+    severity: alert
+    description: Major STS fan fault detected on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1658,7 +1658,7 @@ traps:
     name: TELECOM-MIB::matReturnFromStsFanFault
     category: diagnostic
     severity: notice
-    description: Return from STS fan fault on module {matStsSerialNum} on {_HOSTNAME}.
+    description: STS fan fault cleared on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1666,7 +1666,7 @@ traps:
     name: TELECOM-MIB::matStsEEPROMFault
     category: diagnostic
     severity: crit
-    description: STS EEPROM fault detected on module {matStsSerialNum} on {_HOSTNAME}.
+    description: STS EEPROM fault detected on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1674,7 +1674,7 @@ traps:
     name: TELECOM-MIB::matReturnFromStsEEPROMFault
     category: diagnostic
     severity: warning
-    description: STS EEPROM fault cleared for module {matStsSerialNum} on {_HOSTNAME}.
+    description: STS EEPROM fault cleared for module {{value "matStsSerialNum"}} on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1682,15 +1682,15 @@ traps:
     name: TELECOM-MIB::matStsInvFail
     category: diagnostic
     severity: crit
-    description: STS Inverter unavailable on {_HOSTNAME}.
+    description: STS Inverter unavailable on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.66
     name: TELECOM-MIB::matReturnFromStsInvFail
     category: diagnostic
-    severity: err
-    description: STS inverter unavailable reported for module {matStsSerialNum} on {_HOSTNAME}.
+    severity: warning
+    description: STS Inverter unavailable on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1698,23 +1698,23 @@ traps:
     name: TELECOM-MIB::matStsMainsFail
     category: diagnostic
     severity: alert
-    description: STS Mains unavailable on {_HOSTNAME}.
+    description: STS mains power unavailable on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.68
     name: TELECOM-MIB::matReturnFromStsMainFail
     category: diagnostic
-    severity: alert
-    description: STS mains unavailable detected on module {matStsSerialNum} on {_HOSTNAME}.
+    severity: warning
+    description: STS mains unavailable on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.69
     name: TELECOM-MIB::matStsOverLoad
     category: diagnostic
-    severity: warning
-    description: STS output overload detected on module {matStsSerialNum} on {_HOSTNAME}.
+    severity: crit
+    description: STS output overload detected on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1722,7 +1722,7 @@ traps:
     name: TELECOM-MIB::matReturnFromStsOverLoad
     category: diagnostic
     severity: warning
-    description: STS output overload condition cleared on module {matStsSerialNum} on {_HOSTNAME}.
+    description: STS output over load condition cleared on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1730,15 +1730,15 @@ traps:
     name: TELECOM-MIB::matStsOutputShortCircuit
     category: diagnostic
     severity: crit
-    description: STS output short circuit detected on module {matStsSerialNum} on {_HOSTNAME}.
+    description: STS output short circuit detected on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.72
     name: TELECOM-MIB::matReturnFromStsOutputShortCircuit
     category: diagnostic
-    severity: notice
-    description: STS output short circuit cleared for module {matStsSerialNum} on {_HOSTNAME}.
+    severity: crit
+    description: STS output short circuit cleared on module {{value "matStsSerialNum"}} on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1746,7 +1746,7 @@ traps:
     name: TELECOM-MIB::matStsInvBypassMode
     category: diagnostic
     severity: alert
-    description: STS Inverter {matStsSerialNum} entered bypass mode on {_HOSTNAME}.
+    description: STS Inverter entered bypass mode on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1754,15 +1754,15 @@ traps:
     name: TELECOM-MIB::matReturnFromStsInvBypassMode
     category: state_change
     severity: notice
-    description: STS {matStsSerialNum} returned from bypass mode on {_HOSTNAME}.
+    description: STS unit returned from bypass mode on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.75
     name: TELECOM-MIB::matStsTemperatureHigh
     category: diagnostic
-    severity: warning
-    description: High temperature detected on module {matStsSerialNum} on {_HOSTNAME}.
+    severity: crit
+    description: STS temperature high on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1770,7 +1770,7 @@ traps:
     name: TELECOM-MIB::matReturnFromStsTemperatureHigh
     category: diagnostic
     severity: warning
-    description: STS module {matStsSerialNum} returned from high temperature state on {_HOSTNAME}.
+    description: STS module {{value "matStsSerialNum"}} returned from high temperature condition on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1778,15 +1778,15 @@ traps:
     name: TELECOM-MIB::matStsMBSPosFault
     category: diagnostic
     severity: crit
-    description: STS MBS abnormal position detected on {_HOSTNAME}.
+    description: STS MBS module {{value "matStsSerialNum"}} is in abnormal position on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.78
     name: TELECOM-MIB::matReturnFromStsMBSPosFault
     category: diagnostic
-    severity: err
-    description: STS MBS fault cleared on module {matStsSerialNum} on {_HOSTNAME}.
+    severity: crit
+    description: STS MBS returned from abnormal position on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1794,15 +1794,15 @@ traps:
     name: TELECOM-MIB::matStsControlPowerFail
     category: diagnostic
     severity: crit
-    description: STS Control power fail detected on {_HOSTNAME}.
+    description: STS control power failure detected on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.80
     name: TELECOM-MIB::matReturnFromStsControlPowerFail
-    category: diagnostic
-    severity: warning
-    description: STS control power failure cleared for module {matStsSerialNum} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: STS control power failure cleared on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1810,31 +1810,31 @@ traps:
     name: TELECOM-MIB::matStsNotRespond
     category: diagnostic
     severity: crit
-    description: STS disconnected on {_HOSTNAME}.
+    description: STS module disconnected on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.82
     name: TELECOM-MIB::matReturnFromStsNotRespond
-    category: state_change
-    severity: notice
-    description: STS {matStsSerialNum} returned from not responding on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: STS unit {{value "matStsSerialNum"}} returned from not responding on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.83
     name: TELECOM-MIB::matStsOutputAbnormal
     category: diagnostic
-    severity: err
-    description: STS output abnormal for module {matStsSerialNum} on {_HOSTNAME}.
+    severity: crit
+    description: STS output abnormal detected on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.84
     name: TELECOM-MIB::matReturnFromStsOutputAbnormal
     category: diagnostic
-    severity: warning
-    description: STS output abnormal detected on module {matStsSerialNum} on {_HOSTNAME}.
+    severity: crit
+    description: STS output abnormal detected on module {{value "matStsSerialNum"}} on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1842,7 +1842,7 @@ traps:
     name: TELECOM-MIB::matStsMaintenanceBypass
     category: state_change
     severity: warning
-    description: STS maintenance bypass activated for module {matStsSerialNum} on {_HOSTNAME}.
+    description: STS maintenance bypass activated on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
@@ -1850,15 +1850,15 @@ traps:
     name: TELECOM-MIB::matReturnFromStsMaintenanceBypass
     category: state_change
     severity: notice
-    description: STS module {matStsSerialNum} returned from maintenance bypass on {_HOSTNAME}.
+    description: STS maintenance bypass ended for module {{value "matStsSerialNum"}} on {{hostname}}.
     status: current
     varbinds:
       - matStsSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.87
     name: TELECOM-MIB::matConBatteryLow
     category: diagnostic
-    severity: warning
-    description: Controller battery low detected for serial {matConSerialNum} on {_HOSTNAME}.
+    severity: crit
+    description: Controller battery low on {{hostname}}.
     status: current
     varbinds:
       - matConSerialNum
@@ -1866,7 +1866,7 @@ traps:
     name: TELECOM-MIB::matReturnFromConBatteryLow
     category: diagnostic
     severity: warning
-    description: Controller battery low condition cleared on {_HOSTNAME}.
+    description: Controller battery low condition resolved on {{hostname}}.
     status: current
     varbinds:
       - matConSerialNum
@@ -1874,7 +1874,7 @@ traps:
     name: TELECOM-MIB::matConTemperatureHigh
     category: diagnostic
     severity: crit
-    description: Controller temperature high for serial {matConSerialNum} on {_HOSTNAME}.
+    description: Controller temperature is high on {{hostname}}.
     status: current
     varbinds:
       - matConSerialNum
@@ -1882,7 +1882,7 @@ traps:
     name: TELECOM-MIB::matReturnFromConTemperatureHigh
     category: diagnostic
     severity: warning
-    description: Controller temperature high for serial {matConSerialNum} on {_HOSTNAME}.
+    description: Controller temperature high on {{hostname}}.
     status: current
     varbinds:
       - matConSerialNum
@@ -1890,7 +1890,7 @@ traps:
     name: TELECOM-MIB::matConEEPROMFault
     category: diagnostic
     severity: crit
-    description: Controller EEPROM fault detected for serial number {matConSerialNum} on {_HOSTNAME}.
+    description: Controller EEPROM fault detected on {{hostname}}.
     status: current
     varbinds:
       - matConSerialNum
@@ -1898,15 +1898,15 @@ traps:
     name: TELECOM-MIB::matReturnFromConEEPROMFault
     category: diagnostic
     severity: warning
-    description: Controller EEPROM fault detected for serial {matConSerialNum} on {_HOSTNAME}.
+    description: Controller EEPROM fault resolved for {{value "matConSerialNum"}} on {{hostname}}.
     status: current
     varbinds:
       - matConSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.93
     name: TELECOM-MIB::matConBatteryVoltHigh
     category: diagnostic
-    severity: warning
-    description: Controller battery voltage high on {_HOSTNAME}.
+    severity: alert
+    description: Controller battery voltage high on {{hostname}}.
     status: current
     varbinds:
       - matConSerialNum
@@ -1914,7 +1914,7 @@ traps:
     name: TELECOM-MIB::matReturnFromConBatteryVoltHigh
     category: diagnostic
     severity: warning
-    description: Controller battery voltage high detected on serial {matConSerialNum} on {_HOSTNAME}.
+    description: Controller battery voltage high detected{{with value "matConSerialNum"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - matConSerialNum
@@ -1922,15 +1922,15 @@ traps:
     name: TELECOM-MIB::matConCanBusOff
     category: diagnostic
     severity: crit
-    description: Controller CAN bus off on {_HOSTNAME}.
+    description: Controller CAN bus off on {{hostname}}.
     status: current
     varbinds:
       - matConSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.96
     name: TELECOM-MIB::matReturnFromConCanBusOff
     category: diagnostic
-    severity: warning
-    description: Controller {matConSerialNum} returned from CAN bus off on {_HOSTNAME}.
+    severity: notice
+    description: Controller {{value "matConSerialNum"}} returned from CAN bus off on {{hostname}}.
     status: current
     varbinds:
       - matConSerialNum
@@ -1938,15 +1938,15 @@ traps:
     name: TELECOM-MIB::matConCommunicationLost
     category: diagnostic
     severity: crit
-    description: Controller communication lost for serial number {matConSerialNum} on {_HOSTNAME}.
+    description: Controller communication lost on {{hostname}}.
     status: current
     varbinds:
       - matConSerialNum
   - oid: 1.3.6.1.4.1.935.10.2.2.0.98
     name: TELECOM-MIB::matReturnFromCommunicationLost
     category: state_change
-    severity: warning
-    description: Controller communication restored from lost state for serial {matConSerialNum} on {_HOSTNAME}.
+    severity: notice
+    description: Controller communication restored{{with value "matConSerialNum"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - matConSerialNum

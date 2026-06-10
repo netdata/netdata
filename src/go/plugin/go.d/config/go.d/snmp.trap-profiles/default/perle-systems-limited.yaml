@@ -364,7 +364,7 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoDigitalInputAlarmSensor
     category: diagnostic
     severity: warning
-    description: Digital I/O sensor alarm triggered with state {ioDigitalStatusState} on {_HOSTNAME}.
+    description: Digital I/O sensor alarm triggered with state {{value "ioDigitalStatusState"}} on {{hostname}}.
     status: current
     varbinds:
       - ioDigitalStatusState
@@ -372,7 +372,7 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoLineInputDSRAlarm
     category: diagnostic
     severity: warning
-    description: Serial line DSR input alarm triggered with signal state {ioLineSignalStatusState} on {_HOSTNAME}.
+    description: Serial line DSR input alarm triggered{{with value "ioLineSignalStatusState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ioLineSignalStatusState
@@ -380,7 +380,7 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoLineInputDCDAlarm
     category: diagnostic
     severity: warning
-    description: Serial line DCD input alarm triggered with state {ioLineSignalStatusState} on {_HOSTNAME}.
+    description: Serial line DCD input alarm triggered{{with value "ioLineSignalStatusState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ioLineSignalStatusState
@@ -388,7 +388,7 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoLineInputCTSAlarm
     category: diagnostic
     severity: warning
-    description: Serial line CTS input alarm triggered with state {ioLineSignalStatusState} on {_HOSTNAME}.
+    description: Serial line CTS input alarm triggered{{with value "ioLineSignalStatusState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ioLineSignalStatusState
@@ -396,7 +396,7 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoAnalogInputAlarmSeverityLevel1
     category: diagnostic
     severity: warning
-    description: Analog I/O channel alarm triggered with status {ioAnalogStatusValue} on {_HOSTNAME}.
+    description: Analog I/O channel alarm triggered at severity level 1 with value {{value "ioAnalogStatusValue"}} on {{hostname}}.
     status: current
     varbinds:
       - ioAnalogStatusValue
@@ -404,15 +404,15 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoAnalogInputAlarmSeverityLevel2
     category: diagnostic
     severity: warning
-    description: Analog input alarm triggered with value {ioAnalogStatusValue} on {_HOSTNAME}.
+    description: Analog I/O alarm at severity level 2 with value {{value "ioAnalogStatusValue"}} on {{hostname}}.
     status: current
     varbinds:
       - ioAnalogStatusValue
   - oid: 1.3.6.1.4.1.1966.12.2.0.7
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoAnalogInputAlarmSeverityLevel3
     category: diagnostic
-    severity: err
-    description: Analog input alarm triggered at severity level 3 with value {ioAnalogStatusValue} on {_HOSTNAME}.
+    severity: warning
+    description: Analog input alarm at severity level 3{{with value "ioAnalogStatusValue"}} value {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ioAnalogStatusValue
@@ -420,15 +420,15 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoAnalogInputAlarmSeverityLevel4
     category: diagnostic
     severity: crit
-    description: Analog I/O channel alarm triggered at severity level 4 with value {ioAnalogStatusValue} on {_HOSTNAME}.
+    description: Analog I/O alarm at severity level 4 with value {{value "ioAnalogStatusValue"}} on {{hostname}}.
     status: current
     varbinds:
       - ioAnalogStatusValue
   - oid: 1.3.6.1.4.1.1966.12.2.0.9
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoAnalogInputAlarmSeverityLevel5
     category: diagnostic
-    severity: warning
-    description: Analog input alarm triggered at severity level 5 with value {ioAnalogStatusValue} on {_HOSTNAME}.
+    severity: alert
+    description: Analog I/O alarm at severity level 5 triggered{{with value "ioAnalogStatusValue"}} with value {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ioAnalogStatusValue
@@ -436,7 +436,7 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoDigitalInputAlarmClear
     category: state_change
     severity: notice
-    description: Digital I/O alarm cleared with state {ioDigitalStatusState} on {_HOSTNAME}.
+    description: Digital I/O channel alarm cleared{{with value "ioDigitalStatusState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ioDigitalStatusState
@@ -444,7 +444,7 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoLineInputDSRAlarmClear
     category: state_change
     severity: notice
-    description: Serial line DSR input alarm cleared with state {ioLineSignalStatusState} on {_HOSTNAME}.
+    description: Serial line DSR input alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - ioLineSignalStatusState
@@ -452,7 +452,7 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoLineInputDCDAlarmClear
     category: state_change
     severity: notice
-    description: Serial line DCD alarm cleared with state {ioLineSignalStatusState} on {_HOSTNAME}.
+    description: Serial line DCD input alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - ioLineSignalStatusState
@@ -460,7 +460,7 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoLineInputCTSAlarmClear
     category: state_change
     severity: notice
-    description: Serial line CTS input alarm cleared with state {ioLineSignalStatusState} on {_HOSTNAME}.
+    description: Serial line CTS input alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - ioLineSignalStatusState
@@ -468,7 +468,7 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoAnalogInputAlarmSeverityLevel1Clear
     category: diagnostic
     severity: notice
-    description: Analog input alarm cleared with value {ioAnalogStatusValue} on {_HOSTNAME}.
+    description: Analog input alarm at severity level 1 cleared on {{hostname}}.
     status: current
     varbinds:
       - ioAnalogStatusValue
@@ -476,7 +476,7 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoAnalogInputAlarmSeverityLevel2Clear
     category: diagnostic
     severity: notice
-    description: Analog input alarm cleared with value {ioAnalogStatusValue} on {_HOSTNAME}.
+    description: Analog input alarm severity level 2 cleared{{with value "ioAnalogStatusValue"}} value {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ioAnalogStatusValue
@@ -484,7 +484,7 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoAnalogInputAlarmSeverityLevel3Clear
     category: diagnostic
     severity: notice
-    description: Analog input alarm cleared with value {ioAnalogStatusValue} on {_HOSTNAME}.
+    description: Analog input alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - ioAnalogStatusValue
@@ -492,7 +492,7 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoAnalogInputAlarmSeverityLevel4Clear
     category: diagnostic
     severity: notice
-    description: Analog input alarm cleared with value {ioAnalogStatusValue} on {_HOSTNAME}.
+    description: Analog input alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - ioAnalogStatusValue
@@ -500,7 +500,7 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBIoAnalogInputAlarmSeverityLevel5Clear
     category: diagnostic
     severity: notice
-    description: Analog input alarm cleared with value {ioAnalogStatusValue} on {_HOSTNAME}.
+    description: Analog input alarm severity level 5 cleared{{with value "ioAnalogStatusValue"}} value {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ioAnalogStatusValue
@@ -508,7 +508,7 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBEthernetLinkDown
     category: state_change
     severity: warning
-    description: Ethernet link {ethStatsName} is down with status {ethStatsStatus} on {_HOSTNAME}.
+    description: Ethernet link {{first (value "ethStatsName") "link"}} went down on {{hostname}}.
     status: current
     varbinds:
       - ethStatsName
@@ -517,7 +517,7 @@ traps:
     name: PERLE-IOLAN-SDS-MIB::sdsMIBEthernetLinkUp
     category: state_change
     severity: notice
-    description: Ethernet link {ethStatsName} transitioned to up state on {_HOSTNAME}.
+    description: Ethernet link {{first (value "ethStatsName") "link"}} went up on {{hostname}}.
     status: current
     varbinds:
       - ethStatsName
@@ -526,7 +526,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMgtModuleInserted
     category: state_change
     severity: notice
-    description: Management module {mcrModuleModelName} inserted in chassis {mcrChassisIndex} slot {mcrChassisSlotIndex} on {_HOSTNAME}.
+    description: Management module {{value "mcrModuleModelName"}} inserted in slot {{value "mcrChassisSlotIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -538,7 +538,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMgtSystemBoot
     category: state_change
     severity: notice
-    description: Management module system firmware booted up on {_HOSTNAME}.
+    description: Management module system firmware booted up{{with value "adminbootReason"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -547,7 +547,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMgtReset
     category: state_change
     severity: notice
-    description: Management module reset via button on {_HOSTNAME}.
+    description: Management module was manually reset on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -555,7 +555,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMgtResetFactory
     category: config_change
     severity: alert
-    description: Management module reset to factory defaults on {_HOSTNAME}.
+    description: Management module reset to factory defaults on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -563,7 +563,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMgtEtheLinkUp
     category: state_change
     severity: notice
-    description: Ethernet port link status changed to up on {_HOSTNAME}.
+    description: Ethernet port on management module link is up on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -571,7 +571,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMgtEtheLinkDown
     category: state_change
     severity: warning
-    description: Ethernet port link status changed to down on {_HOSTNAME}.
+    description: Ethernet port on management module went down on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -579,7 +579,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMgtConMonDSRSigChg
     category: state_change
     severity: warning
-    description: Console port DSR signal {mcrMgtConsoleDSR} status changed on {_HOSTNAME}.
+    description: Console port DSR signal status changed to {{value "mcrMgtConsoleDSR"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -588,7 +588,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMgtAuthFail
     category: auth
     severity: warning
-    description: Authentication failure via {mgtAccessMethod} from {remoteMgtIpAddress} on {_HOSTNAME}.
+    description: Authentication failure via {{value "mgtAccessMethod"}} from {{value "remoteMgtIpAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -598,7 +598,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMgtAuthSuccess
     category: auth
     severity: notice
-    description: Successful authentication via {mgtAccessMethod} from {remoteMgtIpAddress} on {_HOSTNAME}.
+    description: Successful authentication via {{value "mgtAccessMethod"}} from {{value "remoteMgtIpAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -608,7 +608,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMgtDateTimeChg
     category: config_change
     severity: notice
-    description: System date and time changed to {systemDateTimeAndOffset} on {_HOSTNAME}.
+    description: System date and time changed to {{value "systemDateTimeAndOffset"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -617,7 +617,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMgtSntpServFail
     category: diagnostic
     severity: warning
-    description: SNTP communication failed with host {timeSntpHost1} on {_HOSTNAME}.
+    description: SNTP communication failed with {{first (value "timeSntpHost1") "configured server"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -625,9 +625,9 @@ traps:
       - timeSntpHost2
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.12
     name: PERLE-MCR-MGT-MIB::mcrMgtSntpServRec
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: SNTP communication recovered with server {timeSntpHost1} on {_HOSTNAME}.
+    description: SNTP service recovered and communicating with {{first (value "timeSntpHost1") (value "timeSntpHost2") "configured server"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -637,7 +637,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMgtSnmpTrapHostFail
     category: diagnostic
     severity: warning
-    description: SNMP trap host {snmpTrapHostIpAddress} communication failure on {_HOSTNAME}.
+    description: SNMP trap communication failed with host {{value "snmpTrapHostIpAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -647,7 +647,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMgtSnmpTrapHostRec
     category: state_change
     severity: notice
-    description: SNMP trap host {snmpTrapHostIpAddress} communication recovered on {_HOSTNAME}.
+    description: SNMP trap host {{value "snmpTrapHostIpAddress"}} communication recovered on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -657,16 +657,16 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMgtEmailServFail
     category: diagnostic
     severity: warning
-    description: Email server {emailSMTPHost} communication failure on {_HOSTNAME}.
+    description: Failed to communicate with configured email server {{value "emailSMTPHost"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
       - emailSMTPHost
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.16
     name: PERLE-MCR-MGT-MIB::mcrMgtEmailServRec
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Alert email server {emailSMTPHost} recovered communications on {_HOSTNAME}.
+    description: Email server communication recovered on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -675,15 +675,15 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMgtConfSavedFlash
     category: config_change
     severity: notice
-    description: Configuration saved to flash on {_HOSTNAME}.
+    description: Configuration saved to flash on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.18
     name: PERLE-MCR-MGT-MIB::mcrMgtIpAddrDynChg
-    category: state_change
+    category: config_change
     severity: notice
-    description: System IP address changed to {networkIpAddress} on {_HOSTNAME}.
+    description: System IP address dynamically changed to {{value "networkIpAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -692,7 +692,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMgtTftpUploadFail
     category: diagnostic
     severity: err
-    description: TFTP upload of {remoteTftpFileName} to {remoteTftpHost} failed on {_HOSTNAME}.
+    description: TFTP upload of {{value "remoteTftpFileName"}} to {{value "remoteTftpHost"}} failed on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -700,9 +700,9 @@ traps:
       - remoteTftpHost
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.20
     name: PERLE-MCR-MGT-MIB::mcrMgtTftpUploadSuccess
-    category: config_change
-    severity: notice
-    description: TFTP file upload to {remoteTftpHost} completed successfully on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: TFTP file upload to {{value "remoteTftpHost"}} succeeded on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -711,8 +711,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.21
     name: PERLE-MCR-MGT-MIB::mcrMgtTftpDownloadFail
     category: diagnostic
-    severity: warning
-    description: TFTP file transfer from {remoteTftpHost} failed for {remoteTftpFileName} on {_HOSTNAME}.
+    severity: err
+    description: TFTP file transfer from {{value "remoteTftpHost"}} failed for {{value "remoteTftpFileName"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -720,9 +720,9 @@ traps:
       - remoteTftpHost
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.22
     name: PERLE-MCR-MGT-MIB::mcrMgtTftpDownloadSuccess
-    category: config_change
-    severity: notice
-    description: TFTP file {remoteTftpFileName} from {remoteTftpHost} downloaded successfully on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: TFTP file transfer from {{value "remoteTftpHost"}} succeeded on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -731,8 +731,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.23
     name: PERLE-MCR-MGT-MIB::mcrMgtChassisMismatch
     category: config_change
-    severity: warning
-    description: Management module inserted into mismatched chassis, resetting configuration on {_HOSTNAME}.
+    severity: alert
+    description: Management module chassis mismatch reset backup configuration on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -740,7 +740,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrChassisAdd
     category: state_change
     severity: notice
-    description: New chassis {chassisModelName} with serial {chassisSerialNumber} added to chain on {_HOSTNAME}.
+    description: New chassis {{value "chassisModelName"}} added on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -750,8 +750,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.25
     name: PERLE-MCR-MGT-MIB::mcrChassisRemove
     category: state_change
-    severity: warning
-    description: Chassis {mcrChassisIndex} removed from chain on {_HOSTNAME}.
+    severity: alert
+    description: Chassis {{value "mcrChassisIndex"}} removed from the chain on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -760,7 +760,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrChassisReset
     category: state_change
     severity: notice
-    description: Chassis back-plane reset by user on chassis {mcrChassisIndex} on {_HOSTNAME}.
+    description: Chassis {{value "mcrChassisIndex"}} back-plane was manually reset on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -768,8 +768,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.27
     name: PERLE-MCR-MGT-MIB::mcrChassisTemperatureAlarm
     category: diagnostic
-    severity: warning
-    description: Chassis temperature {chassisTemperature} exceeded threshold {chassisCfgHighTempThreshold} on {_HOSTNAME}.
+    severity: crit
+    description: Chassis temperature {{value "chassisTemperature"}} exceeded high threshold {{value "chassisCfgHighTempThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -781,7 +781,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrChassisTemperatureRecover
     category: diagnostic
     severity: notice
-    description: Chassis temperature recovered to normal at {chassisTemperature} {cfgTemperatureUnits} on {_HOSTNAME}.
+    description: Chassis temperature recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -791,8 +791,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.29
     name: PERLE-MCR-MGT-MIB::mcrChassisSlotPoweredOn
     category: state_change
-    severity: notice
-    description: Chassis slot {mcrChassisSlotIndex} powered on on {_HOSTNAME}.
+    severity: warning
+    description: Chassis slot {{value "mcrChassisSlotIndex"}} powered off on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -804,8 +804,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.30
     name: PERLE-MCR-MGT-MIB::mcrChassisSlotPoweredOff
     category: state_change
-    severity: notice
-    description: Chassis slot {mcrChassisSlotIndex} powered on on {_HOSTNAME}.
+    severity: warning
+    description: Chassis slot {{value "mcrChassisSlotIndex"}} powered off on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -815,7 +815,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrChassisFail
     category: diagnostic
     severity: crit
-    description: Chassis {mcrChassisIndex} failure condition detected with severity {eventSeverityLevel} on {_HOSTNAME}.
+    description: Chassis {{value "mcrChassisIndex"}} failure detected on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -824,7 +824,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrChassisOk
     category: diagnostic
     severity: notice
-    description: Chassis {mcrChassisIndex} recovered from failure and is operating normally on {_HOSTNAME}.
+    description: Chassis {{value "mcrChassisIndex"}} recovered from failure and is operating normally on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -833,7 +833,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrPsmuInserted
     category: diagnostic
     severity: notice
-    description: Power supply {mcrPsmuModelName} inserted in bay {mcrPsmuIndex} on {_HOSTNAME}.
+    description: Power supply module {{value "mcrPsmuModelName"}} inserted in bay {{value "mcrPsmuIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -844,7 +844,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrPsmuRemoved
     category: diagnostic
     severity: warning
-    description: Power supply removed from chassis {mcrChassisIndex} bay {mcrPsmuIndex} on {_HOSTNAME}.
+    description: Power supply removed from bay {{first (value "mcrPsmuIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -853,8 +853,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.35
     name: PERLE-MCR-MGT-MIB::mcrPsmuPsuFail
     category: diagnostic
-    severity: err
-    description: Power supply failed self-test diagnostics on {_HOSTNAME}.
+    severity: crit
+    description: Power supply failed self-test diagnostics in bay {{value "mcrPsmuIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -865,7 +865,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrPsmuPsuOk
     category: diagnostic
     severity: notice
-    description: Power supply {mcrPsmuIndex} passed self-test diagnostics on {_HOSTNAME}.
+    description: Power supply self-test passed on {{first (value "mcrPsmuIndex") "PSMU"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -874,8 +874,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.37
     name: PERLE-MCR-MGT-MIB::mcrPsmuPsuVoltageFail
     category: diagnostic
-    severity: err
-    description: Power supply voltage insufficient on PSMU bay {mcrPsmuIndex} on {_HOSTNAME}.
+    severity: crit
+    description: Power supply voltage failure detected in bay {{first (value "mcrPsmuIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -885,7 +885,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrPsmuPsuVoltageOk
     category: diagnostic
     severity: notice
-    description: Power supply voltage returned to normal range on {_HOSTNAME}.
+    description: Power supply voltage returned to normal range on {{first (value "mcrChassisIndex") "chassis"}} {{first (value "mcrPsmuIndex") "PSMU"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -894,8 +894,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.39
     name: PERLE-MCR-MGT-MIB::mcrPsmuFanFail
     category: diagnostic
-    severity: err
-    description: Fan failure detected in chassis {mcrChassisIndex} bay {mcrPsmuIndex} on {_HOSTNAME}.
+    severity: crit
+    description: Fan failure detected in PSMU bay {{value "mcrPsmuIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -905,7 +905,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrPsmuFanOk
     category: diagnostic
     severity: notice
-    description: Fan on PSMU bay {mcrPsmuIndex} reported normal operation on {_HOSTNAME}.
+    description: Fan is operating normally on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -913,9 +913,9 @@ traps:
       - mcrPsmuIndex
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.42
     name: PERLE-MCR-MGT-MIB::mcrMediaInserted
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Media converter module {mcrModuleModelName} inserted in slot {mcrChassisSlotIndex} on {_HOSTNAME}.
+    description: Media converter module inserted in slot {{value "mcrChassisSlotIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -926,9 +926,9 @@ traps:
       - mcrUserDefinedModuleName
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.43
     name: PERLE-MCR-MGT-MIB::mcrMediaRemoved
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Media converter module {mcrUserDefinedModuleName} removed from chassis {mcrChassisIndex} slot {mcrChassisSlotIndex} on {_HOSTNAME}.
+    description: Media converter module {{value "mcrUserDefinedModuleName"}} removed from slot {{value "mcrChassisSlotIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -939,7 +939,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMediaReset
     category: state_change
     severity: notice
-    description: Media converter module {mcrUserDefinedModuleName} was manually reset on {_HOSTNAME}.
+    description: Media converter module {{value "mcrUserDefinedModuleName"}} was manually reset on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -949,8 +949,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.45
     name: PERLE-MCR-MGT-MIB::mcrMediaLostCommunication
     category: diagnostic
-    severity: err
-    description: Management module lost communication with media converter {mcrUserDefinedModuleName} in chassis {mcrChassisIndex} slot {mcrChassisSlotIndex} on {_HOSTNAME}.
+    severity: crit
+    description: Management module lost communication with media converter module {{value "mcrUserDefinedModuleName"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -961,7 +961,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMediaRecovCommunication
     category: state_change
     severity: notice
-    description: Management module recovered communication with media converter {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: Management module recovered communication with media converter module {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -971,8 +971,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.47
     name: PERLE-MCR-MGT-MIB::mcrMediaFail
     category: diagnostic
-    severity: err
-    description: Media converter module {mcrUserDefinedModuleName} failed self-test diagnostics with status {mcrModuleDiagStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Media converter module self-test failed on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -984,7 +984,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMediaOk
     category: diagnostic
     severity: notice
-    description: Media converter module {mcrUserDefinedModuleName} passed self-test diagnostics on {_HOSTNAME}.
+    description: Media converter module self-test passed on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -995,7 +995,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMediaLinkUp
     category: state_change
     severity: notice
-    description: Media port {mcrMediaPortDescr} link status changed to up on {_HOSTNAME}.
+    description: Media port {{value "mcrMediaPortDescr"}} link is up on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1008,7 +1008,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMediaLinkDown
     category: state_change
     severity: warning
-    description: Media port {mcrMediaPortDescr} on module {mcrUserDefinedModuleName} link is down on {_HOSTNAME}.
+    description: Media port {{value "mcrMediaPortDescr"}} went down on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1021,7 +1021,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMediaConfUpdateFail
     category: diagnostic
     severity: err
-    description: Media converter module {mcrUserDefinedModuleName} configuration update failed on {_HOSTNAME}.
+    description: Media converter module configuration update failed on {{first (value "mcrUserDefinedModuleName") (value "mcrChassisSlotIndex")}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1032,7 +1032,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMediaConfUpdateSuccess
     category: config_change
     severity: notice
-    description: Media converter module configuration update succeeded for {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: Media converter module configuration update succeeded{{with value "mcrUserDefinedModuleName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1041,9 +1041,9 @@ traps:
       - mcrUserDefinedModuleName
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.53
     name: PERLE-MCR-MGT-MIB::mcrMediaConfMismatch
-    category: diagnostic
+    category: config_change
     severity: warning
-    description: 'Media converter module type mismatch in slot {mcrChassisSlotIndex}: inserted {mcrModuleTypeInserted} vs backed up {mcrMediaBackedupModuleType} on {_HOSTNAME}.'
+    description: Media converter module type mismatch in slot {{value "mcrChassisSlotIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1058,7 +1058,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMediaConfMismatchResolv
     category: config_change
     severity: notice
-    description: Media converter configuration mismatch resolved for {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: Media converter configuration mismatch resolved for module {{value "mcrUserDefinedModuleName"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1073,7 +1073,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMediaFirmwareUpdateFail
     category: diagnostic
     severity: err
-    description: Media converter firmware update failed for {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: Media converter firmware update failed on {{first (value "mcrUserDefinedModuleName") (value "mcrModuleModelName")}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1083,9 +1083,9 @@ traps:
       - mcrModuleModelName
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.56
     name: PERLE-MCR-MGT-MIB::mcrMediaFirmwareUpdateSuccess
-    category: config_change
-    severity: notice
-    description: Media converter firmware update succeeded for {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    category: state_change
+    severity: info
+    description: Media converter firmware update succeeded on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1097,7 +1097,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpInserted
     category: state_change
     severity: notice
-    description: SFP module {mcrUserDefinedModuleName} inserted in slot {mcrChassisSlotIndex} on {_HOSTNAME}.
+    description: SFP module inserted into {{first (value "mcrUserDefinedModuleName") "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1106,9 +1106,9 @@ traps:
       - mcrUserDefinedModuleName
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.58
     name: PERLE-MCR-MGT-MIB::mcrSfpRemoved
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: SFP module removed from {mcrUserDefinedModuleName} in chassis {mcrChassisIndex} slot {mcrChassisSlotIndex} on {_HOSTNAME}.
+    description: SFP module removed from {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1119,7 +1119,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpHighTempWarn
     category: diagnostic
     severity: warning
-    description: SFP module {mcrUserDefinedModuleName} temperature {sfpDmiRealTimeTemp} exceeded high warning threshold {sfpDmiHighTempWarn} on {_HOSTNAME}.
+    description: SFP module temperature exceeded high warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1133,8 +1133,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.60
     name: PERLE-MCR-MGT-MIB::mcrSfpHighTempWarnRecov
     category: diagnostic
-    severity: notice
-    description: SFP module {mcrUserDefinedModuleName} temperature recovered to normal on {_HOSTNAME}.
+    severity: warning
+    description: SFP module temperature recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1148,7 +1148,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpHighTempAlarm
     category: diagnostic
     severity: warning
-    description: SFP module {mcrUserDefinedModuleName} temperature {sfpDmiRealTimeTemp} exceeded high alarm threshold {sfpDmiHighTempAlarm} on {_HOSTNAME}.
+    description: SFP module temperature exceeded high alarm threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1162,8 +1162,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.62
     name: PERLE-MCR-MGT-MIB::mcrSfpHighTempAlarmRecov
     category: diagnostic
-    severity: notice
-    description: SFP module {mcrUserDefinedModuleName} temperature recovered to normal at {sfpDmiRealTimeTemp} on {_HOSTNAME}.
+    severity: warning
+    description: SFP module temperature recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1177,7 +1177,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowTempWarn
     category: diagnostic
     severity: warning
-    description: SFP module {mcrUserDefinedModuleName} temperature {sfpDmiRealTimeTemp} below low warning threshold {sfpDmiLowTempWarn} on {_HOSTNAME}.
+    description: SFP module temperature below low warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1192,7 +1192,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowTempWarnRecov
     category: diagnostic
     severity: notice
-    description: SFP module {mcrUserDefinedModuleName} temperature recovered to normal at {sfpDmiRealTimeTemp} on {_HOSTNAME}.
+    description: SFP module temperature recovered to normal on {{first (value "mcrUserDefinedModuleName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1206,7 +1206,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowTempAlarm
     category: diagnostic
     severity: warning
-    description: SFP module {mcrUserDefinedModuleName} temperature {sfpDmiRealTimeTemp} below low alarm threshold {sfpDmiLowTempAlarm} on {_HOSTNAME}.
+    description: SFP module temperature below low alarm threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1221,7 +1221,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowTempAlarmRecov
     category: diagnostic
     severity: notice
-    description: SFP module {mcrUserDefinedModuleName} temperature recovered to normal on {_HOSTNAME}.
+    description: SFP module temperature recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1235,7 +1235,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpHighVoltWarn
     category: diagnostic
     severity: warning
-    description: SFP module {mcrUserDefinedModuleName} voltage {sfpDmiRealTimeVolt} exceeded threshold {sfpDmiHighVoltWarn} on {_HOSTNAME}.
+    description: SFP module voltage exceeded high warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1249,7 +1249,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpHighVoltWarnRecov
     category: diagnostic
     severity: notice
-    description: SFP module voltage recovered to normal at {sfpDmiRealTimeVolt} on {_HOSTNAME}.
+    description: SFP module voltage recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1262,7 +1262,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpHighVoltAlarm
     category: diagnostic
     severity: warning
-    description: SFP voltage {sfpDmiRealTimeVolt} exceeded high alarm threshold {sfpDmiHighVoltAlarm} on {_HOSTNAME}.
+    description: SFP module voltage exceeded high alarm threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1276,7 +1276,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpHighVoltAlarmRecov
     category: diagnostic
     severity: notice
-    description: SFP module voltage recovered to normal at {sfpDmiRealTimeVolt} on {_HOSTNAME}.
+    description: SFP module voltage recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1289,7 +1289,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowVoltWarn
     category: diagnostic
     severity: warning
-    description: SFP module voltage {sfpDmiRealTimeVolt} below warning threshold {sfpDmiLowVoltWarn} on {_HOSTNAME}.
+    description: SFP module voltage below warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1302,8 +1302,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.72
     name: PERLE-MCR-MGT-MIB::mcrSfpLowVoltWarnRecov
     category: diagnostic
-    severity: notice
-    description: SFP module voltage recovered to normal on {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    severity: warning
+    description: SFP module voltage recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1316,7 +1316,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowVoltAlarm
     category: diagnostic
     severity: warning
-    description: SFP module {mcrUserDefinedModuleName} voltage {sfpDmiRealTimeVolt} below alarm threshold {sfpDmiLowVoltAlarm} on {_HOSTNAME}.
+    description: SFP module voltage below alarm threshold on {{first (value "mcrUserDefinedModuleName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1330,7 +1330,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowVoltAlarmRecov
     category: diagnostic
     severity: notice
-    description: SFP module {mcrUserDefinedModuleName} voltage recovered to normal on {_HOSTNAME}.
+    description: SFP module voltage recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1343,7 +1343,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpHighTxBiasWarn
     category: diagnostic
     severity: warning
-    description: SFP TX bias current {sfpDmiRealTimeTxBias} exceeded threshold {sfpDmiHighTxBiasWarn} on port {mcrMediaPortNum} on {_HOSTNAME}.
+    description: SFP TX bias current warning on port {{value "mcrMediaPortNum"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1356,8 +1356,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.76
     name: PERLE-MCR-MGT-MIB::mcrSfpHighTxBiasWarnRecov
     category: diagnostic
-    severity: notice
-    description: SFP TX bias recovered to normal on port {mcrMediaPortNum} of module {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    severity: warning
+    description: SFP TX bias current recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1370,7 +1370,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpHighTxBiasAlarm
     category: diagnostic
     severity: warning
-    description: SFP TX bias current {sfpDmiRealTimeTxBias} exceeded threshold {sfpDmiHighTxBiasAlarm} on {_HOSTNAME}.
+    description: SFP TX bias current exceeded high alarm threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1384,7 +1384,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpHighTxBiasAlarmRecov
     category: diagnostic
     severity: notice
-    description: SFP TX bias recovered to normal on port {mcrMediaPortNum} of {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: SFP TX bias current recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1397,7 +1397,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowTxBiasWarn
     category: diagnostic
     severity: warning
-    description: SFP TX bias current {sfpDmiRealTimeTxBias} below warning threshold {sfpDmiLowTxBiasWarn} on {_HOSTNAME}.
+    description: SFP TX bias current below warning threshold on {{first (value "mcrUserDefinedModuleName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1411,7 +1411,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowTxBiasWarnRecov
     category: diagnostic
     severity: notice
-    description: SFP TX bias current recovered to normal on port {mcrMediaPortNum} of module {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: SFP TX bias current recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1424,7 +1424,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowTxBiasAlarm
     category: diagnostic
     severity: warning
-    description: SFP module {mcrUserDefinedModuleName} TX bias {sfpDmiRealTimeTxBias} below alarm threshold {sfpDmiLowTxBiasAlarm} on {_HOSTNAME}.
+    description: SFP TX bias current below low alarm threshold on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1438,7 +1438,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowTxBiasAlarmRecov
     category: diagnostic
     severity: notice
-    description: SFP TX bias recovered to normal on module {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: SFP TX bias current recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1451,7 +1451,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpHighTxPowerWarn
     category: diagnostic
     severity: warning
-    description: SFP TX power {sfpDmiRealTimeTxPower} exceeded warning threshold {sfpDmiHighTxPowerWarn} on {_HOSTNAME}.
+    description: SFP TX power exceeded high warning threshold on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1466,7 +1466,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpHighTxPowerWarnRecov
     category: diagnostic
     severity: notice
-    description: SFP TX power recovered to normal at {sfpDmiRealTimeTxPower} on {_HOSTNAME}.
+    description: SFP TX power recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1480,7 +1480,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpHighTxPowerAlarm
     category: diagnostic
     severity: warning
-    description: SFP TX power {sfpDmiRealTimeTxPower} exceeded high alarm threshold {sfpDmiHighTxPowerAlarm} on {_HOSTNAME}.
+    description: SFP module TX power exceeded high alarm threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1495,7 +1495,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpHighTxPowerAlarmRecov
     category: diagnostic
     severity: notice
-    description: SFP TX power recovered to normal on module {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: SFP TX power recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1509,7 +1509,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowTxPowerWarn
     category: diagnostic
     severity: warning
-    description: SFP TX power {sfpDmiRealTimeTxPower} below threshold {sfpDmiLowTxPowerWarn} on {_HOSTNAME}.
+    description: SFP module TX power below warning threshold on {{first (value "mcrUserDefinedModuleName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1524,7 +1524,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowTxPowerWarnRecov
     category: diagnostic
     severity: notice
-    description: SFP TX power recovered to normal on port {mcrMediaPortNum} of {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: SFP TX power recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1538,7 +1538,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowTxPowerAlarm
     category: diagnostic
     severity: warning
-    description: SFP module {mcrUserDefinedModuleName} TX power {sfpDmiRealTimeTxPower} below alarm threshold {sfpDmiLowTxPowerAlarm} on {_HOSTNAME}.
+    description: SFP module TX power below alarm threshold on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1553,7 +1553,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowTxPowerAlarmRecov
     category: diagnostic
     severity: notice
-    description: SFP TX power recovered to normal on port {mcrMediaPortNum} of {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: SFP TX power recovered to normal on {{first (value "mcrUserDefinedModuleName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1567,7 +1567,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpHighRxPowerWarn
     category: diagnostic
     severity: warning
-    description: SFP module {mcrUserDefinedModuleName} RX power {sfpDmiRealTimeRxPower} exceeded high warning threshold {sfpDmiHighRxPowerWarn} on {_HOSTNAME}.
+    description: SFP module RX power exceeded high warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1582,7 +1582,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpHighRxPowerWarnRecov
     category: diagnostic
     severity: notice
-    description: SFP RX power recovered to normal on port {mcrMediaPortNum} of {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: SFP RX power recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1596,7 +1596,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpHighRxPowerAlarm
     category: diagnostic
     severity: warning
-    description: SFP module {mcrUserDefinedModuleName} RX power {sfpDmiRealTimeRxPower} exceeded high alarm threshold {sfpDmiHighRxPowerAlarm} on {_HOSTNAME}.
+    description: SFP high RX power alarm on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1611,7 +1611,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpHighRxPowerAlarmRecov
     category: diagnostic
     severity: notice
-    description: SFP RX power recovered to normal level on port {mcrMediaPortNum} of {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: SFP RX power recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1625,7 +1625,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowRxPowerWarn
     category: diagnostic
     severity: warning
-    description: SFP RX power {sfpDmiRealTimeRxPower} below warning threshold {sfpDmiLowRxPowerWarn} on {_HOSTNAME}.
+    description: SFP module RX power below low warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1638,9 +1638,9 @@ traps:
       - mcrMediaPortNum
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.96
     name: PERLE-MCR-MGT-MIB::mcrSfpLowRxPowerWarnRecov
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: SFP RX power recovered to normal on port {mcrMediaPortNum} of {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: SFP module RX power recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1654,7 +1654,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowRxPowerAlarm
     category: diagnostic
     severity: warning
-    description: SFP module {mcrUserDefinedModuleName} RX power {sfpDmiRealTimeRxPower} below alarm threshold {sfpDmiLowRxPowerAlarm} on {_HOSTNAME}.
+    description: SFP module RX power below low alarm threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1669,7 +1669,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpLowRxPowerAlarmRecov
     category: diagnostic
     severity: notice
-    description: SFP RX power recovered to normal on port {mcrMediaPortNum} of {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: SFP module RX power recovered to normal on {{first (value "mcrUserDefinedModuleName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1682,8 +1682,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.99
     name: PERLE-MCR-MGT-MIB::mcrChassisCommTempSensorFail
     category: diagnostic
-    severity: warning
-    description: Chassis temperature sensor communication failed on {_HOSTNAME}.
+    severity: crit
+    description: Chassis temperature sensor communication failed on {{first (value "mcrChassisIndex") "chassis"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1692,7 +1692,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrChassisCommTempSensorRecov
     category: diagnostic
     severity: notice
-    description: Chassis temperature sensor communication recovered on {_HOSTNAME}.
+    description: Chassis temperature sensor communication recovered on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1701,7 +1701,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMediaDetectFail
     category: diagnostic
     severity: crit
-    description: Media card {mcrUserDefinedModuleName} in slot {mcrChassisSlotIndex} powered down due to hardware failure on {_HOSTNAME}.
+    description: Media card powered down due to hardware failure on {{first (value "mcrUserDefinedModuleName") "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1711,8 +1711,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.102
     name: PERLE-MCR-MGT-MIB::mcrMediaBadImage
     category: diagnostic
-    severity: err
-    description: Media converter module {mcrUserDefinedModuleName} firmware image is corrupt on {_HOSTNAME}.
+    severity: crit
+    description: Media converter module firmware image is corrupt on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1722,8 +1722,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.103
     name: PERLE-MCR-MGT-MIB::mcrSfpLostComm
     category: diagnostic
-    severity: err
-    description: SFP communication lost for module {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    severity: crit
+    description: SFP module communication lost on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1732,9 +1732,9 @@ traps:
       - mcrUserDefinedModuleName
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.104
     name: PERLE-MCR-MGT-MIB::mcrSfpRecovComm
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: SFP module communication restored on {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: SFP module communication restored on {{first (value "mcrUserDefinedModuleName") "module"}} in slot {{value "mcrChassisSlotIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1745,7 +1745,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrModuleNotSupported
     category: diagnostic
     severity: warning
-    description: Media converter module {mcrUserDefinedModuleName} in slot {mcrChassisSlotIndex} is not supported on {_HOSTNAME}.
+    description: Media converter module {{value "mcrUserDefinedModuleName"}} not supported on slot {{value "mcrChassisSlotIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1754,9 +1754,9 @@ traps:
       - mcrUserDefinedModuleName
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.106
     name: PERLE-MCR-MGT-MIB::mcrModuleFirmwareUpdate
-    category: config_change
+    category: state_change
     severity: notice
-    description: Media converter module {mcrUserDefinedModuleName} firmware update in progress on {_HOSTNAME}.
+    description: Media converter module firmware update started on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1767,7 +1767,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpPortShutdown
     category: diagnostic
     severity: warning
-    description: SFP/XFP port shutdown due to high temperature on {_HOSTNAME}.
+    description: SFP/XFP port shutdown due to high temperature on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1779,7 +1779,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpPortShutdownRecov
     category: state_change
     severity: notice
-    description: SFP/XFP port shutdown recovered on {mcrUserDefinedModuleName} port {mcrMediaPortNum} on {_HOSTNAME}.
+    description: SFP/XFP port shutdown recovered on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1791,7 +1791,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighApdBiasWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} APD bias current exceeded high warning threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} APD bias current high warning on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1804,8 +1804,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.110
     name: PERLE-MCR-MGT-MIB::mcrXfpHighApdBiasWarnRecov
     category: diagnostic
-    severity: notice
-    description: XFP module {mcrUserDefinedModuleName} APD bias current recovered to normal on {_HOSTNAME}.
+    severity: warning
+    description: XFP module APD bias current recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1818,7 +1818,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighApdBiasAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} APD bias current exceeded high alarm threshold on {_HOSTNAME}.
+    description: XFP module APD bias current exceeded high alarm threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1832,7 +1832,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighApdBiasAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} APD bias current recovered on {_HOSTNAME}.
+    description: XFP module APD bias current recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1845,7 +1845,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowApdBiasWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} APD bias current below low threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} APD bias current below low warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1859,7 +1859,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowApdBiasWarnRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} APD bias current recovered to normal on {_HOSTNAME}.
+    description: XFP module APD bias current recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1872,7 +1872,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowApdBiasAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} APD bias current below low alarm threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} APD bias current low alarm on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1886,7 +1886,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowApdBiasAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} APD bias current recovered on {_HOSTNAME}.
+    description: XFP module APD bias current recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1899,7 +1899,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighTecCurrentWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} TEC current exceeded high warning threshold {xfpDmiHighAuxWarn} on {_HOSTNAME}.
+    description: XFP module TEC current exceeded high warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1913,7 +1913,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighTecCurrentWarnRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} TEC current recovered to normal on {_HOSTNAME}.
+    description: XFP module TEC current recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1926,7 +1926,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighTecCurrentAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} TEC current exceeded high alarm threshold on {_HOSTNAME}.
+    description: XFP module TEC current exceeded high alarm threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1940,7 +1940,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighTecCurrentAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP TEC current recovered to normal on {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: XFP module TEC current recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1953,7 +1953,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowTecCurrentWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} TEC current below low warning threshold on {_HOSTNAME}.
+    description: XFP module TEC current below low warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1967,7 +1967,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowTecCurrentWarnRecov
     category: diagnostic
     severity: notice
-    description: XFP module TEC current recovered to normal on {_HOSTNAME}.
+    description: XFP module TEC current recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1980,7 +1980,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowTecCurrentAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} TEC current below low threshold on slot {mcrChassisSlotIndex} on {_HOSTNAME}.
+    description: XFP module TEC current alarm on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -1994,7 +1994,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowTecCurrentAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module TEC current recovered to normal on {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: XFP module TEC current recovered to normal on {{first (value "mcrUserDefinedModuleName") (value "mcrMediaPortNum")}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2007,7 +2007,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighLaserTempWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} laser temperature exceeded high warning threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} laser temperature exceeded high warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2022,7 +2022,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighLaserTempWarnRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} laser temperature recovered to normal on {_HOSTNAME}.
+    description: XFP laser temperature recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2036,7 +2036,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighLaserTempAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} laser temperature exceeded high alarm threshold on {_HOSTNAME}.
+    description: XFP laser temperature exceeded high alarm threshold on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2051,7 +2051,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighLaserTempAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} laser temperature recovered to normal on {_HOSTNAME}.
+    description: XFP laser temperature recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2065,7 +2065,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowLaserTempWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} laser temperature below low warning threshold on {_HOSTNAME}.
+    description: XFP module laser temperature below low warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2080,7 +2080,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowLaserTempWarnRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} laser temperature recovered to normal on {_HOSTNAME}.
+    description: XFP module laser temperature recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2094,7 +2094,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowLaserTempAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} laser temperature below low alarm threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} laser temperature below low alarm threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2109,7 +2109,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowLaserTempAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} laser temperature recovered to normal on {_HOSTNAME}.
+    description: XFP module laser temperature recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2123,7 +2123,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighLaserWavelengthWarn
     category: diagnostic
     severity: warning
-    description: XFP laser wavelength exceeded high warning threshold on {mcrUserDefinedModuleName} port {mcrMediaPortNum} on {_HOSTNAME}.
+    description: XFP laser wavelength exceeded high warning threshold on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2136,8 +2136,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.134
     name: PERLE-MCR-MGT-MIB::mcrXfpHighLaserWavelengthWarnRecov
     category: diagnostic
-    severity: notice
-    description: XFP laser wavelength recovered to normal on {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    severity: warning
+    description: XFP laser wavelength recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2150,7 +2150,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighLaserWavelengthAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} laser wavelength exceeded high alarm threshold on {_HOSTNAME}.
+    description: XFP laser wavelength high alarm on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2164,7 +2164,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighLaserWavelengthAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP laser wavelength recovered to normal on {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: XFP laser wavelength recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2177,7 +2177,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowLaserWavelengthWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} laser wavelength below low warning threshold {xfpDmiLowAuxWarn} on {_HOSTNAME}.
+    description: XFP laser wavelength below low warning threshold on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2191,7 +2191,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowLaserWavelengthWarnRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} laser wavelength recovered to normal on {_HOSTNAME}.
+    description: XFP module laser wavelength recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2204,7 +2204,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowLaserWavelengthAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} laser wavelength below low threshold on {_HOSTNAME}.
+    description: XFP laser wavelength low alarm on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2218,7 +2218,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowLaserWavelengthAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP laser wavelength recovered to normal on module {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: XFP module laser wavelength recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2231,7 +2231,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh5VoltWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +5V supply exceeded high warning threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} +5V supply exceeded high warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2244,8 +2244,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.142
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh5VoltWarnRecov
     category: diagnostic
-    severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +5v supply recovered to normal on {_HOSTNAME}.
+    severity: warning
+    description: XFP module +5V supply recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2258,7 +2258,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh5VoltAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +5V supply exceeded high alarm threshold on {_HOSTNAME}.
+    description: XFP module +5V supply exceeded high alarm threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2272,7 +2272,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh5VoltAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +5v supply recovered to normal on {_HOSTNAME}.
+    description: XFP module +5v supply recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2285,7 +2285,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow5VoltWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} on port {mcrMediaPortNum} voltage {xfpDmiRealTimeAux} below low warning threshold {xfpDmiLowAuxWarn} on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} +5V supply below warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2298,8 +2298,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.146
     name: PERLE-MCR-MGT-MIB::mcrXfpLow5VoltWarnRecov
     category: diagnostic
-    severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +5V supply recovered on {_HOSTNAME}.
+    severity: warning
+    description: XFP module +5V supply recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2312,7 +2312,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow5VoltAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} voltage alarm on port {mcrMediaPortNum} on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} low +5V alarm on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2326,7 +2326,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow5VoltAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +5V supply recovered on {_HOSTNAME}.
+    description: XFP module +5v supply recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2339,7 +2339,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh33VoltWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +3.3V supply exceeded high warning threshold {xfpDmiHighAuxWarn} on {_HOSTNAME}.
+    description: XFP module +3.3v supply exceeded high warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2352,8 +2352,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.150
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh33VoltWarnRecov
     category: diagnostic
-    severity: notice
-    description: XFP +3.3v supply recovered to normal on {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    severity: warning
+    description: XFP module +3.3v supply recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2366,7 +2366,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh33VoltAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +3.3V supply exceeded high alarm threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} +3.3V supply exceeded high alarm threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2380,7 +2380,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh33VoltAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +3.3v supply recovered to normal on {_HOSTNAME}.
+    description: XFP module +3.3v supply recovered on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2393,7 +2393,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow33VoltWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +3.3V supply below low warning threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} +3.3V supply below warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2407,7 +2407,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow33VoltWarnRecov
     category: diagnostic
     severity: notice
-    description: XFP +3.3v supply recovered to normal on {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: XFP module +3.3v supply recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2420,7 +2420,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow33VoltAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +3.3V supply below low alarm threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} +3.3V supply alarm on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2434,7 +2434,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow33VoltAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP +3.3v supply recovered to normal on {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: XFP module +3.3v supply recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2447,7 +2447,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh18VoltWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +1.8V supply exceeded high warning threshold on {_HOSTNAME}.
+    description: XFP module +1.8V supply exceeded high warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2460,8 +2460,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.158
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh18VoltWarnRecov
     category: diagnostic
-    severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +1.8v supply recovered on {_HOSTNAME}.
+    severity: warning
+    description: XFP module +1.8V supply recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2474,7 +2474,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh18VoltAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +1.8V supply exceeded high alarm threshold on {_HOSTNAME}.
+    description: XFP module +1.8V supply exceeded high alarm threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2488,7 +2488,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh18VoltAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP +1.8V supply recovered to normal on {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: XFP module +1.8V supply recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2501,7 +2501,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow18VoltWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +1.8V supply below warning threshold on {_HOSTNAME}.
+    description: XFP module +1.8V supply below warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2515,7 +2515,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow18VoltWarnRecov
     category: diagnostic
     severity: notice
-    description: XFP +1.8V supply recovered to normal on {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: XFP module +1.8V supply recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2528,7 +2528,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow18VoltAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +1.8V supply below low alarm threshold {xfpDmiLowAuxAlarm} on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} +1.8V supply alarm on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2542,7 +2542,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow18VoltAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP +1.8V supply recovered to normal on {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: XFP module +1.8V supply recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2555,7 +2555,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighM52VoltWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} -5.2v supply exceeded high warning threshold {xfpDmiHighAuxWarn} on {_HOSTNAME}.
+    description: XFP module -5.2v supply exceeded high warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2568,8 +2568,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.166
     name: PERLE-MCR-MGT-MIB::mcrXfpHighM52VoltWarnRecov
     category: diagnostic
-    severity: notice
-    description: XFP module {mcrUserDefinedModuleName} -5.2v supply recovered to normal on {_HOSTNAME}.
+    severity: warning
+    description: XFP module -5.2V supply recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2582,7 +2582,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighM52VoltAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} -5.2V supply exceeded high alarm threshold on {_HOSTNAME}.
+    description: XFP module -5.2V supply exceeded high alarm threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2596,7 +2596,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighM52VoltAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module -5.2v supply recovered to normal on slot {mcrChassisSlotIndex} on {_HOSTNAME}.
+    description: XFP module -5.2v supply recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2609,7 +2609,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowM52VoltWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} -5.2v supply below warning threshold on {_HOSTNAME}.
+    description: XFP module -5.2V supply below warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2622,8 +2622,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.170
     name: PERLE-MCR-MGT-MIB::mcrXfpLowM52VoltWarnRecov
     category: diagnostic
-    severity: notice
-    description: XFP -5.2V supply recovered to normal on slot {mcrChassisSlotIndex} port {mcrMediaPortNum} on {_HOSTNAME}.
+    severity: warning
+    description: XFP module -5.2v supply recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2636,7 +2636,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowM52VoltAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} -5.2V supply below low alarm threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} -5.2V supply low alarm on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2650,7 +2650,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowM52VoltAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} -5.2v supply recovered to normal on {_HOSTNAME}.
+    description: XFP module -5.2v supply recovered on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2663,7 +2663,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh5VCurrentWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} high 5V current warning on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} high 5V current warning on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2676,8 +2676,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.174
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh5VCurrentWarnRecov
     category: diagnostic
-    severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +5V current recovered to normal on {_HOSTNAME}.
+    severity: warning
+    description: XFP module +5V current recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2690,7 +2690,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh5VCurrentAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} high 5V current alarm on port {mcrMediaPortNum} on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} high 5V current alarm on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2704,7 +2704,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh5VCurrentAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +5V current recovered to normal on {_HOSTNAME}.
+    description: XFP module +5V current recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2717,7 +2717,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow5VCurrentWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} low 5V current warning on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} on port {{value "mcrMediaPortNum"}} has low +5V current on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2730,8 +2730,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.178
     name: PERLE-MCR-MGT-MIB::mcrXfpLow5VCurrentWarnRecov
     category: diagnostic
-    severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +5V current recovered on {_HOSTNAME}.
+    severity: warning
+    description: XFP module +5V current recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2744,7 +2744,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow5VCurrentAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} low 5V current alarm on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} low 5V current alarm on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2758,7 +2758,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow5VCurrentAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +5V current recovered to normal on {_HOSTNAME}.
+    description: XFP module +5V current recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2771,7 +2771,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh33VCurrentWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +3.3v current exceeded warning threshold {xfpDmiHighAuxWarn} on {_HOSTNAME}.
+    description: XFP module +3.3v supply current exceeded warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2785,7 +2785,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh33VCurrentWarnRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +3.3v current recovered to normal on {_HOSTNAME}.
+    description: XFP +3.3V current recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2798,7 +2798,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh33VCurrentAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +3.3V current exceeded high alarm threshold {xfpDmiHighAuxAlarm} on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} +3.3V current alarm on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2812,7 +2812,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh33VCurrentAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP +3.3v current recovered to normal on module {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: XFP module +3.3v current recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2825,7 +2825,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow33VCurrentWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +3.3V current below low warning threshold {xfpDmiLowAuxWarn} on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} +3.3V current below warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2838,8 +2838,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.186
     name: PERLE-MCR-MGT-MIB::mcrXfpLow33VCurrentWarnRecov
     category: diagnostic
-    severity: notice
-    description: XFP +3.3V current recovered to normal on module {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    severity: warning
+    description: XFP module +3.3v current recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2852,7 +2852,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow33VCurrentAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +3.3V current below low alarm threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} +3.3V current alarm on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2866,7 +2866,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow33VCurrentAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +3.3V current recovered to normal on {_HOSTNAME}.
+    description: XFP module +3.3V current alarm recovered on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2879,7 +2879,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh18VCurrentWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +1.8V current exceeded warning threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} +1.8V supply current warning on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2893,7 +2893,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh18VCurrentWarnRecov
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +1.8V current recovered to normal on {_HOSTNAME}.
+    description: XFP +1.8V supply current recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2906,7 +2906,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh18VCurrentAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +1.8V current alarm on port {mcrMediaPortNum} on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} +1.8V supply current alarm on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2920,7 +2920,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHigh18VCurrentAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +1.8V current recovered on {_HOSTNAME}.
+    description: XFP module +1.8V supply current recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2933,7 +2933,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow18VCurrentWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +1.8V supply current below warning threshold on {_HOSTNAME}.
+    description: XFP module +1.8V supply current below warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2947,7 +2947,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow18VCurrentWarnRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +1.8V supply current recovered on {_HOSTNAME}.
+    description: XFP +1.8V supply current recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2960,7 +2960,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow18VCurrentAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +1.8V supply current alarm on {_HOSTNAME}.
+    description: XFP module +1.8V supply current alarm on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2974,7 +2974,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLow18VCurrentAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +1.8V current recovered on {_HOSTNAME}.
+    description: XFP module +1.8V supply current recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -2987,7 +2987,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighM52VCurrentWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} -5.2V current exceeded warning threshold on {_HOSTNAME}.
+    description: XFP module -5.2v supply current warning threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3000,8 +3000,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.198
     name: PERLE-MCR-MGT-MIB::mcrXfpHighM52VCurrentWarnRecov
     category: diagnostic
-    severity: notice
-    description: XFP module {mcrUserDefinedModuleName} -5.2v supply current recovered on {_HOSTNAME}.
+    severity: warning
+    description: XFP module -5.2V supply current recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3014,7 +3014,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighM52VCurrentAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} -5.2v current exceeded alarm threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} -5.2V supply current alarm on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3027,8 +3027,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.200
     name: PERLE-MCR-MGT-MIB::mcrXfpHighM52VCurrentAlarmRecov
     category: diagnostic
-    severity: notice
-    description: XFP module {mcrUserDefinedModuleName} -5.2v current recovered to normal on {_HOSTNAME}.
+    severity: warning
+    description: XFP module -5.2v supply current recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3041,7 +3041,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowM52VCurrentWarn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} -5.2v current below warning threshold {xfpDmiLowAuxWarn} on {_HOSTNAME}.
+    description: XFP module -5.2V supply current below warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3054,8 +3054,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.202
     name: PERLE-MCR-MGT-MIB::mcrXfpLowM52VCurrentWarnRecov
     category: diagnostic
-    severity: notice
-    description: XFP module {mcrUserDefinedModuleName} -5.2V current recovered to normal on {_HOSTNAME}.
+    severity: warning
+    description: XFP module -5.2V supply current recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3068,7 +3068,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowM52VCurrentAlarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} -5.2V current below low alarm threshold on {_HOSTNAME}.
+    description: XFP module -5.2V supply current alarm on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3082,7 +3082,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowM52VCurrentAlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} -5.2v supply current recovered on {_HOSTNAME}.
+    description: XFP module -5.2V supply current recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3095,7 +3095,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighVCC5Warn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +5v supply exceeded warning threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} +5v supply exceeded warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3107,7 +3107,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighVCC5WarnRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +5V supply recovered on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} +5v supply recovered on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3119,7 +3119,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighVCC5Alarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +5v supply exceeded high alarm threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} on port {{value "mcrMediaPortNum"}} exceeded high +5V supply alarm on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3131,7 +3131,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighVCC5AlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +5v supply recovered to normal on {_HOSTNAME}.
+    description: XFP module +5v supply recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3143,7 +3143,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowVCC5Warn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +5v supply below warning threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} on slot {{value "mcrChassisSlotIndex"}} has low +5V supply on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3154,8 +3154,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.210
     name: PERLE-MCR-MGT-MIB::mcrXfpLowVCC5WarnRecov
     category: diagnostic
-    severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +5V supply recovered on {_HOSTNAME}.
+    severity: warning
+    description: XFP module {{value "mcrUserDefinedModuleName"}} +5V supply recovered on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3167,7 +3167,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowVCC5Alarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} low voltage alarm on port {mcrMediaPortNum} on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} low voltage alarm on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3179,7 +3179,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowVCC5AlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +5v supply recovered on {_HOSTNAME}.
+    description: XFP module +5v supply recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3191,7 +3191,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighVCC3Warn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +3.3v supply exceeded warning threshold on {_HOSTNAME}.
+    description: XFP module +3.3v supply exceeded high warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3202,8 +3202,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.214
     name: PERLE-MCR-MGT-MIB::mcrXfpHighVCC3WarnRecov
     category: diagnostic
-    severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +3.3v supply recovered to normal on {_HOSTNAME}.
+    severity: notice
+    description: XFP module +3.3V supply recovered to normal on {{first (value "mcrUserDefinedModuleName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3214,8 +3214,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.215
     name: PERLE-MCR-MGT-MIB::mcrXfpHighVCC3Alarm
     category: diagnostic
-    severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +3.3v supply exceeded high alarm threshold on {_HOSTNAME}.
+    severity: alert
+    description: XFP module +3.3v supply exceeded high alarm threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3227,7 +3227,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighVCC3AlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +3.3v supply recovered on {_HOSTNAME}.
+    description: XFP module +3.3v supply recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3239,7 +3239,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowVCC3Warn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +3.3v supply below warning threshold on port {mcrMediaPortNum} on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} on slot {{value "mcrChassisSlotIndex"}} has low +3.3v supply on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3251,7 +3251,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowVCC3WarnRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +3.3v supply recovered to normal on {_HOSTNAME}.
+    description: XFP module +3.3v supply recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3263,7 +3263,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowVCC3Alarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +3.3v supply below threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} on slot {{value "mcrChassisSlotIndex"}} has low +3.3V supply on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3275,7 +3275,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowVCC3AlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +3.3v supply recovered to normal on {_HOSTNAME}.
+    description: XFP module +3.3v supply recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3287,7 +3287,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighVCC2Warn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +1.8v supply exceeded high warning threshold on {_HOSTNAME}.
+    description: XFP module +1.8v supply exceeded warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3299,7 +3299,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighVCC2WarnRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +1.8v supply recovered on {_HOSTNAME}.
+    description: XFP module +1.8v supply recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3311,7 +3311,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighVCC2Alarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} voltage exceeded high alarm threshold on {_HOSTNAME}.
+    description: XFP module {{value "mcrUserDefinedModuleName"}} +1.8v supply exceeded high alarm threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3322,8 +3322,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.224
     name: PERLE-MCR-MGT-MIB::mcrXfpHighVCC2AlarmRecov
     category: diagnostic
-    severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +1.8v supply recovered on {_HOSTNAME}.
+    severity: notice
+    description: XFP module +1.8v supply recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3335,7 +3335,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowVCC2Warn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} +1.8v supply below warning threshold on {_HOSTNAME}.
+    description: XFP module +1.8v supply below warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3347,7 +3347,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowVCC2WarnRecov
     category: diagnostic
     severity: notice
-    description: XFP +1.8v supply recovered to normal on {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: XFP module +1.8v supply recovered to normal on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3358,8 +3358,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.227
     name: PERLE-MCR-MGT-MIB::mcrXfpLowVCC2Alarm
     category: diagnostic
-    severity: warning
-    description: XFP module {mcrUserDefinedModuleName} voltage alarm on port {mcrMediaPortNum} on {_HOSTNAME}.
+    severity: crit
+    description: XFP module +1.8v supply alarm on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3371,7 +3371,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowVCC2AlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module {mcrUserDefinedModuleName} +1.8v supply recovered on {_HOSTNAME}.
+    description: XFP module +1.8v supply recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3383,7 +3383,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighVEE5Warn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} -5.2v supply exceeded warning threshold on {_HOSTNAME}.
+    description: XFP module -5.2v supply exceeded high warning threshold on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3394,8 +3394,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.230
     name: PERLE-MCR-MGT-MIB::mcrXfpHighVEE5WarnRecov
     category: diagnostic
-    severity: notice
-    description: XFP module {mcrUserDefinedModuleName} -5.2v supply recovered on {_HOSTNAME}.
+    severity: warning
+    description: XFP module -5.2v supply recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3407,7 +3407,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighVEE5Alarm
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} -5.2v supply exceeded high alarm threshold on {_HOSTNAME}.
+    description: XFP module -5.2v supply exceeded high alarm threshold on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3419,7 +3419,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpHighVEE5AlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP -5.2v supply recovered on module {mcrUserDefinedModuleName} port {mcrMediaPortNum} on {_HOSTNAME}.
+    description: XFP module -5.2v supply recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3431,7 +3431,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowVEE5Warn
     category: diagnostic
     severity: warning
-    description: XFP module {mcrUserDefinedModuleName} -5.2v supply below warning threshold on {_HOSTNAME}.
+    description: XFP module -5.2v supply below warning threshold on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3442,8 +3442,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.234
     name: PERLE-MCR-MGT-MIB::mcrXfpLowVEE5WarnRecov
     category: diagnostic
-    severity: notice
-    description: XFP module {mcrUserDefinedModuleName} -5.2v supply recovered to normal on {_HOSTNAME}.
+    severity: warning
+    description: XFP module -5.2v supply recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3454,8 +3454,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.235
     name: PERLE-MCR-MGT-MIB::mcrXfpLowVEE5Alarm
     category: diagnostic
-    severity: alert
-    description: XFP module {mcrUserDefinedModuleName} -5.2v supply alarm on slot {mcrChassisSlotIndex} port {mcrMediaPortNum} on {_HOSTNAME}.
+    severity: warning
+    description: XFP module {{value "mcrUserDefinedModuleName"}} on port {{value "mcrMediaPortNum"}} has low -5.2v supply on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3467,7 +3467,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpLowVEE5AlarmRecov
     category: diagnostic
     severity: notice
-    description: XFP module -5.2v supply recovered to normal on {_HOSTNAME}.
+    description: XFP module -5.2v supply recovered to normal on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3479,7 +3479,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrSfpSpeedMismatch
     category: diagnostic
     severity: warning
-    description: SFP speed mismatch detected in module {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: SFP speed mismatch detected on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3488,9 +3488,9 @@ traps:
       - mcrUserDefinedModuleName
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.238
     name: PERLE-MCR-MGT-MIB::mcrSfpSpeedMismatchRecov
-    category: diagnostic
-    severity: notice
-    description: SFP speed mismatch recovered for module {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    category: state_change
+    severity: warning
+    description: SFP speed mismatch recovered on {{first (value "mcrUserDefinedModuleName") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3500,8 +3500,8 @@ traps:
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.239
     name: PERLE-MCR-MGT-MIB::mcrXfpPowerExceeded
     category: diagnostic
-    severity: err
-    description: XFP module {mcrUserDefinedModuleName} power exceeded card capacity on {_HOSTNAME}.
+    severity: crit
+    description: XFP module power exceeded card capacity on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3512,7 +3512,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrXfpPowerExceededRecov
     category: diagnostic
     severity: notice
-    description: XFP excessive power alarm recovered for {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: XFP excessive power alarm recovered on {{first (value "mcrUserDefinedModuleName") "module"}} in slot {{value "mcrChassisSlotIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3523,7 +3523,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrLinkTestError
     category: diagnostic
     severity: warning
-    description: Link test detected errors on module {mcrUserDefinedModuleName} on {_HOSTNAME}.
+    description: Link test detected errors on {{first (value "mcrUserDefinedModuleName") "media converter"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3534,7 +3534,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrAlarmRelayEngaged
     category: diagnostic
     severity: warning
-    description: Chassis alarm relay engaged for chassis {mcrChassisIndex} with severity {eventSeverityLevel} on {_HOSTNAME}.
+    description: Chassis alarm relay engaged on {{first (value "mcrChassisIndex") "chassis"}} on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3543,16 +3543,16 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrAlarmRelayDisengaged
     category: diagnostic
     severity: notice
-    description: Chassis alarm relay disengaged for chassis {mcrChassisIndex} on {_HOSTNAME}.
+    description: Chassis alarm relay disengaged on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
       - mcrChassisIndex
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.244
     name: PERLE-MCR-MGT-MIB::mcrBandwidthLevelUpstreamLow
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Media port {mcrMediaPortNum} bandwidth {mcrMediaPortBandwidth} below threshold {mcrMediaPortBandwidthThreshold} on {_HOSTNAME}.
+    description: Media port {{value "mcrMediaPortNum"}} upstream bandwidth is low on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3564,9 +3564,9 @@ traps:
       - mcrMediaPortBandwidthThreshold
   - oid: 1.3.6.1.4.1.1966.21.1.1.0.245
     name: PERLE-MCR-MGT-MIB::mcrBandwidthLevelUpstreamRecov
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Media port {mcrMediaPortNum} recovered from low upstream bandwidth on {_HOSTNAME}.
+    description: Media port {{value "mcrMediaPortNum"}} recovered from low upstream bandwidth on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3580,7 +3580,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrBandwidthLevelDownstreamLow
     category: diagnostic
     severity: warning
-    description: Media port {mcrMediaPortNum} bandwidth {mcrMediaPortBandwidth} below threshold {mcrMediaPortBandwidthThreshold} on {_HOSTNAME}.
+    description: Media port {{value "mcrMediaPortNum"}} bandwidth is low at {{value "mcrMediaPortBandwidth"}} kbps on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3594,7 +3594,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrBandwidthLevelDownstreamRecov
     category: state_change
     severity: notice
-    description: Media port {mcrMediaPortNum} recovered from low downstream bandwidth on {_HOSTNAME}.
+    description: Media port {{value "mcrMediaPortNum"}} recovered from low downstream bandwidth on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel
@@ -3608,7 +3608,7 @@ traps:
     name: PERLE-MCR-MGT-MIB::mcrMediaRemoteReset
     category: state_change
     severity: notice
-    description: Media converter module {mcrUserDefinedModuleName} peer was manually reset on {_HOSTNAME}.
+    description: Media converter module {{value "mcrUserDefinedModuleName"}} peer was manually reset on {{hostname}}.
     status: current
     varbinds:
       - eventSeverityLevel

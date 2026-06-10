@@ -1310,7 +1310,7 @@ traps:
     name: TITAN-MIB::alarm
     category: diagnostic
     severity: warning
-    description: Alarm {alarmName} with level {alarmLevel} reported on {_HOSTNAME}.
+    description: TitanLive alarm {{value "alarmName"}} {{value "alarmDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmName
@@ -1326,19 +1326,19 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeApplianceMonitorLogSystemStartedNotification
     category: state_change
     severity: notice
-    description: System started on {_HOSTNAME}.
+    description: System started on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.27338.50.2.1.2.1.2
     name: ATEME-TITAN-EDGE-MIB::titanEdgeApplianceMonitorLogSystemStoppedNotification
-    category: state_change
-    severity: alert
-    description: System stopped on {_HOSTNAME}.
+    category: diagnostic
+    severity: emerg
+    description: System stopped on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.27338.50.2.1.2.1.3
     name: ATEME-TITAN-EDGE-MIB::titanEdgeApplianceMonitorLogSystemEthernetIgmpVersionChangedNotification
-    category: state_change
+    category: config_change
     severity: notice
-    description: Ethernet IGMP version changed on {_HOSTNAME}.
+    description: Ethernet IGMP version changed on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeApplianceMonitorLogSystemEthernetIgmpVersionChangedId
@@ -1346,7 +1346,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeApplianceMonitorLogDvbSsuChannelUpdateNotification
     category: state_change
     severity: notice
-    description: DVB-SSU channel {titanEdgeApplianceMonitorLogDvbSsuChannelUpdateName} updated on {_HOSTNAME}.
+    description: DVB-SSU channel {{value "titanEdgeApplianceMonitorLogDvbSsuChannelUpdateName"}} updated on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeApplianceMonitorLogDvbSsuChannelUpdateId
@@ -1355,7 +1355,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeApplianceMonitorLogDvbSsuLicenseUpdateNotification
     category: license
     severity: notice
-    description: DVB-SSU license update for {titanEdgeApplianceMonitorLogDvbSsuLicenseUpdateName} on {_HOSTNAME}.
+    description: DVB-SSU license update {{value "titanEdgeApplianceMonitorLogDvbSsuLicenseUpdateName"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeApplianceMonitorLogDvbSsuLicenseUpdateId
@@ -1364,16 +1364,16 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeApplianceMonitorLogDvbSsuFirmwareUpdatingNotification
     category: diagnostic
     severity: notice
-    description: DVB-SSU firmware updating initiated for {titanEdgeApplianceMonitorLogDvbSsuFirmwareUpdatingName} on {_HOSTNAME}.
+    description: DVB-SSU firmware updating started on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeApplianceMonitorLogDvbSsuFirmwareUpdatingId
       - titanEdgeApplianceMonitorLogDvbSsuFirmwareUpdatingName
   - oid: 1.3.6.1.4.1.27338.50.2.1.2.1.14
     name: ATEME-TITAN-EDGE-MIB::titanEdgeApplianceMonitorLogDvbSsuAssetUpdateNotification
-    category: config_change
-    severity: notice
-    description: DVB-SSU asset update {titanEdgeApplianceMonitorLogDvbSsuAssetUpdateName} on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: DVB-SSU asset update {{value "titanEdgeApplianceMonitorLogDvbSsuAssetUpdateName"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeApplianceMonitorLogDvbSsuAssetUpdateId
@@ -1382,16 +1382,16 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeApplianceMonitorLogDvbSsuAssetDeletedNotification
     category: config_change
     severity: notice
-    description: DVB-SSU asset {titanEdgeApplianceMonitorLogDvbSsuAssetDeletedName} deleted on {_HOSTNAME}.
+    description: DVB-SSU asset {{value "titanEdgeApplianceMonitorLogDvbSsuAssetDeletedName"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeApplianceMonitorLogDvbSsuAssetDeletedId
       - titanEdgeApplianceMonitorLogDvbSsuAssetDeletedName
   - oid: 1.3.6.1.4.1.27338.50.2.1.2.1.16
     name: ATEME-TITAN-EDGE-MIB::titanEdgeApplianceMonitorLogDvbSsuFirmwareUpdateRejectedNotification
-    category: diagnostic
-    severity: err
-    description: DVB-SSU firmware update rejected for {titanEdgeApplianceMonitorLogDvbSsuFirmwareUpdateRejectedName} on {_HOSTNAME}.
+    category: state_change
+    severity: warning
+    description: DVB-SSU firmware update rejected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeApplianceMonitorLogDvbSsuFirmwareUpdateRejectedId
@@ -1400,7 +1400,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeApplianceMonitorAlarmSystemEthernetLinkDownOnNotification
     category: state_change
     severity: warning
-    description: Ethernet link down on {_HOSTNAME}.
+    description: Ethernet link down on {{first (value "titanEdgeApplianceMonitorAlarmSystemEthernetLinkDownOnId") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeApplianceMonitorAlarmSystemEthernetLinkDownOnId
@@ -1408,23 +1408,23 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeApplianceMonitorAlarmSystemEthernetLinkDownOffNotification
     category: state_change
     severity: warning
-    description: Ethernet link down on port {titanEdgeApplianceMonitorAlarmSystemEthernetLinkDownOffId} on {_HOSTNAME}.
+    description: Ethernet link down on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeApplianceMonitorAlarmSystemEthernetLinkDownOffId
   - oid: 1.3.6.1.4.1.27338.50.2.1.2.2.36.1
     name: ATEME-TITAN-EDGE-MIB::titanEdgeApplianceMonitorAlarmSystemPsuFailureOnNotification
     category: diagnostic
-    severity: err
-    description: Power supply unit failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Power supply unit failure detected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeApplianceMonitorAlarmSystemPsuFailureOnId
   - oid: 1.3.6.1.4.1.27338.50.2.1.2.2.36.2
     name: ATEME-TITAN-EDGE-MIB::titanEdgeApplianceMonitorAlarmSystemPsuFailureOffNotification
     category: diagnostic
-    severity: err
-    description: Power supply unit failure detected with ID {titanEdgeApplianceMonitorAlarmSystemPsuFailureOffId} on {_HOSTNAME}.
+    severity: alert
+    description: Power supply unit failure detected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeApplianceMonitorAlarmSystemPsuFailureOffId
@@ -1432,7 +1432,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderApiLogChannelAddedNotification
     category: config_change
     severity: notice
-    description: Channel added with ID {titanEdgeDecoderApiLogChannelAddedId} on {_HOSTNAME}.
+    description: Log channel {{value "titanEdgeDecoderApiLogChannelAddedId"}} added on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderApiLogChannelAddedId
@@ -1440,7 +1440,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderApiLogChannelDeletedNotification
     category: config_change
     severity: notice
-    description: Decoder API log channel {titanEdgeDecoderApiLogChannelDeletedId} deleted on {_HOSTNAME}.
+    description: Log channel {{value "titanEdgeDecoderApiLogChannelDeletedId"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderApiLogChannelDeletedId
@@ -1448,7 +1448,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderApiLogChannelModifiedNotification
     category: config_change
     severity: notice
-    description: Channel modified with ID {titanEdgeDecoderApiLogChannelModifiedId} on {_HOSTNAME}.
+    description: Decoder log channel {{value "titanEdgeDecoderApiLogChannelModifiedId"}} modified on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderApiLogChannelModifiedId
@@ -1456,7 +1456,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerLogChannelStartedNotification
     category: state_change
     severity: notice
-    description: Channel {titanEdgeDecoderSchedulerLogChannelStartedId} started on {_HOSTNAME}.
+    description: Decoder log channel {{value "titanEdgeDecoderSchedulerLogChannelStartedId"}} started on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerLogChannelStartedId
@@ -1464,7 +1464,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerLogChannelStoppedNotification
     category: diagnostic
     severity: warning
-    description: Decoder channel {titanEdgeDecoderSchedulerLogChannelStoppedId} stopped on {_HOSTNAME}.
+    description: Decoder log channel {{value "titanEdgeDecoderSchedulerLogChannelStoppedId"}} stopped on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerLogChannelStoppedId
@@ -1472,7 +1472,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerLogChannelFailoverInputChangedNotification
     category: state_change
     severity: notice
-    description: Channel failover input changed on {_HOSTNAME}.
+    description: Channel failover input changed on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerLogChannelFailoverInputChangedId
@@ -1481,7 +1481,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerLogOutputSplicingInProgressNotification
     category: diagnostic
     severity: notice
-    description: Splicing in progress for ID {titanEdgeDecoderSchedulerLogOutputSplicingInProgressId} on {_HOSTNAME}.
+    description: Decoder splicing in progress on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerLogOutputSplicingInProgressId
@@ -1489,7 +1489,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerLogOutputSplicingDoneNotification
     category: diagnostic
     severity: info
-    description: Splicing completed with reason {titanEdgeDecoderSchedulerLogOutputSplicingDoneReason} on {_HOSTNAME}.
+    description: Decoder splicing completed on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerLogOutputSplicingDoneId
@@ -1498,7 +1498,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmTsInputSignalMissingOnNotification
     category: diagnostic
     severity: warning
-    description: TS input signal missing on {titanEdgeDecoderSchedulerAlarmTsInputSignalMissingOnId} on {_HOSTNAME}.
+    description: TS input signal missing on {{first (value "titanEdgeDecoderSchedulerAlarmTsInputSignalMissingOnId") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmTsInputSignalMissingOnId
@@ -1507,7 +1507,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmTsInputSignalMissingOffNotification
     category: diagnostic
     severity: warning
-    description: TS input signal missing on {_HOSTNAME}.
+    description: TS input signal missing on {{first (value "titanEdgeDecoderSchedulerAlarmTsInputSignalMissingOffIndex") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmTsInputSignalMissingOffId
@@ -1516,7 +1516,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmSatelliteInputSignalNotLockedOnNotification
     category: diagnostic
     severity: warning
-    description: Satellite input signal not locked on {_HOSTNAME}.
+    description: Satellite input signal not locked on {{first (value "titanEdgeDecoderSchedulerAlarmSatelliteInputSignalNotLockedOnId") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmSatelliteInputSignalNotLockedOnId
@@ -1525,7 +1525,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmSatelliteInputSignalNotLockedOffNotification
     category: diagnostic
     severity: warning
-    description: Satellite input signal not locked on {_HOSTNAME}.
+    description: Satellite input signal not locked on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmSatelliteInputSignalNotLockedOffId
@@ -1534,7 +1534,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmZixiInputNotConnectedOnNotification
     category: diagnostic
     severity: warning
-    description: Zixi input not connected on {_HOSTNAME}.
+    description: Zixi input not connected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmZixiInputNotConnectedOnId
@@ -1543,7 +1543,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmZixiInputNotConnectedOffNotification
     category: diagnostic
     severity: warning
-    description: Zixi input not connected on {_HOSTNAME}.
+    description: Zixi input not connected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmZixiInputNotConnectedOffId
@@ -1552,7 +1552,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmZixiExcessiveJitterOnNotification
     category: diagnostic
     severity: warning
-    description: Excessive Zixi input jitter detected on channel {titanEdgeDecoderSchedulerAlarmZixiExcessiveJitterOnIndex} with threshold {titanEdgeDecoderSchedulerAlarmZixiExcessiveJitterOnThreshold} on {_HOSTNAME}.
+    description: Excessive Zixi input jitter detected on {{first (value "titanEdgeDecoderSchedulerAlarmZixiExcessiveJitterOnIndex") "stream"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmZixiExcessiveJitterOnId
@@ -1562,7 +1562,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmZixiExcessiveJitterOffNotification
     category: diagnostic
     severity: warning
-    description: Zixi input excessive jitter detected with threshold {titanEdgeDecoderSchedulerAlarmZixiExcessiveJitterOffThreshold} on {_HOSTNAME}.
+    description: Excessive Zixi input jitter detected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmZixiExcessiveJitterOffId
@@ -1572,7 +1572,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionProgramMissingOnNotification
     category: diagnostic
     severity: warning
-    description: Program missing alarm on {titanEdgeDecoderSchedulerAlarmCompositionProgramMissingOnId} on {_HOSTNAME}.
+    description: Decoder program missing on {{value "titanEdgeDecoderSchedulerAlarmCompositionProgramMissingOnId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionProgramMissingOnId
@@ -1580,7 +1580,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionProgramMissingOffNotification
     category: diagnostic
     severity: warning
-    description: Program missing alarm cleared for {titanEdgeDecoderSchedulerAlarmCompositionProgramMissingOffId} on {_HOSTNAME}.
+    description: Decoder program missing alarm cleared for {{value "titanEdgeDecoderSchedulerAlarmCompositionProgramMissingOffId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionProgramMissingOffId
@@ -1588,7 +1588,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionProgramScrambledOnNotification
     category: diagnostic
     severity: warning
-    description: Program scrambled alarm on {titanEdgeDecoderSchedulerAlarmCompositionProgramScrambledOnId} on {_HOSTNAME}.
+    description: Program scrambled alarm detected on {{value "titanEdgeDecoderSchedulerAlarmCompositionProgramScrambledOnId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionProgramScrambledOnId
@@ -1596,7 +1596,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionProgramScrambledOffNotification
     category: diagnostic
     severity: warning
-    description: Program scrambled off for {titanEdgeDecoderSchedulerAlarmCompositionProgramScrambledOffId} on {_HOSTNAME}.
+    description: Decoder program scrambled off for {{value "titanEdgeDecoderSchedulerAlarmCompositionProgramScrambledOffId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionProgramScrambledOffId
@@ -1604,7 +1604,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionVideoSourceMissingOnNotification
     category: diagnostic
     severity: warning
-    description: Video source missing on decoder {titanEdgeDecoderSchedulerAlarmCompositionVideoSourceMissingOnId} on {_HOSTNAME}.
+    description: Video source missing on decoder scheduler on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionVideoSourceMissingOnId
@@ -1612,7 +1612,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionVideoSourceMissingOffNotification
     category: diagnostic
     severity: warning
-    description: Video source missing alarm on decoder {titanEdgeDecoderSchedulerAlarmCompositionVideoSourceMissingOffId} on {_HOSTNAME}.
+    description: Video source missing on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionVideoSourceMissingOffId
@@ -1620,7 +1620,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionAudioSourceMissingOnNotification
     category: diagnostic
     severity: warning
-    description: Audio source missing on component {titanEdgeDecoderSchedulerAlarmCompositionAudioSourceMissingOnId} on {_HOSTNAME}.
+    description: Audio source missing on decoder scheduler index {{value "titanEdgeDecoderSchedulerAlarmCompositionAudioSourceMissingOnIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionAudioSourceMissingOnId
@@ -1629,7 +1629,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionAudioSourceMissingOffNotification
     category: diagnostic
     severity: warning
-    description: Audio source missing alarm triggered on index {titanEdgeDecoderSchedulerAlarmCompositionAudioSourceMissingOffIndex} on {_HOSTNAME}.
+    description: Audio source missing alarm triggered on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionAudioSourceMissingOffId
@@ -1638,7 +1638,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionDataSourceMissingOnNotification
     category: diagnostic
     severity: warning
-    description: Data source missing on component {titanEdgeDecoderSchedulerAlarmCompositionDataSourceMissingOnId} on {_HOSTNAME}.
+    description: Data source missing on {{value "titanEdgeDecoderSchedulerAlarmCompositionDataSourceMissingOnId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionDataSourceMissingOnId
@@ -1647,7 +1647,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionDataSourceMissingOffNotification
     category: diagnostic
     severity: warning
-    description: Data source missing alarm cleared for index {titanEdgeDecoderSchedulerAlarmCompositionDataSourceMissingOffIndex} on {_HOSTNAME}.
+    description: Data source missing for {{value "titanEdgeDecoderSchedulerAlarmCompositionDataSourceMissingOffId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionDataSourceMissingOffId
@@ -1656,7 +1656,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmLicenseMissingOnNotification
     category: license
     severity: alert
-    description: License missing for {titanEdgeDecoderSchedulerAlarmLicenseMissingOnName} on {_HOSTNAME}.
+    description: License missing for {{value "titanEdgeDecoderSchedulerAlarmLicenseMissingOnName"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmLicenseMissingOnId
@@ -1665,7 +1665,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmLicenseMissingOffNotification
     category: license
     severity: alert
-    description: License missing for {titanEdgeDecoderSchedulerAlarmLicenseMissingOffName} on {_HOSTNAME}.
+    description: License missing for {{value "titanEdgeDecoderSchedulerAlarmLicenseMissingOffName"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmLicenseMissingOffId
@@ -1674,7 +1674,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionProgramDecodingPreventedOnNotification
     category: diagnostic
     severity: warning
-    description: Program decoding prevented on {titanEdgeDecoderSchedulerAlarmCompositionProgramDecodingPreventedOnId} on {_HOSTNAME}.
+    description: Program decoding prevented for {{value "titanEdgeDecoderSchedulerAlarmCompositionProgramDecodingPreventedOnId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionProgramDecodingPreventedOnId
@@ -1682,7 +1682,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionProgramDecodingPreventedOffNotification
     category: diagnostic
     severity: warning
-    description: Program decoding prevented for {titanEdgeDecoderSchedulerAlarmCompositionProgramDecodingPreventedOffId} on {_HOSTNAME}.
+    description: Program decoding prevented on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionProgramDecodingPreventedOffId
@@ -1690,7 +1690,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionVideoConstraintIncompatibleOnNotification
     category: diagnostic
     severity: warning
-    description: Video constraint incompatible alarm on {titanEdgeDecoderSchedulerAlarmCompositionVideoConstraintIncompatibleOnId} on {_HOSTNAME}.
+    description: Video constraint incompatible alarm detected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionVideoConstraintIncompatibleOnId
@@ -1698,7 +1698,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionVideoConstraintIncompatibleOffNotification
     category: diagnostic
     severity: warning
-    description: Video constraint incompatible alarm triggered for {titanEdgeDecoderSchedulerAlarmCompositionVideoConstraintIncompatibleOffId} on {_HOSTNAME}.
+    description: Video constraint incompatible alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionVideoConstraintIncompatibleOffId
@@ -1706,15 +1706,15 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmChannelInternalErrorOnNotification
     category: diagnostic
     severity: err
-    description: Channel internal error reported on {titanEdgeDecoderSchedulerAlarmChannelInternalErrorOnId} on {_HOSTNAME}.
+    description: Channel internal error on {{value "titanEdgeDecoderSchedulerAlarmChannelInternalErrorOnId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmChannelInternalErrorOnId
   - oid: 1.3.6.1.4.1.27338.50.2.2.2.2.19.2
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmChannelInternalErrorOffNotification
     category: diagnostic
-    severity: err
-    description: Channel internal error reported for channel {titanEdgeDecoderSchedulerAlarmChannelInternalErrorOffId} on {_HOSTNAME}.
+    severity: warning
+    description: Channel internal error occurred on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmChannelInternalErrorOffId
@@ -1722,7 +1722,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmSdiOutputInvalidTimecodeOffsetOnNotification
     category: diagnostic
     severity: warning
-    description: Invalid timecode offset detected on SDI output {titanEdgeDecoderSchedulerAlarmSdiOutputInvalidTimecodeOffsetOnId} on {_HOSTNAME}.
+    description: SDI output invalid timecode offset detected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmSdiOutputInvalidTimecodeOffsetOnId
@@ -1731,7 +1731,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmSdiOutputInvalidTimecodeOffsetOffNotification
     category: diagnostic
     severity: warning
-    description: Invalid timecode offset detected on decoder {titanEdgeDecoderSchedulerAlarmSdiOutputInvalidTimecodeOffsetOffId} on {_HOSTNAME}.
+    description: SDI output invalid timecode offset detected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmSdiOutputInvalidTimecodeOffsetOffId
@@ -1740,7 +1740,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmSystemExtensionPinUnknownOnNotification
     category: diagnostic
     severity: warning
-    description: Hardware extension pin unknown on {_HOSTNAME}.
+    description: Hardware extension pin unknown on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmSystemExtensionPinUnknownOnId
@@ -1749,7 +1749,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmSystemExtensionPinUnknownOffNotification
     category: diagnostic
     severity: warning
-    description: Hardware extension pin {titanEdgeDecoderSchedulerAlarmSystemExtensionPinUnknownOffId} reported unknown state on {_HOSTNAME}.
+    description: Hardware extension pin unknown on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmSystemExtensionPinUnknownOffId
@@ -1758,7 +1758,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmSdiOutputGenlockUnlockedOnNotification
     category: diagnostic
     severity: warning
-    description: SDI output genlock unlocked on {_HOSTNAME}.
+    description: SDI output genlock unlocked on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmSdiOutputGenlockUnlockedOnId
@@ -1767,7 +1767,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmSdiOutputGenlockUnlockedOffNotification
     category: diagnostic
     severity: warning
-    description: SDI output genlock unlocked on {_HOSTNAME}.
+    description: SDI output genlock unlocked on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmSdiOutputGenlockUnlockedOffId
@@ -1776,7 +1776,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmSystemExtensionPinInConflictOnNotification
     category: diagnostic
     severity: warning
-    description: Hardware extension pin conflict detected on {_HOSTNAME}.
+    description: Hardware extension pin conflict detected on {{first (value "titanEdgeDecoderSchedulerAlarmSystemExtensionPinInConflictOnIndex") "component"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmSystemExtensionPinInConflictOnId
@@ -1785,7 +1785,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmSystemExtensionPinInConflictOffNotification
     category: diagnostic
     severity: warning
-    description: Hardware extension pin conflict detected on {_HOSTNAME}.
+    description: Hardware extension pin conflict resolved on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmSystemExtensionPinInConflictOffId
@@ -1793,8 +1793,8 @@ traps:
   - oid: 1.3.6.1.4.1.27338.50.2.2.2.2.24.1
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmSystemExtensionPinConfigurationInvalidOnNotification
     category: diagnostic
-    severity: err
-    description: Hardware extension pin configuration invalid on {_HOSTNAME}.
+    severity: warning
+    description: Hardware extension pin configuration invalid on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmSystemExtensionPinConfigurationInvalidOnId
@@ -1802,8 +1802,8 @@ traps:
   - oid: 1.3.6.1.4.1.27338.50.2.2.2.2.24.2
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmSystemExtensionPinConfigurationInvalidOffNotification
     category: diagnostic
-    severity: err
-    description: Hardware extension pin configuration invalid on {_HOSTNAME}.
+    severity: warning
+    description: Hardware extension pin configuration invalid on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmSystemExtensionPinConfigurationInvalidOffId
@@ -1812,7 +1812,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmInternalInputNotConnectedOnNotification
     category: diagnostic
     severity: warning
-    description: Internal input not connected on {_HOSTNAME}.
+    description: Internal input not connected on {{first (value "titanEdgeDecoderSchedulerAlarmInternalInputNotConnectedOnId") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmInternalInputNotConnectedOnId
@@ -1821,7 +1821,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmInternalInputNotConnectedOffNotification
     category: diagnostic
     severity: warning
-    description: Internal input not connected on {_HOSTNAME}.
+    description: Internal input not connected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmInternalInputNotConnectedOffId
@@ -1829,8 +1829,8 @@ traps:
   - oid: 1.3.6.1.4.1.27338.50.2.2.2.2.26.1
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmSystemRivermaxLicenseIssueOnNotification
     category: license
-    severity: err
-    description: Rivermax license issue detected on {_HOSTNAME}.
+    severity: warning
+    description: Mellanox Rivermax license issue detected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmSystemRivermaxLicenseIssueOnId
@@ -1839,7 +1839,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmSystemRivermaxLicenseIssueOffNotification
     category: license
     severity: warning
-    description: Mellanox Rivermax license issue detected on {_HOSTNAME}.
+    description: Mellanox Rivermax license issue detected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmSystemRivermaxLicenseIssueOffId
@@ -1847,8 +1847,8 @@ traps:
   - oid: 1.3.6.1.4.1.27338.50.2.2.2.2.28.1
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmTsSmpte20227SignalMissingOnNotification
     category: diagnostic
-    severity: warning
-    description: SMPTE 2022-7 signal missing on {titanEdgeDecoderSchedulerAlarmTsSmpte20227SignalMissingOnName} on {_HOSTNAME}.
+    severity: crit
+    description: SMPTE 2022-7 signal missing on {{first (value "titanEdgeDecoderSchedulerAlarmTsSmpte20227SignalMissingOnName") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmTsSmpte20227SignalMissingOnId
@@ -1858,7 +1858,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmTsSmpte20227SignalMissingOffNotification
     category: diagnostic
     severity: warning
-    description: SMPTE 2022-7 signal missing on {_HOSTNAME}.
+    description: SMPTE 2022-7 signal is missing on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmTsSmpte20227SignalMissingOffId
@@ -1868,7 +1868,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmTsSmpte20227SkewTooLargeOnNotification
     category: diagnostic
     severity: warning
-    description: SMPTE 2022-7 skew too large detected on {_HOSTNAME}.
+    description: SMPTE 2022-7 skew is too large on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmTsSmpte20227SkewTooLargeOnId
@@ -1877,16 +1877,16 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmTsSmpte20227SkewTooLargeOffNotification
     category: diagnostic
     severity: warning
-    description: SMPTE 2022-7 skew too large detected on {_HOSTNAME}.
+    description: SMPTE 2022-7 skew is too large on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmTsSmpte20227SkewTooLargeOffId
       - titanEdgeDecoderSchedulerAlarmTsSmpte20227SkewTooLargeOffIndex
   - oid: 1.3.6.1.4.1.27338.50.2.2.2.2.30.1
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmSystemEthernetUnknownOnNotification
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Ethernet link {titanEdgeDecoderSchedulerAlarmSystemEthernetUnknownOnName} reported unknown state on {_HOSTNAME}.
+    description: Ethernet link status unknown on {{first (value "titanEdgeDecoderSchedulerAlarmSystemEthernetUnknownOnName") "link"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmSystemEthernetUnknownOnId
@@ -1894,9 +1894,9 @@ traps:
       - titanEdgeDecoderSchedulerAlarmSystemEthernetUnknownOnName
   - oid: 1.3.6.1.4.1.27338.50.2.2.2.2.30.2
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmSystemEthernetUnknownOffNotification
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Ethernet link state unknown for {titanEdgeDecoderSchedulerAlarmSystemEthernetUnknownOffName} on {_HOSTNAME}.
+    description: Ethernet link unknown on {{first (value "titanEdgeDecoderSchedulerAlarmSystemEthernetUnknownOffName") "link"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmSystemEthernetUnknownOffId
@@ -1906,7 +1906,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionWatermarkingNotAvailableOnNotification
     category: diagnostic
     severity: warning
-    description: Watermarking is not available on component {titanEdgeDecoderSchedulerAlarmCompositionWatermarkingNotAvailableOnName} on {_HOSTNAME}.
+    description: Watermarking is not available on {{first (value "titanEdgeDecoderSchedulerAlarmCompositionWatermarkingNotAvailableOnName") "component"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionWatermarkingNotAvailableOnId
@@ -1915,7 +1915,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionWatermarkingNotAvailableOffNotification
     category: diagnostic
     severity: warning
-    description: Watermarking not available for {titanEdgeDecoderSchedulerAlarmCompositionWatermarkingNotAvailableOffName} on {_HOSTNAME}.
+    description: Watermarking is not available on {{first (value "titanEdgeDecoderSchedulerAlarmCompositionWatermarkingNotAvailableOffName") "component"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionWatermarkingNotAvailableOffId
@@ -1924,7 +1924,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmChannelLostOnNotification
     category: diagnostic
     severity: warning
-    description: Decoder channel {titanEdgeDecoderSchedulerAlarmChannelLostOnId} lost on {_HOSTNAME}.
+    description: Decoder channel {{value "titanEdgeDecoderSchedulerAlarmChannelLostOnId"}} is lost on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmChannelLostOnId
@@ -1932,7 +1932,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmChannelLostOffNotification
     category: diagnostic
     severity: warning
-    description: Decoder channel {titanEdgeDecoderSchedulerAlarmChannelLostOffId} is lost on {_HOSTNAME}.
+    description: Decoder channel {{value "titanEdgeDecoderSchedulerAlarmChannelLostOffId"}} is lost on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmChannelLostOffId
@@ -1940,7 +1940,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarm2110Smpte20227ConfigurationInvalidOnNotification
     category: diagnostic
     severity: warning
-    description: SMPTE 2022-7 configuration invalid for output {titanEdgeDecoderSchedulerAlarm2110Smpte20227ConfigurationInvalidOnName} on {_HOSTNAME}.
+    description: SMPTE 2022-7 configuration invalid on {{first (value "titanEdgeDecoderSchedulerAlarm2110Smpte20227ConfigurationInvalidOnName") "output"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarm2110Smpte20227ConfigurationInvalidOnId
@@ -1950,7 +1950,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarm2110Smpte20227ConfigurationInvalidOffNotification
     category: diagnostic
     severity: warning
-    description: SMPTE 2110 output configuration invalid for {titanEdgeDecoderSchedulerAlarm2110Smpte20227ConfigurationInvalidOffName} on {_HOSTNAME}.
+    description: SMPTE 2022-7 configuration invalid for output {{value "titanEdgeDecoderSchedulerAlarm2110Smpte20227ConfigurationInvalidOffName"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarm2110Smpte20227ConfigurationInvalidOffId
@@ -1960,7 +1960,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionMCamLimitsReachedOnNotification
     category: diagnostic
     severity: warning
-    description: M-CAM capacity limit reached for {titanEdgeDecoderSchedulerAlarmCompositionMCamLimitsReachedOnName} on {_HOSTNAME}.
+    description: M-CAM capacity limit reached on {{first (value "titanEdgeDecoderSchedulerAlarmCompositionMCamLimitsReachedOnName") "component"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionMCamLimitsReachedOnId
@@ -1970,7 +1970,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionMCamLimitsReachedOffNotification
     category: diagnostic
     severity: warning
-    description: M-CAM capacity limit reached for {titanEdgeDecoderSchedulerAlarmCompositionMCamLimitsReachedOffName} on {_HOSTNAME}.
+    description: M-CAM capacity limit reached for {{value "titanEdgeDecoderSchedulerAlarmCompositionMCamLimitsReachedOffName"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionMCamLimitsReachedOffId
@@ -1979,8 +1979,8 @@ traps:
   - oid: 1.3.6.1.4.1.27338.50.2.2.2.2.42.1
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionMCamHardwareErrorOnNotification
     category: diagnostic
-    severity: err
-    description: M-CAM pin hardware capacity is full on {_HOSTNAME}.
+    severity: warning
+    description: M-CAM pin hardware capacity is full on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionMCamHardwareErrorOnId
@@ -1988,8 +1988,8 @@ traps:
   - oid: 1.3.6.1.4.1.27338.50.2.2.2.2.42.2
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionMCamHardwareErrorOffNotification
     category: diagnostic
-    severity: err
-    description: M-CAM hardware error detected on index {titanEdgeDecoderSchedulerAlarmCompositionMCamHardwareErrorOffIndex} on {_HOSTNAME}.
+    severity: warning
+    description: M-CAM pin hardware capacity is full on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionMCamHardwareErrorOffId
@@ -1998,7 +1998,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionMCamDuplicatedProgramsOnNotification
     category: diagnostic
     severity: warning
-    description: Duplicated programs detected on M-CAM pin {titanEdgeDecoderSchedulerAlarmCompositionMCamDuplicatedProgramsOnName} on {_HOSTNAME}.
+    description: Duplicated programs detected on the M-CAM pin {{value "titanEdgeDecoderSchedulerAlarmCompositionMCamDuplicatedProgramsOnName"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionMCamDuplicatedProgramsOnId
@@ -2008,7 +2008,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderSchedulerAlarmCompositionMCamDuplicatedProgramsOffNotification
     category: diagnostic
     severity: warning
-    description: Duplicated programs detected on M-CAM pin {titanEdgeDecoderSchedulerAlarmCompositionMCamDuplicatedProgramsOffName} on {_HOSTNAME}.
+    description: Duplicated programs detected on the M-CAM pin {{value "titanEdgeDecoderSchedulerAlarmCompositionMCamDuplicatedProgramsOffName"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderSchedulerAlarmCompositionMCamDuplicatedProgramsOffId
@@ -2018,7 +2018,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeDecoderProcessingLogProcessingFailureNotification
     category: diagnostic
     severity: err
-    description: Processing failure {titanEdgeDecoderProcessingLogProcessingFailureId} on {_HOSTNAME}.
+    description: Decoder processing failure {{value "titanEdgeDecoderProcessingLogProcessingFailureId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeDecoderProcessingLogProcessingFailureId
@@ -2026,7 +2026,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderApiLogChannelAddedNotification
     category: config_change
     severity: notice
-    description: Channel added with ID {titanEdgeEncoderApiLogChannelAddedId} on {_HOSTNAME}.
+    description: Log channel added with ID {{value "titanEdgeEncoderApiLogChannelAddedId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderApiLogChannelAddedId
@@ -2034,7 +2034,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderApiLogChannelDeletedNotification
     category: config_change
     severity: notice
-    description: Channel deleted with ID {titanEdgeEncoderApiLogChannelDeletedId} on {_HOSTNAME}.
+    description: Log channel {{value "titanEdgeEncoderApiLogChannelDeletedId"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderApiLogChannelDeletedId
@@ -2042,15 +2042,15 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderApiLogChannelModifiedNotification
     category: config_change
     severity: notice
-    description: Log channel {titanEdgeEncoderApiLogChannelModifiedId} was modified on {_HOSTNAME}.
+    description: Log channel {{value "titanEdgeEncoderApiLogChannelModifiedId"}} modified on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderApiLogChannelModifiedId
   - oid: 1.3.6.1.4.1.27338.50.2.3.2.1.7
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerLogChannelStartedNotification
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Channel started on {_HOSTNAME}.
+    description: Encoder scheduler channel {{value "titanEdgeEncoderSchedulerLogChannelStartedId"}} started on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerLogChannelStartedId
@@ -2058,7 +2058,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerLogChannelStoppedNotification
     category: diagnostic
     severity: warning
-    description: Encoder scheduler channel {titanEdgeEncoderSchedulerLogChannelStoppedId} stopped on {_HOSTNAME}.
+    description: Encoder scheduler channel {{value "titanEdgeEncoderSchedulerLogChannelStoppedId"}} stopped on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerLogChannelStoppedId
@@ -2066,7 +2066,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerLogChannelFailoverInputChangedNotification
     category: state_change
     severity: notice
-    description: Channel failover input changed for channel {titanEdgeEncoderSchedulerLogChannelFailoverInputChangedId} on {_HOSTNAME}.
+    description: Channel failover input changed on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerLogChannelFailoverInputChangedId
@@ -2075,7 +2075,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmCompositionVideoSourceMissingOnNotification
     category: diagnostic
     severity: warning
-    description: Video source missing on encoder {titanEdgeEncoderSchedulerAlarmCompositionVideoSourceMissingOnId} on {_HOSTNAME}.
+    description: Video source missing on encoder scheduler on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmCompositionVideoSourceMissingOnId
@@ -2083,7 +2083,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmCompositionVideoSourceMissingOffNotification
     category: diagnostic
     severity: warning
-    description: Video source missing alarm triggered for {titanEdgeEncoderSchedulerAlarmCompositionVideoSourceMissingOffId} on {_HOSTNAME}.
+    description: Video source missing alarm triggered on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmCompositionVideoSourceMissingOffId
@@ -2091,7 +2091,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmCompositionAudioSourceMissingOnNotification
     category: diagnostic
     severity: warning
-    description: Audio source missing on {titanEdgeEncoderSchedulerAlarmCompositionAudioSourceMissingOnId} on {_HOSTNAME}.
+    description: Audio source missing on encoder scheduler on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmCompositionAudioSourceMissingOnId
@@ -2100,7 +2100,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmCompositionAudioSourceMissingOffNotification
     category: diagnostic
     severity: warning
-    description: Audio source missing alarm triggered for index {titanEdgeEncoderSchedulerAlarmCompositionAudioSourceMissingOffIndex} on {_HOSTNAME}.
+    description: Audio source missing alarm triggered on {{first (value "titanEdgeEncoderSchedulerAlarmCompositionAudioSourceMissingOffIndex") "component"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmCompositionAudioSourceMissingOffId
@@ -2109,7 +2109,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmLicenseMissingOnNotification
     category: license
     severity: alert
-    description: License missing for {titanEdgeEncoderSchedulerAlarmLicenseMissingOnName} on {_HOSTNAME}.
+    description: License missing for {{value "titanEdgeEncoderSchedulerAlarmLicenseMissingOnName"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmLicenseMissingOnId
@@ -2117,8 +2117,8 @@ traps:
   - oid: 1.3.6.1.4.1.27338.50.2.3.2.2.11.2
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmLicenseMissingOffNotification
     category: license
-    severity: warning
-    description: License missing for {titanEdgeEncoderSchedulerAlarmLicenseMissingOffName} on {_HOSTNAME}.
+    severity: alert
+    description: License missing for {{value "titanEdgeEncoderSchedulerAlarmLicenseMissingOffName"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmLicenseMissingOffId
@@ -2127,7 +2127,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmCompositionVideoSourceIncompatibleOnNotification
     category: diagnostic
     severity: warning
-    description: Video source incompatible alarm triggered on {_HOSTNAME}.
+    description: Video source incompatible on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmCompositionVideoSourceIncompatibleOnId
@@ -2135,7 +2135,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmCompositionVideoSourceIncompatibleOffNotification
     category: diagnostic
     severity: warning
-    description: Video source incompatible alarm triggered on {_HOSTNAME}.
+    description: Video source incompatible alarm triggered on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmCompositionVideoSourceIncompatibleOffId
@@ -2143,7 +2143,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmCompositionVideoSourceNotSupportedOnNotification
     category: diagnostic
     severity: warning
-    description: Video source not supported on {titanEdgeEncoderSchedulerAlarmCompositionVideoSourceNotSupportedOnId} on {_HOSTNAME}.
+    description: Video source not supported on {{first (value "titanEdgeEncoderSchedulerAlarmCompositionVideoSourceNotSupportedOnId") "component"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmCompositionVideoSourceNotSupportedOnId
@@ -2151,7 +2151,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmCompositionVideoSourceNotSupportedOffNotification
     category: diagnostic
     severity: warning
-    description: Video source not supported alarm triggered for {titanEdgeEncoderSchedulerAlarmCompositionVideoSourceNotSupportedOffId} on {_HOSTNAME}.
+    description: Video source not supported alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmCompositionVideoSourceNotSupportedOffId
@@ -2159,7 +2159,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmCompositionAudioSourceIncompatibleOnNotification
     category: diagnostic
     severity: warning
-    description: Audio source incompatible alarm triggered on {_HOSTNAME}.
+    description: Audio source incompatible alarm detected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmCompositionAudioSourceIncompatibleOnId
@@ -2168,7 +2168,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmCompositionAudioSourceIncompatibleOffNotification
     category: diagnostic
     severity: warning
-    description: Audio source incompatible alarm cleared on {_HOSTNAME}.
+    description: Audio source incompatible alarm triggered on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmCompositionAudioSourceIncompatibleOffId
@@ -2177,7 +2177,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmCompositionAudioSourceInactiveOnNotification
     category: diagnostic
     severity: warning
-    description: Audio source inactive alarm on index {titanEdgeEncoderSchedulerAlarmCompositionAudioSourceInactiveOnIndex} on {_HOSTNAME}.
+    description: Audio source inactive on {{first (value "titanEdgeEncoderSchedulerAlarmCompositionAudioSourceInactiveOnId") "component"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmCompositionAudioSourceInactiveOnId
@@ -2186,7 +2186,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmCompositionAudioSourceInactiveOffNotification
     category: diagnostic
     severity: warning
-    description: Audio source inactive alarm triggered on {_HOSTNAME}.
+    description: Audio source inactive alarm triggered on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmCompositionAudioSourceInactiveOffId
@@ -2195,7 +2195,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmTsOutputBitrateDifferentOnNotification
     category: diagnostic
     severity: warning
-    description: Program output bitrate differs from configured value on {_HOSTNAME}.
+    description: Program output bitrate differs from configured value on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmTsOutputBitrateDifferentOnId
@@ -2203,7 +2203,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmTsOutputBitrateDifferentOffNotification
     category: diagnostic
     severity: warning
-    description: Program output bitrate differs from configured value for stream {titanEdgeEncoderSchedulerAlarmTsOutputBitrateDifferentOffId} on {_HOSTNAME}.
+    description: TS output bitrate differs from configured value on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmTsOutputBitrateDifferentOffId
@@ -2211,15 +2211,15 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmChannelInternalErrorOnNotification
     category: diagnostic
     severity: err
-    description: Channel internal error reported on {_HOSTNAME}.
+    description: Channel internal error on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmChannelInternalErrorOnId
   - oid: 1.3.6.1.4.1.27338.50.2.3.2.2.19.2
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmChannelInternalErrorOffNotification
     category: diagnostic
-    severity: err
-    description: Channel internal error reported on {_HOSTNAME}.
+    severity: warning
+    description: Channel internal error occurred on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmChannelInternalErrorOffId
@@ -2227,7 +2227,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmSystemExtensionPinUnknownOnNotification
     category: diagnostic
     severity: warning
-    description: Hardware extension pin unknown detected on {_HOSTNAME}.
+    description: Hardware extension pin unknown on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmSystemExtensionPinUnknownOnId
@@ -2236,7 +2236,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmSystemExtensionPinUnknownOffNotification
     category: diagnostic
     severity: warning
-    description: Hardware extension pin {titanEdgeEncoderSchedulerAlarmSystemExtensionPinUnknownOffId} reported unknown state on {_HOSTNAME}.
+    description: Hardware extension pin unknown on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmSystemExtensionPinUnknownOffId
@@ -2245,7 +2245,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmSystemExtensionPinInConflictOnNotification
     category: diagnostic
     severity: warning
-    description: Hardware extension pin conflict detected on {_HOSTNAME}.
+    description: Hardware extension pin conflict detected on {{first (value "titanEdgeEncoderSchedulerAlarmSystemExtensionPinInConflictOnId") "pin"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmSystemExtensionPinInConflictOnId
@@ -2254,7 +2254,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmSystemExtensionPinInConflictOffNotification
     category: diagnostic
     severity: warning
-    description: Hardware extension pin conflict detected on {_HOSTNAME}.
+    description: Hardware extension pin conflict detected on {{first (value "titanEdgeEncoderSchedulerAlarmSystemExtensionPinInConflictOffId") "pin"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmSystemExtensionPinInConflictOffId
@@ -2262,8 +2262,8 @@ traps:
   - oid: 1.3.6.1.4.1.27338.50.2.3.2.2.24.1
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmSystemExtensionPinConfigurationInvalidOnNotification
     category: diagnostic
-    severity: err
-    description: Hardware extension pin configuration invalid on {titanEdgeEncoderSchedulerAlarmSystemExtensionPinConfigurationInvalidOnId} on {_HOSTNAME}.
+    severity: warning
+    description: Hardware extension pin configuration invalid on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmSystemExtensionPinConfigurationInvalidOnId
@@ -2272,7 +2272,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmSystemExtensionPinConfigurationInvalidOffNotification
     category: diagnostic
     severity: warning
-    description: Hardware extension pin configuration invalid on {_HOSTNAME}.
+    description: Hardware extension pin configuration invalid on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmSystemExtensionPinConfigurationInvalidOffId
@@ -2281,7 +2281,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmSystemRivermaxLicenseIssueOnNotification
     category: license
     severity: warning
-    description: Mellanox Rivermax license issue detected on {_HOSTNAME}.
+    description: Mellanox Rivermax license issue detected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmSystemRivermaxLicenseIssueOnId
@@ -2290,7 +2290,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmSystemRivermaxLicenseIssueOffNotification
     category: license
     severity: warning
-    description: Rivermax license issue detected on {_HOSTNAME}.
+    description: Mellanox Rivermax license issue detected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmSystemRivermaxLicenseIssueOffId
@@ -2299,7 +2299,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmTsOccupancyBitrateInvalidOnNotification
     category: diagnostic
     severity: warning
-    description: Program occupancy bitrate mismatch detected on {titanEdgeEncoderSchedulerAlarmTsOccupancyBitrateInvalidOnId} on {_HOSTNAME}.
+    description: TS occupancy bitrate mismatch detected on {{value "titanEdgeEncoderSchedulerAlarmTsOccupancyBitrateInvalidOnId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmTsOccupancyBitrateInvalidOnId
@@ -2307,7 +2307,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmTsOccupancyBitrateInvalidOffNotification
     category: diagnostic
     severity: warning
-    description: Program occupancy bitrate mismatch detected for {titanEdgeEncoderSchedulerAlarmTsOccupancyBitrateInvalidOffId} on {_HOSTNAME}.
+    description: TS occupancy bitrate is invalid on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmTsOccupancyBitrateInvalidOffId
@@ -2315,7 +2315,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmSystemEthernetUnknownOnNotification
     category: state_change
     severity: warning
-    description: Ethernet link unknown on {_HOSTNAME}.
+    description: Ethernet link status unknown on {{first (value "titanEdgeEncoderSchedulerAlarmSystemEthernetUnknownOnName") "link"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmSystemEthernetUnknownOnId
@@ -2323,9 +2323,9 @@ traps:
       - titanEdgeEncoderSchedulerAlarmSystemEthernetUnknownOnName
   - oid: 1.3.6.1.4.1.27338.50.2.3.2.2.30.2
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmSystemEthernetUnknownOffNotification
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Ethernet link {titanEdgeEncoderSchedulerAlarmSystemEthernetUnknownOffName} reported unknown state on {_HOSTNAME}.
+    description: Ethernet link unknown on {{first (value "titanEdgeEncoderSchedulerAlarmSystemEthernetUnknownOffName") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmSystemEthernetUnknownOffId
@@ -2335,7 +2335,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmChannelLostOnNotification
     category: diagnostic
     severity: warning
-    description: Encoder scheduler channel lost on {titanEdgeEncoderSchedulerAlarmChannelLostOnId} on {_HOSTNAME}.
+    description: Encoder scheduler channel lost{{with value "titanEdgeEncoderSchedulerAlarmChannelLostOnId"}} on channel {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmChannelLostOnId
@@ -2343,7 +2343,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmChannelLostOffNotification
     category: diagnostic
     severity: warning
-    description: Encoder channel {titanEdgeEncoderSchedulerAlarmChannelLostOffId} lost on {_HOSTNAME}.
+    description: Encoder scheduler channel {{value "titanEdgeEncoderSchedulerAlarmChannelLostOffId"}} is lost on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmChannelLostOffId
@@ -2351,7 +2351,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmOutputDiscardedPacketsOnNotification
     category: diagnostic
     severity: warning
-    description: Discarded packets detected on encoder {titanEdgeEncoderSchedulerAlarmOutputDiscardedPacketsOnId} on {_HOSTNAME}.
+    description: Encoder scheduler discarded packets on {{first (value "titanEdgeEncoderSchedulerAlarmOutputDiscardedPacketsOnId") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmOutputDiscardedPacketsOnId
@@ -2360,7 +2360,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmOutputDiscardedPacketsOffNotification
     category: diagnostic
     severity: warning
-    description: Discarded packets detected on scheduler index {titanEdgeEncoderSchedulerAlarmOutputDiscardedPacketsOffIndex} on {_HOSTNAME}.
+    description: Encoder scheduler discarded packets on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmOutputDiscardedPacketsOffId
@@ -2369,7 +2369,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmTsNoOutputConnectionOnNotification
     category: diagnostic
     severity: warning
-    description: TS output connection alarm on index {titanEdgeEncoderSchedulerAlarmTsNoOutputConnectionOnIndex} on {_HOSTNAME}.
+    description: TS output connection alarm on {{first (value "titanEdgeEncoderSchedulerAlarmTsNoOutputConnectionOnId") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmTsNoOutputConnectionOnId
@@ -2378,7 +2378,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmTsNoOutputConnectionOffNotification
     category: diagnostic
     severity: warning
-    description: TS output connection off detected on {_HOSTNAME}.
+    description: TS output connection is off on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmTsNoOutputConnectionOffId
@@ -2387,7 +2387,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmOutputBitrateInvalidOnNotification
     category: diagnostic
     severity: warning
-    description: Invalid bitrate detected for output {titanEdgeEncoderSchedulerAlarmOutputBitrateInvalidOnId} on {_HOSTNAME}.
+    description: Encoder output bitrate is invalid on {{first (value "titanEdgeEncoderSchedulerAlarmOutputBitrateInvalidOnId") "output"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmOutputBitrateInvalidOnId
@@ -2396,7 +2396,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderSchedulerAlarmOutputBitrateInvalidOffNotification
     category: diagnostic
     severity: warning
-    description: Invalid bitrate detected for output {titanEdgeEncoderSchedulerAlarmOutputBitrateInvalidOffIndex} on {_HOSTNAME}.
+    description: Encoder output bitrate is invalid on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderSchedulerAlarmOutputBitrateInvalidOffId
@@ -2405,7 +2405,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeEncoderProcessingLogProcessingFailureNotification
     category: diagnostic
     severity: err
-    description: Processing failure {titanEdgeEncoderProcessingLogProcessingFailureId} on {_HOSTNAME}.
+    description: Encoder processing failure {{value "titanEdgeEncoderProcessingLogProcessingFailureId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeEncoderProcessingLogProcessingFailureId
@@ -2413,7 +2413,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewayApiLogChannelAddedNotification
     category: config_change
     severity: notice
-    description: Log channel {titanEdgeGatewayApiLogChannelAddedId} added on {_HOSTNAME}.
+    description: Log channel added with ID {{value "titanEdgeGatewayApiLogChannelAddedId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewayApiLogChannelAddedId
@@ -2421,7 +2421,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewayApiLogChannelDeletedNotification
     category: config_change
     severity: notice
-    description: Log channel {titanEdgeGatewayApiLogChannelDeletedId} deleted on {_HOSTNAME}.
+    description: Log channel {{value "titanEdgeGatewayApiLogChannelDeletedId"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewayApiLogChannelDeletedId
@@ -2429,23 +2429,23 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewayApiLogChannelModifiedNotification
     category: config_change
     severity: notice
-    description: Log channel {titanEdgeGatewayApiLogChannelModifiedId} modified on {_HOSTNAME}.
+    description: Log channel {{value "titanEdgeGatewayApiLogChannelModifiedId"}} modified on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewayApiLogChannelModifiedId
   - oid: 1.3.6.1.4.1.27338.50.2.4.2.1.7
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerLogChannelStartedNotification
-    category: diagnostic
-    severity: info
-    description: Log channel {titanEdgeGatewaySchedulerLogChannelStartedId} started on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Scheduler log channel {{value "titanEdgeGatewaySchedulerLogChannelStartedId"}} started on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerLogChannelStartedId
   - oid: 1.3.6.1.4.1.27338.50.2.4.2.1.8
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerLogChannelStoppedNotification
-    category: state_change
-    severity: notice
-    description: Scheduler log channel {titanEdgeGatewaySchedulerLogChannelStoppedId} stopped on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: Scheduler log channel {{value "titanEdgeGatewaySchedulerLogChannelStoppedId"}} stopped on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerLogChannelStoppedId
@@ -2453,7 +2453,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerLogChannelFailoverInputChangedNotification
     category: state_change
     severity: notice
-    description: Channel failover input changed for index {titanEdgeGatewaySchedulerLogChannelFailoverInputChangedIndex} on {_HOSTNAME}.
+    description: Channel failover input changed for channel {{value "titanEdgeGatewaySchedulerLogChannelFailoverInputChangedId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerLogChannelFailoverInputChangedId
@@ -2461,8 +2461,8 @@ traps:
   - oid: 1.3.6.1.4.1.27338.50.2.4.2.2.2.1
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmTsInputSignalMissingOnNotification
     category: diagnostic
-    severity: warning
-    description: TS input signal missing on {titanEdgeGatewaySchedulerAlarmTsInputSignalMissingOnId} on {_HOSTNAME}.
+    severity: crit
+    description: TS input signal missing on {{first (value "titanEdgeGatewaySchedulerAlarmTsInputSignalMissingOnId") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmTsInputSignalMissingOnId
@@ -2471,7 +2471,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmTsInputSignalMissingOffNotification
     category: diagnostic
     severity: warning
-    description: TS input signal missing on {_HOSTNAME}.
+    description: TS input signal missing on {{first (value "titanEdgeGatewaySchedulerAlarmTsInputSignalMissingOffId") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmTsInputSignalMissingOffId
@@ -2480,7 +2480,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmSatelliteInputSignalNotLockedOnNotification
     category: diagnostic
     severity: warning
-    description: Satellite input signal not locked on {_HOSTNAME}.
+    description: Satellite input signal not locked on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmSatelliteInputSignalNotLockedOnId
@@ -2489,7 +2489,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmSatelliteInputSignalNotLockedOffNotification
     category: diagnostic
     severity: warning
-    description: Satellite input signal not locked on {_HOSTNAME}.
+    description: Satellite input signal not locked on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmSatelliteInputSignalNotLockedOffId
@@ -2498,7 +2498,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmZixiInputNotConnectedOnNotification
     category: diagnostic
     severity: warning
-    description: Zixi input not connected at index {titanEdgeGatewaySchedulerAlarmZixiInputNotConnectedOnIndex} on {_HOSTNAME}.
+    description: Zixi input not connected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmZixiInputNotConnectedOnId
@@ -2507,7 +2507,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmZixiInputNotConnectedOffNotification
     category: diagnostic
     severity: warning
-    description: Zixi input not connected on {_HOSTNAME}.
+    description: Zixi input not connected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmZixiInputNotConnectedOffId
@@ -2516,7 +2516,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmZixiExcessiveJitterOnNotification
     category: diagnostic
     severity: warning
-    description: Excessive Zixi input jitter detected with threshold {titanEdgeGatewaySchedulerAlarmZixiExcessiveJitterOnThreshold} on {_HOSTNAME}.
+    description: Excessive Zixi input jitter detected on {{first (value "titanEdgeGatewaySchedulerAlarmZixiExcessiveJitterOnId") "stream"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmZixiExcessiveJitterOnId
@@ -2526,7 +2526,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmZixiExcessiveJitterOffNotification
     category: diagnostic
     severity: warning
-    description: Excessive Zixi input jitter detected with threshold {titanEdgeGatewaySchedulerAlarmZixiExcessiveJitterOffThreshold} on {_HOSTNAME}.
+    description: Excessive Zixi input jitter detected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmZixiExcessiveJitterOffId
@@ -2535,8 +2535,8 @@ traps:
   - oid: 1.3.6.1.4.1.27338.50.2.4.2.2.11.1
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmLicenseMissingOnNotification
     category: license
-    severity: warning
-    description: License missing for {titanEdgeGatewaySchedulerAlarmLicenseMissingOnName} on {_HOSTNAME}.
+    severity: alert
+    description: License missing for {{value "titanEdgeGatewaySchedulerAlarmLicenseMissingOnName"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmLicenseMissingOnId
@@ -2544,8 +2544,8 @@ traps:
   - oid: 1.3.6.1.4.1.27338.50.2.4.2.2.11.2
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmLicenseMissingOffNotification
     category: license
-    severity: alert
-    description: License missing for {titanEdgeGatewaySchedulerAlarmLicenseMissingOffName} on {_HOSTNAME}.
+    severity: warning
+    description: License missing for {{value "titanEdgeGatewaySchedulerAlarmLicenseMissingOffName"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmLicenseMissingOffId
@@ -2554,15 +2554,15 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmChannelInternalErrorOnNotification
     category: diagnostic
     severity: err
-    description: Channel internal error on {titanEdgeGatewaySchedulerAlarmChannelInternalErrorOnId} on {_HOSTNAME}.
+    description: Channel internal error on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmChannelInternalErrorOnId
   - oid: 1.3.6.1.4.1.27338.50.2.4.2.2.19.2
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmChannelInternalErrorOffNotification
     category: diagnostic
-    severity: err
-    description: Channel internal error reported on {_HOSTNAME}.
+    severity: warning
+    description: Channel internal error occurred on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmChannelInternalErrorOffId
@@ -2570,7 +2570,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmSystemExtensionPinUnknownOnNotification
     category: diagnostic
     severity: warning
-    description: Hardware extension pin unknown on {_HOSTNAME}.
+    description: Hardware extension pin unknown on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmSystemExtensionPinUnknownOnId
@@ -2579,7 +2579,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmSystemExtensionPinUnknownOffNotification
     category: diagnostic
     severity: warning
-    description: Hardware extension pin {titanEdgeGatewaySchedulerAlarmSystemExtensionPinUnknownOffId} reported unknown state on {_HOSTNAME}.
+    description: Hardware extension pin unknown detected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmSystemExtensionPinUnknownOffId
@@ -2587,8 +2587,8 @@ traps:
   - oid: 1.3.6.1.4.1.27338.50.2.4.2.2.23.1
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmSystemExtensionPinInConflictOnNotification
     category: diagnostic
-    severity: err
-    description: Hardware extension pin conflict detected on {_HOSTNAME}.
+    severity: warning
+    description: Hardware extension pin conflict detected on {{first (value "titanEdgeGatewaySchedulerAlarmSystemExtensionPinInConflictOnIndex") "pin"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmSystemExtensionPinInConflictOnId
@@ -2597,7 +2597,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmSystemExtensionPinInConflictOffNotification
     category: diagnostic
     severity: warning
-    description: Hardware extension pin conflict detected on {_HOSTNAME}.
+    description: Hardware extension pin conflict resolved on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmSystemExtensionPinInConflictOffId
@@ -2606,7 +2606,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmSystemExtensionPinConfigurationInvalidOnNotification
     category: diagnostic
     severity: warning
-    description: Hardware extension pin configuration invalid on {titanEdgeGatewaySchedulerAlarmSystemExtensionPinConfigurationInvalidOnId} on {_HOSTNAME}.
+    description: Hardware extension pin configuration invalid on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmSystemExtensionPinConfigurationInvalidOnId
@@ -2615,7 +2615,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmSystemExtensionPinConfigurationInvalidOffNotification
     category: diagnostic
     severity: warning
-    description: Hardware extension pin configuration invalid on {_HOSTNAME}.
+    description: Hardware extension pin configuration invalid on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmSystemExtensionPinConfigurationInvalidOffId
@@ -2624,7 +2624,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmInternalInputNotConnectedOnNotification
     category: diagnostic
     severity: warning
-    description: Internal input {titanEdgeGatewaySchedulerAlarmInternalInputNotConnectedOnId} at index {titanEdgeGatewaySchedulerAlarmInternalInputNotConnectedOnIndex} is not connected on {_HOSTNAME}.
+    description: Internal input not connected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmInternalInputNotConnectedOnId
@@ -2633,7 +2633,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmInternalInputNotConnectedOffNotification
     category: diagnostic
     severity: warning
-    description: Internal input not connected on {_HOSTNAME}.
+    description: Internal input not connected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmInternalInputNotConnectedOffId
@@ -2642,7 +2642,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmTsSmpte20227SignalMissingOnNotification
     category: diagnostic
     severity: warning
-    description: SMPTE 2022-7 signal missing on {titanEdgeGatewaySchedulerAlarmTsSmpte20227SignalMissingOnName} on {_HOSTNAME}.
+    description: SMPTE 2022-7 signal is missing on {{first (value "titanEdgeGatewaySchedulerAlarmTsSmpte20227SignalMissingOnName") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmTsSmpte20227SignalMissingOnId
@@ -2652,7 +2652,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmTsSmpte20227SignalMissingOffNotification
     category: diagnostic
     severity: warning
-    description: SMPTE 2022-7 signal missing for {titanEdgeGatewaySchedulerAlarmTsSmpte20227SignalMissingOffName} on {_HOSTNAME}.
+    description: SMPTE 2022-7 signal is missing on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmTsSmpte20227SignalMissingOffId
@@ -2662,7 +2662,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmTsSmpte20227SkewTooLargeOnNotification
     category: diagnostic
     severity: warning
-    description: SMPTE 2022-7 skew is too large on {titanEdgeGatewaySchedulerAlarmTsSmpte20227SkewTooLargeOnId} on {_HOSTNAME}.
+    description: SMPTE 2022-7 skew is too large on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmTsSmpte20227SkewTooLargeOnId
@@ -2671,7 +2671,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmTsSmpte20227SkewTooLargeOffNotification
     category: diagnostic
     severity: warning
-    description: SMPTE 2022-7 skew too large alarm triggered for {titanEdgeGatewaySchedulerAlarmTsSmpte20227SkewTooLargeOffId} on {_HOSTNAME}.
+    description: SMPTE 2022-7 skew is too large on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmTsSmpte20227SkewTooLargeOffId
@@ -2680,7 +2680,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmSystemEthernetUnknownOnNotification
     category: state_change
     severity: warning
-    description: Ethernet link status unknown for {titanEdgeGatewaySchedulerAlarmSystemEthernetUnknownOnName} on {_HOSTNAME}.
+    description: Ethernet link status unknown on {{first (value "titanEdgeGatewaySchedulerAlarmSystemEthernetUnknownOnName") "link"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmSystemEthernetUnknownOnId
@@ -2688,9 +2688,9 @@ traps:
       - titanEdgeGatewaySchedulerAlarmSystemEthernetUnknownOnName
   - oid: 1.3.6.1.4.1.27338.50.2.4.2.2.30.2
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmSystemEthernetUnknownOffNotification
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Ethernet link on {titanEdgeGatewaySchedulerAlarmSystemEthernetUnknownOffName} reported unknown state on {_HOSTNAME}.
+    description: Ethernet link status unknown on {{first (value "titanEdgeGatewaySchedulerAlarmSystemEthernetUnknownOffName") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmSystemEthernetUnknownOffId
@@ -2698,9 +2698,9 @@ traps:
       - titanEdgeGatewaySchedulerAlarmSystemEthernetUnknownOffName
   - oid: 1.3.6.1.4.1.27338.50.2.4.2.2.31.1
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmCompositionProgramDescramblingPreventedOnNotification
-    category: diagnostic
+    category: security
     severity: warning
-    description: Program descrambling prevented on index {titanEdgeGatewaySchedulerAlarmCompositionProgramDescramblingPreventedOnIndex} on {_HOSTNAME}.
+    description: Program descrambling prevented on {{first (value "titanEdgeGatewaySchedulerAlarmCompositionProgramDescramblingPreventedOnId") "program"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmCompositionProgramDescramblingPreventedOnId
@@ -2709,7 +2709,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmCompositionProgramDescramblingPreventedOffNotification
     category: diagnostic
     severity: warning
-    description: Program descrambling prevented on {_HOSTNAME}.
+    description: Program descrambling prevented on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmCompositionProgramDescramblingPreventedOffId
@@ -2718,7 +2718,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmChannelLostOnNotification
     category: diagnostic
     severity: warning
-    description: Scheduler channel lost on {titanEdgeGatewaySchedulerAlarmChannelLostOnId} on {_HOSTNAME}.
+    description: Scheduler alarm channel lost on {{value "titanEdgeGatewaySchedulerAlarmChannelLostOnId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmChannelLostOnId
@@ -2726,7 +2726,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmChannelLostOffNotification
     category: diagnostic
     severity: warning
-    description: Scheduler channel alarm lost off on {_HOSTNAME}.
+    description: Scheduler channel {{value "titanEdgeGatewaySchedulerAlarmChannelLostOffId"}} is lost on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmChannelLostOffId
@@ -2734,7 +2734,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmOutputDiscardedPacketsOnNotification
     category: diagnostic
     severity: warning
-    description: Discarded packets detected on {titanEdgeGatewaySchedulerAlarmOutputDiscardedPacketsOnId} on {_HOSTNAME}.
+    description: Discarded packets detected on scheduler alarm output {{value "titanEdgeGatewaySchedulerAlarmOutputDiscardedPacketsOnId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmOutputDiscardedPacketsOnId
@@ -2743,7 +2743,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmOutputDiscardedPacketsOffNotification
     category: diagnostic
     severity: warning
-    description: Discarded packets detected on scheduler alarm output index {titanEdgeGatewaySchedulerAlarmOutputDiscardedPacketsOffIndex} on {_HOSTNAME}.
+    description: Scheduler alarm output discarded packets on {{first (value "titanEdgeGatewaySchedulerAlarmOutputDiscardedPacketsOffId") "scheduler"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmOutputDiscardedPacketsOffId
@@ -2751,8 +2751,8 @@ traps:
   - oid: 1.3.6.1.4.1.27338.50.2.4.2.2.37.1
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmCompositionRemuxRemappingDetectedOnNotification
     category: diagnostic
-    severity: notice
-    description: Remux remapped input content on {_HOSTNAME}.
+    severity: warning
+    description: Remux remapped input content on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmCompositionRemuxRemappingDetectedOnId
@@ -2761,7 +2761,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmCompositionRemuxRemappingDetectedOffNotification
     category: diagnostic
     severity: notice
-    description: Remux remapped input content at index {titanEdgeGatewaySchedulerAlarmCompositionRemuxRemappingDetectedOffIndex} on {_HOSTNAME}.
+    description: Remux remapped input content on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmCompositionRemuxRemappingDetectedOffId
@@ -2770,7 +2770,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmCompositionRemuxInputsMissingActivityOnNotification
     category: diagnostic
     severity: warning
-    description: Remux inputs missing activity detected on {_HOSTNAME}.
+    description: Remux inputs missing activity detected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmCompositionRemuxInputsMissingActivityOnId
@@ -2778,7 +2778,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmCompositionRemuxInputsMissingActivityOffNotification
     category: diagnostic
     severity: warning
-    description: Remux inputs missing activity detected with ID {titanEdgeGatewaySchedulerAlarmCompositionRemuxInputsMissingActivityOffId} on {_HOSTNAME}.
+    description: Remux inputs missing activity detected on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmCompositionRemuxInputsMissingActivityOffId
@@ -2786,7 +2786,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmCompositionRemuxLimitsReachedOnNotification
     category: diagnostic
     severity: warning
-    description: Remux limits reached for scheduler ID {titanEdgeGatewaySchedulerAlarmCompositionRemuxLimitsReachedOnId} on {_HOSTNAME}.
+    description: Remux limits reached on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmCompositionRemuxLimitsReachedOnId
@@ -2794,7 +2794,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmCompositionRemuxLimitsReachedOffNotification
     category: diagnostic
     severity: warning
-    description: Remux limits reached with ID {titanEdgeGatewaySchedulerAlarmCompositionRemuxLimitsReachedOffId} on {_HOSTNAME}.
+    description: Remux limits reached on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmCompositionRemuxLimitsReachedOffId
@@ -2802,7 +2802,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmTsNoOutputConnectionOnNotification
     category: diagnostic
     severity: warning
-    description: No TS output connected on {_HOSTNAME}.
+    description: TS output connection missing on {{first (value "titanEdgeGatewaySchedulerAlarmTsNoOutputConnectionOnId") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmTsNoOutputConnectionOnId
@@ -2811,7 +2811,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmTsNoOutputConnectionOffNotification
     category: diagnostic
     severity: warning
-    description: TS output connection off detected on {_HOSTNAME}.
+    description: TS output connection is off on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmTsNoOutputConnectionOffId
@@ -2820,7 +2820,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmCompositionMCamLimitsReachedOnNotification
     category: diagnostic
     severity: warning
-    description: M-CAM capacity limit reached for {titanEdgeGatewaySchedulerAlarmCompositionMCamLimitsReachedOnName} on {_HOSTNAME}.
+    description: M-CAM capacity limit reached on {{first (value "titanEdgeGatewaySchedulerAlarmCompositionMCamLimitsReachedOnName") "component"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmCompositionMCamLimitsReachedOnId
@@ -2830,7 +2830,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmCompositionMCamLimitsReachedOffNotification
     category: diagnostic
     severity: warning
-    description: M-CAM capacity limit reached for {titanEdgeGatewaySchedulerAlarmCompositionMCamLimitsReachedOffName} on {_HOSTNAME}.
+    description: M-CAM capacity limit reached on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmCompositionMCamLimitsReachedOffId
@@ -2839,8 +2839,8 @@ traps:
   - oid: 1.3.6.1.4.1.27338.50.2.4.2.2.42.1
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmCompositionMCamHardwareErrorOnNotification
     category: diagnostic
-    severity: err
-    description: M-CAM pin hardware capacity is full on {_HOSTNAME}.
+    severity: crit
+    description: M-CAM pin hardware capacity is full on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmCompositionMCamHardwareErrorOnId
@@ -2848,8 +2848,8 @@ traps:
   - oid: 1.3.6.1.4.1.27338.50.2.4.2.2.42.2
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmCompositionMCamHardwareErrorOffNotification
     category: diagnostic
-    severity: err
-    description: M-CAM pin hardware capacity is full on {_HOSTNAME}.
+    severity: warning
+    description: M-CAM pin hardware capacity is full on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmCompositionMCamHardwareErrorOffId
@@ -2858,7 +2858,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmOutputBitrateInvalidOnNotification
     category: diagnostic
     severity: warning
-    description: Invalid output bitrate detected on {titanEdgeGatewaySchedulerAlarmOutputBitrateInvalidOnId} on {_HOSTNAME}.
+    description: Invalid bitrate detected for output {{value "titanEdgeGatewaySchedulerAlarmOutputBitrateInvalidOnId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmOutputBitrateInvalidOnId
@@ -2867,7 +2867,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmOutputBitrateInvalidOffNotification
     category: diagnostic
     severity: warning
-    description: Output bitrate invalid alarm triggered on index {titanEdgeGatewaySchedulerAlarmOutputBitrateInvalidOffIndex} on {_HOSTNAME}.
+    description: Bitrate is invalid for output {{value "titanEdgeGatewaySchedulerAlarmOutputBitrateInvalidOffId"}} on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmOutputBitrateInvalidOffId
@@ -2876,7 +2876,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmCompositionMCamDuplicatedProgramsOnNotification
     category: diagnostic
     severity: warning
-    description: Duplicated programs detected on M-CAM pin {titanEdgeGatewaySchedulerAlarmCompositionMCamDuplicatedProgramsOnName} on {_HOSTNAME}.
+    description: Duplicated programs detected on the M-CAM pin on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmCompositionMCamDuplicatedProgramsOnId
@@ -2886,7 +2886,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewaySchedulerAlarmCompositionMCamDuplicatedProgramsOffNotification
     category: diagnostic
     severity: warning
-    description: Duplicated programs detected on M-CAM pin on {_HOSTNAME}.
+    description: Duplicated programs detected on the M-CAM pin on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewaySchedulerAlarmCompositionMCamDuplicatedProgramsOffId
@@ -2896,7 +2896,7 @@ traps:
     name: ATEME-TITAN-EDGE-MIB::titanEdgeGatewayProcessingLogProcessingFailureNotification
     category: diagnostic
     severity: err
-    description: Processing failure {titanEdgeGatewayProcessingLogProcessingFailureId} on {_HOSTNAME}.
+    description: Processing failure occurred on {{hostname}}.
     status: current
     varbinds:
       - titanEdgeGatewayProcessingLogProcessingFailureId

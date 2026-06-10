@@ -102,7 +102,7 @@ traps:
     name: RADIO-BRIDGE-MIB::trapModulationChange
     category: state_change
     severity: notice
-    description: Modulation parameters changed to {rfModulationType} with {rfNumOfSubchannels} subchannels on {_HOSTNAME}.
+    description: Modulation parameters changed on {{hostname}}.
     status: current
     varbinds:
       - rfModulationType
@@ -113,27 +113,27 @@ traps:
     name: RADIO-BRIDGE-MIB::trapTemperatureOutOfRange
     category: diagnostic
     severity: warning
-    description: Temperature out of range detected on {_HOSTNAME}.
+    description: Temperature out of range detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31926.3.3
     name: RADIO-BRIDGE-MIB::trapTemperatureInRange
     category: diagnostic
-    severity: notice
-    description: Temperature reported within normal range on {_HOSTNAME}.
+    severity: info
+    description: Temperature is within the normal range on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31926.3.4
     name: RADIO-BRIDGE-MIB::trapSfpIn
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: SFP module status changed on interface {ifIndex} on {_HOSTNAME}.
+    description: SFP module failure detected on interface {{value "ifIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.31926.3.5
     name: RADIO-BRIDGE-MIB::trapSfpOut
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: SFP module removed from interface {ifIndex} on {_HOSTNAME}.
+    description: SFP module removed from interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -141,7 +141,7 @@ traps:
     name: RADIO-BRIDGE-MIB::trapRefClockChanged
     category: state_change
     severity: notice
-    description: Reference clock quality level changed to {refClockQualityLevelActual} on interface {ifIndex} on {_HOSTNAME}.
+    description: Reference clock changed on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -150,7 +150,7 @@ traps:
     name: RADIO-BRIDGE-MIB::trapCurrentAlarm
     category: diagnostic
     severity: warning
-    description: Alarm {rbCurrentAlarmTypeName} with severity {rbCurrentAlarmSeverity} detected from {rbCurrentAlarmSource} on {_HOSTNAME}.
+    description: 'Radio bridge alarm raised{{with value "rbCurrentAlarmTypeName"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - rbCurrentAlarmChangeCounter
@@ -167,7 +167,7 @@ traps:
     name: RADIO-BRIDGE-MIB::trapLoopEnabled
     category: state_change
     severity: notice
-    description: Loop detection enabled on interface {ifIndex} on {_HOSTNAME}.
+    description: Loop detection enabled on interface {{first (value "ifIndex") "link"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -175,7 +175,7 @@ traps:
     name: RADIO-BRIDGE-MIB::trapLoopDisabled
     category: state_change
     severity: warning
-    description: Loop detection disabled on interface {ifIndex} on {_HOSTNAME}.
+    description: Loop detection disabled on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -183,47 +183,47 @@ traps:
     name: RADIO-BRIDGE-MIB::trapTxMuteEnabled
     category: state_change
     severity: notice
-    description: Transmit mute enabled on {_HOSTNAME}.
+    description: Transmit mute enabled on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31926.3.15
     name: RADIO-BRIDGE-MIB::trapTxMuteDisabled
     category: state_change
     severity: notice
-    description: Transmit mute disabled on {_HOSTNAME}.
+    description: Transmit mute disabled on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31926.3.19
     name: RADIO-BRIDGE-MIB::trapCinrOutOfRange
     category: diagnostic
     severity: warning
-    description: Radio signal strength out of range on {_HOSTNAME}.
+    description: CINR is out of range on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31926.3.20
     name: RADIO-BRIDGE-MIB::trapCinrInRange
-    category: unknown
+    category: diagnostic
     severity: notice
-    description: Trap {TRAP_NAME} received on {_HOSTNAME}.
+    description: CINR is within acceptable range on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31926.3.21
     name: RADIO-BRIDGE-MIB::trapRssiOutOfRange
     category: diagnostic
     severity: warning
-    description: RSSI signal strength out of range on {_HOSTNAME}.
+    description: RSSI is out of range on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31926.3.22
     name: RADIO-BRIDGE-MIB::trapRssiInRange
     category: diagnostic
-    severity: notice
-    description: RSSI is within acceptable range on {_HOSTNAME}.
+    severity: info
+    description: RSSI is within acceptable range on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31926.3.23
     name: RADIO-BRIDGE-MIB::trapLowestModulation
     category: diagnostic
     severity: warning
-    description: Lowest modulation threshold reached on {_HOSTNAME}.
+    description: Lowest modulation threshold reached on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31926.3.24
     name: RADIO-BRIDGE-MIB::trapNoLowestModulation
     category: diagnostic
     severity: warning
-    description: Lowest modulation threshold exceeded on {_HOSTNAME}.
+    description: Radio bridge module reported no lowest modulation available on {{hostname}}.
     status: current

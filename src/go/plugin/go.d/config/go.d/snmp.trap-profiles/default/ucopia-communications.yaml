@@ -9,5 +9,5 @@ traps:
     name: CONTROLLER-MIB::ucpServiceFaultStateNotification
     category: diagnostic
     severity: warning
-    description: Service entered fault state on {_HOSTNAME}.
+    description: Service entered fault state on {{hostname}}.
     status: current

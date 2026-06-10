@@ -42,15 +42,15 @@ traps:
     name: DAHUA-SNMP-MIB::snmpStatusEvent
     category: state_change
     severity: notice
-    description: SNMP service status changed to {snmpStatus} on {_HOSTNAME}.
+    description: SNMP service status changed to {{value "snmpStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - snmpStatus
   - oid: 1.3.6.1.4.1.1004849.2.11.11.1
     name: DAHUA-SNMP-MIB::videoMotionEvent
     category: diagnostic
-    severity: info
-    description: Video motion event {action} on channel {videoMotionIndex} at {currentTime} on {_HOSTNAME}.
+    severity: notice
+    description: Video motion detected on camera {{value "videoMotionIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - action
@@ -59,8 +59,8 @@ traps:
   - oid: 1.3.6.1.4.1.1004849.2.11.11.2
     name: DAHUA-SNMP-MIB::videoBlindEvent
     category: diagnostic
-    severity: notice
-    description: Video blind event {action} on channel {videoBlindIndex} at {currentTime} on {_HOSTNAME}.
+    severity: warning
+    description: Video blind event detected on camera {{value "videoBlindIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - action
@@ -70,7 +70,7 @@ traps:
     name: DAHUA-SNMP-MIB::videoLossEvent
     category: diagnostic
     severity: warning
-    description: Video loss detected on channel {videoLossIndex} on {_HOSTNAME}.
+    description: Video loss detected on channel {{value "videoLossIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - action
@@ -78,9 +78,9 @@ traps:
       - videoLossIndex
   - oid: 1.3.6.1.4.1.1004849.2.11.12.1
     name: DAHUA-SNMP-MIB::localAlarmEvent
-    category: security
-    severity: warning
-    description: Video motion event detected at {localAlarmIndex} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Video motion event detected on {{first (value "localAlarmIndex") "alarm"}} on {{hostname}}.
     status: current
     varbinds:
       - action
@@ -89,8 +89,8 @@ traps:
   - oid: 1.3.6.1.4.1.1004849.2.11.13.1
     name: DAHUA-SNMP-MIB::storageFailureEvent
     category: diagnostic
-    severity: err
-    description: Storage failure detected on logic unit {logicNo} on {_HOSTNAME}.
+    severity: crit
+    description: Storage failure detected on logic unit {{value "logicNo"}} on {{hostname}}.
     status: current
     varbinds:
       - action
@@ -100,7 +100,7 @@ traps:
     name: DAHUA-SNMP-MIB::storageLowSpaceEvent
     category: diagnostic
     severity: warning
-    description: Storage full event triggered for logic {logicNo} at {currentTime} on {_HOSTNAME}.
+    description: Storage low space event detected{{with value "logicNo"}} on logic {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - action
@@ -110,7 +110,7 @@ traps:
     name: DAHUA-SNMP-MIB::storageInOutEvent
     category: diagnostic
     severity: notice
-    description: Storage I/O event {action} on logic unit {logicNo} at {currentTime} on {_HOSTNAME}.
+    description: Storage in-out event occurred on {{hostname}}.
     status: current
     varbinds:
       - action
@@ -120,7 +120,7 @@ traps:
     name: DAHUA-SNMP-MIB::storageSMARTAbnormityEvent
     category: diagnostic
     severity: warning
-    description: Storage SMART abnormity detected on logic unit {logicNo} at {currentTime} on {_HOSTNAME}.
+    description: Storage SMART abnormity detected on logic {{value "logicNo"}} on {{hostname}}.
     status: current
     varbinds:
       - action
@@ -128,9 +128,9 @@ traps:
       - logicNo
   - oid: 1.3.6.1.4.1.1004849.2.11.14.1
     name: DAHUA-SNMP-MIB::recordMainStreamEvent
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Main stream recording event {action} on channel {recordMainChannelIndex} at {currentTime} on {_HOSTNAME}.
+    description: Main stream recording event {{value "action"}} on channel {{value "recordMainChannelIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - action
@@ -140,7 +140,7 @@ traps:
     name: DAHUA-SNMP-MIB::recordExtraStreamEvent
     category: diagnostic
     severity: info
-    description: Extra stream event {action} recorded at {currentTime} on {_HOSTNAME}.
+    description: Record extra stream event {{value "action"}} on {{hostname}}.
     status: current
     varbinds:
       - action

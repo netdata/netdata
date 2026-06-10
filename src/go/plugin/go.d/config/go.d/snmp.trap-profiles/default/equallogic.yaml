@@ -133,7 +133,7 @@ traps:
     name: EQLMEMBER-MIB::eqlMemberHealthTempSensorHighThreshold
     category: diagnostic
     severity: warning
-    description: Temperature sensor {eqlMemberHealthDetailsTemperatureName} value {eqlMemberHealthDetailsTemperatureValue} exceeded high threshold on {_HOSTNAME}.
+    description: Temperature sensor {{value "eqlMemberHealthDetailsTemperatureName"}} exceeded high threshold on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthDetailsTemperatureName
@@ -146,7 +146,7 @@ traps:
     name: EQLMEMBER-MIB::eqlMemberHealthTempSensorLowThreshold
     category: diagnostic
     severity: warning
-    description: Temperature sensor {eqlMemberHealthDetailsTemperatureName} value {eqlMemberHealthDetailsTemperatureValue} below low threshold on {_HOSTNAME}.
+    description: Temperature sensor {{value "eqlMemberHealthDetailsTemperatureName"}} low threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthDetailsTemperatureName
@@ -159,7 +159,7 @@ traps:
     name: EQLMEMBER-MIB::eqlMemberHealthFanSpeedHighThreshold
     category: diagnostic
     severity: warning
-    description: Fan {eqlMemberHealthDetailsFanName} speed {eqlMemberHealthDetailsFanValue} exceeded high threshold with state {eqlMemberHealthDetailsFanCurrentState} on {_HOSTNAME}.
+    description: Fan {{value "eqlMemberHealthDetailsFanName"}} speed exceeded high warning threshold on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthDetailsFanName
@@ -172,7 +172,7 @@ traps:
     name: EQLMEMBER-MIB::eqlMemberHealthFanSpeedLowThreshold
     category: diagnostic
     severity: warning
-    description: Fan {eqlMemberHealthDetailsFanName} speed {eqlMemberHealthDetailsFanValue} rpm is below threshold on {_HOSTNAME}.
+    description: Fan {{value "eqlMemberHealthDetailsFanName"}} speed below low threshold on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthDetailsFanName
@@ -184,8 +184,8 @@ traps:
   - oid: 1.3.6.1.4.1.12740.2.2.1.5
     name: EQLMEMBER-MIB::eqlMemberHealthPowerSupplyFanFailure
     category: diagnostic
-    severity: err
-    description: Power supply fan failure detected for {eqlMemberHealthDetailsPowerSupplyName} on {_HOSTNAME}.
+    severity: crit
+    description: Power supply fan failure detected on {{value "eqlMemberHealthDetailsPowerSupplyName"}} on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthDetailsPowerSupplyName
@@ -194,8 +194,8 @@ traps:
   - oid: 1.3.6.1.4.1.12740.2.2.1.6
     name: EQLMEMBER-MIB::eqlMemberHealthPowerSupplyFailure
     category: diagnostic
-    severity: err
-    description: Power supply {eqlMemberHealthDetailsPowerSupplyName} reported failure state {eqlMemberHealthDetailsPowerSupplyCurrentState} on {_HOSTNAME}.
+    severity: crit
+    description: Power supply {{value "eqlMemberHealthDetailsPowerSupplyName"}} failure detected on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthDetailsPowerSupplyName
@@ -204,8 +204,8 @@ traps:
   - oid: 1.3.6.1.4.1.12740.2.2.1.7
     name: EQLMEMBER-MIB::eqlMemberHealthRAIDSetDoubleFaulted
     category: diagnostic
-    severity: alert
-    description: RAID set double fault detected with status {eqlMemberHealthStatus} on {_HOSTNAME}.
+    severity: crit
+    description: RAID set double fault detected, array will not come up on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
@@ -213,7 +213,7 @@ traps:
     name: EQLMEMBER-MIB::eqlMemberHealthBothFanTraysRemoved
     category: diagnostic
     severity: crit
-    description: Both fan trays removed causing overheating risk with status {eqlMemberHealthStatus} on {_HOSTNAME}.
+    description: Both fan trays removed causing overheating on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
@@ -221,23 +221,23 @@ traps:
     name: EQLMEMBER-MIB::eqlMemberHealthRAIDlostCache
     category: diagnostic
     severity: crit
-    description: RAID battery-backed cache lost on {_HOSTNAME}.
+    description: RAID battery-backed cache lost; disk array will not initialize on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
   - oid: 1.3.6.1.4.1.12740.2.2.1.10
     name: EQLMEMBER-MIB::eqlMemberHealthFanTrayRemoved
     category: diagnostic
-    severity: alert
-    description: Fan tray removed causing overheating with status {eqlMemberHealthStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Fan tray removed from chassis causing overheating risk on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
   - oid: 1.3.6.1.4.1.12740.2.2.1.11
     name: EQLMEMBER-MIB::eqlMemberHealthRAIDSetLostBlkTableFull
     category: diagnostic
-    severity: alert
-    description: RAID lost block table full indicating potential data loss with status {eqlMemberHealthStatus} on {_HOSTNAME}.
+    severity: crit
+    description: RAID lost block table is full, indicating potential data loss on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
@@ -245,7 +245,7 @@ traps:
     name: EQLMEMBER-MIB::eqlMemberHealthBatteryLessThan72Hours
     category: diagnostic
     severity: warning
-    description: Battery health status {eqlMemberHealthStatus} indicates insufficient charge on {_HOSTNAME}.
+    description: Battery has insufficient charge to survive a 72 hour power outage on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
@@ -253,7 +253,7 @@ traps:
     name: EQLMEMBER-MIB::eqlMemberHealthRaidOrphanCache
     category: diagnostic
     severity: crit
-    description: RAID orphan cache detected with no matching disk array on {_HOSTNAME}.
+    description: RAID orphan cache detected with no matching disk array on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
@@ -261,15 +261,15 @@ traps:
     name: EQLMEMBER-MIB::eqlMemberHealthRaidMultipleRaidSets
     category: diagnostic
     severity: crit
-    description: Multiple valid RAID sets detected causing initialization conflict on {_HOSTNAME}.
+    description: Multiple valid RAID sets detected preventing initialization on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
   - oid: 1.3.6.1.4.1.12740.2.2.1.15
     name: EQLMEMBER-MIB::eqlMemberHealthNVRAMBatteryFailed
     category: diagnostic
-    severity: err
-    description: NVRAM battery failure detected with status {eqlMemberHealthStatus} on {_HOSTNAME}.
+    severity: alert
+    description: NVRAM battery failed on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
@@ -277,31 +277,31 @@ traps:
     name: EQLMEMBER-MIB::eqlMemberHealthhwComponentFailedCrit
     category: diagnostic
     severity: crit
-    description: Critical hardware component failure detected with status {eqlMemberHealthStatus} on {_HOSTNAME}.
+    description: Critical hardware component failure detected with status {{value "eqlMemberHealthStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
   - oid: 1.3.6.1.4.1.12740.2.2.1.17
     name: EQLMEMBER-MIB::eqlMemberHealthincompatControlModule
     category: diagnostic
-    severity: err
-    description: Incorrect control module detected with status {eqlMemberHealthStatus} on {_HOSTNAME}.
+    severity: alert
+    description: Incorrect control module detected in chassis with health status {{value "eqlMemberHealthStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
   - oid: 1.3.6.1.4.1.12740.2.2.1.18
     name: EQLMEMBER-MIB::eqlMemberHealthlowAmbientTemp
     category: diagnostic
-    severity: warning
-    description: Sensor temperature below critical range with status {eqlMemberHealthStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Member health low ambient temperature detected with status {{value "eqlMemberHealthStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
   - oid: 1.3.6.1.4.1.12740.2.2.1.19
     name: EQLMEMBER-MIB::eqlMemberHealthopsPanelFailure
     category: diagnostic
-    severity: err
-    description: Ops panel failure detected with status {eqlMemberHealthStatus} on {_HOSTNAME}.
+    severity: alert
+    description: Ops panel failure detected with health status {{value "eqlMemberHealthStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
@@ -309,7 +309,7 @@ traps:
     name: EQLMEMBER-MIB::eqlMemberHealthemmLinkFailure
     category: diagnostic
     severity: warning
-    description: Enclosure management services unavailable with status {eqlMemberHealthStatus} on {_HOSTNAME}.
+    description: Enclosure management services unavailable with status {{value "eqlMemberHealthStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
@@ -317,7 +317,7 @@ traps:
     name: EQLMEMBER-MIB::eqlMemberHealthhighBatteryTemperature
     category: diagnostic
     severity: warning
-    description: Cache battery temperature exceeded upper limit with status {eqlMemberHealthStatus} on {_HOSTNAME}.
+    description: High battery temperature detected on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
@@ -325,7 +325,7 @@ traps:
     name: EQLMEMBER-MIB::eqlMemberHealthenclosureOpenPerm
     category: diagnostic
     severity: warning
-    description: Enclosure open for a long time with status {eqlMemberHealthStatus} on {_HOSTNAME}.
+    description: Enclosure open for a long time detected on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
@@ -333,15 +333,15 @@ traps:
     name: EQLMEMBER-MIB::eqlMemberHealthsumoChannelBothMissing
     category: diagnostic
     severity: crit
-    description: Sumo Channel cards missing with status {eqlMemberHealthStatus} on {_HOSTNAME}.
+    description: Both Sumo Channel cards are missing on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
   - oid: 1.3.6.1.4.1.12740.2.2.1.24
     name: EQLMEMBER-MIB::eqlMemberHealthsumoEIPFailureCOndition
     category: diagnostic
-    severity: err
-    description: EIP failure condition detected with health status {eqlMemberHealthStatus} on {_HOSTNAME}.
+    severity: crit
+    description: EIP failure condition detected with health status {{value "eqlMemberHealthStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
@@ -349,15 +349,15 @@ traps:
     name: EQLMEMBER-MIB::eqlMemberHealthsumoChannelBothFailed
     category: diagnostic
     severity: crit
-    description: Both Sumo Channel cards failed with status {eqlMemberHealthStatus} on {_HOSTNAME}.
+    description: Both Sumo Channel cards failed on {{hostname}}.
     status: current
     varbinds:
       - eqlMemberHealthStatus
   - oid: 1.3.6.1.4.1.12740.3.2.1.1
     name: EQLDISK-MIB::eqlDiskStatusChange
     category: state_change
-    severity: notice
-    description: Disk status changed to {eqlDiskStatus} in slot {eqlDiskSlot} on {_HOSTNAME}.
+    severity: warning
+    description: Disk status changed to {{value "eqlDiskStatus"}} in slot {{value "eqlDiskSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - eqlDiskStatus

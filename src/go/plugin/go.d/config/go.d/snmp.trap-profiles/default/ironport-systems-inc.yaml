@@ -62,7 +62,7 @@ traps:
     name: ASYNCOS-MAIL-MIB::resourceConservationMode
     category: diagnostic
     severity: warning
-    description: System entered resource conservation mode due to {resourceConservationReason} on {_HOSTNAME}.
+    description: System entered resource conservation mode{{with value "resourceConservationReason"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - resourceConservationReason
@@ -70,7 +70,7 @@ traps:
     name: ASYNCOS-MAIL-MIB::powerSupplyStatusChange
     category: diagnostic
     severity: warning
-    description: Power supply status changed to {powerSupplyStatus} on {_HOSTNAME}.
+    description: Power supply status changed to {{value "powerSupplyStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - powerSupplyStatus
@@ -78,15 +78,15 @@ traps:
     name: ASYNCOS-MAIL-MIB::highTemperature
     category: diagnostic
     severity: warning
-    description: High temperature detected on sensor {temperatureName} on {_HOSTNAME}.
+    description: High temperature detected on sensor {{value "temperatureName"}} on {{hostname}}.
     status: current
     varbinds:
       - temperatureName
   - oid: 1.3.6.1.4.1.15497.1.1.2.4
     name: ASYNCOS-MAIL-MIB::fanFailure
     category: diagnostic
-    severity: err
-    description: Fan {fanName} failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Fan {{value "fanName"}} failure detected on {{hostname}}.
     status: current
     varbinds:
       - fanName
@@ -94,7 +94,7 @@ traps:
     name: ASYNCOS-MAIL-MIB::keyExpiration
     category: license
     severity: warning
-    description: Feature key {keyDescription} is pending expiration or has expired on {_HOSTNAME}.
+    description: Feature key {{value "keyDescription"}} is pending expiration or has expired on {{hostname}}.
     status: current
     varbinds:
       - keyDescription
@@ -102,7 +102,7 @@ traps:
     name: ASYNCOS-MAIL-MIB::updateFailure
     category: diagnostic
     severity: err
-    description: Update service {updateServiceName} failed to update on {_HOSTNAME}.
+    description: Update service {{value "updateServiceName"}} failed to update on {{hostname}}.
     status: current
     varbinds:
       - updateServiceName
@@ -110,15 +110,15 @@ traps:
     name: ASYNCOS-MAIL-MIB::raidStatusChange
     category: diagnostic
     severity: warning
-    description: RAID drive {raidID} status changed on {_HOSTNAME}.
+    description: RAID drive {{value "raidID"}} status changed on {{hostname}}.
     status: current
     varbinds:
       - raidID
   - oid: 1.3.6.1.4.1.15497.1.1.2.8
     name: ASYNCOS-MAIL-MIB::connectivityFailure
     category: diagnostic
-    severity: warning
-    description: Connectivity failure to {connectionURL} on {_HOSTNAME}.
+    severity: err
+    description: Connectivity failure to {{value "connectionURL"}} on {{hostname}}.
     status: current
     varbinds:
       - connectionURL
@@ -126,7 +126,7 @@ traps:
     name: ASYNCOS-MAIL-MIB::memoryUtilizationExceeded
     category: diagnostic
     severity: warning
-    description: Memory utilization {perCentMemoryUtilization}% exceeded threshold on {_HOSTNAME}.
+    description: Memory utilization exceeded threshold at {{value "perCentMemoryUtilization"}}% on {{hostname}}.
     status: current
     varbinds:
       - perCentMemoryUtilization
@@ -134,23 +134,23 @@ traps:
     name: ASYNCOS-MAIL-MIB::cpuUtilizationExceeded
     category: diagnostic
     severity: warning
-    description: CPU utilization {perCentCPUUtilization}% exceeded threshold on {_HOSTNAME}.
+    description: CPU utilization exceeded threshold at {{value "perCentCPUUtilization"}}% on {{hostname}}.
     status: current
     varbinds:
       - perCentCPUUtilization
   - oid: 1.3.6.1.4.1.15497.1.1.2.11
     name: ASYNCOS-MAIL-MIB::hsmInitializationFailure
     category: diagnostic
-    severity: err
-    description: HSM initialization failed with error {hsmErrorReason} on {_HOSTNAME}.
+    severity: crit
+    description: Hardware Security Module initialization failed with reason {{value "hsmErrorReason"}} on {{hostname}}.
     status: current
     varbinds:
       - hsmErrorReason
   - oid: 1.3.6.1.4.1.15497.1.1.2.12
     name: ASYNCOS-MAIL-MIB::hsmResetLoginFailure
-    category: auth
-    severity: warning
-    description: HSM reset due to login failure with reason {hsmErrorReason} on {_HOSTNAME}.
+    category: security
+    severity: alert
+    description: HSM reset due to multiple login failures with reason {{value "hsmErrorReason"}} on {{hostname}}.
     status: current
     varbinds:
       - hsmErrorReason
@@ -158,7 +158,7 @@ traps:
     name: ASYNCOSWEBSECURITYAPPLIANCE-MIB::upstreamProxyFailure
     category: diagnostic
     severity: warning
-    description: Upstream proxy failure detected for {connectionURL} on {_HOSTNAME}.
+    description: Upstream proxy failure detected for {{value "connectionURL"}} on {{hostname}}.
     status: current
     varbinds:
       - connectionURL

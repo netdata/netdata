@@ -141,9 +141,9 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.641.1.0.0
     name: LEXMARK-PVT-MIB::irCleared
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Printer intervention required cleared with code {prtgenStatusIRC} on {_HOSTNAME}.
+    description: Printer intervention required condition cleared on {{hostname}}.
     status: current
     varbinds:
       - prtgenStatusIRC
@@ -151,7 +151,7 @@ traps:
     name: LEXMARK-PVT-MIB::irCondition
     category: diagnostic
     severity: warning
-    description: Printer intervention required with code {prtgenStatusIRC} on {_HOSTNAME}.
+    description: Printer intervention required (code {{value "prtgenStatusIRC"}}) on {{hostname}}.
     status: current
     varbinds:
       - prtgenStatusIRC
@@ -159,7 +159,7 @@ traps:
     name: LEXMARK-PVT-MIB::irOutputFull
     category: diagnostic
     severity: warning
-    description: Printer output bin is full with intervention code {prtgenStatusIRC} on {_HOSTNAME}.
+    description: Printer output bin is full on {{hostname}}.
     status: current
     varbinds:
       - prtgenStatusIRC
@@ -167,7 +167,7 @@ traps:
     name: LEXMARK-PVT-MIB::irLoadPaper
     category: diagnostic
     severity: warning
-    description: Printer intervention required with code {prtgenStatusIRC} on {_HOSTNAME}.
+    description: Printer intervention required with code {{value "prtgenStatusIRC"}} on {{hostname}}.
     status: current
     varbinds:
       - prtgenStatusIRC
@@ -175,7 +175,7 @@ traps:
     name: LEXMARK-PVT-MIB::irPaperJam
     category: diagnostic
     severity: warning
-    description: Printer intervention required code {prtgenStatusIRC} indicates paper jam on {_HOSTNAME}.
+    description: Paper jam detected on the printer on {{hostname}}.
     status: current
     varbinds:
       - prtgenStatusIRC
@@ -183,7 +183,7 @@ traps:
     name: LEXMARK-PVT-MIB::irTonerLow
     category: diagnostic
     severity: warning
-    description: Printer toner low with intervention code {prtgenStatusIRC} on {_HOSTNAME}.
+    description: Printer toner is low with intervention required code {{value "prtgenStatusIRC"}} on {{hostname}}.
     status: current
     varbinds:
       - prtgenStatusIRC
@@ -191,7 +191,7 @@ traps:
     name: LEXMARK-PVT-MIB::irServiceReq
     category: diagnostic
     severity: warning
-    description: Printer intervention required with code {prtgenStatusIRC} on {_HOSTNAME}.
+    description: Printer intervention required with code {{value "prtgenStatusIRC"}} on {{hostname}}.
     status: current
     varbinds:
       - prtgenStatusIRC
@@ -199,7 +199,7 @@ traps:
     name: LEXMARK-PVT-MIB::irDiskErr
     category: diagnostic
     severity: warning
-    description: Disk error detected with intervention code {prtgenStatusIRC} on {_HOSTNAME}.
+    description: Disk error detected on the printer with intervention code {{value "prtgenStatusIRC"}} on {{hostname}}.
     status: current
     varbinds:
       - prtgenStatusIRC
@@ -207,7 +207,7 @@ traps:
     name: LEXMARK-PVT-MIB::irCoverOpen
     category: diagnostic
     severity: warning
-    description: Printer cover open detected with intervention code {prtgenStatusIRC} on {_HOSTNAME}.
+    description: Printer cover is open with intervention required code {{value "prtgenStatusIRC"}} on {{hostname}}.
     status: current
     varbinds:
       - prtgenStatusIRC
@@ -215,7 +215,7 @@ traps:
     name: LEXMARK-PVT-MIB::irPageComplexity
     category: diagnostic
     severity: warning
-    description: Page complexity error with intervention code {prtgenStatusIRC} on {_HOSTNAME}.
+    description: Page complexity error detected{{with value "prtgenStatusIRC"}} (code {{.}}){{end}} on {{hostname}}.
     status: current
     varbinds:
       - prtgenStatusIRC
@@ -223,15 +223,15 @@ traps:
     name: LEXMARK-PVT-MIB::irOffline
     category: diagnostic
     severity: warning
-    description: Printer reported intervention required code {prtgenStatusIRC} on {_HOSTNAME}.
+    description: Printer is offline with intervention required code {{value "prtgenStatusIRC"}} on {{hostname}}.
     status: current
     varbinds:
       - prtgenStatusIRC
   - oid: 1.3.6.1.4.1.641.1.0.11
     name: LEXMARK-PVT-MIB::irClearedTypeII
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Printer intervention required condition cleared with code {prtgenStatusIRC} on {_HOSTNAME}.
+    description: Printer intervention required condition cleared on {{hostname}}.
     status: current
     varbinds:
       - prtgenStatusIRC
@@ -239,7 +239,7 @@ traps:
     name: LEXMARK-MPS-MIB::deviceV2AlertMPS
     category: diagnostic
     severity: crit
-    description: Critical device alert {deviceAlertDescription} with code {deviceAlertCode} on {_HOSTNAME}.
+    description: Critical device alert {{value "deviceAlertDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceAlertIndex

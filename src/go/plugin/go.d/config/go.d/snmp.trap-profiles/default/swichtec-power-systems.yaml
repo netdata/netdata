@@ -363,8 +363,8 @@ traps:
   - oid: 1.3.6.1.4.1.1918.2.13.20.100
     name: RPS-SC200-MIB::major-Alarm-Active
     category: diagnostic
-    severity: err
-    description: Major alarm {alarm-Name} is active on {_HOSTNAME}.
+    severity: alert
+    description: Major alarm {{value "alarm-Name"}} is active on {{hostname}}.
     status: current
     varbinds:
       - alarm-Index
@@ -377,7 +377,7 @@ traps:
     name: RPS-SC200-MIB::major-AI-High-Active
     category: diagnostic
     severity: warning
-    description: Major analog input high alarm active for {ai-Name} at {system-Location} on {_HOSTNAME}.
+    description: Major analog input high alarm active on {{first (value "ai-Name") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - analog-Input-Index
@@ -390,7 +390,7 @@ traps:
     name: RPS-SC200-MIB::major-AI-Low-Active
     category: diagnostic
     severity: warning
-    description: Analog input {ai-Name} low alarm active with notes {ai-Low-Notes} on {_HOSTNAME}.
+    description: Major analog input low alarm active on {{first (value "ai-Name") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - analog-Input-Index
@@ -403,7 +403,7 @@ traps:
     name: RPS-SC200-MIB::major-DI-Active
     category: diagnostic
     severity: warning
-    description: Major digital input alarm active for {di-Name} at {system-Location} on {_HOSTNAME}.
+    description: Major digital input alarm active on {{first (value "di-Name") "digital input"}} on {{hostname}}.
     status: current
     varbinds:
       - digital-Input-Index
@@ -415,8 +415,8 @@ traps:
   - oid: 1.3.6.1.4.1.1918.2.13.20.104
     name: RPS-SC200-MIB::major-Smart-Active
     category: diagnostic
-    severity: warning
-    description: Smart alarm {smart-Alarm-Name} is active on {_HOSTNAME}.
+    severity: alert
+    description: Major smart alarm {{value "smart-Alarm-Name"}} is active on {{hostname}}.
     status: current
     varbinds:
       - smart-Alarm-Index
@@ -429,7 +429,7 @@ traps:
     name: RPS-SC200-MIB::minor-Alarm-Active
     category: diagnostic
     severity: warning
-    description: Minor alarm {alarm-Name} is active at {site-Name} on {_HOSTNAME}.
+    description: Minor alarm {{value "alarm-Name"}} is active on {{hostname}}.
     status: current
     varbinds:
       - alarm-Index
@@ -442,7 +442,7 @@ traps:
     name: RPS-SC200-MIB::minor-AI-High-Active
     category: diagnostic
     severity: warning
-    description: Minor analog input high alarm active on {ai-Name} at {system-Location} on {_HOSTNAME}.
+    description: Minor analog input high alarm active on {{first (value "ai-Name") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - analog-Input-Index
@@ -455,7 +455,7 @@ traps:
     name: RPS-SC200-MIB::minor-AI-Low-Active
     category: diagnostic
     severity: warning
-    description: Analog input {ai-Name} reported low alarm with notes {ai-Low-Notes} on {_HOSTNAME}.
+    description: Minor analog input low alarm active on {{first (value "ai-Name") "analog input"}} on {{hostname}}.
     status: current
     varbinds:
       - analog-Input-Index
@@ -468,7 +468,7 @@ traps:
     name: RPS-SC200-MIB::minor-DI-Active
     category: diagnostic
     severity: warning
-    description: Minor digital input alarm active for {di-Name} at {system-Location} on {_HOSTNAME}.
+    description: Minor digital input alarm active on {{first (value "di-Name") "digital input"}} on {{hostname}}.
     status: current
     varbinds:
       - digital-Input-Index
@@ -481,7 +481,7 @@ traps:
     name: RPS-SC200-MIB::minor-Smart-Active
     category: diagnostic
     severity: warning
-    description: Minor smart alarm {smart-Alarm-Name} is active on {_HOSTNAME}.
+    description: Minor smart alarm {{value "smart-Alarm-Name"}} is active on {{hostname}}.
     status: current
     varbinds:
       - smart-Alarm-Index
@@ -494,7 +494,7 @@ traps:
     name: RPS-SC200-MIB::warning-Alarm-Active
     category: diagnostic
     severity: warning
-    description: Warning alarm {alarm-Name} is active on {_HOSTNAME}.
+    description: Warning alarm {{value "alarm-Name"}} is active on {{hostname}}.
     status: current
     varbinds:
       - alarm-Index
@@ -507,7 +507,7 @@ traps:
     name: RPS-SC200-MIB::warning-AI-High-Active
     category: diagnostic
     severity: warning
-    description: Analog input {ai-Name} high warning active with notes {ai-High-Notes} on {_HOSTNAME}.
+    description: Analog input high warning active on {{first (value "ai-Name") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - analog-Input-Index
@@ -520,7 +520,7 @@ traps:
     name: RPS-SC200-MIB::warning-AI-Low-Active
     category: diagnostic
     severity: warning
-    description: Analog input {ai-Name} low warning active with notes {ai-Low-Notes} on {_HOSTNAME}.
+    description: Analog input low warning active on {{first (value "ai-Name") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - analog-Input-Index
@@ -533,7 +533,7 @@ traps:
     name: RPS-SC200-MIB::warning-DI-Active
     category: diagnostic
     severity: warning
-    description: Digital input {di-Name} warning is active on {_HOSTNAME}.
+    description: Digital input {{value "di-Name"}} warning is active on {{hostname}}.
     status: current
     varbinds:
       - digital-Input-Index
@@ -546,7 +546,7 @@ traps:
     name: RPS-SC200-MIB::warning-Smart-Active
     category: diagnostic
     severity: warning
-    description: Smart alarm {smart-Alarm-Name} is active on {_HOSTNAME}.
+    description: Smart alarm {{value "smart-Alarm-Name"}} is active on {{hostname}}.
     status: current
     varbinds:
       - smart-Alarm-Index
@@ -559,7 +559,7 @@ traps:
     name: RPS-SC200-MIB::alarm-Inactive
     category: state_change
     severity: notice
-    description: Alarm {alarm-Name} at {site-Name} became inactive on {_HOSTNAME}.
+    description: Alarm {{value "alarm-Name"}} became inactive on {{hostname}}.
     status: current
     varbinds:
       - alarm-Index
@@ -570,9 +570,9 @@ traps:
       - alarm-Notes
   - oid: 1.3.6.1.4.1.1918.2.13.20.401
     name: RPS-SC200-MIB::ai-High-Inactive
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Analog input {ai-Name} high alarm became inactive on {_HOSTNAME}.
+    description: Analog input high alarm became inactive on {{first (value "ai-Name") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - analog-Input-Index
@@ -585,7 +585,7 @@ traps:
     name: RPS-SC200-MIB::ai-Low-Inactive
     category: diagnostic
     severity: notice
-    description: Analog input low alarm for {ai-Name} became inactive on {_HOSTNAME}.
+    description: Analog input low alarm became inactive on {{first (value "ai-Name") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - analog-Input-Index
@@ -598,7 +598,7 @@ traps:
     name: RPS-SC200-MIB::di-Inactive
     category: state_change
     severity: notice
-    description: Digital input {di-Name} alarm became inactive on {_HOSTNAME}.
+    description: Digital input alarm inactive for {{value "di-Name"}} on {{hostname}}.
     status: current
     varbinds:
       - digital-Input-Index
@@ -609,9 +609,9 @@ traps:
       - di-Notes
   - oid: 1.3.6.1.4.1.1918.2.13.20.404
     name: RPS-SC200-MIB::smart-Inactive
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Smart alarm {smart-Alarm-Name} became inactive on {_HOSTNAME}.
+    description: Smart alarm {{value "smart-Alarm-Name"}} became inactive on {{hostname}}.
     status: current
     varbinds:
       - smart-Alarm-Index
@@ -623,8 +623,8 @@ traps:
   - oid: 1.3.6.1.4.1.1918.2.13.20.500
     name: RPS-SC200-MIB::alarm-Status-Change
     category: state_change
-    severity: notice
-    description: Alarm status changed for serial number {serial-Number} on {_HOSTNAME}.
+    severity: warning
+    description: Alarm status changed{{with value "serial-Number"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - serial-Number
@@ -633,7 +633,7 @@ traps:
     name: RPS-SC200-MIB::critical-Alarm-Active
     category: diagnostic
     severity: crit
-    description: Critical alarm {alarm-Name} active at {system-Location} on {_HOSTNAME}.
+    description: Critical alarm {{value "alarm-Name"}} is active on {{hostname}}.
     status: current
     varbinds:
       - alarm-Index
@@ -645,8 +645,8 @@ traps:
   - oid: 1.3.6.1.4.1.1918.2.13.20.601
     name: RPS-SC200-MIB::critical-AI-High-Active
     category: diagnostic
-    severity: warning
-    description: Critical analog input high alarm active for {ai-Name} on {_HOSTNAME}.
+    severity: alert
+    description: Critical analog input high alarm active on {{first (value "ai-Name") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - analog-Input-Index
@@ -658,8 +658,8 @@ traps:
   - oid: 1.3.6.1.4.1.1918.2.13.20.602
     name: RPS-SC200-MIB::critical-AI-Low-Active
     category: diagnostic
-    severity: warning
-    description: Analog input {ai-Name} reported low alarm on {_HOSTNAME}.
+    severity: crit
+    description: Critical analog input low alarm active on {{first (value "ai-Name") "analog input"}} on {{hostname}}.
     status: current
     varbinds:
       - analog-Input-Index
@@ -671,8 +671,8 @@ traps:
   - oid: 1.3.6.1.4.1.1918.2.13.20.603
     name: RPS-SC200-MIB::critical-DI-Active
     category: diagnostic
-    severity: crit
-    description: Critical digital input alarm active for {di-Name} at {system-Location} on {_HOSTNAME}.
+    severity: alert
+    description: Critical digital input alarm active on {{first (value "di-Name") "digital input"}} on {{hostname}}.
     status: current
     varbinds:
       - digital-Input-Index
@@ -685,7 +685,7 @@ traps:
     name: RPS-SC200-MIB::critical-Smart-Active
     category: diagnostic
     severity: crit
-    description: Critical smart alarm {smart-Alarm-Name} active at {system-Location} on {_HOSTNAME}.
+    description: Critical smart alarm {{value "smart-Alarm-Name"}} is active on {{hostname}}.
     status: current
     varbinds:
       - smart-Alarm-Index
@@ -698,7 +698,7 @@ traps:
     name: RPS-SC200-MIB::global
     category: diagnostic
     severity: warning
-    description: Alarm {trap-Alarm-Name} with severity {trap-Alarm-Keep-Severity} changed state on {_HOSTNAME}.
+    description: Alarm {{value "trap-Alarm-Name"}} state changed on {{hostname}}.
     status: current
     varbinds:
       - trap-Alarm-Number
@@ -712,8 +712,8 @@ traps:
   - oid: 1.3.6.1.4.1.1918.2.14.20.100
     name: RpsSc300Mib::majorAlarmActive
     category: diagnostic
-    severity: crit
-    description: Major alarm {alarmName} active at {systemLocation} on {_HOSTNAME}.
+    severity: alert
+    description: Major alarm {{value "alarmName"}} is active on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -730,7 +730,7 @@ traps:
     name: RpsSc300Mib::majorAiHighActive
     category: diagnostic
     severity: warning
-    description: Major analog input high alarm active on {aiName} on {_HOSTNAME}.
+    description: Major analog input high alarm active on {{first (value "aiName") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - analogInputIndex
@@ -747,7 +747,7 @@ traps:
     name: RpsSc300Mib::majorAiLowActive
     category: diagnostic
     severity: warning
-    description: Major analog input low alarm active for {aiName} on {_HOSTNAME}.
+    description: Major analog input low alarm active on {{first (value "aiName") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - analogInputIndex
@@ -764,7 +764,7 @@ traps:
     name: RpsSc300Mib::majorDiActive
     category: diagnostic
     severity: warning
-    description: Major digital input alarm active for {diName} on {_HOSTNAME}.
+    description: Major digital input alarm active on {{first (value "diName") "digital input"}} on {{hostname}}.
     status: current
     varbinds:
       - digitalInputIndex
@@ -780,8 +780,8 @@ traps:
   - oid: 1.3.6.1.4.1.1918.2.14.20.104
     name: RpsSc300Mib::majorSmartActive
     category: diagnostic
-    severity: warning
-    description: Major smart alarm {smartAlarmName} is active on {_HOSTNAME}.
+    severity: alert
+    description: Major smart alarm {{value "smartAlarmName"}} is active on {{hostname}}.
     status: current
     varbinds:
       - smartAlarmIndex
@@ -798,7 +798,7 @@ traps:
     name: RpsSc300Mib::minorAlarmActive
     category: diagnostic
     severity: warning
-    description: Minor alarm {alarmName} is active on {_HOSTNAME}.
+    description: Minor alarm {{value "alarmName"}} is active on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -815,7 +815,7 @@ traps:
     name: RpsSc300Mib::minorAiHighActive
     category: diagnostic
     severity: warning
-    description: Minor analog input high alarm active on {aiName} on {_HOSTNAME}.
+    description: Minor analog input high alarm active on {{first (value "aiName") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - analogInputIndex
@@ -832,7 +832,7 @@ traps:
     name: RpsSc300Mib::minorAiLowActive
     category: diagnostic
     severity: warning
-    description: Minor analog input low alarm active on {aiName} at {systemLocation} on {_HOSTNAME}.
+    description: Minor analog input low alarm active on {{first (value "aiName") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - analogInputIndex
@@ -849,7 +849,7 @@ traps:
     name: RpsSc300Mib::minorDiActive
     category: diagnostic
     severity: warning
-    description: Minor digital input alarm active for {diName} on {_HOSTNAME}.
+    description: Minor digital input alarm active on {{first (value "diName") "digital input"}} on {{hostname}}.
     status: current
     varbinds:
       - digitalInputIndex
@@ -866,7 +866,7 @@ traps:
     name: RpsSc300Mib::minorSmartActive
     category: diagnostic
     severity: warning
-    description: Minor smart alarm {smartAlarmName} is active on {_HOSTNAME}.
+    description: Minor smart alarm {{value "smartAlarmName"}} is active on {{hostname}}.
     status: current
     varbinds:
       - smartAlarmIndex
@@ -883,7 +883,7 @@ traps:
     name: RpsSc300Mib::warningAlarmActive
     category: diagnostic
     severity: warning
-    description: Warning alarm {alarmName} is active on {_HOSTNAME}.
+    description: Warning alarm {{value "alarmName"}} is active on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -900,7 +900,7 @@ traps:
     name: RpsSc300Mib::warningAiHighActive
     category: diagnostic
     severity: warning
-    description: Analog input {aiName} high warning active with notes {aiHighNotes} on {_HOSTNAME}.
+    description: Analog input high warning active on {{first (value "aiName") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - analogInputIndex
@@ -917,7 +917,7 @@ traps:
     name: RpsSc300Mib::warningAiLowActive
     category: diagnostic
     severity: warning
-    description: Analog input {aiName} low warning active with notes {aiLowNotes} on {_HOSTNAME}.
+    description: Analog input {{value "aiName"}} low warning active on {{hostname}}.
     status: current
     varbinds:
       - analogInputIndex
@@ -934,7 +934,7 @@ traps:
     name: RpsSc300Mib::warningDiActive
     category: diagnostic
     severity: warning
-    description: Digital input {diName} warning is active on {_HOSTNAME}.
+    description: Digital input {{value "diName"}} warning is active on {{hostname}}.
     status: current
     varbinds:
       - digitalInputIndex
@@ -951,7 +951,7 @@ traps:
     name: RpsSc300Mib::warningSmartActive
     category: diagnostic
     severity: warning
-    description: Smart alarm {smartAlarmName} is active on {_HOSTNAME}.
+    description: Smart alarm {{value "smartAlarmName"}} is active on {{hostname}}.
     status: current
     varbinds:
       - smartAlarmIndex
@@ -968,7 +968,7 @@ traps:
     name: RpsSc300Mib::alarmInactive
     category: state_change
     severity: notice
-    description: Alarm {alarmName} at index {alarmIndex} became inactive on {_HOSTNAME}.
+    description: Alarm {{value "alarmName"}} became inactive on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -985,7 +985,7 @@ traps:
     name: RpsSc300Mib::aiHighInactive
     category: diagnostic
     severity: notice
-    description: Analog input high alarm became inactive for {aiName} on {_HOSTNAME}.
+    description: Analog input high alarm became inactive on {{first (value "aiName") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - analogInputIndex
@@ -1002,7 +1002,7 @@ traps:
     name: RpsSc300Mib::aiLowInactive
     category: diagnostic
     severity: notice
-    description: Analog input low alarm {aiName} became inactive on {_HOSTNAME}.
+    description: Analog input low alarm became inactive on {{hostname}}.
     status: current
     varbinds:
       - analogInputIndex
@@ -1019,7 +1019,7 @@ traps:
     name: RpsSc300Mib::diInactive
     category: state_change
     severity: notice
-    description: Digital input alarm {diName} became inactive on {_HOSTNAME}.
+    description: Digital input alarm {{value "diName"}} became inactive on {{hostname}}.
     status: current
     varbinds:
       - digitalInputIndex
@@ -1036,7 +1036,7 @@ traps:
     name: RpsSc300Mib::smartInactive
     category: diagnostic
     severity: notice
-    description: Smart alarm {smartAlarmName} at index {smartAlarmIndex} became inactive on {_HOSTNAME}.
+    description: Smart alarm {{value "smartAlarmName"}} became inactive on {{hostname}}.
     status: current
     varbinds:
       - smartAlarmIndex
@@ -1051,9 +1051,9 @@ traps:
       - smartAlarmNotes
   - oid: 1.3.6.1.4.1.1918.2.14.20.500
     name: RpsSc300Mib::alarmStatusChange
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Alarm status changed for device {serialNumber} on {_HOSTNAME}.
+    description: Alarm status changed on {{hostname}}.
     status: current
     varbinds:
       - serialNumber
@@ -1061,8 +1061,8 @@ traps:
   - oid: 1.3.6.1.4.1.1918.2.14.20.600
     name: RpsSc300Mib::criticalAlarmActive
     category: diagnostic
-    severity: crit
-    description: Critical alarm {alarmName} is active on {_HOSTNAME}.
+    severity: alert
+    description: Critical alarm {{value "alarmName"}} is active on {{hostname}}.
     status: current
     varbinds:
       - alarmIndex
@@ -1078,8 +1078,8 @@ traps:
   - oid: 1.3.6.1.4.1.1918.2.14.20.601
     name: RpsSc300Mib::criticalAiHighActive
     category: diagnostic
-    severity: warning
-    description: Analog input {aiName} reported high alarm {aiHighNotes} on {_HOSTNAME}.
+    severity: alert
+    description: Critical analog input high alarm active on {{first (value "aiName") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - analogInputIndex
@@ -1095,8 +1095,8 @@ traps:
   - oid: 1.3.6.1.4.1.1918.2.14.20.602
     name: RpsSc300Mib::criticalAiLowActive
     category: diagnostic
-    severity: warning
-    description: Critical analog input low alarm active for {aiName} on {_HOSTNAME}.
+    severity: alert
+    description: Critical analog input low alarm active on {{first (value "aiName") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - analogInputIndex
@@ -1113,7 +1113,7 @@ traps:
     name: RpsSc300Mib::criticalDiActive
     category: diagnostic
     severity: alert
-    description: Critical digital input alarm active for {diName} on {_HOSTNAME}.
+    description: Critical digital input alarm active on {{first (value "diName") "digital input"}} on {{hostname}}.
     status: current
     varbinds:
       - digitalInputIndex
@@ -1129,8 +1129,8 @@ traps:
   - oid: 1.3.6.1.4.1.1918.2.14.20.604
     name: RpsSc300Mib::criticalSmartActive
     category: diagnostic
-    severity: crit
-    description: Critical smart alarm {smartAlarmName} is active on {_HOSTNAME}.
+    severity: alert
+    description: Critical smart alarm {{value "smartAlarmName"}} is active on {{hostname}}.
     status: current
     varbinds:
       - smartAlarmIndex
@@ -1147,7 +1147,7 @@ traps:
     name: RpsSc300Mib::global
     category: diagnostic
     severity: warning
-    description: Alarm {trapAlarmName} with severity {trapAlarmKeepSeverity} changed state on {_HOSTNAME}.
+    description: Alarm {{value "trapAlarmName"}} state changed on {{hostname}}.
     status: current
     varbinds:
       - trapAlarmNumber
@@ -1166,7 +1166,7 @@ traps:
     name: RpsSc300Mib::heartbeat
     category: diagnostic
     severity: notice
-    description: Heartbeat received from {TRAP_DEVICE_VENDOR} on {_HOSTNAME}.
+    description: Heartbeat received from {{first (value "siteName") "system"}} on {{hostname}}.
     status: current
     varbinds:
       - systemLocation

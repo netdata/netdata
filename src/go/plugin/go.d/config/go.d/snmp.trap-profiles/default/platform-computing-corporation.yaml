@@ -39,31 +39,31 @@ traps:
     name: LSF-SNMP-MIB::lsfLimDown
     category: state_change
     severity: warning
-    description: LSF host status changed to {lsfHostStatus} on {_HOSTNAME}.
+    description: LSF LIM went down on {{hostname}}.
     status: current
     varbinds:
       - lsfHostStatus
   - oid: 1.3.6.1.4.1.2766.1000.0.2
     name: LSF-SNMP-MIB::lsfResDown
     category: diagnostic
-    severity: err
-    description: LSF resource on host reported status {lsfHostStatus} on {_HOSTNAME}.
+    severity: warning
+    description: LSF resource on host {{value "lsfHostStatus"}} went down on {{hostname}}.
     status: current
     varbinds:
       - lsfHostStatus
   - oid: 1.3.6.1.4.1.2766.1000.0.3
     name: LSF-SNMP-MIB::lsfSbdDown
-    category: state_change
-    severity: warning
-    description: Batch host status changed to {lsbHostStatus} on {_HOSTNAME}.
+    category: diagnostic
+    severity: alert
+    description: Sbatchd process is down on host with status {{value "lsbHostStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - lsbHostStatus
   - oid: 1.3.6.1.4.1.2766.1000.0.4
     name: LSF-SNMP-MIB::lsfHostUnlicensed
     category: license
-    severity: warning
-    description: Host {lsfHostStatus} is unlicensed on {_HOSTNAME}.
+    severity: alert
+    description: Host in cluster became unlicensed on {{hostname}}.
     status: current
     varbinds:
       - lsfHostStatus
@@ -71,7 +71,7 @@ traps:
     name: LSF-SNMP-MIB::lsfMasterElect
     category: state_change
     severity: notice
-    description: Master election completed, new master is {lsfHostName} on {_HOSTNAME}.
+    description: LSF master election completed, new master is {{value "lsfHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - lsfHostName
@@ -79,7 +79,7 @@ traps:
     name: LSF-SNMP-MIB::lsfMbdUp
     category: state_change
     severity: notice
-    description: mbatchd service came up and is ready on {lsbHostName} on {_HOSTNAME}.
+    description: LSF mbatchd service started on {{hostname}}.
     status: current
     varbinds:
       - lsbHostName
@@ -87,21 +87,21 @@ traps:
     name: LSF-SNMP-MIB::lsfMbdDown
     category: diagnostic
     severity: alert
-    description: mbatchd process down detected on {_HOSTNAME}.
+    description: mbatchd process is down on {{hostname}}.
     status: current
     varbinds:
       - lsbHostName
   - oid: 1.3.6.1.4.1.2766.1000.0.8
     name: LSF-SNMP-MIB::lsfMbdReconfig
-    category: config_change
+    category: state_change
     severity: notice
-    description: MBatch daemon reconfiguration initiated on {_HOSTNAME}.
+    description: MBatch daemon reconfiguration initiated on {{hostname}}.
     status: current
     varbinds:
       - lsbHostName
   - oid: 1.3.6.1.4.1.2766.1000.0.9
     name: LSF-SNMP-MIB::lsfWorkdirFull
     category: diagnostic
-    severity: warning
-    description: LSF work directory full preventing mbatchd writes on {_HOSTNAME}.
+    severity: crit
+    description: LSF shared directory is full preventing mbatchd from writing on {{hostname}}.
     status: current

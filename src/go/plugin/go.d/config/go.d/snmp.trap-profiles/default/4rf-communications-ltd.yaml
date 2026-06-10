@@ -273,9 +273,9 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.14817.7.1.3.0.1
     name: COMMON-4RF::fourRFResetEvent
-    category: diagnostic
-    severity: warning
-    description: System reset of type {fourRFResetType} is about to occur on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: System reset {{value "fourRFResetType"}} is about to occur on {{hostname}}.
     status: current
     varbinds:
       - fourRFResetType
@@ -283,7 +283,7 @@ traps:
     name: COMMON-4RF::fourRFMibBackupStatusEvent
     category: config_change
     severity: notice
-    description: Configuration backup {fourRFMibBackupCommand} completed with result {fourRFMibBackupResult} on {_HOSTNAME}.
+    description: Configuration backup {{value "fourRFMibBackupResult"}} for {{value "fourRFMibBackupFile"}} on {{hostname}}.
     status: current
     varbinds:
       - fourRFMibBackupFile
@@ -291,9 +291,9 @@ traps:
       - fourRFMibBackupResult
   - oid: 1.3.6.1.4.1.14817.7.1.3.0.3
     name: COMMON-4RF::fouRFUploadStatusEvent
-    category: config_change
-    severity: notice
-    description: File upload operation for {fourRFUploadFile} completed on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: File upload status event for {{value "fourRFUploadFile"}} on {{hostname}}.
     status: current
     varbinds:
       - fourRFUploadFile
@@ -301,9 +301,9 @@ traps:
       - fourRFUploadResult
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.1
     name: APRISAXE-EVENTS-4RF::aprisaXEThresholdAlarmEvent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Threshold alarm {aprisaXEEventAlarmType} status changed to {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Threshold alarm status changed to {{value "aprisaXEEventAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -315,15 +315,15 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXERxSynthOutOfLockAlarmEvent
     category: diagnostic
     severity: warning
-    description: Rx synthesizer out of lock alarm status changed to {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Rx synthesizer out of lock alarm {{value "aprisaXEEventAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.11
     name: APRISAXE-EVENTS-4RF::aprisaXEAlarmRxCDataEvent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Receiver characterisation data alarm status changed to {aprisaXEEventCharacterisationStatus} on {_HOSTNAME}.
+    description: Receiver characterisation data alarm state changed to {{value "aprisaXEEventCharacterisationStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCharacterisationStatus
@@ -331,7 +331,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEAlarmRx12VStatusEvent
     category: diagnostic
     severity: warning
-    description: Rx synthesizer alarm status changed to {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Rx synthesizer alarm status changed to {{value "aprisaXEEventAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -339,7 +339,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEAlarmRxOffEvent
     category: diagnostic
     severity: warning
-    description: Receiver alarm status changed to {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Receiver alarm status changed to {{value "aprisaXEEventAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -347,7 +347,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEAlarmRxBadMibEvent
     category: diagnostic
     severity: warning
-    description: Receiver MIB data alarm status changed to {aprisaXEEventMibStatus} on {_HOSTNAME}.
+    description: Receiver MIB data alarm status changed to {{value "aprisaXEEventMibStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventMibStatus
@@ -355,15 +355,15 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEAlarmTxCDataEvent
     category: diagnostic
     severity: warning
-    description: Transmitter characterisation data alarm status {aprisaXEEventCharacterisationStatus} on {_HOSTNAME}.
+    description: Transmitter characterisation data alarm status changed to {{value "aprisaXEEventCharacterisationStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCharacterisationStatus
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.21
     name: APRISAXE-EVENTS-4RF::aprisaXEAlarmTxSynthOutOfLockEvent
     category: diagnostic
-    severity: alert
-    description: Transmitter synthesizer out of lock alarm detected with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Transmitter synthesizer out of lock alarm detected{{with value "aprisaXEEventAlarmStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -371,7 +371,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEAlarmTx28VStatusEvent
     category: diagnostic
     severity: warning
-    description: Transmitter 28V supply status alarm changed to {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Transmitter 28V supply alarm status changed to {{value "aprisaXEEventAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -379,7 +379,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEAlarmTx11VStatusEvent
     category: diagnostic
     severity: warning
-    description: Transmitter 11V supply status alarm changed to {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Transmitter 11V supply alarm status changed to {{value "aprisaXEEventAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -387,7 +387,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEAlarmTx5VStatusEvent
     category: diagnostic
     severity: warning
-    description: Transmitter 5V supply status alarm {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Transmitter 5V supply alarm status changed to {{value "aprisaXEEventAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -395,7 +395,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEAlarmTxAmplifierBalanceEvent
     category: diagnostic
     severity: warning
-    description: Transmitter amplifier balance alarm status changed to {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Transmitter amplifier balance alarm status changed to {{value "aprisaXEEventAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -403,7 +403,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEAlarmTxBadMibEvent
     category: diagnostic
     severity: warning
-    description: Transmitter MIB data alarm status changed to {aprisaXEEventMibStatus} on {_HOSTNAME}.
+    description: Transmitter MIB data alarm status changed to {{value "aprisaXEEventMibStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventMibStatus
@@ -411,7 +411,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEAlarmTxNeg5VStatusEvent
     category: diagnostic
     severity: warning
-    description: Transmitter -5V supply alarm status changed to {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Transmitter negative 5V supply alarm status changed to {{value "aprisaXEEventAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -419,7 +419,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEModemSyncEvent
     category: diagnostic
     severity: warning
-    description: Modem lock state change detected with alarm status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Modem lock state changed{{with value "aprisaXEEventAlarmStatus"}} to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -427,7 +427,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEModemTDMAlignmentEvent
     category: state_change
     severity: warning
-    description: Modem TDM alignment state changed with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Modem TDM alignment state changed{{with value "aprisaXEEventAlarmStatus"}} to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -435,7 +435,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEModemDemodAlignmentEvent
     category: diagnostic
     severity: warning
-    description: Modem demodulator alignment state changed with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Modem demodulator alignment event occurred{{with value "aprisaXEEventAlarmStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -443,15 +443,15 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEModemRefAStatusEvent
     category: state_change
     severity: warning
-    description: Ref A clock status changed to {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Ref A clock status changed to {{value "aprisaXEEventAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.34
     name: APRISAXE-EVENTS-4RF::aprisaXEModemRefBStatusEvent
     category: state_change
-    severity: notice
-    description: Ref B clock state changed with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Ref B clock status changed to {{value "aprisaXEEventAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -459,7 +459,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEModemUCEPresentEvent
     category: diagnostic
     severity: warning
-    description: Uncorrectable error alarm detected with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Uncorrectable errors detected{{with value "aprisaXEEventAlarmStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -467,7 +467,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEQuadE1LOSEvent
     category: diagnostic
     severity: warning
-    description: LOS alarm detected on slot {aprisaXEEventCardSlot} port {aprisaXEEventCardPort} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: LOS event on port {{value "aprisaXEEventCardPort"}} in slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -477,7 +477,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEQuadE1AISEvent
     category: diagnostic
     severity: warning
-    description: Port {aprisaXEEventCardPort} in slot {aprisaXEEventCardSlot} reported AIS state change {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: AIS state change detected on port {{value "aprisaXEEventCardPort"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -487,7 +487,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEQuadE1RAIEvent
     category: state_change
     severity: warning
-    description: RAI state changed on port {aprisaXEEventCardPort} in slot {aprisaXEEventCardSlot} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: RAI state changed for port {{value "aprisaXEEventCardPort"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -497,7 +497,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEQuadE1RMAIEvent
     category: state_change
     severity: warning
-    description: RMAI state changed on port {aprisaXEEventCardPort} in slot {aprisaXEEventCardSlot} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: RMAI state changed on port {{value "aprisaXEEventCardPort"}} in slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -505,9 +505,9 @@ traps:
       - aprisaXEEventAlarmStatus
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.44
     name: APRISAXE-EVENTS-4RF::aprisaXEQuadE1TS16AISEvent
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: TS16 AIS state changed on port {aprisaXEEventCardPort} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: TS16 AIS state change on port {{value "aprisaXEEventCardPort"}} slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -517,7 +517,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEQuadE1TS16LOSEvent
     category: diagnostic
     severity: warning
-    description: TS16LOS state change on port {aprisaXEEventCardPort} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: TS16 LOS alarm detected on port {{value "aprisaXEEventCardPort"}} in slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -527,7 +527,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEQuadE1LOFEvent
     category: diagnostic
     severity: warning
-    description: Loss of frame event on port {aprisaXEEventCardPort} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Loss of frame alarm on port {{value "aprisaXEEventCardPort"}} in slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -537,7 +537,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEFXOCodecOvldEvent
     category: diagnostic
     severity: warning
-    description: Codec overload event on port {aprisaXEEventCardPort} in slot {aprisaXEEventCardSlot} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Codec overload event on port {{value "aprisaXEEventCardPort"}} in slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -547,7 +547,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEFXOBillToneOvldEvent
     category: diagnostic
     severity: warning
-    description: Billing Tone overload event on port {aprisaXEEventCardPort} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Billing tone overload event on port {{value "aprisaXEEventCardPort"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -557,7 +557,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEFXOCurrentOvldEvent
     category: diagnostic
     severity: warning
-    description: Port {aprisaXEEventCardPort} in slot {aprisaXEEventCardSlot} reported current overload status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Current overload event on port {{value "aprisaXEEventCardPort"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -567,7 +567,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEFXOUnplugEvent
     category: state_change
     severity: warning
-    description: Port {aprisaXEEventCardPort} in slot {aprisaXEEventCardSlot} unplug state changed on {_HOSTNAME}.
+    description: Port {{value "aprisaXEEventCardPort"}} unplug event detected on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -576,8 +576,8 @@ traps:
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.60
     name: APRISAXE-EVENTS-4RF::aprisaXEFXSCalibrateErrorEvent
     category: diagnostic
-    severity: err
-    description: Common mode error on card slot {aprisaXEEventCardSlot} port {aprisaXEEventCardPort} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Common mode calibration error on port {{value "aprisaXEEventCardPort"}} in slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -586,8 +586,8 @@ traps:
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.61
     name: APRISAXE-EVENTS-4RF::aprisaXEFXSDCDCErrorEvent
     category: diagnostic
-    severity: err
-    description: DC-DC converter error on card slot {aprisaXEEventCardSlot} port {aprisaXEEventCardPort} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    severity: warning
+    description: DC-DC converter error on slot {{value "aprisaXEEventCardSlot"}} port {{value "aprisaXEEventCardPort"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - aprisaXEEventCardSlot
@@ -597,7 +597,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEFXSCASLockEvent
     category: diagnostic
     severity: warning
-    description: FPGA failed to lock onto CAS frame on slot {aprisaXEEventCardSlot} port {aprisaXEEventCardPort} on {_HOSTNAME}.
+    description: FPGA lost CAS frame lock on port {{value "aprisaXEEventCardPort"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -606,8 +606,8 @@ traps:
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.70
     name: APRISAXE-EVENTS-4RF::aprisaXEHSSTDMLockEvent
     category: diagnostic
-    severity: err
-    description: HSS TDM Lock error on card slot {aprisaXEEventCardSlot} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    severity: warning
+    description: HSS TDM Lock error detected on slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -615,8 +615,8 @@ traps:
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.71
     name: APRISAXE-EVENTS-4RF::aprisaXEHSS32MHzResetEvent
     category: diagnostic
-    severity: err
-    description: 32MHz clock reset error detected on slot {aprisaXEEventCardSlot} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    severity: warning
+    description: 32MHz clock reset error detected on card slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -625,7 +625,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEHSSTDMResetEvent
     category: diagnostic
     severity: warning
-    description: TDM reset error detected on slot {aprisaXEEventCardSlot} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: TDM reset error detected on card slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -633,8 +633,8 @@ traps:
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.73
     name: APRISAXE-EVENTS-4RF::aprisaXEHSSPatternLossEvent
     category: diagnostic
-    severity: err
-    description: Pattern Loss error on card slot {aprisaXEEventCardSlot} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Pattern loss error detected on slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -643,7 +643,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEHSSRxFifoFullEvent
     category: diagnostic
     severity: warning
-    description: Rx FIFO Full error on card slot {aprisaXEEventCardSlot} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Rx FIFO Full error detected on card slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -651,8 +651,8 @@ traps:
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.75
     name: APRISAXE-EVENTS-4RF::aprisaXEHSSRxFifoEmptyEvent
     category: diagnostic
-    severity: err
-    description: Rx FIFO Empty error detected on slot {aprisaXEEventCardSlot} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Rx FIFO empty error detected on slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -661,7 +661,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEHSSTxFifoFullEvent
     category: diagnostic
     severity: warning
-    description: Tx FIFO Full error on card slot {aprisaXEEventCardSlot} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Tx FIFO Full error detected{{with value "aprisaXEEventCardSlot"}} on slot {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -669,8 +669,8 @@ traps:
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.77
     name: APRISAXE-EVENTS-4RF::aprisaXEHSSTxFifoEmptyEvent
     category: diagnostic
-    severity: err
-    description: Tx FIFO Empty error detected on card slot {aprisaXEEventCardSlot} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Tx FIFO Empty error detected{{with value "aprisaXEEventCardSlot"}} on slot {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -679,7 +679,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEHSSRxClockValidEvent
     category: diagnostic
     severity: warning
-    description: Rx Clock Valid error detected on slot {aprisaXEEventCardSlot} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Rx clock valid error detected on slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -688,7 +688,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEHSSTxClockValidEvent
     category: diagnostic
     severity: warning
-    description: Tx Clock Valid error on card slot {aprisaXEEventCardSlot} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Tx clock valid error detected on card slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -697,7 +697,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEV24ControlLineLossEvent
     category: diagnostic
     severity: warning
-    description: V24 control line sync loss on card slot {aprisaXEEventCardSlot} port {aprisaXEEventCardPort} on {_HOSTNAME}.
+    description: V24 control line sync loss detected on port {{value "aprisaXEEventCardPort"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -706,17 +706,17 @@ traps:
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.100
     name: APRISAXE-EVENTS-4RF::aprisaXEUnexpectedCardEvent
     category: diagnostic
-    severity: warning
-    description: Mismatch between MIB and installed MUX card in slot {aprisaXEEventCardSlot} with status {aprisaXEEventCardStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Mismatch between MIB and installed MUX cards in slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
       - aprisaXEEventCardStatus
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.110
     name: APRISAXE-EVENTS-4RF::aprisaXECLKSyncEvent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Clock sync state change detected with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Clock sync state changed{{with value "aprisaXEEventAlarmStatus"}} to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -724,7 +724,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXENetClkConfigEvent
     category: state_change
     severity: notice
-    description: Network clock configuration state changed with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Network clock configuration state changed{{with value "aprisaXEEventAlarmStatus"}} to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -732,7 +732,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXECharacterisationEEFailEvent
     category: diagnostic
     severity: err
-    description: Failed read of characterisation data from EEPROM on slot {aprisaXEEventCardSlot} with status {aprisaXEEventCharacterisationStatus} on {_HOSTNAME}.
+    description: Failed to read characterisation data from EEPROM on {{first (value "aprisaXEEventCardSlot") "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -740,8 +740,8 @@ traps:
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.121
     name: APRISAXE-EVENTS-4RF::aprisaXEMibEEFailEvent
     category: diagnostic
-    severity: err
-    description: Failed read of MIB data from EEPROM on card slot {aprisaXEEventCardSlot} with status {aprisaXEEventMibStatus} on {_HOSTNAME}.
+    severity: warning
+    description: EEPROM MIB read failed on slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -749,8 +749,8 @@ traps:
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.130
     name: APRISAXE-EVENTS-4RF::aprisaXEMhsbSwitchToStandbyEvent
     category: state_change
-    severity: notice
-    description: Monitored Hot Standby switch to Standby Event on {_HOSTNAME}.
+    severity: warning
+    description: Monitored hot standby switch to standby on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -758,7 +758,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEAlternateImageTableEvent
     category: diagnostic
     severity: warning
-    description: Alternate image table event with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Alternate Image Table event occurred{{with value "aprisaXEEventAlarmStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -766,7 +766,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEDefaultImageTableEvent
     category: diagnostic
     severity: warning
-    description: Default image table alarm status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Default image table event occurred{{with value "aprisaXEEventAlarmStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -774,7 +774,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEUploadFailEvent
     category: diagnostic
     severity: err
-    description: Upload failure event reported with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: APRISA XE upload failed{{with value "aprisaXEEventAlarmStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -782,7 +782,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEPscDemuxAlignmentEvent
     category: diagnostic
     severity: warning
-    description: PSC Demux alignment state change detected with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: PSC demux alignment event occurred{{with value "aprisaXEEventAlarmStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -790,7 +790,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEPscTDMAlignmentEvent
     category: diagnostic
     severity: warning
-    description: PSC TDM alignment state change reported with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: PSC TDM alignment state changed{{with value "aprisaXEEventAlarmStatus"}} to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -798,15 +798,15 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEPscMuxAlignmentErrorEvent
     category: diagnostic
     severity: warning
-    description: TDM mux alignment error detected with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: TDM mux alignment error detected{{with value "aprisaXEEventAlarmStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.143
     name: APRISAXE-EVENTS-4RF::aprisaXEPscCompanionTxFailEvent
     category: diagnostic
-    severity: err
-    description: HRSD Companion transmitter failure detected with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    severity: crit
+    description: HRSD Companion transmitter failed on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -814,7 +814,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEPscSoftwareOverrideEvent
     category: state_change
     severity: notice
-    description: Software override of PSC Mode Switch triggered on {_HOSTNAME}.
+    description: Software override of PSC mode switch{{with value "aprisaXEEventAlarmStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
@@ -822,15 +822,15 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEPscInvalidSwitchValueEvent
     category: diagnostic
     severity: warning
-    description: Invalid PSC Mode Switch value detected with alarm status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: Invalid PSC Mode Switch value detected{{with value "aprisaXEEventAlarmStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.150
     name: APRISAXE-EVENTS-4RF::aprisaXEDualE1LOSEvent
     category: diagnostic
-    severity: alert
-    description: LOS alarm on port {aprisaXEEventCardPort} in slot {aprisaXEEventCardSlot} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    severity: warning
+    description: LOS event detected on port {{value "aprisaXEEventCardPort"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -838,9 +838,9 @@ traps:
       - aprisaXEEventAlarmStatus
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.151
     name: APRISAXE-EVENTS-4RF::aprisaXEDualE1AISEvent
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: AIS state change on port {aprisaXEEventCardPort} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: AIS state change detected on port {{value "aprisaXEEventCardPort"}} in slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -850,7 +850,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXESingleE1LOSEvent
     category: diagnostic
     severity: warning
-    description: LOS event on slot {aprisaXEEventCardSlot} port {aprisaXEEventCardPort} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: LOS event on port {{value "aprisaXEEventCardPort"}} in slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -860,7 +860,7 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXESingleE1AISEvent
     category: state_change
     severity: warning
-    description: AIS state changed on port {aprisaXEEventCardPort} in slot {aprisaXEEventCardSlot} with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: AIS state changed on port {{value "aprisaXEEventCardPort"}} in slot {{value "aprisaXEEventCardSlot"}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventCardSlot
@@ -870,15 +870,15 @@ traps:
     name: APRISAXE-EVENTS-4RF::aprisaXEHrsdCompareOidEvent
     category: diagnostic
     severity: warning
-    description: OID comparison check failed with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    description: OID comparison check failed{{with value "aprisaXEEventAlarmStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus
   - oid: 1.3.6.1.4.1.14817.7.3.1.3.1.0.171
     name: APRISAXE-EVENTS-4RF::aprisaXEHrsdCompanionLostEvent
     category: diagnostic
-    severity: crit
-    description: HRSD Companion heartbeat lost with status {aprisaXEEventAlarmStatus} on {_HOSTNAME}.
+    severity: alert
+    description: HRSD Companion Heartbeat lost{{with value "aprisaXEEventAlarmStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aprisaXEEventAlarmStatus

@@ -41,7 +41,7 @@ traps:
     name: JACQUES-650-MIB::jacquesJccpserverUpNotify
     category: state_change
     severity: notice
-    description: Application {jacquesServerName} is {jacquesAppUp} on {_HOSTNAME}.
+    description: JCCP server {{value "jacquesServerName"}} is up on {{hostname}}.
     status: current
     varbinds:
       - jacquesAppUp
@@ -50,7 +50,7 @@ traps:
     name: JACQUES-650-MIB::jacquesEndpointOnlineNotify
     category: state_change
     severity: notice
-    description: Endpoint {jacquesEndpointOnline} online state changed for tag {jacquesTag} on {_HOSTNAME}.
+    description: Endpoint {{value "jacquesTag"}} online state changed to {{value "jacquesEndpointOnline"}} on {{hostname}}.
     status: current
     varbinds:
       - jacquesTag
@@ -59,16 +59,16 @@ traps:
     name: JACQUES-650-MIB::jacquesEndpointModeNotify
     category: state_change
     severity: notice
-    description: Endpoint mode changed to {jacquesEndpointMode} for tag {jacquesTag} on {_HOSTNAME}.
+    description: Endpoint mode changed to {{value "jacquesEndpointMode"}} on {{hostname}}.
     status: current
     varbinds:
       - jacquesTag
       - jacquesEndpointMode
   - oid: 1.3.6.1.4.1.49759.3.1.0.3
     name: JACQUES-650-MIB::jacquesEndpointAlarmNotify
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Endpoint alarm {jacquesEndpointAlarmType} triggered for {jacquesTag} on {_HOSTNAME}.
+    description: Endpoint alarm {{value "jacquesEndpointAlarmType"}} on {{first (value "jacquesTag") "endpoint"}} on {{hostname}}.
     status: current
     varbinds:
       - jacquesTag

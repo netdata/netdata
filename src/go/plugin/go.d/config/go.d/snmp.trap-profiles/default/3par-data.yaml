@@ -58,8 +58,8 @@ traps:
   - oid: 1.3.6.1.4.1.12925.1.8
     name: ThreeParMIB::alertNotify
     category: diagnostic
-    severity: warning
-    description: Alert {severity} for {component} with code {messageCode} on {_HOSTNAME}.
+    severity: crit
+    description: HP 3PAR alert {{value "messageCode"}} on {{value "component"}} with state {{value "state"}} on {{hostname}}.
     status: current
     varbinds:
       - component

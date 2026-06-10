@@ -99,7 +99,7 @@ traps:
     name: GW-EPON-MIB::onuNewRegSuccess
     category: state_change
     severity: notice
-    description: ONU registration succeeded for device {deviceIndex} on {_HOSTNAME}.
+    description: New ONU registered successfully on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -111,7 +111,7 @@ traps:
     name: GW-EPON-MIB::onuReregSuccess
     category: state_change
     severity: notice
-    description: ONU registration succeeded for device {deviceIndex} on {_HOSTNAME}.
+    description: ONU reregistration succeeded on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -123,15 +123,15 @@ traps:
     name: GW-EPON-MIB::onuNotPresent
     category: diagnostic
     severity: warning
-    description: ONU not present detected at device index {deviceIndex} on {_HOSTNAME}.
+    description: ONU not present alarm detected for device index {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.4
     name: GW-EPON-MIB::devPowerOff
     category: diagnostic
-    severity: crit
-    description: Device power off alarm detected on device index {deviceIndex} on {_HOSTNAME}.
+    severity: alert
+    description: Device power off alarm detected on {{first (value "deviceIndex") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -139,7 +139,7 @@ traps:
     name: GW-EPON-MIB::devPowerOn
     category: diagnostic
     severity: notice
-    description: Device power on alarm detected at index {deviceIndex} on {_HOSTNAME}.
+    description: Device power on alarm detected on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -152,15 +152,15 @@ traps:
     name: GW-EPON-MIB::cfgDataSaveSuccess
     category: config_change
     severity: notice
-    description: Configuration data saved successfully on {_HOSTNAME}.
+    description: Configuration data saved to flash successfully on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.7
     name: GW-EPON-MIB::cfgDataSaveFail
     category: config_change
-    severity: err
-    description: Configuration save failed on {_HOSTNAME}.
+    severity: crit
+    description: Configuration save to flash failed on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -168,23 +168,23 @@ traps:
     name: GW-EPON-MIB::flashClearSuccess
     category: config_change
     severity: notice
-    description: Configuration data cleared on device {deviceIndex} on {_HOSTNAME}.
+    description: Configuration data cleared successfully on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.9
     name: GW-EPON-MIB::flashClearFail
-    category: config_change
+    category: diagnostic
     severity: err
-    description: Configuration data clear failed on {_HOSTNAME}.
+    description: Failed to clear configuration data on device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.10
     name: GW-EPON-MIB::softwareUpdateSuccess
-    category: config_change
-    severity: notice
-    description: Software update completed successfully on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Software update completed successfully on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -192,15 +192,15 @@ traps:
     name: GW-EPON-MIB::softwareUpdateFail
     category: diagnostic
     severity: err
-    description: Software update failed for device index {deviceIndex} on {_HOSTNAME}.
+    description: Software update failed for device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.12
     name: GW-EPON-MIB::firmwareUpdateSuccess
-    category: config_change
-    severity: notice
-    description: Firmware update completed successfully on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Firmware update successfully completed on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -208,7 +208,7 @@ traps:
     name: GW-EPON-MIB::firmwareUpdateFail
     category: diagnostic
     severity: err
-    description: Firmware update failed for device index {deviceIndex} on {_HOSTNAME}.
+    description: Firmware update failed for device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -216,15 +216,15 @@ traps:
     name: GW-EPON-MIB::cfgDataBackupSuccess
     category: config_change
     severity: notice
-    description: Configuration backup completed successfully on {_HOSTNAME}.
+    description: Configuration backup succeeded on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.15
     name: GW-EPON-MIB::cfgDataBackupFail
-    category: config_change
+    category: diagnostic
     severity: err
-    description: Backup configuration data to NMS failed on {_HOSTNAME}.
+    description: Backup configuration data to NMS failed for device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -232,7 +232,7 @@ traps:
     name: GW-EPON-MIB::cfgDataRestoreSuccess
     category: config_change
     severity: notice
-    description: Configuration data restored successfully from NMS on {_HOSTNAME}.
+    description: Configuration data restored successfully on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -240,7 +240,7 @@ traps:
     name: GW-EPON-MIB::cfgDataRestoreFail
     category: config_change
     severity: err
-    description: Configuration restore from NMS failed for device {deviceIndex} on {_HOSTNAME}.
+    description: Failed to restore configuration data from NMS on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -248,7 +248,7 @@ traps:
     name: GW-EPON-MIB::autoProtectSwitch
     category: state_change
     severity: notice
-    description: Auto Protect Switch event occurred on {_HOSTNAME}.
+    description: Auto Protect Switch occurred on device {{value "deviceIndex"}} board {{value "boardIndex"}} port {{value "ponPortIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -258,7 +258,7 @@ traps:
     name: GW-EPON-MIB::cpuUsageFactorHigh
     category: diagnostic
     severity: warning
-    description: High CPU usage factor detected on device index {deviceIndex} on {_HOSTNAME}.
+    description: High CPU usage factor alarm detected on device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -266,7 +266,7 @@ traps:
     name: GW-EPON-MIB::ponPortBERAlarm
     category: diagnostic
     severity: warning
-    description: PON port {ponPortIndex} on device {deviceIndex} reported BER alarm on {_HOSTNAME}.
+    description: PON port {{value "ponPortIndex"}} BER alarm detected on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -275,7 +275,7 @@ traps:
     name: GW-EPON-MIB::ponPortBERAlarmClear
     category: diagnostic
     severity: notice
-    description: PON port {ponPortIndex} BER alarm cleared on {_HOSTNAME}.
+    description: PON port {{value "ponPortIndex"}} BER alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -284,16 +284,16 @@ traps:
     name: GW-EPON-MIB::ponPortFERAlarm
     category: diagnostic
     severity: warning
-    description: PON port {ponPortIndex} on device {deviceIndex} reported FER alarm on {_HOSTNAME}.
+    description: PON port FER alarm detected on port {{value "ponPortIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
       - ponPortIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.23
     name: GW-EPON-MIB::ponPortFERAlarmClear
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: PON port {ponPortIndex} FER alarm cleared on {_HOSTNAME}.
+    description: PON port FER alarm cleared on {{first (value "ponPortIndex") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -302,7 +302,7 @@ traps:
     name: GW-EPON-MIB::llidActBWExceeding
     category: diagnostic
     severity: warning
-    description: LLID bandwidth exceeded limit on port {ponPortIndex} LLID {ponLlidIndex} on {_HOSTNAME}.
+    description: LLID bandwidth exceeded limit on PON port {{value "ponPortIndex"}} LLID {{value "ponLlidIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -310,9 +310,9 @@ traps:
       - ponLlidIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.25
     name: GW-EPON-MIB::llidActBWExceedingClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: LLID {ponLlidIndex} bandwidth usage returned to normal on {_HOSTNAME}.
+    description: LLID {{value "ponLlidIndex"}} bandwidth usage returned to normal on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -320,9 +320,9 @@ traps:
       - ponLlidIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.26
     name: GW-EPON-MIB::devBoardInterted
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Board {curBoardType} inserted at device {deviceIndex} board {boardIndex} on {_HOSTNAME}.
+    description: Board {{value "boardIndex"}} inserted on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -331,8 +331,8 @@ traps:
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.27
     name: GW-EPON-MIB::devBoardPull
     category: state_change
-    severity: notice
-    description: Board {boardIndex} of device {deviceIndex} was pulled out on {_HOSTNAME}.
+    severity: warning
+    description: Board {{value "boardIndex"}} pulled out on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -341,8 +341,8 @@ traps:
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.28
     name: GW-EPON-DEV-MIB::devFanAlarm
     category: diagnostic
-    severity: err
-    description: Fan alarm on device {deviceIndex} fan {devFanIndex} on {_HOSTNAME}.
+    severity: warning
+    description: Fan alarm detected on device {{value "deviceIndex"}} fan {{value "devFanIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -351,7 +351,7 @@ traps:
     name: GW-EPON-DEV-MIB::devFanAlarmClear
     category: diagnostic
     severity: notice
-    description: Fan alarm cleared for device {deviceIndex} fan {devFanIndex} on {_HOSTNAME}.
+    description: Fan alarm cleared for fan {{value "devFanIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -359,8 +359,8 @@ traps:
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.30
     name: GW-EPON-MIB::powerOffAlarm
     category: diagnostic
-    severity: crit
-    description: Power off alarm detected for device {deviceIndex} board {boardIndex} on {_HOSTNAME}.
+    severity: alert
+    description: Power off alarm detected on device {{value "deviceIndex"}} board {{value "boardIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -369,7 +369,7 @@ traps:
     name: GW-EPON-MIB::powerOnAlarm
     category: diagnostic
     severity: warning
-    description: Power on alarm detected for device {deviceIndex} board {boardIndex} on {_HOSTNAME}.
+    description: Power on alarm detected on device {{value "deviceIndex"}} board {{value "boardIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -378,7 +378,7 @@ traps:
     name: GW-EPON-MIB::boardTemperatureHigh
     category: diagnostic
     severity: warning
-    description: Board temperature high alarm on device {deviceIndex} board {boardIndex} on {_HOSTNAME}.
+    description: Board temperature high alarm on board {{value "boardIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -387,7 +387,7 @@ traps:
     name: GW-EPON-MIB::boardTemperatureHighClear
     category: diagnostic
     severity: notice
-    description: Board temperature high alarm cleared for board {boardIndex} on {_HOSTNAME}.
+    description: Board temperature high alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -395,17 +395,17 @@ traps:
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.34
     name: GW-EPON-MIB::ponBoardReset
     category: diagnostic
-    severity: warning
-    description: PON board reset event occurred on device {deviceIndex} board {boardIndex} on {_HOSTNAME}.
+    severity: notice
+    description: PON board reset event occurred on device {{value "deviceIndex"}} board {{value "boardIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
       - boardIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.35
     name: GW-EPON-MIB::swBoardProtectedSwitch
-    category: state_change
-    severity: notice
-    description: Switch protection event occurred for device {deviceIndex} board {boardIndex} on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: SW board protected switch event occurred on device {{value "deviceIndex"}} board {{value "boardIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -414,7 +414,7 @@ traps:
     name: GW-EPON-MIB::ponPortAbnormal
     category: diagnostic
     severity: warning
-    description: Abnormal status detected on PON port {ponPortIndex} on {_HOSTNAME}.
+    description: PON port abnormal status detected on device {{value "deviceIndex"}} board {{value "boardIndex"}} port {{value "ponPortIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -424,15 +424,15 @@ traps:
     name: GW-EPON-MIB::onuRegisterConflict
     category: state_change
     severity: warning
-    description: ONU registration conflict detected for device index {deviceIndex} on {_HOSTNAME}.
+    description: ONU register conflict detected for device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.38
     name: GW-EPON-MIB::firmwareLoadSuccess
-    category: config_change
-    severity: notice
-    description: Firmware load successfully completed on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Firmware load succeeded on {{first (value "deviceIndex") (value "boardIndex") (value "ponPortIndex")}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -441,8 +441,8 @@ traps:
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.39
     name: GW-EPON-MIB::firmwareLoadFailure
     category: diagnostic
-    severity: err
-    description: Firmware load failed on device {deviceIndex} board {boardIndex} port {ponPortIndex} on {_HOSTNAME}.
+    severity: crit
+    description: Firmware load failed on device {{value "deviceIndex"}} board {{value "boardIndex"}} port {{value "ponPortIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -450,9 +450,9 @@ traps:
       - ponPortIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.40
     name: GW-EPON-MIB::dbaUpdateSuccess
-    category: config_change
+    category: state_change
     severity: notice
-    description: DBA update succeeded for device index {deviceIndex} on {_HOSTNAME}.
+    description: DBA update succeeded for device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -460,15 +460,15 @@ traps:
     name: GW-EPON-MIB::dbaUpdateFailure
     category: diagnostic
     severity: err
-    description: DBA update failure on device index {deviceIndex} on {_HOSTNAME}.
+    description: DBA update failure for device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.42
     name: GW-EPON-MIB::dbaLoadSuccess
-    category: state_change
-    severity: notice
-    description: DBA load succeeded on PON port {ponPortIndex} on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: DBA load succeeded on PON port {{value "ponPortIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -477,8 +477,8 @@ traps:
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.43
     name: GW-EPON-MIB::dbaLoadFailure
     category: diagnostic
-    severity: err
-    description: DBA load failure on device {deviceIndex} board {boardIndex} port {ponPortIndex} on {_HOSTNAME}.
+    severity: warning
+    description: DBA load failure on PON port {{value "ponPortIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -488,7 +488,7 @@ traps:
     name: GW-EPON-MIB::ponToEthLinkdown
     category: state_change
     severity: warning
-    description: EPON link down on device {deviceIndex} board {boardIndex} port {ponPortIndex} on {_HOSTNAME}.
+    description: EPON link down on PON port {{value "ponPortIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -498,7 +498,7 @@ traps:
     name: GW-EPON-MIB::ponToEthLinkup
     category: state_change
     severity: notice
-    description: PON to Ethernet link up on device {deviceIndex} board {boardIndex} port {ponPortIndex} on {_HOSTNAME}.
+    description: EPON link up on PON port {{value "ponPortIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -506,17 +506,17 @@ traps:
       - ponPortIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.46
     name: GW-EPON-MIB::onuSoftwareLoadSuccess
-    category: config_change
+    category: state_change
     severity: notice
-    description: ONU software load completed successfully on {_HOSTNAME}.
+    description: ONU software load succeeded for device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.47
     name: GW-EPON-MIB::onuSoftwareLoadFailure
     category: diagnostic
-    severity: err
-    description: ONU software load failed for device index {deviceIndex} on {_HOSTNAME}.
+    severity: crit
+    description: ONU software load failure on device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -524,7 +524,7 @@ traps:
     name: GW-EPON-MIB::ethLinkdown
     category: state_change
     severity: warning
-    description: Ethernet port linkdown on device {deviceIndex} board {boardIndex} on {_HOSTNAME}.
+    description: Ethernet port link down on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -533,32 +533,32 @@ traps:
     name: GW-EPON-MIB::ethLinkup
     category: state_change
     severity: notice
-    description: Ethernet port linkup on device {deviceIndex} board {boardIndex} on {_HOSTNAME}.
+    description: Ethernet port linkup alarm on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
       - boardIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.56
     name: GW-EPON-MIB::bootUpdateSuccess
-    category: config_change
-    severity: notice
-    description: Boot firmware update completed successfully on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Boot firmware update succeeded on device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.57
     name: GW-EPON-MIB::bootUpdateFailure
     category: diagnostic
-    severity: err
-    description: Boot firmware update failed for device {deviceIndex} on {_HOSTNAME}.
+    severity: crit
+    description: Boot firmware update failed for device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.58
     name: GW-EPON-MIB::batFileBackupSuccess
-    category: config_change
+    category: diagnostic
     severity: info
-    description: BAT file backup completed successfully on {_HOSTNAME}.
+    description: BAT file backup succeeded for device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -566,15 +566,15 @@ traps:
     name: GW-EPON-MIB::batFileBackupFailure
     category: diagnostic
     severity: err
-    description: BAT file backup failed for device index {deviceIndex} on {_HOSTNAME}.
+    description: BAT file backup failed for device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.60
     name: GW-EPON-MIB::batFileRestoreSuccess
-    category: config_change
-    severity: notice
-    description: BAT file restore completed successfully on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: BAT file restore completed successfully on device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -582,7 +582,7 @@ traps:
     name: GW-EPON-MIB::batFileRestoreFailure
     category: diagnostic
     severity: err
-    description: BAT file restore failed for device {deviceIndex} on {_HOSTNAME}.
+    description: BAT file restore failed for device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -590,7 +590,7 @@ traps:
     name: GW-EPON-MIB::onuRegAuthFailure
     category: security
     severity: warning
-    description: Illegal ONU registration attempt detected on {_HOSTNAME}.
+    description: Illegal ONU registration attempt detected on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -601,7 +601,7 @@ traps:
     name: GW-EPON-MIB::deviceColdStart
     category: state_change
     severity: notice
-    description: Device {deviceIndex} of type {deviceType} performed a cold start on {_HOSTNAME}.
+    description: Device cold start detected on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -612,9 +612,9 @@ traps:
       - deviceRestartupTime
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.64
     name: GW-EPON-MIB::deviceWarmStart
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Device warm start detected with restart time {deviceRestartupTime} on {_HOSTNAME}.
+    description: Device warm start occurred on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -627,7 +627,7 @@ traps:
     name: GW-EPON-MIB::deviceExceptionRestart
     category: diagnostic
     severity: alert
-    description: Device {deviceIndex} restarted due to exception at {deviceRestartupTime} on {_HOSTNAME}.
+    description: Device {{value "deviceIndex"}} restarted due to exception on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -640,7 +640,7 @@ traps:
     name: GW-EPON-MIB::ethLoopAlarm
     category: diagnostic
     severity: warning
-    description: Ethernet port loop alarm detected on device {deviceIndex} board {boardIndex} on {_HOSTNAME}.
+    description: Ethernet port loop alarm detected on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -649,7 +649,7 @@ traps:
     name: GW-EPON-MIB::ethLoopAlarmClear
     category: state_change
     severity: notice
-    description: Ethernet port loop cleared on device {deviceIndex} board {boardIndex} on {_HOSTNAME}.
+    description: Ethernet port loop clear detected on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -658,7 +658,7 @@ traps:
     name: GW-EPON-MIB::onuLoopAlarm
     category: diagnostic
     severity: warning
-    description: ONU loop alarm detected on device index {deviceIndex} on {_HOSTNAME}.
+    description: ONU loop alarm detected on device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -666,7 +666,7 @@ traps:
     name: GW-EPON-MIB::onuLoopAlarmClear
     category: state_change
     severity: notice
-    description: ONU loop condition cleared on {_HOSTNAME}.
+    description: ONU loop alarm cleared for device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -674,7 +674,7 @@ traps:
     name: GW-EPON-MIB::backboneEthLinkdown
     category: state_change
     severity: warning
-    description: Ethernet port linkdown alarm on device {deviceIndex} board {boardIndex} on {_HOSTNAME}.
+    description: Ethernet port link down on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -683,7 +683,7 @@ traps:
     name: GW-EPON-MIB::backboneEthLinkup
     category: state_change
     severity: notice
-    description: Ethernet port linkup on device {deviceIndex} board {boardIndex} on {_HOSTNAME}.
+    description: Ethernet port linkup alarm on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -692,7 +692,7 @@ traps:
     name: GW-EPON-MIB::boardCpuUsageAlarm
     category: diagnostic
     severity: warning
-    description: Board {boardIndex} CPU usage alarm on {_HOSTNAME}.
+    description: CPU usage alarm on board {{value "boardIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -701,7 +701,7 @@ traps:
     name: GW-EPON-MIB::boardCpuUsageAlarmClear
     category: diagnostic
     severity: notice
-    description: CPU usage alarm cleared for device {deviceIndex} board {boardIndex} on {_HOSTNAME}.
+    description: CPU usage alarm cleared for board {{value "boardIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -710,7 +710,7 @@ traps:
     name: GW-EPON-MIB::boardMemoryUsageAlarm
     category: diagnostic
     severity: warning
-    description: Board memory usage alarm triggered for device {deviceIndex} board {boardIndex} on {_HOSTNAME}.
+    description: Board memory usage alarm on {{first (value "boardIndex") "board"}} of device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -719,7 +719,7 @@ traps:
     name: GW-EPON-MIB::boardMemoryUsageAlarmClear
     category: diagnostic
     severity: notice
-    description: Board memory usage alarm cleared for device {deviceIndex} board {boardIndex} on {_HOSTNAME}.
+    description: Board memory usage alarm cleared for board {{value "boardIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -728,7 +728,7 @@ traps:
     name: GW-EPON-DEV-MIB::deviceTemperatureHigh
     category: diagnostic
     severity: warning
-    description: Device temperature high alarm detected for device index {deviceIndex} on {_HOSTNAME}.
+    description: Device temperature high alarm on device index {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -736,7 +736,7 @@ traps:
     name: GW-EPON-DEV-MIB::deviceTemperatureHighClear
     category: diagnostic
     severity: notice
-    description: Device temperature high alarm cleared for device index {deviceIndex} on {_HOSTNAME}.
+    description: Device temperature high alarm cleared for device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -744,7 +744,7 @@ traps:
     name: GW-EPON-DEV-MIB::deviceTemperatureLow
     category: diagnostic
     severity: warning
-    description: Device temperature low alarm detected on device index {deviceIndex} on {_HOSTNAME}.
+    description: Device {{value "deviceIndex"}} temperature low alarm on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -752,15 +752,15 @@ traps:
     name: GW-EPON-DEV-MIB::deviceTemperatureLowClear
     category: diagnostic
     severity: notice
-    description: Device temperature low alarm cleared for device {deviceIndex} on {_HOSTNAME}.
+    description: Device temperature low alarm cleared for device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.132
     name: GW-EPON-MIB::ponPortFullAlarm
     category: diagnostic
-    severity: alert
-    description: PON port {ponPortIndex} on board {boardIndex} of device {deviceIndex} triggered full alarm on {_HOSTNAME}.
+    severity: crit
+    description: PON port full alarm on device {{value "deviceIndex"}} board {{value "boardIndex"}} port {{value "ponPortIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -770,7 +770,7 @@ traps:
     name: GW-EPON-MIB::ponPortAbnormalClear
     category: state_change
     severity: notice
-    description: PON port {ponPortIndex} on board {boardIndex} of device {deviceIndex} returned to normal state on {_HOSTNAME}.
+    description: PON port {{value "ponPortIndex"}} abnormal condition cleared on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -780,25 +780,25 @@ traps:
     name: GW-EPON-MIB::ethPortBroadCastFloodControl
     category: diagnostic
     severity: warning
-    description: Ethernet port broadcast flood alarm detected on device {deviceIndex} board {boardIndex} on {_HOSTNAME}.
+    description: Ethernet port broadcast flood alarm detected on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
       - boardIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.137
     name: GW-EPON-MIB::ethPortBroadCastFloodControlClear
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Broadcast flood alarm cleared on port {deviceIndex} on {_HOSTNAME}.
+    description: Ethernet port broadcast flood alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
       - boardIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.138
     name: GW-EPON-MIB::sysfileUploadsuccess
-    category: config_change
-    severity: notice
-    description: File upload completed for device index {deviceIndex} on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: System file upload succeeded for device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -806,15 +806,15 @@ traps:
     name: GW-EPON-MIB::sysfileUploadfailure
     category: diagnostic
     severity: err
-    description: File upload failed for device index {deviceIndex} on {_HOSTNAME}.
+    description: System file upload failure on device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.140
     name: GW-EPON-MIB::sysfileDownloadsuccess
-    category: config_change
-    severity: notice
-    description: File download completed successfully on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: File download succeeded for device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -822,15 +822,15 @@ traps:
     name: GW-EPON-MIB::sysfileDownloadfailure
     category: diagnostic
     severity: err
-    description: File download failure detected on device index {deviceIndex} on {_HOSTNAME}.
+    description: System file download failure for device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.142
     name: GW-EPON-MIB::ponPortLosAlarm
     category: diagnostic
-    severity: err
-    description: PON port loss of signal alarm on device {deviceIndex} board {boardIndex} port {ponPortIndex} on {_HOSTNAME}.
+    severity: crit
+    description: PON port loss of signal alarm on device {{value "deviceIndex"}} board {{value "boardIndex"}} port {{value "ponPortIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -840,7 +840,7 @@ traps:
     name: GW-EPON-MIB::ponPortLosAlarmClear
     category: state_change
     severity: notice
-    description: PON port loss of signal alarm cleared for device {deviceIndex} board {boardIndex} port {ponPortIndex} on {_HOSTNAME}.
+    description: PON port LOS alarm cleared on {{first (value "ponPortIndex") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -850,7 +850,7 @@ traps:
     name: GW-EPON-MIB::ponFWVersionMismatch
     category: diagnostic
     severity: warning
-    description: Firmware version mismatch detected on device {deviceIndex} board {boardIndex} port {ponPortIndex} on {_HOSTNAME}.
+    description: Firmware version mismatch detected on PON port {{value "ponPortIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -858,9 +858,9 @@ traps:
       - ponPortIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.145
     name: GW-EPON-MIB::ponFWVersionMatch
-    category: diagnostic
+    category: config_change
     severity: warning
-    description: PON firmware version mismatch detected on device {deviceIndex} board {boardIndex} port {ponPortIndex} on {_HOSTNAME}.
+    description: Firmware version mismatch detected on PON port {{value "ponPortIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -870,7 +870,7 @@ traps:
     name: GW-EPON-MIB::ponDBAVersionMismatch
     category: diagnostic
     severity: warning
-    description: PON DBA version mismatch detected on device {deviceIndex} board {boardIndex} port {ponPortIndex} on {_HOSTNAME}.
+    description: PON DBA version mismatch detected on {{first (value "ponPortIndex") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -880,7 +880,7 @@ traps:
     name: GW-EPON-MIB::ponDBAVersionMatch
     category: diagnostic
     severity: warning
-    description: PON DBA version mismatch detected on device {deviceIndex} board {boardIndex} port {ponPortIndex} on {_HOSTNAME}.
+    description: PON DBA version mismatch detected on {{first (value "ponPortIndex") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -890,7 +890,7 @@ traps:
     name: GW-EPON-MIB::ponSFPTypeMismatch
     category: diagnostic
     severity: warning
-    description: SFP type mismatch detected on device {deviceIndex} board {boardIndex} port {ponPortIndex} on {_HOSTNAME}.
+    description: SFP type mismatch detected on PON port {{value "ponPortIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -899,8 +899,8 @@ traps:
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.149
     name: GW-EPON-MIB::ponSFPTypeMitch
     category: diagnostic
-    severity: err
-    description: PON SFP type mismatch detected on device {deviceIndex} board {boardIndex} port {ponPortIndex} on {_HOSTNAME}.
+    severity: warning
+    description: PON SFP type mismatch detected on device {{value "deviceIndex"}} board {{value "boardIndex"}} port {{value "ponPortIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -909,8 +909,8 @@ traps:
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.150
     name: GW-EPON-MIB::ponPortBRASAlarm
     category: diagnostic
-    severity: warning
-    description: PON port alarm detected on device {deviceIndex} board {boardIndex} port {ponPortIndex} on {_HOSTNAME}.
+    severity: crit
+    description: PON port alarm detected on device {{value "deviceIndex"}} board {{value "boardIndex"}} port {{value "ponPortIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -920,7 +920,7 @@ traps:
     name: GW-EPON-MIB::ponPortBRASAlarmClear
     category: state_change
     severity: notice
-    description: PON port alarm cleared for device {deviceIndex} board {boardIndex} port {ponPortIndex} on {_HOSTNAME}.
+    description: PON port alarm cleared for device {{value "deviceIndex"}} board {{value "boardIndex"}} port {{value "ponPortIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -929,8 +929,8 @@ traps:
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.152
     name: GW-EPON-MIB::ponPortUpNoTraffic
     category: state_change
-    severity: notice
-    description: PON port {ponPortIndex} is up with no traffic on {_HOSTNAME}.
+    severity: warning
+    description: PON port {{value "ponPortIndex"}} is up but has no traffic on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -940,7 +940,7 @@ traps:
     name: GW-EPON-MIB::ponPortUpNoTrafficClear
     category: state_change
     severity: notice
-    description: PON port {ponPortIndex} cleared no-traffic state on {_HOSTNAME}.
+    description: PON port {{value "ponPortIndex"}} is up with no traffic on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
@@ -950,21 +950,21 @@ traps:
     name: GW-EPON-MIB::onuDeletingNotify
     category: security
     severity: warning
-    description: Illegal ONU register detected on {_HOSTNAME}.
+    description: Illegal ONU registration detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.208
     name: GW-EPON-MIB::onuMacTableOverFlow
     category: diagnostic
     severity: warning
-    description: MAC table overflow detected on device index {deviceIndex} on {_HOSTNAME}.
+    description: ONU MAC table overflow detected on device {{value "deviceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex
   - oid: 1.3.6.1.4.1.10072.2.20.1.1.6.209
     name: GW-EPON-MIB::onuMacTableOverFlowClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: ONU MAC table overflow cleared on {_HOSTNAME}.
+    description: ONU MAC table overflow cleared on {{hostname}}.
     status: current
     varbinds:
       - deviceIndex

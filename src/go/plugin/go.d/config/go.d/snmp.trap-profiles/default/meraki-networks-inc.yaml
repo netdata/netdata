@@ -3,16 +3,8 @@
 # operator overrides belong in /etc/netdata/go.d/snmp.trap-profiles/.
 vendor: meraki-networks-inc
 mib_count: 1
-trap_count: 33
+trap_count: 23
 varbinds:
-  actionTaken:
-    oid: 1.3.6.1.4.1.29671.1.1.5.1.13
-    type: DisplayString
-    constraints: SIZE(0..255)
-  changeDescription:
-    oid: 1.3.6.1.4.1.29671.3.1
-    type: DisplayString
-    constraints: SIZE(0..255)
   devInterfaceCarrier:
     oid: 1.3.6.1.4.1.29671.1.1.5.1.9
     type: DisplayString
@@ -51,22 +43,6 @@ varbinds:
     oid: 1.3.6.1.4.1.29671.1.1.4.1.13
     type: DisplayString
     constraints: SIZE(0..255)
-  endOfHighUsageWindow:
-    oid: 1.3.6.1.4.1.29671.3.7
-    type: DisplayString
-    constraints: SIZE(0..255)
-  loginDescription:
-    oid: 1.3.6.1.4.1.29671.3.4
-    type: DisplayString
-    constraints: SIZE(0..255)
-  loginEmail:
-    oid: 1.3.6.1.4.1.29671.3.2
-    type: DisplayString
-    constraints: SIZE(0..255)
-  loginResult:
-    oid: 1.3.6.1.4.1.29671.3.3
-    type: DisplayString
-    constraints: SIZE(0..255)
   networkAdmin:
     oid: 1.3.6.1.4.1.29671.1.1.2.1.3
     type: DisplayString
@@ -79,36 +55,12 @@ varbinds:
     oid: 1.3.6.1.4.1.29671.1.1.1
     type: DisplayString
     constraints: SIZE(0..255)
-  period:
-    oid: 1.3.6.1.4.1.29671.3.6
-    type: DisplayString
-    constraints: SIZE(0..255)
-  portNumber:
-    oid: 1.3.6.1.4.1.29671.1.1.5.1.14
-    type: DisplayString
-    constraints: SIZE(0..255)
-  powerSupplyNum:
-    oid: 1.3.6.1.4.1.29671.1.1.5.1.12
-    type: DisplayString
-    constraints: SIZE(0..255)
   radiusServerIp:
     oid: 1.3.6.1.4.1.29671.1.1.3.1.6
     type: IpAddress
     constraints: SIZE(4)
   ssidName:
     oid: 1.3.6.1.4.1.29671.1.1.3.1.3
-    type: DisplayString
-    constraints: SIZE(0..255)
-  threshold:
-    oid: 1.3.6.1.4.1.29671.3.8
-    type: DisplayString
-    constraints: SIZE(0..255)
-  tunnelDescription:
-    oid: 1.3.6.1.4.1.29671.3.5
-    type: DisplayString
-    constraints: SIZE(0..255)
-  usage:
-    oid: 1.3.6.1.4.1.29671.3.9
     type: DisplayString
     constraints: SIZE(0..255)
   userEmail:
@@ -130,9 +82,9 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.29671.1.1.7.1
     name: MERAKI-CLOUD-CONTROLLER-MIB::testTrap
-    category: unknown
+    category: diagnostic
     severity: info
-    description: Test trap received from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Test trap received to verify server configuration for network {{value "networkName"}} on {{hostname}}.
     status: current
     varbinds:
       - networkName
@@ -140,41 +92,41 @@ traps:
     name: MERAKI-CLOUD-CONTROLLER-MIB::deviceGoesDownTrap
     category: state_change
     severity: crit
-    description: Device {devMac} became unreachable from the Meraki cloud on {_HOSTNAME}.
+    description: Device {{value "devMac"}} went down on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
-      - networkName
       - devMac
+      - networkName
+      - organizationName
   - oid: 1.3.6.1.4.1.29671.1.1.7.3
     name: MERAKI-CLOUD-CONTROLLER-MIB::deviceComesOnline
     category: state_change
     severity: notice
-    description: Device {devMac} reconnected to the Meraki cloud in {networkName} on {_HOSTNAME}.
+    description: Device {{value "devMac"}} reconnected to the Meraki cloud on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
-      - networkName
       - devMac
+      - networkName
+      - organizationName
   - oid: 1.3.6.1.4.1.29671.1.1.7.4
     name: MERAKI-CLOUD-CONTROLLER-MIB::foreignAPDetected
     category: security
     severity: warning
-    description: Unknown access point detected with MAC {devMac} on network {networkName} on {_HOSTNAME}.
+    description: Unknown access point detected on {{value "networkName"}} with MAC {{value "devMac"}} on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
-      - networkName
       - devMac
+      - networkName
+      - organizationName
   - oid: 1.3.6.1.4.1.29671.1.1.7.5
     name: MERAKI-CLOUD-CONTROLLER-MIB::cellularNetworkUp
     category: state_change
     severity: notice
-    description: Cellular network connected on interface {devInterfaceName} with carrier {devInterfaceCarrier} on {_HOSTNAME}.
+    description: Cellular network connected on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
       - devMac
       - devInterfaceModel
       - devInterfaceCarrier
@@ -183,11 +135,11 @@ traps:
     name: MERAKI-CLOUD-CONTROLLER-MIB::cellularNetworkDown
     category: state_change
     severity: crit
-    description: Cellular network disconnected on interface {devInterfaceName} with carrier {devInterfaceCarrier} on {_HOSTNAME}.
+    description: Cellular network disconnected for {{first (value "devInterfaceName") "device"}} on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
       - devMac
       - devInterfaceModel
       - devInterfaceCarrier
@@ -196,11 +148,11 @@ traps:
     name: MERAKI-CLOUD-CONTROLLER-MIB::newDhcpServerAlert
     category: security
     severity: warning
-    description: New DHCP server detected at {devLanIp} on {_HOSTNAME}.
+    description: New DHCP server detected at {{value "devLanIp"}} on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
       - devMac
       - devLanIp
       - devSubnet
@@ -209,11 +161,11 @@ traps:
     name: MERAKI-CLOUD-CONTROLLER-MIB::noDhcpLeases
     category: diagnostic
     severity: warning
-    description: DHCP leases exhausted for network {networkName} on {_HOSTNAME}.
+    description: DHCP leases exhausted on {{first (value "networkName") "network"}} on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
       - devMac
       - devLanIp
       - vlanNumber
@@ -221,61 +173,61 @@ traps:
     name: MERAKI-CLOUD-CONTROLLER-MIB::uplinkStatusChanged
     category: state_change
     severity: warning
-    description: Uplink status changed for interface {devInterfaceName} on {_HOSTNAME}.
+    description: Uplink status changed on {{first (value "devInterfaceName") "link"}} on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
       - devMac
       - devInterfaceName
   - oid: 1.3.6.1.4.1.29671.1.1.7.10
     name: MERAKI-CLOUD-CONTROLLER-MIB::unreachableDevicesDetected
-    category: security
+    category: diagnostic
     severity: warning
-    description: Unreachable devices detected on network {networkName} on {_HOSTNAME}.
+    description: Unreachable devices detected{{with value "networkName"}} in {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
   - oid: 1.3.6.1.4.1.29671.1.1.7.11
     name: MERAKI-CLOUD-CONTROLLER-MIB::upcomingFirewallInformationChanges
     category: config_change
     severity: notice
-    description: Upcoming firewall information changes for network {networkName} on {_HOSTNAME}.
+    description: Upcoming firewall information changes for {{value "networkName"}} on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
   - oid: 1.3.6.1.4.1.29671.1.1.7.12
     name: MERAKI-CLOUD-CONTROLLER-MIB::gatewayToRepeater
     category: state_change
     severity: notice
-    description: Gateway changed to repeater mode for device {devMac} on {_HOSTNAME}.
+    description: Gateway became a repeater on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
       - devMac
   - oid: 1.3.6.1.4.1.29671.1.1.7.13
     name: MERAKI-CLOUD-CONTROLLER-MIB::ipConflict
     category: security
     severity: warning
-    description: IP conflict detected for {devLanIp} on {_HOSTNAME}.
+    description: IP conflict detected for {{value "devLanIp"}} on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
       - devLanIp
       - devMac
   - oid: 1.3.6.1.4.1.29671.1.1.7.14
     name: MERAKI-CLOUD-CONTROLLER-MIB::newSplashSignup
     category: mobility
-    severity: notice
-    description: New splash user {userName} registered on SSID {ssidName} on {_HOSTNAME}.
+    severity: info
+    description: New splash user {{value "userName"}} registered on {{value "ssidName"}} on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
       - ssidName
       - userName
       - userEmail
@@ -283,11 +235,11 @@ traps:
     name: MERAKI-CLOUD-CONTROLLER-MIB::portCableError
     category: diagnostic
     severity: warning
-    description: Cable error detected on interface {devInterfacePortDescription} for device {devMac} on {_HOSTNAME}.
+    description: Cable error detected on {{first (value "devInterfacePortDescription") (value "devInterfaceDescription") "port"}} on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
       - devMac
       - devInterfaceDescription
       - devInterfacePortDescription
@@ -295,33 +247,33 @@ traps:
     name: MERAKI-CLOUD-CONTROLLER-MIB::portConnected
     category: state_change
     severity: notice
-    description: Port connected for device {devMac} on interface {devInterfaceDescription} on {_HOSTNAME}.
+    description: Switch port connected on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
       - devMac
       - devInterfaceDescription
   - oid: 1.3.6.1.4.1.29671.1.1.7.17
     name: MERAKI-CLOUD-CONTROLLER-MIB::portDisconnected
     category: state_change
     severity: warning
-    description: Port {devInterfaceDescription} disconnected on device {devMac} in {networkName} on {_HOSTNAME}.
+    description: Switch port disconnected on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
       - devMac
       - devInterfaceDescription
   - oid: 1.3.6.1.4.1.29671.1.1.7.18
     name: MERAKI-CLOUD-CONTROLLER-MIB::portSpeedChange
     category: state_change
     severity: notice
-    description: Port speed changed on {devInterfaceDescription} on {_HOSTNAME}.
+    description: Port link speed changed on {{first (value "devInterfaceDescription") (value "devInterfacePortDescription") "interface"}} on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
       - devMac
       - devInterfaceDescription
       - devInterfacePortDescription
@@ -329,11 +281,11 @@ traps:
     name: MERAKI-CLOUD-CONTROLLER-MIB::rogueDhcpServer
     category: security
     severity: alert
-    description: Rogue DHCP server detected at {devLanIp} on VLAN {vlanNumber} on {_HOSTNAME}.
+    description: Rogue DHCP server detected at {{value "devLanIp"}} on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
       - devMac
       - devSubnet
       - devLanIp
@@ -342,156 +294,42 @@ traps:
     name: MERAKI-CLOUD-CONTROLLER-MIB::settingsChanged
     category: config_change
     severity: notice
-    description: Meraki Dashboard settings changed by {networkAdmin} on {_HOSTNAME}.
+    description: Meraki Dashboard settings changed by {{value "networkAdmin"}} on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
       - networkAdmin
-      - changeDescription
   - oid: 1.3.6.1.4.1.29671.1.1.7.21
     name: MERAKI-CLOUD-CONTROLLER-MIB::unreachableRadiusServer
-    category: diagnostic
+    category: auth
     severity: warning
-    description: RADIUS server {radiusServerIp} unreachable for SSID {ssidName} on {_HOSTNAME}.
+    description: RADIUS authentication server {{value "radiusServerIp"}} is unreachable on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
       - radiusServerIp
       - ssidName
       - devLanIp
   - oid: 1.3.6.1.4.1.29671.1.1.7.22
     name: MERAKI-CLOUD-CONTROLLER-MIB::vpnConnectivityChange
     category: state_change
-    severity: warning
-    description: VPN connectivity status changed to {devStatus} for peer {vpnPeer} on {_HOSTNAME}.
+    severity: notice
+    description: VPN connectivity changed to {{value "devStatus"}} for {{value "devMac"}} on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
+      - organizationName
       - devMac
       - vpnPeer
       - devStatus
-      - tunnelDescription
   - oid: 1.3.6.1.4.1.29671.1.1.7.23
-    name: MERAKI-CLOUD-CONTROLLER-MIB::warmSpareFailoverDetected
+    name: MERAKI-CLOUD-CONTROLLER-MIB::vpnFailoverDetected
     category: state_change
-    severity: notice
-    description: Warm spare failover detected for device {devMac} with status {devStatus} on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - organizationName
-      - networkName
-      - devMac
-      - devStatus
-  - oid: 1.3.6.1.4.1.29671.1.1.7.24
-    name: MERAKI-CLOUD-CONTROLLER-MIB::loginAttempt
-    category: auth
-    severity: notice
-    description: Login attempt for {loginEmail} with result {loginResult} on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - organizationName
-      - networkName
-      - loginEmail
-      - loginResult
-      - loginDescription
-  - oid: 1.3.6.1.4.1.29671.1.1.7.25
-    name: MERAKI-CLOUD-CONTROLLER-MIB::malwareDetected
-    category: security
     severity: alert
-    description: Malware detected on network {networkName} on {_HOSTNAME}.
+    description: VPN failover detected for {{value "networkName"}} on {{hostname}}.
     status: current
     varbinds:
-      - organizationName
       - networkName
-  - oid: 1.3.6.1.4.1.29671.1.1.7.26
-    name: MERAKI-CLOUD-CONTROLLER-MIB::malwareBlocked
-    category: security
-    severity: warning
-    description: Malware download attempt blocked on network {networkName} on {_HOSTNAME}.
-    status: current
-    varbinds:
       - organizationName
-      - networkName
-  - oid: 1.3.6.1.4.1.29671.1.1.7.27
-    name: MERAKI-CLOUD-CONTROLLER-MIB::powerSupplyUp
-    category: diagnostic
-    severity: notice
-    description: External power supply {powerSupplyNum} gained connectivity on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - organizationName
-      - networkName
-      - devMac
-      - powerSupplyNum
-  - oid: 1.3.6.1.4.1.29671.1.1.7.28
-    name: MERAKI-CLOUD-CONTROLLER-MIB::powerSupplyDown
-    category: diagnostic
-    severity: crit
-    description: External power supply {powerSupplyNum} lost connectivity on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - organizationName
-      - networkName
-      - devMac
-      - powerSupplyNum
-  - oid: 1.3.6.1.4.1.29671.1.1.7.29
-    name: MERAKI-CLOUD-CONTROLLER-MIB::redundantPowerSupplyBackup
-    category: diagnostic
-    severity: notice
-    description: Redundant power supply {powerSupplyNum} is providing primary power on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - organizationName
-      - networkName
-      - devMac
-      - powerSupplyNum
-  - oid: 1.3.6.1.4.1.29671.1.1.7.30
-    name: MERAKI-CLOUD-CONTROLLER-MIB::redundantPowerSupplyBackToPrimary
-    category: diagnostic
-    severity: notice
-    description: Redundant power supply {powerSupplyNum} returned to primary on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - organizationName
-      - networkName
-      - devMac
-      - powerSupplyNum
-  - oid: 1.3.6.1.4.1.29671.1.1.7.31
-    name: MERAKI-CLOUD-CONTROLLER-MIB::udldError
-    category: diagnostic
-    severity: warning
-    description: UDLD error detected on port {portNumber} with action {actionTaken} on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - organizationName
-      - networkName
-      - devMac
-      - portNumber
-      - devInterfacePortDescription
-      - actionTaken
-  - oid: 1.3.6.1.4.1.29671.1.1.7.32
-    name: MERAKI-CLOUD-CONTROLLER-MIB::criticalTemperature
-    category: diagnostic
-    severity: alert
-    description: Critical temperature alert for device {devMac} on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - organizationName
-      - networkName
-      - devMac
-  - oid: 1.3.6.1.4.1.29671.1.1.7.33
-    name: MERAKI-CLOUD-CONTROLLER-MIB::usageAlert
-    category: diagnostic
-    severity: warning
-    description: Network usage {usage} exceeded threshold {threshold} on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - organizationName
-      - networkName
-      - period
-      - endOfHighUsageWindow
-      - threshold
-      - usage

@@ -27,16 +27,16 @@ traps:
   - oid: 1.3.6.1.4.1.27993.5.0.5001
     name: VEL-HOST2-MIB::host2DevConnectionTrap
     category: state_change
-    severity: warning
-    description: Network connection status changed to {host2DevLanState} on {_HOSTNAME}.
+    severity: notice
+    description: Device network connection status changed to {{value "host2DevLanState"}} on {{hostname}}.
     status: current
     varbinds:
       - host2DevLanState
   - oid: 1.3.6.1.4.1.27993.5.0.5002
     name: VEL-HOST2-MIB::host2DevEvtStateTrap
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Device state changed to {host2DevEvtState} on {_HOSTNAME}.
+    description: Device state changed to {{value "host2DevEvtState"}} on {{hostname}}.
     status: current
     varbinds:
       - host2DevEvtState
@@ -44,7 +44,7 @@ traps:
     name: VEL-HOST2-MIB::host2DevParStateTrap
     category: state_change
     severity: notice
-    description: Measured parameter state changed to {host2DevParState} on {_HOSTNAME}.
+    description: Measured parameter state changed to {{value "host2DevParState"}} on {{hostname}}.
     status: current
     varbinds:
       - host2DevParState

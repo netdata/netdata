@@ -124,9 +124,9 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.31023.1.1.1.0.1
     name: VEEAM-MIB::onBackupJobCompleted
-    category: state_change
+    category: diagnostic
     severity: info
-    description: Backup job {backupJobName} completed with result {backupJobResult} on {_HOSTNAME}.
+    description: Backup job {{value "backupJobName"}} completed on {{hostname}}.
     status: current
     varbinds:
       - backupJobId
@@ -136,8 +136,8 @@ traps:
   - oid: 1.3.6.1.4.1.31023.1.1.1.0.2
     name: VEEAM-MIB::onVmBackupCompleted
     category: state_change
-    severity: notice
-    description: VM backup completed for {vmName} with result {vmBackupResult} on {_HOSTNAME}.
+    severity: info
+    description: VM backup completed for {{value "vmName"}} on {{hostname}}.
     status: current
     varbinds:
       - backupJobName
@@ -149,7 +149,7 @@ traps:
     name: VEEAM-MIB::onLinuxFLRMountStarted
     category: state_change
     severity: notice
-    description: Multi-OS FLR helper appliance started for VM {vmName} on {_HOSTNAME}.
+    description: Multi-OS FLR helper appliance started on {{hostname}}.
     status: current
     varbinds:
       - sessionId
@@ -162,7 +162,7 @@ traps:
     name: VEEAM-MIB::onLinuxFLRCopyToStarted
     category: config_change
     severity: notice
-    description: FLR copy to operation initiated for VM {vmName} by {initiatorName} on {_HOSTNAME}.
+    description: FLR copy-to recovery initiated for {{value "vmName"}} on {{hostname}}.
     status: current
     varbinds:
       - sessionId
@@ -175,9 +175,9 @@ traps:
       - targetDir
   - oid: 1.3.6.1.4.1.31023.1.1.1.0.5
     name: VEEAM-MIB::onLinuxFLRToOriginalStarted
-    category: config_change
+    category: state_change
     severity: notice
-    description: Multi-OS FLR restore initiated for VM {vmName} by {initiatorName} on {_HOSTNAME}.
+    description: Multi-OS FLR restore initiated for {{value "vmName"}} on {{hostname}}.
     status: current
     varbinds:
       - sessionId
@@ -188,9 +188,9 @@ traps:
       - vmRestorePointCreationTime
   - oid: 1.3.6.1.4.1.31023.1.1.1.0.6
     name: VEEAM-MIB::onLinuxFLRCopyToFinished
-    category: config_change
+    category: diagnostic
     severity: info
-    description: FLR copy to operation completed for VM {vmName} on {_HOSTNAME}.
+    description: Multi-OS FLR copy to operation completed on {{hostname}}.
     status: current
     varbinds:
       - sessionId
@@ -210,7 +210,7 @@ traps:
     name: VEEAM-MIB::onLinuxFLRToOriginalFinished
     category: state_change
     severity: notice
-    description: Multi-OS FLR file recovery completed with status {transferStatus} for VM {vmName} on {_HOSTNAME}.
+    description: Multi-OS FLR file recovery completed{{with value "vmName"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sessionId
@@ -228,7 +228,7 @@ traps:
     name: VEEAM-MIB::onWinFLRMountStarted
     category: state_change
     severity: notice
-    description: Windows FLR mount started for VM {vmName} on {_HOSTNAME}.
+    description: Windows FLR mount started for {{value "vmName"}} on {{hostname}}.
     status: current
     varbinds:
       - initiatorName
@@ -239,9 +239,9 @@ traps:
       - mountServerName
   - oid: 1.3.6.1.4.1.31023.1.1.1.0.9
     name: VEEAM-MIB::onWinFLRToOriginalStarted
-    category: config_change
+    category: state_change
     severity: notice
-    description: Windows FLR restore operation completed for {vmName} on {_HOSTNAME}.
+    description: Windows FLR restore completed for {{value "vmName"}} on {{hostname}}.
     status: current
     varbinds:
       - initiatorName
@@ -251,9 +251,9 @@ traps:
       - vmRestorePointCreationTime
   - oid: 1.3.6.1.4.1.31023.1.1.1.0.10
     name: VEEAM-MIB::onWinFLRCopyToStarted
-    category: config_change
-    severity: notice
-    description: Windows FLR Copy To operation initiated for VM {vmName} on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Windows FLR copy-to recovery initiated for {{value "vmName"}} on {{hostname}}.
     status: current
     varbinds:
       - initiatorName
@@ -264,9 +264,9 @@ traps:
       - targetDir
   - oid: 1.3.6.1.4.1.31023.1.1.1.0.11
     name: VEEAM-MIB::onWinFLRToOriginalFinished
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Windows FLR file recovery completed with status {transferStatus} for VM {vmName} on {_HOSTNAME}.
+    description: Windows FLR file recovery completed on {{hostname}}.
     status: current
     varbinds:
       - initiatorName
@@ -280,9 +280,9 @@ traps:
       - csvReportFilePath
   - oid: 1.3.6.1.4.1.31023.1.1.1.0.12
     name: VEEAM-MIB::onWinFLRCopyToFinished
-    category: config_change
-    severity: notice
-    description: Windows FLR copy to operation completed for VM {vmName} on {_HOSTNAME}.
+    category: state_change
+    severity: info
+    description: Windows FLR copy to operation completed for {{value "vmName"}} on {{hostname}}.
     status: current
     varbinds:
       - initiatorName
@@ -298,8 +298,8 @@ traps:
   - oid: 1.3.6.1.4.1.31023.1.1.1.0.13
     name: VEEAM-MIB::onWebDownloadStart
     category: diagnostic
-    severity: notice
-    description: 1-Click FLR file download initiated by {initiatorName} for VM {vmName} on {_HOSTNAME}.
+    severity: info
+    description: 1-Click FLR file download initiated for {{value "vmName"}} on {{hostname}}.
     status: current
     varbinds:
       - initiatorName
@@ -309,9 +309,9 @@ traps:
       - vmRestorePointCreationTime
   - oid: 1.3.6.1.4.1.31023.1.1.1.0.14
     name: VEEAM-MIB::onWebDownloadFinished
-    category: config_change
-    severity: notice
-    description: 1-Click FLR file download completed for VM {vmName} with status {transferStatus} on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: 1-Click FLR file download completed for {{value "vmName"}} on {{hostname}}.
     status: current
     varbinds:
       - initiatorName
@@ -324,9 +324,9 @@ traps:
       - notTransferFileList
   - oid: 1.3.6.1.4.1.31023.1.1.1.0.15
     name: VEEAM-MIB::onSobrOffloadFinished
-    category: config_change
-    severity: notice
-    description: Scale-out repository offload job finished for {repositoryName} on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Scale-out repository offload job finished for {{value "repositoryName"}} on {{hostname}}.
     status: current
     varbinds:
       - repositoryId
@@ -336,7 +336,7 @@ traps:
     name: VEEAM-MIB::onCdpRpoReport
     category: state_change
     severity: warning
-    description: CDP RPO status {cdpRpoStatus} changed for {vmName} on {_HOSTNAME}.
+    description: CDP RPO status changed to {{value "cdpRpoStatus"}} for {{value "vmName"}} on {{hostname}}.
     status: current
     varbinds:
       - cdpPolicyName

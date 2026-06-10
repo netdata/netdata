@@ -79,7 +79,7 @@ traps:
     name: TELDAT-MIB::telSistemaEventos
     category: diagnostic
     severity: notice
-    description: System event {sreTrapSubSist}.{sreTrapEvento} occurred with parameters on {_HOSTNAME}.
+    description: System event {{value "sreTrapEvento"}} occurred in subsystem {{value "sreTrapSubSist"}} on {{hostname}}.
     status: current
     varbinds:
       - sreTrapSubSist
@@ -97,7 +97,7 @@ traps:
     name: TELDAT-MIB::telTECircuitTrapUp
     category: state_change
     severity: notice
-    description: TE-Circuit {telTrapVarCircuitID} is UP on {_HOSTNAME}.
+    description: TE circuit {{value "telTrapVarCircuitID"}} went up on {{hostname}}.
     status: current
     varbinds:
       - telTrapVarIPAddr
@@ -115,7 +115,7 @@ traps:
     name: TELDAT-MIB::telTECircuitTrapBackup
     category: state_change
     severity: notice
-    description: TE-Circuit {telTrapVarCircuitID} switched to backup state on {_HOSTNAME}.
+    description: TE circuit {{value "telTrapVarCircuitID"}} switched to backup on {{hostname}}.
     status: current
     varbinds:
       - telTrapVarIPAddr
@@ -132,8 +132,8 @@ traps:
   - oid: 1.3.6.1.4.1.2007.1.3.0.3
     name: TELDAT-MIB::telTECircuitTrapDown
     category: state_change
-    severity: crit
-    description: TE Circuit {telTrapVarCircuitID} is DOWN on {_HOSTNAME}.
+    severity: warning
+    description: TE circuit {{value "telTrapVarCircuitID"}} went down on {{hostname}}.
     status: current
     varbinds:
       - telTrapVarIPAddr

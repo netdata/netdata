@@ -63,8 +63,8 @@ traps:
   - oid: 1.3.6.1.4.1.21695.1.10.8.1
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmCurrentCritLow
     category: diagnostic
-    severity: warning
-    description: Current {e3IpmIrms} on meter {e3IpmMeter} dropped below critical low threshold on {_HOSTNAME}.
+    severity: crit
+    description: Critical low current threshold reached on meter {{value "e3IpmMeter"}} on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -74,7 +74,7 @@ traps:
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmCurrentWarnLow
     category: diagnostic
     severity: warning
-    description: Current {e3IpmIrms} on meter {e3IpmMeter} fell below warn low threshold on {_HOSTNAME}.
+    description: Low current threshold reached on meter {{value "e3IpmMeter"}} on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -84,7 +84,7 @@ traps:
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmCurrentNormal
     category: diagnostic
     severity: notice
-    description: Current {e3IpmIrms} on meter {e3IpmMeter} is within normal limits on {_HOSTNAME}.
+    description: Power meter {{value "e3IpmMeter"}} current returned to normal on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -94,7 +94,7 @@ traps:
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmCurrentWarnHigh
     category: diagnostic
     severity: warning
-    description: Current {e3IpmIrms} on meter {e3IpmMeter} exceeded warn high threshold on {_HOSTNAME}.
+    description: Current threshold warning on meter {{value "e3IpmMeter"}} with {{value "e3IpmIrms"}} on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -103,8 +103,8 @@ traps:
   - oid: 1.3.6.1.4.1.21695.1.10.8.5
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmCurrentCritHigh
     category: diagnostic
-    severity: warning
-    description: Critical high current threshold exceeded on meter {e3IpmMeter} with current {e3IpmIrms} on {_HOSTNAME}.
+    severity: crit
+    description: Critical high current threshold exceeded on meter {{value "e3IpmMeter"}} on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -113,8 +113,8 @@ traps:
   - oid: 1.3.6.1.4.1.21695.1.10.8.6
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmTempCritLow
     category: diagnostic
-    severity: warning
-    description: Sensor {e3IpmSensor} temperature {e3IpmSensorTemperatureCelsius} below critical low threshold on {_HOSTNAME}.
+    severity: crit
+    description: Critical low temperature {{value "e3IpmSensorTemperatureCelsius"}} detected on sensor {{value "e3IpmSensor"}} on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -124,7 +124,7 @@ traps:
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmTempWarnLow
     category: diagnostic
     severity: warning
-    description: Sensor {e3IpmSensor} temperature {e3IpmSensorTemperatureCelsius} below warn low threshold on {_HOSTNAME}.
+    description: Sensor {{value "e3IpmSensor"}} temperature {{value "e3IpmSensorTemperatureCelsius"}}C is below warn low threshold on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -134,7 +134,7 @@ traps:
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmTempNormal
     category: diagnostic
     severity: notice
-    description: Sensor {e3IpmSensor} temperature {e3IpmSensorTemperatureCelsius} returned to normal limits on {_HOSTNAME}.
+    description: Sensor {{value "e3IpmSensor"}} temperature returned to normal on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -144,7 +144,7 @@ traps:
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmTempWarnHigh
     category: diagnostic
     severity: warning
-    description: Sensor {e3IpmSensor} temperature {e3IpmSensorTemperatureCelsius} exceeded warn high threshold on {_HOSTNAME}.
+    description: Temperature warning on sensor {{value "e3IpmSensor"}} reached {{value "e3IpmSensorTemperatureCelsius"}} degrees Celsius on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -153,8 +153,8 @@ traps:
   - oid: 1.3.6.1.4.1.21695.1.10.8.10
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmTempCritHigh
     category: diagnostic
-    severity: alert
-    description: Sensor {e3IpmSensor} temperature {e3IpmSensorTemperatureCelsius} exceeded critical high threshold on {_HOSTNAME}.
+    severity: crit
+    description: Critical high temperature {{value "e3IpmSensorTemperatureCelsius"}} on sensor {{value "e3IpmSensor"}} on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -164,7 +164,7 @@ traps:
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmRHCritLow
     category: diagnostic
     severity: crit
-    description: Relative humidity {e3IpmSensorHumidity} on sensor {e3IpmSensor} dropped below critical low threshold on {_HOSTNAME}.
+    description: Critical low relative humidity detected on sensor {{value "e3IpmSensor"}} on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -174,7 +174,7 @@ traps:
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmRHWarnLow
     category: diagnostic
     severity: warning
-    description: Low relative humidity {e3IpmSensorHumidity} detected on sensor {e3IpmSensor} on {_HOSTNAME}.
+    description: Low relative humidity warning on sensor {{value "e3IpmSensor"}} on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -184,7 +184,7 @@ traps:
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmRHNormal
     category: diagnostic
     severity: notice
-    description: Relative humidity {e3IpmSensorHumidity} on sensor {e3IpmSensor} is within limits on {_HOSTNAME}.
+    description: Sensor {{value "e3IpmSensor"}} humidity returned to normal on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -194,7 +194,7 @@ traps:
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmRHWarnHigh
     category: diagnostic
     severity: warning
-    description: Relative humidity {e3IpmSensorHumidity} on sensor {e3IpmSensor} exceeded warn high threshold on {_HOSTNAME}.
+    description: High relative humidity warning on sensor {{value "e3IpmSensor"}} on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -204,7 +204,7 @@ traps:
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmRHCritHigh
     category: diagnostic
     severity: crit
-    description: Relative humidity {e3IpmSensorHumidity} on sensor {e3IpmSensor} exceeded critical high threshold on {_HOSTNAME}.
+    description: Critical high relative humidity threshold exceeded on sensor {{value "e3IpmSensor"}} on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -213,8 +213,8 @@ traps:
   - oid: 1.3.6.1.4.1.21695.1.10.8.16
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmRcmAcNormal
     category: diagnostic
-    severity: warning
-    description: AC residual current {e3IpmRcmAc} on channel {e3IpmRcmChannel} fell below limit on {_HOSTNAME}.
+    severity: notice
+    description: AC residual current returned to normal on channel {{value "e3IpmRcmChannel"}} on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -224,7 +224,7 @@ traps:
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmRcmAcCritHigh
     category: diagnostic
     severity: crit
-    description: AC residual current {e3IpmRcmAc} exceeded critical limit on channel {e3IpmRcmChannel} on {_HOSTNAME}.
+    description: Critical AC residual current limit exceeded on channel {{value "e3IpmRcmChannel"}} on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -234,7 +234,7 @@ traps:
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmRcmDcNormal
     category: diagnostic
     severity: warning
-    description: DC residual current {e3IpmRcmDc} on channel {e3IpmRcmChannel} fell below limit on {_HOSTNAME}.
+    description: DC residual current dropped below limit on channel {{value "e3IpmRcmChannel"}} on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -244,7 +244,7 @@ traps:
     name: NETTRACK-E3METER-SNMP-MIB::e3IpmRcmDcCritHigh
     category: diagnostic
     severity: crit
-    description: DC residual current {e3IpmRcmDc} exceeded critical limit on channel {e3IpmRcmChannel} on {_HOSTNAME}.
+    description: DC residual current exceeded critical limit on channel {{value "e3IpmRcmChannel"}} on {{hostname}}.
     status: current
     varbinds:
       - e3IpmInfoSerial
@@ -254,7 +254,7 @@ traps:
     name: NETTRACK-E3METER-CTR-SNMP-MIB::e3ConcentratorEventLog
     category: diagnostic
     severity: warning
-    description: Event {e3CtrEventDescription} from {e3CtrEventSource} with severity {e3CtrEventSeverityLevel} on {_HOSTNAME}.
+    description: 'Event detected by Data Concentrator: {{value "e3CtrEventDescription"}} on {{hostname}}.'
     status: current
     varbinds:
       - e3CtrEventTime

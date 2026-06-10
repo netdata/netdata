@@ -94,7 +94,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxVpnLinkUp
     category: state_change
     severity: notice
-    description: VPN Link {cgxVpnLinkId} came up on {_HOSTNAME}.
+    description: VPN link {{value "cgxVpnLinkId"}} came up on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -118,7 +118,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxVpnLinkDown
     category: state_change
     severity: warning
-    description: VPN Link {cgxVpnLinkId} went down on {_HOSTNAME}.
+    description: VPN link {{value "cgxVpnLinkId"}} went down on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -142,7 +142,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxVpnPeerUnreachableClear
     category: state_change
     severity: notice
-    description: Routing peer unreachability cleared for VPN link {cgxVpnLinkId} on {_HOSTNAME}.
+    description: Routing peer unreachability cleared for {{value "cgxElementRemoteName"}} on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -166,7 +166,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxVpnPeerUnreachable
     category: state_change
     severity: warning
-    description: Routing peer {cgxElementRemoteName} became unreachable on {_HOSTNAME}.
+    description: Routing peer became unreachable on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -190,7 +190,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxVpnBfdUp
     category: state_change
     severity: notice
-    description: BFD peer came up on {_HOSTNAME}.
+    description: BFD peer came up on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -214,7 +214,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxVpnBfdDown
     category: state_change
     severity: warning
-    description: BFD peer has gone down on {_HOSTNAME}.
+    description: BFD peer session went down{{with value "cgxElementRemoteName"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -238,7 +238,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxRoutePeerUp
     category: state_change
     severity: notice
-    description: Routing peer {cgxRoutePeerIp} of type {cgxRoutePeerType} came up on {_HOSTNAME}.
+    description: Routing peer {{value "cgxRoutePeerIp"}} came up on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -252,7 +252,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxRoutePeerDown
     category: state_change
     severity: warning
-    description: Routing peer {cgxRoutePeerIp} ({cgxRoutePeerType}) went down on {_HOSTNAME}.
+    description: Routing peer {{value "cgxRoutePeerIp"}} went down on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -266,7 +266,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxPrivateWanUnreachableClear
     category: state_change
     severity: notice
-    description: Private WAN unreachability cleared for {cgxElementName} on {_HOSTNAME}.
+    description: Private WAN unreachability cleared for {{value "cgxWanNetworkName"}} on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -282,7 +282,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxPrivateWanUnreachable
     category: state_change
     severity: crit
-    description: Private WAN {cgxWanNetworkName} has become unreachable on {_HOSTNAME}.
+    description: Private WAN {{value "cgxWanNetworkName"}} is unreachable on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -298,7 +298,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxPrivateWanDegradedClear
     category: state_change
     severity: notice
-    description: Private WAN degradation cleared for {cgxElementName} on {_HOSTNAME}.
+    description: Private WAN degradation cleared on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -314,7 +314,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxPrivateWanDegraded
     category: diagnostic
     severity: warning
-    description: Private WAN {cgxWanNetworkName} has degraded on {_HOSTNAME}.
+    description: Private WAN {{value "cgxWanNetworkName"}} degraded on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -330,7 +330,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxPublicWanUp
     category: state_change
     severity: notice
-    description: Public WAN link {cgxSiteWanInterfaceName} came up on {_HOSTNAME}.
+    description: Public WAN link came up on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -346,7 +346,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxPublicWanDown
     category: state_change
     severity: crit
-    description: Public WAN link down on {cgxSiteWanInterfaceName} at {cgxSiteName} on {_HOSTNAME}.
+    description: Public WAN link is down on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -362,7 +362,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxPrivateWanUp
     category: state_change
     severity: notice
-    description: Private WAN link {cgxSiteWanInterfaceName} came up on {_HOSTNAME}.
+    description: Private WAN link came up on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -378,7 +378,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxPrivateWanDown
     category: state_change
     severity: warning
-    description: Private WAN link down on {cgxElementName} site {cgxSiteName} on {_HOSTNAME}.
+    description: Private WAN link went down on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -394,7 +394,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxProcessStopClear
     category: state_change
     severity: notice
-    description: Process {cgxProcessName} resumed on {_HOSTNAME}.
+    description: Process {{value "cgxProcessName"}} resumed on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -405,8 +405,8 @@ traps:
   - oid: 1.3.6.1.4.1.50114.10.1.0.302
     name: CGX-EVENTS-MIB::cgxProcessStop
     category: diagnostic
-    severity: err
-    description: Process {cgxProcessName} has stopped on {_HOSTNAME}.
+    severity: crit
+    description: Process {{value "cgxProcessName"}} stopped on {{value "cgxElementName"}} on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId
@@ -418,7 +418,7 @@ traps:
     name: CGX-EVENTS-MIB::cgxProcessRestart
     category: diagnostic
     severity: notice
-    description: Process {cgxProcessName} restarted on {_HOSTNAME}.
+    description: Process {{value "cgxProcessName"}} restarted on {{hostname}}.
     status: current
     varbinds:
       - cgxElementId

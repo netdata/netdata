@@ -75,7 +75,7 @@ traps:
     name: CUBO-MINI-MIB::cubominiNotification
     category: diagnostic
     severity: warning
-    description: Card {cubominiCardId} notification {cubominiShortDescription} on {_HOSTNAME}.
+    description: Card notification {{value "cubominiShortDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - cubominiCardId

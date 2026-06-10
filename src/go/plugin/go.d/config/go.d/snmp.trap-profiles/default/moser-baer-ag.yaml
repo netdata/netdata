@@ -30,7 +30,7 @@ traps:
     name: MOBANetClocksV2-MIB::mbnscTrapsAlarm
     category: diagnostic
     severity: warning
-    description: Alarm triggered with error number {mbnscTrapAlMsgErrorNr} and state {mbnscTrapAlMsgErrorState} on {_HOSTNAME}.
+    description: Alarm event {{value "mbnscTrapAlMsgErrorNr"}} with state {{value "mbnscTrapAlMsgErrorState"}} on {{hostname}}.
     status: current
     varbinds:
       - mbnscTrapAlMsgErrorNr
@@ -40,7 +40,7 @@ traps:
     name: MOBANetClocksV2-MIB::mbnscTrapsAlive
     category: diagnostic
     severity: notice
-    description: Device alive status {mbnscGeneralStatus} with alarms {mbnscGeneralAlarms} on {_HOSTNAME}.
+    description: Device alive trap received{{with value "mbnscGeneralAlarms"}} with alarms {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - mbnscGeneralStatus

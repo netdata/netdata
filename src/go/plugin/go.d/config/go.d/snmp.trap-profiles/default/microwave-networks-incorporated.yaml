@@ -36,8 +36,8 @@ traps:
   - oid: 1.3.6.1.4.1.3323.11.1.1.0.1
     name: MNI-PROTEUS-AMT-MIB::mnPrNotificationMajorAlarmSet
     category: diagnostic
-    severity: alert
-    description: Major alarm {mnPrNotifyText} set for {mnPrNotifyRadioName} on {_HOSTNAME}.
+    severity: crit
+    description: Major alarm {{value "mnPrNotifyText"}} on {{first (value "mnPrNotifyRadioName") "radio"}} on {{hostname}}.
     status: current
     varbinds:
       - mnPrNotifyID
@@ -49,9 +49,9 @@ traps:
       - mnPrNotifyTimeStamp
   - oid: 1.3.6.1.4.1.3323.11.1.1.0.2
     name: MNI-PROTEUS-AMT-MIB::mnPrNotificationAlarmClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Alarm {mnPrNotifyText} cleared on radio {mnPrNotifyRadioName} on {_HOSTNAME}.
+    description: 'Alarm {{value "mnPrNotifyID"}} cleared{{with value "mnPrNotifyText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mnPrNotifyID
@@ -65,7 +65,7 @@ traps:
     name: MNI-PROTEUS-AMT-MIB::mnPrNotificationMinorAlarmSet
     category: diagnostic
     severity: warning
-    description: Minor alarm {mnPrNotifyText} set on radio {mnPrNotifyRadioName} on {_HOSTNAME}.
+    description: Minor alarm {{value "mnPrNotifyText"}} on {{first (value "mnPrNotifyRadioName") "radio"}} on {{hostname}}.
     status: current
     varbinds:
       - mnPrNotifyID
@@ -79,7 +79,7 @@ traps:
     name: MNI-PROTEUS-AMT-MIB::mnPrNotificationInfoAlarmSet
     category: diagnostic
     severity: warning
-    description: Alarm {mnPrNotifyText} with severity {mnPrNotifySeverity} set on radio {mnPrNotifyRadioName} on {_HOSTNAME}.
+    description: Alarm {{value "mnPrNotifyText"}} set on {{first (value "mnPrNotifyRadioName") "radio"}} on {{hostname}}.
     status: current
     varbinds:
       - mnPrNotifyID
@@ -93,7 +93,7 @@ traps:
     name: MNI-PROTEUS-AMT-MIB::mnPrFNotificationMajorAlarmSet
     category: diagnostic
     severity: crit
-    description: Major alarm {mnPrNotifyText} set on radio {mnPrNotifyRadioName} on {_HOSTNAME}.
+    description: Major alarm {{value "mnPrNotifyText"}} on {{first (value "mnPrNotifyRadioName") (value "mnPrNotifyRadioIndex")}} on {{hostname}}.
     status: current
     varbinds:
       - mnPrNotifyID
@@ -105,9 +105,9 @@ traps:
       - mnPrNotifyTimeStamp
   - oid: 1.3.6.1.4.1.3323.13.1.0.2
     name: MNI-PROTEUS-AMT-MIB::mnPrFNotificationAlarmClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Alarm {mnPrNotifyText} cleared for radio {mnPrNotifyRadioName} on {_HOSTNAME}.
+    description: 'Alarm {{value "mnPrNotifyID"}} cleared{{with value "mnPrNotifyText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mnPrNotifyID
@@ -121,7 +121,7 @@ traps:
     name: MNI-PROTEUS-AMT-MIB::mnPrFNotificationMinorAlarmSet
     category: diagnostic
     severity: warning
-    description: Minor alarm {mnPrNotifyText} set on radio {mnPrNotifyRadioName} on {_HOSTNAME}.
+    description: Minor alarm {{value "mnPrNotifyText"}} on {{first (value "mnPrNotifyRadioName") "radio"}} on {{hostname}}.
     status: current
     varbinds:
       - mnPrNotifyID
@@ -135,7 +135,7 @@ traps:
     name: MNI-PROTEUS-AMT-MIB::mnPrFNotificationInfoAlarmSet
     category: diagnostic
     severity: warning
-    description: Alarm {mnPrNotifyText} with severity {mnPrNotifySeverity} set on radio {mnPrNotifyRadioName} on {_HOSTNAME}.
+    description: 'Alarm set: {{value "mnPrNotifyText"}} on {{hostname}}.'
     status: current
     varbinds:
       - mnPrNotifyID

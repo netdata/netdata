@@ -135,8 +135,8 @@ traps:
   - oid: 1.3.6.1.4.1.6066.2.1.1.3.4.1
     name: OCCAM-MLT-MIB::mltTestCompletedNotification
     category: diagnostic
-    severity: notice
-    description: MLT test {mltTestIdentifier} on port {mltTestPort} completed with status {mltLastTestStatus} on {_HOSTNAME}.
+    severity: info
+    description: MLT test {{value "mltTestIdentifier"}} on port {{value "mltTestPort"}} completed on {{hostname}}.
     status: current
     varbinds:
       - mltTestIdentifier
@@ -147,7 +147,7 @@ traps:
     name: OCCAM-SENSOR-MIB::sensorThresholdNotification
     category: diagnostic
     severity: warning
-    description: Sensor {sensorName} of type {sensorType} crossed threshold {sensorThresholdValue} with severity {sensorThresholdSeverity} on {_HOSTNAME}.
+    description: Sensor {{value "sensorName"}} crossed threshold {{value "sensorThresholdValue"}} on {{hostname}}.
     status: current
     varbinds:
       - sensorName
@@ -159,15 +159,15 @@ traps:
     name: OCCAM-SENSOR-MIB::occamExtAlarmRaised
     category: diagnostic
     severity: warning
-    description: 'External alarm detected: {occamExtAlarmDescription} on {_HOSTNAME}.'
+    description: 'External alarm detected: {{value "occamExtAlarmDescription"}} on {{hostname}}.'
     status: current
     varbinds:
       - occamExtAlarmDescription
   - oid: 1.3.6.1.4.1.6066.2.1.3.2.2.0.3
     name: OCCAM-SENSOR-MIB::occamExtAlarmCleared
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: 'External alarm cleared: {occamExtAlarmDescription} on {_HOSTNAME}.'
+    description: 'External alarm cleared{{with value "occamExtAlarmDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - occamExtAlarmDescription
@@ -175,7 +175,7 @@ traps:
     name: OCCAM-SHELF-MIB::cardPresenceNotification
     category: state_change
     severity: warning
-    description: Card presence status changed to {shelfCardPresenceStatus} at shelf {cardShelfIndex} slot {cardSlotIndex} on {_HOSTNAME}.
+    description: Card presence status changed on slot {{value "cardSlotIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - cardIpAddress
@@ -186,7 +186,7 @@ traps:
     name: OCCAM-SHELF-MIB::cardOperationalNotification
     category: state_change
     severity: warning
-    description: Card operational status changed to {shelfCardOperationalStatus} on {_HOSTNAME}.
+    description: Card operational status changed to {{value "shelfCardOperationalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - cardIpAddress
@@ -196,8 +196,8 @@ traps:
   - oid: 1.3.6.1.4.1.6066.2.1.3.3.2.3
     name: OCCAM-SHELF-MIB::shelfControllerFailoverNotification
     category: state_change
-    severity: notice
-    description: Shelf controller failover occurred on {_HOSTNAME}.
+    severity: alert
+    description: Shelf controller failover occurred on {{hostname}}.
     status: current
     varbinds:
       - cardIpAddress
@@ -209,8 +209,8 @@ traps:
   - oid: 1.3.6.1.4.1.6066.2.1.3.3.2.4
     name: OCCAM-SHELF-MIB::shelfControllerForcedFailoverNotification
     category: state_change
-    severity: notice
-    description: Shelf controller failover occurred with role {shelfControllerRole} on {_HOSTNAME}.
+    severity: alert
+    description: Shelf controller forced failover occurred on {{hostname}}.
     status: current
     varbinds:
       - cardIpAddress
@@ -223,7 +223,7 @@ traps:
     name: OCCAM-SHELF-MIB::peerFoundNotification
     category: state_change
     severity: notice
-    description: Shelf controller peer found status changed to {shelfControllerPeerFoundStatus} on {_HOSTNAME}.
+    description: Shelf controller peer found status changed to {{value "shelfControllerPeerFoundStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - cardIpAddress
@@ -237,7 +237,7 @@ traps:
     name: OCCAM-SHELF-MIB::configChangedNotification
     category: config_change
     severity: notice
-    description: Running configuration changed by {blcConfigChangeString} on {_HOSTNAME}.
+    description: Running configuration copied to startup{{with value "blcConfigChangeString"}} in {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - cardIpAddress
@@ -247,8 +247,8 @@ traps:
   - oid: 1.3.6.1.4.1.6066.2.1.3.3.2.7
     name: OCCAM-SHELF-MIB::shelfRedundancyChangeNotification
     category: state_change
-    severity: notice
-    description: Shelf redundancy status changed to {shelfRedundancyStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Shelf redundancy status changed to {{value "shelfRedundancyStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - cardIpAddress

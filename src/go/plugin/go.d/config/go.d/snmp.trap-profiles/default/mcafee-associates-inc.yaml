@@ -43,7 +43,7 @@ traps:
     name: MCAFEE-MWG-MIB::trSystem
     category: diagnostic
     severity: warning
-    description: System event {notifyReasonString} with severity {notifySeverity} on {_HOSTNAME}.
+    description: System event {{value "notifyReasonString"}} on {{hostname}}.
     status: current
     varbinds:
       - notifyOrigin
@@ -57,7 +57,7 @@ traps:
     name: MCAFEE-MWG-MIB::trApplication
     category: diagnostic
     severity: warning
-    description: Application system event {notifyReasonString} from {notifyOriginName} on {_HOSTNAME}.
+    description: McAfee application event {{value "notifyReasonString"}} on {{hostname}}.
     status: current
     varbinds:
       - notifyOrigin
@@ -71,7 +71,7 @@ traps:
     name: MCAFEE-MWG-MIB::trUser
     category: security
     severity: notice
-    description: Security event {notifyReasonString} for host {notifyAffectedHost} on {_HOSTNAME}.
+    description: Security event {{value "notifyReasonString"}} for host {{value "notifyAffectedHost"}} on {{hostname}}.
     status: current
     varbinds:
       - notifyReason

@@ -75,9 +75,9 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.714.1.2.3.0.1
     name: WYSE-MIB::wbt3TrapDHCPBuildMismatch
-    category: diagnostic
+    category: config_change
     severity: warning
-    description: DHCP-supplied firmware build {wbt3DUpBuildNum} mismatches current terminal build {wbt3CurBuildNum} on {_HOSTNAME}.
+    description: Firmware build number mismatch detected on {{hostname}}.
     status: current
     varbinds:
       - wbt3CurBuildNum
@@ -90,7 +90,7 @@ traps:
     name: WYSE-MIB::wbt3TrapDHCPUpdDone
     category: config_change
     severity: notice
-    description: Firmware upgrade completed due to build number mismatch on {_HOSTNAME}.
+    description: Firmware upgrade completed due to build number mismatch on {{hostname}}.
     status: current
     varbinds:
       - wbt3CurBuildNum
@@ -102,8 +102,8 @@ traps:
   - oid: 1.3.6.1.4.1.714.1.2.3.0.3
     name: WYSE-MIB::wbt3TrapDHCPUpdNotComplete
     category: diagnostic
-    severity: err
-    description: Firmware upgrade initiated due to build number mismatch was not completed on {_HOSTNAME}.
+    severity: warning
+    description: Firmware upgrade initiated by DHCP build mismatch did not complete on {{hostname}}.
     status: current
     varbinds:
       - wbt3CurBuildNum
@@ -117,15 +117,15 @@ traps:
     name: WYSE-MIB::wbt3TrapSNMPAccptLd
     category: state_change
     severity: notice
-    description: Device ready to accept up/download request on {_HOSTNAME}.
+    description: Device is ready to accept up/download request on {{hostname}}.
     status: current
     varbinds:
       - wbt3SubmitLoadJob
   - oid: 1.3.6.1.4.1.714.1.2.3.0.5
     name: WYSE-MIB::wbt3TrapSNMPLdDone
-    category: config_change
-    severity: notice
-    description: SNMP up/download request {wbt3TrapReqId} completed on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: SNMP up/download request {{value "wbt3TrapReqId"}} completed on {{hostname}}.
     status: current
     varbinds:
       - wbt3TrapReqId
@@ -133,7 +133,7 @@ traps:
     name: WYSE-MIB::wbt3TrapSNMPLdNotComplete
     category: diagnostic
     severity: warning
-    description: SNMP load request {wbt3TrapReqId} failed with status {wbt3TrapStatus} on {_HOSTNAME}.
+    description: SNMP load request {{value "wbt3TrapReqId"}} not completed on {{hostname}}.
     status: current
     varbinds:
       - wbt3TrapReqId
@@ -142,7 +142,7 @@ traps:
     name: WYSE-MIB::wbt3TrapRebootNotComplete
     category: diagnostic
     severity: warning
-    description: Reboot request not completed with status {wbt3TrapStatus} on {_HOSTNAME}.
+    description: SNMP reboot request not completed{{with value "wbt3TrapStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - wbt3TrapStatus

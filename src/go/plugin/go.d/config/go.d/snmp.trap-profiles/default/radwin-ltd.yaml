@@ -9,659 +9,659 @@ traps:
     name: RADWIN-MIB-WINLINK1000::externalAlarmInPort1Alarm
     category: diagnostic
     severity: warning
-    description: External alarm triggered on port 1 on {_HOSTNAME}.
+    description: External alarm detected on port 1 on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.106
     name: RADWIN-MIB-WINLINK1000::externalAlarmInPort2Alarm
     category: diagnostic
     severity: warning
-    description: External alarm triggered on port 2 on {_HOSTNAME}.
+    description: External alarm input on port 2 triggered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.107
     name: RADWIN-MIB-WINLINK1000::bitFailedAlarm
     category: diagnostic
-    severity: alert
-    description: ODU power up built-in test failed with no recovery possible on {_HOSTNAME}.
+    severity: crit
+    description: ODU power up built-in test failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.108
     name: RADWIN-MIB-WINLINK1000::wrongConfigurationLoadedAlarm
     category: config_change
     severity: warning
-    description: Wrong configuration loaded on {_HOSTNAME}.
+    description: Wrong configuration loaded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.109
     name: RADWIN-MIB-WINLINK1000::lanPort1DisconnectedAlarm
     category: state_change
     severity: warning
-    description: LAN port 1 status changed to disconnected on {_HOSTNAME}.
+    description: LAN port 1 disconnected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.110
     name: RADWIN-MIB-WINLINK1000::lanPort2DisconnectedAlarm
     category: state_change
     severity: warning
-    description: LAN port 2 status changed to disconnected on {_HOSTNAME}.
+    description: LAN port 2 disconnected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.111
     name: RADWIN-MIB-WINLINK1000::mngPortDisconnectedAlarm
     category: state_change
     severity: warning
-    description: LAN1 port status changed to disconnected on {_HOSTNAME}.
+    description: LAN1 port disconnected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.112
     name: RADWIN-MIB-WINLINK1000::externalAlarmInPort3Alarm
     category: diagnostic
     severity: warning
-    description: External alarm triggered on port 3 on {_HOSTNAME}.
+    description: External alarm triggered on port 3 on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.113
     name: RADWIN-MIB-WINLINK1000::externalAlarmInPort4Alarm
     category: diagnostic
     severity: warning
-    description: External alarm triggered on port 4 on {_HOSTNAME}.
+    description: External alarm triggered on port 4 on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.114
     name: RADWIN-MIB-WINLINK1000::swVersionsMismatchFullCompatibilityAlarm
     category: state_change
     severity: warning
-    description: Software versions mismatch with full link functionality detected on {_HOSTNAME}.
+    description: Software versions mismatch with full link functionality on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.115
     name: RADWIN-MIB-WINLINK1000::swVersionsMismatchRestrictedCompatibilityAlarm
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Software versions mismatch restricted link functionality on {_HOSTNAME}.
+    description: Software versions mismatch with restricted link functionality on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.116
     name: RADWIN-MIB-WINLINK1000::swVersionsMismatchSoftwareUpgradeRequired
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Software versions mismatch detected, software upgrade required on {_HOSTNAME}.
+    description: Software versions mismatch detected and software upgrade is required on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.117
     name: RADWIN-MIB-WINLINK1000::swVersionsIncompatible
-    category: diagnostic
-    severity: warning
-    description: Software versions are incompatible on {_HOSTNAME}.
+    category: state_change
+    severity: crit
+    description: Software versions are incompatible on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.118
     name: RADWIN-MIB-WINLINK1000::hssMultipleSourcesDetectedAlarm
     category: diagnostic
     severity: warning
-    description: Multiple sync pulse sources detected on {_HOSTNAME}.
+    description: Multiple sync pulse sources detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.119
     name: RADWIN-MIB-WINLINK1000::hssSyncToProperSourceStoppedAlarm
     category: diagnostic
-    severity: warning
-    description: HSS synchronization to proper source stopped on {_HOSTNAME}.
+    severity: crit
+    description: HSS synchronization to proper source stopped on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.120
     name: RADWIN-MIB-WINLINK1000::hssSyncPulseDetectedAlarm
     category: diagnostic
     severity: warning
-    description: HSS additional sync pulse detected on {_HOSTNAME}.
+    description: HSS additional sync pulse was detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.121
     name: RADWIN-MIB-WINLINK1000::tdmBackupAlarm
     category: state_change
     severity: warning
-    description: TDM backup link was activated on {_HOSTNAME}.
+    description: TDM backup link was activated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.122
     name: RADWIN-MIB-WINLINK1000::linkLockUnauthorizedRemoteODU
     category: security
     severity: warning
-    description: Unauthorized remote ODU connection rejected on {_HOSTNAME}.
+    description: Unauthorized remote ODU connection rejected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.123
     name: RADWIN-MIB-WINLINK1000::linkLockUnauthorizedODU
     category: security
     severity: warning
-    description: Unauthorized ODU connection rejected on {_HOSTNAME}.
+    description: Unauthorized ODU connection rejected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.124
     name: RADWIN-MIB-WINLINK1000::hotStandbyAlarm
     category: state_change
     severity: notice
-    description: Hot standby secondary link activated on {_HOSTNAME}.
+    description: Hot standby secondary link activated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.126
     name: RADWIN-MIB-WINLINK1000::sfpInsertion
     category: state_change
     severity: notice
-    description: SFP device inserted on {_HOSTNAME}.
+    description: SFP device inserted on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.127
     name: RADWIN-MIB-WINLINK1000::sfpPort1DisconnectedAlarm
     category: state_change
     severity: warning
-    description: SFP port 1 status changed to disconnected on {_HOSTNAME}.
+    description: SFP port 1 status changed to disconnected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.128
     name: RADWIN-MIB-WINLINK1000::ringRplStateActiveAlarm
     category: state_change
     severity: notice
-    description: RPL state changed to Active on {_HOSTNAME}.
+    description: RPL state changed to Active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.129
     name: RADWIN-MIB-WINLINK1000::desiredRatioCanNotBeAppliedAlarm
     category: diagnostic
     severity: warning
-    description: Desired UL/DL ratio cannot be applied on {_HOSTNAME}.
+    description: Desired UL/DL ratio cannot be applied on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.130
     name: RADWIN-MIB-WINLINK1000::cbwMismatch
     category: state_change
     severity: warning
-    description: Channel bandwidth mismatch detected on {_HOSTNAME}.
+    description: Channel bandwidth mismatch detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.131
     name: RADWIN-MIB-WINLINK1000::gpsNotSynchronized
     category: diagnostic
     severity: warning
-    description: GPS is not synchronized with satellites on {_HOSTNAME}.
+    description: GPS is not synchronized with satellites on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.132
     name: RADWIN-MIB-WINLINK1000::pdTooHighDueCbwLimitations
-    category: diagnostic
-    severity: warning
-    description: Link establishment failed due to CBW limitations on {_HOSTNAME}.
+    category: state_change
+    severity: crit
+    description: Link establishment failed due to channel bandwidth limitations on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.133
     name: RADWIN-MIB-WINLINK1000::hbsEncryptionAlarm
     category: security
     severity: alert
-    description: Encryption key mismatch detected on {_HOSTNAME}.
+    description: Encryption key mismatch detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.134
     name: RADWIN-MIB-WINLINK1000::hbsEhServiceClosedToHsu
     category: security
-    severity: warning
-    description: Encryption key mismatch detected on {_HOSTNAME}.
+    severity: alert
+    description: Encryption key mismatch detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.135
     name: RADWIN-MIB-WINLINK1000::hbsUnsynchronizedHsuAlarm
     category: diagnostic
-    severity: warning
-    description: HSU lost synchronization on {_HOSTNAME}.
+    severity: crit
+    description: HSU lost synchronization on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.136
     name: RADWIN-MIB-WINLINK1000::hbsInactiveHbsAlarm
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: HBS is InActive on {_HOSTNAME}.
+    description: HBS is inactive on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.137
     name: RADWIN-MIB-WINLINK1000::incompatibleHsu
     category: diagnostic
-    severity: err
-    description: HSU is not compatible with HBS on {_HOSTNAME}.
+    severity: crit
+    description: HSU is incompatible with HBS on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.138
     name: RADWIN-MIB-WINLINK1000::hsuUnsupportedBeacon
     category: diagnostic
     severity: warning
-    description: Unsupported beacon received on {_HOSTNAME}.
+    description: Unsupported beacon received at HSU on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.139
     name: RADWIN-MIB-WINLINK1000::lanPortDisconnectedAlarm
     category: state_change
     severity: warning
-    description: LAN port disconnected on {_HOSTNAME}.
+    description: LAN port disconnected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.140
     name: RADWIN-MIB-WINLINK1000::poePortDisconnectedAlarm
     category: state_change
     severity: warning
-    description: LAN2 port status changed to disconnected on {_HOSTNAME}.
+    description: LAN2 port status changed to disconnected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.141
     name: RADWIN-MIB-WINLINK1000::poePowerConsumptionAlarm
     category: diagnostic
     severity: warning
-    description: POE power consumption exceeded maximum limit on {_HOSTNAME}.
+    description: POE power consumption exceeded maximum limit on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.149
     name: RADWIN-MIB-WINLINK1000::hobupFaultyStateAlarm
     category: diagnostic
-    severity: err
-    description: Hot Backup module reported faulty state on {_HOSTNAME}.
+    severity: alert
+    description: Hot Backup module is in faulty state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.150
     name: RADWIN-MIB-WINLINK1000::gpsOverCurrentAlarm
     category: diagnostic
-    severity: warning
-    description: GPS antenna current consumption exceeded maximum limit on {_HOSTNAME}.
+    severity: alert
+    description: GPS antenna over-current alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.151
     name: RADWIN-MIB-WINLINK1000::gpsCommunicationFailiureAlarm
     category: diagnostic
-    severity: err
-    description: GPS communication failure detected on {_HOSTNAME}.
+    severity: crit
+    description: GPS communication failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.152
     name: RADWIN-MIB-WINLINK1000::temperatureThresholdAlarm
     category: diagnostic
     severity: warning
-    description: Temperature threshold alarm triggered on {_HOSTNAME}.
+    description: Temperature threshold alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.153
     name: RADWIN-MIB-WINLINK1000::localRouterDiscoveryStatus
     category: state_change
-    severity: alert
-    description: Connection with local train router lost on {_HOSTNAME}.
+    severity: crit
+    description: Connection to local train router lost on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.154
     name: RADWIN-MIB-WINLINK1000::trackRouterDiscoveryStatus
     category: state_change
-    severity: crit
-    description: Connection with Track side router lost on {_HOSTNAME}.
+    severity: alert
+    description: Connection to Track side router lost on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.155
     name: RADWIN-MIB-WINLINK1000::lastUserSnmpAccessOverHourAgo
     category: auth
     severity: notice
-    description: User {TRAP_NAME} last SNMP access was over an hour ago on {_HOSTNAME}.
+    description: SNMP user access was inactive for more than an hour on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.156
     name: RADWIN-MIB-WINLINK1000::btsTargetUnreachable
     category: state_change
     severity: crit
-    description: BTS target connection lost on {_HOSTNAME}.
+    description: BTS target unreachable, connection lost on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.200
     name: RADWIN-MIB-WINLINK1000::tdmServiceClear
     category: state_change
     severity: notice
-    description: TDM Service fault cleared on {_HOSTNAME}.
+    description: TDM Service fault cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.201
     name: RADWIN-MIB-WINLINK1000::ethServiceOpened
     category: state_change
     severity: notice
-    description: Ethernet Service has been opened on {_HOSTNAME}.
+    description: Ethernet Service has been opened on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.203
     name: RADWIN-MIB-WINLINK1000::encryptionClear
     category: diagnostic
-    severity: info
-    description: Encryption status is normal on {_HOSTNAME}.
+    severity: notice
+    description: Encryption status is normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.204
     name: RADWIN-MIB-WINLINK1000::changeLinkPasswordClear
     category: config_change
     severity: notice
-    description: Link password changed successfully on {_HOSTNAME}.
+    description: Link password changed successfully on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.205
     name: RADWIN-MIB-WINLINK1000::externalAlarmInPort1Clear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: External alarm input fault on port 1 cleared on {_HOSTNAME}.
+    description: External alarm input port 1 fault cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.206
     name: RADWIN-MIB-WINLINK1000::externalAlarmInPort2Clear
     category: state_change
     severity: notice
-    description: External alarm input fault cleared on port 2 on {_HOSTNAME}.
+    description: External alarm input on port 2 cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.209
     name: RADWIN-MIB-WINLINK1000::lanPort1Clear
     category: state_change
     severity: notice
-    description: LAN port 1 status changed to connected on {_HOSTNAME}.
+    description: LAN port 1 status changed to connected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.210
     name: RADWIN-MIB-WINLINK1000::lanPort2Clear
     category: state_change
     severity: notice
-    description: LAN port 2 status changed to connected on {_HOSTNAME}.
+    description: LAN port 2 status changed to connected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.211
     name: RADWIN-MIB-WINLINK1000::mngPortClear
     category: state_change
     severity: notice
-    description: LAN1 port status changed to connected on {_HOSTNAME}.
+    description: LAN1 port status changed to connected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.212
     name: RADWIN-MIB-WINLINK1000::externalAlarmInPort3Clear
     category: state_change
     severity: notice
-    description: External alarm input port 3 fault cleared on {_HOSTNAME}.
+    description: External alarm input on port 3 cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.213
     name: RADWIN-MIB-WINLINK1000::externalAlarmInPort4Clear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: External alarm on port 4 cleared on {_HOSTNAME}.
+    description: External alarm input on port 4 cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.214
     name: RADWIN-MIB-WINLINK1000::swVersionsMatchFullCompatibilityClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Software versions match for full compatibility on {_HOSTNAME}.
+    description: Software versions match on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.215
     name: RADWIN-MIB-WINLINK1000::swVersionsMatchRestrictedCompatibilityClear
     category: state_change
     severity: notice
-    description: Software versions match and link functionality is not restricted on {_HOSTNAME}.
+    description: Software versions match and link functionality is unrestricted on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.216
     name: RADWIN-MIB-WINLINK1000::swVersionsMatchSoftwareUpgradeRequiredClear
-    category: config_change
+    category: state_change
     severity: notice
-    description: Software upgrade completed successfully and versions match on {_HOSTNAME}.
+    description: Software upgrade successful and versions match on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.217
     name: RADWIN-MIB-WINLINK1000::swVersionsCompatibleClear
     category: state_change
     severity: notice
-    description: Software versions compatibility cleared on {_HOSTNAME}.
+    description: Software versions compatibility cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.218
     name: RADWIN-MIB-WINLINK1000::hssMultipleSourcesDisappearedClear
     category: diagnostic
     severity: warning
-    description: HSS multiple sync pulse sources disappeared on {_HOSTNAME}.
+    description: Multiple sync pulse sources disappeared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.219
     name: RADWIN-MIB-WINLINK1000::hssSyncToProperSourceAchievedClear
     category: state_change
     severity: notice
-    description: HSS synchronization to proper source achieved on {_HOSTNAME}.
+    description: HSS synchronization to proper source achieved on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.220
     name: RADWIN-MIB-WINLINK1000::hssSyncPulseDisappearedClear
     category: diagnostic
     severity: warning
-    description: HSS additional sync pulse disappeared on {_HOSTNAME}.
+    description: HSS additional sync pulse disappeared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.221
     name: RADWIN-MIB-WINLINK1000::tdmBackupClear
     category: state_change
     severity: notice
-    description: TDM main link was activated on {_HOSTNAME}.
+    description: TDM main link was activated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.222
     name: RADWIN-MIB-WINLINK1000::linkLockAuthorizedRemoteODU
     category: state_change
     severity: notice
-    description: Remote ODU connection authorized on {_HOSTNAME}.
+    description: Remote ODU authorized on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.223
     name: RADWIN-MIB-WINLINK1000::linkLockAuthorizedODU
     category: state_change
     severity: notice
-    description: ODU link authorized on {_HOSTNAME}.
+    description: ODU link authorized on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.224
     name: RADWIN-MIB-WINLINK1000::linkAuthenticationDisabled
     category: security
     severity: warning
-    description: Link authentication has been disabled on {_HOSTNAME}.
+    description: Link authentication has been disabled on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.225
     name: RADWIN-MIB-WINLINK1000::hotStandbyClear
     category: state_change
     severity: notice
-    description: Primary link activated on {_HOSTNAME}.
+    description: Primary link was activated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.226
     name: RADWIN-MIB-WINLINK1000::sfpExtraction
     category: state_change
     severity: notice
-    description: SFP device extracted from port on {_HOSTNAME}.
+    description: SFP device was extracted on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.227
     name: RADWIN-MIB-WINLINK1000::sfpPort1Clear
     category: state_change
     severity: notice
-    description: SFP port 1 status changed to connected on {_HOSTNAME}.
+    description: SFP port 1 status changed to connected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.228
     name: RADWIN-MIB-WINLINK1000::compatibleIdus
     category: state_change
     severity: notice
-    description: ODU identified compatible Idus on both sides of the link on {_HOSTNAME}.
+    description: ODU identified compatible Idus on both sides of the link on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.229
     name: RADWIN-MIB-WINLINK1000::desiredRatioCanNotBeAppliedClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UL/DL ratio is now equal to desired ratio on {_HOSTNAME}.
+    description: UL/DL ratio is now equal to desired ratio on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.230
     name: RADWIN-MIB-WINLINK1000::cbwMatch
     category: diagnostic
     severity: notice
-    description: Channel bandwidth match detected on {_HOSTNAME}.
+    description: Channel bandwidth match detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.231
     name: RADWIN-MIB-WINLINK1000::switchCbwAndChannel
     category: state_change
     severity: notice
-    description: System switching channel bandwidth and frequency on {_HOSTNAME}.
+    description: System switching channel bandwidth and frequency on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.232
     name: RADWIN-MIB-WINLINK1000::ringRplStateIdle
     category: state_change
     severity: notice
-    description: RPL state changed to Idle on {_HOSTNAME}.
+    description: RPL state changed to Idle on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.233
     name: RADWIN-MIB-WINLINK1000::ringEthServiceStatus
     category: state_change
-    severity: notice
-    description: Ethernet service state changed to blocked or unblocked on {_HOSTNAME}.
+    severity: warning
+    description: Ethernet service state changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.234
     name: RADWIN-MIB-WINLINK1000::ringFirstRpmReceived
     category: state_change
     severity: notice
-    description: First RPM received for ring application on {_HOSTNAME}.
+    description: First RPM received on non-RPL link on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.235
     name: RADWIN-MIB-WINLINK1000::ringEthernetSrviceUnblockedTO
     category: state_change
     severity: warning
-    description: Ethernet service unblocked due to RPM timeout on {_HOSTNAME}.
+    description: Ethernet service unblocked due to RPM timeout on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.236
     name: RADWIN-MIB-WINLINK1000::gpsSynchronized
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: GPS synchronized with satellites on {_HOSTNAME}.
+    description: GPS synchronized with satellites on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.237
     name: RADWIN-MIB-WINLINK1000::hbsEncryptionClear
     category: diagnostic
     severity: notice
-    description: Encryption status cleared on {_HOSTNAME}.
+    description: Encryption status cleared to OK on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.238
     name: RADWIN-MIB-WINLINK1000::hbsEhServiceOpenedToHsu
     category: diagnostic
-    severity: info
-    description: Encryption status OK on {_HOSTNAME}.
+    severity: notice
+    description: Encryption status is OK on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.239
     name: RADWIN-MIB-WINLINK1000::hbsSynchronizedHsuAlarm
     category: state_change
     severity: notice
-    description: HSU synchronization state changed on {_HOSTNAME}.
+    description: HSU synchronization alarm triggered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.240
     name: RADWIN-MIB-WINLINK1000::hbsActiveHbs
     category: state_change
     severity: notice
-    description: HBS has been activated on {_HOSTNAME}.
+    description: HBS activation event occurred on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.241
     name: RADWIN-MIB-WINLINK1000::switchCBW
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Switching Channel Bandwidth event on {_HOSTNAME}.
+    description: Switching channel bandwidth event occurred on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.242
     name: RADWIN-MIB-WINLINK1000::changeRatio
     category: state_change
     severity: notice
-    description: HBS Tx ratio has changed on {_HOSTNAME}.
+    description: HBS Tx ratio has changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.243
     name: RADWIN-MIB-WINLINK1000::lanPortClear
     category: state_change
     severity: notice
-    description: LAN port status changed to connected on {_HOSTNAME}.
+    description: LAN port status changed to connected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.244
     name: RADWIN-MIB-WINLINK1000::poePortClear
     category: state_change
     severity: notice
-    description: LAN2 port status changed to connected on {_HOSTNAME}.
+    description: LAN2 port status changed to connected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.245
     name: RADWIN-MIB-WINLINK1000::poePowerConsumptionClear
     category: diagnostic
     severity: notice
-    description: POE power consumption is valid on {_HOSTNAME}.
+    description: POE power consumption is valid and port is opened on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.246
     name: RADWIN-MIB-WINLINK1000::incompatibleHbsHsu
     category: diagnostic
     severity: crit
-    description: Incompatible HBS/HSU software versions detected causing no service on {_HOSTNAME}.
+    description: Incompatible HBS/HSU software versions detected, resulting in no service on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.247
     name: RADWIN-MIB-WINLINK1000::mobilityLinkOff
     category: mobility
     severity: warning
-    description: Mobility link establishment failed on {_HOSTNAME}.
+    description: Mobility link cannot be established on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.248
     name: RADWIN-MIB-WINLINK1000::enterLocalConnection
     category: state_change
     severity: notice
-    description: Device entered Local Connection Broadcast Mode on {_HOSTNAME}.
+    description: Device entered local connection broadcast mode on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.249
     name: RADWIN-MIB-WINLINK1000::hobupActiveStateFaultyClear
     category: state_change
     severity: notice
-    description: Hot Backup unit activated on {_HOSTNAME}.
+    description: Hot Backup unit activated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.250
     name: RADWIN-MIB-WINLINK1000::hobupStandbyState
     category: state_change
     severity: notice
-    description: Hot backup module entered standby state on {_HOSTNAME}.
+    description: Hot backup module entered standby state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.251
     name: RADWIN-MIB-WINLINK1000::gpsOverCurrentClear
     category: diagnostic
     severity: notice
-    description: GPS antenna current consumption is valid on {_HOSTNAME}.
+    description: GPS antenna over-current condition cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.252
     name: RADWIN-MIB-WINLINK1000::temperatureThresholdClear
     category: diagnostic
     severity: notice
-    description: Temperature threshold cleared on {_HOSTNAME}.
+    description: Temperature threshold cleared; board temperature is valid on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.253
     name: RADWIN-MIB-WINLINK1000::localRouterDiscoverySucceed
     category: state_change
     severity: notice
-    description: Router discovery succeeded on {_HOSTNAME}.
+    description: Local router discovery succeeded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.254
     name: RADWIN-MIB-WINLINK1000::trackRouterDiscoverySucceed
     category: state_change
     severity: notice
-    description: Track router discovery succeeded on {_HOSTNAME}.
+    description: Track router discovery succeeded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.255
     name: RADWIN-MIB-WINLINK1000::qosVersion2StrictMismatch
     category: config_change
     severity: warning
-    description: QoS version 2 strict configuration mismatch detected on {_HOSTNAME}.
+    description: QoS version 2 strict configuration mismatch detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.256
     name: RADWIN-MIB-WINLINK1000::qosVersion2TtlMismatch
     category: diagnostic
     severity: warning
-    description: QoS TTL mismatch detected on {_HOSTNAME}.
+    description: QoS TTL mismatch detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.257
     name: RADWIN-MIB-WINLINK1000::btsTargetIsReachable
     category: state_change
     severity: notice
-    description: BTS target connection established on {_HOSTNAME}.
+    description: BTS target connection established on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.258
     name: RADWIN-MIB-WINLINK1000::tcNotSupportedByHSU
     category: diagnostic
     severity: warning
-    description: CPE does not support TC functionality on {_HOSTNAME}.
+    description: TC functionality is not supported by HSU on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.259
     name: RADWIN-MIB-WINLINK1000::syncEPortHOStateChange
     category: state_change
     severity: warning
-    description: SyncE port HO state changed on {_HOSTNAME}.
+    description: SyncE port HO state changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.260
     name: RADWIN-MIB-WINLINK1000::syncEPortFailureStateChange
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: SyncE port entered failure state on {_HOSTNAME}.
+    description: SyncE port entered or left failure state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.261
     name: RADWIN-MIB-WINLINK1000::btsCpeUpdateServiceFailed
     category: diagnostic
     severity: err
-    description: Update service failed on {_HOSTNAME}.
+    description: CPE update service failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.262
     name: RADWIN-MIB-WINLINK1000::btsCpeUpdateServiceSucceed
-    category: config_change
-    severity: notice
-    description: Update service succeeded on {_HOSTNAME}.
+    category: state_change
+    severity: info
+    description: CPE update service succeeded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.263
     name: RADWIN-MIB-WINLINK1000::radiusServerNoREsponse
     category: diagnostic
     severity: warning
-    description: No response from radius server on {_HOSTNAME}.
+    description: No response from RADIUS server on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.264
     name: RADWIN-MIB-WINLINK1000::noRadiusServerRespond
     category: diagnostic
     severity: warning
-    description: No Radius server is connected on {_HOSTNAME}.
+    description: No Radius server is connected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.265
     name: RADWIN-MIB-WINLINK1000::radiusServerRespondedSuccessfully
-    category: auth
+    category: diagnostic
     severity: info
-    description: RADIUS server responded successfully on {_HOSTNAME}.
+    description: RADIUS server responded successfully on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.266
     name: RADWIN-MIB-WINLINK1000::bsaAlignmentStarted
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Alignment process started on {_HOSTNAME}.
+    description: BSA alignment process started on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.267
     name: RADWIN-MIB-WINLINK1000::bsaAlignmentFinished
     category: diagnostic
     severity: notice
-    description: Alignment process completed on {_HOSTNAME}.
+    description: Alignment process completed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4458.1000.0.268
     name: RADWIN-MIB-WINLINK1000::bsaAlignmentTriggered
     category: diagnostic
     severity: warning
-    description: Alignment process triggered due to threshold exceedance on {_HOSTNAME}.
+    description: Alignment process triggered due to exceeding thresholds on {{hostname}}.
     status: current

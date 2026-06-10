@@ -31,8 +31,8 @@ traps:
   - oid: 1.3.6.1.4.1.2509.9.47.0.1
     name: AVIAT-ALARM-REPORTING-MIB::aviatAlarmRaisedInstanceNotification
     category: diagnostic
-    severity: warning
-    description: Alarm raised for {aviatAlarmEntityName} with severity {aviatAlarmInstanceCurrentSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: System alarm raised on {{value "aviatAlarmEntityName"}} with severity {{value "aviatAlarmInstanceCurrentSeverity"}} on {{hostname}}.
     status: current
     varbinds:
       - aviatAlarmInstanceLastStatusChange
@@ -43,7 +43,7 @@ traps:
     name: AVIAT-ALARM-REPORTING-MIB::aviatAlarmClearedInstanceNotification
     category: state_change
     severity: notice
-    description: Alarm cleared for entity {aviatAlarmEntityName} on {_HOSTNAME}.
+    description: System alarm cleared for {{value "aviatAlarmEntityName"}} on {{hostname}}.
     status: current
     varbinds:
       - aviatAlarmInstanceLastStatusChange
@@ -51,9 +51,9 @@ traps:
       - aviatAlarmTypeID
   - oid: 1.3.6.1.4.1.2509.9.47.0.3
     name: AVIAT-ALARM-REPORTING-MIB::aviatAlarmUnstableInstanceNotification
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Alarm {aviatAlarmEntityName} suspended with severity {aviatAlarmInstanceCurrentSeverity} on {_HOSTNAME}.
+    description: Alarm instance {{value "aviatAlarmEntityName"}} suspended on {{hostname}}.
     status: current
     varbinds:
       - aviatAlarmInstanceLastStatusChange
@@ -62,9 +62,9 @@ traps:
       - aviatAlarmInstanceCurrentSeverity
   - oid: 1.3.6.1.4.1.2509.9.47.0.4
     name: AVIAT-ALARM-REPORTING-MIB::aviatAlarmStabilizedInstanceNotification
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Alarm {aviatAlarmEntityName} stabilized on {_HOSTNAME}.
+    description: System alarm suspension cleared for {{value "aviatAlarmEntityName"}} on {{hostname}}.
     status: current
     varbinds:
       - aviatAlarmInstanceLastStatusChange

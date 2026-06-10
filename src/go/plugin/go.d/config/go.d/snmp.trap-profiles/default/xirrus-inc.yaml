@@ -33,7 +33,7 @@ traps:
     name: XIRRUS-MIB::adminLogin
     category: auth
     severity: notice
-    description: Admin {adminUsername} logged into array on {_HOSTNAME}.
+    description: Admin {{value "adminUsername"}} logged into array on {{hostname}}.
     status: current
     varbinds:
       - adminUsername
@@ -41,7 +41,7 @@ traps:
     name: XIRRUS-MIB::adminLogout
     category: auth
     severity: notice
-    description: Admin {adminUsername} logged out on {_HOSTNAME}.
+    description: Admin {{value "adminUsername"}} logged out on {{hostname}}.
     status: current
     varbinds:
       - adminUsername
@@ -49,7 +49,7 @@ traps:
     name: XIRRUS-MIB::stationACLFailure
     category: security
     severity: warning
-    description: Station rejected by ACL at MAC {stationAssociationMACAddress} on {_HOSTNAME}.
+    description: Station rejected by ACL{{with value "stationAssociationMACAddress"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - stationAssociationMACAddress
@@ -57,51 +57,51 @@ traps:
     name: XIRRUS-MIB::stationRadiusAuthFailure
     category: auth
     severity: warning
-    description: Station {stationAssociationMACAddress} failed Radius server authentication on {_HOSTNAME}.
+    description: Station {{value "stationAssociationMACAddress"}} failed Radius authentication on {{hostname}}.
     status: current
     varbinds:
       - stationAssociationMACAddress
   - oid: 1.3.6.1.4.1.21013.1.2.50.3.1
     name: XIRRUS-MIB::resetArray
-    category: state_change
+    category: config_change
     severity: notice
-    description: Array reset requested by admin on {_HOSTNAME}.
+    description: Array reset requested by administrator on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21013.1.2.50.3.2
     name: XIRRUS-MIB::rebootArray
     category: state_change
     severity: notice
-    description: Administrator requested a reboot of Array on {_HOSTNAME}.
+    description: Administrator requested a reboot of the array on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21013.1.2.50.3.3
     name: XIRRUS-MIB::softwareUploadFailure
     category: diagnostic
     severity: err
-    description: Software upload failed on {_HOSTNAME}.
+    description: Array software image upload failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21013.1.2.50.3.4
     name: XIRRUS-MIB::softwareUploadSuccess
-    category: config_change
-    severity: notice
-    description: Software image upload succeeded on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Software image upload succeeded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21013.1.2.50.3.5
     name: XIRRUS-MIB::softwareUpgradeFailure
     category: diagnostic
-    severity: err
-    description: Software upgrade failed on {_HOSTNAME}.
+    severity: crit
+    description: Array software upgrade failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21013.1.2.50.3.6
     name: XIRRUS-MIB::softwareUpgradeSuccess
-    category: config_change
+    category: state_change
     severity: notice
-    description: Software upgrade succeeded on {_HOSTNAME}.
+    description: Software upgrade succeeded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21013.1.2.50.3.7
     name: XIRRUS-MIB::dhcpRenewFailure
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DHCP renewal failed for interface {ethStatsIfaceName} on {_HOSTNAME}.
+    description: DHCP renewal failed for interface {{first (value "ethStatsIfaceName") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ethStatsIfaceName
@@ -109,77 +109,77 @@ traps:
     name: XIRRUS-MIB::cfgChange
     category: config_change
     severity: notice
-    description: Configuration change detected for module {cfgModuleOID} on {_HOSTNAME}.
+    description: Configuration change detected{{with value "cfgModuleOID"}} on module {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - cfgModuleOID
   - oid: 1.3.6.1.4.1.21013.1.2.50.3.9
     name: XIRRUS-MIB::keepAlive
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Keepalive notice received from {systemHostname} on {_HOSTNAME}.
+    description: Keepalive notice received on {{hostname}}.
     status: current
     varbinds:
       - systemHostname
   - oid: 1.3.6.1.4.1.21013.1.2.50.3.10
     name: XIRRUS-MIB::encDoorOpened
     category: security
-    severity: warning
-    description: Enclosure door opened detected on {_HOSTNAME}.
+    severity: alert
+    description: Enclosure door opened on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21013.1.2.50.3.11
     name: XIRRUS-MIB::encDoorClosed
-    category: diagnostic
-    severity: notice
-    description: Enclosure door closed on {_HOSTNAME}.
+    category: security
+    severity: warning
+    description: Enclosure door closed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21013.1.2.50.3.12
     name: XIRRUS-MIB::flashPartitionCorrupt
     category: diagnostic
-    severity: err
-    description: Flash partition corruption detected on {_HOSTNAME}.
+    severity: crit
+    description: Flash partition is corrupt on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21013.1.2.50.3.13
     name: XIRRUS-MIB::licenseUpdate
     category: license
     severity: notice
-    description: License updated on {_HOSTNAME}.
+    description: License updated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21013.1.2.50.3.14
     name: XIRRUS-MIB::radioMixInvalid
     category: diagnostic
     severity: warning
-    description: Invalid Radio Mix detected on {_HOSTNAME}.
+    description: Invalid radio mix detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21013.1.2.50.4.1
     name: XIRRUS-MIB::envCtrlTempOver
     category: diagnostic
     severity: warning
-    description: Outdoor enclosure temperature too high on {_HOSTNAME}.
+    description: Outdoor enclosure temperature is too high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21013.1.2.50.4.2
     name: XIRRUS-MIB::envCtrlTempUnder
     category: diagnostic
     severity: warning
-    description: Outdoor enclosure temperature too low on {_HOSTNAME}.
+    description: Outdoor enclosure temperature is too low on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21013.1.2.50.4.3
     name: XIRRUS-MIB::envCtrlHumidOver
     category: diagnostic
     severity: warning
-    description: Outdoor enclosure humidity too high on {_HOSTNAME}.
+    description: Outdoor enclosure humidity is too high on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21013.1.2.50.4.4
     name: XIRRUS-MIB::envCtrlFanFail
     category: diagnostic
-    severity: crit
-    description: Fan failure detected on {_HOSTNAME}.
+    severity: alert
+    description: Outdoor enclosure fan failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21013.1.2.50.5.1
     name: XIRRUS-MIB::iapBeaconProbeFailure
     category: diagnostic
     severity: warning
-    description: No beacons received from IAP on interface {iapStatsIfaceName} on {_HOSTNAME}.
+    description: IAP beacon probe failure detected{{with value "iapStatsIfaceName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - iapStatsIfaceName
@@ -187,15 +187,15 @@ traps:
     name: XIRRUS-MIB::iapBeaconProbeFailurePhyReset
     category: diagnostic
     severity: warning
-    description: Beacon probe failure caused PHY reset on interface {iapStatsIfaceName} on {_HOSTNAME}.
+    description: IAP beacon probe failure caused PHY reset on interface {{value "iapStatsIfaceName"}} on {{hostname}}.
     status: current
     varbinds:
       - iapStatsIfaceName
   - oid: 1.3.6.1.4.1.21013.1.2.50.5.3
     name: XIRRUS-MIB::iapBeaconProbeFailureMacReset
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Beacon probe failure caused MAC reset on interface {iapStatsIfaceName} on {_HOSTNAME}.
+    description: Beacon probe failure caused MAC reset on interface {{value "iapStatsIfaceName"}} on {{hostname}}.
     status: current
     varbinds:
       - iapStatsIfaceName
@@ -203,7 +203,7 @@ traps:
     name: XIRRUS-MIB::iapBeaconProbeFailureArrayReboot
     category: diagnostic
     severity: warning
-    description: Beacon probe failure detected on interface {iapStatsIfaceName}, scheduling array reboot on {_HOSTNAME}.
+    description: IAP beacon probe failure detected, scheduling array reboot on {{hostname}}.
     status: current
     varbinds:
       - iapStatsIfaceName

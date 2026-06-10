@@ -17,15 +17,15 @@ traps:
     name: STAND-ALONE-ETHERNET-SWITCH-MIB::logonIntruder
     category: security
     severity: alert
-    description: Repeated invalid login attempts detected from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Intruder login attempts exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - sysName
   - oid: 1.3.6.1.4.1.437.1.1.3.0.1
     name: STAND-ALONE-ETHERNET-SWITCH-MIB::switchDiagnostic
     category: diagnostic
-    severity: crit
-    description: Power On Self Test (POST) failed on {_HOSTNAME}.
+    severity: alert
+    description: Switch POST failed on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -33,7 +33,7 @@ traps:
     name: STAND-ALONE-ETHERNET-SWITCH-MIB::addressViolation
     category: security
     severity: warning
-    description: Address violation detected on interface {ifIndex} on {_HOSTNAME}.
+    description: Address violation detected on secured port {{first (value "ifIndex") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -41,15 +41,15 @@ traps:
     name: STAND-ALONE-ETHERNET-SWITCH-MIB::broadcastStorm
     category: diagnostic
     severity: warning
-    description: Broadcast storm detected on interface {ifIndex} on {_HOSTNAME}.
+    description: Broadcast storm detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.437.1.1.3.0.5
     name: STAND-ALONE-ETHERNET-SWITCH-MIB::rpsFailed
     category: diagnostic
-    severity: err
-    description: Redundant power source failure detected on {_HOSTNAME}.
+    severity: alert
+    description: Redundant power source failure detected on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -57,7 +57,7 @@ traps:
     name: STAND-ALONE-ETHERNET-SWITCH-MIB::ipAddressChange
     category: state_change
     severity: warning
-    description: IP address change detected on {_HOSTNAME}.
+    description: IP address changed on {{hostname}}.
     status: current
     varbinds:
       - sysName

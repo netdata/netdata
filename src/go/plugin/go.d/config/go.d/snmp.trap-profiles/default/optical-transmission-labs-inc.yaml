@@ -53,7 +53,7 @@ traps:
     name: ONS15501-MIB::ons15501GenericNotificationTrap
     category: diagnostic
     severity: warning
-    description: Equipment bitmap change detected with severity {ons15501TrapLogEntrySeverity} on {_HOSTNAME}.
+    description: Equipment bitmap change detected{{with value "ons15501TrapLogEntrySeverity"}} severity {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ons15501LastTrapIndex

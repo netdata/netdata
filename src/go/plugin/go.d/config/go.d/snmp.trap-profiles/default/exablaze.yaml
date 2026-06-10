@@ -63,14 +63,14 @@ traps:
   - oid: 1.3.6.1.4.1.43296.3.6.1
     name: EXALINK-FUSION-MIB::fusionPowerFail
     category: diagnostic
-    severity: crit
-    description: System is shutting down due to power loss on {_HOSTNAME}.
+    severity: alert
+    description: System is shutting down due to power loss on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.43296.3.6.2
     name: EXALINK-FUSION-MIB::fusionTamperAlert
     category: security
     severity: warning
-    description: Device lid status changed to {fusionLidOpenStatus} on {_HOSTNAME}.
+    description: 'Device tamper alert: lid is {{value "fusionLidOpenStatus"}} on {{hostname}}.'
     status: current
     varbinds:
       - fusionLidOpenStatus
@@ -78,7 +78,7 @@ traps:
     name: EXALINK-FUSION-MIB::fusionTempAlert
     category: diagnostic
     severity: warning
-    description: Temperature sensor {fusionTempSensorName} reported high temperature status {fusionHighTempStatus} on {_HOSTNAME}.
+    description: Temperature threshold exceeded on sensor {{value "fusionTempSensorName"}} on {{hostname}}.
     status: current
     varbinds:
       - fusionTempSensorName
@@ -87,7 +87,7 @@ traps:
     name: EXALINK-FUSION-MIB::fusionPsuAlert
     category: diagnostic
     severity: warning
-    description: Power supply fault status {fusionPsuFaultStatus} detected on {_HOSTNAME}.
+    description: Power supply fault status changed to {{value "fusionPsuFaultStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - fusionPsuFaultStatus
@@ -95,21 +95,21 @@ traps:
     name: EXALINK-FUSION-MIB::fusionSystemAlert
     category: diagnostic
     severity: notice
-    description: System service restarted on {_HOSTNAME}.
+    description: System service restarted on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.43296.3.6.6
     name: EXALINK-FUSION-MIB::fusionFanAlert
     category: diagnostic
     severity: warning
-    description: Fan fault status changed to {fusionFanFaultStatus} on {_HOSTNAME}.
+    description: Fan fault status changed to {{value "fusionFanFaultStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - fusionFanFaultStatus
   - oid: 1.3.6.1.4.1.43296.3.6.7
     name: EXALINK-FUSION-MIB::fusionPortAlert
     category: state_change
-    severity: warning
-    description: Port {fusionPortName} link status {fusionPortLinkStatus} and usage {fusionPortUsageStatus} changed on {_HOSTNAME}.
+    severity: notice
+    description: Port {{value "fusionPortName"}} link status changed on {{hostname}}.
     status: current
     varbinds:
       - fusionPortName
@@ -119,13 +119,13 @@ traps:
     name: EXALINK-FUSION-MIB::fusionConfigUpdateAlert
     category: config_change
     severity: notice
-    description: Configuration update detected on {_HOSTNAME}.
+    description: Device configuration has been changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.43296.3.6.9
     name: EXALINK-FUSION-MIB::fusionTimeAlert
     category: state_change
-    severity: notice
-    description: Time synchronisation source status changed to {fusionTimeSourceStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Time synchronisation source status changed to {{value "fusionTimeSourceStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - fusionTimeSourceStatus

@@ -196,7 +196,7 @@ traps:
     name: TANDEM-EMS-MIB::emsMessage
     category: diagnostic
     severity: warning
-    description: EMS event {trapEventNumber} from {trapProcess} with text {trapText} on {_HOSTNAME}.
+    description: EMS event {{value "trapEventNumber"}} from {{value "trapProcess"}} on {{hostname}}.
     status: current
     varbinds:
       - trapSSID
@@ -211,7 +211,7 @@ traps:
     name: SNMP-HMSA-MIB::zhrmTrapDeviceStateChange
     category: state_change
     severity: warning
-    description: Device {zhrmTrapDeviceDescr} status changed to {zhrmTrapDeviceStatus} on {_HOSTNAME}.
+    description: Device {{value "zhrmTrapDeviceDescr"}} status changed to {{value "zhrmTrapDeviceStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - zhrmTrapDeviceStateIndex
@@ -221,7 +221,7 @@ traps:
     name: SNMP-HMSA-MIB::zhrmRAMThreshold
     category: diagnostic
     severity: warning
-    description: RAM utilization {zhrmThrRAMPercentUse}% on {zhrmTrapStorageDescr} exceeded threshold on {_HOSTNAME}.
+    description: RAM usage reached threshold at {{value "zhrmThrRAMPercentUse"}}% on {{hostname}}.
     status: current
     varbinds:
       - zhrmTrapStorageThrIndex
@@ -231,7 +231,7 @@ traps:
     name: SNMP-HMSA-MIB::zhrmDiskThreshold
     category: diagnostic
     severity: warning
-    description: Disk utilization {zhrmThrDiskPercentUse}% on {zhrmTrapStorageDescr} reached threshold on {_HOSTNAME}.
+    description: Disk storage utilization threshold reached for {{value "zhrmTrapStorageDescr"}} at {{value "zhrmThrDiskPercentUse"}}% on {{hostname}}.
     status: current
     varbinds:
       - zhrmTrapStorageThrIndex
@@ -241,7 +241,7 @@ traps:
     name: EthernetSubagentPvt-MIB::zesalinkUp
     category: state_change
     severity: notice
-    description: Link status changed to STARTED with {zesaTrap} on {_HOSTNAME}.
+    description: Link status changed to STARTED on {{hostname}}.
     status: current
     varbinds:
       - zesaTrap
@@ -249,7 +249,7 @@ traps:
     name: EthernetSubagentPvt-MIB::zesalinkDown
     category: state_change
     severity: warning
-    description: Link status changed to STOPPED with {zesaTrap} on {_HOSTNAME}.
+    description: Link went down on {{hostname}}.
     status: current
     varbinds:
       - zesaTrap
@@ -257,7 +257,7 @@ traps:
     name: ServerNetPCI-MIB::snetAdaptrStatusChange
     category: state_change
     severity: warning
-    description: ServerNet adapter {snetAdaptrSnetID} status changed to {snetAdaptrStatus} on {_HOSTNAME}.
+    description: ServerNet adapter status changed to {{value "snetAdaptrStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - snetAdaptrStatus
@@ -266,7 +266,7 @@ traps:
     name: ServerNetPCI-MIB::snetAdaptrXPortStatusChange
     category: state_change
     severity: warning
-    description: X-Port status changed to {snetAdaptrXPortStatus} on ServerNet ID {snetAdaptrSnetID} on {_HOSTNAME}.
+    description: ServerNet X-Port status changed to {{value "snetAdaptrXPortStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - snetAdaptrXPortStatus
@@ -275,7 +275,7 @@ traps:
     name: ServerNetPCI-MIB::snetAdaptrYPortStatusChange
     category: state_change
     severity: warning
-    description: ServerNet Controller Y-Port status changed to {snetAdaptrYPortStatus} on {_HOSTNAME}.
+    description: Y-Port controller status changed to {{value "snetAdaptrYPortStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - snetAdaptrYPortStatus
@@ -284,7 +284,7 @@ traps:
     name: ServerNetPCI-MIB::snetAdaptrTimeoutErrorsChange
     category: diagnostic
     severity: warning
-    description: Adapter timeout errors detected with count {snetAdaptrSnetID} on {_HOSTNAME}.
+    description: ServerNet adapter timeout errors detected on {{hostname}}.
     status: current
     varbinds:
       - snetAdaptrTimeoutErrorsLow
@@ -293,8 +293,8 @@ traps:
   - oid: 1.3.6.1.4.1.169.8.0.100
     name: SnetSwitch-MIB::snetSwitchLinkAliveChange
     category: state_change
-    severity: warning
-    description: Port {snetSwitchPortErrorStatusIndex} status changed to {snetSwitchPortStatus} on {_HOSTNAME}.
+    severity: notice
+    description: Switch port status changed to {{value "snetSwitchPortStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - snetSwitchSnetID
@@ -304,8 +304,8 @@ traps:
   - oid: 1.3.6.1.4.1.169.8.0.101
     name: SnetSwitch-MIB::snetSwitchNeighborValidationFailed
     category: diagnostic
-    severity: err
-    description: Neighbor validation failed on port {snetSwitchPortErrorStatusIndex} with neighbor ID {snetSwitchNeighborID} on {_HOSTNAME}.
+    severity: warning
+    description: ServerNet switch neighbor validation failed on port {{value "snetSwitchPortErrorStatusIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - snetSwitchSnetID
@@ -316,7 +316,7 @@ traps:
     name: SnetSwitch-MIB::snetSwitchLinkLevelError
     category: diagnostic
     severity: warning
-    description: Link level errors detected on port {snetSwitchPortErrorStatusIndex} with {snetSwitchLinkErrorCounter} link errors on {_HOSTNAME}.
+    description: Link level errors detected on port {{value "snetSwitchPortErrorStatusIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - snetSwitchSnetID
@@ -329,7 +329,7 @@ traps:
     name: SnetSwitch-MIB::snetSwitchPacketLevelError
     category: diagnostic
     severity: warning
-    description: Packet level errors detected on port {snetSwitchPortErrorStatusIndex} with {snetSwitchPacketErrorCounter} packet errors on {_HOSTNAME}.
+    description: Packet level errors detected on port {{value "snetSwitchPortErrorStatusIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - snetSwitchSnetID
@@ -342,7 +342,7 @@ traps:
     name: SnetSwitch-MIB::snetSwitchIBCError
     category: diagnostic
     severity: warning
-    description: IBC errors detected on switch {snetSwitchName} with {snetSwitchIBCErrorCounter} errors on {_HOSTNAME}.
+    description: IBC errors detected on port {{value "snetSwitchPortErrorStatusIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - snetSwitchSnetID
@@ -355,7 +355,7 @@ traps:
     name: SnetSwitch-MIB::snetSwitchAccessViolation
     category: security
     severity: warning
-    description: Access violation detected with invalid ID {snetSwitchAccessViolationID} on {_HOSTNAME}.
+    description: Switch detected access violation for invalid ID {{value "snetSwitchAccessViolationID"}} on {{hostname}}.
     status: current
     varbinds:
       - snetSwitchSnetID
@@ -366,7 +366,7 @@ traps:
     name: SnetSwitch-MIB::snetSwitchOwnerChange
     category: state_change
     severity: notice
-    description: Primary administrative node changed to {snetSwitchSANManSNetID} on {_HOSTNAME}.
+    description: Primary administrative node changed to {{value "snetSwitchSANManSNetID"}} on {{hostname}}.
     status: current
     varbinds:
       - snetSwitchSnetID
@@ -376,7 +376,7 @@ traps:
     name: SnetSwitch-MIB::snetSwitchFirmwareUpgrade
     category: config_change
     severity: notice
-    description: Firmware upgrade performed on {snetSwitchName} with release {snetSwitchFWRelease} on {_HOSTNAME}.
+    description: Firmware upgrade performed on {{first (value "snetSwitchName") "switch"}} version {{value "snetSwitchFWRelease"}} on {{hostname}}.
     status: current
     varbinds:
       - snetSwitchSANManSNetID
@@ -389,7 +389,7 @@ traps:
     name: SnetSwitch-MIB::snetSwitchSANManFailover
     category: state_change
     severity: alert
-    description: Administrative node failover detected with event type {snetSwitchFailoverEventType} on {_HOSTNAME}.
+    description: Administrative node failover detected on {{hostname}}.
     status: current
     varbinds:
       - snetSwitchPrimarySANManSNetID
@@ -401,13 +401,13 @@ traps:
     name: SnetSwitch-MIB::snetSwitchTopologyConfigUpdate
     category: config_change
     severity: notice
-    description: ServerNet topology configuration updated on {_HOSTNAME}.
+    description: ServerNet topology configuration changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.169.8.0.110
     name: SnetSwitch-MIB::snetSwitchFanFailure
     category: diagnostic
     severity: crit
-    description: Fan failure detected on switch {snetSwitchName} on {_HOSTNAME}.
+    description: Fan failure detected on {{first (value "snetSwitchName") "switch"}} on {{hostname}}.
     status: current
     varbinds:
       - snetSwitchSnetID

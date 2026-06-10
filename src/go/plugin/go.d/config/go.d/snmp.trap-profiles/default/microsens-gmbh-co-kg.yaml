@@ -166,7 +166,7 @@ traps:
     name: MS-SWITCH30-MIB::linkChangeNotification
     category: state_change
     severity: warning
-    description: Port {portStatusId} link status changed to {portStatusLink} on {_HOSTNAME}.
+    description: Port {{value "portStatusId"}} link status changed to {{value "portStatusLink"}} on {{hostname}}.
     status: current
     varbinds:
       - portStatusId
@@ -174,14 +174,14 @@ traps:
   - oid: 1.3.6.1.4.1.3181.10.3.100.2
     name: MS-SWITCH30-MIB::factoryResetNotification
     category: config_change
-    severity: notice
-    description: Factory reset initiated on {_HOSTNAME}.
+    severity: alert
+    description: Factory reset initiated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3181.10.3.100.3
     name: MS-SWITCH30-MIB::temperatureLevelChangeNotification
     category: diagnostic
     severity: warning
-    description: Device temperature level changed to {deviceTemperatureLevel} on {_HOSTNAME}.
+    description: Device temperature level changed to {{value "deviceTemperatureLevel"}} on {{hostname}}.
     status: current
     varbinds:
       - deviceTemperatureLevel
@@ -189,37 +189,37 @@ traps:
     name: MS-SWITCH30-MIB::errorcountNotification
     category: diagnostic
     severity: warning
-    description: Error count detected on port {portStatusId} on {_HOSTNAME}.
+    description: Port {{value "portStatusId"}} reported error counts on {{hostname}}.
     status: current
     varbinds:
       - portStatusId
   - oid: 1.3.6.1.4.1.3181.10.3.100.5
     name: MS-SWITCH30-MIB::underOverVoltageNotification
     category: diagnostic
-    severity: warning
-    description: PoLAN port voltage out of operating range, power turned off on port {portStatusId} on {_HOSTNAME}.
+    severity: alert
+    description: PoLAN port voltage out of range, power off on port {{value "portStatusId"}} on {{hostname}}.
     status: current
     varbinds:
       - portStatusId
   - oid: 1.3.6.1.4.1.3181.10.3.100.6
     name: MS-SWITCH30-MIB::temperatureShutdownNotification
     category: diagnostic
-    severity: alert
-    description: Device temperature exceeded maximum operating temperature, triggering shutdown on {_HOSTNAME}.
+    severity: emerg
+    description: Device temperature exceeded maximum limit and shutdown is imminent on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3181.10.3.100.7
     name: MS-SWITCH30-MIB::portPoELimitExceededNotification
     category: diagnostic
     severity: warning
-    description: Port power limit exceeded, power turned off for port {portStatusId} on {_HOSTNAME}.
+    description: Port power turned off due to limit exceeded on {{first (value "portStatusId") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - portStatusId
   - oid: 1.3.6.1.4.1.3181.10.3.100.8
     name: MS-SWITCH30-MIB::powerSupplyStatusChangeNotification
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Power supply {supplyId} status changed on {_HOSTNAME}.
+    description: Power supply {{value "supplyId"}} status changed on {{hostname}}.
     status: current
     varbinds:
       - supplyId
@@ -227,7 +227,7 @@ traps:
     name: MS-SWITCH30-MIB::sfpPlugChangeNotification
     category: state_change
     severity: notice
-    description: SFP module plug change detected on port {sfpPortnumber} on {_HOSTNAME}.
+    description: SFP module plugged in or out on port {{value "sfpPortnumber"}} on {{hostname}}.
     status: current
     varbinds:
       - sfpPortnumber
@@ -236,13 +236,13 @@ traps:
     name: MS-SWITCH30-MIB::loginFailureNotification
     category: auth
     severity: warning
-    description: Invalid password login attempt detected from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Login attempt with invalid password on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3181.10.3.100.11
     name: MS-SWITCH30-MIB::ringBrokenNotification
     category: state_change
     severity: warning
-    description: Ring link down detected on port {portStatusId} on {_HOSTNAME}.
+    description: Ring {{value "ringNumber"}} port {{value "portStatusId"}} link down on {{hostname}}.
     status: current
     varbinds:
       - ringNumber
@@ -250,9 +250,9 @@ traps:
       - portStatusLink
   - oid: 1.3.6.1.4.1.3181.10.3.100.12
     name: MS-SWITCH30-MIB::ringAlarmNotification
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Ring alarm detected on ring {ringNumber} with status {ringStatus} for {ringAlarmDuration} on {_HOSTNAME}.
+    description: Ring alarm received on ring {{value "ringNumber"}} with status {{value "ringStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ringNumber
@@ -262,31 +262,31 @@ traps:
     name: MS-SWITCH30-MIB::snmpv3AuthenticationPwFailNotification
     category: auth
     severity: warning
-    description: SNMP authentication password failure from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: SNMPv3 authentication password failure from {{source_ip}} on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3181.10.3.100.14
     name: MS-SWITCH30-MIB::snmpv3PrivacyPwFailNotification
     category: auth
     severity: warning
-    description: SNMPv3 privacy password failure on {_HOSTNAME}.
+    description: SNMPv3 privacy password failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3181.10.3.100.15
     name: MS-SWITCH30-MIB::snmpv3AccessPermissionNotification
     category: security
     severity: warning
-    description: SNMP write attempt without matching WriteView on {_HOSTNAME}.
+    description: SNMPv3 write attempt without matching WriteView on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3181.10.3.100.16
     name: MS-SWITCH30-MIB::snmpv3SeclevelFailNotification
     category: auth
     severity: warning
-    description: SNMPv3 security level mismatch detected on {_HOSTNAME}.
+    description: SNMPv3 security level mismatch detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.3
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapDebug
     category: diagnostic
     severity: debug
-    description: Debug event {g6TrapObjEventName} with severity {g6TrapObjSeverity} on {_HOSTNAME}.
+    description: Internal debug message {{value "g6TrapObjEventName"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -300,7 +300,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapAliveTest
     category: diagnostic
     severity: info
-    description: Alive test event {g6TrapObjEventName} reported on {_HOSTNAME}.
+    description: Alive test notification received on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -312,9 +312,9 @@ traps:
       - g6TrapObjDescription
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.5
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapFirmwareUpdateOk
-    category: config_change
-    severity: notice
-    description: Firmware installation completed successfully on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Firmware installation completed successfully on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -328,7 +328,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapFirmwareUpdateFail
     category: diagnostic
     severity: err
-    description: Firmware installation failed with event {g6TrapObjEventName} on {_HOSTNAME}.
+    description: Firmware installation failed on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -341,8 +341,8 @@ traps:
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.7
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapLicenseViolation
     category: license
-    severity: warning
-    description: 'License violation detected: {g6TrapObjDescription} on {_HOSTNAME}.'
+    severity: alert
+    description: 'License violation detected: firmware used without granted license on {{hostname}}.'
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -356,7 +356,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapColdStart
     category: state_change
     severity: notice
-    description: Device cold start detected on {_HOSTNAME}.
+    description: Device cold start detected on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -370,7 +370,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapWarmStart
     category: state_change
     severity: notice
-    description: Device warm start completed on {_HOSTNAME}.
+    description: Device warm start completed without service interruption on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -384,7 +384,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapFactoryReset
     category: config_change
     severity: notice
-    description: Configuration factory reset executed via local push button on {_HOSTNAME}.
+    description: Configuration factory reset executed via local push button on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -398,7 +398,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapConfigurationLoaded
     category: config_change
     severity: notice
-    description: Configuration restored and activated by {g6TrapObjSource} on {_HOSTNAME}.
+    description: Configuration file restored and activated on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -412,7 +412,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapChangeConfig
     category: config_change
     severity: notice
-    description: Configuration parameter modified and activated by {g6TrapObjSource} on {_HOSTNAME}.
+    description: Configuration parameter modified and activated on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -426,7 +426,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapChangeOfflineConfig
     category: config_change
     severity: notice
-    description: Offline configuration parameter modified by {g6TrapObjSource} on {_HOSTNAME}.
+    description: Offline configuration parameter modified on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -439,8 +439,8 @@ traps:
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.14
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapActionResponse
     category: diagnostic
-    severity: info
-    description: Action response for {g6TrapObjEventName} completed on {_HOSTNAME}.
+    severity: notice
+    description: Action response received with event {{value "g6TrapObjEventName"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -454,7 +454,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapCommitConfig
     category: config_change
     severity: notice
-    description: Configuration changes stored and activated on {_HOSTNAME}.
+    description: Configuration changes stored and activated on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -468,7 +468,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapPowerSupplyOk
     category: diagnostic
     severity: notice
-    description: Power supply restored on {_HOSTNAME}.
+    description: Power supply has been restored on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -481,8 +481,8 @@ traps:
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.17
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapPowerSupplyFail
     category: diagnostic
-    severity: err
-    description: Power supply failed with event {g6TrapObjEventName} on {_HOSTNAME}.
+    severity: crit
+    description: Power supply has failed on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -496,7 +496,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapLogin
     category: auth
     severity: notice
-    description: Operator logged onto the system on {_HOSTNAME}.
+    description: Operator logged onto the system on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -510,7 +510,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapLogout
     category: auth
     severity: notice
-    description: Operator logged off from the system on {_HOSTNAME}.
+    description: Operator logged off from the system on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -524,7 +524,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapLoginAttempt
     category: auth
     severity: warning
-    description: Operator login failed due to invalid credentials from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Operator login attempt failed on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -538,7 +538,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapLinkUp
     category: state_change
     severity: notice
-    description: Port {g6TrapObjPortString} link went online on {_HOSTNAME}.
+    description: Port {{first (value "g6TrapObjPortString") "link"}} went online on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -554,7 +554,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapLinkDown
     category: state_change
     severity: warning
-    description: Port {g6TrapObjPortString} link is down on {_HOSTNAME}.
+    description: Port {{first (value "g6TrapObjPortString") "link"}} went down on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -570,7 +570,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapRingNormal
     category: state_change
     severity: notice
-    description: Ring {g6TrapObjGroupName} returned to normal operation with protection available on {_HOSTNAME}.
+    description: Ring is back to normal operation with protection available on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -583,8 +583,8 @@ traps:
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.24
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapRingBackup
     category: state_change
-    severity: notice
-    description: Ring switched to redundant backup path on {_HOSTNAME}.
+    severity: warning
+    description: Ring switched to redundant backup path on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -598,7 +598,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapRingFailure
     category: state_change
     severity: crit
-    description: Ring failure detected with normal and backup path unavailable on {_HOSTNAME}.
+    description: Ring failure detected; normal and backup paths unavailable on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -612,7 +612,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapCouplingState
     category: state_change
     severity: warning
-    description: Coupling controller state change on port {g6TrapObjPortString} with event {g6TrapObjEventName} on {_HOSTNAME}.
+    description: Coupling controller state changed{{with value "g6TrapObjPortString"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -627,8 +627,8 @@ traps:
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.27
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapTemperatureOk
     category: diagnostic
-    severity: notice
-    description: Operating temperature is within acceptable limits on {_HOSTNAME}.
+    severity: info
+    description: Operating temperature is within acceptable limits on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -642,7 +642,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapTemperatureWarning
     category: diagnostic
     severity: warning
-    description: 'Operating temperature warning: {g6TrapObjDescription} on {_HOSTNAME}.'
+    description: Operating temperature warning on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -656,7 +656,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapTemperatureFailure
     category: diagnostic
     severity: crit
-    description: Temperature failure {g6TrapObjDescription} on {_HOSTNAME}.
+    description: Operating temperature failure detected on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -670,7 +670,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapMacAccepted
     category: security
     severity: notice
-    description: MAC address {g6TrapObjMac} authorized on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: MAC address {{value "g6TrapObjMac"}} authorized on {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -688,7 +688,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapMacAuthError
     category: security
     severity: warning
-    description: MAC authorization error for {g6TrapObjMac} on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: MAC authorization error on {{first (value "g6TrapObjPortString") "port"}} for {{value "g6TrapObjMac"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -706,7 +706,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapMacBlocked
     category: security
     severity: warning
-    description: MAC address {g6TrapObjMac} blocked on port {g6TrapObjPortString} VLAN {g6TrapObjVlanId} on {_HOSTNAME}.
+    description: MAC address {{value "g6TrapObjMac"}} blocked on {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -724,7 +724,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapMacBlockedVlan
     category: security
     severity: warning
-    description: MAC address {g6TrapObjMac} blocked on port {g6TrapObjPortString} for unauthorized VLAN {g6TrapObjVlanId} on {_HOSTNAME}.
+    description: MAC address {{value "g6TrapObjMac"}} blocked on unauthorized VLAN {{value "g6TrapObjVlanId"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -742,7 +742,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapMacDisconnected
     category: state_change
     severity: notice
-    description: MAC address {g6TrapObjMac} disconnected on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: MAC address disconnected on port {{value "g6TrapObjPortString"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -760,7 +760,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapSfpInserted
     category: state_change
     severity: notice
-    description: SFP module inserted on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: SFP module inserted on {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -776,7 +776,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapSfpRemoved
     category: state_change
     severity: warning
-    description: SFP module removed from port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: SFP module removed from {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -792,7 +792,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapSfpSignalPresent
     category: state_change
     severity: notice
-    description: SFP optical receive signal detected on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: SFP optical receive signal detected on {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -807,8 +807,8 @@ traps:
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.38
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapSfpSignalLoss
     category: diagnostic
-    severity: err
-    description: SFP signal loss detected on port {g6TrapObjPortString} on {_HOSTNAME}.
+    severity: warning
+    description: SFP signal loss detected on {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -824,7 +824,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapSfpSignalChange
     category: diagnostic
     severity: warning
-    description: SFP optical input power level change detected on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: SFP optical input power level changed on {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -840,7 +840,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapSfpMismatch
     category: diagnostic
     severity: warning
-    description: SFP mismatch detected on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: SFP module mismatch detected on {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -856,7 +856,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapPoeConnect
     category: state_change
     severity: notice
-    description: POE device connected and powered on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: POE device connected and powered on port {{first (value "g6TrapObjPortString") "link"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -872,7 +872,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapPoeVoltage
     category: diagnostic
     severity: warning
-    description: POE voltage too low on {g6TrapObjPortString} on {_HOSTNAME}.
+    description: POE operating voltage is too low on {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -887,8 +887,8 @@ traps:
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.43
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapPoeError
     category: diagnostic
-    severity: err
-    description: POE error on port {g6TrapObjPortString} with severity {g6TrapObjSeverity} on {_HOSTNAME}.
+    severity: warning
+    description: POE error occurred on port {{first (value "g6TrapObjPortString") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -904,7 +904,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapPoeClassmismatch
     category: diagnostic
     severity: warning
-    description: PoE power mismatch on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: POE power mismatch detected on port {{first (value "g6TrapObjPortString") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -920,7 +920,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapPoeDisconnect
     category: state_change
     severity: warning
-    description: POE device disconnected on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: POE device disconnected on port {{first (value "g6TrapObjPortString") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -936,7 +936,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapNtpFail
     category: diagnostic
     severity: warning
-    description: NTP client failure condition detected on {_HOSTNAME}.
+    description: NTP client failure condition detected on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -949,8 +949,8 @@ traps:
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.47
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapHardwareError
     category: diagnostic
-    severity: err
-    description: 'Hardware error detected: {g6TrapObjDescription} on {_HOSTNAME}.'
+    severity: crit
+    description: 'Hardware error detected{{with value "g6TrapObjDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -964,7 +964,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapSoftwareError
     category: diagnostic
     severity: err
-    description: Software error {g6TrapObjDescription} reported by {g6TrapObjSource} on {_HOSTNAME}.
+    description: 'Software error occurred{{with value "g6TrapObjDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -976,9 +976,9 @@ traps:
       - g6TrapObjDescription
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.49
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapButtonPressed
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: System button pressed on {_HOSTNAME}.
+    description: System button pressed on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -992,7 +992,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapInputSignalNormal
     category: state_change
     severity: notice
-    description: External input signal {g6TrapObjDescription} returned to normal state on {_HOSTNAME}.
+    description: External input signal returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1006,7 +1006,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapInputSignalActivated
     category: state_change
     severity: notice
-    description: External input signal activated with event {g6TrapObjEventName} on {_HOSTNAME}.
+    description: 'External input signal activated{{with value "g6TrapObjEventName"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1020,7 +1020,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapOutputRelayNormal
     category: state_change
     severity: notice
-    description: Relay output returned to normal state on {_HOSTNAME}.
+    description: Relay output returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1034,7 +1034,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapOutputRelayActivated
     category: state_change
     severity: notice
-    description: External input signal deactivated and returned to normal state on {_HOSTNAME}.
+    description: Output relay activated on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1048,7 +1048,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapPacketIntercepted
     category: security
     severity: warning
-    description: Special filter intercepted a data packet on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: Special filter intercepted a data packet on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1064,7 +1064,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapScriptUnitPositive
     category: diagnostic
     severity: warning
-    description: Positive unit event {g6TrapObjEventName} with severity {g6TrapObjSeverity} on {_HOSTNAME}.
+    description: Positive unit event {{value "g6TrapObjEventName"}} occurred on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1078,7 +1078,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapScriptUnitNegative
     category: diagnostic
     severity: warning
-    description: Negative unit event {g6TrapObjEventName} with severity {g6TrapObjSeverity} on {_HOSTNAME}.
+    description: Negative unit event {{value "g6TrapObjEventName"}} occurred on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1090,9 +1090,9 @@ traps:
       - g6TrapObjDescription
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.74
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapScriptPortPositive
-    category: state_change
-    severity: notice
-    description: Port {g6TrapObjPortString} event {g6TrapObjEventName} occurred on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: Positive port event {{value "g6TrapObjEventName"}} on {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1108,7 +1108,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapScriptPortNegative
     category: diagnostic
     severity: warning
-    description: Negative port event {g6TrapObjEventName} on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: Negative port event {{value "g6TrapObjEventName"}} on {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1124,7 +1124,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapScriptExecuted
     category: diagnostic
     severity: notice
-    description: Script execution {g6TrapObjEventName} started on {_HOSTNAME}.
+    description: User defined script execution started on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1137,8 +1137,8 @@ traps:
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.77
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapScriptError
     category: diagnostic
-    severity: warning
-    description: Script execution error {g6TrapObjDescription} on {_HOSTNAME}.
+    severity: err
+    description: 'Script execution error occurred{{with value "g6TrapObjDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1152,7 +1152,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapLoopRemoved
     category: state_change
     severity: notice
-    description: Cable loop removed and port unblocked on {_HOSTNAME}.
+    description: Cable loop removed and port unblocked on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1168,7 +1168,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapLoopDetected
     category: state_change
     severity: warning
-    description: Cable loop detected on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: Cable loop detected and port blocked on {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1184,7 +1184,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapLacpConnect
     category: state_change
     severity: notice
-    description: Aggregated link established on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: Aggregated link established on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1200,7 +1200,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapLacpDisconnect
     category: state_change
     severity: warning
-    description: Aggregated link down on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: Aggregated link went down on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1214,9 +1214,9 @@ traps:
       - g6TrapObjDescription
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.82
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapAppInstalled
-    category: config_change
+    category: diagnostic
     severity: info
-    description: Application installed successfully on {_HOSTNAME}.
+    description: Application installed successfully on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1230,7 +1230,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapAppInstallationFail
     category: diagnostic
     severity: err
-    description: App installation failed with {g6TrapObjDescription} on {_HOSTNAME}.
+    description: App installation has failed on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1244,7 +1244,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapAppDeinstalled
     category: diagnostic
     severity: notice
-    description: Application deinstalled on {_HOSTNAME}.
+    description: Application deinstalled on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1258,7 +1258,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapCableChangeDetected
     category: state_change
     severity: warning
-    description: Cable termination change detected on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: Cable termination change detected on {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1274,7 +1274,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapImplausibleConfig
     category: config_change
     severity: warning
-    description: Implausible configuration detected for {g6TrapObjEventName} on {_HOSTNAME}.
+    description: 'Implausible configuration detected{{with value "g6TrapObjDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1288,7 +1288,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapNetworkAttack
     category: security
     severity: alert
-    description: Potential network attack detected on {_HOSTNAME}.
+    description: Potential network attack detected on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1304,7 +1304,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapModuleInserted
     category: diagnostic
     severity: notice
-    description: Hardware module inserted into the system on {_HOSTNAME}.
+    description: Hardware module inserted on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1318,7 +1318,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapModuleRemoved
     category: diagnostic
     severity: warning
-    description: Hardware module removed on {_HOSTNAME}.
+    description: Hardware module removed on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1331,8 +1331,8 @@ traps:
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.90
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapMsp1000UnitPositive
     category: diagnostic
-    severity: warning
-    description: MSP1000 unit event {g6TrapObjEventName} with severity {g6TrapObjSeverity} on {_HOSTNAME}.
+    severity: notice
+    description: Positive MSP1000 unit event {{value "g6TrapObjEventName"}} occurred on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1346,7 +1346,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapMsp1000UnitNegative
     category: diagnostic
     severity: warning
-    description: Negative event {g6TrapObjEventName} with severity {g6TrapObjSeverity} on {_HOSTNAME}.
+    description: Negative MSP1000 unit event {{value "g6TrapObjEventName"}} occurred on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1360,7 +1360,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapMsp1000PortPositive
     category: diagnostic
     severity: warning
-    description: Port {g6TrapObjPortString} event {g6TrapObjEventName} occurred on {_HOSTNAME}.
+    description: Positive MSP1000 port event {{value "g6TrapObjEventName"}} on {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1376,7 +1376,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapMsp1000PortNegative
     category: diagnostic
     severity: warning
-    description: Negative port event {g6TrapObjEventName} on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: Negative MSP1000 port event {{value "g6TrapObjEventName"}} on {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1390,9 +1390,9 @@ traps:
       - g6TrapObjDescription
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.94
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapBackupTerminated
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Backup path terminated for {g6TrapObjPortString} on {_HOSTNAME}.
+    description: Backup path not required on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1408,7 +1408,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapBackupEngaged
     category: state_change
     severity: warning
-    description: Backup path engaged for {g6TrapObjPortString} on {_HOSTNAME}.
+    description: Backup path has been engaged on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1424,7 +1424,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapBackupFailure
     category: diagnostic
     severity: err
-    description: Backup path could not be completed on {_HOSTNAME}.
+    description: Backup path could not be completed on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1440,7 +1440,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapFanOk
     category: diagnostic
     severity: notice
-    description: Cooling fan operating normally on {_HOSTNAME}.
+    description: Cooling fan is operating normally on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1454,7 +1454,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapFanDegraded
     category: diagnostic
     severity: warning
-    description: Cooling fan degraded on {_HOSTNAME}.
+    description: Cooling fan degraded on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1467,8 +1467,8 @@ traps:
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.99
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapFanFailure
     category: diagnostic
-    severity: crit
-    description: Cooling fan failed on {_HOSTNAME}.
+    severity: alert
+    description: Cooling fan failed on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1482,7 +1482,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapIncomingAlert
     category: diagnostic
     severity: warning
-    description: Incoming alert {g6TrapObjEventName} with severity {g6TrapObjSeverity} on {_HOSTNAME}.
+    description: 'Incoming alert received{{with value "g6TrapObjDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1496,7 +1496,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapCableTerminationEstablished
     category: state_change
     severity: notice
-    description: Cable termination established on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: Cable termination established on {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1512,7 +1512,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapCableTerminationLost
     category: state_change
     severity: warning
-    description: Cable termination lost on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: Cable termination lost on {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1528,7 +1528,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapTerminalServerConnected
     category: state_change
     severity: notice
-    description: Terminal server connected to local serial port on {_HOSTNAME}.
+    description: Terminal server connected to local serial port on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1542,7 +1542,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapTerminalServerDisconnected
     category: state_change
     severity: notice
-    description: Terminal server disconnected foreign host from local serial port on {_HOSTNAME}.
+    description: Terminal server disconnected foreign host from local serial port on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1556,7 +1556,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapTerminalServerFail
     category: diagnostic
     severity: err
-    description: Terminal server failed to connect foreign host to local serial port on {_HOSTNAME}.
+    description: Terminal server failed to connect foreign host to local serial port on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1570,7 +1570,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapSensorGroupChange
     category: diagnostic
     severity: notice
-    description: Sensor group {g6TrapObjOfficeGroupName} values changed with severity {g6TrapObjSeverity} on {_HOSTNAME}.
+    description: Sensor group {{value "g6TrapObjOfficeGroupName"}} values changed on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1585,9 +1585,9 @@ traps:
       - g6TrapObjDescription
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.110
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapActorGroupChangeRequest
-    category: config_change
+    category: state_change
     severity: notice
-    description: Actor group {g6TrapObjGroupName} change requested by {g6TrapObjSource} on {_HOSTNAME}.
+    description: Actor group change requested{{with value "g6TrapObjGroupName"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1601,7 +1601,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapRegisterSmartDevice
     category: state_change
     severity: notice
-    description: Smart device registered on {_HOSTNAME}.
+    description: New smart device registered on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1615,7 +1615,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapUpdateSmartDevice
     category: state_change
     severity: warning
-    description: Smart device {g6TrapObjSysName} status changed to {g6TrapObjEventName} on {_HOSTNAME}.
+    description: Smart device status changed {{value "g6TrapObjEventName"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1628,8 +1628,8 @@ traps:
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.115
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapRegisterSmartAttribute
     category: diagnostic
-    severity: notice
-    description: Smart attribute {g6TrapObjSysName} registered with severity {g6TrapObjSeverity} on {_HOSTNAME}.
+    severity: info
+    description: New smart attribute registered on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1643,7 +1643,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapUnregisterSmartDevice
     category: state_change
     severity: notice
-    description: Smart device unregistered on {_HOSTNAME}.
+    description: Smart device unregistered on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1655,9 +1655,9 @@ traps:
       - g6TrapObjDescription
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.118
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapUnregisterSmartAttribute
-    category: config_change
+    category: diagnostic
     severity: notice
-    description: Smart attribute {g6TrapObjEventName} unregistered on {_HOSTNAME}.
+    description: 'Smart attribute unregistered{{with value "g6TrapObjDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1670,8 +1670,8 @@ traps:
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.119
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapSingleActorChange
     category: state_change
-    severity: notice
-    description: Actor {g6TrapObjEventName} changed state in group {g6TrapObjGroupName} on {_HOSTNAME}.
+    severity: warning
+    description: Actor {{value "g6TrapObjEventName"}} changed state on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1685,7 +1685,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapActorGroupChanged
     category: state_change
     severity: notice
-    description: Actor group {g6TrapObjOfficeGroupName} changed state on {_HOSTNAME}.
+    description: Actor group {{value "g6TrapObjOfficeGroupName"}} changed on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1699,9 +1699,9 @@ traps:
       - g6TrapObjDescription
   - oid: 1.3.6.1.4.1.3181.10.6.1.1.121
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapSmartOfficeInitializing
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Smart Office initialization started on {_HOSTNAME}.
+    description: Smart Office initialization started on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1715,7 +1715,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapSmartOfficeStarted
     category: state_change
     severity: notice
-    description: Smart Office started and ready on {_HOSTNAME}.
+    description: Smart Office is started and ready on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1729,7 +1729,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapSmartOfficeStopped
     category: state_change
     severity: notice
-    description: Smart Office service stopped on {_HOSTNAME}.
+    description: Smart Office service is being stopped on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1743,7 +1743,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapSmartOfficeError
     category: diagnostic
     severity: warning
-    description: Smart Office error {g6TrapObjDescription} on {_HOSTNAME}.
+    description: 'Smart Office error occurred{{with value "g6TrapObjDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - g6TrapObjEventName
@@ -1757,7 +1757,7 @@ traps:
     name: MICROSENS-G6-NOTIFICATION-MIB::g6TrapOtdrMeasurements
     category: diagnostic
     severity: warning
-    description: OTDR measurement detected optical characteristic change on port {g6TrapObjPortString} on {_HOSTNAME}.
+    description: OTDR detected optical cable change on {{first (value "g6TrapObjPortString") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - g6TrapObjEventName

@@ -228,8 +228,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.1
     name: CPS-MIB::communicationLost
     category: diagnostic
-    severity: alert
-    description: 'Communication with UPS lost, detail: {mtrapinfoString} on {_HOSTNAME}.'
+    severity: crit
+    description: Communication with the UPS has been lost on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -237,31 +237,31 @@ traps:
     name: CPS-MIB::upsOverload
     category: diagnostic
     severity: warning
-    description: UPS overload condition detected with {mtrapinfoString} on {_HOSTNAME}.
+    description: 'UPS overload condition detected{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.3
     name: CPS-MIB::upsDiagnosticsFailed
     category: diagnostic
-    severity: err
-    description: UPS battery test failed with detail {mtrapinfoString} on {_HOSTNAME}.
+    severity: alert
+    description: 'UPS battery test failed{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.4
     name: CPS-MIB::upsDischarged
     category: diagnostic
-    severity: notice
-    description: UPS runtime estimation started on {_HOSTNAME}.
+    severity: alert
+    description: UPS discharged and started runtime estimation on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.5
     name: CPS-MIB::upsOnBattery
-    category: diagnostic
+    category: state_change
     severity: alert
-    description: Utility power failed, UPS transferred to backup mode on {_HOSTNAME}.
+    description: UPS transferred to backup battery mode due to utility power failure on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -269,15 +269,15 @@ traps:
     name: CPS-MIB::upsBoostOn
     category: diagnostic
     severity: warning
-    description: UPS boost enabled due to low utility voltage on {_HOSTNAME}.
+    description: UPS boost enabled due to low utility voltage on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.7
     name: CPS-MIB::lowBattery
     category: diagnostic
-    severity: warning
-    description: UPS battery capacity is low on {_HOSTNAME}.
+    severity: alert
+    description: UPS battery capacity is low and soon to be exhausted on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -285,7 +285,7 @@ traps:
     name: CPS-MIB::communicationEstablished
     category: state_change
     severity: notice
-    description: Communication to the UPS has been established on {_HOSTNAME}.
+    description: Communication to the UPS has been established on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -293,7 +293,7 @@ traps:
     name: CPS-MIB::powerRestored
     category: diagnostic
     severity: notice
-    description: Utility power restored on {_HOSTNAME}.
+    description: Utility power restored, return from backup mode on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -301,23 +301,23 @@ traps:
     name: CPS-MIB::upsDiagnosticsPassed
     category: diagnostic
     severity: info
-    description: UPS battery test passed on {_HOSTNAME}.
+    description: UPS battery test passed on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.11
     name: CPS-MIB::returnFromLowBattery
     category: diagnostic
-    severity: info
-    description: UPS returned from low battery condition on {_HOSTNAME}.
+    severity: notice
+    description: UPS returned from low battery condition on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.12
     name: CPS-MIB::upsTurnedOff
-    category: diagnostic
-    severity: warning
-    description: UPS has been turned off on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: UPS has been turned off on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -325,7 +325,7 @@ traps:
     name: CPS-MIB::upsSleeping
     category: diagnostic
     severity: warning
-    description: UPS entered sleep mode, output power not provided on {_HOSTNAME}.
+    description: UPS entered sleep mode and output power is not provided on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -333,23 +333,23 @@ traps:
     name: CPS-MIB::upsWokeUp
     category: state_change
     severity: notice
-    description: UPS woke up from sleep mode on {_HOSTNAME}.
+    description: UPS woke up from sleep mode and is providing output power on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.15
     name: CPS-MIB::upsRebootStarted
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS reboot sequence started on {_HOSTNAME}.
+    description: UPS reboot sequence started on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.16
     name: CPS-MIB::upsOverTemp
     category: diagnostic
-    severity: warning
-    description: UPS inner temperature is too high on {_HOSTNAME}.
+    severity: crit
+    description: UPS inner temperature is too high on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -357,7 +357,7 @@ traps:
     name: CPS-MIB::returnFromOverTemp
     category: diagnostic
     severity: notice
-    description: Over temperature condition cleared on {_HOSTNAME}.
+    description: UPS over temperature condition cleared on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -365,7 +365,7 @@ traps:
     name: CPS-MIB::upsBuckOn
     category: diagnostic
     severity: warning
-    description: UPS enabled buck mode due to high utility voltage on {_HOSTNAME}.
+    description: UPS buck mode enabled due to high utility voltage on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -373,7 +373,7 @@ traps:
     name: CPS-MIB::returnFromOverLoad
     category: state_change
     severity: notice
-    description: UPS returned from overload condition on {_HOSTNAME}.
+    description: UPS returned from overload condition on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -381,15 +381,15 @@ traps:
     name: CPS-MIB::returnFromDischarged
     category: diagnostic
     severity: info
-    description: UPS runtime estimation completed on {_HOSTNAME}.
+    description: UPS runtime estimation completed on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.21
     name: CPS-MIB::upsScheduleShutdown
-    category: diagnostic
-    severity: notice
-    description: UPS started scheduled shutdown sequence on {_HOSTNAME}.
+    category: state_change
+    severity: warning
+    description: UPS has started its scheduled shutdown sequence on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -397,15 +397,15 @@ traps:
     name: CPS-MIB::upsEnterSleep
     category: diagnostic
     severity: notice
-    description: UPS entered sleep sequence on {_HOSTNAME}.
+    description: UPS entered sleep sequence on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.23
     name: CPS-MIB::upsChargerFailure
     category: diagnostic
-    severity: warning
-    description: 'Battery charger abnormal: {mtrapinfoString} on {_HOSTNAME}.'
+    severity: crit
+    description: UPS battery charger is abnormal on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -413,15 +413,15 @@ traps:
     name: CPS-MIB::returnFromChargerFailure
     category: diagnostic
     severity: notice
-    description: Charger returned from failure condition on {_HOSTNAME}.
+    description: Charger returned from a failure condition on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.25
     name: CPS-MIB::upsTurnoffStarted
     category: state_change
-    severity: warning
-    description: UPS turn-off sequence started on {_HOSTNAME}.
+    severity: alert
+    description: 'UPS turn off sequence started{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
@@ -429,7 +429,7 @@ traps:
     name: CPS-MIB::upsTurnedOn
     category: state_change
     severity: notice
-    description: UPS has been turned on on {_HOSTNAME}.
+    description: UPS has been turned on on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -437,15 +437,15 @@ traps:
     name: CPS-MIB::upsRemoteCommandFailed
     category: diagnostic
     severity: err
-    description: UPS remote command failed with {mtrapinfoString} on {_HOSTNAME}.
+    description: 'UPS remote command failed{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.28
     name: CPS-MIB::upsLostRedundant
     category: diagnostic
-    severity: warning
-    description: Not enough power redundancy modules reported by {mtrapinfoString} on {_HOSTNAME}.
+    severity: alert
+    description: 'UPS lost redundant power modules{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
@@ -453,23 +453,23 @@ traps:
     name: CPS-MIB::upsSignalClientShutdown
     category: diagnostic
     severity: alert
-    description: UPS has signaled clients to shutdown on {_HOSTNAME}.
+    description: UPS signaled clients to shutdown on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.30
     name: CPS-MIB::upsEmergencyPowerOff
-    category: diagnostic
+    category: security
     severity: alert
-    description: Emergency Power Off (EPO) event detected on {_HOSTNAME}.
+    description: Emergency Power Off (EPO) event detected on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.31
     name: CPS-MIB::nclBankOn
     category: state_change
-    severity: notice
-    description: Non-critical bank turned on with detail {mtrapinfoString} on {_HOSTNAME}.
+    severity: info
+    description: Non-critical bank has been turned on on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -477,23 +477,23 @@ traps:
     name: CPS-MIB::nclBankOff
     category: state_change
     severity: notice
-    description: Non-Critical bank turned off with {mtrapinfoString} on {_HOSTNAME}.
+    description: 'Non-critical bank turned off{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.33
     name: CPS-MIB::upsCommandCancel
-    category: config_change
+    category: state_change
     severity: notice
-    description: UPS command cancel executed on {_HOSTNAME}.
+    description: UPS command cancel executed on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.34
     name: CPS-MIB::upsStartBatteryTest
     category: diagnostic
-    severity: notice
-    description: UPS battery test started on {_HOSTNAME}.
+    severity: info
+    description: UPS started a battery test process on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -501,7 +501,7 @@ traps:
     name: CPS-MIB::upsRemainRuntimeLowThanThreshold
     category: diagnostic
     severity: warning
-    description: UPS remaining runtime is lower than threshold on {_HOSTNAME}.
+    description: UPS remaining runtime is lower than threshold on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -509,7 +509,7 @@ traps:
     name: CPS-MIB::nclBankStartScheduleOff
     category: state_change
     severity: notice
-    description: Non-critical bank schedule off sequence started on {_HOSTNAME}.
+    description: Non-critical bank started its schedule off sequence on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -517,15 +517,15 @@ traps:
     name: CPS-MIB::upsEstimationAbort
     category: diagnostic
     severity: warning
-    description: UPS runtime estimation aborted on {_HOSTNAME}.
+    description: 'UPS runtime estimation aborted{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.38
     name: CPS-MIB::upsHardwareFault
     category: diagnostic
-    severity: err
-    description: UPS hardware fault reported with detail {mtrapinfoString} on {_HOSTNAME}.
+    severity: alert
+    description: 'UPS hardware fault detected{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
@@ -533,15 +533,15 @@ traps:
     name: CPS-MIB::upsBatteryNotPresent
     category: diagnostic
     severity: warning
-    description: UPS battery not detected on {_HOSTNAME}.
+    description: UPS battery is not present on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.40
     name: CPS-MIB::upsWiringFault
     category: diagnostic
-    severity: err
-    description: UPS wiring fault detected with detail {mtrapinfoString} on {_HOSTNAME}.
+    severity: alert
+    description: 'UPS wiring fault detected{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
@@ -549,7 +549,7 @@ traps:
     name: CPS-MIB::upsWiringFaultCleared
     category: diagnostic
     severity: notice
-    description: UPS wiring fault cleared on {_HOSTNAME}.
+    description: UPS wiring fault has been cleared on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -557,7 +557,7 @@ traps:
     name: CPS-MIB::upsEnterBypassMode
     category: state_change
     severity: warning
-    description: UPS entered bypass mode on {_HOSTNAME}.
+    description: 'UPS entered bypass mode{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
@@ -565,7 +565,7 @@ traps:
     name: CPS-MIB::upsReturnFromBypassMode
     category: state_change
     severity: notice
-    description: UPS returned from bypass mode on {_HOSTNAME}.
+    description: UPS returned from bypass mode on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -573,15 +573,15 @@ traps:
     name: CPS-MIB::upsBypassOverload
     category: diagnostic
     severity: warning
-    description: UPS bypass overload detected on {_HOSTNAME}.
+    description: 'UPS bypass overload detected{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.45
     name: CPS-MIB::upsBypassOverloadCleared
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS bypass overload cleared on {_HOSTNAME}.
+    description: UPS bypass overload cleared on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -589,7 +589,7 @@ traps:
     name: CPS-MIB::upsEnterECOMode
     category: state_change
     severity: notice
-    description: UPS entered ECO mode on {_HOSTNAME}.
+    description: UPS entered ECO mode on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -597,7 +597,7 @@ traps:
     name: CPS-MIB::upsReturnFromECOMode
     category: state_change
     severity: notice
-    description: UPS left ECO mode on {_HOSTNAME}.
+    description: UPS returned from ECO mode on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -605,7 +605,7 @@ traps:
     name: CPS-MIB::upsBatteryOverThreeYear
     category: diagnostic
     severity: warning
-    description: 'UPS battery warning: battery has been 3 years from last replacement on {_HOSTNAME}.'
+    description: 'UPS battery warning: battery has been 3 years from last replacement on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
@@ -613,23 +613,23 @@ traps:
     name: CPS-MIB::upsBatteryExpiration
     category: diagnostic
     severity: warning
-    description: 'UPS battery warning: {mtrapinfoString} on {_HOSTNAME}.'
+    description: UPS battery may not work well anymore on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.50
     name: CPS-MIB::upsBatteryReplacement
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS battery replacement detected on {_HOSTNAME}.
+    description: UPS battery replacement detected on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.51
     name: CPS-MIB::upsModuleInvertorAlarm
     category: diagnostic
-    severity: warning
-    description: UPS module inverter alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: 'UPS module invertor alarm detected{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
@@ -637,7 +637,7 @@ traps:
     name: CPS-MIB::upsModuleRectifierAlarm
     category: diagnostic
     severity: warning
-    description: UPS module rectifier alarm detected on {_HOSTNAME}.
+    description: 'UPS module rectifier alarm detected{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
@@ -645,15 +645,15 @@ traps:
     name: CPS-MIB::upsModuleFanAlarm
     category: diagnostic
     severity: warning
-    description: UPS module fan alarm detected with detail {mtrapinfoString} on {_HOSTNAME}.
+    description: UPS module fan alarm detected on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.54
     name: CPS-MIB::upsModuleManualShutdown
-    category: diagnostic
-    severity: warning
-    description: UPS module manual shutdown detected on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: UPS module manual shutdown detected on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -661,39 +661,39 @@ traps:
     name: CPS-MIB::upsModuleOverload
     category: diagnostic
     severity: warning
-    description: UPS module overload detected with detail {mtrapinfoString} on {_HOSTNAME}.
+    description: 'UPS module overload detected{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.56
     name: CPS-MIB::upsFirmwareUpgradeStart
-    category: config_change
+    category: diagnostic
     severity: notice
-    description: UPS firmware upgrade started on {_HOSTNAME}.
+    description: UPS firmware upgrade started on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.57
     name: CPS-MIB::upsFirmwareUpgradeEnd
-    category: config_change
+    category: diagnostic
     severity: notice
-    description: UPS firmware update completed on {_HOSTNAME}.
+    description: UPS firmware upgrade completed on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.58
     name: CPS-MIB::upsRFC1628TrapOnBattery
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: UPS is on battery on {_HOSTNAME}.
+    description: UPS switched to battery power on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.59
     name: CPS-MIB::upsRFC1628TrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS test completed on {_HOSTNAME}.
+    severity: info
+    description: UPS test completed on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -701,7 +701,7 @@ traps:
     name: CPS-MIB::upsRFC1628TrapAlarmEntryAdded
     category: diagnostic
     severity: warning
-    description: UPS alarm entry added with detail {mtrapinfoString} on {_HOSTNAME}.
+    description: 'UPS alarm entry added{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
@@ -709,7 +709,7 @@ traps:
     name: CPS-MIB::failAuthViaHTTP
     category: auth
     severity: warning
-    description: Login authorization failure via HTTP from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: 'Login authorization failure via HTTP{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
@@ -717,7 +717,7 @@ traps:
     name: CPS-MIB::passwordChange
     category: auth
     severity: notice
-    description: Password changed on {_HOSTNAME}.
+    description: Password changed on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -725,7 +725,7 @@ traps:
     name: CPS-MIB::failAuthViaConsole
     category: auth
     severity: warning
-    description: Login authorization failure via Console reported by {mtrapinfoString} on {_HOSTNAME}.
+    description: Login authorization failure via Console on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -733,7 +733,7 @@ traps:
     name: CPS-MIB::configFileUpload
     category: config_change
     severity: notice
-    description: Configuration file uploaded on {_HOSTNAME}.
+    description: Configuration file uploaded on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -741,7 +741,7 @@ traps:
     name: CPS-MIB::adminLoginInfo
     category: auth
     severity: notice
-    description: Administrator login detected on {_HOSTNAME}.
+    description: Administrator login on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -749,7 +749,7 @@ traps:
     name: CPS-MIB::adminLogoutInfo
     category: auth
     severity: notice
-    description: Administrator logout on {_HOSTNAME}.
+    description: Administrator logout on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -757,7 +757,7 @@ traps:
     name: CPS-MIB::deviceLoginInfo
     category: auth
     severity: notice
-    description: Device login event recorded on {_HOSTNAME}.
+    description: Device login event on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -765,7 +765,7 @@ traps:
     name: CPS-MIB::deviceLogoutInfo
     category: auth
     severity: notice
-    description: Device logout event received on {_HOSTNAME}.
+    description: 'Device logout{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
@@ -773,7 +773,7 @@ traps:
     name: CPS-MIB::configurationChanged
     category: config_change
     severity: notice
-    description: Configuration changed with detail {mtrapinfoString} on {_HOSTNAME}.
+    description: Configuration has been changed{{with value "mtrapinfoString"}} {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -781,7 +781,7 @@ traps:
     name: CPS-MIB::clientRegistered
     category: state_change
     severity: notice
-    description: PowerPanel client registered on {_HOSTNAME}.
+    description: PowerPanel client registered on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -789,15 +789,15 @@ traps:
     name: CPS-MIB::clientRemoved
     category: state_change
     severity: notice
-    description: PowerPanel client removed on {_HOSTNAME}.
+    description: PowerPanel client removed on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.72
     name: CPS-MIB::testEvent
-    category: unknown
+    category: diagnostic
     severity: info
-    description: Test event received with message {mtrapinfoString} on {_HOSTNAME}.
+    description: 'Test event occurred{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
@@ -805,7 +805,7 @@ traps:
     name: CPS-MIB::outletUserLoginInfo
     category: auth
     severity: notice
-    description: Outlet user login event detected on {_HOSTNAME}.
+    description: Outlet user login event on {{hostname}}.
     status: current
     varbinds:
       - mtrapinfoString
@@ -813,7 +813,7 @@ traps:
     name: CPS-MIB::outletUserLogoutInfo
     category: auth
     severity: notice
-    description: Outlet user logout on {_HOSTNAME}.
+    description: 'Outlet user logout{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mtrapinfoString
@@ -821,7 +821,7 @@ traps:
     name: CPS-MIB::ePDUCommunicationEstablished
     category: state_change
     severity: notice
-    description: Communication established with Rack PDU {ePDUIdentName} (serial {ePDUIdentSerialNumber}) on {_HOSTNAME}.
+    description: Communication established with Rack PDU {{value "ePDUIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -830,8 +830,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.101
     name: CPS-MIB::ePDUCommunicationLost
     category: diagnostic
-    severity: alert
-    description: Communication with Rack PDU {ePDUIdentName} (serial {ePDUIdentSerialNumber}) lost on {_HOSTNAME}.
+    severity: crit
+    description: Communication with Rack PDU {{value "ePDUIdentName"}} lost on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -841,7 +841,7 @@ traps:
     name: CPS-MIB::ePDUOutletOn
     category: state_change
     severity: notice
-    description: Outlet {ePDUOutletControlOutletName} on PDU {ePDUIdentName} turned on on {_HOSTNAME}.
+    description: Outlet {{value "ePDUOutletControlOutletName"}} on {{value "ePDUIdentName"}} turned on on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -853,7 +853,7 @@ traps:
     name: CPS-MIB::ePDUOutletOff
     category: state_change
     severity: notice
-    description: Outlet {ePDUOutletControlOutletName} turned off on {ePDUIdentName} on {_HOSTNAME}.
+    description: Outlet {{value "ePDUOutletControlOutletName"}} on {{value "ePDUIdentName"}} turned off on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -865,7 +865,7 @@ traps:
     name: CPS-MIB::ePDUDeviceConfigChange
     category: config_change
     severity: notice
-    description: Device configuration changed on Rack PDU {ePDUIdentName} (serial {ePDUIdentSerialNumber}) on {_HOSTNAME}.
+    description: Rack PDU configuration changed on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -875,7 +875,7 @@ traps:
     name: CPS-MIB::ePDUOutletConfigChange
     category: config_change
     severity: notice
-    description: Outlet configuration changed for {ePDUOutletControlOutletName} on {ePDUIdentName} on {_HOSTNAME}.
+    description: Outlet configuration changed on {{value "ePDUIdentName"}} outlet {{value "ePDUOutletControlOutletName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -887,7 +887,7 @@ traps:
     name: CPS-MIB::ePDULowLoad
     category: diagnostic
     severity: warning
-    description: Rack PDU {ePDUIdentName} phase {ePDULoadStatusPhaseNumber} violated low load threshold on {_HOSTNAME}.
+    description: Rack PDU {{value "ePDUIdentName"}} on phase {{value "ePDULoadStatusPhaseNumber"}} violated low load threshold on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -898,7 +898,7 @@ traps:
     name: CPS-MIB::ePDULowLoadCleared
     category: diagnostic
     severity: notice
-    description: Low load condition cleared on Rack PDU {ePDUIdentName} phase {ePDULoadStatusPhaseNumber} on {_HOSTNAME}.
+    description: Low load condition cleared on {{value "ePDUIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -909,7 +909,7 @@ traps:
     name: CPS-MIB::ePDUNearOverload
     category: diagnostic
     severity: warning
-    description: Rack PDU {ePDUIdentName} phase {ePDULoadStatusPhaseNumber} near overload on {_HOSTNAME}.
+    description: Rack PDU {{value "ePDUIdentName"}} near overload on phase {{value "ePDULoadStatusPhaseNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -918,9 +918,9 @@ traps:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.109
     name: CPS-MIB::ePDUNearOverloadCleared
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Near overload condition cleared for phase {ePDULoadStatusPhaseNumber} on {ePDUIdentName} on {_HOSTNAME}.
+    description: Near overload condition cleared for {{value "ePDUIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -931,7 +931,7 @@ traps:
     name: CPS-MIB::ePDUOverload
     category: diagnostic
     severity: alert
-    description: Rack PDU {ePDUIdentName} overload on phase {ePDULoadStatusPhaseNumber} on {_HOSTNAME}.
+    description: Rack PDU {{value "ePDUIdentName"}} overload on phase {{value "ePDULoadStatusPhaseNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -942,7 +942,7 @@ traps:
     name: CPS-MIB::ePDUOverloadCleared
     category: diagnostic
     severity: notice
-    description: Overload condition cleared for phase {ePDULoadStatusPhaseNumber} on {ePDUIdentName} on {_HOSTNAME}.
+    description: Overload condition cleared on {{value "ePDUIdentName"}} phase {{value "ePDULoadStatusPhaseNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -953,7 +953,7 @@ traps:
     name: CPS-MIB::ePDUDelayOutletOnCommand
     category: state_change
     severity: notice
-    description: Outlet {ePDUOutletControlOutletName} (index {ePDUOutletControlIndex}) on PDU {ePDUIdentName} turned on on {_HOSTNAME}.
+    description: Outlet {{value "ePDUOutletControlOutletName"}} on {{value "ePDUIdentName"}} turned on on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -965,7 +965,7 @@ traps:
     name: CPS-MIB::ePDUDelayOutletOffCommand
     category: state_change
     severity: notice
-    description: Outlet {ePDUOutletControlOutletName} assigned to turn off on {_HOSTNAME}.
+    description: Outlet {{value "ePDUOutletControlOutletName"}} scheduled to turn off on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -977,7 +977,7 @@ traps:
     name: CPS-MIB::ePDUDelayOutletRebootCommand
     category: state_change
     severity: notice
-    description: Outlet {ePDUOutletControlOutletName} on PDU {ePDUIdentName} assigned to reboot on {_HOSTNAME}.
+    description: Outlet {{value "ePDUOutletControlOutletName"}} reboot command issued on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -989,7 +989,7 @@ traps:
     name: CPS-MIB::ePDUCancelPendingCommand
     category: config_change
     severity: notice
-    description: Pending command cancelled for outlet {ePDUOutletControlOutletName} on {ePDUIdentName} on {_HOSTNAME}.
+    description: Cancel pending command issued for outlet {{value "ePDUOutletControlOutletName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1000,8 +1000,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.116
     name: CPS-MIB::ePDULineUndervoltage
     category: diagnostic
-    severity: warning
-    description: Utility line undervoltage detected on phase {ePDULoadStatusPhaseNumber} for PDU {ePDUIdentName} on {_HOSTNAME}.
+    severity: alert
+    description: E-PDU line undervoltage detected on phase {{value "ePDULoadStatusPhaseNumber"}} of {{value "ePDUIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1012,7 +1012,7 @@ traps:
     name: CPS-MIB::ePDULineUndervoltageCleared
     category: diagnostic
     severity: notice
-    description: Utility line undervoltage cleared for phase {ePDULoadStatusPhaseNumber} on device {ePDUIdentName} on {_HOSTNAME}.
+    description: Utility line undervoltage cleared on phase {{value "ePDULoadStatusPhaseNumber"}} of {{value "ePDUIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1023,7 +1023,7 @@ traps:
     name: CPS-MIB::ePDULineOvervoltage
     category: diagnostic
     severity: alert
-    description: Utility line overvoltage detected on phase {ePDULoadStatusPhaseNumber} for PDU {ePDUIdentName} on {_HOSTNAME}.
+    description: Utility line overvoltage detected on phase {{value "ePDULoadStatusPhaseNumber"}} of {{value "ePDUIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1034,7 +1034,7 @@ traps:
     name: CPS-MIB::ePDULineOvervoltageCleared
     category: diagnostic
     severity: notice
-    description: Utility line overvoltage cleared for phase {ePDULoadStatusPhaseNumber} on {ePDUIdentName} on {_HOSTNAME}.
+    description: Utility line overvoltage cleared on {{value "ePDUIdentName"}} phase {{value "ePDULoadStatusPhaseNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1045,7 +1045,7 @@ traps:
     name: CPS-MIB::ePDUPowerSupply1Fail
     category: diagnostic
     severity: crit
-    description: Power Supply 1 on Rack PDU {ePDUIdentName} reported FAIL state on {_HOSTNAME}.
+    description: Power Supply 1 on {{value "ePDUIdentName"}} failed on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1054,8 +1054,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.121
     name: CPS-MIB::ePDUPowerSupply1Ok
     category: diagnostic
-    severity: notice
-    description: Power Supply 1 on Rack PDU {ePDUIdentName} is operating normally on {_HOSTNAME}.
+    severity: info
+    description: Power Supply 1 on {{value "ePDUIdentName"}} is operating normally on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1065,7 +1065,7 @@ traps:
     name: CPS-MIB::ePDUPowerSupply2Fail
     category: diagnostic
     severity: crit
-    description: Power Supply 2 failed on {ePDUIdentName} (serial {ePDUIdentSerialNumber}) on {_HOSTNAME}.
+    description: Power Supply 2 on {{value "ePDUIdentName"}} failed on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1074,8 +1074,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.123
     name: CPS-MIB::ePDUPowerSupply2Ok
     category: diagnostic
-    severity: notice
-    description: Power Supply 2 on Rack PDU {ePDUIdentName} is operating normally on {_HOSTNAME}.
+    severity: info
+    description: Power Supply 2 on {{value "ePDUIdentName"}} is operating normally on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1085,7 +1085,7 @@ traps:
     name: CPS-MIB::ePDUBankLowLoad
     category: diagnostic
     severity: warning
-    description: Rack PDU bank {ePDULoadStatusBankNumber} violated low load threshold on {_HOSTNAME}.
+    description: Rack PDU {{value "ePDUIdentName"}} bank {{value "ePDULoadStatusBankNumber"}} violated low load threshold on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1096,7 +1096,7 @@ traps:
     name: CPS-MIB::ePDUBankLowLoadCleared
     category: diagnostic
     severity: notice
-    description: Low load condition cleared on bank {ePDULoadStatusBankNumber} of device {ePDUIdentName} on {_HOSTNAME}.
+    description: Low load condition cleared on bank {{value "ePDULoadStatusBankNumber"}} of {{value "ePDUIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1107,7 +1107,7 @@ traps:
     name: CPS-MIB::ePDUBankNearOverload
     category: diagnostic
     severity: warning
-    description: Rack PDU {ePDUIdentName} bank {ePDULoadStatusBankNumber} near overload on {_HOSTNAME}.
+    description: Rack PDU bank {{value "ePDULoadStatusBankNumber"}} near overload on {{value "ePDUIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1118,7 +1118,7 @@ traps:
     name: CPS-MIB::ePDUBankNearOverloadCleared
     category: diagnostic
     severity: notice
-    description: Near overload condition cleared for bank {ePDULoadStatusBankNumber} on {ePDUIdentName} on {_HOSTNAME}.
+    description: Near overload condition cleared on bank {{value "ePDULoadStatusBankNumber"}} of {{value "ePDUIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1129,7 +1129,7 @@ traps:
     name: CPS-MIB::ePDUBankOverload
     category: diagnostic
     severity: alert
-    description: Rack PDU {ePDUIdentName} bank {ePDULoadStatusBankNumber} overload on {_HOSTNAME}.
+    description: Rack PDU {{value "ePDUIdentName"}} bank {{value "ePDULoadStatusBankNumber"}} is overloaded on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1140,7 +1140,7 @@ traps:
     name: CPS-MIB::ePDUBankOverloadCleared
     category: diagnostic
     severity: notice
-    description: Rack PDU bank overload cleared for {ePDULoadStatusBankNumber} on {_HOSTNAME}.
+    description: Overload condition cleared on bank {{value "ePDULoadStatusBankNumber"}} of {{value "ePDUIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1151,7 +1151,7 @@ traps:
     name: CPS-MIB::ePDUComponentCommunicationEstablished
     category: state_change
     severity: notice
-    description: Component communication restored for {ePDUIdentName} on {_HOSTNAME}.
+    description: Component communication restored for {{value "ePDUIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1160,8 +1160,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.131
     name: CPS-MIB::ePDUComponentCommunicationLost
     category: diagnostic
-    severity: crit
-    description: Component communication lost for {ePDUIdentName} ({ePDUIdentSerialNumber}) on {_HOSTNAME}.
+    severity: alert
+    description: ePDU component communication lost for {{value "ePDUIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1171,7 +1171,7 @@ traps:
     name: CPS-MIB::ePDUOutletLowLoad
     category: diagnostic
     severity: warning
-    description: Outlet {ePDUOutletConfigMonitoredName} on {ePDUIdentName} reported low load on {_HOSTNAME}.
+    description: Outlet {{value "ePDUOutletConfigMonitoredName"}} on {{value "ePDUIdentName"}} has low load on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1181,9 +1181,9 @@ traps:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.133
     name: CPS-MIB::ePDUOutletLowLoadCleared
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Outlet low load condition cleared for {ePDUOutletConfigMonitoredName} on {_HOSTNAME}.
+    description: Outlet low load condition cleared for {{value "ePDUOutletConfigMonitoredName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1195,7 +1195,7 @@ traps:
     name: CPS-MIB::ePDUOutletNearOverload
     category: diagnostic
     severity: warning
-    description: Outlet {ePDUOutletConfigMonitoredName} near overload on {ePDUIdentName} on {_HOSTNAME}.
+    description: Outlet {{value "ePDUOutletConfigMonitoredName"}} near overload on {{value "ePDUIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1205,9 +1205,9 @@ traps:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.135
     name: CPS-MIB::ePDUOutletNearOverloadCleared
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Outlet near overload condition cleared for {ePDUOutletConfigMonitoredName} on {_HOSTNAME}.
+    description: Outlet near overload condition cleared for {{value "ePDUOutletConfigMonitoredName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1218,8 +1218,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.136
     name: CPS-MIB::ePDUOutletOverload
     category: diagnostic
-    severity: warning
-    description: Rack PDU overload detected on outlet {ePDUOutletConfigMonitoredName} ({ePDUOutletConfigMonitoredNumber}) on {_HOSTNAME}.
+    severity: alert
+    description: Rack PDU {{value "ePDUIdentName"}} outlet {{value "ePDUOutletConfigMonitoredName"}} overload on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1229,9 +1229,9 @@ traps:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.137
     name: CPS-MIB::ePDUOutletOverloadCleared
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Outlet overload cleared for {ePDUOutletConfigMonitoredName} on {_HOSTNAME}.
+    description: Outlet overload cleared for {{value "ePDUOutletConfigMonitoredName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDUIdentSerialNumber
@@ -1243,7 +1243,7 @@ traps:
     name: CPS-MIB::envHighTemperatureViolation
     category: diagnostic
     severity: warning
-    description: High temperature violation detected at {envirIdentLocation} with temperature {envirTemperature} on {_HOSTNAME}.
+    description: High temperature threshold violated on {{first (value "envirIdentName") "sensor"}} at {{value "envirTemperature"}} on {{hostname}}.
     status: current
     varbinds:
       - envirIdentName
@@ -1253,7 +1253,7 @@ traps:
     name: CPS-MIB::envHighTemperatureBack
     category: diagnostic
     severity: warning
-    description: High environment temperature {envirTemperature} detected at {envirIdentLocation} on {_HOSTNAME}.
+    description: High environment temperature detected on {{first (value "envirIdentName") "sensor"}} on {{hostname}}.
     status: current
     varbinds:
       - envirIdentName
@@ -1263,7 +1263,7 @@ traps:
     name: CPS-MIB::envLowTemperatureViolation
     category: diagnostic
     severity: warning
-    description: Low temperature threshold violated for sensor {envirIdentName} at {envirTemperature} on {_HOSTNAME}.
+    description: Low temperature threshold violated on sensor {{value "envirIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - envirIdentName
@@ -1273,7 +1273,7 @@ traps:
     name: CPS-MIB::envLowTempBack
     category: diagnostic
     severity: warning
-    description: Low temperature alert for sensor {envirIdentName} at {envirTemperature} on {_HOSTNAME}.
+    description: Environment temperature low at {{value "envirIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - envirIdentName
@@ -1283,7 +1283,7 @@ traps:
     name: CPS-MIB::envHighHumidityViolation
     category: diagnostic
     severity: warning
-    description: High humidity {envirHumidity}% detected at {envirIdentName} on {_HOSTNAME}.
+    description: High humidity threshold violated at {{value "envirIdentLocation"}} on {{hostname}}.
     status: current
     varbinds:
       - envirIdentName
@@ -1293,7 +1293,7 @@ traps:
     name: CPS-MIB::envHighHumidityBack
     category: diagnostic
     severity: warning
-    description: High humidity {envirHumidity}% detected at {envirIdentLocation} on {_HOSTNAME}.
+    description: High humidity detected at {{value "envirIdentLocation"}} on {{hostname}}.
     status: current
     varbinds:
       - envirIdentName
@@ -1303,7 +1303,7 @@ traps:
     name: CPS-MIB::envLowHumidityViolation
     category: diagnostic
     severity: warning
-    description: Low humidity violation detected at {envirIdentLocation} with {envirHumidity}% on {_HOSTNAME}.
+    description: Low humidity threshold violated at {{value "envirIdentLocation"}} on {{hostname}}.
     status: current
     varbinds:
       - envirIdentName
@@ -1313,7 +1313,7 @@ traps:
     name: CPS-MIB::envLowHumdBack
     category: diagnostic
     severity: warning
-    description: Environment humidity {envirHumidity}% dropped below low threshold at {envirIdentLocation} on {_HOSTNAME}.
+    description: Environment humidity returned to low value on {{first (value "envirIdentName") "sensor"}} on {{hostname}}.
     status: current
     varbinds:
       - envirIdentName
@@ -1323,7 +1323,7 @@ traps:
     name: CPS-MIB::envDryContactAbnormal
     category: diagnostic
     severity: warning
-    description: Environmental contact {envirContactName} reported abnormal state on {_HOSTNAME}.
+    description: Environmental contact {{value "envirContactName"}} is abnormal on {{hostname}}.
     status: current
     varbinds:
       - envirIdentName
@@ -1334,7 +1334,7 @@ traps:
     name: CPS-MIB::envDryContactNormal
     category: diagnostic
     severity: notice
-    description: Environmental contact {envirContactName} returned to normal state on {_HOSTNAME}.
+    description: Dry contact {{value "envirContactName"}} returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - envirIdentName
@@ -1345,7 +1345,7 @@ traps:
     name: CPS-MIB::envConntected
     category: diagnostic
     severity: notice
-    description: Environment sensor {envirIdentName} at {envirIdentLocation} connected on {_HOSTNAME}.
+    description: Environment sensor {{value "envirIdentName"}} connected on {{hostname}}.
     status: current
     varbinds:
       - envirIdentName
@@ -1354,7 +1354,7 @@ traps:
     name: CPS-MIB::envDisconntected
     category: diagnostic
     severity: warning
-    description: Environment sensor {envirIdentName} at {envirIdentLocation} disconnected on {_HOSTNAME}.
+    description: Environment sensor {{value "envirIdentName"}} disconnected on {{hostname}}.
     status: current
     varbinds:
       - envirIdentName
@@ -1363,7 +1363,7 @@ traps:
     name: CPS-MIB::envRateOfTemperatureChangeAbnormal
     category: diagnostic
     severity: warning
-    description: Abnormal temperature change rate detected for sensor {envirIdentName} at {envirTemperature} on {_HOSTNAME}.
+    description: Abnormal rate of temperature change detected on sensor {{value "envirIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - envirIdentName
@@ -1373,7 +1373,7 @@ traps:
     name: CPS-MIB::envRateOfHumdChangeAbnormal
     category: diagnostic
     severity: warning
-    description: Abnormal humidity change rate detected at sensor {envirIdentName} on {_HOSTNAME}.
+    description: Abnormal humidity change rate detected on {{first (value "envirIdentName") "environment sensor"}} on {{hostname}}.
     status: current
     varbinds:
       - envirIdentName
@@ -1383,7 +1383,7 @@ traps:
     name: CPS-MIB::atsSwitchSource
     category: state_change
     severity: notice
-    description: ATS {atsIdentName} switched source to {atsStatusSelectedSource} on {_HOSTNAME}.
+    description: ATS switched source to {{value "atsStatusSelectedSource"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1393,8 +1393,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.302
     name: CPS-MIB::atsSourceFault
     category: diagnostic
-    severity: err
-    description: ATS fault detected on {atsIdentName} with serial {atsIdentSerialNumber} on {_HOSTNAME}.
+    severity: warning
+    description: ATS source fault detected for {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1405,7 +1405,7 @@ traps:
     name: CPS-MIB::atsSourceFaultCleared
     category: state_change
     severity: notice
-    description: Source fault cleared for {atsIdentName} on {_HOSTNAME}.
+    description: ATS source fault cleared for {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1415,8 +1415,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.304
     name: CPS-MIB::atsRedundancyFail
     category: state_change
-    severity: alert
-    description: Redundancy failure detected for ATS {atsIdentName} on {_HOSTNAME}.
+    severity: crit
+    description: ATS redundancy failure detected for {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1427,7 +1427,7 @@ traps:
     name: CPS-MIB::atsRedundancyRestored
     category: state_change
     severity: notice
-    description: Redundancy restored for ATS {atsIdentName} on {_HOSTNAME}.
+    description: ATS redundancy restored for {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1438,7 +1438,7 @@ traps:
     name: CPS-MIB::atsInputHighVoltage
     category: diagnostic
     severity: warning
-    description: ATS {atsIdentName} input voltage {atsStatusInputVoltage} exceeded upper limit on {_HOSTNAME}.
+    description: ATS {{value "atsIdentName"}} input voltage {{value "atsStatusInputVoltage"}} exceeded limit on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1450,7 +1450,7 @@ traps:
     name: CPS-MIB::atsInputHighVoltageCleared
     category: diagnostic
     severity: notice
-    description: High input voltage condition cleared for ATS {atsIdentName} on {_HOSTNAME}.
+    description: High voltage condition cleared for {{value "atsStatusInputName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1462,7 +1462,7 @@ traps:
     name: CPS-MIB::atsInputLowVoltage
     category: diagnostic
     severity: warning
-    description: ATS {atsIdentName} input voltage {atsStatusInputVoltage} crossed lower limit on {_HOSTNAME}.
+    description: ATS input voltage below limit on {{value "atsStatusInputName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1474,7 +1474,7 @@ traps:
     name: CPS-MIB::atsInputLowVoltageCleared
     category: diagnostic
     severity: notice
-    description: Low voltage condition cleared for ATS {atsIdentName} on {_HOSTNAME}.
+    description: Low voltage condition cleared for {{value "atsStatusInputName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1486,7 +1486,7 @@ traps:
     name: CPS-MIB::atsInputHighFrequency
     category: diagnostic
     severity: warning
-    description: ATS {atsIdentName} input frequency {atsStatusInputFrequency} exceeded upper limit on {_HOSTNAME}.
+    description: ATS input frequency exceeded upper limit on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1497,8 +1497,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.311
     name: CPS-MIB::atsInputHighFrequencyCleared
     category: diagnostic
-    severity: notice
-    description: Input frequency cleared for {atsIdentName} on {_HOSTNAME}.
+    severity: info
+    description: ATS high frequency condition cleared for {{value "atsStatusInputName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1510,7 +1510,7 @@ traps:
     name: CPS-MIB::atsInputLowFrequency
     category: diagnostic
     severity: warning
-    description: ATS {atsIdentName} input {atsStatusInputName} frequency {atsStatusInputFrequency} crossed lower limit on {_HOSTNAME}.
+    description: ATS {{value "atsIdentName"}} input {{value "atsStatusInputName"}} frequency crossed lower limit on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1520,9 +1520,9 @@ traps:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.313
     name: CPS-MIB::atsInputLowFrequencyCleared
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Low frequency condition cleared for input {atsStatusInputName} on {atsIdentName} on {_HOSTNAME}.
+    description: Low frequency condition cleared for input {{value "atsStatusInputName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1533,8 +1533,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.314
     name: CPS-MIB::atsCommunicationLost
     category: diagnostic
-    severity: alert
-    description: ATS communication lost for device {atsIdentName} serial {atsIdentSerialNumber} on {_HOSTNAME}.
+    severity: crit
+    description: ATS communication lost for {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1544,7 +1544,7 @@ traps:
     name: CPS-MIB::atsCommunicationEstablished
     category: state_change
     severity: notice
-    description: ATS communication established for {atsIdentName} on {_HOSTNAME}.
+    description: ATS communication established with {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1553,8 +1553,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.316
     name: CPS-MIB::atsLCDCommunicationLost
     category: diagnostic
-    severity: err
-    description: LCD communication lost for ATS {atsIdentName} serial {atsIdentSerialNumber} on {_HOSTNAME}.
+    severity: crit
+    description: LCD communication lost for ATS {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1563,8 +1563,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.317
     name: CPS-MIB::atsLCDCommunicationLostCleared
     category: diagnostic
-    severity: notice
-    description: LCD communication lost cleared for ATS {atsIdentName} on {_HOSTNAME}.
+    severity: info
+    description: LCD communication lost cleared for {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1573,8 +1573,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.318
     name: CPS-MIB::atsDB9CommunicationLost
     category: diagnostic
-    severity: err
-    description: DB9 communication lost for ATS {atsIdentName} serial {atsIdentSerialNumber} on {_HOSTNAME}.
+    severity: crit
+    description: ATS {{value "atsIdentName"}} communication lost on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1582,9 +1582,9 @@ traps:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.319
     name: CPS-MIB::atsDB9CommunicationLostCleared
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: DB9 communication lost cleared for ATS {atsIdentName} on {_HOSTNAME}.
+    description: DB9 communication lost cleared for {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1594,7 +1594,7 @@ traps:
     name: CPS-MIB::atsPowerSupplyFault
     category: diagnostic
     severity: crit
-    description: Power supply fault detected for {atsIdentName} on {_HOSTNAME}.
+    description: Power supply failure detected on {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1605,7 +1605,7 @@ traps:
     name: CPS-MIB::atsPowerSupplyFaultCleared
     category: diagnostic
     severity: notice
-    description: Power supply fault cleared for {atsIdentName} on {_HOSTNAME}.
+    description: Power supply fault cleared for {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1616,7 +1616,7 @@ traps:
     name: CPS-MIB::atsDevHardwareFault
     category: diagnostic
     severity: crit
-    description: Hardware fault detected on ATS {atsIdentName} serial {atsIdentSerialNumber} on {_HOSTNAME}.
+    description: Device hardware failure detected for {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1626,7 +1626,7 @@ traps:
     name: CPS-MIB::atsDevHardwareFaultCleared
     category: diagnostic
     severity: notice
-    description: Hardware fault cleared for {atsIdentName} serial {atsIdentSerialNumber} on {_HOSTNAME}.
+    description: Hardware fault cleared for {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1636,7 +1636,7 @@ traps:
     name: CPS-MIB::atsSourceConfigChanged
     category: config_change
     severity: notice
-    description: ATS source configuration changed for {atsIdentName} on {_HOSTNAME}.
+    description: ATS source configuration changed for {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1646,7 +1646,7 @@ traps:
     name: CPS-MIB::atsDeviceConfigChanged
     category: config_change
     severity: notice
-    description: Device configuration changed for {atsIdentName} on {_HOSTNAME}.
+    description: ATS device configuration changed on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1656,7 +1656,7 @@ traps:
     name: CPS-MIB::atsOutletConfigChanged
     category: config_change
     severity: notice
-    description: ATS outlet configuration changed for {atsIdentName} serial {atsIdentSerialNumber} on {_HOSTNAME}.
+    description: ATS outlet configuration changed for {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1666,7 +1666,7 @@ traps:
     name: CPS-MIB::atsEventCountsCleared
     category: diagnostic
     severity: info
-    description: Event counts cleared for ATS {atsIdentName} serial {atsIdentSerialNumber} on {_HOSTNAME}.
+    description: ATS event counts cleared for {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1676,7 +1676,7 @@ traps:
     name: CPS-MIB::atsOverload
     category: diagnostic
     severity: warning
-    description: ATS {atsIdentName} load {atsLoadStatusBankLoad} exceeded overload threshold on {_HOSTNAME}.
+    description: ATS overload threshold exceeded for {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1688,7 +1688,7 @@ traps:
     name: CPS-MIB::atsOverloadCleared
     category: diagnostic
     severity: notice
-    description: Overload condition cleared for ATS {atsIdentName} on {_HOSTNAME}.
+    description: ATS overload condition cleared for {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1700,7 +1700,7 @@ traps:
     name: CPS-MIB::atsNearOverload
     category: diagnostic
     severity: warning
-    description: ATS load {atsLoadStatusBankLoad} exceeded near overload threshold on {_HOSTNAME}.
+    description: ATS {{value "atsIdentName"}} load exceeded near overload threshold on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1712,7 +1712,7 @@ traps:
     name: CPS-MIB::atsNearOverloadCleared
     category: diagnostic
     severity: notice
-    description: ATS near overload condition cleared for bank {atsLoadStatusBankTableIndex} on {_HOSTNAME}.
+    description: ATS near overload condition cleared for {{value "atsIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1724,7 +1724,7 @@ traps:
     name: CPS-MIB::atsLowLoad
     category: diagnostic
     severity: warning
-    description: ATS {atsIdentName} load {atsLoadStatusBankLoad} is below low load threshold on {_HOSTNAME}.
+    description: ATS load below threshold on {{value "atsIdentName"}} bank {{value "atsLoadStatusBankTableIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1736,7 +1736,7 @@ traps:
     name: CPS-MIB::atsLowLoadCleared
     category: diagnostic
     severity: notice
-    description: Low load condition cleared for ATS {atsIdentName} bank {atsLoadStatusBankTableIndex} on {_HOSTNAME}.
+    description: Low load condition cleared for ATS {{value "atsIdentName"}} bank {{value "atsLoadStatusBankTableIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1748,7 +1748,7 @@ traps:
     name: CPS-MIB::atsOutletOnCommand
     category: state_change
     severity: notice
-    description: ATS outlet {atsOutletCtrlOutletName} assigned to turn on on {_HOSTNAME}.
+    description: ATS outlet {{value "atsOutletCtrlOutletName"}} turned on on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1760,7 +1760,7 @@ traps:
     name: CPS-MIB::atsOutletOffCommand
     category: state_change
     severity: notice
-    description: ATS outlet {atsOutletCtrlOutletName} assigned to turn off on {_HOSTNAME}.
+    description: ATS outlet {{value "atsOutletCtrlOutletName"}} turned off on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1770,9 +1770,9 @@ traps:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.336
     name: CPS-MIB::atsOutletRebootCommand
-    category: config_change
+    category: state_change
     severity: notice
-    description: ATS outlet {atsOutletCtrlOutletName} assigned to reboot on {_HOSTNAME}.
+    description: ATS outlet {{value "atsOutletCtrlOutletName"}} assigned to reboot on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1782,9 +1782,9 @@ traps:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.337
     name: CPS-MIB::atsCancelPendingCommand
-    category: config_change
+    category: state_change
     severity: notice
-    description: Pending command cancelled for ATS {atsIdentName} outlet {atsOutletCtrlOutletName} on {_HOSTNAME}.
+    description: ATS pending command cancelled for outlet {{value "atsOutletCtrlOutletName"}} on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1796,7 +1796,7 @@ traps:
     name: CPS-MIB::atsOutletOn
     category: state_change
     severity: notice
-    description: ATS outlet {atsOutletCtrlOutletName} turned on on {_HOSTNAME}.
+    description: ATS outlet {{value "atsOutletCtrlOutletName"}} turned on on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1807,8 +1807,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.339
     name: CPS-MIB::atsOutletOff
     category: state_change
-    severity: warning
-    description: ATS outlet {atsOutletCtrlOutletName} turned off on {_HOSTNAME}.
+    severity: notice
+    description: ATS outlet {{value "atsOutletCtrlOutletName"}} turned off on {{hostname}}.
     status: current
     varbinds:
       - atsIdentName
@@ -1818,9 +1818,9 @@ traps:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.400
     name: CPS-MIB::pduDeviceEvent
-    category: state_change
-    severity: notice
-    description: PDU device event occurred for {ePDU2IdentName} on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: PDU device event occurred for {{value "ePDU2IdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -1830,8 +1830,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.401
     name: CPS-MIB::pduDeviceAlarm
     category: diagnostic
-    severity: warning
-    description: PDU device alarm detected for {ePDU2IdentName} on {_HOSTNAME}.
+    severity: alert
+    description: PDU device alarm detected for {{value "ePDU2IdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -1840,9 +1840,9 @@ traps:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.402
     name: CPS-MIB::pduDeviceAlarmClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: PDU alarm cleared for {ePDU2IdentName} (serial {ePDU2IdentSerialNumber}) on {_HOSTNAME}.
+    description: PDU alarm cleared for {{value "ePDU2IdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -1852,8 +1852,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.403
     name: CPS-MIB::pduPhaseEvent
     category: state_change
-    severity: notice
-    description: PDU phase event occurred for {ePDU2IdentName} on {_HOSTNAME}.
+    severity: info
+    description: PDU phase event occurred on {{value "ePDU2IdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -1864,8 +1864,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.404
     name: CPS-MIB::pduPhaseAlarm
     category: diagnostic
-    severity: warning
-    description: PDU phase alarm detected for {ePDU2IdentName} on {_HOSTNAME}.
+    severity: alert
+    description: PDU phase alarm detected on {{value "ePDU2IdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -1875,9 +1875,9 @@ traps:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.405
     name: CPS-MIB::pduPhaseAlarmClear
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: PDU phase alarm cleared for device {ePDU2IdentName} on {_HOSTNAME}.
+    description: PDU phase alarm cleared for {{value "ePDU2IdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -1887,9 +1887,9 @@ traps:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.406
     name: CPS-MIB::pduBankEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: PDU bank event occurred for device {ePDU2IdentName} bank {ePDU2BankConfigNumber} on {_HOSTNAME}.
+    description: PDU bank event occurred on {{value "ePDU2IdentName"}} bank {{value "ePDU2BankConfigNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -1900,8 +1900,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.407
     name: CPS-MIB::pduBankAlarm
     category: diagnostic
-    severity: warning
-    description: PDU bank alarm detected on {ePDU2IdentName} bank {ePDU2BankStatusNumber} on {_HOSTNAME}.
+    severity: alert
+    description: PDU bank alarm detected on {{value "ePDU2IdentName"}} bank {{value "ePDU2BankStatusNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -1913,7 +1913,7 @@ traps:
     name: CPS-MIB::pduBankAlarmClear
     category: state_change
     severity: notice
-    description: PDU bank alarm cleared for bank {ePDU2BankStatusNumber} on {_HOSTNAME}.
+    description: PDU bank alarm cleared for bank {{value "ePDU2BankStatusNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -1925,7 +1925,7 @@ traps:
     name: CPS-MIB::pduOutletSwitchedEvent
     category: state_change
     severity: notice
-    description: Outlet {ePDU2OutletSwitchedControlName} switched state on {ePDU2IdentName} on {_HOSTNAME}.
+    description: PDU outlet {{value "ePDU2OutletSwitchedControlName"}} switched on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -1937,8 +1937,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.410
     name: CPS-MIB::pduOutletSwitchedAlarm
     category: state_change
-    severity: warning
-    description: Outlet {ePDU2OutletSwitchedStatusName} switched state on PDU {ePDU2IdentName} on {_HOSTNAME}.
+    severity: alert
+    description: PDU switched outlet alarm detected on {{value "ePDU2OutletSwitchedStatusName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -1951,7 +1951,7 @@ traps:
     name: CPS-MIB::pduOutletSwitchedAlarmClear
     category: state_change
     severity: notice
-    description: Outlet {ePDU2OutletSwitchedStatusName} alarm cleared on {_HOSTNAME}.
+    description: PDU outlet {{value "ePDU2OutletSwitchedStatusName"}} alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -1962,9 +1962,9 @@ traps:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.412
     name: CPS-MIB::pduOutletMeteredEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: PDU outlet {ePDU2OutletMeteredConfigName} event occurred on {_HOSTNAME}.
+    description: PDU metered outlet event occurred for outlet {{value "ePDU2OutletMeteredConfigName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -1977,7 +1977,7 @@ traps:
     name: CPS-MIB::pduOutletMeteredAlarm
     category: diagnostic
     severity: warning
-    description: PDU outlet alarm detected for outlet {ePDU2OutletMeteredStatusName} on {_HOSTNAME}.
+    description: PDU metered outlet alarm detected on {{value "ePDU2OutletMeteredStatusName"}} of {{value "ePDU2IdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -1990,7 +1990,7 @@ traps:
     name: CPS-MIB::pduOutletMeteredAlarmClear
     category: state_change
     severity: notice
-    description: PDU outlet alarm cleared for outlet {ePDU2OutletMeteredStatusName} on {_HOSTNAME}.
+    description: PDU metered outlet alarm cleared for outlet {{value "ePDU2OutletMeteredStatusName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -2003,7 +2003,7 @@ traps:
     name: CPS-MIB::pduDaisyChainEvent
     category: diagnostic
     severity: notice
-    description: PDU daisy-chain event detected for device {ePDU2IdentName} on {_HOSTNAME}.
+    description: PDU daisy-chain event detected for {{value "ePDU2IdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -2016,7 +2016,7 @@ traps:
     name: CPS-MIB::pduDaisyChainAlarm
     category: diagnostic
     severity: warning
-    description: PDU daisy-chain alarm detected for {ePDU2IdentName} on {_HOSTNAME}.
+    description: PDU daisy-chain alarm detected on {{value "ePDU2IdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -2027,9 +2027,9 @@ traps:
       - mtrapinfoString
   - oid: 1.3.6.1.4.1.3808.0.417
     name: CPS-MIB::pduDaisyChainAlarmClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: PDU daisy-chain alarm cleared for device {ePDU2IdentName} on {_HOSTNAME}.
+    description: PDU daisy-chain alarm cleared for {{value "ePDU2IdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - ePDU2IdentSerialNumber
@@ -2042,7 +2042,7 @@ traps:
     name: CPS-MIB::bmSystemAlarm
     category: diagnostic
     severity: warning
-    description: System alarm event {mtrapinfoBmEventId} occurred for battery manager {bmIdentName} at {bmIdentLocation} on {_HOSTNAME}.
+    description: 'System alarm occurred{{with value "mtrapinfoString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - bmIdentSerialNumber
@@ -2054,7 +2054,7 @@ traps:
     name: CPS-MIB::bmSystemWarning
     category: diagnostic
     severity: warning
-    description: System warning occurred with event ID {mtrapinfoBmEventId} and info {mtrapinfoString} on {_HOSTNAME}.
+    description: System warning occurred for {{value "bmIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - bmIdentSerialNumber
@@ -2065,8 +2065,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.602
     name: CPS-MIB::bmSystemInfo
     category: diagnostic
-    severity: notice
-    description: Battery manager system information reported with event ID {mtrapinfoBmEventId} on {_HOSTNAME}.
+    severity: info
+    description: Battery manager system information reported for {{value "bmIdentName"}} on {{hostname}}.
     status: current
     varbinds:
       - bmIdentSerialNumber
@@ -2078,7 +2078,7 @@ traps:
     name: CPS-MIB::bmProbesAlarm
     category: diagnostic
     severity: warning
-    description: Battery manager probe alarm {mtrapinfoString} on {bmIdentSerialNumber} at {bmIdentLocation} on {_HOSTNAME}.
+    description: Battery manager probe alarm {{value "mtrapinfoString"}} on {{hostname}}.
     status: current
     varbinds:
       - bmIdentSerialNumber
@@ -2092,7 +2092,7 @@ traps:
     name: CPS-MIB::bmSProbesWarning
     category: diagnostic
     severity: warning
-    description: Battery manager probe warning for serial {bmIdentSerialNumber} at string {bmProbesStringIndex} on {_HOSTNAME}.
+    description: Battery manager probe warning {{value "mtrapinfoString"}} on {{hostname}}.
     status: current
     varbinds:
       - bmIdentSerialNumber
@@ -2105,8 +2105,8 @@ traps:
   - oid: 1.3.6.1.4.1.3808.0.605
     name: CPS-MIB::bmProbesInfo
     category: diagnostic
-    severity: notice
-    description: Battery manager probe information reported for serial {bmIdentSerialNumber} at {bmIdentLocation} on {_HOSTNAME}.
+    severity: info
+    description: Battery manager probe information reported on {{hostname}}.
     status: current
     varbinds:
       - bmIdentSerialNumber

@@ -167,7 +167,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysRestart
     category: state_change
     severity: notice
-    description: System restart initiated on {_HOSTNAME}.
+    description: System received a restart command on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -178,7 +178,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysDownloadBegin
     category: diagnostic
     severity: notice
-    description: Firmware download begin for entity {iswEventEntPhyIndex} on {_HOSTNAME}.
+    description: Firmware download begin on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -187,8 +187,8 @@ traps:
   - oid: 1.3.6.1.4.1.5833.2017.8.1.1.3
     name: IMP-HF528-MIB::iswTrapEvtSysDownloadSuccess
     category: diagnostic
-    severity: notice
-    description: Firmware download succeeded on {_HOSTNAME}.
+    severity: info
+    description: Firmware download succeeded on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -198,7 +198,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysDownloadFail
     category: diagnostic
     severity: err
-    description: Firmware download failed on {_HOSTNAME}.
+    description: Firmware download failed on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -208,7 +208,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysProvisiondataExport
     category: config_change
     severity: notice
-    description: System CLI configuration export completed on {_HOSTNAME}.
+    description: System CLI configuration export occurred on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -218,7 +218,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysProvisiondataImport
     category: config_change
     severity: notice
-    description: System CLI configuration import completed on {_HOSTNAME}.
+    description: System CLI configuration import completed on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -228,7 +228,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysProvisiondataSetdefault
     category: config_change
     severity: notice
-    description: System configuration set to default on {_HOSTNAME}.
+    description: System configuration set to default on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -238,7 +238,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysAlarmLogClear
     category: diagnostic
     severity: notice
-    description: System alarm log cleared on {_HOSTNAME}.
+    description: System alarm log table cleared on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -248,7 +248,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysEventLogClear
     category: config_change
     severity: notice
-    description: System event log table cleared on {_HOSTNAME}.
+    description: System event log table cleared on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -256,9 +256,9 @@ traps:
       - iswEventTime
   - oid: 1.3.6.1.4.1.5833.2017.8.1.1.10
     name: IMP-HF528-MIB::iswTrapEvtSysRTCDateTimeChange
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: System Real Time Clock time change detected on {_HOSTNAME}.
+    description: System Real Time Clock time changed on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -268,7 +268,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysAlarmProfileChange
     category: config_change
     severity: notice
-    description: System alarm profile changed with sequence {iswEventSeqId} on {_HOSTNAME}.
+    description: System alarm profile changed{{with value "iswEventIfIndex"}} on interface {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -278,7 +278,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysFTPReceptionStart
     category: diagnostic
     severity: notice
-    description: FTP reception started with sequence {iswEventSeqId} on {_HOSTNAME}.
+    description: FTP reception started on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -286,9 +286,9 @@ traps:
       - iswEventTime
   - oid: 1.3.6.1.4.1.5833.2017.8.1.1.13
     name: IMP-HF528-MIB::iswTrapEvtSysFTPReceptionComplete
-    category: config_change
-    severity: notice
-    description: FTP reception completed with sequence {iswEventSeqId} on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: FTP reception complete for {{first (value "iswEventEntPhyIndex") "system"}} on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -298,7 +298,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysFTPReceptionIncomplete
     category: diagnostic
     severity: warning
-    description: FTP reception incomplete for entity {iswEventEntPhyIndex} on {_HOSTNAME}.
+    description: FTP reception incomplete on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -306,9 +306,9 @@ traps:
       - iswEventTime
   - oid: 1.3.6.1.4.1.5833.2017.8.1.1.15
     name: IMP-HF528-MIB::iswTrapEvtSysSNTPTimeZoneChange
-    category: config_change
+    category: state_change
     severity: notice
-    description: SNTP time zone change detected on {_HOSTNAME}.
+    description: SNTP time zone changed on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -318,7 +318,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysSNTPProvisionChanged
     category: config_change
     severity: notice
-    description: SNTP provision changed with event sequence {iswEventSeqId} on {_HOSTNAME}.
+    description: SNTP provision changed on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -328,7 +328,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysDatabaseSavingFailed
     category: diagnostic
     severity: err
-    description: Database saving failed with event sequence {iswEventSeqId} on {_HOSTNAME}.
+    description: Database saving failed on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -338,7 +338,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysUserLoginSuccess
     category: auth
     severity: notice
-    description: User {iswEventUserLoginName} logged in successfully via {iswEventUserLoginMethod} from {iswEventUserLoginIp} on {_HOSTNAME}.
+    description: User {{value "iswEventUserLoginName"}} logged in successfully from {{value "iswEventUserLoginIp"}} on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -351,7 +351,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysUserLoginFailure
     category: auth
     severity: warning
-    description: User login failure for {iswEventUserLoginName} from {iswEventUserLoginIp} on {_HOSTNAME}.
+    description: User login failure for {{value "iswEventUserLoginName"}} from {{value "iswEventUserLoginIp"}} on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -364,7 +364,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysLoginSessionLogout
     category: auth
     severity: notice
-    description: User {iswEventUserLoginName} logged out via {iswEventUserLoginMethod} on {_HOSTNAME}.
+    description: User {{value "iswEventUserLoginName"}} logged out on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -377,7 +377,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysLoginSessionTimeout
     category: auth
     severity: notice
-    description: User session timed out for {iswEventUserLoginName} on {_HOSTNAME}.
+    description: User {{value "iswEventUserLoginName"}} session timed out on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -390,7 +390,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysAlarmLEDOn
     category: diagnostic
     severity: warning
-    description: System Alarm LED activated on {_HOSTNAME}.
+    description: System alarm LED is on{{with value "iswEventEntPhyIndex"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -400,7 +400,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysAlarmLEDOff
     category: diagnostic
     severity: warning
-    description: System Alarm LED turned off on {_HOSTNAME}.
+    description: System Alarm LED turned off on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -410,7 +410,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysAlarmOutPutOn
     category: diagnostic
     severity: warning
-    description: System alarm output activated for entity {iswEventEntPhyIndex} on {_HOSTNAME}.
+    description: System alarm output turned on for {{first (value "iswEventEntPhyIndex") "system"}} on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -420,7 +420,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysAlarmOutPutOff
     category: diagnostic
     severity: warning
-    description: System alarm output turned off at {iswEventTime} on {_HOSTNAME}.
+    description: System alarm output turned off on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -428,9 +428,9 @@ traps:
       - iswEventTime
   - oid: 1.3.6.1.4.1.5833.2017.8.1.1.26
     name: IMP-HF528-MIB::iswTrapEvtSysDDMIEnabled
-    category: config_change
+    category: diagnostic
     severity: notice
-    description: System DDMI was enabled on {_HOSTNAME}.
+    description: System DDMI is enabled on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -440,7 +440,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSysDDMIDisabled
     category: diagnostic
     severity: warning
-    description: System DDMI is disabled on {_HOSTNAME}.
+    description: System DDMI is disabled on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -450,7 +450,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtGEPortLinkup
     category: state_change
     severity: notice
-    description: GE port link is up on {_HOSTNAME}.
+    description: GE port link is up on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -460,7 +460,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtGEPortLinkdown
     category: state_change
     severity: warning
-    description: GE port link down on interface {iswEventIfIndex} on {_HOSTNAME}.
+    description: GE port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -470,7 +470,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSfpTemperatureHighAlarm
     category: diagnostic
     severity: warning
-    description: SFP temperature reached high alarm on {_HOSTNAME}.
+    description: SFP temperature high alarm on {{first (value "iswEventIfIndex") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -480,7 +480,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSfpTemperatureLowAlarm
     category: diagnostic
     severity: warning
-    description: SFP temperature reached low alarm on interface {iswEventIfIndex} on {_HOSTNAME}.
+    description: SFP temperature reached low alarm on {{first (value "iswEventIfIndex") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -490,7 +490,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSfpTemperatureHighWarn
     category: diagnostic
     severity: warning
-    description: SFP temperature reached high warning on {_HOSTNAME}.
+    description: SFP temperature reached high warning on {{first (value "iswEventIfIndex") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -500,7 +500,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSfpTemperatureLowWarn
     category: diagnostic
     severity: warning
-    description: SFP temperature reached low warning on {_HOSTNAME}.
+    description: SFP temperature reached low warning on {{first (value "iswEventIfIndex") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -510,7 +510,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapEvtSfpTemperatureNormal
     category: diagnostic
     severity: notice
-    description: SFP temperature returned to normal on {_HOSTNAME}.
+    description: SFP temperature returned to normal on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - iswEventSeqId
@@ -520,7 +520,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE1PortLinkDown
     category: state_change
     severity: warning
-    description: GE-1 port link is down on {_HOSTNAME}.
+    description: GE-1 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -532,7 +532,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE2PortLinkDown
     category: state_change
     severity: warning
-    description: GE-2 port link is down on {_HOSTNAME}.
+    description: GE-2 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -544,7 +544,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE3PortLinkDown
     category: state_change
     severity: warning
-    description: GE-3 port link down on interface {iswCurrentAlarmIfIndex} on {_HOSTNAME}.
+    description: GE-3 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -556,7 +556,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE4PortLinkDown
     category: state_change
     severity: warning
-    description: GE-4 port link is down on {_HOSTNAME}.
+    description: GE-4 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -568,7 +568,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE5PortLinkDown
     category: state_change
     severity: warning
-    description: Link down on interface {iswCurrentAlarmIfIndex} on {_HOSTNAME}.
+    description: GE-5 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -580,7 +580,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE6PortLinkDown
     category: state_change
     severity: warning
-    description: GE-6 port link is down on {_HOSTNAME}.
+    description: GE-6 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -592,7 +592,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE7PortLinkDown
     category: state_change
     severity: warning
-    description: GE-7 port link is down on {_HOSTNAME}.
+    description: GE-7 port link is down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -604,7 +604,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE8PortLinkDown
     category: state_change
     severity: warning
-    description: GE-8 port link is down on {_HOSTNAME}.
+    description: GE-8 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -616,7 +616,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE9PortLinkDown
     category: state_change
     severity: warning
-    description: GE-9 port link down on interface {iswCurrentAlarmIfIndex} on {_HOSTNAME}.
+    description: GE-9 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -628,7 +628,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE10PortLinkDown
     category: state_change
     severity: warning
-    description: GE-10 port link down on interface {iswCurrentAlarmIfIndex} on {_HOSTNAME}.
+    description: GE-10 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -640,7 +640,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE11PortLinkDown
     category: state_change
     severity: warning
-    description: GE-11 port link is down on {_HOSTNAME}.
+    description: GE-11 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -652,7 +652,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE12PortLinkDown
     category: state_change
     severity: warning
-    description: GE-12 port link is down on {_HOSTNAME}.
+    description: GE-12 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -664,7 +664,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE13PortLinkDown
     category: state_change
     severity: warning
-    description: GE-13 port link is down on {_HOSTNAME}.
+    description: GE-13 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -676,7 +676,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE14PortLinkDown
     category: state_change
     severity: warning
-    description: Port link down detected on interface {iswCurrentAlarmIfIndex} on {_HOSTNAME}.
+    description: GE-14 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -688,7 +688,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE15PortLinkDown
     category: state_change
     severity: warning
-    description: GE-15 port link is down on {_HOSTNAME}.
+    description: GE-15 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -700,7 +700,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE16PortLinkDown
     category: state_change
     severity: warning
-    description: GE-16 port link is down with alarm level {iswCurrentAlarmLevel} on {_HOSTNAME}.
+    description: GE-16 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -712,7 +712,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE17PortLinkDown
     category: state_change
     severity: warning
-    description: GE-17 port link is down on {_HOSTNAME}.
+    description: GE-17 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -724,7 +724,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE18PortLinkDown
     category: state_change
     severity: warning
-    description: Port link down detected with alarm state {iswCurrentAlarmState} on interface {iswCurrentAlarmIfIndex} on {_HOSTNAME}.
+    description: GE-18 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -736,7 +736,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE19PortLinkDown
     category: state_change
     severity: warning
-    description: GE-19 port link is down on {_HOSTNAME}.
+    description: GE-19 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -748,7 +748,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE20PortLinkDown
     category: state_change
     severity: warning
-    description: Port link down with alarm state {iswCurrentAlarmState} on {_HOSTNAME}.
+    description: GE-20 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -760,7 +760,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE21PortLinkDown
     category: state_change
     severity: warning
-    description: Port link down with alarm state {iswCurrentAlarmState} on {_HOSTNAME}.
+    description: GE-21 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -772,7 +772,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE22PortLinkDown
     category: state_change
     severity: warning
-    description: GE-22 port link down on interface {iswCurrentAlarmIfIndex} on {_HOSTNAME}.
+    description: GE-22 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -784,7 +784,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE23PortLinkDown
     category: state_change
     severity: warning
-    description: GE-23 port link is down on {_HOSTNAME}.
+    description: GE-23 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -796,7 +796,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE24PortLinkDown
     category: state_change
     severity: warning
-    description: GE-24 port link is down on interface {iswCurrentAlarmIfIndex} on {_HOSTNAME}.
+    description: GE-24 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -808,7 +808,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE25PortLinkDown
     category: state_change
     severity: warning
-    description: GE-25 port link down on interface {iswCurrentAlarmIfIndex} on {_HOSTNAME}.
+    description: GE-25 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -820,7 +820,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE26PortLinkDown
     category: state_change
     severity: warning
-    description: GE-26 port link is down on {_HOSTNAME}.
+    description: GE-26 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -832,7 +832,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE27PortLinkDown
     category: state_change
     severity: warning
-    description: Port link down detected with alarm state {iswCurrentAlarmState} on {_HOSTNAME}.
+    description: GE-27 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -844,7 +844,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmGE28PortLinkDown
     category: state_change
     severity: warning
-    description: GE-28 port link is down on {_HOSTNAME}.
+    description: GE-28 port link went down on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -856,7 +856,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmPowerAlarm
     category: diagnostic
     severity: warning
-    description: Power alarm {iswCurrentAlarmState} on interface {iswCurrentAlarmIfIndex} with level {iswCurrentAlarmLevel} on {_HOSTNAME}.
+    description: Power alarm detected on {{first (value "iswCurrentAlarmIfIndex") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -868,7 +868,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmAboveTemperature
     category: diagnostic
     severity: warning
-    description: Temperature alarm triggered with level {iswCurrentAlarmLevel} on {_HOSTNAME}.
+    description: Temperature exceeded threshold on {{first (value "iswCurrentAlarmIfIndex") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId
@@ -880,7 +880,7 @@ traps:
     name: IMP-HF528-MIB::iswTrapAlmBelowTemperature
     category: diagnostic
     severity: warning
-    description: Below temperature alarm {iswCurrentAlarmLevel} detected on {_HOSTNAME}.
+    description: Below temperature alarm detected on {{first (value "iswCurrentAlarmIfIndex") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - iswCurrentAlarmSeqId

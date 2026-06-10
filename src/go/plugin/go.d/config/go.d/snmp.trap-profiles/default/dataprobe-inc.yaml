@@ -27,7 +27,7 @@ traps:
     name: IBOOTPDU-MIB::outletChange
     category: state_change
     severity: notice
-    description: Outlet {outletName} changed state to {outletStatus} on {_HOSTNAME}.
+    description: Outlet {{value "outletName"}} changed state on {{hostname}}.
     status: current
     varbinds:
       - outletIndex

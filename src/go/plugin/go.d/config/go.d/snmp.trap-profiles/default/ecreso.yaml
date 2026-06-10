@@ -891,7 +891,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventTxLocalMode
     category: state_change
     severity: notice
-    description: Transceiver local mode changed to {txGnGlLocalMode} on {_HOSTNAME}.
+    description: TxLocalMode changed to {{value "txGnGlLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -906,7 +906,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventTxAl3dB
     category: diagnostic
     severity: warning
-    description: Tx 3dB alarm state {txGnAl3dB} reported on {_HOSTNAME}.
+    description: Tx 3dB alarm is {{value "txGnAl3dB"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -920,8 +920,8 @@ traps:
   - oid: 1.3.6.1.4.1.6404.3.1.2.0.3
     name: ECRESO-FM-TRANS-MIB::eventTxAlFault
     category: diagnostic
-    severity: err
-    description: Transmitter alarm fault {txGnAlFault} detected on {_HOSTNAME}.
+    severity: crit
+    description: Transmitter alarm fault detected on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -936,7 +936,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventTxAlWarning
     category: diagnostic
     severity: warning
-    description: Transmitter alarm warning {txGnAlWarning} detected on {_HOSTNAME}.
+    description: Transmitter alarm warning is {{value "txGnAlWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -951,7 +951,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventTxAlVSWR
     category: diagnostic
     severity: warning
-    description: Transmitter VSWR alarm state {txGnAlVSWR} detected on {_HOSTNAME}.
+    description: Transmitter VSWR alert {{value "txGnAlVSWR"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -966,7 +966,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventTxAlInterlockAnt
     category: diagnostic
     severity: warning
-    description: Antenna interlock state is {txGnAlInterlockAnt} on {_HOSTNAME}.
+    description: Antenna interlock state is {{value "txGnAlInterlockAnt"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -979,9 +979,9 @@ traps:
       - txGnAlInterlockAnt
   - oid: 1.3.6.1.4.1.6404.3.1.2.0.7
     name: ECRESO-FM-TRANS-MIB::eventTxAlInterlockLoad
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: TxAl Interlock load state is {txGnAlInterlockLoad} on {_HOSTNAME}.
+    description: TxAl interlock load is {{value "txGnAlInterlockLoad"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - sysDescr
@@ -996,7 +996,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventTxRfOpmode
     category: state_change
     severity: notice
-    description: Transmission RF mode changed to {txGnRfOpmode} on {_HOSTNAME}.
+    description: Tx RF operation mode changed to {{value "txGnRfOpmode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1011,7 +1011,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventTxRfRFPresent
     category: state_change
     severity: notice
-    description: RF presence state changed to {txGnRfRFPresent} on {_HOSTNAME}.
+    description: RF present status changed to {{value "txGnRfRFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1026,7 +1026,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventAcReserveControl
     category: state_change
     severity: notice
-    description: Transmitter reserve control changed to {acGnGlReserveControl} on {_HOSTNAME}.
+    description: AcReserveControl event occurred with priority {{value "eventAcReserveControlPriority"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1041,7 +1041,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventAcLocalMode
     category: state_change
     severity: notice
-    description: AC unit local mode changed to {acGnGlLocalMode} on {_HOSTNAME}.
+    description: AC local mode changed to {{value "acGnGlLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1055,8 +1055,8 @@ traps:
   - oid: 1.3.6.1.4.1.6404.3.1.2.0.12
     name: ECRESO-FM-TRANS-MIB::eventAcFault
     category: diagnostic
-    severity: err
-    description: ACU fault detected with priority {eventAcFaultPriority} on {_HOSTNAME}.
+    severity: alert
+    description: AC fault detected on {{first (value "syGeSerial") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1070,8 +1070,8 @@ traps:
   - oid: 1.3.6.1.4.1.6404.3.1.2.0.13
     name: ECRESO-FM-TRANS-MIB::eventAcSwitchOver
     category: state_change
-    severity: notice
-    description: AC switch over state changed to {acGnAlSwitchOver} on {_HOSTNAME}.
+    severity: warning
+    description: AC switch over occurred with state {{value "acGnAlSwitchOver"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1086,7 +1086,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventSysWarning
     category: diagnostic
     severity: warning
-    description: System warning {syAlWarning} with priority {eventSysWarningPriority} on {_HOSTNAME}.
+    description: System warning {{value "syAlWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1100,8 +1100,8 @@ traps:
   - oid: 1.3.6.1.4.1.6404.3.1.2.0.15
     name: ECRESO-FM-TRANS-MIB::eventSysFault
     category: diagnostic
-    severity: err
-    description: System fault {syAlFault} detected with priority {eventSysFaultPriority} on {_HOSTNAME}.
+    severity: alert
+    description: System fault detected with priority {{value "eventSysFaultPriority"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1116,7 +1116,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventSysAlAmb
     category: diagnostic
     severity: warning
-    description: System ambient temperature alarm {syAlAmb} with priority {eventSysAlAmbPriority} on {_HOSTNAME}.
+    description: System ambient temperature alarm {{value "syAlAmb"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1131,7 +1131,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventSysAlVoltAux
     category: diagnostic
     severity: warning
-    description: Auxiliary voltage alarm state {syAlVoltAux} detected on {_HOSTNAME}.
+    description: Auxiliary voltage alarm state {{value "syAlVoltAux"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1146,7 +1146,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventSysAlRelay
     category: diagnostic
     severity: warning
-    description: System relay alarm state {syAlRelay} reported on {_HOSTNAME}.
+    description: System relay alarm state {{value "syAlRelay"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1161,7 +1161,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventSysAlReserve
     category: diagnostic
     severity: warning
-    description: System reserve alarm state {syAlReserve} reported on {_HOSTNAME}.
+    description: System reserve alarm state is {{value "syAlReserve"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1176,7 +1176,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventInSeAlrInputSwitch
     category: diagnostic
     severity: warning
-    description: Input switch alarm {inSeAlrInputSwitch} with priority {eventInSeAlrInputSwitchPriority} on {_HOSTNAME}.
+    description: Input switch alarm {{value "inSeAlrInputSwitch"}} detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1191,7 +1191,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventTxAl1dB
     category: diagnostic
     severity: warning
-    description: Transmitter 1dB alarm state {txGnAl1dB} triggered on {_HOSTNAME}.
+    description: Tx 1dB alarm is {{value "txGnAl1dB"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1206,7 +1206,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventTxGnGlStandby
     category: state_change
     severity: notice
-    description: TxGnGlStandby status changed to {txGnGlStandby} on {_HOSTNAME}.
+    description: TxGnGlStandby standby state changed to {{value "txGnGlStandby"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1221,7 +1221,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventInAlLine1
     category: diagnostic
     severity: warning
-    description: Line1 alarm {inAlLine1} with priority {eventInAlLine1Priority} on {_HOSTNAME}.
+    description: Line 1 alarm {{value "inAlLine1"}} detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1236,7 +1236,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventInAlLine2
     category: diagnostic
     severity: warning
-    description: Line2 alarm {inAlLine2} with priority {eventInAlLine2Priority} on {_HOSTNAME}.
+    description: Line2 alarm {{value "inAlLine2"}} detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1251,7 +1251,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventInAlMpx1
     category: diagnostic
     severity: warning
-    description: Mpx1 alarm {inAlMpx1} with priority {eventInAlMpx1Priority} detected on {_HOSTNAME}.
+    description: Mpx1 alarm {{value "inAlMpx1"}} detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1266,7 +1266,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventInAlMpx2
     category: diagnostic
     severity: warning
-    description: Mpx2 alarm {inAlMpx2} with priority {eventInAlMpx2Priority} on {_HOSTNAME}.
+    description: Mpx2 alarm {{value "inAlMpx2"}} detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1281,7 +1281,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventInAlPlayer
     category: diagnostic
     severity: warning
-    description: Player alarm {inAlPlayer} with priority {eventInAlPlayerPriority} on {_HOSTNAME}.
+    description: Player alarm {{value "inAlPlayer"}} detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1296,7 +1296,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventSysAlInvalidData
     category: diagnostic
     severity: warning
-    description: System invalid data alarm state {syAlInvalidData} reported on {_HOSTNAME}.
+    description: System invalid data alarm is {{value "syAlInvalidData"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1309,9 +1309,9 @@ traps:
       - syAlInvalidData
   - oid: 1.3.6.1.4.1.6404.3.1.2.0.29
     name: ECRESO-FM-TRANS-MIB::eventAcGnAlInterlockAnt
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Antenna interlock state {acGnAlInterlockAnt} reported on {_HOSTNAME}.
+    description: Antenna interlock state is {{value "acGnAlInterlockAnt"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1324,9 +1324,9 @@ traps:
       - acGnAlInterlockAnt
   - oid: 1.3.6.1.4.1.6404.3.1.2.0.30
     name: ECRESO-FM-TRANS-MIB::eventAcGnAlInterlockLoad
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Interlock load state {acGnAlInterlockLoad} reported with priority {eventAcGnAlInterlockLoadPriority} on {_HOSTNAME}.
+    description: Interlock load state changed to {{value "acGnAlInterlockLoad"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1340,8 +1340,8 @@ traps:
   - oid: 1.3.6.1.4.1.6404.3.1.2.0.31
     name: ECRESO-FM-TRANS-MIB::eventSysAl24v
     category: diagnostic
-    severity: warning
-    description: System 24v alarm {syAl24v} with priority {eventSysAl24vPriority} on {_HOSTNAME}.
+    severity: alert
+    description: System 24V alarm state is {{value "syAl24v"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1356,7 +1356,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventSysAlComm
     category: diagnostic
     severity: warning
-    description: Internal bus communication error {syAlComm} reported on {_HOSTNAME}.
+    description: Internal bus communication alarm {{value "syAlComm"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1369,9 +1369,9 @@ traps:
       - syAlComm
   - oid: 1.3.6.1.4.1.6404.3.1.2.0.33
     name: ECRESO-FM-TRANS-MIB::eventEquipmentOn
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Equipment turned on at {eventTimeStampEquipmentOn} on {_HOSTNAME}.
+    description: Equipment powered on at {{value "eventTimeStampEquipmentOn"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1386,7 +1386,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventHeartBeat
     category: diagnostic
     severity: notice
-    description: Heartbeat event received with priority {eventHeartBeatPriority} on {_HOSTNAME}.
+    description: Heartbeat event received with priority {{value "eventHeartBeatPriority"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1400,7 +1400,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventConfigChanged
     category: config_change
     severity: notice
-    description: Configuration changed with priority {eventConfigChangedPriority} on {_HOSTNAME}.
+    description: Configuration changed on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1414,7 +1414,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventEquipmentFault
     category: diagnostic
     severity: err
-    description: Equipment fault {eventEquipmentFaultError} with priority {eventEquipmentFaultPriority} on {_HOSTNAME}.
+    description: 'Equipment fault detected: {{value "eventEquipmentFaultError"}} on {{hostname}}.'
     status: obsolete
     varbinds:
       - sysDescr
@@ -1428,8 +1428,8 @@ traps:
   - oid: 1.3.6.1.4.1.6404.3.1.2.0.37
     name: ECRESO-FM-TRANS-MIB::eventInAlFault
     category: diagnostic
-    severity: err
-    description: Input fault alarm {inAlFault} with priority {eventInAlFaultPriority} on {_HOSTNAME}.
+    severity: warning
+    description: Input alarm fault detected with priority {{value "eventInAlFaultPriority"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1444,7 +1444,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventMoSfAlarm
     category: diagnostic
     severity: warning
-    description: SF alarm state {moSfAlarm} reported on {_HOSTNAME}.
+    description: moSfAlarm {{value "moSfAlarm"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1459,7 +1459,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventMoSfSwitch10MAlarm
     category: diagnostic
     severity: warning
-    description: 10MHz Switch input alarm {moSfSwitch10MAlarm} with priority {eventMoSfAlarmPriority} on {_HOSTNAME}.
+    description: 10MHz switch input alarm is {{value "moSfSwitch10MAlarm"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1474,7 +1474,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventSyAlLogging
     category: diagnostic
     severity: warning
-    description: SD card logging alarm state {syAlLogging} reported on {_HOSTNAME}.
+    description: SD card logging alarm state changed to {{value "syAlLogging"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1489,7 +1489,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventInAlMpx3
     category: diagnostic
     severity: warning
-    description: Mpx3 alarm {inAlMpx3} with priority {eventInAlMpx3Priority} on {_HOSTNAME}.
+    description: Mpx3 alarm {{value "inAlMpx3"}} with priority {{value "eventInAlMpx3Priority"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1504,7 +1504,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventInAlMpx4
     category: diagnostic
     severity: warning
-    description: Mpx4 alarm {inAlMpx4} with priority {eventInAlMpx4Priority} on {_HOSTNAME}.
+    description: Mpx4 alarm {{value "inAlMpx4"}} detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1519,7 +1519,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventTxSfStAct
     category: state_change
     severity: notice
-    description: TxSfStAct changed to {txSfStAct} on {_HOSTNAME}.
+    description: TxSfStAct activation {{value "txSfStAct"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1534,7 +1534,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventTxSfStAlarm
     category: diagnostic
     severity: warning
-    description: Transmitter smart FM alarm {txSfStAlarm} status changed on {_HOSTNAME}.
+    description: Transmitter SF status alarm {{value "txSfStAlarm"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1549,7 +1549,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventSyLiAlRds
     category: license
     severity: warning
-    description: RDS license expiration alarm {syLiAlRds} reported on {_HOSTNAME}.
+    description: RDS license expiration alarm triggered{{with value "eventSyLiAlRdsPriority"}} priority {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1563,8 +1563,8 @@ traps:
   - oid: 1.3.6.1.4.1.6404.3.1.2.0.46
     name: ECRESO-FM-TRANS-MIB::eventSyLiAlSoundProc
     category: license
-    severity: warning
-    description: SoundProc license expiration alarm {syLiAlSoundProc} on {_HOSTNAME}.
+    severity: alert
+    description: SoundProc license expiration alarm on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1578,8 +1578,8 @@ traps:
   - oid: 1.3.6.1.4.1.6404.3.1.2.0.47
     name: ECRESO-FM-TRANS-MIB::eventSyLiAlSfm
     category: license
-    severity: warning
-    description: SmartFM license expiration alarm {syLiAlSfm} reported on {_HOSTNAME}.
+    severity: alert
+    description: SmartFM license expiration alarm {{value "syLiAlSfm"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1594,7 +1594,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventSyLiAlActivation
     category: license
     severity: warning
-    description: License expiration alarm {syLiAlActivation} triggered on {_HOSTNAME}.
+    description: License activation alarm triggered{{with value "syLiAlActivation"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1609,7 +1609,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventInAlAes1
     category: diagnostic
     severity: warning
-    description: AES1 alarm {inAlAes1} with priority {eventInAlAes1Priority} detected on {_HOSTNAME}.
+    description: AES1 alarm {{value "inAlAes1"}} detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1624,7 +1624,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventInAlAes2
     category: diagnostic
     severity: warning
-    description: AES2 alarm {inAlAes2} with priority {eventInAlAes2Priority} detected on {_HOSTNAME}.
+    description: AES2 alarm {{value "inAlAes2"}} detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1639,7 +1639,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventInAlAes3
     category: diagnostic
     severity: warning
-    description: AES3 alarm {inAlAes3} with priority {eventInAlAes3Priority} detected on {_HOSTNAME}.
+    description: AES3 alarm detected with priority {{value "eventInAlAes3Priority"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1654,7 +1654,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventInAlAna1
     category: diagnostic
     severity: warning
-    description: ANA1 alarm {inAlAna1} with priority {eventInAlAna1Priority} on {_HOSTNAME}.
+    description: ANA1 alarm {{value "inAlAna1"}} with priority {{value "eventInAlAna1Priority"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1669,7 +1669,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventInAlAoip
     category: diagnostic
     severity: warning
-    description: AOIP alarm {inAlAoip} with priority {eventInAlAoipPriority} on {_HOSTNAME}.
+    description: AOIP alarm {{value "inAlAoip"}} detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1683,8 +1683,8 @@ traps:
   - oid: 1.3.6.1.4.1.6404.3.1.2.0.54
     name: ECRESO-FM-TRANS-MIB::eventLossOfEth0
     category: diagnostic
-    severity: warning
-    description: Loss of ETH0 alarm state {syLossOfEth0} reported on {_HOSTNAME}.
+    severity: alert
+    description: Loss of ETH0 alarm is {{value "syLossOfEth0"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1698,8 +1698,8 @@ traps:
   - oid: 1.3.6.1.4.1.6404.3.1.2.0.55
     name: ECRESO-FM-TRANS-MIB::eventLossOfEth1
     category: diagnostic
-    severity: warning
-    description: Loss of ETH1 alarm state {syLossOfEth1} reported on {_HOSTNAME}.
+    severity: alert
+    description: Loss of ETH1 alarm is active on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1714,7 +1714,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventSyLiAlAoipdecoder
     category: license
     severity: warning
-    description: Aoip decoder license expiration alarm {syLiAlAoipdecoder} on {_HOSTNAME}.
+    description: Aoip decoder license expiration alarm triggered{{with value "eventSyLiAlAoipdecoderPriority"}} priority {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1729,7 +1729,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventSyLiAlMpxoipdecoder
     category: license
     severity: warning
-    description: Mpxoip decoder license expiration alarm triggered on {_HOSTNAME}.
+    description: Mpxoip decoder license expiration alarm triggered{{with value "syLiAlMpxoipdecoder"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1744,7 +1744,7 @@ traps:
     name: ECRESO-FM-TRANS-MIB::eventSyLiAlSurestream
     category: license
     severity: warning
-    description: Surestream license expiration alarm reported on {_HOSTNAME}.
+    description: Surestream license expiration alarm triggered{{with value "eventSyLiAlSurestreamPriority"}} priority {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -1758,8 +1758,8 @@ traps:
   - oid: 1.3.6.1.4.1.6404.3.1.2.0.59
     name: ECRESO-FM-TRANS-MIB::eventSyLiAlSynchrostream
     category: license
-    severity: warning
-    description: Synchrostream license expiration alarm {syLiAlSynchrostream} on {_HOSTNAME}.
+    severity: alert
+    description: Synchrostream license expiration alarm on {{hostname}}.
     status: current
     varbinds:
       - sysDescr

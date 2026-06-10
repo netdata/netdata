@@ -156,7 +156,7 @@ traps:
     name: MERU-WLAN-MIB::mwlTopoStaAtsAdd
     category: mobility
     severity: notice
-    description: Station {mwTopoStaapStaId} associated with AP {mwTopoStaapApId} on {_HOSTNAME}.
+    description: Station {{value "mwTopoStaapStaId"}} associated with AP {{value "mwTopoStaapApId"}} on {{hostname}}.
     status: current
     varbinds:
       - mwTopoStaapApId
@@ -165,7 +165,7 @@ traps:
     name: MERU-WLAN-MIB::mwlTopoStaAtsRemove
     category: mobility
     severity: notice
-    description: Station {mwTopoStaapStaId.raw} removed from AP {mwTopoStaapApId} on {_HOSTNAME}.
+    description: Station {{value "mwTopoStaapStaId"}} removed from AP {{value "mwTopoStaapApId"}} on {{hostname}}.
     status: current
     varbinds:
       - mwTopoStaapApId
@@ -174,7 +174,7 @@ traps:
     name: MERU-WLAN-MIB::mwlTopoStaAtsModify
     category: mobility
     severity: notice
-    description: Station {mwTopoStaapStaId} modified on AP {mwTopoStaapApId} on {_HOSTNAME}.
+    description: Station {{value "mwTopoStaapStaId"}} modified on AP {{value "mwTopoStaapApId"}} on {{hostname}}.
     status: current
     varbinds:
       - mwTopoStaapApId
@@ -183,7 +183,7 @@ traps:
     name: MERU-WLAN-MIB::mwlRogueApDetected
     category: security
     severity: alert
-    description: Rogue AP detected with MAC {mwlApMacAddr} on {_HOSTNAME}.
+    description: Rogue AP detected with MAC {{value "mwlApMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - mwlApMacAddr
@@ -192,7 +192,7 @@ traps:
     name: MERU-WLAN-MIB::mwlRogueApRemoved
     category: security
     severity: notice
-    description: Rogue AP {mwlApMacAddr} removed from network on {_HOSTNAME}.
+    description: Rogue AP {{value "mwlApMacAddr"}} removed from the wireless network on {{hostname}}.
     status: current
     varbinds:
       - mwlApMacAddr
@@ -200,8 +200,8 @@ traps:
   - oid: 1.3.6.1.4.1.15983.3.1.3.18
     name: MERU-WLAN-MIB::mwlAtsDown
     category: state_change
-    severity: warning
-    description: Access Point {mwApNodeId} entered down state on {_HOSTNAME}.
+    severity: crit
+    description: Access Point {{value "mwApNodeId"}} went down on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -211,7 +211,7 @@ traps:
     name: MERU-WLAN-MIB::mwlAtsUp
     category: state_change
     severity: notice
-    description: Access Point {mwApNodeId} entered up state on {_HOSTNAME}.
+    description: Access point {{value "mwApNodeId"}} entered up state on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -220,8 +220,8 @@ traps:
   - oid: 1.3.6.1.4.1.15983.3.1.3.22
     name: MERU-WLAN-MIB::mwlWatchdogFailure
     category: diagnostic
-    severity: crit
-    description: 'WatchDog failure detected on controller {mwWncVarsHostName} with details: {mwlTrapContent} on {_HOSTNAME}.'
+    severity: alert
+    description: WatchDog failure detected on {{value "mwWncVarsHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - mwWncVarsHostName
@@ -230,16 +230,16 @@ traps:
     name: MERU-WLAN-MIB::mwlWatchdogUp
     category: diagnostic
     severity: notice
-    description: WatchDog is up on controller {mwWncVarsHostName} on {_HOSTNAME}.
+    description: WatchDog is up on {{first (value "mwWncVarsHostName") "controller"}} on {{hostname}}.
     status: current
     varbinds:
       - mwWncVarsHostName
       - mwlTrapContent
   - oid: 1.3.6.1.4.1.15983.3.1.3.24
     name: MERU-WLAN-MIB::mwlCertificateError
-    category: diagnostic
-    severity: err
-    description: 'SSL certificate error detected: {mwlTrapContent} on {_HOSTNAME}.'
+    category: security
+    severity: alert
+    description: 'SSL certificate error detected{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwlTrapContent
@@ -247,7 +247,7 @@ traps:
     name: MERU-WLAN-MIB::mwlCertificateInstalled
     category: config_change
     severity: notice
-    description: SSL certificate installed as {mwlTrapContent} on {_HOSTNAME}.
+    description: 'SSL certificate installed{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwlTrapContent
@@ -255,7 +255,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApSoftwareVersionMismatch
     category: config_change
     severity: warning
-    description: AP software version mismatch detected for {mwApNodeId} on {_HOSTNAME}.
+    description: AP software version mismatch detected on {{value "mwApNodeId"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -267,7 +267,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApSoftwareVersionMatch
     category: diagnostic
     severity: notice
-    description: AP software version mismatch cleared for {mwApNodeId} on {_HOSTNAME}.
+    description: AP software version mismatch cleared for {{value "mwApNodeId"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -278,8 +278,8 @@ traps:
   - oid: 1.3.6.1.4.1.15983.3.1.3.28
     name: MERU-WLAN-MIB::mwlApInitFailure
     category: diagnostic
-    severity: err
-    description: AP initialization failed for {mwApNodeId} with details {mwlTrapContent} on {_HOSTNAME}.
+    severity: crit
+    description: 'AP initialization failed for {{value "mwApNodeId"}}{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwApNodeId
@@ -288,7 +288,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApInitFailureCleared
     category: diagnostic
     severity: notice
-    description: AP initialization failure cleared for {mwApNodeId} with details {mwlTrapContent} on {_HOSTNAME}.
+    description: MWL AP initialization failure cleared for AP {{value "mwApNodeId"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -296,8 +296,8 @@ traps:
   - oid: 1.3.6.1.4.1.15983.3.1.3.30
     name: MERU-WLAN-MIB::mwlApRadioCardFailure
     category: diagnostic
-    severity: err
-    description: Radio card failure detected on AP {mwApNodeId} with content {mwlTrapContent} on {_HOSTNAME}.
+    severity: crit
+    description: Radio card failure detected on AP {{value "mwApNodeId"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -308,7 +308,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApRadioCardFailureCleared
     category: diagnostic
     severity: notice
-    description: Radio card failure cleared for AP {mwApNodeId} on {_HOSTNAME}.
+    description: Radio card failure cleared on {{value "mwApNodeId"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -319,7 +319,7 @@ traps:
     name: MERU-WLAN-MIB::mwlAuthFailure
     category: auth
     severity: warning
-    description: Authentication failure for station {mwlStationMacAddr} on profile {mwlSecProfileName} on {_HOSTNAME}.
+    description: Wireless authentication failure for {{value "mwlStationMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - mwlStationMacAddr
@@ -331,7 +331,7 @@ traps:
     name: MERU-WLAN-MIB::mwlRadiusServerSwitchover
     category: state_change
     severity: notice
-    description: RADIUS server switched from {mwlOldIpAddr} to {mwlNewIpAddr} on {_HOSTNAME}.
+    description: RADIUS server switched from {{value "mwlOldIpAddr"}} to {{value "mwlNewIpAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - mwlOldIpAddr
@@ -342,7 +342,7 @@ traps:
     name: MERU-WLAN-MIB::mwlRadiusServerSwitchoverFailure
     category: diagnostic
     severity: warning
-    description: Radius server switchover failure from {mwlOldIpAddr} on {_HOSTNAME}.
+    description: 'Radius server switchover failure{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwlOldIpAddr
@@ -352,7 +352,7 @@ traps:
     name: MERU-WLAN-MIB::mwlRadiusServerRestored
     category: state_change
     severity: notice
-    description: RADIUS server {mwlNewIpAddr} restored and reverted to primary on {_HOSTNAME}.
+    description: Primary RADIUS server restored and reverted to on {{hostname}}.
     status: current
     varbinds:
       - mwlNewIpAddr
@@ -362,15 +362,15 @@ traps:
     name: MERU-WLAN-MIB::mwlAcctRadiusServerSwitchover
     category: state_change
     severity: notice
-    description: Radius accounting server switched to secondary on {_HOSTNAME}.
+    description: RADIUS accounting server switched to secondary on {{hostname}}.
     status: current
     varbinds:
       - mwlTrapContent
   - oid: 1.3.6.1.4.1.15983.3.1.3.37
     name: MERU-WLAN-MIB::mwlAcctRadiusServerSwitchoverFailure
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: 'Radius accounting server switchover failure: {mwlTrapContent} on {_HOSTNAME}.'
+    description: 'Radius accounting server switchover failed{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwlTrapContent
@@ -378,7 +378,7 @@ traps:
     name: MERU-WLAN-MIB::mwlMicFailure
     category: security
     severity: warning
-    description: MIC failure detected on AP {mwApNodeId} for station {mwlStationMacAddr} on {_HOSTNAME}.
+    description: MIC failure detected on AP {{value "mwApNodeId"}} for station {{value "mwlStationMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -389,8 +389,8 @@ traps:
   - oid: 1.3.6.1.4.1.15983.3.1.3.39
     name: MERU-WLAN-MIB::mwlMicCounterMeasureActivated
     category: security
-    severity: warning
-    description: MIC countermeasures activated on AP {mwApNodeId} due to failures on {_HOSTNAME}.
+    severity: alert
+    description: MIC countermeasures activated on AP {{value "mwApNodeId"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -398,8 +398,8 @@ traps:
   - oid: 1.3.6.1.4.1.15983.3.1.3.40
     name: MERU-WLAN-MIB::mwlMasterDown
     category: state_change
-    severity: crit
-    description: Master controller {mwWncVarsHostName} at {mwlIpAddr} entered down state on {_HOSTNAME}.
+    severity: alert
+    description: Master controller {{value "mwWncVarsHostName"}} went down on {{hostname}}.
     status: current
     varbinds:
       - mwWncVarsHostName
@@ -409,7 +409,7 @@ traps:
     name: MERU-WLAN-MIB::mwlMasterUp
     category: state_change
     severity: alert
-    description: Master controller {mwWncVarsHostName} at {mwlIpAddr} entered down state on {_HOSTNAME}.
+    description: Master controller {{value "mwWncVarsHostName"}} entered down state on {{hostname}}.
     status: current
     varbinds:
       - mwWncVarsHostName
@@ -417,9 +417,9 @@ traps:
       - mwlTrapContent
   - oid: 1.3.6.1.4.1.15983.3.1.3.42
     name: MERU-WLAN-MIB::mwlAtsNeighborLoss
-    category: state_change
+    category: mobility
     severity: warning
-    description: ATS neighbor loss detected for AP ID {mwApNodeId} on {_HOSTNAME}.
+    description: ATS neighbor loss detected{{with value "mwApNodeId"}} for AP {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -427,7 +427,7 @@ traps:
     name: MERU-WLAN-MIB::mwlAtsNeighborLossCleared
     category: state_change
     severity: notice
-    description: ATS neighbor loss cleared for AP {mwApNodeId} on {_HOSTNAME}.
+    description: ATS neighbor loss cleared for AP {{value "mwApNodeId"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -435,7 +435,7 @@ traps:
     name: MERU-WLAN-MIB::mwlHandoffFail
     category: mobility
     severity: warning
-    description: Wireless handoff failed for AP {mwApNodeId} on {_HOSTNAME}.
+    description: Wireless handoff failed for AP {{value "mwApNodeId"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -443,7 +443,7 @@ traps:
     name: MERU-WLAN-MIB::mwlHandoffFailCleared
     category: mobility
     severity: notice
-    description: Wireless handoff failure cleared for AP {mwApNodeId} on {_HOSTNAME}.
+    description: Handoff failure cleared for AP {{value "mwApNodeId"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -451,15 +451,15 @@ traps:
     name: MERU-WLAN-MIB::mwlResourceThresholdExceed
     category: diagnostic
     severity: warning
-    description: Resource consumption threshold exceeded on {mwWncVarsHostName} on {_HOSTNAME}.
+    description: Resource threshold exceeded on {{value "mwWncVarsHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - mwWncVarsHostName
   - oid: 1.3.6.1.4.1.15983.3.1.3.47
     name: MERU-WLAN-MIB::mwlResourceThresholdExceedCleared
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Resource threshold exceeded condition cleared for {mwWncVarsHostName} on {_HOSTNAME}.
+    description: Resource threshold exceeded condition cleared on {{hostname}}.
     status: current
     varbinds:
       - mwWncVarsHostName
@@ -467,7 +467,7 @@ traps:
     name: MERU-WLAN-MIB::mwlSystemFailure
     category: diagnostic
     severity: crit
-    description: System failure detected on {mwWncVarsHostName} on {_HOSTNAME}.
+    description: System failure detected{{with value "mwWncVarsHostName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - mwWncVarsHostName
@@ -475,15 +475,15 @@ traps:
     name: MERU-WLAN-MIB::mwlSystemFailureCleared
     category: diagnostic
     severity: notice
-    description: System failure cleared for {mwWncVarsHostName} on {_HOSTNAME}.
+    description: System failure cleared for {{value "mwWncVarsHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - mwWncVarsHostName
   - oid: 1.3.6.1.4.1.15983.3.1.3.50
     name: MERU-WLAN-MIB::mwlApBootimageVersionMismatch
-    category: diagnostic
+    category: config_change
     severity: warning
-    description: Boot image version mismatch detected for AP {mwApNodeId} with details {mwlTrapContent} on {_HOSTNAME}.
+    description: Bootimage version mismatch detected on AP {{value "mwApNodeId"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -492,7 +492,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApBootimageVersionMatch
     category: state_change
     severity: notice
-    description: AP boot image version mismatch cleared for {mwApNodeId} on {_HOSTNAME}.
+    description: Boot image version mismatch cleared for AP {{value "mwApNodeId"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -501,15 +501,15 @@ traps:
     name: MERU-WLAN-MIB::mwlMacFilterDeny
     category: security
     severity: warning
-    description: MAC filter denied access for {mwlTrapContent} on {_HOSTNAME}.
+    description: 'MAC filter denied access{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwlTrapContent
   - oid: 1.3.6.1.4.1.15983.3.1.3.53
     name: MERU-WLAN-MIB::mwlMacFilterDenyCleared
-    category: security
+    category: state_change
     severity: notice
-    description: MAC filter deny cleared with details {mwlTrapContent} on {_HOSTNAME}.
+    description: 'MAC filter deny cleared{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwlTrapContent
@@ -517,7 +517,7 @@ traps:
     name: MERU-WLAN-MIB::mwlSoftwareLicenseExpired
     category: license
     severity: alert
-    description: Software license for {mwlLicenseFeatureName} has expired on {_HOSTNAME}.
+    description: Software license expired for {{value "mwlLicenseFeatureName"}} on {{hostname}}.
     status: current
     varbinds:
       - mwlLicenseFeatureName
@@ -527,7 +527,7 @@ traps:
     name: MERU-WLAN-MIB::mwlSoftwareLicenseInstalled
     category: license
     severity: notice
-    description: Software license {mwlLicenseFeatureName} installed on {_HOSTNAME}.
+    description: Software license installed{{with value "mwlLicenseFeatureName"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - mwlLicenseFeatureName
@@ -537,7 +537,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApTemperature
     category: diagnostic
     severity: warning
-    description: AP {mwApNodeId} temperature raised with details {mwlTrapContent} on {_HOSTNAME}.
+    description: 'AP {{value "mwApNodeId"}} temperature raised{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwApNodeId
@@ -546,7 +546,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApTemperatureCleared
     category: diagnostic
     severity: notice
-    description: AP {mwApNodeId} temperature returned to normal on {_HOSTNAME}.
+    description: AP {{value "mwApNodeId"}} temperature returned to normal on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -554,8 +554,8 @@ traps:
   - oid: 1.3.6.1.4.1.15983.3.1.3.58
     name: MERU-WLAN-MIB::mwlHardwareDiagnostic
     category: diagnostic
-    severity: notice
-    description: Hardware diagnostics detected on {mwWncVarsHostName} on {_HOSTNAME}.
+    severity: warning
+    description: Hardware diagnostic detected on {{value "mwWncVarsHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - mwWncVarsHostName
@@ -563,7 +563,7 @@ traps:
     name: MERU-WLAN-MIB::mwlHardwareDiagnosticCleared
     category: diagnostic
     severity: notice
-    description: Hardware diagnostic cleared on {mwWncVarsHostName} on {_HOSTNAME}.
+    description: Hardware diagnostic cleared on {{hostname}}.
     status: current
     varbinds:
       - mwWncVarsHostName
@@ -571,7 +571,7 @@ traps:
     name: MERU-WLAN-MIB::mwlCacLimitReached
     category: diagnostic
     severity: warning
-    description: CAC limit reached with limit number {mwlLimitNumber} and details {mwlTrapContent} on {_HOSTNAME}.
+    description: CAC limit reached with value {{value "mwlLimitNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - mwlLimitNumber
@@ -580,7 +580,7 @@ traps:
     name: MERU-WLAN-MIB::mwlRadarDetected
     category: security
     severity: warning
-    description: 'Radar interference detected: {mwlTrapContent} on {_HOSTNAME}.'
+    description: 'Radar detected event{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwlTrapContent
@@ -588,7 +588,7 @@ traps:
     name: MERU-WLAN-MIB::mwlOperationalChannelChange
     category: state_change
     severity: notice
-    description: Access Point {mwApNodeId} wireless interface {mwlWirelessIfIndex} changed operational channel to {mwlChannelNumber} on {_HOSTNAME}.
+    description: Operational channel changed to {{value "mwlChannelNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -598,25 +598,25 @@ traps:
       - mwlTrapContent
   - oid: 1.3.6.1.4.1.15983.3.1.3.63
     name: MERU-WLAN-MIB::mwlLicensingServerDown
-    category: diagnostic
-    severity: crit
-    description: Licensing server is down with details {mwlTrapContent} on {_HOSTNAME}.
+    category: license
+    severity: alert
+    description: 'Licensing server is down{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwlTrapContent
   - oid: 1.3.6.1.4.1.15983.3.1.3.64
     name: MERU-WLAN-MIB::mwlNUpgradeLicenseCheckoutFail
     category: license
-    severity: err
-    description: License checkout failed with details {mwlTrapContent} on {_HOSTNAME}.
+    severity: warning
+    description: 'License checkout failed{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwlTrapContent
   - oid: 1.3.6.1.4.1.15983.3.1.3.65
     name: MERU-WLAN-MIB::mwlNoLicenseEnforcementExpired
     category: license
-    severity: warning
-    description: No license enforcement on active slave of {mwWncVarsHostName} will expire in {mwlDaysLeft} days on {_HOSTNAME}.
+    severity: alert
+    description: No License Enforcement on Active Slave expired on {{hostname}}.
     status: current
     varbinds:
       - mwWncVarsHostName
@@ -627,7 +627,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApWirelessIfDown
     category: state_change
     severity: warning
-    description: Wireless interface {mwlWirelessIfIndex} on AP {mwApNodeId} went down on {_HOSTNAME}.
+    description: Wireless interface on AP {{value "mwlApMacAddr"}} went down on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -639,7 +639,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApWirelessIfUp
     category: state_change
     severity: notice
-    description: AP wireless interface {mwlWirelessIfIndex} up on {_HOSTNAME}.
+    description: Wireless interface up on {{first (value "mwlWirelessIfIndex") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -649,9 +649,9 @@ traps:
       - mwlTrapContent
   - oid: 1.3.6.1.4.1.15983.3.1.3.68
     name: MERU-WLAN-MIB::mwlApWirelessStaCapacityFull
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Wireless station capacity reached limit on {mwApNodeId} on {_HOSTNAME}.
+    description: Wireless station capacity full on AP {{value "mwlApMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -664,7 +664,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApWirelessStaCapacityRecovered
     category: state_change
     severity: notice
-    description: AP wireless station capacity recovered on {mwApNodeId} on {_HOSTNAME}.
+    description: AP wireless station capacity recovered on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -677,7 +677,7 @@ traps:
     name: MERU-WLAN-MIB::mwlWncCpuUsageHigh
     category: diagnostic
     severity: warning
-    description: High CPU usage {mwlCpuUsage}% detected on CPU {mwlCpuId} on {_HOSTNAME}.
+    description: High CPU usage detected on {{value "mwlCpuId"}} at {{value "mwlCpuUsage"}}% on {{hostname}}.
     status: current
     varbinds:
       - mwlCpuId
@@ -687,7 +687,7 @@ traps:
     name: MERU-WLAN-MIB::mwlWncCpuUsageRecovered
     category: diagnostic
     severity: notice
-    description: CPU usage recovered for {mwlCpuId} on {_HOSTNAME}.
+    description: WNC CPU usage recovered on {{hostname}}.
     status: current
     varbinds:
       - mwlCpuId
@@ -697,7 +697,7 @@ traps:
     name: MERU-WLAN-MIB::mwlWncMemUsageHigh
     category: diagnostic
     severity: warning
-    description: WNC memory usage high at {mwlMemoryUsage} with details {mwlTrapContent} on {_HOSTNAME}.
+    description: WNC memory usage is high at {{value "mwlMemoryUsage"}}% on {{hostname}}.
     status: current
     varbinds:
       - mwlMemoryUsage
@@ -706,7 +706,7 @@ traps:
     name: MERU-WLAN-MIB::mwlWncMemUsageRecovered
     category: diagnostic
     severity: notice
-    description: Wnc Memory Usage recovered with {mwlMemoryUsage} on {_HOSTNAME}.
+    description: 'WNC memory usage recovered{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwlMemoryUsage
@@ -715,7 +715,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApCpuUsageHigh
     category: diagnostic
     severity: warning
-    description: AP {mwApNodeId} CPU usage {mwlCpuUsage}% is high on {_HOSTNAME}.
+    description: High CPU usage detected on AP {{value "mwlApMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -727,7 +727,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApCpuUsageRecovered
     category: diagnostic
     severity: notice
-    description: AP CPU usage recovered on {mwApNodeId} on {_HOSTNAME}.
+    description: AP CPU usage recovered on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -739,7 +739,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApMemUsageHigh
     category: diagnostic
     severity: warning
-    description: AP {mwApNodeId} memory usage {mwlMemoryUsage}% is high on {_HOSTNAME}.
+    description: AP {{value "mwlApMacAddr"}} memory usage is high at {{value "mwlMemoryUsage"}}% on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -750,7 +750,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApMemUsageRecovered
     category: diagnostic
     severity: notice
-    description: AP {mwApNodeId} memory usage recovered with {mwlMemoryUsage}% usage on {_HOSTNAME}.
+    description: AP {{value "mwlApMacAddr"}} memory usage recovered on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -761,7 +761,7 @@ traps:
     name: MERU-WLAN-MIB::mwlDhcpSvrPoolExhausted
     category: diagnostic
     severity: warning
-    description: 'DHCP server pool {mwDhcpSvrPoolName} exhausted: {mwlTrapContent} on {_HOSTNAME}.'
+    description: DHCP server pool {{value "mwDhcpSvrPoolName"}} exhausted on {{hostname}}.
     status: current
     varbinds:
       - mwDhcpSvrPoolName
@@ -770,16 +770,16 @@ traps:
     name: MERU-WLAN-MIB::mwlDhcpSvrPoolRecovered
     category: state_change
     severity: notice
-    description: DHCP server pool {mwDhcpSvrPoolName} recovered on {_HOSTNAME}.
+    description: DHCP server pool {{value "mwDhcpSvrPoolName"}} recovered on {{hostname}}.
     status: current
     varbinds:
       - mwDhcpSvrPoolName
       - mwlTrapContent
   - oid: 1.3.6.1.4.1.15983.3.1.3.80
     name: MERU-WLAN-MIB::mwlRadiusSvrFailure
-    category: diagnostic
+    category: security
     severity: warning
-    description: 'Radius server {mwlIpAddr} of type {mwlRadiusSvrType} failed: {mwlTrapContent} on {_HOSTNAME}.'
+    description: 'RADIUS server failure detected{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwlIpAddr
@@ -787,9 +787,9 @@ traps:
       - mwlTrapContent
   - oid: 1.3.6.1.4.1.15983.3.1.3.81
     name: MERU-WLAN-MIB::mwlRadiusSvrRecovered
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Radius server {mwlIpAddr} of type {mwlRadiusSvrType} recovered on {_HOSTNAME}.
+    description: Radius server recovered on {{hostname}}.
     status: current
     varbinds:
       - mwlIpAddr
@@ -799,7 +799,7 @@ traps:
     name: MERU-WLAN-MIB::mwlAlarmHistoryFull
     category: diagnostic
     severity: warning
-    description: Alarm history full notification received with record {mwlRecordNumber} on {_HOSTNAME}.
+    description: Alarm history is full with record {{value "mwlRecordNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - mwlRecordNumber
@@ -808,7 +808,7 @@ traps:
     name: MERU-WLAN-MIB::mwlAlarmHistoryRecovered
     category: diagnostic
     severity: notice
-    description: Alarm history recovered with record {mwlRecordNumber} and content {mwlTrapContent} on {_HOSTNAME}.
+    description: 'Alarm history recovered{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwlRecordNumber
@@ -817,7 +817,7 @@ traps:
     name: MERU-WLAN-MIB::mwlEventLogFull
     category: diagnostic
     severity: warning
-    description: Event log full on {_HOSTNAME}.
+    description: Event log is full with record {{value "mwlRecordNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - mwlRecordNumber
@@ -826,7 +826,7 @@ traps:
     name: MERU-WLAN-MIB::mwlEventLogRecovered
     category: diagnostic
     severity: notice
-    description: Event log recovered with record {mwlRecordNumber} on {_HOSTNAME}.
+    description: Event log recovered with record {{value "mwlRecordNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - mwlRecordNumber
@@ -835,7 +835,7 @@ traps:
     name: MERU-WLAN-MIB::mwlAdminLoginFailure
     category: auth
     severity: warning
-    description: Admin login failure from {mwlIpAddr} on {_HOSTNAME}.
+    description: Admin login failure{{with value "mwlIpAddr"}} from {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - mwlTimeStamp
@@ -846,7 +846,7 @@ traps:
     name: MERU-WLAN-MIB::mwlWncIpAddrChange
     category: state_change
     severity: notice
-    description: IP address changed from {mwlOldIpAddr} to {mwlNewIpAddr} on {_HOSTNAME}.
+    description: WNC IP address changed from {{value "mwlOldIpAddr"}} to {{value "mwlNewIpAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - mwlOldIpAddr
@@ -856,7 +856,7 @@ traps:
     name: MERU-WLAN-MIB::mwlAlarmHistoryReachThreshold
     category: diagnostic
     severity: warning
-    description: Alarm history reached threshold with content {mwlTrapContent} on {_HOSTNAME}.
+    description: Alarm history reached threshold {{value "mwlTrapContent"}} on {{hostname}}.
     status: current
     varbinds:
       - mwlRecordNumber
@@ -865,7 +865,7 @@ traps:
     name: MERU-WLAN-MIB::mwlEventLogReachThreshold
     category: diagnostic
     severity: warning
-    description: Event log reached threshold with record {mwlRecordNumber} and content {mwlTrapContent} on {_HOSTNAME}.
+    description: Event log reached threshold with record {{value "mwlRecordNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - mwlRecordNumber
@@ -873,8 +873,8 @@ traps:
   - oid: 1.3.6.1.4.1.15983.3.1.3.90
     name: MERU-WLAN-MIB::mwlAtsRuntimeError
     category: diagnostic
-    severity: err
-    description: Internal AP configuration error detected on {mwApNodeId} with details {mwlTrapContent} on {_HOSTNAME}.
+    severity: crit
+    description: Internal AP configuration error detected on {{value "mwApNodeId"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -883,7 +883,7 @@ traps:
     name: MERU-WLAN-MIB::mwlAtsRuntimeErrorCleared
     category: diagnostic
     severity: notice
-    description: AP Runtime Error cleared for AP {mwApNodeId} with details {mwlTrapContent} on {_HOSTNAME}.
+    description: AP Runtime Error condition cleared for {{value "mwApNodeId"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -892,7 +892,7 @@ traps:
     name: MERU-WLAN-MIB::mwlSystemIdChanged
     category: config_change
     severity: notice
-    description: System ID changed from {mwlOldSystemId} to {mwlNewSystemId} on {_HOSTNAME}.
+    description: System ID changed from {{value "mwlOldSystemId"}} to {{value "mwlNewSystemId"}} on {{hostname}}.
     status: current
     varbinds:
       - mwlIpAddr
@@ -901,9 +901,9 @@ traps:
       - mwlTrapContent
   - oid: 1.3.6.1.4.1.15983.3.1.3.93
     name: MERU-WLAN-MIB::mwlSoftwareLicenseViolationRaised
-    category: security
+    category: license
     severity: warning
-    description: Software license violation detected for feature {mwlLicenseFeatureName} on {_HOSTNAME}.
+    description: Software license violation detected for {{value "mwlLicenseFeatureName"}} on {{hostname}}.
     status: current
     varbinds:
       - mwlLicenseFeatureName
@@ -913,7 +913,7 @@ traps:
     name: MERU-WLAN-MIB::mwlSoftwareLicenseViolationRecovered
     category: license
     severity: notice
-    description: Software license violation recovered for {mwlLicenseFeatureName} on {_HOSTNAME}.
+    description: Software license violation recovered for {{value "mwlLicenseFeatureName"}} on {{hostname}}.
     status: current
     varbinds:
       - mwlLicenseFeatureName
@@ -922,8 +922,8 @@ traps:
   - oid: 1.3.6.1.4.1.15983.3.1.3.95
     name: MERU-WLAN-MIB::mwlPowerModuleFailure
     category: diagnostic
-    severity: err
-    description: Power module {mwlModuleId} failed with content {mwlTrapContent} on {_HOSTNAME}.
+    severity: crit
+    description: Power module {{value "mwlModuleId"}} failed on {{hostname}}.
     status: current
     varbinds:
       - mwlModuleId
@@ -932,7 +932,7 @@ traps:
     name: MERU-WLAN-MIB::mwlPowerModuleClear
     category: diagnostic
     severity: notice
-    description: Power module {mwlModuleId} running detected via {mwlTrapContent} on {_HOSTNAME}.
+    description: 'Power module {{value "mwlModuleId"}} is running{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwlModuleId
@@ -940,8 +940,8 @@ traps:
   - oid: 1.3.6.1.4.1.15983.3.1.3.97
     name: MERU-WLAN-MIB::mwlFanModuleFailure
     category: diagnostic
-    severity: err
-    description: Fan module {mwlModuleId} failed with content {mwlTrapContent} on {_HOSTNAME}.
+    severity: crit
+    description: Fan module {{value "mwlModuleId"}} failed on {{hostname}}.
     status: current
     varbinds:
       - mwlModuleId
@@ -950,7 +950,7 @@ traps:
     name: MERU-WLAN-MIB::mwlFanModuleClear
     category: diagnostic
     severity: notice
-    description: Fan module {mwlModuleId} status cleared with content {mwlTrapContent} on {_HOSTNAME}.
+    description: Fan module {{value "mwlModuleId"}} is running on {{hostname}}.
     status: current
     varbinds:
       - mwlModuleId
@@ -959,7 +959,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApWirelessIfDownDuetoFallbackChanNotFound
     category: state_change
     severity: warning
-    description: Wireless interface {mwlWirelessIfIndex} on AP {mwApNodeId} went down due to DFS fallback channel not found on {_HOSTNAME}.
+    description: Wireless interface down due to DFS fallback channel not found on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -971,7 +971,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApWirelessIfDownDuetoFallbackChanNotFoundRecovered
     category: state_change
     severity: notice
-    description: Wireless interface recovered from DFS fallback on AP {mwApNodeId} on {_HOSTNAME}.
+    description: Wireless interface recovered from DFS fallback on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -982,8 +982,8 @@ traps:
   - oid: 1.3.6.1.4.1.15983.3.1.3.101
     name: MERU-WLAN-MIB::mwlAtsLicenseExceeded
     category: license
-    severity: warning
-    description: AP license count {mwlApLicenseCount} exceeded limit with details {mwlTrapContent} on {_HOSTNAME}.
+    severity: alert
+    description: AP license limit exceeded with {{value "mwlApLicenseCount"}} licenses on {{hostname}}.
     status: current
     varbinds:
       - mwlApLicenseCount
@@ -992,7 +992,7 @@ traps:
     name: MERU-WLAN-MIB::mwlAtsLicenseExceededCleared
     category: license
     severity: notice
-    description: AP buffer license usage cleared with count {mwlApLicenseCount} on {_HOSTNAME}.
+    description: AP license usage cleared on {{hostname}}.
     status: current
     varbinds:
       - mwlApLicenseCount
@@ -1001,7 +1001,7 @@ traps:
     name: MERU-WLAN-MIB::mwlPowerNotAT
     category: diagnostic
     severity: warning
-    description: Power supply type {mwApPowerSupplyType} reported {mwlTrapContent} on {_HOSTNAME}.
+    description: 'Power supply type mismatch detected{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwApPowerSupplyType
@@ -1010,15 +1010,15 @@ traps:
     name: MERU-WLAN-MIB::mwlSwitchSupport
     category: diagnostic
     severity: warning
-    description: 'Switch not supporting LACP notification received: {mwlTrapContent} on {_HOSTNAME}.'
+    description: 'Switch not supporting LACP detected{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwlTrapContent
   - oid: 1.3.6.1.4.1.15983.3.1.3.105
     name: MERU-WLAN-MIB::mwlApHwRevNotSupported
     category: diagnostic
-    severity: err
-    description: 'AP {mwApNodeId} with MAC {mwlApMacAddr} reported unsupported hardware revision: {mwlTrapContent} on {_HOSTNAME}.'
+    severity: warning
+    description: AP {{value "mwlApMacAddr"}} hardware revision not supported on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -1028,7 +1028,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApHwRevNotSupportedRecovered
     category: diagnostic
     severity: notice
-    description: AP hardware revision mismatch recovered for {mwlApMacAddr} on {_HOSTNAME}.
+    description: AP hardware revision incompatibility recovered on {{value "mwlApMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -1038,7 +1038,7 @@ traps:
     name: MERU-WLAN-MIB::mwlPowerSupplyTypeNotAtForOAP832
     category: diagnostic
     severity: warning
-    description: Power supply type not supported on AP {mwApNodeId} with MAC {mwlApMacAddr} on {_HOSTNAME}.
+    description: Power supply type not supported on AP {{value "mwlApMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -1048,7 +1048,7 @@ traps:
     name: MERU-WLAN-MIB::mwlPowerSupplyTypeAtForOAP832
     category: diagnostic
     severity: notice
-    description: Power supply type notification received for AP {mwApNodeId} on {_HOSTNAME}.
+    description: Power supply type AT for OAP832 detected on {{value "mwlApMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -1057,8 +1057,8 @@ traps:
   - oid: 1.3.6.1.4.1.15983.3.1.3.109
     name: MERU-WLAN-MIB::mwlReInitDB
     category: diagnostic
-    severity: warning
-    description: SNMP entity received ReInitDB notification with content {mwlTrapContent} on {_HOSTNAME}.
+    severity: notice
+    description: 'SNMP entity reinitialized database{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwlRecordNumber
@@ -1067,7 +1067,7 @@ traps:
     name: MERU-WLAN-MIB::mwlApModelNotSupported
     category: diagnostic
     severity: warning
-    description: Unsupported AP model {mwlApMacAddr} reported via {mwlTrapContent} on {_HOSTNAME}.
+    description: Unsupported AP model detected at {{value "mwlApMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - mwlApMacAddr
@@ -1075,8 +1075,8 @@ traps:
   - oid: 1.3.6.1.4.1.15983.3.1.3.111
     name: MERU-WLAN-MIB::mwlServiceDown
     category: diagnostic
-    severity: err
-    description: Wireless network timer entered down state with details {mwlTrapContent} on {_HOSTNAME}.
+    severity: crit
+    description: 'Wireless service down{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwlTrapContent
@@ -1084,7 +1084,7 @@ traps:
     name: MERU-WLAN-MIB::mwlBadPlanningChannel
     category: diagnostic
     severity: warning
-    description: Bad planning channel detected due to interference on {_HOSTNAME}.
+    description: Bad planning channel detected due to interference on {{hostname}}.
     status: current
     varbinds:
       - mwlTrapContent
@@ -1092,7 +1092,7 @@ traps:
     name: MERU-WLAN-MIB::mwlImproperAPRFPositioning
     category: diagnostic
     severity: warning
-    description: 'Improper AP RF positioning detected: {mwlTrapContent} on {_HOSTNAME}.'
+    description: 'Improper AP RF positioning detected{{with value "mwlTrapContent"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mwlTrapContent
@@ -1100,7 +1100,7 @@ traps:
     name: MERU-WLAN-MIB::mwlChannelChangeDynamicUpdateMCA
     category: state_change
     severity: notice
-    description: Dynamic channel change detected on interface via {mwlTrapContent} on {_HOSTNAME}.
+    description: Wireless interface channel changed due to dynamic MCA update on {{hostname}}.
     status: current
     varbinds:
       - mwlTrapContent
@@ -1108,7 +1108,7 @@ traps:
     name: MERU-WLAN-MIB::mwlNewAPAfterChannelPlanning
     category: state_change
     severity: notice
-    description: New AP {mwApNodeId} added to network after channel planning on {_HOSTNAME}.
+    description: New AP {{value "mwlApMacAddr"}} detected after channel planning on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId
@@ -1116,9 +1116,9 @@ traps:
       - mwlTrapContent
   - oid: 1.3.6.1.4.1.15983.3.1.3.116
     name: MERU-WLAN-MIB::mwlNewAPAfterChannelPlanningRecovered
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: New AP alarm cleared after channel planning recovered for AP {mwApNodeId} on {_HOSTNAME}.
+    description: New AP alarm cleared after channel planning recovered for {{value "mwlApMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - mwApNodeId

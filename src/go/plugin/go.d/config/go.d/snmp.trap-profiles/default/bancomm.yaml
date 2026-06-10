@@ -72,7 +72,7 @@ traps:
     name: SSU2000-MIB::ssuEvent
     category: diagnostic
     severity: warning
-    description: Alarm {tpAlmCode} with description {tpDescr} on {_HOSTNAME}.
+    description: Alarm {{value "tpAlmCode"}} {{value "tpDescr"}} on {{hostname}}.
     status: current
     varbinds:
       - tpTag

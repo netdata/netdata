@@ -447,16 +447,16 @@ traps:
     name: RS-XX8000-COMMON-MIB::testTrap
     category: diagnostic
     severity: info
-    description: Test trap received with serial number {serialNumber} and {counterEvents} events on {_HOSTNAME}.
+    description: Test trap received from {{vendor}} on {{hostname}}.
     status: current
     varbinds:
       - serialNumber
       - counterEvents
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.1.2.0.10.0.1
     name: RS-XX8000-COMMON-MIB::swUpdateStarted
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Software update started on {_HOSTNAME}.
+    description: Software update started on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -466,7 +466,7 @@ traps:
     name: RS-XX8000-COMMON-MIB::ntpSyncFailed
     category: diagnostic
     severity: warning
-    description: NTP synchronisation failed on {_HOSTNAME}.
+    description: NTP synchronisation failed on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -476,7 +476,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txSummaryFault
     category: diagnostic
     severity: crit
-    description: Transmitter summary fault {eventEvent} with priority {eventAlarmPriority} on {_HOSTNAME}.
+    description: Transmitter summary fault detected{{with value "eventAlarmPriority"}} priority {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -486,7 +486,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txSummaryWarning
     category: diagnostic
     severity: warning
-    description: Transmitter summary warning {eventEvent} on {_HOSTNAME}.
+    description: Transmitter summary warning {{value "eventEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -494,9 +494,9 @@ traps:
       - eventEvent
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.3
     name: RS-XX8000-DVB-TX-MIB::txLocal
-    category: diagnostic
-    severity: warning
-    description: Transmitter Local/Remote event {eventEvent} with priority {eventAlarmPriority} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Transmitter mode changed to {{value "eventEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -506,7 +506,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRfOn
     category: state_change
     severity: notice
-    description: Transmitter RF state changed to {eventEvent} on {_HOSTNAME}.
+    description: Transmitter RF turned on{{with value "eventAlarmClass"}} ({{.}}){{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -515,8 +515,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.5
     name: RS-XX8000-DVB-TX-MIB::txRfOk
     category: diagnostic
-    severity: warning
-    description: Transmitter RF status changed to {eventEvent.raw} on {_HOSTNAME}.
+    severity: notice
+    description: Transmitter RF status is {{value "eventEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -526,7 +526,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txParamSetSubDeviceDiffers
     category: diagnostic
     severity: warning
-    description: Subdevice parameterset mismatch detected with priority {eventAlarmPriority} on {_HOSTNAME}.
+    description: Subdevice parameterset differs from expected configuration on {{hostname}}.
     status: obsolete
     varbinds:
       - eventAlarmPriority
@@ -536,7 +536,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txParamSetValuesChanged
     category: config_change
     severity: warning
-    description: Parameter set inconsistency detected due to changes after load on {_HOSTNAME}.
+    description: Parameterset changed and is now inconsistent on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -545,8 +545,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.8
     name: RS-XX8000-DVB-TX-MIB::txRfLoopProgram
     category: diagnostic
-    severity: warning
-    description: RF loop program event {eventEvent} with priority {eventAlarmPriority} on {_HOSTNAME}.
+    severity: notice
+    description: NetCCU Loop Program event {{value "eventEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -556,7 +556,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRfLoopReserve
     category: diagnostic
     severity: warning
-    description: NetCCU Loop Reserve event {eventEvent} with priority {eventAlarmPriority} on {_HOSTNAME}.
+    description: NetCCU loop reserve event {{value "eventEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -566,7 +566,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRfWarning
     category: diagnostic
     severity: warning
-    description: RF warning event {eventEvent} with priority {eventAlarmPriority} on {_HOSTNAME}.
+    description: RF warning {{value "eventEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -576,7 +576,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txReflectionWarning
     category: diagnostic
     severity: warning
-    description: TX reflection warning event {eventEvent} with priority {eventAlarmPriority} on {_HOSTNAME}.
+    description: TX reflection warning detected{{with value "eventAlarmPriority"}} priority {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -585,8 +585,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.12
     name: RS-XX8000-DVB-TX-MIB::txNetCCUFanFault
     category: diagnostic
-    severity: err
-    description: Fan fault detected with priority {eventAlarmPriority} on {_HOSTNAME}.
+    severity: alert
+    description: NetCCU fan fault detected on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -596,7 +596,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txNetCCUPowerSupply
     category: diagnostic
     severity: warning
-    description: Power supply event {eventEvent} with priority {eventAlarmPriority} on {_HOSTNAME}.
+    description: Power supply event {{value "eventEvent"}} with priority {{value "eventAlarmPriority"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -605,8 +605,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.14
     name: RS-XX8000-DVB-TX-MIB::txRfFail
     category: diagnostic
-    severity: warning
-    description: RF failure detected with priority {eventAlarmPriority} on {_HOSTNAME}.
+    severity: alert
+    description: RF failure detected{{with value "eventAlarmPriority"}} priority {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -615,8 +615,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.15
     name: RS-XX8000-DVB-TX-MIB::txReflectionFault
     category: diagnostic
-    severity: err
-    description: Reflection fault detected with priority {eventAlarmPriority} and class {eventAlarmClass} on {_HOSTNAME}.
+    severity: crit
+    description: Reflection fault detected{{with value "eventAlarmPriority"}} priority {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -626,7 +626,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txNetCCUBoardTemperatureFault
     category: diagnostic
     severity: warning
-    description: Temperature fault detected on NetCCU board with priority {eventAlarmPriority} on {_HOSTNAME}.
+    description: CCU board temperature fault detected{{with value "eventAlarmPriority"}} priority {{.}}{{end}} on {{hostname}}.
     status: deprecated
     varbinds:
       - eventAlarmPriority
@@ -635,8 +635,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.17
     name: RS-XX8000-DVB-TX-MIB::txNetCCUNoConnectionToExcA
     category: diagnostic
-    severity: err
-    description: NetCCU connection to ExciterA is faulty with priority {eventAlarmPriority} on {_HOSTNAME}.
+    severity: crit
+    description: NetCCU connection to ExciterA is faulty on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -645,8 +645,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.18
     name: RS-XX8000-DVB-TX-MIB::txNetCCUNoConnectionToOstA
     category: diagnostic
-    severity: err
-    description: NetCCU connection to OutputstageA reported faulty event on {_HOSTNAME}.
+    severity: crit
+    description: NetCCU connection to OutputstageA is faulty on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -655,8 +655,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.19
     name: RS-XX8000-DVB-TX-MIB::txNetCCUNoConnectionToExcB
     category: diagnostic
-    severity: err
-    description: NetCCU connection to ExciterB is faulty with priority {eventAlarmPriority} on {_HOSTNAME}.
+    severity: crit
+    description: NetCCU connection to ExciterB is faulty on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -665,8 +665,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.20
     name: RS-XX8000-DVB-TX-MIB::txNetCCUNoConnectionToOstB
     category: diagnostic
-    severity: err
-    description: NetCCU connection to OutputstageB is faulty on {_HOSTNAME}.
+    severity: crit
+    description: NetCCU connection to OutputstageB is faulty on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -676,7 +676,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txAutomaticExcReady
     category: diagnostic
     severity: notice
-    description: Exciter Automatic Ready event reported on {_HOSTNAME}.
+    description: Exciter automatic ready on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -684,9 +684,9 @@ traps:
       - eventEvent
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.22
     name: RS-XX8000-DVB-TX-MIB::txAutomaticExcChanged
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Exciter automatic mode changed with event {eventEvent} on {_HOSTNAME}.
+    description: Exciter automatic mode changed{{with value "eventEvent"}} to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -695,8 +695,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.23
     name: RS-XX8000-DVB-TX-MIB::txAutomaticExcFault
     category: diagnostic
-    severity: warning
-    description: Exciter automatic fault detected with priority {eventAlarmPriority} on {_HOSTNAME}.
+    severity: alert
+    description: Exciter automatic fault detected{{with value "eventAlarmPriority"}} priority {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -704,9 +704,9 @@ traps:
       - eventEvent
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.24
     name: RS-XX8000-DVB-TX-MIB::txAutomaticOstReady
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Outputstage automatic ready event on {_HOSTNAME}.
+    description: Outputstage automatic ready on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -715,8 +715,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.25
     name: RS-XX8000-DVB-TX-MIB::txAutomaticOstChanged
     category: diagnostic
-    severity: warning
-    description: Outputstage automatic change detected with priority {eventAlarmPriority} on {_HOSTNAME}.
+    severity: notice
+    description: Output stage automatic mode changed{{with value "eventEvent"}} to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -725,8 +725,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.26
     name: RS-XX8000-DVB-TX-MIB::txAutomaticOstFault
     category: diagnostic
-    severity: warning
-    description: Outputstage automatic fault detected on {_HOSTNAME}.
+    severity: alert
+    description: Outputstage automatic fault detected{{with value "eventAlarmPriority"}} priority {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -736,7 +736,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txNetCCUBoardTemperatureWarning
     category: diagnostic
     severity: warning
-    description: Temperature warning on NetCCU board with priority {eventAlarmPriority} on {_HOSTNAME}.
+    description: NetCCU board temperature warning detected{{with value "eventAlarmPriority"}} priority {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -746,7 +746,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txInternalPowerSupplyWarning
     category: diagnostic
     severity: warning
-    description: Internal power supply warning with priority {eventAlarmPriority} on {_HOSTNAME}.
+    description: Internal power supply warning {{value "eventAlarmPriority"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -756,7 +756,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExternalPowerSupplyWarning
     category: diagnostic
     severity: warning
-    description: External power supply warning with priority {eventAlarmPriority} on {_HOSTNAME}.
+    description: External power supply warning {{value "eventEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -766,7 +766,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txModeSwitchOverStarted
     category: state_change
     severity: notice
-    description: TX mode switch over started on {_HOSTNAME}.
+    description: TX mode switch over started on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -776,7 +776,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txModeSwitchOverEnded
     category: state_change
     severity: notice
-    description: TX mode switch over ended with event {eventEvent} on {_HOSTNAME}.
+    description: TX mode switch over ended on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -786,7 +786,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txModeInconsistent
     category: config_change
     severity: warning
-    description: TX mode configuration inconsistency detected between CCU and exiter on {_HOSTNAME}.
+    description: TX mode configuration inconsistency detected between CCU and exiter on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -795,8 +795,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.38
     name: RS-XX8000-DVB-TX-MIB::txModeSwitchOverFailed
     category: diagnostic
-    severity: err
-    description: TX mode switch over failed on {_HOSTNAME}.
+    severity: crit
+    description: TX mode switch over failed on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -805,8 +805,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.100
     name: RS-XX8000-DVB-TX-MIB::txExcSummaryFault
     category: diagnostic
-    severity: err
-    description: Exciter summary fault {eventEvent} on module {indexAB} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter summary fault detected{{with value "indexAB"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -817,7 +817,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcSummaryWarning
     category: diagnostic
     severity: warning
-    description: Exciter summary warning {eventEvent} on {indexAB} with priority {eventAlarmPriority} on {_HOSTNAME}.
+    description: Exciter summary warning {{value "eventEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -826,9 +826,9 @@ traps:
       - indexAB
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.102
     name: RS-XX8000-DVB-TX-MIB::txExcLocal
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Exciter {indexAB} local/remote status change reported with priority {eventAlarmPriority} on {_HOSTNAME}.
+    description: Exciter local/remote mode changed{{with value "indexAB"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -837,9 +837,9 @@ traps:
       - indexAB
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.104
     name: RS-XX8000-DVB-TX-MIB::txExcRfOk
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Exciter RF status reported as Ok on {_HOSTNAME}.
+    description: Exciter RF status is OK{{with value "indexAB"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -850,7 +850,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcInputNoConnectHP1
     category: diagnostic
     severity: warning
-    description: Exciter Input HP1 has no connected input signal on {_HOSTNAME}.
+    description: Exciter input signal missing on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -861,7 +861,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcInputNoConnectLP1
     category: diagnostic
     severity: warning
-    description: Exciter Input LP1 has no connected input signal on {_HOSTNAME}.
+    description: Exciter Input LP1 has no connected input signal on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -872,7 +872,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcInputNoConnectHP2
     category: diagnostic
     severity: warning
-    description: Exciter Input HP2 has no connected input signal on {_HOSTNAME}.
+    description: Exciter input signal missing on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -883,7 +883,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcInputNoConnectLP2
     category: diagnostic
     severity: warning
-    description: Exciter Input LP2 has no connected input signal on {_HOSTNAME}.
+    description: Exciter Input LP2 has no connected input signal on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -892,9 +892,9 @@ traps:
       - indexAB
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.109
     name: RS-XX8000-DVB-TX-MIB::txExcInputActiveHP1
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Exciter Input HP1 is active on {_HOSTNAME}.
+    description: Exciter Input HP1 is active on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -905,7 +905,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcInputActiveLP1
     category: state_change
     severity: notice
-    description: Exciter Input LP1 is active on {_HOSTNAME}.
+    description: Exciter Input LP1 is active on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -916,7 +916,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcInputActiveHP2
     category: state_change
     severity: notice
-    description: Exciter Input HP2 is active on {_HOSTNAME}.
+    description: Exciter input HP2 is active{{with value "indexAB"}} on module {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -925,9 +925,9 @@ traps:
       - indexAB
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.112
     name: RS-XX8000-DVB-TX-MIB::txExcInputActiveLP2
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Exciter Input LP2 is active on {_HOSTNAME}.
+    description: Exciter Input LP2 is active on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -938,7 +938,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcOn
     category: state_change
     severity: notice
-    description: Exciter {indexAB} turned on on {_HOSTNAME}.
+    description: Exciter {{value "indexAB"}} went on on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -949,7 +949,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcRfOn
     category: state_change
     severity: notice
-    description: Exciter RF turned on for module {indexAB} on {_HOSTNAME}.
+    description: Exciter RF turned on{{with value "indexAB"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -959,8 +959,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.115
     name: RS-XX8000-DVB-TX-MIB::txExcNoInput
     category: diagnostic
-    severity: err
-    description: Exciter {indexAB} has no valid input signal on {_HOSTNAME}.
+    severity: crit
+    description: Exciter has no valid input signal{{with value "indexAB"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -970,8 +970,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.116
     name: RS-XX8000-DVB-TX-MIB::txExcRfLoop
     category: diagnostic
-    severity: warning
-    description: Exciter RF loop detected on {indexAB} on {_HOSTNAME}.
+    severity: alert
+    description: Exciter RF loop detected on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -981,8 +981,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.117
     name: RS-XX8000-DVB-TX-MIB::txExcRfFail
     category: diagnostic
-    severity: err
-    description: Exciter RF failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Exciter RF fail detected on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -993,7 +993,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcSelfTest
     category: diagnostic
     severity: warning
-    description: Exciter hardware self test reported on {_HOSTNAME}.
+    description: Exciter hardware self test triggered{{with value "indexAB"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1004,7 +1004,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcOutputOpen
     category: diagnostic
     severity: crit
-    description: Exciter output open detected on module {indexAB} on {_HOSTNAME}.
+    description: Exciter output open detected{{with value "indexAB"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1015,7 +1015,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcBoardTemperatureWarning
     category: diagnostic
     severity: warning
-    description: Exciter board temperature warning on {_HOSTNAME}.
+    description: Exciter board temperature warning on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1026,7 +1026,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcFanWarning
     category: diagnostic
     severity: warning
-    description: Exciter module {indexAB} has a faulty fan on {_HOSTNAME}.
+    description: Exciter fan fault detected{{with value "indexAB"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1036,8 +1036,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.122
     name: RS-XX8000-DVB-TX-MIB::txExcFanFault
     category: diagnostic
-    severity: crit
-    description: Exciter fans reported faulty status on {_HOSTNAME}.
+    severity: alert
+    description: Both exciter fans are faulty on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1048,7 +1048,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcFifoWarning
     category: diagnostic
     severity: warning
-    description: Exciter FIFO warning on {indexAB} on {_HOSTNAME}.
+    description: Exciter FIFO warning on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1059,7 +1059,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcTestSignal
     category: diagnostic
     severity: notice
-    description: Exciter test signal active on {_HOSTNAME}.
+    description: Exciter test signal active on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1069,8 +1069,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.125
     name: RS-XX8000-DVB-TX-MIB::txExcSFNDelay
     category: diagnostic
-    severity: err
-    description: Exciter SFN Delay Fault detected on {indexAB} on {_HOSTNAME}.
+    severity: alert
+    description: Exciter SFN Delay Fault detected on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1081,7 +1081,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcWrongDatarate
     category: diagnostic
     severity: warning
-    description: Exciter wrong datarate detected on {indexAB} on {_HOSTNAME}.
+    description: Exciter wrong datarate detected{{with value "indexAB"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1092,7 +1092,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcMute
     category: diagnostic
     severity: warning
-    description: Exciter mute event {eventEvent} on module {indexAB} on {_HOSTNAME}.
+    description: Exciter mute alarm detected on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1102,8 +1102,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.128
     name: RS-XX8000-DVB-TX-MIB::txExcPPSFail
     category: diagnostic
-    severity: warning
-    description: Exciter PPS failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Exciter PPS fail detected{{with value "indexAB"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1113,8 +1113,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.129
     name: RS-XX8000-DVB-TX-MIB::txExcReferenceFail
     category: diagnostic
-    severity: err
-    description: Exciter reference failure detected on module {indexAB} on {_HOSTNAME}.
+    severity: alert
+    description: Exciter reference failure detected on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1125,7 +1125,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcMIPFail
     category: diagnostic
     severity: crit
-    description: Exciter MIP failure detected on module {indexAB} with priority {eventAlarmPriority} on {_HOSTNAME}.
+    description: Exciter MIP failure detected on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1136,7 +1136,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcInputAutomaticSwitchReady
     category: state_change
     severity: notice
-    description: Input automatic switch ready on {_HOSTNAME}.
+    description: Input automatic switch ready{{with value "indexAB"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1147,7 +1147,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcInputAutomaticChangedOver
     category: state_change
     severity: notice
-    description: Input automatic changed over on {_HOSTNAME}.
+    description: Input automatic changed over to {{value "indexAB"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1158,13 +1158,13 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txExcInputReseveMissing
     category: diagnostic
     severity: warning
-    description: Missing input signal detected on {_HOSTNAME}.
+    description: Missing input or automatic switching enabled on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.200
     name: RS-XX8000-DVB-TX-MIB::txOstSummaryFault
     category: diagnostic
-    severity: err
-    description: Outputstage summary fault reported on {_HOSTNAME}.
+    severity: alert
+    description: Outputstage summary fault detected{{with value "indexAB"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1175,7 +1175,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txOstSummaryWarning
     category: diagnostic
     severity: warning
-    description: Outputstage summary warning with priority {eventAlarmPriority} on {_HOSTNAME}.
+    description: Outputstage summary warning on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1186,7 +1186,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txOstRfOn
     category: state_change
     severity: notice
-    description: Outputstage RF turned on for module {indexAB} on {_HOSTNAME}.
+    description: Outputstage RF turned on{{with value "indexAB"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1197,7 +1197,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txOstRfOk
     category: diagnostic
     severity: notice
-    description: Outputstage RF status is OK on {_HOSTNAME}.
+    description: Outputstage RF is OK{{with value "indexAB"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1207,8 +1207,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.204
     name: RS-XX8000-DVB-TX-MIB::txOstNoInput
     category: diagnostic
-    severity: warning
-    description: Outputstage no input signal detected on {indexAB} on {_HOSTNAME}.
+    severity: crit
+    description: Outputstage no input signal detected on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1219,7 +1219,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txOstRfWarning
     category: diagnostic
     severity: warning
-    description: Outputstage RF warning {eventEvent} on module {indexAB} on {_HOSTNAME}.
+    description: Outputstage RF warning on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1230,7 +1230,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txOstReflectionWarning
     category: diagnostic
     severity: warning
-    description: Outputstage reflection warning detected on {indexAB} on {_HOSTNAME}.
+    description: Outputstage reflection warning detected on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1241,7 +1241,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txOstRackWarning
     category: diagnostic
     severity: warning
-    description: Outputstage rack warning with priority {eventAlarmPriority} and class {eventAlarmClass} on {_HOSTNAME}.
+    description: Outputstage rack warning with pending error on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1252,7 +1252,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txOstCoolingWarning
     category: diagnostic
     severity: warning
-    description: Cooling warning on outputstage {indexAB} on {_HOSTNAME}.
+    description: Outputstage cooling warning on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1262,8 +1262,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.209
     name: RS-XX8000-DVB-TX-MIB::txOstRfFail
     category: diagnostic
-    severity: err
-    description: Outputstage RF Fail detected on {_HOSTNAME}.
+    severity: crit
+    description: Outputstage RF fail detected on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1273,8 +1273,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.210
     name: RS-XX8000-DVB-TX-MIB::txOstReflectionFault
     category: diagnostic
-    severity: err
-    description: Outputstage reflection fault detected on {indexAB} on {_HOSTNAME}.
+    severity: alert
+    description: Outputstage reflection fault detected on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1284,8 +1284,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.211
     name: RS-XX8000-DVB-TX-MIB::txOstACFault
     category: diagnostic
-    severity: err
-    description: Outputstage AC fault detected on module {indexAB} on {_HOSTNAME}.
+    severity: crit
+    description: Outputstage AC Fault detected on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1295,8 +1295,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.212
     name: RS-XX8000-DVB-TX-MIB::txOstCoolingFault
     category: diagnostic
-    severity: err
-    description: Outputstage cooling fault detected on {_HOSTNAME}.
+    severity: crit
+    description: Outputstage cooling fault detected on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1306,8 +1306,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.213
     name: RS-XX8000-DVB-TX-MIB::txOstCommFault
     category: diagnostic
-    severity: err
-    description: Outputstage communication fault detected on {_HOSTNAME}.
+    severity: crit
+    description: Outputstage communication fault on {{first (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1317,8 +1317,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.300
     name: RS-XX8000-DVB-TX-MIB::txRackSumFault
     category: diagnostic
-    severity: err
-    description: Rack {indexRack} reported fault event {eventEvent} with priority {eventAlarmPriority} on {_HOSTNAME}.
+    severity: alert
+    description: Summary fault detected on rack {{value "indexRack"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1330,7 +1330,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRackSumWarning
     category: diagnostic
     severity: warning
-    description: Rack {indexRack} module {indexAB} triggered summary warning event on {_HOSTNAME}.
+    description: Summary warning at rack {{value "indexRack"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1342,7 +1342,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRackOn
     category: state_change
     severity: notice
-    description: Rack {indexRack} operation mode changed to on on {_HOSTNAME}.
+    description: Rack {{value "indexRack"}} operation mode is on on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1354,7 +1354,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRackGpiWarning
     category: diagnostic
     severity: warning
-    description: General purpose input warning on module {indexAB} in rack {indexRack} on {_HOSTNAME}.
+    description: General purpose input warning occurred on {{first (value "indexRack") (value "indexAB")}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1365,8 +1365,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.304
     name: RS-XX8000-DVB-TX-MIB::txRackFan1Fault
     category: diagnostic
-    severity: err
-    description: Fan 1 fault detected on rack {indexRack} with priority {eventAlarmPriority} on {_HOSTNAME}.
+    severity: alert
+    description: Rack fan 1 fault detected{{with value "indexRack"}} on rack {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1377,8 +1377,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.305
     name: RS-XX8000-DVB-TX-MIB::txRackFan2Fault
     category: diagnostic
-    severity: err
-    description: Rack {indexRack} fan 2 fault detected on {_HOSTNAME}.
+    severity: alert
+    description: Rack fan 2 fault detected{{with value "indexRack"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1390,7 +1390,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRackCoolingSumWarning
     category: diagnostic
     severity: warning
-    description: Rack cooling summary warning on {indexRack} on {_HOSTNAME}.
+    description: Rack cooling warning on {{first (value "indexRack") "rack"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1401,8 +1401,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.307
     name: RS-XX8000-DVB-TX-MIB::txRackAmplifierSumFault
     category: diagnostic
-    severity: err
-    description: Rack amplifier fault detected on {indexRack} module {indexAB} on {_HOSTNAME}.
+    severity: alert
+    description: Rack amplifier fault detected on {{value "indexRack"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1414,7 +1414,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRackNoLink
     category: diagnostic
     severity: crit
-    description: No communication to rack {indexRack} on {_HOSTNAME}.
+    description: No communication to the designated rack {{value "indexRack"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1426,7 +1426,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRackGpiFault
     category: diagnostic
     severity: warning
-    description: General purpose input fault on module {indexAB} in rack {indexRack} on {_HOSTNAME}.
+    description: General purpose input fault detected on {{first (value "indexRack") "rack"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1438,7 +1438,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRackTemperatureFault
     category: diagnostic
     severity: alert
-    description: Rack {indexRack} temperature fault detected with priority {eventAlarmPriority} on {_HOSTNAME}.
+    description: Rack temperature fault detected{{with value "indexRack"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1450,7 +1450,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRackACFault
     category: diagnostic
     severity: alert
-    description: AC phase fault detected on rack {indexRack} with priority {eventAlarmPriority} on {_HOSTNAME}.
+    description: AC phase fault detected on rack {{value "indexRack"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1461,8 +1461,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.312
     name: RS-XX8000-DVB-TX-MIB::txRackCoolingSumFault
     category: diagnostic
-    severity: crit
-    description: Rack cooling summary fault detected on {_HOSTNAME}.
+    severity: alert
+    description: Rack cooling summary fault detected on {{first (value "indexRack") "rack"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1473,8 +1473,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.313
     name: RS-XX8000-DVB-TX-MIB::txRackTempFaultAbs1
     category: diagnostic
-    severity: crit
-    description: Rack {indexRack} absorber 1 temperature fault on {_HOSTNAME}.
+    severity: alert
+    description: Rack temperature fault on absorber 1{{with value "indexRack"}} in rack {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1485,8 +1485,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.314
     name: RS-XX8000-DVB-TX-MIB::txRackTempFaultAbs2
     category: diagnostic
-    severity: warning
-    description: Temperature fault detected for absorber 2 in rack {indexRack} on {_HOSTNAME}.
+    severity: alert
+    description: Rack temperature fault on absorber 2{{with value "indexRack"}} in rack {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1497,8 +1497,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.315
     name: RS-XX8000-DVB-TX-MIB::txRackDCFault
     category: diagnostic
-    severity: err
-    description: Rack {indexRack} DC fault detected on {_HOSTNAME}.
+    severity: alert
+    description: DC fault detected on rack {{value "indexRack"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1510,7 +1510,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRackRfOn
     category: state_change
     severity: notice
-    description: RF power is on for module {indexAB} in rack {indexRack} on {_HOSTNAME}.
+    description: RF power is on{{with value "indexRack"}} on rack {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1522,7 +1522,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRackRfOk
     category: diagnostic
     severity: info
-    description: RF power is ok for {indexAB} in rack {indexRack} on {_HOSTNAME}.
+    description: RF power is ok on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1534,7 +1534,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRackRfWarning
     category: diagnostic
     severity: warning
-    description: RF power decreased below warning threshold on {indexRack} {indexAB} on {_HOSTNAME}.
+    description: RF power decreased below warning threshold on {{first (value "indexRack") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1545,8 +1545,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.321
     name: RS-XX8000-DVB-TX-MIB::txRackRfFault
     category: diagnostic
-    severity: err
-    description: RF output power decreased below fault threshold on {indexRack} on {_HOSTNAME}.
+    severity: crit
+    description: RF output power decreased below fault threshold on {{first (value "indexRack") "system"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1558,7 +1558,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRackReflectionWarning
     category: diagnostic
     severity: warning
-    description: Reflected power exceeded warning threshold for {indexRack} on {_HOSTNAME}.
+    description: Reflected power warning threshold exceeded on {{first (value "indexRack") (value "indexAB") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1570,7 +1570,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRackReflectionFault
     category: diagnostic
     severity: warning
-    description: Reflected power fault detected on module {indexAB} in rack {indexRack} on {_HOSTNAME}.
+    description: Reflected power fault threshold exceeded on {{first (value "indexRack") (value "indexAB")}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1582,7 +1582,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRackProbeNotCalibrated
     category: diagnostic
     severity: warning
-    description: Probe calibration status is not calibrated on {_HOSTNAME}.
+    description: Probe calibration missing{{with value "indexRack"}} on rack {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1594,7 +1594,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRackTemperatureWarning
     category: diagnostic
     severity: warning
-    description: Rack temperature exceeded warning threshold on {_HOSTNAME}.
+    description: Rack temperature exceeded warning threshold on {{first (value "indexRack") "rack"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1606,7 +1606,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txRackOvervoltProtectWarning
     category: diagnostic
     severity: warning
-    description: Overvoltage protection is out of order on rack {indexRack} module {indexAB} on {_HOSTNAME}.
+    description: Overvoltage protection is out of order on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1617,8 +1617,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.400
     name: RS-XX8000-DVB-TX-MIB::txAmpSumFault
     category: diagnostic
-    severity: err
-    description: Amplifier fault detected on {indexAB} in rack {indexRack} slot {indexAmplifier} on {_HOSTNAME}.
+    severity: alert
+    description: Amplifier summary fault detected on {{first (value "indexAmplifier") (value "indexRack") "amplifier"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1631,7 +1631,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txAmpSumWarning
     category: diagnostic
     severity: warning
-    description: Amplifier {indexAmplifier} in rack {indexRack} module {indexAB} signals summary warning with priority {eventAlarmPriority} on {_HOSTNAME}.
+    description: Amplifier summary warning on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1644,7 +1644,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txAmpPowerOn
     category: state_change
     severity: notice
-    description: Amplifier power is on at {indexRack} {indexAB} on {_HOSTNAME}.
+    description: Amplifier power is on{{with value "indexAmplifier"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1657,7 +1657,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txAmpDCOk
     category: diagnostic
     severity: notice
-    description: Amplifier DC status is ok on {_HOSTNAME}.
+    description: Amplifier DC power is ok on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1670,7 +1670,7 @@ traps:
     name: RS-XX8000-DVB-TX-MIB::txAmpACOk
     category: diagnostic
     severity: notice
-    description: Amplifier {indexAB} in rack {indexRack} reported {eventEvent} on {_HOSTNAME}.
+    description: Amplifier AC status is ok on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1682,8 +1682,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.405
     name: RS-XX8000-DVB-TX-MIB::txAmpRfInFail
     category: diagnostic
-    severity: crit
-    description: RF input fail on amplifier {indexAmplifier} in rack {indexRack} on {_HOSTNAME}.
+    severity: alert
+    description: RF input fail on amplifier {{value "indexAmplifier"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1695,8 +1695,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.406
     name: RS-XX8000-DVB-TX-MIB::txAmpRfFail
     category: diagnostic
-    severity: crit
-    description: RF failure detected on amplifier {indexAmplifier} in rack {indexRack} on {_HOSTNAME}.
+    severity: alert
+    description: RF amplifier failure detected on amplifier {{value "indexAmplifier"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1708,8 +1708,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.407
     name: RS-XX8000-DVB-TX-MIB::txAmpReflectionFault
     category: diagnostic
-    severity: warning
-    description: Amplifier reflection fault detected on {indexRack} {indexAmplifier} on {_HOSTNAME}.
+    severity: alert
+    description: Amplifier reflection fault detected on {{first (value "indexAmplifier") "amplifier"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1721,8 +1721,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.408
     name: RS-XX8000-DVB-TX-MIB::txAmpTemperatureFault
     category: diagnostic
-    severity: crit
-    description: Amplifier {indexAmplifier} in rack {indexRack} reported high temperature fault on {_HOSTNAME}.
+    severity: alert
+    description: Amplifier temperature fault detected on {{first (value "indexAmplifier") "amplifier"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1734,8 +1734,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.167.4.3.2.0.409
     name: RS-XX8000-DVB-TX-MIB::txAmpTransistorFault
     category: diagnostic
-    severity: err
-    description: Amplifier fault detected for transistor at {indexRack}/{indexAB}/{indexAmplifier} on {_HOSTNAME}.
+    severity: alert
+    description: Amplifier transistor fault detected on {{first (value "indexAmplifier") "amplifier"}} on {{hostname}}.
     status: current
     varbinds:
       - eventAlarmPriority
@@ -1748,7 +1748,7 @@ traps:
     name: RS-XX9-COMMON-MIB::commonNtpSync
     category: state_change
     severity: warning
-    description: NTP synchronization state changed to {commonTxNotificationState} on {_HOSTNAME}.
+    description: NTP synchronization state changed to {{value "commonTxNotificationState"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - commonNotificationAlarmClass
@@ -1758,7 +1758,7 @@ traps:
     name: RS-XX9-COMMON-MIB::commonSwUpdateStatus
     category: diagnostic
     severity: info
-    description: Software update status {commonTxNotificationState} on {_HOSTNAME}.
+    description: Software update status changed to {{value "commonTxNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1768,7 +1768,7 @@ traps:
     name: RS-XX9-COMMON-MIB::commonFwUpdateStatus
     category: diagnostic
     severity: warning
-    description: Firmware update status is {commonTxNotificationState} on {_HOSTNAME}.
+    description: Firmware update status is {{value "commonNotificationAlarmClass"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1776,9 +1776,9 @@ traps:
       - commonTxNotificationState
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.2.0.100
     name: RS-XX9-COMMON-MIB::commonOptionKeyStatus
-    category: diagnostic
+    category: license
     severity: warning
-    description: Option key status {commonOpkNotificationState} with priority {commonOpkNotificationPriority} on {_HOSTNAME}.
+    description: Option key state is {{value "commonOpkNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1788,16 +1788,16 @@ traps:
     name: RS-XX9-COMMON-MIB::commonTest
     category: diagnostic
     severity: info
-    description: Test notification received with counter {commonTrapCounter} on {_HOSTNAME}.
+    description: Test notification received on {{hostname}}.
     status: current
     varbinds:
       - sysName
       - commonTrapCounter
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.2.0.1001
     name: RS-XX9-COMMON-MIB::commonRising
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Custom notification variable {customNotificationVariable} reached rising threshold {customNotificationRisingThreshold} on {_HOSTNAME}.
+    description: Threshold exceeded for {{value "customNotificationVariable"}} on {{hostname}}.
     status: current
     varbinds:
       - customNotificationVariable
@@ -1806,9 +1806,9 @@ traps:
       - customNotificationPriority
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.2.0.1002
     name: RS-XX9-COMMON-MIB::commonFalling
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Metric {customNotificationVariable} fell below threshold {customNotificationFallingThreshold} on {_HOSTNAME}.
+    description: Notification {{value "customNotificationVariable"}} crossed falling threshold on {{hostname}}.
     status: current
     varbinds:
       - customNotificationVariable
@@ -1817,9 +1817,9 @@ traps:
       - customNotificationPriority
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.2.0.1003
     name: RS-XX9-COMMON-MIB::commonChanging
-    category: diagnostic
-    severity: warning
-    description: Custom notification variable {customNotificationVariable} changed value to {customNotificationValue} with priority {customNotificationPriority} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Notification table entry changed to {{value "customNotificationValue"}} on {{hostname}}.
     status: current
     varbinds:
       - customNotificationVariable
@@ -1829,7 +1829,7 @@ traps:
     name: RS-XX9-COMMON-MIB::commonDateTimeNtpState
     category: diagnostic
     severity: warning
-    description: NTP synchronization state {commonDateTimeNotificationState} reported on {_HOSTNAME}.
+    description: NTP synchronization state is {{value "commonDateTimeNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1839,7 +1839,7 @@ traps:
     name: RS-XX9-COMMON-MIB::commonGpsState
     category: diagnostic
     severity: warning
-    description: GNSS receiver unable to locate satellites with state {commonGpsNotificationState} on {_HOSTNAME}.
+    description: GNSS receiver lost satellite lock on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1849,7 +1849,7 @@ traps:
     name: RS-XX9-COMMON-MIB::commonDevInfoAcFail
     category: diagnostic
     severity: warning
-    description: Capacitor battery failure indicated with alarm class {commonNotificationAlarmClass} on {_HOSTNAME}.
+    description: Capacitor battery {{value "commonDevInfoNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1859,7 +1859,7 @@ traps:
     name: RS-XX9-COMMON-MIB::commonDevInfoFanState
     category: diagnostic
     severity: warning
-    description: Fan state notification {commonDevInfoNotificationState} with priority {commonDevInfoNotificationPriority} on {_HOSTNAME}.
+    description: Fan state notification {{value "commonDevInfoNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1869,7 +1869,7 @@ traps:
     name: RS-XX9-COMMON-MIB::commonDevInfoOvpState
     category: diagnostic
     severity: warning
-    description: Notification state {commonDevInfoNotificationState} with priority {commonDevInfoNotificationPriority} on {_HOSTNAME}.
+    description: Device notification {{value "commonDevInfoNotificationState"}} with priority {{value "commonDevInfoNotificationPriority"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1879,7 +1879,7 @@ traps:
     name: RS-XX9-COMMON-MIB::commonEnvSummary
     category: diagnostic
     severity: warning
-    description: Alarm {commonNotificationAlarmClass} with state {commonEnvNotificationState} on {_HOSTNAME}.
+    description: Environmental notification {{value "commonEnvNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1889,7 +1889,7 @@ traps:
     name: RS-XX9-COMMON-MIB::commonEnvTemperature
     category: diagnostic
     severity: warning
-    description: Environmental temperature alarm {commonEnvNotificationState} with priority {commonEnvNotificationPriority} on {_HOSTNAME}.
+    description: Environmental temperature notification {{value "commonEnvNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1899,7 +1899,7 @@ traps:
     name: RS-XX9-COMMON-MIB::commonEnvDewPoint
     category: diagnostic
     severity: warning
-    description: Environmental dew point alarm {commonNotificationAlarmClass} with state {commonEnvNotificationState} on {_HOSTNAME}.
+    description: Environmental dew point notification {{value "commonEnvNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1909,7 +1909,7 @@ traps:
     name: RS-XX9-TX-MIB::txSummary
     category: diagnostic
     severity: warning
-    description: Transmitter summary state is {txTransmitterNotificationState} with priority {txTransmitterNotificationPriority} on {_HOSTNAME}.
+    description: Transmitter summary state is {{value "txTransmitterNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1919,7 +1919,7 @@ traps:
     name: RS-XX9-TX-MIB::txRF
     category: diagnostic
     severity: warning
-    description: RF power warning with state {txTransmitterNotificationState} on {_HOSTNAME}.
+    description: RF power warning or fault detected on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1928,8 +1928,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.3
     name: RS-XX9-TX-MIB::txReflection
     category: diagnostic
-    severity: warning
-    description: Reflected RF alarm {txTransmitterNotificationState} on {_HOSTNAME}.
+    severity: crit
+    description: Reflected RF is above fault limit on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1939,7 +1939,7 @@ traps:
     name: RS-XX9-TX-MIB::txRfSensorSummary
     category: diagnostic
     severity: warning
-    description: RF sensor summary state is {txTransmitterNotificationState} with priority {txTransmitterNotificationPriority} on {_HOSTNAME}.
+    description: RF sensor summary state is {{value "txTransmitterNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1949,7 +1949,7 @@ traps:
     name: RS-XX9-TX-MIB::txLocal
     category: state_change
     severity: notice
-    description: Transmitter state changed to {txTransmitterNotificationState} on {_HOSTNAME}.
+    description: Transmitter state changed to {{value "txTransmitterNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1959,7 +1959,7 @@ traps:
     name: RS-XX9-TX-MIB::txExciterAutomaticOn
     category: state_change
     severity: notice
-    description: Exciter automatic state changed to {txTransmitterNotificationState} on {_HOSTNAME}.
+    description: Exciter automatic activation state changed on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1967,9 +1967,9 @@ traps:
       - txTransmitterNotificationState
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.7
     name: RS-XX9-TX-MIB::txExciterAutomaticReady
-    category: diagnostic
-    severity: info
-    description: Automatic exciter switchover function is {txTransmitterNotificationState} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Automatic exciter switchover function is ready on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1977,9 +1977,9 @@ traps:
       - txTransmitterNotificationState
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.8
     name: RS-XX9-TX-MIB::txExciterAutomaticSwitchedOver
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Exciter automatic switch to reserve reported as {txTransmitterNotificationState} on {_HOSTNAME}.
+    description: Exciter automatically switched to reserve on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1988,8 +1988,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.9
     name: RS-XX9-TX-MIB::txExciterAutomaticRfSwitchSummary
     category: diagnostic
-    severity: err
-    description: RF switch summary reported {txTransmitterNotificationState} on {_HOSTNAME}.
+    severity: crit
+    description: RF switch summary state is not working properly on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -1999,19 +1999,19 @@ traps:
     name: RS-XX9-TX-MIB::txExciterAutomaticSummary
     category: diagnostic
     severity: warning
-    description: Exciter automatic summary state changed to {TRAP_NAME} on {_HOSTNAME}.
+    description: Exciter automatic summary state is warning on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.1000
     name: RS-XX9-TX-MIB::txActiveReserveExcAutoOn
-    category: unknown
+    category: state_change
     severity: notice
-    description: Trap {TRAP_NAME} received on {_HOSTNAME}.
+    description: TX active reserve auto-on event triggered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.1001
     name: RS-XX9-TX-MIB::txActiveReserveExcAutoReady
-    category: diagnostic
-    severity: warning
-    description: Automatic exciter switchover function state is {txTransmitterNotificationState} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Automatic exciter switchover function is ready on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2019,9 +2019,9 @@ traps:
       - txTransmitterNotificationState
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.1002
     name: RS-XX9-TX-MIB::txActiveReserveExcAutoSwitchedOver
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Transmitter auto-switched to reserve on {_HOSTNAME}.
+    description: Transmitter reserve auto-switched over{{with value "txTransmitterNotificationState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2030,8 +2030,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.1003
     name: RS-XX9-TX-MIB::txActiveReserveExcAutoRfSwitchSummary
     category: diagnostic
-    severity: err
-    description: Exciter switch failed to switch to standby on {_HOSTNAME}.
+    severity: crit
+    description: Exciter switchover to standby failed on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2041,7 +2041,7 @@ traps:
     name: RS-XX9-TX-MIB::txActiveReserveExcAutoSummary
     category: diagnostic
     severity: warning
-    description: Transmitter notification {txTransmitterNotificationState} with priority {txTransmitterNotificationPriority} on {_HOSTNAME}.
+    description: Transmitter notification {{value "txTransmitterNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2049,15 +2049,15 @@ traps:
       - txTransmitterNotificationState
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.1500
     name: RS-XX9-TX-MIB::txActiveReserveOstAutoOn
-    category: unknown
-    severity: info
-    description: Trap {TRAP_NAME} received with no varbind context on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: TX active reserve OST auto-on event triggered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.1501
     name: RS-XX9-TX-MIB::txActiveReserveOstAutoReady
     category: diagnostic
-    severity: warning
-    description: Transmitter notification state {txTransmitterNotificationState} with priority {txTransmitterNotificationPriority} on {_HOSTNAME}.
+    severity: notice
+    description: 'Transmitter reserve auto-ready state notification{{with value "txTransmitterNotificationState"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2067,7 +2067,7 @@ traps:
     name: RS-XX9-TX-MIB::txActiveReserveOstAutoSwitchedOver
     category: state_change
     severity: warning
-    description: Transmitter reserve auto-switched over with state {txTransmitterNotificationState} on {_HOSTNAME}.
+    description: Transmitter reserve auto-switched over{{with value "txTransmitterNotificationState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2077,7 +2077,7 @@ traps:
     name: RS-XX9-TX-MIB::txActiveReserveOstAutoRfSwitchSummary
     category: diagnostic
     severity: warning
-    description: Transmitter notification {txTransmitterNotificationState} with priority {txTransmitterNotificationPriority} on {_HOSTNAME}.
+    description: Transmitter RF switch state changed to {{value "txTransmitterNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2087,7 +2087,7 @@ traps:
     name: RS-XX9-TX-MIB::txActiveReserveOstAutoSummary
     category: diagnostic
     severity: warning
-    description: Transmitter notification {txTransmitterNotificationState} with priority {txTransmitterNotificationPriority} on {_HOSTNAME}.
+    description: Transmitter notification {{value "txTransmitterNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2096,8 +2096,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.2000
     name: RS-XX9-TX-MIB::txExciterSummary
     category: diagnostic
-    severity: err
-    description: Exciter reported {txExciterNotificationState} with priority {txExciterNotificationPriority} on {_HOSTNAME}.
+    severity: warning
+    description: Exciter summary state is {{value "txExciterNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2107,7 +2107,7 @@ traps:
     name: RS-XX9-TX-MIB::txExciterLoop
     category: diagnostic
     severity: warning
-    description: Protection loop status {txExciterNotificationState} reported as {commonNotificationAlarmClass} on {_HOSTNAME}.
+    description: Protection loop is open on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2117,7 +2117,7 @@ traps:
     name: RS-XX9-TX-MIB::txExciterMute
     category: diagnostic
     severity: warning
-    description: RF exciter output mute state {txExciterNotificationState} reported on {_HOSTNAME}.
+    description: RF exciter output is muted on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2126,8 +2126,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.2003
     name: RS-XX9-TX-MIB::txExciterOutputConnect
     category: diagnostic
-    severity: warning
-    description: RF connection fault detected with state {txExciterNotificationState} on {_HOSTNAME}.
+    severity: crit
+    description: RF connection fault between exciter output and amplifier input on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2137,7 +2137,7 @@ traps:
     name: RS-XX9-TX-MIB::txExciterRfState
     category: diagnostic
     severity: warning
-    description: RF signal state is {txExciterNotificationState} on {_HOSTNAME}.
+    description: RF exciter state {{value "txExciterNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2146,8 +2146,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.3000
     name: RS-XX9-TX-MIB::txInpIfLogState
     category: diagnostic
-    severity: warning
-    description: Logical input state {txInpIfNotificationState} reported on {_HOSTNAME}.
+    severity: crit
+    description: Logical input state is fault on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2157,7 +2157,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfLogInfoPacket
     category: diagnostic
     severity: crit
-    description: Input interface packet state {txInpIfNotificationState} reported fault on {_HOSTNAME}.
+    description: Input interface packet state fault {{value "txInpIfNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2167,7 +2167,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfLogPacketLength
     category: diagnostic
     severity: warning
-    description: Packet length detection warning state {txInpIfNotificationState} on {_HOSTNAME}.
+    description: Packet length detection warning {{value "txInpIfNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2177,7 +2177,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfIpState
     category: diagnostic
     severity: warning
-    description: IP feed stream state {txInpIfNotificationState} reported on {_HOSTNAME}.
+    description: IP feed stream state is {{value "txInpIfNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2187,7 +2187,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfIpInfoPacket
     category: diagnostic
     severity: warning
-    description: Information packet state {txInpIfNotificationState} reported on {_HOSTNAME}.
+    description: Input interface information packet state is {{value "txInpIfNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2197,7 +2197,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfIpPacketLength
     category: diagnostic
     severity: warning
-    description: Packet length detection warning {txInpIfNotificationState} on {_HOSTNAME}.
+    description: Input interface packet length status is {{value "txInpIfNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2207,7 +2207,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfTsState
     category: diagnostic
     severity: warning
-    description: Transmitter input stream state {txInpIfNotificationState} reported on {_HOSTNAME}.
+    description: Transmitter input TS stream state is {{value "txInpIfNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2217,7 +2217,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfTsInfoPacket
     category: diagnostic
     severity: warning
-    description: SFN control information status {txInpIfNotificationState} reported on {_HOSTNAME}.
+    description: Transport stream control information status is {{value "txInpIfNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2227,7 +2227,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfTsPacketLength
     category: diagnostic
     severity: warning
-    description: Packet length detection reported {txInpIfNotificationState} with priority {txInpIfNotificationPriority} on {_HOSTNAME}.
+    description: 'Packet length detection warning{{with value "txInpIfNotificationState"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2237,7 +2237,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfLogDatarateBufferUnderrun
     category: diagnostic
     severity: warning
-    description: Input datarate buffer underrun detected with state {txInpIfNotificationState} on {_HOSTNAME}.
+    description: Input datarate buffer underrun detected{{with value "txInpIfNotificationState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2247,7 +2247,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfLogDatarateBufferOverflow
     category: diagnostic
     severity: warning
-    description: Input datarate buffer overflow detected with state {txInpIfNotificationState} on {_HOSTNAME}.
+    description: Input datarate buffer overflow detected{{with value "txInpIfNotificationState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2257,7 +2257,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfSatInputState
     category: diagnostic
     severity: warning
-    description: Transmitter input state {txInpIfNotificationState} indicates {commonNotificationAlarmClass} on {_HOSTNAME}.
+    description: Transmitter input stream state is {{value "txInpIfNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2265,9 +2265,9 @@ traps:
       - txInpIfNotificationState
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.3012
     name: RS-XX9-TX-MIB::txInpIfSatInfoPacket
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Input interface information packet state {txInpIfNotificationState} reported on {_HOSTNAME}.
+    description: Input interface information packet state changed to {{value "txInpIfNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2277,7 +2277,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfSatPacketLength
     category: diagnostic
     severity: warning
-    description: Packet length detection issue reported with state {txInpIfNotificationState} on {_HOSTNAME}.
+    description: Packet length detection warning {{value "txInpIfNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2285,9 +2285,9 @@ traps:
       - txInpIfNotificationState
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.3014
     name: RS-XX9-TX-MIB::txInpIfSatTransponderLocked
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DVB-S/S2 Receiver signal lock status changed to {txInpIfNotificationState} on {_HOSTNAME}.
+    description: Transponder lock state changed to {{value "txInpIfNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2297,7 +2297,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfSatIpOutput
     category: diagnostic
     severity: warning
-    description: Notification {txInpIfNotificationState} with priority {txInpIfNotificationPriority} on {_HOSTNAME}.
+    description: Input interface notification {{value "txInpIfNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2307,7 +2307,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfSatReceiverState
     category: diagnostic
     severity: warning
-    description: Transmitter input interface state changed to {txInpIfNotificationState} on {_HOSTNAME}.
+    description: TX input interface saturation receiver state is {{value "txInpIfNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2317,7 +2317,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfSatBtsStatus
     category: diagnostic
     severity: warning
-    description: Input interface status {txInpIfNotificationState} reported on {_HOSTNAME}.
+    description: Input interface status is {{value "txInpIfNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2327,7 +2327,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfSatDriftStatus
     category: diagnostic
     severity: warning
-    description: Transponder frequency drift warning with state {txInpIfNotificationState} on {_HOSTNAME}.
+    description: Transponder frequency drift warning detected{{with value "txInpIfNotificationState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2337,7 +2337,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfSatLinkMarginStatus
     category: diagnostic
     severity: warning
-    description: Input interface link margin status changed to {txInpIfNotificationState} on {_HOSTNAME}.
+    description: Input interface saturation link margin status changed to {{value "txInpIfNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2347,7 +2347,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfSatCarrierNoiseStatus
     category: diagnostic
     severity: warning
-    description: Carrier to noise ratio below warning limit with state {txInpIfNotificationState} on {_HOSTNAME}.
+    description: Carrier to noise ratio warning on {{first (value "txInpIfNotificationState") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2357,7 +2357,7 @@ traps:
     name: RS-XX9-TX-MIB::txInpIfSatStreamTsIdMatch
     category: diagnostic
     severity: warning
-    description: TS ID mismatch detected with priority {txTransmitterNotificationPriority} on {_HOSTNAME}.
+    description: Transport stream TS ID mismatch detected{{with value "txTransmitterNotificationState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2366,8 +2366,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.4000
     name: RS-XX9-TX-MIB::txInpAuto1Active
     category: state_change
-    severity: info
-    description: RF modulation input state changed to {txInpAutoNotificationState} on {_HOSTNAME}.
+    severity: notice
+    description: RF input auto-switch state changed to {{value "txInpAutoNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2375,9 +2375,9 @@ traps:
       - txInpAutoNotificationState
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.4001
     name: RS-XX9-TX-MIB::txInpAutoState
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Automatic input signal switchover state is {txInpAutoNotificationState} on {_HOSTNAME}.
+    description: Automatic input signal switchover state changed to {{value "txInpAutoNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2387,7 +2387,7 @@ traps:
     name: RS-XX9-TX-MIB::txFrqRegSummary
     category: diagnostic
     severity: warning
-    description: Reference state {txFrqRegNotificationState} reported on {_HOSTNAME}.
+    description: Reference signal state is {{value "txFrqRegNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2397,7 +2397,7 @@ traps:
     name: RS-XX9-TX-MIB::txFrqRegCurrentSource
     category: diagnostic
     severity: warning
-    description: Current reference source status is {txFrqRegNotificationState} on {_HOSTNAME}.
+    description: Transmitter frequency reference source status is {{value "txFrqRegNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2407,7 +2407,7 @@ traps:
     name: RS-XX9-TX-MIB::txFrqRegSourceExtRef
     category: diagnostic
     severity: warning
-    description: Reference signal status {txFrqRegNotificationState} reported on {_HOSTNAME}.
+    description: Reference signal status {{value "txFrqRegNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2417,7 +2417,7 @@ traps:
     name: RS-XX9-TX-MIB::txFrqRegSourceExtPPS
     category: diagnostic
     severity: warning
-    description: 1PPS signal status {txFrqRegNotificationState} on {_HOSTNAME}.
+    description: 1PPS signal status {{value "txFrqRegNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2427,7 +2427,7 @@ traps:
     name: RS-XX9-TX-MIB::txFrqRegSourceIntGPS
     category: diagnostic
     severity: warning
-    description: GPS reference source quality is {txFrqRegNotificationState} on {_HOSTNAME}.
+    description: GPS reference source quality is {{value "txFrqRegNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2437,7 +2437,7 @@ traps:
     name: RS-XX9-TX-MIB::txSfnSummary
     category: diagnostic
     severity: warning
-    description: Time synchronization state is {txSfnNotificationState} on {_HOSTNAME}.
+    description: Time synchronization state is {{value "txSfnNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2447,7 +2447,7 @@ traps:
     name: RS-XX9-TX-MIB::txPrecorrLinSummary
     category: diagnostic
     severity: warning
-    description: Linear precorrection summary state is {txPrecorrNotificationState} on {_HOSTNAME}.
+    description: Linear precorrection summary state is {{value "txPrecorrNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2457,7 +2457,7 @@ traps:
     name: RS-XX9-TX-MIB::txPrecorrNonLinSummary
     category: diagnostic
     severity: warning
-    description: Non-linear precorrection summary state is {txPrecorrNotificationState} on {_HOSTNAME}.
+    description: Non-linear precorrection summary state is {{value "txPrecorrNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2467,7 +2467,7 @@ traps:
     name: RS-XX9-TX-MIB::txPrecorrMerState
     category: diagnostic
     severity: warning
-    description: Alarm class {commonNotificationAlarmClass} with priority {txPrecorrNotificationPriority} and state {txPrecorrNotificationState} on {_HOSTNAME}.
+    description: Rohde & Schwarz pre-correction notification {{value "txPrecorrNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2477,7 +2477,7 @@ traps:
     name: RS-XX9-TX-MIB::txOstSummary
     category: diagnostic
     severity: warning
-    description: Output stage summary state is {txOstNotificationState} with priority {txOstNotificationPriority} on {_HOSTNAME}.
+    description: Output stage summary state is {{value "txOstNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2486,8 +2486,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.10000
     name: RS-XX9-TX-MIB::txAmpSummary
     category: diagnostic
-    severity: warning
-    description: Amplifier state {txAmpNotificationState} with priority {txAmpNotificationPriority} on {_HOSTNAME}.
+    severity: crit
+    description: Amplifier fault detected{{with value "txAmpNotificationState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2497,7 +2497,7 @@ traps:
     name: RS-XX9-TX-MIB::txAmpRfPowerFail
     category: diagnostic
     severity: crit
-    description: Amplifier output power fault detected with state {txAmpNotificationState} on {_HOSTNAME}.
+    description: RF amplifier output power is more than 3 dB below reference on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2507,7 +2507,7 @@ traps:
     name: RS-XX9-TX-MIB::txAmpReflection
     category: diagnostic
     severity: warning
-    description: RF output reflection warning detected with state {txAmpNotificationState} on {_HOSTNAME}.
+    description: RF output reflection is too great on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2517,7 +2517,7 @@ traps:
     name: RS-XX9-TX-MIB::txAmpSupplyFail
     category: diagnostic
     severity: crit
-    description: Power supply fault detected with state {txAmpNotificationState} on {_HOSTNAME}.
+    description: Internal power supply units are faulty on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2527,7 +2527,7 @@ traps:
     name: RS-XX9-TX-MIB::txAmpRfInFail
     category: diagnostic
     severity: warning
-    description: Amplifier input signal level too low with state {txAmpNotificationState} on {_HOSTNAME}.
+    description: Amplifier input signal level is too low on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2537,7 +2537,7 @@ traps:
     name: RS-XX9-TX-MIB::txAmpMute
     category: diagnostic
     severity: warning
-    description: Amplifier suppressing output signal with state {txAmpNotificationState} on {_HOSTNAME}.
+    description: Amplifier output suppressed{{with value "txAmpNotificationState"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2546,8 +2546,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.10006
     name: RS-XX9-TX-MIB::txAmpTemperatureFail
     category: diagnostic
-    severity: crit
-    description: Amplifier overheating fault reported with state {txAmpNotificationState} on {_HOSTNAME}.
+    severity: alert
+    description: Amplifier overheating fault detected on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2557,7 +2557,7 @@ traps:
     name: RS-XX9-TX-MIB::txAmpTransistorFail
     category: diagnostic
     severity: crit
-    description: Driver or power transistor defect detected with priority {txAmpNotificationPriority} on {_HOSTNAME}.
+    description: Transistor failure detected on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2567,7 +2567,7 @@ traps:
     name: RS-XX9-TX-MIB::txAmpRegulationFail
     category: diagnostic
     severity: crit
-    description: Amplifier power regulation fault with state {txAmpNotificationState} on {_HOSTNAME}.
+    description: TX amplifier power regulation failure detected on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2577,7 +2577,7 @@ traps:
     name: RS-XX9-TX-MIB::txAmpAcFail
     category: diagnostic
     severity: warning
-    description: Power supply fault detected with state {txAmpNotificationState} on {_HOSTNAME}.
+    description: Power supply fault detected on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2586,8 +2586,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.10010
     name: RS-XX9-TX-MIB::txAmpDcFail
     category: diagnostic
-    severity: err
-    description: Internal power supply fault detected with state {txAmpNotificationState} on {_HOSTNAME}.
+    severity: crit
+    description: Internal amplifier power supply unit fault detected on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2597,7 +2597,7 @@ traps:
     name: RS-XX9-TX-MIB::txAmpDriverFail
     category: diagnostic
     severity: crit
-    description: Amplifier driver transistors damaged with {txAmpNotificationState} on {_HOSTNAME}.
+    description: Driver transistors damaged on amplifier on {{hostname}}.
     status: obsolete
     varbinds:
       - commonNotificationAlarmClass
@@ -2607,7 +2607,7 @@ traps:
     name: RS-XX9-TX-MIB::txAmpLink
     category: state_change
     severity: warning
-    description: Communication link status changed to {txAmpNotificationState} on {_HOSTNAME}.
+    description: Communication link status changed to {{value "txAmpNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2616,8 +2616,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.10013
     name: RS-XX9-TX-MIB::txAmpBiasFail
     category: diagnostic
-    severity: err
-    description: Transmitter amplifier fault detected with state {txAmpNotificationState} on {_HOSTNAME}.
+    severity: warning
+    description: Transmitter amplifier bias fault detected{{with value "commonNotificationAlarmClass"}} class {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2627,7 +2627,7 @@ traps:
     name: RS-XX9-TX-MIB::txAmpInitFail
     category: diagnostic
     severity: warning
-    description: Amplifier internal fault detected at power ON with state {txAmpNotificationState} on {_HOSTNAME}.
+    description: Amplifier internal fault detected at power ON on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2637,7 +2637,7 @@ traps:
     name: RS-XX9-TX-MIB::txAmpAbsorberFail
     category: diagnostic
     severity: warning
-    description: Overheating of rack absorber detected with state {txAmpNotificationState} on {_HOSTNAME}.
+    description: Overheating of rack absorber detected on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2647,7 +2647,7 @@ traps:
     name: RS-XX9-TX-MIB::txAmpOn
     category: diagnostic
     severity: warning
-    description: Amplifier state {txAmpNotificationState} reported with priority {txAmpNotificationPriority} on {_HOSTNAME}.
+    description: Amplifier state changed to {{value "txAmpNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2656,8 +2656,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.10017
     name: RS-XX9-TX-MIB::txAmpBlocking
     category: diagnostic
-    severity: crit
-    description: TX amplifier fault detected with priority {txAmpNotificationPriority} on {_HOSTNAME}.
+    severity: alert
+    description: TX amplifier fault detected with priority {{value "txAmpNotificationPriority"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2667,7 +2667,7 @@ traps:
     name: RS-XX9-TX-MIB::txSwiCoSummary
     category: diagnostic
     severity: warning
-    description: Switchless Combiner state is {txSwiCoNotificationState} on {_HOSTNAME}.
+    description: Switchless Combiner state is {{value "txSwiCoNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2677,31 +2677,31 @@ traps:
     name: RS-XX9-TX-MIB::txSwiCoHwLink
     category: diagnostic
     severity: warning
-    description: Transmitter to switchless combiner link status is off on {_HOSTNAME}.
+    description: Transmitter to switchless combiner link status is abnormal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.11002
     name: RS-XX9-TX-MIB::txSwiCoHwWarn
     category: diagnostic
     severity: warning
-    description: Switchless combiner hardware warning detected on {_HOSTNAME}.
+    description: Switchless combiner hardware warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.11003
     name: RS-XX9-TX-MIB::txSwiCoHwFault
     category: diagnostic
     severity: warning
-    description: Switchless combiner hardware fault detected on {_HOSTNAME}.
+    description: Switchless combiner hardware fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.11004
     name: RS-XX9-TX-MIB::txSwiCoHwLocal
     category: diagnostic
     severity: warning
-    description: Switchless combiner is in local state on {_HOSTNAME}.
+    description: Switchless combiner is in local state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.3.0.11005
     name: RS-XX9-TX-MIB::txSwiCoRcbFail
     category: diagnostic
     severity: warning
-    description: Redundancy control board reported {txSwiCoNotificationState} on {_HOSTNAME}.
+    description: Redundancy control board fault detected on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2711,7 +2711,7 @@ traps:
     name: RS-XX9-TX-MIB::txSwiCoRfProbeFail
     category: diagnostic
     severity: warning
-    description: RF probe test point reported {txSwiCoNotificationState} on {_HOSTNAME}.
+    description: RF probe test point fault detected on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2721,7 +2721,7 @@ traps:
     name: RS-XX9-TX-MIB::txSwiCoRegulationSummary
     category: diagnostic
     severity: warning
-    description: Switchless Combiner regulation state is {txSwiCoNotificationState} on {_HOSTNAME}.
+    description: Switchless combiner regulation state is {{value "txSwiCoNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2731,7 +2731,7 @@ traps:
     name: RS-XX9-TX-MIB::txRfSensorLinkStatus
     category: diagnostic
     severity: warning
-    description: RF Sensor communication fault detected with state {txTransmitterNotificationState} on {_HOSTNAME}.
+    description: Communication fault to RF sensor detected on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2741,13 +2741,13 @@ traps:
     name: RS-XX9-TX-MIB::txRfSensorCalibrated
     category: diagnostic
     severity: warning
-    description: RF sensor calibration status changed on {_HOSTNAME}.
+    description: RF sensor calibration is required on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.4.0.1
     name: RS-XX9-MTX-MIB::mtxNp1AutomaticSummary
     category: diagnostic
     severity: warning
-    description: N+1 automatic summary state changed to {mtxNotificationState} on {_HOSTNAME}.
+    description: N+1 automatic summary state is {{value "mtxNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2755,9 +2755,9 @@ traps:
       - mtxNotificationState
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.4.0.2
     name: RS-XX9-MTX-MIB::mtxNp1AutomaticReady
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: n+1 automatic readiness state changed to {mtxNotificationState} on {_HOSTNAME}.
+    description: N+1 automatic readiness changed to {{value "mtxNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2767,7 +2767,7 @@ traps:
     name: RS-XX9-MTX-MIB::mtxNp1AutomaticRfSwitch
     category: diagnostic
     severity: warning
-    description: RF switch fault indicated by {mtxNotificationState} on {_HOSTNAME}.
+    description: 'RF switch fault detected{{with value "mtxNotificationState"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2775,9 +2775,9 @@ traps:
       - mtxNotificationState
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.4.0.4
     name: RS-XX9-MTX-MIB::mtxNp1AutomaticInputChannel
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Input channel fault reported with state {mtxNotificationState} on {_HOSTNAME}.
+    description: Transport stream input to transmitter B is {{value "mtxNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2787,7 +2787,7 @@ traps:
     name: RS-XX9-MTX-MIB::mtxNp1AutomaticChangeOver
     category: state_change
     severity: warning
-    description: Automatic changeover to TxB occurred with state {mtxNotificationState} on {_HOSTNAME}.
+    description: Automatic changeover to TxB occurred {{with value "mtxNotificationState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2797,7 +2797,7 @@ traps:
     name: RS-XX9-MTX-MIB::mtxLocal
     category: state_change
     severity: notice
-    description: System control state changed to {mtxNotificationState} on {_HOSTNAME}.
+    description: System control state changed to {{value "mtxNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2807,7 +2807,7 @@ traps:
     name: RS-XX9-MTX-MIB::mtxNp1AutomaticProgramRf
     category: diagnostic
     severity: warning
-    description: RF power warning for program transmitter with state {mtxNotificationState} on {_HOSTNAME}.
+    description: RF power warning for program transmitter on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2817,7 +2817,7 @@ traps:
     name: RS-XX9-MTX-MIB::mtxMultiTxSummary
     category: diagnostic
     severity: warning
-    description: Notification {commonNotificationAlarmClass} with priority {mtxNotificationPriority} and state {mtxNotificationState} on {_HOSTNAME}.
+    description: Multi-transmitter summary notification {{value "mtxNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2827,7 +2827,7 @@ traps:
     name: RS-XX9-MTX-MIB::mtxMultiTxRfSwitch
     category: diagnostic
     severity: warning
-    description: Alarm {commonNotificationAlarmClass} with priority {mtxNotificationPriority} and state {mtxNotificationState} on {_HOSTNAME}.
+    description: Multi-transmit RF switch notification {{value "mtxNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2837,7 +2837,7 @@ traps:
     name: RS-XX9-MTX-MIB::mtxBackupTxSummary
     category: diagnostic
     severity: warning
-    description: Backup TX automatic state {btxAutoNotificationState} reported on {_HOSTNAME}.
+    description: Backup transmitter automatic state is {{value "btxAutoNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2845,9 +2845,9 @@ traps:
       - btxAutoNotificationState
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.4.0.201
     name: RS-XX9-MTX-MIB::mtxBackupTxReady
-    category: diagnostic
-    severity: warning
-    description: Transmitter readiness state {btxAutoNotificationState} reported on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Backup transmitter readiness state changed to {{value "btxAutoNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2857,7 +2857,7 @@ traps:
     name: RS-XX9-MTX-MIB::mtxBackupTxLink
     category: state_change
     severity: warning
-    description: Backup link state changed to {btxAutoNotificationState} on {_HOSTNAME}.
+    description: TX link status changed to {{value "btxAutoNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2867,7 +2867,7 @@ traps:
     name: RS-XX9-MTX-MIB::mtxBackupTxRfSwitch
     category: diagnostic
     severity: warning
-    description: RF switch status changed to {btxAutoNotificationState} on {_HOSTNAME}.
+    description: RF switch status changed to {{value "btxAutoNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2875,9 +2875,9 @@ traps:
       - btxAutoNotificationState
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.4.0.204
     name: RS-XX9-MTX-MIB::mtxBackupTxSwitchedOver
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: MTX backup transmission switch position mismatch detected on {_HOSTNAME}.
+    description: Backup transmitter switched over to preselected position on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2887,7 +2887,7 @@ traps:
     name: RS-XX9-DVBT2-MIB::dvbt2L1State
     category: diagnostic
     severity: warning
-    description: DVB-T2 L1 frame status is {dvbt2StatusNotificationState} on {_HOSTNAME}.
+    description: DVB-T2 L1 state notification received with status {{value "dvbt2StatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2897,7 +2897,7 @@ traps:
     name: RS-XX9-DVBT2-MIB::dvbt2IaState
     category: diagnostic
     severity: warning
-    description: DVBT2 individual addressing state is {dvbt2StatusNotificationState} on {_HOSTNAME}.
+    description: DVBT2 individual addressing status is {{value "dvbt2StatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2907,7 +2907,7 @@ traps:
     name: RS-XX9-DVBT2-MIB::dvbt2ConfigurationValid
     category: diagnostic
     severity: warning
-    description: DVB-T2 configuration coherence check reported {dvbt2StatusNotificationState} on {_HOSTNAME}.
+    description: DVB-T2 configuration is {{value "dvbt2StatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2917,7 +2917,7 @@ traps:
     name: RS-XX9-DVBT2-MIB::dvbt2ConfigurationSupported
     category: diagnostic
     severity: warning
-    description: DVBT2 modulation support status is {dvbt2StatusNotificationState} on {_HOSTNAME}.
+    description: DVBT2 configuration support status {{value "dvbt2StatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2925,9 +2925,9 @@ traps:
       - dvbt2StatusNotificationState
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.5.0.7
     name: RS-XX9-DVBT2-MIB::dvbt2ConfigurationMatched
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DVBT2 configuration mismatch detected with state {dvbt2StatusNotificationState} on {_HOSTNAME}.
+    description: DVBT2 channel bandwidth configuration consistency check {{value "dvbt2StatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2937,7 +2937,7 @@ traps:
     name: RS-XX9-DVBT2-MIB::dvbt2EncoderSummary
     category: diagnostic
     severity: warning
-    description: Encoder summary state is {dvbt2StatusNotificationState} on {_HOSTNAME}.
+    description: DVBT2 encoder summary state is {{value "dvbt2StatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2947,7 +2947,7 @@ traps:
     name: RS-XX9-DVBT2-MIB::dvbt2Test
     category: diagnostic
     severity: warning
-    description: DVBT2 test signal generation status changed to {dvbt2StatusNotificationState} on {_HOSTNAME}.
+    description: DVBT2 test signal generation status changed to {{value "dvbt2StatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2957,7 +2957,7 @@ traps:
     name: RS-XX9-DVBT2-MIB::dvbt2SupportedPlps
     category: diagnostic
     severity: warning
-    description: DVBT2 status notification {dvbt2StatusNotificationState} reported {commonNotificationAlarmClass} on {_HOSTNAME}.
+    description: DVBT2 PLPS status notification {{value "dvbt2StatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2967,7 +2967,7 @@ traps:
     name: RS-XX9-DVBT2-MIB::dvbt2SupportedTrIterations
     category: diagnostic
     severity: warning
-    description: DVBT2 status notification {dvbt2StatusNotificationState} with priority {dvbt2StatusNotificationPriority} on {_HOSTNAME}.
+    description: DVBT2 supported TR iterations status is warning on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2977,7 +2977,7 @@ traps:
     name: RS-XX9-DVBT2-MIB::dvbt2T2MiTimeInterleaverBuffer
     category: diagnostic
     severity: warning
-    description: Time interleaver buffer reported state {dvbt2StatusNotificationState} on {_HOSTNAME}.
+    description: DVBT2 time interleaver buffer status {{value "dvbt2StatusNotificationState"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - commonNotificationAlarmClass
@@ -2987,7 +2987,7 @@ traps:
     name: RS-XX9-DVBT2-MIB::dvbt2CompositeSummary
     category: diagnostic
     severity: warning
-    description: DVBT2 composite status {dvbt2StatusNotificationState} with priority {dvbt2StatusNotificationPriority} on {_HOSTNAME}.
+    description: DVBT2 composite status changed to {{value "dvbt2StatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -2997,7 +2997,7 @@ traps:
     name: RS-XX9-DVBT2-MIB::dvbt2CompositeProfiles
     category: diagnostic
     severity: warning
-    description: DVBT2 composite profile status {dvbt2StatusNotificationState} reported on {_HOSTNAME}.
+    description: DVBT2 composite profile status changed to {{value "dvbt2StatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3007,7 +3007,7 @@ traps:
     name: RS-XX9-DVBT2-MIB::dvbt2CompositeFrameLength
     category: diagnostic
     severity: warning
-    description: DVBT2 composite frame status {dvbt2StatusNotificationState} reported on {_HOSTNAME}.
+    description: DVBT2 composite frame length status changed to {{value "dvbt2StatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3017,7 +3017,7 @@ traps:
     name: RS-XX9-DVBT2-MIB::dvbt2SubIaState
     category: diagnostic
     severity: warning
-    description: Individual addressing state {dvbt2StatusNotificationState} reported with priority {dvbt2StatusNotificationPriority} on {_HOSTNAME}.
+    description: DVBT2 individual addressing state is {{value "dvbt2StatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3027,7 +3027,7 @@ traps:
     name: RS-XX9-DVBT2-MIB::dvbt2SubConfigurationValid
     category: diagnostic
     severity: warning
-    description: DVB-T2 configuration coherence check reported {dvbt2StatusNotificationState} on {_HOSTNAME}.
+    description: DVB-T2 configuration coherence check {{value "dvbt2StatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3037,7 +3037,7 @@ traps:
     name: RS-XX9-DVBT2-MIB::dvbt2SubConfigurationSupported
     category: diagnostic
     severity: warning
-    description: DVBT2 modulation configuration status {dvbt2StatusNotificationState} on {_HOSTNAME}.
+    description: DVBT2 modulation support status {{value "dvbt2StatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3045,9 +3045,9 @@ traps:
       - dvbt2StatusNotificationState
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.5.0.207
     name: RS-XX9-DVBT2-MIB::dvbt2SubConfigurationMatched
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DVBT2 configuration consistency check reported {dvbt2StatusNotificationState} on {_HOSTNAME}.
+    description: DVBT2 channel bandwidth configuration consistency check failed on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3056,8 +3056,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.6.0.1
     name: RS-XX9-DVBT-MIB::dvbtEncoderSummary
     category: diagnostic
-    severity: warning
-    description: Encoder summary state is {dvbtStatusNotificationState} with priority {dvbtStatusNotificationPriority} on {_HOSTNAME}.
+    severity: crit
+    description: DVBT encoder summary fault detected{{with value "dvbtStatusNotificationState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3067,7 +3067,7 @@ traps:
     name: RS-XX9-DVBT-MIB::dvbtTest
     category: diagnostic
     severity: warning
-    description: Test signal activation detected with state {dvbtStatusNotificationState} on {_HOSTNAME}.
+    description: DVBT test signal activated{{with value "dvbtStatusNotificationState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3076,8 +3076,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.7.0.1
     name: RS-XX9-ATSC-MIB::atscEncoderSummary
     category: diagnostic
-    severity: alert
-    description: Encoder summary state is {atscStatusNotificationState} on {_HOSTNAME}.
+    severity: warning
+    description: ATSC encoder summary state is {{value "atscStatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3087,7 +3087,7 @@ traps:
     name: RS-XX9-ATSC-MIB::atscContentFail
     category: diagnostic
     severity: warning
-    description: No mobile data in data stream with state {atscStatusNotificationState} on {_HOSTNAME}.
+    description: 'ATSC content failure: no mobile data in stream on {{hostname}}.'
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3097,7 +3097,7 @@ traps:
     name: RS-XX9-ATSC-MIB::atscTest
     category: diagnostic
     severity: warning
-    description: Test signal generation status changed to {atscStatusNotificationState} on {_HOSTNAME}.
+    description: ATSC test signal generation is active{{with value "atscStatusNotificationState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3107,7 +3107,7 @@ traps:
     name: RS-XX9-ISDBT-MIB::isdbtIIP
     category: diagnostic
     severity: warning
-    description: ISDB-T IIP status notification {isdbtStatusNotificationState} on {_HOSTNAME}.
+    description: ISDB-T IIP status is {{value "isdbtStatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3117,7 +3117,7 @@ traps:
     name: RS-XX9-ISDBT-MIB::isdbtFrameCounter
     category: diagnostic
     severity: warning
-    description: TSP correctness status {isdbtStatusNotificationState} on {_HOSTNAME}.
+    description: ISDB-T frame counter status warning detected on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3127,7 +3127,7 @@ traps:
     name: RS-XX9-ISDBT-MIB::isdbtEquipmentId
     category: diagnostic
     severity: warning
-    description: SFN information status is {isdbtStatusNotificationState} on {_HOSTNAME}.
+    description: ISDB-T equipment ID status is {{value "isdbtStatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3137,7 +3137,7 @@ traps:
     name: RS-XX9-ISDBT-MIB::isdbtManualConfiguration
     category: diagnostic
     severity: warning
-    description: ISDB-T configuration status {isdbtStatusNotificationState} on {_HOSTNAME}.
+    description: ISDB-T configuration status is {{value "isdbtStatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3147,7 +3147,7 @@ traps:
     name: RS-XX9-ISDBT-MIB::isdbtActiveConfiguration
     category: diagnostic
     severity: warning
-    description: ISDB-T configuration status is {isdbtStatusNotificationState} on {_HOSTNAME}.
+    description: ISDB-T active configuration status is {{value "isdbtStatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3157,7 +3157,7 @@ traps:
     name: RS-XX9-ISDBT-MIB::isdbtTest
     category: diagnostic
     severity: warning
-    description: ISDB-T test signal generation activated with state {isdbtStatusNotificationState} on {_HOSTNAME}.
+    description: ISDB-T test signal generation status changed to {{value "isdbtStatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3167,7 +3167,7 @@ traps:
     name: RS-XX9-DAB-MIB::dabTiiMainIdOutOfRange
     category: diagnostic
     severity: warning
-    description: DAB main ID {dabStatusNotificationState} is out of range on {_HOSTNAME}.
+    description: DAB main ID out of range detected{{with value "dabStatusNotificationState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3177,7 +3177,7 @@ traps:
     name: RS-XX9-DAB-MIB::dabEncoderSummary
     category: diagnostic
     severity: crit
-    description: DAB encoder reported {dabStatusNotificationState} with priority {dabStatusNotificationPriority} on {_HOSTNAME}.
+    description: DAB encoder summary fault detected on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3187,7 +3187,7 @@ traps:
     name: RS-XX9-DAB-MIB::dabTest
     category: diagnostic
     severity: warning
-    description: Test signal activated with state {dabStatusNotificationState} on {_HOSTNAME}.
+    description: DAB test signal activated, decoding unavailable on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3195,9 +3195,9 @@ traps:
       - dabStatusNotificationState
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.10.0.4
     name: RS-XX9-DAB-MIB::dabInpIfEtiState
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DAB input notification state {dabInputNotificationState} with priority {dabInputNotificationPriority} on {_HOSTNAME}.
+    description: DAB input interface state changed to {{value "dabInputNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3205,9 +3205,9 @@ traps:
       - dabInputNotificationState
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.10.0.5
     name: RS-XX9-DAB-MIB::dabInpIfEdiState
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DAB input notification state {dabInputNotificationState} with priority {dabInputNotificationPriority} on {_HOSTNAME}.
+    description: DAB input notification state changed to {{value "dabInputNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3216,8 +3216,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.11.0.1
     name: RS-XX9-FM-MIB::fmAudioInputPrimary
     category: diagnostic
-    severity: err
-    description: Primary audio input state is {fmInpStNotificationState} on {_HOSTNAME}.
+    severity: crit
+    description: Primary audio input fault {{value "fmInpStNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3227,7 +3227,7 @@ traps:
     name: RS-XX9-FM-MIB::fmAudioInputSecondary
     category: diagnostic
     severity: crit
-    description: FM audio input secondary reported {fmInpStNotificationState} on {_HOSTNAME}.
+    description: FM audio input secondary state is {{value "fmInpStNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3236,8 +3236,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.11.0.3
     name: RS-XX9-FM-MIB::fmAfLeft
     category: diagnostic
-    severity: warning
-    description: Left AF input state reported as {fmInpStNotificationState} on {_HOSTNAME}.
+    severity: crit
+    description: Left AF input fault detected{{with value "fmInpStNotificationState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3246,8 +3246,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.11.0.4
     name: RS-XX9-FM-MIB::fmAfRight
     category: diagnostic
-    severity: warning
-    description: Right AF input state reported as {fmInpStNotificationState} on {_HOSTNAME}.
+    severity: crit
+    description: Right AF input fault detected with state {{value "fmInpStNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3256,8 +3256,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.11.0.5
     name: RS-XX9-FM-MIB::fmMpx1
     category: diagnostic
-    severity: err
-    description: MPx 1 input state reported as {fmInpStNotificationState} with priority {fmInpStNotificationPriority} on {_HOSTNAME}.
+    severity: crit
+    description: MPx 1 input fault detected with state {{value "fmInpStNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3266,8 +3266,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.11.0.6
     name: RS-XX9-FM-MIB::fmMpx2
     category: diagnostic
-    severity: warning
-    description: MPx 2 input state {fmInpStNotificationState} with priority {fmInpStNotificationPriority} on {_HOSTNAME}.
+    severity: crit
+    description: MPx 2 input fault detected with state {{value "fmInpStNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3276,8 +3276,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.11.0.7
     name: RS-XX9-FM-MIB::fmAesLeft
     category: diagnostic
-    severity: err
-    description: Left AES input fault detected with state {fmInpStNotificationState} on {_HOSTNAME}.
+    severity: crit
+    description: Left AES input fault detected on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3286,8 +3286,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.11.0.8
     name: RS-XX9-FM-MIB::fmAesRight
     category: diagnostic
-    severity: warning
-    description: Right AES input state is {fmInpStNotificationState} on {_HOSTNAME}.
+    severity: crit
+    description: Right AES input fault detected on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3297,7 +3297,7 @@ traps:
     name: RS-XX9-FM-MIB::fmAux1Input
     category: diagnostic
     severity: warning
-    description: Aux 1 input state is {fmInpStNotificationState} with priority {fmInpStNotificationPriority} on {_HOSTNAME}.
+    description: FM Aux 1 input state is {{value "fmInpStNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3307,7 +3307,7 @@ traps:
     name: RS-XX9-FM-MIB::fmAux2Input
     category: diagnostic
     severity: warning
-    description: Aux 2 input state {fmInpStNotificationState} reported on {_HOSTNAME}.
+    description: Aux 2 input state is {{value "fmInpStNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3317,7 +3317,7 @@ traps:
     name: RS-XX9-DTMB-MIB::dtmbEncoderSummary
     category: diagnostic
     severity: warning
-    description: Encoder summary state is {dtmbStatusNotificationState} with priority {dtmbStatusNotificationPriority} on {_HOSTNAME}.
+    description: Encoder summary state is {{value "dtmbStatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3327,7 +3327,7 @@ traps:
     name: RS-XX9-DTMB-MIB::dtmbManualConfiguration
     category: diagnostic
     severity: warning
-    description: DTMB configuration status {dtmbStatusNotificationState} reported on {_HOSTNAME}.
+    description: DTMB configuration status is {{value "dtmbStatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3337,7 +3337,7 @@ traps:
     name: RS-XX9-DTMB-MIB::dtmbActiveConfiguration
     category: diagnostic
     severity: warning
-    description: DTMB configuration status {dtmbStatusNotificationState} reported on {_HOSTNAME}.
+    description: DTMB active configuration status is {{value "dtmbStatusNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3347,7 +3347,7 @@ traps:
     name: RS-XX9-DTMB-MIB::dtmbTest
     category: diagnostic
     severity: warning
-    description: Test signal activation detected with state {dtmbStatusNotificationState} on {_HOSTNAME}.
+    description: DTMB test signal activated{{with value "dtmbStatusNotificationState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3357,7 +3357,7 @@ traps:
     name: RS-XX9-LIQUID-COOLING-MIB::lqSummary
     category: diagnostic
     severity: crit
-    description: Cooling system reported fault state {lqNotificationState.raw} on {_HOSTNAME}.
+    description: Liquid cooling failure reported on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3367,7 +3367,7 @@ traps:
     name: RS-XX9-LIQUID-COOLING-MIB::lqFilterSummary
     category: diagnostic
     severity: warning
-    description: Liquid filter pollution warning detected with state {lqNotificationState} on {_HOSTNAME}.
+    description: Liquid cooling filter is polluted on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3377,7 +3377,7 @@ traps:
     name: RS-XX9-LIQUID-COOLING-MIB::lqSensorsSummary
     category: diagnostic
     severity: warning
-    description: Liquid cooling sensor summary state is {lqNotificationState} on {_HOSTNAME}.
+    description: Liquid cooling sensor summary warning {{value "lqNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3387,7 +3387,7 @@ traps:
     name: RS-XX9-LIQUID-COOLING-MIB::lqSiteWarning
     category: diagnostic
     severity: warning
-    description: Site cooling system warning with state {lqNotificationState} on {_HOSTNAME}.
+    description: Site cooling system warning detected on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3397,7 +3397,7 @@ traps:
     name: RS-XX9-LIQUID-COOLING-MIB::lqSiteFault
     category: diagnostic
     severity: warning
-    description: Site cooling system fault reported with state {lqNotificationState} on {_HOSTNAME}.
+    description: Site cooling system fault detected{{with value "lqNotificationState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3406,8 +3406,8 @@ traps:
   - oid: 1.3.6.1.4.1.2566.127.1.2.216.101.0.1
     name: RS-XX9-AIR-COOLING-MIB::airCoolingSummary
     category: diagnostic
-    severity: warning
-    description: Air cooling summary state is {airCoolingNotificationState} on {_HOSTNAME}.
+    severity: crit
+    description: Air cooling summary fault detected{{with value "airCoolingNotificationState"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass
@@ -3417,7 +3417,7 @@ traps:
     name: RS-XX9-AIR-COOLING-MIB::airCoolingSensorsSummary
     category: diagnostic
     severity: warning
-    description: Air cooling sensor summary state {airCoolingNotificationState} on {_HOSTNAME}.
+    description: Air cooling sensors summary state is {{value "airCoolingNotificationState"}} on {{hostname}}.
     status: current
     varbinds:
       - commonNotificationAlarmClass

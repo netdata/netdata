@@ -55,21 +55,21 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.7185.3.1.3.0.1
     name: CISCO-LATITUDE-MIB::mpT1Down
-    category: state_change
-    severity: warning
-    description: Telephony port T1 link is down on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: MeetingPlace T1 down alarm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7185.3.1.3.0.2
     name: CISCO-LATITUDE-MIB::mpGWSimAlarm
     category: diagnostic
     severity: warning
-    description: MeetingPlace Gateway alarm triggered on {_HOSTNAME}.
+    description: MeetingPlace Gateway alarm triggered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7185.3.1.3.0.3
     name: CISCO-LATITUDE-MIB::mpMajHwAlarm
     category: diagnostic
-    severity: alert
-    description: Major hardware alarm on {mpSysUnit} device {mpHwDev} unit {mpHwUnit} slot {mpHwSlot} on {_HOSTNAME}.
+    severity: crit
+    description: Major hardware alarm on {{first (value "mpHwDev") "hardware"}} unit {{value "mpHwUnit"}} on {{hostname}}.
     status: current
     varbinds:
       - mpExCode
@@ -82,7 +82,7 @@ traps:
     name: CISCO-LATITUDE-MIB::mpMinHwAlarm
     category: diagnostic
     severity: warning
-    description: Minor hardware alarm on {mpHwDev} unit {mpHwUnit} slot {mpHwSlot} port {mpHwPort} on {_HOSTNAME}.
+    description: Minor hardware alarm on {{first (value "mpHwDev") "hardware"}} unit {{value "mpHwUnit"}} on {{hostname}}.
     status: current
     varbinds:
       - mpExCode
@@ -94,8 +94,8 @@ traps:
   - oid: 1.3.6.1.4.1.7185.3.1.3.0.5
     name: CISCO-LATITUDE-MIB::mpMajSwAlarm
     category: diagnostic
-    severity: err
-    description: MeetingPlace major software alarm {mpExCode} with description {mpAlarmDesc} on {_HOSTNAME}.
+    severity: crit
+    description: Major software alarm {{value "mpAlarmDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - mpExCode
@@ -105,7 +105,7 @@ traps:
     name: CISCO-LATITUDE-MIB::mpMinSwAlarm
     category: diagnostic
     severity: warning
-    description: Minor hardware alarm {mpAlarmDesc} reported on {_HOSTNAME}.
+    description: Minor hardware alarm {{value "mpAlarmDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - mpExCode

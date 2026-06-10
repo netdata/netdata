@@ -41,9 +41,9 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.59732.2.7.4.1
     name: SKYHIGHSECURITY-SWG-MIB::trSystem
-    category: unknown
-    severity: notice
-    description: System event notification {notifyReasonString} from {notifyOriginName} on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: System event {{value "notifyReasonString"}} on {{hostname}}.
     status: current
     varbinds:
       - notifyOrigin
@@ -57,7 +57,7 @@ traps:
     name: SKYHIGHSECURITY-SWG-MIB::trApplication
     category: diagnostic
     severity: warning
-    description: Application system event {notifyReasonString} from {notifyOriginName} on {_HOSTNAME}.
+    description: Application system event {{value "notifyReasonString"}} on {{hostname}}.
     status: current
     varbinds:
       - notifyOrigin
@@ -70,8 +70,8 @@ traps:
   - oid: 1.3.6.1.4.1.59732.2.7.4.3
     name: SKYHIGHSECURITY-SWG-MIB::trUser
     category: security
-    severity: warning
-    description: Security event {notifyReasonString} for host {notifyAffectedHost} on {_HOSTNAME}.
+    severity: notice
+    description: Security event {{value "notifyReasonString"}} for host {{value "notifyAffectedHost"}} on {{hostname}}.
     status: current
     varbinds:
       - notifyReason

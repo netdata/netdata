@@ -689,31 +689,31 @@ traps:
     name: AIRESPACE-SWITCHING-MIB::multipleUsersTrap
     category: auth
     severity: notice
-    description: Multiple users logged in on {_HOSTNAME}.
+    description: Multiple users logged in on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.14179.1.50.2
     name: AIRESPACE-SWITCHING-MIB::broadcastStormStartTrap
-    category: diagnostic
-    severity: warning
-    description: Broadcast storm detected on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: Broadcast storm detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.14179.1.50.3
     name: AIRESPACE-SWITCHING-MIB::broadcastStormEndTrap
     category: state_change
     severity: notice
-    description: Broadcast storm ended on {_HOSTNAME}.
+    description: Broadcast storm ended on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.14179.1.50.4
     name: AIRESPACE-SWITCHING-MIB::linkFailureTrap
     category: state_change
     severity: warning
-    description: Link failure detected on {_HOSTNAME}.
+    description: Link failure detected on {{trap_interface}} on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.14179.1.50.5
     name: AIRESPACE-SWITCHING-MIB::vlanRequestFailureTrap
-    category: diagnostic
-    severity: err
-    description: VLAN request failed for {dot1qVlanIndex} on {_HOSTNAME}.
+    category: state_change
+    severity: warning
+    description: VLAN request failed for VLAN {{value "dot1qVlanIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - dot1qVlanIndex
@@ -721,15 +721,15 @@ traps:
     name: AIRESPACE-SWITCHING-MIB::vlanDeleteLastTrap
     category: config_change
     severity: notice
-    description: VLAN {dot1qVlanIndex} deleted on {_HOSTNAME}.
+    description: VLAN {{value "dot1qVlanIndex"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - dot1qVlanIndex
   - oid: 1.3.6.1.4.1.14179.1.50.7
     name: AIRESPACE-SWITCHING-MIB::vlanDefaultCfgFailureTrap
-    category: config_change
+    category: state_change
     severity: err
-    description: Default VLAN configuration failed for VLAN {dot1qVlanIndex} on {_HOSTNAME}.
+    description: Default VLAN configuration failure for VLAN {{value "dot1qVlanIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - dot1qVlanIndex
@@ -737,21 +737,21 @@ traps:
     name: AIRESPACE-SWITCHING-MIB::vlanRestoreFailureTrap
     category: diagnostic
     severity: err
-    description: VLAN restore failed for {dot1qVlanIndex} on {_HOSTNAME}.
+    description: VLAN restore failed for VLAN {{value "dot1qVlanIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - dot1qVlanIndex
   - oid: 1.3.6.1.4.1.14179.1.50.9
     name: AIRESPACE-SWITCHING-MIB::fanFailureTrap
     category: diagnostic
-    severity: err
-    description: Fan failure detected on {_HOSTNAME}.
+    severity: alert
+    description: Fan failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.14179.1.50.10
     name: AIRESPACE-SWITCHING-MIB::stpInstanceNewRootTrap
     category: state_change
     severity: notice
-    description: STP instance new root detected on VLAN {dot1qVlanIndex} on {_HOSTNAME}.
+    description: STP instance new root detected{{with value "dot1qVlanIndex"}} on VLAN {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - dot1qVlanIndex
@@ -759,21 +759,21 @@ traps:
     name: AIRESPACE-SWITCHING-MIB::stpInstanceTopologyChangeTrap
     category: state_change
     severity: notice
-    description: STP topology change detected on VLAN {dot1qVlanIndex} on {_HOSTNAME}.
+    description: STP instance topology changed{{with value "dot1qVlanIndex"}} on VLAN {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - dot1qVlanIndex
   - oid: 1.3.6.1.4.1.14179.1.50.12
     name: AIRESPACE-SWITCHING-MIB::powerSupplyStatusChangeTrap
     category: diagnostic
-    severity: err
-    description: Power supply status changed on {_HOSTNAME}.
+    severity: warning
+    description: Power supply status changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.14179.2.6.3.1
     name: AIRESPACE-WIRELESS-MIB::bsnDot11StationDisassociate
     category: mobility
     severity: notice
-    description: Wireless client {bsnStationMacAddress} disassociated from AP {bsnAPName} on {_HOSTNAME}.
+    description: Wireless client {{value "bsnStationMacAddress"}} disassociated from {{value "bsnAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnStationAPMacAddr
@@ -787,7 +787,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnDot11StationDeauthenticate
     category: mobility
     severity: notice
-    description: Wireless client {bsnStationMacAddress} deauthenticated from {bsnAPName} on {_HOSTNAME}.
+    description: Wireless station {{value "bsnStationMacAddress"}} deauthenticated on {{hostname}}.
     status: current
     varbinds:
       - bsnStationAPMacAddr
@@ -801,7 +801,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnDot11StationAuthenticateFail
     category: security
     severity: warning
-    description: Station authentication failed with reason {bsnStationReasonCode} on {_HOSTNAME}.
+    description: Wireless station {{value "bsnStationMacAddress"}} authentication failed on {{hostname}}.
     status: current
     varbinds:
       - bsnStationAPMacAddr
@@ -815,7 +815,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnDot11StationAssociateFail
     category: security
     severity: warning
-    description: Wireless station {bsnStationMacAddress} failed association with reason {bsnStationReasonCode} on {_HOSTNAME}.
+    description: Wireless station association failed with reason {{value "bsnStationReasonCode"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnStationAPMacAddr
@@ -829,15 +829,15 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPUp
     category: mobility
     severity: notice
-    description: Wireless AP {bsnAPDot3MacAddress} operation status went up on {_HOSTNAME}.
+    description: Wireless AP {{value "bsnAPDot3MacAddress"}} came online on {{hostname}}.
     status: obsolete
     varbinds:
       - bsnAPDot3MacAddress
   - oid: 1.3.6.1.4.1.14179.2.6.3.6
     name: AIRESPACE-WIRELESS-MIB::bsnAPDown
     category: state_change
-    severity: warning
-    description: Wireless AP with MAC {bsnAPDot3MacAddress} went down on {_HOSTNAME}.
+    severity: crit
+    description: Wireless AP {{value "bsnAPDot3MacAddress"}} went down on {{hostname}}.
     status: obsolete
     varbinds:
       - bsnAPDot3MacAddress
@@ -845,7 +845,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPAssociated
     category: mobility
     severity: notice
-    description: Wireless AP {bsnAPName} associated on port {bsnAPPortNumberTrapVariable} on {_HOSTNAME}.
+    description: Wireless AP {{value "bsnAPName"}} associated on {{hostname}}.
     status: deprecated
     varbinds:
       - bsnAPMacAddrTrapVariable
@@ -855,16 +855,16 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPDisassociated
     category: mobility
     severity: notice
-    description: Wireless client disassociation from AP {bsnAPName} on {_HOSTNAME}.
+    description: AP {{value "bsnAPName"}} disassociated from switch on {{hostname}}.
     status: current
     varbinds:
       - bsnAPMacAddrTrapVariable
       - bsnAPName
   - oid: 1.3.6.1.4.1.14179.2.6.3.9
     name: AIRESPACE-WIRELESS-MIB::bsnAPIfUp
-    category: mobility
+    category: state_change
     severity: notice
-    description: Wireless client association for AP {bsnAPName} on {_HOSTNAME}.
+    description: Wireless AP interface {{value "bsnAPName"}} went up on {{hostname}}.
     status: deprecated
     varbinds:
       - bsnAPDot3MacAddress
@@ -876,7 +876,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPIfDown
     category: state_change
     severity: warning
-    description: AP interface {bsnAPName} went down due to {bsnAPIfUpDownCause} on {_HOSTNAME}.
+    description: Wireless interface went down on {{hostname}}.
     status: deprecated
     varbinds:
       - bsnAPDot3MacAddress
@@ -889,7 +889,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPLoadProfileFailed
     category: diagnostic
     severity: warning
-    description: Load profile check failed for AP {bsnAPName} (MAC {bsnAPDot3MacAddress}) on {_HOSTNAME}.
+    description: AP load profile check failed for {{value "bsnAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -899,7 +899,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPNoiseProfileFailed
     category: diagnostic
     severity: warning
-    description: Noise profile failed for AP {bsnAPName} slot {bsnAPIfSlotId} on {_HOSTNAME}.
+    description: Noise profile check failed for AP {{value "bsnAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -909,7 +909,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPInterferenceProfileFailed
     category: diagnostic
     severity: warning
-    description: AP {bsnAPName} interference profile failed on {_HOSTNAME}.
+    description: Interference profile failed for AP {{value "bsnAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -919,7 +919,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPCoverageProfileFailed
     category: diagnostic
     severity: warning
-    description: AP coverage profile failed for {bsnAPNameTrapVariable} with {bsnAPCoverageFailedClients} failed clients on {_HOSTNAME}.
+    description: AP {{value "bsnAPName"}} coverage profile failed on {{hostname}}.
     status: current
     varbinds:
       - bsnAPMacAddrTrapVariable
@@ -936,7 +936,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPCurrentTxPowerChanged
     category: state_change
     severity: notice
-    description: AP {bsnAPName} transmission power updated to {bsnAPIfPhyTxPowerLevel} on {_HOSTNAME}.
+    description: AP {{value "bsnAPName"}} transmit power changed to {{value "bsnAPIfPhyTxPowerLevel"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -947,7 +947,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPCurrentChannelChanged
     category: state_change
     severity: notice
-    description: AP {bsnAPName} channel changed to {bsnAPChannelNumberTrapVariable} on {_HOSTNAME}.
+    description: AP {{value "bsnAPName"}} channel changed to {{value "bsnAPChannelNumberTrapVariable"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPMacAddrTrapVariable
@@ -966,7 +966,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnRrmDot11aGroupingDone
     category: mobility
     severity: notice
-    description: 802.11a group leader election completed with new leader {bsnRrmDot11aGroupLeaderMacAddr} on {_HOSTNAME}.
+    description: 802.11a grouping completed with new leader {{value "bsnRrmDot11aGroupLeaderMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnRrmDot11aGroupLeaderMacAddr
@@ -974,7 +974,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnRrmDot11bGroupingDone
     category: mobility
     severity: notice
-    description: Wireless grouping completed with new Group Leader {bsnRrmDot11bGroupLeaderMacAddr} on {_HOSTNAME}.
+    description: 802.11b grouping completed with new leader {{value "bsnRrmDot11bGroupLeaderMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnRrmDot11bGroupLeaderMacAddr
@@ -982,35 +982,35 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnConfigSaved
     category: config_change
     severity: notice
-    description: Configuration saved on {_HOSTNAME}.
+    description: Configuration saved on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.14179.2.6.3.24
     name: AIRESPACE-WIRELESS-MIB::bsnDot11EssCreated
     category: mobility
     severity: notice
-    description: New ESS {bsnDot11EssIndex} created on {_HOSTNAME}.
+    description: New ESS {{value "bsnDot11EssIndex"}} created on {{hostname}}.
     status: current
     varbinds:
       - bsnDot11EssIndex
   - oid: 1.3.6.1.4.1.14179.2.6.3.25
     name: AIRESPACE-WIRELESS-MIB::bsnDot11EssDeleted
-    category: config_change
+    category: state_change
     severity: notice
-    description: WLAN ESS deleted with index {bsnDot11EssIndex} on {_HOSTNAME}.
+    description: WLAN ESS {{value "bsnDot11EssIndex"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - bsnDot11EssIndex
   - oid: 1.3.6.1.4.1.14179.2.6.3.26
     name: AIRESPACE-WIRELESS-MIB::bsnRADIUSServerNotResponding
     category: diagnostic
-    severity: warning
-    description: RADIUS server not responding to authentication requests on {_HOSTNAME}.
+    severity: crit
+    description: RADIUS server(s) not responding to authentication requests on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.14179.2.6.3.27
     name: AIRESPACE-WIRELESS-MIB::bsnAuthenticationFailure
     category: auth
     severity: warning
-    description: Client authentication failure for {bsnAuthFailureUserName} ({bsnAuthFailureUserType}) on {_HOSTNAME}.
+    description: Client authentication failure for {{value "bsnAuthFailureUserName"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAuthFailureUserType
@@ -1019,7 +1019,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnIpsecEspAuthFailureTrap
     category: security
     severity: warning
-    description: IPsec ESP authentication failure with {bsnIpsecErrorCount} errors from {bsnRemoteIPv4Address} on {_HOSTNAME}.
+    description: IPsec ESP authentication failure detected from {{value "bsnRemoteIPv4Address"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnRemoteIPv4Address
@@ -1028,7 +1028,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnIpsecEspReplayFailureTrap
     category: security
     severity: warning
-    description: IPsec ESP replay failure detected from {bsnRemoteIPv4Address} with count {bsnIpsecErrorCount} on {_HOSTNAME}.
+    description: IPsec ESP replay failure detected from {{value "bsnRemoteIPv4Address"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnRemoteIPv4Address
@@ -1037,7 +1037,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnIpsecEspInvalidSpiTrap
     category: security
     severity: warning
-    description: IPsec invalid SPI {bsnIpsecSPI} detected from {bsnRemoteIPv4Address} on {_HOSTNAME}.
+    description: IPsec ESP invalid SPI detected from {{value "bsnRemoteIPv4Address"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnRemoteIPv4Address
@@ -1046,7 +1046,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnIpsecIkeNegFailure
     category: security
     severity: warning
-    description: IKE phase 1 negotiation failed with remote {bsnRemoteIPv4Address} on {_HOSTNAME}.
+    description: IKE phase 1 negotiation failed with remote {{value "bsnRemoteIPv4Address"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnRemoteIPv4Address
@@ -1061,7 +1061,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnIpsecSuiteNegFailure
     category: security
     severity: warning
-    description: IPsec suite negotiation failure with {bsnRemoteIPv4Address} on {_HOSTNAME}.
+    description: IPsec phase 2 SA suite negotiation failed with remote {{value "bsnRemoteIPv4Address"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnRemoteIPv4Address
@@ -1073,7 +1073,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnIpsecInvalidCookieTrap
     category: security
     severity: warning
-    description: ISAKMP invalid cookies detected from {bsnRemoteIPv4Address} on {_HOSTNAME}.
+    description: ISAKMP invalid cookie detected from {{value "bsnRemoteIPv4Address"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnRemoteIPv4Address
@@ -1085,7 +1085,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnRogueAPDetected
     category: security
     severity: alert
-    description: Rogue AP detected with SSID {bsnRogueAPSsid} on {_HOSTNAME}.
+    description: Rogue AP detected with SSID {{value "bsnRogueAPSsid"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnRogueAPDot11MacAddress
@@ -1102,9 +1102,9 @@ traps:
       - bsnRogueAPClassType
   - oid: 1.3.6.1.4.1.14179.2.6.3.37
     name: AIRESPACE-WIRELESS-MIB::bsnAPLoadProfileUpdatedToPass
-    category: mobility
-    severity: notice
-    description: AP {bsnAPName} load profile updated to pass on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: AP {{value "bsnAPName"}} load profile state changed to pass on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -1114,7 +1114,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPNoiseProfileUpdatedToPass
     category: diagnostic
     severity: notice
-    description: Noise profile for AP {bsnAPName} (slot {bsnAPIfSlotId}) changed to PASS on {_HOSTNAME}.
+    description: Noise profile for AP {{value "bsnAPName"}} passed on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -1124,7 +1124,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPInterferenceProfileUpdatedToPass
     category: diagnostic
     severity: notice
-    description: AP {bsnAPName} interference profile changed to PASS on {_HOSTNAME}.
+    description: Interference profile passed for AP {{value "bsnAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -1134,7 +1134,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPCoverageProfileUpdatedToPass
     category: diagnostic
     severity: notice
-    description: AP {bsnAPName} coverage profile state changed to PASS on {_HOSTNAME}.
+    description: AP {{value "bsnAPName"}} coverage profile state changed to PASS on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -1144,7 +1144,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnRogueAPRemoved
     category: security
     severity: notice
-    description: Rogue AP {bsnRogueAPAirespaceAPName} removed on {_HOSTNAME}.
+    description: Rogue AP removed{{with value "bsnRogueAPAirespaceAPName"}} detected by {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - bsnRogueAPDot11MacAddress
@@ -1156,7 +1156,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnRadiosExceedLicenseCount
     category: license
     severity: warning
-    description: Current radio count {bsnCurrentRadiosCount} exceeded license limit {bsnLicenseRadioCount} on {_HOSTNAME}.
+    description: Radio count {{value "bsnCurrentRadiosCount"}} exceeds license limit {{value "bsnLicenseRadioCount"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnCurrentRadiosCount
@@ -1164,8 +1164,8 @@ traps:
   - oid: 1.3.6.1.4.1.14179.2.6.3.43
     name: AIRESPACE-WIRELESS-MIB::bsnSensedTemperatureTooHigh
     category: diagnostic
-    severity: alert
-    description: Temperature sensor reported high temperature {bsnSensorTemperature} on {_HOSTNAME}.
+    severity: warning
+    description: Temperature sensor reading {{value "bsnSensorTemperature"}}°C is too high on {{hostname}}.
     status: current
     varbinds:
       - bsnSensorTemperature
@@ -1173,21 +1173,21 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnSensedTemperatureTooLow
     category: diagnostic
     severity: warning
-    description: Temperature sensor reported {bsnSensorTemperature} on {_HOSTNAME}.
+    description: Temperature sensor reading {{value "bsnSensorTemperature"}}°C is too low on {{hostname}}.
     status: current
     varbinds:
       - bsnSensorTemperature
   - oid: 1.3.6.1.4.1.14179.2.6.3.45
     name: AIRESPACE-WIRELESS-MIB::bsnTemperatureSensorFailure
     category: diagnostic
-    severity: err
-    description: Temperature sensor hardware failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Temperature sensor hardware failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.14179.2.6.3.46
     name: AIRESPACE-WIRELESS-MIB::bsnTemperatureSensorClear
     category: diagnostic
     severity: notice
-    description: Temperature sensor alarm cleared; current temperature is {bsnSensorTemperature} on {_HOSTNAME}.
+    description: Temperature sensor alarm cleared, current temperature {{value "bsnSensorTemperature"}}°C on {{hostname}}.
     status: current
     varbinds:
       - bsnSensorTemperature
@@ -1195,13 +1195,13 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnPOEControllerFailure
     category: diagnostic
     severity: crit
-    description: POE Controller has failed on {_HOSTNAME}.
+    description: POE Controller has failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.14179.2.6.3.48
     name: AIRESPACE-WIRELESS-MIB::bsnMaxRogueCountExceeded
     category: security
     severity: warning
-    description: Rogue device count {bsnMaxRogueCount} exceeded maximum allowed on {_HOSTNAME}.
+    description: Maximum rogue count {{value "bsnMaxRogueCount"}} exceeded on {{hostname}}.
     status: current
     varbinds:
       - bsnMaxRogueCount
@@ -1209,15 +1209,15 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnMaxRogueCountClear
     category: security
     severity: notice
-    description: Rogue count cleared, current count {bsnMaxRogueCount} is within maximum allowed on {_HOSTNAME}.
+    description: Rogue count cleared, current value {{value "bsnMaxRogueCount"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnMaxRogueCount
   - oid: 1.3.6.1.4.1.14179.2.6.3.50
     name: AIRESPACE-WIRELESS-MIB::bsnApMaxRogueCountExceeded
     category: security
-    severity: warning
-    description: Rogue device count {bsnMaxRogueCount} exceeded maximum on AP {bsnAPName} on {_HOSTNAME}.
+    severity: alert
+    description: Maximum rogue device count exceeded on {{value "bsnAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPMacAddrTrapVariable
@@ -1227,7 +1227,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnApMaxRogueCountClear
     category: security
     severity: notice
-    description: Maximum rogue count cleared on {bsnAPName} on {_HOSTNAME}.
+    description: Rogue device count cleared on {{value "bsnAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPMacAddrTrapVariable
@@ -1237,7 +1237,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnDot11StationBlacklisted
     category: security
     severity: warning
-    description: Wireless station {bsnStationMacAddress} blacklisted on AP {bsnAPName} due to {bsnStationBlacklistingReasonCode} on {_HOSTNAME}.
+    description: Wireless client {{value "bsnStationMacAddress"}} blacklisted on {{value "bsnAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnStationAPMacAddr
@@ -1251,7 +1251,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnDot11StationAssociate
     category: mobility
     severity: notice
-    description: Client {bsnStationMacAddress} associated with AP {bsnAPName} on {_HOSTNAME}.
+    description: Watchlisted client {{value "bsnStationMacAddress"}} associated with AP {{value "bsnAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnStationAPMacAddr
@@ -1264,7 +1264,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnApBigNavDosAttack
     category: security
     severity: alert
-    description: BSN AP Big Nav DoS attack detected from {bsnNavDosAttackSourceMacAddr} on {_HOSTNAME}.
+    description: Denial of service attack detected from {{value "bsnNavDosAttackSourceMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPMacAddrTrapVariable
@@ -1275,7 +1275,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnTooManyUnsuccessLoginAttempts
     category: auth
     severity: warning
-    description: Too many unsuccessful login attempts for user {bsnStationUserName} from {bsnUserIpAddress} on {_HOSTNAME}.
+    description: Too many unsuccessful login attempts by {{value "bsnStationUserName"}} from {{value "bsnUserIpAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnUserIpAddress
@@ -1284,7 +1284,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnWepKeyDecryptError
     category: security
     severity: warning
-    description: WEP key decrypt error for station {bsnStationMacAddress} on {_HOSTNAME}.
+    description: WEP key decrypt error for station {{value "bsnStationMacAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnStationMacAddress
@@ -1294,7 +1294,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnWpaMicErrorCounterActivated
     category: security
     severity: warning
-    description: WPA MIC error counter measure activated for station {bsnStationMacAddress} on AP {bsnAPName} on {_HOSTNAME}.
+    description: WPA MIC error counter measure activated for client {{value "bsnStationMacAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnStationMacAddress
@@ -1306,7 +1306,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnRogueAPDetectedOnWiredNetwork
     category: security
     severity: alert
-    description: Rogue AP {bsnAPName} detected on wired network at {bsnRogueAPDot11MacAddress} on {_HOSTNAME}.
+    description: Rogue AP detected on wired network with MAC {{value "bsnRogueAPDot11MacAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnRogueAPDot11MacAddress
@@ -1315,8 +1315,8 @@ traps:
   - oid: 1.3.6.1.4.1.14179.2.6.3.60
     name: AIRESPACE-WIRELESS-MIB::bsnApHasNoRadioCards
     category: diagnostic
-    severity: warning
-    description: Access point {bsnAPName} has no radio cards present on {_HOSTNAME}.
+    severity: crit
+    description: Access point {{value "bsnAPName"}} has no radio cards present on {{hostname}}.
     status: current
     varbinds:
       - bsnAPMacAddrTrapVariable
@@ -1325,7 +1325,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnDuplicateIpAddressReported
     category: security
     severity: warning
-    description: Duplicate IP address {bsnDuplicateIpTrapVariable} detected on network on {_HOSTNAME}.
+    description: Duplicate IP address {{value "bsnDuplicateIpTrapVariable"}} detected on {{hostname}}.
     status: current
     varbinds:
       - bsnDuplicateIpReportedByAP
@@ -1338,7 +1338,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPContainedAsARogue
     category: security
     severity: warning
-    description: AP {bsnAPName} detected as rogue on {_HOSTNAME}.
+    description: AP {{value "bsnAPName"}} is being contained as a rogue on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -1349,8 +1349,8 @@ traps:
   - oid: 1.3.6.1.4.1.14179.2.6.3.63
     name: AIRESPACE-WIRELESS-MIB::bsnTrustedApHasInvalidSsid
     category: security
-    severity: warning
-    description: Trusted Rogue AP {bsnRogueAPDot11MacAddress} auto-contained for invalid SSID on {_HOSTNAME}.
+    severity: alert
+    description: Trusted Rogue AP auto-contained for invalid SSID{{with value "bsnClearTrapVariable"}} (clear){{end}} at {{value "bsnRogueAPDot11MacAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnRogueAPDot11MacAddress
@@ -1358,8 +1358,8 @@ traps:
   - oid: 1.3.6.1.4.1.14179.2.6.3.64
     name: AIRESPACE-WIRELESS-MIB::bsnTrustedApIsMissing
     category: security
-    severity: warning
-    description: Trusted Rogue AP {bsnRogueAPDot11MacAddress} is missing on {_HOSTNAME}.
+    severity: alert
+    description: Trusted Rogue AP missing or failed at {{value "bsnRogueAPDot11MacAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnRogueAPDot11MacAddress
@@ -1367,8 +1367,8 @@ traps:
   - oid: 1.3.6.1.4.1.14179.2.6.3.65
     name: AIRESPACE-WIRELESS-MIB::bsnAdhocRogueAutoContained
     category: security
-    severity: notice
-    description: Adhoc rogue AP {bsnRogueAPDot11MacAddress} auto-contained on {_HOSTNAME}.
+    severity: alert
+    description: Adhoc rogue AP auto-contained{{with value "bsnClearTrapVariable"}} (clear){{end}} at {{value "bsnRogueAPDot11MacAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnRogueAPDot11MacAddress
@@ -1376,8 +1376,8 @@ traps:
   - oid: 1.3.6.1.4.1.14179.2.6.3.66
     name: AIRESPACE-WIRELESS-MIB::bsnRogueApAutoContained
     category: security
-    severity: alert
-    description: Rogue AP {bsnRogueAPDot11MacAddress} auto-contained on {_HOSTNAME}.
+    severity: warning
+    description: Rogue AP auto-contained for advertising SSID on {{hostname}}.
     status: current
     varbinds:
       - bsnRogueAPDot11MacAddress
@@ -1385,8 +1385,8 @@ traps:
   - oid: 1.3.6.1.4.1.14179.2.6.3.67
     name: AIRESPACE-WIRELESS-MIB::bsnTrustedApHasInvalidEncryption
     category: security
-    severity: warning
-    description: Trusted AP {bsnRogueAPDot11MacAddress} auto-contained for invalid encryption {bsnTrustedApEncryptionUsed} on {_HOSTNAME}.
+    severity: alert
+    description: Trusted Rogue AP auto-contained for invalid encryption {{value "bsnTrustedApEncryptionUsed"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnRogueAPDot11MacAddress
@@ -1396,8 +1396,8 @@ traps:
   - oid: 1.3.6.1.4.1.14179.2.6.3.68
     name: AIRESPACE-WIRELESS-MIB::bsnTrustedApHasInvalidRadioPolicy
     category: security
-    severity: warning
-    description: Trusted Rogue AP {bsnRogueAPDot11MacAddress} auto-contained for invalid radio policy {bsnTrustedApRadioPolicyUsed} on {_HOSTNAME}.
+    severity: alert
+    description: Trusted AP auto-contained for invalid radio policy {{value "bsnTrustedApRadioPolicyUsed"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnRogueAPDot11MacAddress
@@ -1408,7 +1408,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnNetworkStateChanged
     category: state_change
     severity: notice
-    description: Wireless network state changed to {bsnNetworkState} on {_HOSTNAME}.
+    description: Wireless network state changed to {{value "bsnNetworkState"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnNetworkType
@@ -1417,7 +1417,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnSignatureAttackDetected
     category: security
     severity: alert
-    description: Signature attack detected by {bsnSignatureName} from {bsnSignatureAttackerMacAddress} on {_HOSTNAME}.
+    description: Signature attack detected by {{value "bsnSignatureName"}} from {{value "bsnSignatureAttackerMacAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -1436,8 +1436,8 @@ traps:
   - oid: 1.3.6.1.4.1.14179.2.6.3.71
     name: AIRESPACE-WIRELESS-MIB::bsnAPRadioCardTxFailure
     category: diagnostic
-    severity: err
-    description: Radio card on AP {bsnAPName} stopped transmitting on {_HOSTNAME}.
+    severity: crit
+    description: Radio card transmission failure on AP {{value "bsnAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -1448,7 +1448,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPRadioCardTxFailureClear
     category: diagnostic
     severity: notice
-    description: Radio card transmission failure cleared for AP {bsnAPName} on {_HOSTNAME}.
+    description: Radio card transmission failure cleared for AP {{value "bsnAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -1458,8 +1458,8 @@ traps:
   - oid: 1.3.6.1.4.1.14179.2.6.3.73
     name: AIRESPACE-WIRELESS-MIB::bsnAPRadioCardRxFailure
     category: diagnostic
-    severity: err
-    description: Radio card on AP {bsnAPName} stopped receiving on {_HOSTNAME}.
+    severity: warning
+    description: Radio card on AP {{value "bsnAPName"}} stopped receiving on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -1470,7 +1470,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPRadioCardRxFailureClear
     category: diagnostic
     severity: notice
-    description: Radio card on AP {bsnAPName} (slot {bsnAPIfSlotId}) recovered from RX failure on {_HOSTNAME}.
+    description: Radio card RX failure cleared for AP {{value "bsnAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -1481,7 +1481,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPImpersonationDetected
     category: security
     severity: alert
-    description: 'Rogue AP impersonation detected: {bsnImpersonatingSourceMacAddr} impersonating {bsnImpersonatedAPMacAddr} on {_HOSTNAME}.'
+    description: 'AP impersonation detected: {{value "bsnImpersonatingSourceMacAddr"}} impersonating {{value "bsnImpersonatedAPMacAddr"}} on {{hostname}}.'
     status: current
     varbinds:
       - bsnImpersonatedAPMacAddr
@@ -1493,8 +1493,8 @@ traps:
   - oid: 1.3.6.1.4.1.14179.2.6.3.76
     name: AIRESPACE-WIRELESS-MIB::bsnTrustedApHasInvalidPreamble
     category: security
-    severity: warning
-    description: Trusted Rogue AP {bsnRogueAPDot11MacAddress} auto-contained for invalid preamble on {_HOSTNAME}.
+    severity: alert
+    description: Trusted Rogue AP auto-contained for invalid preamble {{value "bsnTrustedApPreambleUsed"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnRogueAPDot11MacAddress
@@ -1503,9 +1503,9 @@ traps:
       - bsnClearTrapVariable
   - oid: 1.3.6.1.4.1.14179.2.6.3.77
     name: AIRESPACE-WIRELESS-MIB::bsnAPIPAddressFallback
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: AP {bsnAPName} fell back to DHCP because static IP {bsnAPStaticIPAddress} failed on {_HOSTNAME}.
+    description: AP {{value "bsnAPName"}} fell back to DHCP on {{value "bsnApIpAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -1516,7 +1516,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPFunctionalityDisabled
     category: license
     severity: alert
-    description: AP functionality disabled due to expired or mismatched license key {bsnLicenseKeyTrapVariable} on {_HOSTNAME}.
+    description: AP functionality disabled due to expired or mismatched license key on {{hostname}}.
     status: current
     varbinds:
       - bsnApFunctionalityDisableReasonCode
@@ -1526,7 +1526,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnAPRegulatoryDomainMismatch
     category: security
     severity: warning
-    description: AP {bsnAPName} regulatory domain {bsnApRegulatoryDomain} mismatched with country index {bsnGlobalDot11CountryIndex} on {_HOSTNAME}.
+    description: Regulatory domain mismatch detected for {{value "bsnAPName"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - bsnAPDot3MacAddress
@@ -1537,13 +1537,13 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnRxMulticastQueueFull
     category: diagnostic
     severity: warning
-    description: Receive multicast queue is full on {_HOSTNAME}.
+    description: Receive multicast queue is full on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.14179.2.6.3.81
     name: AIRESPACE-WIRELESS-MIB::bsnRadarChannelDetected
-    category: security
+    category: diagnostic
     severity: warning
-    description: Radar signals detected on channel {bsnAPIfPhyChannelNumber} on {_HOSTNAME}.
+    description: Radar signals detected on channel {{value "bsnAPIfPhyChannelNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -1554,7 +1554,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::bsnRadarChannelCleared
     category: diagnostic
     severity: notice
-    description: Radar channel {bsnAPIfPhyChannelNumber} cleared on AP {bsnAPName} on {_HOSTNAME}.
+    description: Radar channel interference cleared on {{value "bsnAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -1564,8 +1564,8 @@ traps:
   - oid: 1.3.6.1.4.1.14179.2.6.3.83
     name: AIRESPACE-WIRELESS-MIB::bsnAPAuthorizationFailure
     category: security
-    severity: warning
-    description: AP {bsnAPName} authorization failure on {_HOSTNAME}.
+    severity: alert
+    description: AP {{value "bsnAPName"}} authorization failed on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -1575,8 +1575,8 @@ traps:
   - oid: 1.3.6.1.4.1.14179.2.6.3.84
     name: AIRESPACE-WIRELESS-MIB::radioCoreDumpTrap
     category: diagnostic
-    severity: err
-    description: Radio core dump detected on AP {bsnAPName} on {_HOSTNAME}.
+    severity: crit
+    description: Radio module core dump detected on {{value "bsnAPName"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -1586,7 +1586,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::invalidRadioTrap
     category: diagnostic
     severity: warning
-    description: AP {bsnAPName} reported unsupported radio type {bsnAPInvalidRadioType} on slot {bsnAPIfSlotId} on {_HOSTNAME}.
+    description: AP {{value "bsnAPName"}} joined with unsupported radio type {{value "bsnAPInvalidRadioType"}} on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -1597,7 +1597,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::countryChangeTrap
     category: config_change
     severity: notice
-    description: Wireless country code changed to {bsnGlobalDot11CountryIndex} on {_HOSTNAME}.
+    description: Wireless country code changed to {{value "bsnGlobalDot11CountryIndex"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - bsnGlobalDot11CountryIndex
@@ -1605,7 +1605,7 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::unsupportedAPTrap
     category: security
     severity: warning
-    description: Unsupported AP {bsnAPName} with MAC {bsnAPDot3MacAddress} attempted to join the controller on {_HOSTNAME}.
+    description: Unsupported AP {{value "bsnAPName"}} attempted to join the network on {{hostname}}.
     status: current
     varbinds:
       - bsnAPDot3MacAddress
@@ -1614,13 +1614,13 @@ traps:
     name: AIRESPACE-WIRELESS-MIB::heartbeatLossTrap
     category: diagnostic
     severity: alert
-    description: Controller lost connection with Supervisor Switch on {_HOSTNAME}.
+    description: Controller lost heartbeat connection with Supervisor Switch on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.14179.2.6.3.89
     name: AIRESPACE-WIRELESS-MIB::locationNotifyTrap
     category: mobility
-    severity: notice
-    description: Location event notification received on {_HOSTNAME}.
+    severity: info
+    description: Wireless location event notification received on {{hostname}}.
     status: current
     varbinds:
       - locationNotifyContent

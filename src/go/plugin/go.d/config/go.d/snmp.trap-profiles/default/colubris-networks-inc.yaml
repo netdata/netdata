@@ -351,18 +351,18 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.8744.5.1.2.0.1
     name: COLUBRIS-PUBLIC-ACCESS-MIB::publicAccessStatusChangedTrap
-    category: auth
+    category: state_change
     severity: warning
-    description: Authentication system status changed to {publicAccessStatus} due to {publicAccessStatusChangedCause} on {_HOSTNAME}.
+    description: Authentication system status changed to {{value "publicAccessStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - publicAccessStatus
       - publicAccessStatusChangedCause
   - oid: 1.3.6.1.4.1.8744.5.1.2.0.2
     name: COLUBRIS-PUBLIC-ACCESS-MIB::publicAccessUsersThresholdTrap
-    category: diagnostic
+    category: security
     severity: warning
-    description: Public access user count {publicAccessUsersCount} exceeded threshold on {_HOSTNAME}.
+    description: Public access user threshold exceeded with {{value "publicAccessUsersCount"}} users on {{hostname}}.
     status: current
     varbinds:
       - publicAccessUsersCount
@@ -370,15 +370,15 @@ traps:
     name: COLUBRIS-PUBLIC-ACCESS-MIB::publicAccessUsersSessionStartTrap
     category: auth
     severity: notice
-    description: User {publicAccessUserName} successfully authenticated on {_HOSTNAME}.
+    description: Public access user {{value "publicAccessUserName"}} session started on {{hostname}}.
     status: current
     varbinds:
       - publicAccessUserName
   - oid: 1.3.6.1.4.1.8744.5.1.2.0.4
     name: COLUBRIS-PUBLIC-ACCESS-MIB::publicAccessUsersSessionStopTrap
-    category: state_change
+    category: mobility
     severity: notice
-    description: User session terminated for {publicAccessUserName} on {_HOSTNAME}.
+    description: User {{value "publicAccessUserName"}} session stopped on {{hostname}}.
     status: current
     varbinds:
       - publicAccessUserName
@@ -386,15 +386,15 @@ traps:
     name: COLUBRIS-PUBLIC-ACCESS-MIB::publicAccessUsersSessionFailTrap
     category: auth
     severity: warning
-    description: User authentication failed for {publicAccessUserName} on {_HOSTNAME}.
+    description: Public access user authentication failed for {{value "publicAccessUserName"}} on {{hostname}}.
     status: current
     varbinds:
       - publicAccessUserName
   - oid: 1.3.6.1.4.1.8744.5.1.2.0.6
     name: COLUBRIS-PUBLIC-ACCESS-MIB::publicAccessUsersLoggedInTrap
     category: auth
-    severity: notice
-    description: Public user {publicAccessUserName} authenticated on {publicAccessUserConnectedInterface} on {_HOSTNAME}.
+    severity: info
+    description: Public access user {{value "publicAccessUserName"}} authenticated on {{hostname}}.
     status: current
     varbinds:
       - publicAccessUsersCount
@@ -410,7 +410,7 @@ traps:
     name: COLUBRIS-MAINTENANCE-MIB::configurationUpdateNotification
     category: config_change
     severity: notice
-    description: Configuration update attempted with version {systemConfigurationVersion} on {_HOSTNAME}.
+    description: 'Configuration update attempted{{with value "configurationUpdateInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - configurationUpdateInfo
@@ -419,7 +419,7 @@ traps:
     name: COLUBRIS-MAINTENANCE-MIB::configurationLocalUpdateNotification
     category: config_change
     severity: notice
-    description: Configuration updated with {configurationUpdateInfo} on {_HOSTNAME}.
+    description: 'Configuration updated{{with value "configurationUpdateInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - configurationUpdateInfo
@@ -427,7 +427,7 @@ traps:
     name: COLUBRIS-MAINTENANCE-MIB::certificateAboutToExpireNotification
     category: license
     severity: warning
-    description: Certificate nearing expiration at {certificateExpiryDate} on {_HOSTNAME}.
+    description: Certificate about to expire on {{hostname}}.
     status: current
     varbinds:
       - certificateExpiryDate
@@ -435,7 +435,7 @@ traps:
     name: COLUBRIS-MAINTENANCE-MIB::certificateExpiredNotification
     category: license
     severity: warning
-    description: Certificate expired at {certificateExpiryDate} on {_HOSTNAME}.
+    description: Certificate expired on {{hostname}}.
     status: current
     varbinds:
       - certificateExpiryDate
@@ -443,7 +443,7 @@ traps:
     name: COLUBRIS-MAINTENANCE-MIB::firmwareUpdateNotification
     category: config_change
     severity: notice
-    description: Firmware update attempted with {firmwareUpdateInfo} on {_HOSTNAME}.
+    description: 'Firmware update attempted{{with value "firmwareUpdateInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - firmwareUpdateInfo
@@ -452,7 +452,7 @@ traps:
     name: COLUBRIS-SYSLOG-MIB::syslogSeverityNotification
     category: diagnostic
     severity: warning
-    description: Syslog message {syslogMsgText} with severity {syslogMsgSeverity} on {_HOSTNAME}.
+    description: Syslog message {{value "syslogMsgText"}} on {{hostname}}.
     status: current
     varbinds:
       - syslogMsgNumber
@@ -463,7 +463,7 @@ traps:
     name: COLUBRIS-SYSLOG-MIB::syslogRegExMatchNotification
     category: diagnostic
     severity: warning
-    description: Syslog message {syslogMsgText} with severity {syslogMsgSeverity} matched regex on {_HOSTNAME}.
+    description: 'Syslog message {{value "syslogMsgSeverity"}} matched regex: {{value "syslogMsgText"}} on {{hostname}}.'
     status: current
     varbinds:
       - syslogMsgNumber
@@ -474,7 +474,7 @@ traps:
     name: COLUBRIS-802DOT11-MIB::coDot11SNRLevelNotification
     category: diagnostic
     severity: warning
-    description: Low average SNR level {coDot11CurrentSNRLevel} for SSID {coVirtualApSSID} on {_HOSTNAME}.
+    description: Low average SNR level {{value "coDot11CurrentSNRLevel"}} detected on {{first (value "coVirtualApSSID") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -485,7 +485,7 @@ traps:
     name: COLUBRIS-802DOT11-MIB::coDot11AssociationNotification
     category: mobility
     severity: notice
-    description: Wireless station {coDot11StationName} associated with SSID {coDot11StationSSID} on {_HOSTNAME}.
+    description: Wireless client {{value "coDot11StationMACAddress"}} associated on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -502,7 +502,7 @@ traps:
     name: COLUBRIS-802DOT11-MIB::coDot11UnauthorizedAPNotification
     category: security
     severity: alert
-    description: Unauthorized AP detected with SSID {coDot11ScanSSID} and MAC {coDot11ScanMacAddress} on {_HOSTNAME}.
+    description: Unauthorized AP detected with SSID {{value "coDot11ScanSSID"}} and MAC {{value "coDot11ScanMacAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -515,7 +515,7 @@ traps:
     name: COLUBRIS-SYSTEM-MIB::adminAccessAuthFailureNotification
     category: auth
     severity: warning
-    description: Administrator authentication failure from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: 'Administrator authentication failure{{with value "adminAccessInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - adminAccessInfo
@@ -523,13 +523,13 @@ traps:
     name: COLUBRIS-SYSTEM-MIB::adminAccessLoginNotification
     category: auth
     severity: notice
-    description: Administrator successfully authenticated on {_HOSTNAME}.
+    description: Administrator successfully authenticated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.8744.5.6.2.0.3
     name: COLUBRIS-SYSTEM-MIB::systemColdStart
     category: state_change
     severity: notice
-    description: System cold start detected on {_HOSTNAME}.
+    description: System cold start detected on {{hostname}}.
     status: current
     varbinds:
       - systemProductName
@@ -540,7 +540,7 @@ traps:
     name: COLUBRIS-SYSTEM-MIB::systemHeartbeatNotification
     category: diagnostic
     severity: info
-    description: System heartbeat received from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: System heartbeat received on {{hostname}}.
     status: current
     varbinds:
       - systemSerialNumber
@@ -563,7 +563,7 @@ traps:
     name: COLUBRIS-SYSTEM-MIB::adminAccessLogoutNotification
     category: auth
     severity: notice
-    description: Administrator {adminAccessInfo} logged out on {_HOSTNAME}.
+    description: Administrator logout{{with value "adminAccessInfo"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - adminAccessInfo
@@ -571,15 +571,15 @@ traps:
     name: COLUBRIS-SYSTEM-MIB::timeServerFailure
     category: diagnostic
     severity: warning
-    description: Time server {systemTimeServerAddress} is unreachable on {_HOSTNAME}.
+    description: Time server {{value "systemTimeServerAddress"}} is unreachable on {{hostname}}.
     status: current
     varbinds:
       - systemTimeServerAddress
   - oid: 1.3.6.1.4.1.8744.5.7.2.0.1
     name: COLUBRIS-SATELLITE-MANAGEMENT-MIB::satelliteUpNotification
-    category: state_change
+    category: mobility
     severity: notice
-    description: New satellite {satelliteName} detected on {_HOSTNAME}.
+    description: New satellite {{value "satelliteName"}} detected on {{hostname}}.
     status: current
     varbinds:
       - satelliteName
@@ -591,7 +591,7 @@ traps:
     name: COLUBRIS-SATELLITE-MANAGEMENT-MIB::satelliteDownNotification
     category: state_change
     severity: warning
-    description: Satellite {satelliteName} became unreachable on {_HOSTNAME}.
+    description: Satellite {{first (value "satelliteName") (value "satelliteDeviceId")}} became unreachable on {{hostname}}.
     status: current
     varbinds:
       - satelliteName
@@ -603,24 +603,24 @@ traps:
     name: COLUBRIS-TOOLS-MIB::traceStatusNotification
     category: diagnostic
     severity: notice
-    description: IP Trace tool {traceCaptureStatus} triggered on {_HOSTNAME}.
+    description: IP trace tool {{value "traceCaptureStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - traceCaptureStatus
   - oid: 1.3.6.1.4.1.8744.5.15.2.0.1
     name: COLUBRIS-PUBLIC-ACCESS-RETENTION-MIB::publicAccessRetentionSessionMaxCountReachedTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Public access retention session count exceeded maximum {publicAccessRetentionSessionsMaxCount} on {_HOSTNAME}.
+    description: Public access session count exceeded maximum limit of {{value "publicAccessRetentionSessionsMaxCount"}} on {{hostname}}.
     status: current
     varbinds:
       - publicAccessRetentionSessionsMaxCount
       - publicAccessRetentionSessionsMaxTime
   - oid: 1.3.6.1.4.1.8744.5.18.2.0.1
     name: COLUBRIS-CONNECTION-LIMITING-MIB::connectionLimitingMaximumUserConnectionsReached
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: User {connectionLimitingUserMACAddress} reached maximum connection limit {connectionLimitingMaximumUserConnections} on {_HOSTNAME}.
+    description: User {{value "connectionLimitingUserIPAddress"}} reached maximum connection limit of {{value "connectionLimitingMaximumUserConnections"}} on {{hostname}}.
     status: current
     varbinds:
       - connectionLimitingMaximumUserConnections
@@ -629,8 +629,8 @@ traps:
   - oid: 1.3.6.1.4.1.8744.5.19.2.0.1
     name: COLUBRIS-CLIENT-TRACKING-MIB::clientTrackingSuccessfulAssociation
     category: mobility
-    severity: info
-    description: Client successfully associated with AP {clientTrackingEventInformation} on {_HOSTNAME}.
+    severity: notice
+    description: 'Client successfully associated with AP{{with value "clientTrackingEventInformation"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - clientTrackingEventInformation
@@ -638,7 +638,7 @@ traps:
     name: COLUBRIS-CLIENT-TRACKING-MIB::clientTrackingAssociationFailure
     category: security
     severity: warning
-    description: 'User failed to associate with AP: {clientTrackingEventInformation} on {_HOSTNAME}.'
+    description: 'Client association failure{{with value "clientTrackingEventInformation"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - clientTrackingEventInformation
@@ -646,7 +646,7 @@ traps:
     name: COLUBRIS-CLIENT-TRACKING-MIB::clientTrackingSuccessfulReAssociation
     category: mobility
     severity: notice
-    description: Client successfully reassociated with the AP on {_HOSTNAME}.
+    description: 'Client successfully reassociated with AP{{with value "clientTrackingEventInformation"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - clientTrackingEventInformation
@@ -654,7 +654,7 @@ traps:
     name: COLUBRIS-CLIENT-TRACKING-MIB::clientTrackingReAssociationFailure
     category: mobility
     severity: warning
-    description: Client reassociation failed with {clientTrackingEventInformation} on {_HOSTNAME}.
+    description: 'Client reassociation with AP failed{{with value "clientTrackingEventInformation"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - clientTrackingEventInformation
@@ -662,7 +662,7 @@ traps:
     name: COLUBRIS-CLIENT-TRACKING-MIB::clientTrackingSuccessfulAuthentication
     category: auth
     severity: notice
-    description: Successful user authentication on {_HOSTNAME}.
+    description: 'User successfully authenticated{{with value "clientTrackingEventInformation"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - clientTrackingEventInformation
@@ -670,7 +670,7 @@ traps:
     name: COLUBRIS-CLIENT-TRACKING-MIB::clientTrackingAuthenticationFailure
     category: auth
     severity: warning
-    description: Authentication failure for {clientTrackingEventInformation} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: 'Client authentication failure{{with value "clientTrackingEventInformation"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - clientTrackingEventInformation
@@ -678,15 +678,15 @@ traps:
     name: COLUBRIS-CLIENT-TRACKING-MIB::clientTrackingSuccessfulDisAssociation
     category: mobility
     severity: notice
-    description: Client disassociation from AP recorded as {clientTrackingEventInformation} on {_HOSTNAME}.
+    description: 'Client disassociated from AP{{with value "clientTrackingEventInformation"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - clientTrackingEventInformation
   - oid: 1.3.6.1.4.1.8744.5.19.2.0.8
     name: COLUBRIS-CLIENT-TRACKING-MIB::clientTrackingDisAssociationFailure
-    category: mobility
+    category: security
     severity: warning
-    description: Client disassociation failed with {clientTrackingEventInformation} on {_HOSTNAME}.
+    description: 'Client disassociation failure{{with value "clientTrackingEventInformation"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - clientTrackingEventInformation
@@ -694,7 +694,7 @@ traps:
     name: COLUBRIS-CLIENT-TRACKING-MIB::clientTrackingSuccessfulDeAuthentication
     category: mobility
     severity: notice
-    description: Client successfully deauthenticated with {clientTrackingEventInformation} on {_HOSTNAME}.
+    description: 'Client successfully deauthenticated{{with value "clientTrackingEventInformation"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - clientTrackingEventInformation
@@ -702,15 +702,15 @@ traps:
     name: COLUBRIS-CLIENT-TRACKING-MIB::clientTrackingDeAuthenticationFailure
     category: security
     severity: warning
-    description: Client deauthentication failure reported by {clientTrackingEventInformation} on {_HOSTNAME}.
+    description: 'Client deauthentication failure{{with value "clientTrackingEventInformation"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - clientTrackingEventInformation
   - oid: 1.3.6.1.4.1.8744.5.20.2.0.1
     name: COLUBRIS-WIRELESS-CLIENT-MIB::colubrisWirelessClientConnectionNotification
     category: mobility
-    severity: notice
-    description: Wireless client associated with SSID {colubrisWirelessClientSSID} on {_HOSTNAME}.
+    severity: info
+    description: Wireless client associated to SSID {{value "colubrisWirelessClientSSID"}} on {{hostname}}.
     status: current
     varbinds:
       - sysName
@@ -721,7 +721,7 @@ traps:
     name: COLUBRIS-DEVICE-MIB::coDeviceStateChangeNotification
     category: state_change
     severity: notice
-    description: Device {coDevDisSystemName} state changed to {coDevDisState} on {_HOSTNAME}.
+    description: Device state changed to {{value "coDevDisState"}} on {{hostname}}.
     status: current
     varbinds:
       - coDevDisSerialNumber
@@ -732,7 +732,7 @@ traps:
     name: COLUBRIS-DEVICE-MIB::coDeviceAuthorizationFailureNotification
     category: auth
     severity: warning
-    description: Device authentication failure detected from {coDevDisIpAddress} on {_HOSTNAME}.
+    description: Device authentication failure from {{value "coDevDisIpAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - coDevDisSerialNumber
@@ -743,7 +743,7 @@ traps:
     name: COLUBRIS-DEVICE-MIB::coDeviceSecurityFailureNotification
     category: security
     severity: warning
-    description: Device connection failure detected for {coDevDisSystemName} at {coDevDisIpAddress} on {_HOSTNAME}.
+    description: Device security failure detected{{with value "coDevDisIpAddress"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - coDevDisSerialNumber
@@ -753,8 +753,8 @@ traps:
   - oid: 1.3.6.1.4.1.8744.5.23.2.0.4
     name: COLUBRIS-DEVICE-MIB::coDeviceFirmwareFailureNotification
     category: diagnostic
-    severity: err
-    description: Device firmware failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Device firmware failure detected on {{hostname}}.
     status: current
     varbinds:
       - coDevDisSerialNumber
@@ -764,8 +764,8 @@ traps:
   - oid: 1.3.6.1.4.1.8744.5.23.2.0.5
     name: COLUBRIS-DEVICE-MIB::coDeviceConfigurationFailureNotification
     category: config_change
-    severity: err
-    description: Device configuration failure detected for {coDevDisSystemName} on {_HOSTNAME}.
+    severity: warning
+    description: Device configuration failure detected{{with value "coDevDisSystemName"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - coDevDisSerialNumber
@@ -776,7 +776,7 @@ traps:
     name: COLUBRIS-DEVICE-WIRELESS-MIB::coDeviceWirelessSNRLevelNotification
     category: diagnostic
     severity: warning
-    description: Average SNR level {coDevWirVscStaAverageSNR} below threshold for BSSID {coDevWirVscStaBSSID} on {_HOSTNAME}.
+    description: Average SNR level {{value "coDevWirVscStaAverageSNR"}} is below threshold on {{hostname}}.
     status: current
     varbinds:
       - coDevWirVscStaBSSID
@@ -786,7 +786,7 @@ traps:
     name: COLUBRIS-DEVICE-WIRELESS-MIB::coDeviceWirelessAssociationNotification
     category: mobility
     severity: notice
-    description: Wireless client {coDevWirCliStaMACAddress} associated with BSSID {coDevWirVscStaBSSID} on {_HOSTNAME}.
+    description: Wireless client {{value "coDevWirCliStaMACAddress"}} associated on {{hostname}}.
     status: current
     varbinds:
       - coDevWirCliStaMACAddress
@@ -796,7 +796,7 @@ traps:
     name: COLUBRIS-DEVICE-EVENT-MIB::coDeviceEventSuccessfulAssociation
     category: mobility
     severity: notice
-    description: Wireless client {coDevEvMacAddress} associated with SSID {coDevEvSSID} on {_HOSTNAME}.
+    description: Wireless client {{value "coDevEvMacAddress"}} associated on SSID {{value "coDevEvSSID"}} on {{hostname}}.
     status: current
     varbinds:
       - coDevEvMacAddress
@@ -807,7 +807,7 @@ traps:
     name: COLUBRIS-DEVICE-EVENT-MIB::coDeviceEventAssociationFailure
     category: mobility
     severity: warning
-    description: Wireless client {coDevEvMacAddress} failed to associate on SSID {coDevEvSSID} on {_HOSTNAME}.
+    description: Client {{value "coDevEvMacAddress"}} failed to associate on SSID {{value "coDevEvSSID"}} on {{hostname}}.
     status: current
     varbinds:
       - coDevEvMacAddress
@@ -818,7 +818,7 @@ traps:
     name: COLUBRIS-DEVICE-EVENT-MIB::coDeviceEventSuccessfulReAssociation
     category: mobility
     severity: notice
-    description: Wireless client {coDevEvMacAddress} successfully reassociated on SSID {coDevEvSSID} on {_HOSTNAME}.
+    description: Wireless client reassociated with SSID {{value "coDevEvSSID"}} on {{hostname}}.
     status: current
     varbinds:
       - coDevEvMacAddress
@@ -829,7 +829,7 @@ traps:
     name: COLUBRIS-DEVICE-EVENT-MIB::coDeviceEventReAssociationFailure
     category: mobility
     severity: warning
-    description: Client {coDevEvMacAddress} failed to reassociate on SSID {coDevEvSSID} on {_HOSTNAME}.
+    description: Client {{value "coDevEvMacAddress"}} failed to reassociate on SSID {{value "coDevEvSSID"}} on {{hostname}}.
     status: current
     varbinds:
       - coDevEvMacAddress
@@ -838,9 +838,9 @@ traps:
       - coDevEvOptionalData
   - oid: 1.3.6.1.4.1.8744.5.26.2.0.5
     name: COLUBRIS-DEVICE-EVENT-MIB::coDeviceEventSuccessfulAuthentication
-    category: auth
-    severity: notice
-    description: Client station successfully authenticated with SSID {coDevEvSSID} on {_HOSTNAME}.
+    category: mobility
+    severity: info
+    description: Wireless client successfully authenticated on {{value "coDevEvSSID"}} on {{hostname}}.
     status: current
     varbinds:
       - coDevEvMacAddress
@@ -851,7 +851,7 @@ traps:
     name: COLUBRIS-DEVICE-EVENT-MIB::coDeviceEventAuthenticationFailure
     category: auth
     severity: warning
-    description: Client authentication failure for MAC {coDevEvMacAddress} on SSID {coDevEvSSID} on {_HOSTNAME}.
+    description: Client authentication failure{{with value "coDevEvSSID"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - coDevEvMacAddress
@@ -862,7 +862,7 @@ traps:
     name: COLUBRIS-DEVICE-EVENT-MIB::coDeviceEventSuccessfulDisAssociation
     category: mobility
     severity: notice
-    description: Wireless client {coDevEvMacAddress} disassociated from SSID {coDevEvSSID} on {_HOSTNAME}.
+    description: Wireless client {{value "coDevEvMacAddress"}} disassociated from {{value "coDevEvSSID"}} on {{hostname}}.
     status: current
     varbinds:
       - coDevEvMacAddress
@@ -873,7 +873,7 @@ traps:
     name: COLUBRIS-DEVICE-EVENT-MIB::coDeviceEventDisAssociationFailure
     category: mobility
     severity: warning
-    description: Client disassociation failure for {coDevEvMacAddress} on {coDevEvSSID} on {_HOSTNAME}.
+    description: Client {{value "coDevEvMacAddress"}} failed to disassociate from AP on {{hostname}}.
     status: current
     varbinds:
       - coDevEvMacAddress
@@ -884,7 +884,7 @@ traps:
     name: COLUBRIS-DEVICE-EVENT-MIB::coDeviceEventSuccessfulDeAuthentication
     category: mobility
     severity: notice
-    description: Client {coDevEvMacAddress} successfully deauthenticated on SSID {coDevEvSSID} on {_HOSTNAME}.
+    description: Client station successfully deauthenticated{{with value "coDevEvSSID"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - coDevEvMacAddress
@@ -895,7 +895,7 @@ traps:
     name: COLUBRIS-DEVICE-EVENT-MIB::coDeviceEventDeAuthenticationFailure
     category: security
     severity: warning
-    description: Deauthentication failure for client {coDevEvMacAddress} on SSID {coDevEvSSID} on {_HOSTNAME}.
+    description: Deauthentication failure for client {{value "coDevEvMacAddress"}} on SSID {{value "coDevEvSSID"}} on {{hostname}}.
     status: current
     varbinds:
       - coDevEvMacAddress
@@ -906,7 +906,7 @@ traps:
     name: COLUBRIS-CONTROLLER-MIB::coControllerStateNotification
     category: state_change
     severity: notice
-    description: Controller {coControllerDisSerialNumber} state changed to {coControllerDisState} on {_HOSTNAME}.
+    description: Controller state changed to {{value "coControllerDisState"}} on {{hostname}}.
     status: current
     varbinds:
       - coControllerDisSerialNumber

@@ -13,8 +13,8 @@ traps:
   - oid: 1.3.6.1.4.1.731.2.2.1.0.1
     name: TMS-COMMON-MIB::tmsCommonSnmpV2TestTrap
     category: diagnostic
-    severity: debug
-    description: SNMP test trap from {tmsCommonMiscProductName} on {_HOSTNAME}.
+    severity: info
+    description: SNMP test trap received from {{value "tmsCommonMiscProductName"}} on {{hostname}}.
     status: current
     varbinds:
       - tmsCommonMiscProductName

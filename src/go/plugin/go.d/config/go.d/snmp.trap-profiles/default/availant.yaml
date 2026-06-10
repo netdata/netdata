@@ -22,7 +22,7 @@ traps:
     name: AVAM-SNMPv1::avEventNotify
     category: diagnostic
     severity: notice
-    description: Availant Manager event {avEventAgent} occurred at {avEventDateTime} on {_HOSTNAME}.
+    description: Availant Manager event occurred{{with value "avEventAgent"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - avEventDateTime

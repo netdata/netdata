@@ -14,7 +14,7 @@ traps:
     name: BEGEMOT-BRIDGE-MIB::begemotBridgeNewRoot
     category: state_change
     severity: notice
-    description: Bridge interface {begemotBridgeBaseName} became the new spanning tree root on {_HOSTNAME}.
+    description: Spanning tree root changed to bridge interface {{value "begemotBridgeBaseName"}} on {{hostname}}.
     status: current
     varbinds:
       - begemotBridgeBaseName
@@ -22,7 +22,7 @@ traps:
     name: BEGEMOT-BRIDGE-MIB::begemotBridgeTopologyChange
     category: state_change
     severity: notice
-    description: Bridge topology change detected on interface {begemotBridgeBaseName} on {_HOSTNAME}.
+    description: Bridge topology change detected on {{value "begemotBridgeBaseName"}} on {{hostname}}.
     status: current
     varbinds:
       - begemotBridgeBaseName

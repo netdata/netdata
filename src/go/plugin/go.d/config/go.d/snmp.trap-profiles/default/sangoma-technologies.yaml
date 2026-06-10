@@ -13,182 +13,182 @@ traps:
   - oid: 1.3.6.1.4.1.4686.11.0.1
     name: Vega-MIB::fileServerOrFileNotFound
     category: diagnostic
-    severity: warning
-    description: File server not found via TFTP/FTP/HTTP/HTTPS on {_HOSTNAME}.
+    severity: err
+    description: File server or file not found for autoexec on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.2
     name: Vega-MIB::scriptFileTooBig
     category: diagnostic
     severity: warning
-    description: Autoexec script file size exceeded limit on {_HOSTNAME}.
+    description: Autoexec script file is too big on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.3
     name: Vega-MIB::fileServerUnknownError
     category: diagnostic
     severity: err
-    description: File server unknown error reported on {_HOSTNAME}.
+    description: FileServer (TFTP/FTP/HTTP/HTTPS) unknown error reported on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.4
     name: Vega-MIB::fileDoesNotExist
     category: diagnostic
-    severity: warning
-    description: File not found or invalid filename reported on {_HOSTNAME}.
+    severity: err
+    description: File does not exist on FileServer or invalid filename on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.5
     name: Vega-MIB::recurFileServerGetError
     category: diagnostic
     severity: warning
-    description: Recursive FileServer get error occurred on {_HOSTNAME}.
+    description: Recursive FileServer get error occurred on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.6
     name: Vega-MIB::fileServerGetMemoryError
     category: diagnostic
     severity: warning
-    description: Memory error occurred due to insufficient memory for file transfer on {_HOSTNAME}.
+    description: Memory error occurred on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.7
     name: Vega-MIB::lanInterfaceNotActive
     category: state_change
     severity: warning
-    description: LAN interface entity is not active on {_HOSTNAME}.
+    description: LAN interface entity is not active on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.8
     name: Vega-MIB::ftpNotConfigured
     category: config_change
     severity: warning
-    description: FTP is not configured on {_HOSTNAME}.
+    description: FTP is not configured on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.9
     name: Vega-MIB::invalidUserParams
     category: auth
     severity: warning
-    description: SNMP authentication failure due to invalid user parameters on {_HOSTNAME}.
+    description: Invalid SNMP user parameters detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.10
     name: Vega-MIB::serverUnavailable
     category: diagnostic
-    severity: warning
-    description: FTP/TFTP/HTTP/HTTPS server unavailable on {_HOSTNAME}.
+    severity: crit
+    description: FTP/TFTP/HTTP/HTTPS server is unavailable on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.11
     name: Vega-MIB::systemNotReady
     category: diagnostic
-    severity: crit
-    description: System not ready and unable to execute AUTOEXEC on {_HOSTNAME}.
+    severity: warning
+    description: System not ready and unable to action AUTOEXEC on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.12
     name: Vega-MIB::tftpNotConfigured
-    category: config_change
+    category: diagnostic
     severity: warning
-    description: TFTP configuration is not set on {_HOSTNAME}.
+    description: TFTP is not configured because the TFTP IP address is 0.0.0.0 on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.13
     name: Vega-MIB::httpNotConfigured
     category: config_change
     severity: warning
-    description: HTTP is not configured with an IP address on {_HOSTNAME}.
+    description: HTTP is not configured on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.14
     name: Vega-MIB::httpsNotConfigured
     category: config_change
     severity: warning
-    description: HTTPS configuration is not set on {_HOSTNAME}.
+    description: HTTPS is not configured on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.21
     name: Vega-MIB::configNotLoaded
     category: config_change
     severity: warning
-    description: Configuration not loaded due to remote file mismatch on {_HOSTNAME}.
+    description: Configuration not loaded due to file mismatch on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.22
     name: Vega-MIB::firmwareNotLoaded
     category: diagnostic
     severity: warning
-    description: Firmware not loaded on {_HOSTNAME}.
+    description: Firmware not loaded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.23
     name: Vega-MIB::configLoaded
     category: config_change
     severity: notice
-    description: Remote configuration loaded on {_HOSTNAME}.
+    description: Remote configuration loaded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.24
     name: Vega-MIB::firmwareLoaded
     category: config_change
     severity: notice
-    description: Firmware loaded on {_HOSTNAME}.
+    description: Firmware loaded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.25
     name: Vega-MIB::bypassRelayActivated
     category: state_change
-    severity: notice
-    description: Bypass relay activated for ongoing emergency call on {_HOSTNAME}.
+    severity: alert
+    description: Bypass relay activated for ongoing emergency call on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.30
     name: Vega-MIB::pktLossThresholdExceed
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Packet loss threshold exceeded on {_HOSTNAME}.
+    description: Gateway packet loss threshold has been exceeded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.31
     name: Vega-MIB::playoutThresholdExceed
     category: diagnostic
     severity: warning
-    description: Gateway play-out delay threshold exceeded on {_HOSTNAME}.
+    description: Gateway play-out delay threshold has been exceeded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.32
     name: Vega-MIB::jitterThresholdExceed
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Average jitter threshold exceeded on {_HOSTNAME}.
+    description: Average jitter threshold has been exceeded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.40
     name: Vega-MIB::sysFanFailed
     category: diagnostic
     severity: crit
-    description: All system fans failed on {_HOSTNAME}.
+    description: All system fans have failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.41
     name: Vega-MIB::sysFanOK
     category: diagnostic
     severity: notice
-    description: System fan status returned to OK on {_HOSTNAME}.
+    description: System fan status returned to OK on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.42
     name: Vega-MIB::sysOverTempIndication
     category: diagnostic
     severity: warning
-    description: Over temperature indication detected on {_HOSTNAME}.
+    description: Over temperature indication detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.43
     name: Vega-MIB::sysOverTempOK
     category: diagnostic
     severity: notice
-    description: Over temperature condition cleared on {_HOSTNAME}.
+    description: Over temperature condition cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.44
     name: Vega-MIB::sysOverPower
     category: diagnostic
     severity: warning
-    description: Excessive power consumption detected on {_HOSTNAME}.
+    description: Excessive power consumption detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.45
     name: Vega-MIB::sysOverPowerOK
     category: diagnostic
     severity: notice
-    description: Power usage returned to OK state on {_HOSTNAME}.
+    description: Power usage returned to normal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.46
     name: Vega-MIB::fxsPortShutDown
     category: diagnostic
     severity: warning
-    description: FXS port shut down due to thermal heating on {_HOSTNAME}.
+    description: FXS port shut down due to thermal heating on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4686.11.0.50
     name: Vega-MIB::sipRegistrationSuccess
     category: state_change
     severity: notice
-    description: SIP registration succeeded on {_HOSTNAME}.
+    description: SIP registration succeeded on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -196,7 +196,7 @@ traps:
     name: Vega-MIB::sipRegistrationFailure
     category: auth
     severity: warning
-    description: SIP registration failure detected on {_HOSTNAME}.
+    description: SIP registration failure detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -204,7 +204,7 @@ traps:
     name: Vega-MIB::sipUnRegistered
     category: state_change
     severity: warning
-    description: SIP registration lost on {_HOSTNAME}.
+    description: SIP registration lost for {{first (value "sysDescr") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -212,7 +212,7 @@ traps:
     name: Vega-MIB::iSDNLinkUp
     category: state_change
     severity: notice
-    description: ISDN link is up on {_HOSTNAME}.
+    description: ISDN link went up on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -220,7 +220,7 @@ traps:
     name: Vega-MIB::iSDNLinkDown
     category: state_change
     severity: warning
-    description: ISDN link down on {_HOSTNAME}.
+    description: ISDN link went down on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -228,7 +228,7 @@ traps:
     name: Vega-MIB::lANLinkUp
     category: state_change
     severity: notice
-    description: LAN link became active on {_HOSTNAME}.
+    description: LAN link went up on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -236,7 +236,7 @@ traps:
     name: Vega-MIB::lANLinkDown
     category: state_change
     severity: warning
-    description: LAN link down detected on {_HOSTNAME}.
+    description: LAN link went down on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -244,7 +244,7 @@ traps:
     name: Vega-MIB::cOLDSTART
     category: state_change
     severity: notice
-    description: System cold start detected on {_HOSTNAME}.
+    description: System cold start detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -252,15 +252,15 @@ traps:
     name: Vega-MIB::wARMSTART
     category: diagnostic
     severity: notice
-    description: Device warm start detected on {_HOSTNAME}.
+    description: System warm restart detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
   - oid: 1.3.6.1.4.1.4686.11.0.66
     name: Vega-MIB::dspFatalError
     category: diagnostic
-    severity: alert
-    description: DSP fatal error triggered device reboot on {_HOSTNAME}.
+    severity: crit
+    description: DSP fatal error occurred, triggering a Vega reboot on {{hostname}}.
     status: current
     varbinds:
       - sysDescr

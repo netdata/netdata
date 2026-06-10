@@ -47,7 +47,7 @@ traps:
     name: DCS-MIB::systemAlarmTrapDefine
     category: diagnostic
     severity: warning
-    description: Alarm {systemAlarmId} status changed to {systemAlarmStatusChange} with severity {systemAlarmSeverity} on {_HOSTNAME}.
+    description: System alarm {{value "systemAlarmDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - systemAlarmIndex

@@ -338,21 +338,21 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.2185.1.3.12.1
     name: IMCO-BIG-MIB::imco3TrapNoDevice
-    category: unknown
-    severity: notice
-    description: Trap {TRAP_NAME} received with no device context on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: No device detected on {{trap_interface}} on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2185.1.3.12.2
     name: IMCO-BIG-MIB::imco3TrapOnBattery
     category: diagnostic
-    severity: warning
-    description: Device switched to battery power on {_HOSTNAME}.
+    severity: alert
+    description: Device switched to battery power on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2185.1.3.12.3
     name: IMCO-BIG-MIB::imco3TrapNewAlarm
     category: diagnostic
     severity: warning
-    description: Alarm {imco3AlarmDescr} detected at {imco3AlarmTime} on {_HOSTNAME}.
+    description: Alarm {{value "imco3AlarmDescr"}} detected on {{hostname}}.
     status: current
     varbinds:
       - imco3AlarmDescr
@@ -362,7 +362,7 @@ traps:
     name: IMCO-BIG-MIB::imco3TrapAlarmEnd
     category: diagnostic
     severity: warning
-    description: Alarm condition {imco3AlarmDescr} ended at {imco3AlarmTime} on {_HOSTNAME}.
+    description: 'Alarm condition ended{{with value "imco3AlarmDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - imco3AlarmDescr
@@ -372,7 +372,7 @@ traps:
     name: IMCO-BIG-MIB::imco3TrapAlarmOut1ON
     category: diagnostic
     severity: warning
-    description: Alarm triggered for PM identifier {imco3IdentPMnumber} on {_HOSTNAME}.
+    description: Alarm 1 is active for PM number {{value "imco3IdentPMnumber"}} on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber
@@ -380,7 +380,7 @@ traps:
     name: IMCO-BIG-MIB::imco3TrapAlarmOut2ON
     category: diagnostic
     severity: warning
-    description: Alarm triggered for PM number {imco3IdentPMnumber} on {_HOSTNAME}.
+    description: Alarm triggered for PM number {{value "imco3IdentPMnumber"}} on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber
@@ -388,7 +388,7 @@ traps:
     name: IMCO-BIG-MIB::imco3TrapAlarmOut3ON
     category: diagnostic
     severity: warning
-    description: Alarm triggered for PM index {imco3IdentPMnumber} on {_HOSTNAME}.
+    description: Alarm out 3 is active on PM {{value "imco3IdentPMnumber"}} on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber
@@ -396,7 +396,7 @@ traps:
     name: IMCO-BIG-MIB::imco3TrapAlarmOut4ON
     category: diagnostic
     severity: warning
-    description: Alarm triggered for PM number {imco3IdentPMnumber} on {_HOSTNAME}.
+    description: Alarm out 4 is active on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber
@@ -404,7 +404,7 @@ traps:
     name: IMCO-BIG-MIB::imco3TrapAlarmOut5ON
     category: diagnostic
     severity: warning
-    description: Alarm triggered for PM identifier {imco3IdentPMnumber} on {_HOSTNAME}.
+    description: Alarm out 5 is active for PM number {{value "imco3IdentPMnumber"}} on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber
@@ -412,7 +412,7 @@ traps:
     name: IMCO-BIG-MIB::imco3TrapAlarmOut6ON
     category: diagnostic
     severity: warning
-    description: Alarm triggered for performance monitor {imco3IdentPMnumber} on {_HOSTNAME}.
+    description: Alarm out 6 is active for PM number {{value "imco3IdentPMnumber"}} on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber
@@ -420,7 +420,7 @@ traps:
     name: IMCO-BIG-MIB::imco3TrapAlarmOut7ON
     category: diagnostic
     severity: warning
-    description: Alarm triggered for PM number {imco3IdentPMnumber} on {_HOSTNAME}.
+    description: Alarm out 7 is active on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber
@@ -428,7 +428,7 @@ traps:
     name: IMCO-BIG-MIB::imco3TrapAlarmOut8ON
     category: diagnostic
     severity: warning
-    description: Alarm triggered for PM number {imco3IdentPMnumber} on {_HOSTNAME}.
+    description: Alarm out 8 ON detected with PM number {{value "imco3IdentPMnumber"}} on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber
@@ -436,7 +436,7 @@ traps:
     name: IMCO-BIG-MIB::imco3TrapAlarmOut1OFF
     category: diagnostic
     severity: warning
-    description: Alarm out1 turned off for PM number {imco3IdentPMnumber} on {_HOSTNAME}.
+    description: Alarm out 1 is off for PM number {{value "imco3IdentPMnumber"}} on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber
@@ -444,7 +444,7 @@ traps:
     name: IMCO-BIG-MIB::imco3TrapAlarmOut2OFF
     category: diagnostic
     severity: warning
-    description: Alarm triggered for PM number {imco3IdentPMnumber} on {_HOSTNAME}.
+    description: Alarm out 2 off detected for PM {{value "imco3IdentPMnumber"}} on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber
@@ -452,7 +452,7 @@ traps:
     name: IMCO-BIG-MIB::imco3TrapAlarmOut3OFF
     category: diagnostic
     severity: warning
-    description: Alarm out 3 OFF detected on PM {imco3IdentPMnumber} on {_HOSTNAME}.
+    description: Alarm out 3 is off for PM number {{value "imco3IdentPMnumber"}} on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber
@@ -460,7 +460,7 @@ traps:
     name: IMCO-BIG-MIB::imco3TrapAlarmOut4OFF
     category: diagnostic
     severity: warning
-    description: Alarm triggered for PM index {imco3IdentPMnumber} on {_HOSTNAME}.
+    description: Alarm out 4 is off for PM number {{value "imco3IdentPMnumber"}} on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber
@@ -468,7 +468,7 @@ traps:
     name: IMCO-BIG-MIB::imco3TrapAlarmOut5OFF
     category: diagnostic
     severity: warning
-    description: Alarm out5 triggered for PM number {imco3IdentPMnumber} on {_HOSTNAME}.
+    description: Alarm 5 OFF detected on PM {{value "imco3IdentPMnumber"}} on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber
@@ -476,7 +476,7 @@ traps:
     name: IMCO-BIG-MIB::imco3TrapAlarmOut6OFF
     category: diagnostic
     severity: warning
-    description: Alarm triggered for PM number {imco3IdentPMnumber} on {_HOSTNAME}.
+    description: Alarm out 6 is off on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber
@@ -484,7 +484,7 @@ traps:
     name: IMCO-BIG-MIB::imco3TrapAlarmOut7OFF
     category: diagnostic
     severity: warning
-    description: Alarm triggered for PM identifier {imco3IdentPMnumber} on {_HOSTNAME}.
+    description: Alarm out7 OFF detected on PM number {{value "imco3IdentPMnumber"}} on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber
@@ -492,23 +492,23 @@ traps:
     name: IMCO-BIG-MIB::imco3TrapAlarmOut8OFF
     category: diagnostic
     severity: warning
-    description: Alarm out8 OFF detected for PM number {imco3IdentPMnumber} on {_HOSTNAME}.
+    description: Alarm out 8 OFF detected on PM {{value "imco3IdentPMnumber"}} on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber
   - oid: 1.3.6.1.4.1.2185.1.3.12.30
     name: IMCO-BIG-MIB::imco3TrapTestCAPstart
     category: diagnostic
-    severity: notice
-    description: Performance monitoring identification {imco3IdentPMnumber} started on {_HOSTNAME}.
+    severity: info
+    description: CAP start diagnostic event with PM number {{value "imco3IdentPMnumber"}} on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber
   - oid: 1.3.6.1.4.1.2185.1.3.12.31
     name: IMCO-BIG-MIB::imco3TrapTestCAPstop
-    category: unknown
-    severity: warning
-    description: Trap {TRAP_NAME} received with no clear meaning on {_HOSTNAME}.
+    category: diagnostic
+    severity: notice
+    description: CAP stop diagnostic event detected with PM number {{value "imco3IdentPMnumber"}} on {{hostname}}.
     status: current
     varbinds:
       - imco3IdentPMnumber

@@ -305,7 +305,7 @@ traps:
     name: CRI-SERVER-MIB::domainChange
     category: config_change
     severity: notice
-    description: Domain table changed with {confNumDomain} domains on {_HOSTNAME}.
+    description: Domain table changed with {{value "confNumDomain"}} domains on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -319,8 +319,8 @@ traps:
   - oid: 1.3.6.1.4.1.34.0.1
     name: CRI-SERVER-MIB::eddControl
     category: diagnostic
-    severity: notice
-    description: EDD control action {sspPlatformAppEddControl} triggered for platform {platformName} on {_HOSTNAME}.
+    severity: warning
+    description: EDD control action {{value "sspPlatformAppEddControl"}} requested on {{first (value "platformName") "platform"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -329,7 +329,7 @@ traps:
     name: CRI-SERVER-MIB::eddState
     category: diagnostic
     severity: warning
-    description: Event Detector Daemon state changed to {sspPlatformAppEddState} on {_HOSTNAME}.
+    description: Event Detector Daemon state changed to {{value "sspPlatformAppEddState"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -338,7 +338,7 @@ traps:
     name: CRI-SERVER-MIB::sysBrdTempNorm
     category: diagnostic
     severity: notice
-    description: System board temperature returned to normal on {_HOSTNAME}.
+    description: System board temperature returned to normal on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -359,7 +359,7 @@ traps:
     name: CRI-SERVER-MIB::sysBrdTempHigh
     category: diagnostic
     severity: warning
-    description: System board high temperature detected on {_HOSTNAME}.
+    description: System board high temperature detected on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -380,7 +380,7 @@ traps:
     name: CRI-SERVER-MIB::sysBrdTempWarn
     category: diagnostic
     severity: warning
-    description: System board temperature warning on {_HOSTNAME}.
+    description: System board temperature warning on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -401,7 +401,7 @@ traps:
     name: CRI-SERVER-MIB::sysBrdTempMax
     category: diagnostic
     severity: warning
-    description: System board temperature threshold exceeded on {_HOSTNAME}.
+    description: System board {{value "sysBrdStarfireNum"}} temperature threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -422,7 +422,7 @@ traps:
     name: CRI-SERVER-MIB::sysBrdTemp911
     category: diagnostic
     severity: warning
-    description: System board temperature threshold exceeded on {_HOSTNAME}.
+    description: System board {{value "sysBrdStarfireNum"}} temperature threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -442,8 +442,8 @@ traps:
   - oid: 1.3.6.1.4.1.34.0.8
     name: CRI-SERVER-MIB::sysBrdTempBad
     category: diagnostic
-    severity: crit
-    description: System board temperature sensors report invalid readings on {_HOSTNAME}.
+    severity: warning
+    description: System board temperature sensors report invalid readings on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -463,8 +463,8 @@ traps:
   - oid: 1.3.6.1.4.1.34.0.9
     name: CRI-SERVER-MIB::sysBrdTempChange
     category: diagnostic
-    severity: warning
-    description: System board temperature changed on {_HOSTNAME}.
+    severity: notice
+    description: System board temperature changed on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -485,7 +485,7 @@ traps:
     name: CRI-SERVER-MIB::cbTempNorm
     category: diagnostic
     severity: notice
-    description: Control board {cbStarfireNum} temperature returned to normal on {_HOSTNAME}.
+    description: Control board {{value "cbStarfireNum"}} temperature returned to normal on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -500,7 +500,7 @@ traps:
     name: CRI-SERVER-MIB::cbTempHigh
     category: diagnostic
     severity: warning
-    description: Control board {cbStarfireNum} high temperature detected on {_HOSTNAME}.
+    description: Control board {{value "cbStarfireNum"}} high temperature detected on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -515,7 +515,7 @@ traps:
     name: CRI-SERVER-MIB::cbTempWarn
     category: diagnostic
     severity: warning
-    description: Control board {cbStarfireNum} temperature warning on {_HOSTNAME}.
+    description: Control board {{value "cbStarfireNum"}} temperature warning on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -530,7 +530,7 @@ traps:
     name: CRI-SERVER-MIB::cbTempMax
     category: diagnostic
     severity: warning
-    description: Control board {cbStarfireNum} temperature threshold exceeded on {_HOSTNAME}.
+    description: Control board {{value "cbStarfireNum"}} temperature threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -545,7 +545,7 @@ traps:
     name: CRI-SERVER-MIB::cbTemp911
     category: diagnostic
     severity: warning
-    description: Control board {cbStarfireNum} temperature threshold exceeded on {_HOSTNAME}.
+    description: Control board {{value "cbStarfireNum"}} temperature threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -560,7 +560,7 @@ traps:
     name: CRI-SERVER-MIB::cbTempBad
     category: diagnostic
     severity: warning
-    description: Control board {cbStarfireNum} reported bad temperature reading on {_HOSTNAME}.
+    description: Control board {{value "cbStarfireNum"}} reports bad temperature readings on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -575,7 +575,7 @@ traps:
     name: CRI-SERVER-MIB::cbTempChange
     category: diagnostic
     severity: warning
-    description: Control board {cbStarfireNum} temperature reading changed on {_HOSTNAME}.
+    description: Control board temperature threshold crossed on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -590,7 +590,7 @@ traps:
     name: CRI-SERVER-MIB::centerplaneTempNorm
     category: diagnostic
     severity: notice
-    description: Temperature reading returned to normal for platform {platformName} on {_HOSTNAME}.
+    description: Temperature returned to normal on {{value "platformName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -609,7 +609,7 @@ traps:
     name: CRI-SERVER-MIB::centerplaneTempHigh
     category: diagnostic
     severity: warning
-    description: High temperature detected on platform {platformName} on {_HOSTNAME}.
+    description: High temperature detected on {{value "platformName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -628,7 +628,7 @@ traps:
     name: CRI-SERVER-MIB::centerplaneTempWarn
     category: diagnostic
     severity: warning
-    description: Temperature warning on platform {platformName} with readings {centerplaneStarfireTemp0} on {_HOSTNAME}.
+    description: Temperature warning on {{value "platformName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -647,7 +647,7 @@ traps:
     name: CRI-SERVER-MIB::centerplaneTempMax
     category: diagnostic
     severity: warning
-    description: Temperature threshold exceeded on {platformName} on {_HOSTNAME}.
+    description: Temperature threshold exceeded on {{value "platformName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -666,7 +666,7 @@ traps:
     name: CRI-SERVER-MIB::centerplaneTemp911
     category: diagnostic
     severity: warning
-    description: Temperature threshold exceeded on platform {platformName} on {_HOSTNAME}.
+    description: Temperature threshold exceeded on {{value "platformName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -684,8 +684,8 @@ traps:
   - oid: 1.3.6.1.4.1.34.0.22
     name: CRI-SERVER-MIB::centerplaneTempBad
     category: diagnostic
-    severity: warning
-    description: Bad temperature reading detected on {platformName} on {_HOSTNAME}.
+    severity: crit
+    description: Bad temperature reading detected on {{value "platformName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -703,8 +703,8 @@ traps:
   - oid: 1.3.6.1.4.1.34.0.23
     name: CRI-SERVER-MIB::centerplaneTempChange
     category: diagnostic
-    severity: notice
-    description: Temperature reading changed on platform {platformName} on {_HOSTNAME}.
+    severity: warning
+    description: Temperature threshold crossed on {{value "platformName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -723,7 +723,7 @@ traps:
     name: CRI-SERVER-MIB::cbeConnected
     category: state_change
     severity: notice
-    description: Control board server connected to executive on {_HOSTNAME}.
+    description: Control board server connected to executive on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -733,7 +733,7 @@ traps:
     name: CRI-SERVER-MIB::cbeDisconnected
     category: diagnostic
     severity: crit
-    description: Control board server lost connection with control board executive on {_HOSTNAME}.
+    description: Control board server lost connection with control board executive on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -743,7 +743,7 @@ traps:
     name: CRI-SERVER-MIB::suppBrdTempNorm
     category: diagnostic
     severity: notice
-    description: Support board {suppBrdStarfireNum} temperature returned to normal on {_HOSTNAME}.
+    description: Support board {{value "suppBrdStarfireNum"}} temperature returned to normal on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -754,7 +754,7 @@ traps:
     name: CRI-SERVER-MIB::suppBrdTempHigh
     category: diagnostic
     severity: warning
-    description: High temperature detected on support board {suppBrdStarfireNum} with reading {suppBrdStarfire3p3VDC1Temp} on {_HOSTNAME}.
+    description: High temperature detected on support board {{value "suppBrdStarfireNum"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -765,7 +765,7 @@ traps:
     name: CRI-SERVER-MIB::suppBrdTempWarn
     category: diagnostic
     severity: warning
-    description: Support board {suppBrdStarfireNum} temperature warning on {platformName} on {_HOSTNAME}.
+    description: Support board {{value "suppBrdStarfireNum"}} on {{value "platformName"}} reported high temperature on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -776,7 +776,7 @@ traps:
     name: CRI-SERVER-MIB::suppBrdTempMax
     category: diagnostic
     severity: warning
-    description: Support board {suppBrdStarfireNum} temperature exceeded threshold on {_HOSTNAME}.
+    description: Support board {{value "suppBrdStarfireNum"}} on {{value "platformName"}} exceeded max temperature threshold on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -787,7 +787,7 @@ traps:
     name: CRI-SERVER-MIB::suppBrdTemp911
     category: diagnostic
     severity: warning
-    description: Temperature threshold exceeded on support board {suppBrdStarfireNum} with reading {suppBrdStarfire3p3VDC1Temp} on {_HOSTNAME}.
+    description: Support board {{value "suppBrdStarfireNum"}} temperature threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -798,7 +798,7 @@ traps:
     name: CRI-SERVER-MIB::suppBrdTempBad
     category: diagnostic
     severity: warning
-    description: Support board {suppBrdStarfireNum} reported bad temperature reading on {_HOSTNAME}.
+    description: Support board {{value "suppBrdStarfireNum"}} on {{value "platformName"}} reports bad temperature readings on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -809,7 +809,7 @@ traps:
     name: CRI-SERVER-MIB::suppBrdTempChange
     category: diagnostic
     severity: warning
-    description: Support board {suppBrdStarfireNum} temperature changed on {_HOSTNAME}.
+    description: Support board temperature threshold crossed on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -820,7 +820,7 @@ traps:
     name: CRI-SERVER-MIB::sysBrdVoltNorm
     category: diagnostic
     severity: notice
-    description: System board voltage returned to normal on {_HOSTNAME}.
+    description: System board voltage returned to normal on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -834,7 +834,7 @@ traps:
     name: CRI-SERVER-MIB::sysBrdVoltMax
     category: diagnostic
     severity: warning
-    description: System board {sysBrdStarfireNum} voltage threshold exceeded on {_HOSTNAME}.
+    description: System board voltage threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -848,7 +848,7 @@ traps:
     name: CRI-SERVER-MIB::sysBrdVoltMin
     category: diagnostic
     severity: warning
-    description: System board voltage threshold crossed on {_HOSTNAME}.
+    description: System board voltage threshold crossed on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -861,8 +861,8 @@ traps:
   - oid: 1.3.6.1.4.1.34.0.36
     name: CRI-SERVER-MIB::sysBrdVoltBad
     category: diagnostic
-    severity: err
-    description: System board {sysBrdStarfireNum} reported bad voltage readings on {_HOSTNAME}.
+    severity: crit
+    description: System board voltage sensors report invalid readings on {{value "platformName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -876,7 +876,7 @@ traps:
     name: CRI-SERVER-MIB::sysBrdVoltChange
     category: diagnostic
     severity: warning
-    description: System board voltage reading changed on {_HOSTNAME}.
+    description: System board voltage reading changed on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -890,7 +890,7 @@ traps:
     name: CRI-SERVER-MIB::cbVoltNorm
     category: diagnostic
     severity: notice
-    description: Control board {cbStarfireNum} voltage returned to normal on {_HOSTNAME}.
+    description: Control board {{value "cbStarfireNum"}} voltage returned to normal on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -904,7 +904,7 @@ traps:
     name: CRI-SERVER-MIB::cbVoltMax
     category: diagnostic
     severity: warning
-    description: Control board {cbStarfireNum} voltage threshold exceeded on {_HOSTNAME}.
+    description: Control board {{value "cbStarfireNum"}} voltage threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -918,7 +918,7 @@ traps:
     name: CRI-SERVER-MIB::cbVoltMin
     category: diagnostic
     severity: warning
-    description: Control board {cbStarfireNum} voltage {cbStarfire5VDC} crossed threshold on {_HOSTNAME}.
+    description: Control board {{value "cbStarfireNum"}} voltage threshold crossed on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -931,8 +931,8 @@ traps:
   - oid: 1.3.6.1.4.1.34.0.41
     name: CRI-SERVER-MIB::cbVoltBad
     category: diagnostic
-    severity: err
-    description: Control board {cbStarfireNum} reported bad voltage readings on {_HOSTNAME}.
+    severity: warning
+    description: Control board {{value "cbStarfireNum"}} on {{value "platformName"}} reports bad voltage readings on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -946,7 +946,7 @@ traps:
     name: CRI-SERVER-MIB::cbVoltChange
     category: diagnostic
     severity: warning
-    description: Control board {cbStarfireNum} voltage reading changed on {_HOSTNAME}.
+    description: Control board voltage reading changed on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -960,7 +960,7 @@ traps:
     name: CRI-SERVER-MIB::centerplaneVoltNorm
     category: diagnostic
     severity: notice
-    description: Voltage reading returned to normal for platform {platformName} on {_HOSTNAME}.
+    description: Voltage reading returned to normal on {{value "platformName"}} board {{value "centerplaneStarfireNum"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -969,7 +969,7 @@ traps:
     name: CRI-SERVER-MIB::centerplaneVoltMax
     category: diagnostic
     severity: warning
-    description: Max voltage threshold exceeded for platform {platformName} unit {centerplaneStarfireNum} on {_HOSTNAME}.
+    description: Centerplane max voltage threshold exceeded on {{value "platformName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -978,7 +978,7 @@ traps:
     name: CRI-SERVER-MIB::centerplaneVoltMin
     category: diagnostic
     severity: warning
-    description: Min voltage threshold crossed on platform {platformName} unit {centerplaneStarfireNum} on {_HOSTNAME}.
+    description: Centerplane voltage threshold crossed on {{value "platformName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -987,7 +987,7 @@ traps:
     name: CRI-SERVER-MIB::centerplaneVoltBad
     category: diagnostic
     severity: warning
-    description: Bad voltage reading detected on platform {platformName} board {centerplaneStarfireNum} on {_HOSTNAME}.
+    description: Bad voltage reading detected on {{value "platformName"}} board {{value "centerplaneStarfireNum"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -995,8 +995,8 @@ traps:
   - oid: 1.3.6.1.4.1.34.0.47
     name: CRI-SERVER-MIB::centerplaneVoltChange
     category: diagnostic
-    severity: notice
-    description: Voltage reading changed on platform {platformName} board {centerplaneStarfireNum} on {_HOSTNAME}.
+    severity: warning
+    description: Centerplane voltage reading changed on {{value "platformName"}} board {{value "centerplaneStarfireNum"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1005,7 +1005,7 @@ traps:
     name: CRI-SERVER-MIB::suppBrdVoltNorm
     category: diagnostic
     severity: notice
-    description: Support board voltage returned to normal on {_HOSTNAME}.
+    description: Support board voltage returned to normal on {{value "platformName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1016,7 +1016,7 @@ traps:
     name: CRI-SERVER-MIB::suppBrdVoltMax
     category: diagnostic
     severity: warning
-    description: Support board voltage threshold exceeded on {platformName} board {suppBrdStarfireNum} on {_HOSTNAME}.
+    description: Support board {{value "suppBrdStarfireNum"}} voltage threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1027,7 +1027,7 @@ traps:
     name: CRI-SERVER-MIB::suppBrdVoltMin
     category: diagnostic
     severity: warning
-    description: Support board {suppBrdStarfireNum} voltage {suppBrdStarfire5VDCHK} on {platformName} crossed threshold on {_HOSTNAME}.
+    description: Support board {{value "suppBrdStarfireNum"}} voltage threshold crossed on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1038,7 +1038,7 @@ traps:
     name: CRI-SERVER-MIB::suppBrdVoltBad
     category: diagnostic
     severity: warning
-    description: Support board {suppBrdStarfireNum} reported bad voltage readings on {_HOSTNAME}.
+    description: Support board {{value "suppBrdStarfireNum"}} on {{value "platformName"}} has bad voltage readings on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1049,7 +1049,7 @@ traps:
     name: CRI-SERVER-MIB::suppBrdVoltChange
     category: diagnostic
     severity: warning
-    description: Voltage reading changed on platform {platformName} board {suppBrdStarfireNum} on {_HOSTNAME}.
+    description: Support board voltage threshold crossed on {{value "platformName"}} board {{value "suppBrdStarfireNum"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1060,7 +1060,7 @@ traps:
     name: CRI-SERVER-MIB::fanNorm
     category: diagnostic
     severity: notice
-    description: Fan {fanGenNum} in slot {fanGenTraySlotNum} transitioned to normal status on {_HOSTNAME}.
+    description: Fan {{value "fanGenNum"}} in slot {{value "fanGenTraySlotNum"}} returned to normal on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1070,8 +1070,8 @@ traps:
   - oid: 1.3.6.1.4.1.34.0.54
     name: CRI-SERVER-MIB::fanFail
     category: diagnostic
-    severity: err
-    description: Fan {fanGenNum} in tray slot {fanGenTraySlotNum} failed on {_HOSTNAME}.
+    severity: crit
+    description: Fan failure detected on fan {{value "fanGenNum"}} in tray slot {{value "fanGenTraySlotNum"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1081,7 +1081,7 @@ traps:
     name: CRI-SERVER-MIB::systemConfigurationChange
     category: config_change
     severity: notice
-    description: System configuration changed with updated board and processor lists on {_HOSTNAME}.
+    description: System configuration changed{{with value "platformName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1093,18 +1093,18 @@ traps:
       - confBulkPowerList
   - oid: 1.3.6.1.4.1.34.0.56
     name: CRI-SERVER-MIB::arbitrationStop
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Arbitration stopped for domain {domainName} on {_HOSTNAME}.
+    description: Arbitration stop occurred on domain {{value "domainName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
       - domainName
   - oid: 1.3.6.1.4.1.34.0.57
     name: CRI-SERVER-MIB::recordStop
-    category: state_change
-    severity: notice
-    description: Record stop event for domain {domainName} on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: Record stop occurred on domain {{value "domainName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1112,8 +1112,8 @@ traps:
   - oid: 1.3.6.1.4.1.34.0.58
     name: CRI-SERVER-MIB::watchdog
     category: diagnostic
-    severity: warning
-    description: Watchdog event detected on domain {domainName} on {_HOSTNAME}.
+    severity: alert
+    description: Watchdog event detected on {{first (value "platformName") "platform"}} domain {{value "domainName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1122,16 +1122,16 @@ traps:
     name: CRI-SERVER-MIB::environmentalShutdown
     category: diagnostic
     severity: emerg
-    description: Environmental shutdown detected on platform {platformName} domain {domainName} on {_HOSTNAME}.
+    description: Environmental shutdown detected on {{first (value "platformName") "platform"}} domain {{first (value "domainName") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
       - domainName
   - oid: 1.3.6.1.4.1.34.0.60
     name: CRI-SERVER-MIB::reboot
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: System rebooted on domain {domainName} on {_HOSTNAME}.
+    description: System reboot detected on {{first (value "platformName") "platform"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1140,7 +1140,7 @@ traps:
     name: CRI-SERVER-MIB::panic1
     category: diagnostic
     severity: emerg
-    description: Panic1 detected on platform {platformName} in domain {domainName} on {_HOSTNAME}.
+    description: System panic occurred on {{value "platformName"}} in domain {{value "domainName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1149,7 +1149,7 @@ traps:
     name: CRI-SERVER-MIB::panic2
     category: diagnostic
     severity: emerg
-    description: Panic2 detected on platform {platformName} in domain {domainName} on {_HOSTNAME}.
+    description: System panic occurred on platform {{value "platformName"}} in domain {{value "domainName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1157,8 +1157,8 @@ traps:
   - oid: 1.3.6.1.4.1.34.0.63
     name: CRI-SERVER-MIB::panicReboot
     category: diagnostic
-    severity: alert
-    description: Panic reboot detected on platform {platformName} in domain {domainName} on {_HOSTNAME}.
+    severity: emerg
+    description: System panic reboot occurred on {{first (value "platformName") "platform"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1167,7 +1167,7 @@ traps:
     name: CRI-SERVER-MIB::heartbeatFailure
     category: diagnostic
     severity: alert
-    description: Heartbeat failure detected for platform {platformName} in domain {domainName} on {_HOSTNAME}.
+    description: Heartbeat failure detected for domain {{value "domainName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1176,7 +1176,7 @@ traps:
     name: CRI-SERVER-MIB::signatureBlockChange
     category: diagnostic
     severity: warning
-    description: Signature block changed for {platformName} with program state {procStateGenPgmState} on {_HOSTNAME}.
+    description: Processor program signature changed to {{value "procStateGenPgmSignature"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1187,17 +1187,17 @@ traps:
   - oid: 1.3.6.1.4.1.34.0.66
     name: CRI-SERVER-MIB::sysbrdPowerOff
     category: diagnostic
-    severity: crit
-    description: System board {sysBrdGenNum} on {platformName} has been powered off on {_HOSTNAME}.
+    severity: alert
+    description: System board {{value "sysBrdGenNum"}} on {{value "platformName"}} powered off on {{hostname}}.
     status: current
     varbinds:
       - platformName
       - sysBrdGenNum
   - oid: 1.3.6.1.4.1.34.0.67
     name: CRI-SERVER-MIB::sysbrdPowerOn
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: System board {sysBrdGenNum} on {platformName} powered on on {_HOSTNAME}.
+    description: System board {{value "sysBrdGenNum"}} on {{value "platformName"}} powered on on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1205,8 +1205,8 @@ traps:
   - oid: 1.3.6.1.4.1.34.0.68
     name: CRI-SERVER-MIB::suppbrdPowerOff
     category: diagnostic
-    severity: err
-    description: Support board {suppBrdGenNum} on platform {platformName} powered off on {_HOSTNAME}.
+    severity: crit
+    description: Support board {{value "suppBrdGenNum"}} powered off on {{value "platformName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1215,7 +1215,7 @@ traps:
     name: CRI-SERVER-MIB::suppbrdPowerOn
     category: state_change
     severity: notice
-    description: Support board {suppBrdGenNum} on platform {platformName} powered on on {_HOSTNAME}.
+    description: Support board {{value "suppBrdGenNum"}} powered on on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1224,7 +1224,7 @@ traps:
     name: CRI-SERVER-MIB::bulkPowerNorm
     category: diagnostic
     severity: notice
-    description: Bulk power supply {platformName} generator {bulkPowerGenNum} returned to normal mode on {_HOSTNAME}.
+    description: Bulk power supply {{value "bulkPowerGenNum"}} returned to normal mode on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1232,17 +1232,17 @@ traps:
   - oid: 1.3.6.1.4.1.34.0.71
     name: CRI-SERVER-MIB::bulkPowerFail
     category: diagnostic
-    severity: crit
-    description: Bulk power failure detected on generator {bulkPowerGenNum} on {_HOSTNAME}.
+    severity: alert
+    description: Bulk power failure detected on {{value "platformName"}} generator {{value "bulkPowerGenNum"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
       - bulkPowerGenNum
   - oid: 1.3.6.1.4.1.34.0.72
     name: CRI-SERVER-MIB::bootProcChange
-    category: state_change
+    category: config_change
     severity: notice
-    description: Boot processor {domainBootProc} configuration changed on {_HOSTNAME}.
+    description: Boot processor configuration changed for {{value "domainName"}} on {{hostname}}.
     status: current
     varbinds:
       - platformName
@@ -1255,7 +1255,7 @@ traps:
     name: CRI-SERVER-MIB::sigObpBooting
     category: state_change
     severity: notice
-    description: Domain {domainName} booting with process state {procStateGenNum} on {_HOSTNAME}.
+    description: Domain {{value "domainName"}} is booting on {{hostname}}.
     status: current
     varbinds:
       - platformName

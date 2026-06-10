@@ -25,7 +25,7 @@ traps:
     name: QLOGIC-MIB::qlSB2PortLinkDown
     category: state_change
     severity: warning
-    description: Port link down with operational status {fcQxPortPhysOperStatus} on {_HOSTNAME}.
+    description: FC port link went down on {{hostname}}.
     status: current
     varbinds:
       - fcQxPortPhysAdminStatus
@@ -34,7 +34,7 @@ traps:
     name: QLOGIC-MIB::qlSB2PortLinkUp
     category: state_change
     severity: notice
-    description: Link {fcQxPortPhysOperStatus} came online on {_HOSTNAME}.
+    description: FC port link came online on {{hostname}}.
     status: current
     varbinds:
       - fcQxPortPhysAdminStatus

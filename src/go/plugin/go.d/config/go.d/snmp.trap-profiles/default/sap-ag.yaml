@@ -214,7 +214,7 @@ traps:
     name: SAP-MIB::r3trapInstanceStartUp
     category: state_change
     severity: notice
-    description: R/3 instance {r3alertSapNameString} started on {_HOSTNAME}.
+    description: R/3 instance {{value "r3alertSapNameString"}} started on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -224,9 +224,9 @@ traps:
       - r3alertTimeStamp
   - oid: 1.3.6.1.4.1.694.1.1.1.2.3
     name: SAP-MIB::r3trapInstanceShutDown
-    category: state_change
+    category: diagnostic
     severity: alert
-    description: R/3 instance {r3alertSapNameString} is shutting down on {_HOSTNAME}.
+    description: SAP R/3 instance {{value "r3alertSapNameString"}} is shutting down on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -238,7 +238,7 @@ traps:
     name: SAP-MIB::r3trapStateChange
     category: state_change
     severity: notice
-    description: SAP instance {r3alertSapNameString} state changed on {_HOSTNAME}.
+    description: SAP instance services changed on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -250,7 +250,7 @@ traps:
     name: SAP-MIB::r3trapSyslogIdNormal
     category: diagnostic
     severity: notice
-    description: System log entry with normal severity recorded for SAP system {r3systemNumber} on {_HOSTNAME}.
+    description: SAP alert {{value "r3alertMsgString"}} with normal severity on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -266,7 +266,7 @@ traps:
     name: SAP-MIB::r3trapSyslogIdWarning
     category: diagnostic
     severity: warning
-    description: SAP alert {r3alertMsgString} with severity {r3alertSeverity} on system {r3systemNumber} on {_HOSTNAME}.
+    description: SAP alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -282,7 +282,7 @@ traps:
     name: SAP-MIB::r3trapSyslogIdCritical
     category: diagnostic
     severity: crit
-    description: Critical system log entry {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: Critical system log alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -297,8 +297,8 @@ traps:
   - oid: 1.3.6.1.4.1.694.1.1.3.2.33
     name: SAP-MIB::r3trapSyslogFreqNormal
     category: diagnostic
-    severity: notice
-    description: System log entry rate normal on {_HOSTNAME}.
+    severity: warning
+    description: System log rate exceeded limit on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -314,7 +314,7 @@ traps:
     name: SAP-MIB::r3trapSyslogFreqWarning
     category: diagnostic
     severity: warning
-    description: System log entry rate exceeded limit for SAP system {r3systemNumber} on {_HOSTNAME}.
+    description: System log rate exceeded limit on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -330,7 +330,7 @@ traps:
     name: SAP-MIB::r3trapSyslogFreqCritical
     category: diagnostic
     severity: crit
-    description: SAP system {r3systemNumber} alert {r3alertNumber} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: System log rate exceeded critical limit on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -346,7 +346,7 @@ traps:
     name: SAP-MIB::r3trapBufferSumNormal
     category: diagnostic
     severity: warning
-    description: Buffer performance hit/access exceeded limit for SAP system {r3systemNumber} on {_HOSTNAME}.
+    description: SAP buffer performance alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -362,7 +362,7 @@ traps:
     name: SAP-MIB::r3trapBufferSumWarning
     category: diagnostic
     severity: warning
-    description: SAP buffer performance warning {r3alertMsgString} on {_HOSTNAME}.
+    description: 'Buffer performance warning: {{value "r3alertMsgString"}} on {{hostname}}.'
     status: current
     varbinds:
       - r3systemNumber
@@ -378,7 +378,7 @@ traps:
     name: SAP-MIB::r3trapBufferSumCritical
     category: diagnostic
     severity: crit
-    description: Buffer performance critical alert {r3alertMsgString} on {_HOSTNAME}.
+    description: SAP buffer performance critical alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -394,7 +394,7 @@ traps:
     name: SAP-MIB::r3trapEnqueueNormal
     category: diagnostic
     severity: warning
-    description: SAP system {r3systemNumber} alert {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: SAP enqueue space shortage or error {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -410,7 +410,7 @@ traps:
     name: SAP-MIB::r3trapEnqueueWarning
     category: diagnostic
     severity: warning
-    description: SAP enqueue warning alert {r3alertMsgString} on {_HOSTNAME}.
+    description: SAP enqueue space shortage or error detected on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -426,7 +426,7 @@ traps:
     name: SAP-MIB::r3trapEnqueueCritical
     category: diagnostic
     severity: crit
-    description: SAP enqueue critical alert {r3alertMsgString} on {_HOSTNAME}.
+    description: SAP enqueue space shortage or error occurred on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -441,8 +441,8 @@ traps:
   - oid: 1.3.6.1.4.1.694.1.1.3.2.42
     name: SAP-MIB::r3trapRollPageNormal
     category: diagnostic
-    severity: notice
-    description: Roll page size threshold passed on {r3alertAgentHostName} with severity {r3alertSeverity} on {_HOSTNAME}.
+    severity: warning
+    description: SAP roll/page file size threshold exceeded on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -458,7 +458,7 @@ traps:
     name: SAP-MIB::r3trapRollPageWarning
     category: diagnostic
     severity: warning
-    description: Roll page size warning for SAP system {r3systemNumber} with message {r3alertMsgString} on {_HOSTNAME}.
+    description: Rollfile or pagefile size warning on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -474,7 +474,7 @@ traps:
     name: SAP-MIB::r3trapRollPageCritical
     category: diagnostic
     severity: crit
-    description: SAP rollfile size critical alert {r3alertMsgString} on {_HOSTNAME}.
+    description: Rollfile or pagefile size exceeded critical threshold on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -489,8 +489,8 @@ traps:
   - oid: 1.3.6.1.4.1.694.1.1.3.2.45
     name: SAP-MIB::r3trapTraceNormal
     category: diagnostic
-    severity: notice
-    description: SAP trace option active affecting performance on {_HOSTNAME}.
+    severity: warning
+    description: SAP trace option active, potentially affecting performance on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -506,7 +506,7 @@ traps:
     name: SAP-MIB::r3trapTraceWarning
     category: diagnostic
     severity: warning
-    description: SAP trace warning {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: SAP trace warning active, potentially affecting performance on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -522,7 +522,7 @@ traps:
     name: SAP-MIB::r3trapTraceCritical
     category: diagnostic
     severity: crit
-    description: Critical trace alert {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: Critical trace alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -538,7 +538,7 @@ traps:
     name: SAP-MIB::r3trapDpQueueNormal
     category: diagnostic
     severity: warning
-    description: Application server queue shortage alert {r3alertMsgString} on {_HOSTNAME}.
+    description: SAP application server queue shortage detected on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -554,7 +554,7 @@ traps:
     name: SAP-MIB::r3trapDpQueueWarning
     category: diagnostic
     severity: warning
-    description: Application server queue shortage detected with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: SAP application server queue shortage detected on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -570,7 +570,7 @@ traps:
     name: SAP-MIB::r3trapDpQueueCritical
     category: diagnostic
     severity: crit
-    description: Application server queue shortage detected with severity {r3alertSeverity.raw} on {_HOSTNAME}.
+    description: Application server request queue critical shortage on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -586,7 +586,7 @@ traps:
     name: SAP-MIB::r3trapAbapUpdNormal
     category: diagnostic
     severity: warning
-    description: ABAP processor update process break detected with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: ABAP processor update break detected with normal severity on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -602,7 +602,7 @@ traps:
     name: SAP-MIB::r3trapAbapUpdWarning
     category: diagnostic
     severity: warning
-    description: ABAP processor update warning {r3alertMsgString} on {_HOSTNAME}.
+    description: ABAP processor update process warning on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -618,7 +618,7 @@ traps:
     name: SAP-MIB::r3trapAbapUpdCritical
     category: diagnostic
     severity: crit
-    description: Critical ABAP processor update break detected with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: Critical ABAP update process break detected on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -634,7 +634,7 @@ traps:
     name: SAP-MIB::r3trapAbapErrorNormal
     category: diagnostic
     severity: warning
-    description: ABAP processor error with shortdump on {r3alertAgentHostName} on {_HOSTNAME}.
+    description: ABAP processor error detected with shortdump on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -650,7 +650,7 @@ traps:
     name: SAP-MIB::r3trapAbapErrorWarning
     category: diagnostic
     severity: warning
-    description: ABAP processor error detected with alert {r3alertMsgString} on {_HOSTNAME}.
+    description: 'ABAP processor error and shortdump detected{{with value "r3alertMsgString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - r3systemNumber
@@ -666,7 +666,7 @@ traps:
     name: SAP-MIB::r3trapAbapErrorCritical
     category: diagnostic
     severity: crit
-    description: ABAP processor error with shortdump detected, severity {r3alertSeverity.raw}, message {r3alertMsgString.raw} on {_HOSTNAME}.
+    description: Critical ABAP processor error with shortdump on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -682,7 +682,7 @@ traps:
     name: SAP-MIB::r3trapAbapSqlNormal
     category: diagnostic
     severity: warning
-    description: Database access error detected in SAP system {r3systemNumber} with message {r3alertMsgString} on {_HOSTNAME}.
+    description: Database access error in ABAP processor on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -698,7 +698,7 @@ traps:
     name: SAP-MIB::r3trapAbapSqlWarning
     category: diagnostic
     severity: warning
-    description: ABAP database access warning {r3alertMsgString} on {_HOSTNAME}.
+    description: ABAP database access warning {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -714,7 +714,7 @@ traps:
     name: SAP-MIB::r3trapAbapSqlCritical
     category: diagnostic
     severity: crit
-    description: Database access error with severity {r3alertSeverity.raw} and message {r3alertMsgString.raw} on {_HOSTNAME}.
+    description: Critical database access error in ABAP processor on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -730,7 +730,7 @@ traps:
     name: SAP-MIB::r3trapDbIndicesNormal
     category: diagnostic
     severity: warning
-    description: Database table missing indices causing reduced access time on {_HOSTNAME}.
+    description: Database table indices missing, reducing access time on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -746,7 +746,7 @@ traps:
     name: SAP-MIB::r3trapDbIndicesWarning
     category: diagnostic
     severity: warning
-    description: Database table index warning {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: Database table missing indices detected on {{value "r3alertSapNameString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -762,7 +762,7 @@ traps:
     name: SAP-MIB::r3trapDbIndicesCritical
     category: diagnostic
     severity: crit
-    description: SAP database table missing indices detected with severity {r3alertSeverity.raw} on {_HOSTNAME}.
+    description: Database indices missing causing reduced access time on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -777,8 +777,8 @@ traps:
   - oid: 1.3.6.1.4.1.694.1.1.3.2.126
     name: SAP-MIB::r3trapDbFreeSpaceNormal
     category: diagnostic
-    severity: notice
-    description: Database free space returned to normal for system {r3systemNumber} on {_HOSTNAME}.
+    severity: warning
+    description: Database free space alert on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -794,7 +794,7 @@ traps:
     name: SAP-MIB::r3trapDbFreeSpaceWarning
     category: diagnostic
     severity: warning
-    description: Database free space warning for SAP system {r3systemNumber} on {_HOSTNAME}.
+    description: 'Database free space warning: {{value "r3alertMsgString"}} on {{hostname}}.'
     status: current
     varbinds:
       - r3systemNumber
@@ -810,7 +810,7 @@ traps:
     name: SAP-MIB::r3trapDbFreeSpaceCritical
     category: diagnostic
     severity: crit
-    description: Database free space critical alert {r3alertMsgString} on {_HOSTNAME}.
+    description: Database free space critical on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -826,7 +826,7 @@ traps:
     name: SAP-MIB::r3trapDbArcStuckNormal
     category: diagnostic
     severity: warning
-    description: Database archiver alert {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: Database archiver is stuck on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -842,7 +842,7 @@ traps:
     name: SAP-MIB::r3trapDbArcStuckWarning
     category: diagnostic
     severity: warning
-    description: Database archiver alert {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: Database archiver is stuck on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -858,7 +858,7 @@ traps:
     name: SAP-MIB::r3trapDbArcStuckCritical
     category: diagnostic
     severity: crit
-    description: Database archiver alert {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: Database archiver is stuck and non-functional on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -874,7 +874,7 @@ traps:
     name: SAP-MIB::r3trapDbBackupNormal
     category: diagnostic
     severity: warning
-    description: Database backup alert {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: 'Database backup problems detected{{with value "r3alertMsgString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - r3systemNumber
@@ -890,7 +890,7 @@ traps:
     name: SAP-MIB::r3trapDbBackupWarning
     category: diagnostic
     severity: warning
-    description: Database backup warning for SAP system {r3systemNumber} with message {r3alertMsgString} on {_HOSTNAME}.
+    description: 'Database backup problems detected{{with value "r3alertMsgString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - r3systemNumber
@@ -906,7 +906,7 @@ traps:
     name: SAP-MIB::r3trapDbBackupCritical
     category: diagnostic
     severity: crit
-    description: Database backup critical alert {r3alertMsgString} on {_HOSTNAME}.
+    description: 'Database backup critical failure detected{{with value "r3alertMsgString"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - r3systemNumber
@@ -921,8 +921,8 @@ traps:
   - oid: 1.3.6.1.4.1.694.1.1.3.2.153
     name: SAP-MIB::r3trapSpoolNormal
     category: diagnostic
-    severity: notice
-    description: SAP alert {r3alertNumber} with severity {r3alertSeverity} on {_HOSTNAME}.
+    severity: info
+    description: SAP spool alert returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -938,7 +938,7 @@ traps:
     name: SAP-MIB::r3trapSpoolWarning
     category: diagnostic
     severity: warning
-    description: SAP spool alert {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: SAP spool warning alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -954,7 +954,7 @@ traps:
     name: SAP-MIB::r3trapSpoolCritical
     category: diagnostic
     severity: crit
-    description: SAP alert {r3alertMsgString} with severity {r3alertSeverity} on system {r3systemNumber} on {_HOSTNAME}.
+    description: SAP spool critical alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -970,7 +970,7 @@ traps:
     name: SAP-MIB::r3trapArchiveNormal
     category: diagnostic
     severity: notice
-    description: SAP alert {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: SAP alert {{value "r3alertMsgString"}} on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -986,7 +986,7 @@ traps:
     name: SAP-MIB::r3trapArchiveWarning
     category: diagnostic
     severity: warning
-    description: SAP alert {r3alertMsgString} with severity {r3alertSeverity} on system {r3systemNumber} on {_HOSTNAME}.
+    description: SAP archive warning alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1002,7 +1002,7 @@ traps:
     name: SAP-MIB::r3trapArchiveCritical
     category: diagnostic
     severity: crit
-    description: Critical SAP alert {r3alertMsgString} on {_HOSTNAME}.
+    description: Critical SAP alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1018,7 +1018,7 @@ traps:
     name: SAP-MIB::r3trapGenPur3Normal
     category: diagnostic
     severity: notice
-    description: SAP alert {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: SAP alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1034,7 +1034,7 @@ traps:
     name: SAP-MIB::r3trapGenPur3Warning
     category: diagnostic
     severity: warning
-    description: SAP alert {r3alertMsgString} with severity {r3alertSeverity} on system {r3systemNumber} on {_HOSTNAME}.
+    description: SAP alert warning {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1050,7 +1050,7 @@ traps:
     name: SAP-MIB::r3trapGenPur3Critical
     category: diagnostic
     severity: crit
-    description: Critical alert {r3alertMsgString} from SAP system {r3systemNumber} on {_HOSTNAME}.
+    description: SAP alert {{value "r3alertMsgString"}} on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1065,8 +1065,8 @@ traps:
   - oid: 1.3.6.1.4.1.694.1.1.3.2.162
     name: SAP-MIB::r3trapGenPur4Normal
     category: diagnostic
-    severity: warning
-    description: SAP alert {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    severity: notice
+    description: SAP alert {{value "r3alertMsgString"}} on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1082,7 +1082,7 @@ traps:
     name: SAP-MIB::r3trapGenPur4Warning
     category: diagnostic
     severity: warning
-    description: SAP alert {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: SAP alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1098,7 +1098,7 @@ traps:
     name: SAP-MIB::r3trapGenPur4Critical
     category: diagnostic
     severity: crit
-    description: Critical alert {r3alertMsgString} from SAP system {r3systemNumber} on {_HOSTNAME}.
+    description: SAP R/3 critical alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1114,7 +1114,7 @@ traps:
     name: SAP-MIB::r3trapGenPur5Normal
     category: diagnostic
     severity: notice
-    description: SAP alert {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: SAP alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1130,7 +1130,7 @@ traps:
     name: SAP-MIB::r3trapGenPur5Warning
     category: diagnostic
     severity: warning
-    description: SAP alert {r3alertMsgString} with severity {r3alertSeverity} on system {r3systemNumber} on {_HOSTNAME}.
+    description: SAP alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1146,7 +1146,7 @@ traps:
     name: SAP-MIB::r3trapGenPur5Critical
     category: diagnostic
     severity: crit
-    description: Critical alert {r3alertMsgString} from SAP system {r3systemNumber} on {_HOSTNAME}.
+    description: Critical SAP alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1162,7 +1162,7 @@ traps:
     name: SAP-MIB::r3trapGenPur6Normal
     category: diagnostic
     severity: notice
-    description: Normal alert {r3alertMsgString} from SAP system {r3systemNumber} on {_HOSTNAME}.
+    description: SAP alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1178,7 +1178,7 @@ traps:
     name: SAP-MIB::r3trapGenPur6Warning
     category: diagnostic
     severity: warning
-    description: SAP alert {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: SAP alert {{value "r3alertMsgString"}} on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1194,7 +1194,7 @@ traps:
     name: SAP-MIB::r3trapGenPur6Critical
     category: diagnostic
     severity: crit
-    description: Critical alert {r3alertMsgString} for system {r3systemNumber} on {_HOSTNAME}.
+    description: SAP alert {{value "r3alertMsgString"}} on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1210,7 +1210,7 @@ traps:
     name: SAP-MIB::r3trapGenPur7Normal
     category: diagnostic
     severity: notice
-    description: SAP alert {r3alertNumber} with severity {r3alertSeverity} on system {r3systemNumber} on {_HOSTNAME}.
+    description: SAP alert {{value "r3alertMsgString"}} on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1226,7 +1226,7 @@ traps:
     name: SAP-MIB::r3trapGenPur7Warning
     category: diagnostic
     severity: warning
-    description: SAP alert {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: SAP alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1242,7 +1242,7 @@ traps:
     name: SAP-MIB::r3trapGenPur7Critical
     category: diagnostic
     severity: crit
-    description: Critical alert {r3alertMsgString} from SAP system {r3systemNumber} on {_HOSTNAME}.
+    description: Critical SAP alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1258,7 +1258,7 @@ traps:
     name: SAP-MIB::r3trapGenPur8Normal
     category: diagnostic
     severity: notice
-    description: SAP alert {r3alertMsgString} with severity {r3alertSeverity.raw} on {_HOSTNAME}.
+    description: SAP alert {{value "r3alertMsgString"}} on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1274,7 +1274,7 @@ traps:
     name: SAP-MIB::r3trapGenPur8Warning
     category: diagnostic
     severity: warning
-    description: SAP alert {r3alertMsgString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: SAP alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1290,7 +1290,7 @@ traps:
     name: SAP-MIB::r3trapGenPur8Critical
     category: diagnostic
     severity: crit
-    description: Critical alert {r3alertMsgString} from SAP system {r3systemNumber} on {_HOSTNAME}.
+    description: Critical SAP alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1305,8 +1305,8 @@ traps:
   - oid: 1.3.6.1.4.1.694.1.1.4.2.60
     name: SAP-MIB::r3trapPerfDiaNormal
     category: diagnostic
-    severity: notice
-    description: Performance threshold normal for SAP system {r3systemNumber} on {_HOSTNAME}.
+    severity: warning
+    description: SAP performance threshold exceeded for {{value "r3alertSapNameString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1322,7 +1322,7 @@ traps:
     name: SAP-MIB::r3trapPerfDiaWarning
     category: diagnostic
     severity: warning
-    description: SAP performance warning {r3alertMsgString} on {_HOSTNAME}.
+    description: 'SAP performance warning: {{value "r3alertMsgString"}} on {{hostname}}.'
     status: current
     varbinds:
       - r3systemNumber
@@ -1338,7 +1338,7 @@ traps:
     name: SAP-MIB::r3trapPerfDiaCritical
     category: diagnostic
     severity: crit
-    description: SAP performance threshold exceeded with severity {r3alertSeverity.raw} on {_HOSTNAME}.
+    description: SAP performance critical alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1353,8 +1353,8 @@ traps:
   - oid: 1.3.6.1.4.1.694.1.1.4.2.63
     name: SAP-MIB::r3trapPerfUpdNormal
     category: diagnostic
-    severity: notice
-    description: Performance update normal for {r3alertSapNameString} on {_HOSTNAME}.
+    severity: warning
+    description: SAP performance threshold exceeded for {{value "r3alertSapNameString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1370,7 +1370,7 @@ traps:
     name: SAP-MIB::r3trapPerfUpdWarning
     category: diagnostic
     severity: warning
-    description: 'SAP performance warning: {r3alertMsgString} on {_HOSTNAME}.'
+    description: 'SAP performance warning: {{value "r3alertMsgString"}} on {{hostname}}.'
     status: current
     varbinds:
       - r3systemNumber
@@ -1386,7 +1386,7 @@ traps:
     name: SAP-MIB::r3trapPerfUpdCritical
     category: diagnostic
     severity: crit
-    description: SAP performance threshold exceeded for {r3alertSapNameString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: SAP ABAP performance threshold exceeded on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1402,7 +1402,7 @@ traps:
     name: SAP-MIB::r3trapPerfBtcNormal
     category: diagnostic
     severity: warning
-    description: Performance threshold exceeded for {r3alertSapNameString} with severity {r3alertSeverity} on {_HOSTNAME}.
+    description: SAP performance threshold exceeded for {{value "r3alertSapNameString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1418,7 +1418,7 @@ traps:
     name: SAP-MIB::r3trapPerfBtcWarning
     category: diagnostic
     severity: warning
-    description: SAP performance warning {r3alertMsgString} on {_HOSTNAME}.
+    description: 'SAP performance warning: {{value "r3alertMsgString"}} on {{hostname}}.'
     status: current
     varbinds:
       - r3systemNumber
@@ -1434,7 +1434,7 @@ traps:
     name: SAP-MIB::r3trapPerfBtcCritical
     category: diagnostic
     severity: crit
-    description: SAP performance alert {r3alertMsgString} with severity {r3alertSeverity.raw} on {_HOSTNAME}.
+    description: SAP performance critical alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1450,7 +1450,7 @@ traps:
     name: SAP-MIB::r3trapPerfSpoNormal
     category: diagnostic
     severity: warning
-    description: SAP performance threshold exceeded for {r3alertSapNameString} on {_HOSTNAME}.
+    description: SAP Spool performance threshold exceeded on {{value "r3alertAgentHostName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1466,7 +1466,7 @@ traps:
     name: SAP-MIB::r3trapPerfSpoWarning
     category: diagnostic
     severity: warning
-    description: Performance warning for SAP system {r3systemNumber} with alert {r3alertMsgString} on {_HOSTNAME}.
+    description: 'SAP Spool performance warning: {{value "r3alertMsgString"}} on {{hostname}}.'
     status: current
     varbinds:
       - r3systemNumber
@@ -1482,7 +1482,7 @@ traps:
     name: SAP-MIB::r3trapPerfSpoCritical
     category: diagnostic
     severity: crit
-    description: Critical performance threshold exceeded for {r3alertSapNameString} on {_HOSTNAME}.
+    description: SAP Spool performance critical alert {{value "r3alertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3systemNumber
@@ -1498,7 +1498,7 @@ traps:
     name: SAP-MIB::r3maTrap
     category: diagnostic
     severity: warning
-    description: SAP R/3 alert {r3maAlertMsgString} with severity {r3maAlertSeverity} on {_HOSTNAME}.
+    description: SAP R/3 alert {{value "r3maAlertMsgString"}} on {{hostname}}.
     status: current
     varbinds:
       - r3maAlertSystemName
@@ -1517,7 +1517,7 @@ traps:
     name: SAP-MIB::r3maiTrap
     category: diagnostic
     severity: warning
-    description: SAP MAI alert {r3maiAlertName} with severity {r3maiAlertSeverity} on {_HOSTNAME}.
+    description: SAP MAI alert {{value "r3maiAlertName"}} raised on {{value "r3maiAlertMOName"}} on {{hostname}}.
     status: current
     varbinds:
       - r3maiAlertMOName
@@ -1541,7 +1541,7 @@ traps:
     name: SAP-MIB::r3customTrap
     category: diagnostic
     severity: warning
-    description: SAP Solution Manager custom alert {r3customAlertXXX} with code {r3customAlertYYY} on {_HOSTNAME}.
+    description: SAP Solution Manager custom alert raised with {{value "r3customAlertXXX"}} on {{hostname}}.
     status: current
     varbinds:
       - r3customAlertXXX

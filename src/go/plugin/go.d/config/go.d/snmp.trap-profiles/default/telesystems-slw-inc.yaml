@@ -41,7 +41,7 @@ traps:
     name: AWCVX-MIB::awcTrapLog
     category: diagnostic
     severity: warning
-    description: 'Event {awcEventType} with severity {awcEventSeverity} occurred: {awcEventDescription} on {_HOSTNAME}.'
+    description: 'Event {{value "awcEventType"}} occurred: {{value "awcEventDescription"}} on {{hostname}}.'
     status: current
     varbinds:
       - awcEventTime

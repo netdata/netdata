@@ -77,7 +77,7 @@ traps:
     name: LLDP-MIB::lldpRemTablesChange
     category: state_change
     severity: notice
-    description: LLDP remote systems table changed on {_HOSTNAME}.
+    description: LLDP remote systems table changed on {{hostname}}.
     status: current
     varbinds:
       - lldpStatsRemTablesInserts
@@ -88,7 +88,7 @@ traps:
     name: LLDP-EXT-MED-MIB::lldpXMedTopologyChangeDetected
     category: state_change
     severity: notice
-    description: LLDP topology change detected on {_HOSTNAME}.
+    description: LLDP-MED topology changed due to device attachment or movement on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - lldpRemChassisIdSubtype
@@ -98,23 +98,23 @@ traps:
     name: LLDP-EXT-DCBX-MIB::lldpXdcbxMiscControlError
     category: diagnostic
     severity: warning
-    description: DCBX control error on port {lldpXdcbxPortNumber} on {_HOSTNAME}.
+    description: DCBX control error occurred on port {{value "lldpXdcbxPortNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - lldpXdcbxPortNumber
   - oid: 1.0.8802.1.1.2.1.5.6945.0.2
     name: LLDP-EXT-DCBX-MIB::lldpXdcbxMiscFeatureError
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DCBX feature configuration error detected with {lldpXdcbxFeatError} on {_HOSTNAME}.
+    description: LLDP DCBX feature configuration error detected on {{hostname}}.
     status: current
     varbinds:
       - lldpXdcbxFeatError
   - oid: 1.0.8802.1.1.2.1.5.6945.0.3
     name: LLDP-EXT-DCBX-MIB::lldpXdcbxMultiplePeers
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Multiple LLDP neighbors detected on port {lldpXdcbxPortNumber} on {_HOSTNAME}.
+    description: Multiple LLDP neighbors detected on port {{value "lldpXdcbxPortNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - lldpXdcbxPortNumber
@@ -122,15 +122,15 @@ traps:
     name: LLDP-EXT-DCBX-MIB::lldpXdcbxLldpTxDisabled
     category: state_change
     severity: notice
-    description: LLDP transmit disabled on port {lldpXdcbxPortNumber} on {_HOSTNAME}.
+    description: LLDP transmit disabled on port {{value "lldpXdcbxPortNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - lldpXdcbxPortNumber
   - oid: 1.0.8802.1.1.2.1.5.6945.0.5
     name: LLDP-EXT-DCBX-MIB::lldpXdcbxLldpRxDisabled
     category: state_change
-    severity: warning
-    description: LLDP receive disabled on port {lldpXdcbxPortNumber} on {_HOSTNAME}.
+    severity: notice
+    description: LLDP receive disabled on port {{value "lldpXdcbxPortNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - lldpXdcbxPortNumber
@@ -138,7 +138,7 @@ traps:
     name: LLDP-EXT-DCBX-MIB::lldpXdcbxDupControlTlv
     category: diagnostic
     severity: warning
-    description: Duplicate DCBX control Sub-TLV detected on port {lldpXdcbxPortNumber} on {_HOSTNAME}.
+    description: Duplicate DCBX control Sub-TLV detected on port {{value "lldpXdcbxPortNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - lldpXdcbxPortNumber
@@ -146,15 +146,15 @@ traps:
     name: LLDP-EXT-DCBX-MIB::lldpXdcbxDupFeatureTlv
     category: diagnostic
     severity: warning
-    description: Duplicate DCBX feature Sub-TLV detected for {lldpXdcbxFeatType} on {_HOSTNAME}.
+    description: Duplicate DCBX feature {{value "lldpXdcbxFeatType"}} detected on {{hostname}}.
     status: current
     varbinds:
       - lldpXdcbxFeatType
   - oid: 1.0.8802.1.1.2.1.5.6945.0.8
     name: LLDP-EXT-DCBX-MIB::lldpXdcbxPeerNoFeat
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Unsupported DCB feature {lldpXdcbxFeatType} detected on peer on {_HOSTNAME}.
+    description: LLDP DCBX peer does not support {{value "lldpXdcbxFeatType"}} on {{hostname}}.
     status: current
     varbinds:
       - lldpXdcbxFeatType
@@ -162,23 +162,23 @@ traps:
     name: LLDP-EXT-DCBX-MIB::lldpXdcbxPeerNoResp
     category: state_change
     severity: warning
-    description: LLDP peer stopped responding on port {lldpXdcbxPortNumber} on {_HOSTNAME}.
+    description: LLDP DCBX peer stopped responding on port {{value "lldpXdcbxPortNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - lldpXdcbxPortNumber
   - oid: 1.0.8802.1.1.2.1.5.6945.0.10
     name: LLDP-EXT-DCBX-MIB::lldpXdcbxPeerConfigMismatch
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: LLDP DCBX configuration mismatch detected on port {lldpXdcbxPortNumber} on {_HOSTNAME}.
+    description: LLDP DCBX peer configuration mismatch detected on port {{value "lldpXdcbxPortNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - lldpXdcbxPortNumber
   - oid: 1.0.8802.1.1.3.0.1
     name: IEEE802171-CFM-MIB::dot1agCfmFaultAlarm
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: MEP reported highest priority defect {dot1agCfmMepHighestPrDefect} on {_HOSTNAME}.
+    description: MEP fault alarm for highest priority defect {{value "dot1agCfmMepHighestPrDefect"}} on {{hostname}}.
     status: current
     varbinds:
       - dot1agCfmMepHighestPrDefect

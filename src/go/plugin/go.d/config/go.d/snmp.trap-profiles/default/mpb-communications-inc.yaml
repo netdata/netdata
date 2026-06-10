@@ -13,7 +13,7 @@ traps:
     name: MPBC-2RU-MIB::mpbc2RUTrapCritical
     category: diagnostic
     severity: crit
-    description: Critical alarm triggered for device {mpbc2RUAlarmNEID} on {_HOSTNAME}.
+    description: Critical alarm detected on {{value "mpbc2RUAlarmNEID"}} on {{hostname}}.
     status: current
     varbinds:
       - mpbc2RUAlarmNEID
@@ -21,7 +21,7 @@ traps:
     name: MPBC-2RU-MIB::mpbc2RUTrapMajor
     category: diagnostic
     severity: crit
-    description: Major alarm reported for device {mpbc2RUAlarmNEID} on {_HOSTNAME}.
+    description: Major alarm detected on {{value "mpbc2RUAlarmNEID"}} on {{hostname}}.
     status: current
     varbinds:
       - mpbc2RUAlarmNEID
@@ -29,7 +29,7 @@ traps:
     name: MPBC-2RU-MIB::mpbc2RUTrapMinor
     category: diagnostic
     severity: warning
-    description: Minor alarm detected on device {mpbc2RUAlarmNEID} on {_HOSTNAME}.
+    description: Minor alarm detected on {{value "mpbc2RUAlarmNEID"}} on {{hostname}}.
     status: current
     varbinds:
       - mpbc2RUAlarmNEID
@@ -37,7 +37,7 @@ traps:
     name: MPBC-2RU-MIB::mpbc2RUTrapInformational
     category: diagnostic
     severity: notice
-    description: Informational alarm received with NE ID {mpbc2RUAlarmNEID} on {_HOSTNAME}.
+    description: Informational alarm received for {{value "mpbc2RUAlarmNEID"}} on {{hostname}}.
     status: current
     varbinds:
       - mpbc2RUAlarmNEID

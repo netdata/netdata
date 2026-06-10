@@ -30,7 +30,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sMgmtStartup
     category: state_change
     severity: notice
-    description: Agent startup completed on {_HOSTNAME}.
+    description: Agent has started up and is running on {{hostname}}.
     status: current
     varbinds:
       - lt2sTrapDetails
@@ -38,7 +38,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sMgmtAuthenticationFailure
     category: auth
     severity: warning
-    description: Login has failed with details {lt2sTrapDetails} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: SNMP authentication failure on {{hostname}}.
     status: current
     varbinds:
       - lt2sTrapDetails
@@ -46,7 +46,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sTemperatureHigh
     category: diagnostic
     severity: warning
-    description: Device temperature is high with details {lt2sTrapDetails} on {_HOSTNAME}.
+    description: 'Device temperature is high{{with value "lt2sTrapDetails"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - lt2sTrapDetails
@@ -54,23 +54,23 @@ traps:
     name: Lambdatrail2s-MIB::lt2sTemperatureNormal
     category: diagnostic
     severity: notice
-    description: Device temperature returned to normal state on {_HOSTNAME}.
+    description: Device temperature returned to normal on {{hostname}}.
     status: current
     varbinds:
       - lt2sTrapDetails
   - oid: 1.3.6.1.4.1.35616.5.0.5
     name: Lambdatrail2s-MIB::lt2sPowerSupplyPluggedIn
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Power supply plugged in with details {lt2sTrapDetails} on {_HOSTNAME}.
+    description: 'Power supply plugged in{{with value "lt2sTrapDetails"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - lt2sTrapDetails
   - oid: 1.3.6.1.4.1.35616.5.0.6
     name: Lambdatrail2s-MIB::lt2sPowerSupplyPluggedOut
     category: diagnostic
-    severity: err
-    description: 'Power supply plugged out: {lt2sTrapDetails} on {_HOSTNAME}.'
+    severity: crit
+    description: 'Power supply plugged out{{with value "lt2sTrapDetails"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - lt2sTrapDetails
@@ -78,15 +78,15 @@ traps:
     name: Lambdatrail2s-MIB::lt2sPowerNormal
     category: diagnostic
     severity: notice
-    description: Power supply status returned to normal on {_HOSTNAME}.
+    description: Power supply returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - lt2sTrapDetails
   - oid: 1.3.6.1.4.1.35616.5.0.8
     name: Lambdatrail2s-MIB::lt2sPowerFailure
     category: diagnostic
-    severity: alert
-    description: Power failure detected with details {lt2sTrapDetails} on {_HOSTNAME}.
+    severity: crit
+    description: 'Power failure detected{{with value "lt2sTrapDetails"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - lt2sTrapDetails
@@ -94,7 +94,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sFanOn
     category: diagnostic
     severity: notice
-    description: Fan status change reported via {lt2sTrapDetails} on {_HOSTNAME}.
+    description: 'Fan went on{{with value "lt2sTrapDetails"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - lt2sTrapDetails
@@ -102,15 +102,15 @@ traps:
     name: Lambdatrail2s-MIB::lt2sFanOff
     category: diagnostic
     severity: crit
-    description: Fan failure detected with details {lt2sTrapDetails} on {_HOSTNAME}.
+    description: Fan went off on {{hostname}}.
     status: current
     varbinds:
       - lt2sTrapDetails
   - oid: 1.3.6.1.4.1.35616.5.0.11
     name: Lambdatrail2s-MIB::lt2sFanFailure
     category: diagnostic
-    severity: err
-    description: Fan failure detected with details {lt2sTrapDetails} on {_HOSTNAME}.
+    severity: crit
+    description: 'Fan failure detected{{with value "lt2sTrapDetails"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - lt2sTrapDetails
@@ -118,7 +118,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sMgmtSfpPluggedIn
     category: state_change
     severity: notice
-    description: SFP transceiver plugged in on management port {lt2sMgmtPortId} on {_HOSTNAME}.
+    description: SFP transceiver plugged in on management port {{value "lt2sMgmtPortName"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sMgmtPortId
@@ -126,9 +126,9 @@ traps:
       - lt2sMgmtPortName
   - oid: 1.3.6.1.4.1.35616.5.0.13
     name: Lambdatrail2s-MIB::lt2sMgmtSfpPluggedOut
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: SFP transceiver plugged out on management port {lt2sMgmtPortName} on {_HOSTNAME}.
+    description: SFP transceiver unplugged from {{first (value "lt2sMgmtPortName") "management port"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sMgmtPortId
@@ -138,7 +138,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sMgmtLinkUp
     category: state_change
     severity: notice
-    description: Management port {lt2sMgmtPortName} link went up on {_HOSTNAME}.
+    description: Management port {{first (value "lt2sMgmtPortName") "link"}} went up on {{hostname}}.
     status: current
     varbinds:
       - lt2sMgmtPortId
@@ -148,7 +148,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sMgmtLinkDown
     category: state_change
     severity: warning
-    description: Management port {lt2sMgmtPortName} (ID {lt2sMgmtPortId}) link went down on {_HOSTNAME}.
+    description: Management port {{first (value "lt2sMgmtPortName") "link"}} went down on {{hostname}}.
     status: current
     varbinds:
       - lt2sMgmtPortId
@@ -158,7 +158,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sMgmtTxLow
     category: diagnostic
     severity: warning
-    description: Transceiver TX power is low on port {lt2sMgmtPortName} on {_HOSTNAME}.
+    description: Transceiver TX power is low on {{first (value "lt2sMgmtPortName") "management port"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sMgmtPortId
@@ -168,7 +168,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sMgmtTxHigh
     category: diagnostic
     severity: warning
-    description: Transceiver TX power is high on port {lt2sMgmtPortName} on {_HOSTNAME}.
+    description: Transceiver TX power is high on management port {{first (value "lt2sMgmtPortName") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sMgmtPortId
@@ -178,7 +178,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sMgmtTxNormal
     category: diagnostic
     severity: notice
-    description: Transceiver TX power is normal on management port {lt2sMgmtPortName} on {_HOSTNAME}.
+    description: Transceiver TX power is normal on port {{value "lt2sMgmtPortName"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sMgmtPortId
@@ -188,7 +188,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sMgmtRxLow
     category: diagnostic
     severity: warning
-    description: Transceiver RX power is low on management port {lt2sMgmtPortName} on {_HOSTNAME}.
+    description: Transceiver RX power is low on management port {{first (value "lt2sMgmtPortName") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sMgmtPortId
@@ -198,7 +198,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sMgmtRxHigh
     category: diagnostic
     severity: warning
-    description: Transceiver RX power high on management port {lt2sMgmtPortId} on {_HOSTNAME}.
+    description: Transceiver RX power is high on management port {{value "lt2sMgmtPortName"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sMgmtPortId
@@ -208,7 +208,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sMgmtRxNormal
     category: diagnostic
     severity: notice
-    description: Transceiver RX power is normal on port {lt2sMgmtPortName} on {_HOSTNAME}.
+    description: Transceiver RX power is normal on {{first (value "lt2sMgmtPortName") "management port"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sMgmtPortId
@@ -218,7 +218,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sPortEnabled
     category: state_change
     severity: notice
-    description: Port {lt2sPortName} administrative state changed to enabled on {_HOSTNAME}.
+    description: Port {{value "lt2sPortName"}} was administratively enabled on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -228,7 +228,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sPortDisabled
     category: state_change
     severity: notice
-    description: Port {lt2sPortName} was administratively disabled on {_HOSTNAME}.
+    description: Port {{value "lt2sPortName"}} was administratively disabled on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -237,8 +237,8 @@ traps:
   - oid: 1.3.6.1.4.1.35616.5.0.24
     name: Lambdatrail2s-MIB::lt2sPortReseted
     category: state_change
-    severity: warning
-    description: Port {lt2sPortName} was reset on {_HOSTNAME}.
+    severity: notice
+    description: Port {{value "lt2sPortName"}} was reset on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -247,8 +247,8 @@ traps:
   - oid: 1.3.6.1.4.1.35616.5.0.25
     name: Lambdatrail2s-MIB::lt2sPortThermalShutdown
     category: diagnostic
-    severity: err
-    description: Port {lt2sPortName} thermal shutdown reported on {_HOSTNAME}.
+    severity: crit
+    description: Port {{value "lt2sPortName"}} thermal shutdown on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -258,7 +258,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sPortThermalWakeup
     category: diagnostic
     severity: warning
-    description: Thermal wakeup detected on port {lt2sPortName} on {_HOSTNAME}.
+    description: Thermal wakeup detected on port {{value "lt2sPortName"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -268,7 +268,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sLinePluggedIn
     category: state_change
     severity: notice
-    description: SFP transceiver plugged in on port {lt2sPortName} on {_HOSTNAME}.
+    description: SFP transceiver plugged in on {{first (value "lt2sPortName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -278,7 +278,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sClientPluggedIn
     category: state_change
     severity: notice
-    description: SFP transceiver plugged in on port {lt2sPortName} on {_HOSTNAME}.
+    description: SFP transceiver plugged in on {{first (value "lt2sPortName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -288,7 +288,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sLinePluggedOut
     category: state_change
     severity: warning
-    description: SFP transceiver unplugged on port {lt2sPortName} on {_HOSTNAME}.
+    description: SFP transceiver unplugged on port {{first (value "lt2sPortName") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -296,9 +296,9 @@ traps:
       - lt2sPortName
   - oid: 1.3.6.1.4.1.35616.5.0.30
     name: Lambdatrail2s-MIB::lt2sClientPluggedOut
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: SFP transceiver unplugged on port {lt2sPortName} on {_HOSTNAME}.
+    description: SFP transceiver unplugged on port {{value "lt2sPortName"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -308,7 +308,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sLineLinkUp
     category: state_change
     severity: notice
-    description: SFP transceiver link on port {lt2sPortName} went up on {_HOSTNAME}.
+    description: SFP link up on port {{value "lt2sPortName"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -318,7 +318,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sClientLinkUp
     category: state_change
     severity: notice
-    description: SFP transceiver link on port {lt2sPortName} went up on {_HOSTNAME}.
+    description: SFP transceiver link up on port {{first (value "lt2sPortName") "link"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -328,7 +328,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sLineLinkDown
     category: state_change
     severity: warning
-    description: SFP transceiver link down on port {lt2sPortName} on {_HOSTNAME}.
+    description: SFP link down on port {{first (value "lt2sPortName") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -338,7 +338,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sClientLinkDown
     category: state_change
     severity: warning
-    description: SFP transceiver link down on port {lt2sPortName} on {_HOSTNAME}.
+    description: SFP transceiver link down on port {{first (value "lt2sPortName") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -348,7 +348,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sLineLoopOn
     category: state_change
     severity: notice
-    description: Line loop activated on port {lt2sPortName} on {_HOSTNAME}.
+    description: Line loop activated on port {{first (value "lt2sPortName") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -358,7 +358,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sLineLoopOff
     category: state_change
     severity: warning
-    description: Line loop turned off on port {lt2sPortName} on {_HOSTNAME}.
+    description: Line loop turned off on port {{first (value "lt2sPortName") (value "lt2sPortId")}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -368,7 +368,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sClientLoopOn
     category: security
     severity: warning
-    description: Client loop detected on port {lt2sPortName} on {_HOSTNAME}.
+    description: Client loop detected on port {{first (value "lt2sPortName") (value "lt2sPortId")}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -377,8 +377,8 @@ traps:
   - oid: 1.3.6.1.4.1.35616.5.0.38
     name: Lambdatrail2s-MIB::lt2sClientLoopOff
     category: state_change
-    severity: notice
-    description: Client loop protection disabled on port {lt2sPortName} on {_HOSTNAME}.
+    severity: warning
+    description: Client loop protection turned off on port {{first (value "lt2sPortName") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -388,7 +388,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sPortTxLow
     category: diagnostic
     severity: warning
-    description: SFP transceiver TX power is low on port {lt2sPortName} on {_HOSTNAME}.
+    description: SFP transceiver TX power is low on port {{value "lt2sPortName"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -398,7 +398,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sPortTxHigh
     category: diagnostic
     severity: warning
-    description: SFP transceiver TX power high on port {lt2sPortName} on {_HOSTNAME}.
+    description: SFP transceiver TX power is high on port {{value "lt2sPortName"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -407,8 +407,8 @@ traps:
   - oid: 1.3.6.1.4.1.35616.5.0.41
     name: Lambdatrail2s-MIB::lt2sPortTxNormal
     category: diagnostic
-    severity: info
-    description: SFP transceiver TX power is normal on port {lt2sPortName} on {_HOSTNAME}.
+    severity: notice
+    description: SFP transceiver TX power is normal on port {{value "lt2sPortName"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -418,7 +418,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sPortRxLow
     category: diagnostic
     severity: warning
-    description: SFP transceiver RX power is low on port {lt2sPortName} on {_HOSTNAME}.
+    description: SFP transceiver RX power is low on port {{first (value "lt2sPortName") (value "lt2sPortId")}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -428,7 +428,7 @@ traps:
     name: Lambdatrail2s-MIB::lt2sPortRxHigh
     category: diagnostic
     severity: warning
-    description: SFP transceiver RX power high on port {lt2sPortName} on {_HOSTNAME}.
+    description: SFP transceiver RX power is high on port {{value "lt2sPortName"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId
@@ -437,8 +437,8 @@ traps:
   - oid: 1.3.6.1.4.1.35616.5.0.44
     name: Lambdatrail2s-MIB::lt2sPortRxNormal
     category: diagnostic
-    severity: notice
-    description: SFP transceiver RX power is normal on port {lt2sPortName} on {_HOSTNAME}.
+    severity: info
+    description: SFP transceiver RX power is normal on port {{value "lt2sPortName"}} on {{hostname}}.
     status: current
     varbinds:
       - lt2sPortId

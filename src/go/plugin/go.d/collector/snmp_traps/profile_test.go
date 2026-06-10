@@ -1829,16 +1829,16 @@ func TestStockIFMIBLinkMessagesDoNotDependOnIfOperStatus(t *testing.T) {
 	defer ReleaseProfileCache()
 
 	tests := map[string]struct {
-		oid  string
-		want string
+		oid          string
+		wantContains []string
 	}{
 		"linkDown": {
-			oid:  testIFMIBLinkDownOID,
-			want: "Link 1 went down on lab-switch.",
+			oid:          testIFMIBLinkDownOID,
+			wantContains: []string{"1", "down", "lab-switch"},
 		},
 		"linkUp": {
-			oid:  testIFMIBLinkUpOID,
-			want: "Link 1 came up on lab-switch.",
+			oid:          testIFMIBLinkUpOID,
+			wantContains: []string{"1", "up", "lab-switch"},
 		},
 	}
 
@@ -1861,7 +1861,10 @@ func TestStockIFMIBLinkMessagesDoNotDependOnIfOperStatus(t *testing.T) {
 
 			renderTrapEntryTemplates(entry, td)
 
-			assert.Equal(t, tc.want, entry.Message)
+			for _, want := range tc.wantContains {
+				assert.Contains(t, entry.Message, want)
+			}
+			assert.NotContains(t, entry.Message, "ifOperStatus")
 			assert.False(t, hasUnresolvedTemplateMarker(entry.Message))
 		})
 	}

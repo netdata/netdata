@@ -16,9 +16,9 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.1570.1.0.1
     name: Cisco90Series-MIB::frxDownloadTrap
-    category: config_change
+    category: state_change
     severity: notice
-    description: Download configuration triggered via faceplate button on channel unit {frxChUIndex} on {_HOSTNAME}.
+    description: Download Config pushbutton activated on channel unit {{value "frxChUIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - frxBankIndex
@@ -27,7 +27,7 @@ traps:
     name: Cisco90Series-MIB::frxUPerfTrap
     category: diagnostic
     severity: warning
-    description: Performance threshold exceeded on channel bank {frxBankIndex} and channel unit {frxChUIndex} on {_HOSTNAME}.
+    description: Performance threshold exceeded on channel unit {{value "frxChUIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - frxBankIndex
@@ -36,7 +36,7 @@ traps:
     name: Cisco90Series-MIB::frxInsertChUTrap
     category: state_change
     severity: notice
-    description: Channel unit {frxChUIndex} inserted in bank {frxBankIndex} on {_HOSTNAME}.
+    description: Channel unit inserted at bank {{value "frxBankIndex"}} unit {{value "frxChUIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - frxBankIndex
@@ -44,17 +44,17 @@ traps:
   - oid: 1.3.6.1.4.1.1570.1.0.4
     name: Cisco90Series-MIB::frxRemoveChUTrap
     category: state_change
-    severity: notice
-    description: Channel unit {frxChUIndex} removed from bank {frxBankIndex} on {_HOSTNAME}.
+    severity: warning
+    description: Channel unit {{value "frxChUIndex"}} removed from bank {{value "frxBankIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - frxBankIndex
       - frxChUIndex
   - oid: 1.3.6.1.4.1.1570.1.0.5
     name: Cisco90Series-MIB::frxDConfigFailed
-    category: config_change
+    category: diagnostic
     severity: err
-    description: Configuration download failed for channel bank {frxBankIndex} and unit {frxChUIndex} on {_HOSTNAME}.
+    description: Configuration download failed on channel unit {{value "frxChUIndex"}} bank {{value "frxBankIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - frxBankIndex

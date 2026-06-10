@@ -21,7 +21,7 @@ traps:
     name: SENSORTRAP-MIB::sensorAlarmTMax
     category: diagnostic
     severity: warning
-    description: Sensor {sensorId} reached maximum temperature threshold on {_HOSTNAME}.
+    description: Sensor {{value "sensorId"}} reached maximum temperature threshold on {{hostname}}.
     status: current
     varbinds:
       - sensorId
@@ -29,7 +29,7 @@ traps:
     name: SENSORTRAP-MIB::sensorAlarmTMaxRemoved
     category: diagnostic
     severity: notice
-    description: Temperature sensor {sensorId} returned to standard level on {_HOSTNAME}.
+    description: Temperature alarm cleared for sensor {{value "sensorId"}} on {{hostname}}.
     status: current
     varbinds:
       - sensorId
@@ -37,7 +37,7 @@ traps:
     name: SENSORTRAP-MIB::sensorAlarmTMin
     category: diagnostic
     severity: warning
-    description: Sensor {sensorId} reached minimum temperature threshold on {_HOSTNAME}.
+    description: Sensor {{value "sensorId"}} reached minimum temperature threshold on {{hostname}}.
     status: current
     varbinds:
       - sensorId
@@ -45,15 +45,15 @@ traps:
     name: SENSORTRAP-MIB::sensorAlarmTMinRemoved
     category: diagnostic
     severity: notice
-    description: Temperature sensor {sensorId} returned to standard level on {_HOSTNAME}.
+    description: Temperature sensor {{value "sensorId"}} returned to standard level on {{hostname}}.
     status: current
     varbinds:
       - sensorId
   - oid: 1.3.6.1.4.1.5491.9.1.2.0.5
     name: SENSORTRAP-MIB::sensorIOAlarm
     category: diagnostic
-    severity: warning
-    description: Sensor {sensorId} input contact alarm on {_HOSTNAME}.
+    severity: alert
+    description: Sensor input contact alarm on sensor {{value "sensorId"}} on {{hostname}}.
     status: current
     varbinds:
       - sensorId
@@ -61,7 +61,7 @@ traps:
     name: SENSORTRAP-MIB::sensorIOAlarmRemoved
     category: diagnostic
     severity: notice
-    description: Sensor {sensorId} input contact returned to normal on {_HOSTNAME}.
+    description: Sensor input alarm removed for sensor {{value "sensorId"}} on {{hostname}}.
     status: current
     varbinds:
       - sensorId
@@ -69,7 +69,7 @@ traps:
     name: SENSORTRAP-MIB::sensorHumidityAlarm
     category: diagnostic
     severity: warning
-    description: Humidity alarm triggered for sensor {sensorId} on {_HOSTNAME}.
+    description: Sensor {{value "sensorId"}} humidity reached maximum level on {{hostname}}.
     status: current
     varbinds:
       - sensorId
@@ -77,7 +77,7 @@ traps:
     name: SENSORTRAP-MIB::sensorHumidityAlarmRemoved
     category: diagnostic
     severity: notice
-    description: Humidity alarm cleared for sensor {sensorId} on {_HOSTNAME}.
+    description: Humidity alarm removed for sensor {{value "sensorId"}} on {{hostname}}.
     status: current
     varbinds:
       - sensorId
@@ -85,7 +85,7 @@ traps:
     name: SENSORTRAP-MIB::sensorHumidityLowAlarm
     category: diagnostic
     severity: warning
-    description: Sensor {sensorId} reported low humidity alarm on {_HOSTNAME}.
+    description: Sensor {{value "sensorId"}} humidity reached minimum level on {{hostname}}.
     status: current
     varbinds:
       - sensorId
@@ -93,7 +93,7 @@ traps:
     name: SENSORTRAP-MIB::sensorHumidityLowAlarmRemoved
     category: diagnostic
     severity: notice
-    description: Humidity alarm removed for sensor {sensorId} on {_HOSTNAME}.
+    description: Humidity alarm removed for sensor {{value "sensorId"}} on {{hostname}}.
     status: current
     varbinds:
       - sensorId
@@ -101,7 +101,7 @@ traps:
     name: RIELLOUPS-MIB::rupsTrapOnBattery
     category: state_change
     severity: warning
-    description: UPS switched to battery power with {rupsEstimatedMinutesRemaining} minutes remaining on {_HOSTNAME}.
+    description: UPS switched to battery power{{with value "rupsEstimatedMinutesRemaining"}} for {{.}} minutes{{end}} on {{hostname}}.
     status: current
     varbinds:
       - rupsEstimatedMinutesRemaining
@@ -109,78 +109,78 @@ traps:
   - oid: 1.3.6.1.4.1.5491.10.2.0.2
     name: RIELLOUPS-MIB::rupsTrapTestCompleted
     category: diagnostic
-    severity: notice
-    description: UPS diagnostic test completed on {_HOSTNAME}.
+    severity: info
+    description: UPS diagnostic test completed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.5491.10.2.0.3
     name: RIELLOUPS-MIB::rupsTrapAlarmEntryAdded
     category: diagnostic
-    severity: notice
-    description: UPS alarm entry added on {_HOSTNAME}.
+    severity: warning
+    description: UPS alarm entry added to the alarm table on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.5491.10.2.0.4
     name: RIELLOUPS-MIB::rupsTrapAlarmEntryRemoved
     category: state_change
     severity: notice
-    description: Alarm removed from the alarm table on {_HOSTNAME}.
+    description: UPS alarm entry removed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.5491.11.4.0.1
     name: RIELLOMDU-MIB::mduNormal
     category: state_change
     severity: notice
-    description: MDU status changed to normal on {_HOSTNAME}.
+    description: MDU returned to normal status on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.5491.11.4.0.2
     name: RIELLOMDU-MIB::mduAnomaly
     category: diagnostic
     severity: warning
-    description: MDU anomaly detected on {_HOSTNAME}.
+    description: MDU anomaly detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.5491.11.4.0.3
     name: RIELLOMDU-MIB::mduFault
     category: diagnostic
-    severity: err
-    description: MDU fault detected on {_HOSTNAME}.
+    severity: alert
+    description: MDU fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.5491.11.4.0.4
     name: RIELLOMDU-MIB::mduLock
-    category: diagnostic
+    category: security
     severity: alert
-    description: MDU device is locked on {_HOSTNAME}.
+    description: MDU is locked on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.5491.11.4.0.5
     name: RIELLOMDU-MIB::mduManualBypassEnabled
     category: state_change
-    severity: notice
-    description: MDU entered manual bypass state on {_HOSTNAME}.
+    severity: warning
+    description: MDU manual bypass is enabled on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.5491.12.4.0.1
     name: RIELLOMTS-MIB::mtsNormal
     category: state_change
     severity: notice
-    description: STS status changed to normal on {_HOSTNAME}.
+    description: STS returned to normal status on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.5491.12.4.0.2
     name: RIELLOMTS-MIB::mtsAnomaly
     category: diagnostic
     severity: warning
-    description: Anomaly detected on STS device on {_HOSTNAME}.
+    description: STS anomaly detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.5491.12.4.0.3
     name: RIELLOMTS-MIB::mtsFault
     category: diagnostic
-    severity: warning
-    description: STS fault detected on {_HOSTNAME}.
+    severity: alert
+    description: STS fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.5491.12.4.0.4
     name: RIELLOMTS-MIB::mtsLock
     category: diagnostic
     severity: warning
-    description: STS is locked on {_HOSTNAME}.
+    description: STS is locked on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.5491.12.4.0.5
     name: RIELLOMTS-MIB::mtsManualBypassEnabled
     category: state_change
     severity: notice
-    description: STS switched to manual bypass mode on {_HOSTNAME}.
+    description: STS entered manual bypass mode on {{hostname}}.
     status: current

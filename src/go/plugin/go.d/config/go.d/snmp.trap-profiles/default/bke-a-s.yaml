@@ -38,7 +38,7 @@ traps:
     name: PNETMOD-MIB::tsTrapAlarmStart
     category: diagnostic
     severity: warning
-    description: Alarm inserted with description {alarmDescription} and value {value} on {_HOSTNAME}.
+    description: 'Alarm started: {{value "alarmDescription"}} on {{hostname}}.'
     status: current
     varbinds:
       - sysName
@@ -49,7 +49,7 @@ traps:
     name: PNETMOD-MIB::tsTrapAlarmEnd
     category: state_change
     severity: notice
-    description: Alarm {alarmDescription} removed from alarm table on {_HOSTNAME}.
+    description: 'Alarm cleared{{with value "alarmDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - sysName

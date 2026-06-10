@@ -24,23 +24,23 @@ traps:
     name: GAMATRONIC-MIB::psTrap1006ACLow
     category: diagnostic
     severity: warning
-    description: AC power low alarm reported with status {psTrapStatus} on {_HOSTNAME}.
+    description: Power supply AC low alarm detected{{with value "psTrapStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapStatus
   - oid: 1.3.6.1.4.1.6050.1.12.10.0.2
     name: GAMATRONIC-MIB::psTrap1006Battery2TestFault
     category: diagnostic
-    severity: err
-    description: Battery 2 test fault reported with status {psTrapStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Battery 2 test fault detected on {{hostname}}.
     status: current
     varbinds:
       - psTrapStatus
   - oid: 1.3.6.1.4.1.6050.1.12.10.0.3
     name: GAMATRONIC-MIB::psTrap1006Battery1TestFault
     category: diagnostic
-    severity: err
-    description: Battery 1 test fault reported with status {psTrapStatus} on {_HOSTNAME}.
+    severity: alert
+    description: Battery 1 test fault detected{{with value "psTrapStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapStatus
@@ -48,7 +48,7 @@ traps:
     name: GAMATRONIC-MIB::psTrap1006LVD2Open
     category: diagnostic
     severity: warning
-    description: Power supply status {psTrapStatus} indicates LVD2 driven open on {_HOSTNAME}.
+    description: Power supply alarm status {{value "psTrapStatus"}} indicates LVD2 driven open on {{hostname}}.
     status: current
     varbinds:
       - psTrapStatus
@@ -56,7 +56,7 @@ traps:
     name: GAMATRONIC-MIB::psTrap1006LVD1Open
     category: diagnostic
     severity: warning
-    description: Power supply status {psTrapStatus} indicates LVD1 driven open on {_HOSTNAME}.
+    description: LVD1 driven open detected on {{hostname}}.
     status: current
     varbinds:
       - psTrapStatus
@@ -64,23 +64,23 @@ traps:
     name: GAMATRONIC-MIB::psTrap1006AUXContactOpen
     category: diagnostic
     severity: warning
-    description: Auxiliary contact status changed to {psTrapStatus} on {_HOSTNAME}.
+    description: AUX contact open status detected on {{hostname}}.
     status: current
     varbinds:
       - psTrapStatus
   - oid: 1.3.6.1.4.1.6050.1.12.10.0.7
     name: GAMATRONIC-MIB::psTrap1006AUXBreakerOpen
     category: diagnostic
-    severity: warning
-    description: Auxiliary breaker open status reported via {psTrapStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Auxiliary breaker is open with status {{value "psTrapStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapStatus
   - oid: 1.3.6.1.4.1.6050.1.12.10.0.8
     name: GAMATRONIC-MIB::psTrap1006BatteryBreakerOpen
     category: diagnostic
-    severity: crit
-    description: Battery breaker open with status {psTrapStatus} on {_HOSTNAME}.
+    severity: alert
+    description: Battery breaker is open on {{hostname}}.
     status: current
     varbinds:
       - psTrapStatus
@@ -88,7 +88,7 @@ traps:
     name: GAMATRONIC-MIB::psTrap1006LoadBreakerOpen
     category: diagnostic
     severity: alert
-    description: Power supply load breaker open status {psTrapStatus} on {_HOSTNAME}.
+    description: Power supply load breaker is open on {{hostname}}.
     status: current
     varbinds:
       - psTrapStatus
@@ -96,7 +96,7 @@ traps:
     name: GAMATRONIC-MIB::psTrap1006DCLOWLow
     category: diagnostic
     severity: warning
-    description: Power supply status {psTrapStatus} indicates DC low on {_HOSTNAME}.
+    description: Power supply alarm status {{value "psTrapStatus"}} indicates low DC voltage on {{hostname}}.
     status: current
     varbinds:
       - psTrapStatus
@@ -104,15 +104,15 @@ traps:
     name: GAMATRONIC-MIB::psTrap1006Rectifier
     category: diagnostic
     severity: warning
-    description: Rectifier status changed to {psTrapStatus} on {_HOSTNAME}.
+    description: Rectifier alarm status {{value "psTrapStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapStatus
   - oid: 1.3.6.1.4.1.6050.1.12.10.0.12
     name: GAMATRONIC-MIB::psTrap1006OverTemptature
     category: diagnostic
-    severity: warning
-    description: Over temperature alarm reported with status {psTrapStatus} on {_HOSTNAME}.
+    severity: alert
+    description: Over temperature condition detected on {{hostname}}.
     status: current
     varbinds:
       - psTrapStatus
@@ -120,7 +120,7 @@ traps:
     name: GAMATRONIC-MIB::psTrap1006LVDBypassOpen
     category: diagnostic
     severity: warning
-    description: LVD bypass open status {psTrapStatus} on {_HOSTNAME}.
+    description: LVD bypass open detected on {{hostname}}.
     status: current
     varbinds:
       - psTrapStatus
@@ -128,7 +128,7 @@ traps:
     name: GAMATRONIC-MIB::psTrap1006DCHigh
     category: diagnostic
     severity: warning
-    description: DC high voltage alarm reported with status {psTrapStatus} on {_HOSTNAME}.
+    description: DC power supply high voltage alarm detected on {{hostname}}.
     status: current
     varbinds:
       - psTrapStatus
@@ -136,7 +136,7 @@ traps:
     name: GAMATRONIC-MIB::psTrap1006DCLow
     category: diagnostic
     severity: warning
-    description: DC power supply status {psTrapStatus} indicates low voltage on {_HOSTNAME}.
+    description: DC power low alarm detected{{with value "psTrapStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapStatus
@@ -144,15 +144,15 @@ traps:
     name: GAMATRONIC-MIB::psTrap1006ACHigh
     category: diagnostic
     severity: warning
-    description: AC HIGH alarm reported with status {psTrapStatus} on {_HOSTNAME}.
+    description: AC power supply high alarm detected{{with value "psTrapStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapStatus
   - oid: 1.3.6.1.4.1.6050.1.12.11.0.1
     name: GAMATRONIC-MIB::psTrapRFAMAJ
     category: diagnostic
-    severity: alert
-    description: Power supply rectifier fault detected with severity {psTrapSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: Power supply rectifier fault detected on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -160,8 +160,8 @@ traps:
   - oid: 1.3.6.1.4.1.6050.1.12.11.0.2
     name: GAMATRONIC-MIB::psTrapRFAMIN
     category: diagnostic
-    severity: err
-    description: Rectifier reported fault with severity {psTrapSeverity} on {_HOSTNAME}.
+    severity: warning
+    description: Power supply rectifier fault detected{{with value "psTrapStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -169,8 +169,8 @@ traps:
   - oid: 1.3.6.1.4.1.6050.1.12.11.0.3
     name: GAMATRONIC-MIB::psTrapACFAIL
     category: diagnostic
-    severity: err
-    description: AC input abnormal failure detected with severity {psTrapSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: AC input failure detected on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -179,7 +179,7 @@ traps:
     name: GAMATRONIC-MIB::psTrapLVDX2
     category: diagnostic
     severity: warning
-    description: Power supply alarm {psTrapStatus} with severity {psTrapSeverity} on {_HOSTNAME}.
+    description: 'Power supply alarm: both LVDs are open on {{hostname}}.'
     status: current
     varbinds:
       - psTrapSeverity
@@ -187,8 +187,8 @@ traps:
   - oid: 1.3.6.1.4.1.6050.1.12.11.0.5
     name: GAMATRONIC-MIB::psTrapSYSOT
     category: diagnostic
-    severity: crit
-    description: System over temperature alarm with severity {psTrapSeverity} and status {psTrapStatus} on {_HOSTNAME}.
+    severity: alert
+    description: System over temperature condition detected{{with value "psTrapStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -197,7 +197,7 @@ traps:
     name: GAMATRONIC-MIB::psTrapLVDX1
     category: diagnostic
     severity: warning
-    description: Power supply status changed to {psTrapStatus} with severity {psTrapSeverity} on {_HOSTNAME}.
+    description: Power supply alarm triggered with status {{value "psTrapStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -205,8 +205,8 @@ traps:
   - oid: 1.3.6.1.4.1.6050.1.12.11.0.7
     name: GAMATRONIC-MIB::psTrapCBOPEN
     category: diagnostic
-    severity: alert
-    description: Load breaker open detected with severity {psTrapSeverity} on {_HOSTNAME}.
+    severity: warning
+    description: Power supply load breaker open on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -215,7 +215,7 @@ traps:
     name: GAMATRONIC-MIB::psTrapEQHST
     category: diagnostic
     severity: warning
-    description: Power supply {psTrapStatus} reported {psTrapSeverity} on {_HOSTNAME}.
+    description: Power supply equalizing mode detected{{with value "psTrapStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -223,8 +223,8 @@ traps:
   - oid: 1.3.6.1.4.1.6050.1.12.11.0.9
     name: GAMATRONIC-MIB::psTrapBATTST
     category: diagnostic
-    severity: err
-    description: Battery test failed with severity {psTrapSeverity} and status {psTrapStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Battery test failed with status {{value "psTrapStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -232,8 +232,8 @@ traps:
   - oid: 1.3.6.1.4.1.6050.1.12.11.0.10
     name: GAMATRONIC-MIB::psTrapINUBAD
     category: diagnostic
-    severity: crit
-    description: Inverter fault detected with severity {psTrapSeverity} and status {psTrapStatus} on {_HOSTNAME}.
+    severity: alert
+    description: Power supply fault detected{{with value "psTrapStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -241,8 +241,8 @@ traps:
   - oid: 1.3.6.1.4.1.6050.1.12.11.0.11
     name: GAMATRONIC-MIB::psTrapUNIVPD
     category: diagnostic
-    severity: err
-    description: Universal PD not responding with severity {psTrapSeverity} on {_HOSTNAME}.
+    severity: alert
+    description: Universal power supply not responding with status {{value "psTrapStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -250,8 +250,8 @@ traps:
   - oid: 1.3.6.1.4.1.6050.1.12.11.0.12
     name: GAMATRONIC-MIB::psTrapIBADIN
     category: diagnostic
-    severity: err
-    description: Power supply {psTrapStatus} reported {psTrapSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: Power supply inverter not responding on PD bus on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -259,8 +259,8 @@ traps:
   - oid: 1.3.6.1.4.1.6050.1.12.11.0.13
     name: GAMATRONIC-MIB::psTrapRBADIN
     category: diagnostic
-    severity: err
-    description: Rectifier not responding on PD bus with status {psTrapStatus} on {_HOSTNAME}.
+    severity: alert
+    description: Power supply rectifier not responding on PD bus on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -268,8 +268,8 @@ traps:
   - oid: 1.3.6.1.4.1.6050.1.12.11.0.14
     name: GAMATRONIC-MIB::psTrapSLFTST
     category: diagnostic
-    severity: err
-    description: Self test failed with status {psTrapStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Power supply self test failed with status {{value "psTrapStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -277,8 +277,8 @@ traps:
   - oid: 1.3.6.1.4.1.6050.1.12.11.0.15
     name: GAMATRONIC-MIB::psTrapFUSEBD
     category: diagnostic
-    severity: alert
-    description: Battery fuse fault reported with severity {psTrapSeverity} and status {psTrapStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Power supply battery fuse fault detected{{with value "psTrapStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -287,7 +287,7 @@ traps:
     name: GAMATRONIC-MIB::psTrapLOADHI
     category: diagnostic
     severity: warning
-    description: Power supply load current high with severity {psTrapSeverity} and status {psTrapStatus} on {_HOSTNAME}.
+    description: Power supply load current high {{value "psTrapStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -295,8 +295,8 @@ traps:
   - oid: 1.3.6.1.4.1.6050.1.12.11.0.17
     name: GAMATRONIC-MIB::psTrapSURGBD
     category: diagnostic
-    severity: err
-    description: Surge fault detected with severity {psTrapSeverity} and status {psTrapStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Power supply surge fault detected{{with value "psTrapStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -305,7 +305,7 @@ traps:
     name: GAMATRONIC-MIB::psTrapEQLONG
     category: diagnostic
     severity: warning
-    description: Power supply equalizing running more than 60 hours with {psTrapStatus} on {_HOSTNAME}.
+    description: Power supply equalizing running more than 60 hours on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -313,8 +313,8 @@ traps:
   - oid: 1.3.6.1.4.1.6050.1.12.11.0.19
     name: GAMATRONIC-MIB::psTrapFUSE24
     category: diagnostic
-    severity: err
-    description: 24V Fuse fault reported with severity {psTrapSeverity} and status {psTrapStatus} on {_HOSTNAME}.
+    severity: alert
+    description: 24V fuse fault detected{{with value "psTrapStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -322,8 +322,8 @@ traps:
   - oid: 1.3.6.1.4.1.6050.1.12.11.0.20
     name: GAMATRONIC-MIB::psTrapFUSE48
     category: diagnostic
-    severity: err
-    description: 48V Fuse fault reported with severity {psTrapSeverity} and status {psTrapStatus} on {_HOSTNAME}.
+    severity: alert
+    description: 48V fuse fault detected{{with value "psTrapStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -332,7 +332,7 @@ traps:
     name: GAMATRONIC-MIB::psTrapBYPS2
     category: diagnostic
     severity: warning
-    description: ByPass LVD2 is ON with severity {psTrapSeverity} and status {psTrapStatus} on {_HOSTNAME}.
+    description: Power supply bypass status is ON with severity {{value "psTrapSeverity"}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -341,7 +341,7 @@ traps:
     name: GAMATRONIC-MIB::psTrapBYPS1
     category: diagnostic
     severity: warning
-    description: Power supply bypass status {psTrapStatus} with severity {psTrapSeverity} on {_HOSTNAME}.
+    description: Power supply bypass status is ON with severity {{value "psTrapSeverity"}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -349,8 +349,8 @@ traps:
   - oid: 1.3.6.1.4.1.6050.1.12.11.0.23
     name: GAMATRONIC-MIB::psTrapCB24CR
     category: diagnostic
-    severity: emerg
-    description: 24V breaker critical alarm with severity {psTrapSeverity} and status {psTrapStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Power supply 24V breaker critical status on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -359,7 +359,7 @@ traps:
     name: GAMATRONIC-MIB::psTrapCB48CR
     category: diagnostic
     severity: crit
-    description: Power supply critical alarm with status {psTrapStatus} on {_HOSTNAME}.
+    description: Power supply 48V breaker critical status on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity
@@ -368,7 +368,7 @@ traps:
     name: GAMATRONIC-MIB::psTrapBATOT
     category: diagnostic
     severity: warning
-    description: Battery over temperature detected with severity {psTrapSeverity} on {_HOSTNAME}.
+    description: Battery over temperature detected{{with value "psTrapStatus"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - psTrapSeverity

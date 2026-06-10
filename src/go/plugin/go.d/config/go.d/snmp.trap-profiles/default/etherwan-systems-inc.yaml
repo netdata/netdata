@@ -77,9 +77,9 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.2736.1.1.1.15.1
     name: EtherWAN-ewnSwitchM::ewnTrapsLoopbackDetected
-    category: state_change
+    category: security
     severity: warning
-    description: Interface error-disabled due to loopback detection on port {ewnPortNo} on {_HOSTNAME}.
+    description: Loopback detected and interface error-disabled on port {{value "ewnPortNo"}} on {{hostname}}.
     status: current
     varbinds:
       - ewnPortNo
@@ -87,7 +87,7 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnTrapsMacChangedNotification
     category: state_change
     severity: notice
-    description: MAC address change detected on port via {ewnPortMacChangedMsg} on {_HOSTNAME}.
+    description: MAC address changed or removed on {{hostname}}.
     status: current
     varbinds:
       - ewnPortMacChangedMsg
@@ -95,7 +95,7 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnTrapsRringTopologyChange
     category: state_change
     severity: notice
-    description: Ring topology change on port {ewnPortNo} on {_HOSTNAME}.
+    description: RRing topology change on port {{value "ewnPortNo"}} on {{hostname}}.
     status: current
     varbinds:
       - ewnPortNo
@@ -103,27 +103,27 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnTrapsDigitalIOInput1
     category: state_change
     severity: notice
-    description: Digital input 1 state change detected on {_HOSTNAME}.
+    description: Digital input 1 state changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2736.1.1.1.15.5
     name: EtherWAN-ewnSwitchM::ewnTrapsDigitalIOInput2
     category: state_change
     severity: notice
-    description: Digital input 2 state change detected on {_HOSTNAME}.
+    description: Digital input 2 state changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2736.1.1.1.15.6
     name: EtherWAN-ewnSwitchM::ewnTrapsPowerUp
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Power state changed to {ewnSystemPowerState} on {_HOSTNAME}.
+    description: System power up event detected on {{hostname}}.
     status: current
     varbinds:
       - ewnSystemPowerState
   - oid: 1.3.6.1.4.1.2736.1.1.1.15.7
     name: EtherWAN-ewnSwitchM::ewnTrapsPowerDown
     category: diagnostic
-    severity: err
-    description: Power down event detected with state {ewnSystemPowerState} on {_HOSTNAME}.
+    severity: alert
+    description: Power down event detected on {{hostname}}.
     status: current
     varbinds:
       - ewnSystemPowerState
@@ -131,7 +131,7 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnTrapsPoEIFUp
     category: state_change
     severity: notice
-    description: PoE interface {ewnPortNo} is up on {_HOSTNAME}.
+    description: PoE interface {{first (value "ewnPortNo") "port"}} went up on {{hostname}}.
     status: current
     varbinds:
       - ewnPortNo
@@ -139,7 +139,7 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnTrapsPoEIFDown
     category: state_change
     severity: warning
-    description: PoE interface {ewnPortNo} went down on {_HOSTNAME}.
+    description: PoE interface down on port {{value "ewnPortNo"}} on {{hostname}}.
     status: current
     varbinds:
       - ewnPortNo
@@ -147,7 +147,7 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnTrapsPoEOverLoad
     category: diagnostic
     severity: warning
-    description: PoE over load detected on port {ewnPortNo} on {_HOSTNAME}.
+    description: PoE over load detected on port {{value "ewnPortNo"}} on {{hostname}}.
     status: current
     varbinds:
       - ewnPortNo
@@ -155,13 +155,13 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnTrapsPoESystemError
     category: diagnostic
     severity: err
-    description: PoE system error detected on {_HOSTNAME}.
+    description: PoE system error detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.2736.1.1.1.15.12
     name: EtherWAN-ewnSwitchM::ewnTrapsRringCPTopologyChange
     category: state_change
     severity: notice
-    description: Bridge topology change detected on port {ewnPortNo} on {_HOSTNAME}.
+    description: Ring topology change on port {{value "ewnPortNo"}} on {{hostname}}.
     status: current
     varbinds:
       - ewnPortNo
@@ -169,7 +169,7 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnStormDetected
     category: state_change
     severity: warning
-    description: Port {ewnPortNo} error-disabled by storm detection on {_HOSTNAME}.
+    description: Port {{value "ewnPortNo"}} error-disabled by storm detection on {{hostname}}.
     status: current
     varbinds:
       - ewnPortNo
@@ -177,7 +177,7 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnTrapsUserLogin
     category: auth
     severity: notice
-    description: User {ewnSystemLoginUserName} logged in via {ewnSystemLoginMethod} from {ewnSystemLoginUserIpAddr} on {_HOSTNAME}.
+    description: User {{value "ewnSystemLoginUserName"}} logged in via {{value "ewnSystemLoginMethod"}} from {{value "ewnSystemLoginUserIpAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - ewnSystemLoginUserName
@@ -187,7 +187,7 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnTrapsUserLogout
     category: auth
     severity: notice
-    description: User {ewnSystemLoginUserName} logged out via {ewnSystemLoginMethod} from {ewnSystemLoginUserIpAddr} on {_HOSTNAME}.
+    description: User {{value "ewnSystemLoginUserName"}} logged out on {{hostname}}.
     status: current
     varbinds:
       - ewnSystemLoginUserName
@@ -197,7 +197,7 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnTrapsUserLoginFailure
     category: auth
     severity: warning
-    description: User login rejected for {ewnSystemLoginUserName} via {ewnSystemLoginMethod} from {ewnSystemLoginUserIpAddr} on {_HOSTNAME}.
+    description: User login rejected for {{value "ewnSystemLoginUserName"}} from {{value "ewnSystemLoginUserIpAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - ewnSystemLoginUserName
@@ -207,7 +207,7 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnSensorTempOverTrap
     category: diagnostic
     severity: warning
-    description: Temperature {ewnSensorTempValue} exceeded threshold {ewnSensorTempHighThreshold} on {_HOSTNAME}.
+    description: Temperature {{value "ewnSensorTempValue"}} exceeded threshold {{value "ewnSensorTempHighThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - ewnSensorTempHighThreshold
@@ -216,7 +216,7 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnSensorTempUnderTrap
     category: diagnostic
     severity: warning
-    description: Temperature {ewnSensorTempValue} fell below threshold {ewnSensorTempLowhreshold} on {_HOSTNAME}.
+    description: Sensor temperature {{value "ewnSensorTempValue"}} fell below threshold {{value "ewnSensorTempLowhreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - ewnSensorTempLowhreshold
@@ -225,7 +225,7 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnSensorHumidityOverTrap
     category: diagnostic
     severity: warning
-    description: Humidity {ewnSensorHumidityValue}% exceeded high threshold {ewnSensorHumidityHighThreshold}% on {_HOSTNAME}.
+    description: Humidity exceeded high threshold of {{value "ewnSensorHumidityHighThreshold"}}% on {{hostname}}.
     status: current
     varbinds:
       - ewnSensorHumidityHighThreshold
@@ -234,7 +234,7 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnSensorHumidityUnderTrap
     category: diagnostic
     severity: warning
-    description: Humidity {ewnSensorHumidityValue} fell below threshold {ewnSensorHumidityLowThreshold} on {_HOSTNAME}.
+    description: Humidity sensor value {{value "ewnSensorHumidityValue"}}%RH fell below threshold on {{hostname}}.
     status: current
     varbinds:
       - ewnSensorHumidityLowThreshold
@@ -243,7 +243,7 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnSensorDigitalInputTrap
     category: state_change
     severity: notice
-    description: Digital input {ewnSensorDigitalInputIndex} state changed to {ewnSensorDigitalInputState} on {_HOSTNAME}.
+    description: Digital input {{value "ewnSensorDigitalInputIndex"}} state changed to {{value "ewnSensorDigitalInputState"}} on {{hostname}}.
     status: current
     varbinds:
       - ewnSensorDigitalInputIndex
@@ -253,7 +253,7 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnSensorTempNormalTrap
     category: diagnostic
     severity: notice
-    description: Temperature returned to normal at {ewnSensorTempValue} on {_HOSTNAME}.
+    description: Sensor temperature returned to normal from alarm on {{hostname}}.
     status: current
     varbinds:
       - ewnSensorTempValue
@@ -261,7 +261,7 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnSensorHumidityNormalTrap
     category: diagnostic
     severity: notice
-    description: Humidity returned to normal at {ewnSensorHumidityValue} on {_HOSTNAME}.
+    description: Humidity sensor returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - ewnSensorHumidityValue
@@ -269,7 +269,7 @@ traps:
     name: EtherWAN-ewnSwitchM::ewnSensorDigitalInputNormalTrap
     category: state_change
     severity: notice
-    description: Digital input {ewnSensorDigitalInputIndex} state changed to {ewnSensorDigitalInputState} on {_HOSTNAME}.
+    description: Digital input sensor returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - ewnSensorDigitalInputIndex

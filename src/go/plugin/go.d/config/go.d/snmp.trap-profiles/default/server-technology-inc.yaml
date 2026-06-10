@@ -1196,8 +1196,8 @@ traps:
   - oid: 1.3.6.1.4.1.1718.3.100.0.1
     name: Sentry3-MIB::towerStatusEvent
     category: diagnostic
-    severity: err
-    description: Tower {towerName} reported error status {towerStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Tower {{value "towerName"}} reported status {{value "towerStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - systemLocation
@@ -1210,7 +1210,7 @@ traps:
     name: Sentry3-MIB::infeedStatusEvent
     category: diagnostic
     severity: warning
-    description: Input feed {infeedName} reported error state {infeedStatus} on {_HOSTNAME}.
+    description: Input feed {{value "infeedName"}} status error {{value "eventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - systemLocation
@@ -1223,7 +1223,7 @@ traps:
     name: Sentry3-MIB::infeedLoadEvent
     category: diagnostic
     severity: warning
-    description: Input feed {infeedName} load status {infeedLoadStatus} on {_HOSTNAME}.
+    description: Input feed {{value "infeedName"}} load status is {{value "infeedLoadStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - systemLocation
@@ -1238,7 +1238,7 @@ traps:
     name: Sentry3-MIB::outletStatusEvent
     category: diagnostic
     severity: warning
-    description: Outlet {outletName} reported error state {outletStatus} on {_HOSTNAME}.
+    description: Outlet {{value "outletName"}} status error {{value "eventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - systemLocation
@@ -1251,7 +1251,7 @@ traps:
     name: Sentry3-MIB::outletLoadEvent
     category: diagnostic
     severity: warning
-    description: Outlet {outletName} reported load status {outletLoadStatus} on {_HOSTNAME}.
+    description: Outlet {{value "outletName"}} load status {{value "outletLoadStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - systemLocation
@@ -1267,7 +1267,7 @@ traps:
     name: Sentry3-MIB::outletChangeEvent
     category: state_change
     severity: notice
-    description: Outlet {outletName} changed status to {outletStatus} on {_HOSTNAME}.
+    description: Outlet {{value "outletName"}} status changed to {{value "outletStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - systemLocation
@@ -1280,8 +1280,8 @@ traps:
   - oid: 1.3.6.1.4.1.1718.3.100.0.7
     name: Sentry3-MIB::envMonStatusEvent
     category: diagnostic
-    severity: err
-    description: Environmental monitor {envMonName} reported {envMonStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Environmental monitor {{value "envMonName"}} reports status {{value "eventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - systemLocation
@@ -1294,7 +1294,7 @@ traps:
     name: Sentry3-MIB::envMonWaterSensorEvent
     category: diagnostic
     severity: warning
-    description: Water sensor {envMonWaterSensorName} reported {eventStatusText} on {_HOSTNAME}.
+    description: Water sensor {{value "envMonWaterSensorName"}} reported an alarm condition on {{hostname}}.
     status: current
     varbinds:
       - systemLocation
@@ -1307,7 +1307,7 @@ traps:
     name: Sentry3-MIB::envMonADCEvent
     category: diagnostic
     severity: warning
-    description: Environmental monitor ADC {envMonADCName} reported status {envMonADCStatus} on {_HOSTNAME}.
+    description: Environmental monitor ADC event {{value "eventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - systemLocation
@@ -1323,7 +1323,7 @@ traps:
     name: Sentry3-MIB::tempHumidSensorStatusEvent
     category: diagnostic
     severity: warning
-    description: Temperature/humidity sensor {tempHumidSensorName} reported status {tempHumidSensorStatus} on {_HOSTNAME}.
+    description: Temperature/humidity sensor {{value "tempHumidSensorName"}} reported error status on {{hostname}}.
     status: current
     varbinds:
       - systemLocation
@@ -1336,7 +1336,7 @@ traps:
     name: Sentry3-MIB::tempHumidSensorTempEvent
     category: diagnostic
     severity: warning
-    description: Temperature sensor {tempHumidSensorName} reported {eventStatusText} with value {tempHumidSensorTempValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "tempHumidSensorName"}} reported {{value "eventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - systemLocation
@@ -1353,7 +1353,7 @@ traps:
     name: Sentry3-MIB::tempHumidSensorHumidEvent
     category: diagnostic
     severity: warning
-    description: Humidity sensor {tempHumidSensorName} reported {tempHumidSensorHumidStatus} on {_HOSTNAME}.
+    description: Humidity sensor {{value "tempHumidSensorName"}} reported {{value "eventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - systemLocation
@@ -1369,7 +1369,7 @@ traps:
     name: Sentry3-MIB::contactClosureEvent
     category: diagnostic
     severity: warning
-    description: Contact closure {contactClosureName} reported status {contactClosureStatus} on {_HOSTNAME}.
+    description: Contact closure {{value "contactClosureName"}} alarm state on {{hostname}}.
     status: current
     varbinds:
       - systemLocation
@@ -1382,7 +1382,7 @@ traps:
     name: Sentry3-MIB::branchStatusEvent
     category: diagnostic
     severity: warning
-    description: Branch {branchName} reported error state {eventStatusText} on {_HOSTNAME}.
+    description: Branch {{value "branchName"}} status error {{value "eventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - systemLocation
@@ -1395,7 +1395,7 @@ traps:
     name: Sentry3-MIB::branchLoadEvent
     category: diagnostic
     severity: warning
-    description: Branch {branchName} load status {branchLoadStatus} on {_HOSTNAME}.
+    description: Branch load event {{value "eventStatusText"}} on {{value "branchName"}} on {{hostname}}.
     status: current
     varbinds:
       - systemLocation
@@ -1410,7 +1410,7 @@ traps:
     name: Sentry4-MIB::st4UnitStatusEvent
     category: state_change
     severity: warning
-    description: Unit {st4UnitName} status changed to {st4UnitStatus} on {_HOSTNAME}.
+    description: Unit {{value "st4UnitName"}} status changed to {{value "st4EventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1423,7 +1423,7 @@ traps:
     name: Sentry4-MIB::st4InputCordStatusEvent
     category: state_change
     severity: warning
-    description: Input cord {st4InputCordName} state changed to {st4InputCordState} on {_HOSTNAME}.
+    description: Input cord {{value "st4InputCordName"}} status changed to {{value "st4EventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1437,7 +1437,7 @@ traps:
     name: Sentry4-MIB::st4InputCordActivePowerEvent
     category: diagnostic
     severity: warning
-    description: Input cord {st4InputCordName} active power status {st4InputCordActivePowerStatus} on {_HOSTNAME}.
+    description: Input cord {{value "st4InputCordName"}} active power event {{value "st4EventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1451,7 +1451,7 @@ traps:
     name: Sentry4-MIB::st4InputCordApparentPowerEvent
     category: diagnostic
     severity: warning
-    description: Input cord {st4InputCordName} apparent power status {st4InputCordApparentPowerStatus} on {_HOSTNAME}.
+    description: Input cord {{value "st4InputCordName"}} apparent power event {{value "st4EventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1465,7 +1465,7 @@ traps:
     name: Sentry4-MIB::st4InputCordPowerFactorEvent
     category: diagnostic
     severity: warning
-    description: Input cord power factor {st4InputCordPowerFactorStatus} on {st4InputCordName} on {_HOSTNAME}.
+    description: Input cord power factor event {{value "st4EventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1479,7 +1479,7 @@ traps:
     name: Sentry4-MIB::st4InputCordOutOfBalanceEvent
     category: diagnostic
     severity: warning
-    description: Input cord {st4InputCordName} imbalance status {st4InputCordOutOfBalanceStatus} on {_HOSTNAME}.
+    description: Input cord {{value "st4InputCordName"}} imbalance detected on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1492,8 +1492,8 @@ traps:
   - oid: 1.3.6.1.4.1.1718.4.100.0.7
     name: Sentry4-MIB::st4LineStatusEvent
     category: state_change
-    severity: notice
-    description: Line {st4LineLabel} state changed to {st4LineState} on {_HOSTNAME}.
+    severity: warning
+    description: Line {{value "st4LineLabel"}} status changed to {{value "st4EventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1507,7 +1507,7 @@ traps:
     name: Sentry4-MIB::st4LineCurrentEvent
     category: diagnostic
     severity: warning
-    description: Line {st4LineID} current status {st4LineCurrentStatus} reported on {_HOSTNAME}.
+    description: Line current event {{value "st4EventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1520,8 +1520,8 @@ traps:
   - oid: 1.3.6.1.4.1.1718.4.100.0.9
     name: Sentry4-MIB::st4PhaseStatusEvent
     category: state_change
-    severity: notice
-    description: Phase {st4PhaseLabel} status changed to {st4PhaseStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Phase {{value "st4PhaseLabel"}} status changed to {{value "st4EventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1535,7 +1535,7 @@ traps:
     name: Sentry4-MIB::st4PhaseVoltageEvent
     category: diagnostic
     severity: warning
-    description: Phase voltage event on {st4PhaseLabel} with status {st4PhaseVoltageStatus} on {_HOSTNAME}.
+    description: Phase voltage event {{value "st4EventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1549,7 +1549,7 @@ traps:
     name: Sentry4-MIB::st4PhasePowerFactorEvent
     category: diagnostic
     severity: warning
-    description: Phase {st4PhaseLabel} power factor status {st4PhasePowerFactorStatus} on {_HOSTNAME}.
+    description: Phase power factor event {{value "st4EventStatusText"}} on {{first (value "st4PhaseLabel") (value "st4PhaseID")}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1563,7 +1563,7 @@ traps:
     name: Sentry4-MIB::st4OcpStatusEvent
     category: diagnostic
     severity: warning
-    description: Over-current protector {st4OcpLabel} status changed to {st4OcpStatus} on {_HOSTNAME}.
+    description: Over-current protector {{value "st4OcpLabel"}} status event on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1575,8 +1575,8 @@ traps:
   - oid: 1.3.6.1.4.1.1718.4.100.0.13
     name: Sentry4-MIB::st4BranchStatusEvent
     category: state_change
-    severity: notice
-    description: Branch {st4BranchID} status changed to {st4BranchStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Branch {{value "st4BranchLabel"}} status changed to {{value "st4BranchState"}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1590,7 +1590,7 @@ traps:
     name: Sentry4-MIB::st4BranchCurrentEvent
     category: diagnostic
     severity: warning
-    description: Branch current {st4BranchCurrent} status {st4BranchCurrentStatus} on branch {st4BranchID} on {_HOSTNAME}.
+    description: Branch current event {{value "st4EventStatusText"}} on branch {{value "st4BranchLabel"}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1604,7 +1604,7 @@ traps:
     name: Sentry4-MIB::st4OutletStatusEvent
     category: state_change
     severity: notice
-    description: Outlet {st4OutletName} status changed to {st4OutletStatus} on {_HOSTNAME}.
+    description: Outlet {{value "st4OutletName"}} status event occurred on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1619,7 +1619,7 @@ traps:
     name: Sentry4-MIB::st4OutletStateChangeEvent
     category: state_change
     severity: notice
-    description: Outlet {st4OutletName} state changed to {st4OutletState} on {_HOSTNAME}.
+    description: Outlet {{value "st4OutletName"}} state changed on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1634,7 +1634,7 @@ traps:
     name: Sentry4-MIB::st4OutletCurrentEvent
     category: diagnostic
     severity: warning
-    description: Outlet {st4OutletName} current event {st4EventStatusText} on {_HOSTNAME}.
+    description: Outlet current event {{value "st4EventStatusText"}} on {{first (value "st4OutletName") (value "st4OutletID")}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1648,7 +1648,7 @@ traps:
     name: Sentry4-MIB::st4OutletActivePowerEvent
     category: diagnostic
     severity: warning
-    description: Outlet {st4OutletName} active power status {st4OutletActivePowerStatus} at {st4OutletActivePower} Watts on {_HOSTNAME}.
+    description: Outlet {{value "st4OutletName"}} active power event {{value "st4EventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1662,7 +1662,7 @@ traps:
     name: Sentry4-MIB::st4OutletPowerFactorEvent
     category: diagnostic
     severity: warning
-    description: Outlet {st4OutletName} power factor {st4OutletPowerFactor} status {st4OutletPowerFactorStatus} on {_HOSTNAME}.
+    description: Outlet power factor event {{value "st4OutletPowerFactorStatus"}} on {{first (value "st4OutletName") (value "st4OutletID")}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1676,7 +1676,7 @@ traps:
     name: Sentry4-MIB::st4TempSensorEvent
     category: diagnostic
     severity: warning
-    description: Temperature sensor {st4TempSensorName} reported {st4EventStatusText} on {_HOSTNAME}.
+    description: Temperature sensor {{value "st4TempSensorName"}} event on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1691,7 +1691,7 @@ traps:
     name: Sentry4-MIB::st4HumidSensorEvent
     category: diagnostic
     severity: warning
-    description: Humidity sensor {st4HumidSensorName} reported status {st4HumidSensorStatus} on {_HOSTNAME}.
+    description: Humidity sensor {{value "st4HumidSensorName"}} event {{value "st4EventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1705,7 +1705,7 @@ traps:
     name: Sentry4-MIB::st4WaterSensorStatusEvent
     category: diagnostic
     severity: warning
-    description: Water sensor {st4WaterSensorName} reported status {st4EventStatusText} on {_HOSTNAME}.
+    description: Water sensor {{value "st4WaterSensorName"}} status changed to {{value "st4EventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1718,7 +1718,7 @@ traps:
     name: Sentry4-MIB::st4CcSensorStatusEvent
     category: diagnostic
     severity: warning
-    description: Contact closure sensor {st4CcSensorName} reported status {st4CcSensorStatus} on {_HOSTNAME}.
+    description: Contact closure sensor {{value "st4CcSensorName"}} status changed to {{value "st4EventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1731,7 +1731,7 @@ traps:
     name: Sentry4-MIB::st4AdcSensorEvent
     category: diagnostic
     severity: warning
-    description: ADC sensor {st4AdcSensorName} reported status {st4AdcSensorStatus} with value {st4AdcSensorValue} on {_HOSTNAME}.
+    description: ADC sensor {{value "st4AdcSensorName"}} event {{value "st4EventStatusText"}} on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation
@@ -1745,7 +1745,7 @@ traps:
     name: Sentry4-MIB::st4FanSensorEvent
     category: diagnostic
     severity: warning
-    description: Fan sensor {st4FanSensorName} reported status {st4FanSensorStatus} on {_HOSTNAME}.
+    description: Fan sensor {{value "st4FanSensorName"}} event occurred on {{hostname}}.
     status: current
     varbinds:
       - st4SystemLocation

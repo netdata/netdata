@@ -9,59 +9,59 @@ traps:
     name: SCHLEIFENBAUER-DATABUS-MIB::sdbDevSsDeviceStatusCodeChanged
     category: state_change
     severity: notice
-    description: Device status code changed on {_HOSTNAME}.
+    description: Device status code changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31034.12.1.0.2
     name: SCHLEIFENBAUER-DATABUS-MIB::sdbDevSsTemperatureAlertDetected
     category: diagnostic
     severity: warning
-    description: Temperature alert detected on {_HOSTNAME}.
+    description: Temperature alert detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31034.12.1.0.3
     name: SCHLEIFENBAUER-DATABUS-MIB::sdbDevSsInputCurrentAlertDetected
     category: diagnostic
     severity: warning
-    description: Input current alert detected on {_HOSTNAME}.
+    description: Input current alert detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31034.12.1.0.4
     name: SCHLEIFENBAUER-DATABUS-MIB::sdbDevSsOutletCurrentAlertDetected
     category: diagnostic
     severity: warning
-    description: Outlet current alert detected on {_HOSTNAME}.
+    description: Outlet current alert detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31034.12.1.0.5
     name: SCHLEIFENBAUER-DATABUS-MIB::sdbDevSsInputVoltageAlertDetected
     category: diagnostic
     severity: warning
-    description: Input voltage alert detected on {_HOSTNAME}.
+    description: Input voltage alert detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31034.12.1.0.6
     name: SCHLEIFENBAUER-DATABUS-MIB::sdbDevSsOutletCurrentDropAlertDetected
     category: diagnostic
     severity: warning
-    description: Outlet current drop alert detected on {_HOSTNAME}.
+    description: Outlet current drop alert detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31034.12.1.0.7
     name: SCHLEIFENBAUER-DATABUS-MIB::sdbDevSsInputCurrentDropAlertDetected
     category: diagnostic
     severity: warning
-    description: Input current drop alert detected on {_HOSTNAME}.
+    description: Input current drop alert detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31034.12.1.0.8
     name: SCHLEIFENBAUER-DATABUS-MIB::sdbDevSsSensorChangeAlertDetected
     category: diagnostic
     severity: warning
-    description: Sensor channel change alert detected on {_HOSTNAME}.
+    description: Sensor channel change alert detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31034.12.1.0.9
     name: SCHLEIFENBAUER-DATABUS-MIB::sdbMgmtStsRingStateChanged
     category: state_change
     severity: notice
-    description: Ring state changed to open on {_HOSTNAME}.
+    description: Data bus ring state changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.31034.12.1.0.10
     name: SCHLEIFENBAUER-DATABUS-MIB::sdbDevSsOutletVoltageDropAlertDetected
     category: diagnostic
     severity: warning
-    description: Outlet voltage drop alert detected on {_HOSTNAME}.
+    description: Outlet voltage drop alert detected on {{hostname}}.
     status: current

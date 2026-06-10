@@ -42,7 +42,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedAlarmEvent
     category: diagnostic
     severity: warning
-    description: Alarm event {reason} detected in {module} with severity {severity} on {_HOSTNAME}.
+    description: Alarm event {{value "reason"}} {{value "description"}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -53,7 +53,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedPidMissingAlarmEvent
     category: diagnostic
     severity: warning
-    description: Alarm event PID missing with reason {reason} on {_HOSTNAME}.
+    description: 'Alarm event PID missing detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -63,8 +63,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.3
     name: TELESTE-LUMINATO-MIB2::extendedServiceMissingAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Service missing alarm {severity.raw} on module {module.raw} on {_HOSTNAME}.
+    severity: crit
+    description: 'Service missing alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -75,7 +75,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedPidConflictAlarmEvent
     category: diagnostic
     severity: warning
-    description: PID conflict alarm detected with reason {reason} on {_HOSTNAME}.
+    description: 'PID conflict alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -85,8 +85,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.6
     name: TELESTE-LUMINATO-MIB2::extendedTemperatureTooHighAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Temperature too high alarm on module {module} with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: 'Temperature too high alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -97,7 +97,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedTemperatureTooLowAlarmEvent
     category: diagnostic
     severity: warning
-    description: Temperature too low alarm detected with severity {severity.raw} on {_HOSTNAME}.
+    description: 'Temperature too low alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -108,7 +108,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedManualTableInsertionFailedAlarmEvent
     category: diagnostic
     severity: err
-    description: Manual table insertion failed with reason {reason} on {_HOSTNAME}.
+    description: Manual table insertion failed{{with value "reason"}} reason {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -119,7 +119,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedAlertMessageAlarmEvent
     category: diagnostic
     severity: warning
-    description: Alarm event triggered with severity {severity.raw} and reason {reason.raw} on {_HOSTNAME}.
+    description: 'Alarm event triggered{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -130,7 +130,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedServicesPassthroughAlarmEvent
     category: diagnostic
     severity: warning
-    description: 'Services passthrough alarm: {description} on {_HOSTNAME}.'
+    description: 'Services passthrough alarm: duplicated SID from input stream on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -140,8 +140,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.15
     name: TELESTE-LUMINATO-MIB2::extendedPsigTableInsertionFailedAlarmEvent
     category: diagnostic
-    severity: err
-    description: Psig table insertion failed with reason {reason.raw} on {_HOSTNAME}.
+    severity: crit
+    description: Psig table insertion failed{{with value "reason"}} reason {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -152,7 +152,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedModuleOffAlarmEvent
     category: diagnostic
     severity: warning
-    description: Module {module} alarm {description} on {_HOSTNAME}.
+    description: Extended module off alarm on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -162,8 +162,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4097
     name: TELESTE-LUMINATO-MIB2::extendedSignalMissingAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Signal missing alarm with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: Signal missing alarm on {{first (value "module") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -173,8 +173,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4098
     name: TELESTE-LUMINATO-MIB2::extendedNoTsSyncAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Alarm {reason.raw} ({description.raw}) with severity {severity.raw} on {_HOSTNAME}.
+    severity: crit
+    description: 'Alarm No TS sync detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -185,7 +185,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedTsRxErrorsAlarmEvent
     category: diagnostic
     severity: warning
-    description: TS RX errors alarm {description} on {_HOSTNAME}.
+    description: 'TS RX errors alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -195,8 +195,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4100
     name: TELESTE-LUMINATO-MIB2::extendedTsInputBufferOverflowAlarmEvent
     category: diagnostic
-    severity: warning
-    description: TS input buffer overflow alarm with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: 'TS input buffer overflow alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -206,8 +206,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4102
     name: TELESTE-LUMINATO-MIB2::extendedAsiLinkDownAlarmEvent
     category: state_change
-    severity: warning
-    description: ASI link down alarm triggered with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: ASI link down alarm on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -216,9 +216,9 @@ traps:
       - description
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4103
     name: TELESTE-LUMINATO-MIB2::extendedForbiddenNetworkAlarmEvent
-    category: diagnostic
-    severity: warning
-    description: Alarm event 'Forbidden network' with reason {reason} and severity {severity.raw} on {_HOSTNAME}.
+    category: security
+    severity: alert
+    description: 'Forbidden network alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -228,8 +228,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4104
     name: TELESTE-LUMINATO-MIB2::extendedPidCapacityExceededAlarmEvent
     category: diagnostic
-    severity: warning
-    description: PID capacity exceeded alarm triggered with reason {reason} on {_HOSTNAME}.
+    severity: alert
+    description: 'PID capacity exceeded alarm triggered{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -239,8 +239,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4105
     name: TELESTE-LUMINATO-MIB2::extendedPsiSiCaptureCapacityExceededAlarmEvent
     category: diagnostic
-    severity: warning
-    description: PSI/SI capture capacity exceeded with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: PSI/SI capture capacity exceeded on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -251,7 +251,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedOutOfServiceIdsAlarmEvent
     category: diagnostic
     severity: warning
-    description: Out of service IDs alarm detected with reason {reason} on {_HOSTNAME}.
+    description: 'Out of service IDs alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -261,8 +261,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4108
     name: TELESTE-LUMINATO-MIB2::extendedCaModuleMissingAlarmEvent
     category: diagnostic
-    severity: warning
-    description: CA module missing alarm with reason {reason} on {_HOSTNAME}.
+    severity: alert
+    description: 'CA module missing alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -273,7 +273,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedPsiSiInsertCapacityExceededAlarmEvent
     category: diagnostic
     severity: warning
-    description: PSI/SI insert capacity exceeded with reason {reason} on {_HOSTNAME}.
+    description: 'PSI/SI insert capacity exceeded{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -284,7 +284,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedMultiplexOversubscriptionPacketsDiscardedAlarmEvent
     category: diagnostic
     severity: warning
-    description: Multiplex oversubscription discarded packets detected with reason {reason} on {_HOSTNAME}.
+    description: 'Multiplex oversubscription discarded packets detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -295,7 +295,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedUnknownModuleAlarmEvent
     category: diagnostic
     severity: warning
-    description: Alarm event Unknown module detected with severity {severity} on {_HOSTNAME}.
+    description: 'Unknown module alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -305,8 +305,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4112
     name: TELESTE-LUMINATO-MIB2::extendedMainVoltageTooHighAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Main voltage too high alarm detected with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: 'Main voltage too high alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -316,8 +316,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4113
     name: TELESTE-LUMINATO-MIB2::extendedMainVoltageTooLowAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Main voltage too low alarm with severity {severity} on {_HOSTNAME}.
+    severity: crit
+    description: 'Main voltage too low alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -327,8 +327,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4114
     name: TELESTE-LUMINATO-MIB2::extendedCurrentTooHighAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Current too high alarm triggered with severity {severity.raw} on {_HOSTNAME}.
+    severity: crit
+    description: Current too high alarm on {{first (value "module") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -339,7 +339,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedCurrentTooLowAlarmEvent
     category: diagnostic
     severity: warning
-    description: Low current alarm {description} with severity {severity.raw} on {_HOSTNAME}.
+    description: 'Current too low alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -350,7 +350,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedDaemonInitializationFailedAlarmEvent
     category: diagnostic
     severity: crit
-    description: Daemon initialization failed with reason {reason} on {_HOSTNAME}.
+    description: Daemon initialization failed with reason {{value "reason"}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -360,8 +360,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4129
     name: TELESTE-LUMINATO-MIB2::extendedDeviceDriverFailureAlarmEvent
     category: diagnostic
-    severity: err
-    description: Device driver failure alarm {description} on {_HOSTNAME}.
+    severity: crit
+    description: Device driver failure alarm on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -371,8 +371,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4130
     name: TELESTE-LUMINATO-MIB2::extendedHardwareFailureAlarmEvent
     category: diagnostic
-    severity: err
-    description: Hardware failure alarm with reason {reason.raw} and description {description} on {_HOSTNAME}.
+    severity: crit
+    description: 'Hardware failure alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -382,8 +382,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4131
     name: TELESTE-LUMINATO-MIB2::extendedFanFailureAlarmEvent
     category: diagnostic
-    severity: err
-    description: Fan failure alarm detected with severity {severity.raw} and reason {reason.raw} on {_HOSTNAME}.
+    severity: crit
+    description: 'Fan failure alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -394,7 +394,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedRunningOnBackupPowerAlarmEvent
     category: diagnostic
     severity: warning
-    description: Running on backup power alarm with severity {severity.raw} on {_HOSTNAME}.
+    description: 'Device is running on backup power{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -404,8 +404,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4133
     name: TELESTE-LUMINATO-MIB2::extendedPowerSupplyOverloadedAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Power supply overloaded alarm triggered with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: 'Power supply overloaded alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -416,7 +416,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedBootingUpAlarmEvent
     category: diagnostic
     severity: warning
-    description: Device {description} reported {severity} alarm on {_HOSTNAME}.
+    description: 'Alarm event ''Booting up'' detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -426,8 +426,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4135
     name: TELESTE-LUMINATO-MIB2::extendedBootFailedRetryingAlarmEvent
     category: diagnostic
-    severity: err
-    description: Boot failed and retrying with reason {reason} on {_HOSTNAME}.
+    severity: warning
+    description: 'Boot failed and is retrying{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -437,8 +437,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4136
     name: TELESTE-LUMINATO-MIB2::extendedBootFailedAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Boot failed alarm {severity.raw} with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: 'Boot failed alarm on {{first (value "module") "module"}}: {{value "description"}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -449,7 +449,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedShuttingDownAlarmEvent
     category: diagnostic
     severity: warning
-    description: Alarm event 'Shutting down' with reason {reason} on {_HOSTNAME}.
+    description: 'Alarm event Shutting down triggered{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -460,7 +460,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedConnectionLostAlarmEvent
     category: diagnostic
     severity: warning
-    description: Connection lost alarm {description} with severity {severity.raw} on {_HOSTNAME}.
+    description: 'Connection lost alarm received{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -471,7 +471,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedIncompatibleModuleDisabledAlarmEvent
     category: diagnostic
     severity: warning
-    description: Incompatible module disabled alarm triggered with reason {reason} on {_HOSTNAME}.
+    description: Incompatible module {{value "module"}} disabled{{with value "reason"}} due to reason {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -481,8 +481,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4141
     name: TELESTE-LUMINATO-MIB2::extendedFailedToBootAlarmEvent
     category: diagnostic
-    severity: err
-    description: Device failed to boot with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: 'Device failed to boot{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -493,7 +493,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedUpcTooLowInputPowerAlarmEvent
     category: diagnostic
     severity: warning
-    description: UPC input power too low alarm triggered on {_HOSTNAME}.
+    description: UPC input power is too low on {{first (value "module") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -504,7 +504,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedUpcTooHighInputPowerAlarmEvent
     category: diagnostic
     severity: warning
-    description: Input power alarm triggered with reason {reason} and description {description} on {_HOSTNAME}.
+    description: 'UPC input power alarm triggered{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -515,7 +515,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedCalibrationDataMissingAlarmEvent
     category: diagnostic
     severity: warning
-    description: Calibration data missing alarm {description} on {_HOSTNAME}.
+    description: Calibration data missing alarm on {{first (value "module") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -526,7 +526,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedCalibrationCheckSkippedAlarmEvent
     category: diagnostic
     severity: warning
-    description: Calibration check skipped on {_HOSTNAME}.
+    description: Calibration check skipped{{with value "reason"}} reason {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -536,8 +536,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4151
     name: TELESTE-LUMINATO-MIB2::extendedDescramblingFailureAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Descrambling failure alarm {reason} on {_HOSTNAME}.
+    severity: crit
+    description: 'Descrambling failure alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -547,8 +547,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4153
     name: TELESTE-LUMINATO-MIB2::extendedBackupSwitchedOverToBackupDeviceAlarmEvent
     category: state_change
-    severity: warning
-    description: Backup device switched over to backup device on {_HOSTNAME}.
+    severity: alert
+    description: System switched over to backup device on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -558,8 +558,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4157
     name: TELESTE-LUMINATO-MIB2::extendedFailedToQuerySomeOfTheNitDataAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Alarm event Failed to query some of the NIT data with severity {severity} and reason {reason} on {_HOSTNAME}.
+    severity: err
+    description: 'Failed to query some of the NIT data{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -569,8 +569,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4158
     name: TELESTE-LUMINATO-MIB2::extendedNitWizardFailureAlarmEvent
     category: diagnostic
-    severity: warning
-    description: NIT wizard failure alarm {reason} on {_HOSTNAME}.
+    severity: crit
+    description: 'NIT wizard failure alarm occurred{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -580,8 +580,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4159
     name: TELESTE-LUMINATO-MIB2::extendedDuplicateFrequencyInTwoOrMoreSelectedQamOutputsAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Duplicate frequency in two or more selected QAM outputs detected on {_HOSTNAME}.
+    severity: crit
+    description: Duplicate frequency detected in two or more selected QAM outputs on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -592,7 +592,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedCannotResolveTableVersionUsingDefaultAlarmEvent
     category: diagnostic
     severity: warning
-    description: 'Alarm event 4160: Cannot resolve table version using default on {_HOSTNAME}.'
+    description: 'Cannot resolve table version, using default{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -603,7 +603,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedSidConflictAlarmEvent
     category: diagnostic
     severity: warning
-    description: SID conflict alarm detected with reason {reason} on {_HOSTNAME}.
+    description: 'SID conflict alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -614,7 +614,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedUnsupportedConfigurationAlarmEvent
     category: diagnostic
     severity: warning
-    description: Unsupported configuration alarm {reason} on {_HOSTNAME}.
+    description: 'Unsupported configuration alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -625,7 +625,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedFrequencyOutOfRangeAlarmEvent
     category: diagnostic
     severity: warning
-    description: Frequency out of range alarm {description} on {_HOSTNAME}.
+    description: Frequency out of range alarm on {{first (value "module") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -635,8 +635,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4177
     name: TELESTE-LUMINATO-MIB2::extendedOutputPowerOutOfRangeAlarmEvent
     category: diagnostic
-    severity: err
-    description: Output power out of range alarm triggered with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: Output power out of range alarm on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -647,7 +647,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedSymbolrateOutOfRangeAlarmEvent
     category: diagnostic
     severity: warning
-    description: Symbol rate out of range alarm on {TRAP_NAME} with severity {severity.raw} on {_HOSTNAME}.
+    description: 'Symbolrate out of range alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -658,7 +658,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedChannelDistanceTooNarrowAlarmEvent
     category: diagnostic
     severity: warning
-    description: Alarm {reason.raw} ({description.raw}) on {_HOSTNAME}.
+    description: 'Channel distance too narrow alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -668,8 +668,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4180
     name: TELESTE-LUMINATO-MIB2::extendedInvalidLnbVoltageConfigurationAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Invalid LNB voltage configuration alarm detected with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: 'Invalid LNB voltage configuration detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -680,7 +680,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedInvalidFecRateForSelectedModulationAlarmEvent
     category: diagnostic
     severity: warning
-    description: Invalid FEC rate for selected modulation detected with reason {reason} on {_HOSTNAME}.
+    description: 'Invalid FEC rate for selected modulation detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -691,7 +691,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedLnbCurrentAlarmEvent
     category: diagnostic
     severity: warning
-    description: LNB current alarm event {reason} with severity {severity.raw} on {_HOSTNAME}.
+    description: LNB current alarm event {{value "description"}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -702,7 +702,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedFrequencyOffsetAlarmEvent
     category: diagnostic
     severity: warning
-    description: Frequency offset alarm {description} with severity {severity.raw} on {_HOSTNAME}.
+    description: 'Frequency offset alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -713,7 +713,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedRestartingDescramblingAlarmEvent
     category: diagnostic
     severity: warning
-    description: Descrambler restarting alarm {description} on {_HOSTNAME}.
+    description: Descrambler restarting on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -724,7 +724,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedRebootingCamAlarmEvent
     category: diagnostic
     severity: warning
-    description: CAM device reported alarm {description} with severity {severity.raw} on {_HOSTNAME}.
+    description: 'CAM device is rebooting{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -734,8 +734,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4187
     name: TELESTE-LUMINATO-MIB2::extendedEcmgFailureAlarmEvent
     category: diagnostic
-    severity: warning
-    description: ECMG failure alarm reported with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: 'ECMG failure alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -745,8 +745,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4188
     name: TELESTE-LUMINATO-MIB2::extendedEcmStreamFailureAlarmEvent
     category: diagnostic
-    severity: warning
-    description: ECM stream failure alarm {reason} on {description} on {_HOSTNAME}.
+    severity: crit
+    description: 'ECM stream failure alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -756,8 +756,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4189
     name: TELESTE-LUMINATO-MIB2::extendedEmmFailureAlarmEvent
     category: diagnostic
-    severity: err
-    description: EMM failure alarm triggered with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: 'EMM failure alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -767,8 +767,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4190
     name: TELESTE-LUMINATO-MIB2::extendedEmmStreamFailureAlarmEvent
     category: diagnostic
-    severity: err
-    description: EMM stream failure alarm {description} on {_HOSTNAME}.
+    severity: crit
+    description: 'EMM stream failure alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -779,7 +779,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedEcmgNotConnectedAlarmEvent
     category: diagnostic
     severity: warning
-    description: ECMG not connected alarm {description} on {_HOSTNAME}.
+    description: 'ECMG not connected alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -789,8 +789,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4192
     name: TELESTE-LUMINATO-MIB2::extendedEmmNotConnectedAlarmEvent
     category: diagnostic
-    severity: warning
-    description: EMM not connected alarm {description} on {_HOSTNAME}.
+    severity: alert
+    description: 'EMM not connected alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -800,8 +800,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4193
     name: TELESTE-LUMINATO-MIB2::extendedScsNotLicensedAlarmEvent
     category: license
-    severity: warning
-    description: SCS not licensed alarm triggered with reason {reason} on {_HOSTNAME}.
+    severity: alert
+    description: 'SCS not licensed alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -810,9 +810,9 @@ traps:
       - description
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4194
     name: TELESTE-LUMINATO-MIB2::extendedEcmgSwitchedToSpareServerAlarmEvent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: ECMG switched to spare server with severity {severity.raw} and reason {reason.raw} on {_HOSTNAME}.
+    description: 'ECMG switched to spare server{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -822,8 +822,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4195
     name: TELESTE-LUMINATO-MIB2::extendedUpdatedBootLoaderAvailableAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Updated boot loader available alarm {description} on {_HOSTNAME}.
+    severity: notice
+    description: 'Updated boot loader available{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -833,8 +833,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4196
     name: TELESTE-LUMINATO-MIB2::extendedUpdatingStage1BootLoaderAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Boot loader update stage 1 initiated with severity {severity.raw} on {_HOSTNAME}.
+    severity: notice
+    description: Updating stage 1 boot loader on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -844,8 +844,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4197
     name: TELESTE-LUMINATO-MIB2::extendedUpdatingStage2BootLoaderAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Boot loader updating stage 2 alarm {description} on {_HOSTNAME}.
+    severity: notice
+    description: Updating stage 2 boot loader on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -855,8 +855,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4198
     name: TELESTE-LUMINATO-MIB2::extendedFailedToUpdateStage1BootLoaderAlarmEvent
     category: diagnostic
-    severity: err
-    description: Failed to update stage 1 boot loader with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: 'Failed to update stage 1 boot loader{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -866,8 +866,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4199
     name: TELESTE-LUMINATO-MIB2::extendedFailedToUpdateStage2BootLoaderAlarmEvent
     category: diagnostic
-    severity: err
-    description: Failed to update stage 2 boot loader on {_HOSTNAME}.
+    severity: crit
+    description: 'Failed to update stage 2 boot loader{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -878,7 +878,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedBackupActiveBackupAlarmEvent
     category: diagnostic
     severity: warning
-    description: Alarm event {description} with severity {severity.raw} on {_HOSTNAME}.
+    description: 'Active backup alarm event triggered{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -889,7 +889,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedConfiguringModuleAlarmEvent
     category: diagnostic
     severity: warning
-    description: Module {module} alarm event {description} on {_HOSTNAME}.
+    description: Module {{value "module"}} configuring alarm event {{value "reason"}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -899,8 +899,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4206
     name: TELESTE-LUMINATO-MIB2::extendedNoModuleAlarmEvent
     category: diagnostic
-    severity: warning
-    description: No module alarm detected on {_HOSTNAME}.
+    severity: crit
+    description: 'No module alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -911,7 +911,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedProcessStartedAlarmEvent
     category: diagnostic
     severity: notice
-    description: Process started alarm {description} with severity {severity.raw} on {_HOSTNAME}.
+    description: Process started alarm event {{value "description"}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -922,7 +922,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedBackupLicenseMissingAlarmEvent
     category: license
     severity: warning
-    description: Backup license missing alarm triggered with reason {reason} on {_HOSTNAME}.
+    description: Backup license missing on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -932,8 +932,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4211
     name: TELESTE-LUMINATO-MIB2::extendedMultiplexingLicenseMissingAlarmEvent
     category: license
-    severity: warning
-    description: Multiplexing license missing alarm triggered with reason {reason} on {_HOSTNAME}.
+    severity: alert
+    description: 'Multiplexing license missing alarm triggered{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -943,8 +943,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4212
     name: TELESTE-LUMINATO-MIB2::extendedDemultiplexingLicenseMissingAlarmEvent
     category: license
-    severity: warning
-    description: Demultiplexing license missing alarm triggered on {_HOSTNAME}.
+    severity: alert
+    description: Demultiplexing license missing alarm detected on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -954,8 +954,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4213
     name: TELESTE-LUMINATO-MIB2::extendedDvbProcessingLicenseMissingAlarmEvent
     category: license
-    severity: warning
-    description: DVB processing license missing alarm triggered with reason {reason} on {_HOSTNAME}.
+    severity: alert
+    description: DVB processing license missing on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -965,8 +965,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4214
     name: TELESTE-LUMINATO-MIB2::extendedMsdLicenseMissingAlarmEvent
     category: license
-    severity: warning
-    description: MSD license missing alarm triggered with reason {reason} on {_HOSTNAME}.
+    severity: alert
+    description: MSD license missing alarm detected on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -977,7 +977,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedDvbS2LicenseMissingAlarmEvent
     category: license
     severity: alert
-    description: DVB-S2 license missing alarm triggered on {_HOSTNAME}.
+    description: 'DVB-S2 license missing alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -987,8 +987,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4216
     name: TELESTE-LUMINATO-MIB2::extendedScramblingLicenseMissingAlarmEvent
     category: license
-    severity: warning
-    description: Scrambling license missing on {_HOSTNAME}.
+    severity: alert
+    description: Scrambling license missing on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -999,7 +999,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedScsLicenseMissingAlarmEvent
     category: license
     severity: alert
-    description: SCS license missing alarm triggered with reason {reason} on {_HOSTNAME}.
+    description: 'SCS license missing alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1009,8 +1009,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4218
     name: TELESTE-LUMINATO-MIB2::extendedUserFromGroupAdminIsUsingCliAlarmEvent
     category: security
-    severity: warning
-    description: User from group admin is using CLI on {_HOSTNAME}.
+    severity: notice
+    description: 'Admin user CLI access detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1019,9 +1019,9 @@ traps:
       - description
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4219
     name: TELESTE-LUMINATO-MIB2::extendedUserFromGroupInstallIsUsingCliAlarmEvent
-    category: diagnostic
+    category: security
     severity: warning
-    description: Alarm event 'User from group install is using CLI' with severity {severity} and reason {reason} on {_HOSTNAME}.
+    description: 'User from group install is using CLI{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1032,7 +1032,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedUserFromGroupOperIsUsingCliAlarmEvent
     category: security
     severity: warning
-    description: User from group oper is using CLI on {_HOSTNAME}.
+    description: 'User from group oper is using CLI{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1043,7 +1043,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedUserFromGroupMonitorIsUsingCliAlarmEvent
     category: security
     severity: warning
-    description: User from group monitor is using CLI on {_HOSTNAME}.
+    description: 'User from group monitor is using CLI{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1054,7 +1054,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedRedundancyActivatedAlarmEvent
     category: state_change
     severity: notice
-    description: Redundancy activated on {_HOSTNAME}.
+    description: 'Redundancy activated{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1065,7 +1065,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedExtIoSignaledAlarmEvent
     category: diagnostic
     severity: warning
-    description: EXT IO alarm {description} with severity {severity.raw} on {_HOSTNAME}.
+    description: 'Extended I/O alarm signaled{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1075,8 +1075,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4224
     name: TELESTE-LUMINATO-MIB2::extendedExtIoBackupPowerSupplyFailureAlarmEvent
     category: diagnostic
-    severity: err
-    description: EXT IO backup power supply failure reported on {_HOSTNAME}.
+    severity: alert
+    description: 'Extended IO backup power supply failure detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1086,8 +1086,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4225
     name: TELESTE-LUMINATO-MIB2::extendedExtIoIntrusionDetectedAlarmEvent
     category: security
-    severity: warning
-    description: Intrusion detected on {description} with severity {severity.raw} on {_HOSTNAME}.
+    severity: alert
+    description: 'Extended I/O intrusion detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1098,7 +1098,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedLinkMissingAlarmEvent
     category: diagnostic
     severity: warning
-    description: Link missing alarm {description} with severity {severity.raw} on {_HOSTNAME}.
+    description: 'Link missing alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1107,9 +1107,9 @@ traps:
       - description
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4227
     name: TELESTE-LUMINATO-MIB2::extendedRedundancyFailedAlarmEvent
-    category: diagnostic
+    category: state_change
     severity: crit
-    description: Redundancy failed with severity {severity.raw} and reason {reason} on {_HOSTNAME}.
+    description: Redundancy failed on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1120,7 +1120,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedMultiplexOversubscriptionPacketsDelayedAlarmEvent
     category: diagnostic
     severity: warning
-    description: Multiplex oversubscription packets delayed with reason {reason} on {_HOSTNAME}.
+    description: Multiplex oversubscription packets delayed on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1131,7 +1131,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedCbrOutputOversubscriptionAlarmEvent
     category: diagnostic
     severity: warning
-    description: CBR output oversubscription alarm {reason} on {_HOSTNAME}.
+    description: 'CBR output oversubscription alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1142,7 +1142,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedBackupHwDoesNotSupportSelectedDeviceRoleAlarmEvent
     category: diagnostic
     severity: warning
-    description: Backup hardware does not support selected device role, falling back to Standalone on {_HOSTNAME}.
+    description: Backup hardware does not support selected device role, falling back to Standalone on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1152,8 +1152,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4231
     name: TELESTE-LUMINATO-MIB2::extendedSoftwareUpdateInProgressAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Software update in progress on {_HOSTNAME}.
+    severity: notice
+    description: 'Software update in progress{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1162,9 +1162,9 @@ traps:
       - description
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4232
     name: TELESTE-LUMINATO-MIB2::extendedSoftwareUpdateReadyWaitingForRebootToCompleteAlarmEvent
-    category: diagnostic
-    severity: warning
-    description: Software update ready, waiting for reboot to complete on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Software update ready, waiting for reboot to complete on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1175,7 +1175,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedSoftwareUpdateFailedAlarmEvent
     category: diagnostic
     severity: err
-    description: Software update failed with reason {reason} on {_HOSTNAME}.
+    description: 'Software update failed{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1185,8 +1185,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4234
     name: TELESTE-LUMINATO-MIB2::extendedBackupModuleHwDoesNotSupportSelectedOnePlusOneBackupRoleAlarmEvent
     category: diagnostic
-    severity: warning
-    description: 'Backup module hardware mismatch detected: {description} on {_HOSTNAME}.'
+    severity: crit
+    description: Backup module hardware does not support selected 1+1 backup role on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1196,8 +1196,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4235
     name: TELESTE-LUMINATO-MIB2::extendedEitProcessingLicenseMissingAlarmEvent
     category: license
-    severity: warning
-    description: EIT processing license missing alarm triggered with description {description.raw} on {_HOSTNAME}.
+    severity: alert
+    description: EIT processing license missing alarm detected on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1208,7 +1208,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedCbrOutputOversubscriptionPacketsDiscardedAlarmEvent
     category: diagnostic
     severity: warning
-    description: 'CBR output oversubscription packets discarded: {description} on {_HOSTNAME}.'
+    description: 'CBR output oversubscription discarded packets detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1219,7 +1219,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedDescramblingFailedAlarmEvent
     category: diagnostic
     severity: warning
-    description: Descrambling failed with severity {severity.raw} and reason {reason.raw} on {_HOSTNAME}.
+    description: 'Descrambling failed alarm on {{first (value "module") "module"}}: {{value "description"}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1230,7 +1230,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedIpInputCapacityExceededAlarmEvent
     category: diagnostic
     severity: warning
-    description: IP input capacity exceeded alarm {reason} on {_HOSTNAME}.
+    description: 'IP input capacity exceeded{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1241,7 +1241,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedEitReinsertCapacityExceededAlarmEvent
     category: diagnostic
     severity: warning
-    description: EIT reinsert capacity exceeded alarm {reason} on {_HOSTNAME}.
+    description: 'EIT reinsert capacity exceeded alarm triggered{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1252,7 +1252,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedRtpInputErrorsDroppedPacketsAlarmEvent
     category: diagnostic
     severity: warning
-    description: RTP input errors and dropped packets detected with reason {reason} on {_HOSTNAME}.
+    description: 'RTP input errors and dropped packets detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1263,7 +1263,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedRtpInputPacketSequenceAnomaliesDetectedAlarmEvent
     category: diagnostic
     severity: warning
-    description: RTP input packet sequence anomalies detected with reason {reason.raw} on {_HOSTNAME}.
+    description: 'RTP input packet sequence anomalies detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1273,8 +1273,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4243
     name: TELESTE-LUMINATO-MIB2::extendedDvbTimeMissingAlarmEvent
     category: diagnostic
-    severity: warning
-    description: DVB time missing alarm {reason} on {_HOSTNAME}.
+    severity: alert
+    description: 'DVB time missing alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1284,8 +1284,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4244
     name: TELESTE-LUMINATO-MIB2::extendedDvbT2LicenseMissingAlarmEvent
     category: license
-    severity: warning
-    description: DVB-T2 license missing alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: DVB-T2 license missing alarm detected on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1296,7 +1296,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedDcFeedCurrentAlarmEvent
     category: diagnostic
     severity: warning
-    description: DC feed current alarm {description} with severity {severity.raw} on {_HOSTNAME}.
+    description: DC feed current alarm event {{value "reason"}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1307,7 +1307,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedNotGeneratingTdtTotTableWaitingForCorrectSystemTimeAlarmEvent
     category: diagnostic
     severity: warning
-    description: TDT/TOT table not generating due to incorrect system time on {_HOSTNAME}.
+    description: TDT/TOT table generation stopped due to incorrect system time on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1318,7 +1318,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedDataPlpIdSelectionRequiredAlarmEvent
     category: diagnostic
     severity: warning
-    description: Alarm {description} with reason {reason} on {_HOSTNAME}.
+    description: 'Data PLP ID selection required alarm triggered{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1329,7 +1329,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedDataPlpIdSelectionNotValidAlarmEvent
     category: diagnostic
     severity: warning
-    description: Alarm event {TRAP_NAME} with reason {reason} on {_HOSTNAME}.
+    description: 'Data PLP ID selection not valid{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1340,7 +1340,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedHierarchyHpSelectedForNonAlarmEvent
     category: diagnostic
     severity: warning
-    description: Alarm event {reason} with description {description} on {_HOSTNAME}.
+    description: Hierarchy HP selected for non-hierarchical transmission on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1351,7 +1351,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedEcmMissingAlarmEvent
     category: diagnostic
     severity: warning
-    description: ECM missing alarm detected with severity {severity.raw} and reason {reason} on {_HOSTNAME}.
+    description: 'ECM missing alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1362,7 +1362,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedScramblingConflictInSharedComponentAlarmEvent
     category: diagnostic
     severity: warning
-    description: Scrambling conflict in shared component reported on {_HOSTNAME}.
+    description: 'Scrambling conflict in shared component detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1373,7 +1373,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedScrambledSharedComponentAlarmEvent
     category: diagnostic
     severity: warning
-    description: Scrambled shared component alarm {description} with severity {severity} on {_HOSTNAME}.
+    description: 'Scrambled shared component alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1384,7 +1384,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedBackupVoltageTooHighAlarmEvent
     category: diagnostic
     severity: crit
-    description: Backup voltage too high alarm triggered with reason {reason} on {_HOSTNAME}.
+    description: Backup voltage too high alarm detected on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1394,8 +1394,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4254
     name: TELESTE-LUMINATO-MIB2::extendedBackupVoltageTooLowAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Backup voltage too low alarm triggered with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: 'Backup voltage too low alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1406,7 +1406,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedInvalidSdtTemplateAlarmEvent
     category: diagnostic
     severity: warning
-    description: Invalid SDT template alarm reported with severity {severity.raw} and reason {reason.raw} on {_HOSTNAME}.
+    description: 'Invalid SDT template alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1416,8 +1416,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4256
     name: TELESTE-LUMINATO-MIB2::extendedCamFailureActionTakenRestartingDescramblingAlarmEvent
     category: diagnostic
-    severity: warning
-    description: 'CAM failure action taken: restarting descrambling with reason {reason} on {_HOSTNAME}.'
+    severity: alert
+    description: 'CAM failure action taken: restarting descrambling on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1427,8 +1427,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4257
     name: TELESTE-LUMINATO-MIB2::extendedCamFailureActionTakenRebootingCaModuleAlarmEvent
     category: diagnostic
-    severity: alert
-    description: CAM failure triggered rebooting CA module with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: CAM failure triggered reboot of CA module on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1439,7 +1439,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedCaMenuIsOpenAlarmEvent
     category: diagnostic
     severity: warning
-    description: Alarm event {TRAP_NAME} with severity {severity} and reason {reason} on {_HOSTNAME}.
+    description: 'CA menu is open alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1449,8 +1449,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4259
     name: TELESTE-LUMINATO-MIB2::extendedCannotDescrambleDueToCamRoutingAlarmEvent
     category: diagnostic
-    severity: warning
-    description: 'CAM routing alarm: cannot descramble due to {reason} on {_HOSTNAME}.'
+    severity: crit
+    description: Cannot descramble due to CAM routing alarm on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1461,7 +1461,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedNitSidConflictAlarmEvent
     category: diagnostic
     severity: warning
-    description: SID conflict in output detected with reason {reason} on {_HOSTNAME}.
+    description: 'SID conflict in output detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1472,7 +1472,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedNotGeneratingSttTableWaitingForCorrectSystemTimeAlarmEvent
     category: diagnostic
     severity: warning
-    description: Alarm {description} on {_HOSTNAME}.
+    description: STT table generation suspended due to incorrect system time on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1482,8 +1482,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4262
     name: TELESTE-LUMINATO-MIB2::extendedNumberOfFecLicensesExceededAlarmEvent
     category: license
-    severity: warning
-    description: FEC license count exceeded on {_HOSTNAME}.
+    severity: alert
+    description: Number of FEC licenses exceeded on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1493,8 +1493,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4263
     name: TELESTE-LUMINATO-MIB2::extendedErrorCorrectionOverloadTooManySimultaneousMissingPacketsAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Error correction overload due to too many simultaneous missing packets reported on {_HOSTNAME}.
+    severity: crit
+    description: Error correction overload due to too many simultaneous missing packets on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1505,7 +1505,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedFecPacketsDiscardedModuleBitrateTooHighAlarmEvent
     category: diagnostic
     severity: warning
-    description: FEC packets discarded due to module bitrate too high on {_HOSTNAME}.
+    description: 'FEC packets discarded due to module bitrate too high{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1516,7 +1516,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedMediaPacketsDiscardedModuleBitrateTooHighAlarmEvent
     category: diagnostic
     severity: warning
-    description: Media packets discarded due to module bitrate too high on {_HOSTNAME}.
+    description: Media packets discarded due to module bitrate too high on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1527,7 +1527,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedFecHasCorrectedPacketsAlarmEvent
     category: diagnostic
     severity: warning
-    description: FEC corrected packets alarm {description} with severity {severity} on {_HOSTNAME}.
+    description: 'FEC corrected packets detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1538,7 +1538,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedFecInputAnomaliesDetectedAlarmEvent
     category: diagnostic
     severity: warning
-    description: FEC input anomalies detected with reason {reason} on {_HOSTNAME}.
+    description: 'FEC input anomalies detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1548,8 +1548,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4268
     name: TELESTE-LUMINATO-MIB2::extendedFecErrorCorrectionCapacityExceededAlarmEvent
     category: diagnostic
-    severity: warning
-    description: FEC error correction capacity exceeded with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: FEC error correction capacity exceeded on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1560,7 +1560,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedSfpLinkDownAlarmEvent
     category: state_change
     severity: warning
-    description: SFP link down alarm triggered with reason {reason} on {_HOSTNAME}.
+    description: SFP link down alarm on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1571,7 +1571,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedBackupsyncTurnedOffAlarmEvent
     category: diagnostic
     severity: warning
-    description: Backup synchronization turned off with reason {reason} on {_HOSTNAME}.
+    description: 'Backup synchronization turned off{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1582,7 +1582,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedBackupsyncManualModeAlarmEvent
     category: diagnostic
     severity: warning
-    description: Alarm event {reason} with description {description} on {_HOSTNAME}.
+    description: 'BackupSync entered manual mode{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1593,7 +1593,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedBackupsyncAutomaticModeAlarmEvent
     category: diagnostic
     severity: warning
-    description: BackupSync alarm {description} with severity {severity} on {_HOSTNAME}.
+    description: 'BackupSync automatic mode alarm triggered{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1604,7 +1604,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedBackupsyncConfigurationWillBeSynchronizedAutomaticallyAlarmEvent
     category: diagnostic
     severity: notice
-    description: Backup synchronization configuration will be synchronized automatically on {_HOSTNAME}.
+    description: Backup sync configuration will be synchronized automatically on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1615,7 +1615,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedBackupsyncSynchronizingAlarmEvent
     category: diagnostic
     severity: warning
-    description: Backup synchronization alarm {description} on {_HOSTNAME}.
+    description: 'Backup synchronization alarm triggered{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1626,7 +1626,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedBackupsyncSwCompatibilityCheckAlarmEvent
     category: diagnostic
     severity: warning
-    description: BackupSync software compatibility check alarm {description} on {_HOSTNAME}.
+    description: 'BackupSync software compatibility check alarm triggered{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1637,7 +1637,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedBackupsyncHwCompatibilityCheckAlarmEvent
     category: diagnostic
     severity: warning
-    description: BackupSync hardware compatibility check alarm triggered with reason {reason} on {_HOSTNAME}.
+    description: 'BackupSync hardware compatibility check alarm triggered{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1647,8 +1647,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4280
     name: TELESTE-LUMINATO-MIB2::extendedBackupsyncConfigurationFaultAlarmEvent
     category: diagnostic
-    severity: warning
-    description: BackupSync configuration fault detected with reason {reason} on {_HOSTNAME}.
+    severity: crit
+    description: 'Backup sync configuration fault detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1659,7 +1659,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedBackupsyncConnectionLostAlarmEvent
     category: diagnostic
     severity: warning
-    description: Backup sync connection lost with reason {reason} on {_HOSTNAME}.
+    description: 'Backup sync connection lost{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1670,7 +1670,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedBackupsyncAutosyncNotPossibleFromBackupToMainAlarmEvent
     category: diagnostic
     severity: warning
-    description: 'BackupSync autosync not possible from backup to main: {description} on {_HOSTNAME}.'
+    description: BackupSync autosync not possible from backup to main{{with value "reason"}} reason {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1679,9 +1679,9 @@ traps:
       - description
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4284
     name: TELESTE-LUMINATO-MIB2::extendedBackupsyncRebootingPairDeviceToNewConfigurationAlarmEvent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: BackupSync pair device rebooting to new configuration with reason {reason} on {_HOSTNAME}.
+    description: 'Backup sync rebooting pair device to new configuration{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1692,7 +1692,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedBackupsyncCheckLicenseCompatibilityAlarmEvent
     category: license
     severity: warning
-    description: License compatibility check failed for {description} on {_HOSTNAME}.
+    description: 'License compatibility check failed for backup sync{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1703,7 +1703,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedBackupsyncLicenseCompatibilityCheckAlarmEvent
     category: license
     severity: warning
-    description: BackupSync license compatibility check alarm triggered with reason {reason} on {_HOSTNAME}.
+    description: 'BackupSync license compatibility check alarm triggered{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1714,7 +1714,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedDeviceFirstBootActionsAreInProgressAlarmEvent
     category: diagnostic
     severity: notice
-    description: Device first boot actions are in progress with severity {severity.raw} on {_HOSTNAME}.
+    description: Device first boot actions are in progress on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1725,7 +1725,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedDeviceConfigurationBackupInProgressAlarmEvent
     category: diagnostic
     severity: notice
-    description: Device configuration backup in progress on {_HOSTNAME}.
+    description: 'Device configuration backup in progress{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1735,8 +1735,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4290
     name: TELESTE-LUMINATO-MIB2::extendedDeviceConfigurationRestoreInProgressAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Device configuration restore in progress on {_HOSTNAME}.
+    severity: notice
+    description: 'Device configuration restore in progress{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1747,7 +1747,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedDeviceOtherSoftwareActivationAlarmEvent
     category: diagnostic
     severity: warning
-    description: Device software activation alarm {severity.raw} ({reason.raw}) on {_HOSTNAME}.
+    description: Device software activation alarm {{value "reason"}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1758,7 +1758,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedTooManyOutputPidsConfiguredAlarmEvent
     category: diagnostic
     severity: warning
-    description: Too many output PIDs configured alarm triggered with reason {reason} on {_HOSTNAME}.
+    description: Too many output PIDs configured on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1769,7 +1769,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedRebootRequestByUserAlarmEvent
     category: state_change
     severity: notice
-    description: Reboot request by user triggered alarm on {_HOSTNAME}.
+    description: 'Reboot request by user received{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1780,7 +1780,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedRemovedFromTheChassisAlarmEvent
     category: state_change
     severity: notice
-    description: Alarm {description} removed from chassis on {_HOSTNAME}.
+    description: 'Module removed from chassis{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1790,8 +1790,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4295
     name: TELESTE-LUMINATO-MIB2::extendedInsertedIntoTheChassisAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Alarm event 'Inserted into the chassis' with severity {severity.raw} on {_HOSTNAME}.
+    severity: notice
+    description: Alarm event 'Inserted into the chassis' occurred on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1802,7 +1802,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedUsedInputIsNotSptsAlarmEvent
     category: diagnostic
     severity: warning
-    description: Alarm '{description}' with severity {severity.raw} on {_HOSTNAME}.
+    description: 'Alarm ''Used input is not SPTS'' detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1813,7 +1813,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedPacketsDiscardedInIpMirrorOutputsAlarmEvent
     category: diagnostic
     severity: warning
-    description: IP mirror output packet discard alarm triggered with reason {reason} on {_HOSTNAME}.
+    description: 'IP mirror output packets discarded{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1823,8 +1823,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4298
     name: TELESTE-LUMINATO-MIB2::extendedAesLicenseMissingAlarmEvent
     category: license
-    severity: warning
-    description: AES license missing alarm detected on {_HOSTNAME}.
+    severity: alert
+    description: 'AES license missing alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1835,7 +1835,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedSymbolRateTooHighForSelectedModulationSelectHighSpeedModulationModeToAvoidErrorsAlarmEvent
     category: diagnostic
     severity: warning
-    description: Symbol rate too high for selected modulation on {_HOSTNAME}.
+    description: Symbol rate too high for selected modulation on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1846,7 +1846,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedEcmResponsesDelayedAlarmEvent
     category: diagnostic
     severity: warning
-    description: ECM responses delayed alarm triggered with reason {reason} on {_HOSTNAME}.
+    description: ECM responses delayed alarm on {{first (value "module") "module"}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1857,7 +1857,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedCwGroupConflictAlarmEvent
     category: diagnostic
     severity: warning
-    description: CW group conflict alarm {reason} on {_HOSTNAME}.
+    description: 'CW group conflict alarm detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1868,7 +1868,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedDisconnectedHostInMultichassisGroupAlarmEvent
     category: diagnostic
     severity: warning
-    description: Disconnected host(s) in multichassis group detected with severity {severity.raw} on {_HOSTNAME}.
+    description: 'Disconnected host(s) in multichassis group detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - severity
@@ -1878,8 +1878,8 @@ traps:
   - oid: 1.3.6.1.4.1.3715.17.4.2.2.4303
     name: TELESTE-LUMINATO-MIB2::extendedMultichassisConfigurationFailureAlarmEvent
     category: diagnostic
-    severity: warning
-    description: Multichassis configuration failure reported with severity {severity.raw} and reason {reason.raw} on {_HOSTNAME}.
+    severity: crit
+    description: Multichassis configuration failure detected{{with value "reason"}} (reason {{.}}){{end}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1890,7 +1890,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedSwVersionDifferenceWithinMultichassisGroupAlarmEvent
     category: diagnostic
     severity: warning
-    description: SW version difference within multichassis group detected with reason {reason} on {_HOSTNAME}.
+    description: Software version mismatch detected within multichassis group on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -1901,7 +1901,7 @@ traps:
     name: TELESTE-LUMINATO-MIB2::extendedSwVersionMismatchAlarmEvent
     category: diagnostic
     severity: warning
-    description: SW version mismatch on module {module} with reason {reason} on {_HOSTNAME}.
+    description: Software version mismatch detected on module {{value "module"}} on {{hostname}}.
     status: current
     varbinds:
       - severity

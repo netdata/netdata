@@ -28,8 +28,8 @@ traps:
   - oid: 1.3.6.1.4.1.40482.2.50
     name: PURESTORAGE-MIB::pureInfoTrap
     category: diagnostic
-    severity: warning
-    description: Pure Storage alert {pureAlertCode} with subject {pureAlertSubject} on {_HOSTNAME}.
+    severity: notice
+    description: Pure Storage info trap received with alert {{value "pureAlertSubject"}} on {{hostname}}.
     status: current
     varbinds:
       - pureProductName
@@ -42,7 +42,7 @@ traps:
     name: PURESTORAGE-MIB::pureWarningTrap
     category: diagnostic
     severity: warning
-    description: Warning alert {pureAlertCode} with subject {pureAlertSubject} on {_HOSTNAME}.
+    description: Pure Storage warning alert {{value "pureAlertSubject"}} on {{hostname}}.
     status: current
     varbinds:
       - pureProductName
@@ -55,7 +55,7 @@ traps:
     name: PURESTORAGE-MIB::pureCriticalTrap
     category: diagnostic
     severity: crit
-    description: Critical alert {pureAlertCode} with subject {pureAlertSubject} on {pureHost} on {_HOSTNAME}.
+    description: Critical alert {{value "pureAlertSubject"}} received on {{hostname}}.
     status: current
     varbinds:
       - pureProductName

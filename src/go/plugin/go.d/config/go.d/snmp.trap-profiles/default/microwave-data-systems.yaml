@@ -9,5 +9,5 @@ traps:
     name: MDS-EVENT-MIB::mdsEvent
     category: unknown
     severity: notice
-    description: Generic MDS event {TRAP_NAME} received from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Generic MDS event received on {{hostname}}.
     status: current

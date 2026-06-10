@@ -41,7 +41,7 @@ traps:
     name: FORCEPOINT-NGFW-ENGINE-MIB::fwPolicyInstall
     category: config_change
     severity: notice
-    description: Firewall policy {fwSecurityPolicy} was installed on {_HOSTNAME}.
+    description: Firewall policy {{value "fwSecurityPolicy"}} was installed on {{hostname}}.
     status: current
     varbinds:
       - fwSecurityPolicy
@@ -49,15 +49,15 @@ traps:
     name: FORCEPOINT-NGFW-ENGINE-MIB::nodeOnline
     category: state_change
     severity: notice
-    description: Node changed operational state to {nodeOperState} on {_HOSTNAME}.
+    description: Node has gone online on {{hostname}}.
     status: current
     varbinds:
       - nodeOperState
   - oid: 1.3.6.1.4.1.47565.1.1.0.3
     name: FORCEPOINT-NGFW-ENGINE-MIB::nodeOffline
     category: state_change
-    severity: warning
-    description: Node changed operational state to {nodeOperState} on {_HOSTNAME}.
+    severity: alert
+    description: Node went offline on {{hostname}}.
     status: current
     varbinds:
       - nodeOperState
@@ -65,19 +65,19 @@ traps:
     name: FORCEPOINT-NGFW-ENGINE-MIB::nodeBoot
     category: state_change
     severity: notice
-    description: Node has booted up on {_HOSTNAME}.
+    description: Node has booted up on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.47565.1.1.0.5
     name: FORCEPOINT-NGFW-ENGINE-MIB::nodeShutdown
     category: state_change
     severity: alert
-    description: Node shutdown detected on {_HOSTNAME}.
+    description: Node is shutting down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.47565.1.1.0.6
     name: FORCEPOINT-NGFW-ENGINE-MIB::nodeUserLogin
     category: auth
     severity: notice
-    description: User login session started with last login {nodeLastLogin} on {_HOSTNAME}.
+    description: User login session started on {{hostname}}.
     status: current
     varbinds:
       - nodeLastLogin
@@ -85,27 +85,27 @@ traps:
     name: FORCEPOINT-NGFW-ENGINE-MIB::nodeFailedUserLogin
     category: auth
     severity: warning
-    description: Failed user login detected from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Failed user login on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.47565.1.1.0.8
     name: FORCEPOINT-NGFW-ENGINE-MIB::nodeUserLogout
     category: auth
     severity: notice
-    description: User session logout detected on {_HOSTNAME}.
+    description: User session ended on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.47565.1.1.0.9
     name: FORCEPOINT-NGFW-ENGINE-MIB::nodeTestFailure
     category: diagnostic
-    severity: err
-    description: Node test failed for {nodeTestIdentity} on {_HOSTNAME}.
+    severity: crit
+    description: Node test {{value "nodeTestIdentity"}} failed on {{hostname}}.
     status: current
     varbinds:
       - nodeTestIdentity
   - oid: 1.3.6.1.4.1.47565.1.1.0.10
     name: FORCEPOINT-NGFW-ENGINE-MIB::nodeHwmon
     category: diagnostic
-    severity: err
-    description: Hardware monitoring system detected problem {nodeHwmonEvent} on {_HOSTNAME}.
+    severity: warning
+    description: 'Hardware monitoring event detected: {{value "nodeHwmonEvent"}} on {{hostname}}.'
     status: current
     varbinds:
       - nodeHwmonEvent

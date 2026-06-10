@@ -631,16 +631,16 @@ traps:
   - oid: 1.3.6.1.4.1.27975.1.7.1
     name: SWITCH::writeSuccessTrap
     category: config_change
-    severity: notice
-    description: Configuration saved successfully with status {configSave} on {_HOSTNAME}.
+    severity: info
+    description: Configuration saved successfully on {{hostname}}.
     status: current
     varbinds:
       - configSave
   - oid: 1.3.6.1.4.1.27975.1.7.2
     name: SWITCH::writeFailureTrap
-    category: config_change
+    category: diagnostic
     severity: err
-    description: Configuration write failure for {configSave} on {_HOSTNAME}.
+    description: Configuration write failure on {{hostname}}.
     status: current
     varbinds:
       - configSave
@@ -648,7 +648,7 @@ traps:
     name: SWITCH::rebootSendTrap
     category: state_change
     severity: notice
-    description: Device initiated a reload with configuration save state {reload} on {_HOSTNAME}.
+    description: Switch reload initiated{{with value "reload"}} with save config {{.}} {{else}} without save config{{end}} on {{hostname}}.
     status: current
     varbinds:
       - reload
@@ -656,7 +656,7 @@ traps:
     name: SWITCH::memUsageHigher
     category: diagnostic
     severity: warning
-    description: Memory usage higher with {memTotalFree} free memory on {_HOSTNAME}.
+    description: Memory usage is higher with {{value "memTotalFree"}} bytes free on {{hostname}}.
     status: current
     varbinds:
       - memTotalFree
@@ -664,7 +664,7 @@ traps:
     name: SWITCH::memUsageFormHigherToNormal
     category: diagnostic
     severity: notice
-    description: Memory usage returned to normal with {memTotalFree} bytes free on {_HOSTNAME}.
+    description: Memory usage returned to normal on {{hostname}}.
     status: current
     varbinds:
       - memTotalFree
@@ -672,7 +672,7 @@ traps:
     name: SWITCH::vtySessionStartTrap
     category: auth
     severity: notice
-    description: Virtual terminal session started for user {usersname} from {usersLocation} on {_HOSTNAME}.
+    description: Virtual terminal session started by {{value "usersname"}} on {{hostname}}.
     status: current
     varbinds:
       - usersLineIndex
@@ -682,7 +682,7 @@ traps:
     name: SWITCH::vtySessionStopTrap
     category: auth
     severity: notice
-    description: Virtual terminal session stopped for user {usersname} at {usersLocation} on {_HOSTNAME}.
+    description: Virtual terminal session stopped for {{value "usersname"}} on {{hostname}}.
     status: current
     varbinds:
       - usersLineIndex
@@ -690,9 +690,9 @@ traps:
       - usersLocation
   - oid: 1.3.6.1.4.1.27975.1.7.8
     name: SWITCH::timeChangeTrap
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: System clock changed to {timeSetMonth}/{timeSetDay}/{timeSetYear} {timeSetClock} on {_HOSTNAME}.
+    description: System time changed to {{value "timeSetMonth"}}/{{value "timeSetDay"}}/{{value "timeSetYear"}} {{value "timeSetClock"}} on {{hostname}}.
     status: current
     varbinds:
       - timeSetClock
@@ -703,7 +703,7 @@ traps:
     name: SWITCH::cpuUsageHigher
     category: diagnostic
     severity: warning
-    description: CPU usage is high with idle percentage {ssCpuIdle} on {_HOSTNAME}.
+    description: CPU usage is higher with {{value "ssCpuIdle"}}% idle on {{hostname}}.
     status: current
     varbinds:
       - ssCpuIdle
@@ -711,7 +711,7 @@ traps:
     name: SWITCH::cpuUsageFormHigherToNormal
     category: diagnostic
     severity: notice
-    description: CPU usage returned to normal with idle percentage {ssCpuIdle} on {_HOSTNAME}.
+    description: CPU usage returned to normal from {{value "ssCpuIdle"}}% idle on {{hostname}}.
     status: current
     varbinds:
       - ssCpuIdle
@@ -719,15 +719,15 @@ traps:
     name: SWITCH::lastCommandTrap
     category: config_change
     severity: notice
-    description: Last configuration command {lastCommand} recorded on {_HOSTNAME}.
+    description: 'Last configuration command executed{{with value "lastCommand"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - lastCommand
   - oid: 1.3.6.1.4.1.27975.1.7.12
     name: SWITCH::cFInserted
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: CompactFlash card inserted at index {cfIndex} on {_HOSTNAME}.
+    description: CompactFlash card inserted at index {{value "cfIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - cfIndex
@@ -735,7 +735,7 @@ traps:
     name: SWITCH::cFRemoved
     category: diagnostic
     severity: warning
-    description: CF card at index {cfIndex} removed on {_HOSTNAME}.
+    description: CompactFlash card removed at index {{value "cfIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - cfIndex
@@ -743,15 +743,15 @@ traps:
     name: SWITCH::loginFailTrap
     category: auth
     severity: warning
-    description: Login failure detected with count {loginFail} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: SNMP authentication failure after {{value "loginFail"}} attempts on {{hostname}}.
     status: current
     varbinds:
       - loginFail
   - oid: 1.3.6.1.4.1.27975.1.7.15
     name: SWITCH::processDumpTrap
     category: diagnostic
-    severity: notice
-    description: Process dump completed for process ID {lastDumpedProcess} on {_HOSTNAME}.
+    severity: warning
+    description: Process {{value "lastDumpedProcess"}} dumped on {{hostname}}.
     status: current
     varbinds:
       - lastDumpedProcess
@@ -759,7 +759,7 @@ traps:
     name: SWITCH::igmpSnoopingGrplimitReach
     category: diagnostic
     severity: warning
-    description: IGMP snooping group record limit reached on {_HOSTNAME}.
+    description: IGMP snooping group record limit reached on {{hostname}}.
     status: current
     varbinds:
       - configSave
@@ -767,7 +767,7 @@ traps:
     name: SWITCH::igmpSnoopingVlanGrplimitReach
     category: diagnostic
     severity: warning
-    description: IGMP snooping group record limit reached on {_HOSTNAME}.
+    description: IGMP snooping group record limit reached on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - configSave
@@ -775,31 +775,31 @@ traps:
     name: SWITCH::igmpSnoopingVlanQuerierSwitch
     category: state_change
     severity: notice
-    description: IGMP snooping querier address changed to {igmpSnoopingVlanQuerierOperationalAddress} on {_HOSTNAME}.
+    description: IGMP snooping querier changed on {{hostname}}.
     status: current
     varbinds:
       - igmpSnoopingVlanQuerierOperationalAddress
   - oid: 1.3.6.1.4.1.27975.11.2.10.1
     name: SWITCH::fdbExtDbFull
     category: diagnostic
-    severity: warning
-    description: FDB database full on VLAN {vlanIndex} on {_HOSTNAME}.
+    severity: crit
+    description: FDB database is full{{with value "vlanIndex"}} on VLAN {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - vlanIndex
   - oid: 1.3.6.1.4.1.27975.39.1.1
     name: SWITCH::powerabsent
     category: diagnostic
-    severity: err
-    description: Power supply {devMPowerIndex} is absent on {_HOSTNAME}.
+    severity: crit
+    description: Power supply absent on {{first (value "devMPowerIndex") "power supply"}} on {{hostname}}.
     status: current
     varbinds:
       - devMPowerIndex
   - oid: 1.3.6.1.4.1.27975.39.1.2
     name: SWITCH::powerfailure
     category: diagnostic
-    severity: err
-    description: Power supply {devMPowerIndex} reported failure on {_HOSTNAME}.
+    severity: alert
+    description: Power supply failure on power unit {{value "devMPowerIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - devMPowerIndex
@@ -807,23 +807,23 @@ traps:
     name: SWITCH::powerNormal
     category: diagnostic
     severity: notice
-    description: Power supply {devMPowerIndex} returned to normal state on {_HOSTNAME}.
+    description: Power supply {{value "devMPowerIndex"}} returned to normal on {{hostname}}.
     status: current
     varbinds:
       - devMPowerIndex
   - oid: 1.3.6.1.4.1.27975.39.1.4
     name: SWITCH::powerfanfailure
     category: diagnostic
-    severity: err
-    description: Power supply fan failure detected on power index {devMPowerIndex} on {_HOSTNAME}.
+    severity: crit
+    description: Power supply fan failure detected on power {{value "devMPowerIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - devMPowerIndex
   - oid: 1.3.6.1.4.1.27975.39.1.5
     name: SWITCH::fanfailure
     category: diagnostic
-    severity: err
-    description: Fan at position {devMFanPosition} with module ID {devMFanModuleId} failed on {_HOSTNAME}.
+    severity: alert
+    description: Fan failure detected on {{first (value "devMFanPosition") "fan"}} on {{hostname}}.
     status: current
     varbinds:
       - devMFanPosition
@@ -833,7 +833,7 @@ traps:
     name: SWITCH::fanNormal
     category: diagnostic
     severity: notice
-    description: Fan {devMFanPosition} module {devMFanModuleId} returned to normal state on {_HOSTNAME}.
+    description: Fan {{value "devMFanIndex"}} returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - devMFanPosition
@@ -843,7 +843,7 @@ traps:
     name: SWITCH::supervisorRemove
     category: state_change
     severity: alert
-    description: Supervisor card removed from slot {lswSlotIndex} on {_HOSTNAME}.
+    description: Supervisor card removed from slot {{value "lswSlotIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - lswSlotFrameIndex
@@ -852,7 +852,7 @@ traps:
     name: SWITCH::supervisorInsert
     category: state_change
     severity: notice
-    description: Supervisor card inserted at slot {lswSlotIndex} on {_HOSTNAME}.
+    description: Supervisor card inserted in slot {{value "lswSlotIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - lswSlotFrameIndex
@@ -861,7 +861,7 @@ traps:
     name: SWITCH::boardTemperatureAlarm
     category: diagnostic
     severity: warning
-    description: Board temperature high on slot {lswSlotIndex} with value {devMSlotEnvironmentValue} on {_HOSTNAME}.
+    description: Board temperature high on {{hostname}}.
     status: current
     varbinds:
       - lswSlotFrameIndex
@@ -871,7 +871,7 @@ traps:
     name: SWITCH::boardTemperatureReturnNormal
     category: diagnostic
     severity: notice
-    description: Board temperature returned to normal on {_HOSTNAME}.
+    description: Board temperature returned to normal on {{hostname}}.
     status: current
     varbinds:
       - lswSlotFrameIndex
@@ -880,17 +880,17 @@ traps:
   - oid: 1.3.6.1.4.1.27975.39.1.15
     name: SWITCH::loadFailure
     category: diagnostic
-    severity: err
-    description: Board load failure detected on slot {lswSlotIndex} on {_HOSTNAME}.
+    severity: crit
+    description: Board load failure detected on slot {{value "lswSlotIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - lswSlotFrameIndex
       - lswSlotIndex
   - oid: 1.3.6.1.4.1.27975.39.1.16
     name: SWITCH::loadFinished
-    category: config_change
+    category: diagnostic
     severity: notice
-    description: Board load finished for slot {lswSlotIndex} on {_HOSTNAME}.
+    description: Board load finished for slot {{value "lswSlotIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - lswSlotFrameIndex
@@ -899,15 +899,15 @@ traps:
     name: SWITCH::transceiverInsert
     category: state_change
     severity: notice
-    description: Transceiver inserted with status {transceiveStatus} on {_HOSTNAME}.
+    description: Transceiver inserted on {{hostname}}.
     status: current
     varbinds:
       - transceiveStatus
   - oid: 1.3.6.1.4.1.27975.39.1.19
     name: SWITCH::transceiverRemove
     category: state_change
-    severity: notice
-    description: Transceiver removed with status {transceiveStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Transceiver removed on {{hostname}}.
     status: current
     varbinds:
       - transceiveStatus
@@ -915,7 +915,7 @@ traps:
     name: SWITCH::transceiverSfpMonitor
     category: diagnostic
     severity: warning
-    description: Transceiver monitor status {transceiveMointorStatus} indicates warning or alarm on {_HOSTNAME}.
+    description: Transceiver SFP monitor detected warning or alarm with status {{value "transceiveMointorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - transceiveMointorStatus
@@ -923,7 +923,7 @@ traps:
     name: SWITCH::chsmBootupDiagTrap
     category: diagnostic
     severity: notice
-    description: Bootup diagnostic event detected on {_HOSTNAME}.
+    description: Chsm bootup diagnostic completed on {{hostname}}.
     status: current
     varbinds:
       - devMFanPosition
@@ -931,25 +931,25 @@ traps:
     name: SWITCH::chsmPoePortStatTrap
     category: state_change
     severity: notice
-    description: PoE port status changed on {_HOSTNAME}.
+    description: PoE port status changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.27975.39.1.23
     name: SWITCH::chsmPoeSysConsumpThresholdTrap
     category: diagnostic
     severity: warning
-    description: PoE system consumption reached warning threshold on {_HOSTNAME}.
+    description: PoE system consumption warning threshold reached on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.27975.39.1.24
     name: SWITCH::chsmPoePseVoltageTrap
     category: diagnostic
     severity: notice
-    description: Chsm bootup diagnostic trap received on {_HOSTNAME}.
+    description: Chassis bootup diagnostic trap received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.27975.39.1.25
     name: SWITCH::fanAbsent
     category: diagnostic
-    severity: warning
-    description: Fan {devMFanIndex} is absent on {_HOSTNAME}.
+    severity: crit
+    description: Fan {{value "devMFanIndex"}} is absent on {{hostname}}.
     status: current
     varbinds:
       - devMFanIndex
@@ -957,7 +957,7 @@ traps:
     name: SWITCH::fanPresent
     category: diagnostic
     severity: notice
-    description: Fan {devMFanIndex} detected as present on {_HOSTNAME}.
+    description: Fan {{value "devMFanIndex"}} is present on {{hostname}}.
     status: current
     varbinds:
       - devMFanIndex
@@ -965,7 +965,7 @@ traps:
     name: SWITCH::powerAlert
     category: diagnostic
     severity: warning
-    description: Power alert detected for power unit {devMPowerIndex} on {_HOSTNAME}.
+    description: Power alert detected for power unit {{value "devMPowerIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - devMPowerIndex
@@ -973,15 +973,15 @@ traps:
     name: SWITCH::powerNoAlert
     category: diagnostic
     severity: notice
-    description: Power supply {devMPowerIndex} alert cleared on {_HOSTNAME}.
+    description: Power supply {{value "devMPowerIndex"}} returned to normal state on {{hostname}}.
     status: current
     varbinds:
       - devMPowerIndex
   - oid: 1.3.6.1.4.1.27975.39.1.29
     name: SWITCH::dyingGasp
     category: diagnostic
-    severity: alert
-    description: Dying gasp event detected indicating imminent hardware failure on {_HOSTNAME}.
+    severity: crit
+    description: Dying Gasp event detected{{with value "dyingGaspEvent"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - dyingGaspEvent
@@ -989,7 +989,7 @@ traps:
     name: SWITCH::ifpReceiveManyErrorPacket
     category: diagnostic
     severity: warning
-    description: CRC error packets received on interface {interfaceIndex} on {_HOSTNAME}.
+    description: Receive many CRC error packets on interface {{value "interfaceIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - interfaceIndex
@@ -997,15 +997,15 @@ traps:
     name: SWITCH::erpsLinkSwitch
     category: state_change
     severity: warning
-    description: ERPS ring status changed to {ringStatus} on {_HOSTNAME}.
+    description: ERPS ring status changed to {{value "ringStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ringStatus
   - oid: 1.3.6.1.4.1.27975.69.1000.1
     name: SWITCH::tpOAMEventTrap
-    category: state_change
-    severity: notice
-    description: MPLS-TP OAM event {mplsTpOAMEventId} on service {mplsTpOAMEventService} on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: MPLS-TP OAM event {{value "mplsTpOAMEventId"}} on {{hostname}}.
     status: current
     varbinds:
       - mplsTpOAMEventService
@@ -1017,7 +1017,7 @@ traps:
     name: SWITCH::mplsTunnelSwitch
     category: state_change
     severity: notice
-    description: MPLS tunnel {mplsTunnelSelectedLspPe} LSP switchover to {mplsTunnelG8131CurrentState} on {_HOSTNAME}.
+    description: MPLS tunnel LSP switchover occurred on {{hostname}}.
     status: current
     varbinds:
       - mplsTunnelSelectedLspPe
@@ -1026,7 +1026,7 @@ traps:
     name: SWITCH::mplsTPVpwsSwitch
     category: state_change
     severity: notice
-    description: MPLS-TP VPWS PW switchover occurred on {mplsTPVpwsSelectedPw} with state {mplsTPVpwsG8131CurrentState} on {_HOSTNAME}.
+    description: MPLS-TP VPWs switchover occurred{{with value "mplsTPVpwsSelectedPw"}} to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - mplsTPVpwsSelectedPw
@@ -1035,7 +1035,7 @@ traps:
     name: SWITCH::mplsVplsTPPeerSwitch
     category: state_change
     severity: notice
-    description: PW switchover of MPLS-TP VPLS peer {mplsVplsTPPeerSelectedPw} to state {mplsVplsTPPeerG8131CurrentState} on {_HOSTNAME}.
+    description: PW switchover occurred for MPLS-TP VPLS peer {{value "mplsVplsTPPeerSelectedPw"}} on {{hostname}}.
     status: current
     varbinds:
       - mplsVplsTPPeerSelectedPw
@@ -1044,7 +1044,7 @@ traps:
     name: SWITCH::mplsVpwsStateChange
     category: state_change
     severity: warning
-    description: VPWS state changed to {mplsVpwsState} on {_HOSTNAME}.
+    description: MPLS VPLS state changed to {{value "mplsVpwsState"}} on {{hostname}}.
     status: current
     varbinds:
       - mplsVpwsState
@@ -1052,7 +1052,7 @@ traps:
     name: SWITCH::mplsVplsPeerStateChange
     category: state_change
     severity: warning
-    description: VPLS peer state changed to {mplsVplsPeerState} on {_HOSTNAME}.
+    description: VPLS peer state changed to {{value "mplsVplsPeerState"}} on {{hostname}}.
     status: current
     varbinds:
       - mplsVplsPeerState
@@ -1060,7 +1060,7 @@ traps:
     name: SWITCH::mplsVpwsOAMCsfStateChange
     category: state_change
     severity: warning
-    description: VPWS OAM CSF state changed to {mplsTPVpwsOAMCsfSrvState} on {_HOSTNAME}.
+    description: VPWS OAM CSF state changed{{with value "mplsTPVpwsOAMCsfDCReason"}} reason {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - mplsTPVpwsOAMCsfSrvState
@@ -1071,7 +1071,7 @@ traps:
     name: SWITCH::tpOAMSingleLmLocalLossTrap
     category: diagnostic
     severity: warning
-    description: Single LM local loss {mplsTpOAMSingleLMCacheLocalLoss} reached threshold on {_HOSTNAME}.
+    description: Single LM local loss reached threshold with ratio {{value "mplsTpOAMSingleLMCacheLocalLossRatio"}} on {{hostname}}.
     status: current
     varbinds:
       - mplsTpOAMSingleLMCacheLocalLoss
@@ -1079,9 +1079,9 @@ traps:
       - mplsTpOAMSingleLMCacheTime
   - oid: 1.3.6.1.4.1.27975.69.1000.9
     name: SWITCH::tpOAMSingleLmLocalLossClearTrap
-    category: diagnostic
-    severity: warning
-    description: Single LM local loss cleared for {mplsTpOAMSingleLMCacheTime} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Single LM local loss cleared on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - mplsTpOAMSingleLMCacheLocalLoss
@@ -1091,7 +1091,7 @@ traps:
     name: SWITCH::tpOAMSingleLmRemoteLossTrap
     category: diagnostic
     severity: warning
-    description: Remote loss reached threshold with value {mplsTpOAMSingleLMCacheRemoteLoss} on {_HOSTNAME}.
+    description: OAM single-link local loss reached threshold with {{value "mplsTpOAMSingleLMCacheLocalLossRatio"}}% loss on {{hostname}}.
     status: current
     varbinds:
       - mplsTpOAMSingleLMCacheRemoteLoss
@@ -1099,9 +1099,9 @@ traps:
       - mplsTpOAMSingleLMCacheTime
   - oid: 1.3.6.1.4.1.27975.69.1000.11
     name: SWITCH::tpOAMSingleLmRemoteLossClearTrap
-    category: diagnostic
-    severity: warning
-    description: Single-lm far end loss cleared with ratio {mplsTpOAMSingleLMCacheRemoteLossRatio} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Remote loss threshold cleared on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - mplsTpOAMSingleLMCacheRemoteLoss
@@ -1110,17 +1110,17 @@ traps:
   - oid: 1.3.6.1.4.1.27975.81.100.1
     name: SWITCH::syncEStateChange
     category: state_change
-    severity: notice
-    description: SyncE state changed to {syncEClockState} on interface {syncESelectedInterface} on {_HOSTNAME}.
+    severity: warning
+    description: SyncE state changed to {{value "syncEClockState"}} on {{hostname}}.
     status: current
     varbinds:
       - syncEClockState
       - syncESelectedInterface
   - oid: 1.3.6.1.4.1.27975.83.1000.1
     name: SWITCH::cfmErrorTrap
-    category: diagnostic
+    category: security
     severity: warning
-    description: CFM error {cfmErrorReason} detected for remote MAC {cfmErrorRmac} on {_HOSTNAME}.
+    description: CFM error detected on {{trap_interface}} with reason {{value "cfmErrorReason"}} on {{hostname}}.
     status: current
     varbinds:
       - cfmErrorRmac
@@ -1129,7 +1129,7 @@ traps:
     name: SWITCH::ptpMasterChange
     category: state_change
     severity: notice
-    description: PTP timing reference changed to {ptpFMClockID} on {_HOSTNAME}.
+    description: PTP timing reference changed to {{value "ptpFMClockID"}} on {{hostname}}.
     status: current
     varbinds:
       - ptpFMClockID
@@ -1137,15 +1137,15 @@ traps:
     name: SWITCH::ptpIfStateChange
     category: state_change
     severity: notice
-    description: PTP interface state changed to {ptpIfState} on {_HOSTNAME}.
+    description: PTP interface state changed to {{value "ptpIfState"}} on {{hostname}}.
     status: current
     varbinds:
       - ptpIfState
   - oid: 1.3.6.1.4.1.27975.85.100.3
     name: SWITCH::ptpMasterClockAccuracyChange
     category: diagnostic
-    severity: notice
-    description: PTP master clock accuracy changed to {ptpClockAccuracy} on {_HOSTNAME}.
+    severity: warning
+    description: PTP master clock accuracy changed to {{value "ptpClockAccuracy"}} on {{hostname}}.
     status: current
     varbinds:
       - ptpClockAccuracy
@@ -1153,7 +1153,7 @@ traps:
     name: SWITCH::aAlarmEventNotify
     category: diagnostic
     severity: warning
-    description: Alarm {alarmHistoryLogObject} with severity {alarmHistoryLogSeverity} detected on {_HOSTNAME}.
+    description: System fault alarm detected on {{hostname}}.
     status: current
     varbinds:
       - alarmHistoryLogSeq
@@ -1168,7 +1168,7 @@ traps:
     name: SWITCH::loopbackDetectStatusNotify
     category: state_change
     severity: warning
-    description: Loopback detection status changed to {loopbackDetectStatus} on interface index {loopbackDetectIfIndex} on {_HOSTNAME}.
+    description: Loopback detection status changed to {{value "loopbackDetectStatus"}} on interface {{value "loopbackDetectIfIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - loopbackDetectIfIndex
@@ -1177,7 +1177,7 @@ traps:
     name: SWITCH::ipslaTestFailure
     category: diagnostic
     severity: warning
-    description: IP SLA test {ipslaCtrlAdminDesc} failed on {_HOSTNAME}.
+    description: IP SLA test {{value "ipslaCtrlAdminDesc"}} failed on {{hostname}}.
     status: current
     varbinds:
       - ipslaCtrlAdminIndex
@@ -1197,7 +1197,7 @@ traps:
     name: SWITCH::ipslaPktTimeout
     category: diagnostic
     severity: warning
-    description: IP SLA packet test {ipslaPktTestId} timed out on {_HOSTNAME}.
+    description: ICMP request timeout detected for test {{value "ipslaCtrlAdminDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - ipslaCtrlAdminIndex
@@ -1210,7 +1210,7 @@ traps:
     name: SWITCH::ipslaTestSuccess
     category: diagnostic
     severity: info
-    description: IP SLA test {ipslaCtrlAdminDesc} completed successfully on {_HOSTNAME}.
+    description: IP SLA test completed successfully on {{hostname}}.
     status: current
     varbinds:
       - ipslaCtrlAdminIndex
@@ -1230,7 +1230,7 @@ traps:
     name: SWITCH::ipslaPktOverthreshold
     category: diagnostic
     severity: warning
-    description: ICMP response RTT {ipslaPktRtt} exceeded threshold {ipslaCtrlAdminThreshold} for {ipslaCtrlAdminDesc} on {_HOSTNAME}.
+    description: ICMP response RTT {{value "ipslaPktRtt"}} exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - ipslaCtrlAdminIndex

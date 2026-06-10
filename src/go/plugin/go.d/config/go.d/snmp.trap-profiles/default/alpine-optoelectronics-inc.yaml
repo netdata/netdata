@@ -41,8 +41,8 @@ traps:
   - oid: 1.3.6.1.4.1.52326.1.1.2.3
     name: ALPINE-GEN-CARD-EDFA-MIB::alpineGenEdfaPowerAlarm
     category: diagnostic
-    severity: warning
-    description: EDFA output power alarm triggered with {geaiLossOutputAlarm} on {_HOSTNAME}.
+    severity: alert
+    description: EDFA output power alarm triggered{{with value "geaiLossOutputAlarm"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - gceOutputPower
@@ -51,7 +51,7 @@ traps:
     name: ALPINE-GEN-CARD-EDFA-MIB::alpineGenEdfaTemperatureAlarm
     category: diagnostic
     severity: warning
-    description: EDFA temperature alarm detected with pump status {geaiPumpTemperatureAlarm} and case status {geaiCaseTemperatureAlarm} on {_HOSTNAME}.
+    description: EDFA temperature alarm detected{{with value "geaiPumpTemperatureAlarm"}} pump{{else}}{{with value "geaiCaseTemperatureAlarm"}} case{{end}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - gceTemperature
@@ -61,15 +61,15 @@ traps:
     name: ALPINE-GEN-CARD-EDFA-MIB::alpineGenEdfaBiasAlarm
     category: diagnostic
     severity: warning
-    description: Pump bias alarm state {geaiPumpBiasAlarm} detected on {_HOSTNAME}.
+    description: EDFA pump bias alarm {{value "geaiPumpBiasAlarm"}} on {{hostname}}.
     status: current
     varbinds:
       - geaiPumpBiasAlarm
   - oid: 1.3.6.1.4.1.52326.1.1.2.6
     name: ALPINE-GEN-CARD-EDFA-MIB::alpineGenEdfaLossAlarm
     category: diagnostic
-    severity: warning
-    description: EDFA loss of input alarm triggered with value {geaiLossInputAlarm} on {_HOSTNAME}.
+    severity: alert
+    description: EDFA loss of input alarm triggered with value {{value "geaiLossInputAlarm"}} on {{hostname}}.
     status: current
     varbinds:
       - geaiLossInputAlarm
@@ -77,7 +77,7 @@ traps:
     name: ALPINE-TDCM-EDFA-MIB::alpineTEAlarmTemperature
     category: diagnostic
     severity: warning
-    description: Temperature reading {alpineTEBISlotTemperature} reported on {_HOSTNAME}.
+    description: Temperature alarm triggered for slot {{value "alpineTEBISlotTemperature"}} on {{hostname}}.
     status: current
     varbinds:
       - alpineTEBISlotTemperature

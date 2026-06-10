@@ -83,7 +83,7 @@ traps:
     name: B100-MIB::vSstateChange
     category: state_change
     severity: notice
-    description: Virtual Service {vSname} changed state to {vSstate} on {_HOSTNAME}.
+    description: Virtual service {{value "vSname"}} changed state to {{value "vSstate"}} on {{hostname}}.
     status: current
     varbinds:
       - vSstate
@@ -96,7 +96,7 @@ traps:
     name: B100-MIB::rSstateChange
     category: state_change
     severity: warning
-    description: Real Server {rSip} state changed to {rSstate} on {_HOSTNAME}.
+    description: Real Server {{value "rSip"}} state changed to {{value "rSstate"}} on {{hostname}}.
     status: current
     varbinds:
       - rSstate
@@ -113,13 +113,13 @@ traps:
     name: B100-MIB::hAstateChange
     category: state_change
     severity: notice
-    description: HA state changed to {hAstate} on {_HOSTNAME}.
+    description: HA state changed to {{value "hAstate"}} on {{hostname}}.
     status: current
     varbinds:
       - hAstate
   - oid: 1.3.6.1.4.1.12196.13.3.1.4
     name: B100-MIB::licenseExceeded
     category: license
-    severity: warning
-    description: Timed license has expired on {_HOSTNAME}.
+    severity: alert
+    description: Timed license has expired on {{hostname}}.
     status: current

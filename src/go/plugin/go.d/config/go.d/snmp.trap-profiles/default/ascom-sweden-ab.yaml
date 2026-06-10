@@ -16,19 +16,19 @@ traps:
     name: ASCOM-IPDECT-MIB::ascomColdStart
     category: diagnostic
     severity: notice
-    description: Device power cycle detected on {_HOSTNAME}.
+    description: Device power cycle detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.27614.0.1
     name: ASCOM-IPDECT-MIB::ascomWarmStart
     category: state_change
     severity: notice
-    description: Device reset administratively on {_HOSTNAME}.
+    description: Device reset administratively on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.27614.0.2
     name: ASCOM-IPDECT-MIB::ascomLinkDown
     category: state_change
     severity: warning
-    description: Interface link down detected on {_HOSTNAME}.
+    description: Interface link went down on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -36,7 +36,7 @@ traps:
     name: ASCOM-IPDECT-MIB::ascomLinkUp
     category: state_change
     severity: notice
-    description: Interface {ifIndex} link went up on {_HOSTNAME}.
+    description: Interface link went up on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -44,21 +44,21 @@ traps:
     name: ASCOM-IPDECT-MIB::ascomAuthenticationFailure
     category: auth
     severity: warning
-    description: SNMP authentication failure from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: SNMP authentication failure from {{source_ip}} on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.27614.0.11
     name: ASCOM-IPDECT-MIB::ipDectSetCriticalAlarmTrap
     category: diagnostic
     severity: crit
-    description: Critical alarm triggered with error code {ipDectLastErrorCode} on {_HOSTNAME}.
+    description: Critical alarm set with error code {{value "ipDectLastErrorCode"}} on {{hostname}}.
     status: current
     varbinds:
       - ipDectLastErrorCode
   - oid: 1.3.6.1.4.1.27614.0.12
     name: ASCOM-IPDECT-MIB::ipDectSetMajorAlarmTrap
     category: diagnostic
-    severity: err
-    description: Major alarm reported with error code {ipDectLastErrorCode} on {_HOSTNAME}.
+    severity: crit
+    description: Major alarm set with error code {{value "ipDectLastErrorCode"}} on {{hostname}}.
     status: current
     varbinds:
       - ipDectLastErrorCode
@@ -66,7 +66,7 @@ traps:
     name: ASCOM-IPDECT-MIB::ipDectSetMinorAlarmTrap
     category: diagnostic
     severity: warning
-    description: Minor alarm set with error code {ipDectLastErrorCode} on {_HOSTNAME}.
+    description: Minor alarm set with error code {{value "ipDectLastErrorCode"}} on {{hostname}}.
     status: current
     varbinds:
       - ipDectLastErrorCode
@@ -74,15 +74,15 @@ traps:
     name: ASCOM-IPDECT-MIB::ipDectSetIndeterminateAlarmTrap
     category: diagnostic
     severity: warning
-    description: Indeterminate alarm set with error code {ipDectLastErrorCode} on {_HOSTNAME}.
+    description: Indeterminate alarm set with error code {{value "ipDectLastErrorCode"}} on {{hostname}}.
     status: current
     varbinds:
       - ipDectLastErrorCode
   - oid: 1.3.6.1.4.1.27614.0.15
     name: ASCOM-IPDECT-MIB::ipDectClearAlarmTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Indeterminate alarm cleared with last error code {ipDectLastErrorCode} on {_HOSTNAME}.
+    description: Indeterminate alarm cleared{{with value "ipDectLastErrorCode"}} with error code {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ipDectLastErrorCode
@@ -90,15 +90,15 @@ traps:
     name: ASCOM-IPDECT-MIB::ipDectCriticalFaultTrap
     category: diagnostic
     severity: crit
-    description: Critical fault detected with error code {ipDectLastErrorCode} on {_HOSTNAME}.
+    description: Critical fault detected with error code {{value "ipDectLastErrorCode"}} on {{hostname}}.
     status: current
     varbinds:
       - ipDectLastErrorCode
   - oid: 1.3.6.1.4.1.27614.0.17
     name: ASCOM-IPDECT-MIB::ipDectMajorFaultTrap
     category: diagnostic
-    severity: err
-    description: Major fault detected with error code {ipDectLastErrorCode} on {_HOSTNAME}.
+    severity: crit
+    description: Major fault detected with error code {{value "ipDectLastErrorCode"}} on {{hostname}}.
     status: current
     varbinds:
       - ipDectLastErrorCode
@@ -106,15 +106,15 @@ traps:
     name: ASCOM-IPDECT-MIB::ipDectMinorFaultTrap
     category: diagnostic
     severity: warning
-    description: Minor fault detected with error code {ipDectLastErrorCode} on {_HOSTNAME}.
+    description: Minor fault detected with error code {{value "ipDectLastErrorCode"}} on {{hostname}}.
     status: current
     varbinds:
       - ipDectLastErrorCode
   - oid: 1.3.6.1.4.1.27614.0.19
     name: ASCOM-IPDECT-MIB::ipDectIndeterminateFaultTrap
     category: diagnostic
-    severity: err
-    description: Indeterminate error occurred with code {ipDectLastErrorCode} on {_HOSTNAME}.
+    severity: warning
+    description: Indeterminate fault occurred with error code {{value "ipDectLastErrorCode"}} on {{hostname}}.
     status: current
     varbinds:
       - ipDectLastErrorCode

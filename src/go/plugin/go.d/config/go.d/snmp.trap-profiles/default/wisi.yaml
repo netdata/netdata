@@ -108,129 +108,129 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.2.0.1
     name: WISI-GTMODULES-MIB::gtModulesNotifyPlugin
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: New SFM/MFM module detected on {_HOSTNAME}.
+    description: New SFM/MFM module plugged in on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.2.0.2
     name: WISI-GTMODULES-MIB::gtModulesNotifyPlugout
     category: state_change
-    severity: warning
-    description: SFM/MFM module plugout detected on {_HOSTNAME}.
+    severity: notice
+    description: SFM/MFM module plugged out on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.2.0.3
     name: WISI-GTMODULES-MIB::gtModulesNotifyFailure
     category: diagnostic
-    severity: err
-    description: GT11 SFM/MFM module failure detected on {_HOSTNAME}.
+    severity: crit
+    description: SFM/MFM module failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.2.0.4
     name: WISI-GTMODULES-MIB::gtModulesNotifyRedundancy
     category: state_change
     severity: notice
-    description: Redundancy module replacement completed on {_HOSTNAME}.
+    description: Redundancy module replaced on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.2.0.5
     name: WISI-GTMODULES-MIB::gtModulesNotifyRedundancyClear
     category: state_change
     severity: notice
-    description: Redundancy clear event detected on {_HOSTNAME}.
+    description: Redundancy cleared; SFM/MFM master module replaced on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.2.0.6
     name: WISI-GTMODULES-MIB::gtModulesNotifyFailureClear
     category: diagnostic
     severity: notice
-    description: GT11 module failure cleared on {_HOSTNAME}.
+    description: SFM/MFM module failure cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.3.0.1
     name: WISI-GTSENSORS-MIB::gtSensorsNotifyFanPlugin
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Fan plugin detected on {_HOSTNAME}.
+    description: Fan plugin plugged in on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.3.0.2
     name: WISI-GTSENSORS-MIB::gtSensorsNotifyFanPlugout
     category: diagnostic
     severity: warning
-    description: Fan unit plug-out detected on {_HOSTNAME}.
+    description: Fan unit plug-out detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.3.0.3
     name: WISI-GTSENSORS-MIB::gtSensorsNotifyPSUPlugin
     category: state_change
     severity: notice
-    description: PSU plugin detected on {_HOSTNAME}.
+    description: Power supply unit plugin plugged in on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.3.0.4
     name: WISI-GTSENSORS-MIB::gtSensorsNotifyPSUPlugout
     category: diagnostic
-    severity: warning
-    description: Power supply unit plug-out detected on {_HOSTNAME}.
+    severity: alert
+    description: Power supply unit plug-out detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.3.0.5
     name: WISI-GTSENSORS-MIB::gtSensorsNotifyTemperature
     category: diagnostic
     severity: warning
-    description: Temperature exceeded upper limit on {_HOSTNAME}.
+    description: Temperature on GT11 board exceeded upper limit on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.3.0.6
     name: WISI-GTSENSORS-MIB::gtSensorsNotifyFanSpeed
     category: diagnostic
     severity: warning
-    description: Fan speed below lower limit detected on {_HOSTNAME}.
+    description: Fan speed below lower limit detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.3.0.7
     name: WISI-GTSENSORS-MIB::gtSensorsNotifyPSUCurrent
     category: diagnostic
     severity: warning
-    description: PSU output current is out of range limit on {_HOSTNAME}.
+    description: PSU output current is out of range limit on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.3.0.8
     name: WISI-GTSENSORS-MIB::gtSensorsNotifyPSUVoltage
     category: diagnostic
     severity: warning
-    description: PSU output voltage is out of range limit on {_HOSTNAME}.
+    description: PSU output voltage is out of range limit on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.3.0.9
     name: WISI-GTSENSORS-MIB::gtSensorsNotifyPSUTemperature
     category: diagnostic
     severity: warning
-    description: PSU temperature exceeded upper limit on {_HOSTNAME}.
+    description: PSU temperature exceeded upper limit on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.3.0.10
     name: WISI-GTSENSORS-MIB::gtSensorsNotifyPSUTemperatureClear
     category: diagnostic
     severity: notice
-    description: PSU temperature cleared high threshold on {_HOSTNAME}.
+    description: PSU temperature cleared upper limit on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.3.0.11
     name: WISI-GTSENSORS-MIB::gtSensorsNotifyBOARDTemperatureClear
     category: diagnostic
     severity: notice
-    description: Board temperature cleared high threshold on {_HOSTNAME}.
+    description: Board temperature cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.3.0.12
     name: WISI-GTSENSORS-MIB::gtSensorsNotifyPSUFailure
     category: diagnostic
     severity: crit
-    description: Power Supply Unit voltage dropped below limit on {_HOSTNAME}.
+    description: Power Supply Unit internal voltage dropped below limit on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.3.0.13
     name: WISI-GTSENSORS-MIB::gtSensorsNotifyPSUFailureClear
     category: diagnostic
     severity: notice
-    description: PSU failure cleared on {_HOSTNAME}.
+    description: PSU failure cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.4.0.1
     name: WISI-TANGRAM-MIB::gtGenericNotifyUsertrap
     category: unknown
     severity: notice
-    description: Generic user notification received on {_HOSTNAME}.
+    description: Generic user notification received on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7465.20.2.9.1.5.0.1
     name: WISI-GTSETTINGS-MIB::gtSettingsNotifyWebChanged
     category: state_change
     severity: notice
-    description: Web server status changed to {gtWebEnable} on {_HOSTNAME}.
+    description: Web server status changed on {{hostname}}.
     status: current
     varbinds:
       - gtWebEnable
@@ -240,7 +240,7 @@ traps:
     name: WISI-GTSETTINGS-MIB::gtSettingsNotifyInterfaceChanged
     category: config_change
     severity: notice
-    description: Interface {gtInterfaceName} global settings changed on {_HOSTNAME}.
+    description: Interface {{first (value "gtInterfaceName") "interface"}} global settings changed on {{hostname}}.
     status: current
     varbinds:
       - gtInterfaceName

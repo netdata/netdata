@@ -25,7 +25,7 @@ traps:
     name: MIMOSA-NETWORKS-BASE-MIB::mimosaCriticalFault
     category: diagnostic
     severity: crit
-    description: 'Critical fault detected: {mimosaTrapMessage} on {_HOSTNAME}.'
+    description: 'Critical fault detected{{with value "mimosaTrapMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mimosaTrapMessage
@@ -33,7 +33,7 @@ traps:
     name: MIMOSA-NETWORKS-BASE-MIB::mimosaTempWarning
     category: diagnostic
     severity: warning
-    description: 'Temperature warning: {mimosaTrapMessage} on {_HOSTNAME}.'
+    description: 'Temperature warning received{{with value "mimosaTrapMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mimosaTrapMessage
@@ -41,7 +41,7 @@ traps:
     name: MIMOSA-NETWORKS-BASE-MIB::mimosaTempNormal
     category: diagnostic
     severity: notice
-    description: Temperature returned to safe range on {_HOSTNAME}.
+    description: 'Temperature returned to normal range{{with value "mimosaTrapMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mimosaTrapMessage
@@ -49,7 +49,7 @@ traps:
     name: MIMOSA-NETWORKS-BASE-MIB::mimosaEthernetSpeedChange
     category: state_change
     severity: notice
-    description: Ethernet port {ifIndex} speed changed from {mimosaOldSpeed} to {mimosaNewSpeed} on {_HOSTNAME}.
+    description: Ethernet speed changed from {{value "mimosaOldSpeed"}} to {{value "mimosaNewSpeed"}} on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex

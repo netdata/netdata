@@ -2555,7 +2555,7 @@ traps:
     name: IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTInputPreselectionEvent
     category: state_change
     severity: notice
-    description: DVB-ST input preselection changed to {dvbSTInputPreselection} on {_HOSTNAME}.
+    description: DVB-T transmitter input preselection changed to {{value "dvbSTInputPreselection"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2569,7 +2569,7 @@ traps:
     name: IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTInputAutomaticEvent
     category: state_change
     severity: notice
-    description: Single transmitter input mode changed to {dvbSTInputAutomatic} on {_HOSTNAME}.
+    description: Single transmitter input mode changed to {{value "dvbSTInputAutomatic"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2583,7 +2583,7 @@ traps:
     name: IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTTransmitterOpModeEvent
     category: state_change
     severity: notice
-    description: Transmitter operational mode changed to {dvbSTTransmitterOpMode} on {_HOSTNAME}.
+    description: Transmitter operational mode changed to {{value "dvbSTTransmitterOpMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2597,7 +2597,7 @@ traps:
     name: IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTRFPresentEvent
     category: diagnostic
     severity: notice
-    description: Single transmitter output power status is {dvbSTRFPresent} on {_HOSTNAME}.
+    description: DVB transmitter RF output status is {{value "dvbSTRFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2610,8 +2610,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.1.0.5
     name: IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTResetFaultEvent
     category: diagnostic
-    severity: err
-    description: Single transmitter reset fault detected with counter {dvbSTResetFault} on {_HOSTNAME}.
+    severity: warning
+    description: Single transmitter reset fault detected{{with value "dvbSTResetFault"}} code {{.}}{{end}} on {{hostname}}.
     status: obsolete
     varbinds:
       - sysDescr
@@ -2624,8 +2624,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.1.0.6
     name: IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTFaultEvent
     category: diagnostic
-    severity: err
-    description: Transmitter fault state {dvbSTFault} detected on {_HOSTNAME}.
+    severity: crit
+    description: DVB transmitter fault detected{{with value "dvbSTFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2639,7 +2639,7 @@ traps:
     name: IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTWarningEvent
     category: diagnostic
     severity: warning
-    description: Single transmitter warning state {dvbSTWarning.raw} detected on {_HOSTNAME}.
+    description: DVB single transmitter warning {{value "dvbSTWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2653,7 +2653,7 @@ traps:
     name: IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTInput1OKEvent
     category: diagnostic
     severity: notice
-    description: DVB transmitter input 1 signal status is {dvbSTInput1OK} on {_HOSTNAME}.
+    description: DVB transmitter input 1 signal is ok on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2667,7 +2667,7 @@ traps:
     name: IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTInput2OKEvent
     category: state_change
     severity: notice
-    description: DVB transmitter input 2 signal status changed to ok on {_HOSTNAME}.
+    description: DVB transmitter input 2 signal status is OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2681,7 +2681,7 @@ traps:
     name: IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTLocalModeEvent
     category: state_change
     severity: notice
-    description: Transmitter mode changed to {dvbSTLocalMode} on {_HOSTNAME}.
+    description: DVB-ST local mode changed to {{value "dvbSTLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2695,7 +2695,7 @@ traps:
     name: IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTActiveInputEvent
     category: state_change
     severity: notice
-    description: DVB transmitter active input changed to {dvbSTActiveInput} on {_HOSTNAME}.
+    description: DVB single transmitter active input changed to {{value "dvbSTActiveInput"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2709,7 +2709,7 @@ traps:
     name: IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTSFNModeEvent
     category: state_change
     severity: notice
-    description: Single transmitter mode changed to {dvbSTSFNMode} on {_HOSTNAME}.
+    description: DVB single transmitter SFN mode changed to {{value "dvbSTSFNMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2723,7 +2723,7 @@ traps:
     name: IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTRefFaultEvent
     category: diagnostic
     severity: warning
-    description: Single transmitter reference fault state is {dvbSTRefFault} on {_HOSTNAME}.
+    description: Single transmitter reference fault detected{{with value "dvbSTRefFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2735,9 +2735,9 @@ traps:
       - dvbSTRefFault
   - oid: 1.3.6.1.4.1.19831.1.1.1.1.0.14
     name: IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTMuteEvent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DVB-S transmitter mute state changed to {dvbSTMute} on {_HOSTNAME}.
+    description: DVB-S transmitter mute state is {{value "dvbSTMute"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2750,8 +2750,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.1.0.15
     name: IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTFaultMIPEvent
     category: diagnostic
-    severity: err
-    description: Transmitter fault state {dvbSTFaultMIP} detected on {_HOSTNAME}.
+    severity: warning
+    description: DVB transmitter MIP fault detected{{with value "dvbSTFaultMIP"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2763,9 +2763,9 @@ traps:
       - dvbSTFaultMIP
   - oid: 1.3.6.1.4.1.19831.1.1.1.1.0.16
     name: IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTStuffingModeEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: DVB-ST stuffing mode changed to {dvbSTStuffingMode} on {_HOSTNAME}.
+    description: DVB-ST stuffing mode changed to {{value "dvbSTStuffingMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2779,7 +2779,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARInputPreselectionEvent
     category: state_change
     severity: notice
-    description: DVB AR input preselection changed to {dvbARInputPreselection} on {_HOSTNAME}.
+    description: DVB AR input preselection changed to {{value "dvbARInputPreselection"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2793,7 +2793,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARInputAutomaticEvent
     category: state_change
     severity: notice
-    description: DVB AR input selection mode changed to {dvbARInputAutomatic} on {_HOSTNAME}.
+    description: DVB AR input mode changed to {{value "dvbARInputAutomatic"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2805,9 +2805,9 @@ traps:
       - dvbARInputAutomatic
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.3
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARPreselectionExciterEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: DVB AR preselection exciter event reported on {_HOSTNAME}.
+    description: DVB AR preselection exciter state changed to {{value "dvbARPreselectionExciter"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2820,8 +2820,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.4
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARPreselectionAmplifierEvent
     category: diagnostic
-    severity: warning
-    description: Preselection amplifier {dvbARPreselectionAmplifier} event detected on {_HOSTNAME}.
+    severity: notice
+    description: DVB preselection amplifier event occurred on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2835,7 +2835,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARTransmitterOpModeEvent
     category: state_change
     severity: notice
-    description: DVB AR transmitter active reserve mode changed to {dvbARTransmitterOpMode} on {_HOSTNAME}.
+    description: DVB AR transmitter active reserve mode changed to {{value "dvbARTransmitterOpMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2849,7 +2849,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARReserveControlEvent
     category: state_change
     severity: notice
-    description: Active reserve control changed to {dvbARReserveControl} on {_HOSTNAME}.
+    description: DVB AR reserve control changed to {{value "dvbARReserveControl"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2863,7 +2863,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARResetFaultEvent
     category: diagnostic
     severity: warning
-    description: DVB AR reset fault triggered with value {dvbARResetFault} on {_HOSTNAME}.
+    description: DVB-Arithmetic Reset fault detected with value {{value "dvbARResetFault"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - sysDescr
@@ -2876,8 +2876,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.8
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARActiveAmplifierEvent
     category: diagnostic
-    severity: warning
-    description: Active amplifier {dvbARActiveAmplifier} status change detected on {_HOSTNAME}.
+    severity: notice
+    description: Active amplifier {{value "dvbARActiveAmplifier"}} event occurred on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2889,9 +2889,9 @@ traps:
       - dvbARActiveAmplifier
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.9
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARActiveExciterEvent
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Active exciter {dvbARActiveExciter} status changed on {_HOSTNAME}.
+    description: DVB-AR active exciter {{value "dvbARActiveExciter"}} is active on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2905,7 +2905,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARLocalModeEvent
     category: state_change
     severity: notice
-    description: DVB AR local mode changed to {dvbARLocalMode} on {_HOSTNAME}.
+    description: DVB-AR local mode changed to {{value "dvbARLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2918,8 +2918,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.11
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARControlUnitFaultEvent
     category: diagnostic
-    severity: err
-    description: DVB AR control unit fault detected with state {dvbARControlUnitFault} on {_HOSTNAME}.
+    severity: warning
+    description: DVB AR control unit fault detected{{with value "dvbARControlUnitFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2933,7 +2933,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterSwitchOverModeEvent
     category: state_change
     severity: notice
-    description: Exciter switch over mode changed to {dvbARExciterSwitchOverMode} on {_HOSTNAME}.
+    description: DVB-A exciter switch over mode changed to {{value "dvbARExciterSwitchOverMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2947,7 +2947,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterSwitchOverReadyEvent
     category: state_change
     severity: notice
-    description: Amplifier switch over ready state changed to {dvbARAmplifierSwitchOverReady} on {_HOSTNAME}.
+    description: Exciter switch over ready event occurred on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2961,7 +2961,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterSwitchOverExecutedEvent
     category: state_change
     severity: notice
-    description: DVB-A exciter switch over {dvbARExciterSwitchOverExecuted} on {_HOSTNAME}.
+    description: DVB-A exciter switch over executed on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2974,8 +2974,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.15
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterSwitchOverFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter switch over unit reported fault state {dvbARExciterSwitchOverFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter switch-over unit is in a faulty state {{value "dvbARExciterSwitchOverFault"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -2989,7 +2989,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARAmplifierSwitchOverModeEvent
     category: state_change
     severity: notice
-    description: Amplifier switch over mode changed to {dvbARAmplifierSwitchOverMode} on {_HOSTNAME}.
+    description: Amplifier switch over mode changed to {{value "dvbARAmplifierSwitchOverMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3003,7 +3003,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARAmplifierSwitchOverReadyEvent
     category: state_change
     severity: notice
-    description: Amplifier switch over unit is {dvbARAmplifierSwitchOverReady} on {_HOSTNAME}.
+    description: Amplifier switch over is ready on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3017,7 +3017,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARAmplifierSwitchOverExecutedEvent
     category: state_change
     severity: notice
-    description: Amplifier switch over executed on {_HOSTNAME}.
+    description: Amplifier switch over executed on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3030,8 +3030,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.19
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARAmplifierSwitchOverFaultEvent
     category: diagnostic
-    severity: err
-    description: Amplifier switch-over unit reported fault state {dvbARAmplifierSwitchOverFault} on {_HOSTNAME}.
+    severity: crit
+    description: Amplifier switch-over fault detected{{with value "dvbARAmplifierSwitchOverFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3044,8 +3044,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.20
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARAmplifierARFPresentEvent
     category: diagnostic
-    severity: notice
-    description: Amplifier ARF status changed to {dvbARAmplifierARFPresent} on {_HOSTNAME}.
+    severity: warning
+    description: Amplifier ARF output power status changed to {{value "dvbARAmplifierARFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3058,8 +3058,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.21
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARAmplifierAFaultEvent
     category: diagnostic
-    severity: err
-    description: Amplifier A fault detected with state {dvbARAmplifierAFault} on {_HOSTNAME}.
+    severity: warning
+    description: Amplifier A fault detected{{with value "dvbARAmplifierAFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3073,7 +3073,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARAmplifierAWarningEvent
     category: diagnostic
     severity: warning
-    description: Amplifier A warning state {dvbARAmplifierAWarning} detected on {_HOSTNAME}.
+    description: Amplifier A warning state {{value "dvbARAmplifierAWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3087,7 +3087,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARAmplifierBRFPresentEvent
     category: diagnostic
     severity: warning
-    description: Amplifier BRF status {dvbARAmplifierBRFPresent} reported on {_HOSTNAME}.
+    description: Amplifier BRF output power status changed to {{value "dvbARAmplifierBRFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3100,8 +3100,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.24
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARAmplifierBFaultEvent
     category: diagnostic
-    severity: err
-    description: Amplifier B fault state is {dvbARAmplifierBFault} on {_HOSTNAME}.
+    severity: warning
+    description: Amplifier B fault detected{{with value "dvbARAmplifierBFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3115,7 +3115,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARAmplifierBWarningEvent
     category: diagnostic
     severity: warning
-    description: Amplifier B warning state {dvbARAmplifierBWarning} detected on {_HOSTNAME}.
+    description: Amplifier B warning state {{value "dvbARAmplifierBWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3129,7 +3129,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterAInput1OKEvent
     category: state_change
     severity: notice
-    description: Exciter A input 1 signal status is {dvbARExciterAInput1OK} on {_HOSTNAME}.
+    description: Exciter A input 1 signal is OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3141,9 +3141,9 @@ traps:
       - dvbARExciterAInput1OK
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.27
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterAInput2OKEvent
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Exciter A input 2 signal status changed to {dvbARExciterAInput2OK} on {_HOSTNAME}.
+    description: Exciter A input 2 signal is OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3157,7 +3157,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterALocalModeEvent
     category: state_change
     severity: notice
-    description: Exciter A local mode changed to {dvbARExciterALocalMode} on {_HOSTNAME}.
+    description: Exciter A local mode changed to {{value "dvbARExciterALocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3170,8 +3170,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.29
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterAFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter A fault detected with status {dvbARExciterAFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter A fault detected{{with value "dvbARExciterAFault"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3185,7 +3185,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterAWarningEvent
     category: diagnostic
     severity: warning
-    description: Exciter A warning state {dvbARExciterAWarning} detected on {_HOSTNAME}.
+    description: Exciter A warning state {{value "dvbARExciterAWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3199,7 +3199,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterAActiveInputEvent
     category: state_change
     severity: notice
-    description: Exciter A active input changed to {dvbARExciterAActiveInput} on {_HOSTNAME}.
+    description: Exciter A active input changed to {{value "dvbARExciterAActiveInput"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3213,7 +3213,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterASFNModeEvent
     category: state_change
     severity: notice
-    description: Exciter A SFN mode changed to {dvbARExciterASFNMode} on {_HOSTNAME}.
+    description: Exciter A SFN mode changed to {{value "dvbARExciterASFNMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3226,8 +3226,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.33
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterARefFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter A reference fault detected with status {dvbARExciterARefFault} on {_HOSTNAME}.
+    severity: alert
+    description: Exciter A reference fault detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3241,7 +3241,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterAMuteEvent
     category: diagnostic
     severity: warning
-    description: Exciter A mute state is {dvbARExciterAMute} on {_HOSTNAME}.
+    description: Exciter A mute state is {{value "dvbARExciterAMute"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3254,8 +3254,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.35
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterAFaultMIPEvent
     category: diagnostic
-    severity: err
-    description: Exciter A MIP fault state is {dvbARExciterAFaultMIP} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter A MIP fault detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3267,9 +3267,9 @@ traps:
       - dvbARExciterAFaultMIP
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.36
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterAStuffingModeEvent
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Exciter A stuffing mode changed to {dvbARExciterAStuffingMode} on {_HOSTNAME}.
+    description: Exciter A stuffing mode changed to {{value "dvbARExciterAStuffingMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3281,9 +3281,9 @@ traps:
       - dvbARExciterAStuffingMode
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.37
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterBInput1OKEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Exciter B input 1 signal status is {dvbARExciterBInput1OK} on {_HOSTNAME}.
+    description: Exciter B input 1 signal is now OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3297,7 +3297,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterBInput2OKEvent
     category: state_change
     severity: notice
-    description: Exciter B input 2 signal status changed to {dvbARExciterBInput2OK} on {_HOSTNAME}.
+    description: Exciter B input 2 signal is OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3311,7 +3311,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterBLocalModeEvent
     category: state_change
     severity: notice
-    description: Exciter B local mode changed to {dvbARExciterBLocalMode} on {_HOSTNAME}.
+    description: Exciter B local mode changed to {{value "dvbARExciterBLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3324,8 +3324,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.40
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterBFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter B fault state reported as {dvbARExciterBFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter B fault detected with status {{value "dvbARExciterBFault"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3339,7 +3339,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterBWarningEvent
     category: diagnostic
     severity: warning
-    description: Exciter B warning state {dvbARExciterBWarning} detected on {_HOSTNAME}.
+    description: Exciter B warning state {{value "dvbARExciterBWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3353,7 +3353,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterBActiveInputEvent
     category: state_change
     severity: notice
-    description: Exciter B active input changed to {dvbARExciterBActiveInput} on {_HOSTNAME}.
+    description: Exciter B active input changed to {{value "dvbARExciterBActiveInput"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3367,7 +3367,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterBSFNModeEvent
     category: state_change
     severity: notice
-    description: Exciter B SFN mode changed to {dvbARExciterBSFNMode} on {_HOSTNAME}.
+    description: Exciter B SFN mode changed to {{value "dvbARExciterBSFNMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3380,8 +3380,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.44
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterBRefFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter B reference fault detected with status {dvbARExciterBRefFault} on {_HOSTNAME}.
+    severity: alert
+    description: Exciter B reference fault detected{{with value "dvbARExciterBRefFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3395,7 +3395,7 @@ traps:
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterBMuteEvent
     category: diagnostic
     severity: warning
-    description: Exciter B mute state changed to {dvbARExciterBMute} on {_HOSTNAME}.
+    description: Exciter B mute state changed to {{value "dvbARExciterBMute"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3408,8 +3408,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.46
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterBFaultMIPEvent
     category: diagnostic
-    severity: err
-    description: Exciter B fault state is {dvbARExciterBFaultMIP} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter B MIP fault detected with status {{value "dvbARExciterBFaultMIP"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3421,9 +3421,9 @@ traps:
       - dvbARExciterBFaultMIP
   - oid: 1.3.6.1.4.1.19831.1.1.1.2.0.47
     name: IRT-DVBT-ACTIVERESERVE-MIB::dvbARExciterBStuffingModeEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Exciter B stuffing mode changed to {dvbARExciterBStuffingMode} on {_HOSTNAME}.
+    description: Exciter B stuffing mode changed to {{value "dvbARExciterBStuffingMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3437,7 +3437,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDInputPreselectionEvent
     category: state_change
     severity: notice
-    description: DVB dual drive input preselection changed to {dvbDDInputPreselection} on {_HOSTNAME}.
+    description: DVB input preselection changed to {{value "dvbDDInputPreselection"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3451,7 +3451,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDInputAutomaticEvent
     category: state_change
     severity: notice
-    description: Input selection mode changed to {dvbDDInputAutomatic} on {_HOSTNAME}.
+    description: DVB input selection mode changed to {{value "dvbDDInputAutomatic"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3465,7 +3465,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDPreselectionExciterEvent
     category: diagnostic
     severity: notice
-    description: DVB preselection exciter event occurred on {_HOSTNAME}.
+    description: DVB preselection exciter event occurred{{with value "dvbDDPreselectionExciter"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3479,7 +3479,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDTransmitterOpModeEvent
     category: state_change
     severity: notice
-    description: Transmitter operation mode changed to {dvbDDTransmitterOpMode} on {_HOSTNAME}.
+    description: Transmitter operation mode changed to {{value "dvbDDTransmitterOpMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3493,7 +3493,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDReserveControlEvent
     category: state_change
     severity: notice
-    description: DVBT dual drive reserve control changed to {dvbDDReserveControl} on {_HOSTNAME}.
+    description: DVB reserve control changed to {{value "dvbDDReserveControl"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3506,8 +3506,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.4.0.6
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDRFPresentEvent
     category: diagnostic
-    severity: notice
-    description: Dual drive DVB-DDR FPU status changed to {dvbDDRFPresent} on {_HOSTNAME}.
+    severity: warning
+    description: Dual drive DVB DRF status changed to {{value "dvbDDRFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3520,8 +3520,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.4.0.7
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDResetFaultEvent
     category: diagnostic
-    severity: err
-    description: DVB dual drive reset fault triggered on {_HOSTNAME}.
+    severity: warning
+    description: DVB dual-drive reset fault triggered on {{hostname}}.
     status: obsolete
     varbinds:
       - sysDescr
@@ -3534,8 +3534,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.4.0.8
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDAmplifierFaultEvent
     category: diagnostic
-    severity: err
-    description: Amplifier fault detected with state {dvbDDAmplifierFault} on {_HOSTNAME}.
+    severity: warning
+    description: Amplifier fault detected{{with value "dvbDDAmplifierFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3549,7 +3549,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDAmplifierWarningEvent
     category: diagnostic
     severity: warning
-    description: Amplifier warning state {dvbDDAmplifierWarning} detected on {_HOSTNAME}.
+    description: DVB-DD amplifier warning state {{value "dvbDDAmplifierWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3563,7 +3563,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDActiveExciterEvent
     category: state_change
     severity: notice
-    description: Active exciter {dvbDDActiveExciter} changed state on {_HOSTNAME}.
+    description: Active exciter changed to {{value "dvbDDActiveExciter"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3577,7 +3577,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDLocalModeEvent
     category: state_change
     severity: notice
-    description: Dual drive mode changed to {dvbDDLocalMode} on {_HOSTNAME}.
+    description: DVB dual drive mode changed to {{value "dvbDDLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3590,8 +3590,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.4.0.12
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDControlUnitFaultEvent
     category: diagnostic
-    severity: err
-    description: Control unit fault reported with state {dvbDDControlUnitFault} on {_HOSTNAME}.
+    severity: alert
+    description: Dual drive control unit fault detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3605,7 +3605,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDSwitchOverModeEvent
     category: state_change
     severity: notice
-    description: Dual drive switch over mode changed to {dvbDDSwitchOverMode} on {_HOSTNAME}.
+    description: DVB dual drive switch over mode changed to {{value "dvbDDSwitchOverMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3619,7 +3619,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDSwitchOverReadyEvent
     category: state_change
     severity: notice
-    description: Dual drive switch over unit is {dvbDDSwitchOverReady} on {_HOSTNAME}.
+    description: Dual drive switch over is ready on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3633,7 +3633,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDSwitchOverExecutedEvent
     category: state_change
     severity: notice
-    description: Dual drive switch over {dvbDDSwitchOverExecuted} executed on {_HOSTNAME}.
+    description: DVB dual drive switch over executed on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3646,8 +3646,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.4.0.16
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDSwitchOverFaultEvent
     category: diagnostic
-    severity: err
-    description: Dual drive switch over unit reported fault state {dvbDDSwitchOverFault} on {_HOSTNAME}.
+    severity: crit
+    description: Dual drive switch-over unit fault detected{{with value "dvbDDSwitchOverFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3661,7 +3661,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterAInput1OKEvent
     category: diagnostic
     severity: notice
-    description: Exciter A input 1 signal status is {dvbDDExciterAInput1OK} on {_HOSTNAME}.
+    description: Exciter A input 1 signal is ok on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3673,9 +3673,9 @@ traps:
       - dvbDDExciterAInput1OK
   - oid: 1.3.6.1.4.1.19831.1.1.1.4.0.18
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterAInput2OKEvent
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Exciter A input 2 signal status changed to {dvbDDExciterAInput2OK} on {_HOSTNAME}.
+    description: Exciter A input 2 signal is OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3687,9 +3687,9 @@ traps:
       - dvbDDExciterAInput2OK
   - oid: 1.3.6.1.4.1.19831.1.1.1.4.0.19
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterALocalModeEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Exciter A local mode changed to {dvbDDExciterALocalMode} on {_HOSTNAME}.
+    description: Exciter A local mode changed to {{value "dvbDDExciterALocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3702,8 +3702,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.4.0.20
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterAFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter A fault reported as {dvbDDExciterAFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter A fault detected{{with value "dvbDDExciterAFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3717,7 +3717,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterAWarningEvent
     category: diagnostic
     severity: warning
-    description: Exciter A warning state is {dvbDDExciterAWarning} on {_HOSTNAME}.
+    description: Exciter A warning state is {{value "dvbDDExciterAWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3731,7 +3731,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterAActiveInputEvent
     category: state_change
     severity: notice
-    description: Exciter A active input changed to {dvbDDExciterAActiveInput} on {_HOSTNAME}.
+    description: Exciter A active input changed to {{value "dvbDDExciterAActiveInput"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3745,7 +3745,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterASFNModeEvent
     category: state_change
     severity: notice
-    description: Exciter A SFN mode changed to {dvbDDExciterASFNMode} on {_HOSTNAME}.
+    description: Exciter A SFN mode changed to {{value "dvbDDExciterASFNMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3758,8 +3758,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.4.0.24
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterARefFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter A reference fault detected with state {dvbDDExciterARefFault} on {_HOSTNAME}.
+    severity: warning
+    description: Exciter A reference fault detected{{with value "dvbDDExciterARefFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3773,7 +3773,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterAMuteEvent
     category: diagnostic
     severity: warning
-    description: Exciter A mute state changed to {dvbDDExciterAMute} on {_HOSTNAME}.
+    description: Exciter A mute state is {{value "dvbDDExciterAMute"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3786,8 +3786,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.4.0.26
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterAFaultMIPEvent
     category: diagnostic
-    severity: err
-    description: Exciter A MIP fault state is {dvbDDExciterAFaultMIP} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter A MIP fault detected{{with value "dvbDDExciterAFaultMIP"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3799,9 +3799,9 @@ traps:
       - dvbDDExciterAFaultMIP
   - oid: 1.3.6.1.4.1.19831.1.1.1.4.0.27
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterAStuffingModeEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Exciter A stuffing mode changed to {dvbDDExciterAStuffingMode} on {_HOSTNAME}.
+    description: Exciter A stuffing mode changed to {{value "dvbDDExciterAStuffingMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3815,7 +3815,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterBInput1OKEvent
     category: diagnostic
     severity: notice
-    description: Exciter B input 1 signal status is {dvbDDExciterBInput1OK} on {_HOSTNAME}.
+    description: Exciter B input 1 signal is ok on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3827,9 +3827,9 @@ traps:
       - dvbDDExciterBInput1OK
   - oid: 1.3.6.1.4.1.19831.1.1.1.4.0.29
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterBInput2OKEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Exciter B input 2 signal status is {dvbDDExciterBInput2OK} on {_HOSTNAME}.
+    description: Exciter B input 2 signal status is OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3843,7 +3843,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterBLocalModeEvent
     category: state_change
     severity: notice
-    description: Exciter B mode changed to {dvbDDExciterBLocalMode} on {_HOSTNAME}.
+    description: Exciter B local mode changed to {{value "dvbDDExciterBLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3856,8 +3856,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.4.0.31
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterBFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter B fault state is {dvbDDExciterBFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter B fault detected{{with value "dvbDDExciterBFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3871,7 +3871,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterBWarningEvent
     category: diagnostic
     severity: warning
-    description: Exciter B warning state {dvbDDExciterBWarning} detected on {_HOSTNAME}.
+    description: Exciter B warning state {{value "dvbDDExciterBWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3885,7 +3885,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterBActiveInputEvent
     category: state_change
     severity: notice
-    description: Exciter B active input changed to {dvbDDExciterBActiveInput} on {_HOSTNAME}.
+    description: Exciter B active input changed to {{value "dvbDDExciterBActiveInput"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3899,7 +3899,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterBSFNModeEvent
     category: state_change
     severity: notice
-    description: Exciter B SFN mode changed to {dvbDDExciterBSFNMode} on {_HOSTNAME}.
+    description: Exciter B SFN mode changed to {{value "dvbDDExciterBSFNMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3912,8 +3912,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.4.0.35
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterBRefFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter B reference fault detected with state {dvbDDExciterBRefFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter B reference fault detected{{with value "dvbDDExciterBRefFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3927,7 +3927,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterBMuteEvent
     category: diagnostic
     severity: warning
-    description: Exciter B mute state changed to {dvbDDExciterBMute} on {_HOSTNAME}.
+    description: Exciter B mute state changed to {{value "dvbDDExciterBMute"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3940,8 +3940,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.4.0.37
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterBFaultMIPEvent
     category: diagnostic
-    severity: warning
-    description: Exciter B MIP fault state is {dvbDDExciterBFaultMIP} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter B MIP fault detected{{with value "dvbDDExciterBFaultMIP"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3955,7 +3955,7 @@ traps:
     name: IRT-DVBT-DUALDRIVE-MIB::dvbDDExciterBStuffingModeEvent
     category: state_change
     severity: notice
-    description: Exciter B stuffing mode changed to {dvbDDExciterBStuffingMode} on {_HOSTNAME}.
+    description: Exciter B stuffing mode changed to {{value "dvbDDExciterBStuffingMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3969,7 +3969,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1ResetFaultEvent
     category: diagnostic
     severity: warning
-    description: Reset fault triggered for sum fault on {_HOSTNAME}.
+    description: N+1 redundancy reset fault triggered on {{hostname}}.
     status: obsolete
     varbinds:
       - sysDescr
@@ -3982,8 +3982,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.2
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1RedundancySwitchOverEvent
     category: state_change
-    severity: notice
-    description: N+1 redundancy switch over occurred on {_HOSTNAME}.
+    severity: alert
+    description: N+1 redundancy switch over to {{value "dvbnPlus1RedundancySwitchOver"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -3997,7 +3997,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1LocalModeEvent
     category: state_change
     severity: notice
-    description: N+1 reserve mode changed to {dvbnPlus1LocalMode} on {_HOSTNAME}.
+    description: N+1 reserve mode changed to {{value "dvbnPlus1LocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4010,8 +4010,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.4
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1ControlUnitFaultEvent
     category: diagnostic
-    severity: err
-    description: Control unit fault reported with status {dvbnPlus1ControlUnitFault} on {_HOSTNAME}.
+    severity: crit
+    description: N+1 control unit fault detected{{with value "dvbnPlus1ControlUnitFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4025,7 +4025,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1SwitchOverModeEvent
     category: state_change
     severity: notice
-    description: N+1 switch over mode changed to {dvbnPlus1SwitchOverMode} on {_HOSTNAME}.
+    description: N+1 switch over mode changed to {{value "dvbnPlus1SwitchOverMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4039,7 +4039,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1SwitchOverReadyEvent
     category: state_change
     severity: notice
-    description: N+1 switch over unit is {dvbnPlus1SwitchOverReady} on {_HOSTNAME}.
+    description: N+1 switch over unit is ready on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4053,7 +4053,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1SwitchOverExecutedEvent
     category: state_change
     severity: notice
-    description: N+1 switch over executed on {_HOSTNAME}.
+    description: N+1 switch over executed on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4066,8 +4066,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.8
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1SwitchOverFaultEvent
     category: diagnostic
-    severity: err
-    description: N+1 switch over unit reported fault state {dvbnPlus1SwitchOverFault} on {_HOSTNAME}.
+    severity: crit
+    description: N+1 switch over unit fault detected {{value "dvbnPlus1SwitchOverFault"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4081,7 +4081,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1ChannelSelectionEvent
     category: state_change
     severity: notice
-    description: N+1 channel selection changed to {dvbnPlus1ChannelSelection} on {_HOSTNAME}.
+    description: DVB-N+1 channel selection changed to {{value "dvbnPlus1ChannelSelection"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4095,7 +4095,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TransmitterBResetEvent
     category: diagnostic
     severity: warning
-    description: Transmitter B reset triggered on N+1 Reserve on {_HOSTNAME}.
+    description: N+1 Transmitter B reset event occurred on {{hostname}}.
     status: obsolete
     varbinds:
       - sysDescr
@@ -4109,7 +4109,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TransmitterBModeEvent
     category: state_change
     severity: warning
-    description: Transmitter B redundancy state changed to {dvbnPlus1TransmitterBMode} on {_HOSTNAME}.
+    description: N+1 reserve Transmitter B mode is {{value "dvbnPlus1TransmitterBMode"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - sysDescr
@@ -4123,7 +4123,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1MTInputPreselectionEvent
     category: state_change
     severity: notice
-    description: Input preselection event occurred on transmitter index {dvbnPlus1EventTransmitterIndex} on {_HOSTNAME}.
+    description: MT input preselection changed to {{value "dvbnPlus1MTInputPreselection"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4136,9 +4136,9 @@ traps:
       - dvbnPlus1EventTransmitterIndex
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.13
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1MTInputAutomaticEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: N+1 transmitter input automatic event triggered on {dvbnPlus1EventTransmitterIndex} on {_HOSTNAME}.
+    description: N+1 input automatic event occurred on transmitter index {{value "dvbnPlus1EventTransmitterIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4153,7 +4153,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1MTOpModeEvent
     category: state_change
     severity: notice
-    description: N+1 reserve transmitter {dvbnPlus1EventTransmitterIndex} operational mode changed to {dvbnPlus1MTOpMode} on {_HOSTNAME}.
+    description: N+1 reserve transmitter mode changed to {{value "dvbnPlus1MTOpMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4168,7 +4168,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1MTRFProgramPresentEvent
     category: state_change
     severity: warning
-    description: N+1 reserve transmitter {dvbnPlus1EventTransmitterIndex} RF program status changed to {dvbnPlus1MTRFProgramPresent} on {_HOSTNAME}.
+    description: N+1 reserve transmitter power status changed to {{value "dvbnPlus1MTRFProgramPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4183,7 +4183,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1RTInputPreselectionEvent
     category: state_change
     severity: notice
-    description: RT input preselection changed to {dvbnPlus1RTInputPreselection} on {_HOSTNAME}.
+    description: RT input preselection event occurred{{with value "dvbnPlus1RTInputPreselection"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4197,7 +4197,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1RTInputAutomaticEvent
     category: state_change
     severity: notice
-    description: Redundant input automatic event {dvbnPlus1RTInputAutomatic} on {_HOSTNAME}.
+    description: RT input automatic event occurred{{with value "dvbnPlus1RTInputAutomatic"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4211,7 +4211,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1RTOpModeEvent
     category: state_change
     severity: notice
-    description: N+1 reserve transmitter control mode changed to {dvbnPlus1RTOpMode} on {_HOSTNAME}.
+    description: N+1 reserve transmitter mode changed to {{value "dvbnPlus1RTOpMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4223,9 +4223,9 @@ traps:
       - dvbnPlus1RTOpMode
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.19
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1RTRFProgramPresentEvent
-    category: diagnostic
-    severity: notice
-    description: N+1 reserve transmitter status changed to {dvbnPlus1RTRFProgramPresent} on {_HOSTNAME}.
+    category: state_change
+    severity: warning
+    description: N+1 reserve transmitter status changed to {{value "dvbnPlus1RTRFProgramPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4239,7 +4239,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TARFPresentEvent
     category: state_change
     severity: warning
-    description: Transmitter {dvbnPlus1EventTransmitterIndex} N+1 reserve status changed to {dvbnPlus1TARFPresent} on {_HOSTNAME}.
+    description: N+1 reserve transmitter status changed to {{value "dvbnPlus1TARFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4254,7 +4254,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TAInput1OKEvent
     category: state_change
     severity: notice
-    description: Transmitter input 1 signal status is OK on {_HOSTNAME}.
+    description: Transmitter A input 1 signal is now OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4267,9 +4267,9 @@ traps:
       - dvbnPlus1EventTransmitterIndex
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.22
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TAInput2OKEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Transmitter A input 2 signal status is ok on {_HOSTNAME}.
+    description: Transmitter input 2 signal is OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4284,7 +4284,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TALocalModeEvent
     category: state_change
     severity: notice
-    description: Transmitter {dvbnPlus1EventTransmitterIndex} changed to {dvbnPlus1TALocalMode} mode on {_HOSTNAME}.
+    description: Transmitter A local mode changed to {{value "dvbnPlus1TALocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4297,9 +4297,9 @@ traps:
       - dvbnPlus1EventTransmitterIndex
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.24
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TAInputPreselectionEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: TA input preselection event on transmitter index {dvbnPlus1EventTransmitterIndex} on {_HOSTNAME}.
+    description: TA input preselection event occurred on transmitter index {{value "dvbnPlus1EventTransmitterIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4314,7 +4314,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TAInputAutomaticEvent
     category: state_change
     severity: notice
-    description: TA input switched to automatic mode at index {dvbnPlus1EventTransmitterIndex} on {_HOSTNAME}.
+    description: N+1 transmitter input mode changed to automatic on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4328,8 +4328,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.26
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TAFaultEvent
     category: diagnostic
-    severity: warning
-    description: Transmitter A fault state {dvbnPlus1TAFault} detected on {_HOSTNAME}.
+    severity: crit
+    description: Transmitter A fault detected on {{first (value "dvbnPlus1EventTransmitterIndex") "transmitter"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4344,7 +4344,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TAWarningEvent
     category: diagnostic
     severity: warning
-    description: N+1 reserve transmitter A warning state {dvbnPlus1TAWarning} on transmitter index {dvbnPlus1EventTransmitterIndex} on {_HOSTNAME}.
+    description: N+1 reserve transmitter A warning on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4359,7 +4359,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TAActiveInputEvent
     category: state_change
     severity: notice
-    description: N+1 reserve active input changed to {dvbnPlus1TAActiveInput} on transmitter {dvbnPlus1EventTransmitterIndex} on {_HOSTNAME}.
+    description: N+1 active input changed to {{value "dvbnPlus1TAActiveInput"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4374,7 +4374,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TASFNModeEvent
     category: state_change
     severity: notice
-    description: N+1 transmitter {dvbnPlus1EventTransmitterIndex} mode changed to {dvbnPlus1TASFNMode} on {_HOSTNAME}.
+    description: DVB-N+1 transmitter {{value "dvbnPlus1EventTransmitterIndex"}} mode changed to {{value "dvbnPlus1TASFNMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4388,8 +4388,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.30
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TARefFaultEvent
     category: diagnostic
-    severity: err
-    description: Transmitter {dvbnPlus1EventTransmitterIndex} GPS reference fault {dvbnPlus1TARefFault} on {_HOSTNAME}.
+    severity: alert
+    description: Transmitter A TA reference fault detected{{with value "dvbnPlus1EventTransmitterIndex"}} on index {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4404,7 +4404,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TAMuteEvent
     category: diagnostic
     severity: warning
-    description: Transmitter A mute state changed to {dvbnPlus1TAMute} on {_HOSTNAME}.
+    description: Transmitter A mute state changed to {{value "dvbnPlus1TAMute"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4418,8 +4418,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.32
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TAFaultMIPEvent
     category: diagnostic
-    severity: err
-    description: N+1 reserve transmitter A fault detected with state {dvbnPlus1TAFaultMIP} on {_HOSTNAME}.
+    severity: crit
+    description: N+1 transmitter fault detected on {{first (value "dvbnPlus1EventTransmitterIndex") "transmitter"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4434,7 +4434,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TAStuffingModeEvent
     category: state_change
     severity: notice
-    description: Transmitter {dvbnPlus1EventTransmitterIndex} TA stuffing mode changed to {dvbnPlus1TAStuffingMode} on {_HOSTNAME}.
+    description: TA stuffing mode changed to {{value "dvbnPlus1TAStuffingMode"}} on transmitter {{value "dvbnPlus1EventTransmitterIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4447,9 +4447,9 @@ traps:
       - dvbnPlus1EventTransmitterIndex
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.34
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TBRFPresentEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: n+1 reserve transmitter B status changed to {dvbnPlus1TBRFPresent} on {_HOSTNAME}.
+    description: N+1 reserve TBF status changed to {{value "dvbnPlus1TBRFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4461,9 +4461,9 @@ traps:
       - dvbnPlus1TBRFPresent
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.35
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TBInput1OKEvent
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: N+1 reserve input 1 signal status changed to {dvbnPlus1TBInput1OK} on {_HOSTNAME}.
+    description: N+1 reserve input 1 signal is ok on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4475,9 +4475,9 @@ traps:
       - dvbnPlus1TBInput1OK
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.36
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TBInput2OKEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: N+1 reserve input 2 signal status is {dvbnPlus1TBInput2OK} on {_HOSTNAME}.
+    description: N+1 reserve input 2 signal is OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4491,7 +4491,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TBLocalModeEvent
     category: state_change
     severity: notice
-    description: N+1 reserve transmitter B entered local mode on {_HOSTNAME}.
+    description: N+1 reserve local mode changed to {{value "dvbnPlus1TBLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4504,8 +4504,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.38
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TBFaultEvent
     category: diagnostic
-    severity: err
-    description: N+1 reserve reported fault state {dvbnPlus1TBFault} on {_HOSTNAME}.
+    severity: crit
+    description: N+1 reserve fault detected{{with value "dvbnPlus1TBFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4519,7 +4519,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TBWarningEvent
     category: diagnostic
     severity: warning
-    description: n+1 reserve status is {dvbnPlus1TBWarning} on {_HOSTNAME}.
+    description: N+1 reserve warning state {{value "dvbnPlus1TBWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4531,9 +4531,9 @@ traps:
       - dvbnPlus1TBWarning
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.40
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TBInputPreselectionEvent
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Input preselection changed to {dvbnPlus1TBInputPreselection} on {_HOSTNAME}.
+    description: Input preselection event occurred{{with value "dvbnPlus1TBInputPreselection"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4547,7 +4547,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TBInputAutomaticEvent
     category: state_change
     severity: notice
-    description: Input mode changed to automatic on {_HOSTNAME}.
+    description: DVBT input mode changed to {{value "dvbnPlus1TBInputAutomatic"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4561,7 +4561,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TBActiveInputEvent
     category: state_change
     severity: notice
-    description: N+1 reserve active input changed to {dvbnPlus1TBActiveInput} on {_HOSTNAME}.
+    description: N+1 reserve active input changed to {{value "dvbnPlus1TBActiveInput"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4575,7 +4575,7 @@ traps:
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TBSFNModeEvent
     category: state_change
     severity: notice
-    description: DVB-N+1 reserve mode changed to {dvbnPlus1TBSFNMode} on {_HOSTNAME}.
+    description: DVB-N+1 reserve mode changed to {{value "dvbnPlus1TBSFNMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4588,8 +4588,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.44
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TBRefFaultEvent
     category: diagnostic
-    severity: err
-    description: N+1 reference fault detected with status {dvbnPlus1TBRefFault} on {_HOSTNAME}.
+    severity: crit
+    description: N+1 reference fault detected{{with value "dvbnPlus1TBRefFault"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4601,9 +4601,9 @@ traps:
       - dvbnPlus1TBRefFault
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.45
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TBMuteEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: N+1 reserve mute state is {dvbnPlus1TBMute} on {_HOSTNAME}.
+    description: N+1 reserve mute state changed to {{value "dvbnPlus1TBMute"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4616,8 +4616,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.46
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TBFaultMIPEvent
     category: diagnostic
-    severity: err
-    description: N+1 reserve MIP fault state is {dvbnPlus1TBFaultMIP} on {_HOSTNAME}.
+    severity: warning
+    description: N+1 reserve MIP fault detected{{with value "dvbnPlus1TBFaultMIP"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4629,9 +4629,9 @@ traps:
       - dvbnPlus1TBFaultMIP
   - oid: 1.3.6.1.4.1.19831.1.1.1.5.0.47
     name: IRT-DVBT-NPLUS1-MIB::dvbnPlus1TBStuffingModeEvent
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: N+1 reserve stuffing mode changed to {dvbnPlus1TBStuffingMode} on {_HOSTNAME}.
+    description: DVB-N+1 reserve stuffing mode is {{value "dvbnPlus1TBStuffingMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4645,7 +4645,7 @@ traps:
     name: IRT-DAB-SINGLETRANSMITTER-MIB::dabSTInputPreselectionEvent
     category: state_change
     severity: notice
-    description: DAB transmitter input preselection changed to {dabSTInputPreselection} on {_HOSTNAME}.
+    description: DAB transmitter input preselection changed to {{value "dabSTInputPreselection"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4659,7 +4659,7 @@ traps:
     name: IRT-DAB-SINGLETRANSMITTER-MIB::dabSTInputAutomaticEvent
     category: state_change
     severity: notice
-    description: Single transmitter input mode changed to {dabSTInputAutomatic} on {_HOSTNAME}.
+    description: DAB transmitter input selection mode changed to {{value "dabSTInputAutomatic"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4673,7 +4673,7 @@ traps:
     name: IRT-DAB-SINGLETRANSMITTER-MIB::dabSTTransmitterOpModeEvent
     category: state_change
     severity: notice
-    description: DAB transmitter operational mode changed to {dabSTTransmitterOpMode} on {_HOSTNAME}.
+    description: DAB transmitter operating mode changed to {{value "dabSTTransmitterOpMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4686,8 +4686,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.1.0.4
     name: IRT-DAB-SINGLETRANSMITTER-MIB::dabSTRFPresentEvent
     category: diagnostic
-    severity: notice
-    description: DAB transmitter presence status is {dabSTRFPresent} on {_HOSTNAME}.
+    severity: warning
+    description: DAB transmitter output power status changed to {{value "dabSTRFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4701,7 +4701,7 @@ traps:
     name: IRT-DAB-SINGLETRANSMITTER-MIB::dabSTResetFaultEvent
     category: diagnostic
     severity: warning
-    description: Single transmitter reset fault detected with status {dabSTResetFault} on {_HOSTNAME}.
+    description: DAB single transmitter reset fault occurred on {{hostname}}.
     status: obsolete
     varbinds:
       - sysDescr
@@ -4714,8 +4714,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.1.0.6
     name: IRT-DAB-SINGLETRANSMITTER-MIB::dabSTFaultEvent
     category: diagnostic
-    severity: err
-    description: Transmitter fault state {dabSTFault} detected on {_HOSTNAME}.
+    severity: alert
+    description: DAB single transmitter fault detected{{with value "dabSTFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4729,7 +4729,7 @@ traps:
     name: IRT-DAB-SINGLETRANSMITTER-MIB::dabSTWarningEvent
     category: diagnostic
     severity: warning
-    description: DAB single transmitter warning state {dabSTWarning} on {_HOSTNAME}.
+    description: DAB single transmitter warning state {{value "dabSTWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4743,7 +4743,7 @@ traps:
     name: IRT-DAB-SINGLETRANSMITTER-MIB::dabSTInput1OKEvent
     category: diagnostic
     severity: notice
-    description: DAB transmitter input 1 signal status is {dabSTInput1OK} on {_HOSTNAME}.
+    description: DAB transmitter input 1 signal is ok on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4757,7 +4757,7 @@ traps:
     name: IRT-DAB-SINGLETRANSMITTER-MIB::dabSTInput2OKEvent
     category: diagnostic
     severity: notice
-    description: DAB transmitter input 2 signal status is {dabSTInput2OK} on {_HOSTNAME}.
+    description: DAB transmitter input 2 signal status is OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4771,7 +4771,7 @@ traps:
     name: IRT-DAB-SINGLETRANSMITTER-MIB::dabSTLocalModeEvent
     category: state_change
     severity: notice
-    description: DAB transmitter mode changed to {dabSTLocalMode} on {_HOSTNAME}.
+    description: DAB transmitter mode changed to {{value "dabSTLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4785,7 +4785,7 @@ traps:
     name: IRT-DAB-SINGLETRANSMITTER-MIB::dabSTActiveInputEvent
     category: state_change
     severity: notice
-    description: DAB transmitter active input changed to {dabSTActiveInput} on {_HOSTNAME}.
+    description: DAB single transmitter active input changed to {{value "dabSTActiveInput"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4799,7 +4799,7 @@ traps:
     name: IRT-DAB-SINGLETRANSMITTER-MIB::dabSTSFNModeEvent
     category: state_change
     severity: notice
-    description: Single transmitter mode changed to {dabSTSFNMode} on {_HOSTNAME}.
+    description: DAB single transmitter SFN mode changed to {{value "dabSTSFNMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4812,8 +4812,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.1.0.13
     name: IRT-DAB-SINGLETRANSMITTER-MIB::dabSTRefFaultEvent
     category: diagnostic
-    severity: err
-    description: DAB transmitter reference fault detected with state {dabSTRefFault} on {_HOSTNAME}.
+    severity: warning
+    description: DAB single transmitter reference fault detected{{with value "dabSTRefFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4827,7 +4827,7 @@ traps:
     name: IRT-DAB-SINGLETRANSMITTER-MIB::dabSTMuteEvent
     category: diagnostic
     severity: warning
-    description: DAB single transmitter mute state changed to {dabSTMute} on {_HOSTNAME}.
+    description: DAB single transmitter mute state is {{value "dabSTMute"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4841,7 +4841,7 @@ traps:
     name: IRT-DAB-SINGLETRANSMITTER-MIB::dabSTWarningTimeStampEvent
     category: diagnostic
     severity: warning
-    description: DAB transmitter warning state {dabSTWarningTimeStamp} at {eventTimeStamp} on {_HOSTNAME}.
+    description: DAB transmitter warning state changed to {{value "dabSTWarningTimeStamp"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4855,7 +4855,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARInputPreselectionEvent
     category: state_change
     severity: notice
-    description: DAB active reserve input preselection changed to {dabARInputPreselection} on {_HOSTNAME}.
+    description: DAB AR input preselection changed to {{value "dabARInputPreselection"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4869,7 +4869,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARInputAutomaticEvent
     category: state_change
     severity: notice
-    description: Input selection mode changed to {dabARInputAutomatic} on {_HOSTNAME}.
+    description: Active reserve input selection mode changed to {{value "dabARInputAutomatic"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4883,7 +4883,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARPreselectionExciterEvent
     category: diagnostic
     severity: warning
-    description: DAB active reserve preselection exciter event detected on {_HOSTNAME}.
+    description: DAB AR preselection exciter event detected{{with value "dabARPreselectionExciter"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4897,7 +4897,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARPreselectionAmplifierEvent
     category: diagnostic
     severity: warning
-    description: DAB preselection amplifier {dabARPreselectionAmplifier} status change detected on {_HOSTNAME}.
+    description: DAB preselection amplifier state changed to {{value "dabARPreselectionAmplifier"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4911,7 +4911,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARTransmitterOpModeEvent
     category: state_change
     severity: notice
-    description: Active reserve transmitter operational mode changed to {dabARTransmitterOpMode} on {_HOSTNAME}.
+    description: DAB AR transmitter operational mode changed to {{value "dabARTransmitterOpMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4925,7 +4925,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARReserveControlEvent
     category: state_change
     severity: notice
-    description: Active reserve control changed to {dabARReserveControl} on {_HOSTNAME}.
+    description: Active reserve control changed to {{value "dabARReserveControl"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4939,7 +4939,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARResetFaultEvent
     category: diagnostic
     severity: warning
-    description: Active Reserve reset fault triggered with value {dabARResetFault} on {_HOSTNAME}.
+    description: Active Reserve reset fault triggered on {{hostname}}.
     status: obsolete
     varbinds:
       - sysDescr
@@ -4952,8 +4952,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.2.0.8
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARActiveAmplifierEvent
     category: diagnostic
-    severity: notice
-    description: DAB active amplifier status changed for {dabARActiveAmplifier} on {_HOSTNAME}.
+    severity: warning
+    description: Active amplifier {{value "dabARActiveAmplifier"}} event detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4967,7 +4967,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARActiveExciterEvent
     category: state_change
     severity: notice
-    description: DAB active exciter status changed to {dabARActiveExciter} on {_HOSTNAME}.
+    description: Active exciter changed to {{value "dabARActiveExciter"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4981,7 +4981,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARLocalModeEvent
     category: state_change
     severity: notice
-    description: Active reserve mode changed to {dabARLocalMode} on {_HOSTNAME}.
+    description: Active reserve mode changed to {{value "dabARLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -4994,8 +4994,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.2.0.11
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARControlUnitFaultEvent
     category: diagnostic
-    severity: err
-    description: Control unit reported fault state {dabARControlUnitFault} on {_HOSTNAME}.
+    severity: crit
+    description: Active reserve control unit fault detected with status {{value "dabARControlUnitFault"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5009,7 +5009,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterSwitchOverModeEvent
     category: state_change
     severity: notice
-    description: Exciter switch over mode changed to {dabARExciterSwitchOverMode} on {_HOSTNAME}.
+    description: Exciter switch-over mode changed to {{value "dabARExciterSwitchOverMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5023,7 +5023,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterSwitchOverReadyEvent
     category: state_change
     severity: notice
-    description: Exciter switch-over unit reported ready state {dabARExciterSwitchOverReady} on {_HOSTNAME}.
+    description: Exciter switch-over unit is ready on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5037,7 +5037,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterSwitchOverExecutedEvent
     category: state_change
     severity: notice
-    description: Exciter switch over executed on {_HOSTNAME}.
+    description: Exciter switch over executed on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5051,7 +5051,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterSwitchOverFaultEvent
     category: diagnostic
     severity: crit
-    description: Exciter switch over unit reported {dabARExciterSwitchOverFault} fault on {_HOSTNAME}.
+    description: Exciter switch-over unit is in a faulty state on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5065,7 +5065,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARAmplifierSwitchOverModeEvent
     category: state_change
     severity: notice
-    description: Amplifier switch over mode changed to {dabARAmplifierSwitchOverMode} on {_HOSTNAME}.
+    description: DAB amplifier switch-over mode changed to {{value "dabARAmplifierSwitchOverMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5079,7 +5079,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARAmplifierSwitchOverReadyEvent
     category: state_change
     severity: notice
-    description: Amplifier switch over unit state changed to {dabARAmplifierSwitchOverReady} on {_HOSTNAME}.
+    description: DAB amplifier switch-over is {{value "dabARAmplifierSwitchOverReady"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5093,7 +5093,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARAmplifierSwitchOverExecutedEvent
     category: state_change
     severity: notice
-    description: Amplifier switch over {dabARAmplifierSwitchOverExecuted} on {_HOSTNAME}.
+    description: DAB amplifier switch-over executed on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5106,8 +5106,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.2.0.19
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARAmplifierSwitchOverFaultEvent
     category: diagnostic
-    severity: err
-    description: Amplifier switch-over unit reported fault state {dabARAmplifierSwitchOverFault} on {_HOSTNAME}.
+    severity: crit
+    description: Amplifier switch-over unit is faulty on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5121,7 +5121,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARAmplifierARFPresentEvent
     category: diagnostic
     severity: warning
-    description: Amplifier A active reserve status is {dabARAmplifierARFPresent} on {_HOSTNAME}.
+    description: Amplifier A active reserve status is {{value "dabARAmplifierARFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5134,8 +5134,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.2.0.21
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARAmplifierAFaultEvent
     category: diagnostic
-    severity: err
-    description: Amplifier A fault state is {dabARAmplifierAFault} on {_HOSTNAME}.
+    severity: alert
+    description: Amplifier A fault detected{{with value "dabARAmplifierAFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5149,7 +5149,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARAmplifierAWarningEvent
     category: diagnostic
     severity: warning
-    description: Amplifier A warning state {dabARAmplifierAWarning} detected on {_HOSTNAME}.
+    description: Amplifier A warning state {{value "dabARAmplifierAWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5163,7 +5163,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARAmplifierBRFPresentEvent
     category: diagnostic
     severity: warning
-    description: Amplifier BRF status is {dabARAmplifierBRFPresent} on {_HOSTNAME}.
+    description: Amplifier BRF status is {{value "dabARAmplifierBRFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5176,8 +5176,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.2.0.24
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARAmplifierBFaultEvent
     category: diagnostic
-    severity: err
-    description: Amplifier B fault detected with status {dabARAmplifierBFault} on {_HOSTNAME}.
+    severity: warning
+    description: Amplifier B fault detected{{with value "dabARAmplifierBFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5191,7 +5191,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARAmplifierBWarningEvent
     category: diagnostic
     severity: warning
-    description: Amplifier B warning state {dabARAmplifierBWarning} detected on {_HOSTNAME}.
+    description: Amplifier B warning state {{value "dabARAmplifierBWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5205,7 +5205,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterAInput1OKEvent
     category: diagnostic
     severity: notice
-    description: Exciter A input 1 signal status is {dabARExciterAInput1OK} on {_HOSTNAME}.
+    description: DAB Exciter A input 1 signal is OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5217,9 +5217,9 @@ traps:
       - dabARExciterAInput1OK
   - oid: 1.3.6.1.4.1.19831.1.1.2.2.0.27
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterAInput2OKEvent
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Exciter A input 2 signal status changed to {dabARExciterAInput2OK} on {_HOSTNAME}.
+    description: DAB Exciter A input 2 signal is OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5233,7 +5233,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterALocalModeEvent
     category: state_change
     severity: notice
-    description: Exciter A local mode changed to {dabARExciterALocalMode} on {_HOSTNAME}.
+    description: Exciter A local mode changed to {{value "dabARExciterALocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5246,8 +5246,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.2.0.29
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterAFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter A reported fault state {dabARExciterAFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter A fault detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5261,7 +5261,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterAWarningEvent
     category: diagnostic
     severity: warning
-    description: Exciter A warning state {dabARExciterAWarning} detected on {_HOSTNAME}.
+    description: Exciter A warning state {{value "dabARExciterAWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5275,7 +5275,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterAActiveInputEvent
     category: state_change
     severity: notice
-    description: Exciter A active input changed to {dabARExciterAActiveInput} on {_HOSTNAME}.
+    description: Exciter A active input changed to {{value "dabARExciterAActiveInput"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5289,7 +5289,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterASFNModeEvent
     category: state_change
     severity: notice
-    description: Exciter A SFN/MFN mode changed to {dabARExciterASFNMode} on {_HOSTNAME}.
+    description: Exciter A SFN mode changed to {{value "dabARExciterASFNMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5302,8 +5302,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.2.0.33
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterARefFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter A reference fault detected with state {dabARExciterARefFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter A reference fault detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5317,7 +5317,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterAMuteEvent
     category: diagnostic
     severity: warning
-    description: Exciter A mute state changed to {dabARExciterAMute} on {_HOSTNAME}.
+    description: Exciter A mute state is {{value "dabARExciterAMute"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5331,7 +5331,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterAWarningTimeStampEvent
     category: diagnostic
     severity: warning
-    description: Exciter A warning timestamp {dabARExciterAWarningTimeStamp} reported on {_HOSTNAME}.
+    description: Exciter A warning state {{value "dabARExciterAWarningTimeStamp"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5345,7 +5345,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterBInput1OKEvent
     category: diagnostic
     severity: notice
-    description: Exciter B input 1 signal status is {dabARExciterBInput1OK} on {_HOSTNAME}.
+    description: Exciter B input 1 signal is OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5359,7 +5359,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterBInput2OKEvent
     category: diagnostic
     severity: notice
-    description: Exciter B input 2 signal status is {dabARExciterBInput2OK} on {_HOSTNAME}.
+    description: Exciter B input 2 signal is ok on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5373,7 +5373,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterBLocalModeEvent
     category: state_change
     severity: notice
-    description: Exciter B local mode changed to {dabARExciterBLocalMode} on {_HOSTNAME}.
+    description: Exciter B local mode changed to {{value "dabARExciterBLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5386,8 +5386,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.2.0.39
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterBFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter B fault detected with state {dabARExciterBFault} on {_HOSTNAME}.
+    severity: warning
+    description: Exciter B fault detected with status {{value "dabARExciterBFault"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5401,7 +5401,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterBWarningEvent
     category: diagnostic
     severity: warning
-    description: Exciter B warning state {dabARExciterBWarning} detected on {_HOSTNAME}.
+    description: Exciter B warning state {{value "dabARExciterBWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5413,9 +5413,9 @@ traps:
       - dabARExciterBWarning
   - oid: 1.3.6.1.4.1.19831.1.1.2.2.0.41
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterBActiveInputEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Exciter B active input state changed to {dabARExciterBActiveInput} on {_HOSTNAME}.
+    description: Exciter B active input changed to {{value "dabARExciterBActiveInput"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5429,7 +5429,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterBSFNModeEvent
     category: state_change
     severity: notice
-    description: Exciter B SFN mode changed to {dabARExciterBSFNMode} on {_HOSTNAME}.
+    description: Exciter B SFN mode changed to {{value "dabARExciterBSFNMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5442,8 +5442,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.2.0.43
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterBRefFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter B reference fault detected with state {dabARExciterBRefFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter B reference fault detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5457,7 +5457,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterBMuteEvent
     category: diagnostic
     severity: warning
-    description: Exciter B mute state changed to {dabARExciterBMute} on {_HOSTNAME}.
+    description: Exciter B mute state is {{value "dabARExciterBMute"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5471,7 +5471,7 @@ traps:
     name: IRT-DAB-ACTIVERESERVE-MIB::dabARExciterBWarningTimeStampEvent
     category: diagnostic
     severity: warning
-    description: Exciter B warning detected at {dabARExciterBWarningTimeStamp} on {_HOSTNAME}.
+    description: Exciter B warning state detected{{with value "dabARExciterBWarningTimeStamp"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5485,7 +5485,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDInputPreselectionEvent
     category: state_change
     severity: notice
-    description: DAB dual drive input preselection changed to {dabDDInputPreselection} on {_HOSTNAME}.
+    description: DAB dual drive input preselection changed to {{value "dabDDInputPreselection"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5499,7 +5499,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDInputAutomaticEvent
     category: state_change
     severity: notice
-    description: Dual drive input selection mode changed to {dabDDInputAutomatic} on {_HOSTNAME}.
+    description: Dual drive input selection mode changed to {{value "dabDDInputAutomatic"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5513,7 +5513,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDPreselectionExciterEvent
     category: diagnostic
     severity: warning
-    description: DAB preselection exciter event {dabDDPreselectionExciter} detected on {_HOSTNAME}.
+    description: DAB dual drive exciter preselection event {{value "dabDDPreselectionExciter"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5527,7 +5527,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDTransmitterOpModeEvent
     category: state_change
     severity: notice
-    description: Transmitter operation mode changed to {dabDDTransmitterOpMode} on {_HOSTNAME}.
+    description: DAB transmitter operation mode changed to {{value "dabDDTransmitterOpMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5541,7 +5541,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDReserveControlEvent
     category: state_change
     severity: notice
-    description: Dual drive reserve control changed to {dabDDReserveControl} on {_HOSTNAME}.
+    description: Dual drive reserve exciter control changed to {{value "dabDDReserveControl"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5554,8 +5554,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.4.0.6
     name: IRT-DAB-DUALDRIVE-MIB::dabDDRFPresentEvent
     category: diagnostic
-    severity: notice
-    description: Dual drive power status changed to {dabDDRFPresent} on {_HOSTNAME}.
+    severity: warning
+    description: Dual drive DAB DDRF status changed to {{value "dabDDRFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5568,8 +5568,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.4.0.7
     name: IRT-DAB-DUALDRIVE-MIB::dabDDResetFaultEvent
     category: diagnostic
-    severity: err
-    description: Dual drive reset fault detected with code {dabDDResetFault} on {_HOSTNAME}.
+    severity: alert
+    description: Dual drive reset fault detected on {{hostname}}.
     status: obsolete
     varbinds:
       - sysDescr
@@ -5582,8 +5582,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.4.0.8
     name: IRT-DAB-DUALDRIVE-MIB::dabDDAmplifierFaultEvent
     category: diagnostic
-    severity: err
-    description: Amplifier fault detected with state {dabDDAmplifierFault} on {_HOSTNAME}.
+    severity: crit
+    description: Amplifier fault detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5597,7 +5597,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDAmplifierWarningEvent
     category: diagnostic
     severity: warning
-    description: Amplifier warning state {dabDDAmplifierWarning} detected on {_HOSTNAME}.
+    description: DAB dual drive amplifier warning state {{value "dabDDAmplifierWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5609,9 +5609,9 @@ traps:
       - dabDDAmplifierWarning
   - oid: 1.3.6.1.4.1.19831.1.1.2.4.0.10
     name: IRT-DAB-DUALDRIVE-MIB::dabDDActiveExciterEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Active exciter state changed to {dabDDActiveExciter} on {_HOSTNAME}.
+    description: Active exciter changed to {{value "dabDDActiveExciter"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5625,7 +5625,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDLocalModeEvent
     category: state_change
     severity: notice
-    description: Dual drive mode changed to {dabDDLocalMode} on {_HOSTNAME}.
+    description: Dual drive mode changed to {{value "dabDDLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5638,8 +5638,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.4.0.12
     name: IRT-DAB-DUALDRIVE-MIB::dabDDControlUnitFaultEvent
     category: diagnostic
-    severity: err
-    description: Dual drive control unit fault detected with status {dabDDControlUnitFault} on {_HOSTNAME}.
+    severity: crit
+    description: Dual drive control unit fault detected{{with value "dabDDControlUnitFault"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5651,9 +5651,9 @@ traps:
       - dabDDControlUnitFault
   - oid: 1.3.6.1.4.1.19831.1.1.2.4.0.13
     name: IRT-DAB-DUALDRIVE-MIB::dabDDSwitchOverModeEvent
-    category: config_change
+    category: state_change
     severity: notice
-    description: Dual drive switch over mode changed to {dabDDSwitchOverMode} on {_HOSTNAME}.
+    description: Dual drive switch over mode changed to {{value "dabDDSwitchOverMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5667,7 +5667,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDSwitchOverReadyEvent
     category: state_change
     severity: notice
-    description: Dual drive switch over unit is {dabDDSwitchOverReady} on {_HOSTNAME}.
+    description: Dual drive switch over unit is ready on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5681,7 +5681,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDSwitchOverExecutedEvent
     category: state_change
     severity: notice
-    description: Dual drive switch over {dabDDSwitchOverExecuted} on {_HOSTNAME}.
+    description: Dual drive switch over executed on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5694,8 +5694,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.4.0.16
     name: IRT-DAB-DUALDRIVE-MIB::dabDDSwitchOverFaultEvent
     category: diagnostic
-    severity: err
-    description: Dual drive switch-over unit reported fault state {dabDDSwitchOverFault} on {_HOSTNAME}.
+    severity: crit
+    description: Dual drive switch-over unit fault detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5709,7 +5709,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterAInput1OKEvent
     category: diagnostic
     severity: notice
-    description: Exciter A input 1 signal status is {dabDDExciterAInput1OK} on {_HOSTNAME}.
+    description: Exciter A input 1 signal is ok on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5723,7 +5723,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterAInput2OKEvent
     category: diagnostic
     severity: notice
-    description: Exciter A input 2 signal status is {dabDDExciterAInput2OK} on {_HOSTNAME}.
+    description: Exciter A input 2 signal is OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5737,7 +5737,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterALocalModeEvent
     category: state_change
     severity: notice
-    description: Exciter A local mode changed to {dabDDExciterALocalMode} on {_HOSTNAME}.
+    description: Exciter A local mode changed to {{value "dabDDExciterALocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5750,8 +5750,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.4.0.20
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterAFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter A fault detected with state {dabDDExciterAFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter A fault detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5765,7 +5765,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterAWarningEvent
     category: diagnostic
     severity: warning
-    description: Exciter A warning state {dabDDExciterAWarning} detected on {_HOSTNAME}.
+    description: Exciter A warning state is {{value "dabDDExciterAWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5779,7 +5779,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterAActiveInputEvent
     category: state_change
     severity: notice
-    description: Exciter A active input changed to {dabDDExciterAActiveInput} on {_HOSTNAME}.
+    description: Exciter A active input changed to {{value "dabDDExciterAActiveInput"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5793,7 +5793,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterASFNModeEvent
     category: state_change
     severity: notice
-    description: DAB exciter SFN mode changed to {dabDDExciterASFNMode} on {_HOSTNAME}.
+    description: DAB exciter SFN mode changed to {{value "dabDDExciterASFNMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5806,8 +5806,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.4.0.24
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterARefFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter A reference fault detected with state {dabDDExciterARefFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter A reference fault detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5819,9 +5819,9 @@ traps:
       - dabDDExciterARefFault
   - oid: 1.3.6.1.4.1.19831.1.1.2.4.0.25
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterAMuteEvent
-    category: diagnostic
-    severity: warning
-    description: Exciter A mute state changed to {dabDDExciterAMute} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Exciter A mute state changed to {{value "dabDDExciterAMute"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5835,7 +5835,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterAWarningTimeStampEvent
     category: diagnostic
     severity: warning
-    description: Exciter A warning state changed to {dabDDExciterAWarningTimeStamp} on {_HOSTNAME}.
+    description: Exciter A warning state changed to {{value "dabDDExciterAWarningTimeStamp"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5849,7 +5849,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterBInput1OKEvent
     category: diagnostic
     severity: notice
-    description: Exciter B input 1 signal status is {dabDDExciterBInput1OK} on {_HOSTNAME}.
+    description: Exciter B input 1 signal is OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5863,7 +5863,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterBInput2OKEvent
     category: diagnostic
     severity: notice
-    description: Exciter B input 2 signal status is {dabDDExciterBInput2OK} on {_HOSTNAME}.
+    description: Exciter B input 2 signal is OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5877,7 +5877,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterBLocalModeEvent
     category: state_change
     severity: notice
-    description: Exciter B local mode changed to {dabDDExciterBLocalMode} on {_HOSTNAME}.
+    description: Exciter B local mode changed to {{value "dabDDExciterBLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5890,8 +5890,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.4.0.30
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterBFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter B fault detected with status {dabDDExciterBFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter B fault detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5905,7 +5905,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterBWarningEvent
     category: diagnostic
     severity: warning
-    description: Exciter B warning state {dabDDExciterBWarning} detected on {_HOSTNAME}.
+    description: Exciter B warning state {{value "dabDDExciterBWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5919,7 +5919,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterBActiveInputEvent
     category: diagnostic
     severity: warning
-    description: Exciter B warning state {dabDDExciterBWarning} detected on {_HOSTNAME}.
+    description: Exciter B warning state changed to {{value "dabDDExciterBWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5933,7 +5933,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterBSFNModeEvent
     category: state_change
     severity: notice
-    description: DAB exciter SFN mode changed to {dabDDExciterBSFNMode} on {_HOSTNAME}.
+    description: DAB exciter B SFN mode changed to {{value "dabDDExciterBSFNMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5946,8 +5946,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.4.0.34
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterBRefFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter B reference fault detected with status {dabDDExciterBRefFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter B reference fault detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5960,8 +5960,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.4.0.35
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterBMuteEvent
     category: diagnostic
-    severity: notice
-    description: Exciter B mute state changed to {dabDDExciterBMute} on {_HOSTNAME}.
+    severity: warning
+    description: Exciter B mute state is {{value "dabDDExciterBMute"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5975,7 +5975,7 @@ traps:
     name: IRT-DAB-DUALDRIVE-MIB::dabDDExciterBWarningTimeStampEvent
     category: diagnostic
     severity: warning
-    description: Exciter B warning state changed to {dabDDExciterBWarningTimeStamp} on {_HOSTNAME}.
+    description: Exciter B warning state is {{value "dabDDExciterBWarningTimeStamp"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -5989,7 +5989,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1ResetFaultEvent
     category: diagnostic
     severity: warning
-    description: N+1 reserve reset fault triggered on {_HOSTNAME}.
+    description: N+1 reserve reset fault triggered on {{hostname}}.
     status: obsolete
     varbinds:
       - sysDescr
@@ -6003,7 +6003,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1RedundancySwitchOverEvent
     category: state_change
     severity: notice
-    description: N+1 redundancy switch over to {dabnPlus1RedundancySwitchOver} on {_HOSTNAME}.
+    description: N+1 redundancy switch over occurred on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6017,7 +6017,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1LocalModeEvent
     category: state_change
     severity: notice
-    description: N+1 reserve mode changed to {dabnPlus1LocalMode} on {_HOSTNAME}.
+    description: N+1 reserve mode changed to {{value "dabnPlus1LocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6030,8 +6030,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.5.0.4
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1ControlUnitFaultEvent
     category: diagnostic
-    severity: err
-    description: N+1 control unit fault reported with status {dabnPlus1ControlUnitFault} on {_HOSTNAME}.
+    severity: alert
+    description: N+1 control unit fault detected{{with value "dabnPlus1ControlUnitFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6043,9 +6043,9 @@ traps:
       - dabnPlus1ControlUnitFault
   - oid: 1.3.6.1.4.1.19831.1.1.2.5.0.5
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1SwitchOverModeEvent
-    category: config_change
+    category: state_change
     severity: notice
-    description: N+1 switch over mode changed to {dabnPlus1SwitchOverMode} on {_HOSTNAME}.
+    description: N+1 switch over mode changed to {{value "dabnPlus1SwitchOverMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6059,7 +6059,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1SwitchOverReadyEvent
     category: state_change
     severity: notice
-    description: N+1 switch over unit is {dabnPlus1SwitchOverReady} on {_HOSTNAME}.
+    description: N+1 switch-over unit is ready on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6073,7 +6073,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1SwitchOverExecutedEvent
     category: state_change
     severity: notice
-    description: N+1 switch over executed on {_HOSTNAME}.
+    description: N+1 switch over executed on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6086,8 +6086,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.5.0.8
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1SwitchOverFaultEvent
     category: diagnostic
-    severity: crit
-    description: N+1 switch over unit reported fault state {dabnPlus1SwitchOverFault} on {_HOSTNAME}.
+    severity: alert
+    description: N+1 switch-over unit fault detected{{with value "dabnPlus1SwitchOverFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6101,7 +6101,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1ChannelSelectionEvent
     category: state_change
     severity: notice
-    description: N+1 channel selection changed to {dabnPlus1ChannelSelection} on {_HOSTNAME}.
+    description: N+1 channel selection changed to {{value "dabnPlus1ChannelSelection"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6115,7 +6115,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TransmitterBResetEvent
     category: diagnostic
     severity: warning
-    description: Transmitter B reset triggered on N+1 Reserve on {_HOSTNAME}.
+    description: Transmitter B reset triggered on {{hostname}}.
     status: obsolete
     varbinds:
       - sysDescr
@@ -6128,8 +6128,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.5.0.11
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TransmitterBModeEvent
     category: state_change
-    severity: notice
-    description: Transmitter B redundancy state changed to {dabnPlus1TransmitterBMode} on {_HOSTNAME}.
+    severity: warning
+    description: N+1 reserve Transmitter B redundancy state changed to {{value "dabnPlus1TransmitterBMode"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - sysDescr
@@ -6143,7 +6143,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1MTInputPreselectionEvent
     category: state_change
     severity: notice
-    description: N+1 input preselection event on transmitter index {dabnPlus1EventTransmitterIndex} on {_HOSTNAME}.
+    description: N+1 input preselection event occurred on transmitter index {{value "dabnPlus1EventTransmitterIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6158,7 +6158,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1MTInputAutomaticEvent
     category: diagnostic
     severity: notice
-    description: N+1 transmitter {dabnPlus1EventTransmitterIndex} input automatic event triggered on {_HOSTNAME}.
+    description: N+1 input automatic event occurred on transmitter index {{value "dabnPlus1EventTransmitterIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6173,7 +6173,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1MTOpModeEvent
     category: state_change
     severity: notice
-    description: N+1 transmitter mode changed to {dabnPlus1MTOpMode} on {_HOSTNAME}.
+    description: N+1 reserve transmitter index {{value "dabnPlus1EventTransmitterIndex"}} mode changed to {{value "dabnPlus1MTOpMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6186,9 +6186,9 @@ traps:
       - dabnPlus1EventTransmitterIndex
   - oid: 1.3.6.1.4.1.19831.1.1.2.5.0.15
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1MTRFProgramPresentEvent
-    category: state_change
-    severity: notice
-    description: N+1 reserve program status {dabnPlus1MTRFProgramPresent} changed on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: N+1 reserve transmitter status changed to {{value "dabnPlus1MTRFProgramPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6203,7 +6203,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1RTInputPreselectionEvent
     category: state_change
     severity: notice
-    description: RT input preselection event {dabnPlus1RTInputPreselection} on {_HOSTNAME}.
+    description: DAB+ RT input preselection event occurred on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6217,7 +6217,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1RTInputAutomaticEvent
     category: diagnostic
     severity: warning
-    description: RT input automatic event {dabnPlus1RTInputAutomatic} detected on {_HOSTNAME}.
+    description: RT input automatic event detected{{with value "dabnPlus1RTInputAutomatic"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6231,7 +6231,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1RTOpModeEvent
     category: state_change
     severity: notice
-    description: N+1 reserve transmitter control mode changed to {dabnPlus1RTOpMode} on {_HOSTNAME}.
+    description: N+1 reserve transmitter mode changed to {{value "dabnPlus1RTOpMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6245,7 +6245,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1RTRFProgramPresentEvent
     category: diagnostic
     severity: warning
-    description: N+1 reserve transmitter status changed to {dabnPlus1RTRFProgramPresent} on {_HOSTNAME}.
+    description: N+1 reserve transmitter status is {{value "dabnPlus1RTRFProgramPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6258,8 +6258,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.5.0.20
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TARFPresentEvent
     category: diagnostic
-    severity: notice
-    description: Transmitter {dabnPlus1EventTransmitterIndex} N+1 reserve status changed to {dabnPlus1TARFPresent} on {_HOSTNAME}.
+    severity: warning
+    description: Transmitter A output power status changed to {{value "dabnPlus1TARFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6272,9 +6272,9 @@ traps:
       - dabnPlus1EventTransmitterIndex
   - oid: 1.3.6.1.4.1.19831.1.1.2.5.0.21
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TAInput1OKEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Transmitter A input 1 signal status is {dabnPlus1TAInput1OK} on {_HOSTNAME}.
+    description: Transmitter A input 1 signal is OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6287,9 +6287,9 @@ traps:
       - dabnPlus1EventTransmitterIndex
   - oid: 1.3.6.1.4.1.19831.1.1.2.5.0.22
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TAInput2OKEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Transmitter A input 2 signal status is ok on {_HOSTNAME}.
+    description: Transmitter A input 2 signal status is OK on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6304,7 +6304,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TALocalModeEvent
     category: state_change
     severity: notice
-    description: Transmitter A local mode changed to {dabnPlus1TALocalMode} on {_HOSTNAME}.
+    description: Transmitter A local mode changed to {{value "dabnPlus1TALocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6319,7 +6319,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TAInputPreselectionEvent
     category: state_change
     severity: notice
-    description: N+1 transmitter preselection event at index {dabnPlus1EventTransmitterIndex} on {_HOSTNAME}.
+    description: N+1 TA input preselection event occurred on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6332,9 +6332,9 @@ traps:
       - dabnPlus1EventTransmitterIndex
   - oid: 1.3.6.1.4.1.19831.1.1.2.5.0.25
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TAInputAutomaticEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: N+1 transmitter input switched to automatic mode at index {dabnPlus1EventTransmitterIndex} on {_HOSTNAME}.
+    description: TA input mode changed to automatic on transmitter index {{value "dabnPlus1EventTransmitterIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6349,7 +6349,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TAFaultEvent
     category: diagnostic
     severity: warning
-    description: Transmitter A fault detected at index {dabnPlus1EventTransmitterIndex} with state {dabnPlus1TAFault} on {_HOSTNAME}.
+    description: Transmitter A fault detected{{with value "dabnPlus1TAFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6364,7 +6364,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TAWarningEvent
     category: diagnostic
     severity: warning
-    description: N+1 reserve transmitter A warning state {dabnPlus1TAWarning} on {_HOSTNAME}.
+    description: N+1 transmitter A warning state {{value "dabnPlus1TAWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6379,7 +6379,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TAActiveInputEvent
     category: state_change
     severity: notice
-    description: N+1 reserve active input changed to {dabnPlus1TAActiveInput} on {_HOSTNAME}.
+    description: N+1 reserve active input changed to {{value "dabnPlus1TAActiveInput"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6394,7 +6394,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TASFNModeEvent
     category: state_change
     severity: notice
-    description: Transmitter {dabnPlus1EventTransmitterIndex} SFN mode changed to {dabnPlus1TASFNMode} on {_HOSTNAME}.
+    description: N+1 transmitter mode changed to {{value "dabnPlus1TASFNMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6409,7 +6409,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TARefFaultEvent
     category: diagnostic
     severity: warning
-    description: Transmitter {dabnPlus1EventTransmitterIndex} GPS reference fault state {dabnPlus1TARefFault} on {_HOSTNAME}.
+    description: Transmitter A reference fault detected on {{value "dabnPlus1EventTransmitterIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6422,9 +6422,9 @@ traps:
       - dabnPlus1EventTransmitterIndex
   - oid: 1.3.6.1.4.1.19831.1.1.2.5.0.31
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TAMuteEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Transmitter A mute state changed to {dabnPlus1TAMute} on {_HOSTNAME}.
+    description: Transmitter A mute state changed to {{value "dabnPlus1TAMute"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6439,7 +6439,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TAWarningTimeStampEvent
     category: diagnostic
     severity: warning
-    description: Transmitter A warning state {dabnPlus1TAWarningTimeStamp} at index {dabnPlus1EventTransmitterIndex} on {_HOSTNAME}.
+    description: N+1 reserve warning state on transmitter A{{with value "dabnPlus1EventTransmitterIndex"}} index {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6454,7 +6454,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TBRFPresentEvent
     category: diagnostic
     severity: warning
-    description: Transmitter B power status changed to {dabnPlus1TBRFPresent} on {_HOSTNAME}.
+    description: N+1 reserve transmitter B status is {{value "dabnPlus1TBRFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6468,7 +6468,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TBInput1OKEvent
     category: diagnostic
     severity: notice
-    description: N+1 reserve input 1 signal status is {dabnPlus1TBInput1OK} on {_HOSTNAME}.
+    description: N+1 reserve input 1 signal is ok on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6480,9 +6480,9 @@ traps:
       - dabnPlus1TBInput1OK
   - oid: 1.3.6.1.4.1.19831.1.1.2.5.0.35
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TBInput2OKEvent
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: N+1 reserve input 2 signal status is ok on {_HOSTNAME}.
+    description: N+1 reserve input 2 signal is ok on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6496,7 +6496,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TBLocalModeEvent
     category: state_change
     severity: notice
-    description: N+1 reserve mode changed to local on {_HOSTNAME}.
+    description: N+1 reserve transmitter B entered local mode on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6509,8 +6509,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.5.0.37
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TBFaultEvent
     category: diagnostic
-    severity: err
-    description: N+1 reserve fault state {dabnPlus1TBFault} detected on {_HOSTNAME}.
+    severity: warning
+    description: N+1 reserve fault detected{{with value "dabnPlus1TBFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6524,7 +6524,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TBWarningEvent
     category: diagnostic
     severity: warning
-    description: n+1 reserve warning state {dabnPlus1TBWarning} detected on {_HOSTNAME}.
+    description: N+1 reserve warning state {{value "dabnPlus1TBWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6538,7 +6538,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TBInputPreselectionEvent
     category: state_change
     severity: notice
-    description: Input preselection event {dabnPlus1TBInputPreselection} on {_HOSTNAME}.
+    description: DAB+ input preselection event occurred on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6552,7 +6552,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TBInputAutomaticEvent
     category: diagnostic
     severity: notice
-    description: N+1 transmitter input mode changed to automatic on {_HOSTNAME}.
+    description: DAB+ N+1 transmitter input switched to automatic mode on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6566,7 +6566,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TBActiveInputEvent
     category: state_change
     severity: notice
-    description: N+1 reserve active input changed to {dabnPlus1TBActiveInput} on {_HOSTNAME}.
+    description: N+1 reserve active input changed to {{value "dabnPlus1TBActiveInput"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6580,7 +6580,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TBSFNModeEvent
     category: state_change
     severity: notice
-    description: N+1 reserve mode changed to {dabnPlus1TBSFNMode} on {_HOSTNAME}.
+    description: N+1 reserve mode changed to {{value "dabnPlus1TBSFNMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6593,8 +6593,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.2.5.0.43
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TBRefFaultEvent
     category: diagnostic
-    severity: err
-    description: N+1 reserve fault detected on {dabnPlus1TBRefFault} on {_HOSTNAME}.
+    severity: warning
+    description: N+1 reference fault detected{{with value "dabnPlus1TBRefFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6606,9 +6606,9 @@ traps:
       - dabnPlus1TBRefFault
   - oid: 1.3.6.1.4.1.19831.1.1.2.5.0.44
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TBMuteEvent
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: N+1 reserve mute state changed to {dabnPlus1TBMute} on {_HOSTNAME}.
+    description: N+1 reserve mute state changed to {{value "dabnPlus1TBMute"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6622,7 +6622,7 @@ traps:
     name: IRT-DAB-NPLUS1-MIB::dabnPlus1TBWarningTimeStampEvent
     category: diagnostic
     severity: warning
-    description: N+1 reserve transmitter B warning state is {dabnPlus1TBWarningTimeStamp} at {eventTimeStamp} on {_HOSTNAME}.
+    description: N+1 reserve warning state detected on transmitter B at {{value "dabnPlus1TBWarningTimeStamp"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6636,7 +6636,7 @@ traps:
     name: IRT-FM-SINGLETRANSMITTER-MIB::fmSTTransmitterOpModeEvent
     category: state_change
     severity: notice
-    description: Transmitter operational mode changed to {fmSTTransmitterOpMode} on {_HOSTNAME}.
+    description: Transmitter operational mode changed to {{value "fmSTTransmitterOpMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6650,7 +6650,7 @@ traps:
     name: IRT-FM-SINGLETRANSMITTER-MIB::fmSTRFPresentEvent
     category: diagnostic
     severity: notice
-    description: Single transmitter presence status is {fmSTRFPresent} on {_HOSTNAME}.
+    description: Single transmitter SFP status changed to {{value "fmSTRFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6663,8 +6663,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.3.1.0.3
     name: IRT-FM-SINGLETRANSMITTER-MIB::fmSTFaultEvent
     category: diagnostic
-    severity: err
-    description: Transmitter fault detected with state {fmSTFault} on {_HOSTNAME}.
+    severity: warning
+    description: Single transmitter fault detected{{with value "fmSTFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6678,7 +6678,7 @@ traps:
     name: IRT-FM-SINGLETRANSMITTER-MIB::fmSTWarningEvent
     category: diagnostic
     severity: warning
-    description: Single transmitter warning state {fmSTWarning} detected on {_HOSTNAME}.
+    description: Single transmitter warning {{value "fmSTWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6692,7 +6692,7 @@ traps:
     name: IRT-FM-SINGLETRANSMITTER-MIB::fmSTLocalModeEvent
     category: state_change
     severity: notice
-    description: Single transmitter mode changed to {fmSTLocalMode} on {_HOSTNAME}.
+    description: Single transmitter local mode changed to {{value "fmSTLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6706,7 +6706,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARPreselectionExciterEvent
     category: diagnostic
     severity: warning
-    description: Active reserve preselection exciter {fmARPreselectionExciter} triggered on {_HOSTNAME}.
+    description: Active reserve preselection exciter event detected{{with value "fmARPreselectionExciter"}} value {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6720,7 +6720,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARPreselectionAmplifierEvent
     category: diagnostic
     severity: warning
-    description: Preselection amplifier {fmARPreselectionAmplifier} status change detected on {_HOSTNAME}.
+    description: Preselection amplifier event detected{{with value "fmARPreselectionAmplifier"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6734,7 +6734,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARTransmitterOpModeEvent
     category: state_change
     severity: notice
-    description: Active reserve transmitter operational mode changed to {fmARTransmitterOpMode} on {_HOSTNAME}.
+    description: Active reserve transmitter mode changed to {{value "fmARTransmitterOpMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6748,7 +6748,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARReserveControlEvent
     category: state_change
     severity: notice
-    description: Active reserve control changed to {fmARReserveControl} on {_HOSTNAME}.
+    description: Active reserve control changed to {{value "fmARReserveControl"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6761,8 +6761,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.3.2.0.5
     name: IRT-FM-ACTIVERESERVE-MIB::fmARActiveAmplifierEvent
     category: diagnostic
-    severity: warning
-    description: Active amplifier {fmARActiveAmplifier} status change detected on {_HOSTNAME}.
+    severity: notice
+    description: Active amplifier {{value "fmARActiveAmplifier"}} event detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6776,7 +6776,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARActiveExciterEvent
     category: state_change
     severity: notice
-    description: Active exciter {fmARActiveExciter} changed state on {_HOSTNAME}.
+    description: Active exciter changed to {{value "fmARActiveExciter"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6790,7 +6790,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARLocalModeEvent
     category: state_change
     severity: notice
-    description: Active reserve mode changed to {fmARLocalMode} on {_HOSTNAME}.
+    description: Active reserve mode changed to {{value "fmARLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6803,8 +6803,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.3.2.0.8
     name: IRT-FM-ACTIVERESERVE-MIB::fmARControlUnitFaultEvent
     category: diagnostic
-    severity: err
-    description: Active reserve control unit reported fault state {fmARControlUnitFault} on {_HOSTNAME}.
+    severity: crit
+    description: Active reserve control unit fault detected {{value "fmARControlUnitFault"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6818,7 +6818,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARExciterSwitchOverModeEvent
     category: state_change
     severity: notice
-    description: Exciter switch over mode changed to {fmARExciterSwitchOverMode} on {_HOSTNAME}.
+    description: Exciter switch-over mode changed to {{value "fmARExciterSwitchOverMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6832,7 +6832,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARExciterSwitchOverReadyEvent
     category: state_change
     severity: notice
-    description: Exciter switch over unit state changed to {fmARExciterSwitchOverReady} on {_HOSTNAME}.
+    description: Exciter switch over unit is ready on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6846,7 +6846,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARExciterSwitchOverExecutedEvent
     category: state_change
     severity: notice
-    description: Active reserve exciter switch over executed on {_HOSTNAME}.
+    description: Exciter switch over executed on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6859,8 +6859,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.3.2.0.12
     name: IRT-FM-ACTIVERESERVE-MIB::fmARExciterSwitchOverFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter switch-over unit reported fault state {fmARExciterSwitchOverFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter switch-over unit fault detected with status {{value "fmARExciterSwitchOverFault"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6874,7 +6874,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARAmplifierSwitchOverModeEvent
     category: state_change
     severity: notice
-    description: Amplifier switch over mode changed to {fmARAmplifierSwitchOverMode} on {_HOSTNAME}.
+    description: Amplifier switch over mode changed to {{value "fmARAmplifierSwitchOverMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6888,7 +6888,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARAmplifierSwitchOverReadyEvent
     category: state_change
     severity: notice
-    description: Amplifier switch-over unit is {fmARAmplifierSwitchOverReady} on {_HOSTNAME}.
+    description: Amplifier switch over unit is ready on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6902,7 +6902,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARAmplifierSwitchOverExecutedEvent
     category: state_change
     severity: notice
-    description: Amplifier switch over {fmARAmplifierSwitchOverExecuted} on {_HOSTNAME}.
+    description: Amplifier switch over executed on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6915,8 +6915,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.3.2.0.16
     name: IRT-FM-ACTIVERESERVE-MIB::fmARAmplifierSwitchOverFaultEvent
     category: diagnostic
-    severity: err
-    description: Amplifier switch-over unit reported fault state {fmARAmplifierSwitchOverFault} on {_HOSTNAME}.
+    severity: warning
+    description: Amplifier switch-over unit is {{value "fmARAmplifierSwitchOverFault"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6929,8 +6929,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.3.2.0.17
     name: IRT-FM-ACTIVERESERVE-MIB::fmARAmplifierARFPresentEvent
     category: diagnostic
-    severity: warning
-    description: Amplifier ARF status changed to {fmARAmplifierARFPresent} on {_HOSTNAME}.
+    severity: notice
+    description: Amplifier A RF output power status changed to {{value "fmARAmplifierARFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6943,8 +6943,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.3.2.0.18
     name: IRT-FM-ACTIVERESERVE-MIB::fmARAmplifierAFaultEvent
     category: diagnostic
-    severity: err
-    description: Amplifier A fault detected with state {fmARAmplifierAFault} on {_HOSTNAME}.
+    severity: warning
+    description: Amplifier A fault detected{{with value "fmARAmplifierAFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6958,7 +6958,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARAmplifierAWarningEvent
     category: diagnostic
     severity: warning
-    description: Amplifier A warning state {fmARAmplifierAWarning} detected on {_HOSTNAME}.
+    description: Amplifier A warning state {{value "fmARAmplifierAWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6972,7 +6972,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARAmplifierBRFPresentEvent
     category: diagnostic
     severity: warning
-    description: Amplifier BRF status reported as {fmARAmplifierBRFPresent} on {_HOSTNAME}.
+    description: Amplifier BRF status changed to {{value "fmARAmplifierBRFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -6985,8 +6985,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.3.2.0.21
     name: IRT-FM-ACTIVERESERVE-MIB::fmARAmplifierBFaultEvent
     category: diagnostic
-    severity: err
-    description: Amplifier B fault state {fmARAmplifierBFault} detected on {_HOSTNAME}.
+    severity: crit
+    description: Amplifier B fault detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7000,7 +7000,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARAmplifierBWarningEvent
     category: diagnostic
     severity: warning
-    description: Amplifier B warning state {fmARAmplifierBWarning} detected on {_HOSTNAME}.
+    description: Amplifier B warning state {{value "fmARAmplifierBWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7014,7 +7014,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARExciterALocalModeEvent
     category: state_change
     severity: notice
-    description: Exciter local mode changed to {fmARExciterALocalMode} on {_HOSTNAME}.
+    description: Exciter local mode changed to {{value "fmARExciterALocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7027,8 +7027,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.3.2.0.24
     name: IRT-FM-ACTIVERESERVE-MIB::fmARExciterAFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter A fault detected with status {fmARExciterAFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter A fault detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7042,7 +7042,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARExciterAWarningEvent
     category: diagnostic
     severity: warning
-    description: Exciter A warning state {fmARExciterAWarning} detected on {_HOSTNAME}.
+    description: Exciter A warning state {{value "fmARExciterAWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7056,7 +7056,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARExciterBLocalModeEvent
     category: state_change
     severity: notice
-    description: Exciter mode changed to {fmARExciterBLocalMode} on {_HOSTNAME}.
+    description: Exciter local mode changed to {{value "fmARExciterBLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7069,8 +7069,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.3.2.0.27
     name: IRT-FM-ACTIVERESERVE-MIB::fmARExciterBFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter B fault state is {fmARExciterBFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter B fault detected{{with value "fmARExciterBFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7084,7 +7084,7 @@ traps:
     name: IRT-FM-ACTIVERESERVE-MIB::fmARExciterBWarningEvent
     category: diagnostic
     severity: warning
-    description: Exciter B warning state {fmARExciterBWarning} detected on {_HOSTNAME}.
+    description: Exciter B warning state {{value "fmARExciterBWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7098,7 +7098,7 @@ traps:
     name: IRT-FM-DUALDRIVE-MIB::fmDDPreselectionExciterEvent
     category: diagnostic
     severity: warning
-    description: FM dual-drive preselection exciter {fmDDPreselectionExciter} event triggered on {_HOSTNAME}.
+    description: FM dual-drive preselection exciter event detected{{with value "fmDDPreselectionExciter"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7110,9 +7110,9 @@ traps:
       - fmDDPreselectionExciter
   - oid: 1.3.6.1.4.1.19831.1.1.3.4.0.2
     name: IRT-FM-DUALDRIVE-MIB::fmDDTransmitterOpModeEvent
-    category: diagnostic
-    severity: warning
-    description: Dual drive transmitter operation mode changed to {fmDDTransmitterOpMode} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: FM dual drive transmitter operation mode changed to {{value "fmDDTransmitterOpMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7126,7 +7126,7 @@ traps:
     name: IRT-FM-DUALDRIVE-MIB::fmDDReserveControlEvent
     category: state_change
     severity: notice
-    description: Dual drive reserve control changed to {fmDDReserveControl} on {_HOSTNAME}.
+    description: Dual drive reserve exciter control changed to {{value "fmDDReserveControl"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7140,7 +7140,7 @@ traps:
     name: IRT-FM-DUALDRIVE-MIB::fmDDRFPresentEvent
     category: diagnostic
     severity: notice
-    description: Dual drive power status changed to {fmDDRFPresent} on {_HOSTNAME}.
+    description: Dual drive status changed to {{value "fmDDRFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7153,8 +7153,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.3.4.0.5
     name: IRT-FM-DUALDRIVE-MIB::fmDDAmplifierFaultEvent
     category: diagnostic
-    severity: err
-    description: Amplifier fault detected with state {fmDDAmplifierFault} on {_HOSTNAME}.
+    severity: crit
+    description: Amplifier fault detected on dual drive on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7168,7 +7168,7 @@ traps:
     name: IRT-FM-DUALDRIVE-MIB::fmDDAmplifierWarningEvent
     category: diagnostic
     severity: warning
-    description: Amplifier warning state {fmDDAmplifierWarning} detected on {_HOSTNAME}.
+    description: Amplifier warning state {{value "fmDDAmplifierWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7180,9 +7180,9 @@ traps:
       - fmDDAmplifierWarning
   - oid: 1.3.6.1.4.1.19831.1.1.3.4.0.7
     name: IRT-FM-DUALDRIVE-MIB::fmDDActiveExciterEvent
-    category: state_change
-    severity: notice
-    description: Active exciter {fmDDActiveExciter} state changed on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: Active exciter changed to {{value "fmDDActiveExciter"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7196,7 +7196,7 @@ traps:
     name: IRT-FM-DUALDRIVE-MIB::fmDDLocalModeEvent
     category: state_change
     severity: notice
-    description: Dual drive mode changed to {fmDDLocalMode} on {_HOSTNAME}.
+    description: Dual drive local mode changed to {{value "fmDDLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7209,8 +7209,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.3.4.0.9
     name: IRT-FM-DUALDRIVE-MIB::fmDDControlUnitFaultEvent
     category: diagnostic
-    severity: err
-    description: Dual drive control unit fault detected with status {fmDDControlUnitFault} on {_HOSTNAME}.
+    severity: crit
+    description: Dual drive control unit fault detected{{with value "fmDDControlUnitFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7222,9 +7222,9 @@ traps:
       - fmDDControlUnitFault
   - oid: 1.3.6.1.4.1.19831.1.1.3.4.0.10
     name: IRT-FM-DUALDRIVE-MIB::fmDDSwitchOverModeEvent
-    category: config_change
+    category: state_change
     severity: notice
-    description: Dual drive switch over mode changed to {fmDDSwitchOverMode} on {_HOSTNAME}.
+    description: Dual drive switch over mode changed to {{value "fmDDSwitchOverMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7238,7 +7238,7 @@ traps:
     name: IRT-FM-DUALDRIVE-MIB::fmDDSwitchOverReadyEvent
     category: state_change
     severity: notice
-    description: Dual drive switch over unit reported {fmDDSwitchOverReady} on {_HOSTNAME}.
+    description: Dual drive switch over unit is ready on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7252,7 +7252,7 @@ traps:
     name: IRT-FM-DUALDRIVE-MIB::fmDDSwitchOverExecutedEvent
     category: state_change
     severity: notice
-    description: Dual drive switch over {fmDDSwitchOverExecuted} on {_HOSTNAME}.
+    description: Dual drive switch over executed on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7265,8 +7265,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.3.4.0.13
     name: IRT-FM-DUALDRIVE-MIB::fmDDSwitchOverFaultEvent
     category: diagnostic
-    severity: err
-    description: Dual drive switch-over unit reported fault state {fmDDSwitchOverFault} on {_HOSTNAME}.
+    severity: crit
+    description: Dual drive switch-over unit fault detected{{with value "fmDDSwitchOverFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7280,7 +7280,7 @@ traps:
     name: IRT-FM-DUALDRIVE-MIB::fmDDExciterALocalModeEvent
     category: state_change
     severity: notice
-    description: Exciter A local mode changed to {fmDDExciterALocalMode} on {_HOSTNAME}.
+    description: Exciter A local mode changed to {{value "fmDDExciterALocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7293,8 +7293,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.3.4.0.15
     name: IRT-FM-DUALDRIVE-MIB::fmDDExciterAFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter A fault detected with status {fmDDExciterAFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter A fault detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7308,7 +7308,7 @@ traps:
     name: IRT-FM-DUALDRIVE-MIB::fmDDExciterAWarningEvent
     category: diagnostic
     severity: warning
-    description: Exciter A warning state {fmDDExciterAWarning.raw} detected on {_HOSTNAME}.
+    description: 'Exciter A warning state detected{{with value "fmDDExciterAWarning"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - sysDescr
@@ -7322,7 +7322,7 @@ traps:
     name: IRT-FM-DUALDRIVE-MIB::fmDDExciterBLocalModeEvent
     category: state_change
     severity: notice
-    description: Exciter B local mode changed to {fmDDExciterBLocalMode} on {_HOSTNAME}.
+    description: Exciter B local mode changed to {{value "fmDDExciterBLocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7335,8 +7335,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.3.4.0.18
     name: IRT-FM-DUALDRIVE-MIB::fmDDExciterBFaultEvent
     category: diagnostic
-    severity: err
-    description: Exciter B fault detected with status {fmDDExciterBFault} on {_HOSTNAME}.
+    severity: crit
+    description: Exciter B fault detected{{with value "fmDDExciterBFault"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7350,7 +7350,7 @@ traps:
     name: IRT-FM-DUALDRIVE-MIB::fmDDExciterBWarningEvent
     category: diagnostic
     severity: warning
-    description: Exciter B warning state {fmDDExciterBWarning} detected on {_HOSTNAME}.
+    description: Exciter B warning state is {{value "fmDDExciterBWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7363,8 +7363,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.3.5.0.1
     name: IRT-FM-NPLUS1-MIB::fmnPlus1RedundancySwitchOverEvent
     category: state_change
-    severity: notice
-    description: N+1 redundancy switch over to {fmnPlus1RedundancySwitchOver} on {_HOSTNAME}.
+    severity: alert
+    description: N+1 redundancy switch over occurred on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7378,7 +7378,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1LocalModeEvent
     category: state_change
     severity: notice
-    description: N+1 reserve mode changed to {fmnPlus1LocalMode} on {_HOSTNAME}.
+    description: N+1 reserve mode changed to {{value "fmnPlus1LocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7391,8 +7391,8 @@ traps:
   - oid: 1.3.6.1.4.1.19831.1.1.3.5.0.3
     name: IRT-FM-NPLUS1-MIB::fmnPlus1ControlUnitFaultEvent
     category: diagnostic
-    severity: err
-    description: Control unit fault detected with status {fmnPlus1ControlUnitFault} on {_HOSTNAME}.
+    severity: crit
+    description: N+1 control unit fault detected{{with value "fmnPlus1ControlUnitFault"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7406,7 +7406,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1SwitchOverModeEvent
     category: state_change
     severity: notice
-    description: N+1 switch over mode changed to {fmnPlus1SwitchOverMode} on {_HOSTNAME}.
+    description: N+1 switch over mode changed to {{value "fmnPlus1SwitchOverMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7420,7 +7420,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1SwitchOverReadyEvent
     category: state_change
     severity: notice
-    description: N+1 switch over unit state changed to {fmnPlus1SwitchOverReady} on {_HOSTNAME}.
+    description: N+1 switch over unit is ready on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7434,7 +7434,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1SwitchOverExecutedEvent
     category: state_change
     severity: notice
-    description: N+1 switch over executed on {_HOSTNAME}.
+    description: N+1 switch over executed on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7448,7 +7448,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1SwitchOverFaultEvent
     category: diagnostic
     severity: crit
-    description: N+1 switch over unit reported fault state {fmnPlus1SwitchOverFault} on {_HOSTNAME}.
+    description: N+1 switch over unit is in a faulty state on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7462,7 +7462,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1ChannelSelectionEvent
     category: state_change
     severity: notice
-    description: N+1 channel selection changed to {fmnPlus1ChannelSelection} on {_HOSTNAME}.
+    description: N+1 channel selection changed to {{value "fmnPlus1ChannelSelection"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7476,7 +7476,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1TransmitterBResetEvent
     category: diagnostic
     severity: warning
-    description: Transmitter B reset triggered on {_HOSTNAME}.
+    description: N+1 Transmitter B reset triggered on {{hostname}}.
     status: obsolete
     varbinds:
       - sysDescr
@@ -7490,7 +7490,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1TransmitterBModeEvent
     category: state_change
     severity: warning
-    description: Transmitter B redundancy state changed to {fmnPlus1TransmitterBMode} on {_HOSTNAME}.
+    description: Transmitter B redundancy is {{value "fmnPlus1TransmitterBMode"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - sysDescr
@@ -7504,7 +7504,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1MTOpModeEvent
     category: state_change
     severity: notice
-    description: N+1 transmitter {fmnPlus1EventTransmitterIndex} operational mode changed to {fmnPlus1MTOpMode} on {_HOSTNAME}.
+    description: N+1 reserve transmitter mode changed to {{value "fmnPlus1MTOpMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7517,9 +7517,9 @@ traps:
       - fmnPlus1EventTransmitterIndex
   - oid: 1.3.6.1.4.1.19831.1.1.3.5.0.12
     name: IRT-FM-NPLUS1-MIB::fmnPlus1MTRFProgramPresentEvent
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: N+1 reserve transmitter {fmnPlus1MTRFProgramPresent} status changed on {_HOSTNAME}.
+    description: N+1 reserve transmitter status changed to {{value "fmnPlus1MTRFProgramPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7534,7 +7534,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1RTOpModeEvent
     category: state_change
     severity: notice
-    description: N+1 reserve transmitter control mode changed to {fmnPlus1RTOpMode} on {_HOSTNAME}.
+    description: N+1 reserve transmitter control mode changed to {{value "fmnPlus1RTOpMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7548,7 +7548,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1RTRFProgramPresentEvent
     category: diagnostic
     severity: warning
-    description: N+1 reserve transmitter status {fmnPlus1RTRFProgramPresent} on {_HOSTNAME}.
+    description: N+1 reserve transmitter program status is {{value "fmnPlus1RTRFProgramPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7562,7 +7562,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1TARFPresentEvent
     category: diagnostic
     severity: warning
-    description: Transmitter {fmnPlus1EventTransmitterIndex} N+1 reserve status changed to {fmnPlus1TARFPresent} on {_HOSTNAME}.
+    description: N+1 reserve transmitter A status changed to {{value "fmnPlus1TARFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7577,7 +7577,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1TALocalModeEvent
     category: state_change
     severity: notice
-    description: Transmitter A local mode changed to {fmnPlus1TALocalMode} on {_HOSTNAME}.
+    description: Transmitter A local mode changed to {{value "fmnPlus1TALocalMode"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7592,7 +7592,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1TAFaultEvent
     category: diagnostic
     severity: warning
-    description: Transmitter A fault state {fmnPlus1TAFault} detected on {_HOSTNAME}.
+    description: Transmitter A fault detected{{with value "fmnPlus1TAFault"}} state {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7607,7 +7607,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1TAWarningEvent
     category: diagnostic
     severity: warning
-    description: N+1 reserve transmitter A warning state {fmnPlus1TAWarning} on {_HOSTNAME}.
+    description: N+1 transmitter A warning state {{value "fmnPlus1TAWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7622,7 +7622,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1TBRFPresentEvent
     category: diagnostic
     severity: warning
-    description: Transmitter B output power status changed to {fmnPlus1TBRFPresent} on {_HOSTNAME}.
+    description: N+1 reserve TBRF status changed to {{value "fmnPlus1TBRFPresent"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7636,7 +7636,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1TBLocalModeEvent
     category: state_change
     severity: notice
-    description: N+1 reserve mode changed to {fmnPlus1TBLocalMode} on {_HOSTNAME}.
+    description: N+1 reserve mode changed to local on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7650,7 +7650,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1TBFaultEvent
     category: diagnostic
     severity: warning
-    description: N+1 reserve fault state {fmnPlus1TBFault.raw} detected on {_HOSTNAME}.
+    description: N+1 reserve fault detected{{with value "fmnPlus1TBFault"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -7664,7 +7664,7 @@ traps:
     name: IRT-FM-NPLUS1-MIB::fmnPlus1TBWarningEvent
     category: diagnostic
     severity: warning
-    description: N+1 redundancy warning state {fmnPlus1TBWarning.raw} detected on {_HOSTNAME}.
+    description: N+1 reserve warning state {{value "fmnPlus1TBWarning"}} on {{hostname}}.
     status: current
     varbinds:
       - sysDescr

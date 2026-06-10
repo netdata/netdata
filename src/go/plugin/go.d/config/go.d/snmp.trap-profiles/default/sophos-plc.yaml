@@ -34,7 +34,7 @@ traps:
     name: SFOS-FIREWALL-MIB::sfosNotification
     category: diagnostic
     severity: notice
-    description: SFOS notification {sfosTrapMessage} on {_HOSTNAME}.
+    description: 'SFOS notification received: {{value "sfosTrapMessage"}} on {{hostname}}.'
     status: current
     varbinds:
       - sfosDeviceType

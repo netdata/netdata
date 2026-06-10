@@ -49,7 +49,7 @@ traps:
     name: DLB-GENERIC-MIB::dlbPowerLoss
     category: diagnostic
     severity: alert
-    description: Power loss or device crash detected at {sysLocation} on {_HOSTNAME}.
+    description: Power loss or device crash detected{{with value "sysLocation"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - sysLocation
@@ -57,7 +57,7 @@ traps:
     name: DLB-GENERIC-MIB::dlbAdministrativeReboot
     category: state_change
     severity: notice
-    description: Device rebooted by administrator on {_HOSTNAME}.
+    description: Device rebooted by administrator on {{hostname}}.
     status: current
     varbinds:
       - sysLocation
@@ -65,7 +65,7 @@ traps:
     name: DLB-802DOT11-EXT-MIB::dlbFrequencyChange
     category: state_change
     severity: notice
-    description: Frequency changed to {dlbDot11IfFrequency} on {_HOSTNAME}.
+    description: DLB frequency changed to {{value "dlbDot11IfFrequency"}} on {{hostname}}.
     status: current
     varbinds:
       - sysLocation
@@ -75,7 +75,7 @@ traps:
     name: DLB-802DOT11-EXT-MIB::dlbNoiseThresholdReached
     category: diagnostic
     severity: warning
-    description: Noise level {dlbDot11IfNoiseLevel} exceeded threshold on interface {ifIndex} on {_HOSTNAME}.
+    description: Noise level {{value "dlbDot11IfNoiseLevel"}} exceeded threshold on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - sysLocation
@@ -85,7 +85,7 @@ traps:
     name: DLB-802DOT11-EXT-MIB::dlbRemoteNodeConnected
     category: mobility
     severity: notice
-    description: Remote node {dlbDot11RmtNodeMacAddress} associated on {_HOSTNAME}.
+    description: Remote node {{value "dlbDot11RmtNodeMacAddress"}} associated on {{hostname}}.
     status: current
     varbinds:
       - sysLocation
@@ -96,7 +96,7 @@ traps:
     name: DLB-802DOT11-EXT-MIB::dlbRemoteNodeDisconnected
     category: mobility
     severity: notice
-    description: Remote node {dlbDot11RmtNodeMacAddress} disassociated on {_HOSTNAME}.
+    description: Remote node {{value "dlbDot11RmtNodeMacAddress"}} disassociated on {{hostname}}.
     status: current
     varbinds:
       - sysLocation
@@ -105,9 +105,9 @@ traps:
       - dlbDot11RmtNodeMacAddress
   - oid: 1.3.6.1.4.1.32761.3.5.1.0.5
     name: DLB-802DOT11-EXT-MIB::dlbLinkQualThresholdReached
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Link quality {dlbDot11IfLinkQuality} crossed threshold on {_HOSTNAME}.
+    description: Link quality threshold reached on {{trap_interface}} with quality {{value "dlbDot11IfLinkQuality"}} on {{hostname}}.
     status: current
     varbinds:
       - sysLocation
@@ -117,7 +117,7 @@ traps:
     name: DLB-RADIO3-DRV-MIB::dlbRdo3RxDropsThreshold
     category: diagnostic
     severity: warning
-    description: Radio frame drop threshold reached with {dlbRdo3RxDropped} dropped frames on {_HOSTNAME}.
+    description: Radio3 RX drop threshold reached with {{value "dlbRdo3RxDropped"}} dropped frames on {{hostname}}.
     status: current
     varbinds:
       - sysLocation
@@ -126,9 +126,9 @@ traps:
       - dlbRdo3RxDropped
   - oid: 1.3.6.1.4.1.32761.3.8.1.0.2
     name: DLB-RADIO3-DRV-MIB::dlbRdo3TxRetriesThreshold
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Transmission retry threshold reached with {dlbRdo3TxRetried} retries on {_HOSTNAME}.
+    description: Transmission retry threshold reached with {{value "dlbRdo3TxRetried"}} retries on {{hostname}}.
     status: current
     varbinds:
       - sysLocation

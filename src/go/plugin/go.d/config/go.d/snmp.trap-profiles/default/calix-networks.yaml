@@ -1529,7 +1529,7 @@ traps:
     name: E7-Notifications-MIB::e7TrapAlarm
     category: diagnostic
     severity: warning
-    description: Alarm {e7TrapText} with severity {e7TrapAlarmSeverityLevel} on {_HOSTNAME}.
+    description: Alarm {{value "e7TrapAlarmStatus"}} on {{first (value "e7TrapCliObject") "object"}} on {{hostname}}.
     status: current
     varbinds:
       - e7TrapSequenceNo
@@ -1568,7 +1568,7 @@ traps:
     name: E7-Notifications-MIB::e7TrapEvent
     category: diagnostic
     severity: notice
-    description: General event {e7TrapEventType} with text {e7TrapText} on {_HOSTNAME}.
+    description: General event {{value "e7TrapText"}} on {{hostname}}.
     status: current
     varbinds:
       - e7TrapSequenceNo
@@ -1593,7 +1593,7 @@ traps:
     name: E7-Notifications-MIB::e7TrapDbChange
     category: config_change
     severity: notice
-    description: Database change detected with type {e7TrapDbChangeType} on {_HOSTNAME}.
+    description: 'Database change occurred{{with value "e7TrapText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - e7TrapSequenceNo
@@ -1621,7 +1621,7 @@ traps:
     name: E7-Notifications-MIB::e7TrapSecurity
     category: security
     severity: warning
-    description: Security event {e7TrapSecurityType} detected for user {e7TrapUserName} on {_HOSTNAME}.
+    description: Security event {{value "e7TrapSecurityType"}} for user {{value "e7TrapUserName"}} on {{hostname}}.
     status: current
     varbinds:
       - e7TrapSequenceNo
@@ -1635,9 +1635,9 @@ traps:
       - e7TrapText
   - oid: 1.3.6.1.4.1.6321.1.2.2.4.2.5
     name: E7-Notifications-MIB::e7TrapTca
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Threshold crossing detected for {e7TrapCliObject} with type {e7TrapTcaType} on {_HOSTNAME}.
+    description: 'Threshold crossing occurred{{with value "e7TrapText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - e7TrapSequenceNo
@@ -1663,7 +1663,7 @@ traps:
     name: E5-110-IESCOMMON-MIB::reboot
     category: state_change
     severity: notice
-    description: System is rebooting due to {iesProblemCause} on {_HOSTNAME}.
+    description: System is rebooting{{with value "iesProblemCause"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - iesProblemCause
@@ -1671,15 +1671,15 @@ traps:
     name: E5-110-IESCOMMON-MIB::systemShutdown
     category: state_change
     severity: emerg
-    description: System shutdown initiated due to {iesProblemCause} on {_HOSTNAME}.
+    description: System is shutting down{{with value "iesProblemCause"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - iesProblemCause
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.0.3
     name: E5-110-IESCOMMON-MIB::overheat
     category: diagnostic
-    severity: warning
-    description: System overheated with temperature {iesSysTempCurValue} on {_HOSTNAME}.
+    severity: alert
+    description: System overheated with temperature {{value "iesSysTempCurValue"}}C on {{hostname}}.
     status: current
     varbinds:
       - iesChassisId
@@ -1690,7 +1690,7 @@ traps:
     name: E5-110-IESCOMMON-MIB::overheatOver
     category: diagnostic
     severity: notice
-    description: Overheat condition cleared with current temperature {iesSysTempCurValue} on {_HOSTNAME}.
+    description: Overheat condition cleared on {{hostname}}.
     status: current
     varbinds:
       - iesChassisId
@@ -1701,7 +1701,7 @@ traps:
     name: E5-110-IESCOMMON-MIB::errLog
     category: diagnostic
     severity: warning
-    description: System error log created with cause {iesProblemCause} on {_HOSTNAME}.
+    description: 'System error log created{{with value "iesProblemCause"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - iesProblemCause
@@ -1709,7 +1709,7 @@ traps:
     name: E5-110-IESCOMMON-MIB::fanRpmLow
     category: diagnostic
     severity: warning
-    description: Fan {iesFanRpmIndex} reported low RPM {iesFanRpmCurValue} on {_HOSTNAME}.
+    description: Fan {{value "iesFanRpmIndex"}} RPM is low at {{value "iesFanRpmCurValue"}} on {{hostname}}.
     status: current
     varbinds:
       - iesChassisId
@@ -1719,7 +1719,7 @@ traps:
     name: E5-110-IESCOMMON-MIB::fanRpmNormal
     category: diagnostic
     severity: notice
-    description: Fan {iesFanRpmIndex} RPM returned to normal at {iesFanRpmCurValue} on {_HOSTNAME}.
+    description: Fan {{value "iesFanRpmIndex"}} RPM returned to normal at {{value "iesFanRpmCurValue"}} on {{hostname}}.
     status: current
     varbinds:
       - iesChassisId
@@ -1729,7 +1729,7 @@ traps:
     name: E5-110-IESCOMMON-MIB::voltageOutOfRange
     category: diagnostic
     severity: warning
-    description: System voltage {iesVoltageCurValue} is out of range on {_HOSTNAME}.
+    description: System voltage {{value "iesVoltageCurValue"}}mV is out of range on {{hostname}}.
     status: current
     varbinds:
       - iesChassisId
@@ -1740,7 +1740,7 @@ traps:
     name: E5-110-IESCOMMON-MIB::voltageNormal
     category: diagnostic
     severity: notice
-    description: Low-voltage condition cleared for sensor {iesVoltageIndex} with current voltage {iesVoltageCurValue} on {_HOSTNAME}.
+    description: Voltage normal condition restored on slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - iesChassisId
@@ -1751,7 +1751,7 @@ traps:
     name: E5-110-IESCOMMON-MIB::systemMaintenanceFailure
     category: diagnostic
     severity: err
-    description: System maintenance operation failed with cause {iesProblemCause} on {_HOSTNAME}.
+    description: 'System maintenance operation failed{{with value "iesProblemCause"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - iesChassisId
@@ -1761,7 +1761,7 @@ traps:
     name: E5-110-IESCOMMON-MIB::configChange
     category: config_change
     severity: notice
-    description: Configuration data changed for chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    description: Module configuration changed{{with value "iesSlotId"}} on slot {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - iesChassisId
@@ -1771,7 +1771,7 @@ traps:
     name: E5-110-IESCOMMON-MIB::moduleUp
     category: state_change
     severity: notice
-    description: Module in slot {iesSlotId} of chassis {iesChassisId} came up on {_HOSTNAME}.
+    description: Module {{first (value "iesSlotId") "slot"}} came up on {{hostname}}.
     status: current
     varbinds:
       - iesChassisId
@@ -1779,8 +1779,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.0.13
     name: E5-110-IESCOMMON-MIB::moduleDown
     category: diagnostic
-    severity: err
-    description: Module in slot {iesSlotId} of chassis {iesChassisId} reported failure on {_HOSTNAME}.
+    severity: crit
+    description: Module failure detected in slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - iesChassisId
@@ -1789,7 +1789,7 @@ traps:
     name: E5-110-IESCOMMON-MIB::modulePlugIn
     category: state_change
     severity: notice
-    description: Module plugged into chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    description: Module plugged into slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - iesChassisId
@@ -1797,8 +1797,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.0.15
     name: E5-110-IESCOMMON-MIB::modulePullOut
     category: diagnostic
-    severity: warning
-    description: Module pulled out from chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    severity: alert
+    description: Module pulled out from slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - iesChassisId
@@ -1807,43 +1807,43 @@ traps:
     name: E5-110-IESCOMMON-MIB::powerDC48VAFailure
     category: diagnostic
     severity: crit
-    description: DC 48V power supply failure detected on {_HOSTNAME}.
+    description: DC 48V power supply failure on the right side of the main chassis on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.0.17
     name: E5-110-IESCOMMON-MIB::powerDC48VANormal
     category: diagnostic
     severity: notice
-    description: DC 48V power supply status returned to normal on {_HOSTNAME}.
+    description: DC 48V power supply on the right side of the main chassis returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.0.18
     name: E5-110-IESCOMMON-MIB::powerDC48VBFailure
     category: diagnostic
-    severity: err
-    description: DC 48V power supply failure detected on {_HOSTNAME}.
+    severity: crit
+    description: DC 48V power supply failure on the left side of the main chassis on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.0.19
     name: E5-110-IESCOMMON-MIB::powerDC48VBNormal
     category: diagnostic
     severity: notice
-    description: DC 48V power supply returned to normal state on {_HOSTNAME}.
+    description: DC 48V power supply on the left side of the main chassis returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.0.20
     name: E5-110-IESCOMMON-MIB::extAlarmInputTrigger
     category: diagnostic
     severity: warning
-    description: External alarm input triggered on MSC card on {_HOSTNAME}.
+    description: External alarm input triggered on MSC card on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.0.21
     name: E5-110-IESCOMMON-MIB::extAlarmInputRelease
     category: state_change
     severity: notice
-    description: External alarm input released on {_HOSTNAME}.
+    description: External alarm input released on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.0.22
     name: E5-110-IESCOMMON-MIB::thermalSensorFailure
     category: diagnostic
-    severity: err
-    description: Thermal sensor failure detected on chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    severity: crit
+    description: Thermal sensor failure detected on slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - iesChassisId
@@ -1852,7 +1852,7 @@ traps:
     name: E5-110-IESCOMMON-MIB::mscSwitchOverOK
     category: state_change
     severity: notice
-    description: MSC card switch-over completed successfully on slot {iesSlotId} on {_HOSTNAME}.
+    description: MSC card switch over succeeded on slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - iesChassisId
@@ -1861,45 +1861,45 @@ traps:
     name: E5-110-IESCOMMON-MIB::networkTopologyChange
     category: state_change
     severity: notice
-    description: Network topology changed on {_HOSTNAME}.
+    description: Network topology changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.0.25
     name: E5-110-IESCOMMON-MIB::adslAtucLof
-    category: state_change
-    severity: warning
-    description: ATU-C Loss of Framing detected on interface {ifIndex} on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: ADSL ATU-C loss of framing detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.0.26
     name: E5-110-IESCOMMON-MIB::adslAturLof
-    category: state_change
+    category: diagnostic
     severity: crit
-    description: ATU-R Loss of Framing detected on interface {ifIndex} on {_HOSTNAME}.
+    description: ADSL ATU-R Loss of Framing detected on interface {{value "ifIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.0.27
     name: E5-110-IESCOMMON-MIB::adslAtucLos
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: ATU-C Loss of Signal detected on interface {ifIndex} on {_HOSTNAME}.
+    description: ADSL ATU-C loss of signal detected on interface {{value "ifIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.0.28
     name: E5-110-IESCOMMON-MIB::adslAturLos
-    category: state_change
-    severity: warning
-    description: ATU-R Loss of Signal detected on interface {ifIndex} on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: ADSL ATU-R loss of signal detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.0.29
     name: E5-110-IESCOMMON-MIB::adslAturLpr
     category: diagnostic
-    severity: err
-    description: ATU-R Loss of Power detected on interface {ifIndex} on {_HOSTNAME}.
+    severity: alert
+    description: ADSL ATU-R loss of power detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1907,7 +1907,7 @@ traps:
     name: E5-110-IESCOMMON-MIB::adslAtucLofClear
     category: state_change
     severity: notice
-    description: ATU-C Loss of Framing cleared on {_HOSTNAME}.
+    description: ADSL ATU-C Loss of Framing cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1915,7 +1915,7 @@ traps:
     name: E5-110-IESCOMMON-MIB::adslAturLofClear
     category: state_change
     severity: notice
-    description: ATU-R Loss of Framing cleared on {_HOSTNAME}.
+    description: ADSL ATU-R Loss of Framing cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1923,7 +1923,7 @@ traps:
     name: E5-110-IESCOMMON-MIB::adslAtucLosClear
     category: state_change
     severity: notice
-    description: ADSL ATU-C loss of signal cleared on {_HOSTNAME}.
+    description: ADSL ATU-C loss of signal cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1931,29 +1931,29 @@ traps:
     name: E5-110-IESCOMMON-MIB::adslAturLosClear
     category: state_change
     severity: notice
-    description: ATU-R Loss of Signal cleared on {_HOSTNAME}.
+    description: ADSL ATU-R Loss of Signal cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.0.34
     name: E5-110-IESCOMMON-MIB::adslAturLprClear
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: ATU-R Loss of Power cleared on {_HOSTNAME}.
+    description: ADSL ATU-R Loss of Power cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.12.3.1
     name: E5-110-TRAPS-MIB::eqptHWMonitorFailure
     category: diagnostic
-    severity: err
-    description: Hardware monitor diagnosis failed on {_HOSTNAME}.
+    severity: crit
+    description: Hardware monitor diagnosis failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.12.4.1
     name: E5-110-TRAPS-MIB::sysMacAntiSpoofing
     category: security
     severity: warning
-    description: MAC anti-spoofing detected for {sysMacAntiSpoofMAC} on {_HOSTNAME}.
+    description: MAC anti-spoofing detected for {{value "sysMacAntiSpoofMAC"}} on {{hostname}}.
     status: current
     varbinds:
       - sysMacAntiSpoofOrig
@@ -1963,31 +1963,31 @@ traps:
     name: E5-110-TRAPS-MIB::sysAlarmCutoffEnable
     category: state_change
     severity: notice
-    description: Alarm cutoff is activated on {_HOSTNAME}.
+    description: Alarm cutoff is activated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.12.4.3
     name: E5-110-TRAPS-MIB::sysAlarmClearEnable
     category: state_change
     severity: notice
-    description: Alarm clear activated on {_HOSTNAME}.
+    description: Alarm clear is activated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.12.4.4
     name: E5-110-TRAPS-MIB::sysLoginFailure
     category: auth
     severity: warning
-    description: User login failed from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: User login failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.12.4.5
     name: E5-110-TRAPS-MIB::sysAlarmSvrtyChange
-    category: diagnostic
-    severity: notice
-    description: Alarm severity changed on {_HOSTNAME}.
+    category: state_change
+    severity: warning
+    description: Alarm severity changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.1.12.9.2
     name: E5-110-TRAPS-MIB::e5AlarmNotify
     category: diagnostic
     severity: warning
-    description: Alarm {e5AlarmText} with severity {e5AlarmSeverity} on {_HOSTNAME}.
+    description: E5 device alarm {{value "e5AlarmText"}} on {{hostname}}.
     status: current
     varbinds:
       - e5AlarmObjectClass
@@ -2005,7 +2005,7 @@ traps:
     name: E5-111-IESCOMMON-MIB::reboot
     category: state_change
     severity: notice
-    description: System is rebooting due to {iesProblemCause} on {_HOSTNAME}.
+    description: System is going to reboot{{with value "iesProblemCause"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesProblemCause
@@ -2015,7 +2015,7 @@ traps:
     name: E5-111-IESCOMMON-MIB::systemShutdown
     category: state_change
     severity: alert
-    description: System shutdown initiated due to {iesProblemCause} on {_HOSTNAME}.
+    description: System is shutting down{{with value "iesProblemCause"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesProblemCause
@@ -2024,8 +2024,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.0.3
     name: E5-111-IESCOMMON-MIB::overheat
     category: diagnostic
-    severity: warning
-    description: System overheated with temperature {iesSysTempCurValue} on {_HOSTNAME}.
+    severity: alert
+    description: System overheated with temperature {{value "iesSysTempCurValue"}}°C on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2043,8 +2043,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.0.4
     name: E5-111-IESCOMMON-MIB::overheatOver
     category: diagnostic
-    severity: warning
-    description: Overheat condition cleared for sensor {iesSysTempIndex} with current temperature {iesSysTempCurValue} on {_HOSTNAME}.
+    severity: notice
+    description: Overheat condition resolved, current temperature {{value "iesSysTempCurValue"}}°C on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2062,8 +2062,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.0.5
     name: E5-111-IESCOMMON-MIB::errLog
     category: diagnostic
-    severity: warning
-    description: Error log created with cause {iesProblemCause} on {_HOSTNAME}.
+    severity: err
+    description: Error log created with cause {{value "iesProblemCause"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesProblemCause
@@ -2073,7 +2073,7 @@ traps:
     name: E5-111-IESCOMMON-MIB::fanRpmLow
     category: diagnostic
     severity: warning
-    description: Fan {iesFanRpmIndex} reported low RPM {iesFanRpmCurValue} on {_HOSTNAME}.
+    description: Fan {{value "iesFanRpmIndex"}} RPM is low at {{value "iesFanRpmCurValue"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2089,7 +2089,7 @@ traps:
     name: E5-111-IESCOMMON-MIB::fanRpmNormal
     category: diagnostic
     severity: notice
-    description: Fan {iesFanRpmIndex} RPM returned to normal at {iesFanRpmCurValue} on {_HOSTNAME}.
+    description: Fan {{value "iesFanRpmIndex"}} RPM returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2104,8 +2104,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.0.8
     name: E5-111-IESCOMMON-MIB::voltageOutOfRange
     category: diagnostic
-    severity: warning
-    description: Voltage {iesVoltageCurValue} out of range on slot {iesSlotId} on {_HOSTNAME}.
+    severity: crit
+    description: System voltage out of range at {{value "iesVoltageCurValue"}} mV on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2124,7 +2124,7 @@ traps:
     name: E5-111-IESCOMMON-MIB::voltageNormal
     category: diagnostic
     severity: notice
-    description: Voltage normal condition cleared for slot {iesSlotId} on {_HOSTNAME}.
+    description: Voltage normal condition restored on slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2143,7 +2143,7 @@ traps:
     name: E5-111-IESCOMMON-MIB::systemMaintenanceFailure
     category: diagnostic
     severity: err
-    description: System maintenance operation failed with cause {iesProblemCause} on chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    description: 'System maintenance operation failed{{with value "iesProblemCause"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: iesChassisId
@@ -2159,7 +2159,7 @@ traps:
     name: E5-111-IESCOMMON-MIB::configChange
     category: config_change
     severity: notice
-    description: Configuration data changed for slot {iesSlotId} on {_HOSTNAME}.
+    description: Module configuration changed{{with value "iesSlotId"}} on slot {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2175,7 +2175,7 @@ traps:
     name: E5-111-IESCOMMON-MIB::moduleUp
     category: state_change
     severity: notice
-    description: Module in slot {iesSlotId} of chassis {iesChassisId} came up on {_HOSTNAME}.
+    description: Module in slot {{value "iesSlotId"}} came up on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2187,8 +2187,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.0.13
     name: E5-111-IESCOMMON-MIB::moduleDown
     category: diagnostic
-    severity: err
-    description: Module in slot {iesSlotId} of chassis {iesChassisId} reported failure on {_HOSTNAME}.
+    severity: crit
+    description: Module failure detected in slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2201,7 +2201,7 @@ traps:
     name: E5-111-IESCOMMON-MIB::modulePlugIn
     category: state_change
     severity: notice
-    description: Module plugged into chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    description: Module plugged into slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2212,9 +2212,9 @@ traps:
         type: INTEGER
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.0.15
     name: E5-111-IESCOMMON-MIB::modulePullOut
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Module pulled out from chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    description: Module pulled out from slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2227,43 +2227,43 @@ traps:
     name: E5-111-IESCOMMON-MIB::powerDC48VAFailure
     category: diagnostic
     severity: crit
-    description: DC 48V power supply failure detected on {_HOSTNAME}.
+    description: DC 48V power supply failure on the right side of the main chassis on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.0.17
     name: E5-111-IESCOMMON-MIB::powerDC48VANormal
     category: diagnostic
     severity: notice
-    description: DC 48V power supply status returned to normal on {_HOSTNAME}.
+    description: DC 48V power supply on the right side of the main chassis is in normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.0.18
     name: E5-111-IESCOMMON-MIB::powerDC48VBFailure
     category: diagnostic
-    severity: err
-    description: DC 48V power supply failure detected on {_HOSTNAME}.
+    severity: crit
+    description: DC 48V power supply failure on the left side of the main chassis on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.0.19
     name: E5-111-IESCOMMON-MIB::powerDC48VBNormal
     category: diagnostic
     severity: notice
-    description: DC 48V power supply status returned to normal on {_HOSTNAME}.
+    description: DC 48V power supply returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.0.20
     name: E5-111-IESCOMMON-MIB::extAlarmInputTrigger
     category: diagnostic
     severity: warning
-    description: External alarm input triggered on {_HOSTNAME}.
+    description: External alarm input triggered on MSC card on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.0.21
     name: E5-111-IESCOMMON-MIB::extAlarmInputRelease
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: External alarm input released on {_HOSTNAME}.
+    description: External alarm input released on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.0.22
     name: E5-111-IESCOMMON-MIB::thermalSensorFailure
     category: diagnostic
-    severity: err
-    description: Thermal sensor failure detected in chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    severity: crit
+    description: Thermal sensor failure detected on slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2276,7 +2276,7 @@ traps:
     name: E5-111-IESCOMMON-MIB::mscSwitchOverOK
     category: state_change
     severity: notice
-    description: MSC card switch over completed on slot {iesSlotId} on {_HOSTNAME}.
+    description: MSC card switch over succeeded on slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2289,45 +2289,45 @@ traps:
     name: E5-111-IESCOMMON-MIB::networkTopologyChange
     category: state_change
     severity: notice
-    description: Network topology changed on {_HOSTNAME}.
+    description: Network topology changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.0.25
     name: E5-111-IESCOMMON-MIB::adslAtucLof
-    category: state_change
-    severity: warning
-    description: ATU-C Loss of Framing detected on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: ADSL ATU-C Loss of Framing detected on interface {{value "ifIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.0.26
     name: E5-111-IESCOMMON-MIB::adslAturLof
-    category: state_change
-    severity: err
-    description: ATU-R Loss of Framing detected on interface {ifIndex} on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: ATU-R Loss of Framing detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.0.27
     name: E5-111-IESCOMMON-MIB::adslAtucLos
-    category: state_change
-    severity: err
-    description: ADSL ATU-C Loss of Signal detected on interface {ifIndex} on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: ADSL ATU-C loss of signal detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.0.28
     name: E5-111-IESCOMMON-MIB::adslAturLos
-    category: state_change
-    severity: warning
-    description: ADSL ATU-R Loss of Signal detected on interface {ifIndex} on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: ADSL ATU-R loss of signal detected on interface {{value "ifIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.0.29
     name: E5-111-IESCOMMON-MIB::adslAturLpr
     category: diagnostic
-    severity: err
-    description: ATU-R Loss of Power detected on interface {ifIndex} on {_HOSTNAME}.
+    severity: crit
+    description: ADSL ATU-R loss of power detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2335,7 +2335,7 @@ traps:
     name: E5-111-IESCOMMON-MIB::adslAtucLofClear
     category: state_change
     severity: notice
-    description: ATU-C Loss of Framing cleared on {_HOSTNAME}.
+    description: ADSL ATU-C Loss of Framing cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2343,7 +2343,7 @@ traps:
     name: E5-111-IESCOMMON-MIB::adslAturLofClear
     category: state_change
     severity: notice
-    description: ATU-R Loss of Framing cleared on {_HOSTNAME}.
+    description: ADSL ATU-R Loss of Framing cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2351,7 +2351,7 @@ traps:
     name: E5-111-IESCOMMON-MIB::adslAtucLosClear
     category: state_change
     severity: notice
-    description: ATU-C Loss of Signal cleared on interface {ifIndex} on {_HOSTNAME}.
+    description: ADSL ATU-C Loss of Signal cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2359,7 +2359,7 @@ traps:
     name: E5-111-IESCOMMON-MIB::adslAturLosClear
     category: state_change
     severity: notice
-    description: ADSL ATU-R loss of signal cleared on {_HOSTNAME}.
+    description: ADSL ATU-R Loss of Signal cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2367,21 +2367,21 @@ traps:
     name: E5-111-IESCOMMON-MIB::adslAturLprClear
     category: state_change
     severity: notice
-    description: ADSL ATU-R loss of power cleared on {_HOSTNAME}.
+    description: ADSL ATU-R Loss of Power cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.12.3.1
     name: E5-111-TRAPS-MIB::eqptHWMonitorFailure
     category: diagnostic
-    severity: err
-    description: Hardware monitor diagnosis failed on {_HOSTNAME}.
+    severity: crit
+    description: Hardware monitor diagnosis failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.12.4.1
     name: E5-111-TRAPS-MIB::sysMacAntiSpoofing
     category: security
-    severity: warning
-    description: 'MAC anti-spoofing detected: MAC {sysMacAntiSpoofMAC} moved from {sysMacAntiSpoofOrig} to {sysMacAntiSpoofNew} on {_HOSTNAME}.'
+    severity: alert
+    description: MAC anti-spoofing detected for {{value "sysMacAntiSpoofMAC"}} on {{hostname}}.
     status: current
     varbinds:
       - name: sysMacAntiSpoofOrig
@@ -2397,31 +2397,31 @@ traps:
     name: E5-111-TRAPS-MIB::sysAlarmCutoffEnable
     category: state_change
     severity: notice
-    description: Alarm cutoff activated on {_HOSTNAME}.
+    description: Alarm cutoff is activated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.12.4.3
     name: E5-111-TRAPS-MIB::sysAlarmClearEnable
     category: state_change
     severity: notice
-    description: Alarm clear activated on {_HOSTNAME}.
+    description: Alarm clear is activated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.12.4.4
     name: E5-111-TRAPS-MIB::sysLoginFailure
     category: auth
     severity: warning
-    description: User login failed on {_HOSTNAME}.
+    description: User login failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.12.4.5
     name: E5-111-TRAPS-MIB::sysAlarmSvrtyChange
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Alarm severity changed on {_HOSTNAME}.
+    description: Alarm severity changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.12.7.1
     name: E5-111-TRAPS-MIB::voipBatteryFail
     category: diagnostic
-    severity: err
-    description: Battery fault detected on chassis {iesChassisId} slot {iesSlotId} device {voipDevId} on {_HOSTNAME}.
+    severity: warning
+    description: VoIP battery fault detected on device {{value "voipDevId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2436,7 +2436,7 @@ traps:
     name: E5-111-TRAPS-MIB::voipBatteryClear
     category: diagnostic
     severity: notice
-    description: Battery fault cleared for device {voipDevId} on {_HOSTNAME}.
+    description: VoIP battery fault cleared on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2450,8 +2450,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.12.7.3
     name: E5-111-TRAPS-MIB::voipClockFail
     category: diagnostic
-    severity: err
-    description: Clock fault detected on chassis {iesChassisId} slot {iesSlotId} device {voipDevId} on {_HOSTNAME}.
+    severity: warning
+    description: Clock fault detected on {{first (value "voipDevId") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2465,7 +2465,7 @@ traps:
     name: E5-111-TRAPS-MIB::voipClockClear
     category: diagnostic
     severity: notice
-    description: Clock fault cleared for device {voipDevId} on slot {iesSlotId} on {_HOSTNAME}.
+    description: Clock fault released on {{first (value "iesChassisId") "chassis"}} {{first (value "iesSlotId") "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2478,8 +2478,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.12.7.5
     name: E5-111-TRAPS-MIB::voipRingerFault
     category: diagnostic
-    severity: err
-    description: Ringer fault detected with count {voipCount} on chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    severity: warning
+    description: VoIP ringer fault detected with {{value "voipCount"}} faults on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2493,7 +2493,7 @@ traps:
     name: E5-111-TRAPS-MIB::voipRingerClear
     category: diagnostic
     severity: warning
-    description: Ringer fault released with {voipCount} faults on chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    description: VoIP ringer fault released{{with value "voipCount"}} count {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2507,7 +2507,7 @@ traps:
     name: E5-111-TRAPS-MIB::voipTempError
     category: diagnostic
     severity: warning
-    description: Temperature error detected on chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    description: Temperature error detected on {{first (value "iesChassisId") "chassis"}} {{first (value "iesSlotId") "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2522,7 +2522,7 @@ traps:
     name: E5-111-TRAPS-MIB::voipTempClear
     category: diagnostic
     severity: warning
-    description: Temperature error release for phone state {voipPhoneState} on slot {iesSlotId} on {_HOSTNAME}.
+    description: Temperature error cleared on {{first (value "iesSlotId") "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2536,8 +2536,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.12.7.9
     name: E5-111-TRAPS-MIB::voipDcPowerFail
     category: diagnostic
-    severity: err
-    description: DC power failure detected on chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    severity: alert
+    description: DC power error detected on {{first (value "iesChassisId") "chassis"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2551,8 +2551,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.12.7.10
     name: E5-111-TRAPS-MIB::voipDcPowerClear
     category: diagnostic
-    severity: notice
-    description: DC power error cleared for chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    severity: warning
+    description: DC power error cleared on {{first (value "iesSlotId") "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2566,8 +2566,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.12.7.11
     name: E5-111-TRAPS-MIB::voipAcPowerFail
     category: diagnostic
-    severity: warning
-    description: DC power error on chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    severity: alert
+    description: DC power failure detected on {{first (value "iesChassisId") "chassis"}} slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2581,8 +2581,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.2.12.7.12
     name: E5-111-TRAPS-MIB::voipAcPowerClear
     category: diagnostic
-    severity: warning
-    description: DC power error cleared for phone state {voipPhoneState} on {_HOSTNAME}.
+    severity: notice
+    description: DC power error cleared on {{first (value "iesChassisId") "chassis"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2597,7 +2597,7 @@ traps:
     name: E5-111-TRAPS-MIB::e5AlarmNotify
     category: diagnostic
     severity: warning
-    description: Alarm {e5AlarmText} with severity {e5AlarmSeverity} detected on {_HOSTNAME}.
+    description: E5 device alarm {{value "e5AlarmText"}} on {{hostname}}.
     status: current
     varbinds:
       - name: e5AlarmObjectClass
@@ -2637,7 +2637,7 @@ traps:
     name: E5-120-IESCOMMON-MIB::reboot
     category: state_change
     severity: notice
-    description: System shutdown initiated due to {iesProblemCause} on {_HOSTNAME}.
+    description: System is shutting down{{with value "iesProblemCause"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesProblemCause
@@ -2646,8 +2646,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.0.2
     name: E5-120-IESCOMMON-MIB::systemShutdown
     category: state_change
-    severity: notice
-    description: System shutdown initiated due to {iesProblemCause} on {_HOSTNAME}.
+    severity: emerg
+    description: System is shutting down{{with value "iesProblemCause"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesProblemCause
@@ -2656,8 +2656,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.0.3
     name: E5-120-IESCOMMON-MIB::overheat
     category: diagnostic
-    severity: warning
-    description: System temperature {iesSysTempCurValue} Celsius detected on slot {iesSlotId} on {_HOSTNAME}.
+    severity: alert
+    description: System overheated with temperature {{value "iesSysTempCurValue"}}°C on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2676,7 +2676,7 @@ traps:
     name: E5-120-IESCOMMON-MIB::overheatOver
     category: diagnostic
     severity: notice
-    description: Overheat condition cleared for sensor {iesSysTempIndex} with temperature {iesSysTempCurValue} on {_HOSTNAME}.
+    description: Overheat condition cleared for sensor {{value "iesSysTempIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2694,8 +2694,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.0.5
     name: E5-120-IESCOMMON-MIB::errLog
     category: diagnostic
-    severity: warning
-    description: 'System error log created: {iesProblemCause} on {_HOSTNAME}.'
+    severity: err
+    description: System error log created with cause {{value "iesProblemCause"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesProblemCause
@@ -2705,7 +2705,7 @@ traps:
     name: E5-120-IESCOMMON-MIB::fanRpmLow
     category: diagnostic
     severity: warning
-    description: Fan {iesFanRpmIndex} RPM {iesFanRpmCurValue} is too low on {_HOSTNAME}.
+    description: Fan {{value "iesFanRpmIndex"}} RPM is low at {{value "iesFanRpmCurValue"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2721,7 +2721,7 @@ traps:
     name: E5-120-IESCOMMON-MIB::fanRpmNormal
     category: diagnostic
     severity: notice
-    description: Fan {iesFanRpmIndex} RPM condition returned to normal at {iesFanRpmCurValue} on {_HOSTNAME}.
+    description: Fan {{value "iesFanRpmIndex"}} RPM returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2737,7 +2737,7 @@ traps:
     name: E5-120-IESCOMMON-MIB::voltageOutOfRange
     category: diagnostic
     severity: warning
-    description: Voltage {iesVoltageCurValue} out of range on slot {iesSlotId} on {_HOSTNAME}.
+    description: System voltage out of range at {{value "iesVoltageCurValue"}} mV on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2756,7 +2756,7 @@ traps:
     name: E5-120-IESCOMMON-MIB::voltageNormal
     category: diagnostic
     severity: notice
-    description: Voltage sensor {iesVoltageIndex} returned to normal state with value {iesVoltageCurValue} on {_HOSTNAME}.
+    description: Voltage normal condition restored on slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2775,7 +2775,7 @@ traps:
     name: E5-120-IESCOMMON-MIB::systemMaintenanceFailure
     category: diagnostic
     severity: err
-    description: System maintenance operation failed with cause {iesProblemCause} on slot {iesSlotId} on {_HOSTNAME}.
+    description: 'System maintenance operation failed{{with value "iesProblemCause"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: iesChassisId
@@ -2791,7 +2791,7 @@ traps:
     name: E5-120-IESCOMMON-MIB::configChange
     category: config_change
     severity: notice
-    description: Configuration data changed for chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    description: Module configuration changed{{with value "iesSlotId"}} on slot {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2807,7 +2807,7 @@ traps:
     name: E5-120-IESCOMMON-MIB::moduleUp
     category: state_change
     severity: notice
-    description: Module in slot {iesSlotId} of chassis {iesChassisId} came up on {_HOSTNAME}.
+    description: Module in slot {{value "iesSlotId"}} came up on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2819,8 +2819,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.0.13
     name: E5-120-IESCOMMON-MIB::moduleDown
     category: diagnostic
-    severity: err
-    description: Module in slot {iesSlotId} of chassis {iesChassisId} reported failure on {_HOSTNAME}.
+    severity: crit
+    description: Module failure detected in slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2833,7 +2833,7 @@ traps:
     name: E5-120-IESCOMMON-MIB::modulePlugIn
     category: state_change
     severity: notice
-    description: Module plugged into slot {iesSlotId} on {_HOSTNAME}.
+    description: Module plugged into slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2845,8 +2845,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.0.15
     name: E5-120-IESCOMMON-MIB::modulePullOut
     category: state_change
-    severity: warning
-    description: Module pulled out from chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    severity: alert
+    description: Module pulled out from slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2859,43 +2859,43 @@ traps:
     name: E5-120-IESCOMMON-MIB::powerDC48VAFailure
     category: diagnostic
     severity: crit
-    description: DC 48V power supply failure detected on {_HOSTNAME}.
+    description: DC 48V power supply failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.0.17
     name: E5-120-IESCOMMON-MIB::powerDC48VANormal
     category: diagnostic
     severity: notice
-    description: DC 48V power supply status returned to normal on {_HOSTNAME}.
+    description: DC 48V power supply on the right side of the main chassis returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.0.18
     name: E5-120-IESCOMMON-MIB::powerDC48VBFailure
     category: diagnostic
     severity: crit
-    description: DC 48V power supply failure detected on {_HOSTNAME}.
+    description: DC 48V power supply failure on the left side of the main chassis on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.0.19
     name: E5-120-IESCOMMON-MIB::powerDC48VBNormal
     category: diagnostic
     severity: notice
-    description: DC 48V power supply status returned to normal on {_HOSTNAME}.
+    description: DC 48V power supply on the left side of the main chassis is in normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.0.20
     name: E5-120-IESCOMMON-MIB::extAlarmInputTrigger
     category: diagnostic
     severity: warning
-    description: External alarm input on MSC card triggered on {_HOSTNAME}.
+    description: External alarm input triggered on MSC card on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.0.21
     name: E5-120-IESCOMMON-MIB::extAlarmInputRelease
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: External alarm input released on {_HOSTNAME}.
+    description: External alarm input released on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.0.22
     name: E5-120-IESCOMMON-MIB::thermalSensorFailure
     category: diagnostic
-    severity: err
-    description: Thermal sensor failure detected on chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    severity: crit
+    description: Thermal sensor failure detected on chassis {{value "iesChassisId"}} slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2908,7 +2908,7 @@ traps:
     name: E5-120-IESCOMMON-MIB::mscSwitchOverOK
     category: state_change
     severity: notice
-    description: MSC card switch over completed on slot {iesSlotId} on {_HOSTNAME}.
+    description: MSC card switch-over succeeded on slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -2921,45 +2921,45 @@ traps:
     name: E5-120-IESCOMMON-MIB::networkTopologyChange
     category: state_change
     severity: notice
-    description: Network topology changed on {_HOSTNAME}.
+    description: Network topology changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.0.25
     name: E5-120-IESCOMMON-MIB::adslAtucLof
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: ADSL ATU-C loss of framing detected on {_HOSTNAME}.
+    description: ADSL ATU-C loss of framing detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.0.26
     name: E5-120-IESCOMMON-MIB::adslAturLof
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: ATU-R Loss of Framing detected on interface {ifIndex} on {_HOSTNAME}.
+    description: ADSL ATU-R loss of framing detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.0.27
     name: E5-120-IESCOMMON-MIB::adslAtucLos
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: ATU-C Loss of Signal detected on interface {ifIndex} on {_HOSTNAME}.
+    description: ADSL ATU-C loss of signal detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.0.28
     name: E5-120-IESCOMMON-MIB::adslAturLos
     category: state_change
-    severity: warning
-    description: ATU-R Loss of Signal detected on interface {ifIndex} on {_HOSTNAME}.
+    severity: crit
+    description: ADSL ATU-R Loss of Signal detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.0.29
     name: E5-120-IESCOMMON-MIB::adslAturLpr
     category: diagnostic
-    severity: err
-    description: ADSL ATU-R loss of power detected on {_HOSTNAME}.
+    severity: crit
+    description: ADSL ATU-R loss of power detected on {{first (value "ifIndex") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2967,7 +2967,7 @@ traps:
     name: E5-120-IESCOMMON-MIB::adslAtucLofClear
     category: state_change
     severity: notice
-    description: ATU-C Loss of Framing cleared on interface {ifIndex} on {_HOSTNAME}.
+    description: ADSL ATU-C Loss of Framing cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2975,7 +2975,7 @@ traps:
     name: E5-120-IESCOMMON-MIB::adslAturLofClear
     category: state_change
     severity: notice
-    description: ATU-R Loss of Framing cleared on interface {ifIndex} on {_HOSTNAME}.
+    description: ADSL ATU-R Loss of Framing cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2983,7 +2983,7 @@ traps:
     name: E5-120-IESCOMMON-MIB::adslAtucLosClear
     category: state_change
     severity: notice
-    description: ATU-C Loss of Signal cleared on interface {ifIndex} on {_HOSTNAME}.
+    description: ADSL ATU-C Loss of Signal cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2991,29 +2991,29 @@ traps:
     name: E5-120-IESCOMMON-MIB::adslAturLosClear
     category: state_change
     severity: notice
-    description: ATU-R Loss of Signal cleared on {_HOSTNAME}.
+    description: ADSL ATU-R Loss of Signal cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.0.34
     name: E5-120-IESCOMMON-MIB::adslAturLprClear
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: ADSL ATU-R loss of power cleared on {_HOSTNAME}.
+    description: ADSL ATU-R Loss of Power cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.12.3.1
     name: E5-120-TRAPS-MIB::eqptHWMonitorFailure
     category: diagnostic
-    severity: err
-    description: Hardware monitor diagnosis failed on {_HOSTNAME}.
+    severity: crit
+    description: Hardware monitor diagnosis failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.12.4.1
     name: E5-120-TRAPS-MIB::sysMacAntiSpoofing
     category: security
     severity: warning
-    description: MAC anti-spoofing violation detected for MAC {sysMacAntiSpoofMAC} on {_HOSTNAME}.
+    description: MAC anti-spoofing detected for {{value "sysMacAntiSpoofMAC"}} on {{hostname}}.
     status: current
     varbinds:
       - name: sysMacAntiSpoofOrig
@@ -3029,31 +3029,31 @@ traps:
     name: E5-120-TRAPS-MIB::sysAlarmCutoffEnable
     category: state_change
     severity: notice
-    description: Alarm cutoff activated on {_HOSTNAME}.
+    description: Alarm cutoff is activated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.12.4.3
     name: E5-120-TRAPS-MIB::sysAlarmClearEnable
     category: state_change
     severity: notice
-    description: Alarm clear activated on {_HOSTNAME}.
+    description: Alarm clear is activated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.12.4.4
     name: E5-120-TRAPS-MIB::sysLoginFailure
     category: auth
     severity: warning
-    description: User login failed from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: User login failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.12.4.5
     name: E5-120-TRAPS-MIB::sysAlarmSvrtyChange
-    category: diagnostic
-    severity: notice
-    description: Alarm severity changed on {_HOSTNAME}.
+    category: state_change
+    severity: warning
+    description: Alarm severity changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.3.12.8.1
     name: E5-120-TRAPS-MIB::cfmCcmError
     category: diagnostic
     severity: warning
-    description: CFM CCM error {intfCfmCcmErrorCause} on MEP {dot1agCfmMepIdentifier} on {_HOSTNAME}.
+    description: CFM CCM error detected on {{trap_interface}} with cause {{value "intfCfmCcmErrorCause"}} on {{hostname}}.
     status: current
     varbinds:
       - dot1agCfmMdMdLevel
@@ -3064,7 +3064,7 @@ traps:
     name: E5-120-TRAPS-MIB::e5AlarmNotify
     category: diagnostic
     severity: warning
-    description: Alarm {e5AlarmText} with severity {e5AlarmSeverity} on {_HOSTNAME}.
+    description: E5 device alarm {{value "e5AlarmText"}} on {{hostname}}.
     status: current
     varbinds:
       - name: e5AlarmObjectClass
@@ -3103,8 +3103,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.0.1
     name: E5-121-IESCOMMON-MIB::reboot
     category: state_change
-    severity: emerg
-    description: System shutdown initiated due to {iesProblemCause} on {_HOSTNAME}.
+    severity: notice
+    description: System is shutting down{{with value "iesProblemCause"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesProblemCause
@@ -3113,8 +3113,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.0.2
     name: E5-121-IESCOMMON-MIB::systemShutdown
     category: state_change
-    severity: notice
-    description: System shutdown initiated due to {iesProblemCause} on {_HOSTNAME}.
+    severity: emerg
+    description: System is shutting down{{with value "iesProblemCause"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesProblemCause
@@ -3123,8 +3123,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.0.3
     name: E5-121-IESCOMMON-MIB::overheat
     category: diagnostic
-    severity: warning
-    description: System overheated with temperature {iesSysTempCurValue} on {_HOSTNAME}.
+    severity: alert
+    description: System overheated with temperature {{value "iesSysTempCurValue"}}°C on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3143,7 +3143,7 @@ traps:
     name: E5-121-IESCOMMON-MIB::overheatOver
     category: diagnostic
     severity: notice
-    description: Overheat condition cleared with current temperature {iesSysTempCurValue} on {_HOSTNAME}.
+    description: Overheat condition resolved with current temperature {{value "iesSysTempCurValue"}}C on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3161,8 +3161,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.0.5
     name: E5-121-IESCOMMON-MIB::errLog
     category: diagnostic
-    severity: warning
-    description: System error log created with cause {iesProblemCause} on {_HOSTNAME}.
+    severity: err
+    description: System error log created with cause {{value "iesProblemCause"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesProblemCause
@@ -3172,7 +3172,7 @@ traps:
     name: E5-121-IESCOMMON-MIB::fanRpmLow
     category: diagnostic
     severity: warning
-    description: Fan {iesFanRpmIndex} RPM {iesFanRpmCurValue} is too low on {_HOSTNAME}.
+    description: Fan {{value "iesFanRpmIndex"}} RPM is low at {{value "iesFanRpmCurValue"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3188,7 +3188,7 @@ traps:
     name: E5-121-IESCOMMON-MIB::fanRpmNormal
     category: diagnostic
     severity: notice
-    description: Fan low-rpm condition resolved with current rpm {iesFanRpmCurValue} on {_HOSTNAME}.
+    description: Fan {{value "iesFanRpmIndex"}} RPM condition returned to normal on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3203,8 +3203,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.0.8
     name: E5-121-IESCOMMON-MIB::voltageOutOfRange
     category: diagnostic
-    severity: warning
-    description: Voltage {iesVoltageCurValue} out of range for sensor {iesVoltageIndex} on {_HOSTNAME}.
+    severity: crit
+    description: System voltage out of range at {{value "iesVoltageCurValue"}} mV on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3223,7 +3223,7 @@ traps:
     name: E5-121-IESCOMMON-MIB::voltageNormal
     category: diagnostic
     severity: notice
-    description: Voltage condition normalized on slot {iesSlotId} with current value {iesVoltageCurValue} on {_HOSTNAME}.
+    description: Voltage normal condition restored on slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3242,7 +3242,7 @@ traps:
     name: E5-121-IESCOMMON-MIB::systemMaintenanceFailure
     category: diagnostic
     severity: err
-    description: System maintenance operation failed with cause {iesProblemCause} on chassis {iesChassisId} on {_HOSTNAME}.
+    description: 'System maintenance operation failed{{with value "iesProblemCause"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: iesChassisId
@@ -3258,7 +3258,7 @@ traps:
     name: E5-121-IESCOMMON-MIB::configChange
     category: config_change
     severity: notice
-    description: Configuration data changed for chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    description: Module configuration changed{{with value "iesSlotId"}} on slot {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3274,7 +3274,7 @@ traps:
     name: E5-121-IESCOMMON-MIB::moduleUp
     category: state_change
     severity: notice
-    description: Module in slot {iesSlotId} of chassis {iesChassisId} came up on {_HOSTNAME}.
+    description: Module in slot {{value "iesSlotId"}} of chassis {{value "iesChassisId"}} came up on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3285,9 +3285,9 @@ traps:
         type: INTEGER
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.0.13
     name: E5-121-IESCOMMON-MIB::moduleDown
-    category: state_change
+    category: diagnostic
     severity: crit
-    description: Module in chassis {iesChassisId} slot {iesSlotId} is down on {_HOSTNAME}.
+    description: Module failure detected in slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3298,9 +3298,9 @@ traps:
         type: INTEGER
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.0.14
     name: E5-121-IESCOMMON-MIB::modulePlugIn
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Module plugged into slot {iesSlotId} on {_HOSTNAME}.
+    description: Module plugged into slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3312,8 +3312,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.0.15
     name: E5-121-IESCOMMON-MIB::modulePullOut
     category: diagnostic
-    severity: warning
-    description: Module pulled out from chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    severity: alert
+    description: Module pulled out from slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3326,43 +3326,43 @@ traps:
     name: E5-121-IESCOMMON-MIB::powerDC48VAFailure
     category: diagnostic
     severity: crit
-    description: DC 48V power supply failure detected on {_HOSTNAME}.
+    description: DC 48V power supply failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.0.17
     name: E5-121-IESCOMMON-MIB::powerDC48VANormal
     category: diagnostic
     severity: notice
-    description: DC 48V power supply status returned to normal on {_HOSTNAME}.
+    description: DC 48V power supply on the right side of the main chassis returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.0.18
     name: E5-121-IESCOMMON-MIB::powerDC48VBFailure
     category: diagnostic
-    severity: err
-    description: DC 48V power supply failure detected on {_HOSTNAME}.
+    severity: crit
+    description: DC 48V power supply failure on the left side of the main chassis on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.0.19
     name: E5-121-IESCOMMON-MIB::powerDC48VBNormal
     category: diagnostic
     severity: notice
-    description: DC 48V power supply returned to normal state on {_HOSTNAME}.
+    description: DC 48V power supply on left side of main chassis returned to normal state on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.0.20
     name: E5-121-IESCOMMON-MIB::extAlarmInputTrigger
     category: diagnostic
     severity: warning
-    description: External alarm input triggered on MSC card on {_HOSTNAME}.
+    description: External alarm input triggered on MSC card on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.0.21
     name: E5-121-IESCOMMON-MIB::extAlarmInputRelease
     category: state_change
     severity: notice
-    description: External alarm input released on {_HOSTNAME}.
+    description: External alarm input released on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.0.22
     name: E5-121-IESCOMMON-MIB::thermalSensorFailure
     category: diagnostic
-    severity: err
-    description: Thermal sensor failure detected in chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    severity: crit
+    description: Thermal sensor failure detected on chassis {{value "iesChassisId"}} slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3375,7 +3375,7 @@ traps:
     name: E5-121-IESCOMMON-MIB::mscSwitchOverOK
     category: state_change
     severity: notice
-    description: MSC card switch-over completed successfully on slot {iesSlotId} on {_HOSTNAME}.
+    description: MSC card switch over completed on slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3388,13 +3388,13 @@ traps:
     name: E5-121-IESCOMMON-MIB::networkTopologyChange
     category: state_change
     severity: notice
-    description: Network topology changed on {_HOSTNAME}.
+    description: Network topology changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.0.25
     name: E5-121-IESCOMMON-MIB::adslAtucLof
-    category: state_change
-    severity: warning
-    description: ATU-C loss of framing detected on interface {ifIndex} on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: ADSL ATU-C loss of framing detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -3402,7 +3402,7 @@ traps:
     name: E5-121-IESCOMMON-MIB::adslAturLof
     category: state_change
     severity: crit
-    description: ATU-R Loss of Framing detected on interface {ifIndex} on {_HOSTNAME}.
+    description: ADSL ATU-R Loss of Framing detected on interface {{value "ifIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -3410,23 +3410,23 @@ traps:
     name: E5-121-IESCOMMON-MIB::adslAtucLos
     category: state_change
     severity: crit
-    description: ATU-C Loss of Signal detected on interface {ifIndex} on {_HOSTNAME}.
+    description: ADSL ATU-C loss of signal detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.0.28
     name: E5-121-IESCOMMON-MIB::adslAturLos
-    category: state_change
-    severity: warning
-    description: ADSL ATU-R loss of signal detected on interface {ifIndex} on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: ADSL ATU-R loss of signal detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.0.29
     name: E5-121-IESCOMMON-MIB::adslAturLpr
     category: diagnostic
-    severity: warning
-    description: ATU-R Loss of Power detected on interface {ifIndex} on {_HOSTNAME}.
+    severity: crit
+    description: ADSL ATU-R loss of power detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -3434,7 +3434,7 @@ traps:
     name: E5-121-IESCOMMON-MIB::adslAtucLofClear
     category: state_change
     severity: notice
-    description: ATU-C Loss of Framing cleared on {_HOSTNAME}.
+    description: ADSL ATU-C Loss of Framing cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -3442,7 +3442,7 @@ traps:
     name: E5-121-IESCOMMON-MIB::adslAturLofClear
     category: state_change
     severity: notice
-    description: ATU-R Loss of Framing cleared on {_HOSTNAME}.
+    description: ADSL ATU-R Loss of Framing cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -3450,7 +3450,7 @@ traps:
     name: E5-121-IESCOMMON-MIB::adslAtucLosClear
     category: state_change
     severity: notice
-    description: ATU-C Loss of Signal cleared on {_HOSTNAME}.
+    description: ADSL ATU-C loss of signal cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -3458,7 +3458,7 @@ traps:
     name: E5-121-IESCOMMON-MIB::adslAturLosClear
     category: state_change
     severity: notice
-    description: ADSL ATU-R Loss of Signal cleared on {_HOSTNAME}.
+    description: ADSL ATU-R Loss of Signal cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -3466,7 +3466,7 @@ traps:
     name: E5-121-IESCOMMON-MIB::adslAturLprClear
     category: state_change
     severity: notice
-    description: ATU-R Loss of Power cleared on {_HOSTNAME}.
+    description: ADSL ATU-R Loss of Power cleared on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -3474,13 +3474,13 @@ traps:
     name: E5-121-TRAPS-MIB::eqptHWMonitorFailure
     category: diagnostic
     severity: crit
-    description: Hardware monitor diagnosis failed on {_HOSTNAME}.
+    description: Hardware monitor diagnosis failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.12.4.1
     name: E5-121-TRAPS-MIB::sysMacAntiSpoofing
     category: security
-    severity: warning
-    description: MAC anti-spoofing violation detected for MAC {sysMacAntiSpoofMAC} on {_HOSTNAME}.
+    severity: alert
+    description: MAC anti-spoofing violation detected for {{value "sysMacAntiSpoofMAC"}} on {{hostname}}.
     status: current
     varbinds:
       - name: sysMacAntiSpoofOrig
@@ -3494,33 +3494,33 @@ traps:
         type: DisplayString
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.12.4.2
     name: E5-121-TRAPS-MIB::sysAlarmCutoffEnable
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Alarm cutoff activated on {_HOSTNAME}.
+    description: Alarm cutoff is activated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.12.4.3
     name: E5-121-TRAPS-MIB::sysAlarmClearEnable
     category: state_change
     severity: notice
-    description: Alarm clear activated on {_HOSTNAME}.
+    description: Alarm clear is activated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.12.4.4
     name: E5-121-TRAPS-MIB::sysLoginFailure
     category: auth
     severity: warning
-    description: User login failed from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: User login failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.12.4.5
     name: E5-121-TRAPS-MIB::sysAlarmSvrtyChange
-    category: diagnostic
-    severity: notice
-    description: Alarm severity changed on {_HOSTNAME}.
+    category: state_change
+    severity: warning
+    description: Alarm severity changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.12.7.1
     name: E5-121-TRAPS-MIB::voipBatteryFail
     category: diagnostic
-    severity: err
-    description: Battery fault detected on device {voipDevId} in chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    severity: warning
+    description: VoIP battery fault detected on device {{value "voipDevId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3539,7 +3539,7 @@ traps:
     name: E5-121-TRAPS-MIB::voipBatteryClear
     category: diagnostic
     severity: notice
-    description: Battery fault cleared for device {voipDevId} on {_HOSTNAME}.
+    description: VoIP battery fault cleared on {{first (value "voipDevId") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3557,8 +3557,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.12.7.3
     name: E5-121-TRAPS-MIB::voipClockFail
     category: diagnostic
-    severity: err
-    description: Clock fault detected on chassis {iesChassisId} slot {iesSlotId} device {voipDevId} on {_HOSTNAME}.
+    severity: crit
+    description: Clock fault detected on device {{value "voipDevId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3574,7 +3574,7 @@ traps:
     name: E5-121-TRAPS-MIB::voipClockClear
     category: diagnostic
     severity: notice
-    description: Clock fault cleared on chassis {iesChassisId} slot {iesSlotId} device {voipDevId} on {_HOSTNAME}.
+    description: Clock fault cleared on {{first (value "iesChassisId") "chassis"}} {{first (value "iesSlotId") "slot"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3590,7 +3590,7 @@ traps:
     name: E5-121-TRAPS-MIB::voipRingerFault
     category: diagnostic
     severity: warning
-    description: Ringer fault detected on slot {iesSlotId} with count {voipCount} on {_HOSTNAME}.
+    description: VoIP ringer fault detected with {{value "voipCount"}} faults on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3606,7 +3606,7 @@ traps:
     name: E5-121-TRAPS-MIB::voipRingerClear
     category: diagnostic
     severity: warning
-    description: Ringer fault cleared on chassis {iesChassisId} slot {iesSlotId} with {voipCount} faults on {_HOSTNAME}.
+    description: VoIP ringer fault cleared{{with value "voipCount"}} affecting {{.}} ringer(s){{end}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3622,7 +3622,7 @@ traps:
     name: E5-121-TRAPS-MIB::voipTempError
     category: diagnostic
     severity: warning
-    description: Temperature error detected on chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    description: Temperature error detected on {{first (value "iesChassisId") "chassis"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3639,7 +3639,7 @@ traps:
     name: E5-121-TRAPS-MIB::voipTempClear
     category: diagnostic
     severity: notice
-    description: Temperature error cleared for chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    description: Temperature error cleared on {{first (value "iesChassisId") "chassis"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3656,7 +3656,7 @@ traps:
     name: E5-121-TRAPS-MIB::voipDcPowerFail
     category: diagnostic
     severity: alert
-    description: DC power error detected on chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    description: DC power error detected on {{first (value "iesChassisId") "chassis"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3673,7 +3673,7 @@ traps:
     name: E5-121-TRAPS-MIB::voipDcPowerClear
     category: diagnostic
     severity: notice
-    description: DC power error cleared for chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    description: DC power error cleared on {{first (value "iesChassisId") "chassis"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3689,8 +3689,8 @@ traps:
   - oid: 1.3.6.1.4.1.6321.1.2.3.4.12.7.11
     name: E5-121-TRAPS-MIB::voipAcPowerFail
     category: diagnostic
-    severity: err
-    description: DC power failure detected on chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    severity: alert
+    description: DC power error detected on chassis {{value "iesChassisId"}} slot {{value "iesSlotId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3707,7 +3707,7 @@ traps:
     name: E5-121-TRAPS-MIB::voipAcPowerClear
     category: diagnostic
     severity: warning
-    description: DC power error release on chassis {iesChassisId} slot {iesSlotId} on {_HOSTNAME}.
+    description: DC power error cleared on {{first (value "iesChassisId") "chassis"}} on {{hostname}}.
     status: current
     varbinds:
       - name: iesChassisId
@@ -3724,7 +3724,7 @@ traps:
     name: E5-121-TRAPS-MIB::cfmCcmError
     category: diagnostic
     severity: warning
-    description: CFM CCM error detected on MEP {dot1agCfmMepIdentifier} with cause {intfCfmCcmErrorCause} on {_HOSTNAME}.
+    description: CFM CCM error detected on {{trap_interface}} with cause {{value "intfCfmCcmErrorCause"}} on {{hostname}}.
     status: current
     varbinds:
       - dot1agCfmMdMdLevel
@@ -3737,7 +3737,7 @@ traps:
     name: E5-121-TRAPS-MIB::e5AlarmNotify
     category: diagnostic
     severity: warning
-    description: Alarm {e5AlarmText} with severity {e5AlarmSeverity} on {_HOSTNAME}.
+    description: E5 device alarm {{value "e5AlarmText"}} on {{hostname}}.
     status: current
     varbinds:
       - name: e5AlarmObjectClass
@@ -3777,7 +3777,7 @@ traps:
     name: AE-ALARM-TABLE-MIB::aeTrapRegistration
     category: state_change
     severity: notice
-    description: ONT {aeTrapOntLabel} registration state changed to {aeTrapOntState} on {_HOSTNAME}.
+    description: ONT registration event received on {{hostname}}.
     status: current
     varbinds:
       - aeTrapFsanSerialNumber
@@ -3803,7 +3803,7 @@ traps:
     name: AE-ALARM-TABLE-MIB::aeTrapAlarm
     category: diagnostic
     severity: warning
-    description: Alarm {aeTrapText} with severity {aeTrapAlarmSeverityLevel} on equipment {aeTrapEquipmentType} on {_HOSTNAME}.
+    description: ONT alarm {{value "aeTrapAlarmType"}} {{value "aeTrapAlarmStatus"}} on {{value "aeTrapEquipmentType"}} on {{hostname}}.
     status: current
     varbinds:
       - aeTrapSequenceNo

@@ -13,7 +13,7 @@ traps:
     name: SEH-PSRV-MIB::prtFault
     category: diagnostic
     severity: warning
-    description: Printer error state changed with {pprtError} on {_HOSTNAME}.
+    description: Printer error state changed{{with value "pprtError"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - pprtError

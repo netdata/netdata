@@ -340,8 +340,8 @@ traps:
   - oid: 1.3.6.1.4.1.15.0.1
     name: XYLOGICS-TRAP-MIB::suspectAttackTrap
     category: security
-    severity: warning
-    description: User {anxTrapUserName} disabled due to suspected attack on {_HOSTNAME}.
+    severity: alert
+    description: Suspected attack detected for user {{value "anxTrapUserName"}} on {{hostname}}.
     status: current
     varbinds:
       - anxTrapUserName
@@ -353,8 +353,8 @@ traps:
   - oid: 1.3.6.1.4.1.15.0.2
     name: XYLOGICS-TRAP-MIB::acpdbmerrorTrap
     category: diagnostic
-    severity: err
-    description: Database error {anxTrapDbErrcode} ({anxTrapDbErrmsg}) on {_HOSTNAME}.
+    severity: crit
+    description: Database error {{value "anxTrapDbErrmsg"}} on {{hostname}}.
     status: current
     varbinds:
       - anxTrapDbErrcode
@@ -363,7 +363,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::wanAlarmTrap
     category: diagnostic
     severity: warning
-    description: WAN alarm detected on interface {anxt1WanIndex} with status {dsx1LineStatus} on {_HOSTNAME}.
+    description: WAN alarm detected on interface {{first (value "dsx1LineStatus") "WAN"}} on {{hostname}}.
     status: current
     varbinds:
       - dsx1LineStatus
@@ -372,7 +372,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::wanAlarmClearTrap
     category: state_change
     severity: notice
-    description: WAN alarm cleared on {_HOSTNAME}.
+    description: WAN alarm cleared on {{first (value "anxt1WanIndex") "WAN"}} on {{hostname}}.
     status: current
     varbinds:
       - dsx1LineStatus
@@ -381,7 +381,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::wanBpvThreshTrap
     category: diagnostic
     severity: warning
-    description: Bipolar violation count {anxt1CurrentBpvs} exceeded threshold {wanBpvThreshold} on {_HOSTNAME}.
+    description: WAN BPV error count {{value "anxt1CurrentBpvs"}} exceeded threshold {{value "wanBpvThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - anxt1CurrentBpvs
@@ -391,7 +391,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::wanBpvClearTrap
     category: diagnostic
     severity: notice
-    description: Bipolar violation count {anxt1CurrentBpvs} cleared for WAN index {anxt1WanIndex} below threshold {wanBpvThreshold} on {_HOSTNAME}.
+    description: WAN BPV errors cleared below threshold {{value "wanBpvThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - anxt1CurrentBpvs
@@ -401,7 +401,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::wanOofThreshTrap
     category: diagnostic
     severity: warning
-    description: Out of frame errors {anxt1CurrentOofs} exceeded threshold {wanOofThreshold} on WAN index {anxt1WanIndex} on {_HOSTNAME}.
+    description: WAN Out Of Frame errors reached {{value "wanOofThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - anxt1CurrentOofs
@@ -411,7 +411,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::wanOofClearTrap
     category: diagnostic
     severity: notice
-    description: WAN interface {anxt1WanIndex} frame error count {anxt1CurrentOofs} remained below threshold {wanOofThreshold} on {_HOSTNAME}.
+    description: WAN Out Of Frame condition cleared on interface {{first (value "anxt1WanIndex") "WAN"}} on {{hostname}}.
     status: current
     varbinds:
       - anxt1CurrentOofs
@@ -421,7 +421,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::wanEsThreshTrap
     category: diagnostic
     severity: warning
-    description: WAN errored seconds {dsx1CurrentESs} exceeded threshold {wanEsThreshold} on {_HOSTNAME}.
+    description: WAN interface {{first (value "anxt1WanIndex") "link"}} errored seconds {{value "dsx1CurrentESs"}} exceeded threshold {{value "wanEsThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - dsx1CurrentESs
@@ -430,8 +430,8 @@ traps:
   - oid: 1.3.6.1.4.1.15.0.11
     name: XYLOGICS-TRAP-MIB::wanEsClearTrap
     category: diagnostic
-    severity: notice
-    description: WAN interface {anxt1WanIndex} cleared errored seconds threshold {wanEsThreshold} on {_HOSTNAME}.
+    severity: info
+    description: WAN interface {{first (value "anxt1WanIndex") "link"}} errored seconds cleared on {{hostname}}.
     status: current
     varbinds:
       - dsx1CurrentESs
@@ -439,9 +439,9 @@ traps:
       - anxt1WanIndex
   - oid: 1.3.6.1.4.1.15.0.12
     name: XYLOGICS-TRAP-MIB::callBeginTrap
-    category: mobility
+    category: state_change
     severity: notice
-    description: Call initiated on channel {anxt1ChanNumber} to {actcallCalledNumber} on {_HOSTNAME}.
+    description: Call session began on channel {{value "anxt1ChanNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - anxt1ChanIndex
@@ -456,7 +456,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::callEndTrap
     category: state_change
     severity: notice
-    description: Call {callHistIndex} terminated with reason {callHistDisconnectReason} on {_HOSTNAME}.
+    description: Call terminated{{with value "callHistDisconnectReason"}} with reason {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - callHistIndex
@@ -475,7 +475,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::unexpectDisconnectTrap
     category: state_change
     severity: warning
-    description: Call {callHistIndex} disconnected unexpectedly due to {callHistDisconnectReason} on {_HOSTNAME}.
+    description: Call on {{first (value "callHistDeviceType") "channel"}} disconnected unexpectedly due to {{value "callHistDisconnectReason"}} on {{hostname}}.
     status: current
     varbinds:
       - callHistIndex
@@ -490,7 +490,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::forcedCallDisconnectTrap
     category: state_change
     severity: notice
-    description: Call {callHistIndex} disconnected due to inactivity on {_HOSTNAME}.
+    description: Call disconnected due to inactivity on {{first (value "callHistCallingNumber") (value "callHistCalledNumber") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - callHistIndex
@@ -505,14 +505,14 @@ traps:
   - oid: 1.3.6.1.4.1.15.0.16
     name: XYLOGICS-TRAP-MIB::nodeUnreachableTrap
     category: diagnostic
-    severity: warning
-    description: Node unreachable detected via {TRAP_NAME} on {_HOSTNAME}.
+    severity: crit
+    description: Node unreachable detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.15.0.17
     name: XYLOGICS-TRAP-MIB::wanCvThreshTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: CRC6 error count {dsx1CurrentPCVs} exceeded threshold {wanCvThreshold} on {_HOSTNAME}.
+    description: WAN CV threshold exceeded with {{value "dsx1CurrentPCVs"}} errors on {{hostname}}.
     status: current
     varbinds:
       - dsx1CurrentPCVs
@@ -522,7 +522,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::wanCvClearTrap
     category: diagnostic
     severity: notice
-    description: WAN interface {anxt1WanIndex} path coding violations {dsx1CurrentPCVs} below threshold {wanCvThreshold} on {_HOSTNAME}.
+    description: WAN CV threshold cleared for interface {{first (value "anxt1WanIndex") "WAN"}} on {{hostname}}.
     status: current
     varbinds:
       - dsx1CurrentPCVs
@@ -530,9 +530,9 @@ traps:
       - anxt1WanIndex
   - oid: 1.3.6.1.4.1.15.0.19
     name: XYLOGICS-TRAP-MIB::wanEsfThreshTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: ESF error count {anxt1CurrentEsfs} exceeded threshold {wanEsfThreshold} on {_HOSTNAME}.
+    description: ESF error count {{value "anxt1CurrentEsfs"}} reached threshold {{value "wanEsfThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - anxt1CurrentEsfs
@@ -541,8 +541,8 @@ traps:
   - oid: 1.3.6.1.4.1.15.0.20
     name: XYLOGICS-TRAP-MIB::wanEsfClearTrap
     category: diagnostic
-    severity: notice
-    description: ESF error count {anxt1CurrentEsfs} remained below threshold {wanEsfThreshold} on {_HOSTNAME}.
+    severity: info
+    description: ESF error count remained below threshold {{value "wanEsfThreshold"}} on interface {{first (value "anxt1WanIndex") "WAN"}} on {{hostname}}.
     status: current
     varbinds:
       - anxt1CurrentEsfs
@@ -550,9 +550,9 @@ traps:
       - anxt1WanIndex
   - oid: 1.3.6.1.4.1.15.0.21
     name: XYLOGICS-TRAP-MIB::wanSesThreshTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Severely errored seconds {dsx1CurrentSESs} on WAN index {anxt1WanIndex} reached threshold {wanSesThreshold} on {_HOSTNAME}.
+    description: WAN severely errored seconds threshold exceeded with {{value "dsx1CurrentSESs"}} on {{hostname}}.
     status: current
     varbinds:
       - dsx1CurrentSESs
@@ -561,8 +561,8 @@ traps:
   - oid: 1.3.6.1.4.1.15.0.22
     name: XYLOGICS-TRAP-MIB::waSesClearTrap
     category: diagnostic
-    severity: notice
-    description: WAN interface {anxt1WanIndex} SES count {dsx1CurrentSESs} did not exceed threshold {wanSesThreshold} on {_HOSTNAME}.
+    severity: info
+    description: WAN SES count {{value "dsx1CurrentSESs"}} remained below threshold {{value "wanSesThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - dsx1CurrentSESs
@@ -572,7 +572,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::wanUasThreshTrap
     category: diagnostic
     severity: warning
-    description: Unavailable seconds {dsx1CurrentUASs} exceeded threshold {wanUasThreshold} on WAN index {anxt1WanIndex} on {_HOSTNAME}.
+    description: WAN interface {{first (value "anxt1WanIndex") "link"}} unavailable seconds {{value "dsx1CurrentUASs"}} exceeded threshold {{value "wanUasThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - dsx1CurrentUASs
@@ -582,7 +582,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::wanUasClearTrap
     category: diagnostic
     severity: notice
-    description: WAN UAS cleared for {anxt1WanIndex} with {dsx1CurrentUASs} unavailable seconds on {_HOSTNAME}.
+    description: WAN Unavailable Seconds cleared on {{first (value "anxt1WanIndex") "WAN"}} interface on {{hostname}}.
     status: current
     varbinds:
       - dsx1CurrentUASs
@@ -590,9 +590,9 @@ traps:
       - anxt1WanIndex
   - oid: 1.3.6.1.4.1.15.0.25
     name: XYLOGICS-TRAP-MIB::wanBesThreshTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Bursty errored seconds {dsx1CurrentBESs} exceeded threshold {wanBesThreshold} on {_HOSTNAME}.
+    description: WAN bursty errored seconds {{value "dsx1CurrentBESs"}} exceeded threshold {{value "wanBesThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - dsx1CurrentBESs
@@ -602,7 +602,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::wanBesClearTrap
     category: diagnostic
     severity: notice
-    description: Bursty errored seconds {dsx1CurrentBESs} remained below threshold {wanBesThreshold} on {_HOSTNAME}.
+    description: Bursty errored seconds cleared below threshold on {{first (value "anxt1WanIndex") "WAN"}} on {{hostname}}.
     status: current
     varbinds:
       - dsx1CurrentBESs
@@ -612,7 +612,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::wanLofcThreshTrap
     category: diagnostic
     severity: warning
-    description: WAN link loss of frame count {anxt1CurrentLofcs} exceeded threshold {wanLofcThreshold} on {_HOSTNAME}.
+    description: WAN loss of framing count {{value "anxt1CurrentLofcs"}} exceeded threshold {{value "wanLofcThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - anxt1CurrentLofcs
@@ -622,7 +622,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::wanLofcClearTrap
     category: diagnostic
     severity: notice
-    description: WAN loss of frame count {anxt1CurrentLofcs} cleared below threshold {wanLofcThreshold} on {_HOSTNAME}.
+    description: WAN loss of frame count cleared below threshold on {{hostname}}.
     status: current
     varbinds:
       - anxt1CurrentLofcs
@@ -630,9 +630,9 @@ traps:
       - anxt1WanIndex
   - oid: 1.3.6.1.4.1.15.0.29
     name: XYLOGICS-TRAP-MIB::wanCssThreshTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DS1 interface {anxt1WanIndex} controlled slip seconds {dsx1CurrentCSSs} exceeded threshold {wanCssThreshold} on {_HOSTNAME}.
+    description: WAN CSS threshold exceeded with {{value "dsx1CurrentCSSs"}} CSSs on {{hostname}}.
     status: current
     varbinds:
       - dsx1CurrentCSSs
@@ -642,7 +642,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::wanCssClearTrap
     category: diagnostic
     severity: notice
-    description: DS1 interface {anxt1WanIndex} CSS count {dsx1CurrentCSSs} remained below threshold {wanCssThreshold} on {_HOSTNAME}.
+    description: DS1 interface {{first (value "anxt1WanIndex") "WAN"}} CSSs within threshold on {{hostname}}.
     status: current
     varbinds:
       - dsx1CurrentCSSs
@@ -652,7 +652,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::wanFailWanTrap
     category: diagnostic
     severity: crit
-    description: WAN module {anxt1WanIndex} failed initialization on {_HOSTNAME}.
+    description: WAN module {{value "anxt1WanIndex"}} failed initialization on {{hostname}}.
     status: current
     varbinds:
       - anxt1WanIndex
@@ -660,7 +660,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::wanMdmErrorThreshTrap
     category: diagnostic
     severity: warning
-    description: Modem {mdmNumber} consecutive failure count {mdmStatConsecFail} exceeded threshold {mdmErrorTrapThresh} on {_HOSTNAME}.
+    description: Modem {{value "mdmNumber"}} consecutive failure count {{value "mdmStatConsecFail"}} exceeded threshold {{value "mdmErrorTrapThresh"}} on {{hostname}}.
     status: current
     varbinds:
       - mdmStatConsecFail
@@ -670,7 +670,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::modemUnavailableTrap
     category: diagnostic
     severity: warning
-    description: No modems available for call on channel {anxt1ChanNumber} on {_HOSTNAME}.
+    description: No modems available to handle an incoming call on {{hostname}}.
     status: current
     varbinds:
       - anxt1ChanIndex
@@ -681,7 +681,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::ds0ErrorThresholdTrap
     category: diagnostic
     severity: warning
-    description: DS0 consecutive call failures {anxt1ChanConsecFail} exceeded threshold {ds0ErrorThreshold} on channel {anxt1ChanNumber} on {_HOSTNAME}.
+    description: DS0 channel {{value "anxt1ChanNumber"}} consecutive call failures reached threshold on {{hostname}}.
     status: current
     varbinds:
       - anxt1ChanConsecFail
@@ -692,7 +692,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::afderrorTrap
     category: diagnostic
     severity: crit
-    description: 'Catastrophic AFD error on WAN module {anxt1WanIndex}: {trapAfdMsg} on {_HOSTNAME}.'
+    description: Catastrophic WAN module download error on {{first (value "anxt1WanIndex") "WAN module"}} on {{hostname}}.
     status: current
     varbinds:
       - anxt1WanIndex
@@ -700,8 +700,8 @@ traps:
   - oid: 1.3.6.1.4.1.15.0.36
     name: XYLOGICS-TRAP-MIB::dvsConnectFailure
     category: diagnostic
-    severity: err
-    description: DVS connection failure detected on {_HOSTNAME}.
+    severity: crit
+    description: DVS connection failure detected on {{hostname}}.
     status: current
     varbinds:
       - sysDescr
@@ -709,7 +709,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::ss7GwConnectTrap
     category: state_change
     severity: notice
-    description: Successfully connected to SS7 gateway {ss7CurrentGateway} on {_HOSTNAME}.
+    description: SS7 gateway connected to {{value "ss7CurrentGateway"}} on {{hostname}}.
     status: current
     varbinds:
       - ss7CurrentGateway
@@ -717,7 +717,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::ss7GwDisconnectTrap
     category: state_change
     severity: alert
-    description: SS7 gateway connection lost to {ss7CurrentGateway} on {_HOSTNAME}.
+    description: SS7 gateway connection lost to {{value "ss7CurrentGateway"}} on {{hostname}}.
     status: current
     varbinds:
       - ss7CurrentGateway
@@ -725,7 +725,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::operModemImageVersTrap
     category: diagnostic
     severity: notice
-    description: Operational image version {operImageModemImage} reported on {_HOSTNAME}.
+    description: Operational and modem image version updated to {{value "operImageModemImage"}} on {{hostname}}.
     status: current
     varbinds:
       - operImageModemImage
@@ -733,7 +733,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::wanVersionTrap
     category: state_change
     severity: notice
-    description: WAN version {wanVersion} indicates link is up on {_HOSTNAME}.
+    description: WAN interface came up with version {{value "wanVersion"}} on {{hostname}}.
     status: current
     varbinds:
       - wanVersion
@@ -741,7 +741,7 @@ traps:
     name: XYLOGICS-TRAP-MIB::nfasBackupStatusTrap
     category: state_change
     severity: notice
-    description: NFAS switch-over status changed to {nfasBackupStatus} on {_HOSTNAME}.
+    description: NFAS switch-over status changed to {{value "nfasBackupStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - nfasBackupStatus

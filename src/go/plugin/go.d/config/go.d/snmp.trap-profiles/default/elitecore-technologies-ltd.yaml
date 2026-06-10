@@ -9,113 +9,113 @@ traps:
     name: CYBEROAM-MIB::highCpuUsage
     category: diagnostic
     severity: warning
-    description: High CPU usage detected on {_HOSTNAME}.
+    description: High CPU usage detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.2.1
     name: CYBEROAM-MIB::highConfDiskUsage
     category: diagnostic
     severity: warning
-    description: High disk usage detected on {_HOSTNAME}.
+    description: High disk usage detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.2.2
     name: CYBEROAM-MIB::highSigDiskUsage
     category: diagnostic
     severity: warning
-    description: High disk usage detected on {_HOSTNAME}.
+    description: High disk usage detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.2.3
     name: CYBEROAM-MIB::highReportDiskUsage
     category: diagnostic
     severity: warning
-    description: High disk usage reported on {_HOSTNAME}.
+    description: High disk usage reported on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.3.1
     name: CYBEROAM-MIB::highPhyMemUsage
     category: diagnostic
     severity: warning
-    description: High physical memory usage detected on {_HOSTNAME}.
+    description: High physical memory usage detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.3.2
     name: CYBEROAM-MIB::highSwapMemUsage
     category: diagnostic
     severity: warning
-    description: High swap memory usage detected on {_HOSTNAME}.
+    description: High swap memory usage detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.4.1
     name: CYBEROAM-MIB::httpVirus
     category: security
-    severity: warning
-    description: HTTP virus detected on {_HOSTNAME}.
+    severity: alert
+    description: HTTP virus detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.4.2
     name: CYBEROAM-MIB::smtpVirus
     category: security
-    severity: warning
-    description: SMTP virus detected on {_HOSTNAME}.
+    severity: alert
+    description: SMTP virus detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.4.3
     name: CYBEROAM-MIB::pop3Virus
     category: security
     severity: alert
-    description: POP3 virus detected on {_HOSTNAME}.
+    description: POP3 virus detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.4.4
     name: CYBEROAM-MIB::imap4Virus
     category: security
     severity: alert
-    description: Virus detected by {TRAP_NAME} on {_HOSTNAME}.
+    description: IMAP4 virus detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.4.5
     name: CYBEROAM-MIB::ftpVirus
     category: security
-    severity: warning
-    description: FTP virus detected on {_HOSTNAME}.
+    severity: alert
+    description: FTP virus detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.5.1
     name: CYBEROAM-MIB::gwLiveDead
     category: state_change
-    severity: warning
-    description: Gateway live/dead status changed on {_HOSTNAME}.
+    severity: alert
+    description: Gateway live/dead state changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.6.1
     name: CYBEROAM-MIB::idpAlert
     category: security
-    severity: warning
-    description: Intrusion Detection System alert {TRAP_NAME} detected on {_HOSTNAME}.
+    severity: alert
+    description: Intrusion detection alert triggered on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.7.1
     name: CYBEROAM-MIB::synFlood
     category: security
     severity: alert
-    description: SYN flood attack detected from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: SYN flood attack detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.7.2
     name: CYBEROAM-MIB::tcpFlood
     category: security
     severity: alert
-    description: TCP flood attack detected on {_HOSTNAME}.
+    description: TCP flood attack detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.7.3
     name: CYBEROAM-MIB::udpFlood
     category: security
-    severity: warning
-    description: UDP flood detected on {_HOSTNAME}.
+    severity: alert
+    description: UDP flood attack detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.7.4
     name: CYBEROAM-MIB::icmpFlood
     category: security
     severity: alert
-    description: ICMP flood attack detected from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: ICMP flood attack detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.8.1
     name: CYBEROAM-MIB::opcodeFail
     category: diagnostic
     severity: err
-    description: Opcode failure detected on {_HOSTNAME}.
+    description: Opcode processing failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.21067.2.1.4.8.2
     name: CYBEROAM-MIB::serviceFail
     category: diagnostic
     severity: crit
-    description: Service failure detected on {_HOSTNAME}.
+    description: Service failure detected on {{hostname}}.
     status: current

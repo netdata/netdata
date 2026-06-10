@@ -107,7 +107,7 @@ traps:
     name: MEF-SOAM-PM-MIB::mefSoamAvailabilityChangeAlarm
     category: state_change
     severity: warning
-    description: SOAM availability state changed for forward status {mefSoamLmMeasuredStatsAvailForwardStatus} on {_HOSTNAME}.
+    description: MEF SOAM availability state changed for PM session on {{hostname}}.
     status: current
     varbinds:
       - mefSoamPmNotificationObjDateAndTime
@@ -125,7 +125,7 @@ traps:
     name: MEF-SOAM-PM-MIB::mefSoamLmSessionStartStopAlarm
     category: state_change
     severity: notice
-    description: LM session state changed to {mefSoamLmCfgSessionStatus} on {_HOSTNAME}.
+    description: LM session status changed to {{value "mefSoamLmCfgSessionStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - mefSoamLmCfgSessionStatus
@@ -135,7 +135,7 @@ traps:
     name: MEF-SOAM-PM-MIB::mefSoamDmSessionStartStopAlarm
     category: state_change
     severity: notice
-    description: DM session status changed to {mefSoamDmCfgSessionStatus} on {_HOSTNAME}.
+    description: DM session status changed to {{value "mefSoamDmCfgSessionStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - mefSoamDmCfgSessionStatus
@@ -143,9 +143,9 @@ traps:
       - mefSoamPmNotificationObjDestinationMep
   - oid: 1.3.6.1.4.1.15007.1.3.0.4
     name: MEF-SOAM-PM-MIB::mefSoamPmThresholdCrossingAlarm
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Performance threshold exceeded for {mefSoamPmNotificationObjThresholdId} with value {mefSoamPmNotificationObjThresholdValue} on {_HOSTNAME}.
+    description: Performance threshold crossing alarm triggered on {{value "mefSoamPmNotificationObjSuspect"}} on {{hostname}}.
     status: current
     varbinds:
       - mefSoamPmNotificationObjCrossingType
@@ -159,7 +159,7 @@ traps:
     name: MEF-UNI-EVC-MIB::mefServiceConfigurationAlarm
     category: config_change
     severity: notice
-    description: MEF service configuration {mefServiceNotificationConfigurationChangeType} detected on {_HOSTNAME}.
+    description: MEF service configuration {{value "mefServiceNotificationConfigurationChangeType"}} on {{hostname}}.
     status: current
     varbinds:
       - mefServiceNotificationObjDateAndTime

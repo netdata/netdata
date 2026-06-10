@@ -22,7 +22,7 @@ traps:
     name: AXIS-VIDEO-MIB::alarmNew
     category: diagnostic
     severity: warning
-    description: Alarm {alarmName} generated with text {alarmText} on {_HOSTNAME}.
+    description: Alarm {{value "alarmName"}} triggered with text {{value "alarmText"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmID
@@ -32,7 +32,7 @@ traps:
     name: AXIS-VIDEO-MIB::alarmCleared
     category: state_change
     severity: notice
-    description: Alarm {alarmName} cleared on {_HOSTNAME}.
+    description: Alarm {{value "alarmName"}} cleared on {{hostname}}.
     status: current
     varbinds:
       - alarmID
@@ -40,9 +40,9 @@ traps:
       - alarmText
   - oid: 1.3.6.1.4.1.368.4.2.0.3
     name: AXIS-VIDEO-MIB::alarmSingle
-    category: security
+    category: diagnostic
     severity: warning
-    description: New alarm {alarmName} with text {alarmText} generated on {_HOSTNAME}.
+    description: Alarm {{value "alarmName"}} triggered with text {{value "alarmText"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmID

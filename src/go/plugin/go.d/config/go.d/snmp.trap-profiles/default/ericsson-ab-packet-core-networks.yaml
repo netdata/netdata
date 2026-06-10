@@ -49,7 +49,7 @@ traps:
     name: GGSN-MIB::ggsnTrapNew
     category: diagnostic
     severity: warning
-    description: Alarm {ggsnAlarmName} with severity {ggsnAlarmSeverity} detected on {ggsnAlarmObjectClass} {ggsnAlarmObjectInstance} on {_HOSTNAME}.
+    description: Alarm {{value "ggsnAlarmName"}} reported on {{value "ggsnAlarmObjectInstance"}} on {{hostname}}.
     status: current
     varbinds:
       - ggsnAlarmId
@@ -62,9 +62,9 @@ traps:
       - ggsnAlarmDescription
   - oid: 1.3.6.1.4.1.10923.1.1.2.2
     name: GGSN-MIB::ggsnTrapChanged
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Alarm {ggsnAlarmName} with severity {ggsnAlarmSeverity} reported on {_HOSTNAME}.
+    description: Alarm {{value "ggsnAlarmName"}} changed on {{hostname}}.
     status: current
     varbinds:
       - ggsnAlarmId
@@ -77,9 +77,9 @@ traps:
       - ggsnAlarmDescription
   - oid: 1.3.6.1.4.1.10923.1.1.2.3
     name: GGSN-MIB::ggsnTrapCleared
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Alarm {ggsnAlarmName} with ID {ggsnAlarmId} cleared on {_HOSTNAME}.
+    description: Alarm {{value "ggsnAlarmName"}} cleared on {{hostname}}.
     status: current
     varbinds:
       - ggsnAlarmId

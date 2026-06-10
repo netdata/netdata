@@ -1837,7 +1837,7 @@ traps:
     name: METASWITCH-MIB::alarmTrap
     category: diagnostic
     severity: warning
-    description: Alarm {alarmTrapDisplayName} reported {alarmTrapDescription} on {_HOSTNAME}.
+    description: Alarm {{value "alarmTrapDescription"}} on {{first (value "alarmTrapDisplayName") "element"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmTrapElementName
@@ -1878,7 +1878,7 @@ traps:
     name: METASWITCH-MIB::alarmShortTrap
     category: diagnostic
     severity: warning
-    description: Alarm {alarmShortTrapDisplayName} with severity {alarmShortTrapSeverity} detected on {_HOSTNAME}.
+    description: Alarm condition detected on {{value "alarmShortTrapDisplayName"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmShortTrapElementInstance

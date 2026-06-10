@@ -1170,7 +1170,7 @@ traps:
     name: PRVT-SWITCH-MIB::cpuTemperatureExceeded
     category: diagnostic
     severity: warning
-    description: CPU temperature {reportsHardwareTemperature} exceeded threshold on {_HOSTNAME}.
+    description: CPU temperature exceeded threshold at {{value "reportsHardwareTemperature"}} degrees Celsius on {{hostname}}.
     status: current
     varbinds:
       - reportsHardwareTemperature
@@ -1178,7 +1178,7 @@ traps:
     name: PRVT-SWITCH-MIB::powerSupplyStatusChange
     category: diagnostic
     severity: warning
-    description: Power supply status changed to {reportsHardwarePSStatus} on {_HOSTNAME}.
+    description: Power supply status changed to {{value "reportsHardwarePSStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - reportsHardwarePSStatus
@@ -1186,7 +1186,7 @@ traps:
     name: PRVT-SWITCH-MIB::fanStatusChange
     category: diagnostic
     severity: warning
-    description: Fan status changed to {reportsHardwareFanStatus} on {_HOSTNAME}.
+    description: Fan status changed to {{value "reportsHardwareFanStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - reportsHardwareFanStatus
@@ -1194,7 +1194,7 @@ traps:
     name: PRVT-SWITCH-MIB::portSecurityViolation
     category: security
     severity: warning
-    description: Port security violation detected on interface {ifIndex} on {_HOSTNAME}.
+    description: Port security violation detected on interface {{first (value "ifIndex") "unknown"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1202,7 +1202,7 @@ traps:
     name: PRVT-SWITCH-MIB::portRedundantLinkChange
     category: state_change
     severity: warning
-    description: Redundant link {reportsL2IfaceLink} changed state from {ifOperStatus} to {ifAdminStatus} on {_HOSTNAME}.
+    description: Redundant link state changed to {{value "ifOperStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ifAdminStatus
@@ -1212,7 +1212,7 @@ traps:
     name: PRVT-SWITCH-MIB::sysIntfModuleChange
     category: state_change
     severity: notice
-    description: System interface module {sysIntfModule} status changed on {_HOSTNAME}.
+    description: System interface module {{value "sysIntfModule"}} status changed on {{hostname}}.
     status: current
     varbinds:
       - sysIntfModule
@@ -1220,21 +1220,21 @@ traps:
     name: PRVT-SWITCH-MIB::prvtLogNotifyFull
     category: diagnostic
     severity: warning
-    description: Log buffer is almost full on {_HOSTNAME}.
+    description: Log buffer is almost full on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.738.1.5.100.0.8
     name: PRVT-SWITCH-MIB::doorStatusChange
-    category: diagnostic
+    category: security
     severity: warning
-    description: Door status changed to {reportsHardwareDoorStatus} on {_HOSTNAME}.
+    description: Door status changed to {{value "reportsHardwareDoorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - reportsHardwareDoorStatus
   - oid: 1.3.6.1.4.1.738.1.5.102.0.1
     name: PRVT-RESILIENT-LINK-MIB::resilientLinkStatusChange
     category: state_change
-    severity: notice
-    description: Resilient link {resilientLinkIndex} status changed with active port {resilientLinkCurrentActivePort} on {_HOSTNAME}.
+    severity: warning
+    description: Resilient link {{value "resilientLinkIndex"}} status changed on {{hostname}}.
     status: current
     varbinds:
       - resilientLinkIndex
@@ -1242,9 +1242,9 @@ traps:
       - resilientLinkCurrentActivePort
   - oid: 1.3.6.1.4.1.738.1.5.103.0.1
     name: PRVT-UPS-MIB::upsStatusChange
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: UPS status changed with {upsConnectedStatus} and {upsBatteryStorageStatus} on {_HOSTNAME}.
+    description: UPS status changed on {{hostname}}.
     status: current
     varbinds:
       - upsConnectedStatus
@@ -1255,7 +1255,7 @@ traps:
     name: PRVT-PORTS-AGGREGATION-MIB::lagMemberLinkUp
     category: state_change
     severity: notice
-    description: LAG member link became up on {_HOSTNAME}.
+    description: LAG member link became up on {{hostname}}.
     status: current
     varbinds:
       - name: ifIndex
@@ -1270,7 +1270,7 @@ traps:
     name: PRVT-PORTS-AGGREGATION-MIB::lagMemberLinkDown
     category: state_change
     severity: warning
-    description: LAG member link down on {_HOSTNAME}.
+    description: LAG member link went down on {{hostname}}.
     status: current
     varbinds:
       - name: ifIndex
@@ -1285,7 +1285,7 @@ traps:
     name: PRVT-PORTS-AGGREGATION-MIB::lagMemberAdd
     category: state_change
     severity: notice
-    description: Port member added to link aggregation group {ifIndex} on {_HOSTNAME}.
+    description: Port member added to LAG trunk on {{hostname}}.
     status: current
     varbinds:
       - name: ifIndex
@@ -1298,7 +1298,7 @@ traps:
     name: PRVT-PORTS-AGGREGATION-MIB::lagMemberRemove
     category: state_change
     severity: notice
-    description: Port member removed from trunk interface {ifIndex} on {_HOSTNAME}.
+    description: Port member removed from link aggregation group on {{hostname}}.
     status: current
     varbinds:
       - name: ifIndex
@@ -1311,19 +1311,19 @@ traps:
     name: PRVT-SPANNING-TREE-MIB::stTopologyChange
     category: state_change
     severity: notice
-    description: STP topology change detected on {_HOSTNAME}.
+    description: Spanning tree topology change detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.738.1.5.107.0.2
     name: PRVT-SPANNING-TREE-MIB::stNewRoot
     category: state_change
     severity: notice
-    description: Device elected as new Spanning Tree root on {_HOSTNAME}.
+    description: Device elected as new Spanning Tree root on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.738.1.5.107.0.3
     name: PRVT-SPANNING-TREE-MIB::mstTopologyChange
     category: state_change
     severity: notice
-    description: Topology change detected on port {prvtStMInstPortStatRole} after {prvtStTimeSinceTopologyChange} seconds on {_HOSTNAME}.
+    description: MST topology change detected{{with value "prvtStMInstPortStatRole"}} on port role {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - prvtStMInstPortStatRole
@@ -1332,7 +1332,7 @@ traps:
     name: PRVT-SPANNING-TREE-MIB::mstNewRoot
     category: state_change
     severity: notice
-    description: MSTP elected new root on port {prvtStMInstPortStatRole} on {_HOSTNAME}.
+    description: Device elected as new MSTP root on {{hostname}}.
     status: current
     varbinds:
       - prvtStMInstPortStatRole
@@ -1340,7 +1340,7 @@ traps:
     name: PRVT-MAC-SECURITY-MIB::portSecurityWmarkViolation
     category: security
     severity: warning
-    description: Port security watermark violation on interface {prvtMacSecIfName} on {_HOSTNAME}.
+    description: Port security watermark violation on interface {{value "prvtMacSecIfName"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtMacSecIfName
@@ -1348,7 +1348,7 @@ traps:
     name: PRVT-MAC-SECURITY-MIB::portSecurityViolation
     category: security
     severity: warning
-    description: Port security violation on interface {prvtMacSecIfName} on {_HOSTNAME}.
+    description: Port security violation detected on interface {{value "prvtMacSecIfName"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtMacSecIfName
@@ -1356,7 +1356,7 @@ traps:
     name: PRVT-CES-MIB::prvtCESDsx1Alarm
     category: diagnostic
     severity: warning
-    description: TDM port error {prvtCESDsx1AlarmValue} exceeded threshold {prvtCESDsx1AlarmThreshold} on {_HOSTNAME}.
+    description: TDM port error condition {{value "prvtCESDsx1AlarmValue"}} exceeded threshold {{value "prvtCESDsx1AlarmThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtCESDsx1AlarmVariable
@@ -1366,23 +1366,23 @@ traps:
     name: PRVT-CES-MIB::prvtCESModuleAvailable
     category: diagnostic
     severity: notice
-    description: CES module {prvtCESModuleIndex} is available on {_HOSTNAME}.
+    description: CES module {{value "prvtCESModuleIndex"}} became available on {{hostname}}.
     status: current
     varbinds:
       - prvtCESModuleIndex
   - oid: 1.3.6.1.4.1.738.1.5.111.0.3
     name: PRVT-CES-MIB::prvtCESModuleUnAvailableDueExtract
     category: diagnostic
-    severity: err
-    description: CES module {prvtCESModuleIndex} unavailable due to extraction on {_HOSTNAME}.
+    severity: warning
+    description: CES module {{value "prvtCESModuleIndex"}} unavailable due to extraction on {{hostname}}.
     status: current
     varbinds:
       - prvtCESModuleIndex
   - oid: 1.3.6.1.4.1.738.1.5.111.0.4
     name: PRVT-CES-MIB::prvtCESModuleUnAvailableDueReload
     category: diagnostic
-    severity: err
-    description: CES module {prvtCESModuleIndex} unavailable due to reload on {_HOSTNAME}.
+    severity: crit
+    description: CES module {{value "prvtCESModuleIndex"}} unavailable due to reload on {{hostname}}.
     status: current
     varbinds:
       - prvtCESModuleIndex
@@ -1390,7 +1390,7 @@ traps:
     name: PRVT-DRY-CONTACTS-MIB::stateChanged
     category: state_change
     severity: warning
-    description: Dry-contact sensor {prvtName} status changed to {prvtAlarmStatus} on {_HOSTNAME}.
+    description: Dry contact sensor {{value "prvtName"}} status changed to {{value "prvtAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtAlarmID
@@ -1403,7 +1403,7 @@ traps:
     name: PRVT-STATISTICS-CES-MIB::prvtSonetSectionAlarms
     category: state_change
     severity: warning
-    description: Sonet section alarm {prvtSonetSectionAlarmType} status changed to {prvtSonetSectionAlarmStatus} on {_HOSTNAME}.
+    description: Sonet section alarm {{value "prvtSonetSectionAlarmType"}} status is {{value "prvtSonetSectionAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1413,7 +1413,7 @@ traps:
     name: PRVT-STATISTICS-CES-MIB::prvtSonetLineAlarms
     category: state_change
     severity: warning
-    description: Sonet line alarm {prvtSonetLineAlarmType} status changed to {prvtSonetLineAlarmStatus} on {_HOSTNAME}.
+    description: Sonet line alarm {{value "prvtSonetLineAlarmType"}} status is {{value "prvtSonetLineAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1423,7 +1423,7 @@ traps:
     name: PRVT-STATISTICS-CES-MIB::prvtSonetPathAlarms
     category: state_change
     severity: warning
-    description: Sonet Path alarm {prvtSonetPathAlarmType} on interface {ifIndex} changed status to {prvtSonetPathAlarmStatus} on {_HOSTNAME}.
+    description: Sonet path alarm {{value "prvtSonetPathAlarmType"}} status is {{value "prvtSonetPathAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1433,7 +1433,7 @@ traps:
     name: PRVT-STATISTICS-CES-MIB::prvtSonetVTAlarms
     category: state_change
     severity: warning
-    description: Sonet VT alarm {prvtSonetVTAlarmType} status changed to {prvtSonetVTAlarmStatus} on {_HOSTNAME}.
+    description: Sonet VT {{value "prvtSonetVTAlarmType"}} alarm {{value "prvtSonetVTAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1443,24 +1443,24 @@ traps:
     name: PRVT-ELMI-MIB::prvtELMIStatus
     category: state_change
     severity: notice
-    description: E-LMI status changed to {prvtELMIStatusChange} on {_HOSTNAME}.
+    description: E-LMI status changed to {{value "prvtELMIStatusChange"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtELMIEnable
       - prvtELMIStatusChange
   - oid: 1.3.6.1.4.1.738.1.5.120.0.2
     name: PRVT-ELMI-MIB::prvtELMIChangeEVC
-    category: state_change
+    category: config_change
     severity: notice
-    description: EVC {prvtELMIEVCId} status changed on {_HOSTNAME}.
+    description: CE-VLAN ID/EVC Map changed for EVC {{value "prvtELMIEVCId"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtELMIEVCId
   - oid: 1.3.6.1.4.1.738.1.5.129.0.1
     name: PRVT-Y1564-MIB::prvtY1564ProbeFailed
     category: diagnostic
-    severity: err
-    description: Y1564 probe test {prvtY1564TestType} failed with status {prvtY1564TestResultStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Y1564 {{value "prvtY1564TestType"}} probe failed on {{hostname}}.
     status: current
     varbinds:
       - prvtY1564TestType
@@ -1469,7 +1469,7 @@ traps:
     name: PRVT-Y1564-MIB::prvtY1564ProbeSuccess
     category: diagnostic
     severity: info
-    description: Y1564 probe test {prvtY1564TestType} completed successfully with status {prvtY1564TestResultStatus} on {_HOSTNAME}.
+    description: Y1564 probe test {{value "prvtY1564TestType"}} completed successfully on {{hostname}}.
     status: current
     varbinds:
       - prvtY1564TestType
@@ -1478,7 +1478,7 @@ traps:
     name: PRVT-Y1564-MIB::prvtY1564TestFinished
     category: diagnostic
     severity: notice
-    description: Y1564 test finished with status {prvtY1564TestExecStatus} on {_HOSTNAME}.
+    description: Y1564 test finished with status {{value "prvtY1564TestExecStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtY1564TestExecStatus
@@ -1486,7 +1486,7 @@ traps:
     name: PRVT-SAA-MIB::prvtSaaRFC2544ProbeFailed
     category: diagnostic
     severity: warning
-    description: SAA probe test {prvtSaaRFC2544ThroughputTestType} failed with status {prvtSaaRFC2544TestResultStatus} on {_HOSTNAME}.
+    description: SAA RFC2544 probe failed for {{value "prvtSaaRFC2544ThroughputTestType"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtSaaRFC2544ThroughputTestType
@@ -1495,7 +1495,7 @@ traps:
     name: PRVT-SAA-MIB::prvtSaaRFC2544ProbeSuccess
     category: diagnostic
     severity: info
-    description: SAA probe test {prvtSaaRFC2544ThroughputTestType} completed successfully on {_HOSTNAME}.
+    description: SAA RFC2544 probe test completed successfully on {{hostname}}.
     status: current
     varbinds:
       - prvtSaaRFC2544ThroughputTestType
@@ -1503,25 +1503,25 @@ traps:
   - oid: 1.3.6.1.4.1.738.1.5.130.0.3
     name: PRVT-SAA-MIB::prvtSaaRFC2544TestFinished
     category: diagnostic
-    severity: notice
-    description: SAA RFC2544 test finished with status {prvtSaaRFC2544ThroughputTestExecStatus} on {_HOSTNAME}.
+    severity: info
+    description: SAA RFC2544 throughput test finished with status {{value "prvtSaaRFC2544ThroughputTestExecStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtSaaRFC2544ThroughputTestExecStatus
   - oid: 1.3.6.1.4.1.738.1.5.130.0.4
     name: PRVT-SAA-MIB::prvtSaaY1731DelayNEThreshold
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Near end delay {prvtSaaY1731TestResultDelayNE} exceeded threshold {prvtSaaProfileDelayNE} on {_HOSTNAME}.
+    description: Near end delay threshold exceeded with {{value "prvtSaaY1731TestResultDelayNE"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtSaaY1731TestResultDelayNE
       - prvtSaaProfileDelayNE
   - oid: 1.3.6.1.4.1.738.1.5.130.0.5
     name: PRVT-SAA-MIB::prvtSaaY1731DelayFEThreshold
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Far end delay {prvtSaaY1731TestResultDelayFE} exceeded threshold on {_HOSTNAME}.
+    description: Far end delay threshold exceeded ({{value "prvtSaaY1731TestResultDelayFE"}} us) on {{hostname}}.
     status: current
     varbinds:
       - prvtSaaY1731TestResultDelayFE
@@ -1530,16 +1530,16 @@ traps:
     name: PRVT-SAA-MIB::prvtSaaY1731JitterNEThreshold
     category: diagnostic
     severity: warning
-    description: Near end jitter {prvtSaaY1731TestResultJitterNE} exceeded threshold on {_HOSTNAME}.
+    description: Near end jitter threshold exceeded on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - prvtSaaY1731TestResultJitterNE
       - prvtSaaProfileJitterNE
   - oid: 1.3.6.1.4.1.738.1.5.130.0.7
     name: PRVT-SAA-MIB::prvtSaaY1731JitterFEThreshold
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Far end jitter {prvtSaaY1731TestResultJitterFE} exceeded threshold on {_HOSTNAME}.
+    description: Far end jitter threshold exceeded on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - prvtSaaY1731TestResultJitterFE
@@ -1548,25 +1548,25 @@ traps:
     name: PRVT-SAA-MIB::prvtSaaY1731FrLossNEThreshold
     category: diagnostic
     severity: warning
-    description: Near end frame loss {prvtSaaY1731TestResultFrameLossNE} exceeded threshold {prvtSaaProfileFrameLossNE} on {_HOSTNAME}.
+    description: Near end frame loss threshold exceeded with {{value "prvtSaaY1731TestResultFrameLossNE"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtSaaY1731TestResultFrameLossNE
       - prvtSaaProfileFrameLossNE
   - oid: 1.3.6.1.4.1.738.1.5.130.0.9
     name: PRVT-SAA-MIB::prvtSaaY1731FrLossFEThreshold
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Far end frame loss {prvtSaaY1731TestResultFrameLossFE} exceeded threshold {prvtSaaProfileFrameLossFE} on {_HOSTNAME}.
+    description: Far end frame loss threshold exceeded at {{value "prvtSaaY1731TestResultFrameLossFE"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtSaaY1731TestResultFrameLossFE
       - prvtSaaProfileFrameLossFE
   - oid: 1.3.6.1.4.1.738.1.5.131.0.1
     name: PRVT-CFM-MIB::prvtCfm1wJitterThreshold
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: One-way jitter {prvtCfmProcessResultOneWayJitter} exceeded threshold on {_HOSTNAME}.
+    description: One-way jitter threshold exceeded on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - prvtCfmProcessResultOneWayJitter
@@ -1576,7 +1576,7 @@ traps:
     name: PRVT-CFM-MIB::prvtCfmJitterThreshold
     category: diagnostic
     severity: warning
-    description: Two-way jitter {prvtCfmProcessResultTwoWayJitter} exceeded threshold on {_HOSTNAME}.
+    description: CFM two-way jitter exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - prvtCfmProcessResultTwoWayJitter
@@ -1588,7 +1588,7 @@ traps:
     name: PRVT-CFM-MIB::prvtCfmFrameLossThreshold
     category: diagnostic
     severity: warning
-    description: CFM frame loss {prvtCfmProcessResultFrameloss} exceeded threshold on {_HOSTNAME}.
+    description: CFM frame loss threshold exceeded with {{value "prvtCfmProcessResultFrameloss"}}% loss on {{hostname}}.
     status: current
     varbinds:
       - prvtCfmProcessResultFrameloss
@@ -1596,9 +1596,9 @@ traps:
       - prvtCfmProfileFrameLossError
   - oid: 1.3.6.1.4.1.738.1.5.131.0.4
     name: PRVT-CFM-MIB::prvtCfmLatencyThreshold
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: CFM latency {prvtCfmProcessResultLatency} exceeded threshold on {_HOSTNAME}.
+    description: CFM latency threshold exceeded on {{hostname}}.
     status: current
     varbinds:
       - prvtCfmProcessResultLatency
@@ -1610,7 +1610,7 @@ traps:
     name: PRVT-CFM-MIB::prvtCfmAisReceived
     category: diagnostic
     severity: warning
-    description: AIS condition detected with lifetime {prvtCfmMepAisLifetime} on {_HOSTNAME}.
+    description: AIS condition detected on {{trap_interface}} for {{value "prvtCfmMepAisLifetime"}} seconds on {{hostname}}.
     status: current
     varbinds:
       - prvtCfmMepAisLifetime
@@ -1618,15 +1618,15 @@ traps:
     name: PRVT-CFM-MIB::prvtCfmLckReceived
     category: state_change
     severity: warning
-    description: CFM LCK condition received with lifetime {prvtCfmMepLckLifetime} on {_HOSTNAME}.
+    description: CFM LCK condition received on {{trap_interface}} with lifetime {{value "prvtCfmMepLckLifetime"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtCfmMepLckLifetime
   - oid: 1.3.6.1.4.1.738.1.5.132.0.1
     name: PRVT-EPS-MIB::prvtEpsDefectAlarm
     category: diagnostic
-    severity: crit
-    description: EPS service defect alarm with status {prvtEpsServiceOperationalStatus} and defect {prvtEpsServiceDefectFop} on {_HOSTNAME}.
+    severity: warning
+    description: EPS service defect alarm detected with status {{value "prvtEpsServiceOperationalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtEpsServiceOperationalStatus
@@ -1635,15 +1635,15 @@ traps:
     name: PRVT-EPS-MIB::prvtEpsSwitchoverAlarm
     category: state_change
     severity: warning
-    description: Active link switchover occurred to {prvtEpsServiceActivePath} on {_HOSTNAME}.
+    description: Active link switchover occurred to {{value "prvtEpsServiceActivePath"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtEpsServiceActivePath
   - oid: 1.3.6.1.4.1.738.1.5.132.0.3
     name: PRVT-EPS-MIB::prvtEpsLostCommunication
     category: diagnostic
-    severity: warning
-    description: APS frame loss detected for service {prvtEpsSvcId} on {_HOSTNAME}.
+    severity: alert
+    description: APS communication lost for service {{value "prvtEpsSvcId"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtEpsSvcId
@@ -1651,15 +1651,15 @@ traps:
     name: PRVT-EPS-MIB::prvtEpsRestoredCommunication
     category: state_change
     severity: notice
-    description: APS communication restored for service {prvtEpsSvcId} on {_HOSTNAME}.
+    description: APS communication restored for service {{value "prvtEpsSvcId"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtEpsSvcId
   - oid: 1.3.6.1.4.1.738.1.5.132.0.5
     name: PRVT-EPS-MIB::prvtEpsSignalFailDetected
     category: diagnostic
-    severity: alert
-    description: Service {prvtEpsSvcId} lost CCM connectivity on {_HOSTNAME}.
+    severity: crit
+    description: CCM reception failure detected for service {{value "prvtEpsSvcId"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtEpsSvcId
@@ -1667,15 +1667,15 @@ traps:
     name: PRVT-EPS-MIB::prvtEpsSignalDegradeDetected
     category: diagnostic
     severity: warning
-    description: Signal degradation detected for service {prvtEpsSvcId} on {_HOSTNAME}.
+    description: Signal degradation detected for service {{value "prvtEpsSvcId"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtEpsSvcId
   - oid: 1.3.6.1.4.1.738.1.5.132.0.7
     name: PRVT-EPS-MIB::prvtEpsProtctSignalFailDetected
     category: diagnostic
-    severity: err
-    description: Protection signal failure detected for service {prvtEpsSvcId} on {_HOSTNAME}.
+    severity: crit
+    description: Protection signal failure detected for service {{value "prvtEpsSvcId"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtEpsSvcId
@@ -1683,7 +1683,7 @@ traps:
     name: PRVT-EPS-MIB::prvtEpsSignalFailRecovery
     category: state_change
     severity: notice
-    description: CCM reception recovered for service {prvtEpsSvcId} on {_HOSTNAME}.
+    description: Signal failure recovered for service {{value "prvtEpsSvcId"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtEpsSvcId
@@ -1691,7 +1691,7 @@ traps:
     name: PRVT-EPS-MIB::prvtEpsSignalDegradeRecovery
     category: diagnostic
     severity: warning
-    description: Signal degradation detected for service {prvtEpsSvcId} on {_HOSTNAME}.
+    description: Signal degradation recovered for service {{value "prvtEpsSvcId"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtEpsSvcId
@@ -1699,7 +1699,7 @@ traps:
     name: PRVT-EPS-MIB::prvtEpsProtctSignalFailRecovery
     category: state_change
     severity: notice
-    description: Protected link signal failure recovered for service {prvtEpsSvcId} on {_HOSTNAME}.
+    description: Protected link signal failure recovered for service {{value "prvtEpsSvcId"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtEpsSvcId
@@ -1707,7 +1707,7 @@ traps:
     name: PRVT-SWITCH-EFM-OAM-MIB::prvtOamLoopBackState
     category: state_change
     severity: notice
-    description: OAM loopback state changed to {dot3OamLoopbackStatus} on {_HOSTNAME}.
+    description: OAM loopback state changed to {{value "dot3OamLoopbackStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1718,13 +1718,13 @@ traps:
     name: PRVT-SWITCH-EFM-OAM-MIB::prvtOamDyingGasp
     category: diagnostic
     severity: alert
-    description: Dying gasp event detected on {_HOSTNAME}.
+    description: Dying gasp event due to loss of local power detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.738.1.5.133.0.3
     name: PRVT-EFM-OAM-MIB::prvtEfmOamThresholdEvent
     category: diagnostic
     severity: warning
-    description: Threshold crossing event detected with type {prvtEfmOamEventLogType} and value {prvtEfmOamEventLogValue} on {_HOSTNAME}.
+    description: Ethernet OAM threshold crossing event detected on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - prvtEfmOamEventLogTimeStamp
@@ -1740,7 +1740,7 @@ traps:
     name: PRVT-EFM-OAM-MIB::prvtEfmOamNonThresholdEvent
     category: diagnostic
     severity: warning
-    description: Ethernet OAM event {prvtEfmOamEventLogType} detected at {prvtEfmOamEventLogLocation} on {_HOSTNAME}.
+    description: EFM OAM non-threshold event detected on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - prvtEfmOamEventLogTimeStamp
@@ -1750,9 +1750,9 @@ traps:
       - prvtEfmOamEventLogEventTotal
   - oid: 1.3.6.1.4.1.738.1.5.134.0.1
     name: PRVT-RING-EPS-MIB::prvtRingEpsDefectAlarm
-    category: diagnostic
-    severity: warning
-    description: Ring defect detected with operational status {prvtRingEpsOperationalStatus} and defect type {prvtRingEpsDefectFop} on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: Ring defect detected on {{first (value "prvtRingEpsDefectFop") "ring"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtRingEpsOperationalStatus
@@ -1760,16 +1760,16 @@ traps:
   - oid: 1.3.6.1.4.1.738.1.5.134.0.2
     name: PRVT-RING-EPS-MIB::prvtRingEpsSwitchoverAlarm
     category: state_change
-    severity: notice
-    description: Ring EPS state changed to {prvtRingEpsState} on {_HOSTNAME}.
+    severity: warning
+    description: Ring EPS switchover alarm occurred with state {{value "prvtRingEpsState"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtRingEpsState
   - oid: 1.3.6.1.4.1.738.1.5.134.0.3
     name: PRVT-RING-EPS-MIB::prvtRingEpsSubRingDefectAlarm
-    category: diagnostic
-    severity: err
-    description: Subring defect detected with status {prvtRingEpsSubRingOperationalStatus} and defect type {prvtRingEpsSubRingDefectFop} on {_HOSTNAME}.
+    category: state_change
+    severity: crit
+    description: Subring defect detected on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - prvtRingEpsSubRingOperationalStatus
@@ -1777,16 +1777,16 @@ traps:
   - oid: 1.3.6.1.4.1.738.1.5.134.0.4
     name: PRVT-RING-EPS-MIB::prvtRingEpsSubRingSwitchoverAlarm
     category: state_change
-    severity: notice
-    description: Subring state changed to {prvtRingEpsSubRingState} on {_HOSTNAME}.
+    severity: warning
+    description: Subring state changed to {{value "prvtRingEpsSubRingState"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtRingEpsSubRingState
   - oid: 1.3.6.1.4.1.738.1.5.137.0.1
     name: PRVT-JDSU-MIB::prvtJdsuAdminStateChange
-    category: state_change
+    category: config_change
     severity: notice
-    description: JDSU loopback administrative state changed to {prvtJdsuLoopbackAdminStatus} on {_HOSTNAME}.
+    description: JDSU admin state changed{{with value "prvtJdsuLoopbackAdminStatus"}} to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - prvtJdsuLoopbackAdminStatus
@@ -1794,7 +1794,7 @@ traps:
     name: PRVT-JDSU-MIB::prvtJdsuOperStateChange
     category: state_change
     severity: notice
-    description: JDSU loopback operational status changed to {prvtJdsuLoopbackOperationalStatus} on {_HOSTNAME}.
+    description: JDSU loopback operational status changed to {{value "prvtJdsuLoopbackOperationalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtJdsuLoopbackOperationalStatus
@@ -1802,7 +1802,7 @@ traps:
     name: PRVT-CONFIGCHANGE-MIB::prvtConfigChangeAlarm
     category: config_change
     severity: notice
-    description: Configurable attribute {prvtConfigChangeAlarmOID} changed on {_HOSTNAME}.
+    description: Configurable attribute changed{{with value "prvtConfigChangeAlarmOID"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - prvtConfigChangeAlarmOID
@@ -1811,7 +1811,7 @@ traps:
     name: PRVT-CONFIGCHANGE-MIB::cliConfigurationChange
     category: config_change
     severity: notice
-    description: Configuration command {cliConfigChangeCommand} executed at {cliConfigChangeNodePrompt} on {_HOSTNAME}.
+    description: Configuration command {{value "cliConfigChangeCommand"}} executed on {{hostname}}.
     status: current
     varbinds:
       - cliConfigChangeNodePrompt
@@ -1820,7 +1820,7 @@ traps:
     name: PRVT-CONFIGCHANGE-MIB::snmpServerStatusChange
     category: state_change
     severity: notice
-    description: SNMP server status changed to {snmpServerStatus} on {_HOSTNAME}.
+    description: SNMP server status changed to {{value "snmpServerStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - snmpServerStatus
@@ -1828,7 +1828,7 @@ traps:
     name: PRVT-SWITCH-EV-PROP-MIB::prvtEvPropAction
     category: state_change
     severity: notice
-    description: Event {prvtEventPropagationEvent} triggered action {prvtEventPropagationActionID} on peer {prvtEventPropagationRemotePeerID} on {_HOSTNAME}.
+    description: Event propagation action {{value "prvtEventPropagationActionID"}} triggered for {{value "prvtEventPropagationEvent"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtEventPropagationEvent
@@ -1839,7 +1839,7 @@ traps:
     name: PRVT-SWITCH-EV-PROP-MIB::prvtEvPropRevert
     category: state_change
     severity: notice
-    description: Revertive action {prvtEventPropagationRevertiveActionID} triggered for event {prvtEventPropagationEvent} on {_HOSTNAME}.
+    description: Event propagation revert action {{value "prvtEventPropagationRevertiveActionID"}} performed on {{hostname}}.
     status: current
     varbinds:
       - prvtEventPropagationEvent
@@ -1850,15 +1850,15 @@ traps:
     name: PRVT-SYNC-ETHERNET-MIB::syncEthernetInvalidESMC
     category: diagnostic
     severity: warning
-    description: Invalid ESMC received with error code {syncEthernetClockSourceLastRecvLastError} on {_HOSTNAME}.
+    description: Invalid ESMC received{{with value "syncEthernetClockSourceLastRecvLastError"}} error {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - syncEthernetClockSourceLastRecvLastError
   - oid: 1.3.6.1.4.1.738.1.5.170.0.2
     name: PRVT-SYNC-ETHERNET-MIB::syncEthernetQualityLevelChange
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Sync Ethernet clock source quality changed to {syncEthernetClockSourceQuality} on {_HOSTNAME}.
+    description: Sync Ethernet clock source quality changed to {{value "syncEthernetClockSourceQuality"}} on {{hostname}}.
     status: current
     varbinds:
       - syncEthernetClockSourceQuality
@@ -1866,7 +1866,7 @@ traps:
     name: PRVT-SYNC-ETHERNET-MIB::syncEthernetInvalidQualityLevelReceived
     category: diagnostic
     severity: warning
-    description: Invalid sync Ethernet quality level {syncEthernetClockSourceRecvQualityLevel} received on {_HOSTNAME}.
+    description: Invalid SyncE quality level {{value "syncEthernetClockSourceRecvQualityLevel"}} received on {{hostname}}.
     status: current
     varbinds:
       - syncEthernetClockSourceRecvQualityLevel
@@ -1874,23 +1874,23 @@ traps:
     name: PRVT-SYNC-ETHERNET-MIB::syncEthernetDPLLReferenceChange
     category: state_change
     severity: notice
-    description: DPLL reference clock changed at {syncEthernetDpllSelectedReferenceClockChange} on {_HOSTNAME}.
+    description: DPLL reference clock changed at {{value "syncEthernetDpllSelectedReferenceClockChange"}} on {{hostname}}.
     status: current
     varbinds:
       - syncEthernetDpllSelectedReferenceClockChange
   - oid: 1.3.6.1.4.1.738.1.5.170.0.5
     name: PRVT-SYNC-ETHERNET-MIB::syncEthernetDPLLChanged
     category: state_change
-    severity: notice
-    description: Synchronous Ethernet DPLL operational status changed to {syncEthernetDpllStatus} on {_HOSTNAME}.
+    severity: warning
+    description: DPLL operational status changed to {{value "syncEthernetDpllStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - syncEthernetDpllStatus
   - oid: 1.3.6.1.4.1.738.1.5.170.0.6
     name: PRVT-SYNC-ETHERNET-MIB::syncEthernetDPLLLockFailed
     category: diagnostic
-    severity: err
-    description: DPLL failed to lock reference clock with status {syncEthernetDpllClkRefFailStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Sync Ethernet DPLL failed to lock onto reference clock on {{hostname}}.
     status: current
     varbinds:
       - syncEthernetDpllClkRefFailStatus
@@ -1898,7 +1898,7 @@ traps:
     name: PRVT-LMM-MIB::prvtLmmTemperatureThresholdCrossed
     category: diagnostic
     severity: warning
-    description: Temperature {prvtLmmInterfaceTempValue} crossed threshold on {_HOSTNAME}.
+    description: Laser temperature {{value "prvtLmmInterfaceTempValue"}} crossed threshold on {{hostname}}.
     status: current
     varbinds:
       - prvtLmmInterfaceTempValue
@@ -1908,7 +1908,7 @@ traps:
     name: PRVT-LMM-MIB::prvtLmmTxPowerThresholdCrossed
     category: diagnostic
     severity: warning
-    description: Transmit laser power {prvtLmmInterfaceTxPowerValue} crossed threshold on {_HOSTNAME}.
+    description: Transmit power threshold crossed on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - prvtLmmInterfaceTxPowerValue
@@ -1918,7 +1918,7 @@ traps:
     name: PRVT-LMM-MIB::prvtLmmRxPowerThresholdCrossed
     category: diagnostic
     severity: warning
-    description: Laser Rx power {prvtLmmInterfaceRxPowerValue} crossed threshold on {_HOSTNAME}.
+    description: Laser RX power threshold crossed on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - prvtLmmInterfaceRxPowerValue
@@ -1928,7 +1928,7 @@ traps:
     name: PRVT-PW-TDM-MIB::prvtPwVcTDMAlarm
     category: diagnostic
     severity: warning
-    description: TDM port error condition {prvtPwVcTDMAlarmVariable} exceeded threshold {prvtPwVcTDMAlarmThreshold} with value {prvtPwVcTDMAlarmValue} on {_HOSTNAME}.
+    description: TDM port error condition exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - prvtPwVcTDMAlarmVariable
@@ -1937,8 +1937,8 @@ traps:
   - oid: 1.3.6.1.4.1.738.1.5.200.2.2.2
     name: PRVT-PW-TDM-MIB::prvtPwVcTDMStatusChange
     category: state_change
-    severity: notice
-    description: Circuit status changed to {prvtPwVcTDMOperStatus} with admin status {prvtPwVcTDMCfgAdminStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Circuit status changed to {{value "prvtPwVcTDMOperStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - prvtPwVcTDMOperStatus
@@ -1947,7 +1947,7 @@ traps:
     name: PRVT-SWITCH-ACCESS-LIST-MIB::standardAccessListRuleMatched
     category: security
     severity: notice
-    description: Standard ACL rule matched with action {standardAccessListAction} on {_HOSTNAME}.
+    description: Standard ACL rule matched on {{trap_interface}} with action {{value "standardAccessListAction"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1957,7 +1957,7 @@ traps:
     name: PRVT-SWITCH-ACCESS-LIST-MIB::extendedAccessListRuleMatched
     category: security
     severity: notice
-    description: Extended ACL rule matched with action {extendedAccessListAction} on interface {ifIndex} on {_HOSTNAME}.
+    description: Extended ACL rule matched on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1967,7 +1967,7 @@ traps:
     name: PRVT-SWITCH-ACCESS-LIST-MIB::macAccessListRuleMatched
     category: security
     severity: notice
-    description: MAC ACL rule matched on interface {ifIndex} with action {macAccessListAction} on {_HOSTNAME}.
+    description: MAC ACL rule matched on {{trap_interface}} with action {{value "macAccessListAction"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1977,7 +1977,7 @@ traps:
     name: PRVT-SWITCH-ACCESS-LIST-MIB::etherTypeAccessListRuleMatched
     category: security
     severity: notice
-    description: Ether-type ACL rule matched on interface {ifIndex} with action {etherTypeAccessListAction} on {_HOSTNAME}.
+    description: Ether-type ACL rule matched on {{first (value "ifIndex") "interface"}} with action {{value "etherTypeAccessListAction"}} on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -1987,7 +1987,7 @@ traps:
     name: PRVT-SWITCH-FIB-MIB::newIP
     category: state_change
     severity: notice
-    description: New IP {ipNetToMediaNetAddress} learned on interface {ipNetToMediaIfIndex} with MAC {ipNetToMediaPhysAddress} on {_HOSTNAME}.
+    description: New IP address {{value "ipNetToMediaNetAddress"}} learned on interface {{value "ipNetToMediaIfIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - ipNetToMediaIfIndex
@@ -1997,15 +1997,15 @@ traps:
     name: PRVT-MPLS-LDP-MIB::mplsLdpInitSessionThresholdExceeded
     category: diagnostic
     severity: warning
-    description: LDP session initialization threshold exceeded with {mplsLdpEntityInitSessionThreshold} on {_HOSTNAME}.
+    description: LDP session initialization messages exceeded threshold {{value "mplsLdpEntityInitSessionThreshold"}} on {{hostname}}.
     status: current
     varbinds:
       - mplsLdpEntityInitSessionThreshold
   - oid: 1.3.6.1.4.1.738.1.6.5.1.2.0.2
     name: PRVT-MPLS-LDP-MIB::mplsLdpPathVectorLimitMismatch
-    category: diagnostic
+    category: config_change
     severity: warning
-    description: LDP path vector limit mismatch between entity {mplsLdpEntityPathVectorLimit} and peer {mplsLdpPeerPathVectorLimit} on {_HOSTNAME}.
+    description: MPLS LDP path vector limit mismatch between entity and peer on {{hostname}}.
     status: current
     varbinds:
       - mplsLdpEntityPathVectorLimit
@@ -2014,7 +2014,7 @@ traps:
     name: PRVT-MPLS-LDP-MIB::mplsLdpSessionUp
     category: state_change
     severity: notice
-    description: LDP session state changed to operational on {_HOSTNAME}.
+    description: MPLS LDP session established on {{hostname}}.
     status: current
     varbinds:
       - mplsLdpSessionState
@@ -2024,8 +2024,8 @@ traps:
   - oid: 1.3.6.1.4.1.738.1.6.5.1.2.0.4
     name: PRVT-MPLS-LDP-MIB::mplsLdpSessionDown
     category: state_change
-    severity: warning
-    description: LDP session state changed to {mplsLdpSessionState} on {_HOSTNAME}.
+    severity: crit
+    description: MPLS LDP session went down on {{hostname}}.
     status: current
     varbinds:
       - mplsLdpSessionState
@@ -2036,7 +2036,7 @@ traps:
     name: PRVT-MPLS-TE-MIB::mplsTunnelUp
     category: state_change
     severity: notice
-    description: MPLS tunnel {mplsTunnelOperStatus} transitioned from down to {mplsTunnelOperStatus} on {_HOSTNAME}.
+    description: MPLS tunnel operational status changed to {{value "mplsTunnelOperStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - mplsTunnelAdminStatus
@@ -2044,8 +2044,8 @@ traps:
   - oid: 1.3.6.1.4.1.738.1.6.5.2.2.0.2
     name: PRVT-MPLS-TE-MIB::mplsTunnelDown
     category: state_change
-    severity: warning
-    description: MPLS tunnel operational status changed to {mplsTunnelOperStatus} on {_HOSTNAME}.
+    severity: crit
+    description: MPLS tunnel {{value "mplsTunnelOperStatus"}} went down on {{hostname}}.
     status: current
     varbinds:
       - mplsTunnelAdminStatus
@@ -2054,7 +2054,7 @@ traps:
     name: PRVT-MPLS-TE-MIB::mplsTunnelRerouted
     category: state_change
     severity: notice
-    description: MPLS tunnel rerouted with new path index {mplsTunnelARHopTableIndex} on {_HOSTNAME}.
+    description: MPLS tunnel rerouted{{with value "mplsTunnelARHopTableIndex"}} to new path{{end}} on {{hostname}}.
     status: current
     varbinds:
       - mplsTunnelAdminStatus
@@ -2064,7 +2064,7 @@ traps:
     name: PRVT-MPLS-TE-MIB::mplsTunnelReoptimized
     category: state_change
     severity: notice
-    description: MPLS tunnel {mplsTunnelARHopTableIndex} reoptimized with new path on {_HOSTNAME}.
+    description: MPLS tunnel reoptimized on {{hostname}}.
     status: current
     varbinds:
       - mplsTunnelAdminStatus
@@ -2074,7 +2074,7 @@ traps:
     name: PRVT-PROXY-MANAGER-MIB::prvtProxyManagerNewDevice
     category: state_change
     severity: notice
-    description: New managed device {prvtProxyManDeviceAddress} discovered and added to proxy manager on {_HOSTNAME}.
+    description: New managed device {{value "prvtProxyManDeviceAddress"}} discovered on {{hostname}}.
     status: current
     varbinds:
       - prvtProxyManDeviceAddress
@@ -2082,23 +2082,23 @@ traps:
     name: PRVT-PROXY-MANAGER-MIB::prvtProxyManagerRemovedDevice
     category: state_change
     severity: notice
-    description: Managed device {prvtProxyManDeviceAddress} removed from proxy manager on {_HOSTNAME}.
+    description: Managed device {{value "prvtProxyManDeviceAddress"}} removed from proxy manager on {{hostname}}.
     status: current
     varbinds:
       - prvtProxyManDeviceAddress
   - oid: 1.3.6.1.4.1.738.1.6.6.0.3
     name: PRVT-PROXY-MANAGER-MIB::prvtProxyManagerUnauthenticatedDevice
     category: security
-    severity: warning
-    description: Unauthenticated device {prvtProxyManDeviceAddress} detected by proxy manager on {_HOSTNAME}.
+    severity: alert
+    description: Unauthenticated device {{value "prvtProxyManDeviceAddress"}} detected by proxy manager on {{hostname}}.
     status: current
     varbinds:
       - prvtProxyManDeviceAddress
   - oid: 1.3.6.1.4.1.738.1.6.7.0.1
     name: PRVT-NETWORK-LOOPBACK-TEST-MIB::prvtNetworkLoopbackTestFinish
     category: diagnostic
-    severity: notice
-    description: Network loopback test {TRAP_NAME} completed on {_HOSTNAME}.
+    severity: info
+    description: Network loopback test completed on {{hostname}}.
     status: current
     varbinds:
       - ifIndex
@@ -2107,7 +2107,7 @@ traps:
     name: PRVT-SERV-MIB::prvtCustCreated
     category: config_change
     severity: notice
-    description: New customer {custName} created on {_HOSTNAME}.
+    description: New customer {{value "custName"}} created on {{hostname}}.
     status: current
     varbinds:
       - custName
@@ -2115,7 +2115,7 @@ traps:
     name: PRVT-SERV-MIB::prvtCustDeleted
     category: config_change
     severity: notice
-    description: Customer configuration {custName} deleted on {_HOSTNAME}.
+    description: Customer {{value "custName"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - custName
@@ -2123,7 +2123,7 @@ traps:
     name: PRVT-SERV-MIB::prvtSvcCreated
     category: config_change
     severity: notice
-    description: Service {svcId} created on {_HOSTNAME}.
+    description: Service {{value "svcId"}} created on {{hostname}}.
     status: current
     varbinds:
       - svcId
@@ -2131,7 +2131,7 @@ traps:
     name: PRVT-SERV-MIB::prvtSvcDeleted
     category: config_change
     severity: notice
-    description: Service {svcId} deleted from svcBaseInfoTable on {_HOSTNAME}.
+    description: Service {{value "svcId"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - svcId
@@ -2139,7 +2139,7 @@ traps:
     name: PRVT-SERV-MIB::prvtSvcStatusChanged
     category: state_change
     severity: notice
-    description: Service {svcId} administrative and operational status changed to {svcAdminStatus} and {svcOperStatus} on {_HOSTNAME}.
+    description: Service {{value "svcId"}} status changed to {{value "svcOperStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - svcId
@@ -2150,7 +2150,7 @@ traps:
     name: PRVT-SERV-MIB::prvtSapCreated
     category: config_change
     severity: notice
-    description: New SAP created with service ID {svcId} on port {sapPortId} on {_HOSTNAME}.
+    description: SAP created for service {{value "svcId"}} on port {{value "sapPortId"}} on {{hostname}}.
     status: current
     varbinds:
       - svcId
@@ -2160,7 +2160,7 @@ traps:
     name: PRVT-SERV-MIB::prvtSapDeleted
     category: config_change
     severity: notice
-    description: SAP {svcId} on port {sapPortId} with encapsulation {sapEncapValue} deleted on {_HOSTNAME}.
+    description: SAP entry deleted from sapBaseInfoTable for service {{value "svcId"}} on {{hostname}}.
     status: current
     varbinds:
       - svcId
@@ -2170,7 +2170,7 @@ traps:
     name: PRVT-SERV-MIB::prvtSapStatusChanged
     category: state_change
     severity: warning
-    description: SAP {svcId} on port {sapPortId} administrative status {sapAdminStatus} and operational status {sapOperStatus} changed on {_HOSTNAME}.
+    description: SAP status changed for service {{value "svcId"}} on {{hostname}}.
     status: current
     varbinds:
       - svcId
@@ -2182,16 +2182,16 @@ traps:
     name: PRVT-SERV-MIB::prvtSdpCreated
     category: config_change
     severity: notice
-    description: SDP {sdpId} created for service {svcId} on {_HOSTNAME}.
+    description: SDP {{value "sdpId"}} created for service {{value "svcId"}} on {{hostname}}.
     status: current
     varbinds:
       - svcId
       - sdpId
   - oid: 1.3.6.1.4.1.738.1.7.2.2.4.0.2
     name: PRVT-SERV-MIB::prvtSdpDeleted
-    category: state_change
+    category: config_change
     severity: notice
-    description: Service {svcId} SDP {sdpId} deleted on {_HOSTNAME}.
+    description: SDP {{value "sdpId"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - svcId
@@ -2199,8 +2199,8 @@ traps:
   - oid: 1.3.6.1.4.1.738.1.7.2.2.4.0.3
     name: PRVT-SERV-MIB::prvtSdpStatusChanged
     category: state_change
-    severity: notice
-    description: SDP {sdpId} administrative status {sdpAdminStatus} and operational status {sdpOperStatus} changed on {_HOSTNAME}.
+    severity: warning
+    description: SDP {{value "sdpId"}} status changed to {{value "sdpOperStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - svcId
@@ -2211,7 +2211,7 @@ traps:
     name: PRVT-INTERWORKING-OS-MIB::imageCrcCheckFailed
     category: diagnostic
     severity: err
-    description: Image CRC check failed for {managementLoadFileName} from {managementLoadTftpServerAddress} on {_HOSTNAME}.
+    description: Image CRC check failed for {{value "managementLoadFileName"}} from {{value "managementLoadTftpServerAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - managementLoadTftpServerAddress
@@ -2220,7 +2220,7 @@ traps:
     name: PRVT-INTERWORKING-OS-MIB::configurationLoadFailed
     category: config_change
     severity: err
-    description: Configuration load failed from {managementLoadTftpServerAddress} file {managementLoadFileName} on {_HOSTNAME}.
+    description: Configuration load failed for {{value "managementLoadFileName"}} on {{hostname}}.
     status: current
     varbinds:
       - managementLoadTftpServerAddress
@@ -2229,13 +2229,13 @@ traps:
     name: PRVT-INTERWORKING-OS-MIB::unauthorizedAccessViaCLI
     category: auth
     severity: warning
-    description: CLI login authorization failed from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: Unauthorized CLI login attempt on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.738.1.111.1.0.4
     name: PRVT-INTERWORKING-OS-MIB::snmpSetExecuted
     category: config_change
     severity: notice
-    description: SNMP set request executed by {usmUserSecurityName} on {_HOSTNAME}.
+    description: SNMP set request executed{{with value "usmUserSecurityName"}} by {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - usmUserSecurityName
@@ -2243,7 +2243,7 @@ traps:
     name: PRVT-INTERWORKING-OS-MIB::managementOptionSupportChanged
     category: license
     severity: notice
-    description: Management option license status changed to {managementOptionSupportStatus} on {_HOSTNAME}.
+    description: Management option license changed to {{value "managementOptionSupportStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - managementOptionSupportStatus
@@ -2252,7 +2252,7 @@ traps:
     name: PRVT-SYS-INFO-MIB::taskSuspended
     category: diagnostic
     severity: warning
-    description: Task {taskName} (ID {taskId}) has been suspended on {_HOSTNAME}.
+    description: Task {{value "taskName"}} has been suspended on {{hostname}}.
     status: current
     varbinds:
       - taskName
@@ -2261,7 +2261,7 @@ traps:
     name: PRVT-SYS-MON-MIB::cpuUtilizationExceeded
     category: diagnostic
     severity: warning
-    description: CPU utilization {monCpuUtilization}% exceeded threshold {cpuUtilizationThreshold}% on {_HOSTNAME}.
+    description: CPU utilization {{value "monCpuUtilization"}}% exceeded threshold {{value "cpuUtilizationThreshold"}}% on {{hostname}}.
     status: current
     varbinds:
       - monCpuUtilization
@@ -2270,7 +2270,7 @@ traps:
     name: PRVT-SYS-MON-MIB::ramFreeSpaceExceeded
     category: diagnostic
     severity: warning
-    description: System memory free space {monRamBytesFree} fell below threshold {ramBytesFreeThreshold} on {_HOSTNAME}.
+    description: System memory utilization exceeded threshold with {{value "monRamBytesFree"}} bytes free on {{hostname}}.
     status: current
     varbinds:
       - monRamBytesFree
@@ -2279,7 +2279,7 @@ traps:
     name: PRVT-SYS-MON-MIB::portErrorsExceeded
     category: diagnostic
     severity: warning
-    description: Port error percentage {monPortErrors} exceeded threshold {portErrorsThreshold} on {_HOSTNAME}.
+    description: Port errors exceeded threshold of {{value "portErrorsThreshold"}}% on {{hostname}}.
     status: current
     varbinds:
       - monPortErrors
@@ -2288,7 +2288,7 @@ traps:
     name: PRVT-SYS-MON-MIB::portsBroadcastExceeded
     category: diagnostic
     severity: warning
-    description: Broadcast packet percentage {monPortBroadcast} exceeded threshold {portsBroadcastThreshold} on {_HOSTNAME}.
+    description: Broadcast limit exceeded at {{value "monPortBroadcast"}}% on {{hostname}}.
     status: current
     varbinds:
       - monPortBroadcast
@@ -2297,7 +2297,7 @@ traps:
     name: PRVT-SYS-MON-MIB::portsCRCErrExceeded
     category: diagnostic
     severity: warning
-    description: CRC error rate {monPortCRCErr}% exceeded threshold {portsCRCErrThreshold}% on {_HOSTNAME}.
+    description: Port CRC error rate {{value "monPortCRCErr"}}% exceeded threshold {{value "portsCRCErrThreshold"}}% on {{hostname}}.
     status: current
     varbinds:
       - monPortCRCErr
@@ -2306,7 +2306,7 @@ traps:
     name: PRVT-SYS-MON-MIB::portsRuntsExceeded
     category: diagnostic
     severity: warning
-    description: Port runt packet percentage {monPortRunts} exceeded threshold {portsRuntsThreshold} on {_HOSTNAME}.
+    description: Port runts exceeded threshold of {{value "portsRuntsThreshold"}}% with {{value "monPortRunts"}}% on {{hostname}}.
     status: current
     varbinds:
       - monPortRunts
@@ -2315,7 +2315,7 @@ traps:
     name: PRVT-SYS-MON-MIB::portsOverSizeExceeded
     category: diagnostic
     severity: warning
-    description: Port oversize percentage {monPortOverSize} exceeded threshold {portsOverSizeThreshold} on {_HOSTNAME}.
+    description: Oversize packet threshold exceeded at {{value "monPortOverSize"}}% on {{hostname}}.
     status: current
     varbinds:
       - monPortOverSize
@@ -2324,7 +2324,7 @@ traps:
     name: PRVT-SYS-MON-MIB::laserTemperatureThresholdCrossed
     category: diagnostic
     severity: warning
-    description: Laser temperature {laserTemperature} crossed threshold on {_HOSTNAME}.
+    description: Laser temperature {{value "laserTemperature"}}C crossed threshold on {{hostname}}.
     status: current
     varbinds:
       - laserTemperature
@@ -2334,7 +2334,7 @@ traps:
     name: PRVT-SYS-MON-MIB::laserTxPowerThresholdCrossed
     category: diagnostic
     severity: warning
-    description: Laser Tx power {laserTxPower} crossed threshold limits on {_HOSTNAME}.
+    description: Laser Tx power {{value "laserTxPower"}} crossed threshold on {{hostname}}.
     status: current
     varbinds:
       - laserTxPower
@@ -2344,7 +2344,7 @@ traps:
     name: PRVT-SYS-MON-MIB::laserRxPowerThresholdCrossed
     category: diagnostic
     severity: warning
-    description: Laser Rx power {laserRxPower} crossed threshold on {_HOSTNAME}.
+    description: Laser RX power threshold crossed ({{value "laserRxPower"}}) on {{hostname}}.
     status: current
     varbinds:
       - laserRxPower
@@ -2354,7 +2354,7 @@ traps:
     name: PRVT-SYS-MON-MIB::sfpMonStatusChanged
     category: state_change
     severity: notice
-    description: SFP module status changed to {sfpMonStatus} on {_HOSTNAME}.
+    description: SFP module {{first (value "sfpMonStatus") "status"}} on {{hostname}}.
     status: current
     varbinds:
       - sfpMonStatus

@@ -153,7 +153,7 @@ traps:
     name: NATEKS-MIB::tlmStatusChange
     category: state_change
     severity: notice
-    description: TLM status changed to {tlmStatus} on {_HOSTNAME}.
+    description: TLM status changed to {{value "tlmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - tlmStatus
@@ -162,7 +162,7 @@ traps:
     name: NATEKS-MIB::alarmValueChange
     category: diagnostic
     severity: warning
-    description: Alarm {alarmName} value changed to {alarmValue} on {_HOSTNAME}.
+    description: Alarm {{value "alarmName"}} value changed to {{value "alarmValue"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmId
@@ -176,7 +176,7 @@ traps:
     name: NATEKS-MIB::tftpStatusChange
     category: diagnostic
     severity: notice
-    description: TFTP operation {tftpLastOp} status {tftpTransferStatus} on {_HOSTNAME}.
+    description: TFTP maintenance operation {{value "tftpLastOp"}} status is {{value "tftpTransferStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - tftpLastOp
@@ -186,7 +186,7 @@ traps:
     name: NATEKS-MIB::macFilterViolation
     category: security
     severity: warning
-    description: MAC filter violation from {macFilterViolationsMAC} on {ifDescr} with action {macFilterConfigAction} on {_HOSTNAME}.
+    description: MAC filter violation detected for {{value "macFilterViolationsMAC"}} on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - macFilterViolationsIfIndex
@@ -196,8 +196,8 @@ traps:
   - oid: 1.3.6.1.4.1.4249.0.5
     name: NATEKS-MIB::dInStateChange
     category: state_change
-    severity: notice
-    description: Discrete input {dInName} state changed to {dInState} on {_HOSTNAME}.
+    severity: warning
+    description: Discrete input {{value "dInName"}} state changed to {{value "dInState"}} on {{hostname}}.
     status: current
     varbinds:
       - dInName
@@ -207,8 +207,8 @@ traps:
   - oid: 1.3.6.1.4.1.4249.0.6
     name: NATEKS-MIB::dOutStateChange
     category: state_change
-    severity: notice
-    description: Discrete output {dOutName} state changed to {dOutState} on {_HOSTNAME}.
+    severity: warning
+    description: Discrete output {{value "dOutName"}} state changed to {{value "dOutState"}} on {{hostname}}.
     status: current
     varbinds:
       - dOutName

@@ -149,9 +149,9 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.3382.2.0.1
     name: FOURELLE-VENTURI2-MIB::venturi2Started
-    category: state_change
-    severity: notice
-    description: Venturi software started execution on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Venturi software started execution on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -162,7 +162,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2Stopped
     category: diagnostic
     severity: warning
-    description: Venturi software shutting down on {_HOSTNAME}.
+    description: Venturi software is shutting down on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -172,8 +172,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.2.0.3
     name: FOURELLE-VENTURI2-MIB::venturi2cpuOverload
     category: diagnostic
-    severity: err
-    description: CPU overload detected with error code {errorCode} on {_HOSTNAME}.
+    severity: crit
+    description: CPU overload detected on {{first (value "systemId") "system"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - mCode
@@ -183,8 +183,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.2.0.4
     name: FOURELLE-VENTURI2-MIB::venturi2memoryOverload
     category: diagnostic
-    severity: crit
-    description: Memory overload detected with error code {errorCode} on {_HOSTNAME}.
+    severity: alert
+    description: Venturi server out of free memory on {{hostname}}.
     status: deprecated
     varbinds:
       - mCode
@@ -196,8 +196,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.2.0.5
     name: FOURELLE-VENTURI2-MIB::venturi2diskOverload
     category: diagnostic
-    severity: warning
-    description: File system {disk} free space {totalPercent}% is under 5% threshold on {_HOSTNAME}.
+    severity: crit
+    description: Disk space critically low on {{value "disk"}} at {{value "totalPercent"}}% on {{hostname}}.
     status: deprecated
     varbinds:
       - mCode
@@ -210,8 +210,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.2.0.6
     name: FOURELLE-VENTURI2-MIB::venturi2diskFailure
     category: diagnostic
-    severity: err
-    description: Hard disk {disk} failure detected with error code {errorCode} on {_HOSTNAME}.
+    severity: crit
+    description: Hard disk failure detected on {{value "disk"}} on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -223,7 +223,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2optimizationFailure
     category: diagnostic
     severity: err
-    description: Compression/decompression error {errorCode} on {_HOSTNAME}.
+    description: Venturi compression/decompression failure {{value "errorCode"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - mCode
@@ -234,7 +234,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2duplicatePackets
     category: diagnostic
     severity: warning
-    description: Duplicate packet rate {totalPercent}% exceeded threshold {threshold} over {timeWindow}s on {_HOSTNAME}.
+    description: Duplicate packet rate {{value "totalPercent"}}% exceeded threshold on {{hostname}}.
     status: deprecated
     varbinds:
       - mCode
@@ -249,7 +249,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2droppedPackets
     category: diagnostic
     severity: warning
-    description: Dropped packet rate {totalPercent}% exceeded threshold {threshold}% on {_HOSTNAME}.
+    description: Dropped packet rate {{value "totalPercent"}}% exceeded threshold {{value "threshold"}}% on {{hostname}}.
     status: deprecated
     varbinds:
       - mCode
@@ -264,7 +264,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2outOfSequencePackets
     category: diagnostic
     severity: warning
-    description: Out-of-sequence packet rate {totalPercent}% exceeded threshold {threshold}% on {_HOSTNAME}.
+    description: Out-of-sequence packet rate exceeded 6% on {{hostname}}.
     status: deprecated
     varbinds:
       - mCode
@@ -279,7 +279,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2testTrap
     category: diagnostic
     severity: notice
-    description: Test trap issued by user on {_HOSTNAME}.
+    description: Diagnostic test trap issued on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -289,8 +289,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.2.0.12
     name: FOURELLE-VENTURI2-MIB::venturi2fanAlarm
     category: diagnostic
-    severity: err
-    description: Fan {fan} speed {currentValue} fell below threshold {threshold} on {_HOSTNAME}.
+    severity: warning
+    description: Fan {{value "fan"}} speed is below threshold on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -303,8 +303,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.2.0.13
     name: FOURELLE-VENTURI2-MIB::venturi2powerSupplyAlarm
     category: diagnostic
-    severity: err
-    description: Power supply {powerSupplyLead} voltage out of spec with current {cur} on {_HOSTNAME}.
+    severity: crit
+    description: Power supply voltage out of spec on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -319,7 +319,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2temperatureAlarm
     category: diagnostic
     severity: warning
-    description: Temperature alarm triggered with current value {currentValue} exceeding threshold {threshold} on {_HOSTNAME}.
+    description: Temperature alarm triggered{{with value "name"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -332,8 +332,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.2.0.15
     name: FOURELLE-VENTURI2-MIB::venturi2licensesExceeded
     category: license
-    severity: warning
-    description: License limit exceeded with error code {errorCode} on {_HOSTNAME}.
+    severity: alert
+    description: License limit exceeded on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -344,7 +344,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2swapOverload
     category: diagnostic
     severity: crit
-    description: Server out of swap space on {_HOSTNAME}.
+    description: Venturi server is out of swap space on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -357,7 +357,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2fileOpenFailed
     category: diagnostic
     severity: err
-    description: File open failed for {filename} with error code {errorCode} on {_HOSTNAME}.
+    description: Failed to open file {{value "filename"}} on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -370,7 +370,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2timeSyncError
     category: diagnostic
     severity: warning
-    description: Time synchronization failure with error code {errorCode} on {_HOSTNAME}.
+    description: Time synchronization failure {{value "errorCode"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - mCode
@@ -382,7 +382,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2internalError
     category: diagnostic
     severity: err
-    description: Internal processing error mCode {mCode} errorCode {errorCode} on {_HOSTNAME}.
+    description: Content optimization internal error (mCode {{value "mCode"}}, errorCode {{value "errorCode"}}) on {{hostname}}.
     status: deprecated
     varbinds:
       - mCode
@@ -393,8 +393,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.2.0.20
     name: FOURELLE-VENTURI2-MIB::venturi2moduleInitFailed
     category: diagnostic
-    severity: err
-    description: Module initialization failed with error code {errorCode} on {_HOSTNAME}.
+    severity: crit
+    description: Venturi module initialization failed on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -405,7 +405,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2serverOverload
     category: diagnostic
     severity: warning
-    description: Server overload alarm state {alarmState} with threshold {threshold} and limit {limit} on {_HOSTNAME}.
+    description: Venturi server overload alarm state {{value "alarmState"}} with threshold {{value "threshold"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - mCode
@@ -419,7 +419,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2statsCollectionTrap
     category: diagnostic
     severity: warning
-    description: FTP statistics upload failed to {ftpHost} on {_HOSTNAME}.
+    description: Statistics upload to FTP {{value "ftpHost"}} failed on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -436,7 +436,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2logCollectionTrap
     category: diagnostic
     severity: warning
-    description: FTP log upload failed to {ftpHost} on {_HOSTNAME}.
+    description: Event log upload to FTP failed{{with value "ftpHost"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -452,8 +452,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.2.0.24
     name: FOURELLE-VENTURI2-MIB::venturi2networkErrorTrap
     category: diagnostic
-    severity: err
-    description: Network initialization error {errorCode} on {_HOSTNAME}.
+    severity: warning
+    description: Network initialization error {{value "errorCode"}} on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -463,8 +463,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.2.0.25
     name: FOURELLE-VENTURI2-MIB::venturi2kernelTrap
     category: diagnostic
-    severity: err
-    description: Kernel problem detected with error code {errorCode} and severity {trapSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: Kernel problem detected with error code {{value "errorCode"}} on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -475,7 +475,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2licenseTrap
     category: license
     severity: warning
-    description: Hardware license issue with code {errorCode} on {_HOSTNAME}.
+    description: Hardware licensing problem detected{{with value "mCode"}} code {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -486,7 +486,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2sharedMemoryTrap
     category: diagnostic
     severity: warning
-    description: Shared memory problem reported with error code {errorCode} on {_HOSTNAME}.
+    description: Shared memory problem detected with code {{value "mCode"}} on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -496,8 +496,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.2.0.28
     name: FOURELLE-VENTURI2-MIB::venturi2fileSystemTrap
     category: diagnostic
-    severity: err
-    description: File system problem detected with error code {errorCode} on {_HOSTNAME}.
+    severity: warning
+    description: File system problem detected with error code {{value "errorCode"}} on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -508,7 +508,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2swapOverloadClear
     category: diagnostic
     severity: notice
-    description: Swap space overload cleared on {_HOSTNAME}.
+    description: Swap space overload condition cleared on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -517,9 +517,9 @@ traps:
       - trapSeverity
   - oid: 1.3.6.1.4.1.3382.2.0.31
     name: FOURELLE-VENTURI2-MIB::venturi2networkClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Network initialization problem cleared with code {mCode} on {_HOSTNAME}.
+    description: Network initialization problem cleared on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -530,7 +530,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2kernelClear
     category: diagnostic
     severity: notice
-    description: Kernel issue cleared with code {mCode} and error {errorCode} on {_HOSTNAME}.
+    description: Kernel problem cleared on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -541,7 +541,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2licenseClear
     category: license
     severity: notice
-    description: Hardware license issue cleared on {_HOSTNAME}.
+    description: Hardware licensing problem cleared on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -552,7 +552,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2sharedMemoryClear
     category: diagnostic
     severity: notice
-    description: Shared memory access issue cleared on {_HOSTNAME}.
+    description: Shared memory access problem cleared on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -563,7 +563,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2fileSystemClear
     category: diagnostic
     severity: notice
-    description: File system access problem cleared on {_HOSTNAME}.
+    description: File system access problem cleared on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -574,7 +574,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2TCPOverload
     category: diagnostic
     severity: warning
-    description: TCP bandwidth threshold {threshold} exceeded limit {limit} on {_HOSTNAME}.
+    description: TCP bandwidth threshold exceeded at {{value "threshold"}}% of limit {{value "limit"}} on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -585,9 +585,9 @@ traps:
       - trapSeverity
   - oid: 1.3.6.1.4.1.3382.2.0.37
     name: FOURELLE-VENTURI2-MIB::venturi2TCPOverloadClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: TCP bandwidth overload condition cleared on {_HOSTNAME}.
+    description: TCP bandwidth overload condition cleared on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -600,7 +600,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2CacheOverload
     category: diagnostic
     severity: warning
-    description: Cache partition {disk} usage {totalPercent}% exceeded threshold {threshold}% on {_HOSTNAME}.
+    description: Cache partition free space is under threshold on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -614,7 +614,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2CacheOverloadClear
     category: diagnostic
     severity: notice
-    description: Cache overload condition cleared on {_HOSTNAME}.
+    description: Cache overload condition cleared on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -628,7 +628,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2LogOverload
     category: diagnostic
     severity: warning
-    description: Log partition free space is under the minimum threshold on {_HOSTNAME}.
+    description: Log partition free space is below threshold on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -642,7 +642,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2LogOverloadClear
     category: diagnostic
     severity: notice
-    description: Log space overload cleared on {_HOSTNAME}.
+    description: Log space overload condition cleared on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -655,8 +655,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.2.0.42
     name: FOURELLE-VENTURI2-MIB::venturi2URLCollectionTrap
     category: diagnostic
-    severity: err
-    description: FTP upload to {ftpHost} failed with {errorCode} on {_HOSTNAME}.
+    severity: warning
+    description: Failed to upload event URL logs to FTP server {{value "ftpHost"}} on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -673,7 +673,7 @@ traps:
     name: FOURELLE-VENTURI2-MIB::venturi2LowCriticalBufs
     category: diagnostic
     severity: crit
-    description: Critical low buffer condition detected with {currentValue} buffers remaining on {_HOSTNAME}.
+    description: Critical low buffer condition detected with {{value "currentValue"}} buffers on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -685,8 +685,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.2.0.44
     name: FOURELLE-VENTURI2-MIB::venturi2LowCriticalBufsClear
     category: diagnostic
-    severity: warning
-    description: Low critical buffer reserves cleared with code {mCode} on {_HOSTNAME}.
+    severity: notice
+    description: Low critical buffer reserves cleared on {{hostname}}.
     status: current
     varbinds:
       - mCode
@@ -697,9 +697,9 @@ traps:
       - trapSeverity
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.1
     name: VENTURI-SERVER-TRAP-MIB::vServerStopped
-    category: state_change
-    severity: notice
-    description: vServer stopped on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: Venturi software is shutting down on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -719,7 +719,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerStarted
     category: diagnostic
     severity: info
-    description: Venturi software started execution on {_HOSTNAME}.
+    description: Venturi software started execution on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -738,8 +738,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.3
     name: VENTURI-SERVER-TRAP-MIB::vServerSwapOverload
     category: diagnostic
-    severity: alert
-    description: Swap space overload detected with usage at {currentValue} exceeding threshold {setThreshold} on {_HOSTNAME}.
+    severity: crit
+    description: Swap space overload detected at {{value "currentValue"}}% on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -764,7 +764,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerSwapOverloadClear
     category: diagnostic
     severity: notice
-    description: Swap overload condition cleared on {_HOSTNAME}.
+    description: Swap overload condition cleared on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -783,8 +783,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.5
     name: VENTURI-SERVER-TRAP-MIB::vServerNetworkError
     category: diagnostic
-    severity: err
-    description: Network initialization error {errorCode} with code {mCode} on {_HOSTNAME}.
+    severity: warning
+    description: vServer network initialization error {{value "errorCode"}} on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -804,7 +804,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerNetworkErrorClear
     category: diagnostic
     severity: notice
-    description: Network initialization error cleared on {_HOSTNAME}.
+    description: Network initialization error cleared on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -823,8 +823,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.7
     name: VENTURI-SERVER-TRAP-MIB::vServerKernelError
     category: diagnostic
-    severity: err
-    description: Kernel error {errorCode} with code {mCode} on {_HOSTNAME}.
+    severity: crit
+    description: vServer kernel error occurred with code {{value "errorCode"}} on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -844,7 +844,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerKernelErrorClear
     category: diagnostic
     severity: notice
-    description: Kernel error {errorCode} cleared on {_HOSTNAME}.
+    description: Kernel error cleared for entity {{value "entityId"}} on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -863,8 +863,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.9
     name: VENTURI-SERVER-TRAP-MIB::vServerLicenseError
     category: license
-    severity: err
-    description: Hardware licensing error {errorCode} on {_HOSTNAME}.
+    severity: warning
+    description: License error occurred{{with value "errorCode"}} (code {{.}}){{end}} on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -882,9 +882,9 @@ traps:
       - entityId
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.10
     name: VENTURI-SERVER-TRAP-MIB::vServerLicenseErrorClear
-    category: diagnostic
+    category: license
     severity: notice
-    description: Hardware licensing error cleared on {_HOSTNAME}.
+    description: Hardware licensing error cleared on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -904,7 +904,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerSharedMemoryError
     category: diagnostic
     severity: err
-    description: Shared memory error {errorCode} on {systemId} on {_HOSTNAME}.
+    description: Shared memory error occurred on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -924,7 +924,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerSharedMemoryErrorClear
     category: diagnostic
     severity: notice
-    description: Shared memory error cleared with code {errorCode} on {_HOSTNAME}.
+    description: Shared memory error cleared on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -944,7 +944,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerFileSystemError
     category: diagnostic
     severity: err
-    description: File system error {errorCode} on {systemId} on {_HOSTNAME}.
+    description: File system error occurred on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -964,7 +964,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerFileSystemErrorClear
     category: diagnostic
     severity: notice
-    description: File system access error cleared for entity {entityId} on {_HOSTNAME}.
+    description: File system error cleared on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -982,9 +982,9 @@ traps:
       - entityId
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.15
     name: VENTURI-SERVER-TRAP-MIB::vServerTCPOverload
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: TCP bandwidth usage {currentValue} exceeded threshold {setThreshold} on {_HOSTNAME}.
+    description: TCP bandwidth threshold exceeded at {{value "currentValue"}}% on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1007,9 +1007,9 @@ traps:
       - entityId
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.16
     name: VENTURI-SERVER-TRAP-MIB::vServerTCPOverloadClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: TCP bandwidth overload cleared on {_HOSTNAME}.
+    description: TCP bandwidth overload condition cleared on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1029,7 +1029,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerCacheOverload
     category: diagnostic
     severity: warning
-    description: Cache partition {disk} free space {currentValue}% dropped below threshold {setThreshold} on {_HOSTNAME}.
+    description: Cache partition {{value "disk"}} overload detected with {{value "currentValue"}} free on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1057,7 +1057,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerCacheOverloadClear
     category: diagnostic
     severity: notice
-    description: vServer cache overload cleared for entity {entityId} on {_HOSTNAME}.
+    description: Cache overload condition cleared on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1077,7 +1077,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerLogOverload
     category: diagnostic
     severity: warning
-    description: Log partition {disk} free space {currentValue}% below threshold {setThreshold} on {_HOSTNAME}.
+    description: Log partition on {{value "disk"}} is under threshold with {{value "currentValue"}} free on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1105,7 +1105,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerLogOverloadClear
     category: diagnostic
     severity: notice
-    description: Log space overload condition cleared on {_HOSTNAME}.
+    description: Log space overload condition cleared on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1124,8 +1124,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.21
     name: VENTURI-SERVER-TRAP-MIB::vServerFanFailure
     category: diagnostic
-    severity: err
-    description: Fan {fan} speed {currentValue} fell below threshold {setThreshold} on {_HOSTNAME}.
+    severity: warning
+    description: Fan {{value "fan"}} speed {{value "currentValue"}} RPM below threshold on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1153,7 +1153,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerFanFailureClear
     category: diagnostic
     severity: notice
-    description: Fan failure cleared for entity {entityId} on {_HOSTNAME}.
+    description: Fan failure cleared and operation returned to acceptable parameters on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1172,8 +1172,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.23
     name: VENTURI-SERVER-TRAP-MIB::vServerPowerSupplyFailure
     category: diagnostic
-    severity: err
-    description: Power supply voltage {powerSupplyLead} value {currentValue} out of range on {_HOSTNAME}.
+    severity: crit
+    description: Power supply voltage out of range on {{value "powerSupplyLead"}} on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1201,7 +1201,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerPowerSupplyFailureClear
     category: diagnostic
     severity: notice
-    description: Power supply failure cleared on {_HOSTNAME}.
+    description: Power supply failure cleared on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1221,7 +1221,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerTemperatureExceeded
     category: diagnostic
     severity: warning
-    description: Temperature sensor {temperatureSensor} exceeded threshold {setThreshold} with value {currentValue} on {_HOSTNAME}.
+    description: Temperature sensor {{value "temperatureSensor"}} exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1247,7 +1247,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerTemperatureExceededClear
     category: diagnostic
     severity: notice
-    description: Temperature exceeded alarm cleared for entity {entityId} on {_HOSTNAME}.
+    description: Temperature exceeded alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1266,8 +1266,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.27
     name: VENTURI-SERVER-TRAP-MIB::vServerStatsDeliveryFailure
     category: diagnostic
-    severity: err
-    description: FTP upload failure for {filename} to {ftpHost}:{ftpDirectory} on {_HOSTNAME}.
+    severity: warning
+    description: Statistics upload to FTP {{value "ftpHost"}} failed on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1305,7 +1305,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerStatsDeliveryClear
     category: diagnostic
     severity: notice
-    description: Statistics collection failure corrected and resumed on {_HOSTNAME}.
+    description: Statistics collection resumed after previous failure on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1324,8 +1324,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.29
     name: VENTURI-SERVER-TRAP-MIB::vServerLogDeliveryFailure
     category: diagnostic
-    severity: err
-    description: Log delivery to {ftpHost} failed for {filename} on {_HOSTNAME}.
+    severity: warning
+    description: Failed to upload log file {{value "filename"}} to FTP server {{value "ftpHost"}} on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1361,9 +1361,9 @@ traps:
       - entityId
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.30
     name: VENTURI-SERVER-TRAP-MIB::vServerLogDeliveryClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Log collection failure corrected and collection resumed for entity {entityId} on {_HOSTNAME}.
+    description: Log collection failure corrected and log collection resumed on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1382,8 +1382,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.31
     name: VENTURI-SERVER-TRAP-MIB::vServerURLDeliveryFailure
     category: diagnostic
-    severity: err
-    description: FTP upload failure for {filename} to {ftpHost}:{ftpDirectory} on {_HOSTNAME}.
+    severity: warning
+    description: Failed to upload log file {{value "filename"}} to FTP server {{value "ftpHost"}} on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1421,7 +1421,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerURLDeliveryClear
     category: diagnostic
     severity: notice
-    description: URL log collection resumed after error {errorCode} cleared on {_HOSTNAME}.
+    description: URL log collection failure corrected and collection resumed on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1440,8 +1440,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.33
     name: VENTURI-SERVER-TRAP-MIB::vServerModuleInitFailure
     category: diagnostic
-    severity: err
-    description: vServer module initialization failed with error code {errorCode} on {_HOSTNAME}.
+    severity: crit
+    description: vServer module initialization failed with error {{value "errorCode"}} on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1461,7 +1461,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerModuleInitFailureClear
     category: state_change
     severity: notice
-    description: vServer module initialization failure cleared on {_HOSTNAME}.
+    description: vServer module initialization failure cleared on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1480,8 +1480,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.35
     name: VENTURI-SERVER-TRAP-MIB::vServerDiskFailure
     category: diagnostic
-    severity: err
-    description: Hard disk {disk} failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Hard disk failure detected on {{value "disk"}} on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1503,8 +1503,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.37
     name: VENTURI-SERVER-TRAP-MIB::vServerTestTrap
     category: diagnostic
-    severity: info
-    description: Diagnostic test trap issued by {TRAP_DEVICE_VENDOR} on {_HOSTNAME}.
+    severity: notice
+    description: Diagnostic test trap issued by user on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1524,7 +1524,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerLicensesExceeded
     category: license
     severity: alert
-    description: License limit exceeded with error code {errorCode} on {_HOSTNAME}.
+    description: System has exceeded the number of purchased licenses on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1543,8 +1543,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.41
     name: VENTURI-SERVER-TRAP-MIB::vServerRadiusServerError
     category: diagnostic
-    severity: err
-    description: Failed to connect to RADIUS server {radiusServer} on {_HOSTNAME}.
+    severity: warning
+    description: Failed to connect to RADIUS server {{value "radiusServer"}} on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1563,9 +1563,9 @@ traps:
       - entityId
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.42
     name: VENTURI-SERVER-TRAP-MIB::vServerRadiusServerErrorClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: RADIUS server connection restored after previous failure on {_HOSTNAME}.
+    description: RADIUS server connection restored after previous failure on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1585,7 +1585,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerLowCriticalBuffers
     category: diagnostic
     severity: crit
-    description: Server buffer level {currentValue} dropped below threshold {setThreshold} on {_HOSTNAME}.
+    description: Server critical low buffer condition on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1610,7 +1610,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerLowCriticalBuffersClear
     category: diagnostic
     severity: notice
-    description: Server buffer reserves restored on {_HOSTNAME}.
+    description: Server buffer reserves restored on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1629,8 +1629,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.45
     name: VENTURI-SERVER-TRAP-MIB::vServerClientStatsDeliveryFailure
     category: diagnostic
-    severity: err
-    description: Client statistics upload to {ftpHost} failed on {_HOSTNAME}.
+    severity: warning
+    description: Failed to upload client statistics file {{value "filename"}} to {{value "ftpHost"}} on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1668,7 +1668,7 @@ traps:
     name: VENTURI-SERVER-TRAP-MIB::vServerClientStatsDeliveryClear
     category: diagnostic
     severity: notice
-    description: Client statistics collection resumed after previous failure on {_HOSTNAME}.
+    description: Client statistics collection resumed after previous failure on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1687,8 +1687,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.47
     name: VENTURI-SERVER-TRAP-MIB::vServerClientUpgradeDeliveryFailure
     category: diagnostic
-    severity: err
-    description: Client upgrade file {filename} failed to upload to FTP server {ftpHost} on {_HOSTNAME}.
+    severity: warning
+    description: Client upgrade file {{value "filename"}} upload to {{value "ftpHost"}} failed on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1724,9 +1724,9 @@ traps:
       - entityId
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.48
     name: VENTURI-SERVER-TRAP-MIB::vServerClientUpgradeDeliveryClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Client upgrade collection failure corrected and statistics resumed on {_HOSTNAME}.
+    description: Client upgrade collection failure corrected and statistics collection resumed on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1745,8 +1745,8 @@ traps:
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.49
     name: VENTURI-SERVER-TRAP-MIB::vServerDCDeliveryFailure
     category: diagnostic
-    severity: err
-    description: FTP upload failure for file {filename} to {ftpHost}{ftpDirectory} on {_HOSTNAME}.
+    severity: warning
+    description: FTP upload failure for {{value "filename"}} to {{value "ftpHost"}} on {{hostname}}.
     status: current
     varbinds:
       - name: mCode
@@ -1782,9 +1782,9 @@ traps:
       - entityId
   - oid: 1.3.6.1.4.1.3382.12.1.1.0.50
     name: VENTURI-SERVER-TRAP-MIB::vServerDCDeliveryClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: DC log collection failure corrected and collection resumed on {_HOSTNAME}.
+    description: DC log collection failure corrected and collection resumed on {{hostname}}.
     status: current
     varbinds:
       - name: mCode

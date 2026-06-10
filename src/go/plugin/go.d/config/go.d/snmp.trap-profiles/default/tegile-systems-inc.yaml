@@ -57,8 +57,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.10
     name: TEGILE-MIB::testNotification
     category: diagnostic
-    severity: info
-    description: Test notification {notificationEventCode} from {notificationComponentName} on {_HOSTNAME}.
+    severity: warning
+    description: Test notification {{value "notificationDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -71,7 +71,7 @@ traps:
     name: TEGILE-MIB::diskIsOnline
     category: diagnostic
     severity: notice
-    description: Disk {notificationComponentName} came back online on {_HOSTNAME}.
+    description: Disk {{value "notificationTargetEntityName"}} came back online on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -83,8 +83,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.102
     name: TEGILE-MIB::diskGoneOffline
     category: diagnostic
-    severity: err
-    description: Disk {notificationTargetEntityName} went offline with severity {notificationSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: Disk went offline on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -97,7 +97,7 @@ traps:
     name: TEGILE-MIB::diskError
     category: diagnostic
     severity: err
-    description: Disk error on {notificationTargetEntityName} with severity {notificationSeverity} on {_HOSTNAME}.
+    description: Disk error encountered on {{first (value "notificationTargetEntityName") "storage"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -110,7 +110,7 @@ traps:
     name: TEGILE-MIB::spareDiskReplaced
     category: diagnostic
     severity: notice
-    description: Spare disk replaced on {_HOSTNAME}.
+    description: Spare disk replaced on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -123,7 +123,7 @@ traps:
     name: TEGILE-MIB::diskSlowIo
     category: diagnostic
     severity: warning
-    description: Slow I/O operations observed on disk component {notificationComponentName} on {_HOSTNAME}.
+    description: Slow I/O operations observed on {{value "notificationTargetEntityName"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -136,7 +136,7 @@ traps:
     name: TEGILE-MIB::poolCreated
     category: config_change
     severity: notice
-    description: Pool created by {notificationComponentName} on {_HOSTNAME}.
+    description: Storage pool created on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -149,7 +149,7 @@ traps:
     name: TEGILE-MIB::poolDeleted
     category: config_change
     severity: notice
-    description: Storage pool deleted on {_HOSTNAME}.
+    description: Storage pool deleted{{with value "notificationTargetEntityName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -162,7 +162,7 @@ traps:
     name: TEGILE-MIB::poolDeletionFailed
     category: diagnostic
     severity: err
-    description: Pool deletion failed for {notificationTargetEntityName} with error {notificationDescription} on {_HOSTNAME}.
+    description: Pool deletion failed{{with value "notificationTargetEntityName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -173,9 +173,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.204
     name: TEGILE-MIB::poolExpanded
-    category: config_change
+    category: state_change
     severity: notice
-    description: Pool expanded on {_HOSTNAME}.
+    description: Storage pool expanded on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -188,7 +188,7 @@ traps:
     name: TEGILE-MIB::poolExported
     category: state_change
     severity: notice
-    description: Pool exported on {_HOSTNAME}.
+    description: Pool exported on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -201,7 +201,7 @@ traps:
     name: TEGILE-MIB::poolImported
     category: config_change
     severity: notice
-    description: Pool imported on {_HOSTNAME}.
+    description: Storage pool imported on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -212,9 +212,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.207
     name: TEGILE-MIB::poolUpgraded
-    category: config_change
+    category: state_change
     severity: notice
-    description: Pool upgraded as described by {notificationDescription} on {_HOSTNAME}.
+    description: Storage pool upgraded on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -227,7 +227,7 @@ traps:
     name: TEGILE-MIB::poolQuotaExceedThresholdWarning
     category: diagnostic
     severity: warning
-    description: Pool quota exceeded threshold limit on {_HOSTNAME}.
+    description: Pool quota exceeded the threshold limit on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -240,7 +240,7 @@ traps:
     name: TEGILE-MIB::poolMetaDataQuotaExceedThresholdWarning
     category: diagnostic
     severity: warning
-    description: Pool meta-data quota exceeded threshold limit on {_HOSTNAME}.
+    description: Pool meta-data quota exceeded threshold limit on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -253,7 +253,7 @@ traps:
     name: TEGILE-MIB::poolAvailableMetaToDataRatioBelowThresholdWarning
     category: diagnostic
     severity: warning
-    description: Pool metadata to data ratio below threshold on {notificationComponentName} on {_HOSTNAME}.
+    description: Pool metadata to data ratio below threshold on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -264,9 +264,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.211
     name: TEGILE-MIB::poolQuotaFinished
-    category: diagnostic
+    category: license
     severity: warning
-    description: Pool quota finished for {notificationComponentName} on {_HOSTNAME}.
+    description: Pool quota finished for {{value "notificationTargetEntityName"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -278,8 +278,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.212
     name: TEGILE-MIB::poolDegraded
     category: diagnostic
-    severity: err
-    description: Pool {notificationComponentName} has degraded with event code {notificationEventCode} on {_HOSTNAME}.
+    severity: warning
+    description: Storage pool degraded{{with value "notificationTargetEntityName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -292,7 +292,7 @@ traps:
     name: TEGILE-MIB::projectCreatedSuccessfully
     category: config_change
     severity: notice
-    description: Project created successfully by {notificationComponentName} on {_HOSTNAME}.
+    description: Project created successfully on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -305,7 +305,7 @@ traps:
     name: TEGILE-MIB::projectDeletionFailed
     category: diagnostic
     severity: err
-    description: Project deletion failed with event code {notificationEventCode} on {_HOSTNAME}.
+    description: Project deletion failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -318,7 +318,7 @@ traps:
     name: TEGILE-MIB::projectDeleted
     category: config_change
     severity: notice
-    description: Project deleted by {notificationComponentName} on {_HOSTNAME}.
+    description: Project {{value "notificationTargetEntityName"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -331,7 +331,7 @@ traps:
     name: TEGILE-MIB::projectModified
     category: config_change
     severity: notice
-    description: Project modified by {notificationComponentName} on {_HOSTNAME}.
+    description: Project modified{{with value "notificationTargetEntityName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -344,7 +344,7 @@ traps:
     name: TEGILE-MIB::projectThresholdExceedWarning
     category: diagnostic
     severity: warning
-    description: Project usage exceeded threshold with severity {notificationSeverity} on {_HOSTNAME}.
+    description: Project usage exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -356,8 +356,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.306
     name: TEGILE-MIB::projectQuotaFinished
     category: diagnostic
-    severity: notice
-    description: Project quota finished for {notificationTargetEntityName} on {_HOSTNAME}.
+    severity: info
+    description: Project quota finished on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -370,7 +370,7 @@ traps:
     name: TEGILE-MIB::projectCreatedWithNonOptimalBlockSize
     category: diagnostic
     severity: warning
-    description: Non-optimal block size detected on {notificationComponentName} on {_HOSTNAME}.
+    description: Project created with non-optimal block size on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -382,8 +382,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.401
     name: TEGILE-MIB::volumeCreatedSuccessfully
     category: config_change
-    severity: notice
-    description: Volume created successfully on {_HOSTNAME}.
+    severity: info
+    description: Volume created successfully on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -396,7 +396,7 @@ traps:
     name: TEGILE-MIB::volumeModifyCompleted
     category: config_change
     severity: notice
-    description: Volume modification completed on {_HOSTNAME}.
+    description: Volume modified{{with value "notificationTargetEntityName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -409,7 +409,7 @@ traps:
     name: TEGILE-MIB::volumeDeleteCompleted
     category: config_change
     severity: notice
-    description: Volume deletion completed on {_HOSTNAME}.
+    description: Volume deleted{{with value "notificationTargetEntityName"}} {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -422,7 +422,7 @@ traps:
     name: TEGILE-MIB::volumeDeleteFailed
     category: diagnostic
     severity: err
-    description: Volume deletion failed with event code {notificationEventCode} on {_HOSTNAME}.
+    description: Volume deletion failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -433,9 +433,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.405
     name: TEGILE-MIB::volumeExceedsThresholdWarning
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Volume quota exceeded configured limit on {_HOSTNAME}.
+    description: Volume quota exceeded configured limit on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -446,9 +446,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.406
     name: TEGILE-MIB::volumeQuotaFinished
-    category: diagnostic
-    severity: info
-    description: Volume quota operation completed for {notificationTargetEntityName} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Volume quota finished for {{value "notificationTargetEntityName"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -459,9 +459,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.407
     name: TEGILE-MIB::volumeCreatedWithNonOptimalBlockSize
-    category: diagnostic
+    category: config_change
     severity: warning
-    description: Volume created with non-optimal block size on {_HOSTNAME}.
+    description: Volume created with non-optimal block size on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -473,8 +473,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.501
     name: TEGILE-MIB::shareCreatedSuccessfully
     category: config_change
-    severity: notice
-    description: Share created successfully on {_HOSTNAME}.
+    severity: info
+    description: Share created successfully on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -487,7 +487,7 @@ traps:
     name: TEGILE-MIB::shareDeletionFailed
     category: diagnostic
     severity: err
-    description: Share deletion failed on {_HOSTNAME}.
+    description: Share deletion failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -500,7 +500,7 @@ traps:
     name: TEGILE-MIB::shareDeleted
     category: config_change
     severity: notice
-    description: Share deleted by {notificationComponentName} on {_HOSTNAME}.
+    description: Share {{value "notificationTargetEntityName"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -513,7 +513,7 @@ traps:
     name: TEGILE-MIB::shareExceedThresholdWarning
     category: diagnostic
     severity: warning
-    description: Share exceeds threshold limit on {_HOSTNAME}.
+    description: Share exceeds the threshold limit on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -524,9 +524,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.505
     name: TEGILE-MIB::shareQuotaFinished
-    category: diagnostic
-    severity: info
-    description: Share quota operation completed on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Share quota finished on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -538,8 +538,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.506
     name: TEGILE-MIB::shareCreatedWithNonOptimalBlockSize
     category: config_change
-    severity: notice
-    description: Share created with non optimal block size on {_HOSTNAME}.
+    severity: warning
+    description: Share created with non-optimal block size on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -550,9 +550,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.601
     name: TEGILE-MIB::aclMigrationStarted
-    category: config_change
+    category: state_change
     severity: notice
-    description: ACL migration started on {_HOSTNAME}.
+    description: ACL migration started on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -565,7 +565,7 @@ traps:
     name: TEGILE-MIB::aclMigrationCompleted
     category: config_change
     severity: notice
-    description: ACL migration completed on {_HOSTNAME}.
+    description: ACL migration completed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -578,7 +578,7 @@ traps:
     name: TEGILE-MIB::deleteFolderCompleted
     category: config_change
     severity: notice
-    description: Folder deleted on {_HOSTNAME}.
+    description: Folder deleted{{with value "notificationTargetEntityName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -591,7 +591,7 @@ traps:
     name: TEGILE-MIB::deleteFolderFailed
     category: diagnostic
     severity: err
-    description: Folder deletion failed with notification {notificationDescription} on {_HOSTNAME}.
+    description: Folder deletion failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -602,9 +602,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.801
     name: TEGILE-MIB::snapshotCreatedSuccessfully
-    category: config_change
+    category: diagnostic
     severity: info
-    description: Snapshot created successfully by {notificationComponentName} on {_HOSTNAME}.
+    description: Snapshot created successfully on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -617,7 +617,7 @@ traps:
     name: TEGILE-MIB::snapshotCreationFailed
     category: diagnostic
     severity: err
-    description: Snapshot creation failed for {notificationTargetEntityName} on {_HOSTNAME}.
+    description: Snapshot creation failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -630,7 +630,7 @@ traps:
     name: TEGILE-MIB::snapshotDeletedSuccessfully
     category: config_change
     severity: info
-    description: Snapshot deleted successfully by {notificationComponentName} on {_HOSTNAME}.
+    description: Snapshot deleted successfully on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -643,7 +643,7 @@ traps:
     name: TEGILE-MIB::snapshotDeleteFailed
     category: diagnostic
     severity: err
-    description: 'Snapshot deletion failed: {notificationDescription} on {_HOSTNAME}.'
+    description: Snapshot deletion failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -656,7 +656,7 @@ traps:
     name: TEGILE-MIB::snapshotCloningFailed
     category: diagnostic
     severity: err
-    description: Snapshot cloning failed with event code {notificationEventCode} on {_HOSTNAME}.
+    description: Snapshot cloning failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -667,9 +667,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.806
     name: TEGILE-MIB::snapshotCloneCompleted
-    category: config_change
-    severity: notice
-    description: Snapshot clone completed on {_HOSTNAME}.
+    category: state_change
+    severity: info
+    description: Snapshot clone completed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -682,7 +682,7 @@ traps:
     name: TEGILE-MIB::snapshotRollbackFailed
     category: diagnostic
     severity: err
-    description: Snapshot rollback failed with event code {notificationEventCode} on {_HOSTNAME}.
+    description: Snapshot rollback failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -695,7 +695,7 @@ traps:
     name: TEGILE-MIB::snapshotRollbackCompleted
     category: config_change
     severity: notice
-    description: Snapshot rollback completed on {_HOSTNAME}.
+    description: Snapshot rollback completed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -708,7 +708,7 @@ traps:
     name: TEGILE-MIB::haResourceGroupTakeBackCompleted
     category: state_change
     severity: notice
-    description: HA resource group taken back on {_HOSTNAME}.
+    description: HA resource group taken back on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -721,7 +721,7 @@ traps:
     name: TEGILE-MIB::haResourceGroupTakeOverCompleted
     category: state_change
     severity: notice
-    description: HA resource group takeover completed on {_HOSTNAME}.
+    description: HA resource group takeover completed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -734,7 +734,7 @@ traps:
     name: TEGILE-MIB::controllerUp
     category: state_change
     severity: notice
-    description: Controller is now up on {_HOSTNAME}.
+    description: Controller is now up on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -745,9 +745,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.1002
     name: TEGILE-MIB::controllerDown
-    category: state_change
+    category: diagnostic
     severity: crit
-    description: Controller {notificationTargetEntityName} went down on {_HOSTNAME}.
+    description: Controller went down on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -760,7 +760,7 @@ traps:
     name: TEGILE-MIB::intelliFlashSoftwareUp
     category: state_change
     severity: notice
-    description: IntelliFlash software is now up on {_HOSTNAME}.
+    description: IntelliFlash software is now up on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -773,7 +773,7 @@ traps:
     name: TEGILE-MIB::intelliFlashSoftwareDown
     category: diagnostic
     severity: crit
-    description: IntelliFlash software down on controller {notificationComponentName} on {_HOSTNAME}.
+    description: IntelliFlash software is down on {{value "notificationComponentName"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -786,7 +786,7 @@ traps:
     name: TEGILE-MIB::controllerTimeDrift
     category: diagnostic
     severity: warning
-    description: Controller time drift detected with severity {notificationSeverity} on {_HOSTNAME}.
+    description: Controller time drift detected on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -799,7 +799,7 @@ traps:
     name: TEGILE-MIB::fcInitiatorCreateCompleted
     category: state_change
     severity: notice
-    description: FC initiator created on {_HOSTNAME}.
+    description: FC initiator created on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -812,7 +812,7 @@ traps:
     name: TEGILE-MIB::fcInitiatorCreateFailed
     category: diagnostic
     severity: err
-    description: FC initiator creation failed with event code {notificationEventCode} on {_HOSTNAME}.
+    description: FC initiator creation failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -825,7 +825,7 @@ traps:
     name: TEGILE-MIB::fcInitiatorModifyCompleted
     category: config_change
     severity: notice
-    description: FC initiator properties modified on {_HOSTNAME}.
+    description: FC initiator properties modified on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -836,9 +836,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.1104
     name: TEGILE-MIB::fcTargetResetHbaPortCompleted
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: FC Target HBA Port reset completed on {_HOSTNAME}.
+    description: FC Target HBA Port reset completed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -851,7 +851,7 @@ traps:
     name: TEGILE-MIB::fcTargetResetHbaPortFailed
     category: diagnostic
     severity: err
-    description: FC Target HBA Port reset failed for {notificationTargetEntityName} on {_HOSTNAME}.
+    description: FC Target HBA Port reset failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -864,7 +864,7 @@ traps:
     name: TEGILE-MIB::fcTargetModifyCompleted
     category: config_change
     severity: notice
-    description: FC target properties modified on {_HOSTNAME}.
+    description: FC target properties modified on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -877,7 +877,7 @@ traps:
     name: TEGILE-MIB::fcPortOnline
     category: state_change
     severity: notice
-    description: FC port {notificationComponentName} came online on {_HOSTNAME}.
+    description: FC Port is online on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -889,8 +889,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.1108
     name: TEGILE-MIB::fcPortOffline
     category: diagnostic
-    severity: err
-    description: FC Port {notificationTargetEntityName} reported {notificationDescription} on {_HOSTNAME}.
+    severity: warning
+    description: FC port is offline on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -903,7 +903,7 @@ traps:
     name: TEGILE-MIB::initiatorGroupCreateCompleted
     category: config_change
     severity: notice
-    description: Initiator group created by {notificationComponentName} on {_HOSTNAME}.
+    description: Initiator group created on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -916,7 +916,7 @@ traps:
     name: TEGILE-MIB::initiatorGroupMemberAdded
     category: config_change
     severity: notice
-    description: Member added to Initiator Group {notificationTargetEntityName} on {_HOSTNAME}.
+    description: Initiator group member added{{with value "notificationTargetEntityName"}} to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -927,9 +927,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.1203
     name: TEGILE-MIB::initiatorGroupMemberRemoved
-    category: state_change
+    category: config_change
     severity: notice
-    description: Initiator group member removed on {_HOSTNAME}.
+    description: Initiator group member {{value "notificationTargetEntityName"}} removed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -942,7 +942,7 @@ traps:
     name: TEGILE-MIB::initiatorGroupDeleteCompleted
     category: config_change
     severity: notice
-    description: Initiator group deleted on {_HOSTNAME}.
+    description: Initiator group deleted on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -955,7 +955,7 @@ traps:
     name: TEGILE-MIB::iscsiInitiatorCreateCompleted
     category: config_change
     severity: notice
-    description: iSCSI initiator created on {_HOSTNAME}.
+    description: iSCSI initiator created on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -968,7 +968,7 @@ traps:
     name: TEGILE-MIB::iscsiInitiatorCreateFailed
     category: diagnostic
     severity: err
-    description: iSCSI initiator creation failed with event code {notificationEventCode} on {_HOSTNAME}.
+    description: iSCSI initiator creation failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -981,7 +981,7 @@ traps:
     name: TEGILE-MIB::iscsiInitiatorModifyCompleted
     category: config_change
     severity: notice
-    description: iSCSI initiator properties modified on {_HOSTNAME}.
+    description: iSCSI initiator properties modified on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -994,7 +994,7 @@ traps:
     name: TEGILE-MIB::iscsiInitiatorDeleteCompleted
     category: config_change
     severity: notice
-    description: iSCSI initiator deleted on {_HOSTNAME}.
+    description: iSCSI initiator deleted on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1007,7 +1007,7 @@ traps:
     name: TEGILE-MIB::iscsiTargetCreateCompleted
     category: config_change
     severity: notice
-    description: iSCSI target created by {notificationComponentName} on {_HOSTNAME}.
+    description: iSCSI target created on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1020,7 +1020,7 @@ traps:
     name: TEGILE-MIB::iscsiTargetModifyCompleted
     category: config_change
     severity: notice
-    description: iSCSI target properties modified on {_HOSTNAME}.
+    description: iSCSI target properties modified on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1033,7 +1033,7 @@ traps:
     name: TEGILE-MIB::iscsiTargetDeleteCompleted
     category: config_change
     severity: notice
-    description: iSCSI target deleted on {_HOSTNAME}.
+    description: iSCSI target deleted{{with value "notificationTargetEntityName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1046,7 +1046,7 @@ traps:
     name: TEGILE-MIB::iscsiTargetError
     category: diagnostic
     severity: err
-    description: iSCSI target error {notificationDescription} on component {notificationComponentName} on {_HOSTNAME}.
+    description: iSCSI target error {{value "notificationDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1059,7 +1059,7 @@ traps:
     name: TEGILE-MIB::iscsiTargetGroupError
     category: diagnostic
     severity: err
-    description: iSCSI target group error on {_HOSTNAME}.
+    description: iSCSI target group error {{value "notificationDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1072,7 +1072,7 @@ traps:
     name: TEGILE-MIB::iscsiImproperTargetGroup
     category: diagnostic
     severity: err
-    description: iSCSI improper target group error reported by {notificationComponentName} on {_HOSTNAME}.
+    description: iSCSI improper target group error on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1085,7 +1085,7 @@ traps:
     name: TEGILE-MIB::targetGroupCreateCompleted
     category: config_change
     severity: notice
-    description: Target group created by {notificationComponentName} on {_HOSTNAME}.
+    description: Target group created{{with value "notificationTargetEntityName"}} {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1098,7 +1098,7 @@ traps:
     name: TEGILE-MIB::targetGroupMemberAdded
     category: config_change
     severity: notice
-    description: Member added to Target group {notificationTargetEntityName} on {_HOSTNAME}.
+    description: Target group member added{{with value "notificationTargetEntityName"}} to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1109,9 +1109,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.1403
     name: TEGILE-MIB::targetGroupMemberRemoved
-    category: state_change
+    category: config_change
     severity: notice
-    description: Target group member removed on {_HOSTNAME}.
+    description: Member removed from the Target group {{value "notificationTargetEntityName"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1124,7 +1124,7 @@ traps:
     name: TEGILE-MIB::targetGroupDeleteCompleted
     category: config_change
     severity: notice
-    description: Target group deleted by {notificationComponentName} on {_HOSTNAME}.
+    description: Target group deleted{{with value "notificationTargetEntityName"}} {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1137,7 +1137,7 @@ traps:
     name: TEGILE-MIB::adServerTimeDrift
     category: diagnostic
     severity: warning
-    description: AD server time drift detected on {_HOSTNAME}.
+    description: AD server time drift detected on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1150,7 +1150,7 @@ traps:
     name: TEGILE-MIB::maintenanceModeEnabled
     category: state_change
     severity: notice
-    description: Maintenance mode enabled on {_HOSTNAME}.
+    description: Maintenance mode enabled on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1163,7 +1163,7 @@ traps:
     name: TEGILE-MIB::maintenanceModeDisabled
     category: state_change
     severity: notice
-    description: Maintenance mode disabled on {_HOSTNAME}.
+    description: Maintenance mode disabled on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1175,8 +1175,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.1504
     name: TEGILE-MIB::diagnosticDataUploaded
     category: diagnostic
-    severity: notice
-    description: Diagnostics data uploaded by {notificationComponentName} on {_HOSTNAME}.
+    severity: info
+    description: Diagnostic data uploaded on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1189,7 +1189,7 @@ traps:
     name: TEGILE-MIB::diagnosticDataUploadingFailed
     category: diagnostic
     severity: err
-    description: Diagnostics data upload failed with event code {notificationEventCode} on {_HOSTNAME}.
+    description: Diagnostics data upload failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1201,8 +1201,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.1506
     name: TEGILE-MIB::alertsCleanupCompleted
     category: diagnostic
-    severity: notice
-    description: Alerts clean-up completed on {_HOSTNAME}.
+    severity: info
+    description: Alerts clean-up completed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1215,7 +1215,7 @@ traps:
     name: TEGILE-MIB::userLoginFailed
     category: auth
     severity: warning
-    description: User login attempt failed on {_HOSTNAME}.
+    description: User login attempt failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1228,7 +1228,7 @@ traps:
     name: TEGILE-MIB::ntpServerTimeDrift
     category: diagnostic
     severity: warning
-    description: NTP time drift detected on {notificationTargetEntityName} with severity {notificationSeverity} on {_HOSTNAME}.
+    description: NTP time drift detected on {{first (value "notificationComponentName") "controller"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1241,7 +1241,7 @@ traps:
     name: TEGILE-MIB::smbSocketFailure
     category: diagnostic
     severity: err
-    description: SMB socket failure detected on {_HOSTNAME}.
+    description: SMB socket failure detected on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1254,7 +1254,7 @@ traps:
     name: TEGILE-MIB::netbiosSocketFailure
     category: diagnostic
     severity: err
-    description: NetBIOS socket failure detected with event code {notificationEventCode} on {_HOSTNAME}.
+    description: NetBIOS socket failure detected on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1265,9 +1265,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.1701
     name: TEGILE-MIB::upgradeStarted
-    category: config_change
+    category: diagnostic
     severity: notice
-    description: Software upgrade started on {_HOSTNAME}.
+    description: Software upgrade started on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1279,8 +1279,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.1702
     name: TEGILE-MIB::upgradeCompleted
     category: config_change
-    severity: notice
-    description: Software upgrade completed on {_HOSTNAME}.
+    severity: info
+    description: Software upgrade completed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1293,7 +1293,7 @@ traps:
     name: TEGILE-MIB::upgradeFailed
     category: diagnostic
     severity: err
-    description: Software upgrade failed with event code {notificationEventCode} on {_HOSTNAME}.
+    description: Software upgrade failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1306,7 +1306,7 @@ traps:
     name: TEGILE-MIB::upgradeTimeout
     category: diagnostic
     severity: err
-    description: Software upgrade timed out on {_HOSTNAME}.
+    description: Software upgrade timed out on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1319,7 +1319,7 @@ traps:
     name: TEGILE-MIB::upgradeCantProcessFilesManually
     category: diagnostic
     severity: err
-    description: Software upgrade cannot process files manually on {_HOSTNAME}.
+    description: Software upgrade cannot process files manually on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1332,7 +1332,7 @@ traps:
     name: TEGILE-MIB::upgradeDownloadStarted
     category: diagnostic
     severity: info
-    description: Software download started on {_HOSTNAME}.
+    description: Software download started on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1343,9 +1343,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.1707
     name: TEGILE-MIB::upgradeDownloadCompleted
-    category: config_change
-    severity: notice
-    description: Software download completed on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Software download completed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1358,7 +1358,7 @@ traps:
     name: TEGILE-MIB::upgradeDownloadFailed
     category: diagnostic
     severity: err
-    description: Software download failed with event code {notificationEventCode} on {_HOSTNAME}.
+    description: Software download failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1371,7 +1371,7 @@ traps:
     name: TEGILE-MIB::tdpsUpgradeCompleted
     category: diagnostic
     severity: info
-    description: TDPS upgrade completed on {_HOSTNAME}.
+    description: TDPS upgrade completed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1384,7 +1384,7 @@ traps:
     name: TEGILE-MIB::tdpsUpgradeFailed
     category: diagnostic
     severity: err
-    description: Upgrade failed for {notificationComponentName} with event code {notificationEventCode} on {_HOSTNAME}.
+    description: TDPS upgrade failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1396,8 +1396,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.1711
     name: TEGILE-MIB::tdpsUpgradeTimeout
     category: diagnostic
-    severity: err
-    description: TDPS upgrade timed out on {_HOSTNAME}.
+    severity: warning
+    description: TDPS upgrade timed out on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1410,7 +1410,7 @@ traps:
     name: TEGILE-MIB::tdpsUpgradeDownloadStarted
     category: diagnostic
     severity: info
-    description: TDPS download started on {_HOSTNAME}.
+    description: TDPS download started on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1423,7 +1423,7 @@ traps:
     name: TEGILE-MIB::tdpsUpgradeDownloadCompleted
     category: diagnostic
     severity: info
-    description: TDPS download completed for {notificationComponentName} on {_HOSTNAME}.
+    description: TDPS download completed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1436,7 +1436,7 @@ traps:
     name: TEGILE-MIB::tdpsUpgradeDownloadFailed
     category: diagnostic
     severity: err
-    description: TDPS download failed with event code {notificationEventCode} on {_HOSTNAME}.
+    description: TDPS download failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1447,9 +1447,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.1715
     name: TEGILE-MIB::webdocsUpgradeDownloadStarted
-    category: config_change
-    severity: notice
-    description: Webdocs upgrade download started on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Webdocs upgrade download started on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1462,7 +1462,7 @@ traps:
     name: TEGILE-MIB::webdocsUpgradeDownloadCompleted
     category: diagnostic
     severity: info
-    description: Webdocs upgrade download completed on {_HOSTNAME}.
+    description: Webdocs upgrade download completed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1475,7 +1475,7 @@ traps:
     name: TEGILE-MIB::webdocsUpgradeDownloadFailed
     category: diagnostic
     severity: err
-    description: Webdocs upgrade download failed with event code {notificationEventCode} on {_HOSTNAME}.
+    description: Webdocs upgrade download failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1486,9 +1486,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.1718
     name: TEGILE-MIB::webdocsUpgradeCompleted
-    category: config_change
-    severity: notice
-    description: Webdocs upgrade completed on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Webdocs upgrade completed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1501,7 +1501,7 @@ traps:
     name: TEGILE-MIB::webdocsUpgradeFailed
     category: diagnostic
     severity: err
-    description: Webdocs upgrade failed with event code {notificationEventCode} on {_HOSTNAME}.
+    description: Webdocs upgrade failed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1514,7 +1514,7 @@ traps:
     name: TEGILE-MIB::replicationTargetDeleted
     category: config_change
     severity: notice
-    description: Replication target {notificationTargetEntityName} deleted on {_HOSTNAME}.
+    description: Replication target {{value "notificationTargetEntityName"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1525,9 +1525,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.1802
     name: TEGILE-MIB::replicationComplete
-    category: diagnostic
-    severity: notice
-    description: Replication completed for {notificationComponentName} on {_HOSTNAME}.
+    category: state_change
+    severity: info
+    description: Replication completed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1540,7 +1540,7 @@ traps:
     name: TEGILE-MIB::replicationAborted
     category: diagnostic
     severity: err
-    description: Replication aborted with severity {notificationSeverity} on component {notificationComponentName} on {_HOSTNAME}.
+    description: Replication aborted{{with value "notificationTargetEntityName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1552,8 +1552,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.1804
     name: TEGILE-MIB::replicationAbandoned
     category: diagnostic
-    severity: err
-    description: Replication abandoned for {notificationTargetEntityName} on {_HOSTNAME}.
+    severity: warning
+    description: Replication abandoned on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1566,7 +1566,7 @@ traps:
     name: TEGILE-MIB::replicationResumed
     category: state_change
     severity: notice
-    description: Replication resumed on {_HOSTNAME}.
+    description: Replication resumed on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1578,8 +1578,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.1806
     name: TEGILE-MIB::replicationStarted
     category: state_change
-    severity: notice
-    description: Replication started on {_HOSTNAME}.
+    severity: info
+    description: Replication started on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1592,7 +1592,7 @@ traps:
     name: TEGILE-MIB::replicationFailed
     category: diagnostic
     severity: err
-    description: Replication failed for {notificationComponentName} on {_HOSTNAME}.
+    description: Replication failed on {{first (value "notificationTargetEntityName") "storage"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1605,7 +1605,7 @@ traps:
     name: TEGILE-MIB::replicationSourceRegistered
     category: state_change
     severity: notice
-    description: Replication source registered with event code {notificationEventCode} on {_HOSTNAME}.
+    description: Replication source registered on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1616,9 +1616,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.1809
     name: TEGILE-MIB::replicationPaused
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Replication paused for {notificationComponentName} on {_HOSTNAME}.
+    description: Replication paused on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1629,9 +1629,9 @@ traps:
       - notificationEventCode
   - oid: 1.3.6.1.4.1.43906.2.1.2.1901
     name: TEGILE-MIB::snmpServiceStarted
-    category: state_change
+    category: diagnostic
     severity: info
-    description: SNMP service started on {_HOSTNAME}.
+    description: SNMP service started on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1643,8 +1643,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.1902
     name: TEGILE-MIB::snmpServiceStartFailed
     category: diagnostic
-    severity: err
-    description: SNMP service failed to start on {_HOSTNAME}.
+    severity: crit
+    description: SNMP service failed to start on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1657,7 +1657,7 @@ traps:
     name: TEGILE-MIB::snmpServiceStopped
     category: diagnostic
     severity: crit
-    description: SNMP service stopped on {_HOSTNAME}.
+    description: SNMP service stopped on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1670,7 +1670,7 @@ traps:
     name: TEGILE-MIB::snmpServiceStopFailed
     category: diagnostic
     severity: err
-    description: SNMP service stop failed with event code {notificationEventCode} on {_HOSTNAME}.
+    description: SNMP service failed to stop on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1682,8 +1682,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.1905
     name: TEGILE-MIB::smisServiceStarted
     category: diagnostic
-    severity: notice
-    description: SMIS service started on {_HOSTNAME}.
+    severity: info
+    description: SMIS service started on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1696,7 +1696,7 @@ traps:
     name: TEGILE-MIB::smisServiceStartFailed
     category: diagnostic
     severity: crit
-    description: SMIS Service failed to start on {_HOSTNAME}.
+    description: SMIS service failed to start on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1708,8 +1708,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.1907
     name: TEGILE-MIB::smisServiceStopped
     category: diagnostic
-    severity: err
-    description: Service {notificationComponentName} stopped with event code {notificationEventCode} on {_HOSTNAME}.
+    severity: crit
+    description: SMIS service stopped on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1722,7 +1722,7 @@ traps:
     name: TEGILE-MIB::smisServiceStopFailed
     category: diagnostic
     severity: err
-    description: SMIS service failed to stop on {_HOSTNAME}.
+    description: SMIS service failed to stop on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1735,7 +1735,7 @@ traps:
     name: TEGILE-MIB::ipmiTemperature
     category: diagnostic
     severity: warning
-    description: Temperature sensor {notificationComponentName} triggered event {notificationEventCode} with severity {notificationSeverity} on {_HOSTNAME}.
+    description: IPMI temperature event {{value "notificationEventCode"}} on {{value "notificationComponentName"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1753,7 +1753,7 @@ traps:
     name: TEGILE-MIB::ipmiVoltage
     category: diagnostic
     severity: warning
-    description: Voltage sensor {notificationComponentName} triggered {notificationSensorAction} on {_HOSTNAME}.
+    description: IPMI voltage event detected on {{value "notificationComponentName"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1771,7 +1771,7 @@ traps:
     name: TEGILE-MIB::ipmiCurrent
     category: diagnostic
     severity: warning
-    description: IPMI event raised for array Current with severity {notificationSeverity} on {_HOSTNAME}.
+    description: IPMI array current event {{value "notificationEventCode"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1789,7 +1789,7 @@ traps:
     name: TEGILE-MIB::ipmiFan
     category: diagnostic
     severity: warning
-    description: IPMI fan event {notificationEventCode} detected on {_HOSTNAME}.
+    description: IPMI fan event detected{{with value "notificationComponentName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1807,7 +1807,7 @@ traps:
     name: TEGILE-MIB::ipmiPowerSupply
     category: diagnostic
     severity: warning
-    description: Power supply event {notificationEventCode} on {notificationComponentName} on {_HOSTNAME}.
+    description: IPMI power supply event detected on {{value "notificationComponentName"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1821,8 +1821,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.2006
     name: TEGILE-MIB::ipmiMemory
     category: diagnostic
-    severity: err
-    description: IPMI Memory error detected on {_HOSTNAME}.
+    severity: crit
+    description: IPMI memory error detected on {{first (value "notificationComponentName") "component"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1837,7 +1837,7 @@ traps:
     name: TEGILE-MIB::ipmiCriticalInterrupt
     category: diagnostic
     severity: crit
-    description: IPMI critical interrupt detected with severity {notificationSeverity} on component {notificationComponentName} on {_HOSTNAME}.
+    description: IPMI critical interrupt received on {{first (value "notificationComponentName") "system"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1852,7 +1852,7 @@ traps:
     name: TEGILE-MIB::ipmiThreshold
     category: diagnostic
     severity: warning
-    description: IPMI threshold event {notificationDescription} on {notificationComponentName} with severity {notificationSeverity} on {_HOSTNAME}.
+    description: IPMI threshold event {{value "notificationEventCode"}} on {{value "notificationComponentName"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1870,7 +1870,7 @@ traps:
     name: TEGILE-MIB::ipmiOther
     category: diagnostic
     severity: warning
-    description: IPMI event {notificationEventCode} on {notificationComponentName} reported {notificationSeverity} on {_HOSTNAME}.
+    description: 'IPMI event received{{with value "notificationDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - notificationDescription
@@ -1884,8 +1884,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.2051
     name: TEGILE-MIB::memoryFailure
     category: diagnostic
-    severity: err
-    description: Memory failure reported by {notificationComponentName} on {_HOSTNAME}.
+    severity: crit
+    description: Memory failure detected on {{first (value "notificationComponentName") "system"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1897,8 +1897,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.2052
     name: TEGILE-MIB::sensorFailureEvent
     category: diagnostic
-    severity: err
-    description: Sensor failure on {notificationComponentName} with event code {notificationEventCode} on {_HOSTNAME}.
+    severity: crit
+    description: Sensor failure detected on {{value "notificationComponentName"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1911,7 +1911,7 @@ traps:
     name: TEGILE-MIB::unknownSensorEvent
     category: diagnostic
     severity: warning
-    description: Unknown sensor event {notificationEventCode} on {notificationComponentName} on {_HOSTNAME}.
+    description: Unknown sensor event {{value "notificationDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1924,7 +1924,7 @@ traps:
     name: TEGILE-MIB::networkIpmpGroupUp
     category: state_change
     severity: notice
-    description: IPMP group {notificationTargetEntityName} is up on {_HOSTNAME}.
+    description: IPMP group is up on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1936,8 +1936,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.2202
     name: TEGILE-MIB::networkIpmpGroupDown
     category: state_change
-    severity: warning
-    description: IPMP group {notificationComponentName} is down on {_HOSTNAME}.
+    severity: crit
+    description: IPMP group {{value "notificationTargetEntityName"}} is down on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1950,7 +1950,7 @@ traps:
     name: TEGILE-MIB::networkIpmpMemberInterfaceAdded
     category: state_change
     severity: notice
-    description: Network interface added to IPMP group on {_HOSTNAME}.
+    description: Network interface added to IPMP group on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1963,7 +1963,7 @@ traps:
     name: TEGILE-MIB::networkIpmpMemberInterfaceRemoved
     category: state_change
     severity: warning
-    description: Network interface removed from IPMP group on {_HOSTNAME}.
+    description: Network interface removed from IPMP group on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1976,7 +1976,7 @@ traps:
     name: TEGILE-MIB::networkInterfaceUp
     category: state_change
     severity: notice
-    description: Network interface {notificationComponentName} is up on {_HOSTNAME}.
+    description: Network interface is up on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -1989,7 +1989,7 @@ traps:
     name: TEGILE-MIB::networkInterfaceDown
     category: state_change
     severity: warning
-    description: Network interface {notificationComponentName} is down on {_HOSTNAME}.
+    description: Network interface is down on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -2002,7 +2002,7 @@ traps:
     name: TEGILE-MIB::vmwareNFSDatastoreCreated
     category: config_change
     severity: notice
-    description: VMware NFS datastore created on {_HOSTNAME}.
+    description: VMware NFS datastore created{{with value "notificationTargetEntityName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -2015,7 +2015,7 @@ traps:
     name: TEGILE-MIB::vmwareNFSDatastoreDeleted
     category: state_change
     severity: notice
-    description: VMware NFS datastore {notificationTargetEntityName} deleted on {_HOSTNAME}.
+    description: VMware NFS datastore {{value "notificationTargetEntityName"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -2028,7 +2028,7 @@ traps:
     name: TEGILE-MIB::nvdimmFailDeviceError
     category: diagnostic
     severity: crit
-    description: NVDIMM device {notificationTargetEntityName} is not detectable on {_HOSTNAME}.
+    description: NVDIMM device is not detectable on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -2040,8 +2040,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.2402
     name: TEGILE-MIB::nvdimmFailSoftError
     category: diagnostic
-    severity: err
-    description: NVDIMM device reported soft error {notificationDescription} on {_HOSTNAME}.
+    severity: warning
+    description: NVDIMM device encountered soft errors on {{first (value "notificationComponentName") "NVDIMM"}} on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -2053,8 +2053,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.2403
     name: TEGILE-MIB::nvdimmFailInitializationError
     category: diagnostic
-    severity: err
-    description: NVDIMM device failed to initialize on {_HOSTNAME}.
+    severity: crit
+    description: NVDIMM device failed to initialize on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription
@@ -2066,8 +2066,8 @@ traps:
   - oid: 1.3.6.1.4.1.43906.2.1.2.2404
     name: TEGILE-MIB::nvdimmFailUnknownError
     category: diagnostic
-    severity: err
-    description: NVDIMM failure reported with severity {notificationSeverity} on component {notificationComponentName} on {_HOSTNAME}.
+    severity: crit
+    description: NVDIMM failure encountered on {{hostname}}.
     status: current
     varbinds:
       - notificationDescription

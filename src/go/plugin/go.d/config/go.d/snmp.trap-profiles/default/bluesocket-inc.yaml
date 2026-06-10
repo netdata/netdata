@@ -3,7 +3,7 @@
 # operator overrides belong in /etc/netdata/go.d/snmp.trap-profiles/.
 vendor: bluesocket-inc
 mib_count: 2
-trap_count: 39
+trap_count: 26
 varbinds:
   ntyobjDesc:
     oid: 1.3.6.1.4.1.9967.2.1.3
@@ -36,7 +36,7 @@ traps:
     name: BLUESERVER-MIB::cctSystemConfChange
     category: config_change
     severity: notice
-    description: System configuration changed by {ntyobjName} with description {ntyobjDesc} on {_HOSTNAME}.
+    description: System configuration changed{{with value "ntyobjName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -46,7 +46,7 @@ traps:
     name: BLUESERVER-MIB::cctUserConfChange
     category: config_change
     severity: notice
-    description: User configuration change {ntyobjDesc} on {_HOSTNAME}.
+    description: User configuration changed{{with value "ntyobjName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -56,7 +56,7 @@ traps:
     name: BLUESERVER-MIB::cctExternalServConfChange
     category: config_change
     severity: notice
-    description: External configuration change for {ntyobjName} ({ntyobjDesc}) on {_HOSTNAME}.
+    description: External configuration change detected{{with value "ntyobjName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -66,7 +66,7 @@ traps:
     name: BLUESERVER-MIB::cctRoleConfChange
     category: config_change
     severity: notice
-    description: Role configuration changed for {ntyobjName} with {ntyobjDesc} on {_HOSTNAME}.
+    description: Role configuration changed{{with value "ntyobjName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -76,7 +76,7 @@ traps:
     name: BLUESERVER-MIB::cctDestinationConfChange
     category: config_change
     severity: notice
-    description: Destination configuration changed for {ntyobjName} on {_HOSTNAME}.
+    description: Destination configuration changed{{with value "ntyobjName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -86,7 +86,7 @@ traps:
     name: BLUESERVER-MIB::cctServiceConfChange
     category: config_change
     severity: notice
-    description: Service configuration changed for {ntyobjName} on {_HOSTNAME}.
+    description: Service configuration changed{{with value "ntyobjName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -96,7 +96,7 @@ traps:
     name: BLUESERVER-MIB::cctNetworkConfChange
     category: config_change
     severity: notice
-    description: Network configuration changed for {ntyobjName} with {ntyobjDesc} on {_HOSTNAME}.
+    description: Network configuration changed{{with value "ntyobjName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -106,7 +106,7 @@ traps:
     name: BLUESERVER-MIB::cctVpnConfChange
     category: config_change
     severity: notice
-    description: VPN configuration changed for {ntyobjName} with {ntyobjDesc} on {_HOSTNAME}.
+    description: VPN configuration changed{{with value "ntyobjName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -116,7 +116,7 @@ traps:
     name: BLUESERVER-MIB::cctMobilityConfChange
     category: config_change
     severity: notice
-    description: Mobility configuration changed for {ntyobjName} with {ntyobjDesc} on {_HOSTNAME}.
+    description: Mobility configuration changed{{with value "ntyobjName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -126,117 +126,17 @@ traps:
     name: BLUESERVER-MIB::cctProcessConfChange
     category: config_change
     severity: notice
-    description: Process configuration change {ntyobjDesc} on {_HOSTNAME}.
+    description: Process configuration changed{{with value "ntyobjName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
       - ntyobjName
       - ntyobjDesc
-  - oid: 1.3.6.1.4.1.9967.2.2.1.1
-    name: BLUE-NOTIFICATION-MIB::cctSystemConfChange
-    category: config_change
-    severity: notice
-    description: Configuration change on {ntyobjObjName} with level {ntyobjLevel} on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - ntyobjLevel
-      - ntyobjObjName
-      - ntyobjDesc
-  - oid: 1.3.6.1.4.1.9967.2.2.1.2
-    name: BLUE-NOTIFICATION-MIB::cctUserConfChange
-    category: config_change
-    severity: notice
-    description: Configuration change detected for {ntyobjObjName} with description {ntyobjDesc} on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - ntyobjLevel
-      - ntyobjObjName
-      - ntyobjDesc
-  - oid: 1.3.6.1.4.1.9967.2.2.1.3
-    name: BLUE-NOTIFICATION-MIB::cctExternalServConfChange
-    category: config_change
-    severity: notice
-    description: Configuration change detected on {ntyobjObjName} with description {ntyobjDesc} on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - ntyobjLevel
-      - ntyobjObjName
-      - ntyobjDesc
-  - oid: 1.3.6.1.4.1.9967.2.2.1.4
-    name: BLUE-NOTIFICATION-MIB::cctRoleConfChange
-    category: config_change
-    severity: notice
-    description: Configuration change on {ntyobjObjName} with level {ntyobjLevel} on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - ntyobjLevel
-      - ntyobjObjName
-      - ntyobjDesc
-  - oid: 1.3.6.1.4.1.9967.2.2.1.5
-    name: BLUE-NOTIFICATION-MIB::cctDestinationConfChange
-    category: config_change
-    severity: notice
-    description: Configuration change on {ntyobjObjName} with description {ntyobjDesc} on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - ntyobjLevel
-      - ntyobjObjName
-      - ntyobjDesc
-  - oid: 1.3.6.1.4.1.9967.2.2.1.6
-    name: BLUE-NOTIFICATION-MIB::cctServiceConfChange
-    category: config_change
-    severity: notice
-    description: Service configuration change {ntyobjObjName} detected on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - ntyobjLevel
-      - ntyobjObjName
-      - ntyobjDesc
-  - oid: 1.3.6.1.4.1.9967.2.2.1.7
-    name: BLUE-NOTIFICATION-MIB::cctInterfaceConfChange
-    category: config_change
-    severity: notice
-    description: Configuration change on {ntyobjObjName} ({ntyobjDesc}) on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - ntyobjLevel
-      - ntyobjObjName
-      - ntyobjDesc
-  - oid: 1.3.6.1.4.1.9967.2.2.1.8
-    name: BLUE-NOTIFICATION-MIB::cctIpsecConfChange
-    category: config_change
-    severity: notice
-    description: 'Configuration change on {ntyobjObjName}: {ntyobjDesc} on {_HOSTNAME}.'
-    status: current
-    varbinds:
-      - ntyobjLevel
-      - ntyobjObjName
-      - ntyobjDesc
-  - oid: 1.3.6.1.4.1.9967.2.2.1.9
-    name: BLUE-NOTIFICATION-MIB::cctMobilityConfChange
-    category: config_change
-    severity: notice
-    description: 'Configuration change detected on {ntyobjObjName}: {ntyobjDesc} on {_HOSTNAME}.'
-    status: current
-    varbinds:
-      - ntyobjLevel
-      - ntyobjObjName
-      - ntyobjDesc
-  - oid: 1.3.6.1.4.1.9967.2.2.1.10
-    name: BLUE-NOTIFICATION-MIB::cctProcessConfChange
-    category: config_change
-    severity: notice
-    description: Configuration change on {ntyobjObjName} ({ntyobjDesc}) on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - ntyobjLevel
-      - ntyobjObjName
-      - ntyobjDesc
   - oid: 1.3.6.1.4.1.9967.2.2.1.11
     name: BLUE-NOTIFICATION-MIB::cctDhcpConfChange
     category: config_change
     severity: notice
-    description: 'Configuration change detected: {ntyobjObjName} - {ntyobjDesc} on {_HOSTNAME}.'
+    description: DHCP configuration changed{{with value "ntyobjObjName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -246,7 +146,7 @@ traps:
     name: BLUE-NOTIFICATION-MIB::cctIKEConfChange
     category: config_change
     severity: notice
-    description: 'Configuration change detected for {ntyobjObjName}: {ntyobjDesc} on {_HOSTNAME}.'
+    description: IKE configuration changed{{with value "ntyobjObjName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -256,7 +156,7 @@ traps:
     name: BLUE-NOTIFICATION-MIB::cctImageConfChange
     category: config_change
     severity: notice
-    description: Configuration change on {ntyobjObjName} with description {ntyobjDesc} on {_HOSTNAME}.
+    description: Configuration changed for {{value "ntyobjObjName"}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -266,7 +166,7 @@ traps:
     name: BLUESERVER-MIB::btSysGeneralFailure
     category: diagnostic
     severity: alert
-    description: System failure {ntyobjDesc} on object {ntyobjName} on {_HOSTNAME}.
+    description: System failure {{value "ntyobjName"}} {{value "ntyobjDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -276,7 +176,7 @@ traps:
     name: BLUESERVER-MIB::btUserLoginFailure
     category: auth
     severity: warning
-    description: User login failure {ntyobjDesc} on {_HOSTNAME}.
+    description: 'User login failure{{with value "ntyobjDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ntyobjLevel
@@ -286,7 +186,7 @@ traps:
     name: BLUESERVER-MIB::btProcessFailure
     category: diagnostic
     severity: err
-    description: Process failure {ntyobjName} reported {ntyobjDesc} on {_HOSTNAME}.
+    description: 'Process failure {{value "ntyobjName"}}: {{value "ntyobjDesc"}} on {{hostname}}.'
     status: current
     varbinds:
       - ntyobjLevel
@@ -296,7 +196,7 @@ traps:
     name: BLUESERVER-MIB::btAuthFailure
     category: auth
     severity: warning
-    description: Authentication failure for {ntyobjName} ({ntyobjDesc}) on {_HOSTNAME}.
+    description: Authentication failure{{with value "ntyobjName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -306,47 +206,17 @@ traps:
     name: BLUESERVER-MIB::btSystemFailover
     category: state_change
     severity: alert
-    description: System failover triggered by {ntyobjName} with description {ntyobjDesc} on {_HOSTNAME}.
+    description: 'System failover occurred{{with value "ntyobjDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ntyobjLevel
       - ntyobjName
       - ntyobjDesc
-  - oid: 1.3.6.1.4.1.9967.2.2.2.1
-    name: BLUE-NOTIFICATION-MIB::btSysConfFailure
-    category: diagnostic
-    severity: err
-    description: System configuration failure {ntyobjObjName} ({ntyobjDesc}) on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - ntyobjLevel
-      - ntyobjObjName
-      - ntyobjDesc
-  - oid: 1.3.6.1.4.1.9967.2.2.2.2
-    name: BLUE-NOTIFICATION-MIB::btIKEFailure
-    category: security
-    severity: warning
-    description: IKE failure on {ntyobjObjName} with {ntyobjDesc} on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - ntyobjLevel
-      - ntyobjObjName
-      - ntyobjDesc
-  - oid: 1.3.6.1.4.1.9967.2.2.2.3
-    name: BLUE-NOTIFICATION-MIB::btProcessFailure
-    category: diagnostic
-    severity: err
-    description: Process failure {ntyobjObjName} ({ntyobjDesc}) on {_HOSTNAME}.
-    status: current
-    varbinds:
-      - ntyobjLevel
-      - ntyobjObjName
-      - ntyobjDesc
   - oid: 1.3.6.1.4.1.9967.2.2.3
     name: BLUE-NOTIFICATION-MIB::btConditionalEvent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Conditional event {ntyobjDesc} with level {ntyobjLevel} on {_HOSTNAME}.
+    description: Conditional threshold event {{value "ntyobjDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -356,7 +226,7 @@ traps:
     name: BLUESERVER-MIB::btConditionalEvent
     category: diagnostic
     severity: warning
-    description: Threshold event {ntyobjDesc} with value {ntyobjValue} reported on {_HOSTNAME}.
+    description: 'Conditional event triggered{{with value "ntyobjDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ntyobjLevel
@@ -367,7 +237,7 @@ traps:
     name: BLUESERVER-MIB::btCpuLoadEvent
     category: diagnostic
     severity: warning
-    description: CPU usage threshold met with value {ntyobjValue} and description {ntyobjDesc} on {_HOSTNAME}.
+    description: CPU usage threshold exceeded with value {{value "ntyobjValue"}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -378,7 +248,7 @@ traps:
     name: BLUESERVER-MIB::btMemSwapUsageEvent
     category: diagnostic
     severity: warning
-    description: Memory or swap usage threshold met with value {ntyobjValue} on {_HOSTNAME}.
+    description: 'Memory or swap threshold exceeded{{with value "ntyobjDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ntyobjLevel
@@ -389,7 +259,7 @@ traps:
     name: BLUESERVER-MIB::btDiskUsageEvent
     category: diagnostic
     severity: warning
-    description: Disk usage threshold met with value {ntyobjValue} on {_HOSTNAME}.
+    description: Disk usage threshold exceeded with value {{value "ntyobjValue"}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -400,7 +270,7 @@ traps:
     name: BLUESERVER-MIB::btLinkUp
     category: state_change
     severity: notice
-    description: Link up event for {ntyobjName} on {_HOSTNAME}.
+    description: Link up event {{value "ntyobjName"}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -410,7 +280,7 @@ traps:
     name: BLUESERVER-MIB::btLinkDown
     category: state_change
     severity: warning
-    description: Link down on {ntyobjName} on {_HOSTNAME}.
+    description: Link down event {{value "ntyobjName"}} on {{hostname}}.
     status: current
     varbinds:
       - ntyobjLevel
@@ -420,7 +290,7 @@ traps:
     name: BLUESERVER-MIB::btSystemGeneralTrap
     category: diagnostic
     severity: warning
-    description: 'System event {ntyobjName} with level {ntyobjLevel}: {ntyobjDesc} on {_HOSTNAME}.'
+    description: 'System status event {{value "ntyobjName"}}: {{value "ntyobjDesc"}} on {{hostname}}.'
     status: current
     varbinds:
       - ntyobjLevel

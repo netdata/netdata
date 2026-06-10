@@ -167,149 +167,149 @@ traps:
     name: ARRIS-C3-FPD-MIB::dcxFPDAttached
     category: state_change
     severity: notice
-    description: Front Panel Display attached on {_HOSTNAME}.
+    description: Front Panel Display has been attached on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.2
     name: ARRIS-C3-FPD-MIB::dcxFPDDetached
     category: diagnostic
     severity: warning
-    description: Front Panel Display has been detached on {_HOSTNAME}.
+    description: Front Panel Display has been detached on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.3
     name: ARRIS-C3-FPD-MIB::dcxFPDFan1Fail
     category: diagnostic
-    severity: err
-    description: Fan nearest the front of the box failed on {_HOSTNAME}.
+    severity: crit
+    description: Front fan failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.4
     name: ARRIS-C3-FPD-MIB::dcxFPDFan1FailClr
     category: diagnostic
     severity: notice
-    description: Fan failure cleared on {_HOSTNAME}.
+    description: Fan failure cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.5
     name: ARRIS-C3-FPD-MIB::dcxFPDFan2Fail
     category: diagnostic
-    severity: err
-    description: Fan 2nd from the front failed on {_HOSTNAME}.
+    severity: crit
+    description: Fan 2nd from the front failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.6
     name: ARRIS-C3-FPD-MIB::dcxFPDFan2FailClr
     category: diagnostic
     severity: notice
-    description: Fan 2nd from the front is working on {_HOSTNAME}.
+    description: Fan 2nd from the front is working on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.7
     name: ARRIS-C3-FPD-MIB::dcxFPDFan3Fail
     category: diagnostic
-    severity: err
-    description: Fan 3rd from the front failed on {_HOSTNAME}.
+    severity: crit
+    description: Fan 3rd from the front failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.8
     name: ARRIS-C3-FPD-MIB::dcxFPDFan3FailClr
     category: diagnostic
     severity: notice
-    description: Fan 3rd from the front is working on {_HOSTNAME}.
+    description: Fan 3rd from the front failure cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.9
     name: ARRIS-C3-FPD-MIB::dcxFPDFan4Fail
     category: diagnostic
     severity: crit
-    description: Fan 4th from the front failed on {_HOSTNAME}.
+    description: Fan 4th from the front failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.10
     name: ARRIS-C3-FPD-MIB::dcxFPDFan4FailClr
     category: diagnostic
     severity: notice
-    description: Fan 4th from the front is working on {_HOSTNAME}.
+    description: Fan 4th from the front is working on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.11
     name: ARRIS-C3-FPD-MIB::dcxFPDFan5Fail
     category: diagnostic
     severity: crit
-    description: Fan 5th from the front failed on {_HOSTNAME}.
+    description: Fan 5th from the front failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.12
     name: ARRIS-C3-FPD-MIB::dcxFPDFan5FailClr
     category: diagnostic
     severity: notice
-    description: Fan 5th from the front is working on {_HOSTNAME}.
+    description: Fan 5 failure cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.13
     name: ARRIS-C3-FPD-MIB::dcxFPDFan6Fail
     category: diagnostic
     severity: crit
-    description: Fan failure detected on {_HOSTNAME}.
+    description: Fan failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.14
     name: ARRIS-C3-FPD-MIB::dcxFPDFan6FailClr
     category: diagnostic
     severity: notice
-    description: Fan failure cleared on {_HOSTNAME}.
+    description: Fan failure cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.15
     name: ARRIS-C3-FPD-MIB::dcxFPDPwr1Fail
     category: diagnostic
     severity: crit
-    description: Power supply failure detected on {_HOSTNAME}.
+    description: Power supply failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.16
     name: ARRIS-C3-FPD-MIB::dcxFPDPwr1FailClr
     category: diagnostic
     severity: notice
-    description: Power supply failure cleared on {_HOSTNAME}.
+    description: Power supply failure cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.17
     name: ARRIS-C3-FPD-MIB::dcxFPDPwr2Fail
     category: diagnostic
     severity: crit
-    description: Power supply failure detected on {_HOSTNAME}.
+    description: Power supply failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.18
     name: ARRIS-C3-FPD-MIB::dcxFPDPwr2FailClr
     category: diagnostic
     severity: notice
-    description: Power supply status cleared on {_HOSTNAME}.
+    description: Power supply failure cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.19
     name: ARRIS-C3-FPD-MIB::dcxFPDTempOkay
     category: diagnostic
     severity: notice
-    description: System temperature is OK on {_HOSTNAME}.
+    description: System temperature is OK on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.20
     name: ARRIS-C3-FPD-MIB::dcxFPDTempBad
     category: diagnostic
-    severity: warning
-    description: System temperature is too hot on {_HOSTNAME}.
+    severity: crit
+    description: System temperature is too hot on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.3.1.3.21
     name: ARRIS-C3-FPD-MIB::dcxFPDTempCritical
     category: diagnostic
-    severity: alert
-    description: System temperature is critical, CMTS will shut itself down on {_HOSTNAME}.
+    severity: crit
+    description: Critical system temperature detected, device will shut down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4115.1.4.3.4.1.4.1
     name: ARRIS-C3-SM-MIB::dcxSMDiskInserted
     category: diagnostic
     severity: warning
-    description: Disk inserted detected on {_HOSTNAME}.
+    description: Disk inserted on {{hostname}}.
     status: current
     varbinds:
       - dcxSMSoftwareVersion
   - oid: 1.3.6.1.4.1.4115.1.4.3.4.1.4.2
     name: ARRIS-C3-SM-MIB::dcxSMDiskRemoved
     category: diagnostic
-    severity: err
-    description: Disk removed on {_HOSTNAME}.
+    severity: crit
+    description: Disk removed on {{hostname}}.
     status: current
     varbinds:
       - dcxSMSoftwareVersion
   - oid: 1.3.6.1.4.1.4115.1.4.3.4.1.4.3
     name: ARRIS-C3-SM-MIB::dcxSMDiskFailed
     category: diagnostic
-    severity: err
-    description: Disk failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Disk failed on {{hostname}}.
     status: current
     varbinds:
       - dcxSMSoftwareVersion
@@ -317,7 +317,7 @@ traps:
     name: ARRIS-C3-SM-MIB::dcxSMConfigChecksumChanged
     category: config_change
     severity: warning
-    description: Configuration file checksum mismatch detected for {dcxSMConfigFileDesc} on {_HOSTNAME}.
+    description: Config file checksum mismatch detected{{with value "dcxSMConfigFileDesc"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - dcxSMConfigFileDesc
@@ -325,7 +325,7 @@ traps:
     name: ARRIS-C3-SM-MIB::dcxSMImageChecksumChanged
     category: diagnostic
     severity: warning
-    description: Config image checksum mismatch detected for software version {dcxSMSoftwareVersion} on {_HOSTNAME}.
+    description: Config image checksum mismatch detected{{with value "dcxSMSoftwareVersion"}} for version {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - dcxSMSoftwareVersion
@@ -333,15 +333,15 @@ traps:
     name: ARRIS-C3-SM-MIB::dcxSMImageDownloadFailed
     category: diagnostic
     severity: err
-    description: Image download failed for version {dcxSMSoftwareVersion} on {_HOSTNAME}.
+    description: Image download failed for version {{value "dcxSMSoftwareVersion"}} on {{hostname}}.
     status: current
     varbinds:
       - dcxSMSoftwareVersion
   - oid: 1.3.6.1.4.1.4115.1.4.3.4.1.4.7
     name: ARRIS-C3-SM-MIB::dcxSMImageBootFailed
     category: diagnostic
-    severity: err
-    description: Image boot failed for software version {dcxSMSoftwareVersion} on {_HOSTNAME}.
+    severity: crit
+    description: Software image boot failed for version {{value "dcxSMSoftwareVersion"}} on {{hostname}}.
     status: current
     varbinds:
       - dcxSMSoftwareVersion
@@ -349,7 +349,7 @@ traps:
     name: ARRIS-C3-CMM-MIB::dcxCMMTrap
     category: diagnostic
     severity: warning
-    description: CMM trap received with reason {dcxCMMTrapReason} on {_HOSTNAME}.
+    description: CMM trap received with reason {{value "dcxCMMTrapReason"}} on {{hostname}}.
     status: current
     varbinds:
       - dcxCMMTrapReason
@@ -357,7 +357,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::alarmNotification
     category: diagnostic
     severity: warning
-    description: Alarm event {docsDevEvId} with level {docsDevEvLevel} and text {docsDevEvText} on {_HOSTNAME}.
+    description: Alarm event {{value "docsDevEvText"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -367,7 +367,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5EnvMonAlarmOffTrap
     category: diagnostic
     severity: notice
-    description: Environmental monitor alarm cleared for {docsDevEvText} on {_HOSTNAME}.
+    description: Environmental monitor alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -378,8 +378,8 @@ traps:
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.1.2
     name: ARRIS-D5-ALARM-MIB::d5EnvMonFanErrorTrap
     category: diagnostic
-    severity: err
-    description: 'Fan error detected: {docsDevEvText} on {_HOSTNAME}.'
+    severity: alert
+    description: Environmental monitor fan error detected on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -392,7 +392,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5EnvMonFanWarningTrap
     category: diagnostic
     severity: warning
-    description: Environmental monitor fan warning detected with {docsDevEvText} on {_HOSTNAME}.
+    description: 'Environmental fan warning detected{{with value "docsDevEvText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - docsDevEvLevel
@@ -404,8 +404,8 @@ traps:
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.1.4
     name: ARRIS-D5-ALARM-MIB::d5EnvMonVoltErrorTrap
     category: diagnostic
-    severity: err
-    description: Environmental monitor voltage error detected on {_HOSTNAME}.
+    severity: crit
+    description: Environmental monitor voltage error detected on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -418,7 +418,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5EnvMonVoltWarningTrap
     category: diagnostic
     severity: warning
-    description: Environmental voltage warning detected with event {docsDevEvText} on {_HOSTNAME}.
+    description: 'Environmental voltage warning detected{{with value "docsDevEvText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - docsDevEvLevel
@@ -430,8 +430,8 @@ traps:
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.1.6
     name: ARRIS-D5-ALARM-MIB::d5EnvMonTempErrorTrap
     category: diagnostic
-    severity: err
-    description: Environmental monitor temperature error detected with value {entPhySensorValue} on {_HOSTNAME}.
+    severity: crit
+    description: Environmental temperature error detected on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -444,7 +444,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5EnvMonTempWarningTrap
     category: diagnostic
     severity: warning
-    description: Environmental temperature warning detected with value {entPhySensorValue} on {_HOSTNAME}.
+    description: 'Environmental temperature warning detected{{with value "docsDevEvText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - docsDevEvLevel
@@ -456,8 +456,8 @@ traps:
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.1.8
     name: ARRIS-D5-ALARM-MIB::d5EnvMonPsuErrorTrap
     category: diagnostic
-    severity: crit
-    description: PSU error detected with event {docsDevEvText} on {_HOSTNAME}.
+    severity: alert
+    description: PSU environmental error detected on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -469,7 +469,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5EnvMonPsuWarningTrap
     category: diagnostic
     severity: warning
-    description: 'PSU warning detected: {docsDevEvText} on {_HOSTNAME}.'
+    description: 'PSU warning detected{{with value "docsDevEvText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - docsDevEvLevel
@@ -481,7 +481,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5EnvMonSysFatalTrap
     category: diagnostic
     severity: emerg
-    description: Environmental monitor system error {docsDevEvText} detected on {_HOSTNAME}.
+    description: Environmental monitor system fatal error detected on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -493,7 +493,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5EnvMonSysRecoverTrap
     category: diagnostic
     severity: notice
-    description: Environmental monitor system recovered event {docsDevEvText} on {_HOSTNAME}.
+    description: Environmental monitor system recovered on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -505,7 +505,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5MpegMgtProgErrorTrap
     category: diagnostic
     severity: err
-    description: MPEG management program error detected with level {docsDevEvLevel} and text {docsDevEvText} on {_HOSTNAME}.
+    description: MPEG management program error detected on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -520,7 +520,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5MpegMgtProgPidErrorTrap
     category: diagnostic
     severity: err
-    description: MPEG program PID error detected with event {docsDevEvText} on {_HOSTNAME}.
+    description: MPEG management program PID error detected on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -536,7 +536,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5MpegMgtProgOversubsTrap
     category: diagnostic
     severity: warning
-    description: MPEG program oversubscription detected on QAM channel {d5QamIndex} program {d5vStreamProgIndex} on {_HOSTNAME}.
+    description: MPEG program oversubscription detected on QAM {{value "d5QamIndex"}} program {{value "d5vStreamProgIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -549,9 +549,9 @@ traps:
       - d5vStreamProgIndex
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.2.4
     name: ARRIS-D5-ALARM-MIB::d5MpegMgtProgStartTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: MPEG Management program start event detected on {_HOSTNAME}.
+    description: MPEG management program start event detected on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -566,7 +566,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5MpegMgtProgStopTrap
     category: diagnostic
     severity: warning
-    description: MPEG program stop event {docsDevEvText} on {_HOSTNAME}.
+    description: MPEG management program stop detected on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -581,7 +581,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5MpegMgtQamErrorTrap
     category: diagnostic
     severity: warning
-    description: MPEG QAM error detected on channel {d5QamIndex} with event {docsDevEvText} on {_HOSTNAME}.
+    description: MPEG QAM error detected on channel {{value "d5QamIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -596,7 +596,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5MpegMgtQamOversubsTrap
     category: diagnostic
     severity: warning
-    description: QAM oversubscription detected on channel {d5QamIndex} with actual bandwidth {d5QamBandwidthActual} on {_HOSTNAME}.
+    description: QAM oversubscription detected on channel {{value "d5QamIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -610,7 +610,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5MpegMgtQamOversubsFilterTrap
     category: diagnostic
     severity: warning
-    description: QAM oversubscription filter event detected on channel {d5QamIndex} program {d5vStreamProgIndex} on {_HOSTNAME}.
+    description: MPEG QAM oversubscription filter event detected on {{first (value "d5QamIndex") "QAM channel"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -625,7 +625,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5MpegMgtQamOversubsRecoveryTrap
     category: diagnostic
     severity: warning
-    description: QAM oversubscription recovery detected on channel {d5QamIndex} with bandwidth {d5QamBandwidthActual} on {_HOSTNAME}.
+    description: QAM oversubscription recovery detected on channel {{value "d5QamIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -639,7 +639,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5MpegMgtSessStartTrap
     category: state_change
     severity: notice
-    description: Video session started for {d5vIpSrcIndex} to {d5vIpDestIndex}:{d5vIpUdpIndex} on {_HOSTNAME}.
+    description: Video session started on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -652,7 +652,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5MpegMgtSessStopTrap
     category: state_change
     severity: notice
-    description: Video session stopped on {_HOSTNAME}.
+    description: Video session stopped on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -665,7 +665,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5MpegMgtTableErrorTrap
     category: diagnostic
     severity: err
-    description: MPEG management error detected with reason {d5MpegTableFailureReason} on {_HOSTNAME}.
+    description: 'MPEG management error detected{{with value "docsDevEvText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - docsDevEvLevel
@@ -679,7 +679,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5MpegMgtProgUnderflowTrap
     category: diagnostic
     severity: warning
-    description: MPEG jitter buffer underflow detected on QAM {d5QamIndex} program {d5vStreamProgIndex} on {_HOSTNAME}.
+    description: MPEG jitter buffer underflow detected on {{first (value "d5QamIndex") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -695,7 +695,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5MpegMgtProgOverflowTrap
     category: diagnostic
     severity: warning
-    description: MPEG jitter buffer overflow detected on channel {d5QamIndex} program {d5vStreamProgIndex} on {_HOSTNAME}.
+    description: MPEG jitter buffer overflow detected on {{first (value "d5QamIndex") "channel"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -711,7 +711,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5SessMgtConnectTrap
     category: state_change
     severity: notice
-    description: Session Management connect event detected at {d5SessMgtIpAddr}:{d5SessMgtPort} on {_HOSTNAME}.
+    description: Session Management connect event detected{{with value "d5SessMgtIpAddr"}} from {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -722,8 +722,8 @@ traps:
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.3.2
     name: ARRIS-D5-ALARM-MIB::d5SessMgtDisconnectTrap
     category: state_change
-    severity: warning
-    description: Session management disconnect detected for {d5SessMgtIpAddr}:{d5SessMgtPort} on {_HOSTNAME}.
+    severity: notice
+    description: Session Management disconnect detected{{with value "d5SessMgtReason"}} reason {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -736,8 +736,8 @@ traps:
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.3.3
     name: ARRIS-D5-ALARM-MIB::d5SessMgtGenErrorTrap
     category: diagnostic
-    severity: err
-    description: Session Management error {docsDevEvText} detected on {_HOSTNAME}.
+    severity: warning
+    description: 'Session Management error detected{{with value "docsDevEvText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - docsDevEvLevel
@@ -749,7 +749,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5SessMgtIgmpErrorTrap
     category: diagnostic
     severity: warning
-    description: 'IGMP error detected: {docsDevEvText} on {_HOSTNAME}.'
+    description: 'Session Management IGMP error detected{{with value "docsDevEvText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - docsDevEvLevel
@@ -761,7 +761,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5SessMgtMsgInfoTrap
     category: diagnostic
     severity: warning
-    description: Session management event {docsDevEvText} from {d5SessMgtIpAddr}:{d5SessMgtPort} on {_HOSTNAME}.
+    description: Session management event {{value "docsDevEvText"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -771,9 +771,9 @@ traps:
       - d5SessMgtPort
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.3.6
     name: ARRIS-D5-ALARM-MIB::d5SessMgtProgOversubsTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Session Management oversubscription detected for session {d5SessionId} on {_HOSTNAME}.
+    description: Session Management program oversubscription detected on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -791,7 +791,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5SessMgtQamOversubsTrap
     category: diagnostic
     severity: warning
-    description: QAM oversubscription detected on channel {d5QamIndex} with actual bandwidth {d5ActualBandwidth} on {_HOSTNAME}.
+    description: QAM oversubscription detected on channel {{value "d5QamIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -803,9 +803,9 @@ traps:
       - d5ActualBandwidth
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.3.8
     name: ARRIS-D5-ALARM-MIB::d5SessMgtSessGroupOversubsTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Session Management oversubscription detected for session {d5SessionId} on {_HOSTNAME}.
+    description: Session oversubscription detected on {{value "d5QamIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -822,7 +822,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5SessMgtQamErrorTrap
     category: diagnostic
     severity: warning
-    description: QAM error on channel {d5QamIndex} with description {docsDevEvText} on {_HOSTNAME}.
+    description: Session Management QAM error detected on channel {{value "d5QamIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -833,7 +833,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5SessMgtSessInfoTrap
     category: state_change
     severity: warning
-    description: Session management event {docsDevEvText} detected on {_HOSTNAME}.
+    description: Session management event {{value "docsDevEvText"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -844,7 +844,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5SessMgtSessErrorTrap
     category: diagnostic
     severity: warning
-    description: Session management error {docsDevEvText} with ID {docsDevEvId} on {_HOSTNAME}.
+    description: Session management error {{value "docsDevEvText"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -855,7 +855,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5SessMgtSessGroupErrorTrap
     category: diagnostic
     severity: warning
-    description: Session management group error {docsDevEvText} on session {d5SessionId} on {_HOSTNAME}.
+    description: Session management group error {{value "docsDevEvText"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -866,8 +866,8 @@ traps:
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.3.13
     name: ARRIS-D5-ALARM-MIB::d5SessMgtShutdownTrap
     category: state_change
-    severity: alert
-    description: Session management shutdown detected with reason {d5ShutdownReason} on {_HOSTNAME}.
+    severity: warning
+    description: Session management shutdown detected{{with value "d5ShutdownReason"}} reason {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -879,7 +879,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5SessMgtStartupTrap
     category: state_change
     severity: notice
-    description: Session Management startup event detected with {docsDevEvText} on {_HOSTNAME}.
+    description: Session Management startup event detected on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -889,7 +889,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5SessMgtTimeoutResetTrap
     category: state_change
     severity: notice
-    description: Session Management timeout reset detected for {d5SessMgtIpAddr}:{d5SessMgtPort} on {_HOSTNAME}.
+    description: Session management timeout reset detected{{with value "d5SessMgtIpAddr"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -899,9 +899,9 @@ traps:
       - d5SessMgtPort
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.3.16
     name: ARRIS-D5-ALARM-MIB::d5SessMgtStreamUnavailTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Stream unavailable detected for session {d5SessionId} on {_HOSTNAME}.
+    description: Session stream unavailable for session {{value "d5SessionId"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -916,7 +916,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5SessMgtStreamLostTrap
     category: state_change
     severity: warning
-    description: Stream lost for session {d5SessionId} on channel {d5QamIndex} on {_HOSTNAME}.
+    description: Stream session lost on {{first (value "d5SessionId") "session"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -932,8 +932,8 @@ traps:
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.3.18
     name: ARRIS-D5-ALARM-MIB::d5SessMgtMcpStreamLostTrap
     category: diagnostic
-    severity: err
-    description: MCP stream lost detected with event {docsDevEvText} on {_HOSTNAME}.
+    severity: warning
+    description: MCP stream lost for {{value "d5QamExtServingGroup"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -947,8 +947,8 @@ traps:
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.4.1
     name: ARRIS-D5-ALARM-MIB::d5CasEcmgErrorTrap
     category: diagnostic
-    severity: err
-    description: DVB ECMG PSIG error detected with event {docsDevEvText} on {_HOSTNAME}.
+    severity: warning
+    description: 'DVB ECMG PSIG error detected{{with value "docsDevEvText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - docsDevEvLevel
@@ -957,8 +957,8 @@ traps:
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.4.2
     name: ARRIS-D5-ALARM-MIB::d5CasEisErrorTrap
     category: diagnostic
-    severity: err
-    description: DVB CAS EIS error {docsDevEvText} detected on {_HOSTNAME}.
+    severity: warning
+    description: 'DVB CAS EIS error detected{{with value "docsDevEvText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - docsDevEvLevel
@@ -968,7 +968,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5CasEmmgErrorTrap
     category: diagnostic
     severity: warning
-    description: DVB CAS EMMG error detected with level {docsDevEvLevel} and text {docsDevEvText} on {_HOSTNAME}.
+    description: 'DVB CAS EMMG error detected{{with value "docsDevEvText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - docsDevEvLevel
@@ -977,8 +977,8 @@ traps:
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.4.4
     name: ARRIS-D5-ALARM-MIB::d5CasPsigErrorTrap
     category: diagnostic
-    severity: err
-    description: DVB CAS PSIG error detected with level {docsDevEvLevel} and text {docsDevEvText} on {_HOSTNAME}.
+    severity: warning
+    description: 'DVB CAS PSIG error detected{{with value "docsDevEvText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - docsDevEvLevel
@@ -988,7 +988,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5SystemRebootTrap
     category: state_change
     severity: notice
-    description: System reboot detected with event {docsDevEvText} on {_HOSTNAME}.
+    description: System reboot detected on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -998,7 +998,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5TacacsErrorTrap
     category: security
     severity: warning
-    description: TACACS error {docsDevEvText} detected on {_HOSTNAME}.
+    description: 'TACACS error detected{{with value "docsDevEvText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - docsDevEvLevel
@@ -1008,7 +1008,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5TacacsInfoTrap
     category: diagnostic
     severity: warning
-    description: 'TACACS info event {docsDevEvId} detected: {docsDevEvText} on {_HOSTNAME}.'
+    description: TACACS info event {{value "docsDevEvText"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -1017,8 +1017,8 @@ traps:
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.5.4
     name: ARRIS-D5-ALARM-MIB::d5HardwareMismatchTrap
     category: diagnostic
-    severity: alert
-    description: 'Hardware mismatch detected: {docsDevEvText} on {_HOSTNAME}.'
+    severity: warning
+    description: 'Hardware mismatch detected{{with value "docsDevEvText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - docsDevEvLevel
@@ -1030,7 +1030,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5EqmNoEcmTrap
     category: diagnostic
     severity: crit
-    description: EQM lost connectivity to ERS and missing ECM on {_HOSTNAME}.
+    description: EQM lost connectivity to ERS and is missing ECM on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -1040,7 +1040,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5EqmStaleEcmTrap
     category: diagnostic
     severity: crit
-    description: EQM lost connectivity to ERS with stale ECMs on {_HOSTNAME}.
+    description: EQM lost connectivity to ERS with stale ECMs on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -1050,7 +1050,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5EqmNoConnTrap
     category: diagnostic
     severity: crit
-    description: EQM lost connectivity to ERS with event {docsDevEvText} on {_HOSTNAME}.
+    description: EQM lost connectivity to ERS on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -1058,9 +1058,9 @@ traps:
       - docsDevEvText
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.8.4
     name: ARRIS-D5-ALARM-MIB::d5EqmDomainShutdownTrap
-    category: diagnostic
-    severity: err
-    description: EQM domain shutdown event {docsDevEvText} on {_HOSTNAME}.
+    category: state_change
+    severity: warning
+    description: 'EQM domain shutdown detected{{with value "docsDevEvText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - docsDevEvLevel
@@ -1068,9 +1068,9 @@ traps:
       - docsDevEvText
   - oid: 1.3.6.1.4.1.4115.1.8.1.2.1.9.1
     name: ARRIS-D5-ALARM-MIB::d5DtiNoPortTrap
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: No active DTI port detected with event {docsDevEvText} on {_HOSTNAME}.
+    description: 'No active DTI port detected{{with value "docsDevEvText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - docsDevEvLevel
@@ -1081,7 +1081,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5DtiStateTrap
     category: state_change
     severity: warning
-    description: DTI state change {docsDevEvText} with level {docsDevEvLevel} on {_HOSTNAME}.
+    description: 'DTI state change detected{{with value "docsDevEvText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - docsDevEvLevel
@@ -1092,7 +1092,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5DtiPortStatusTrap
     category: state_change
     severity: warning
-    description: DTI port status change {docsDevEvText} on {_HOSTNAME}.
+    description: DTI port status changed {{value "docsDevEvText"}} on {{hostname}}.
     status: current
     varbinds:
       - docsDevEvLevel
@@ -1103,7 +1103,7 @@ traps:
     name: ARRIS-D5-ALARM-MIB::d5DtiAdminTrap
     category: config_change
     severity: notice
-    description: DTI Admin configuration changed with event {docsDevEvText} on {_HOSTNAME}.
+    description: 'DTI Admin configuration changed{{with value "docsDevEvText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - docsDevEvLevel
@@ -1113,7 +1113,7 @@ traps:
     name: ARRIS-D5-QAM-MIB::d5QamSpareGroupFailOver
     category: state_change
     severity: notice
-    description: QAM primary entity switched over to spare {d5QamSpareGroupPrimaryPhysicalIndex} on {_HOSTNAME}.
+    description: QAM primary entity switched over to spare on {{hostname}}.
     status: current
     varbinds:
       - d5QamSpareGroupPrimaryPhysicalIndex
@@ -1122,7 +1122,7 @@ traps:
     name: ARRIS-D5-QAM-MIB::d5QamSpareGroupFailBack
     category: state_change
     severity: notice
-    description: Primary QAM entity {d5QamSpareGroupPrimaryPhysicalIndex} restored to standby on {_HOSTNAME}.
+    description: QAM spare group failed back to standby on {{hostname}}.
     status: current
     varbinds:
       - d5QamSpareGroupPrimaryPhysicalIndex
@@ -1130,8 +1130,8 @@ traps:
   - oid: 1.3.6.1.4.1.4115.1.8.1.22.5.1
     name: ARRIS-D5-LICENSE-MIB::d5LMNoKeyAvailable
     category: license
-    severity: warning
-    description: Permanent license pool exhausted for {d5LicenseAllocationType} with {d5LicensesAllocated} allocated on {_HOSTNAME}.
+    severity: alert
+    description: Permanent license pool exhausted for {{value "d5LicenseAllocationType"}} on {{hostname}}.
     status: current
     varbinds:
       - d5LicenseAllocationType
@@ -1141,7 +1141,7 @@ traps:
     name: ARRIS-D5-LICENSE-MIB::d5LMServicePeriodExpire
     category: license
     severity: warning
-    description: Temporary license for {d5LicenseAllocationType} expired and feature revoked on {_HOSTNAME}.
+    description: Temporary license grace period expired and feature revoked on {{hostname}}.
     status: current
     varbinds:
       - d5LicenseAllocationType

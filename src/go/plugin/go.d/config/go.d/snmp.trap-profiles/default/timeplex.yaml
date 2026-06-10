@@ -43,7 +43,7 @@ traps:
     name: HPNSATRAP-MIB::rtConfigUpdated
     category: config_change
     severity: notice
-    description: New configuration written for adapter {rtAdapterNumber} on {_HOSTNAME}.
+    description: New configuration written for adapter {{value "rtAdapterNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -51,7 +51,7 @@ traps:
     name: HPNSATRAP-MIB::rtPhysicalDriveStateChange
     category: diagnostic
     severity: warning
-    description: Drive state changed from {rtOldDriveState} to {rtNewDriveState} on adapter {rtAdapterNumber} channel {rtChannelNumber} target {rtTargetID} on {_HOSTNAME}.
+    description: Drive state changed from {{value "rtOldDriveState"}} to {{value "rtNewDriveState"}} on adapter {{value "rtAdapterNumber"}} channel {{value "rtChannelNumber"}} target {{value "rtTargetID"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -63,7 +63,7 @@ traps:
     name: HPNSATRAP-MIB::rtLogicalDriveStateChange
     category: state_change
     severity: warning
-    description: Logical drive {rtLogicalDriveNumber} on adapter {rtAdapterNumber} changed state from {rtOldDriveState} to {rtNewDriveState} on {_HOSTNAME}.
+    description: Logical drive {{value "rtLogicalDriveNumber"}} on adapter {{value "rtAdapterNumber"}} changed state from {{value "rtOldDriveState"}} to {{value "rtNewDriveState"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -74,7 +74,7 @@ traps:
     name: HPNSATRAP-MIB::rtInitializeStarted
     category: diagnostic
     severity: notice
-    description: Adapter {rtAdapterNumber} logical drive {rtLogicalDriveNumber} initialization started on {_HOSTNAME}.
+    description: Storage adapter {{value "rtAdapterNumber"}} logical drive {{value "rtLogicalDriveNumber"}} initialization started on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -82,8 +82,8 @@ traps:
   - oid: 1.3.6.1.4.1.16.1.1.200.0.9005
     name: HPNSATRAP-MIB::rtInitializeCompleted
     category: diagnostic
-    severity: notice
-    description: Storage adapter {rtAdapterNumber} logical drive {rtLogicalDriveNumber} initialization completed on {_HOSTNAME}.
+    severity: info
+    description: Storage adapter {{value "rtAdapterNumber"}} logical drive {{value "rtLogicalDriveNumber"}} initialization completed on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -92,7 +92,7 @@ traps:
     name: HPNSATRAP-MIB::rtInitializeAborted
     category: diagnostic
     severity: warning
-    description: Adapter {rtAdapterNumber} logical drive {rtLogicalDriveNumber} initialization aborted on {_HOSTNAME}.
+    description: Storage adapter {{value "rtAdapterNumber"}} logical drive {{value "rtLogicalDriveNumber"}} initialization aborted on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -100,8 +100,8 @@ traps:
   - oid: 1.3.6.1.4.1.16.1.1.200.0.9007
     name: HPNSATRAP-MIB::rtInitializeFailed
     category: diagnostic
-    severity: err
-    description: Adapter {rtAdapterNumber} logical drive {rtLogicalDriveNumber} initialization failed on {_HOSTNAME}.
+    severity: crit
+    description: Storage adapter {{value "rtAdapterNumber"}} logical drive {{value "rtLogicalDriveNumber"}} initialization failed on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -110,7 +110,7 @@ traps:
     name: HPNSATRAP-MIB::rtCheckConsistencyStarted
     category: diagnostic
     severity: notice
-    description: Check Consistency started for adapter {rtAdapterNumber} and logical drive {rtLogicalDriveNumber} on {_HOSTNAME}.
+    description: Check consistency started on adapter {{value "rtAdapterNumber"}} logical drive {{value "rtLogicalDriveNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -118,8 +118,8 @@ traps:
   - oid: 1.3.6.1.4.1.16.1.1.200.0.9009
     name: HPNSATRAP-MIB::rtCheckConsistencyCompleted
     category: diagnostic
-    severity: notice
-    description: Check Consistency completed for adapter {rtAdapterNumber} logical drive {rtLogicalDriveNumber} on {_HOSTNAME}.
+    severity: info
+    description: Check consistency completed with no inconsistencies on adapter {{value "rtAdapterNumber"}} logical drive {{value "rtLogicalDriveNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -127,8 +127,8 @@ traps:
   - oid: 1.3.6.1.4.1.16.1.1.200.0.9010
     name: HPNSATRAP-MIB::rtCheckConsistencyAborted
     category: diagnostic
-    severity: notice
-    description: Check Consistency aborted for adapter {rtAdapterNumber} logical drive {rtLogicalDriveNumber} on {_HOSTNAME}.
+    severity: warning
+    description: Check consistency aborted on adapter {{value "rtAdapterNumber"}} logical drive {{value "rtLogicalDriveNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -137,7 +137,7 @@ traps:
     name: HPNSATRAP-MIB::rtConsistencyCorrected
     category: diagnostic
     severity: notice
-    description: Check consistency operation completed and inconsistencies cured for adapter {rtAdapterNumber} logical drive {rtLogicalDriveNumber} on {_HOSTNAME}.
+    description: Check consistency operation cured inconsistencies on adapter {{value "rtAdapterNumber"}} logical drive {{value "rtLogicalDriveNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -145,8 +145,8 @@ traps:
   - oid: 1.3.6.1.4.1.16.1.1.200.0.9012
     name: HPNSATRAP-MIB::rtCheckConsistencyFailed
     category: diagnostic
-    severity: err
-    description: Check consistency failed for adapter {rtAdapterNumber} logical drive {rtLogicalDriveNumber} on {_HOSTNAME}.
+    severity: warning
+    description: Check consistency failed for adapter {{value "rtAdapterNumber"}} logical drive {{value "rtLogicalDriveNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -155,7 +155,7 @@ traps:
     name: HPNSATRAP-MIB::rtReconstructionStarted
     category: diagnostic
     severity: notice
-    description: RAID reconstruction started for adapter {rtAdapterNumber} logical drive {rtLogicalDriveNumber} on {_HOSTNAME}.
+    description: Reconstruction started for adapter {{value "rtAdapterNumber"}} logical drive {{value "rtLogicalDriveNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -164,7 +164,7 @@ traps:
     name: HPNSATRAP-MIB::rtReconstructionCompleted
     category: diagnostic
     severity: notice
-    description: Reconstruction completed for adapter {rtAdapterNumber} logical drive {rtLogicalDriveNumber} on {_HOSTNAME}.
+    description: Reconstruction completed successfully for adapter {{value "rtAdapterNumber"}} logical drive {{value "rtLogicalDriveNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -172,8 +172,8 @@ traps:
   - oid: 1.3.6.1.4.1.16.1.1.200.0.9015
     name: HPNSATRAP-MIB::rtReconstructionFailed
     category: diagnostic
-    severity: err
-    description: Reconstruction failed for adapter {rtAdapterNumber} logical drive {rtLogicalDriveNumber} on {_HOSTNAME}.
+    severity: crit
+    description: Reconstruction failed for adapter {{value "rtAdapterNumber"}} logical drive {{value "rtLogicalDriveNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -182,7 +182,7 @@ traps:
     name: HPNSATRAP-MIB::rtPredictiveFailuresFalse
     category: diagnostic
     severity: warning
-    description: Predictive failure threshold exceeded for adapter {rtAdapterNumber} channel {rtChannelNumber} target {rtTargetID} on {_HOSTNAME}.
+    description: Predictive failure threshold exceeded for drive {{value "rtDriveVendor"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -196,7 +196,7 @@ traps:
     name: HPNSATRAP-MIB::rtPredictiveFailuresExceeded
     category: diagnostic
     severity: warning
-    description: Predictive failure detected on adapter {rtAdapterNumber}, channel {rtChannelNumber}, target {rtTargetID} on {_HOSTNAME}.
+    description: Predictive drive failure detected on adapter {{value "rtAdapterNumber"}} channel {{value "rtChannelNumber"}} target {{value "rtTargetID"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -210,7 +210,7 @@ traps:
     name: HPNSATRAP-MIB::rtCheckConditionStatus
     category: diagnostic
     severity: warning
-    description: Adapter {rtAdapterNumber} channel {rtChannelNumber} target {rtTargetID} reported sense key {rtSenseKey} ASC {rtASC} ASCQ {rtASCQ} on {_HOSTNAME}.
+    description: SCSI command completed with sense key {{value "rtSenseKey"}} on adapter {{value "rtAdapterNumber"}} channel {{value "rtChannelNumber"}} target {{value "rtTargetID"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -221,9 +221,9 @@ traps:
       - rtASCQ
   - oid: 1.3.6.1.4.1.16.1.1.200.0.9019
     name: HPNSATRAP-MIB::rtNewDriveInserted
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: New drive detected on adapter {rtAdapterNumber}, channel {rtChannelNumber}, target {rtTargetID} on {_HOSTNAME}.
+    description: New physical drive detected on adapter {{value "rtAdapterNumber"}}, channel {{value "rtChannelNumber"}}, target {{value "rtTargetID"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -232,8 +232,8 @@ traps:
   - oid: 1.3.6.1.4.1.16.1.1.200.0.9020
     name: HPNSATRAP-MIB::rtBatteryMissing
     category: diagnostic
-    severity: err
-    description: Battery module missing on adapter {rtAdapterNumber} on {_HOSTNAME}.
+    severity: warning
+    description: Battery module missing on adapter {{value "rtAdapterNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
@@ -241,15 +241,15 @@ traps:
     name: HPNSATRAP-MIB::rtBatteryVolatageLow
     category: diagnostic
     severity: warning
-    description: Adapter {rtAdapterNumber} battery voltage is low on {_HOSTNAME}.
+    description: Battery module voltage is low on adapter {{value "rtAdapterNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber
   - oid: 1.3.6.1.4.1.16.1.1.200.0.9022
     name: HPNSATRAP-MIB::rtBatteryTemperatureHigh
     category: diagnostic
-    severity: warning
-    description: Battery module temperature exceeded danger threshold for adapter {rtAdapterNumber} on {_HOSTNAME}.
+    severity: alert
+    description: Battery module temperature exceeded danger threshold on adapter {{value "rtAdapterNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - rtAdapterNumber

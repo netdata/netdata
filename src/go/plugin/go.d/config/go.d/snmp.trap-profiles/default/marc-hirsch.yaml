@@ -39,24 +39,24 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.1
     name: CPS6000-MIB::cps6000TrapDc1Amj
     category: diagnostic
-    severity: err
-    description: Auxiliary Fuse Major alarm received with details {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: Auxiliary fuse major alarm {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.2
     name: CPS6000-MIB::cps6000TrapDc1Epo
     category: diagnostic
-    severity: emerg
-    description: Emergency Power Off event triggered with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Emergency Power Off triggered{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.3
     name: CPS6000-MIB::cps6000TrapDc1Faj
     category: diagnostic
-    severity: err
-    description: External fuse major alarm reported on {_HOSTNAME}.
+    severity: crit
+    description: 'External fuse major alarm triggered{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -64,7 +64,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapDc1Fan
     category: diagnostic
     severity: warning
-    description: External fuse minor alarm reported on {_HOSTNAME}.
+    description: 'External fuse minor alarm detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -72,7 +72,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapDc1Vsf
     category: diagnostic
     severity: warning
-    description: Sense/Control Fuse alarm triggered with {trapInfo} on {_HOSTNAME}.
+    description: 'Sense/Control Fuse alarm triggered{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -80,7 +80,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapDc1Osa
     category: diagnostic
     severity: warning
-    description: DC alarm event {trapInfo} on {_HOSTNAME}.
+    description: 'DC1 OSA alarm triggered{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -88,7 +88,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapDc1Zid
     category: diagnostic
     severity: warning
-    description: DC ID not configured with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'DC ID not configured{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -96,7 +96,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapDc1Tpa
     category: diagnostic
     severity: warning
-    description: Thermal Probe Alarm reported with {trapInfo} on {_HOSTNAME}.
+    description: Thermal Probe Alarm {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
@@ -104,7 +104,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapDc1Vmf
     category: diagnostic
     severity: crit
-    description: Voltage Module Fail with {trapInfo} on {_HOSTNAME}.
+    description: Voltage Module Fail {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
@@ -112,39 +112,39 @@ traps:
     name: CPS6000-MIB::cps6000TrapDc1Cma
     category: diagnostic
     severity: warning
-    description: Minor communication failure reported with {trapInfo} on {_HOSTNAME}.
+    description: 'Minor communication failure{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.11
     name: CPS6000-MIB::cps6000TrapDc1Macf
     category: diagnostic
-    severity: crit
-    description: Multiple AC Failure detected with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Multiple AC power failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.12
     name: CPS6000-MIB::cps6000TrapDc1Mcm
     category: diagnostic
-    severity: crit
-    description: Major communication failure reported with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Major communication failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.13
     name: CPS6000-MIB::cps6000TrapDc1Rfa
     category: diagnostic
-    severity: err
-    description: Rectifier Fail detected with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Rectifier failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.14
     name: CPS6000-MIB::cps6000TrapDc1Did
-    category: security
+    category: diagnostic
     severity: warning
-    description: ID Conflict detected with {trapInfo} on {_HOSTNAME}.
+    description: 'ID conflict detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -152,7 +152,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapDc1Clm
     category: diagnostic
     severity: warning
-    description: Rectifier Current Limit alarm triggered with {trapInfo} on {_HOSTNAME}.
+    description: 'Rectifier current limit alarm triggered{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -160,15 +160,15 @@ traps:
     name: CPS6000-MIB::cps6000TrapDc1Vla
     category: diagnostic
     severity: warning
-    description: Very Low Voltage alarm detected with {trapInfo} on {_HOSTNAME}.
+    description: 'Very Low Voltage detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.17
     name: CPS6000-MIB::cps6000TrapDc1Acf
     category: diagnostic
-    severity: crit
-    description: AC power failure detected with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'AC power failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -176,23 +176,23 @@ traps:
     name: CPS6000-MIB::cps6000TrapDc1Man
     category: state_change
     severity: notice
-    description: Manual Off event reported via {trapInfo} on {_HOSTNAME}.
+    description: 'DC manual off event triggered{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.19
     name: CPS6000-MIB::cps6000TrapDc1Mman
     category: diagnostic
-    severity: warning
-    description: Multiple Manual Off event reported via {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Multiple Manual Off alarm detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.20
     name: CPS6000-MIB::cps6000TrapDc1Mfa
     category: diagnostic
-    severity: err
-    description: Multiple Rectifier Fail reported with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Multiple rectifier failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -200,7 +200,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapDc1Rtl
     category: diagnostic
     severity: warning
-    description: Reserve Time Low alarm reported with {trapInfo} on {_HOSTNAME}.
+    description: 'DC reserve time low{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -208,7 +208,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapDc1Rrtl
     category: diagnostic
     severity: warning
-    description: Real-time reserve time low alarm {trapInfo} on {_HOSTNAME}.
+    description: 'Real-time reserve time low{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -216,7 +216,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapDc1Rls
     category: state_change
     severity: alert
-    description: Redundancy loss detected with {trapInfo} on {_HOSTNAME}.
+    description: 'Redundancy loss detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -224,15 +224,15 @@ traps:
     name: CPS6000-MIB::cps6000TrapDc1Bda
     category: diagnostic
     severity: warning
-    description: Battery on discharge detected with {trapInfo} on {_HOSTNAME}.
+    description: 'Battery on discharge{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.25
     name: CPS6000-MIB::cps6000TrapDc1Hva
     category: diagnostic
-    severity: warning
-    description: High voltage alarm reported with details {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'High voltage alarm detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -240,7 +240,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapDc1Hfv
     category: diagnostic
     severity: warning
-    description: High float voltage alarm reported with {trapInfo} on {_HOSTNAME}.
+    description: 'High float voltage alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -248,7 +248,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapPs1Amth
     category: diagnostic
     severity: warning
-    description: High ambient temperature alarm reported on {_HOSTNAME}.
+    description: 'High ambient temperature detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -256,7 +256,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapPs1Amtl
     category: diagnostic
     severity: warning
-    description: Low ambient temperature alarm detected on {_HOSTNAME}.
+    description: 'Low ambient temperature alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -264,7 +264,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapPs1Bbl
     category: diagnostic
     severity: warning
-    description: Memory Backup Battery Low reported on {_HOSTNAME}.
+    description: 'Memory backup battery low{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -272,7 +272,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapPs1Cch
     category: config_change
     severity: notice
-    description: Configuration changed with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Configuration changed{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -280,7 +280,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapPs1Clc
     category: diagnostic
     severity: warning
-    description: Clock changed event reported with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Clock changed{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -288,7 +288,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapPs1Epr
     category: security
     severity: warning
-    description: External password reset detected via {trapInfo} on {_HOSTNAME}.
+    description: 'External password reset detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -296,7 +296,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapPs1Exl
     category: security
     severity: warning
-    description: Excessive login attempts detected with {trapInfo} on {_HOSTNAME}.
+    description: 'Excessive login attempts detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -304,39 +304,39 @@ traps:
     name: CPS6000-MIB::cps6000TrapPs1Hcl
     category: diagnostic
     severity: notice
-    description: History cleared on {_HOSTNAME}.
+    description: 'History cleared{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.35
     name: CPS6000-MIB::cps6000TrapPs1Pfd
     category: security
-    severity: warning
-    description: Passwords At Default detected on {_HOSTNAME}.
+    severity: alert
+    description: Passwords are at default on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.36
     name: CPS6000-MIB::cps6000TrapPs1Pht
     category: diagnostic
-    severity: alert
-    description: Processor halt detected with supplemental alarm {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: 'Processor halt detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.37
     name: CPS6000-MIB::cps6000TrapPs1Stf
     category: diagnostic
-    severity: err
-    description: Self test failed with supplemental information {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: 'Self test failed{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.38
     name: CPS6000-MIB::cps6000TrapPs1Pgi
     category: diagnostic
-    severity: err
-    description: Program Line Invalid detected on {_HOSTNAME}.
+    severity: warning
+    description: 'Program line invalid{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -344,7 +344,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapPs1Ax1
     category: diagnostic
     severity: warning
-    description: Auxiliary event 1 reported with supplemental information {trapInfo} on {_HOSTNAME}.
+    description: 'Auxiliary event 1 detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -352,7 +352,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapPs1Ax2
     category: diagnostic
     severity: warning
-    description: Auxiliary event reported with supplemental information {trapInfo} on {_HOSTNAME}.
+    description: 'Auxiliary event 1 detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -360,7 +360,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapPs1Ax3
     category: diagnostic
     severity: warning
-    description: Auxiliary event {trapInfo} on {_HOSTNAME}.
+    description: 'Auxiliary event 1 detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -368,7 +368,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapPs1Ax4
     category: diagnostic
     severity: warning
-    description: Auxiliary event {trapInfo} on {_HOSTNAME}.
+    description: 'Auxiliary event 1 detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -376,7 +376,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapPs1Ax5
     category: diagnostic
     severity: warning
-    description: Auxiliary event {trapInfo} reported on {_HOSTNAME}.
+    description: 'Auxiliary event 1 detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -384,7 +384,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapPs1Ax6
     category: diagnostic
     severity: warning
-    description: Auxiliary event reported with {trapInfo} on {_HOSTNAME}.
+    description: 'Auxiliary event 1 detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -392,55 +392,55 @@ traps:
     name: CPS6000-MIB::cps6000TrapAt1Ata
     category: diagnostic
     severity: warning
-    description: Alarm test active with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Alarm test active{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.46
     name: CPS6000-MIB::cps6000TrapAt1Atb
     category: diagnostic
-    severity: notice
-    description: Alarm test aborted with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: warning
+    description: 'Alarm test aborted{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.47
     name: CPS6000-MIB::cps6000TrapCp1Cfa
     category: diagnostic
-    severity: alert
-    description: Converter failure detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: 'Converter failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.48
     name: CPS6000-MIB::cps6000TrapCp1Dfa
     category: diagnostic
-    severity: err
-    description: Distribution Fail detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: 'Distribution Fail alarm detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.49
     name: CPS6000-MIB::cps6000TrapCp1Did
-    category: security
+    category: diagnostic
     severity: warning
-    description: ID conflict detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'ID conflict detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.50
     name: CPS6000-MIB::cps6000TrapCp1Mfa
     category: diagnostic
-    severity: err
-    description: Multiple Converter Fail reported with {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: 'Multiple converter failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.51
     name: CPS6000-MIB::cps6000TrapBs1Bsa
     category: diagnostic
-    severity: warning
-    description: Boost State Alarm reported with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Boost State Alarm detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -448,7 +448,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapBr1Bta
     category: diagnostic
     severity: notice
-    description: Battery test active with {trapInfo} on {_HOSTNAME}.
+    description: 'Battery test active{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -456,7 +456,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapBr1Bfa
     category: diagnostic
     severity: warning
-    description: Battery test failed with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Battery test failed{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -464,7 +464,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapBr1Btha
     category: diagnostic
     severity: warning
-    description: High battery temperature alarm reported on {_HOSTNAME}.
+    description: 'High battery temperature detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -472,63 +472,63 @@ traps:
     name: CPS6000-MIB::cps6000TrapBr1Isda
     category: diagnostic
     severity: alert
-    description: Imminent shutdown alarm reported with {trapInfo} on {_HOSTNAME}.
+    description: 'Imminent shutdown detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.56
     name: CPS6000-MIB::cps6000TrapCn1Cno
     category: diagnostic
-    severity: warning
-    description: Contactor open event reported with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Contactor open event detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.57
     name: CPS6000-MIB::cps6000TrapCn1Cnf
     category: diagnostic
-    severity: crit
-    description: Contactor failed with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Contactor failed{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.58
     name: CPS6000-MIB::cps6000TrapCn2Cno
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Contactor open state detected with {trapInfo} on {_HOSTNAME}.
+    description: 'Contactor open{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.59
     name: CPS6000-MIB::cps6000TrapCn2Cnf
     category: diagnostic
-    severity: err
-    description: Contactor failed with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Contactor failed{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.60
     name: CPS6000-MIB::cps6000TrapCn3Cno
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Contactor Open reported via {trapInfo} on {_HOSTNAME}.
+    description: 'Contactor open{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.61
     name: CPS6000-MIB::cps6000TrapCn3Cnf
     category: diagnostic
-    severity: err
-    description: Contactor failed with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: 'Contactor failed{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.62
     name: CPS6000-MIB::cps6000TrapCn4Cno
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Contactor Open reported with {trapInfo} on {_HOSTNAME}.
+    description: 'Contactor open{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -536,7 +536,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapCn4Cnf
     category: diagnostic
     severity: crit
-    description: Contactor failed with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Contactor failed{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -544,7 +544,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapCm1Cof
     category: diagnostic
     severity: warning
-    description: Queue overflow detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Queue overflow detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -552,7 +552,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapCm1Cor
     category: diagnostic
     severity: warning
-    description: 'CPS6000 alarm triggered: Number Did Not Respond {trapInfo} on {_HOSTNAME}.'
+    description: 'Number Did Not Respond{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -560,7 +560,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapCm1Nnc
     category: diagnostic
     severity: warning
-    description: Alarm reported with supplemental information {trapInfo} on {_HOSTNAME}.
+    description: 'Number Not Configured alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -568,7 +568,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapPo1Por
     category: diagnostic
     severity: warning
-    description: Device reported 'Number Did Not Respond' with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Port did not respond{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -576,7 +576,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapRp1Rf
     category: diagnostic
     severity: warning
-    description: Ringer minor failure reported with {trapInfo} on {_HOSTNAME}.
+    description: 'Ringer minor failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -584,15 +584,15 @@ traps:
     name: CPS6000-MIB::cps6000TrapRp1Rpff
     category: diagnostic
     severity: crit
-    description: Ringer Fan Fail alarm detected with {trapInfo} on {_HOSTNAME}.
+    description: 'Ringer Fan Fail detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.70
     name: CPS6000-MIB::cps6000TrapRp1Rpxj
     category: diagnostic
-    severity: alert
-    description: Ringer Major External Fault reported with {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: Ringer Major External Fault {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
@@ -600,7 +600,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapRp1Rpxn
     category: diagnostic
     severity: warning
-    description: Ringer Minor External Fault reported with {trapInfo} on {_HOSTNAME}.
+    description: Ringer Minor External Fault {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
@@ -608,39 +608,39 @@ traps:
     name: CPS6000-MIB::cps6000TrapRp1Rprl
     category: diagnostic
     severity: alert
-    description: Ringer redundancy loss detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Ringer redundancy loss detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.73
     name: CPS6000-MIB::cps6000TrapRp1Rpfj
     category: diagnostic
-    severity: crit
-    description: Ringer Major Fail detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Ringer Major Fail detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.74
     name: CPS6000-MIB::cps6000TrapUserDefined
-    category: unknown
+    category: diagnostic
     severity: warning
-    description: User-defined trap {trapInfo} received on {_HOSTNAME}.
+    description: User-defined event {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.75
     name: CPS6000-MIB::cps6000TrapDc1Icr
     category: diagnostic
-    severity: err
-    description: Incompatible Rectifier detected with {trapInfo} on {_HOSTNAME}.
+    severity: warning
+    description: 'Incompatible Rectifier detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.76
     name: CPS6000-MIB::cps6000TrapDc1Rfn
     category: diagnostic
-    severity: err
-    description: Rectifier fan failure detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: Rectifier fan failure detected on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
@@ -648,7 +648,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapDc1Emd
     category: diagnostic
     severity: warning
-    description: Energy management disabled on {_HOSTNAME}.
+    description: 'Energy management disabled{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -656,31 +656,31 @@ traps:
     name: CPS6000-MIB::cps6000TrapCp1Cfn
     category: diagnostic
     severity: warning
-    description: Converter fan minor alarm reported on {_HOSTNAME}.
+    description: 'Converter fan minor alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.79
     name: CPS6000-MIB::cps6000TrapCp1Cfj
     category: diagnostic
-    severity: err
-    description: Converter fan major alarm reported with {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: 'Converter fan major fault detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.80
     name: CPS6000-MIB::cps6000TrapCp1Icc
     category: diagnostic
-    severity: err
-    description: Incompatible Converter Alarm reported with {trapInfo} on {_HOSTNAME}.
+    severity: warning
+    description: 'Incompatible Converter Alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.81
     name: CPS6000-MIB::cps6000TrapCp1Hva
     category: diagnostic
-    severity: err
-    description: Converter High Voltage Major alarm reported on {_HOSTNAME}.
+    severity: crit
+    description: 'Converter high voltage major alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -688,7 +688,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapCp1Hfv
     category: diagnostic
     severity: warning
-    description: Converter High Voltage Minor alarm {trapInfo} on {_HOSTNAME}.
+    description: 'Converter high voltage minor alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -696,15 +696,15 @@ traps:
     name: CPS6000-MIB::cps6000TrapCp1Vla
     category: diagnostic
     severity: warning
-    description: Converter Very Low Voltage alarm detected with {trapInfo} on {_HOSTNAME}.
+    description: 'Converter very low voltage detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.84
     name: CPS6000-MIB::cps6000TrapCp1Rl
     category: state_change
-    severity: crit
-    description: Converter redundancy loss detected with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Converter redundancy loss detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -712,7 +712,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapBr1Mdp
     category: diagnostic
     severity: warning
-    description: Voltage Duplicate ID alarm detected with {trapInfo} on {_HOSTNAME}.
+    description: 'Voltage Duplicate ID alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -720,15 +720,15 @@ traps:
     name: CPS6000-MIB::cps6000TrapBr1Mzd
     category: diagnostic
     severity: warning
-    description: Voltage ID not configured with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Voltage ID not configured{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.87
     name: CPS6000-MIB::cps6000TrapBr1Scda
     category: diagnostic
-    severity: crit
-    description: Shorted Cell Detected with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Shorted cell detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -736,7 +736,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapRp1Rcdp
     category: diagnostic
     severity: warning
-    description: Ringer ID conflict detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Ringer ID conflict detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -744,15 +744,15 @@ traps:
     name: CPS6000-MIB::cps6000TrapFt1Fmi
     category: diagnostic
     severity: warning
-    description: Fan fail minor alarm reported on {_HOSTNAME}.
+    description: 'Fan fail minor alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.90
     name: CPS6000-MIB::cps6000TrapFt1Fmj
     category: diagnostic
-    severity: err
-    description: Fan failure major alarm reported with {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: 'Fan failure major alarm detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -760,15 +760,15 @@ traps:
     name: CPS6000-MIB::cps6000TrapFt1Ipi
     category: diagnostic
     severity: warning
-    description: Input power minor alarm reported with {trapInfo} on {_HOSTNAME}.
+    description: 'Input power minor alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.92
     name: CPS6000-MIB::cps6000TrapFt1Ipj
     category: diagnostic
-    severity: err
-    description: Input power major alarm {trapInfo} on {_HOSTNAME}.
+    severity: warning
+    description: 'Input power major alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -776,23 +776,23 @@ traps:
     name: CPS6000-MIB::cps6000TrapFt1Cbt
     category: diagnostic
     severity: alert
-    description: Circuit Breaker Trip reported with {trapInfo} on {_HOSTNAME}.
+    description: 'Circuit breaker trip detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.94
     name: CPS6000-MIB::cps6000TrapFt1Ctf
     category: diagnostic
-    severity: err
-    description: Circuit Fail reported with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Circuit fail alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.95
     name: CPS6000-MIB::cps6000TrapFt1Mctf
     category: diagnostic
-    severity: crit
-    description: Multiple Circuit Fail alarm reported with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Multiple circuit failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -800,7 +800,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapFt1Lor
     category: state_change
     severity: alert
-    description: Loss of redundancy detected with {trapInfo} on {_HOSTNAME}.
+    description: 'Loss of redundancy detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -808,7 +808,7 @@ traps:
     name: CPS6000-MIB::cps6000TrapFt1Lda
     category: diagnostic
     severity: alert
-    description: Load Drop Alarm triggered with {trapInfo} on {_HOSTNAME}.
+    description: 'Load drop alarm detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -816,47 +816,47 @@ traps:
     name: CPS6000-MIB::cps6000TrapFt1Lsa
     category: diagnostic
     severity: warning
-    description: Load share alarm triggered with {trapInfo} on {_HOSTNAME}.
+    description: Load share alarm {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.99
     name: CPS6000-MIB::cps6000TrapFt1Lta
     category: diagnostic
-    severity: err
-    description: Line Test Failed Alarm reported by {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: Line Test Failed Alarm {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.33.100
     name: CPS6000-MIB::cps6000TrapDc1Lsf
     category: diagnostic
-    severity: err
-    description: Loadshare fail detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: 'Loadshare fail detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.1
     name: CPS6000-MIB::cps6000RetireDc1Amj
     category: diagnostic
-    severity: err
-    description: Auxiliary Fuse Major alarm reported with {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: Auxiliary fuse major alarm {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.2
     name: CPS6000-MIB::cps6000RetireDc1Epo
     category: diagnostic
-    severity: alert
-    description: Emergency Power Off triggered with {trapInfo} on {_HOSTNAME}.
+    severity: emerg
+    description: 'Emergency Power Off event detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.3
     name: CPS6000-MIB::cps6000RetireDc1Faj
     category: diagnostic
-    severity: err
-    description: External fuse major fault reported with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: External fuse major alarm detected on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
@@ -864,7 +864,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireDc1Fan
     category: diagnostic
     severity: warning
-    description: External fuse minor alarm reported on {_HOSTNAME}.
+    description: External fuse minor alarm {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
@@ -872,7 +872,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireDc1Vsf
     category: diagnostic
     severity: warning
-    description: Sense/Control Fuse alarm reported with {trapInfo} on {_HOSTNAME}.
+    description: 'Sense/Control Fuse alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -880,7 +880,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireDc1Osa
     category: diagnostic
     severity: warning
-    description: Retire DC1 OSA event reported with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'DC1 OSA retired{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -888,23 +888,23 @@ traps:
     name: CPS6000-MIB::cps6000RetireDc1Zid
     category: diagnostic
     severity: warning
-    description: Device reported {trapInfo} on {_HOSTNAME}.
+    description: 'DC ID not configured{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.8
     name: CPS6000-MIB::cps6000RetireDc1Tpa
     category: diagnostic
-    severity: warning
-    description: Thermal Probe Alarm {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: Thermal Probe Alarm {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.9
     name: CPS6000-MIB::cps6000RetireDc1Vmf
     category: diagnostic
-    severity: err
-    description: Voltage Module Fail {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: 'Voltage module failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -912,39 +912,39 @@ traps:
     name: CPS6000-MIB::cps6000RetireDc1Cma
     category: diagnostic
     severity: warning
-    description: Minor communication failure reported with {trapInfo} on {_HOSTNAME}.
+    description: Minor communication failure {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.11
     name: CPS6000-MIB::cps6000RetireDc1Macf
     category: diagnostic
-    severity: crit
-    description: Multiple AC failure detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Multiple AC failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.12
     name: CPS6000-MIB::cps6000RetireDc1Mcm
     category: diagnostic
-    severity: alert
-    description: Major communication failure reported with {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: 'Major communication failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.13
     name: CPS6000-MIB::cps6000RetireDc1Rfa
     category: diagnostic
-    severity: err
-    description: Rectifier Fail reported with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Rectifier failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.14
     name: CPS6000-MIB::cps6000RetireDc1Did
     category: diagnostic
-    severity: warning
-    description: ID conflict detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'ID conflict detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -952,7 +952,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireDc1Clm
     category: diagnostic
     severity: warning
-    description: Rectifier Current Limit alarm reported with {trapInfo} on {_HOSTNAME}.
+    description: 'Rectifier current limit alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -960,15 +960,15 @@ traps:
     name: CPS6000-MIB::cps6000RetireDc1Vla
     category: diagnostic
     severity: warning
-    description: Very Low Voltage alarm reported with {trapInfo} on {_HOSTNAME}.
+    description: 'Very Low Voltage alarm detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.17
     name: CPS6000-MIB::cps6000RetireDc1Acf
     category: diagnostic
-    severity: alert
-    description: AC failure detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: 'AC power failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -976,23 +976,23 @@ traps:
     name: CPS6000-MIB::cps6000RetireDc1Man
     category: state_change
     severity: notice
-    description: Manual Off event {trapInfo} on {_HOSTNAME}.
+    description: 'DC1 manual off event{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.19
     name: CPS6000-MIB::cps6000RetireDc1Mman
     category: diagnostic
-    severity: warning
-    description: Multiple Manual Off event reported via {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Multiple Manual Off event detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.20
     name: CPS6000-MIB::cps6000RetireDc1Mfa
     category: diagnostic
-    severity: err
-    description: Multiple Rectifier Fail reported via {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Multiple rectifier failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1000,7 +1000,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireDc1Rtl
     category: diagnostic
     severity: warning
-    description: Reserve time low alarm detected with context {trapInfo} on {_HOSTNAME}.
+    description: 'Reserve time low{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1008,15 +1008,15 @@ traps:
     name: CPS6000-MIB::cps6000RetireDc1Rrtl
     category: diagnostic
     severity: warning
-    description: Real-time reserve time low detected with {trapInfo} on {_HOSTNAME}.
+    description: 'Real-time reserve time low{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.23
     name: CPS6000-MIB::cps6000RetireDc1Rls
     category: state_change
-    severity: crit
-    description: Redundancy loss detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Redundancy loss detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1024,15 +1024,15 @@ traps:
     name: CPS6000-MIB::cps6000RetireDc1Bda
     category: diagnostic
     severity: warning
-    description: Battery on discharge detected on {_HOSTNAME}.
+    description: 'Battery on discharge{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.25
     name: CPS6000-MIB::cps6000RetireDc1Hva
     category: diagnostic
-    severity: warning
-    description: High voltage alarm {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: High voltage alarm {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
@@ -1040,7 +1040,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireDc1Hfv
     category: diagnostic
     severity: warning
-    description: High Float Voltage alarm reported on {_HOSTNAME}.
+    description: High float voltage alarm {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
@@ -1048,7 +1048,7 @@ traps:
     name: CPS6000-MIB::cps6000RetirePs1Amth
     category: diagnostic
     severity: warning
-    description: High ambient temperature alert {trapInfo} on {_HOSTNAME}.
+    description: 'High ambient temperature alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1056,7 +1056,7 @@ traps:
     name: CPS6000-MIB::cps6000RetirePs1Amtl
     category: diagnostic
     severity: warning
-    description: Low ambient temperature detected on {_HOSTNAME}.
+    description: 'Low ambient temperature alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1064,7 +1064,7 @@ traps:
     name: CPS6000-MIB::cps6000RetirePs1Bbl
     category: diagnostic
     severity: warning
-    description: Memory Backup Battery Low reported on {_HOSTNAME}.
+    description: 'Memory backup battery low{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1072,7 +1072,7 @@ traps:
     name: CPS6000-MIB::cps6000RetirePs1Cch
     category: config_change
     severity: notice
-    description: Configuration changed with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Configuration changed{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1080,7 +1080,7 @@ traps:
     name: CPS6000-MIB::cps6000RetirePs1Clc
     category: diagnostic
     severity: warning
-    description: Clock changed event reported with {trapInfo} on {_HOSTNAME}.
+    description: 'Clock changed{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1088,7 +1088,7 @@ traps:
     name: CPS6000-MIB::cps6000RetirePs1Epr
     category: security
     severity: warning
-    description: External Password Reset event detected with {trapInfo} on {_HOSTNAME}.
+    description: 'External Password Reset event detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1096,7 +1096,7 @@ traps:
     name: CPS6000-MIB::cps6000RetirePs1Exl
     category: security
     severity: warning
-    description: Excessive login attempts detected with {trapInfo} on {_HOSTNAME}.
+    description: 'Excessive login attempts detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1104,7 +1104,7 @@ traps:
     name: CPS6000-MIB::cps6000RetirePs1Hcl
     category: diagnostic
     severity: notice
-    description: History cleared on {_HOSTNAME}.
+    description: 'History cleared{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1112,7 +1112,7 @@ traps:
     name: CPS6000-MIB::cps6000RetirePs1Pfd
     category: security
     severity: alert
-    description: Passwords at default state detected via {trapInfo} on {_HOSTNAME}.
+    description: 'Passwords at default detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1120,15 +1120,15 @@ traps:
     name: CPS6000-MIB::cps6000RetirePs1Pht
     category: diagnostic
     severity: crit
-    description: Processor halt detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Processor halt detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.37
     name: CPS6000-MIB::cps6000RetirePs1Stf
     category: diagnostic
-    severity: err
-    description: Self test failed with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: 'Self test failed{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1136,7 +1136,7 @@ traps:
     name: CPS6000-MIB::cps6000RetirePs1Pgi
     category: diagnostic
     severity: warning
-    description: Program Line Invalid detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Program line invalid{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1144,7 +1144,7 @@ traps:
     name: CPS6000-MIB::cps6000RetirePs1Ax1
     category: diagnostic
     severity: warning
-    description: Auxiliary event {trapInfo} reported on {_HOSTNAME}.
+    description: 'Auxiliary event 1 occurred{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1152,7 +1152,7 @@ traps:
     name: CPS6000-MIB::cps6000RetirePs1Ax2
     category: diagnostic
     severity: warning
-    description: Auxiliary event reported with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Auxiliary event 1 detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1160,7 +1160,7 @@ traps:
     name: CPS6000-MIB::cps6000RetirePs1Ax3
     category: diagnostic
     severity: warning
-    description: Auxiliary event reported with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Auxiliary event 1 occurred{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1168,7 +1168,7 @@ traps:
     name: CPS6000-MIB::cps6000RetirePs1Ax4
     category: diagnostic
     severity: warning
-    description: Auxiliary event reported with supplemental information {trapInfo} on {_HOSTNAME}.
+    description: 'Auxiliary event 1 occurred{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1176,7 +1176,7 @@ traps:
     name: CPS6000-MIB::cps6000RetirePs1Ax5
     category: diagnostic
     severity: warning
-    description: Auxiliary event {trapInfo} reported on {_HOSTNAME}.
+    description: 'Auxiliary event 1 detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1184,7 +1184,7 @@ traps:
     name: CPS6000-MIB::cps6000RetirePs1Ax6
     category: diagnostic
     severity: warning
-    description: Auxiliary event reported with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Auxiliary event 1 detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1192,7 +1192,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireAt1Ata
     category: diagnostic
     severity: warning
-    description: Alarm test active with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Alarm test active{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1200,23 +1200,23 @@ traps:
     name: CPS6000-MIB::cps6000RetireAt1Atb
     category: diagnostic
     severity: warning
-    description: Alarm test aborted with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Alarm test aborted{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.47
     name: CPS6000-MIB::cps6000RetireCp1Cfa
     category: diagnostic
-    severity: err
-    description: Converter failure detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Converter failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.48
     name: CPS6000-MIB::cps6000RetireCp1Dfa
     category: diagnostic
-    severity: err
-    description: Distribution Fail alarm received with {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: Distribution Fail alarm {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
@@ -1224,23 +1224,23 @@ traps:
     name: CPS6000-MIB::cps6000RetireCp1Did
     category: diagnostic
     severity: warning
-    description: ID conflict detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'ID conflict detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.50
     name: CPS6000-MIB::cps6000RetireCp1Mfa
     category: diagnostic
-    severity: err
-    description: Multiple converter failure detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: 'Multiple converter failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.51
     name: CPS6000-MIB::cps6000RetireBs1Bsa
     category: diagnostic
-    severity: alert
-    description: Boost State Alarm {trapInfo} on {_HOSTNAME}.
+    severity: warning
+    description: Boost State Alarm {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
@@ -1248,15 +1248,15 @@ traps:
     name: CPS6000-MIB::cps6000RetireBr1Bta
     category: diagnostic
     severity: notice
-    description: Battery test active with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Battery test active{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.53
     name: CPS6000-MIB::cps6000RetireBr1Bfa
     category: diagnostic
-    severity: err
-    description: Battery test failed with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Battery test failed{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1264,7 +1264,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireBr1Btha
     category: diagnostic
     severity: warning
-    description: High battery temperature detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'High battery temperature detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1272,7 +1272,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireBr1Isda
     category: diagnostic
     severity: alert
-    description: Imminent shutdown detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Imminent shutdown alarm triggered{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1280,63 +1280,63 @@ traps:
     name: CPS6000-MIB::cps6000RetireCn1Cno
     category: diagnostic
     severity: warning
-    description: Contactor open event reported on {_HOSTNAME}.
+    description: 'Contactor open event{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.57
     name: CPS6000-MIB::cps6000RetireCn1Cnf
     category: diagnostic
-    severity: err
-    description: Contactor failed with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: 'Contactor failed{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.58
     name: CPS6000-MIB::cps6000RetireCn2Cno
     category: diagnostic
-    severity: warning
-    description: Contactor open event reported with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Contactor open event detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.59
     name: CPS6000-MIB::cps6000RetireCn2Cnf
     category: diagnostic
-    severity: err
-    description: Contactor failed with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: 'Contactor failed{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.60
     name: CPS6000-MIB::cps6000RetireCn3Cno
     category: diagnostic
-    severity: warning
-    description: Contactor Open event reported with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Contactor open detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.61
     name: CPS6000-MIB::cps6000RetireCn3Cnf
     category: diagnostic
-    severity: err
-    description: Contactor failed with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Contactor failed{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.62
     name: CPS6000-MIB::cps6000RetireCn4Cno
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Contactor open event reported with {trapInfo} on {_HOSTNAME}.
+    description: 'Contactor open{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.63
     name: CPS6000-MIB::cps6000RetireCn4Cnf
     category: diagnostic
-    severity: crit
-    description: Contactor failed with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Contactor failed{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1344,7 +1344,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireCm1Cof
     category: diagnostic
     severity: warning
-    description: Queue Overflow alarm received with {trapInfo} on {_HOSTNAME}.
+    description: 'Queue overflow detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1352,7 +1352,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireCm1Cor
     category: diagnostic
     severity: warning
-    description: Component reported failure with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Component did not respond{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1360,15 +1360,15 @@ traps:
     name: CPS6000-MIB::cps6000RetireCm1Nnc
     category: diagnostic
     severity: warning
-    description: Number Not Configured alarm received with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'CPS6000 component retired{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.67
     name: CPS6000-MIB::cps6000RetirePo1Por
     category: diagnostic
-    severity: err
-    description: Device reported {trapInfo} on {_HOSTNAME}.
+    severity: warning
+    description: Power supply {{value "trapInfo"}} did not respond on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
@@ -1376,23 +1376,23 @@ traps:
     name: CPS6000-MIB::cps6000RetireRp1Rf
     category: diagnostic
     severity: warning
-    description: Ringer Minor Fail reported with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Ringer minor fail{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.69
     name: CPS6000-MIB::cps6000RetireRp1Rpff
     category: diagnostic
-    severity: err
-    description: Ringer Fan Fail detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: 'Ringer Fan Fail detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.70
     name: CPS6000-MIB::cps6000RetireRp1Rpxj
     category: diagnostic
-    severity: crit
-    description: Ringer Major External Fault reported with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: Ringer Major External Fault {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
@@ -1400,7 +1400,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireRp1Rpxn
     category: diagnostic
     severity: warning
-    description: Ringer Minor External Fault reported with {trapInfo} on {_HOSTNAME}.
+    description: 'Ringer Minor External Fault{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1408,7 +1408,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireRp1Rprl
     category: diagnostic
     severity: alert
-    description: Ringer redundancy loss detected on {_HOSTNAME}.
+    description: Ringer redundancy loss detected on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
@@ -1416,31 +1416,31 @@ traps:
     name: CPS6000-MIB::cps6000RetireRp1Rpfj
     category: diagnostic
     severity: crit
-    description: Ringer Major Fail reported with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Ringer Major Fail{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.74
     name: CPS6000-MIB::cps6000RetireUserDefined
-    category: unknown
-    severity: notice
-    description: User-defined event {trapInfo} on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: CPS6000 user-defined event {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.75
     name: CPS6000-MIB::cps6000RetireDc1Icr
     category: diagnostic
-    severity: err
-    description: Incompatible Rectifier detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: warning
+    description: 'Incompatible Rectifier detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.76
     name: CPS6000-MIB::cps6000RetireDc1Rfn
     category: diagnostic
-    severity: err
-    description: Rectifier fan failure detected with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Rectifier fan failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1448,7 +1448,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireDc1Emd
     category: diagnostic
     severity: warning
-    description: Energy management disabled on {_HOSTNAME}.
+    description: 'Energy management disabled{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1456,15 +1456,15 @@ traps:
     name: CPS6000-MIB::cps6000RetireCp1Cfn
     category: diagnostic
     severity: warning
-    description: Converter Fan Minor alarm reported on {_HOSTNAME}.
+    description: 'Converter fan minor alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.79
     name: CPS6000-MIB::cps6000RetireCp1Cfj
     category: diagnostic
-    severity: err
-    description: Converter Fan Major alarm reported on {_HOSTNAME}.
+    severity: crit
+    description: 'Converter fan major fault detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1472,7 +1472,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireCp1Icc
     category: diagnostic
     severity: warning
-    description: Incompatible Converter Alarm reported with {trapInfo} on {_HOSTNAME}.
+    description: 'Incompatible Converter Alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1480,7 +1480,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireCp1Hva
     category: diagnostic
     severity: crit
-    description: Converter High Voltage Major alarm reported on {_HOSTNAME}.
+    description: Converter High Voltage Major alarm {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
@@ -1488,7 +1488,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireCp1Hfv
     category: diagnostic
     severity: warning
-    description: Converter High Voltage Minor alarm reported with {trapInfo} on {_HOSTNAME}.
+    description: 'Converter high voltage minor alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1496,7 +1496,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireCp1Vla
     category: diagnostic
     severity: warning
-    description: Converter Very Low Voltage detected with {trapInfo} on {_HOSTNAME}.
+    description: 'Converter Very Low Voltage detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1504,7 +1504,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireCp1Rl
     category: state_change
     severity: crit
-    description: Converter redundancy loss reported on {_HOSTNAME}.
+    description: Converter redundancy loss detected on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
@@ -1512,7 +1512,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireBr1Mdp
     category: diagnostic
     severity: warning
-    description: Voltage Duplicate ID alarm reported with {trapInfo} on {_HOSTNAME}.
+    description: 'Voltage Duplicate ID alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1520,15 +1520,15 @@ traps:
     name: CPS6000-MIB::cps6000RetireBr1Mzd
     category: diagnostic
     severity: warning
-    description: Voltage ID not configured with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Voltage ID not configured{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.87
     name: CPS6000-MIB::cps6000RetireBr1Scda
     category: diagnostic
-    severity: err
-    description: Shorted Cell Detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Shorted cell detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1536,7 +1536,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireRp1Rcdp
     category: diagnostic
     severity: warning
-    description: Ringer ID conflict detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    description: 'Ringer ID Conflict detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1544,7 +1544,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireFt1Fmi
     category: diagnostic
     severity: warning
-    description: Fan Fail Minor alarm reported on {_HOSTNAME}.
+    description: 'Fan fail minor alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1552,7 +1552,7 @@ traps:
     name: CPS6000-MIB::cps6000RetireFt1Fmj
     category: diagnostic
     severity: crit
-    description: Fan failure major alarm reported on {_HOSTNAME}.
+    description: 'Fan failure major alarm detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1560,31 +1560,31 @@ traps:
     name: CPS6000-MIB::cps6000RetireFt1Ipi
     category: diagnostic
     severity: warning
-    description: Input power minor alarm reported on {_HOSTNAME}.
+    description: 'Input power minor alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.92
     name: CPS6000-MIB::cps6000RetireFt1Ipj
     category: diagnostic
-    severity: err
-    description: Input Power Major alarm reported with {trapInfo} on {_HOSTNAME}.
+    severity: warning
+    description: 'Input power major alarm{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.93
     name: CPS6000-MIB::cps6000RetireFt1Cbt
-    category: state_change
-    severity: warning
-    description: Circuit Breaker Trip reported via {trapInfo} on {_HOSTNAME}.
+    category: diagnostic
+    severity: alert
+    description: 'Circuit Breaker Trip detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.94
     name: CPS6000-MIB::cps6000RetireFt1Ctf
     category: diagnostic
-    severity: err
-    description: Circuit fail alarm reported with {trapInfo} on {_HOSTNAME}.
+    severity: crit
+    description: Circuit fail alarm {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
@@ -1592,23 +1592,23 @@ traps:
     name: CPS6000-MIB::cps6000RetireFt1Mctf
     category: diagnostic
     severity: crit
-    description: Multiple Circuit Fail reported with {trapInfo} on {_HOSTNAME}.
+    description: 'Multiple circuit failure detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.96
     name: CPS6000-MIB::cps6000RetireFt1Lor
     category: state_change
-    severity: warning
-    description: Loss of redundancy detected with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Loss of redundancy detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.97
     name: CPS6000-MIB::cps6000RetireFt1Lda
     category: diagnostic
-    severity: warning
-    description: Load Drop Alarm {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Load Drop Alarm triggered{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
@@ -1616,31 +1616,31 @@ traps:
     name: CPS6000-MIB::cps6000RetireFt1Lsa
     category: diagnostic
     severity: warning
-    description: Load share alarm {trapInfo} on {_HOSTNAME}.
+    description: Load share alarm {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.99
     name: CPS6000-MIB::cps6000RetireFt1Lta
     category: diagnostic
-    severity: warning
-    description: Line Test Failed Alarm reported with {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: Line Test Failed Alarm {{value "trapInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.1.35.100
     name: CPS6000-MIB::cps6000RetireDc1Lsf
     category: diagnostic
-    severity: err
-    description: Loadshare failure detected with supplemental info {trapInfo} on {_HOSTNAME}.
+    severity: alert
+    description: 'Loadshare fail detected{{with value "trapInfo"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapInfo
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.1
     name: NE843-MIB::ne843TrapDc1Amj
     category: diagnostic
-    severity: err
-    description: Auxiliary fuse major fault reported on {_HOSTNAME}.
+    severity: alert
+    description: Auxiliary Fuse Major event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1652,7 +1652,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Vsf
     category: diagnostic
     severity: warning
-    description: Sense/Control Fuse event {ne843TrapDesc} detected on {_HOSTNAME}.
+    description: 'Sense/Control Fuse event detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1664,7 +1664,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Osa
     category: diagnostic
     severity: warning
-    description: Event {ne843TrapDesc} with severity {ne843TrapSev} occurred on {_HOSTNAME}.
+    description: Device event {{value "ne843TrapDesc"}} occurred on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1676,7 +1676,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Zid
     category: diagnostic
     severity: warning
-    description: Device ID not configured on {_HOSTNAME}.
+    description: Device ID not configured on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1687,8 +1687,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.5
     name: NE843-MIB::ne843TrapDc1Tpa
     category: diagnostic
-    severity: warning
-    description: Thermal probe alarm {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: Thermal Probe Alarm {{value "ne843TrapDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1700,7 +1700,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Vmf
     category: diagnostic
     severity: crit
-    description: Voltage module failure detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Voltage module failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1712,7 +1712,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Cma
     category: diagnostic
     severity: warning
-    description: Minor communication failure reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Minor communication failure {{value "ne843TrapDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1723,8 +1723,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.8
     name: NE843-MIB::ne843TrapDc1Mcm
     category: diagnostic
-    severity: alert
-    description: Major Communication Failure {ne843TrapDesc} on {_HOSTNAME}.
+    severity: crit
+    description: 'Major communication failure detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1736,7 +1736,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Epo
     category: diagnostic
     severity: alert
-    description: Emergency Power Off event detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Emergency Power Off event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1748,7 +1748,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Icr
     category: diagnostic
     severity: warning
-    description: Incompatible Rectifier detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Incompatible Rectifier detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1759,8 +1759,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.11
     name: NE843-MIB::ne843TrapDc1Rfa
     category: diagnostic
-    severity: err
-    description: Rectifier failure detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: 'Rectifier failure detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1771,8 +1771,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.12
     name: NE843-MIB::ne843TrapDc1Acf
     category: diagnostic
-    severity: err
-    description: AC power failure detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: crit
+    description: 'AC power failure detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1782,9 +1782,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.13
     name: NE843-MIB::ne843TrapDc1Man
-    category: diagnostic
-    severity: warning
-    description: Manual Off event {ne843TrapDesc} reported on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Device manual off event occurred on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1794,9 +1794,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.14
     name: NE843-MIB::ne843TrapDc1Did
-    category: diagnostic
-    severity: err
-    description: ID conflict detected with description {ne843TrapDesc} on {_HOSTNAME}.
+    category: security
+    severity: warning
+    description: 'ID conflict detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1808,7 +1808,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Clm
     category: diagnostic
     severity: warning
-    description: Rectifier Current Limit event {ne843TrapDesc} reported on {_HOSTNAME}.
+    description: Rectifier current limit event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1819,8 +1819,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.16
     name: NE843-MIB::ne843TrapDc1Rfn
     category: diagnostic
-    severity: err
-    description: Rectifier fan failure reported on {_HOSTNAME}.
+    severity: crit
+    description: Rectifier fan failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1831,8 +1831,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.17
     name: NE843-MIB::ne843TrapDc1Vla
     category: diagnostic
-    severity: warning
-    description: Event {ne843TrapDesc} with severity {ne843TrapSev} detected on {_HOSTNAME}.
+    severity: crit
+    description: Very Low Voltage event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1843,8 +1843,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.18
     name: NE843-MIB::ne843TrapDc1Mfa
     category: diagnostic
-    severity: err
-    description: Multiple Rectifier Fail reported on {_HOSTNAME}.
+    severity: alert
+    description: 'Multiple rectifier failures detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1856,7 +1856,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Rtl
     category: diagnostic
     severity: warning
-    description: Reserve Time Low event {ne843TrapDesc} reported on {_HOSTNAME}.
+    description: Reserve time low event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1868,7 +1868,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Rrtl
     category: diagnostic
     severity: warning
-    description: Real-time reserve time low reported on {_HOSTNAME}.
+    description: Real-time reserve time low on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1880,7 +1880,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Rls
     category: state_change
     severity: alert
-    description: Redundancy loss detected on {_HOSTNAME}.
+    description: 'Redundancy loss detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1891,8 +1891,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.22
     name: NE843-MIB::ne843TrapDc1Mman
     category: diagnostic
-    severity: err
-    description: Event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: Multiple Manual Off event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1903,8 +1903,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.23
     name: NE843-MIB::ne843TrapDc1Macf
     category: diagnostic
-    severity: crit
-    description: Multiple AC failure detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: Multiple AC power failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1916,7 +1916,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Bda
     category: diagnostic
     severity: warning
-    description: Battery on discharge detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Battery on discharge detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1927,8 +1927,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.25
     name: NE843-MIB::ne843TrapDc1Hva
     category: diagnostic
-    severity: err
-    description: High voltage event {ne843TrapDesc} reported on {_HOSTNAME}.
+    severity: alert
+    description: 'High voltage event detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1940,7 +1940,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Hfv
     category: diagnostic
     severity: warning
-    description: High float voltage detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'High float voltage detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1950,9 +1950,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.27
     name: NE843-MIB::ne843TrapPs1Epr
-    category: config_change
-    severity: notice
-    description: External password reset event {ne843TrapDesc} on {_HOSTNAME}.
+    category: security
+    severity: warning
+    description: External password reset occurred on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1963,8 +1963,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.28
     name: NE843-MIB::ne843TrapPs1Pfd
     category: security
-    severity: warning
-    description: Device reported passwords at default state on {_HOSTNAME}.
+    severity: alert
+    description: Passwords at default configuration detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1976,7 +1976,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Exl
     category: security
     severity: warning
-    description: Excessive login attempts detected on {_HOSTNAME}.
+    description: Excessive login attempts detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1988,7 +1988,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Bbl
     category: diagnostic
     severity: warning
-    description: Memory Backup Battery Low reported on {_HOSTNAME}.
+    description: Memory backup battery low on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -1998,9 +1998,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.31
     name: NE843-MIB::ne843TrapPs1Clc
-    category: diagnostic
-    severity: warning
-    description: Clock changed event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Clock changed on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2011,8 +2011,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.32
     name: NE843-MIB::ne843TrapPs1Stf
     category: diagnostic
-    severity: err
-    description: Self test failed with {ne843TrapDesc} on {_HOSTNAME}.
+    severity: crit
+    description: 'Self test failed{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2024,7 +2024,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Pgi
     category: diagnostic
     severity: warning
-    description: 'Program Line Invalid: {ne843TrapDesc} on {_HOSTNAME}.'
+    description: 'Program line invalid detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2036,7 +2036,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Cch
     category: config_change
     severity: notice
-    description: Configuration changed with description {ne843TrapDesc} on {_HOSTNAME}.
+    description: 'Configuration changed{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2048,7 +2048,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Hcl
     category: diagnostic
     severity: notice
-    description: History cleared for event {ne843TrapDesc} on {_HOSTNAME}.
+    description: History cleared for event {{value "ne843TrapDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2060,7 +2060,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Ax1
     category: diagnostic
     severity: warning
-    description: Auxiliary event {ne843TrapDesc} with severity {ne843TrapSev.raw} on {_HOSTNAME}.
+    description: 'Auxiliary Event 1 occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2072,7 +2072,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Ax2
     category: diagnostic
     severity: warning
-    description: Auxiliary event {ne843TrapDesc} with severity {ne843TrapSev} occurred on {_HOSTNAME}.
+    description: 'Auxiliary Event 2 occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2084,7 +2084,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Ax3
     category: diagnostic
     severity: warning
-    description: Auxiliary event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Auxiliary event occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2096,7 +2096,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Ax4
     category: diagnostic
     severity: warning
-    description: Auxiliary event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Auxiliary Event 4 occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2108,7 +2108,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Ax5
     category: diagnostic
     severity: warning
-    description: Auxiliary Event 5 detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Auxiliary event 5 occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2120,7 +2120,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Ax6
     category: diagnostic
     severity: warning
-    description: Auxiliary event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Auxiliary event 6 occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2132,7 +2132,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Fan24
     category: diagnostic
     severity: warning
-    description: 24 V Fuse Minor event reported on {_HOSTNAME}.
+    description: 24 V Fuse Minor event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2144,7 +2144,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Fan48
     category: diagnostic
     severity: warning
-    description: 48 V Fuse Minor event reported on {_HOSTNAME}.
+    description: 48 V Fuse Minor event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2155,8 +2155,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.44
     name: NE843-MIB::ne843TrapPs1Faj24
     category: diagnostic
-    severity: err
-    description: 24 V Fuse Major event reported on {_HOSTNAME}.
+    severity: crit
+    description: 24 V Fuse Major event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2167,8 +2167,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.45
     name: NE843-MIB::ne843TrapPs1Faj48
     category: diagnostic
-    severity: err
-    description: 48 V Fuse Major event reported on {_HOSTNAME}.
+    severity: alert
+    description: 48 V Fuse Major fault detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2180,7 +2180,7 @@ traps:
     name: NE843-MIB::ne843TrapAt1Ata
     category: diagnostic
     severity: warning
-    description: Alarm test active with description {ne843TrapDesc} on {_HOSTNAME}.
+    description: 'Alarm test active{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2192,7 +2192,7 @@ traps:
     name: NE843-MIB::ne843TrapAt1Atb
     category: diagnostic
     severity: warning
-    description: Alarm test aborted with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Alarm test aborted{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2203,8 +2203,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.48
     name: NE843-MIB::ne843TrapCp1Cfa
     category: diagnostic
-    severity: err
-    description: Converter failure reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: crit
+    description: 'Converter failure detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2216,7 +2216,7 @@ traps:
     name: NE843-MIB::ne843TrapCp1Cfn
     category: diagnostic
     severity: warning
-    description: Converter fan minor fault reported on {_HOSTNAME}.
+    description: Converter fan minor fault detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2227,8 +2227,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.50
     name: NE843-MIB::ne843TrapCp1Cfj
     category: diagnostic
-    severity: err
-    description: Converter fan major fault reported on {_HOSTNAME}.
+    severity: crit
+    description: Converter fan major fault detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2239,8 +2239,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.51
     name: NE843-MIB::ne843TrapCp1Dfa
     category: diagnostic
-    severity: err
-    description: Distribution Fail reported on {_HOSTNAME}.
+    severity: crit
+    description: Distribution Fail event occurred on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2252,7 +2252,7 @@ traps:
     name: NE843-MIB::ne843TrapCp1Did
     category: diagnostic
     severity: warning
-    description: ID conflict detected with description {ne843TrapDesc} on {_HOSTNAME}.
+    description: 'ID conflict detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2264,7 +2264,7 @@ traps:
     name: NE843-MIB::ne843TrapCp1Icc
     category: diagnostic
     severity: warning
-    description: Incompatible Converter Alarm reported on {_HOSTNAME}.
+    description: Incompatible Converter Alarm {{value "ne843TrapDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2276,7 +2276,7 @@ traps:
     name: NE843-MIB::ne843TrapCp1Mfa
     category: diagnostic
     severity: crit
-    description: Multiple Converter Fail reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Multiple converter failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2288,7 +2288,7 @@ traps:
     name: NE843-MIB::ne843TrapCp1Hva
     category: diagnostic
     severity: crit
-    description: Converter high voltage major event reported on {_HOSTNAME}.
+    description: Converter high voltage major fault detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2300,7 +2300,7 @@ traps:
     name: NE843-MIB::ne843TrapCp1Hfv
     category: diagnostic
     severity: warning
-    description: Converter High Voltage Minor event reported on {_HOSTNAME}.
+    description: Converter high voltage minor event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2312,7 +2312,7 @@ traps:
     name: NE843-MIB::ne843TrapCp1Vla
     category: diagnostic
     severity: warning
-    description: Converter Very Low Voltage detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Converter very low voltage event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2322,9 +2322,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.58
     name: NE843-MIB::ne843TrapCp1Rl
-    category: diagnostic
-    severity: crit
-    description: Converter redundancy loss reported on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: Converter redundancy loss detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2336,7 +2336,7 @@ traps:
     name: NE843-MIB::ne843TrapBr1Bta
     category: diagnostic
     severity: notice
-    description: Battery test active with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Battery test active on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2347,8 +2347,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.60
     name: NE843-MIB::ne843TrapBr1Bfa
     category: diagnostic
-    severity: err
-    description: Battery test failed with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: crit
+    description: Battery test failed on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2359,8 +2359,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.61
     name: NE843-MIB::ne843TrapBr1Scda
     category: diagnostic
-    severity: err
-    description: Shorted Cell Detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: 'Shorted cell detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2372,7 +2372,7 @@ traps:
     name: NE843-MIB::ne843TrapBr1Isda
     category: diagnostic
     severity: alert
-    description: Imminent shutdown detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Imminent shutdown detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2384,7 +2384,7 @@ traps:
     name: NE843-MIB::ne843TrapBr1Mdp
     category: diagnostic
     severity: warning
-    description: Voltage Duplicate ID event reported on {_HOSTNAME}.
+    description: 'Voltage Duplicate ID detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2396,7 +2396,7 @@ traps:
     name: NE843-MIB::ne843TrapBr1Mzd
     category: diagnostic
     severity: warning
-    description: Voltage ID Not Configured reported on {_HOSTNAME}.
+    description: 'Voltage ID not configured{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2408,7 +2408,7 @@ traps:
     name: NE843-MIB::ne843TrapBr1Btha
     category: diagnostic
     severity: warning
-    description: High battery temperature detected with description {ne843TrapDesc} on {_HOSTNAME}.
+    description: High battery temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2418,9 +2418,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.66
     name: NE843-MIB::ne843TrapCn1Cno
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Contactor open event reported on {_HOSTNAME}.
+    description: 'Contactor open state detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2431,8 +2431,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.67
     name: NE843-MIB::ne843TrapCn1Cnf
     category: diagnostic
-    severity: err
-    description: Contactor failed with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: 'Contactor failed{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2442,9 +2442,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.68
     name: NE843-MIB::ne843TrapCn2Cno
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Contactor Open event reported on {_HOSTNAME}.
+    description: Contactor open event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2456,7 +2456,7 @@ traps:
     name: NE843-MIB::ne843TrapCn2Cnf
     category: diagnostic
     severity: crit
-    description: Contactor failed with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Contactor failed on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2466,9 +2466,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.70
     name: NE843-MIB::ne843TrapCn3Cno
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Contactor open event reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Contactor open state detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2479,8 +2479,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.71
     name: NE843-MIB::ne843TrapCn3Cnf
     category: diagnostic
-    severity: err
-    description: Contactor failed with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: crit
+    description: Contactor failed on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2492,7 +2492,7 @@ traps:
     name: NE843-MIB::ne843TrapCn4Cno
     category: diagnostic
     severity: warning
-    description: Contactor Open reported by {ne843TrapDesc} on {_HOSTNAME}.
+    description: 'Contactor open event detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2503,8 +2503,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.73
     name: NE843-MIB::ne843TrapCn4Cnf
     category: diagnostic
-    severity: err
-    description: Contactor failed with description {ne843TrapDesc} on {_HOSTNAME}.
+    severity: crit
+    description: Contactor failed on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2516,7 +2516,7 @@ traps:
     name: NE843-MIB::ne843TrapCm1Cof
     category: diagnostic
     severity: warning
-    description: Queue overflow detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Queue overflow detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2528,7 +2528,7 @@ traps:
     name: NE843-MIB::ne843TrapCm1Cor
     category: diagnostic
     severity: warning
-    description: Event {ne843TrapDesc} reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Component did not respond: {{value "ne843TrapDesc"}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2540,7 +2540,7 @@ traps:
     name: NE843-MIB::ne843TrapCm1Nnc
     category: diagnostic
     severity: warning
-    description: Event {ne843TrapDesc} with severity {ne843TrapSev} reported on {_HOSTNAME}.
+    description: Event {{value "ne843TrapDesc"}} occurred on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2551,8 +2551,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.77
     name: NE843-MIB::ne843TrapPo1Por
     category: diagnostic
-    severity: err
-    description: Device reported error {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: warning
+    description: Device did not respond on {{first (value "ne843TrapPath") "unknown path"}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2564,7 +2564,7 @@ traps:
     name: NE843-MIB::ne843TrapRp1Rf
     category: diagnostic
     severity: warning
-    description: Ringer Minor Fail reported on {_HOSTNAME}.
+    description: 'Ringer minor failure detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2575,8 +2575,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.79
     name: NE843-MIB::ne843TrapRp1Rpff
     category: diagnostic
-    severity: err
-    description: Fan failure detected with description {ne843TrapDesc} on {_HOSTNAME}.
+    severity: crit
+    description: Ringer fan failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2587,8 +2587,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.80
     name: NE843-MIB::ne843TrapRp1Rprl
     category: diagnostic
-    severity: crit
-    description: Ringer redundancy loss detected on {_HOSTNAME}.
+    severity: alert
+    description: Ringer redundancy loss detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2600,7 +2600,7 @@ traps:
     name: NE843-MIB::ne843TrapRp1Rpfj
     category: diagnostic
     severity: crit
-    description: Ringer Major Fail reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Ringer major failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2612,7 +2612,7 @@ traps:
     name: NE843-MIB::ne843TrapRp1Rpxj
     category: diagnostic
     severity: crit
-    description: Ringer Major External Fault reported on {_HOSTNAME}.
+    description: 'Ringer Major External Fault detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2624,7 +2624,7 @@ traps:
     name: NE843-MIB::ne843TrapRp1Rpxn
     category: diagnostic
     severity: warning
-    description: Ringer Minor External Fault {ne843TrapDesc} on {_HOSTNAME}.
+    description: Ringer Minor External Fault reported on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2636,7 +2636,7 @@ traps:
     name: NE843-MIB::ne843TrapRp1Rcdp
     category: diagnostic
     severity: warning
-    description: Ringer ID Conflict detected with description {ne843TrapDesc} on {_HOSTNAME}.
+    description: Ringer ID conflict detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2646,9 +2646,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.85
     name: NE843-MIB::ne843TrapUserDefined
-    category: unknown
+    category: diagnostic
     severity: warning
-    description: User-defined event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: User-defined event {{value "ne843TrapDesc"}} occurred on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2660,7 +2660,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Emd
     category: diagnostic
     severity: warning
-    description: Energy management disabled on {_HOSTNAME}.
+    description: Energy management disabled on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2671,8 +2671,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.87
     name: NE843-MIB::ne843TrapDc1Pfs
     category: diagnostic
-    severity: err
-    description: Thermal probe failure detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: crit
+    description: Thermal probe fail safe event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2683,8 +2683,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.88
     name: NE843-MIB::ne843TrapDc1Rif
     category: diagnostic
-    severity: err
-    description: Rectifier internal fault reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: crit
+    description: 'Rectifier internal fault detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2694,9 +2694,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.89
     name: NE843-MIB::ne843TrapDc1Lsf
-    category: diagnostic
-    severity: err
-    description: Load share failure detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: 'Load share fail detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2708,7 +2708,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Ax7
     category: diagnostic
     severity: warning
-    description: Auxiliary event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Auxiliary event 7 occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2720,7 +2720,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Ax8
     category: diagnostic
     severity: warning
-    description: Auxiliary event {ne843TrapDesc} with severity {ne843TrapSev} occurred on {_HOSTNAME}.
+    description: 'Auxiliary event 8 occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2732,7 +2732,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Ax9
     category: diagnostic
     severity: warning
-    description: Auxiliary event {ne843TrapDesc} reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Auxiliary event 9 occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2744,7 +2744,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Ax10
     category: diagnostic
     severity: warning
-    description: Auxiliary event reported on {_HOSTNAME}.
+    description: 'Auxiliary event 10 occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2756,7 +2756,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Ax11
     category: diagnostic
     severity: warning
-    description: Auxiliary Event 11 {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Auxiliary event 11 occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2768,7 +2768,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Ax12
     category: diagnostic
     severity: warning
-    description: Auxiliary event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Auxiliary event 12 occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2780,7 +2780,7 @@ traps:
     name: NE843-MIB::ne843TrapBr1Btla
     category: diagnostic
     severity: warning
-    description: Low Battery Temperature event reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Low battery temperature detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2791,8 +2791,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.97
     name: NE843-MIB::ne843TrapBr1Btvh
     category: diagnostic
-    severity: crit
-    description: Very High Battery Temperature reported on {_HOSTNAME}.
+    severity: alert
+    description: Very High Battery Temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2804,7 +2804,7 @@ traps:
     name: NE843-MIB::ne843TrapBr1Btvl
     category: diagnostic
     severity: warning
-    description: Very Low Battery Temperature reported on {_HOSTNAME}.
+    description: Very Low Battery Temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2816,7 +2816,7 @@ traps:
     name: NE843-MIB::ne843TrapGn1Gnr
     category: diagnostic
     severity: notice
-    description: Generator running event {ne843TrapDesc} reported on {_HOSTNAME}.
+    description: Generator running event {{value "ne843TrapDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2828,7 +2828,7 @@ traps:
     name: NE843-MIB::ne843TrapGn1Gnm
     category: diagnostic
     severity: warning
-    description: 'Generator maintenance required: {ne843TrapDesc} on {_HOSTNAME}.'
+    description: 'Generator maintenance required{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2839,8 +2839,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.101
     name: NE843-MIB::ne843TrapGn1Gnf
     category: diagnostic
-    severity: err
-    description: Generator failure detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: Generator failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2852,7 +2852,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Amtl
     category: diagnostic
     severity: warning
-    description: Low ambient temperature detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Low ambient temperature detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2864,7 +2864,7 @@ traps:
     name: NE843-MIB::ne843TrapPs1Amth
     category: diagnostic
     severity: warning
-    description: High ambient temperature detected on {_HOSTNAME}.
+    description: 'High ambient temperature detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2874,9 +2874,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.104
     name: NE843-MIB::ne843TrapAco1Aac
-    category: diagnostic
-    severity: warning
-    description: ACO Active event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: 'ACO Active event occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2887,8 +2887,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.105
     name: NE843-MIB::ne843TrapBr1Rba
     category: diagnostic
-    severity: crit
-    description: Reverse battery condition detected on {_HOSTNAME}.
+    severity: alert
+    description: Reverse battery condition detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2899,8 +2899,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.106
     name: NE843-MIB::ne843TrapCp1Cin
     category: diagnostic
-    severity: err
-    description: Converter input failure reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: crit
+    description: Converter input failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2911,8 +2911,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.107
     name: NE843-MIB::ne843TrapDc1Bof
     category: diagnostic
-    severity: err
-    description: Rectifier ORing FET Fault {ne843TrapDesc} reported on {_HOSTNAME}.
+    severity: crit
+    description: Rectifier ORing FET Fault detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2923,8 +2923,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.108
     name: NE843-MIB::ne843TrapDc1Sof
     category: diagnostic
-    severity: err
-    description: Rectifier Shorted ORing FET detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: crit
+    description: Rectifier shorted oring FET detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2936,7 +2936,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Der
     category: diagnostic
     severity: warning
-    description: Rectifier under voltage detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Rectifier under voltage condition detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2948,7 +2948,7 @@ traps:
     name: NE843-MIB::ne843TrapGn1Gns
     category: diagnostic
     severity: notice
-    description: Generator start event {ne843TrapDesc} reported on {_HOSTNAME}.
+    description: Generator start event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2960,7 +2960,7 @@ traps:
     name: NE843-MIB::ne843TrapIvp1Ilvi
     category: diagnostic
     severity: warning
-    description: Inverter Low Input event reported on {_HOSTNAME}.
+    description: Inverter Low Input event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2972,7 +2972,7 @@ traps:
     name: NE843-MIB::ne843TrapIvp1Ihvi
     category: diagnostic
     severity: warning
-    description: Inverter High Input event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Inverter High Input event detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2983,8 +2983,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.113
     name: NE843-MIB::ne843TrapIvp1Ita
     category: diagnostic
-    severity: warning
-    description: Inverter high temperature event {ne843TrapDesc} on {_HOSTNAME}.
+    severity: crit
+    description: Inverter high temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -2995,8 +2995,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.114
     name: NE843-MIB::ne843TrapIvp1If
     category: diagnostic
-    severity: err
-    description: Inverter failure detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: Inverter hardware failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3008,7 +3008,7 @@ traps:
     name: NE843-MIB::ne843TrapIvp1Ilv
     category: diagnostic
     severity: warning
-    description: Inverter Low Output reported by {ne843TrapDesc} on {_HOSTNAME}.
+    description: 'Inverter Low Output detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3020,7 +3020,7 @@ traps:
     name: NE843-MIB::ne843TrapIvp1Ifa
     category: diagnostic
     severity: warning
-    description: Inverter Frequency Lock reported on {_HOSTNAME}.
+    description: 'Inverter frequency lock detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3032,7 +3032,7 @@ traps:
     name: NE843-MIB::ne843TrapIvp1Ihv
     category: diagnostic
     severity: warning
-    description: Inverter high output event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Inverter high output event detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3044,7 +3044,7 @@ traps:
     name: NE843-MIB::ne843TrapIvp1Ida
     category: diagnostic
     severity: warning
-    description: Inverter Distribution Alarm {ne843TrapDesc} on {_HOSTNAME}.
+    description: Inverter Distribution Alarm {{value "ne843TrapDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3055,8 +3055,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.119
     name: NE843-MIB::ne843TrapIvp1Iof
     category: diagnostic
-    severity: err
-    description: Inverter Output Fuse fault reported on {_HOSTNAME}.
+    severity: warning
+    description: 'Inverter Output Fuse event detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3068,7 +3068,7 @@ traps:
     name: NE843-MIB::ne843TrapIvp1Idid
     category: diagnostic
     severity: warning
-    description: Inverter ID Conflict detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Inverter ID conflict detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3080,7 +3080,7 @@ traps:
     name: NE843-MIB::ne843TrapIvp1Iirm
     category: diagnostic
     severity: warning
-    description: Inverter High RMS Current detected at {ne843TrapTime} on {ne843TrapDate} on {_HOSTNAME}.
+    description: 'Inverter high RMS current detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3092,7 +3092,7 @@ traps:
     name: NE843-MIB::ne843TrapIvp1Iipk
     category: diagnostic
     severity: warning
-    description: Inverter High Peak Current event {ne843TrapDesc} on {_HOSTNAME}.
+    description: 'Inverter high peak current detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3104,7 +3104,7 @@ traps:
     name: NE843-MIB::ne843TrapIvp1Icf
     category: diagnostic
     severity: warning
-    description: Inverter High Crest Factor detected on {_HOSTNAME}.
+    description: 'Inverter high crest factor detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3115,8 +3115,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.124
     name: NE843-MIB::ne843TrapIvp1Mif
     category: diagnostic
-    severity: err
-    description: Multiple Inverter Fail reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: 'Multiple inverter failure detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3127,8 +3127,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.125
     name: NE843-MIB::ne843TrapIvp1Irls
     category: diagnostic
-    severity: alert
-    description: Inverter redundancy loss detected on {_HOSTNAME}.
+    severity: crit
+    description: 'Inverter redundancy loss detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3139,8 +3139,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.126
     name: NE843-MIB::ne843TrapDc1Pmf
     category: diagnostic
-    severity: err
-    description: Probe minimum fail detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: warning
+    description: 'Probe minimum fail detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3151,8 +3151,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.127
     name: NE843-MIB::ne843TrapPs1Crt
     category: config_change
-    severity: warning
-    description: 'Configuration changed requiring reboot: {ne843TrapDesc} on {_HOSTNAME}.'
+    severity: notice
+    description: 'Configuration changed, reboot required{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3164,7 +3164,7 @@ traps:
     name: NE843-MIB::ne843TrapIvp1Milv
     category: diagnostic
     severity: warning
-    description: Multiple Inverter Low Input Voltage detected on {_HOSTNAME}.
+    description: Multiple Inverter Low Input Voltage detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3176,7 +3176,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Faja
     category: diagnostic
     severity: warning
-    description: Distribution Fuse A event reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Distribution Fuse A event detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3188,7 +3188,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Buht
     category: diagnostic
     severity: warning
-    description: Bus Hi Temp event detected on {_HOSTNAME}.
+    description: Bus high temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3200,7 +3200,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Buvht
     category: diagnostic
     severity: crit
-    description: Bus Very Hi Temp reported on {_HOSTNAME}.
+    description: Bus very high temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3212,7 +3212,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Btha
     category: diagnostic
     severity: warning
-    description: Battery high temperature event {ne843TrapDesc} detected on {_HOSTNAME}.
+    description: Battery high temperature event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3223,8 +3223,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.133
     name: NE843-MIB::ne843TrapDc1Btvh
     category: diagnostic
-    severity: crit
-    description: Battery very high temperature reported on {_HOSTNAME}.
+    severity: alert
+    description: 'Battery very high temperature detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3236,7 +3236,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Btla
     category: diagnostic
     severity: warning
-    description: Battery low temperature event detected on {_HOSTNAME}.
+    description: Battery low temperature event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3248,7 +3248,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Btvl
     category: diagnostic
     severity: warning
-    description: Batt Very Low Temp reported by {ne843TrapDesc} on {_HOSTNAME}.
+    description: Battery very low temperature detected{{with value "ne843TrapPath"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3260,7 +3260,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Laht
     category: diagnostic
     severity: warning
-    description: Local ambient high temperature event {ne843TrapDesc} on {_HOSTNAME}.
+    description: Local ambient high temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3272,7 +3272,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Lalt
     category: diagnostic
     severity: warning
-    description: Local ambient low temperature event {ne843TrapDesc} on {_HOSTNAME}.
+    description: 'Low ambient temperature detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3284,7 +3284,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Raht
     category: diagnostic
     severity: warning
-    description: Remote ambient high temperature detected on {_HOSTNAME}.
+    description: Remote ambient high temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3296,7 +3296,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Ravht
     category: diagnostic
     severity: crit
-    description: Remote ambient very high temperature event reported on {_HOSTNAME}.
+    description: Remote ambient very high temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3308,7 +3308,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Ralt
     category: diagnostic
     severity: warning
-    description: Remote ambient low temperature event {ne843TrapDesc} on {_HOSTNAME}.
+    description: 'Remote ambient low temperature detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3319,8 +3319,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.141
     name: NE843-MIB::ne843TrapDc1Vlva
     category: diagnostic
-    severity: err
-    description: VA Power Loss detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: 'VA power loss detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3331,8 +3331,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.142
     name: NE843-MIB::ne843TrapDc1Vlvb
     category: diagnostic
-    severity: err
-    description: Power loss event detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: 'VB power loss detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3344,7 +3344,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Ovla
     category: diagnostic
     severity: warning
-    description: IA Overload detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'IA Overload detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3356,7 +3356,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Ovlb
     category: diagnostic
     severity: warning
-    description: IB overload event detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'IB overload detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3368,7 +3368,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Pcaux
     category: diagnostic
     severity: warning
-    description: PIC Auxiliary event {ne843TrapDesc} reported on {_HOSTNAME}.
+    description: PIC Auxiliary event {{value "ne843TrapDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3380,7 +3380,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Slot
     category: diagnostic
     severity: warning
-    description: PIC Slot event {ne843TrapDesc} reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: PIC Slot event {{value "ne843TrapDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3392,7 +3392,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Fajb
     category: diagnostic
     severity: warning
-    description: Distribution Fuse B event reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Distribution Fuse B event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3403,8 +3403,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.35.148
     name: NE843-MIB::ne843TrapDc1Smw
     category: diagnostic
-    severity: err
-    description: Shunt mis-wired detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: warning
+    description: Shunt mis-wired detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3416,7 +3416,7 @@ traps:
     name: NE843-MIB::ne843TrapDc1Cca
     category: diagnostic
     severity: warning
-    description: Circuit assignment event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Circuit Assignment event {{value "ne843TrapDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3427,8 +3427,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.1
     name: NE843-MIB::ne843RetireDc1Amj
     category: diagnostic
-    severity: err
-    description: Auxiliary Fuse Major event reported on {_HOSTNAME}.
+    severity: crit
+    description: Auxiliary Fuse Major fault detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3440,7 +3440,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Vsf
     category: diagnostic
     severity: warning
-    description: Sense/Control Fuse event {ne843TrapDesc} reported on {_HOSTNAME}.
+    description: Sense/Control Fuse event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3452,7 +3452,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Osa
     category: diagnostic
     severity: warning
-    description: Event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Retire DC1 OSA event {{value "ne843TrapDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3464,7 +3464,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Zid
     category: diagnostic
     severity: warning
-    description: Device reported {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Device ID not configured on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3475,8 +3475,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.5
     name: NE843-MIB::ne843RetireDc1Tpa
     category: diagnostic
-    severity: err
-    description: Thermal probe alarm {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: 'Thermal Probe Alarm detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3487,8 +3487,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.6
     name: NE843-MIB::ne843RetireDc1Vmf
     category: diagnostic
-    severity: err
-    description: Voltage Module Fail reported on {_HOSTNAME}.
+    severity: crit
+    description: Voltage module failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3500,7 +3500,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Cma
     category: diagnostic
     severity: warning
-    description: Minor Communication Failure reported via {ne843TrapDesc} on {_HOSTNAME}.
+    description: 'Minor communication failure detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3512,7 +3512,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Mcm
     category: diagnostic
     severity: crit
-    description: Major Communication Failure reported on {_HOSTNAME}.
+    description: 'Major communication failure detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3522,9 +3522,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.9
     name: NE843-MIB::ne843RetireDc1Epo
-    category: security
-    severity: emerg
-    description: Emergency Power Off event detected on {_HOSTNAME}.
+    category: diagnostic
+    severity: alert
+    description: Emergency Power Off event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3535,8 +3535,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.10
     name: NE843-MIB::ne843RetireDc1Icr
     category: diagnostic
-    severity: err
-    description: Incompatible Rectifier detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: warning
+    description: 'Incompatible Rectifier detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3547,8 +3547,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.11
     name: NE843-MIB::ne843RetireDc1Rfa
     category: diagnostic
-    severity: err
-    description: Rectifier failure reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: Rectifier failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3559,8 +3559,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.12
     name: NE843-MIB::ne843RetireDc1Acf
     category: diagnostic
-    severity: err
-    description: AC Fail event reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: crit
+    description: AC power failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3571,8 +3571,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.13
     name: NE843-MIB::ne843RetireDc1Man
     category: state_change
-    severity: notice
-    description: Device state changed to Manual Off with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: warning
+    description: DC1 manual off event on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3582,9 +3582,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.14
     name: NE843-MIB::ne843RetireDc1Did
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: ID Conflict detected with description {ne843TrapDesc} on {_HOSTNAME}.
+    description: 'ID conflict detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3596,7 +3596,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Clm
     category: diagnostic
     severity: warning
-    description: Rectifier Current Limit event {ne843TrapDesc} on {_HOSTNAME}.
+    description: Rectifier current limit condition detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3607,8 +3607,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.16
     name: NE843-MIB::ne843RetireDc1Rfn
     category: diagnostic
-    severity: err
-    description: Rectifier fan failure detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: Rectifier fan failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3620,7 +3620,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Vla
     category: diagnostic
     severity: crit
-    description: Very Low Voltage event reported on {_HOSTNAME}.
+    description: Very Low Voltage event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3631,8 +3631,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.18
     name: NE843-MIB::ne843RetireDc1Mfa
     category: diagnostic
-    severity: alert
-    description: Multiple Rectifier Fail reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: crit
+    description: Multiple rectifier failures detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3644,7 +3644,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Rtl
     category: diagnostic
     severity: warning
-    description: Reserve Time Low event detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Reserve time low detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3656,7 +3656,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Rrtl
     category: diagnostic
     severity: warning
-    description: Real-time reserve time low with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Real-time reserve time low on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3667,8 +3667,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.21
     name: NE843-MIB::ne843RetireDc1Rls
     category: state_change
-    severity: crit
-    description: Redundancy loss detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: Redundancy loss detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3679,8 +3679,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.22
     name: NE843-MIB::ne843RetireDc1Mman
     category: diagnostic
-    severity: warning
-    description: Multiple Manual Off event reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: Multiple Manual Off event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3691,8 +3691,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.23
     name: NE843-MIB::ne843RetireDc1Macf
     category: diagnostic
-    severity: crit
-    description: Multiple AC failure detected on {_HOSTNAME}.
+    severity: alert
+    description: Multiple AC failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3704,7 +3704,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Bda
     category: diagnostic
     severity: warning
-    description: Battery on discharge detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Battery on discharge detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3715,8 +3715,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.25
     name: NE843-MIB::ne843RetireDc1Hva
     category: diagnostic
-    severity: warning
-    description: High voltage event {ne843TrapDesc} reported on {_HOSTNAME}.
+    severity: alert
+    description: 'High voltage event detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3728,7 +3728,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Hfv
     category: diagnostic
     severity: warning
-    description: High Float Voltage detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: High float voltage detected{{with value "ne843TrapPath"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3740,7 +3740,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Epr
     category: security
     severity: warning
-    description: External password reset event {ne843TrapDesc} on {_HOSTNAME}.
+    description: External password reset event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3751,8 +3751,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.28
     name: NE843-MIB::ne843RetirePs1Pfd
     category: security
-    severity: warning
-    description: Passwords At Default detected on {_HOSTNAME}.
+    severity: alert
+    description: Passwords at default detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3764,7 +3764,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Exl
     category: security
     severity: warning
-    description: Excessive Login Attempts detected on {_HOSTNAME}.
+    description: Excessive login attempts detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3776,7 +3776,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Bbl
     category: diagnostic
     severity: warning
-    description: Memory Backup Battery Low reported on {_HOSTNAME}.
+    description: Memory backup battery low on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3786,9 +3786,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.31
     name: NE843-MIB::ne843RetirePs1Clc
-    category: diagnostic
-    severity: warning
-    description: Clock changed event {ne843TrapDesc} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Clock changed on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3799,8 +3799,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.32
     name: NE843-MIB::ne843RetirePs1Stf
     category: diagnostic
-    severity: err
-    description: Self test failed with {ne843TrapDesc} on {_HOSTNAME}.
+    severity: crit
+    description: Self test failed on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3812,7 +3812,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Pgi
     category: diagnostic
     severity: warning
-    description: Program Line Invalid reported by {ne843TrapDesc} on {_HOSTNAME}.
+    description: Program line invalid detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3824,7 +3824,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Cch
     category: config_change
     severity: notice
-    description: Configuration changed with description {ne843TrapDesc} on {_HOSTNAME}.
+    description: 'Configuration changed{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3836,7 +3836,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Hcl
     category: diagnostic
     severity: notice
-    description: History cleared for {ne843TrapDesc} on {_HOSTNAME}.
+    description: History cleared on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3848,7 +3848,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Ax1
     category: diagnostic
     severity: warning
-    description: Auxiliary event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Auxiliary event occurred on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3860,7 +3860,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Ax2
     category: diagnostic
     severity: warning
-    description: Auxiliary event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Auxiliary event occurred on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3872,7 +3872,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Ax3
     category: diagnostic
     severity: warning
-    description: Auxiliary event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Auxiliary event 3 occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3884,7 +3884,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Ax4
     category: diagnostic
     severity: warning
-    description: Auxiliary Event 4 reported on {_HOSTNAME}.
+    description: Auxiliary event 4 occurred on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3896,7 +3896,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Ax5
     category: diagnostic
     severity: warning
-    description: Auxiliary Event 5 reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Auxiliary event 5 occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3908,7 +3908,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Ax6
     category: diagnostic
     severity: warning
-    description: Auxiliary event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Auxiliary event 6 occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3920,7 +3920,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Fan24
     category: diagnostic
     severity: warning
-    description: 'Hardware fault: 24 V Fuse Minor reported on {_HOSTNAME}.'
+    description: 24 V Fuse Minor event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3932,7 +3932,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Fan48
     category: diagnostic
     severity: warning
-    description: 48 V Fuse Minor event reported on {_HOSTNAME}.
+    description: 48 V Fuse Minor event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3944,7 +3944,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Faj24
     category: diagnostic
     severity: crit
-    description: 24 V Fuse Major fault detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 24 V Fuse Major fault detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3955,8 +3955,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.45
     name: NE843-MIB::ne843RetirePs1Faj48
     category: diagnostic
-    severity: err
-    description: 48 V Fuse Major event reported on {_HOSTNAME}.
+    severity: crit
+    description: 48 V Fuse Major fault detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3968,7 +3968,7 @@ traps:
     name: NE843-MIB::ne843RetireAt1Ata
     category: diagnostic
     severity: warning
-    description: Alarm test active with description {ne843TrapDesc} on {_HOSTNAME}.
+    description: 'Alarm test active{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3979,8 +3979,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.47
     name: NE843-MIB::ne843RetireAt1Atb
     category: diagnostic
-    severity: warning
-    description: Alarm test aborted with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: notice
+    description: Alarm test aborted on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -3991,8 +3991,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.48
     name: NE843-MIB::ne843RetireCp1Cfa
     category: diagnostic
-    severity: err
-    description: Converter failure detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: Converter failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4004,7 +4004,7 @@ traps:
     name: NE843-MIB::ne843RetireCp1Cfn
     category: diagnostic
     severity: warning
-    description: Converter fan minor fault reported on {_HOSTNAME}.
+    description: Converter fan minor fault detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4015,8 +4015,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.50
     name: NE843-MIB::ne843RetireCp1Cfj
     category: diagnostic
-    severity: err
-    description: Converter fan major fault reported on {_HOSTNAME}.
+    severity: crit
+    description: Converter fan major fault detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4027,8 +4027,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.51
     name: NE843-MIB::ne843RetireCp1Dfa
     category: diagnostic
-    severity: err
-    description: Distribution Fail reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: crit
+    description: Distribution Fail event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4040,7 +4040,7 @@ traps:
     name: NE843-MIB::ne843RetireCp1Did
     category: diagnostic
     severity: warning
-    description: ID conflict detected with description {ne843TrapDesc} on {_HOSTNAME}.
+    description: 'ID conflict detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4051,8 +4051,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.53
     name: NE843-MIB::ne843RetireCp1Icc
     category: diagnostic
-    severity: err
-    description: Incompatible Converter Alarm reported on {_HOSTNAME}.
+    severity: warning
+    description: Incompatible Converter Alarm detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4063,8 +4063,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.54
     name: NE843-MIB::ne843RetireCp1Mfa
     category: diagnostic
-    severity: err
-    description: Multiple Converter Fail reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: Multiple converter failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4076,7 +4076,7 @@ traps:
     name: NE843-MIB::ne843RetireCp1Hva
     category: diagnostic
     severity: crit
-    description: Converter High Voltage Major reported on {_HOSTNAME}.
+    description: Converter high voltage major fault detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4088,7 +4088,7 @@ traps:
     name: NE843-MIB::ne843RetireCp1Hfv
     category: diagnostic
     severity: warning
-    description: Converter High Voltage Minor event reported on {_HOSTNAME}.
+    description: Converter high voltage minor fault detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4100,7 +4100,7 @@ traps:
     name: NE843-MIB::ne843RetireCp1Vla
     category: diagnostic
     severity: warning
-    description: Converter Very Low Voltage detected on {_HOSTNAME}.
+    description: Converter Very Low Voltage event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4110,9 +4110,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.58
     name: NE843-MIB::ne843RetireCp1Rl
-    category: diagnostic
-    severity: err
-    description: Converter redundancy loss reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    category: state_change
+    severity: crit
+    description: Converter redundancy loss detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4124,7 +4124,7 @@ traps:
     name: NE843-MIB::ne843RetireBr1Bta
     category: diagnostic
     severity: notice
-    description: Battery test active with status {ne843TrapDesc} on {_HOSTNAME}.
+    description: Battery test active on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4136,7 +4136,7 @@ traps:
     name: NE843-MIB::ne843RetireBr1Bfa
     category: diagnostic
     severity: warning
-    description: Battery test failed with description {ne843TrapDesc} on {_HOSTNAME}.
+    description: Battery test failed on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4147,8 +4147,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.61
     name: NE843-MIB::ne843RetireBr1Scda
     category: diagnostic
-    severity: err
-    description: Shorted cell detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: Shorted cell detected{{with value "ne843TrapPath"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4160,7 +4160,7 @@ traps:
     name: NE843-MIB::ne843RetireBr1Isda
     category: diagnostic
     severity: alert
-    description: Imminent shutdown detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Imminent shutdown detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4172,7 +4172,7 @@ traps:
     name: NE843-MIB::ne843RetireBr1Mdp
     category: diagnostic
     severity: warning
-    description: Voltage Duplicate ID event reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Voltage Duplicate ID event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4184,7 +4184,7 @@ traps:
     name: NE843-MIB::ne843RetireBr1Mzd
     category: diagnostic
     severity: warning
-    description: Voltage ID not configured on {_HOSTNAME}.
+    description: Voltage ID not configured on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4196,7 +4196,7 @@ traps:
     name: NE843-MIB::ne843RetireBr1Btha
     category: diagnostic
     severity: warning
-    description: High battery temperature detected on {_HOSTNAME}.
+    description: High battery temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4206,9 +4206,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.66
     name: NE843-MIB::ne843RetireCn1Cno
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Contactor open event reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Contactor open event detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4219,8 +4219,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.67
     name: NE843-MIB::ne843RetireCn1Cnf
     category: diagnostic
-    severity: err
-    description: Contactor failed with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: crit
+    description: Contactor failed on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4232,7 +4232,7 @@ traps:
     name: NE843-MIB::ne843RetireCn2Cno
     category: diagnostic
     severity: warning
-    description: Contactor open event reported on {_HOSTNAME}.
+    description: Contactor open event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4243,8 +4243,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.69
     name: NE843-MIB::ne843RetireCn2Cnf
     category: diagnostic
-    severity: err
-    description: Contactor failed with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: crit
+    description: Contactor failed on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4256,7 +4256,7 @@ traps:
     name: NE843-MIB::ne843RetireCn3Cno
     category: diagnostic
     severity: warning
-    description: Contactor open event reported on {_HOSTNAME}.
+    description: Contactor open event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4267,8 +4267,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.71
     name: NE843-MIB::ne843RetireCn3Cnf
     category: diagnostic
-    severity: err
-    description: Contactor failed with description {ne843TrapDesc} on {_HOSTNAME}.
+    severity: crit
+    description: Contactor failed on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4280,7 +4280,7 @@ traps:
     name: NE843-MIB::ne843RetireCn4Cno
     category: diagnostic
     severity: warning
-    description: Contactor open event reported on {_HOSTNAME}.
+    description: 'Contactor open event detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4292,7 +4292,7 @@ traps:
     name: NE843-MIB::ne843RetireCn4Cnf
     category: diagnostic
     severity: crit
-    description: Contactor failed with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Contactor failed on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4304,7 +4304,7 @@ traps:
     name: NE843-MIB::ne843RetireCm1Cof
     category: diagnostic
     severity: warning
-    description: Queue overflow detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Queue overflow detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4316,7 +4316,7 @@ traps:
     name: NE843-MIB::ne843RetireCm1Cor
     category: diagnostic
     severity: warning
-    description: Event {ne843TrapDesc} reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Component did not respond{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4328,7 +4328,7 @@ traps:
     name: NE843-MIB::ne843RetireCm1Nnc
     category: diagnostic
     severity: warning
-    description: Event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: NE843 event {{value "ne843TrapDesc"}} occurred on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4340,7 +4340,7 @@ traps:
     name: NE843-MIB::ne843RetirePo1Por
     category: diagnostic
     severity: err
-    description: Event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Port {{first (value "ne843TrapPath") "port"}} did not respond on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4352,7 +4352,7 @@ traps:
     name: NE843-MIB::ne843RetireRp1Rf
     category: diagnostic
     severity: warning
-    description: Ringer Minor Fail reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Ringer minor failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4363,8 +4363,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.79
     name: NE843-MIB::ne843RetireRp1Rpff
     category: diagnostic
-    severity: err
-    description: 'Fan failure detected: {ne843TrapDesc} on {_HOSTNAME}.'
+    severity: crit
+    description: Ringer fan failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4374,9 +4374,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.80
     name: NE843-MIB::ne843RetireRp1Rprl
-    category: state_change
+    category: diagnostic
     severity: alert
-    description: Ringer Redundancy Loss detected on {_HOSTNAME}.
+    description: Ringer redundancy loss detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4387,8 +4387,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.81
     name: NE843-MIB::ne843RetireRp1Rpfj
     category: diagnostic
-    severity: err
-    description: Ringer Major Fail reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: crit
+    description: Ringer Major Fail detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4399,8 +4399,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.82
     name: NE843-MIB::ne843RetireRp1Rpxj
     category: diagnostic
-    severity: err
-    description: Ringer Major External Fault reported on {_HOSTNAME}.
+    severity: crit
+    description: Ringer Major External Fault detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4412,7 +4412,7 @@ traps:
     name: NE843-MIB::ne843RetireRp1Rpxn
     category: diagnostic
     severity: warning
-    description: Ringer Minor External Fault reported on {_HOSTNAME}.
+    description: Ringer Minor External Fault detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4424,7 +4424,7 @@ traps:
     name: NE843-MIB::ne843RetireRp1Rcdp
     category: diagnostic
     severity: warning
-    description: Ringer ID Conflict reported on {_HOSTNAME}.
+    description: Ringer ID conflict detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4436,7 +4436,7 @@ traps:
     name: NE843-MIB::ne843RetireUserDefined
     category: diagnostic
     severity: warning
-    description: User defined event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: User-defined event {{value "ne843TrapDesc"}} occurred on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4448,7 +4448,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Emd
     category: diagnostic
     severity: warning
-    description: Energy Management Disabled reported on {_HOSTNAME}.
+    description: Energy management disabled on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4459,8 +4459,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.87
     name: NE843-MIB::ne843RetireDc1Pfs
     category: diagnostic
-    severity: err
-    description: Thermal Probe Fail Safe detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: Thermal Probe Fail Safe event occurred on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4471,8 +4471,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.88
     name: NE843-MIB::ne843RetireDc1Rif
     category: diagnostic
-    severity: err
-    description: Rectifier internal fault reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: crit
+    description: Rectifier internal fault detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4482,9 +4482,9 @@ traps:
       - ne843TrapPath
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.89
     name: NE843-MIB::ne843RetireDc1Lsf
-    category: diagnostic
-    severity: err
-    description: Load share failure reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: Load share failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4496,7 +4496,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Ax7
     category: diagnostic
     severity: warning
-    description: Auxiliary event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Auxiliary event 7 occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4508,7 +4508,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Ax8
     category: diagnostic
     severity: warning
-    description: Auxiliary Event 8 reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Auxiliary event 8 occurred{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4520,7 +4520,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Ax9
     category: diagnostic
     severity: warning
-    description: Auxiliary Event 9 reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Auxiliary event 9 occurred on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4532,7 +4532,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Ax10
     category: diagnostic
     severity: warning
-    description: Auxiliary event {ne843TrapDesc} reported on {_HOSTNAME}.
+    description: Auxiliary event 10 occurred on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4544,7 +4544,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Ax11
     category: diagnostic
     severity: warning
-    description: Auxiliary event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Auxiliary event 11 occurred on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4556,7 +4556,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Ax12
     category: diagnostic
     severity: warning
-    description: Auxiliary Event 12 reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Auxiliary event 12 occurred on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4568,7 +4568,7 @@ traps:
     name: NE843-MIB::ne843RetireBr1Btla
     category: diagnostic
     severity: warning
-    description: Low battery temperature event reported on {_HOSTNAME}.
+    description: Low battery temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4579,8 +4579,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.97
     name: NE843-MIB::ne843RetireBr1Btvh
     category: diagnostic
-    severity: warning
-    description: Very High Battery Temperature reported on {_HOSTNAME}.
+    severity: crit
+    description: Very High Battery Temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4592,7 +4592,7 @@ traps:
     name: NE843-MIB::ne843RetireBr1Btvl
     category: diagnostic
     severity: warning
-    description: Very Low Battery Temperature reported on {_HOSTNAME}.
+    description: Very Low Battery Temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4604,7 +4604,7 @@ traps:
     name: NE843-MIB::ne843RetireGn1Gnr
     category: diagnostic
     severity: notice
-    description: Generator Running event {ne843TrapDesc} on {_HOSTNAME}.
+    description: Generator running state detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4616,7 +4616,7 @@ traps:
     name: NE843-MIB::ne843RetireGn1Gnm
     category: diagnostic
     severity: warning
-    description: Generator maintenance required with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Generator maintenance required on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4627,8 +4627,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.101
     name: NE843-MIB::ne843RetireGn1Gnf
     category: diagnostic
-    severity: err
-    description: Generator Fail reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: Generator failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4640,7 +4640,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Amtl
     category: diagnostic
     severity: warning
-    description: Low ambient temperature detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Low ambient temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4652,7 +4652,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Amth
     category: diagnostic
     severity: warning
-    description: High ambient temperature detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: High ambient temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4664,7 +4664,7 @@ traps:
     name: NE843-MIB::ne843RetireAco1Aac
     category: diagnostic
     severity: warning
-    description: ACO Active event {ne843TrapDesc} reported on {_HOSTNAME}.
+    description: ACO Active event reported on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4675,8 +4675,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.105
     name: NE843-MIB::ne843RetireBr1Rba
     category: diagnostic
-    severity: crit
-    description: Reverse battery condition detected on {_HOSTNAME}.
+    severity: alert
+    description: Reverse battery condition detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4687,8 +4687,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.106
     name: NE843-MIB::ne843RetireCp1Cin
     category: diagnostic
-    severity: err
-    description: Converter input failure reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: crit
+    description: Converter input failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4699,8 +4699,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.107
     name: NE843-MIB::ne843RetireDc1Bof
     category: diagnostic
-    severity: err
-    description: Rectifier ORing FET Fault reported on {_HOSTNAME}.
+    severity: crit
+    description: Rectifier ORing FET Fault detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4711,8 +4711,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.108
     name: NE843-MIB::ne843RetireDc1Sof
     category: diagnostic
-    severity: err
-    description: Rectifier Shorted ORing FET detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: crit
+    description: Rectifier shorted oring FET detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4724,7 +4724,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Der
     category: diagnostic
     severity: warning
-    description: Rectifier under voltage condition detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Rectifier under voltage condition detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4736,7 +4736,7 @@ traps:
     name: NE843-MIB::ne843RetireGn1Gns
     category: diagnostic
     severity: notice
-    description: Generator start event {ne843TrapDesc} on {_HOSTNAME}.
+    description: Generator start event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4748,7 +4748,7 @@ traps:
     name: NE843-MIB::ne843RetireIvp1Ilvi
     category: diagnostic
     severity: warning
-    description: Inverter Low Input event reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Inverter Low Input event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4759,8 +4759,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.112
     name: NE843-MIB::ne843RetireIvp1Ihvi
     category: diagnostic
-    severity: err
-    description: Inverter High Input event {ne843TrapDesc} reported on {_HOSTNAME}.
+    severity: warning
+    description: Inverter High Input event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4772,7 +4772,7 @@ traps:
     name: NE843-MIB::ne843RetireIvp1Ita
     category: diagnostic
     severity: warning
-    description: Inverter high temperature detected with description {ne843TrapDesc} on {_HOSTNAME}.
+    description: Inverter high temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4783,8 +4783,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.114
     name: NE843-MIB::ne843RetireIvp1If
     category: diagnostic
-    severity: crit
-    description: Inverter failure reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    severity: alert
+    description: 'Inverter failure detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4796,7 +4796,7 @@ traps:
     name: NE843-MIB::ne843RetireIvp1Ilv
     category: diagnostic
     severity: warning
-    description: Inverter reported low output status {ne843TrapDesc} on {_HOSTNAME}.
+    description: Inverter low output event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4808,7 +4808,7 @@ traps:
     name: NE843-MIB::ne843RetireIvp1Ifa
     category: diagnostic
     severity: warning
-    description: Inverter Frequency Lock reported on {_HOSTNAME}.
+    description: 'Inverter frequency lock detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4820,7 +4820,7 @@ traps:
     name: NE843-MIB::ne843RetireIvp1Ihv
     category: diagnostic
     severity: warning
-    description: Inverter High Output event reported on {_HOSTNAME}.
+    description: Inverter High Output event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4832,7 +4832,7 @@ traps:
     name: NE843-MIB::ne843RetireIvp1Ida
     category: diagnostic
     severity: warning
-    description: Inverter Distribution Alarm {ne843TrapDesc} reported on {_HOSTNAME}.
+    description: Inverter Distribution Alarm {{value "ne843TrapDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4843,8 +4843,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.119
     name: NE843-MIB::ne843RetireIvp1Iof
     category: diagnostic
-    severity: err
-    description: Inverter Output Fuse fault reported on {_HOSTNAME}.
+    severity: crit
+    description: Inverter output fuse fault detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4856,7 +4856,7 @@ traps:
     name: NE843-MIB::ne843RetireIvp1Idid
     category: diagnostic
     severity: warning
-    description: Inverter ID conflict detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: 'Inverter ID conflict detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4868,7 +4868,7 @@ traps:
     name: NE843-MIB::ne843RetireIvp1Iirm
     category: diagnostic
     severity: warning
-    description: Inverter High RMS Current event reported on {_HOSTNAME}.
+    description: Inverter High RMS Current detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4880,7 +4880,7 @@ traps:
     name: NE843-MIB::ne843RetireIvp1Iipk
     category: diagnostic
     severity: warning
-    description: Inverter high peak current event detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Inverter high peak current detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4892,7 +4892,7 @@ traps:
     name: NE843-MIB::ne843RetireIvp1Icf
     category: diagnostic
     severity: warning
-    description: Inverter High Crest Factor detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Inverter High Crest Factor detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4904,7 +4904,7 @@ traps:
     name: NE843-MIB::ne843RetireIvp1Mif
     category: diagnostic
     severity: alert
-    description: Multiple inverter failure detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Multiple inverter failure detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4916,7 +4916,7 @@ traps:
     name: NE843-MIB::ne843RetireIvp1Irls
     category: diagnostic
     severity: crit
-    description: Inverter redundancy loss reported on {_HOSTNAME}.
+    description: Inverter redundancy loss detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4927,8 +4927,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.126
     name: NE843-MIB::ne843RetireDc1Pmf
     category: diagnostic
-    severity: err
-    description: Probe Minimum Fail reported on {_HOSTNAME}.
+    severity: warning
+    description: 'Probe Minimum Fail detected{{with value "ne843TrapDesc"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4940,7 +4940,7 @@ traps:
     name: NE843-MIB::ne843RetirePs1Crt
     category: config_change
     severity: notice
-    description: Configuration changed requiring reboot on {_HOSTNAME}.
+    description: Configuration changed requiring reboot on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4952,7 +4952,7 @@ traps:
     name: NE843-MIB::ne843RetireIvp1Milv
     category: diagnostic
     severity: warning
-    description: Multiple Inverter Low Input Voltage detected on {_HOSTNAME}.
+    description: Multiple Inverter Low Input Voltage detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4964,7 +4964,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Faja
     category: diagnostic
     severity: warning
-    description: Distribution Fuse A event reported on {_HOSTNAME}.
+    description: Distribution Fuse A event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4976,7 +4976,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Buht
     category: diagnostic
     severity: warning
-    description: Bus Hi Temp event reported on {_HOSTNAME}.
+    description: Bus high temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -4987,8 +4987,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.131
     name: NE843-MIB::ne843RetireDc1Buvht
     category: diagnostic
-    severity: warning
-    description: Bus Very Hi Temp reported on {_HOSTNAME}.
+    severity: crit
+    description: Bus very high temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5000,7 +5000,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Btha
     category: diagnostic
     severity: warning
-    description: Battery high temperature event {ne843TrapDesc} detected on {_HOSTNAME}.
+    description: Battery high temperature event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5011,8 +5011,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.133
     name: NE843-MIB::ne843RetireDc1Btvh
     category: diagnostic
-    severity: warning
-    description: Batt Very Hi Temp reported on {_HOSTNAME}.
+    severity: crit
+    description: Battery very high temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5024,7 +5024,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Btla
     category: diagnostic
     severity: warning
-    description: Batt Low Temp event reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Battery low temperature event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5036,7 +5036,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Btvl
     category: diagnostic
     severity: warning
-    description: Battery very low temperature event reported on {_HOSTNAME}.
+    description: Battery very low temperature event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5048,7 +5048,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Laht
     category: diagnostic
     severity: warning
-    description: Local Amb. Hi Temp reported on {_HOSTNAME}.
+    description: Local ambient high temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5060,7 +5060,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Lalt
     category: diagnostic
     severity: warning
-    description: Local ambient temperature low event {ne843TrapDesc} on {_HOSTNAME}.
+    description: Local ambient low temperature event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5072,7 +5072,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Raht
     category: diagnostic
     severity: warning
-    description: Remote ambient high temperature event detected on {_HOSTNAME}.
+    description: Remote ambient high temperature alert on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5084,7 +5084,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Ravht
     category: diagnostic
     severity: crit
-    description: Remote Amb. Very Hi Temp reported on {_HOSTNAME}.
+    description: Remote ambient very high temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5096,7 +5096,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Ralt
     category: diagnostic
     severity: warning
-    description: Remote ambient low temperature event {ne843TrapDesc} on {_HOSTNAME}.
+    description: Remote ambient low temperature detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5107,8 +5107,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.141
     name: NE843-MIB::ne843RetireDc1Vlva
     category: diagnostic
-    severity: err
-    description: VA power loss detected with description {ne843TrapDesc} on {_HOSTNAME}.
+    severity: alert
+    description: VA power loss detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5119,8 +5119,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.142
     name: NE843-MIB::ne843RetireDc1Vlvb
     category: diagnostic
-    severity: crit
-    description: VB Power Loss reported on {_HOSTNAME}.
+    severity: alert
+    description: VB power loss detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5132,7 +5132,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Ovla
     category: diagnostic
     severity: warning
-    description: IA Overload event {ne843TrapDesc} on {_HOSTNAME}.
+    description: IA Overload detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5144,7 +5144,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Ovlb
     category: diagnostic
     severity: warning
-    description: IB Overload detected with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: IB Overload detected on {{first (value "ne843TrapPath") "system"}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5156,7 +5156,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Pcaux
     category: diagnostic
     severity: warning
-    description: PIC Auxiliary event {ne843TrapDesc} with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: PIC Auxiliary event {{value "ne843TrapDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5168,7 +5168,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Slot
     category: diagnostic
     severity: warning
-    description: PIC Slot event {ne843TrapDesc} reported on {_HOSTNAME}.
+    description: PIC Slot {{value "ne843TrapDesc"}} retired on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5180,7 +5180,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Fajb
     category: diagnostic
     severity: warning
-    description: Distribution Fuse B event reported with severity {ne843TrapSev} on {_HOSTNAME}.
+    description: Distribution Fuse B event detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5191,8 +5191,8 @@ traps:
   - oid: 1.3.6.1.4.1.10520.2.1.3.37.148
     name: NE843-MIB::ne843RetireDc1Smw
     category: diagnostic
-    severity: warning
-    description: 'Shunt mis-wired detected: {ne843TrapDesc} on {_HOSTNAME}.'
+    severity: alert
+    description: Shunt mis-wired detected on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc
@@ -5204,7 +5204,7 @@ traps:
     name: NE843-MIB::ne843RetireDc1Cca
     category: diagnostic
     severity: warning
-    description: Circuit Assignment event {ne843TrapDesc} on {_HOSTNAME}.
+    description: Circuit assignment event {{value "ne843TrapDesc"}} on {{hostname}}.
     status: current
     varbinds:
       - ne843TrapDesc

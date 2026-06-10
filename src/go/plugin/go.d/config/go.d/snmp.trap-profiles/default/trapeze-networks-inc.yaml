@@ -933,23 +933,23 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzDeviceFailTrap
     category: diagnostic
     severity: crit
-    description: Device {trpzDeviceId} reported a failure indication on {_HOSTNAME}.
+    description: Device failure indication detected for {{value "trpzDeviceId"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzDeviceId
   - oid: 1.3.6.1.4.1.14525.5.0.2
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzDeviceOkayTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Device {trpzDeviceId} has recovered on {_HOSTNAME}.
+    description: Device recovered and is operational on {{hostname}}.
     status: current
     varbinds:
       - trpzDeviceId
   - oid: 1.3.6.1.4.1.14525.5.0.3
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzPoEFailTrap
     category: diagnostic
-    severity: err
-    description: PoE failed on port {trpzPortNum} on {_HOSTNAME}.
+    severity: warning
+    description: PoE failed on port {{value "trpzPortNum"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzPortNum
@@ -957,7 +957,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzApTimeoutTrap
     category: diagnostic
     severity: warning
-    description: Access point {trpzAPMACAddress} at port {trpzPortNum} timed out on {_HOSTNAME}.
+    description: Access point {{value "trpzAPMACAddress"}} timed out on port {{value "trpzPortNum"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzPortNum
@@ -968,7 +968,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzAPBootTrap
     category: state_change
     severity: notice
-    description: Access point {trpzAPMACAddress} booted on port {trpzPortNum} on {_HOSTNAME}.
+    description: Access point {{value "trpzAPMACAddress"}} booted on port {{value "trpzPortNum"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzPortNum
@@ -979,15 +979,15 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzMobilityDomainJoinTrap
     category: mobility
     severity: notice
-    description: Mobility domain member joined domain at {trpzMobilityDomainIp} on {_HOSTNAME}.
+    description: Mobility domain member joined domain at {{value "trpzMobilityDomainIp"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzMobilityDomainIp
   - oid: 1.3.6.1.4.1.14525.5.0.7
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzMobilityDomainTimeoutTrap
     category: mobility
-    severity: err
-    description: Mobility domain member {trpzMobilityDomainIp} declared remote address DOWN on {_HOSTNAME}.
+    severity: warning
+    description: Mobility domain member declared remote address {{value "trpzMobilityDomainIp"}} down on {{hostname}}.
     status: current
     varbinds:
       - trpzMobilityDomainIp
@@ -995,7 +995,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzMpMichaelMICFailure
     category: security
     severity: alert
-    description: Michael MIC failure detected on {trpzPortNum} for client {trpzClientMACAddress} on {_HOSTNAME}.
+    description: Michael MIC failure detected for client {{value "trpzClientMACAddress"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzPortNum
@@ -1008,7 +1008,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectRogueAPTrap
     category: security
     severity: alert
-    description: Rogue AP detected with MAC {trpzRFDetectXmtrMacAddr} on {_HOSTNAME}.
+    description: RF detection found a rogue AP with MAC {{value "trpzRFDetectXmtrMacAddr"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1017,7 +1017,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectAdhocUserTrap
     category: security
     severity: warning
-    description: Ad-hoc user detected with MAC {trpzRFDetectXmtrMacAddr} on {_HOSTNAME}.
+    description: RF detection found an ad-hoc user with MAC {{value "trpzRFDetectXmtrMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1026,7 +1026,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectRogueDisappearTrap
     category: security
     severity: notice
-    description: Rogue device with transmitter MAC {trpzRFDetectXmtrMacAddr} disappeared on {_HOSTNAME}.
+    description: Rogue device disappeared{{with value "trpzRFDetectXmtrMacAddr"}} at {{.}}{{end}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1034,7 +1034,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientAuthenticationFailureTrap
     category: auth
     severity: warning
-    description: Client authentication failed for {trpzUserName} on {_HOSTNAME}.
+    description: 'Client authentication failed{{with value "trpzClientFailureCauseDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trpzUserName
@@ -1051,9 +1051,9 @@ traps:
       - trpzClientFailureCauseDescription
   - oid: 1.3.6.1.4.1.14525.5.0.13
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientAuthorizationFailureTrap
-    category: auth
+    category: security
     severity: warning
-    description: Client authorization failed for {trpzUserName} on {_HOSTNAME}.
+    description: 'Client authorization failed{{with value "trpzClientFailureCauseDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trpzUserName
@@ -1074,7 +1074,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientAssociationFailureTrap
     category: mobility
     severity: warning
-    description: Client association failed for {trpzClientMACAddress} on {trpzRadioSSID} due to {trpzClientFailureCauseDescription} on {_HOSTNAME}.
+    description: 'Client association failed{{with value "trpzClientFailureCauseDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trpzClientMACAddress
@@ -1087,9 +1087,9 @@ traps:
       - trpzClientFailureCauseDescription
   - oid: 1.3.6.1.4.1.14525.5.0.15
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientAuthorizationSuccessTrap
-    category: auth
-    severity: notice
-    description: Client {trpzUserName} authorized successfully on {_HOSTNAME}.
+    category: mobility
+    severity: info
+    description: Client {{value "trpzClientMACAddress"}} authorized on {{value "trpzRadioSSID"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzUserName
@@ -1111,7 +1111,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientDeAssociationTrap
     category: mobility
     severity: notice
-    description: Client {trpzClientMACAddress} de-associated from SSID {trpzRadioSSID} on {_HOSTNAME}.
+    description: Client {{value "trpzClientMACAddress"}} de-associated on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzUserName
@@ -1130,7 +1130,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientRoamingTrap
     category: mobility
     severity: notice
-    description: Client {trpzClientMACAddress} roamed on {_HOSTNAME}.
+    description: Client {{value "trpzClientMACAddress"}} roamed on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzUserName
@@ -1150,9 +1150,9 @@ traps:
       - trpzClientTimeSinceLastRoam
   - oid: 1.3.6.1.4.1.14525.5.0.18
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzAutoTuneRadioPowerChangeTrap
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Radio {trpzRadioMACAddress} power level changed from {trpzOldPowerLevel} to {trpzNewPowerLevel} on {_HOSTNAME}.
+    description: Radio power auto-tuned from {{value "trpzOldPowerLevel"}} to {{value "trpzNewPowerLevel"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzRadioMACAddress
@@ -1164,7 +1164,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzAutoTuneRadioChannelChangeTrap
     category: state_change
     severity: notice
-    description: Radio {trpzRadioMACAddress} channel changed from {trpzOldChannelNum} to {trpzNewChannelNum} on {_HOSTNAME}.
+    description: Radio channel changed from {{value "trpzOldChannelNum"}} to {{value "trpzNewChannelNum"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzRadioMACAddress
@@ -1174,8 +1174,8 @@ traps:
   - oid: 1.3.6.1.4.1.14525.5.0.20
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzCounterMeasureStartTrap
     category: security
-    severity: warning
-    description: Countermeasures started against rogue device {trpzRFDetectXmtrMacAddr} on {_HOSTNAME}.
+    severity: alert
+    description: Countermeasures started against rogue {{value "trpzRFDetectXmtrMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1184,7 +1184,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzCounterMeasureStopTrap
     category: security
     severity: notice
-    description: Countermeasures stopped against rogue {trpzRFDetectXmtrMacAddr} on {_HOSTNAME}.
+    description: Countermeasures stopped against rogue {{value "trpzRFDetectXmtrMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1193,7 +1193,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientDot1xFailureTrap
     category: security
     severity: warning
-    description: Client {trpzClientMACAddress} failed 802.1X authentication with cause {trpzClientFailureCauseDescription} on {_HOSTNAME}.
+    description: 802.1X authentication failure for client {{value "trpzClientMACAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzUserName
@@ -1209,9 +1209,9 @@ traps:
       - trpzClientFailureCauseDescription
   - oid: 1.3.6.1.4.1.14525.5.0.23
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientClearedTrap
-    category: state_change
+    category: mobility
     severity: notice
-    description: Client session cleared for {trpzUserName} on {_HOSTNAME}.
+    description: Client session cleared for {{value "trpzClientMACAddress"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzUserName
@@ -1227,9 +1227,9 @@ traps:
       - trpzLocalId
   - oid: 1.3.6.1.4.1.14525.5.0.24
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientAuthorizationSuccessTrap2
-    category: auth
+    category: mobility
     severity: notice
-    description: Client {trpzUserName} authorized successfully on {_HOSTNAME}.
+    description: Client {{value "trpzClientMACAddress"}} authorized on {{value "trpzRadioSSID"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzUserName
@@ -1252,7 +1252,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectSpoofedMacAPTrap
     category: security
     severity: alert
-    description: RF detection found AP using spoofed MAC {trpzRFDetectXmtrMacAddr} on {_HOSTNAME}.
+    description: RF detection found an AP spoofing MAC address {{value "trpzRFDetectXmtrMacAddr"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1261,7 +1261,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectSpoofedSsidAPTrap
     category: security
     severity: warning
-    description: RF detection found spoofed SSID from {trpzRFDetectXmtrMacAddr} on {_HOSTNAME}.
+    description: RF detection found a spoofed SSID from {{value "trpzRFDetectXmtrMacAddr"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1269,8 +1269,8 @@ traps:
   - oid: 1.3.6.1.4.1.14525.5.0.27
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectDoSTrap
     category: security
-    severity: warning
-    description: RF DoS attack detected on {trpzRFDetectXmtrMacAddr} with type {trpzRFDetectDoSType} on {_HOSTNAME}.
+    severity: alert
+    description: RF denial of service detected from {{value "trpzRFDetectXmtrMacAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzRFDetectDoSType
@@ -1280,7 +1280,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectClientViaRogueWiredAPTrap
     category: security
     severity: alert
-    description: Rogue client detected via wired AP at {trpzSourceWsIp} port {trpzPortNum} on {_HOSTNAME}.
+    description: Client detected via rogue wired AP on port {{value "trpzPortNum"}} of {{value "trpzSourceWsIp"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzSourceWsIp
@@ -1293,7 +1293,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectInterferingRogueAPTrap
     category: security
     severity: warning
-    description: RF detection found interfering rogue AP {trpzRFDetectXmtrMacAddr} on {_HOSTNAME}.
+    description: RF detection found an interfering rogue AP with MAC {{value "trpzRFDetectXmtrMacAddr"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1302,7 +1302,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectInterferingRogueDisappearTrap
     category: security
     severity: notice
-    description: Interfering rogue device with transmitter MAC {trpzRFDetectXmtrMacAddr} has disappeared on {_HOSTNAME}.
+    description: Interfering rogue disappeared (MAC {{value "trpzRFDetectXmtrMacAddr"}}) on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1310,7 +1310,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectUnAuthorizedSsidTrap
     category: security
     severity: warning
-    description: Unauthorized SSID detected on radio {trpzRFDetectXmtrMacAddr} with listener info {trpzRFDetectListenerListInfo} on {_HOSTNAME}.
+    description: Unauthorized SSID detected on {{value "trpzRFDetectXmtrMacAddr"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1319,7 +1319,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectUnAuthorizedOuiTrap
     category: security
     severity: alert
-    description: RF detection found unauthorized OUI at {trpzRFDetectXmtrMacAddr} with listener info {trpzRFDetectListenerListInfo} on {_HOSTNAME}.
+    description: Unauthorized OUI detected on {{value "trpzRFDetectXmtrMacAddr"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1327,8 +1327,8 @@ traps:
   - oid: 1.3.6.1.4.1.14525.5.0.33
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectUnAuthorizedAPTrap
     category: security
-    severity: alert
-    description: Unauthorized AP detected with MAC {trpzRFDetectXmtrMacAddr} on {_HOSTNAME}.
+    severity: warning
+    description: Unauthorized AP detected with MAC {{value "trpzRFDetectXmtrMacAddr"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1337,7 +1337,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzDAPConnectWarningTrap
     category: security
     severity: warning
-    description: DAP {trpzDeviceModel} connect warning {trpzDAPconnectWarningType} on {_HOSTNAME}.
+    description: DAP connect warning {{value "trpzDAPconnectWarningType"}} for {{value "trpzDeviceModel"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzDeviceModel
@@ -1347,8 +1347,8 @@ traps:
   - oid: 1.3.6.1.4.1.14525.5.0.35
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectDoSPortTrap
     category: security
-    severity: warning
-    description: RF DoS attack detected on {trpzClientAccessType} at {trpzPortNum} from {trpzRFDetectXmtrMacAddr} on {_HOSTNAME}.
+    severity: alert
+    description: RF denial of service detected{{with value "trpzRFDetectDoSType"}} type {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - trpzRFDetectDoSType
@@ -1360,7 +1360,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzMpMichaelMICFailure2
     category: security
     severity: alert
-    description: Two Michael MIC failures detected for clients {trpzClientMACAddress} and {trpzClientMACAddress2} on {_HOSTNAME}.
+    description: Two Michael MIC failures detected from {{value "trpzClientMACAddress"}} and {{value "trpzClientMACAddress2"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzPortNum
@@ -1371,7 +1371,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzApNonOperStatusTrap
     category: state_change
     severity: warning
-    description: AP {trpzApName} transitioned to non-operational state on {_HOSTNAME}.
+    description: AP {{value "trpzApName"}} entered non-operational state on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzDeviceSerNum
@@ -1386,7 +1386,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzApOperRadioStatusTrap
     category: state_change
     severity: notice
-    description: Radio {trpzAPRadioNum} on AP {trpzApName} changed operational state on {_HOSTNAME}.
+    description: Radio {{value "trpzRadioMACAddress"}} state changed on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzDeviceSerNum
@@ -1403,7 +1403,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientIpAddrChangeTrap
     category: state_change
     severity: notice
-    description: Client {trpzClientMACAddress} IP address changed to {trpzClientIp} on {_HOSTNAME}.
+    description: Client {{value "trpzClientMACAddress"}} IP address changed to {{value "trpzClientIp"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzUserName
@@ -1425,8 +1425,8 @@ traps:
   - oid: 1.3.6.1.4.1.14525.5.0.40
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientAssociationSuccessTrap
     category: mobility
-    severity: notice
-    description: Client {trpzClientMACAddress} associated on SSID {trpzRadioSSID} on {_HOSTNAME}.
+    severity: info
+    description: Wireless client associated on {{value "trpzRadioSSID"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzClientMACAddress
@@ -1437,9 +1437,9 @@ traps:
       - trpzRadioSSID
   - oid: 1.3.6.1.4.1.14525.5.0.41
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientAuthenticationSuccessTrap
-    category: auth
+    category: mobility
     severity: notice
-    description: Client {trpzClientMACAddress} authenticated successfully on {trpzRadioSSID} on {_HOSTNAME}.
+    description: Client {{value "trpzClientMACAddress"}} authenticated successfully on {{value "trpzRadioSSID"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzClientMACAddress
@@ -1452,7 +1452,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientDeAuthenticationTrap
     category: mobility
     severity: notice
-    description: Client {trpzClientMACAddress} de-authenticated on {trpzRadioSSID} on {_HOSTNAME}.
+    description: Client {{value "trpzClientMACAddress"}} de-authenticated on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzUserName
@@ -1470,8 +1470,8 @@ traps:
   - oid: 1.3.6.1.4.1.14525.5.0.43
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectBlacklistedTrap
     category: security
-    severity: warning
-    description: Blacklisted transmitter {trpzRFDetectXmtrMacAddr} detected on {_HOSTNAME}.
+    severity: alert
+    description: Blacklisted transmitter {{value "trpzRFDetectXmtrMacAddr"}} detected on {{hostname}}.
     status: current
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1484,7 +1484,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectClientViaRogueWiredAPTrap2
     category: security
     severity: alert
-    description: Client detected via rogue wired AP {trpzRFDetectRogueAPMacAddr} on port {trpzPortNum} on {_HOSTNAME}.
+    description: Client detected via rogue wired AP on port {{value "trpzPortNum"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzSourceWsIp
@@ -1497,8 +1497,8 @@ traps:
   - oid: 1.3.6.1.4.1.14525.5.0.45
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectAdhocUserDisappearTrap
     category: mobility
-    severity: notice
-    description: Ad-hoc user with MAC {trpzRFDetectXmtrMacAddr} disappeared on {_HOSTNAME}.
+    severity: info
+    description: Ad-hoc user with MAC {{value "trpzRFDetectXmtrMacAddr"}} disappeared on {{hostname}}.
     status: current
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1506,7 +1506,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzApRejectLicenseExceededTrap
     category: license
     severity: warning
-    description: License limit for active APs reached with {trpzNumLicensedActiveAPs} on {_HOSTNAME}.
+    description: AP rejected due to license limit of {{value "trpzNumLicensedActiveAPs"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzNumLicensedActiveAPs
@@ -1514,7 +1514,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientDynAuthorChangeSuccessTrap
     category: config_change
     severity: notice
-    description: Dynamic authorization attributes changed for user {trpzUserName} on {_HOSTNAME}.
+    description: User authorization attributes changed for {{value "trpzUserName"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzUserName
@@ -1536,8 +1536,8 @@ traps:
   - oid: 1.3.6.1.4.1.14525.5.0.48
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientDynAuthorChangeFailureTrap
     category: auth
-    severity: err
-    description: Dynamic authorization change failed for {trpzUserName} with cause {trpzClientFailureCauseDescription} on {_HOSTNAME}.
+    severity: warning
+    description: 'Dynamic authorization client change request failed{{with value "trpzClientFailureCauseDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trpzUserName
@@ -1557,7 +1557,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientDisconnectTrap
     category: mobility
     severity: notice
-    description: Client session terminated administratively for {trpzUserName} on {_HOSTNAME}.
+    description: 'Client session terminated administratively{{with value "trpzClientDisconnectDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: obsolete
     varbinds:
       - trpzUserName
@@ -1574,9 +1574,9 @@ traps:
       - trpzClientDisconnectDescription
   - oid: 1.3.6.1.4.1.14525.5.0.50
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzMobilityDomainFailOverTrap
-    category: mobility
+    category: state_change
     severity: alert
-    description: Mobility Domain failed over to secondary seed {trpzMobilityDomainSecondarySeedIp} on {_HOSTNAME}.
+    description: Mobility Domain failed over to secondary seed {{value "trpzMobilityDomainSecondarySeedIp"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzMobilityDomainSecondarySeedIp
@@ -1584,7 +1584,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzMobilityDomainFailBackTrap
     category: mobility
     severity: notice
-    description: Mobility Domain failed back to primary seed {trpzMobilityDomainPrimarySeedIp} on {_HOSTNAME}.
+    description: Mobility Domain failed back to primary seed {{value "trpzMobilityDomainPrimarySeedIp"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzMobilityDomainPrimarySeedIp
@@ -1592,7 +1592,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectRogueDeviceTrap
     category: security
     severity: alert
-    description: RF detection identified rogue device {trpzRFDetectXmtrMacAddr} with reason {trpzRFDetectClassificationReason} on {_HOSTNAME}.
+    description: RF detection found a rogue device {{value "trpzRFDetectXmtrMacAddr"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1602,7 +1602,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectRogueDeviceDisappearTrap
     category: security
     severity: notice
-    description: Rogue device with MAC {trpzRFDetectXmtrMacAddr} disappeared on {_HOSTNAME}.
+    description: Rogue device disappeared{{with value "trpzRFDetectXmtrMacAddr"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1610,7 +1610,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectSuspectDeviceTrap
     category: security
     severity: warning
-    description: RF detection identified suspect device {trpzRFDetectXmtrMacAddr} with reason {trpzRFDetectClassificationReason} on {_HOSTNAME}.
+    description: RF detection found a suspect device with reason {{value "trpzRFDetectClassificationReason"}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1620,7 +1620,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectSuspectDeviceDisappearTrap
     category: security
     severity: notice
-    description: Suspect device with MAC {trpzRFDetectXmtrMacAddr} disappeared on {_HOSTNAME}.
+    description: Suspect device with MAC {{value "trpzRFDetectXmtrMacAddr"}} disappeared on {{hostname}}.
     status: current
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1628,7 +1628,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectClientViaRogueWiredAPTrap3
     category: security
     severity: alert
-    description: Rogue AP {trpzRFDetectRogueAPMacAddr} detected on wired port {trpzSourceWsIp}:{trpzPortNum} on {_HOSTNAME}.
+    description: Client connected via rogue wired AP {{value "trpzRFDetectRogueAPMacAddr"}} on port {{value "trpzPortNum"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzSourceWsIp
@@ -1643,13 +1643,13 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectClassificationChangeTrap
     category: config_change
     severity: notice
-    description: RF detection classification rules changed on {_HOSTNAME}.
+    description: RF detection classification rules changed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.14525.5.0.58
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzConfigurationSavedTrap
     category: config_change
     severity: notice
-    description: Running configuration saved to {trpzConfigSaveFileName} on {_HOSTNAME}.
+    description: Running configuration saved to {{value "trpzConfigSaveFileName"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzConfigSaveFileName
@@ -1661,7 +1661,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzApNonOperStatusTrap2
     category: state_change
     severity: warning
-    description: AP {trpzApName} transitioned to non-operational state with detail {trpzApFailDetail} on {_HOSTNAME}.
+    description: AP {{value "trpzApName"}} transitioned to non-operational state on {{hostname}}.
     status: current
     varbinds:
       - trpzDeviceSerNum
@@ -1675,7 +1675,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzApOperRadioStatusTrap2
     category: state_change
     severity: notice
-    description: Radio {trpzAPRadioNum} on AP {trpzApName} changed operational state on {_HOSTNAME}.
+    description: Radio {{value "trpzAPRadioNum"}} on {{value "trpzApName"}} changed state on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzDeviceSerNum
@@ -1692,7 +1692,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzMichaelMICFailure
     category: security
     severity: alert
-    description: Michael MIC failure detected for clients {trpzClientMACAddress} and {trpzClientMACAddress2} on radio {trpzRadioMACAddress} on {_HOSTNAME}.
+    description: Michael MIC failure detected on radio {{value "trpzRadioMACAddress"}} due to {{value "trpzMichaelMICFailureCause"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzApNum
@@ -1703,9 +1703,9 @@ traps:
       - trpzClientMACAddress2
   - oid: 1.3.6.1.4.1.14525.5.0.62
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientAuthorizationSuccessTrap3
-    category: auth
+    category: mobility
     severity: notice
-    description: Client {trpzUserName} authorized successfully on {_HOSTNAME}.
+    description: Client {{value "trpzClientMACAddress"}} authorized on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzUserName
@@ -1728,7 +1728,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzApManagerChangeTrap
     category: state_change
     severity: notice
-    description: AP {trpzApName} primary manager changed from {trpzApMgrOldIp} to {trpzApMgrNewIp} on {_HOSTNAME}.
+    description: AP {{value "trpzApName"}} manager changed from {{value "trpzApMgrOldIp"}} to {{value "trpzApMgrNewIp"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzDeviceSerNum
@@ -1742,7 +1742,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientClearedTrap2
     category: state_change
     severity: notice
-    description: Client session cleared for {trpzUserName} on {_HOSTNAME}.
+    description: Client session cleared{{with value "trpzClientClearedReason"}} due to {{.}}{{end}} on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzUserName
@@ -1761,7 +1761,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzMobilityDomainResiliencyStatusTrap
     category: mobility
     severity: notice
-    description: Mobility domain resilient capacity status changed to {trpzMobilityDomainResiliencyStatus} on {_HOSTNAME}.
+    description: Mobility domain resilient capacity status changed to {{value "trpzMobilityDomainResiliencyStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzMobilityDomainResiliencyStatus
@@ -1769,7 +1769,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzApOperRadioStatusTrap3
     category: state_change
     severity: notice
-    description: Radio {trpzAPRadioNum} on AP {trpzApName} changed operational state on {_HOSTNAME}.
+    description: Radio status changed on {{value "trpzApName"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzDeviceSerNum
@@ -1786,9 +1786,9 @@ traps:
       - trpzApServiceAvailability
   - oid: 1.3.6.1.4.1.14525.5.0.67
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientAuthorizationSuccessTrap4
-    category: auth
-    severity: info
-    description: Client {trpzUserName} authorized successfully on {_HOSTNAME}.
+    category: mobility
+    severity: notice
+    description: Client {{value "trpzClientMACAddress"}} authorized on {{hostname}}.
     status: obsolete
     varbinds:
       - trpzUserName
@@ -1812,7 +1812,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectRogueDeviceTrap2
     category: security
     severity: alert
-    description: RF detection identified rogue device with MAC {trpzRFDetectXmtrMacAddr} classified as {trpzRFDetectClassificationReason} on {_HOSTNAME}.
+    description: RF detection found a rogue device {{value "trpzRFDetectClassificationReason"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1824,7 +1824,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFDetectSuspectDeviceTrap2
     category: security
     severity: warning
-    description: RF detection identified suspect device {trpzRFDetectXmtrMacAddr} classified as {trpzRFDetectClassificationReason} on {_HOSTNAME}.
+    description: RF detection found a suspect device {{value "trpzRFDetectClassificationReason"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzRFDetectXmtrMacAddr
@@ -1835,17 +1835,17 @@ traps:
   - oid: 1.3.6.1.4.1.14525.5.0.70
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClusterFailureTrap
     category: config_change
-    severity: err
-    description: Cluster configuration failed to apply with reason {trpzClusterFailureReason} on {_HOSTNAME}.
+    severity: crit
+    description: Cluster configuration failed to apply{{with value "trpzClusterFailureReason"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - trpzClusterFailureReason
       - trpzClusterFailureDescription
   - oid: 1.3.6.1.4.1.14525.5.0.71
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzMultimediaCallFailureTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Multimedia call failed with reason {trpzMultimediaCallFailureReason} on {_HOSTNAME}.
+    description: Multimedia call failed{{with value "trpzMultimediaCallFailureReason"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - trpzClientMACAddress
@@ -1871,7 +1871,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzApTunnelLimitExceededTrap
     category: diagnostic
     severity: warning
-    description: AP {trpzAPMACAddress} rejected tunnel creation due to limit {trpzApTunnelLimit} on {_HOSTNAME}.
+    description: AP {{value "trpzAPMACAddress"}} rejected tunnel creation due to limit {{value "trpzApTunnelLimit"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzDeviceSerNum
@@ -1880,9 +1880,9 @@ traps:
       - trpzApTunnelLimit
   - oid: 1.3.6.1.4.1.14525.5.0.73
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzWsTunnelLimitExceededTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Tunnel limit {trpzWsTunnelLimit} exceeded on {_HOSTNAME}.
+    description: Tunnel limit {{value "trpzWsTunnelLimitType"}} reached on {{hostname}}.
     status: current
     varbinds:
       - trpzWsTunnelLimit
@@ -1891,7 +1891,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzRFNoiseSourceTrap
     category: diagnostic
     severity: warning
-    description: RF noise source {trpzRFNoiseSourceID} detected on channel {trpzRFNoiseChannel} from {trpzRadioMACAddress} on {_HOSTNAME}.
+    description: RF noise source detected on channel {{value "trpzRFNoiseChannel"}} from {{value "trpzRadioMACAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzRFNoiseSourceID
@@ -1906,7 +1906,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzM2UConvNotPossibleTrap
     category: diagnostic
     severity: warning
-    description: Multicast to unicast conversion failed for SSID {trpzRadioSSID} on AP {trpzApName} on {_HOSTNAME}.
+    description: Multicast to unicast conversion failed{{with value "trpzM2UConvNotPossibleReason"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - trpzRadioSSID
@@ -1919,7 +1919,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzM2UConvAvailabilityRestoredTrap
     category: state_change
     severity: notice
-    description: Multicast to unicast conversion restored for SSID {trpzRadioSSID} on AP {trpzApName} on {_HOSTNAME}.
+    description: Multicast to unicast conversion restored on {{value "trpzApName"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzRadioSSID
@@ -1929,9 +1929,9 @@ traps:
       - trpzM2UMulticastAddr
   - oid: 1.3.6.1.4.1.14525.5.0.77
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzAutoTuneSuccessTrap
-    category: config_change
-    severity: notice
-    description: Auto-tune operation completed successfully for {trpzRadioBand} tuning {trpzRadiosTunedCount} radios on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Auto-tune operation completed successfully on {{hostname}}.
     status: current
     varbinds:
       - trpzRadioBand
@@ -1939,8 +1939,8 @@ traps:
   - oid: 1.3.6.1.4.1.14525.5.0.78
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzAutoTuneFailureTrap
     category: diagnostic
-    severity: err
-    description: Auto-tune operation failed with reason {trpzAutoTuneFailureReason} on radio band {trpzRadioBand} on {_HOSTNAME}.
+    severity: warning
+    description: Auto-tune operation failed{{with value "trpzAutoTuneFailureReason"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - trpzRadioBand
@@ -1949,7 +1949,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientDeAssociationTrap2
     category: mobility
     severity: notice
-    description: Wireless client {trpzClientMACAddress} de-associated from {trpzRadioSSID} on {_HOSTNAME}.
+    description: Wireless client de-associated{{with value "trpzClientMACAddress"}} from {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - trpzUserName
@@ -1970,7 +1970,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientRoamingTrap2
     category: mobility
     severity: notice
-    description: Client {trpzClientMACAddress} roamed on {_HOSTNAME}.
+    description: Client {{value "trpzClientMACAddress"}} roamed on {{hostname}}.
     status: current
     varbinds:
       - trpzUserName
@@ -1994,7 +1994,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientIpAddrChangeTrap2
     category: mobility
     severity: notice
-    description: Client {trpzClientMACAddress} IP address changed to {trpzClientIpAddr} on {_HOSTNAME}.
+    description: Client {{value "trpzClientMACAddress"}} IP address changed to {{value "trpzClientIpAddr"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzUserName
@@ -2019,7 +2019,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientDeAuthenticationTrap2
     category: mobility
     severity: notice
-    description: Client {trpzUserName} de-authenticated on {_HOSTNAME}.
+    description: Client {{value "trpzClientMACAddress"}} deauthenticated{{with value "trpzClientVLANName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - trpzUserName
@@ -2040,7 +2040,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientDynAuthorChangeSuccessTrap2
     category: auth
     severity: notice
-    description: User {trpzUserName} authorization attributes changed by {trpzClientDynAuthorClientAddr} on {_HOSTNAME}.
+    description: User {{value "trpzUserName"}} authorization changed on {{hostname}}.
     status: current
     varbinds:
       - trpzUserName
@@ -2065,7 +2065,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientDisconnectTrap2
     category: mobility
     severity: notice
-    description: Client session for {trpzUserName} terminated on {trpzClientAccessMode} on {_HOSTNAME}.
+    description: 'Wireless client session terminated administratively{{with value "trpzClientDisconnectDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trpzUserName
@@ -2085,7 +2085,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientClearedTrap3
     category: mobility
     severity: notice
-    description: Client session cleared for {trpzUserName} on {_HOSTNAME}.
+    description: Client session cleared{{with value "trpzClientClearedReason"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - trpzUserName
@@ -2103,9 +2103,9 @@ traps:
       - trpzClientClearedReason
   - oid: 1.3.6.1.4.1.14525.5.0.86
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientAuthorizationSuccessTrap5
-    category: auth
-    severity: notice
-    description: Client {trpzUserName} authorized via {trpzClientAuthenProtocolType} on {_HOSTNAME}.
+    category: mobility
+    severity: info
+    description: Client {{value "trpzClientMACAddress"}} authorized on {{value "trpzClientVLANName"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzUserName
@@ -2129,9 +2129,9 @@ traps:
       - trpzClientAuthorizationReason
   - oid: 1.3.6.1.4.1.14525.5.0.87
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientDeviceTypeChangeTrap
-    category: state_change
+    category: mobility
     severity: notice
-    description: Client device type changed from {trpzClientDeviceTypeOld} to {trpzClientDeviceType} on {_HOSTNAME}.
+    description: Client device type changed to {{value "trpzClientDeviceType"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzUserName
@@ -2159,7 +2159,7 @@ traps:
     name: TRAPEZE-NETWORKS-TRAP-MIB::trpzClientDeviceProfileChangeTrap
     category: state_change
     severity: notice
-    description: Client device profile changed from {trpzClientDeviceProfileNameOld} to {trpzClientDeviceProfileName} on {_HOSTNAME}.
+    description: Client device profile changed to {{value "trpzClientDeviceProfileName"}} on {{hostname}}.
     status: current
     varbinds:
       - trpzUserName

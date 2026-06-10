@@ -543,8 +543,8 @@ traps:
   - oid: 1.3.6.1.4.1.7779.3.1.1.1.1.1
     name: IB-TRAP-MIB::ibEquipmentFailureTrap
     category: diagnostic
-    severity: err
-    description: Equipment failure on {ibObjectName} with probable cause {ibProbableCause} on {_HOSTNAME}.
+    severity: alert
+    description: Equipment failure detected on {{value "ibObjectName"}} with cause {{value "ibProbableCause"}} on {{hostname}}.
     status: current
     varbinds:
       - ibNodeName
@@ -556,7 +556,7 @@ traps:
     name: IB-TRAP-MIB::ibProcessingFailureTrap
     category: diagnostic
     severity: err
-    description: Software failure detected in subsystem {ibSubsystemName} with cause {ibProbableCause} on {_HOSTNAME}.
+    description: Software failure detected in {{value "ibSubsystemName"}} on {{hostname}}.
     status: current
     varbinds:
       - ibNodeName
@@ -566,9 +566,9 @@ traps:
       - ibTrapDesc
   - oid: 1.3.6.1.4.1.7779.3.1.1.1.1.3
     name: IB-TRAP-MIB::ibThresholdCrossingEvent
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Threshold crossing detected for {ibObjectName} with current value {ibCurThresholdValue} on {_HOSTNAME}.
+    description: Threshold crossing detected for {{value "ibObjectName"}} on {{hostname}}.
     status: current
     varbinds:
       - ibNodeName
@@ -582,7 +582,7 @@ traps:
     name: IB-TRAP-MIB::ibStateChangeEvent
     category: state_change
     severity: warning
-    description: Object {ibObjectName} state changed from {ibPreviousState} to {ibCurrentState} on {_HOSTNAME}.
+    description: Object {{value "ibObjectName"}} state changed from {{value "ibPreviousState"}} to {{value "ibCurrentState"}} on {{hostname}}.
     status: current
     varbinds:
       - ibNodeName
@@ -593,9 +593,9 @@ traps:
       - ibTrapDesc
   - oid: 1.3.6.1.4.1.7779.3.1.1.1.1.5
     name: IB-TRAP-MIB::ibProcStartStopTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Process {ibSubsystemName} started or stopped on {_HOSTNAME}.
+    description: Process {{value "ibSubsystemName"}} started or stopped on {{hostname}}.
     status: current
     varbinds:
       - ibNodeName
@@ -606,7 +606,7 @@ traps:
     name: IB-TRAP-MIB::ibRevokedLicenseTrap
     category: license
     severity: warning
-    description: License revoked for {ibSubsystemName} on {_HOSTNAME}.
+    description: License revoked on {{value "ibSubsystemName"}} on {{hostname}}.
     status: current
     varbinds:
       - ibNodeName
@@ -617,7 +617,7 @@ traps:
     name: IB-TRAP-MIB::ibOperationTrap
     category: diagnostic
     severity: warning
-    description: Software operation {ibTrapDesc} on {ibSubsystemName} with severity {ibTrapSeverity} on {_HOSTNAME}.
+    description: Noteworthy software operation {{value "ibSubsystemName"}} on {{hostname}}.
     status: current
     varbinds:
       - ibNodeName

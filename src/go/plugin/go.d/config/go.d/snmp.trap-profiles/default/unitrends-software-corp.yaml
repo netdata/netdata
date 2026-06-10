@@ -45,7 +45,7 @@ traps:
     name: UNITRENDS-SNMP::trapGroupClients
     category: state_change
     severity: notice
-    description: 'Client state changed: {trapDescription} on {_HOSTNAME}.'
+    description: Client state changed{{with value "trapAffectedObj"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - trapType
@@ -58,9 +58,9 @@ traps:
       - trapReleaseVersion
   - oid: 1.3.6.1.4.1.21865.1.2.100.0.2
     name: UNITRENDS-SNMP::trapGroup3Ware
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: 3Ware state changed to {trapStatus} for {trapAffectedObj} on {_HOSTNAME}.
+    description: '3Ware state changed{{with value "trapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapType
@@ -74,8 +74,8 @@ traps:
   - oid: 1.3.6.1.4.1.21865.1.2.100.0.3
     name: UNITRENDS-SNMP::trapGroupPCI
     category: state_change
-    severity: notice
-    description: PCI state changed with status {trapStatus} on {_HOSTNAME}.
+    severity: warning
+    description: 'PCI state has changed{{with value "trapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapType
@@ -90,7 +90,7 @@ traps:
     name: UNITRENDS-SNMP::trapGroupProcess
     category: state_change
     severity: notice
-    description: Process state changed for {trapAffectedObj} with status {trapStatus} on {_HOSTNAME}.
+    description: Process state changed{{with value "trapAffectedObj"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - trapType
@@ -105,7 +105,7 @@ traps:
     name: UNITRENDS-SNMP::trapGroupDisk
     category: diagnostic
     severity: warning
-    description: 'Disk state changed: {trapDescription} on {_HOSTNAME}.'
+    description: Disk state changed{{with value "trapAffectedObj"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - trapType
@@ -120,7 +120,7 @@ traps:
     name: UNITRENDS-SNMP::trapGroupCEP
     category: state_change
     severity: notice
-    description: CEP state changed to {trapStatus} on {_HOSTNAME}.
+    description: 'CEP state changed{{with value "trapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapType
@@ -134,8 +134,8 @@ traps:
   - oid: 1.3.6.1.4.1.21865.1.2.100.0.8
     name: UNITRENDS-SNMP::trapGroupDPU
     category: state_change
-    severity: notice
-    description: DPU state changed for {trapAffectedObj} with status {trapStatus} on {_HOSTNAME}.
+    severity: warning
+    description: DPU state changed {{value "trapDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - trapType
@@ -148,9 +148,9 @@ traps:
       - trapReleaseVersion
   - oid: 1.3.6.1.4.1.21865.1.2.100.0.9
     name: UNITRENDS-SNMP::trapGroupRAID
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: RAID state changed for {trapAffectedObj} with status {trapStatus} on {_HOSTNAME}.
+    description: RAID state changed{{with value "trapAffectedObj"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - trapType
@@ -165,7 +165,7 @@ traps:
     name: UNITRENDS-SNMP::trapGroupBackup
     category: state_change
     severity: notice
-    description: Backup state changed to {trapStatus} on {_HOSTNAME}.
+    description: 'Backup state changed{{with value "trapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapType
@@ -180,7 +180,7 @@ traps:
     name: UNITRENDS-SNMP::trapGroupArchive
     category: state_change
     severity: notice
-    description: Archive state changed to {trapStatus} on {_HOSTNAME}.
+    description: 'Archive state changed{{with value "trapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapType
@@ -195,7 +195,7 @@ traps:
     name: UNITRENDS-SNMP::trapGroupVersion
     category: state_change
     severity: notice
-    description: Version state changed to {trapStatus} on {_HOSTNAME}.
+    description: Version state changed to {{value "trapStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - trapType
@@ -210,7 +210,7 @@ traps:
     name: UNITRENDS-SNMP::trapGroupNetwork
     category: state_change
     severity: notice
-    description: 'Network state changed: {trapDescription} on {_HOSTNAME}.'
+    description: 'Network state changed{{with value "trapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapType
@@ -225,7 +225,7 @@ traps:
     name: UNITRENDS-SNMP::trapGroupDiskHealth
     category: diagnostic
     severity: warning
-    description: Disk health state changed to {trapStatus} on {_HOSTNAME}.
+    description: Disk health state changed{{with value "trapAffectedObj"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - trapType
@@ -240,7 +240,7 @@ traps:
     name: UNITRENDS-SNMP::trapGroupIPMI
     category: diagnostic
     severity: warning
-    description: IPMI state changed for {trapAffectedObj} with status {trapStatus} on {_HOSTNAME}.
+    description: 'IPMI state changed{{with value "trapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapType
@@ -255,7 +255,7 @@ traps:
     name: UNITRENDS-SNMP::trapGroupInstall
     category: state_change
     severity: notice
-    description: Install state changed for {trapAffectedObj} with status {trapStatus} on {_HOSTNAME}.
+    description: 'Install state changed{{with value "trapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapType
@@ -269,8 +269,8 @@ traps:
   - oid: 1.3.6.1.4.1.21865.1.2.100.0.99
     name: UNITRENDS-SNMP::trapGroupTest
     category: diagnostic
-    severity: debug
-    description: Test trap {trapType} issued with status {trapStatus} on {_HOSTNAME}.
+    severity: info
+    description: Diagnostic test trap issued on {{hostname}}.
     status: current
     varbinds:
       - trapType

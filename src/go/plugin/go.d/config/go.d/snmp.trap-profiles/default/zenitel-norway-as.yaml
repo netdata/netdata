@@ -40,7 +40,7 @@ traps:
     name: ALPHACOM-MIB::logEvent
     category: diagnostic
     severity: warning
-    description: Log event {description} from {managedObjectClass} {managedObjectInstance} with severity {severity} on {_HOSTNAME}.
+    description: Log event {{value "description"}} on {{hostname}}.
     status: current
     varbinds:
       - managedObjectClass
@@ -51,8 +51,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.1.11.1001
     name: ALPHACOM-MIB::debugLogEvent
     category: diagnostic
-    severity: warning
-    description: Debug log event {description} from {managedObjectClass} {managedObjectInstance} on {_HOSTNAME}.
+    severity: debug
+    description: Debug log event {{value "description"}} on {{hostname}}.
     status: current
     varbinds:
       - managedObjectClass
@@ -64,7 +64,7 @@ traps:
     name: ALPHACOM-MIB::systemLogEvent
     category: diagnostic
     severity: warning
-    description: System log event {description} with severity {severity} on {managedObjectClass} {managedObjectInstance} at {timestamp} on {_HOSTNAME}.
+    description: System log event {{value "description"}} on {{hostname}}.
     status: current
     varbinds:
       - managedObjectClass
@@ -76,7 +76,7 @@ traps:
     name: ALPHACOM-MIB::callLogEvent
     category: diagnostic
     severity: warning
-    description: Call log event {description} on {managedObjectInstance} with severity {severity} on {_HOSTNAME}.
+    description: Call log event {{value "description"}} on {{hostname}}.
     status: current
     varbinds:
       - managedObjectClass
@@ -88,7 +88,7 @@ traps:
     name: VS-DEVICE-MIB::ipsStarted
     category: state_change
     severity: notice
-    description: Device started on {_HOSTNAME}.
+    description: Device has started on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -108,7 +108,7 @@ traps:
     name: VS-DEVICE-MIB::ipsShutdown
     category: state_change
     severity: notice
-    description: Device shutdown/restart initiated on {_HOSTNAME}.
+    description: Device is shutting down or restarting on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -128,7 +128,7 @@ traps:
     name: VS-DEVICE-MIB::sipRegistered
     category: state_change
     severity: notice
-    description: SIP registration successful with server on {_HOSTNAME}.
+    description: SIP device registered with SIP server on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -147,8 +147,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.5.4
     name: VS-DEVICE-MIB::sipUnregistered
     category: state_change
-    severity: warning
-    description: SIP device {managedObjectInstance} unregistered from server on {_HOSTNAME}.
+    severity: notice
+    description: SIP device unregistered from server on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -166,9 +166,9 @@ traps:
         type: DisplayString
   - oid: 1.3.6.1.4.1.26122.2.5.5
     name: VS-DEVICE-MIB::sipRegisterFailed
-    category: diagnostic
-    severity: err
-    description: SIP registration failed for {managedObjectInstance} on {_HOSTNAME}.
+    category: state_change
+    severity: warning
+    description: 'SIP registration failed{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: managedObjectClass
@@ -188,7 +188,7 @@ traps:
     name: VS-DEVICE-MIB::callConnect
     category: state_change
     severity: notice
-    description: Call connected successfully on {managedObjectInstance} on {_HOSTNAME}.
+    description: Call connected successfully on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -208,7 +208,7 @@ traps:
     name: VS-DEVICE-MIB::callConnectFailed
     category: state_change
     severity: warning
-    description: Call connection failed for {managedObjectClass} {managedObjectInstance} on {_HOSTNAME}.
+    description: Call connect failed for {{value "managedObjectInstance"}} on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -228,7 +228,7 @@ traps:
     name: VS-DEVICE-MIB::callDisconnect
     category: state_change
     severity: notice
-    description: Call disconnected on {managedObjectInstance} on {_HOSTNAME}.
+    description: Call disconnected on {{first (value "managedObjectInstance") "managed object"}} on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -248,7 +248,7 @@ traps:
     name: VS-DEVICE-MIB::callAbnormalDisconnect
     category: state_change
     severity: warning
-    description: Call disconnected abnormally on {managedObjectInstance} on {_HOSTNAME}.
+    description: Call disconnected abnormally on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -267,8 +267,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.5.10
     name: VS-DEVICE-MIB::soundTestSuccess
     category: diagnostic
-    severity: notice
-    description: Sound test completed successfully on {_HOSTNAME}.
+    severity: info
+    description: Sound test succeeded on {{first (value "managedObjectInstance") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -287,8 +287,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.5.11
     name: VS-DEVICE-MIB::soundTestFailed
     category: diagnostic
-    severity: err
-    description: Sound test failed for {managedObjectClass} {managedObjectInstance} with severity {severity.raw} on {_HOSTNAME}.
+    severity: warning
+    description: Sound test failed on {{first (value "managedObjectInstance") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -307,8 +307,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.5.12
     name: VS-DEVICE-MIB::soundTestError
     category: diagnostic
-    severity: err
-    description: Sound test failed for {managedObjectClass} {managedObjectInstance} on {_HOSTNAME}.
+    severity: warning
+    description: Sound test failed on {{value "managedObjectInstance"}} on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -328,7 +328,7 @@ traps:
     name: VS-DEVICE-MIB::buttonHanging
     category: diagnostic
     severity: warning
-    description: Button held for over 10 seconds on {managedObjectInstance} on {_HOSTNAME}.
+    description: Button held down for more than 10 seconds on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -346,9 +346,9 @@ traps:
         type: DisplayString
   - oid: 1.3.6.1.4.1.26122.2.5.14
     name: VS-DEVICE-MIB::buttonPressed
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Button pressed on {managedObjectClass} instance {managedObjectInstance} on {_HOSTNAME}.
+    description: Input button pressed on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -368,7 +368,7 @@ traps:
     name: VS-DEVICE-MIB::buttonReleased
     category: state_change
     severity: notice
-    description: Button release event on {managedObjectClass} {managedObjectInstance} on {_HOSTNAME}.
+    description: Input button released on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -388,7 +388,7 @@ traps:
     name: VS-DEVICE-MIB::relayActivated
     category: state_change
     severity: notice
-    description: Relay activated for {managedObjectInstance} on {_HOSTNAME}.
+    description: Relay activated on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -408,7 +408,7 @@ traps:
     name: VS-DEVICE-MIB::relayDeactivated
     category: state_change
     severity: warning
-    description: Relay deactivated on {managedObjectInstance} with severity {severity} on {_HOSTNAME}.
+    description: Relay deactivated on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -427,8 +427,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.5.18
     name: VS-DEVICE-MIB::dakPressed
     category: diagnostic
-    severity: warning
-    description: DAK pressed on {managedObjectInstance} with severity {severity.raw} on {_HOSTNAME}.
+    severity: notice
+    description: DAK pressed on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -447,8 +447,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.5.19
     name: VS-DEVICE-MIB::dakReleased
     category: state_change
-    severity: warning
-    description: DAK released on {_HOSTNAME}.
+    severity: notice
+    description: DAK released for {{value "managedObjectInstance"}} on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -467,8 +467,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.8.1
     name: VS-DEVICE-MIB::coolingFanFault
     category: diagnostic
-    severity: err
-    description: Cooling fan fault detected on {managedObjectInstance} with description {description} on {_HOSTNAME}.
+    severity: alert
+    description: 'Cooling fan fault detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: managedObjectClass
@@ -487,8 +487,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.8.2
     name: VS-DEVICE-MIB::missingAmpModule
     category: diagnostic
-    severity: err
-    description: Amplifier module missing on {managedObjectInstance} on {_HOSTNAME}.
+    severity: warning
+    description: Amplifier module is missing on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -507,8 +507,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.8.3
     name: VS-DEVICE-MIB::psuVoltageFault
     category: diagnostic
-    severity: err
-    description: Power supply voltage fault detected with description {description} on {_HOSTNAME}.
+    severity: crit
+    description: 'Power supply voltage fault detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: managedObjectClass
@@ -527,8 +527,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.8.4
     name: VS-DEVICE-MIB::lineVoltageFault
     category: diagnostic
-    severity: err
-    description: Speaker line voltage fault detected on {managedObjectInstance} on {_HOSTNAME}.
+    severity: crit
+    description: 'Speaker line voltage fault detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: managedObjectClass
@@ -547,8 +547,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.8.5
     name: VS-DEVICE-MIB::letFault
     category: diagnostic
-    severity: err
-    description: Line End Transponder failed with {description} on {_HOSTNAME}.
+    severity: crit
+    description: 'Line End Transponder failed: {{value "description"}} on {{hostname}}.'
     status: current
     varbinds:
       - name: managedObjectClass
@@ -566,9 +566,9 @@ traps:
         type: DisplayString
   - oid: 1.3.6.1.4.1.26122.2.8.6
     name: VS-DEVICE-MIB::ampShutdown
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Amplifier audio channel shutdown detected with description {description} on {_HOSTNAME}.
+    description: 'Amplifier audio channel shut down{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: managedObjectClass
@@ -588,7 +588,7 @@ traps:
     name: VS-DEVICE-MIB::slmFault
     category: diagnostic
     severity: warning
-    description: Speaker Line Monitoring fault {description} on {managedObjectInstance} on {_HOSTNAME}.
+    description: Speaker Line Monitoring fault {{value "description"}} on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -607,8 +607,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.8.8
     name: VS-DEVICE-MIB::fuseBroken
     category: diagnostic
-    severity: err
-    description: Fuse broken on {managedObjectInstance} with description {description} on {_HOSTNAME}.
+    severity: crit
+    description: Fuse is broken on {{first (value "managedObjectInstance") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -628,7 +628,7 @@ traps:
     name: VS-DEVICE-MIB::ampDisabled
     category: state_change
     severity: warning
-    description: Amplifier audio channel disabled on {_HOSTNAME}.
+    description: 'Amplifier audio channel disabled{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: managedObjectClass
@@ -647,8 +647,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.8.10
     name: VS-DEVICE-MIB::lineInFault
     category: diagnostic
-    severity: err
-    description: Line in disconnected on {_HOSTNAME}.
+    severity: warning
+    description: 'Line in disconnected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: managedObjectClass
@@ -667,8 +667,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.8.11
     name: VS-DEVICE-MIB::rcoFault
     category: diagnostic
-    severity: err
-    description: Control output fault on {managedObjectInstance} with severity {severity} on {_HOSTNAME}.
+    severity: crit
+    description: Control output fault detected on {{value "managedObjectInstance"}} on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -688,7 +688,7 @@ traps:
     name: VS-DEVICE-MIB::rciFault
     category: diagnostic
     severity: warning
-    description: 'Control input fault: {description} on {managedObjectInstance} on {_HOSTNAME}.'
+    description: 'Control input fault detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: managedObjectClass
@@ -707,8 +707,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.8.13
     name: VS-DEVICE-MIB::dcPowerFault
     category: diagnostic
-    severity: err
-    description: DC power fault detected on {managedObjectInstance} with severity {severity} on {_HOSTNAME}.
+    severity: crit
+    description: DC power fault detected on {{first (value "managedObjectInstance") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -727,8 +727,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.8.14
     name: VS-DEVICE-MIB::acPowerFault
     category: diagnostic
-    severity: err
-    description: AC power fault detected on {managedObjectInstance} with severity {severity} on {_HOSTNAME}.
+    severity: alert
+    description: AC power fault detected on {{first (value "managedObjectInstance") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -748,7 +748,7 @@ traps:
     name: VS-DEVICE-MIB::ethPortDisconnected
     category: state_change
     severity: warning
-    description: Ethernet port {managedObjectInstance} disconnected on {_HOSTNAME}.
+    description: Ethernet port disconnected on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -767,8 +767,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.8.16
     name: VS-DEVICE-MIB::micFault
     category: diagnostic
-    severity: err
-    description: 'Microphone fault detected: {description} on {managedObjectInstance} on {_HOSTNAME}.'
+    severity: warning
+    description: 'Microphone fault detected{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: managedObjectClass
@@ -788,7 +788,7 @@ traps:
     name: VS-DEVICE-MIB::missingEmbdr
     category: diagnostic
     severity: warning
-    description: Missing expansion modules detected on {managedObjectInstance} with severity {severity} on {_HOSTNAME}.
+    description: Panel station is missing expansion modules on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -807,8 +807,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.8.18
     name: VS-DEVICE-MIB::swFault
     category: diagnostic
-    severity: err
-    description: 'Software daemon {managedObjectClass} {managedObjectInstance} stopped working: {description} on {_HOSTNAME}.'
+    severity: crit
+    description: 'Software daemon stopped working{{with value "description"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - name: managedObjectClass
@@ -827,8 +827,8 @@ traps:
   - oid: 1.3.6.1.4.1.26122.2.8.19
     name: VS-DEVICE-MIB::tempFault
     category: diagnostic
-    severity: err
-    description: High temperature fault detected on {managedObjectInstance} with description {description} on {_HOSTNAME}.
+    severity: crit
+    description: High temperature fault detected on {{first (value "managedObjectInstance") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - name: managedObjectClass
@@ -848,7 +848,7 @@ traps:
     name: VS-DEVICE-MIB::customFault
     category: diagnostic
     severity: warning
-    description: Custom fault {managedObjectClass} {managedObjectInstance} reported {description} on {_HOSTNAME}.
+    description: 'Custom fault detected on {{value "managedObjectClass"}} {{value "managedObjectInstance"}}: {{value "description"}} on {{hostname}}.'
     status: current
     varbinds:
       - name: managedObjectClass

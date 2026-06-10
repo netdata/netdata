@@ -24,7 +24,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::clientAssociate
     category: mobility
     severity: notice
-    description: Wireless client associated on {_HOSTNAME}.
+    description: Wireless client associated on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -33,7 +33,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::clientDisassociate
     category: mobility
     severity: notice
-    description: Wireless client disassociation detected on {_HOSTNAME}.
+    description: Wireless client disassociated on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -42,7 +42,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::unknownAP
     category: diagnostic
     severity: warning
-    description: Unknown AP detected with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    description: 'Unknown AP detected{{with value "trapMibTrapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -51,7 +51,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::keyError
     category: diagnostic
     severity: warning
-    description: Key error detected with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    description: 'Key error detected{{with value "trapMibTrapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -60,7 +60,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::downlinkRetry
     category: diagnostic
     severity: warning
-    description: Downlink retry detected with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    description: 'Downlink retry detected{{with value "trapMibTrapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -69,7 +69,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::configurationChanged
     category: config_change
     severity: notice
-    description: Configuration changed on {_HOSTNAME}.
+    description: Configuration changed on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -78,7 +78,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::poeError
     category: diagnostic
     severity: err
-    description: POE failed on {_HOSTNAME}.
+    description: POE failed on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -86,8 +86,8 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.8
     name: EXTRICOM-SNMP-MIB::fanError
     category: diagnostic
-    severity: err
-    description: Fan failure reported with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    severity: alert
+    description: Fan failed on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -95,8 +95,8 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.9
     name: EXTRICOM-SNMP-MIB::powerError
     category: diagnostic
-    severity: err
-    description: Power failed with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: Power failure detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -104,8 +104,8 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.10
     name: EXTRICOM-SNMP-MIB::clockError
     category: diagnostic
-    severity: err
-    description: Clock failed on {_HOSTNAME}.
+    severity: crit
+    description: Clock failed on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -114,7 +114,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::upstremReport
     category: diagnostic
     severity: warning
-    description: Upstream report {trapMibTrapDescription} with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    description: 'Upstream report received{{with value "trapMibTrapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -122,8 +122,8 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.12
     name: EXTRICOM-SNMP-MIB::apDisconnected
     category: state_change
-    severity: warning
-    description: AP disconnected on {_HOSTNAME}.
+    severity: alert
+    description: AP physical disconnection detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -132,7 +132,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::apReconnected
     category: state_change
     severity: notice
-    description: AP reconnected on {_HOSTNAME}.
+    description: AP reconnected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -141,7 +141,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::apTurnOFF
     category: state_change
     severity: warning
-    description: AP turned off with severity {trapMibTrapSeverity.raw} on {_HOSTNAME}.
+    description: Access point turned off on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -149,8 +149,8 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.15
     name: EXTRICOM-SNMP-MIB::apMalfunction
     category: diagnostic
-    severity: err
-    description: AP malfunction detected with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    severity: alert
+    description: 'AP malfunction detected{{with value "trapMibTrapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -159,7 +159,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::apConfigured
     category: config_change
     severity: notice
-    description: AP configuration updated on {_HOSTNAME}.
+    description: AP configured on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -167,8 +167,8 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.17
     name: EXTRICOM-SNMP-MIB::radioMulfanction
     category: diagnostic
-    severity: err
-    description: Radio malfunction detected with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    severity: crit
+    description: Radio malfunction detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -176,8 +176,8 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.18
     name: EXTRICOM-SNMP-MIB::wpaAttack
     category: security
-    severity: warning
-    description: WPA attack detected with severity {trapMibTrapSeverity.raw} on {_HOSTNAME}.
+    severity: alert
+    description: WPA attack detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -186,7 +186,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::redPeerConnectionUp
     category: state_change
     severity: notice
-    description: Red Peer connection established on {_HOSTNAME}.
+    description: Red Peer connection up on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -195,7 +195,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::redPeerConnectionDown
     category: state_change
     severity: warning
-    description: Red Peer connection down with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    description: Red Peer connection down on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -204,7 +204,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::redKeepAliveConnectionUp
     category: state_change
     severity: notice
-    description: Red Keep alive connection established on {_HOSTNAME}.
+    description: Red keep alive connection is up on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -212,8 +212,8 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.22
     name: EXTRICOM-SNMP-MIB::redKeepAliveConnectionDown
     category: state_change
-    severity: warning
-    description: Keep alive connection down on {_HOSTNAME}.
+    severity: crit
+    description: Red keep alive connection is down on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -222,16 +222,16 @@ traps:
     name: EXTRICOM-SNMP-MIB::redBeaconStatusUp
     category: state_change
     severity: notice
-    description: Red beacon status changed to up on {_HOSTNAME}.
+    description: Red beacon status is up on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
       - trapMibTrapDescription
   - oid: 1.3.6.1.4.1.23937.0.24
     name: EXTRICOM-SNMP-MIB::redBeaconStatusDown
-    category: state_change
-    severity: warning
-    description: Red beacon status down with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: Red beacon status is down on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -240,16 +240,16 @@ traps:
     name: EXTRICOM-SNMP-MIB::redStatusUp
     category: state_change
     severity: notice
-    description: Red status cleared on {_HOSTNAME}.
+    description: Red status went up on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
       - trapMibTrapDescription
   - oid: 1.3.6.1.4.1.23937.0.26
     name: EXTRICOM-SNMP-MIB::redStatusDown
-    category: state_change
-    severity: warning
-    description: Red status down with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    category: diagnostic
+    severity: crit
+    description: Red status down on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -257,8 +257,8 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.27
     name: EXTRICOM-SNMP-MIB::rogueApStatus
     category: security
-    severity: warning
-    description: Rogue AP detected with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    severity: alert
+    description: Rogue AP detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -267,7 +267,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::rogueApLost
     category: security
     severity: notice
-    description: Rogue AP lost on {_HOSTNAME}.
+    description: Rogue AP lost on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -275,8 +275,8 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.29
     name: EXTRICOM-SNMP-MIB::rogueApFound
     category: security
-    severity: warning
-    description: Rogue AP detected on {_HOSTNAME}.
+    severity: alert
+    description: Rogue AP detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -285,16 +285,16 @@ traps:
     name: EXTRICOM-SNMP-MIB::rogueApUpdate
     category: security
     severity: warning
-    description: Rogue AP update detected with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    description: 'Rogue AP detected{{with value "trapMibTrapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapMibTrapSeverity
       - trapMibTrapDescription
   - oid: 1.3.6.1.4.1.23937.0.31
     name: EXTRICOM-SNMP-MIB::idsTrapStart
-    category: security
-    severity: notice
-    description: IDS trap start event received on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: IDS trap monitoring started on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -303,7 +303,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::authenticated
     category: auth
     severity: notice
-    description: Authentication event {trapMibTrapDescription} on {_HOSTNAME}.
+    description: Authentication event occurred on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -312,7 +312,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::authenticatedFail
     category: auth
     severity: warning
-    description: Authentication failed with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    description: SNMP authentication failure on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -320,8 +320,8 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.34
     name: EXTRICOM-SNMP-MIB::deauthenticated
     category: security
-    severity: warning
-    description: Deauthentication event detected with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    severity: notice
+    description: Wireless client deauthenticated on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -330,7 +330,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::reauthenticated
     category: auth
     severity: notice
-    description: Device reauthenticated on {_HOSTNAME}.
+    description: Device reauthenticated on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -339,7 +339,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::associationReq
     category: mobility
     severity: notice
-    description: Association request received on {_HOSTNAME}.
+    description: Wireless client association request received on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -348,7 +348,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::disassociationReq
     category: mobility
     severity: notice
-    description: Wireless client disassociation request received on {_HOSTNAME}.
+    description: Wireless client disassociation request received on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -357,7 +357,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::reassociationReq
     category: mobility
     severity: notice
-    description: Reassociation request received on {_HOSTNAME}.
+    description: Reassociation request received on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -365,8 +365,8 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.39
     name: EXTRICOM-SNMP-MIB::eapolStart
     category: security
-    severity: info
-    description: EAPOL Start event detected from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    severity: notice
+    description: EAPOL Start detected on {{trap_interface}} on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -375,7 +375,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::eapolLogoff
     category: mobility
     severity: notice
-    description: EAPOL logoff event detected on {_HOSTNAME}.
+    description: EAPOL logoff event detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -383,17 +383,17 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.41
     name: EXTRICOM-SNMP-MIB::navDuration
     category: diagnostic
-    severity: warning
-    description: NAV duration event with severity {trapMibTrapSeverity.raw} on {_HOSTNAME}.
+    severity: info
+    description: NAV duration event reported on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
       - trapMibTrapDescription
   - oid: 1.3.6.1.4.1.23937.0.42
     name: EXTRICOM-SNMP-MIB::idsTrapEnd
-    category: diagnostic
-    severity: notice
-    description: IDS trap {trapMibTrapDescription} ended on {_HOSTNAME}.
+    category: security
+    severity: warning
+    description: 'IDS trap ended{{with value "trapMibTrapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -401,8 +401,8 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.43
     name: EXTRICOM-SNMP-MIB::idsDurationAttack
     category: security
-    severity: warning
-    description: IDS Duration Attack detected with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    severity: alert
+    description: IDS duration attack detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -411,7 +411,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::idsAssociationFloodAttack
     category: security
     severity: alert
-    description: IDS Association Flood Attack detected from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: IDS association flood attack detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -420,7 +420,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::idsDisassociationFloodAttack
     category: security
     severity: alert
-    description: IDS Disassociation Flood Attack detected from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: IDS disassociation flood attack detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -429,7 +429,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::idsAuthenticationFailureAttack
     category: security
     severity: alert
-    description: IDS authentication failure attack detected from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: IDS authentication failure attack detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -438,7 +438,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::idsInvalidAuthenticationAttack
     category: security
     severity: alert
-    description: IDS Invalid Authentication attack detected from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: IDS invalid authentication attack detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -447,7 +447,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::idsAuthenticationFloodAttack
     category: security
     severity: alert
-    description: IDS authentication flood attack detected from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: IDS authentication flood attack detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -456,7 +456,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::idsDeauthenticationFloodAttack
     category: security
     severity: alert
-    description: IDS deauthentication flood attack detected from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: IDS deauthentication flood attack detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -465,7 +465,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::idsRfJammingAttack
     category: security
     severity: alert
-    description: IDS RF Jamming attack detected with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    description: IDS RF jamming attack detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -474,7 +474,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::idsEapolStartAttack
     category: security
     severity: alert
-    description: IDS Eapol start attack detected from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: IDS Eapol start attack detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -483,7 +483,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::idsEapolLogoffAttack
     category: security
     severity: alert
-    description: IDS Eapol Logoff attack detected with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    description: IDS Eapol Logoff attack detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -492,7 +492,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::idsDeauthBcastAttack
     category: security
     severity: alert
-    description: IDS deauthentication broadcast attack detected on {_HOSTNAME}.
+    description: IDS deauthentication broadcast attack detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -501,7 +501,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::radiusAttack
     category: security
     severity: alert
-    description: Radius attack detected with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    description: Radius attack detected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -510,7 +510,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::radiusChangedSelection
     category: state_change
     severity: notice
-    description: Radius selection changed on {_HOSTNAME}.
+    description: Radius changed selection on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -519,7 +519,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::lastRadiusFailed
     category: auth
     severity: warning
-    description: Last Radius failed on {_HOSTNAME}.
+    description: Last Radius failed on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -528,7 +528,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::rfLocalizationFailed
     category: diagnostic
     severity: warning
-    description: RF localization failed with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    description: RF localization failed on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -537,7 +537,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::unmatchedApHwDetection
     category: diagnostic
     severity: warning
-    description: Access Point HW type detection error reported on {_HOSTNAME}.
+    description: Access Point hardware type detection error on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -546,16 +546,16 @@ traps:
     name: EXTRICOM-SNMP-MIB::fwUpgradeStart
     category: diagnostic
     severity: notice
-    description: Firmware upgrade has started on {_HOSTNAME}.
+    description: Firmware upgrade has started on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
       - trapMibTrapDescription
   - oid: 1.3.6.1.4.1.23937.0.60
     name: EXTRICOM-SNMP-MIB::fwUpgradeEnded
-    category: config_change
+    category: diagnostic
     severity: notice
-    description: Firmware upgrade completed on {_HOSTNAME}.
+    description: Firmware upgrade completed on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -563,8 +563,8 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.61
     name: EXTRICOM-SNMP-MIB::fwUpgradeProgress
     category: diagnostic
-    severity: notice
-    description: Firmware upgrade progress OK with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    severity: info
+    description: Firmware upgrade progress OK on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -573,7 +573,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::fwUpgradeFailed
     category: diagnostic
     severity: err
-    description: Firmware upgrade failed on {_HOSTNAME}.
+    description: Firmware upgrade failed on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -582,7 +582,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::fwReconfigureEnded
     category: config_change
     severity: notice
-    description: Reconfigure procedure ended on {_HOSTNAME}.
+    description: Reconfigure procedure has ended on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -591,7 +591,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::diagnosticReport
     category: diagnostic
     severity: warning
-    description: Diagnostic report {trapMibTrapDescription} with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    description: 'Diagnostic report received{{with value "trapMibTrapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -600,7 +600,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::apIncompatibility
     category: diagnostic
     severity: warning
-    description: Access Point incompatibility detected with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    description: 'Access point incompatibility detected{{with value "trapMibTrapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -609,7 +609,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::apCompatibility
     category: diagnostic
     severity: warning
-    description: Access Point compatibility issue reported with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    description: 'Access Point compatibility issue detected{{with value "trapMibTrapDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -618,7 +618,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::clientIgnoreMtu
     category: diagnostic
     severity: warning
-    description: Wireless client MTU mismatch detected on {_HOSTNAME}.
+    description: Wireless client ignored MTU on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -627,7 +627,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::redundancySwitchOver
     category: state_change
     severity: alert
-    description: Redundancy switch-over activated on {_HOSTNAME}.
+    description: Redundancy switch over activated on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -636,7 +636,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::fwReconfigureStarted
     category: config_change
     severity: notice
-    description: Configuration reconfiguration started on {_HOSTNAME}.
+    description: Firewall reconfiguration started on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -645,7 +645,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::edgeConnected
     category: state_change
     severity: notice
-    description: Edge connected state change on {_HOSTNAME}.
+    description: Edge connected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -654,25 +654,25 @@ traps:
     name: EXTRICOM-SNMP-MIB::edgeDisconnected
     category: state_change
     severity: warning
-    description: Edge disconnected on {_HOSTNAME}.
+    description: Edge device disconnected on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
       - trapMibTrapDescription
   - oid: 1.3.6.1.4.1.23937.0.72
     name: EXTRICOM-SNMP-MIB::clientSepIP
-    category: state_change
-    severity: notice
-    description: Client IP association event {trapMibTrapDescription} on {_HOSTNAME}.
+    category: unknown
+    severity: info
+    description: Client IP event received on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
       - trapMibTrapDescription
   - oid: 1.3.6.1.4.1.23937.0.73
     name: EXTRICOM-SNMP-MIB::StartShStarted
-    category: state_change
-    severity: notice
-    description: Start.sh started on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Start.sh started on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -680,8 +680,8 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.74
     name: EXTRICOM-SNMP-MIB::StartShEnded
     category: diagnostic
-    severity: notice
-    description: Script execution completed on {_HOSTNAME}.
+    severity: info
+    description: Start.sh script execution completed on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -690,7 +690,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::BootStarted
     category: state_change
     severity: notice
-    description: Device boot started on {_HOSTNAME}.
+    description: Device boot started on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -698,8 +698,8 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.76
     name: EXTRICOM-SNMP-MIB::WirelessStatusAction
     category: state_change
-    severity: warning
-    description: Wireless status changed to {trapMibTrapDescription} on {_HOSTNAME}.
+    severity: notice
+    description: Wireless status changed to {{value "trapMibTrapDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -708,7 +708,7 @@ traps:
     name: EXTRICOM-SNMP-MIB::RadioReset
     category: diagnostic
     severity: notice
-    description: Radio reset event on {_HOSTNAME}.
+    description: Radio reset event occurred on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -717,16 +717,16 @@ traps:
     name: EXTRICOM-SNMP-MIB::ApReset
     category: state_change
     severity: notice
-    description: AP reset event on {_HOSTNAME}.
+    description: Access point reset on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
       - trapMibTrapDescription
   - oid: 1.3.6.1.4.1.23937.0.79
     name: EXTRICOM-SNMP-MIB::PoeReset
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: POE reset event occurred on {_HOSTNAME}.
+    description: POE reset occurred on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity
@@ -734,8 +734,8 @@ traps:
   - oid: 1.3.6.1.4.1.23937.0.80
     name: EXTRICOM-SNMP-MIB::LicenseValidityFailed
     category: license
-    severity: err
-    description: License validity failed with severity {trapMibTrapSeverity} on {_HOSTNAME}.
+    severity: alert
+    description: License validity failed on {{hostname}}.
     status: current
     varbinds:
       - trapMibTrapSeverity

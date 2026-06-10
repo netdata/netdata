@@ -79,7 +79,7 @@ traps:
     name: SITE-MONITORING-MIB::siteV1NotificationOfEvent
     category: diagnostic
     severity: warning
-    description: Event {siteV1EventName} with severity {siteV1EventSeverityType} reported on {_HOSTNAME}.
+    description: Site event {{value "siteV1EventName"}} occurred on {{hostname}}.
     status: current
     varbinds:
       - siteV1EventId
@@ -92,7 +92,7 @@ traps:
     name: SITE-MONITORING-MIB::es1NotificationOfEvent
     category: diagnostic
     severity: warning
-    description: Event {es1EventName} with severity {es1EventSeverityType} reported on {_HOSTNAME}.
+    description: Event {{value "es1EventName"}} occurred on {{hostname}}.
     status: current
     varbinds:
       - es1EventId
@@ -105,7 +105,7 @@ traps:
     name: SITE-MONITORING-MIB::es1dc1NotificationOfEvent
     category: diagnostic
     severity: warning
-    description: Event {es1dc1EventName} with severity {es1dc1EventSeverityType} reported on {_HOSTNAME}.
+    description: Event {{value "es1dc1EventName"}} occurred on {{hostname}}.
     status: current
     varbinds:
       - es1dc1EventId

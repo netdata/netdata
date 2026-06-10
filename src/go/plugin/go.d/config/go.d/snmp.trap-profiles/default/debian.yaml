@@ -110,7 +110,7 @@ traps:
     name: KEEPALIVED-MIB::vrrpSyncGroupStateChange
     category: state_change
     severity: notice
-    description: VRRP sync group {vrrpSyncGroupName} state changed to {vrrpSyncGroupState} on {_HOSTNAME}.
+    description: VRRP sync group {{value "vrrpSyncGroupName"}} state changed to {{value "vrrpSyncGroupState"}} on {{hostname}}.
     status: current
     varbinds:
       - vrrpSyncGroupName
@@ -120,7 +120,7 @@ traps:
     name: KEEPALIVED-MIB::vrrpInstanceStateChange
     category: state_change
     severity: notice
-    description: VRRP instance {vrrpInstanceName} state changed to {vrrpInstanceState} on {_HOSTNAME}.
+    description: VRRP instance {{value "vrrpInstanceName"}} state changed to {{value "vrrpInstanceState"}} on {{hostname}}.
     status: current
     varbinds:
       - vrrpInstanceName
@@ -131,7 +131,7 @@ traps:
     name: KEEPALIVED-MIB::realServerStateChange
     category: state_change
     severity: warning
-    description: Real server {realServerAddress}:{realServerPort} status changed to {realServerStatus} on {_HOSTNAME}.
+    description: Real server {{value "realServerAddress"}} status changed to {{value "realServerStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - realServerAddrType
@@ -147,7 +147,7 @@ traps:
     name: KEEPALIVED-MIB::virtualServerQuorumStateChange
     category: state_change
     severity: warning
-    description: Virtual server quorum state changed to {virtualServerQuorumStatus} with {virtualServerRealServersUp} of {virtualServerRealServersTotal} real servers on {_HOSTNAME}.
+    description: Virtual server quorum state changed to {{value "virtualServerQuorumStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - virtualServerType

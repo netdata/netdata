@@ -26,7 +26,7 @@ traps:
     name: CA-SNMP-MIB8::syslogTrap
     category: diagnostic
     severity: warning
-    description: Syslog message {msgText} with severity {severity} on {_HOSTNAME}.
+    description: Syslog event {{value "msgText"}} with severity {{value "severity"}} on {{hostname}}.
     status: current
     varbinds:
       - severity
@@ -35,17 +35,17 @@ traps:
     name: CA-SNMP-MIB8::caStart
     category: state_change
     severity: notice
-    description: Agent started on {_HOSTNAME}.
+    description: Agent started on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7564.251.2
     name: CA-SNMP-MIB8::caShutdown
     category: state_change
-    severity: crit
-    description: Agent termination detected on {_HOSTNAME}.
+    severity: emerg
+    description: Agent terminated on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.7564.251.3
     name: CA-SNMP-MIB8::licenseRemainingDays
     category: license
     severity: warning
-    description: License remaining days reported on {_HOSTNAME}.
+    description: License remaining days notification received on {{hostname}}.
     status: current

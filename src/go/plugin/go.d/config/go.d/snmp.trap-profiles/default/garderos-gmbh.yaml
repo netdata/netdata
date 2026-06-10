@@ -68,7 +68,7 @@ traps:
     name: GARDEROS-ROUTER-MIB::routerNotification
     category: diagnostic
     severity: warning
-    description: Router component {routerTrapComponent} reported error {routerTrapErrorCode} ({routerTrapErrorDescription}) on {_HOSTNAME}.
+    description: Router notification {{value "routerTrapDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - routerName

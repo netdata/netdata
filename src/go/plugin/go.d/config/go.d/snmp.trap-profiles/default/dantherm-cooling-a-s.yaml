@@ -54,7 +54,7 @@ traps:
     name: DANTHERM-COOLING-MIB::cc3000Trap
     category: diagnostic
     severity: warning
-    description: CC3000 controller error {errorNumber} with status {status} and info {info} on {_HOSTNAME}.
+    description: CC3000 controller error {{value "errorNumber"}} {{value "info"}} on {{hostname}}.
     status: current
     varbinds:
       - hostName

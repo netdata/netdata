@@ -2461,7 +2461,7 @@ traps:
     name: GS-GXW42XX-MIB::timedTrap
     category: config_change
     severity: notice
-    description: Device configuration updated with {versionCore} on {_HOSTNAME}.
+    description: Timed configuration trap received with {{value "partNo"}} on {{hostname}}.
     status: current
     varbinds:
       - partNo
@@ -3053,9 +3053,9 @@ traps:
       - delayedForward96
   - oid: 1.3.6.1.4.1.42397.1.2.5.1
     name: GS-HT8XX-MIB::TimedTrap
-    category: diagnostic
-    severity: info
-    description: TimedTrap reported with firmware versions {versionBoot}, {versionCore}, {versionBase}, {versionProg} on {_HOSTNAME}.
+    category: config_change
+    severity: notice
+    description: Timed configuration trap received with {{value "PartNo"}} on {{hostname}}.
     status: current
     varbinds:
       - PartNo
@@ -3159,7 +3159,7 @@ traps:
     name: GRANDSTREAM-GWN-PRODUCTS-SWITCH-MIB::logMessageGenerated
     category: diagnostic
     severity: notice
-    description: Syslog message generated with severity {logInfoSeverity} from facility {logInfoFacility} on {_HOSTNAME}.
+    description: Syslog message generated with severity {{value "logInfoSeverity"}} on {{hostname}}.
     status: current
     varbinds:
       - logInfoFacility
@@ -3169,7 +3169,7 @@ traps:
     name: GRANDSTREAM-GWN-PRODUCTS-SWITCH-MIB::normalMessageGenerated
     category: diagnostic
     severity: notice
-    description: Alarm cleared with last value {LastNormalValue} on {_HOSTNAME}.
+    description: Alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - alarmCfgNormalThreshold
@@ -3180,7 +3180,7 @@ traps:
     name: GRANDSTREAM-GWN-PRODUCTS-SWITCH-MIB::alarmMessageGenerated
     category: diagnostic
     severity: warning
-    description: Alarm generated with count {AlarmCount} and value {LastAlarmValue} on {_HOSTNAME}.
+    description: Alarm generated with count {{value "AlarmCount"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmCfgAlarmThreshold
@@ -3191,7 +3191,7 @@ traps:
     name: GRANDSTREAM-GWN-PRODUCTS-SWITCH-MIB::vlanCreated
     category: config_change
     severity: notice
-    description: VLAN {vlanName} was created on {_HOSTNAME}.
+    description: VLAN {{value "vlanName"}} created on {{hostname}}.
     status: current
     varbinds:
       - vlanName
@@ -3199,7 +3199,7 @@ traps:
     name: GRANDSTREAM-GWN-PRODUCTS-SWITCH-MIB::vlanDeleted
     category: state_change
     severity: notice
-    description: VLAN {vlanName} was deleted on {_HOSTNAME}.
+    description: VLAN {{value "vlanName"}} deleted on {{hostname}}.
     status: current
     varbinds:
       - vlanName
@@ -3207,7 +3207,7 @@ traps:
     name: GRANDSTREAM-GWN-PRODUCTS-SWITCH-MIB::psSecureMacAddrViolation
     category: security
     severity: alert
-    description: Secure MAC address violation detected for {psIfSecureLastMacAddress} on {_HOSTNAME}.
+    description: Secure MAC address violation detected on {{trap_interface}} by {{value "psIfSecureLastMacAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - psIfSecureLastMacAddress
@@ -3215,7 +3215,7 @@ traps:
     name: GRANDSTREAM-GWN-PRODUCTS-SWITCH-MIB::mnMacLearnNotification
     category: state_change
     severity: notice
-    description: MAC address {mnEventMACAddress} learned on port {mnEventFromPort} VLAN {mnEventVlan} on {_HOSTNAME}.
+    description: MAC address {{value "mnEventMACAddress"}} learned on port {{value "mnEventFromPort"}} on {{hostname}}.
     status: current
     varbinds:
       - mnEventFromPort
@@ -3225,7 +3225,7 @@ traps:
     name: GRANDSTREAM-GWN-PRODUCTS-SWITCH-MIB::mnMacRemovedNotification
     category: state_change
     severity: notice
-    description: MAC address {mnEventMACAddress} removed from port {mnEventFromPort} on VLAN {mnEventVlan} on {_HOSTNAME}.
+    description: MAC address {{value "mnEventMACAddress"}} removed from port {{value "mnEventFromPort"}} on {{hostname}}.
     status: current
     varbinds:
       - mnEventFromPort
@@ -3235,7 +3235,7 @@ traps:
     name: GRANDSTREAM-GWN-PRODUCTS-SWITCH-MIB::mnMacMoveNotification
     category: mobility
     severity: notice
-    description: MAC address {mnEventMACAddress} moved from port {mnEventFromPort} to port {mnEventToPort} on VLAN {mnEventVlan} on {_HOSTNAME}.
+    description: MAC {{value "mnEventMACAddress"}} moved from port {{value "mnEventFromPort"}} to port {{value "mnEventToPort"}} on {{hostname}}.
     status: current
     varbinds:
       - mnEventFromPort
@@ -3246,7 +3246,7 @@ traps:
     name: GRANDSTREAM-GWN-PRODUCTS-SWITCH-MIB::cfgEventNotification
     category: config_change
     severity: notice
-    description: Configuration event on channel {configEventChannel} from {configEventSource} to {configEventDest} on {_HOSTNAME}.
+    description: Configuration event occurred{{with value "configEventSource"}} from {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - configEventChannel

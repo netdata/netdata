@@ -175,7 +175,7 @@ traps:
     name: GIGAMON-SNMP-MIB::gigamonSnmpResetSystemNotification
     category: state_change
     severity: notice
-    description: System reset notification triggered by cold or warm start on {_HOSTNAME}.
+    description: System reset notification triggered by cold or warm start on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -185,7 +185,7 @@ traps:
     name: GIGAMON-SNMP-MIB::gigamonSnmpUserAuthFailNotification
     category: auth
     severity: warning
-    description: SNMP authentication failure for user {gigamonSnmpNotifUserName} from {TRAP_SOURCE_IP} on {_HOSTNAME}.
+    description: SNMP authentication failure for user {{value "gigamonSnmpNotifUserName"}} on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -196,7 +196,7 @@ traps:
     name: GIGAMON-SNMP-MIB::gigamonSnmpFirmwareChangeNotification
     category: config_change
     severity: notice
-    description: Firmware change detected for {gigamonSnmpNotifHardWareName} on {_HOSTNAME}.
+    description: Firmware changed to {{value "gigamonSnmpNotifFirmwareName"}} on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -207,7 +207,7 @@ traps:
     name: GIGAMON-SNMP-MIB::gigamonSnmpConfigSaveNotification
     category: config_change
     severity: notice
-    description: Configuration saved as {gigamonSnmpNotifFileName} on {_HOSTNAME}.
+    description: Configuration saved to {{value "gigamonSnmpNotifFileName"}} on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -218,7 +218,7 @@ traps:
     name: GIGAMON-SNMP-MIB::gigamonSnmpModuleChangeNotification
     category: state_change
     severity: notice
-    description: Hardware module {gigamonSnmpNotifModuleName} in slot {gigamonNotifSlotNumber} changed state on {_HOSTNAME}.
+    description: GigaVUE module {{value "gigamonSnmpNotifModuleName"}} operation {{value "gigamonSnmpNotifModuleOperationType"}} on slot {{value "gigamonNotifSlotNumber"}} on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -231,7 +231,7 @@ traps:
     name: GIGAMON-SNMP-MIB::gigamonSnmpPacketDropNotification
     category: diagnostic
     severity: warning
-    description: Packet drop detected on {gigamonSnmpNotifPortName} with counter {gigamonSnmpNotifCounter} on {_HOSTNAME}.
+    description: Packet drop detected on {{first (value "gigamonSnmpNotifPortName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -243,7 +243,7 @@ traps:
     name: GIGAMON-SNMP-MIB::gigamonSnmpTapRelayChangeNotification
     category: state_change
     severity: notice
-    description: TAP relay status changed to {gigamonSnmpNotifTAPRelayStatus} on {gigamonSnmpNotifHardWareName} on {_HOSTNAME}.
+    description: TAP relay status changed to {{value "gigamonSnmpNotifTAPRelayStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -255,7 +255,7 @@ traps:
     name: GIGAMON-SNMP-MIB::gigamonSnmpPortLinkChangeNotification
     category: state_change
     severity: warning
-    description: Port {gigamonSnmpNotifPortName} link status changed to {gigamonSnmpNotifPortLinkStatus} on {_HOSTNAME}.
+    description: Port {{first (value "gigamonSnmpNotifPortName") "link"}} status changed to {{value "gigamonSnmpNotifPortLinkStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -267,7 +267,7 @@ traps:
     name: GIGAMON-SNMP-MIB::gigamonSnmpRxTxErrorNotification
     category: diagnostic
     severity: warning
-    description: Packet receive/transmit error on {gigamonSnmpNotifPortName} with error type {gigamonSnmpNotifRxTxErrorType} on {_HOSTNAME}.
+    description: Packet {{value "gigamonSnmpNotifRxTxType"}} error on {{value "gigamonSnmpNotifPortName"}} on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -281,7 +281,7 @@ traps:
     name: GIGAMON-SNMP-MIB::gigamonPowerChangeNotification
     category: diagnostic
     severity: warning
-    description: Power supply {gigamonSnmpNotifHardWareName} status changed to {gigamonNotifPowerStatus} on {_HOSTNAME}.
+    description: Power supply status changed to {{value "gigamonNotifPowerStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -292,7 +292,7 @@ traps:
     name: GIGAMON-SNMP-MIB::gigamonFanChangeNotification
     category: diagnostic
     severity: warning
-    description: Fan {gigamonSnmpNotifFanName} status changed to {gigamonNotifFanStatus} on {_HOSTNAME}.
+    description: Fan {{value "gigamonSnmpNotifFanName"}} status changed to {{value "gigamonNotifFanStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -302,9 +302,9 @@ traps:
       - gigamonNotifFanStatus
   - oid: 1.3.6.1.4.1.26866.1.1.12
     name: GIGAMON-SNMP-MIB::gigamonSnmpOverThresholdChangeNotification
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Port {gigamonSnmpNotifPortName} utilization alarm triggered at {gigamonSnmpNotifUtilizationAlarm}% exceeding threshold {gigamonSnmpNotifUtilizationThreshold}% on {_HOSTNAME}.
+    description: Utilization threshold exceeded on {{first (value "gigamonSnmpNotifPortName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -317,7 +317,7 @@ traps:
     name: GIGAMON-SNMP-MIB::gigamonSnmpBatteryLevelChangeNotification
     category: diagnostic
     severity: warning
-    description: Battery level down on {gigamonSnmpNotifHardWareName} with level {gigamonSnmpBatteryLevel} on {_HOSTNAME}.
+    description: Battery level down on {{first (value "gigamonSnmpNotifHardWareName") "hardware"}} on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -327,8 +327,8 @@ traps:
   - oid: 1.3.6.1.4.1.26866.1.1.14
     name: GIGAMON-SNMP-MIB::gigamonLinkSpeedStatusChangeNotification
     category: state_change
-    severity: warning
-    description: Link speed or status changed on port {gigamonSnmpNotifPortName} on {_HOSTNAME}.
+    severity: notice
+    description: Link speed or status changed on {{first (value "gigamonSnmpNotifPortName") "port"}} on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -341,8 +341,8 @@ traps:
   - oid: 1.3.6.1.4.1.26866.1.1.15
     name: GIGAMON-SNMP-MIB::gigamonPowerSourceChangeNotification
     category: diagnostic
-    severity: notice
-    description: Power source {gigamonSnmpPowerSource} status changed to {gigamonNotifPowerStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Power source {{value "gigamonSnmpPowerSource"}} status changed on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -354,7 +354,7 @@ traps:
     name: GIGAMON-SNMP-MIB::gigamonSnmpCpuUtilHighNotification
     category: diagnostic
     severity: warning
-    description: CPU utilization exceeded threshold {gigamonSnmpNotifUtilizationThreshold}% on {gigamonSnmpNotifHardWareName} on {_HOSTNAME}.
+    description: CPU utilization exceeded threshold on {{first (value "gigamonSnmpNotifHardWareName") "device"}} on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -366,7 +366,7 @@ traps:
     name: GIGAMON-SNMP-MIB::gigamonSnmpUnexpectedShutdownNotification
     category: diagnostic
     severity: alert
-    description: System unexpected shutdown on {_HOSTNAME}.
+    description: System shut down unexpectedly on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -376,7 +376,7 @@ traps:
     name: GIGAMON-SNMP-MIB::gigamonSnmpDiskSpaceLowNotification
     category: diagnostic
     severity: warning
-    description: Low disk space on filesystem {gigamonSnmpNotifFsMountPoint} on {_HOSTNAME}.
+    description: Low disk space on filesystem {{value "gigamonSnmpNotifFsMountPoint"}} on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -386,8 +386,8 @@ traps:
   - oid: 1.3.6.1.4.1.26866.1.1.19
     name: GIGAMON-SNMP-MIB::gigamonSnmpWatchdogResetNotification
     category: diagnostic
-    severity: warning
-    description: System reset triggered by watchdog timer on {gigamonSnmpNotifHardWareName} on {_HOSTNAME}.
+    severity: alert
+    description: System reset triggered by watchdog timer on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName
@@ -397,7 +397,7 @@ traps:
     name: GIGAMON-SNMP-MIB::gigamonSnmpBpsFailoverNotification
     category: state_change
     severity: notice
-    description: Inline-bypass active unit changed to {gigamonSnmpNotifBpsFailoverStatus} on {gigamonSnmpNotifBpsUnitName} on {_HOSTNAME}.
+    description: BPS inline-bypass active unit changed to {{value "gigamonSnmpNotifBpsFailoverStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - gigamonSnmpNotifHardWareName

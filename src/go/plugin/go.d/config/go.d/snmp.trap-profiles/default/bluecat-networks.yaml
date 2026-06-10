@@ -273,9 +273,9 @@ varbinds:
 traps:
   - oid: 1.3.6.1.4.1.13315.3.1.1.3.0.1
     name: BCN-DHCPV4-MIB::bcnDhcpv4AlarmNotif
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: 'DHCPv4 service {bcnDhcpv4SerOperState} alarm {bcnDhcpv4AlarmSeverity}: {bcnDhcpv4AlarmInfo} on {_HOSTNAME}.'
+    description: DHCPv4 service alarm {{value "bcnDhcpv4AlarmInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - bcnDhcpv4SerOperState
@@ -285,15 +285,15 @@ traps:
     name: BCN-DHCPV4-MIB::bcnDhcpv4FailOverNotif
     category: state_change
     severity: warning
-    description: DHCPv4 failover state changed to {bcnDhcpv4FailOverState} on {_HOSTNAME}.
+    description: DHCPv4 failover state changed to {{value "bcnDhcpv4FailOverState"}} on {{hostname}}.
     status: current
     varbinds:
       - bcnDhcpv4FailOverState
   - oid: 1.3.6.1.4.1.13315.3.1.1.3.0.3
     name: BCN-DHCPV4-MIB::bcnDhcpv4SubnetLowNotif
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DHCPv4 subnet {bcnDhcpv4SubnetAlertIpAddr} free addresses {bcnDhcpv4SubnetFreeAddresses} below threshold {bcnDhcpv4SubnetLowThreshold} on {_HOSTNAME}.
+    description: DHCPv4 subnet {{value "bcnDhcpv4SubnetAlertIpAddr"}} has low free addresses on {{hostname}}.
     status: current
     varbinds:
       - bcnDhcpv4SubnetAlertIpAddr
@@ -302,8 +302,8 @@ traps:
   - oid: 1.3.6.1.4.1.13315.3.1.1.3.0.4
     name: BCN-DHCPV4-MIB::bcnDhcpv4SubnetHighNotif
     category: diagnostic
-    severity: warning
-    description: Subnet {bcnDhcpv4SubnetAlertIpAddr} free addresses {bcnDhcpv4SubnetFreeAddresses} exceeded threshold {bcnDhcpv4SubnetHighThreshold} on {_HOSTNAME}.
+    severity: notice
+    description: DHCPv4 subnet {{value "bcnDhcpv4SubnetAlertIpAddr"}} free addresses recovered above threshold on {{hostname}}.
     status: current
     varbinds:
       - bcnDhcpv4SubnetAlertIpAddr
@@ -313,7 +313,7 @@ traps:
     name: BCN-DNS-MIB::bcnDnsAlarmNotif
     category: diagnostic
     severity: warning
-    description: DNS service {bcnDnsSerOperState} alarm {bcnDnsAlarmInfo} on {_HOSTNAME}.
+    description: DNS service alarm {{value "bcnDnsAlarmInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - bcnDnsSerOperState
@@ -323,7 +323,7 @@ traps:
     name: BCN-TFTP-MIB::bcnTftpAlarmNotif
     category: diagnostic
     severity: warning
-    description: TFTP service alarm {bcnTftpAlarmInfo} with severity {bcnTftpAlarmSeverity} on {_HOSTNAME}.
+    description: TFTP service alarm {{value "bcnTftpAlarmInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - bcnTftpSerOperState
@@ -333,7 +333,7 @@ traps:
     name: BCN-NTP-MIB::bcnNtpAlarmNotif
     category: diagnostic
     severity: warning
-    description: NTP service {bcnNtpSerOperState.raw} alarm {bcnNtpAlarmInfo} on {_HOSTNAME}.
+    description: NTP service alarm {{value "bcnNtpAlarmInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - bcnNtpSerOperState
@@ -343,7 +343,7 @@ traps:
     name: BCN-HA-MIB::bcnHaAlarmNotif
     category: state_change
     severity: warning
-    description: HA service state changed to {bcnHaSerOperState} with severity {bcnHaAlarmSeverity} on {_HOSTNAME}.
+    description: HA service alarm {{value "bcnHaAlarmInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - bcnHaSerOperState
@@ -352,8 +352,8 @@ traps:
   - oid: 1.3.6.1.4.1.13315.3.1.6.3.0.1
     name: BCN-LICENSE-MIB::bcnLicenseExpiryNotif
     category: license
-    severity: warning
-    description: License {bcnLicenseType} expiration detected at {bcnLicenseExpiry} on {_HOSTNAME}.
+    severity: alert
+    description: License expiry notification received{{with value "bcnLicenseExpiry"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - bcnLicenseType
@@ -365,7 +365,7 @@ traps:
     name: BCN-COMMANDSERVER-MIB::bcnCommandServerAlarmNotif
     category: diagnostic
     severity: warning
-    description: BCN command server alarm {bcnCommandServerAlarmSeverity} detected with state {bcnCommandServerSerOperState} on {_HOSTNAME}.
+    description: BCN command server alarm {{value "bcnCommandServerAlarmInfo"}} on {{hostname}}.
     status: current
     varbinds:
       - bcnCommandServerSerOperState
@@ -375,7 +375,7 @@ traps:
     name: BCN-SYSTEM-MIB::bcnSysAlarmNotif
     category: state_change
     severity: notice
-    description: System {bcnSysSerOperState.raw} event reported with severity {bcnSysAlarmSeverity.raw} on {_HOSTNAME}.
+    description: System {{value "bcnSysSerOperState"}} on {{hostname}}.
     status: current
     varbinds:
       - bcnSysSerOperState
@@ -385,7 +385,7 @@ traps:
     name: ADONIS-DNS-MIB::trapDNSDaemon
     category: diagnostic
     severity: crit
-    description: DNS daemon stopped running or zone transfer failed on {_HOSTNAME}.
+    description: 'DNS daemon stopped or zone transfer failed{{with value "dnsDaemonZoneTransferFailure"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - dnsDaemonRunning
@@ -393,24 +393,24 @@ traps:
   - oid: 1.3.6.1.4.1.13315.100.101.2.2.1
     name: ADONIS-DNS-MIB::trapHAServiceFailOver
     category: state_change
-    severity: notice
-    description: High availability service failed over on {_HOSTNAME}.
+    severity: alert
+    description: High availability service failed over to {{value "haServiceNodeType"}} node on {{hostname}}.
     status: current
     varbinds:
       - haServiceNodeType
   - oid: 1.3.6.1.4.1.13315.100.101.2.3.1
     name: ADONIS-DNS-MIB::trapCommandServerDaemon
     category: diagnostic
-    severity: crit
-    description: Command server daemon has stopped running on {_HOSTNAME}.
+    severity: alert
+    description: Command server daemon has stopped running on {{hostname}}.
     status: current
     varbinds:
       - commandServerDaemonRunning
   - oid: 1.3.6.1.4.1.13315.100.101.2.4.1
     name: ADONIS-DNS-MIB::trapDHCPDaemon
     category: diagnostic
-    severity: warning
-    description: DHCP daemon status changed to {dhcpDaemonRunning} with subnet alert {dhcpDaemonSubnetAlert} and failover state {dhcpFailOverState} on {_HOSTNAME}.
+    severity: alert
+    description: DHCP daemon stopped or subnet alert triggered{{with value "dhcpDaemonSubnetAlert"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - dhcpDaemonRunning
@@ -420,13 +420,13 @@ traps:
     name: ADONIS-DNS-MIB::trapReplicationFailure
     category: diagnostic
     severity: err
-    description: Replication failure detected on {_HOSTNAME}.
+    description: DNS replication has failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.13315.100.101.2.6.1
     name: ADONIS-DNS-MIB::trapTFTPDaemon
     category: diagnostic
-    severity: err
-    description: TFTP daemon has stopped running on {_HOSTNAME}.
+    severity: alert
+    description: TFTP daemon has stopped running on {{hostname}}.
     status: current
     varbinds:
       - tftpDaemonRunning
@@ -434,7 +434,7 @@ traps:
     name: ADONIS-DNS-MIB::trapSystemDaemon
     category: diagnostic
     severity: crit
-    description: System daemon stopped running with state {systemState} on {_HOSTNAME}.
+    description: System daemon stopped running with state {{value "systemState"}} on {{hostname}}.
     status: current
     varbinds:
       - systemState

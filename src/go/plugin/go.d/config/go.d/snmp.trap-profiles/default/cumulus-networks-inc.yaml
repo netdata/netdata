@@ -24,7 +24,7 @@ traps:
     name: CUMULUS-BGPUN-MIB::bgpEstablished
     category: state_change
     severity: notice
-    description: BGP peer state changed to {bgpPeerState} on {_HOSTNAME}.
+    description: BGP session established with peer {{value "bgpPeerState"}} on {{hostname}}.
     status: current
     varbinds:
       - bgpPeerLastError
@@ -33,7 +33,7 @@ traps:
     name: CUMULUS-BGPUN-MIB::bgpBackwardTransition
     category: state_change
     severity: warning
-    description: BGP peer {bgpPeerState} moved to a lower state on {_HOSTNAME}.
+    description: BGP peer {{value "bgpPeerState"}} entered backward transition on {{hostname}}.
     status: current
     varbinds:
       - bgpPeerLastError
@@ -42,7 +42,7 @@ traps:
     name: CUMULUS-BGPVRF-MIB::bgpEstablished
     category: state_change
     severity: notice
-    description: BGP peer {bgpPeerState} reached established state on {_HOSTNAME}.
+    description: BGP session established with peer {{value "bgpPeerState"}} on {{hostname}}.
     status: current
     varbinds:
       - name: bgpPeerLastError
@@ -55,7 +55,7 @@ traps:
     name: CUMULUS-BGPVRF-MIB::bgpBackwardTransition
     category: state_change
     severity: warning
-    description: BGP peer FSM moved to lower state {bgpPeerState} on {_HOSTNAME}.
+    description: BGP peer {{value "bgpPeerState"}} entered backward transition on {{hostname}}.
     status: current
     varbinds:
       - name: bgpPeerLastError

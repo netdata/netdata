@@ -149,7 +149,7 @@ traps:
     name: SWATCH-MIB::serverFailed
     category: diagnostic
     severity: err
-    description: Network server {isURL} failed to reply within timeout on {_HOSTNAME}.
+    description: Network server failed to reply within timeout on {{hostname}}.
     status: current
     varbinds:
       - isURL
@@ -173,7 +173,7 @@ traps:
     name: SWATCH-MIB::serverUp
     category: state_change
     severity: notice
-    description: Network service {isURL} changed state from down to up on {_HOSTNAME}.
+    description: Network service recovered to up state on {{hostname}}.
     status: current
     varbinds:
       - isURL
@@ -197,11 +197,11 @@ traps:
     name: SWATCH-MIB::dmsStart
     category: state_change
     severity: notice
-    description: ServiceWatch agent started on {_HOSTNAME}.
+    description: ServiceWatch agent started on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.1931.1.3.0.2
     name: SWATCH-MIB::dmsShutdown
-    category: diagnostic
-    severity: warning
-    description: ServiceWatch agent terminated on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: ServiceWatch agent terminated on {{hostname}}.
     status: current

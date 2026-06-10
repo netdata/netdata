@@ -34,7 +34,7 @@ traps:
     name: INOVONICS-MODEL640-MIB::audioLossTrap
     category: diagnostic
     severity: warning
-    description: Audio loss alarm triggered with status {audioLossAlarm} on {_HOSTNAME}.
+    description: Audio loss alarm triggered with status {{value "audioLossAlarm"}} on {{hostname}}.
     status: current
     varbinds:
       - audioLossAlarm
@@ -42,7 +42,7 @@ traps:
     name: INOVONICS-MODEL640-MIB::lowSignalTrap
     category: diagnostic
     severity: warning
-    description: Low signal alarm status {lowSignalAlarm} triggered on {_HOSTNAME}.
+    description: Low signal alarm {{value "lowSignalAlarm"}} on {{hostname}}.
     status: current
     varbinds:
       - lowSignalAlarm
@@ -50,7 +50,7 @@ traps:
     name: INOVONICS-MODEL640-MIB::rdsErrorTrap
     category: diagnostic
     severity: warning
-    description: RDS Error/Mismatch alarm triggered with status {rdsErrorAlarm} on {_HOSTNAME}.
+    description: RDS error/mismatch alarm triggered{{with value "rdsErrorAlarm"}} status {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - rdsErrorAlarm
@@ -58,7 +58,7 @@ traps:
     name: INOVONICS-MODEL640-MIB::pilotLossTrap
     category: diagnostic
     severity: warning
-    description: Pilot loss alarm triggered with status {pilotLossAlarm} on {_HOSTNAME}.
+    description: Pilot loss alarm status changed to {{value "pilotLossAlarm"}} on {{hostname}}.
     status: current
     varbinds:
       - pilotLossAlarm
@@ -66,7 +66,7 @@ traps:
     name: INOVONICS-MODEL650-MIB::audioLossTrap
     category: diagnostic
     severity: warning
-    description: Audio loss alarm triggered with status {audioLossAlarm} on {_HOSTNAME}.
+    description: Audio loss alarm triggered with status {{value "audioLossAlarm"}} on {{hostname}}.
     status: current
     varbinds:
       - name: audioLossAlarm
@@ -76,7 +76,7 @@ traps:
     name: INOVONICS-MODEL650-MIB::lowSignalTrap
     category: diagnostic
     severity: warning
-    description: Low signal alarm triggered with status {lowSignalAlarm} on {_HOSTNAME}.
+    description: Low signal alarm {{value "lowSignalAlarm"}} on {{hostname}}.
     status: current
     varbinds:
       - name: lowSignalAlarm
@@ -86,7 +86,7 @@ traps:
     name: INOVONICS-MODEL650-MIB::rdsErrorTrap
     category: diagnostic
     severity: warning
-    description: RDS Error/Mismatch alarm triggered with status {rdsErrorAlarm} on {_HOSTNAME}.
+    description: RDS error/mismatch alarm triggered with status {{value "rdsErrorAlarm"}} on {{hostname}}.
     status: current
     varbinds:
       - name: rdsErrorAlarm
@@ -96,7 +96,7 @@ traps:
     name: INOVONICS-MODEL650-MIB::pilotLossTrap
     category: diagnostic
     severity: warning
-    description: Pilot loss alarm status {pilotLossAlarm} triggered on {_HOSTNAME}.
+    description: Pilot loss alarm {{value "pilotLossAlarm"}} on {{hostname}}.
     status: current
     varbinds:
       - name: pilotLossAlarm

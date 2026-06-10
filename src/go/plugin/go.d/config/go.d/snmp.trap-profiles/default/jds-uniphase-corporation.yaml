@@ -729,7 +729,7 @@ traps:
     name: JDSU-ONMSI-MIB::jdsuOnmsiImAliveTrap
     category: diagnostic
     severity: info
-    description: Heartbeat received with sequence {jdsuOnmsiImAliveAlarmEventSequence} on {_HOSTNAME}.
+    description: Application heartbeat received on {{hostname}}.
     status: current
     varbinds:
       - jdsuOnmsiImAliveText
@@ -738,7 +738,7 @@ traps:
     name: JDSU-ONMSI-MIB::jdsuOnmsiHomeTestResultTrap
     category: diagnostic
     severity: notice
-    description: Home test started for home {jdsuOnmsiHomeEntryName} on {_HOSTNAME}.
+    description: Home test started for {{value "jdsuOnmsiHomeEntryName"}} on {{hostname}}.
     status: current
     varbinds:
       - jdsuOnmsiHomeStartTestError
@@ -755,7 +755,7 @@ traps:
     name: JDSU-ONMSI-MIB::jdsuOnmsiPonTestResultTrap
     category: diagnostic
     severity: notice
-    description: PON test started for {jdsuOnmsiPonEntryName} on {_HOSTNAME}.
+    description: PON test started on {{first (value "jdsuOnmsiPonEntryName") "PON"}} on {{hostname}}.
     status: current
     varbinds:
       - jdsuOnmsiPonStartTestError
@@ -768,9 +768,9 @@ traps:
       - jdsuOnmsiPonEntrySeverity
   - oid: 1.3.6.1.4.1.35873.5.1.1.1.4.4
     name: JDSU-ONMSI-MIB::jdsuOnmsiMonitoringTestResultTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Monitoring test started on {_HOSTNAME}.
+    description: Monitoring test started{{with value "jdsuOnmsiMonitoringTestStartTestError"}} with error {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - jdsuOnmsiMonitoringTestStartTestError
@@ -779,7 +779,7 @@ traps:
     name: JDSU-ONMSI-MIB::jdsuOnmsiAlarmEventTrap
     category: diagnostic
     severity: warning
-    description: Alarm event {jdsuOnmsiAlarmEventEntryEventType} with severity {jdsuOnmsiAlarmEventEntryEventPerceivedSeverity} reported on {_HOSTNAME}.
+    description: Alarm event received on {{value "jdsuOnmsiAlarmEventEntryAlarmOriginatingEntityName"}} on {{hostname}}.
     status: current
     varbinds:
       - jdsuOnmsiAlarmEventEntrySequence

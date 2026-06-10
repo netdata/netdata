@@ -22,7 +22,7 @@ traps:
     name: PATROL-MIB::patrolInformation
     category: diagnostic
     severity: notice
-    description: PATROL Information event {patrolTrapText} from {patrolTrapOrigin} on {_HOSTNAME}.
+    description: PATROL information event {{value "patrolTrapText"}} from {{value "patrolTrapOrigin"}} on {{hostname}}.
     status: current
     varbinds:
       - patrolTrapText
@@ -32,7 +32,7 @@ traps:
     name: PATROL-MIB::patrolChangeStatus
     category: state_change
     severity: notice
-    description: 'PATROL object {patrolTrapOrigin} status changed: {patrolTrapText} on {_HOSTNAME}.'
+    description: 'PATROL monitored object status changed{{with value "patrolTrapText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - patrolTrapText
@@ -42,7 +42,7 @@ traps:
     name: PATROL-MIB::patrolWarning
     category: diagnostic
     severity: warning
-    description: 'PATROL object {patrolTrapOrigin} reported warning state: {patrolTrapText} on {_HOSTNAME}.'
+    description: 'PATROL object {{value "patrolTrapOrigin"}} is in warning state: {{value "patrolTrapText"}} on {{hostname}}.'
     status: current
     varbinds:
       - patrolTrapText
@@ -52,7 +52,7 @@ traps:
     name: PATROL-MIB::patrolAlarm
     category: diagnostic
     severity: warning
-    description: 'PATROL alarm detected: {patrolTrapText} originating from {patrolTrapOrigin} on {_HOSTNAME}.'
+    description: 'PATROL alarm detected{{with value "patrolTrapText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - patrolTrapText
@@ -61,8 +61,8 @@ traps:
   - oid: 1.3.6.1.4.1.1031.1.1.2.0.11
     name: PATROL-MIB::patrolTrapV1StateChanged
     category: state_change
-    severity: notice
-    description: 'PATROL object state changed: {patrolTrapText} on {_HOSTNAME}.'
+    severity: warning
+    description: 'PATROL monitored object state changed: {{value "patrolTrapText"}} on {{hostname}}.'
     status: current
     varbinds:
       - patrolTrapText

@@ -107,7 +107,7 @@ traps:
     name: ORiNOCO-MIB::oriTrapIPAddrAssignmentNotConfigured
     category: config_change
     severity: warning
-    description: IP Address Pool Assignment Type not configured on {_HOSTNAME}.
+    description: IP Address Pool Assignment Type not configured on {{hostname}}.
     status: current
     varbinds:
       - oriGenericTrapVariable
@@ -115,8 +115,8 @@ traps:
   - oid: 1.3.6.1.4.1.11898.2.1.18.2.0.2
     name: ORiNOCO-MIB::oriTrapRADIUSNotConfigured
     category: config_change
-    severity: crit
-    description: RADIUS configuration not configured on {_HOSTNAME}.
+    severity: warning
+    description: RADIUS configuration is not configured on {{hostname}}.
     status: current
     varbinds:
       - oriGenericTrapVariable
@@ -125,16 +125,16 @@ traps:
     name: ORiNOCO-MIB::oriTrapDNSIPNotConfigured
     category: config_change
     severity: warning
-    description: DNS IP Address not configured on {_HOSTNAME}.
+    description: DNS IP address not configured on {{hostname}}.
     status: current
     varbinds:
       - oriGenericTrapVariable
       - oriTrapVarMACAddress
   - oid: 1.3.6.1.4.1.11898.2.1.18.2.0.4
     name: ORiNOCO-MIB::oriTrapWINSIPNotConfigured
-    category: diagnostic
-    severity: err
-    description: WINS or NBNS IP address not configured on {_HOSTNAME}.
+    category: config_change
+    severity: warning
+    description: WINS or NBNS IP address not configured on {{hostname}}.
     status: current
     varbinds:
       - oriGenericTrapVariable
@@ -142,8 +142,8 @@ traps:
   - oid: 1.3.6.1.4.1.11898.2.1.18.2.0.5
     name: ORiNOCO-MIB::oriTrapRADIUSAuthenticationNotConfigured
     category: config_change
-    severity: alert
-    description: RADIUS authentication not configured on {_HOSTNAME}.
+    severity: warning
+    description: RADIUS authentication not configured on {{hostname}}.
     status: current
     varbinds:
       - oriGenericTrapVariable
@@ -152,7 +152,7 @@ traps:
     name: ORiNOCO-MIB::oriTrapRADIUSAccountingNotConfigured
     category: config_change
     severity: warning
-    description: RADIUS accounting not configured on {_HOSTNAME}.
+    description: RADIUS accounting information is not configured on {{hostname}}.
     status: current
     varbinds:
       - oriGenericTrapVariable
@@ -161,7 +161,7 @@ traps:
     name: ORiNOCO-MIB::oriTrapDuplicateIPAddressEncountered
     category: security
     severity: alert
-    description: Duplicate IP address detected from {oriTrapVarMACAddress} on {_HOSTNAME}.
+    description: Duplicate IP address detected on {{value "oriTrapVarMACAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - oriGenericTrapVariable
@@ -169,20 +169,20 @@ traps:
   - oid: 1.3.6.1.4.1.11898.2.1.18.2.0.8
     name: ORiNOCO-MIB::oriTrapDHCPRelayServerTableNotConfigured
     category: config_change
-    severity: crit
-    description: DHCP relay server table is not configured on {_HOSTNAME}.
+    severity: warning
+    description: DHCP relay server table is not configured on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11898.2.1.18.2.0.9
     name: ORiNOCO-MIB::oriTrapWORPIfNetworkSecretNotConfigured
     category: security
     severity: crit
-    description: Network authentication shared secret not configured on {_HOSTNAME}.
+    description: Network authentication shared secret is not configured on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11898.2.1.18.2.0.10
     name: ORiNOCO-MIB::oriTrapVLANIDInvalidConfiguration
     category: config_change
-    severity: err
-    description: Invalid VLAN ID configuration detected on {oriVLANIDTableIdentifier} on {_HOSTNAME}.
+    severity: crit
+    description: Invalid VLAN ID configuration detected{{with value "oriVLANIDTableIdentifier"}} for VLAN {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - oriGenericTrapVariable
@@ -192,7 +192,7 @@ traps:
     name: ORiNOCO-MIB::oriTrapInvalidEncryptionKey
     category: security
     severity: crit
-    description: Invalid encryption key detected from unauthorized client {oriTrapVarUnauthorizedClientMACAddress} on {_HOSTNAME}.
+    description: Invalid encryption key detected from client {{value "oriTrapVarUnauthorizedClientMACAddress"}} on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarUnauthorizedClientMACAddress
@@ -200,7 +200,7 @@ traps:
     name: ORiNOCO-MIB::oriTrapAuthenticationFailure
     category: auth
     severity: warning
-    description: Client authentication failure for {oriTrapVarUnauthorizedClientMACAddress} using {oriTrapVarFailedAuthenticationType} on {_HOSTNAME}.
+    description: Client authentication failure for {{value "oriTrapVarUnauthorizedClientMACAddress"}} via {{value "oriTrapVarFailedAuthenticationType"}} on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarUnauthorizedClientMACAddress
@@ -209,7 +209,7 @@ traps:
     name: ORiNOCO-MIB::oriTrapUnauthorizedManagerDetected
     category: security
     severity: alert
-    description: Unauthorized SNMP manager {oriTrapVarUnauthorizedManagerIPaddress} detected on {_HOSTNAME}.
+    description: Unauthorized SNMP manager {{value "oriTrapVarUnauthorizedManagerIPaddress"}} detected on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarUnauthorizedManagerIPaddress
@@ -218,7 +218,7 @@ traps:
     name: ORiNOCO-MIB::oriTrapWLCNotPresent
     category: diagnostic
     severity: warning
-    description: Wireless card {oriTrapVarWirelessCard} is not present on {_HOSTNAME}.
+    description: Wireless card {{value "oriTrapVarWirelessCard"}} is not present on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarWirelessCard
@@ -226,7 +226,7 @@ traps:
     name: ORiNOCO-MIB::oriTrapWLCFailure
     category: diagnostic
     severity: crit
-    description: Wireless card {oriTrapVarWirelessCard} reported failure on {_HOSTNAME}.
+    description: Wireless interface/card failure detected on {{first (value "oriTrapVarWirelessCard") "wireless card"}} on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarWirelessCard
@@ -234,7 +234,7 @@ traps:
     name: ORiNOCO-MIB::oriTrapWLCRemoval
     category: diagnostic
     severity: crit
-    description: Wireless card {oriTrapVarWirelessCard} removed from device on {_HOSTNAME}.
+    description: Wireless card {{value "oriTrapVarWirelessCard"}} removed on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarWirelessCard
@@ -242,7 +242,7 @@ traps:
     name: ORiNOCO-MIB::oriTrapWLCIncompatibleFirmware
     category: diagnostic
     severity: crit
-    description: Incompatible firmware detected on wireless card {oriTrapVarWirelessCard} on {_HOSTNAME}.
+    description: Incompatible firmware detected on wireless card {{value "oriTrapVarWirelessCard"}} on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarWirelessCard
@@ -250,7 +250,7 @@ traps:
     name: ORiNOCO-MIB::oriTrapWLCVoltageDiscrepancy
     category: diagnostic
     severity: crit
-    description: Voltage discrepancy detected on wireless card {oriTrapVarWirelessCard} on {_HOSTNAME}.
+    description: Voltage discrepancy detected on wireless card {{value "oriTrapVarWirelessCard"}} on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarWirelessCard
@@ -258,7 +258,7 @@ traps:
     name: ORiNOCO-MIB::oriTrapWLCIncompatibleVendor
     category: security
     severity: crit
-    description: Incompatible wireless vendor card detected on {_HOSTNAME}.
+    description: Incompatible wireless vendor card detected{{with value "oriTrapVarWirelessCard"}} on slot {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarWirelessCard
@@ -266,7 +266,7 @@ traps:
     name: ORiNOCO-MIB::oriTrapWLCFirmwareDownloadFailure
     category: diagnostic
     severity: crit
-    description: Firmware download failed on wireless card {oriTrapVarWirelessCard} on {_HOSTNAME}.
+    description: Firmware download failure on wireless card {{value "oriTrapVarWirelessCard"}} on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarWirelessCard
@@ -274,7 +274,7 @@ traps:
     name: ORiNOCO-MIB::oriTrapWLCFirmwareFailure
     category: diagnostic
     severity: crit
-    description: Wireless card firmware failure on {oriTrapVarWirelessCard} on {_HOSTNAME}.
+    description: Wireless interface/card firmware failure on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarWirelessCard
@@ -282,8 +282,8 @@ traps:
   - oid: 1.3.6.1.4.1.11898.2.1.18.4.0.9
     name: ORiNOCO-MIB::oriTrapWLCRadarInterferenceDetected
     category: diagnostic
-    severity: crit
-    description: Radar interference detected on wireless card {oriTrapVarWirelessCard} on {_HOSTNAME}.
+    severity: warning
+    description: Radar interference detected on wireless card {{value "oriTrapVarWirelessCard"}} on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarWirelessCard
@@ -292,7 +292,7 @@ traps:
     name: ORiNOCO-MIB::oriTrapWatchDogTimerExpired
     category: diagnostic
     severity: crit
-    description: Software watchdog timer expired, indicating a critical software fault on {_HOSTNAME}.
+    description: Software watchdog timer expired, device will reboot on {{hostname}}.
     status: current
     varbinds:
       - oriGenericTrapVariable
@@ -301,16 +301,16 @@ traps:
   - oid: 1.3.6.1.4.1.11898.2.1.18.5.0.2
     name: ORiNOCO-MIB::oriTrapRADIUSServerNotResponding
     category: auth
-    severity: err
-    description: RADIUS server not responding for authentication requests on {_HOSTNAME}.
+    severity: crit
+    description: RADIUS server not responding to authentication requests on {{hostname}}.
     status: current
     varbinds:
       - oriGenericTrapVariable
   - oid: 1.3.6.1.4.1.11898.2.1.18.5.0.3
     name: ORiNOCO-MIB::oriTrapModuleNotInitialized
     category: diagnostic
-    severity: err
-    description: Module initialization failed with {oriGenericTrapVariable} on {_HOSTNAME}.
+    severity: crit
+    description: 'Module initialization failed{{with value "oriGenericTrapVariable"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - oriGenericTrapVariable
@@ -318,7 +318,7 @@ traps:
     name: ORiNOCO-MIB::oriTrapChangeInAdminState
     category: state_change
     severity: notice
-    description: Device administration state changed on {_HOSTNAME}.
+    description: Device administration state changed to maintenance or normal on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarMACAddress
@@ -326,7 +326,7 @@ traps:
     name: ORiNOCO-MIB::oriTrapDeviceRebooting
     category: state_change
     severity: notice
-    description: Device reboot initiated on {_HOSTNAME}.
+    description: Device reboot request received on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarMACAddress
@@ -334,15 +334,15 @@ traps:
     name: ORiNOCO-MIB::oriTrapTaskSuspended
     category: diagnostic
     severity: crit
-    description: Task {oriTrapVarTaskSuspended} has suspended on {_HOSTNAME}.
+    description: Task {{value "oriTrapVarTaskSuspended"}} suspended on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarTaskSuspended
   - oid: 1.3.6.1.4.1.11898.2.1.18.5.0.7
     name: ORiNOCO-MIB::oriTrapBootPFailed
-    category: diagnostic
+    category: state_change
     severity: crit
-    description: BootP request failed, no dynamic IP assigned for {oriTrapVarMACAddress} on {_HOSTNAME}.
+    description: BootP request failed to receive response on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarMACAddress
@@ -350,41 +350,41 @@ traps:
     name: ORiNOCO-MIB::oriTrapDHCPFailed
     category: diagnostic
     severity: crit
-    description: DHCP client request failed for device {oriTrapVarMACAddress} on {_HOSTNAME}.
+    description: DHCP client request failed to receive response on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarMACAddress
   - oid: 1.3.6.1.4.1.11898.2.1.18.5.0.9
     name: ORiNOCO-MIB::oriTrapDNSClientLookupFailure
     category: diagnostic
-    severity: err
-    description: DNS lookup failure for {oriGenericTrapVariable} on {_HOSTNAME}.
+    severity: warning
+    description: DNS client lookup failure for {{value "oriGenericTrapVariable"}} on {{hostname}}.
     status: current
     varbinds:
       - oriGenericTrapVariable
   - oid: 1.3.6.1.4.1.11898.2.1.18.5.0.10
     name: ORiNOCO-MIB::oriTrapSNTPFailure
     category: diagnostic
-    severity: err
-    description: SNTP service failed to receive response from configured servers on {_HOSTNAME}.
+    severity: crit
+    description: SNTP service failed to receive response from configured servers on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11898.2.1.18.6.0.1
     name: ORiNOCO-MIB::oriTrapFlashMemoryEmpty
     category: diagnostic
     severity: warning
-    description: Flash memory is empty on {_HOSTNAME}.
+    description: Flash memory is empty on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11898.2.1.18.6.0.2
     name: ORiNOCO-MIB::oriTrapFlashMemoryCorrupted
     category: diagnostic
     severity: crit
-    description: Flash memory data content is corrupted on {_HOSTNAME}.
+    description: Flash memory data content is corrupted on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11898.2.1.18.7.0.1
     name: ORiNOCO-MIB::oriTrapTFTPFailedOperation
     category: diagnostic
-    severity: err
-    description: TFTP {oriTrapVarTFTPOperation} operation failed for file {oriTrapVarTFTPFilename} on {_HOSTNAME}.
+    severity: crit
+    description: TFTP operation {{value "oriTrapVarTFTPOperation"}} failed for {{value "oriTrapVarTFTPFilename"}} on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarTFTPIPAddress
@@ -392,9 +392,9 @@ traps:
       - oriTrapVarTFTPOperation
   - oid: 1.3.6.1.4.1.11898.2.1.18.7.0.2
     name: ORiNOCO-MIB::oriTrapTFTPOperationInitiated
-    category: config_change
+    category: diagnostic
     severity: info
-    description: TFTP {oriTrapVarTFTPOperation} operation initiated for {oriTrapVarTFTPFilename} on {_HOSTNAME}.
+    description: TFTP {{value "oriTrapVarTFTPOperation"}} initiated for {{value "oriTrapVarTFTPFilename"}} on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarTFTPIPAddress
@@ -402,9 +402,9 @@ traps:
       - oriTrapVarTFTPOperation
   - oid: 1.3.6.1.4.1.11898.2.1.18.7.0.3
     name: ORiNOCO-MIB::oriTrapTFTPOperationCompleted
-    category: config_change
+    category: diagnostic
     severity: info
-    description: TFTP operation {oriTrapVarTFTPOperation} for file {oriTrapVarTFTPFilename} completed on {_HOSTNAME}.
+    description: TFTP {{value "oriTrapVarTFTPOperation"}} operation completed for {{value "oriTrapVarTFTPFilename"}} on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarTFTPIPAddress
@@ -414,52 +414,52 @@ traps:
     name: ORiNOCO-MIB::oriTrapZeroSizeImage
     category: diagnostic
     severity: crit
-    description: Zero size image loaded on {_HOSTNAME}.
+    description: Zero size image loaded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11898.2.1.18.9.0.2
     name: ORiNOCO-MIB::oriTrapInvalidImage
     category: diagnostic
     severity: crit
-    description: Invalid image loaded on {_HOSTNAME}.
+    description: Invalid image loaded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11898.2.1.18.9.0.3
     name: ORiNOCO-MIB::oriTrapImageTooLarge
     category: diagnostic
     severity: crit
-    description: Image loaded on device exceeds flash size limitation on {_HOSTNAME}.
+    description: Image loaded on device exceeds flash size limitation on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11898.2.1.18.9.0.4
     name: ORiNOCO-MIB::oriTrapIncompatibleImage
     category: diagnostic
-    severity: err
-    description: Incompatible image loaded on {_HOSTNAME}.
+    severity: crit
+    description: Incompatible image loaded on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11898.2.1.18.10.0.1
     name: ORiNOCO-MIB::oriADSLIfLinkUp
     category: state_change
     severity: notice
-    description: ADSL link is up on {_HOSTNAME}.
+    description: ADSL link went up on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11898.2.1.18.10.0.2
     name: ORiNOCO-MIB::oriADSLIfLinkDown
     category: state_change
     severity: warning
-    description: ADSL link down on {_HOSTNAME}.
+    description: ADSL link went down on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11898.2.1.18.11.0.1
     name: ORiNOCO-MIB::oriWORPStationRegister
-    category: state_change
-    severity: notice
-    description: WORP station with MAC {oriTrapVarMACAddress} registered on interface {oriTrapVarInterface} on {_HOSTNAME}.
+    category: mobility
+    severity: info
+    description: WORP station {{value "oriTrapVarMACAddress"}} registered on {{first (value "oriTrapVarInterface") "interface"}} on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarInterface
       - oriTrapVarMACAddress
   - oid: 1.3.6.1.4.1.11898.2.1.18.11.0.2
     name: ORiNOCO-MIB::oriWORPStationDeRegister
-    category: mobility
-    severity: info
-    description: WORP station with MAC {oriTrapVarMACAddress} deregistered from interface {oriTrapVarInterface} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: WORP station {{value "oriTrapVarMACAddress"}} de-registered on interface {{value "oriTrapVarInterface"}} on {{hostname}}.
     status: current
     varbinds:
       - oriTrapVarInterface
@@ -467,16 +467,16 @@ traps:
   - oid: 1.3.6.1.4.1.11898.2.1.18.12.0.1
     name: ORiNOCO-MIB::oriTrapIncompatibleLicenseFile
     category: license
-    severity: alert
-    description: Incompatible license file detected on {_HOSTNAME}.
+    severity: crit
+    description: Incompatible license file detected on {{hostname}}.
     status: current
     varbinds:
       - oriGenericTrapVariable
   - oid: 1.3.6.1.4.1.11898.2.1.18.12.0.2
     name: ORiNOCO-MIB::oriTrapFeatureNotSupported
     category: license
-    severity: warning
-    description: Feature {oriSystemFeatureTableCode} not supported by current software image on {_HOSTNAME}.
+    severity: notice
+    description: Feature {{value "oriSystemFeatureTableCode"}} not supported by software image on {{hostname}}.
     status: current
     varbinds:
       - oriSystemFeatureTableCode
@@ -484,21 +484,21 @@ traps:
     name: ORiNOCO-MIB::oriTrapZeroLicenseFiles
     category: license
     severity: crit
-    description: License file missing, device operating in default mode on {_HOSTNAME}.
+    description: License file missing, device operating in limited mode on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.11898.2.1.18.12.0.4
     name: ORiNOCO-MIB::oriTrapInvalidLicenseFile
     category: license
     severity: warning
-    description: Invalid license file detected on {_HOSTNAME}.
+    description: Invalid license file detected on {{hostname}}.
     status: current
     varbinds:
       - oriGenericTrapVariable
   - oid: 1.3.6.1.4.1.11898.2.1.18.12.0.5
     name: ORiNOCO-MIB::oriTrapUselessLicense
     category: license
-    severity: notice
-    description: License code file lacks valid feature code on {_HOSTNAME}.
+    severity: warning
+    description: 'License code file has no valid feature code{{with value "oriGenericTrapVariable"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - oriGenericTrapVariable

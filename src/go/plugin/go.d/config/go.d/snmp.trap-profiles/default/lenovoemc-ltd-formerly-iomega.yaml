@@ -26,7 +26,7 @@ traps:
     name: IOMEGANAS-MIB::iomegaNASNotificationError
     category: diagnostic
     severity: warning
-    description: 'NAS event {eventID} occurred: {eventText} on {_HOSTNAME}.'
+    description: 'NAS error event {{value "eventID"}}: {{value "eventText"}} on {{hostname}}.'
     status: current
     varbinds:
       - deviceDescr
@@ -37,7 +37,7 @@ traps:
     name: IOMEGANAS-MIB::iomegaNASNotificationWarn
     category: diagnostic
     severity: warning
-    description: Warning event {eventID} ({eventText}) detected on {_HOSTNAME}.
+    description: 'Warning event {{value "eventID"}} occurred: {{value "eventText"}} on {{hostname}}.'
     status: current
     varbinds:
       - deviceDescr
@@ -48,7 +48,7 @@ traps:
     name: IOMEGANAS-MIB::iomegaNASNotificationInfo
     category: diagnostic
     severity: info
-    description: Event {eventID} ({eventText}) on {deviceName} on {_HOSTNAME}.
+    description: 'Event {{value "eventID"}} occurred: {{value "eventText"}} on {{hostname}}.'
     status: current
     varbinds:
       - deviceDescr

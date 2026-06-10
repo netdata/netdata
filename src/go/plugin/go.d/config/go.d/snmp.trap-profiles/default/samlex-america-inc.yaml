@@ -58,7 +58,7 @@ traps:
     name: SAMLEXAMERICA-MIB::snmpTrap
     category: diagnostic
     severity: warning
-    description: Hardware warning detected on {_HOSTNAME}.
+    description: Power system warning detected on {{hostname}}.
     status: current
     varbinds:
       - warningFanFault

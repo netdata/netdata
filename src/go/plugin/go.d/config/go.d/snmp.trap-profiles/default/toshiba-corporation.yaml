@@ -9,263 +9,263 @@ traps:
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapFault
     category: diagnostic
     severity: warning
-    description: UPS fault alarm reported on {_HOSTNAME}.
+    description: UPS fault or status alarm reported on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.2
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapFaultClear
     category: state_change
     severity: notice
-    description: UPS fault cleared on {_HOSTNAME}.
+    description: UPS fault cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.3
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapOnBattery
-    category: state_change
-    severity: notice
-    description: UPS switched to battery mode on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: UPS switched to battery mode on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.4
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapOnBatteryClear
     category: state_change
     severity: notice
-    description: UPS cleared on-battery state on {_HOSTNAME}.
+    description: UPS returned from battery mode on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.5
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapBatteryLow
     category: diagnostic
     severity: warning
-    description: UPS battery low voltage warning on {_HOSTNAME}.
+    description: UPS battery low voltage warning on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.6
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapBatteryLowClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS battery low voltage condition cleared on {_HOSTNAME}.
+    description: UPS battery low voltage warning cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.7
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapBatteryDepleted
     category: diagnostic
-    severity: warning
-    description: UPS battery depleted warning on {_HOSTNAME}.
+    severity: alert
+    description: UPS battery depleted, unable to support critical loads on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.8
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapBatteryDepletedClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS depleted battery warning cleared on {_HOSTNAME}.
+    description: UPS battery depleted warning cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.9
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapBatteryOverheat
     category: diagnostic
-    severity: err
-    description: Battery overheat fault detected on {_HOSTNAME}.
+    severity: crit
+    description: UPS battery overheat fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.10
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapBatteryOverheatClear
     category: diagnostic
     severity: notice
-    description: Battery overheat fault cleared on {_HOSTNAME}.
+    description: UPS battery overheat fault cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.11
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapBatteryVoltageAbnormal
     category: diagnostic
     severity: warning
-    description: UPS battery voltage abnormal detected on {_HOSTNAME}.
+    description: UPS battery voltage is abnormal on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.12
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapBatteryVoltageAbnormalClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Battery voltage abnormal condition cleared on {_HOSTNAME}.
+    description: UPS battery voltage abnormal fault cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.13
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapUPSOverheat
     category: diagnostic
-    severity: warning
-    description: UPS overheat fault detected on {_HOSTNAME}.
+    severity: crit
+    description: UPS overheat fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.14
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapUPSOverheatClear
     category: diagnostic
     severity: notice
-    description: UPS overheat fault cleared on {_HOSTNAME}.
+    description: UPS overheat fault cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.15
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapPowerFailure
     category: diagnostic
     severity: alert
-    description: UPS power failure detected on {_HOSTNAME}.
+    description: UPS power failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.16
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapPowerFailureClear
     category: state_change
     severity: notice
-    description: Power failure condition cleared on {_HOSTNAME}.
+    description: UPS power failure condition cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.17
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapUPSOverload
     category: diagnostic
-    severity: warning
-    description: UPS overload detected, output load exceeds rated current on {_HOSTNAME}.
+    severity: alert
+    description: UPS overload fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.18
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapUPSOverloadClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: UPS overload condition cleared on {_HOSTNAME}.
+    description: UPS overload condition cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.19
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapUserDefinedOverloadWarning
     category: diagnostic
     severity: warning
-    description: UPS inverter output load exceeded user-defined overload threshold on {_HOSTNAME}.
+    description: UPS user-defined overload warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.20
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapUserDefinedOverloadWarningClear
-    category: diagnostic
-    severity: warning
-    description: UPS user-defined overload warning cleared on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: User-defined overload warning cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.21
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapOnBypass
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: UPS operating on bypass power on {_HOSTNAME}.
+    description: UPS switched to bypass power on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.22
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapOnBypassClear
     category: state_change
     severity: notice
-    description: UPS on-bypass state cleared on {_HOSTNAME}.
+    description: UPS on-bypass condition cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.23
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapOutputOff
     category: state_change
-    severity: warning
-    description: UPS output is off on {_HOSTNAME}.
+    severity: alert
+    description: UPS output is off on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.24
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapOutputOffClear
     category: state_change
     severity: notice
-    description: UPS output cleared from off state on {_HOSTNAME}.
+    description: UPS output is off on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.25
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapAsyncOperation
     category: diagnostic
-    severity: notice
-    description: Inverter synchronous warning reported on {_HOSTNAME}.
+    severity: warning
+    description: UPS inverter synchronous warning detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.26
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapAsyncOperationClear
     category: diagnostic
     severity: notice
-    description: Inverter synchronous warning cleared on {_HOSTNAME}.
+    description: UPS warning clear for Inverter Synchronous on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.27
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapDCBusOverCurrent
     category: diagnostic
     severity: crit
-    description: DC overcurrent fault detected on {_HOSTNAME}.
+    description: DC overcurrent fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.28
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapDCBusOverCurrentClear
     category: diagnostic
     severity: notice
-    description: DC overcurrent fault cleared on {_HOSTNAME}.
+    description: DC overcurrent fault cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.29
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapDCBusOverVoltage
     category: diagnostic
     severity: crit
-    description: DC overvoltage fault detected on {_HOSTNAME}.
+    description: DC overvoltage fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.30
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapDCBusOverVoltageClear
     category: diagnostic
     severity: notice
-    description: DC overvoltage fault cleared on {_HOSTNAME}.
+    description: DC overvoltage fault cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.31
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapDCBusUnderVoltage
     category: diagnostic
-    severity: warning
-    description: DC bus undervoltage fault detected on {_HOSTNAME}.
+    severity: crit
+    description: DC bus undervoltage fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.32
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapDCBusUnderVoltageClear
     category: diagnostic
     severity: notice
-    description: DC undervoltage fault cleared on {_HOSTNAME}.
+    description: DC undervoltage fault cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.33
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapDCBusImbalance
     category: diagnostic
-    severity: err
-    description: DC bus imbalance fault detected on {_HOSTNAME}.
+    severity: crit
+    description: DC bus imbalance fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.34
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapDCBusImbalanceClear
     category: diagnostic
     severity: notice
-    description: DC bus imbalance fault cleared on {_HOSTNAME}.
+    description: DC bus imbalance fault cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.35
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapOutputUnderVoltage
     category: diagnostic
-    severity: err
-    description: UPS output undervoltage fault detected on {_HOSTNAME}.
+    severity: warning
+    description: UPS output undervoltage fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.36
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapOutputUnderVoltageClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Output undervoltage fault cleared on {_HOSTNAME}.
+    description: UPS output undervoltage fault cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.37
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapOutputOverVoltage
     category: diagnostic
-    severity: err
-    description: UPS output overvoltage fault detected on {_HOSTNAME}.
+    severity: crit
+    description: UPS output overvoltage fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.38
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapOutputOverVoltageClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: Output overvoltage fault cleared on {_HOSTNAME}.
+    description: Output overvoltage fault cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.39
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapInverterOverload
     category: diagnostic
-    severity: warning
-    description: UPS overload fault detected on {_HOSTNAME}.
+    severity: crit
+    description: UPS inverter overload detected due to short time over-current on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.40
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapInverterOverloadClear
-    category: diagnostic
-    severity: warning
-    description: UPS overload fault cleared on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: UPS inverter overload fault cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.41
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapInverterOvercurrent
     category: diagnostic
-    severity: err
-    description: Inverter overcurrent fault detected on {_HOSTNAME}.
+    severity: crit
+    description: Inverter overcurrent fault detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.42
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapInverterOvercurrentClear
     category: diagnostic
     severity: notice
-    description: Inverter overcurrent fault cleared on {_HOSTNAME}.
+    description: Inverter overcurrent fault cleared on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.43
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapRemotEyeCommError
     category: diagnostic
-    severity: err
-    description: RemotEye UPS communication error detected on {_HOSTNAME}.
+    severity: warning
+    description: RemotEye UPS communication error detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.186.1.19.2.5.1.0.44
     name: TIC-RMTI4-G9000-G2020-MIB::upsTrapRemotEyeCommErrorClear
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: RemotEye UPS communication error cleared on {_HOSTNAME}.
+    description: RemotEye UPS communication error cleared on {{hostname}}.
     status: current

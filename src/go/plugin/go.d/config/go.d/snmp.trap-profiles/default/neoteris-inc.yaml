@@ -121,7 +121,7 @@ traps:
     name: PULSESECURE-PSG-MIB::iveLogNearlyFull
     category: diagnostic
     severity: warning
-    description: Log file {logName} is {logFullPercent}% full on {_HOSTNAME}.
+    description: Log file {{value "logName"}} is {{value "logFullPercent"}}% full on {{hostname}}.
     status: current
     varbinds:
       - logFullPercent
@@ -130,15 +130,15 @@ traps:
     name: PULSESECURE-PSG-MIB::iveLogFull
     category: diagnostic
     severity: warning
-    description: Log file full for {logName} on {_HOSTNAME}.
+    description: Log file full for {{value "logName"}} on {{hostname}}.
     status: current
     varbinds:
       - logName
   - oid: 1.3.6.1.4.1.12532.251.6
     name: PULSESECURE-PSG-MIB::iveMaxConcurrentUsersSignedIn
-    category: diagnostic
+    category: license
     severity: notice
-    description: Concurrent user count {iveConcurrentUsers} reported on {_HOSTNAME}.
+    description: Maximum concurrent users signed in reached {{value "iveConcurrentUsers"}} on {{hostname}}.
     status: current
     varbinds:
       - iveConcurrentUsers
@@ -146,15 +146,15 @@ traps:
     name: PULSESECURE-PSG-MIB::iveTooManyFailedLoginAttempts
     category: security
     severity: warning
-    description: Too many failed login attempts from {blockedIP} on {_HOSTNAME}.
+    description: Too many failed login attempts from {{value "blockedIP"}} on {{hostname}}.
     status: current
     varbinds:
       - blockedIP
   - oid: 1.3.6.1.4.1.12532.251.8
     name: PULSESECURE-PSG-MIB::externalAuthServerUnreachable
-    category: diagnostic
+    category: security
     severity: warning
-    description: External authentication server {authServerName} is not responding on {_HOSTNAME}.
+    description: External authentication server {{value "authServerName"}} is unreachable on {{hostname}}.
     status: current
     varbinds:
       - authServerName
@@ -162,37 +162,37 @@ traps:
     name: PULSESECURE-PSG-MIB::iveStart
     category: state_change
     severity: notice
-    description: IVE startup under administrator's instruction on {_HOSTNAME}.
+    description: IVE startup under administrator instruction on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.12532.251.10
     name: PULSESECURE-PSG-MIB::iveShutdown
     category: state_change
     severity: notice
-    description: IVE shutdown under administrator instruction on {_HOSTNAME}.
+    description: IVE shutdown under administrator instruction on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.12532.251.11
     name: PULSESECURE-PSG-MIB::iveReboot
     category: state_change
     severity: notice
-    description: Device rebooted under administrator instruction on {_HOSTNAME}.
+    description: IVE reboot under administrator's instruction on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.12532.251.12
     name: PULSESECURE-PSG-MIB::archiveServerUnreachable
     category: diagnostic
     severity: warning
-    description: Archive server is not responding on {_HOSTNAME}.
+    description: Archive server is not responding on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.12532.251.13
     name: PULSESECURE-PSG-MIB::archiveServerLoginFailed
     category: auth
-    severity: err
-    description: Archive server login failed on {_HOSTNAME}.
+    severity: warning
+    description: Archive server login failed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.12532.251.14
     name: PULSESECURE-PSG-MIB::archiveFileTransferFailed
     category: diagnostic
     severity: err
-    description: Archive file transfer failed for {fileName} on {_HOSTNAME}.
+    description: Archive file transfer failed for {{value "fileName"}} on {{hostname}}.
     status: current
     varbinds:
       - fileName
@@ -200,21 +200,21 @@ traps:
     name: PULSESECURE-PSG-MIB::meetingUserLimit
     category: license
     severity: warning
-    description: Concurrent meeting user count {meetingUserCount} exceeded license limit on {_HOSTNAME}.
+    description: Concurrent meeting users {{value "meetingUserCount"}} exceeded license limit on {{hostname}}.
     status: current
     varbinds:
       - meetingUserCount
   - oid: 1.3.6.1.4.1.12532.251.16
     name: PULSESECURE-PSG-MIB::iveRestart
-    category: config_change
+    category: state_change
     severity: notice
-    description: IVE restarted under administrator's instruction on {_HOSTNAME}.
+    description: IVE has restarted under administrator's instruction on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.12532.251.17
     name: PULSESECURE-PSG-MIB::meetingLimit
     category: license
     severity: warning
-    description: Concurrent meeting count {meetingCount} exceeded license limit on {_HOSTNAME}.
+    description: Concurrent meeting count {{value "meetingCount"}} exceeded license limit on {{hostname}}.
     status: current
     varbinds:
       - meetingCount
@@ -222,7 +222,7 @@ traps:
     name: PULSESECURE-PSG-MIB::iveDiskNearlyFull
     category: diagnostic
     severity: warning
-    description: Disk space nearly full at {diskFullPercent}% on {_HOSTNAME}.
+    description: Disk space nearly full at {{value "diskFullPercent"}}% on {{hostname}}.
     status: current
     varbinds:
       - diskFullPercent
@@ -230,13 +230,13 @@ traps:
     name: PULSESECURE-PSG-MIB::iveDiskFull
     category: diagnostic
     severity: warning
-    description: Disk space full on {_HOSTNAME}.
+    description: Disk space full on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.12532.251.20
     name: PULSESECURE-PSG-MIB::logMessageTrap
     category: diagnostic
     severity: warning
-    description: Log message {logDescription} with type {logType} on {_HOSTNAME}.
+    description: Log message {{value "logDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - logID
@@ -246,7 +246,7 @@ traps:
     name: PULSESECURE-PSG-MIB::memUtilNotify
     category: diagnostic
     severity: warning
-    description: Memory utilization {iveMemoryUtil} exceeded threshold on {_HOSTNAME}.
+    description: IVE memory utilization at {{value "iveMemoryUtil"}}% exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - iveMemoryUtil
@@ -254,7 +254,7 @@ traps:
     name: PULSESECURE-PSG-MIB::cpuUtilNotify
     category: diagnostic
     severity: warning
-    description: CPU utilization {iveCpuUtil} exceeded threshold on {_HOSTNAME}.
+    description: CPU utilization exceeded threshold at {{value "iveCpuUtil"}}% on {{hostname}}.
     status: current
     varbinds:
       - iveCpuUtil
@@ -262,7 +262,7 @@ traps:
     name: PULSESECURE-PSG-MIB::swapUtilNotify
     category: diagnostic
     severity: warning
-    description: Swap utilization {iveSwapUtil} exceeded threshold on {_HOSTNAME}.
+    description: Swap utilization threshold exceeded at {{value "iveSwapUtil"}}% on {{hostname}}.
     status: current
     varbinds:
       - iveSwapUtil
@@ -270,15 +270,15 @@ traps:
     name: PULSESECURE-PSG-MIB::iveMaxConcurrentUsersVirtualSystem
     category: state_change
     severity: notice
-    description: Maximum concurrent users reached for Virtual System {ivsName} on {_HOSTNAME}.
+    description: Maximum concurrent users reached for Virtual System {{value "ivsName"}} on {{hostname}}.
     status: deprecated
     varbinds:
       - ivsName
   - oid: 1.3.6.1.4.1.12532.251.25
     name: PULSESECURE-PSG-MIB::ocspResponderConnectionFailed
     category: diagnostic
-    severity: err
-    description: OCSP responder connection failed at {ocspResponderURL} on {_HOSTNAME}.
+    severity: warning
+    description: OCSP responder connection failed for {{value "ocspResponderURL"}} on {{hostname}}.
     status: current
     varbinds:
       - ocspResponderURL
@@ -286,15 +286,15 @@ traps:
     name: PULSESECURE-PSG-MIB::iveFanNotify
     category: diagnostic
     severity: warning
-    description: Fan status changed for {fanDescription} on {_HOSTNAME}.
+    description: Fan status changed{{with value "fanDescription"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - fanDescription
   - oid: 1.3.6.1.4.1.12532.251.27
     name: PULSESECURE-PSG-MIB::ivePowerSupplyNotify
     category: diagnostic
-    severity: err
-    description: Power supply status changed to {psDescription} on {_HOSTNAME}.
+    severity: warning
+    description: 'Power supply status changed{{with value "psDescription"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - psDescription
@@ -302,24 +302,24 @@ traps:
     name: PULSESECURE-PSG-MIB::iveRaidNotify
     category: diagnostic
     severity: warning
-    description: RAID status changed to {raidDescription} on {_HOSTNAME}.
+    description: RAID status changed to {{value "raidDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - raidDescription
   - oid: 1.3.6.1.4.1.12532.251.29
     name: PULSESECURE-PSG-MIB::iveClusterDisableNodeTrap
     category: state_change
-    severity: warning
-    description: Cluster node(s) {nodeList} disabled in cluster {clusterName} on {_HOSTNAME}.
+    severity: alert
+    description: Cluster {{value "clusterName"}} node(s) {{value "nodeList"}} disabled on {{hostname}}.
     status: current
     varbinds:
       - clusterName
       - nodeList
   - oid: 1.3.6.1.4.1.12532.251.30
     name: PULSESECURE-PSG-MIB::iveClusterChangedVIPTrap
-    category: state_change
+    category: config_change
     severity: notice
-    description: VIP {vipType} changed from {currentVIP} to {newVIP} on {_HOSTNAME}.
+    description: VIP {{value "vipType"}} changed from {{value "currentVIP"}} to {{value "newVIP"}} on {{hostname}}.
     status: current
     varbinds:
       - vipType
@@ -329,15 +329,15 @@ traps:
     name: PULSESECURE-PSG-MIB::iveNetExternalInterfaceDownTrap
     category: state_change
     severity: warning
-    description: External interface down with reason {nicEvent} on {_HOSTNAME}.
+    description: External interface went down{{with value "nicEvent"}} reason {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - nicEvent
   - oid: 1.3.6.1.4.1.12532.251.32
     name: PULSESECURE-PSG-MIB::iveClusterDeleteTrap
-    category: state_change
+    category: config_change
     severity: notice
-    description: Cluster delete initiated by {nodeName} on {_HOSTNAME}.
+    description: Cluster delete initiated by {{value "nodeName"}} on {{hostname}}.
     status: current
     varbinds:
       - nodeName
@@ -345,7 +345,7 @@ traps:
     name: PULSESECURE-PSG-MIB::iveNetInternalInterfaceDownTrap
     category: state_change
     severity: warning
-    description: Internal interface went down with reason {nicEvent} on {_HOSTNAME}.
+    description: Internal interface went down on {{hostname}}.
     status: current
     varbinds:
       - nicEvent
@@ -353,7 +353,7 @@ traps:
     name: PULSESECURE-PSG-MIB::iveNetManagementInterfaceDownTrap
     category: state_change
     severity: warning
-    description: Management interface went down with reason {nicEvent} on {_HOSTNAME}.
+    description: Management interface went down{{with value "nicEvent"}} due to {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - nicEvent
@@ -361,7 +361,7 @@ traps:
     name: PULSESECURE-PSG-MIB::iveTemperatureNotify
     category: diagnostic
     severity: warning
-    description: Temperature {iveTemperature} exceeded threshold on {_HOSTNAME}.
+    description: Temperature threshold exceeded on MAG blade {{value "iveTemperature"}} on {{hostname}}.
     status: current
     varbinds:
       - iveTemperature
@@ -369,7 +369,7 @@ traps:
     name: PULSESECURE-PSG-MIB::iveVIPNodeChanged
     category: state_change
     severity: notice
-    description: VIP node changed to {nodeName} due to {vipChangeReason} on {_HOSTNAME}.
+    description: VIP node changed to {{value "nodeName"}} on {{hostname}}.
     status: current
     varbinds:
       - nodeName
@@ -378,7 +378,7 @@ traps:
     name: PULSESECURE-PSG-MIB::iveProcessesNearMaxLimit
     category: diagnostic
     severity: warning
-    description: Process {processName} count is approaching maximum limit on {_HOSTNAME}.
+    description: Process {{value "processName"}} is near maximum limit on {{hostname}}.
     status: current
     varbinds:
       - processName
@@ -386,7 +386,7 @@ traps:
     name: PULSESECURE-PSG-MIB::iveProcessesReachedMaxLimit
     category: diagnostic
     severity: warning
-    description: Process {processName} reached maximum limit on {_HOSTNAME}.
+    description: Process {{value "processName"}} reached maximum limit on {{hostname}}.
     status: current
     varbinds:
       - processName
@@ -394,15 +394,15 @@ traps:
     name: PULSESECURE-PSG-MIB::iveACLsNearMaxLimit
     category: diagnostic
     severity: warning
-    description: ACL entries reached {vpnACLSPercentage}% of maximum limit on {_HOSTNAME}.
+    description: ACL entries reached {{value "vpnACLSPercentage"}}% of maximum limit on {{hostname}}.
     status: current
     varbinds:
       - vpnACLSPercentage
   - oid: 1.3.6.1.4.1.12532.251.40
     name: PULSESECURE-PSG-MIB::iveACLsCrossedMaxLimit
-    category: diagnostic
+    category: security
     severity: warning
-    description: ACL entry count {vpnACLSCount} crossed maximum supported limit on {_HOSTNAME}.
+    description: ACL entry count {{value "vpnACLSCount"}} crossed maximum limit on {{hostname}}.
     status: current
     varbinds:
       - vpnACLSCount
@@ -410,7 +410,7 @@ traps:
     name: PULSESECURE-PSG-MIB::iveTooManyFailedLoginAttemptsIPv6
     category: auth
     severity: warning
-    description: Too many failed login attempts from IPv6 address {blockedIPv6} on {_HOSTNAME}.
+    description: Too many failed login attempts from IPv6 address {{value "blockedIPv6"}} on {{hostname}}.
     status: current
     varbinds:
       - blockedIPv6

@@ -133,7 +133,7 @@ traps:
     name: CYBER-ARK-MIB::osEventLogInfoNotification
     category: diagnostic
     severity: info
-    description: Event log info {osELEventId} from {osELEventSource} on {_HOSTNAME}.
+    description: OS event log info {{value "osELEventSource"}} {{value "osELEventDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - osELName
@@ -147,7 +147,7 @@ traps:
     name: CYBER-ARK-MIB::osCpuUsageNotification
     category: diagnostic
     severity: warning
-    description: CPU usage {osCpuUsage} with state {osCpuTrapState} on {_HOSTNAME}.
+    description: CPU usage is {{value "osCpuUsage"}}% with state {{value "osCpuTrapState"}} on {{hostname}}.
     status: current
     varbinds:
       - osCpuUsage
@@ -156,7 +156,7 @@ traps:
     name: CYBER-ARK-MIB::osMemoryUsageNotification
     category: diagnostic
     severity: warning
-    description: Physical memory state {osMemoryTrapState} with {osMemoryAvailKbPhysical} available on {_HOSTNAME}.
+    description: Physical memory usage notification received with state {{value "osMemoryTrapState"}} on {{hostname}}.
     status: current
     varbinds:
       - osMemoryTotalKbPhysical
@@ -168,7 +168,7 @@ traps:
     name: CYBER-ARK-MIB::osDiskFreeSpaceNotification
     category: diagnostic
     severity: warning
-    description: Disk free space on {osDiskDrive} is {osDiskFreeSpace} ({osDiskPercentageFreeSpace}%) with state {osDiskTrapState} on {_HOSTNAME}.
+    description: Disk free space alert on {{value "osDiskDrive"}} with {{value "osDiskPercentageFreeSpace"}}% free on {{hostname}}.
     status: current
     varbinds:
       - osDiskDrive
@@ -179,7 +179,7 @@ traps:
     name: CYBER-ARK-MIB::osServiceNameNotification
     category: state_change
     severity: warning
-    description: Service {osServiceName} state changed to {osServiceTrapState} on {_HOSTNAME}.
+    description: OS service {{value "osServiceName"}} state changed to {{value "osServiceTrapState"}} on {{hostname}}.
     status: current
     varbinds:
       - osServiceName
@@ -189,7 +189,7 @@ traps:
     name: CYBER-ARK-MIB::osSwapMemoryUsageNotification
     category: diagnostic
     severity: warning
-    description: Swap memory usage state {osMemoryTrapState} reported on {_HOSTNAME}.
+    description: Swap memory usage notification with state {{value "osMemoryTrapState"}} on {{hostname}}.
     status: current
     varbinds:
       - osMemoryTotalKbPhysical
@@ -199,9 +199,9 @@ traps:
       - osMemoryTrapState
   - oid: 1.3.6.1.4.1.11536.3.6.1000
     name: CYBER-ARK-MIB::paVaultLogInfoNotification
-    category: security
-    severity: notice
-    description: Vault log {paVaultLogName} recorded by {paVaultLogSource} on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Vault log info received from {{value "paVaultLogSource"}} on {{hostname}}.
     status: current
     varbinds:
       - paVaultLogRecord
@@ -211,7 +211,7 @@ traps:
     name: CYBER-ARK-MIB::paVaultServiceNameNotification
     category: diagnostic
     severity: warning
-    description: Service {osServiceName} status changed to {osServiceStatus} on {_HOSTNAME}.
+    description: Service {{value "osServiceName"}} status changed to {{value "osServiceStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - osServiceName
@@ -221,7 +221,7 @@ traps:
     name: CYBER-ARK-MIB::paCIFSLogInfoNotification
     category: diagnostic
     severity: info
-    description: CIFS log info from {paCIFSLogSource} recorded as {paCIFSLogRecord} on {_HOSTNAME}.
+    description: CIFS log info received{{with value "paCIFSLogName"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - paCIFSLogRecord
@@ -231,7 +231,7 @@ traps:
     name: CYBER-ARK-MIB::osCIFSServiceNameNotification
     category: state_change
     severity: notice
-    description: Service {osServiceName} status changed to {osServiceStatus} on {_HOSTNAME}.
+    description: Service {{value "osServiceName"}} status changed to {{value "osServiceStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - osServiceName
@@ -240,7 +240,7 @@ traps:
     name: CYBER-ARK-MIB::paFTPLogInfoNotification
     category: diagnostic
     severity: info
-    description: FTP log info {paFTPLogRecord} from {paFTPLogSource} on {_HOSTNAME}.
+    description: 'FTP log info received{{with value "paFTPLogRecord"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - paFTPLogRecord
@@ -250,7 +250,7 @@ traps:
     name: CYBER-ARK-MIB::paSMTPLogInfoNotification
     category: diagnostic
     severity: info
-    description: SMTP log info {paSMTPLogName} from {paSMTPLogSource} on {_HOSTNAME}.
+    description: SMTP log info received from {{value "paSMTPLogSource"}} on {{hostname}}.
     status: current
     varbinds:
       - paSMTPLogRecord
@@ -260,7 +260,7 @@ traps:
     name: CYBER-ARK-MIB::paDRLogInfoNotification
     category: diagnostic
     severity: info
-    description: Disaster recovery log {paDRLogName} from {paDRLogSource} recorded {paDRLogRecord} on {_HOSTNAME}.
+    description: Cyber-Ark DR log {{value "paDRLogName"}} recorded {{value "paDRLogRecord"}} on {{hostname}}.
     status: current
     varbinds:
       - paDRLogName
@@ -270,7 +270,7 @@ traps:
     name: CYBER-ARK-MIB::osDRServiceNameNotification
     category: state_change
     severity: notice
-    description: Service {osServiceName} state changed to {osServiceTrapState} on {_HOSTNAME}.
+    description: Service {{value "osServiceName"}} status changed to {{value "osServiceStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - osServiceName
@@ -280,7 +280,7 @@ traps:
     name: CYBER-ARK-MIB::paCVMLogInfoNotification
     category: diagnostic
     severity: info
-    description: CyberArk CVM log info {paCVMLogRecord} from {paCVMLogSource} on {_HOSTNAME}.
+    description: 'CVM log info received{{with value "paCVMLogRecord"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - paCVMLogName
@@ -288,9 +288,9 @@ traps:
       - paCVMLogRecord
   - oid: 1.3.6.1.4.1.11536.3.6.6001
     name: CYBER-ARK-MIB::osCVMServiceNameNotification
-    category: diagnostic
-    severity: warning
-    description: Service {osServiceName} reported status {osServiceStatus} with state {osServiceTrapState} on {_HOSTNAME}.
+    category: state_change
+    severity: notice
+    description: Service {{value "osServiceName"}} status changed to {{value "osServiceStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - osServiceName

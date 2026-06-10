@@ -13,24 +13,24 @@ traps:
   - oid: 1.3.6.1.4.1.48328.3.9.1.3
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsfanTrap
     category: diagnostic
-    severity: err
-    description: Fan failure detected on {vrtssystemName} on {_HOSTNAME}.
+    severity: crit
+    description: Fan failure detected on {{first (value "vrtssystemName") "system"}} on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.1.4
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtspowerTrap
     category: diagnostic
-    severity: crit
-    description: Power failure detected on {vrtssystemName} on {_HOSTNAME}.
+    severity: alert
+    description: Power failure detected on {{first (value "vrtssystemName") "system"}} on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.1.5
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsfibrechannelTrap
     category: diagnostic
-    severity: err
-    description: FibreChannel failure reported by {vrtssystemName} on {_HOSTNAME}.
+    severity: warning
+    description: FibreChannel failure detected on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
@@ -38,71 +38,71 @@ traps:
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtstemperatureTrap
     category: diagnostic
     severity: warning
-    description: Temperature failure detected on system {vrtssystemName} on {_HOSTNAME}.
+    description: Temperature failure detected on {{first (value "vrtssystemName") "system"}} on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.1.7
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtscpuTrap
     category: diagnostic
-    severity: err
-    description: CPU failure detected on {vrtssystemName} on {_HOSTNAME}.
+    severity: crit
+    description: CPU failure detected on {{first (value "vrtssystemName") "system"}} on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.1.8
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsdiskTrap
     category: diagnostic
-    severity: err
-    description: Disk failure detected on {vrtssystemName} on {_HOSTNAME}.
+    severity: crit
+    description: Disk failure detected on {{value "vrtssystemName"}} on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.1.9
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsraidgroupTrap
     category: diagnostic
-    severity: err
-    description: Raid failure reported by {vrtssystemName} on {_HOSTNAME}.
+    severity: crit
+    description: RAID group failure detected on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.1.10
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsenclosurefanTrap
     category: diagnostic
-    severity: err
-    description: Enclosure fan failure detected on {_HOSTNAME}.
+    severity: alert
+    description: Enclosure fan failure detected on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.1.11
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsenclosurepowerTrap
     category: diagnostic
-    severity: err
-    description: Enclosure power failure detected on {_HOSTNAME}.
+    severity: alert
+    description: Enclosure power failure detected on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.1.12
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsenclosuretemperatureTrap
     category: diagnostic
-    severity: err
-    description: Enclosure temperature failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Enclosure temperature failure detected{{with value "vrtssystemName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.1.13
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsenclosurediskTrap
     category: diagnostic
-    severity: err
-    description: Enclosure disk failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Enclosure disk failure detected on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.1.14
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsadapterTrap
     category: diagnostic
-    severity: err
-    description: Traps adapter failure reported on {_HOSTNAME}.
+    severity: crit
+    description: Traps adapter failure detected on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
@@ -110,47 +110,47 @@ traps:
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsfirmwareTrap
     category: diagnostic
     severity: err
-    description: Firmware failure detected on {vrtssystemName} on {_HOSTNAME}.
+    description: Firmware failure detected on {{value "vrtssystemName"}} on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.1.16
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtspciTrap
     category: diagnostic
-    severity: err
-    description: PCI failure detected on {vrtssystemName} on {_HOSTNAME}.
+    severity: crit
+    description: PCI failure detected on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.1.17
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsnetworkcardTrap
     category: diagnostic
-    severity: err
-    description: Network card failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Network card failure detected on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.1.18
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsvolumeTrap
     category: diagnostic
-    severity: err
-    description: Volume failure detected on {vrtssystemName} on {_HOSTNAME}.
+    severity: crit
+    description: Volume failure detected on {{value "vrtssystemName"}} on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.1.19
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsbbuTrap
     category: diagnostic
-    severity: err
-    description: BBU failure detected on {vrtssystemName} on {_HOSTNAME}.
+    severity: alert
+    description: BBU failure detected on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.1.20
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsconnectionTrap
     category: diagnostic
-    severity: err
-    description: Connection failure detected for system {vrtssystemName} on {_HOSTNAME}.
+    severity: warning
+    description: Veritas connection failure detected{{with value "vrtssystemName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
@@ -158,23 +158,23 @@ traps:
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtspartitionTrap
     category: diagnostic
     severity: warning
-    description: Partition alert triggered for system {vrtssystemName} on {_HOSTNAME}.
+    description: Partition alert triggered{{with value "vrtssystemName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.1.22
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsstoragestatusTrap
     category: diagnostic
-    severity: err
-    description: Storage array health status failure reported on {vrtssystemName} on {_HOSTNAME}.
+    severity: crit
+    description: Storage array health status failure detected{{with value "vrtssystemName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.1.23
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsdimmTrap
     category: diagnostic
-    severity: err
-    description: DIMM failure detected on {vrtssystemName} on {_HOSTNAME}.
+    severity: crit
+    description: DIMM failure detected on {{first (value "vrtssystemName") "system"}} on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
@@ -182,7 +182,7 @@ traps:
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsiscsiTrap
     category: diagnostic
     severity: err
-    description: iSCSI failure detected on {vrtssystemName} on {_HOSTNAME}.
+    description: iSCSI failure detected on {{value "vrtssystemName"}} on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
@@ -190,7 +190,7 @@ traps:
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsethernetTrap
     category: diagnostic
     severity: err
-    description: Ethernet failure detected on {_HOSTNAME}.
+    description: Ethernet failure detected on {{first (value "vrtssystemName") "system"}} on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
@@ -198,15 +198,15 @@ traps:
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsfailedJobsTrap
     category: diagnostic
     severity: warning
-    description: Job failures detected on {vrtssystemName} on {_HOSTNAME}.
+    description: Veritas job failures detected on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.2.2
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsprocessTrap
     category: diagnostic
-    severity: crit
-    description: Process stopped on {vrtssystemName} on {_HOSTNAME}.
+    severity: alert
+    description: Veritas processes stopped on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
@@ -214,23 +214,23 @@ traps:
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsdiskSpaceTrap
     category: diagnostic
     severity: warning
-    description: Low disk space detected on {vrtssystemName} on {_HOSTNAME}.
+    description: Low disk space detected on {{first (value "vrtssystemName") "system"}} on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.2.4
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtssoftwareUpdateSuccessTrap
-    category: config_change
-    severity: notice
-    description: Software update completed successfully on {_HOSTNAME}.
+    category: diagnostic
+    severity: info
+    description: Software update succeeded on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.2.5
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtssoftwareUpdateFailedRollbackSuccessTrap
     category: diagnostic
-    severity: err
-    description: Software update failed but rollback succeeded on {_HOSTNAME}.
+    severity: alert
+    description: Software update failed but rollback succeeded on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
@@ -238,7 +238,7 @@ traps:
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtssoftwareUpdateFailedRollbackFailedTrap
     category: diagnostic
     severity: crit
-    description: Software update and rollback failed on {_HOSTNAME}.
+    description: Software update and rollback failed on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
@@ -246,23 +246,23 @@ traps:
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsrollbackSuccessTrap
     category: config_change
     severity: notice
-    description: Software rollback completed successfully on {_HOSTNAME}.
+    description: Software rollback succeeded on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.2.8
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsrollbackFailedTrap
     category: diagnostic
-    severity: err
-    description: Software rollback failed on {_HOSTNAME}.
+    severity: crit
+    description: Software rollback failed on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.2.9
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsclusterStateTrap
-    category: diagnostic
-    severity: crit
-    description: Cluster node {vrtssystemName} failed on {_HOSTNAME}.
+    category: state_change
+    severity: alert
+    description: Cluster node failed on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
@@ -270,7 +270,7 @@ traps:
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsdiskPerfTrap
     category: diagnostic
     severity: warning
-    description: Disk performance alert from {vrtssystemName} on {_HOSTNAME}.
+    description: Disk performance alert on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
@@ -278,15 +278,15 @@ traps:
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtscollectorserviceTrap
     category: diagnostic
     severity: err
-    description: Collector plugin loading failed on {_HOSTNAME}.
+    description: Collector plugin loading failed on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName
   - oid: 1.3.6.1.4.1.48328.3.9.2.12
     name: VERITAS-APPLIANCE-MONITORING-MIB::vrtsassetTagTrap
     category: diagnostic
-    severity: info
-    description: Asset tag information received for system {vrtssystemName} on {_HOSTNAME}.
+    severity: notice
+    description: Asset tag information reported for {{first (value "vrtssystemName") "system"}} on {{hostname}}.
     status: current
     varbinds:
       - vrtssystemName

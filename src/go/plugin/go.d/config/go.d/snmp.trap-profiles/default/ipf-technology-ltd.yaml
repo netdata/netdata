@@ -41,7 +41,7 @@ traps:
     name: VOLIUS-OA-MIB::vlsEventTrap
     category: diagnostic
     severity: warning
-    description: Event code {vlsLastEventCode} reported on {_HOSTNAME}.
+    description: VOLIUS event occurred with code {{value "vlsLastEventCode"}} on {{hostname}}.
     status: current
     varbinds:
       - vlsLastEventCode

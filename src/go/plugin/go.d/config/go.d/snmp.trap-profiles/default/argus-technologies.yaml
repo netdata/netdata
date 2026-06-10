@@ -100,7 +100,7 @@ traps:
     name: Argus-MIB::dcPwrSysAlarmActiveTrap
     category: diagnostic
     severity: warning
-    description: DC power system alarm {dcPwrSysRectAlrmStringValue} with severity {dcPwrSysRectAlrmSeverity} became active on {_HOSTNAME}.
+    description: 'DC power system alarm active{{with value "dcPwrSysRectAlrmStringValue"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - dcPwrSysRectAlrmStringValue
@@ -110,9 +110,9 @@ traps:
       - dcPwrSysAlarmTriggerValue
   - oid: 1.3.6.1.4.1.7309.4.1.3.0.2
     name: Argus-MIB::dcPwrSysAlarmClearedTrap
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: DC power system alarm cleared for rectifier index {dcPwrSysRectAlrmIndex} on {_HOSTNAME}.
+    description: DC power system alarm cleared{{with value "dcPwrSysRectAlrmStringValue"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - dcPwrSysRectAlrmStringValue
@@ -122,9 +122,9 @@ traps:
       - dcPwrSysAlarmTriggerValue
   - oid: 1.3.6.1.4.1.7309.4.1.3.0.3
     name: Argus-MIB::dcPwrSysRelayTrap
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: DC power relay {dcPwrSysRelayIndex} reported severity {dcPwrSysRelaySeverity} on {_HOSTNAME}.
+    description: DC power system relay state changed at index {{value "dcPwrSysRelayIndex"}} on {{hostname}}.
     status: current
     varbinds:
       - dcPwrSysRelayIntegerValue
@@ -136,15 +136,15 @@ traps:
     name: Argus-MIB::dcPwrSysComOKTrap
     category: state_change
     severity: notice
-    description: DC power system communications established for site {dcPwrSysSiteName} on {_HOSTNAME}.
+    description: DC power system communication established{{with value "dcPwrSysSiteName"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - dcPwrSysSiteName
   - oid: 1.3.6.1.4.1.7309.4.1.3.0.5
     name: Argus-MIB::dcPwrSysComErrTrap
     category: diagnostic
-    severity: err
-    description: Communication with DC power system controller lost at {dcPwrSysSiteName} on {_HOSTNAME}.
+    severity: crit
+    description: DC power system communication lost{{with value "dcPwrSysSiteName"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - dcPwrSysSiteName
@@ -152,15 +152,15 @@ traps:
     name: Argus-MIB::dcPwrSysAgentStartupTrap
     category: diagnostic
     severity: notice
-    description: Agent software started up at {dcPwrSysSiteName} on {_HOSTNAME}.
+    description: Power system agent software started up{{with value "dcPwrSysSiteName"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - dcPwrSysSiteName
   - oid: 1.3.6.1.4.1.7309.4.1.3.0.7
     name: Argus-MIB::dcPwrSysAgentShutdownTrap
     category: diagnostic
-    severity: crit
-    description: Agent software shutdown detected at site {dcPwrSysSiteName} on {_HOSTNAME}.
+    severity: alert
+    description: Power system agent software has shut down{{with value "dcPwrSysSiteName"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - dcPwrSysSiteName
@@ -168,7 +168,7 @@ traps:
     name: Argus-MIB::dcPwrSysMajorAlarmActiveTrap
     category: diagnostic
     severity: crit
-    description: DC power system major alarm {dcPwrSysRectAlrmStringValue} with severity {dcPwrSysRectAlrmSeverity} on {_HOSTNAME}.
+    description: 'DC power system major alarm active{{with value "dcPwrSysRectAlrmStringValue"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - dcPwrSysRectAlrmStringValue
@@ -177,9 +177,9 @@ traps:
       - dcPwrSysSiteName
   - oid: 1.3.6.1.4.1.7309.4.1.3.0.9
     name: Argus-MIB::dcPwrSysMajorAlarmClearedTrap
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: DC power system major alarm cleared on {_HOSTNAME}.
+    description: DC power system major alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - dcPwrSysRectAlrmStringValue
@@ -190,7 +190,7 @@ traps:
     name: Argus-MIB::dcPwrSysMinorAlarmActiveTrap
     category: diagnostic
     severity: warning
-    description: DC power system minor alarm active with severity {dcPwrSysRectAlrmSeverity} on {_HOSTNAME}.
+    description: 'DC power system minor alarm active{{with value "dcPwrSysRectAlrmStringValue"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - dcPwrSysRectAlrmStringValue
@@ -199,9 +199,9 @@ traps:
       - dcPwrSysSiteName
   - oid: 1.3.6.1.4.1.7309.4.1.3.0.11
     name: Argus-MIB::dcPwrSysMinorAlarmClearedTrap
-    category: diagnostic
+    category: state_change
     severity: notice
-    description: DC power system minor alarm cleared on {_HOSTNAME}.
+    description: DC power system minor alarm cleared on {{hostname}}.
     status: current
     varbinds:
       - dcPwrSysRectAlrmStringValue
@@ -212,7 +212,7 @@ traps:
     name: Argus-Power-System-MIB::upsAlarmTrap
     category: diagnostic
     severity: warning
-    description: UPS alarm triggered with {upsExtraName} value {upsExtraStringValue} on {_HOSTNAME}.
+    description: UPS alarm state changed{{with value "upsExtraName"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - upsExtraIntegerValue
@@ -221,17 +221,17 @@ traps:
       - upsExtraName
   - oid: 1.3.6.1.4.1.7309.6.1.7.0.2
     name: Argus-Power-System-MIB::upsAgentStartupTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: UPS agent software started up on {_HOSTNAME}.
+    description: UPS agent software started up{{with value "upsIdentSiteName"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - upsIdentSiteName
   - oid: 1.3.6.1.4.1.7309.6.1.7.0.3
     name: Argus-Power-System-MIB::upsAgentShutdownTrap
-    category: state_change
-    severity: notice
-    description: UPS agent software shutdown at {upsIdentSiteName} on {_HOSTNAME}.
+    category: diagnostic
+    severity: alert
+    description: UPS agent software has shutdown{{with value "upsIdentSiteName"}} at {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - upsIdentSiteName
@@ -239,7 +239,7 @@ traps:
     name: Argus-Power-System-MIB::upsAgentFaultTrap
     category: diagnostic
     severity: warning
-    description: UPS fault detected with {upsExtraName} ({upsExtraStringValue}) on {_HOSTNAME}.
+    description: UPS fault detected{{with value "upsExtraName"}} on {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - upsExtraIntegerValue
@@ -250,7 +250,7 @@ traps:
     name: Argus-Power-System-MIB::upsAgentEventTrap
     category: state_change
     severity: notice
-    description: UPS event state changed with {upsExtraName}={upsExtraStringValue} on {_HOSTNAME}.
+    description: 'UPS event state changed{{with value "upsExtraName"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - upsExtraIntegerValue
@@ -261,7 +261,7 @@ traps:
     name: ALPHA-NOTIFICATION-MIB::alphaAlarmActiveState
     category: diagnostic
     severity: warning
-    description: Alarm {alarmModelDescription} raised on {componentListStaticName} with severity {alarmSeverity} on {_HOSTNAME}.
+    description: Alarm raised for {{value "alarmModelDescription"}} on {{value "componentListStaticName"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmActiveModelPointer
@@ -278,7 +278,7 @@ traps:
     name: ALPHA-NOTIFICATION-MIB::alphaAlarmClearState
     category: state_change
     severity: notice
-    description: Alarm {alarmModelDescription} cleared for resource {alarmActiveResourceId} on {_HOSTNAME}.
+    description: Alarm cleared for {{value "alarmModelDescription"}} on {{hostname}}.
     status: current
     varbinds:
       - alarmActiveModelPointer

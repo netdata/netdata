@@ -180,7 +180,7 @@ traps:
     name: ANUE-MIB::anueSnmpAuthenticationFailure
     category: auth
     severity: warning
-    description: SNMP authentication failure for user {anueSnmpAuthnFailureUsername} from {anueSnmpAuthnFailureSrcIp} on {_HOSTNAME}.
+    description: SNMP authentication failure for {{value "anueSnmpAuthnFailureUsername"}} from {{value "anueSnmpAuthnFailureSrcIp"}} on {{hostname}}.
     status: current
     varbinds:
       - anueSnmpAuthnFailureTime
@@ -192,7 +192,7 @@ traps:
     name: ANUE-MIB::anueClientLoginFailure
     category: auth
     severity: warning
-    description: Client login failure for {anueClientLoginFailureId} from {anueClientLoginFailureSrcIp} on {_HOSTNAME}.
+    description: Anue client login failure for {{value "anueClientLoginFailureId"}} from {{value "anueClientLoginFailureSrcIp"}} on {{hostname}}.
     status: current
     varbinds:
       - anueClientLoginFailureTime
@@ -204,7 +204,7 @@ traps:
     name: ANUE-MIB::anueNtoEventMonStatInvalidCount
     category: diagnostic
     severity: warning
-    description: Invalid packet counter {anueNtoEventMonDataTriggerValue} exceeded threshold {anueNtoEventMonDataThreshold} for {anueNtoEventMonDataStatName} on {_HOSTNAME}.
+    description: Invalid packet counter {{value "anueNtoEventMonDataStatName"}} exceeded threshold on {{hostname}}.
     status: current
     varbinds:
       - anueNtoEventMonDataDateAndTime
@@ -221,7 +221,7 @@ traps:
     name: ANUE-MIB::anueNtoEventMonStatDropCount
     category: diagnostic
     severity: warning
-    description: Dropped packet counter {anueNtoEventMonDataStatName} exceeded threshold {anueNtoEventMonDataThreshold} on {_HOSTNAME}.
+    description: Dropped packet counter exceeded threshold for {{value "anueNtoEventMonDataStatName"}} on {{hostname}}.
     status: current
     varbinds:
       - anueNtoEventMonDataDateAndTime
@@ -236,9 +236,9 @@ traps:
       - anueNtoEventMonDataWindowCount
   - oid: 1.3.6.1.4.1.32620.2.1.5
     name: ANUE-MIB::anueNtoEventMonStatRxUtilization
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Receive utilization {anueNtoEventMonDataStatName} for {anueNtoEventMonDataEntityName} crossed threshold {anueNtoEventMonDataTriggerValue} on {_HOSTNAME}.
+    description: Receive utilization threshold crossed for {{value "anueNtoEventMonDataStatName"}} on {{value "anueNtoEventMonDataEntityName"}} on {{hostname}}.
     status: current
     varbinds:
       - anueNtoEventMonDataDateAndTime
@@ -254,9 +254,9 @@ traps:
       - anueNtoEventMonDataWindowCount
   - oid: 1.3.6.1.4.1.32620.2.1.6
     name: ANUE-MIB::anueNtoEventMonStatTxUtilization
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Transmit utilization {anueNtoEventMonDataStatName} on {anueNtoEventMonDataEntityName} crossed threshold {anueNtoEventMonDataThreshold} on {_HOSTNAME}.
+    description: Transmit utilization threshold crossed for {{value "anueNtoEventMonDataEntityName"}} on {{hostname}}.
     status: current
     varbinds:
       - anueNtoEventMonDataDateAndTime
@@ -273,8 +273,8 @@ traps:
   - oid: 1.3.6.1.4.1.32620.2.1.7
     name: ANUE-MIB::anueNtoEventTest
     category: diagnostic
-    severity: notice
-    description: SNMP configuration test notification {anueNtoEventTestMessage} generated on {_HOSTNAME}.
+    severity: info
+    description: 'SNMP configuration test notification received{{with value "anueNtoEventTestMessage"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - anueNtoEventTestTime
@@ -283,7 +283,7 @@ traps:
     name: ANUE-MIB::anueNtoEventUnionMemberAction
     category: state_change
     severity: notice
-    description: Union member {anueMemberActionDataMemberName} action {anueMemberActionDataType} occurred on {_HOSTNAME}.
+    description: Union member {{value "anueMemberActionDataMemberName"}} action occurred on {{hostname}}.
     status: current
     varbinds:
       - anueNtoEventMonDataDateAndTime
@@ -293,7 +293,7 @@ traps:
     name: ANUE-MIB::anueNtoEventMonStatLoadDistribution
     category: diagnostic
     severity: warning
-    description: Tool port {anueNtoEventMonDataEntityName} load distribution threshold {anueNtoEventMonDataTriggerValue} exceeded on {_HOSTNAME}.
+    description: Tool port load distribution threshold crossed on {{hostname}}.
     status: current
     varbinds:
       - anueNtoEventMonDataDateAndTime
@@ -311,7 +311,7 @@ traps:
     name: ANUE-MIB::anueGscEventMonStatOverflowPkts
     category: diagnostic
     severity: warning
-    description: Packet drop threshold exceeded for {anueNtoEventMonDataStatName} on entity {anueNtoEventMonDataEntityName} on {_HOSTNAME}.
+    description: Ingress buffer overflow dropped packets on {{value "anueNtoEventMonDataEntityName"}} on {{hostname}}.
     status: current
     varbinds:
       - anueNtoEventMonDataDateAndTime
@@ -328,7 +328,7 @@ traps:
     name: ANUE-MIB::anueGscEventMonStatControlPlanePktRate
     category: diagnostic
     severity: warning
-    description: GTP-C packet rate {anueNtoEventMonDataTriggerValue} exceeded threshold {anueNtoEventMonDataThreshold} for {anueNtoEventMonDataStatName} on {_HOSTNAME}.
+    description: GTP-C packet rate exceeded threshold on {{value "anueNtoEventMonDataEntityName"}} on {{hostname}}.
     status: current
     varbinds:
       - anueNtoEventMonDataDateAndTime
@@ -343,9 +343,9 @@ traps:
       - anueNtoEventMonDataWindowCount
   - oid: 1.3.6.1.4.1.32620.2.2.3
     name: ANUE-MIB::anueGscEventMonStatExcessSessions
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Statistic {anueNtoEventMonDataStatName} value {anueNtoEventMonDataTriggerValue} exceeded threshold {anueNtoEventMonDataThreshold} on {_HOSTNAME}.
+    description: Excess sessions threshold crossed for {{value "anueNtoEventMonDataStatName"}} on {{hostname}}.
     status: current
     varbinds:
       - anueNtoEventMonDataDateAndTime
@@ -363,7 +363,7 @@ traps:
     name: ANUE-MIB::anueGscEventMonStatIngressPktDrops
     category: diagnostic
     severity: warning
-    description: Ingress packet drops for {anueNtoEventMonDataStatName} on {anueNtoEventMonDataEntityName} crossed threshold {anueNtoEventMonDataThreshold} on {_HOSTNAME}.
+    description: Ingress packet drops exceeded threshold for {{value "anueNtoEventMonDataStatName"}} on {{value "anueNtoEventMonDataEntityName"}} on {{hostname}}.
     status: current
     varbinds:
       - anueNtoEventMonDataDateAndTime
@@ -381,7 +381,7 @@ traps:
     name: ANUE-MIB::anueGscEventMonStatSessionsTableLoad
     category: diagnostic
     severity: warning
-    description: Statistic {anueNtoEventMonDataStatName} value {anueNtoEventMonDataTriggerValue} crossed threshold {anueNtoEventMonDataThreshold} on {_HOSTNAME}.
+    description: Event monitor threshold crossed for {{value "anueNtoEventMonDataStatName"}} on {{value "anueNtoEventMonDataEntityName"}} on {{hostname}}.
     status: current
     varbinds:
       - anueNtoEventMonDataDateAndTime
@@ -397,9 +397,9 @@ traps:
       - anueNtoEventMonDataWindowCount
   - oid: 1.3.6.1.4.1.32620.2.2.6
     name: ANUE-MIB::anueGscEventMonStatNetworkElemLoad
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Statistic {anueNtoEventMonDataStatName} on {anueNtoEventMonDataEntityName} crossed threshold {anueNtoEventMonDataThreshold} on {_HOSTNAME}.
+    description: Threshold crossed for {{value "anueNtoEventMonDataStatName"}} on {{value "anueNtoEventMonDataEntityName"}} on {{hostname}}.
     status: current
     varbinds:
       - anueNtoEventMonDataDateAndTime
@@ -415,9 +415,9 @@ traps:
       - anueNtoEventMonDataWindowCount
   - oid: 1.3.6.1.4.1.32620.2.2.7
     name: ANUE-MIB::anueGscEventMonStatReqRespLoad
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Statistic {anueNtoEventMonDataStatName} on {anueNtoEventMonDataEntityName} crossed threshold {anueNtoEventMonDataThreshold} with value {anueNtoEventMonDataTriggerValue} on {_HOSTNAME}.
+    description: Threshold crossed for {{value "anueNtoEventMonDataStatName"}} on {{value "anueNtoEventMonDataEntityName"}} on {{hostname}}.
     status: current
     varbinds:
       - anueNtoEventMonDataDateAndTime
@@ -435,7 +435,7 @@ traps:
     name: ANUE-MIB::anueGscEventMonStatFragmentationLoad
     category: diagnostic
     severity: warning
-    description: Fragmentation load threshold crossed for {anueNtoEventMonDataStatName} on {anueNtoEventMonDataEntityName} on {_HOSTNAME}.
+    description: Fragmentation load threshold crossed for {{value "anueNtoEventMonDataStatName"}} on {{hostname}}.
     status: current
     varbinds:
       - anueNtoEventMonDataDateAndTime
@@ -453,7 +453,7 @@ traps:
     name: ANUE-MIB::anueGscCriticalFailure
     category: diagnostic
     severity: crit
-    description: GSC critical failure {anueCriticalFailureType} occurred on {_HOSTNAME}.
+    description: GSC critical failure {{value "anueCriticalFailureType"}} occurred on {{hostname}}.
     status: current
     varbinds:
       - anueCriticalFailureDateAndTime
@@ -461,8 +461,8 @@ traps:
   - oid: 1.3.6.1.4.1.32620.2.2.10
     name: ANUE-MIB::anueGscProbeFailure
     category: diagnostic
-    severity: err
-    description: GSC probe {anueGscEvFailedPbName} failed on {_HOSTNAME}.
+    severity: warning
+    description: GSC probe {{value "anueGscEvFailedPbName"}} failed on {{hostname}}.
     status: current
     varbinds:
       - anueGscEvFailedPbDateAndTime

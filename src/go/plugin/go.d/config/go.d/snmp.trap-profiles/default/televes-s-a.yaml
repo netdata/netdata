@@ -1346,8 +1346,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.1
     name: TREDESS-FS-MIB::faultSummationTrap
     category: diagnostic
-    severity: warning
-    description: Fault summation event {eventTrapLogId} with status {eventFinalStatus} on {_HOSTNAME}.
+    severity: crit
+    description: 'Fault summation occurred{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - faultSummationStatus
@@ -1361,7 +1361,7 @@ traps:
     name: TREDESS-FS-MIB::warningSummationTrap
     category: diagnostic
     severity: warning
-    description: Warning summation event {eventTrapLogId} with status {warningSummationStatus} on {_HOSTNAME}.
+    description: 'Warning summation trap received{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - warningSummationStatus
@@ -1375,7 +1375,7 @@ traps:
     name: TREDESS-FS-MIB::amplifierSumTrap
     category: diagnostic
     severity: warning
-    description: Amplifier status {amplifierStatus} changed to {eventFinalStatus} with ID {eventTrapLogId} on {_HOSTNAME}.
+    description: Amplifier status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - amplifierStatus
@@ -1389,7 +1389,7 @@ traps:
     name: TREDESS-FS-MIB::exceededOutputPowerTrap
     category: diagnostic
     severity: warning
-    description: Exceeded output power {exceededOutputPower} on {_HOSTNAME}.
+    description: 'Exceeded output power detected{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - exceededOutputPower
@@ -1403,7 +1403,7 @@ traps:
     name: TREDESS-FS-MIB::decreasedOutputPowerTrap
     category: diagnostic
     severity: warning
-    description: Decreased output power detected on redundancy {redundancyId} on {_HOSTNAME}.
+    description: 'Decreased output power detected{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - decreasedOutputPower
@@ -1417,7 +1417,7 @@ traps:
     name: TREDESS-FS-MIB::reflectedPowerTrap
     category: diagnostic
     severity: warning
-    description: Reflected power status {reflectPowerStatus} on redundancy {redundancyId} on {_HOSTNAME}.
+    description: Reflected power {{value "reflectPowerStatus"}} detected on {{hostname}}.
     status: current
     varbinds:
       - reflectPowerStatus
@@ -1431,7 +1431,7 @@ traps:
     name: TREDESS-FS-MIB::temperatureAmplifierTrap
     category: diagnostic
     severity: warning
-    description: Temperature amplifier {temperatureAmplifierStatus} reported status on {_HOSTNAME}.
+    description: Temperature amplifier status changed to {{value "temperatureAmplifierStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - temperatureAmplifierStatus
@@ -1445,7 +1445,7 @@ traps:
     name: TREDESS-FS-MIB::asiInputTrap
     category: diagnostic
     severity: warning
-    description: ASI input status {asiInputStatus} with event ID {eventTrapLogId} on {_HOSTNAME}.
+    description: ASI input status changed to {{value "asiInputStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - asiInputStatus
@@ -1458,8 +1458,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.9
     name: TREDESS-FS-MIB::asi1ErrorTrap
     category: diagnostic
-    severity: err
-    description: ASI 1 error {asi1ErrorStatus} with log ID {eventTrapLogId} on {_HOSTNAME}.
+    severity: warning
+    description: ASI 1 error {{value "asi1ErrorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - asi1ErrorStatus
@@ -1472,8 +1472,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.10
     name: TREDESS-FS-MIB::asi2ErrorTrap
     category: diagnostic
-    severity: err
-    description: ASI 2 error {asi2ErrorStatus} with log ID {eventTrapLogId} on {_HOSTNAME}.
+    severity: warning
+    description: ASI 2 error {{value "asi2ErrorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - asi2ErrorStatus
@@ -1487,7 +1487,7 @@ traps:
     name: TREDESS-FS-MIB::ipInputSumTrap
     category: diagnostic
     severity: warning
-    description: IP input alarm status {ipInputAlarmStatus} with event ID {eventTrapLogId} on {_HOSTNAME}.
+    description: IP input alarm {{value "ipInputAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ipInputAlarmStatus
@@ -1500,8 +1500,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.12
     name: TREDESS-FS-MIB::ipSocket1ErrorTrap
     category: diagnostic
-    severity: err
-    description: IP socket 1 error with status {ipSocket1ErrorStatus} on {_HOSTNAME}.
+    severity: warning
+    description: IP socket 1 error {{value "ipSocket1ErrorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ipSocket1ErrorStatus
@@ -1515,7 +1515,7 @@ traps:
     name: TREDESS-FS-MIB::ipSocket2ErrorTrap
     category: diagnostic
     severity: warning
-    description: IP socket 2 error reported with status {ipSocket2ErrorStatus} on {_HOSTNAME}.
+    description: 'IP socket 2 error occurred{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - ipSocket2ErrorStatus
@@ -1529,7 +1529,7 @@ traps:
     name: TREDESS-FS-MIB::satReceiver1Trap
     category: diagnostic
     severity: warning
-    description: Satellite Receiver 1 status changed to {eventFinalStatus} on {_HOSTNAME}.
+    description: Satellite Receiver 1 status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - satReceiver1Status
@@ -1543,7 +1543,7 @@ traps:
     name: TREDESS-FS-MIB::unlockSatReceiver1Trap
     category: state_change
     severity: notice
-    description: Satellite receiver 1 unlock status changed to {eventFinalStatus} on {_HOSTNAME}.
+    description: Satellite receiver 1 unlocked{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - unlockSatReceiver1Status
@@ -1557,7 +1557,7 @@ traps:
     name: TREDESS-FS-MIB::rfSignalSatReceiver1Trap
     category: diagnostic
     severity: warning
-    description: RF signal satellite receiver 1 status changed to {rfSignalSatReceiver1Status} on {_HOSTNAME}.
+    description: RF signal satellite receiver 1 status changed to {{value "rfSignalSatReceiver1Status"}} on {{hostname}}.
     status: current
     varbinds:
       - rfSignalSatReceiver1Status
@@ -1571,7 +1571,7 @@ traps:
     name: TREDESS-FS-MIB::lnbOverloadSatReceiver1Trap
     category: diagnostic
     severity: warning
-    description: LNB overload detected on Satellite Receiver 1 with status {lnbOverloadSatReceiver1Status} on {_HOSTNAME}.
+    description: LNB overload detected on Satellite Receiver 1 on {{hostname}}.
     status: current
     varbinds:
       - lnbOverloadSatReceiver1Status
@@ -1585,7 +1585,7 @@ traps:
     name: TREDESS-FS-MIB::temperatureSatReceiver1Trap
     category: diagnostic
     severity: warning
-    description: Temperature satellite receiver 1 status changed to {eventFinalStatus} on {_HOSTNAME}.
+    description: Temperature satellite receiver 1 status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - temperatureSatReceiver1Status
@@ -1599,7 +1599,7 @@ traps:
     name: TREDESS-FS-MIB::satReceiver2Trap
     category: diagnostic
     severity: warning
-    description: Satellite receiver 2 status changed to {satReceiver2Status} on {_HOSTNAME}.
+    description: Satellite receiver 2 status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - satReceiver2Status
@@ -1613,7 +1613,7 @@ traps:
     name: TREDESS-FS-MIB::unlockSatReceiver2Trap
     category: state_change
     severity: notice
-    description: Satellite receiver 2 status changed to {eventFinalStatus} on {_HOSTNAME}.
+    description: Satellite receiver 2 unlocked{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - unlockSatReceiver2Status
@@ -1627,7 +1627,7 @@ traps:
     name: TREDESS-FS-MIB::rfSignalSatReceiver2Trap
     category: diagnostic
     severity: warning
-    description: RF signal satellite receiver 1 status changed to {eventFinalStatus} on {_HOSTNAME}.
+    description: RF signal satellite receiver 2 status changed to {{value "rfSignalSatReceiver1Status"}} on {{hostname}}.
     status: current
     varbinds:
       - rfSignalSatReceiver1Status
@@ -1641,7 +1641,7 @@ traps:
     name: TREDESS-FS-MIB::lnbOverloadSatReceiver2Trap
     category: diagnostic
     severity: warning
-    description: LNB overload detected on Satellite Receiver 2 with status {lnbOverloadSatReceiver2Status} on {_HOSTNAME}.
+    description: LNB overload detected on Satellite Receiver 2{{with value "redundancyId"}} (redundancy {{.}}){{end}} on {{hostname}}.
     status: current
     varbinds:
       - lnbOverloadSatReceiver2Status
@@ -1655,7 +1655,7 @@ traps:
     name: TREDESS-FS-MIB::temperatureSatReceiver2Trap
     category: diagnostic
     severity: warning
-    description: Temperature satellite receiver 2 reported status {temperatureSatReceiver2Status} on {_HOSTNAME}.
+    description: Temperature satellite receiver 2 status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - temperatureSatReceiver2Status
@@ -1669,7 +1669,7 @@ traps:
     name: TREDESS-FS-MIB::dttReceiver1Trap
     category: diagnostic
     severity: warning
-    description: DTT receiver 1 alarm {dttReceiver1AlarmStatus} with status {eventFinalStatus} on {_HOSTNAME}.
+    description: DTT receiver 1 alarm status {{value "dttReceiver1AlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - dttReceiver1AlarmStatus
@@ -1683,7 +1683,7 @@ traps:
     name: TREDESS-FS-MIB::unlockDttReceiver1Trap
     category: state_change
     severity: notice
-    description: DTT receiver 1 status changed to {unlockDttReceiver1Status} on {_HOSTNAME}.
+    description: DTT receiver 1 unlocked{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - unlockDttReceiver1Status
@@ -1697,7 +1697,7 @@ traps:
     name: TREDESS-FS-MIB::rfSignalDttReceiver1Trap
     category: diagnostic
     severity: warning
-    description: RF signal DTT receiver 1 status {rfSignalDttReceiver1Status} on {_HOSTNAME}.
+    description: RF signal DTT receiver 1 status changed to {{value "rfSignalDttReceiver1Status"}} on {{hostname}}.
     status: current
     varbinds:
       - rfSignalDttReceiver1Status
@@ -1711,7 +1711,7 @@ traps:
     name: TREDESS-FS-MIB::temperatureDttReceiver1Trap
     category: diagnostic
     severity: warning
-    description: Temperature DTT receiver 1 status changed to {eventFinalStatus} on {_HOSTNAME}.
+    description: Temperature DTT receiver 1 status changed to {{value "temperatureDttReceiver1Status"}} on {{hostname}}.
     status: current
     varbinds:
       - temperatureDttReceiver1Status
@@ -1725,7 +1725,7 @@ traps:
     name: TREDESS-FS-MIB::dttReceiver2Trap
     category: diagnostic
     severity: warning
-    description: DTT receiver 2 alarm {dttReceiver2AlarmStatus} on redundancy {redundancyId} on {_HOSTNAME}.
+    description: DTT receiver 2 alarm {{value "dttReceiver2AlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - dttReceiver2AlarmStatus
@@ -1739,7 +1739,7 @@ traps:
     name: TREDESS-FS-MIB::unlockDttReceiver2Trap
     category: state_change
     severity: notice
-    description: DTT receiver 2 status changed to {eventFinalStatus} on {_HOSTNAME}.
+    description: DTT receiver 2 unlocked{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - unlockDttReceiver2Status
@@ -1753,7 +1753,7 @@ traps:
     name: TREDESS-FS-MIB::rfSignalDttReceiver2Trap
     category: diagnostic
     severity: warning
-    description: RF signal DTT receiver 2 status changed to {rfSignalDttReceiver2Status} on {_HOSTNAME}.
+    description: RF signal DTT receiver 2 status changed to {{value "rfSignalDttReceiver2Status"}} on {{hostname}}.
     status: current
     varbinds:
       - rfSignalDttReceiver2Status
@@ -1767,7 +1767,7 @@ traps:
     name: TREDESS-FS-MIB::temperatureDttReceiver2Trap
     category: diagnostic
     severity: warning
-    description: Temperature DTT receiver 2 reported status {temperatureDttReceiver2Status} on {_HOSTNAME}.
+    description: Temperature DTT receiver 2 status changed to {{value "temperatureDttReceiver2Status"}} on {{hostname}}.
     status: current
     varbinds:
       - temperatureDttReceiver2Status
@@ -1781,7 +1781,7 @@ traps:
     name: TREDESS-FS-MIB::modulatorSumTrap
     category: diagnostic
     severity: warning
-    description: Modulator alarm status {modulatorAlarmStatus} reported on {_HOSTNAME}.
+    description: Modulator alarm status {{value "modulatorAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - modulatorAlarmStatus
@@ -1794,8 +1794,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.33
     name: TREDESS-FS-MIB::tsErrorTrap
     category: diagnostic
-    severity: err
-    description: TS error {tsErrorStatus} with log ID {eventTrapLogId} on {_HOSTNAME}.
+    severity: warning
+    description: TS error {{value "tsErrorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - tsErrorStatus
@@ -1808,8 +1808,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.34
     name: TREDESS-FS-MIB::mipErrorTrap
     category: diagnostic
-    severity: err
-    description: MIP error {mipErrorStatus} with log ID {eventTrapLogId} on {_HOSTNAME}.
+    severity: warning
+    description: MIP error {{value "mipErrorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - mipErrorStatus
@@ -1823,7 +1823,7 @@ traps:
     name: TREDESS-FS-MIB::mpegOverflowTrap
     category: diagnostic
     severity: warning
-    description: MPEG overflow detected with status {mpegOverflowStatus} on {_HOSTNAME}.
+    description: 'MPEG overflow detected{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - mpegOverflowStatus
@@ -1837,7 +1837,7 @@ traps:
     name: TREDESS-FS-MIB::t2miErrorTrap
     category: diagnostic
     severity: warning
-    description: T2MI error {t2miErrorStatus} with log ID {eventTrapLogId} on {_HOSTNAME}.
+    description: T2MI error {{value "t2miErrorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - t2miErrorStatus
@@ -1851,7 +1851,7 @@ traps:
     name: TREDESS-FS-MIB::sfnReferenceTrap
     category: diagnostic
     severity: warning
-    description: SFN error status {sfnErrorStatus} on redundancy {redundancyId} on {_HOSTNAME}.
+    description: SFN error {{value "sfnErrorStatus"}} on redundancy {{value "redundancyId"}} on {{hostname}}.
     status: current
     varbinds:
       - sfnErrorStatus
@@ -1865,7 +1865,7 @@ traps:
     name: TREDESS-FS-MIB::sfnMarginTrap
     category: diagnostic
     severity: warning
-    description: SFN margin {sfnMargin} reported on {_HOSTNAME}.
+    description: SFN margin event {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - sfnMargin
@@ -1879,7 +1879,7 @@ traps:
     name: TREDESS-FS-MIB::temperatureModulatorTrap
     category: diagnostic
     severity: warning
-    description: Temperature modulator status {temperatureModulatorStatus} reported on {_HOSTNAME}.
+    description: Temperature modulator status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - temperatureModulatorStatus
@@ -1893,7 +1893,7 @@ traps:
     name: TREDESS-FS-MIB::modulatorOutputTrap
     category: diagnostic
     severity: warning
-    description: Modulator output status changed to {modulatorOutputStatus} on {_HOSTNAME}.
+    description: Modulator output status changed to {{value "modulatorOutputStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - modulatorOutputStatus
@@ -1907,7 +1907,7 @@ traps:
     name: TREDESS-FS-MIB::rfOutputTrap
     category: diagnostic
     severity: warning
-    description: RF output status changed to {rfOutputStatus} on {_HOSTNAME}.
+    description: RF output status changed to {{value "rfOutputStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - rfOutputStatus
@@ -1921,7 +1921,7 @@ traps:
     name: TREDESS-FS-MIB::cancellerShouldersTrap
     category: diagnostic
     severity: warning
-    description: Canceller shoulders status {cancellerShouldersStatus} on {_HOSTNAME}.
+    description: Canceller shoulders status changed to {{value "cancellerShouldersStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - cancellerShouldersStatus
@@ -1935,7 +1935,7 @@ traps:
     name: TREDESS-FS-MIB::input10MhzTrap
     category: diagnostic
     severity: warning
-    description: 10MHz input synchronization status changed to {input10MhzStatus} on {_HOSTNAME}.
+    description: 10MHz input synchronization status changed to {{value "input10MhzStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - input10MhzStatus
@@ -1947,9 +1947,9 @@ traps:
       - redundancyId
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.44
     name: TREDESS-FS-MIB::input1ppsTrap
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: 1PPS input synchronization status changed to {input1ppsStatus} on {_HOSTNAME}.
+    description: 1PPS input synchronization status changed to {{value "input1ppsStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - input1ppsStatus
@@ -1963,7 +1963,7 @@ traps:
     name: TREDESS-FS-MIB::synchronizationModuleTrap
     category: diagnostic
     severity: warning
-    description: Synchronization module alarm {synchronizationAlarmStatus} on redundancy {redundancyId} on {_HOSTNAME}.
+    description: Synchronization module alarm {{value "synchronizationAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - synchronizationAlarmStatus
@@ -1977,7 +1977,7 @@ traps:
     name: TREDESS-FS-MIB::synchronizationAntennaTrap
     category: diagnostic
     severity: warning
-    description: Synchronization antenna status changed to {synchronizationAntennaStatus} on {_HOSTNAME}.
+    description: Synchronization antenna status changed to {{value "synchronizationAntennaStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - synchronizationAntennaStatus
@@ -1991,7 +1991,7 @@ traps:
     name: TREDESS-FS-MIB::synchronizationUnlockTrap
     category: state_change
     severity: warning
-    description: Synchronization unlock on redundancy unit {redundancyId} with status {synchronizationUnlockStatus} on {_HOSTNAME}.
+    description: Synchronization unlock occurred on redundancy {{value "redundancyId"}} on {{hostname}}.
     status: current
     varbinds:
       - synchronizationUnlockStatus
@@ -2005,7 +2005,7 @@ traps:
     name: TREDESS-FS-MIB::synchronizationHoldoverTrap
     category: state_change
     severity: warning
-    description: Synchronization holdover status {synchronizationHoldoverStatus} on redundancy {redundancyId} on {_HOSTNAME}.
+    description: Synchronization holdover triggered for redundancy {{value "redundancyId"}} on {{hostname}}.
     status: current
     varbinds:
       - synchronizationHoldoverStatus
@@ -2018,8 +2018,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.49
     name: TREDESS-FS-MIB::synchronizationHwErrorTrap
     category: diagnostic
-    severity: err
-    description: Synchronization hardware error detected with status {synchronizationHwErrorStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Synchronization hardware error detected{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - synchronizationHwErrorStatus
@@ -2033,7 +2033,7 @@ traps:
     name: TREDESS-FS-MIB::temperatureSynchronizationTrap
     category: diagnostic
     severity: warning
-    description: Temperature synchronization status {temperatureSynchronizationStatus} on redundancy {redundancyId} on {_HOSTNAME}.
+    description: Temperature synchronization status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - temperatureSynchronizationStatus
@@ -2047,7 +2047,7 @@ traps:
     name: TREDESS-FS-MIB::reference10MHzTrap
     category: diagnostic
     severity: warning
-    description: 10MHz reference status {reference10MHzStatus} reported on {_HOSTNAME}.
+    description: 10MHz reference status changed to {{value "reference10MHzStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - reference10MHzStatus
@@ -2061,7 +2061,7 @@ traps:
     name: TREDESS-FS-MIB::dateAndTimeReferenceEventTrap
     category: diagnostic
     severity: notice
-    description: Date and time reference event {eventInitialStatus} to {eventFinalStatus} on {_HOSTNAME}.
+    description: Date and time reference event {{value "eventAdditionalText"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTrapLogId
@@ -2073,8 +2073,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.53
     name: TREDESS-FS-MIB::acPowerSupplyTrap
     category: diagnostic
-    severity: err
-    description: AC power supply {acPowerSupplyStatus} reported fault on {_HOSTNAME}.
+    severity: warning
+    description: AC power supply status changed to {{value "acPowerSupplyStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - acPowerSupplyStatus
@@ -2088,7 +2088,7 @@ traps:
     name: TREDESS-FS-MIB::psuATrap
     category: diagnostic
     severity: warning
-    description: PSU A status changed to {acPsuAStatus} on {_HOSTNAME}.
+    description: PSU A status changed to {{value "acPsuAStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - acPsuAStatus
@@ -2102,7 +2102,7 @@ traps:
     name: TREDESS-FS-MIB::psuBTrap
     category: diagnostic
     severity: warning
-    description: PSU B reported status {acPsuBStatus} on {_HOSTNAME}.
+    description: PSU B status changed to {{value "acPsuBStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - acPsuBStatus
@@ -2115,8 +2115,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.57
     name: TREDESS-FS-MIB::hwErrorTrap
     category: diagnostic
-    severity: err
-    description: Hardware error {hwErrorStatus} with log ID {eventTrapLogId} on {_HOSTNAME}.
+    severity: warning
+    description: 'Hardware error detected{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - hwErrorStatus
@@ -2130,7 +2130,7 @@ traps:
     name: TREDESS-FS-MIB::ldmosTransistorsTrap
     category: diagnostic
     severity: warning
-    description: LDMOS transistors status {ldmosTransistorsStatus} reported on {_HOSTNAME}.
+    description: LDMOS transistors status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - ldmosTransistorsStatus
@@ -2144,7 +2144,7 @@ traps:
     name: TREDESS-FS-MIB::internalErrorTrap
     category: diagnostic
     severity: err
-    description: Internal error {internalErrorStatus} with log ID {eventTrapLogId} on {_HOSTNAME}.
+    description: 'Internal error occurred{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - internalErrorStatus
@@ -2157,8 +2157,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.60
     name: TREDESS-FS-MIB::localOscillatorTrap
     category: diagnostic
-    severity: warning
-    description: Local oscillator status {localOscillatorStatus} reported on {_HOSTNAME}.
+    severity: crit
+    description: Local oscillator fault detected on {{first (value "redundancyId") "redundancy"}} on {{hostname}}.
     status: current
     varbinds:
       - localOscillatorStatus
@@ -2172,7 +2172,7 @@ traps:
     name: TREDESS-FS-MIB::internalDcSupplyVoltageTrap
     category: diagnostic
     severity: warning
-    description: Internal DC supply voltage status {internalDcSupplyVoltageStatus} reported on {_HOSTNAME}.
+    description: Internal DC supply voltage event {{value "internalDcSupplyVoltageStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - internalDcSupplyVoltageStatus
@@ -2186,7 +2186,7 @@ traps:
     name: TREDESS-FS-MIB::fanSumTrap
     category: diagnostic
     severity: warning
-    description: Fan alarm status {fanAlarmStatus} reported on {_HOSTNAME}.
+    description: Fan alarm status changed to {{value "fanAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - fanAlarmStatus
@@ -2200,7 +2200,7 @@ traps:
     name: TREDESS-FS-MIB::fan1Trap
     category: diagnostic
     severity: warning
-    description: Fan 1 reported status {fan1Status} on {_HOSTNAME}.
+    description: Fan 1 status changed to {{value "fan1Status"}} on {{hostname}}.
     status: current
     varbinds:
       - fan1Status
@@ -2214,7 +2214,7 @@ traps:
     name: TREDESS-FS-MIB::fan2Trap
     category: diagnostic
     severity: warning
-    description: Fan 2 redundancy unit {redundancyId} status changed to {fan2Status} on {_HOSTNAME}.
+    description: Fan 2 status changed to {{value "fan2Status"}} on {{hostname}}.
     status: current
     varbinds:
       - fan2Status
@@ -2228,7 +2228,7 @@ traps:
     name: TREDESS-FS-MIB::fan3Trap
     category: diagnostic
     severity: warning
-    description: Fan 3 reported status {fan3Status} on {_HOSTNAME}.
+    description: Fan 3 status changed to {{value "fan3Status"}} on {{hostname}}.
     status: current
     varbinds:
       - fan3Status
@@ -2242,7 +2242,7 @@ traps:
     name: TREDESS-FS-MIB::externalAlarmTrap
     category: diagnostic
     severity: warning
-    description: External alarm {externalAlarmStatus} with log ID {eventTrapLogId} on {_HOSTNAME}.
+    description: External alarm {{value "externalAlarmStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - externalAlarmStatus
@@ -2256,7 +2256,7 @@ traps:
     name: TREDESS-FS-MIB::externalAlarm1Trap
     category: diagnostic
     severity: warning
-    description: External alarm 1 status {external1Status} reported on {_HOSTNAME}.
+    description: External alarm 1 triggered with status {{value "external1Status"}} on {{hostname}}.
     status: current
     varbinds:
       - external1Status
@@ -2270,7 +2270,7 @@ traps:
     name: TREDESS-FS-MIB::externalAlarm2Trap
     category: diagnostic
     severity: warning
-    description: External alarm 2 status {external2Status} reported on {_HOSTNAME}.
+    description: External alarm 2 status changed to {{value "external2Status"}} on {{hostname}}.
     status: current
     varbinds:
       - external2Status
@@ -2282,9 +2282,9 @@ traps:
       - redundancyId
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.69
     name: TREDESS-FS-MIB::systemInitEventTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: System initialization event {eventAdditionalText} on {_HOSTNAME}.
+    description: 'System initialization event occurred{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eventTrapLogId
@@ -2293,9 +2293,9 @@ traps:
       - redundancyId
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.70
     name: TREDESS-FS-MIB::guiOperationEventTrap
-    category: config_change
-    severity: notice
-    description: GUI operation {eventAdditionalText} on {_HOSTNAME}.
+    category: unknown
+    severity: info
+    description: GUI operation event occurred on {{hostname}}.
     status: current
     varbinds:
       - eventTrapLogId
@@ -2304,9 +2304,9 @@ traps:
       - redundancyId
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.71
     name: TREDESS-FS-MIB::muteEventTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Mute event {eventAdditionalText} on redundancy unit {redundancyId} on {_HOSTNAME}.
+    description: 'Mute event triggered{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eventTrapLogId
@@ -2317,7 +2317,7 @@ traps:
     name: TREDESS-FS-MIB::inputSourceSelectedEventTrap
     category: state_change
     severity: notice
-    description: Input source selected with {eventAdditionalText} on {_HOSTNAME}.
+    description: 'Input source selected{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eventTrapLogId
@@ -2327,7 +2327,7 @@ traps:
     name: TREDESS-FS-MIB::selectedReferenceEventTrap
     category: state_change
     severity: notice
-    description: Redundancy state change for unit {redundancyId} with log ID {eventTrapLogId} on {_HOSTNAME}.
+    description: Selected reference event {{value "eventAdditionalText"}} on redundancy {{value "redundancyId"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTrapLogId
@@ -2338,7 +2338,7 @@ traps:
     name: TREDESS-FS-MIB::outputRelay1Trap
     category: state_change
     severity: notice
-    description: Output relay 1 state changed to {eventFinalStatus} on {_HOSTNAME}.
+    description: Output relay 1 status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTrapLogId
@@ -2351,7 +2351,7 @@ traps:
     name: TREDESS-FS-MIB::outputRelay2Trap
     category: state_change
     severity: notice
-    description: Output relay 2 status changed to {eventFinalStatus} on {_HOSTNAME}.
+    description: Output relay 2 status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTrapLogId
@@ -2364,7 +2364,7 @@ traps:
     name: TREDESS-FS-MIB::forcedMfnEventTrap
     category: state_change
     severity: notice
-    description: Redundancy state change with ID {redundancyId} and text {eventAdditionalText} on {_HOSTNAME}.
+    description: Forced MFN event occurred{{with value "redundancyId"}} on redundancy unit {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventTrapLogId
@@ -2373,9 +2373,9 @@ traps:
       - redundancyId
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.77
     name: TREDESS-FS-MIB::localModeTimeoutEventTrap
-    category: state_change
+    category: diagnostic
     severity: warning
-    description: Local mode timeout occurred on redundancy unit {redundancyId} on {_HOSTNAME}.
+    description: 'Local mode timeout occurred{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eventTrapLogId
@@ -2386,7 +2386,7 @@ traps:
     name: TREDESS-FS-MIB::redundancyEventTrap
     category: state_change
     severity: notice
-    description: Redundancy event {redundancyId} with log ID {eventTrapLogId} on {_HOSTNAME}.
+    description: Redundancy event occurred{{with value "redundancyId"}} on unit {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventTrapLogId
@@ -2397,7 +2397,7 @@ traps:
     name: TREDESS-FS-MIB::btsErrorTrap
     category: diagnostic
     severity: warning
-    description: BTS error {btsErrorStatus} with log ID {eventTrapLogId} on {_HOSTNAME}.
+    description: BTS error {{value "btsErrorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - btsErrorStatus
@@ -2411,7 +2411,7 @@ traps:
     name: TREDESS-FS-MIB::nonLinearSenseFeedbackTrap
     category: diagnostic
     severity: warning
-    description: Non-linear sense feedback {nonLinearSenseFeedback} reported on {_HOSTNAME}.
+    description: 'Non-linear sense feedback detected{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - nonLinearSenseFeedback
@@ -2425,7 +2425,7 @@ traps:
     name: TREDESS-FS-MIB::modulatorShouldersTrap
     category: diagnostic
     severity: warning
-    description: Modulator shoulder status {modulatorShouldersStatus} on {_HOSTNAME}.
+    description: Modulator shoulder alarm {{value "modulatorShouldersStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - modulatorShouldersStatus
@@ -2439,7 +2439,7 @@ traps:
     name: TREDESS-FS-MIB::configurationFromBackupEventTrap
     category: config_change
     severity: notice
-    description: Configuration restored from backup on {_HOSTNAME}.
+    description: 'Configuration restored from backup{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eventTrapLogId
@@ -2452,7 +2452,7 @@ traps:
     name: TREDESS-FS-MIB::rfInputTrap
     category: diagnostic
     severity: warning
-    description: RF input {rfInputStatus} reported status {eventFinalStatus} with additional text {eventAdditionalText} on {_HOSTNAME}.
+    description: RF input status changed to {{value "rfInputStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - rfInputStatus
@@ -2466,7 +2466,7 @@ traps:
     name: TREDESS-FS-MIB::echoCancellerTrap
     category: diagnostic
     severity: warning
-    description: Echo canceller status changed to {eventFinalStatus} on {_HOSTNAME}.
+    description: Echo canceller status changed to {{value "echoCancellerStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - echoCancellerStatus
@@ -2480,7 +2480,7 @@ traps:
     name: TREDESS-FS-MIB::inputLevelTrap
     category: diagnostic
     severity: warning
-    description: Input level status {inputLevelStatus} reported on {_HOSTNAME}.
+    description: Input level status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - inputLevelStatus
@@ -2494,7 +2494,7 @@ traps:
     name: TREDESS-FS-MIB::temperatureECTrap
     category: diagnostic
     severity: warning
-    description: Temperature EC status {temperatureECStatus} reported on {_HOSTNAME}.
+    description: Temperature EC alert {{value "temperatureECStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - temperatureECStatus
@@ -2508,7 +2508,7 @@ traps:
     name: TREDESS-FS-MIB::outputLevelTrap
     category: diagnostic
     severity: warning
-    description: Output level status {outputLevelStatus} reported for redundancy ID {redundancyId} on {_HOSTNAME}.
+    description: Output level status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - outputLevelStatus
@@ -2522,7 +2522,7 @@ traps:
     name: TREDESS-FS-MIB::amplifierOutputSampleTrap
     category: diagnostic
     severity: warning
-    description: Amplifier output sample {amplifierOutputSample} status changed to {eventFinalStatus} on {_HOSTNAME}.
+    description: Amplifier output sample status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - amplifierOutputSample
@@ -2536,7 +2536,7 @@ traps:
     name: TREDESS-FS-MIB::systemShutdownEventTrap
     category: state_change
     severity: emerg
-    description: System shutdown event {eventAdditionalText} on {_HOSTNAME}.
+    description: System shutdown occurred{{with value "redundancyId"}} on redundancy unit {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventTrapLogId
@@ -2545,9 +2545,9 @@ traps:
       - redundancyId
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.106
     name: TREDESS-FS-MIB::standardAutoConfigurationTrap
-    category: state_change
+    category: config_change
     severity: notice
-    description: Standard auto-configuration event {eventAdditionalText} on redundancy {redundancyId} on {_HOSTNAME}.
+    description: Standard auto-configuration event occurred on {{hostname}}.
     status: current
     varbinds:
       - eventTrapLogId
@@ -2558,7 +2558,7 @@ traps:
     name: TREDESS-FS-MIB::cancellerMerStatusTrap
     category: diagnostic
     severity: warning
-    description: Canceller MER status {cancellerMerStatus} reported on {_HOSTNAME}.
+    description: Canceller MER status changed to {{value "cancellerMerStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - cancellerMerStatus
@@ -2571,7 +2571,7 @@ traps:
     name: TREDESS-FS-MIB::gainMarginStatusTrap
     category: diagnostic
     severity: warning
-    description: Gain margin status {gainMarginStatus} reported on {_HOSTNAME}.
+    description: Gain margin status changed to {{value "gainMarginStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - gainMarginStatus
@@ -2585,7 +2585,7 @@ traps:
     name: TREDESS-FS-MIB::cancExternalFeedbackStatusTrap
     category: diagnostic
     severity: warning
-    description: External feedback status {cancExternalFeedbackStatus} changed to {eventFinalStatus} on {_HOSTNAME}.
+    description: Canceller external feedback status changed to {{value "cancExternalFeedbackStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - cancExternalFeedbackStatus
@@ -2599,7 +2599,7 @@ traps:
     name: TREDESS-FS-MIB::modulatorMerStatusTrap
     category: diagnostic
     severity: warning
-    description: Modulator MER status changed to {eventFinalStatus} on {_HOSTNAME}.
+    description: Modulator MER status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - modulatorMerStatus
@@ -2613,7 +2613,7 @@ traps:
     name: TREDESS-FS-MIB::modExternalFeedbackStatusTrap
     category: diagnostic
     severity: warning
-    description: Modulator external feedback status {modulatorExternalFeedbackStatus} reported on {_HOSTNAME}.
+    description: Modulator external feedback status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - modulatorExternalFeedbackStatus
@@ -2627,7 +2627,7 @@ traps:
     name: TREDESS-FS-MIB::amplifierStage1SumTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 1 status {amplifierStage1Status} reported on {_HOSTNAME}.
+    description: Amplifier Stage 1 status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - amplifierStage1Status
@@ -2641,7 +2641,7 @@ traps:
     name: TREDESS-FS-MIB::aS1InputLevelTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 1 input level status {aS1InputLevelStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 1 input level status changed to {{value "aS1InputLevelStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aS1InputLevelStatus
@@ -2655,7 +2655,7 @@ traps:
     name: TREDESS-FS-MIB::aS1ExceededPowerTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 1 exceeded power status {aS1ExceededPowerStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 1 exceeded power{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aS1ExceededPowerStatus
@@ -2669,7 +2669,7 @@ traps:
     name: TREDESS-FS-MIB::aS1DecreasedPowerTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 1 decreased power status {aS1DecreasedPowerStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 1 decreased power detected{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aS1DecreasedPowerStatus
@@ -2683,7 +2683,7 @@ traps:
     name: TREDESS-FS-MIB::aS1ReflectedPowerTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 1 reflected power status {aS1ReflectedPowerStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 1 reflected power status changed to {{value "aS1ReflectedPowerStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aS1ReflectedPowerStatus
@@ -2697,7 +2697,7 @@ traps:
     name: TREDESS-FS-MIB::aS1TemperatureTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 1 temperature status {aS1TemperatureStatus} reported on {_HOSTNAME}.
+    description: Amplifier Stage 1 temperature status changed to {{value "aS1TemperatureStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aS1TemperatureStatus
@@ -2710,8 +2710,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.118
     name: TREDESS-FS-MIB::aS1HwErrorTrap
     category: diagnostic
-    severity: err
-    description: Amplifier Stage 1 hardware error reported with status {aS1HwErrorStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Amplifier Stage 1 hardware error detected{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aS1HwErrorStatus
@@ -2725,7 +2725,7 @@ traps:
     name: TREDESS-FS-MIB::amplifierStage2SumTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 2 status changed to {eventFinalStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 2 status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - amplifierStage2Status
@@ -2739,7 +2739,7 @@ traps:
     name: TREDESS-FS-MIB::aS2InputLevelTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 2 input level status changed to {aS2InputLevelStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 2 input level status changed to {{value "aS2InputLevelStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aS2InputLevelStatus
@@ -2753,7 +2753,7 @@ traps:
     name: TREDESS-FS-MIB::aS2ExceededPowerTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 2 exceeded power status {aS2ExceededPowerStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 2 exceeded power{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aS2ExceededPowerStatus
@@ -2767,7 +2767,7 @@ traps:
     name: TREDESS-FS-MIB::aS2DecreasedPowerTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 2 decreased power status {aS2DecreasedPowerStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 2 decreased power detected{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aS2DecreasedPowerStatus
@@ -2781,7 +2781,7 @@ traps:
     name: TREDESS-FS-MIB::aS2ReflectedPowerTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 2 reflected power status {aS2ReflectedPowerStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 2 reflected power status changed to {{value "aS2ReflectedPowerStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aS2ReflectedPowerStatus
@@ -2795,7 +2795,7 @@ traps:
     name: TREDESS-FS-MIB::aS2TemperatureTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 2 temperature status {aS2TemperatureStatus} reported on {_HOSTNAME}.
+    description: Amplifier Stage 2 temperature status changed to {{value "aS2TemperatureStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aS2TemperatureStatus
@@ -2808,8 +2808,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.125
     name: TREDESS-FS-MIB::aS2HwErrorTrap
     category: diagnostic
-    severity: err
-    description: Amplifier Stage 2 hardware error reported with status {aS2HwErrorStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Amplifier Stage 2 hardware error detected{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aS2HwErrorStatus
@@ -2823,7 +2823,7 @@ traps:
     name: TREDESS-FS-MIB::amplifierStage3SumTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 3 status changed to {eventFinalStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 3 status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - amplifierStage3Status
@@ -2837,7 +2837,7 @@ traps:
     name: TREDESS-FS-MIB::aS3InputLevelTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 3 input level status changed to {aS3InputLevelStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 3 input level status changed to {{value "aS3InputLevelStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aS3InputLevelStatus
@@ -2851,7 +2851,7 @@ traps:
     name: TREDESS-FS-MIB::aS3ExceededPowerTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 3 exceeded power status {aS3ExceededPowerStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 3 exceeded power on {{hostname}}.
     status: current
     varbinds:
       - aS3ExceededPowerStatus
@@ -2865,7 +2865,7 @@ traps:
     name: TREDESS-FS-MIB::aS3DecreasedPowerTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 3 decreased power status {aS3DecreasedPowerStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 3 decreased power detected{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aS3DecreasedPowerStatus
@@ -2879,7 +2879,7 @@ traps:
     name: TREDESS-FS-MIB::aS3ReflectedPowerTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 3 reflected power status {aS3ReflectedPowerStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 3 reflected power status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aS3ReflectedPowerStatus
@@ -2893,7 +2893,7 @@ traps:
     name: TREDESS-FS-MIB::aS3TemperatureTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 3 temperature status {aS3TemperatureStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 3 temperature status changed to {{value "aS3TemperatureStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aS3TemperatureStatus
@@ -2906,8 +2906,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.132
     name: TREDESS-FS-MIB::aS3HwErrorTrap
     category: diagnostic
-    severity: err
-    description: Amplifier Stage 3 hardware error reported with status {aS3HwErrorStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Amplifier Stage 3 hardware error detected{{with value "redundancyId"}} on unit {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aS3HwErrorStatus
@@ -2921,7 +2921,7 @@ traps:
     name: TREDESS-FS-MIB::amplifierStage4SumTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 4 status changed to {amplifierStage4Status} on {_HOSTNAME}.
+    description: Amplifier Stage 4 status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - amplifierStage4Status
@@ -2935,7 +2935,7 @@ traps:
     name: TREDESS-FS-MIB::aS4InputLevelTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 4 input level status {aS4InputLevelStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 4 input level status changed to {{value "aS4InputLevelStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aS4InputLevelStatus
@@ -2949,7 +2949,7 @@ traps:
     name: TREDESS-FS-MIB::aS4ExceededPowerTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 4 exceeded power status {aS4ExceededPowerStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 4 exceeded power{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aS4ExceededPowerStatus
@@ -2963,7 +2963,7 @@ traps:
     name: TREDESS-FS-MIB::aS4DecreasedPowerTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 4 decreased power status {aS4DecreasedPowerStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 4 decreased power detected{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aS4DecreasedPowerStatus
@@ -2977,7 +2977,7 @@ traps:
     name: TREDESS-FS-MIB::aS4ReflectedPowerTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 4 reflected power status {aS4ReflectedPowerStatus} on {_HOSTNAME}.
+    description: Amplifier Stage 4 reflected power status changed to {{value "aS4ReflectedPowerStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aS4ReflectedPowerStatus
@@ -2991,7 +2991,7 @@ traps:
     name: TREDESS-FS-MIB::aS4TemperatureTrap
     category: diagnostic
     severity: warning
-    description: Amplifier Stage 4 temperature status {aS4TemperatureStatus} reported on {_HOSTNAME}.
+    description: Amplifier Stage 4 temperature status changed to {{value "aS4TemperatureStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aS4TemperatureStatus
@@ -3004,8 +3004,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.139
     name: TREDESS-FS-MIB::aS4HwErrorTrap
     category: diagnostic
-    severity: err
-    description: Amplifier Stage 4 hardware error detected with status {aS4HwErrorStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Amplifier Stage 4 hardware error detected{{with value "redundancyId"}} on unit {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aS4HwErrorStatus
@@ -3018,8 +3018,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.145
     name: TREDESS-FS-MIB::aS1PsusErrorTrap
     category: diagnostic
-    severity: err
-    description: Amplifier Stage 1 PSU error reported with status {aS1PsusErrorStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Amplifier Stage 1 PSU error detected{{with value "redundancyId"}} in redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aS1PsusErrorStatus
@@ -3032,8 +3032,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.146
     name: TREDESS-FS-MIB::aS2PsusErrorTrap
     category: diagnostic
-    severity: err
-    description: Amplifier Stage 2 PSU error reported with status {aS2PsusErrorStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Amplifier Stage 2 PSU error detected{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aS2PsusErrorStatus
@@ -3046,8 +3046,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.147
     name: TREDESS-FS-MIB::aS3PsusErrorTrap
     category: diagnostic
-    severity: err
-    description: Amplifier Stage 3 PSU error reported with status {aS3PsusErrorStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Amplifier Stage 3 PSU error detected{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aS3PsusErrorStatus
@@ -3060,8 +3060,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.148
     name: TREDESS-FS-MIB::aS4PsusErrorTrap
     category: diagnostic
-    severity: err
-    description: Amplifier Stage 4 PSU error reported with status {aS4PsusErrorStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Amplifier Stage 4 PSUs error detected{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aS4PsusErrorStatus
@@ -3075,7 +3075,7 @@ traps:
     name: TREDESS-FS-MIB::decreasedOuputPowerNonCritTrap
     category: diagnostic
     severity: warning
-    description: Decreased output power detected on redundancy {redundancyId} on {_HOSTNAME}.
+    description: Decreased output power non-critical event on {{hostname}}.
     status: current
     varbinds:
       - decreasedOutputPowerNonCritical
@@ -3089,7 +3089,7 @@ traps:
     name: TREDESS-FS-MIB::lockingStart1ppsEventTrap
     category: diagnostic
     severity: notice
-    description: 1PPS locking restart detected with event ID {eventTrapLogId} on {_HOSTNAME}.
+    description: 1PPS locking restart occurred{{with value "redundancyId"}} on unit {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventTrapLogId
@@ -3100,7 +3100,7 @@ traps:
     name: TREDESS-FS-MIB::rackCoolingEventTrap
     category: diagnostic
     severity: warning
-    description: Rack cooling status changed to {eventFinalStatus} on {_HOSTNAME}.
+    description: Rack cooling status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - rackCoolingStatus
@@ -3114,7 +3114,7 @@ traps:
     name: TREDESS-FS-MIB::rackCoolingTemperatureEventTrap
     category: diagnostic
     severity: warning
-    description: Rack cooling temperature status {rackCoolingTemperatureStatus} reported on {_HOSTNAME}.
+    description: Rack cooling temperature event {{value "rackCoolingTemperatureStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - rackCoolingTemperatureStatus
@@ -3128,7 +3128,7 @@ traps:
     name: TREDESS-FS-MIB::rackCPressureDifferenceTrap
     category: diagnostic
     severity: warning
-    description: Rack cooling pressure difference {pressureDifferenceStatus} on {_HOSTNAME}.
+    description: Rack cooling pressure difference alert {{value "pressureDifferenceStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - pressureDifferenceStatus
@@ -3141,8 +3141,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.155
     name: TREDESS-FS-MIB::rackCoolingHwErrorEventTrap
     category: diagnostic
-    severity: err
-    description: Rack cooling hardware error reported with status {rackCoolingHwErrorStatus} on {_HOSTNAME}.
+    severity: crit
+    description: 'Rack cooling hardware error detected{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - rackCoolingHwErrorStatus
@@ -3154,9 +3154,9 @@ traps:
       - redundancyId
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.156
     name: TREDESS-FS-MIB::ioInterfaceInputEventTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: I/O interface input event {eventInitialStatus} to {eventFinalStatus} with {eventAdditionalText} on {_HOSTNAME}.
+    description: I/O interface input event {{value "eventAdditionalText"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTrapLogId
@@ -3167,9 +3167,9 @@ traps:
       - redundancyId
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.157
     name: TREDESS-FS-MIB::ioInterfaceOutputEventTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: I/O interface output event {eventInitialStatus} to {eventFinalStatus} on {_HOSTNAME}.
+    description: I/O interface output event {{value "eventAdditionalText"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTrapLogId
@@ -3182,7 +3182,7 @@ traps:
     name: TREDESS-FS-MIB::dcInputEventTrap
     category: diagnostic
     severity: warning
-    description: DC input status changed to {dcInputStatus} on {_HOSTNAME}.
+    description: DC input status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - dcInputStatus
@@ -3195,8 +3195,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.159
     name: TREDESS-FS-MIB::externalDcPowerSupplyEventTrap
     category: diagnostic
-    severity: err
-    description: External DC power supply hardware error reported with status {eventFinalStatus} on {_HOSTNAME}.
+    severity: warning
+    description: External DC power supply event {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - rackCoolingHwErrorStatus
@@ -3210,7 +3210,7 @@ traps:
     name: TREDESS-FS-MIB::redundancySysEventTrap
     category: state_change
     severity: warning
-    description: Redundancy system {redundancySysStatus} changed from {eventInitialStatus} to {eventFinalStatus} on {_HOSTNAME}.
+    description: Redundancy system status changed to {{value "redundancySysStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - redundancySysStatus
@@ -3223,8 +3223,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.161
     name: TREDESS-FS-MIB::redundancySysComEventTrap
     category: diagnostic
-    severity: warning
-    description: Redundancy system communication error for redundancy {redundancyId} on {_HOSTNAME}.
+    severity: crit
+    description: Redundancy system communication error on redundancy {{value "redundancyId"}} on {{hostname}}.
     status: current
     varbinds:
       - redundancySysCommunicationStatus
@@ -3238,7 +3238,7 @@ traps:
     name: TREDESS-FS-MIB::redundancySysSwitchEventTrap
     category: state_change
     severity: crit
-    description: Redundancy system switch error on redundancy {redundancyId} on {_HOSTNAME}.
+    description: Redundancy system switch error on redundancy {{value "redundancyId"}} on {{hostname}}.
     status: current
     varbinds:
       - redundancySysSwitchStatus
@@ -3252,7 +3252,7 @@ traps:
     name: TREDESS-FS-MIB::redundancySysReserveEventTrap
     category: state_change
     severity: notice
-    description: Redundancy system reserve status changed to {redundancySysReserveStatus} on {_HOSTNAME}.
+    description: Redundancy system reserve ready on {{hostname}}.
     status: current
     varbinds:
       - redundancySysReserveStatus
@@ -3266,7 +3266,7 @@ traps:
     name: TREDESS-FS-MIB::modBerStatusTrap
     category: diagnostic
     severity: warning
-    description: Modulator BER status {modulatorBerStatus} reported on {_HOSTNAME}.
+    description: Modulator BER status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - modulatorBerStatus
@@ -3280,7 +3280,7 @@ traps:
     name: TREDESS-FS-MIB::redundancyInputAsiMatrixTrap
     category: state_change
     severity: warning
-    description: Redundancy {redundancyId} ASI matrix status changed to {redundancyInputAsiMatrixStatus} on {_HOSTNAME}.
+    description: ASI matrix redundancy status changed to {{value "redundancyInputAsiMatrixStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - redundancyInputAsiMatrixStatus
@@ -3293,8 +3293,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.166
     name: TREDESS-FS-MIB::redundancyHwMatrixEventTrap
     category: diagnostic
-    severity: err
-    description: HW error ASI matrix reported with status {redundancyHwMatrixStatus} on {_HOSTNAME}.
+    severity: alert
+    description: HW error ASI matrix redundancy {{value "redundancyId"}} on {{hostname}}.
     status: current
     varbinds:
       - redundancyHwMatrixStatus
@@ -3308,7 +3308,7 @@ traps:
     name: TREDESS-FS-MIB::inputDabErrorStatusEventTrap
     category: diagnostic
     severity: warning
-    description: Input DAB error {inputDabErrorStatus} detected on {_HOSTNAME}.
+    description: Input DAB error {{value "inputDabErrorStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - inputDabErrorStatus
@@ -3320,9 +3320,9 @@ traps:
       - redundancyId
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.168
     name: TREDESS-FS-MIB::etiInputTrap
-    category: state_change
-    severity: notice
-    description: ETI input status changed to {eventFinalStatus} on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: ETI input status {{value "etiInputStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - etiInputStatus
@@ -3336,7 +3336,7 @@ traps:
     name: TREDESS-FS-MIB::eti1ErrorTrap
     category: diagnostic
     severity: warning
-    description: ETI 1 error detected with status {eti1ErrorStatus} on {_HOSTNAME}.
+    description: 'ETI 1 error detected{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eti1ErrorStatus
@@ -3350,7 +3350,7 @@ traps:
     name: TREDESS-FS-MIB::camSatReceiver1Trap
     category: diagnostic
     severity: warning
-    description: CAM Satellite Receiver 1 status changed to {camSatReceiver1Status} on {_HOSTNAME}.
+    description: CAM satellite receiver 1 status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - camSatReceiver1Status
@@ -3364,7 +3364,7 @@ traps:
     name: TREDESS-FS-MIB::smartCardSatReceiver1Trap
     category: diagnostic
     severity: warning
-    description: Smart card satellite receiver 1 status changed to {smartCardSatReceiver1Status} on {_HOSTNAME}.
+    description: Smart card satellite receiver 1 status changed to {{value "smartCardSatReceiver1Status"}} on {{hostname}}.
     status: current
     varbinds:
       - smartCardSatReceiver1Status
@@ -3378,7 +3378,7 @@ traps:
     name: TREDESS-FS-MIB::smartCardRightsSatReceiver1Trap
     category: diagnostic
     severity: warning
-    description: Smart card rights satellite receiver 1 reported status {smartCardRightsSatReceiver1Stat} on {_HOSTNAME}.
+    description: Smart card rights satellite receiver 1 status changed to {{value "smartCardRightsSatReceiver1Stat"}} on {{hostname}}.
     status: current
     varbinds:
       - smartCardRightsSatReceiver1Stat
@@ -3392,7 +3392,7 @@ traps:
     name: TREDESS-FS-MIB::asiOutputSatReceiver1Trap
     category: diagnostic
     severity: warning
-    description: ASI output satellite receiver 1 status changed to {eventFinalStatus} on {_HOSTNAME}.
+    description: ASI output satellite receiver 1 status changed to {{value "asiOutputSatReceiver1Status"}} on {{hostname}}.
     status: current
     varbinds:
       - asiOutputSatReceiver1Status
@@ -3405,8 +3405,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.174
     name: TREDESS-FS-MIB::redundancyHwRfMatrixEventTrap
     category: diagnostic
-    severity: err
-    description: HW error RF matrix reported for redundancy {redundancyId} with status {redundancyHwRfMatrixStatus} on {_HOSTNAME}.
+    severity: crit
+    description: Hardware error in RF matrix detected on {{hostname}}.
     status: current
     varbinds:
       - redundancyHwRfMatrixStatus
@@ -3420,7 +3420,7 @@ traps:
     name: TREDESS-FS-MIB::amplifierStagesSumTrap
     category: diagnostic
     severity: warning
-    description: Amplifier stage status changed to {amplifierStagesStatus} on {_HOSTNAME}.
+    description: Amplifier stage status changed to {{value "eventFinalStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - amplifierStagesStatus
@@ -3434,7 +3434,7 @@ traps:
     name: TREDESS-FS-MIB::aSsInputLevelTrap
     category: diagnostic
     severity: warning
-    description: Amplifier input level status {aSsInputLevelStatus} reported on {_HOSTNAME}.
+    description: Amplifier input level status changed to {{value "aSsInputLevelStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aSsInputLevelStatus
@@ -3448,7 +3448,7 @@ traps:
     name: TREDESS-FS-MIB::aSsExceededPowerTrap
     category: diagnostic
     severity: warning
-    description: Amplifier stage exceeded power threshold on {_HOSTNAME}.
+    description: Amplifier stages exceeded power{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aSsExceededPowerStatus
@@ -3462,7 +3462,7 @@ traps:
     name: TREDESS-FS-MIB::aSsDecreasedPowerTrap
     category: diagnostic
     severity: warning
-    description: Amplifier stage {redundancyId} reported decreased power status {aSsDecreasedPowerStatus} on {_HOSTNAME}.
+    description: Amplifier stage decreased power detected{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aSsDecreasedPowerStatus
@@ -3476,7 +3476,7 @@ traps:
     name: TREDESS-FS-MIB::aSsReflectedPowerTrap
     category: diagnostic
     severity: warning
-    description: Amplifier stage reflected power status {aSsReflectedPowerStatus} reported on {_HOSTNAME}.
+    description: Amplifier reflected power status changed to {{value "aSsReflectedPowerStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aSsReflectedPowerStatus
@@ -3490,7 +3490,7 @@ traps:
     name: TREDESS-FS-MIB::aSsTemperatureTrap
     category: diagnostic
     severity: warning
-    description: Amplifier stage temperature status {aSsTemperatureStatus} reported on {_HOSTNAME}.
+    description: Amplifier stage temperature alert {{value "aSsTemperatureStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - aSsTemperatureStatus
@@ -3503,8 +3503,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.181
     name: TREDESS-FS-MIB::aSsHwErrorTrap
     category: diagnostic
-    severity: err
-    description: Amplifier stage hardware error reported with status {aSsHwErrorStatus} on {_HOSTNAME}.
+    severity: crit
+    description: 'Amplifier stages hardware error detected{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - aSsHwErrorStatus
@@ -3517,8 +3517,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.182
     name: TREDESS-FS-MIB::aSsPsusErrorTrap
     category: diagnostic
-    severity: err
-    description: Amplifier Stages PSU error reported with status {aSsPsusErrorStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Amplifier stage PSU error detected{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - aSsPsusErrorStatus
@@ -3531,8 +3531,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.183
     name: TREDESS-FS-MIB::redundancyInputEtiMatrixTrap
     category: state_change
-    severity: notice
-    description: Redundancy {redundancyId} ASI matrix status changed to {eventFinalStatus} on {_HOSTNAME}.
+    severity: warning
+    description: Redundancy input ASI matrix status changed to {{value "redundancyInputAsiMatrixStatus"}} on {{hostname}}.
     status: current
     varbinds:
       - redundancyInputAsiMatrixStatus
@@ -3545,8 +3545,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.184
     name: TREDESS-FS-MIB::redundancyHwEtiMatrixEventTrap
     category: diagnostic
-    severity: err
-    description: HW error ETI matrix reported with status {redundancyHwEtiMatrixStatus} on {_HOSTNAME}.
+    severity: warning
+    description: HW error in ETI matrix redundancy {{value "redundancyId"}} on {{hostname}}.
     status: current
     varbinds:
       - redundancyHwEtiMatrixStatus
@@ -3560,7 +3560,7 @@ traps:
     name: TREDESS-FS-MIB::shortTermMonitoringEventTrap
     category: diagnostic
     severity: notice
-    description: Short-term monitoring event {eventTrapLogId} with text {eventAdditionalText} on redundancy unit {redundancyId} on {_HOSTNAME}.
+    description: Short-term monitoring event {{value "eventTrapLogId"}} occurred on {{hostname}}.
     status: current
     varbinds:
       - eventTrapLogId
@@ -3569,9 +3569,9 @@ traps:
       - redundancyId
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.186
     name: TREDESS-FS-MIB::autoconfFromInputEventTrap
-    category: state_change
+    category: config_change
     severity: notice
-    description: Autoconfiguration from input event occurred on {_HOSTNAME}.
+    description: 'Autoconfiguration from input occurred{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eventTrapLogId
@@ -3580,9 +3580,9 @@ traps:
       - redundancyId
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.187
     name: TREDESS-FS-MIB::channelAdaptationEventTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Channel adaptation event {eventAdditionalText} on redundancy {redundancyId} on {_HOSTNAME}.
+    description: Channel adaptation event {{value "eventAdditionalText"}} on {{hostname}}.
     status: current
     varbinds:
       - eventTrapLogId
@@ -3593,7 +3593,7 @@ traps:
     name: TREDESS-FS-MIB::dttReceiver1BerMuteTrap
     category: diagnostic
     severity: warning
-    description: DTT receiver 1 BER mute detected with event ID {eventTrapLogId} on {_HOSTNAME}.
+    description: DTT receiver 1 BER mute detected{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventTrapLogId
@@ -3604,7 +3604,7 @@ traps:
     name: TREDESS-FS-MIB::dttReceiver2BerMuteTrap
     category: diagnostic
     severity: warning
-    description: DTT receiver 2 BER mute detected with redundancy ID {redundancyId} on {_HOSTNAME}.
+    description: DTT receiver 2 BER mute detected{{with value "redundancyId"}} on redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - eventTrapLogId
@@ -3614,8 +3614,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.190
     name: TREDESS-FS-MIB::automaticPowerCompensationTrap
     category: diagnostic
-    severity: warning
-    description: Automatic power compensation triggered for redundancy {redundancyId} on {_HOSTNAME}.
+    severity: notice
+    description: 'Automatic power compensation event{{with value "eventAdditionalText"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - eventTrapLogId
@@ -3625,8 +3625,8 @@ traps:
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.191
     name: TREDESS-FS-MIB::eti2ErrorTrap
     category: diagnostic
-    severity: err
-    description: ETI 2 error {eti2ErrorStatus} with log ID {eventTrapLogId} on {_HOSTNAME}.
+    severity: warning
+    description: ETI 2 error {{value "eventAdditionalText"}} on {{hostname}}.
     status: current
     varbinds:
       - eti2ErrorStatus
@@ -3638,9 +3638,9 @@ traps:
       - redundancyId
   - oid: 1.3.6.1.4.1.23180.2.1.1.2.10.0.500
     name: TREDESS-FS-MIB::testTrap
-    category: state_change
+    category: diagnostic
     severity: notice
-    description: Redundancy state changed for {name} on {_HOSTNAME}.
+    description: Test trap received{{with value "redundancyId"}} for redundancy {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - localTime
@@ -3650,7 +3650,7 @@ traps:
     name: TREDESS-FS-MIB::keepaliveTrap
     category: state_change
     severity: notice
-    description: Keepalive received from redundancy unit {redundancyId} on {_HOSTNAME}.
+    description: Keepalive received from redundancy {{value "redundancyId"}} on {{hostname}}.
     status: current
     varbinds:
       - localTime

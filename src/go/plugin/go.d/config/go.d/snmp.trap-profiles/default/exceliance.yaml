@@ -42,14 +42,14 @@ traps:
   - oid: 1.3.6.1.4.1.23263.3.1001
     name: EXCELIANCE-MIB::eNotificationMsg
     category: unknown
-    severity: notice
-    description: Generic notification {TRAP_NAME} received on {_HOSTNAME}.
+    severity: info
+    description: Received generic notification eNotificationMsg on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.23263.3.1002
     name: EXCELIANCE-MIB::alTrap
     category: diagnostic
     severity: notice
-    description: Aloha SMIv2 notification {alTrapName} with message {alTrapMsg} on {_HOSTNAME}.
+    description: Aloha SMI notification {{value "alTrapName"}} {{value "alTrapMsg"}} on {{hostname}}.
     status: current
     varbinds:
       - alTrapId

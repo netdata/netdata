@@ -14,25 +14,25 @@ traps:
     name: JUNIPER-WX-COMMON-MIB::jnxWxCommonEventInFailSafeMode
     category: diagnostic
     severity: alert
-    description: Device booted in fail-safe mode on {_HOSTNAME}.
+    description: Device booted in fail-safe mode on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.8239.2.1.3.2.0.2
     name: JUNIPER-WX-COMMON-MIB::jnxWxCommonEventPowerSupplyFailure
     category: diagnostic
-    severity: alert
-    description: Power supply failure detected on {_HOSTNAME}.
+    severity: crit
+    description: Power supply failure detected on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.8239.2.1.3.2.0.3
     name: JUNIPER-WX-COMMON-MIB::jnxWxCommonEventPowerSupplyOk
     category: diagnostic
     severity: notice
-    description: Power supply recovered to normal state on {_HOSTNAME}.
+    description: Power supply recovered to normal operation on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.8239.2.1.3.2.0.4
     name: JUNIPER-WX-COMMON-MIB::jnxWxCommonEventLicenseExpired
     category: license
     severity: alert
-    description: 'License expired: {jnxWxCommonEventDescr} on {_HOSTNAME}.'
+    description: System license expired, switching to pass-through mode on {{hostname}}.
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -40,7 +40,7 @@ traps:
     name: JUNIPER-WX-COMMON-MIB::jnxWxCommonEventThruputLimitExceeded
     category: license
     severity: warning
-    description: Throughput limit exceeded for {jnxWxCommonEventDescr} on {_HOSTNAME}.
+    description: 'Throughput limit exceeded for licensed capacity{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -48,7 +48,7 @@ traps:
     name: JUNIPER-WX-COMMON-MIB::jnxWxCommonEventLicenseWillExpire
     category: license
     severity: warning
-    description: License for the system is about to expire shortly on {_HOSTNAME}.
+    description: 'System license is about to expire{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -56,23 +56,23 @@ traps:
     name: JUNIPER-WX-COMMON-MIB::jnxWxCommonEventLoginFailure
     category: auth
     severity: warning
-    description: Login failure due to incorrect credentials on {_HOSTNAME}.
+    description: 'Login failure due to incorrect credentials{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
   - oid: 1.3.6.1.4.1.8239.2.1.3.2.0.8
     name: JUNIPER-WX-COMMON-MIB::jnxWxCommonEventFaultTolerantPassThrough
     category: diagnostic
-    severity: warning
-    description: Anomalous health condition detected triggering hardware pass-through mode on {_HOSTNAME}.
+    severity: alert
+    description: Anomalous health condition detected triggering hardware pass-through mode on {{hostname}}.
     status: current
     varbinds:
       - jnxWxCommonEventDescr
   - oid: 1.3.6.1.4.1.8239.2.1.3.2.0.9
     name: JUNIPER-WX-COMMON-MIB::jnxWxCommonEventFanFailure
     category: diagnostic
-    severity: err
-    description: Cooling fan {jnxWxCommonEventDescr} has failed on {_HOSTNAME}.
+    severity: alert
+    description: Cooling fan {{value "jnxWxCommonEventDescr"}} failed on {{hostname}}.
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -80,7 +80,7 @@ traps:
     name: JUNIPER-WX-COMMON-MIB::jnxWxCommonEventFanSpeedVariation
     category: diagnostic
     severity: warning
-    description: Cooling fan {jnxWxCommonEventDescr} speed variation detected on {_HOSTNAME}.
+    description: Cooling fan speed variation detected for {{value "jnxWxCommonEventDescr"}} on {{hostname}}.
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -88,7 +88,7 @@ traps:
     name: JUNIPER-WX-COMMON-MIB::jnxWxCommonEventFanOk
     category: diagnostic
     severity: notice
-    description: Cooling fan {jnxWxCommonEventDescr} recovered to working state on {_HOSTNAME}.
+    description: Cooling fan {{value "jnxWxCommonEventDescr"}} recovered to normal operation on {{hostname}}.
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -96,7 +96,7 @@ traps:
     name: JUNIPER-WX-COMMON-MIB::jnxWxCommonEventInterfaceSpeedMismatch
     category: state_change
     severity: warning
-    description: 'Interface speed mismatch detected: {jnxWxCommonEventDescr} on {_HOSTNAME}.'
+    description: 'Interface speed mismatch detected{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -104,15 +104,15 @@ traps:
     name: JUNIPER-WX-COMMON-MIB::jnxWxCommonEventInterfaceSpeedOk
     category: state_change
     severity: notice
-    description: 'Interface speed mismatch resolved: {jnxWxCommonEventDescr} on {_HOSTNAME}.'
+    description: 'Interface speed and mode mismatch resolved{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
   - oid: 1.3.6.1.4.1.8239.2.1.3.2.0.14
     name: JUNIPER-WX-COMMON-MIB::jnxWxCommonEventInterfaceDuplexMismatch
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: Duplex mismatch detected on interface {jnxWxCommonEventDescr} on {_HOSTNAME}.
+    description: Interface duplex mismatch detected on {{value "jnxWxCommonEventDescr"}} on {{hostname}}.
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -120,7 +120,7 @@ traps:
     name: JUNIPER-WX-COMMON-MIB::jnxWxCommonEventIpsecSecurityAssociationAdded
     category: state_change
     severity: notice
-    description: 'IPSec security association added: {jnxWxCommonEventDescr} on {_HOSTNAME}.'
+    description: 'IPSec security association added{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -128,7 +128,7 @@ traps:
     name: JUNIPER-WX-COMMON-MIB::jnxWxCommonEventIpsecSecurityAssociationExpired
     category: state_change
     severity: notice
-    description: 'IPSec security association expired: {jnxWxCommonEventDescr} on {_HOSTNAME}.'
+    description: 'IPSec security association expired{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -136,15 +136,15 @@ traps:
     name: JUNIPER-WX-COMMON-MIB::jnxWxCommonEventIpsecSecurityAssociationDeleted
     category: state_change
     severity: notice
-    description: 'IPSec security association deleted: {jnxWxCommonEventDescr} on {_HOSTNAME}.'
+    description: 'IPSec security association deleted{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
   - oid: 1.3.6.1.4.1.8239.2.2.1.3.2.0.1
     name: JUNIPER-WX-MIB::jnxWxEventRipAuthFailure
-    category: auth
+    category: security
     severity: warning
-    description: RIP authentication failure {jnxWxCommonEventDescr} on {_HOSTNAME}.
+    description: 'RIP authentication failure{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -152,7 +152,7 @@ traps:
     name: JUNIPER-WX-MIB::jnxWxEventCompressionBufferOverflow
     category: diagnostic
     severity: warning
-    description: Compression buffer approaching full capacity with {jnxWxCommonEventDescr} on {_HOSTNAME}.
+    description: 'Compression buffer approaching full capacity{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -160,7 +160,7 @@ traps:
     name: JUNIPER-WX-MIB::jnxWxEventCompressionSessionClosed
     category: state_change
     severity: notice
-    description: Compression session closed for {jnxWxCommonEventDescr} on {_HOSTNAME}.
+    description: 'Compression session closed{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -168,7 +168,7 @@ traps:
     name: JUNIPER-WX-MIB::jnxWxEventDecompressionSessionClosed
     category: state_change
     severity: notice
-    description: Decompression session closed for {jnxWxCommonEventDescr} on {_HOSTNAME}.
+    description: 'Decompression session closed{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -176,7 +176,7 @@ traps:
     name: JUNIPER-WX-MIB::jnxWxEventCompressionSessionOpened
     category: state_change
     severity: notice
-    description: Compression session opened for {jnxWxCommonEventDescr} on {_HOSTNAME}.
+    description: Compression session opened{{with value "jnxWxCommonEventDescr"}} for {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -184,15 +184,15 @@ traps:
     name: JUNIPER-WX-MIB::jnxWxEventDecompressionSessionOpened
     category: state_change
     severity: notice
-    description: Decompression session opened for {jnxWxCommonEventDescr} on {_HOSTNAME}.
+    description: 'Decompression session opened{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
   - oid: 1.3.6.1.4.1.8239.2.2.1.3.2.0.7
     name: JUNIPER-WX-MIB::jnxWxEventPrimaryRegServerUnreachable
-    category: diagnostic
-    severity: warning
-    description: 'Primary registration server unreachable: {jnxWxCommonEventDescr} on {_HOSTNAME}.'
+    category: state_change
+    severity: crit
+    description: Primary registration server is unreachable on {{hostname}}.
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -200,7 +200,7 @@ traps:
     name: JUNIPER-WX-MIB::jnxWxEventSecondaryRegServerUnreachable
     category: diagnostic
     severity: warning
-    description: 'Secondary registration server unreachable: {jnxWxCommonEventDescr} on {_HOSTNAME}.'
+    description: 'Secondary registration server is unreachable{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -208,7 +208,7 @@ traps:
     name: JUNIPER-WX-MIB::jnxWxEventMultiNodeMasterUp
     category: state_change
     severity: notice
-    description: Multi-node master system {jnxWxCommonEventDescr} came up on {_HOSTNAME}.
+    description: 'Multi-node master system came up{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -216,7 +216,7 @@ traps:
     name: JUNIPER-WX-MIB::jnxWxEventMultiNodeMasterDown
     category: state_change
     severity: alert
-    description: 'Multi-node master down event: {jnxWxCommonEventDescr} on {_HOSTNAME}.'
+    description: Multi-node master system is down on {{hostname}}.
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -224,7 +224,7 @@ traps:
     name: JUNIPER-WX-MIB::jnxWxEventMultiNodeLastUp
     category: state_change
     severity: notice
-    description: Multi-node last-node {jnxWxCommonEventDescr} came up on {_HOSTNAME}.
+    description: 'Multi-node last-node system came up{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -232,7 +232,7 @@ traps:
     name: JUNIPER-WX-MIB::jnxWxEventMultiNodeLastDown
     category: state_change
     severity: crit
-    description: 'Multi-node last-node is down: {jnxWxCommonEventDescr} on {_HOSTNAME}.'
+    description: Multi-node last-node is down on {{hostname}}.
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -240,7 +240,7 @@ traps:
     name: JUNIPER-WX-MIB::jnxWxEventPrimaryDownBackupEngaged
     category: state_change
     severity: alert
-    description: Primary device unreachable; backup engaged on {_HOSTNAME}.
+    description: Primary device unreachable and backup engaged on {{hostname}}.
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -248,7 +248,7 @@ traps:
     name: JUNIPER-WX-MIB::jnxWxEventPrimaryDownBackupEngageFailed
     category: state_change
     severity: crit
-    description: Backup device failed to engage for primary on {_HOSTNAME}.
+    description: Backup device failed to engage for unreachable primary on {{hostname}}.
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -256,7 +256,7 @@ traps:
     name: JUNIPER-WX-MIB::jnxWxEventPrimaryUpBackupDisengaged
     category: state_change
     severity: notice
-    description: Primary unit is reachable and backup has disengaged on {_HOSTNAME}.
+    description: Primary link is reachable and backup has disengaged on {{hostname}}.
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -264,23 +264,23 @@ traps:
     name: JUNIPER-WX-MIB::jnxWxEventMultiPathStatusChange
     category: state_change
     severity: warning
-    description: 'Multi-path status changed: {jnxWxCommonEventDescr} on {_HOSTNAME}.'
+    description: 'Multi-path status changed{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
   - oid: 1.3.6.1.4.1.8239.2.2.1.3.2.0.17
     name: JUNIPER-WX-MIB::jnxWxEventDiskFailure
     category: diagnostic
-    severity: crit
-    description: 'Hard disk failure detected: {jnxWxCommonEventDescr} on {_HOSTNAME}.'
+    severity: alert
+    description: 'Hard disk failure detected{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
   - oid: 1.3.6.1.4.1.8239.2.2.1.3.2.0.18
     name: JUNIPER-WX-MIB::jnxWxEventWanPerfStatusChange
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: 'WAN performance path status changed: {jnxWxCommonEventDescr} on {_HOSTNAME}.'
+    description: 'WAN performance monitoring path status changed{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -288,23 +288,23 @@ traps:
     name: JUNIPER-WX-MIB::jnxWxEventDCQAboveHiWatermark
     category: diagnostic
     severity: warning
-    description: 'Decompression queue reached high watermark: {jnxWxCommonEventDescr} on {_HOSTNAME}.'
+    description: 'Decompression queue reached high watermark{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
   - oid: 1.3.6.1.4.1.8239.2.2.1.3.2.0.20
     name: JUNIPER-WX-MIB::jnxWxEventDCQBelowHiWatermark
     category: diagnostic
-    severity: notice
-    description: 'Decompression queue fell below high watermark: {jnxWxCommonEventDescr} on {_HOSTNAME}.'
+    severity: warning
+    description: 'Decompression queue fell below high watermark{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
   - oid: 1.3.6.1.4.1.8239.2.2.1.3.2.0.21
     name: JUNIPER-WX-MIB::jnxWxEventPerformanceThreshCrossed
-    category: diagnostic
+    category: state_change
     severity: warning
-    description: 'Performance threshold crossed: {jnxWxCommonEventDescr} on {_HOSTNAME}.'
+    description: 'Performance threshold crossed{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -312,7 +312,7 @@ traps:
     name: JUNIPER-WX-MIB::jnxWxEventClientLinkDown
     category: state_change
     severity: warning
-    description: Client link went down with event description {jnxWxCommonEventDescr} on {_HOSTNAME}.
+    description: 'Client link went down{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr
@@ -320,7 +320,7 @@ traps:
     name: JUNIPER-WX-MIB::jnxWxEventClientLinkUp
     category: state_change
     severity: notice
-    description: 'Client link came up: {jnxWxCommonEventDescr} on {_HOSTNAME}.'
+    description: 'Client link came up{{with value "jnxWxCommonEventDescr"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - jnxWxCommonEventDescr

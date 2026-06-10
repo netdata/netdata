@@ -26,7 +26,7 @@ traps:
     name: STORMSHIELD-ALARM-MIB::snsNotification
     category: security
     severity: warning
-    description: Security alarm {snsAMessage} from {snsASaddr} to {snsADaddr} on {_HOSTNAME}.
+    description: Security alarm {{value "snsAMessage"}} from {{value "snsASaddr"}} on {{hostname}}.
     status: current
     varbinds:
       - snsATime

@@ -132,19 +132,19 @@ traps:
     name: THALES-ESECURITY-PAYSHIELD-MIB::payShieldPowerOnAlarm
     category: diagnostic
     severity: notice
-    description: Unit powered up on {_HOSTNAME}.
+    description: PayShield unit has been powered up on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4096.999.2.2.2
     name: THALES-ESECURITY-PAYSHIELD-MIB::payShieldRestartAlarm
     category: diagnostic
-    severity: warning
-    description: Reset button pressed on {_HOSTNAME}.
+    severity: notice
+    description: PayShield hardware reset alarm triggered on {{hostname}}.
     status: deprecated
   - oid: 1.3.6.1.4.1.4096.999.2.2.3
     name: THALES-ESECURITY-PAYSHIELD-MIB::payShieldEraseAlarm
     category: security
-    severity: warning
-    description: Erase button pressed at {payShieldAlarmEraseTimeandDate} on {_HOSTNAME}.
+    severity: alert
+    description: Erase button pressed on {{hostname}}.
     status: current
     varbinds:
       - payShieldAlarmEraseTimeandDate
@@ -152,19 +152,19 @@ traps:
     name: THALES-ESECURITY-PAYSHIELD-MIB::payShieldNewLicenseAlarm
     category: license
     severity: notice
-    description: New license installed on {_HOSTNAME}.
+    description: New license installed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4096.999.2.2.5
     name: THALES-ESECURITY-PAYSHIELD-MIB::payShieldNewSoftwareAlarm
     category: config_change
     severity: notice
-    description: New software installed on {_HOSTNAME}.
+    description: New software installed on {{hostname}}.
     status: current
   - oid: 1.3.6.1.4.1.4096.999.2.2.6
     name: THALES-ESECURITY-PAYSHIELD-MIB::payShieldPSUAlarm
     category: diagnostic
-    severity: err
-    description: Power supply {payShieldPSUNumber} reported state {payShieldPSUState} on {_HOSTNAME}.
+    severity: warning
+    description: Power supply unit {{value "payShieldPSUNumber"}} state changed to {{value "payShieldPSUState"}} on {{hostname}}.
     status: current
     varbinds:
       - payShieldPSUNumber
@@ -173,7 +173,7 @@ traps:
     name: THALES-ESECURITY-PAYSHIELD-MIB::payShieldBatteryAlarm
     category: diagnostic
     severity: warning
-    description: Battery state changed to {payShieldBatteryState} on {_HOSTNAME}.
+    description: PayShield battery state changed to {{value "payShieldBatteryState"}} on {{hostname}}.
     status: current
     varbinds:
       - payShieldBatteryState
@@ -181,7 +181,7 @@ traps:
     name: THALES-ESECURITY-PAYSHIELD-MIB::payShieldFanAlarm
     category: diagnostic
     severity: warning
-    description: Fan {payShieldFanNumber} reported state {payShieldFanState} on {_HOSTNAME}.
+    description: Fan {{value "payShieldFanNumber"}} alarm state changed to {{value "payShieldFanState"}} on {{hostname}}.
     status: current
     varbinds:
       - payShieldFanNumber
@@ -190,7 +190,7 @@ traps:
     name: THALES-ESECURITY-PAYSHIELD-MIB::payShieldTamperAlarm
     category: security
     severity: alert
-    description: Tamper detected with cause {payShieldTamperCause} on {_HOSTNAME}.
+    description: Tamper detected on hardware{{with value "payShieldTamperCause"}} cause {{.}}{{end}} on {{hostname}}.
     status: current
     varbinds:
       - payShieldTamperCause
@@ -199,7 +199,7 @@ traps:
     name: THALES-ESECURITY-PAYSHIELD-MIB::payShieldHostPortBadDataAlarm
     category: security
     severity: warning
-    description: Protocol breaking data detected on port {payShieldBadDataPhysicalPort} using {payShieldBadDataProtocol} on {_HOSTNAME}.
+    description: Protocol breaking data detected on port {{value "payShieldBadDataPhysicalPort"}} using {{value "payShieldBadDataProtocol"}} on {{hostname}}.
     status: current
     varbinds:
       - payShieldBadDataPhysicalPort
@@ -208,15 +208,15 @@ traps:
     name: THALES-ESECURITY-PAYSHIELD-MIB::payShieldFraudAlarm
     category: security
     severity: alert
-    description: Fraud limit exceeded for {payShieldFraudType} on {_HOSTNAME}.
+    description: Fraud limit exceeded (type {{value "payShieldFraudType"}}) on {{hostname}}.
     status: current
     varbinds:
       - payShieldFraudType
   - oid: 1.3.6.1.4.1.4096.999.2.2.12
     name: THALES-ESECURITY-PAYSHIELD-MIB::payShieldDiagnosticTestFailureAlarm
     category: diagnostic
-    severity: err
-    description: Diagnostic test {payShieldDiagnosticString} failed on {_HOSTNAME}.
+    severity: crit
+    description: Diagnostic test {{value "payShieldDiagnosticString"}} failed on {{hostname}}.
     status: current
     varbinds:
       - payShieldDiagnosticID
@@ -225,7 +225,7 @@ traps:
     name: THALES-ESECURITY-PAYSHIELD-MIB::payShieldErrorlogAlarm
     category: diagnostic
     severity: warning
-    description: Error log entry filled with {payShieldErrorLogData} on {_HOSTNAME}.
+    description: 'PayShield error log entry received{{with value "payShieldErrorLogData"}}: {{.}}{{end}} on {{hostname}}.'
     status: current
     varbinds:
       - payShieldErrorLogData
@@ -233,15 +233,15 @@ traps:
     name: THALES-ESECURITY-PAYSHIELD-MIB::payShieldSettingsModifiedAlarm
     category: config_change
     severity: notice
-    description: payShield setting {payShieldModifiedSetting} was modified on {_HOSTNAME}.
+    description: payShield setting {{value "payShieldModifiedSetting"}} was modified on {{hostname}}.
     status: current
     varbinds:
       - payShieldModifiedSetting
   - oid: 1.3.6.1.4.1.4096.999.2.2.15
     name: THALES-ESECURITY-PAYSHIELD-MIB::payShieldDeviceStateAlarm
-    category: state_change
-    severity: notice
-    description: payShield device state changed to {payShieldDeviceState} on {_HOSTNAME}.
+    category: diagnostic
+    severity: warning
+    description: PayShield device state changed to {{value "payShieldDeviceState"}} on {{hostname}}.
     status: current
     varbinds:
       - payShieldDeviceState
