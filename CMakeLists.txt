@@ -4386,41 +4386,57 @@ if(ENABLE_PLUGIN_GO)
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default)
 
-    file(GLOB GO_SNMP_TRAP_PROFILE_FILES
+    file(GLOB GO_SNMP_TRAP_PROFILE_FILES CONFIGURE_DEPENDS
             src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/*.yaml
             src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/*.yml)
-    install(FILES ${GO_SNMP_TRAP_PROFILE_FILES}
-            COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default)
+
+    set(SNMP_TRAP_PROFILE_PACK_DIR "${CMAKE_BINARY_DIR}/snmp-trap-profile-pack")
+    set(SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR "${SNMP_TRAP_PROFILE_PACK_DIR}/default")
+    set(SNMP_TRAP_PROFILE_PACK_STAMP "${SNMP_TRAP_PROFILE_PACK_DIR}/.compressed-stamp")
+    file(MAKE_DIRECTORY "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}")
+
+    add_custom_command(
+            OUTPUT "${SNMP_TRAP_PROFILE_PACK_STAMP}"
+            COMMAND "${CMAKE_COMMAND}" -E rm -rf "${SNMP_TRAP_PROFILE_PACK_DIR}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}"
+            COMMAND "${CMAKE_COMMAND}" -E copy_directory
+                "${CMAKE_SOURCE_DIR}/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default"
+                "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}"
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+                "${CMAKE_SOURCE_DIR}/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json"
+                "${SNMP_TRAP_PROFILE_PACK_DIR}/catalogue.json"
+            COMMAND "${CMAKE_COMMAND}" -E env
+                GOROOT=${GO_ROOT}
+                CGO_ENABLED=0
+                GOPROXY=https://proxy.golang.org,direct
+                "${GO_EXECUTABLE}" run -buildvcs=false -ldflags "${GO_LDFLAGS}" ./cmd/snmptrapprofilegen compress-zstd --rm
+                "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}"
+                "${SNMP_TRAP_PROFILE_PACK_DIR}/catalogue.json"
+            COMMAND "${CMAKE_COMMAND}" -E touch "${SNMP_TRAP_PROFILE_PACK_STAMP}"
+            DEPENDS
+                ${GO_SNMP_TRAP_PROFILE_FILES}
+                "${CMAKE_SOURCE_DIR}/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json"
+                ${snmp_trap_profile_gen_DEPS}
+            COMMENT "Compressing SNMP trap profile pack"
+            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/src/go"
+            VERBATIM)
+    add_custom_target(snmp_trap_profile_pack ALL
+            DEPENDS "${SNMP_TRAP_PROFILE_PACK_STAMP}")
+
     install(CODE "
-        file(GLOB _snmp_trap_profiles
-            \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default/*.yaml\"
-            \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default/*.yml\")
-        foreach(_profile IN LISTS _snmp_trap_profiles)
-            execute_process(
-                COMMAND \"${CMAKE_BINARY_DIR}/${SNMP_TRAP_PROFILE_GEN_BIN}\" compress-zstd --rm \"\${_profile}\"
-                RESULT_VARIABLE _zstd_result
-                ERROR_VARIABLE _zstd_error)
-            if(NOT _zstd_result EQUAL 0)
-                message(FATAL_ERROR \"failed to zstd-compress SNMP trap profile '\${_profile}': \${_zstd_error}\")
-            endif()
-        endforeach()
-    " COMPONENT plugin-go)
-    install(FILES src/go/plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json
-            COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
-    install(CODE "
-        set(_snmp_trap_catalogue \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/catalogue.json\")
-        if(EXISTS \"\${_snmp_trap_catalogue}\")
-            execute_process(
-                COMMAND \"${CMAKE_BINARY_DIR}/${SNMP_TRAP_PROFILE_GEN_BIN}\" compress-zstd --rm \"\${_snmp_trap_catalogue}\"
-                RESULT_VARIABLE _zstd_result
-                ERROR_VARIABLE _zstd_error)
-            if(NOT _zstd_result EQUAL 0)
-                message(FATAL_ERROR \"failed to zstd-compress SNMP trap profile catalogue '\${_snmp_trap_catalogue}': \${_zstd_error}\")
-            endif()
+        if(NOT EXISTS \"${SNMP_TRAP_PROFILE_PACK_STAMP}\")
+            message(FATAL_ERROR \"SNMP trap profile pack is not built; build target snmp_trap_profile_pack before install\")
         endif()
     " COMPONENT plugin-go)
+    install(DIRECTORY "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}/"
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default
+            FILES_MATCHING
+                PATTERN "*.yaml.zst"
+                PATTERN "*.yml.zst")
+    install(FILES "${SNMP_TRAP_PROFILE_PACK_DIR}/catalogue.json.zst"
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
     install(FILES src/go/plugin/go.d/config/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)

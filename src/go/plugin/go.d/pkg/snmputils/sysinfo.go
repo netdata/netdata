@@ -16,7 +16,7 @@ import (
 	"github.com/gosnmp/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
+	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 )
 
 var log = logger.New().With("component", "snmp/sysinfo")
@@ -194,8 +194,8 @@ func enterpriseNumbersFilePath() string {
 	if path := strings.TrimSpace(enterpriseNumbersPathOverride); path != "" {
 		return path
 	}
-	if dir := strings.TrimSpace(buildinfo.StockConfigDir); dir != "" {
-		return filepath.Join(dir, "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt")
+	if dir := strings.TrimSpace(pluginconfig.CollectorsStockDir()); dir != "" {
+		return filepath.Join(dir, "snmp.trap-profiles", "iana-enterprise-numbers.txt")
 	}
 	for _, candidate := range enterpriseNumbersFileCandidates() {
 		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {

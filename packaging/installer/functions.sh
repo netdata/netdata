@@ -784,9 +784,19 @@ install_netdata_snmp_trap_journal_dir() {
     return 0
   fi
 
-  run mkdir -p /var/log/journal/netdata/snmp-traps || return 1
-  run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" /var/log/journal/netdata || return 1
-  run chmod 0755 /var/log/journal/netdata /var/log/journal/netdata/snmp-traps || return 1
+  if ! run mkdir -p /var/log/journal/netdata/snmp-traps; then
+    warning "Failed to create /var/log/journal/netdata/snmp-traps. SNMP trap jobs using direct journals will fail until it is created manually."
+    return 0
+  fi
+  if ! run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" /var/log/journal/netdata; then
+    warning "Failed to set ownership on /var/log/journal/netdata. SNMP trap jobs using direct journals will fail until it is fixed manually."
+    return 0
+  fi
+  if ! run chmod 0755 /var/log/journal/netdata /var/log/journal/netdata/snmp-traps; then
+    warning "Failed to set permissions on /var/log/journal/netdata/snmp-traps. SNMP trap jobs using direct journals will fail until it is fixed manually."
+  fi
+
+  return 0
 }
 
 install_netdata_dirs() {
@@ -819,9 +829,7 @@ install_netdata_dirs() {
     run chmod 770 "${NETDATA_CLAIMING_DIR}"
   fi
 
-  if ! install_netdata_snmp_trap_journal_dir; then
-    warning "Failed to create /var/log/journal/netdata/snmp-traps. SNMP trap jobs using direct journals will fail until it is created manually."
-  fi
+  install_netdata_snmp_trap_journal_dir
 }
 
 # -----------------------------------------------------------------------------

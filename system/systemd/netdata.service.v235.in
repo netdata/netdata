@@ -12,7 +12,7 @@ Type=simple
 User=root
 Group=netdata
 EnvironmentFile=-/etc/default/netdata
-ExecStartPre=/bin/sh -c 'if [ -d /var/log/journal ]; then install -d -o @netdata_user_POST@ -g @netdata_group_POST@ -m 0755 /var/log/journal/netdata /var/log/journal/netdata/snmp-traps; fi'
+ExecStartPre=-/bin/sh -c 'if [ -d /var/log/journal ]; then install -d -o @netdata_user_POST@ -g @netdata_group_POST@ -m 0755 /var/log/journal/netdata /var/log/journal/netdata/snmp-traps; fi'
 ExecStart=@sbindir_POST@/netdata -D $EXTRA_OPTS
 
 # saving a big db on slow disks may need some time

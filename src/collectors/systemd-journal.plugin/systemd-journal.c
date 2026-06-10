@@ -153,27 +153,16 @@ static __always_inline SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(cons
                                                                                                                                \
     "|TRAP_REPORT_TYPE"                                                                                                        \
     "|TRAP_DECODE_ERROR_KIND"                                                                                                  \
-    "|TRAP_DECODE_ERROR"                                                                                                       \
-    "|TRAP_REPORT_PERIOD_SEC"                                                                                                  \
     "|TRAP_JOB"                                                                                                                \
     "|TRAP_OID"                                                                                                                \
     "|TRAP_NAME"                                                                                                               \
     "|TRAP_CATEGORY"                                                                                                           \
     "|TRAP_SEVERITY"                                                                                                           \
-    "|TRAP_SUPPRESSED_COUNT"                                                                                                   \
-    "|TRAP_SUPPRESSED_FINGERPRINTS"                                                                                            \
     "|TRAP_PDU_TYPE"                                                                                                           \
     "|TRAP_VERSION"                                                                                                            \
     "|TRAP_SOURCE_IP"                                                                                                          \
-    "|TRAP_SOURCE_UDP_PEER"                                                                                                    \
-    "|TRAP_SOURCE_UDP_PORT"                                                                                                    \
     "|TRAP_LISTENER"                                                                                                           \
-    "|TRAP_ENGINE_ID"                                                                                                          \
-    "|TRAP_PACKET_SIZE"                                                                                                        \
-    "|TRAP_PACKET_SHA256"                                                                                                      \
     "|TRAP_DEVICE_VENDOR"                                                                                                      \
-    "|TRAP_INTERFACE"                                                                                                          \
-    "|TRAP_NEIGHBORS"                                                                                                          \
     "|TRAP_TAG_*"                                                                                                              \
                                                                                                                                \
     ""

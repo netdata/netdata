@@ -424,11 +424,41 @@ func compressZstdCommand(args []string) error {
 		return errors.New("compress-zstd requires at least one file")
 	}
 	for _, path := range fs.Args() {
-		if err := compressZstdFile(path, *removeSource); err != nil {
+		if err := compressZstdPath(path, *removeSource); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func compressZstdPath(path string, removeSource bool) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return compressZstdFile(path, removeSource)
+	}
+	return filepath.WalkDir(path, func(child string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		name := d.Name()
+		if strings.HasSuffix(name, ".zst") || strings.HasSuffix(name, ".gz") || strings.HasSuffix(name, ".tmp") {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		return compressZstdFile(child, removeSource)
+	})
 }
 
 func compressZstdFile(path string, removeSource bool) error {

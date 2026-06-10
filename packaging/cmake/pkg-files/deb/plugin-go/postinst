@@ -11,7 +11,9 @@ case "$1" in
         chmod 0750 /usr/libexec/netdata/plugins.d/snmp-trap-profile-gen
     fi
     if [ -d /var/log/journal ]; then
-        install -d -o netdata -g netdata -m 0755 /var/log/journal/netdata /var/log/journal/netdata/snmp-traps
+        if ! install -d -o netdata -g netdata -m 0755 /var/log/journal/netdata /var/log/journal/netdata/snmp-traps; then
+            echo "warning: failed to create /var/log/journal/netdata/snmp-traps; SNMP trap jobs using direct journals will fail until it is created manually." >&2
+        fi
     fi
     if ! setcap "cap_dac_read_search+epi cap_net_admin=eip cap_net_raw=eip cap_net_bind_service=eip" /usr/libexec/netdata/plugins.d/go.d.plugin; then
         chmod -f 4750 /usr/libexec/netdata/plugins.d/go.d.plugin

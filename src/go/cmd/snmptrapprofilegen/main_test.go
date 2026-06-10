@@ -73,6 +73,41 @@ func TestCompressZstdCommandCompressesAndRemovesSource(t *testing.T) {
 	}
 }
 
+func TestCompressZstdCommandCompressesDirectory(t *testing.T) {
+	dir := t.TempDir()
+	sourcePath := filepath.Join(dir, "vendor.yaml")
+	nestedDir := filepath.Join(dir, "nested")
+	if err := os.Mkdir(nestedDir, 0o755); err != nil {
+		t.Fatalf("create nested dir: %v", err)
+	}
+	nestedSourcePath := filepath.Join(nestedDir, "catalogue.json")
+	if err := os.WriteFile(sourcePath, []byte("profile: vendor\n"), 0o640); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if err := os.WriteFile(nestedSourcePath, []byte(`{"vendor":{}}`), 0o640); err != nil {
+		t.Fatalf("write nested source: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "already.yaml.zst"), []byte("compressed"), 0o640); err != nil {
+		t.Fatalf("write already compressed source: %v", err)
+	}
+
+	if err := compressZstdCommand([]string{"--rm", dir}); err != nil {
+		t.Fatalf("compress-zstd failed: %v", err)
+	}
+
+	if _, err := os.Stat(sourcePath); !os.IsNotExist(err) {
+		t.Fatalf("source file still exists after --rm: %v", err)
+	}
+	if _, err := os.Stat(nestedSourcePath); !os.IsNotExist(err) {
+		t.Fatalf("nested source file still exists after --rm: %v", err)
+	}
+	for _, path := range []string{sourcePath + ".zst", nestedSourcePath + ".zst", filepath.Join(dir, "already.yaml.zst")} {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("expected file %s: %v", path, err)
+		}
+	}
+}
+
 func TestExtractFixtureCoversSMIv1AndSMIv2Traps(t *testing.T) {
 	dir := t.TempDir()
 	writeTestMIB(t, dir, "TEST-SMIV1-MIB.mib", testSMIv1MIB)

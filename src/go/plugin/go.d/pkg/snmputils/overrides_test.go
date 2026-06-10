@@ -8,8 +8,6 @@ import (
 	"github.com/gosnmp/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 )
 
 func withOverrides(t *testing.T, o *overrides) func() {
@@ -140,12 +138,9 @@ func TestLookupEnterpriseNumberLoadsRegistryFromDisk(t *testing.T) {
 
 func TestEnterpriseNumbersFilePathFindsSourceTreeRegistry(t *testing.T) {
 	oldPath := enterpriseNumbersPathOverride
-	oldStockConfigDir := buildinfo.StockConfigDir
 	enterpriseNumbersPathOverride = ""
-	buildinfo.StockConfigDir = ""
 	t.Cleanup(func() {
 		enterpriseNumbersPathOverride = oldPath
-		buildinfo.StockConfigDir = oldStockConfigDir
 	})
 
 	path := enterpriseNumbersFilePath()
@@ -238,4 +233,23 @@ func TestAllMetadataYAMLsLoadAndMerge(t *testing.T) {
 	agg, err := loadOverridesFromDir(dir)
 	require.NoError(t, err, "every YAML must parse strictly without errors")
 	require.NotNil(t, agg, "aggregate overrides must not be nil")
+}
+
+func TestShippedOrgToVendorOverridesCoverCurrentPENRenames(t *testing.T) {
+	dir := getSnmpMetadataDir()
+	require.NotEmpty(t, dir, "metadata dir must resolve in tests")
+
+	agg, err := loadOverridesFromDir(dir)
+	require.NoError(t, err)
+	require.Equal(t, "Infinera", agg.EnterpriseNumbers.OrgToVendor["Nokia (formerly 'Infinera Corp.')"])
+
+	withEnterpriseNumbersFile(t, enterpriseNumbersFilePath())
+	rawOrg := lookupEnterpriseNumber("1.3.6.1.4.1.21296.1")
+	require.Equal(t, "Nokia (formerly 'Infinera Corp.')", rawOrg)
+
+	defer withOverrides(t, agg)()
+	si := &SysInfo{SysObjectID: "1.3.6.1.4.1.21296.1"}
+	updateMetadata(si)
+
+	assert.Equal(t, "Infinera", si.Vendor)
 }
