@@ -720,6 +720,13 @@ static inline int getgrgid_r(gid_t gid __maybe_unused,
 #define pipe(fds) _pipe((fds), 65536, _O_BINARY)
 #endif
 
+// ── pipe2() ── Linux extension that creates a pipe and sets flags atomically ──
+// UCRT64 has no pipe2(); flags (O_CLOEXEC, O_NONBLOCK) are either 0 or no-ops
+// on Windows, so ignoring them is safe.
+static inline int pipe2(int pipefd[2], int flags __maybe_unused) {
+    return pipe(pipefd);
+}
+
 // ── kill() stub ── POSIX, absent from UCRT64 ─────────────────────────────────
 // Callers in spawn_server_windows.c already follow up with TerminateProcess().
 static inline int kill(pid_t pid __maybe_unused, int sig __maybe_unused) {
