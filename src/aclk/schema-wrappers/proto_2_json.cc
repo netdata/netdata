@@ -1,6 +1,8 @@
 #include <google/protobuf/message.h>
 #include <google/protobuf/util/json_util.h>
 
+#include <memory>
+
 #include "alarm/v1/config.pb.h"
 #include "alarm/v1/stream.pb.h"
 #include "aclk/v1/lib.pb.h"
@@ -72,14 +74,14 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
 
 char *protomsg_to_json(const void *protobin, size_t len, const char *msgname)
 {
-    google::protobuf::Message *msg = msg_name_to_protomsg(msgname);
-    if (msg == NULL)
+    // unique_ptr owns the message and frees it on every return path, so no
+    // manual delete is needed (and no path can leak it).
+    std::unique_ptr<google::protobuf::Message> msg(msg_name_to_protomsg(msgname));
+    if (msg == nullptr)
         return strdupz("Don't know this message type by name.");
 
-    if (!msg->ParseFromArray(protobin, len)) {
-        delete msg;
+    if (!msg->ParseFromArray(protobin, len))
         return strdupz("Can't parse this message. Malformed or wrong parser used.");
-    }
 
     JsonPrintOptions options;
 
@@ -89,7 +91,6 @@ char *protomsg_to_json(const void *protobin, size_t len, const char *msgname)
     // 'output' is empty/partial, so check it instead of returning a silent
     // truncated result. .ok() is available on both Status types.
     auto status = google::protobuf::util::MessageToJsonString(*msg, &output, options);
-    delete msg;
     if (!status.ok())
         return strdupz("Failed to convert this message to JSON.");
     return strdupz(output.c_str());
