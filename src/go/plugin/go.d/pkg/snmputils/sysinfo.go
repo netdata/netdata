@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -185,16 +186,25 @@ func enterpriseNumbersFilePath() string {
 	if dir := strings.TrimSpace(buildinfo.StockConfigDir); dir != "" {
 		return filepath.Join(dir, "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt")
 	}
-	for _, candidate := range []string{
-		filepath.Join("..", "..", "config", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt"),
-		filepath.Join("plugin", "go.d", "config", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt"),
-		filepath.Join("src", "go", "plugin", "go.d", "config", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt"),
-	} {
+	for _, candidate := range enterpriseNumbersFileCandidates() {
 		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
 			return candidate
 		}
 	}
 	return filepath.Join("/usr/lib/netdata/conf.d", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt")
+}
+
+func enterpriseNumbersFileCandidates() []string {
+	candidates := []string{
+		filepath.Join("..", "..", "config", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt"),
+		filepath.Join("plugin", "go.d", "config", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt"),
+		filepath.Join("src", "go", "plugin", "go.d", "config", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt"),
+	}
+	if _, file, _, ok := runtime.Caller(0); ok {
+		sourceCandidate := filepath.Join(filepath.Dir(file), "..", "..", "config", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt")
+		candidates = append([]string{sourceCandidate}, candidates...)
+	}
+	return candidates
 }
 
 func loadEnterpriseNumbers(path string) (map[string]string, error) {

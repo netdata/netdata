@@ -8,6 +8,8 @@ import (
 	"github.com/gosnmp/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 )
 
 func withOverrides(t *testing.T, o *overrides) func() {
@@ -134,6 +136,22 @@ func TestLookupEnterpriseNumberLoadsRegistryFromDisk(t *testing.T) {
 	assert.Empty(t, lookupEnterpriseNumber("1.3.6.1.4.1.424243.1"))
 	assert.Empty(t, lookupEnterpriseNumber("1.3.6.1.4.1.424244.1"))
 	assert.Equal(t, "Other Devices Inc.", lookupEnterpriseNumber("1.3.6.1.4.1.424245.1"))
+}
+
+func TestEnterpriseNumbersFilePathFindsSourceTreeRegistry(t *testing.T) {
+	oldPath := enterpriseNumbersPathOverride
+	oldStockConfigDir := buildinfo.StockConfigDir
+	enterpriseNumbersPathOverride = ""
+	buildinfo.StockConfigDir = ""
+	t.Cleanup(func() {
+		enterpriseNumbersPathOverride = oldPath
+		buildinfo.StockConfigDir = oldStockConfigDir
+	})
+
+	path := enterpriseNumbersFilePath()
+
+	require.FileExists(t, path)
+	assert.Contains(t, filepath.ToSlash(path), "plugin/go.d/config/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt")
 }
 
 func TestLookupEnterpriseNumberMissingRegistryReturnsEmpty(t *testing.T) {

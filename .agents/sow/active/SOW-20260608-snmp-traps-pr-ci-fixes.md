@@ -47,6 +47,15 @@ Problem/root-cause model:
   markdownlint findings in the generated SNMP traps integration page, and the
   Sonar quality gate duplication threshold.
 - The SOW `no-working-files` failure is intentional branch-local merge guarding, not a code defect, and is excluded from this batch by user direction to keep SOW files locally.
+- The 2026-06-10 Go toolchain failures after commit `385bec4619` are not
+  another `go fix` diff. All failed Go toolchain shards fail
+  `TestDiscoverer_Run/simple_discovery` because `snmputils` returns empty
+  `SysInfo.Organization` where the test expects `net-snmp`.
+- Root cause: the lazy IANA PEN loader removed the embedded registry and now
+  reads `iana-enterprise-numbers.txt` from disk. Source-tree tests in CI do not
+  have an installed `/usr/lib/netdata/conf.d/...` registry, and the current
+  relative source-tree fallbacks are evaluated from each package test directory,
+  so they miss `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/`.
 
 Evidence reviewed:
 
@@ -78,6 +87,8 @@ Affected contracts and surfaces:
 Clean-end-state target:
 
 - CI-relevant lint/toolchain/static-analysis findings caused by the branch are fixed with minimal behavior change.
+- Lazy PEN lookup remains disk-backed and first-use only, but source-tree tests
+  can find the committed registry without an installed Netdata tree.
 - Static artifacts include the SNMP trap profile generator wherever the runtime
   checker expects it, instead of weakening the runtime check.
 - Generated SNMP traps integration documentation is produced in the repository's
@@ -139,6 +150,22 @@ Open decisions:
 
 ## Validation
 
+- 2026-06-10 PEN source-tree lookup fix:
+  - All failed Go toolchain shards for commit `385bec4619` failed
+    `TestDiscoverer_Run/simple_discovery`.
+  - The test expected `SysInfo.Organization` to resolve to `net-snmp`; CI got
+    an empty value because the lazy disk-backed IANA PEN loader could not find
+    the committed registry from package test working directories.
+  - Implemented a `runtime.Caller` source-file fallback after
+    `buildinfo.StockConfigDir`, preserving first-use disk loading and avoiding
+    any embedded PEN registry.
+  - Added `TestEnterpriseNumbersFilePathFindsSourceTreeRegistry` to prove
+    source-tree tests can find the committed registry without an installed
+    Netdata tree.
+  - `go test -count=1 ./plugin/go.d/pkg/snmputils
+    ./plugin/go.d/discovery/sdext/discoverer/snmpsd
+    ./plugin/go.d/collector/snmp_traps ./cmd/snmptrapprofilegen` passed.
+  - `git diff --check` completed without warnings.
 - 2026-06-10 Go 1.26 follow-up:
   - Current PR CI failed the Go toolchain job because `go fix ./...` still
     wanted mechanical changes in:
