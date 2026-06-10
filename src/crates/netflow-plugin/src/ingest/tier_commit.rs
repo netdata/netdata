@@ -16,6 +16,393 @@
 
 use super::*;
 use crate::tiering::MetricBucket;
+use std::collections::BTreeSet;
+use std::sync::Condvar;
+use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::AtomicU32;
+use std::time::Instant;
+
+const TIER_WORKERS: [TierKind; 3] = MATERIALIZED_TIERS;
+/// Wake stagger after each tier's epoch boundary (1m/5m/1h order). Content is
+/// epoch-keyed at accumulation time, so stagger only spreads disk work.
+const TIER_WAKE_STAGGER_USEC: [u64; 3] = [1_000_000, 2_000_000, 3_000_000];
+const WORKER_STACK_BYTES: usize = 512 * 1024;
+const SHUTDOWN_JOIN_TIMEOUT: Duration = Duration::from_secs(30);
+
+fn tier_bit(index: usize) -> u32 {
+    1 << index
+}
+
+/// Doorbell + per-tier exchange slots shared between the receive thread and
+/// the commit workers. `request_flags` lives alone on its cache line: the
+/// receive thread loads it once per packet, and it must never false-share
+/// with slot state.
+#[repr(align(64))]
+struct Doorbell(AtomicU32);
+
+pub(super) struct TierHandoffShared {
+    request_flags: Doorbell,
+    shutdown: AtomicBool,
+    slots: [TierSlotSync; 3],
+}
+
+struct TierSlotSync {
+    slot: Mutex<TierSlot>,
+    ready: Condvar,
+}
+
+#[derive(Default)]
+struct TierSlot {
+    /// main -> worker: closed, epoch-keyed buckets.
+    pending: Vec<(u64, MetricBucket)>,
+    /// worker -> main: cleared containers, capacity retained.
+    recycled: Vec<MetricBucket>,
+    /// Bumped by the main thread on every response; the workers' wait
+    /// predicate (immune to spurious wakeups and lost notifies).
+    generation: u64,
+    /// Hours covered by `pending` — unioned into the prune's active set so
+    /// flow-index entries a worker still needs are never pruned mid-commit.
+    in_flight_hours: BTreeSet<u64>,
+    /// Observability, mirrored into charts by the tick.
+    last_commit_usec: u64,
+    last_commit_duration_usec: u64,
+    committed_batches: u64,
+}
+
+impl TierHandoffShared {
+    pub(super) fn new() -> Self {
+        let slot = || TierSlotSync {
+            slot: Mutex::new(TierSlot {
+                pending: Vec::with_capacity(4),
+                recycled: Vec::with_capacity(4),
+                ..TierSlot::default()
+            }),
+            ready: Condvar::new(),
+        };
+        Self {
+            request_flags: Doorbell(AtomicU32::new(0)),
+            shutdown: AtomicBool::new(false),
+            slots: [slot(), slot(), slot()],
+        }
+    }
+
+    /// The receive thread's per-packet cost: one relaxed load.
+    pub(super) fn has_requests(&self) -> bool {
+        self.request_flags.0.load(Ordering::Relaxed) != 0
+    }
+
+    pub(super) fn requested(&self, index: usize) -> bool {
+        self.request_flags.0.load(Ordering::Relaxed) & tier_bit(index) != 0
+    }
+
+    /// Main-thread response: move `taken` buckets in, recycled containers
+    /// out, clear the doorbell bit, bump the generation, wake the worker.
+    /// Returns the containers the worker has finished with.
+    pub(super) fn respond(
+        &self,
+        index: usize,
+        taken: Vec<(u64, MetricBucket)>,
+        in_flight_hours: BTreeSet<u64>,
+    ) -> Vec<MetricBucket> {
+        let sync = &self.slots[index];
+        let mut slot = match sync.slot.lock() {
+            Ok(slot) => slot,
+            Err(poisoned) => {
+                // A worker panic aborts the process (see worker_loop); a
+                // poisoned slot here means that abort is already in flight.
+                tracing::error!("tier slot {index} poisoned; aborting");
+                drop(poisoned);
+                std::process::abort();
+            }
+        };
+        slot.pending.extend(taken);
+        slot.in_flight_hours.extend(in_flight_hours);
+        let recycled = std::mem::take(&mut slot.recycled);
+        self.request_flags
+            .0
+            .fetch_and(!tier_bit(index), Ordering::Relaxed);
+        slot.generation = slot.generation.wrapping_add(1);
+        sync.ready.notify_one();
+        recycled
+    }
+
+    /// Hours still being committed, unioned by the tick's prune.
+    pub(super) fn in_flight_hours(&self, into: &mut BTreeSet<u64>) {
+        for sync in &self.slots {
+            if let Ok(slot) = sync.slot.lock() {
+                into.extend(slot.in_flight_hours.iter().copied());
+            }
+        }
+    }
+
+    pub(super) fn commit_telemetry(&self, index: usize) -> (u64, u64, u64) {
+        match self.slots[index].slot.lock() {
+            Ok(slot) => (
+                slot.last_commit_usec,
+                slot.last_commit_duration_usec,
+                slot.committed_batches,
+            ),
+            Err(_) => (0, 0, 0),
+        }
+    }
+
+    pub(super) fn begin_shutdown(&self) {
+        self.shutdown.store(true, Ordering::Relaxed);
+        for sync in &self.slots {
+            sync.ready.notify_all();
+        }
+    }
+}
+
+/// Everything a tier commit worker owns. Constructed on the main thread
+/// (the SDK `Log` is `Send`) and moved into the worker.
+pub(super) struct TierWorker {
+    pub(super) tier: TierKind,
+    pub(super) index: usize,
+    pub(super) writer: Log,
+    pub(super) tier_flow_indexes: Arc<RwLock<TierFlowIndexStore>>,
+    pub(super) facet_runtime: Arc<crate::facet_runtime::FacetRuntime>,
+    pub(super) metrics: Arc<IngestMetrics>,
+    pub(super) consecutive_sync_failures: u32,
+}
+
+pub(super) fn spawn_tier_workers(
+    shared: &Arc<TierHandoffShared>,
+    workers: Vec<TierWorker>,
+) -> Vec<std::thread::JoinHandle<()>> {
+    workers
+        .into_iter()
+        .map(|worker| {
+            let shared = Arc::clone(shared);
+            let name = format!("nf-tier-{}", tier_thread_suffix(worker.tier));
+            std::thread::Builder::new()
+                .name(name)
+                .stack_size(WORKER_STACK_BYTES)
+                .spawn(move || {
+                    // Loud-failure policy: a panicking worker must not leave a
+                    // poisoned slot silently stalling its tier (unbounded
+                    // accumulator growth). Abort; the agent restarts the
+                    // plugin and rebuild-from-raw recovers the tiers.
+                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        worker_loop(&shared, worker);
+                    }));
+                    if let Err(panic) = result {
+                        tracing::error!("tier commit worker panicked: {:?}", panic);
+                        std::process::abort();
+                    }
+                })
+                .expect("spawn tier commit worker")
+        })
+        .collect()
+}
+
+fn tier_thread_suffix(tier: TierKind) -> &'static str {
+    match tier {
+        TierKind::Minute1 => "1m",
+        TierKind::Minute5 => "5m",
+        TierKind::Hour1 => "1h",
+        TierKind::Raw => "raw",
+    }
+}
+
+fn worker_loop(shared: &TierHandoffShared, mut worker: TierWorker) {
+    let bucket_usec = worker
+        .tier
+        .bucket_duration()
+        .expect("materialized tier has a bucket duration")
+        .as_micros() as u64;
+    let stagger = TIER_WAKE_STAGGER_USEC[worker.index];
+    let mut encode_buf = JournalEncodeBuffer::new();
+    let mut seen_generation = 0_u64;
+    // Claim once immediately: buckets that closed while a long rebuild ran
+    // commit now instead of waiting for the first anniversary.
+    let mut next_wake = Instant::now();
+
+    loop {
+        // Sleep to the next anniversary (or immediately on the first pass),
+        // waking early on shutdown or an early response. All blocking goes
+        // through wait_timeout_while with the predicate evaluated under the
+        // slot mutex — lost wakeups are impossible by construction.
+        let sync = &shared.slots[worker.index];
+        {
+            let mut slot = sync.slot.lock().unwrap_or_else(|_| std::process::abort());
+            while !shared.shutdown.load(Ordering::Relaxed) {
+                let now = Instant::now();
+                if now >= next_wake {
+                    break;
+                }
+                let (next, _timeout) = sync
+                    .ready
+                    .wait_timeout(slot, next_wake - now)
+                    .unwrap_or_else(|_| std::process::abort());
+                slot = next;
+            }
+        }
+        if shared.shutdown.load(Ordering::Relaxed) {
+            drain_and_exit(shared, &mut worker, bucket_usec, &mut encode_buf, seen_generation);
+            return;
+        }
+
+        // Raise the doorbell and wait for the main thread's response.
+        shared
+            .request_flags
+            .0
+            .fetch_or(tier_bit(worker.index), Ordering::Relaxed);
+        let batch = {
+            let slot = sync.slot.lock().unwrap_or_else(|_| std::process::abort());
+            let mut slot = sync
+                .ready
+                .wait_while(slot, |slot| {
+                    slot.generation == seen_generation
+                        && !shared.shutdown.load(Ordering::Relaxed)
+                })
+                .unwrap_or_else(|_| std::process::abort());
+            seen_generation = slot.generation;
+            std::mem::take(&mut slot.pending)
+        };
+
+        commit_and_return(shared, &mut worker, bucket_usec, &mut encode_buf, batch);
+
+        if shared.shutdown.load(Ordering::Relaxed) {
+            drain_and_exit(shared, &mut worker, bucket_usec, &mut encode_buf, seen_generation);
+            return;
+        }
+
+        next_wake = next_anniversary(bucket_usec, stagger);
+    }
+}
+
+/// Commit a claimed batch, fsync once, return the cleared containers and
+/// telemetry through the slot.
+fn commit_and_return(
+    shared: &TierHandoffShared,
+    worker: &mut TierWorker,
+    bucket_usec: u64,
+    encode_buf: &mut JournalEncodeBuffer,
+    batch: Vec<(u64, MetricBucket)>,
+) {
+    if batch.is_empty() {
+        return;
+    }
+    let started = Instant::now();
+    commit_batch(
+        worker.tier,
+        bucket_usec,
+        &batch,
+        &worker.tier_flow_indexes,
+        &mut worker.writer,
+        encode_buf,
+        &worker.facet_runtime,
+        &worker.metrics,
+    );
+    sync_with_failure_policy(worker);
+    let duration_usec = started.elapsed().as_micros() as u64;
+
+    let mut containers: Vec<MetricBucket> = batch
+        .into_iter()
+        .map(|(_, mut bucket)| {
+            bucket.clear();
+            bucket
+        })
+        .collect();
+    let sync = &shared.slots[worker.index];
+    let mut slot = sync.slot.lock().unwrap_or_else(|_| std::process::abort());
+    slot.recycled.append(&mut containers);
+    slot.in_flight_hours.clear();
+    slot.last_commit_usec = now_usec();
+    slot.last_commit_duration_usec = duration_usec;
+    slot.committed_batches = slot.committed_batches.wrapping_add(1);
+}
+
+/// Per-commit durability for the long-retention tiers, with the loud-failure
+/// policy: three consecutive sync failures abort the process.
+fn sync_with_failure_policy(worker: &mut TierWorker) {
+    if let Err(err) = worker.writer.sync() {
+        worker
+            .metrics
+            .tier_journal_sync_errors
+            .fetch_add(1, Ordering::Relaxed);
+        worker.consecutive_sync_failures += 1;
+        tracing::warn!(
+            "tier {:?} journal sync failed ({} consecutive): {}",
+            worker.tier,
+            worker.consecutive_sync_failures,
+            err
+        );
+        if worker.consecutive_sync_failures >= 3 {
+            tracing::error!(
+                "tier {:?}: 3 consecutive journal sync failures — aborting (durability tiers must fail loud)",
+                worker.tier
+            );
+            std::process::abort();
+        }
+    } else {
+        worker.consecutive_sync_failures = 0;
+    }
+}
+
+/// Final drain: claim whatever the main thread posted with the shutdown
+/// signal, commit it best-effort, sync, and exit. Write failures during the
+/// drain are logged and counted, never abort.
+fn drain_and_exit(
+    shared: &TierHandoffShared,
+    worker: &mut TierWorker,
+    bucket_usec: u64,
+    encode_buf: &mut JournalEncodeBuffer,
+    _seen_generation: u64,
+) {
+    let batch = {
+        let sync = &shared.slots[worker.index];
+        let mut slot = sync.slot.lock().unwrap_or_else(|_| std::process::abort());
+        std::mem::take(&mut slot.pending)
+    };
+    if !batch.is_empty() {
+        commit_batch(
+            worker.tier,
+            bucket_usec,
+            &batch,
+            &worker.tier_flow_indexes,
+            &mut worker.writer,
+            encode_buf,
+            &worker.facet_runtime,
+            &worker.metrics,
+        );
+    }
+    if let Err(err) = worker.writer.sync() {
+        worker
+            .metrics
+            .tier_journal_sync_errors
+            .fetch_add(1, Ordering::Relaxed);
+        tracing::warn!("tier {:?} final sync failed: {}", worker.tier, err);
+    }
+}
+
+/// Wall-clock instant of the next epoch boundary + stagger for this tier.
+fn next_anniversary(bucket_usec: u64, stagger_usec: u64) -> Instant {
+    let now = now_usec();
+    let next_boundary = (now / bucket_usec + 1) * bucket_usec + stagger_usec;
+    Instant::now() + Duration::from_micros(next_boundary.saturating_sub(now))
+}
+
+/// Join the workers with a deadline; on expiry, log and abandon (the process
+/// is exiting anyway).
+pub(super) fn join_workers(handles: Vec<std::thread::JoinHandle<()>>) {
+    let deadline = Instant::now() + SHUTDOWN_JOIN_TIMEOUT;
+    for handle in handles {
+        let name = handle.thread().name().unwrap_or("nf-tier-?").to_string();
+        while !handle.is_finished() {
+            if Instant::now() >= deadline {
+                tracing::error!("{name} did not finish within the shutdown deadline; abandoning");
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        if handle.join().is_err() {
+            tracing::error!("{name} terminated with a panic during shutdown");
+        }
+    }
+}
 
 /// Commit a batch of closed, epoch-keyed buckets to one tier's journal.
 ///

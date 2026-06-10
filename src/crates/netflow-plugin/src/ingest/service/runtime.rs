@@ -4,6 +4,7 @@ use super::IngestService;
 impl IngestService {
     pub(crate) async fn run(mut self, shutdown: CancellationToken) -> Result<()> {
         self.rebuild_materialized_from_raw().await?;
+        self.spawn_tier_commit_workers();
 
         let listen = self.cfg.listener.listen.clone();
         let socket = UdpSocket::bind(&listen)
@@ -48,7 +49,13 @@ impl IngestService {
     fn handle_sync_tick(&mut self, entries_since_sync: usize) -> usize {
         let now = now_usec();
         self.decoders.refresh_enrichment_state();
-        self.run_tier_maintenance(now);
+        // Tier commits belong to the workers; the tick serves handoff
+        // requests (covers idle networks), prunes with in-flight awareness,
+        // and refreshes the open-tier snapshot — all moved here from the
+        // per-packet path.
+        self.handle_tier_handoffs();
+        self.prune_unused_tier_flow_indexes();
+        self.refresh_open_tier_state(now);
         let entries_since_sync = if self.periodic_sync_enabled() {
             self.sync_if_needed(entries_since_sync)
         } else {
@@ -128,7 +135,8 @@ impl IngestService {
             }
         }
 
-        self.run_tier_maintenance(now_usec());
+        // Per-packet cost of the tier handoff: one relaxed atomic load.
+        self.handle_tier_handoffs();
         self.sync_if_threshold_reached(entries_since_sync)
     }
 
@@ -209,12 +217,92 @@ impl IngestService {
     }
 
     fn finish_shutdown(&mut self, entries_since_sync: usize) {
-        self.run_tier_maintenance(now_usec());
+        if self.tier_worker_handles.is_empty() {
+            // Pre-worker mode (in-process tests, benchmarks, rebuild-only
+            // paths): the inline flush + sync, exactly as before.
+            self.run_tier_maintenance(now_usec());
+            let _ = self.sync_if_needed(entries_since_sync);
+            let _ = self.sync_all_tiers();
+            self.persist_decoder_state();
+            return;
+        }
+
+        // Worker shutdown sequence (order matters; see the SOW):
+        // signal -> wake sleepers -> final per-tier response -> join ->
+        // final facet persist -> decoder persist. The raw journal sync stays
+        // on this thread as today.
+        self.tier_handoff.begin_shutdown();
+        let now = now_usec();
+        for index in 0..MATERIALIZED_TIERS.len() {
+            self.respond_tier_handoff(index, now);
+        }
         let _ = self.sync_if_needed(entries_since_sync);
-        let _ = self.sync_all_tiers();
+        super::tier_commit::join_workers(std::mem::take(&mut self.tier_worker_handles));
+        if let Err(err) = self.facet_runtime.persist_if_dirty() {
+            tracing::warn!("facet runtime persist failed: {}", err);
+        }
         self.persist_decoder_state();
     }
 
+    /// Hand the tier `Log`s to their commit workers. Called once, after the
+    /// rebuild's inline flush; each rebuilt tier is synced first so restart
+    /// history is durable before ownership moves.
+    pub(in crate::ingest) fn spawn_tier_commit_workers(&mut self) {
+        let Some(mut tier_writers) = self.tier_writers.take() else {
+            return;
+        };
+        if let Err(err) = tier_writers.sync_all() {
+            tracing::warn!("failed to sync rebuilt tier journals before worker handoff: {}", err);
+        }
+        let workers = tier_writers.into_workers(
+            &self.tier_flow_indexes,
+            &self.facet_runtime,
+            &self.metrics,
+        );
+        self.tier_worker_handles =
+            super::tier_commit::spawn_tier_workers(&self.tier_handoff, workers);
+    }
+
+    /// The receive path's side of the doorbell protocol: one relaxed load per
+    /// call; on a raised bit, move that tier's closed buckets into the slot
+    /// and recycle the returned containers. Microseconds, at most a few times
+    /// per minute.
+    fn handle_tier_handoffs(&mut self) {
+        if !self.tier_handoff.has_requests() {
+            return;
+        }
+        let now = now_usec();
+        for index in 0..MATERIALIZED_TIERS.len() {
+            if self.tier_handoff.requested(index) {
+                self.respond_tier_handoff(index, now);
+            }
+        }
+    }
+
+    fn respond_tier_handoff(&mut self, index: usize, now_usec: u64) {
+        const HOUR_USEC: u64 = 3_600_000_000;
+        let tier = MATERIALIZED_TIERS[index];
+        let Some(acc) = self.tier_accumulators.get_mut(&tier) else {
+            return;
+        };
+        // An empty take still responds: the worker unblocks on the bumped
+        // generation and simply has nothing to commit this window.
+        let taken = acc.take_closed_buckets(now_usec);
+        // Rows in a bucket share the bucket's hour (receive-time interning),
+        // so the in-flight set is one entry per bucket — no row scan here.
+        let in_flight_hours: std::collections::BTreeSet<u64> = taken
+            .iter()
+            .map(|(start, _)| (start / HOUR_USEC) * HOUR_USEC)
+            .collect();
+        let recycled = self.tier_handoff.respond(index, taken, in_flight_hours);
+        if let Some(acc) = self.tier_accumulators.get_mut(&tier) {
+            for container in recycled {
+                acc.recycle(container);
+            }
+        }
+    }
+
+    /// Pre-worker maintenance (rebuild, in-process tests, benchmarks).
     fn run_tier_maintenance(&mut self, now_usec: u64) {
         if let Err(err) = self.flush_closed_tiers(now_usec) {
             tracing::warn!("tier flush failed: {}", err);
@@ -257,11 +345,16 @@ impl IngestService {
         0
     }
 
+    /// Pre-worker mode only (in-process tests/benchmarks); after the workers
+    /// spawn they own the tier `Log`s and fsync per commit.
     fn sync_all_tiers(&mut self) -> usize {
+        let Some(tier_writers) = self.tier_writers.as_mut() else {
+            return 0;
+        };
         self.metrics
             .tier_journal_syncs
             .fetch_add(1, Ordering::Relaxed);
-        if let Err(err) = self.tier_writers.sync_all() {
+        if let Err(err) = tier_writers.sync_all() {
             self.metrics
                 .journal_sync_errors
                 .fetch_add(1, Ordering::Relaxed);
@@ -285,6 +378,16 @@ impl IngestService {
         entries_since_sync: usize,
     ) -> usize {
         self.handle_received_packet(source, payload, entries_since_sync)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn spawn_tier_commit_workers_for_test(&mut self) {
+        self.spawn_tier_commit_workers();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn handle_tier_handoffs_for_test(&mut self) {
+        self.handle_tier_handoffs();
     }
 
     #[cfg(test)]

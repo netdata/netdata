@@ -56,6 +56,31 @@ impl MaterializedTierWriters {
         self.hour_1.sync()?;
         Ok(())
     }
+
+    fn into_workers(
+        self,
+        tier_flow_indexes: &Arc<RwLock<TierFlowIndexStore>>,
+        facet_runtime: &Arc<crate::facet_runtime::FacetRuntime>,
+        metrics: &Arc<IngestMetrics>,
+    ) -> Vec<super::tier_commit::TierWorker> {
+        [
+            (TierKind::Minute1, self.minute_1),
+            (TierKind::Minute5, self.minute_5),
+            (TierKind::Hour1, self.hour_1),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(index, (tier, writer))| super::tier_commit::TierWorker {
+            tier,
+            index,
+            writer,
+            tier_flow_indexes: Arc::clone(tier_flow_indexes),
+            facet_runtime: Arc::clone(facet_runtime),
+            metrics: Arc::clone(metrics),
+            consecutive_sync_failures: 0,
+        })
+        .collect()
+    }
 }
 
 pub(crate) struct IngestService {
@@ -65,7 +90,11 @@ pub(crate) struct IngestService {
     pub(super) decoder_state_dir: PathBuf,
     pub(super) last_decoder_state_persist_usec: u64,
     pub(super) raw_journal: Log,
-    tier_writers: MaterializedTierWriters,
+    /// `Some` until the commit workers spawn (the rebuild's inline flush path
+    /// uses it); the workers own the tier `Log`s afterwards.
+    tier_writers: Option<MaterializedTierWriters>,
+    pub(super) tier_handoff: Arc<super::tier_commit::TierHandoffShared>,
+    pub(super) tier_worker_handles: Vec<std::thread::JoinHandle<()>>,
     pub(super) tier_accumulators: HashMap<TierKind, TierAccumulator>,
     pub(super) open_tiers: Arc<RwLock<OpenTierState>>,
     pub(super) tier_flow_indexes: Arc<RwLock<TierFlowIndexStore>>,

@@ -372,6 +372,77 @@ async fn e2e_rebuild_tolerates_torn_tier_and_raw_tails() {
     );
 }
 
+/// Cross-thread tier commit roundtrip: closed buckets handed to the spawned
+/// workers via the doorbell protocol must land in the tier journals (with one
+/// fsync per batch), and the shutdown drain must join cleanly. This is the
+/// path production takes; the rest of the suite covers the pre-worker inline
+/// path.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_tier_commit_workers_roundtrip() {
+    let (cfg, _tmp) = offline_journal_cfg();
+    let metrics = Arc::new(ingest::IngestMetrics::default());
+    let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+    let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+    let mut service = ingest::IngestService::new(
+        cfg.clone(),
+        Arc::clone(&metrics),
+        Arc::clone(&open_tiers),
+        Arc::clone(&tier_flow_indexes),
+    )
+    .expect("create ingest service");
+
+    // Two flows with back-dated receive times: their 1m and 5m buckets are
+    // already closed when the workers claim on spawn.
+    let receive_ts = closed_5m_base() + 60_000_000;
+    for protocol in [1_u8, 2] {
+        let record = crate::flow::FlowRecord {
+            flow_version: "ipfix",
+            protocol,
+            bytes: 100 + protocol as u64,
+            packets: 1,
+            flows: 1,
+            ..Default::default()
+        };
+        assert!(service.ingest_decoded_record_for_test(receive_ts, &record));
+    }
+
+    service.spawn_tier_commit_workers_for_test();
+
+    // The workers raise their doorbells immediately (claim-on-spawn); play
+    // the receive thread's role and respond until the commits land.
+    let expected_rows = 4; // 2 protocol rows in the 1m bucket + 2 in the 5m.
+    let mut committed = 0;
+    for _ in 0..300 {
+        service.handle_tier_handoffs_for_test();
+        committed = metrics.tier_entries_written.load(Ordering::Relaxed);
+        if committed >= expected_rows {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert_eq!(
+        committed, expected_rows,
+        "workers should commit the closed 1m and 5m buckets"
+    );
+
+    service.finish_shutdown_for_test(0);
+
+    let minute_1 = timestamp_counts(&journal_source_realtime_timestamps(
+        &cfg.journal.minute_1_tier_dir(),
+    ));
+    assert_eq!(minute_1.values().sum::<usize>(), 2, "{minute_1:?}");
+    let minute_5 = timestamp_counts(&journal_source_realtime_timestamps(
+        &cfg.journal.minute_5_tier_dir(),
+    ));
+    assert_eq!(minute_5.values().sum::<usize>(), 2, "{minute_5:?}");
+    let bytes = bucket_bytes_sums(&cfg.journal.minute_1_tier_dir());
+    assert_eq!(
+        bytes.values().copied().collect::<Vec<_>>(),
+        vec![101 + 102],
+        "worker-committed rows must carry the aggregated metrics: {bytes:?}"
+    );
+}
+
 /// A journal config rooted in a fresh temp dir, with no UDP listener involved.
 fn offline_journal_cfg() -> (plugin_config::PluginConfig, TempDir) {
     let tmp = tempfile::tempdir().expect("create temp dir");

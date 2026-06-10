@@ -66,7 +66,15 @@ impl IngestService {
         }
     }
 
+    /// Inline tier flush — the pre-worker path only: the startup rebuild (and
+    /// in-process tests/benchmarks that never spawn workers) commits closed
+    /// buckets synchronously here. After `spawn_tier_commit_workers` the tier
+    /// `Log`s belong to the workers and this becomes unreachable.
     pub(in crate::ingest) fn flush_closed_tiers(&mut self, now_usec: u64) -> Result<()> {
+        let Some(tier_writers) = self.tier_writers.as_mut() else {
+            debug_assert!(false, "inline tier flush after workers were spawned");
+            return Ok(());
+        };
         for tier in MATERIALIZED_TIERS {
             let Some(acc) = self.tier_accumulators.get_mut(&tier) else {
                 continue;
@@ -82,7 +90,7 @@ impl IngestService {
                 bucket_usec,
                 &taken,
                 &self.tier_flow_indexes,
-                self.tier_writers.get_mut(tier),
+                tier_writers.get_mut(tier),
                 &mut self.encode_buf,
                 &self.facet_runtime,
                 &self.metrics,
@@ -105,6 +113,9 @@ impl IngestService {
                 active_hours.extend(acc.active_hours());
             }
         }
+        // Hours of buckets handed to (or still being committed by) the
+        // workers stay alive until the commit finishes.
+        self.tier_handoff.in_flight_hours(&mut active_hours);
 
         if let Ok(mut tier_flow_indexes) = self.tier_flow_indexes.write() {
             tier_flow_indexes.prune_unused_hours(&active_hours);
