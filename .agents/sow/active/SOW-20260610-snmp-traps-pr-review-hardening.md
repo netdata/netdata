@@ -1865,6 +1865,11 @@ External reviewer final pass findings accepted for this patch:
   `Check()` failures. Runtime apply/update already preserves coded errors.
   Plan: preserve `dyncfg.CodedError.Code()` in `test` responses too, falling
   back to `422` for plain errors.
+- GLM found that `dedup_key_varbinds` could explicitly reference the synthetic
+  SNMP community varbind. This did not expose the value in plaintext, but the
+  value could influence an emitted dedup fingerprint. Plan: preserve the
+  varbind's presence/OID/type in the fingerprint shape while replacing the
+  sensitive value with the shared redaction token before hashing.
 
 Rejected or deferred final-pass findings:
 

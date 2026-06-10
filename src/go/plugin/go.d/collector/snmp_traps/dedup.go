@@ -335,6 +335,10 @@ func dedupFingerprint(entry *TrapEntry, td *TrapDef, jobKeys []string) dedupKey 
 		buf = appendFingerprintPart(buf, dedupVarbindPresent)
 		buf = appendFingerprintPart(buf, vb.OID)
 		buf = appendFingerprintPart(buf, string(vb.Type))
+		if isSensitiveTrapVarbind(vb) {
+			buf = appendFingerprintValue(buf, redactedTrapVarbind)
+			continue
+		}
 		buf = appendFingerprintValue(buf, vb.Value)
 	}
 

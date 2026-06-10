@@ -177,6 +177,23 @@ func TestTrapDeduperNumericColumnOIDKeyVarbindNarrowFingerprint(t *testing.T) {
 	}
 }
 
+func TestTrapDeduperSensitiveKeyVarbindValueDoesNotAffectFingerprint(t *testing.T) {
+	d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil, "")
+	td := &TrapDef{DedupKeyVarbinds: []string{"snmpTrapCommunity"}}
+
+	first := dedupTestEntryWithCommunity("198.51.100.10", "private")
+	_, suppressed := d.Admit(first, td, nil)
+	if suppressed {
+		t.Fatal("first occurrence was suppressed")
+	}
+
+	differentCommunity := dedupTestEntryWithCommunity("198.51.100.10", "public")
+	_, suppressed = d.Admit(differentCommunity, td, nil)
+	if !suppressed {
+		t.Fatal("sensitive key varbind value affected dedup fingerprint")
+	}
+}
+
 func TestTrapDeduperMissingKeyVarbindSentinelDiffersFromEmptyString(t *testing.T) {
 	d := newTrapDeduper("test", DedupConfig{Enabled: true}, nil, nil, "")
 	td := &TrapDef{DedupKeyVarbinds: []string{"ifAlias"}}
@@ -431,6 +448,19 @@ func dedupTestColumnEntry(sourceIP, oid, ifIndex string) *TrapEntry {
 			OID:   oid,
 			Type:  "Integer",
 			Value: ifIndex,
+		}},
+	}
+}
+
+func dedupTestEntryWithCommunity(sourceIP, community string) *TrapEntry {
+	return &TrapEntry{
+		SourceIP: sourceIP,
+		TrapOID:  "1.3.6.1.6.3.1.1.5.3",
+		Varbinds: []VarbindValue{{
+			Name:  "snmpTrapCommunity",
+			OID:   snmpTrapCommunityOID,
+			Type:  "OctetString",
+			Value: community,
 		}},
 	}
 }
