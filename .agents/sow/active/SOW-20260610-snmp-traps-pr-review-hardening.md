@@ -1678,6 +1678,60 @@ Validation evidence:
 - `go test -count=1 ./plugin/go.d/collector/snmp_traps
   ./plugin/agent/jobmgr/funcctl ./cmd/godplugin ./plugin/agent/jobmgr` passed.
 
+### 2026-06-10 External Review Hardening Of User Profile Auto-Reload
+
+Implemented locally after the post-commit external review pass:
+
+- `profileWatcher.Start()` now keeps the periodic fingerprint loop running even
+  when `fsnotify.NewWatcher()` fails. The failure is logged, but automatic
+  operator-profile reload degrades to periodic scans instead of silently
+  disappearing.
+- The watcher now advances `lastFingerprint` only after a successful reload.
+  Invalid changed profiles therefore remain retryable on the next periodic scan
+  or event, and the dirty flag continues to force job-creation validation.
+- The watcher no longer watches the parent go.d config directory. It watches
+  only existing operator profile directories and relies on the periodic
+  fingerprint fallback to notice a newly-created operator profile directory.
+- Remove/rename events now clear matching entries from the internal watch map so
+  deleted-and-recreated profile directories can be watched again.
+- The dead `shouldRefreshForEvent()` parent/base comparison was removed because
+  it was equivalent to `path == dir` and added maintenance risk without
+  behavior.
+- Fingerprinting now uses `fs.DirEntry.Info()` from the `WalkDir` entry instead
+  of a separate `os.Stat()` per profile file.
+- Added tests that start the real watcher run loop, exercise the periodic
+  reload path, prove fallback behavior when fsnotify initialization fails,
+  prove failed reloads do not advance the fingerprint, and cover watch-map
+  cleanup for removed directories.
+- Updated durable specs:
+  - `.agents/sow/specs/snmp-traps/netdata.md`
+  - `.agents/sow/specs/snmp-traps/comparison/comparative-analysis.md`
+
+Rejected or deferred findings:
+
+- User profile duplicate-OID override by a different filename was not changed.
+  Current documented contract is same-filename replacement or explicit
+  `extends:` merge. Different filename additions that duplicate existing stock
+  OIDs remain invalid, matching initial-load behavior.
+- Rebuilding stock enterprise-prefix routes after same-filename replacement was
+  deferred because the current generated stock catalogue routes exact OIDs, the
+  replacement contract is same-filename replacement, and no failing branch test
+  proved a shipped catalogue route loss. Revisit only if a real catalogue
+  contains multi-file enterprise-prefix routes that survive replacement.
+- A fsnotify close-channel drain helper was not added. In this implementation
+  the run goroutine owns `Close()`, `Stop()` cancels and waits for `done`, and
+  fsnotify v1.10.1 closes its event/error channels internally from the backend
+  reader. The existing code avoids concurrent `Close()` from another goroutine.
+
+Validation evidence:
+
+- `go test -count=1 ./plugin/go.d/collector/snmp_traps` passed.
+- `go test -count=1 ./plugin/go.d/collector/snmp_traps
+  ./plugin/agent/jobmgr/funcctl ./cmd/godplugin ./plugin/agent/jobmgr` passed.
+- `rg -n "reload-profiles|snmp_traps:reload" .agents/sow/specs src/go docs
+  integrations` now returns only the explicit superseded/rejected manual
+  Function note in the durable spec.
+
 Closed review nits:
 
 - `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/metadata/.keep` is tracked

@@ -104,7 +104,7 @@ The release posture should be:
 | Need | Cohort baseline | Netdata behavior | Verdict |
 |---|---|---|---|
 | Vendor MIB/profile pack | Datadog and SolarWinds broadest; LibreNMS broad; many systems minimal (`operator-features.md:84`). | Current generated catalogue has 437 profile files, 3,131 MIB modules, 71,787 trap definitions, and 44,462 varbind definitions. Profiles load lazily on first trap job and are shared across jobs. | Above most OSS systems for first release breadth. |
-| Custom MIB workflow | UI in OpenNMS/Zenoss/CheckMK/Centreon/LogicMonitor; CLI/drop-in elsewhere (`operator-features.md:95`). | Installed Go helper `snmp-trap-profile-gen` converts MIBs offline; operator copies YAML to `/etc/netdata/go.d/snmp.trap-profiles/` and runs `snmp_traps:reload-profiles` or re-applies the job. | Meets CLI/drop-in tier; no UI upload yet. |
+| Custom MIB workflow | UI in OpenNMS/Zenoss/CheckMK/Centreon/LogicMonitor; CLI/drop-in elsewhere (`operator-features.md:95`). | Installed Go helper `snmp-trap-profile-gen` converts MIBs offline; operator copies YAML to `/etc/netdata/go.d/snmp.trap-profiles/`. Running trap jobs pick up operator-profile changes automatically; otherwise the next job creation loads them. | Meets CLI/drop-in tier; no UI upload yet. |
 | Trap-to-alert routing | 13/16 support via rules or downstream systems (`operator-features.md:105`). | Alertable self-metrics plus opt-in per-OID metrics. Profile severity is in journal and can be used in Logs queries. | Meets basic routing; less lifecycle-rich than OpenNMS/Zenoss/LogicMonitor. |
 | Alert acknowledgement / clear | Full auto-clear only OpenNMS, Zenoss, LogicMonitor; CheckMK partial (`operator-features.md:111`). | No native trap lifecycle state machine. Operators use logs plus existing alerts, or alert on polled state. | Intentional gap. Do not over-market. |
 | Dedup/suppression | Built-in in OpenNMS/Zenoss/Centreon/CheckMK/Cribl; partial in others (`operator-features.md:121`). | Optional per-job dedup, default off, first event journaled, later duplicates counted and summarized. | Competitive when enabled; forensic trade-off is explicit. |
@@ -208,8 +208,8 @@ The important release requirement is documentation clarity:
 - The installed helper is the operator path.
 - The Go helper is the only maintained profile-generation path in the source
   tree.
-- Reload uses the Function name `snmp_traps:reload-profiles`, not a JSON
-  method wrapper.
+- Operator profile reload is automatic while `snmp_traps` jobs are running.
+  There is no public manual reload Function in the first release.
 
 ### 4.2 Alerting Model
 

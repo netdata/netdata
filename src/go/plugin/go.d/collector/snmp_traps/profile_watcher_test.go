@@ -7,9 +7,12 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 
 	"github.com/stretchr/testify/assert"
@@ -79,6 +82,7 @@ traps:
 	watcher := newUserProfileWatcher([]string{dir})
 	watcher.lastFingerprint, err = fingerprintUserProfileFiles([]string{dir})
 	require.NoError(t, err)
+	previousFingerprint := watcher.lastFingerprint
 
 	writeProfileYAML(t, dir, "bad.yaml", `
 traps:
@@ -92,6 +96,7 @@ traps:
 
 	assert.Same(t, idx, CurrentProfileIndex())
 	assert.Equal(t, uint64(1), atomic.LoadUint64(&metrics.errors.profileLoadFailed))
+	assert.Equal(t, previousFingerprint, watcher.lastFingerprint)
 
 	_, err = AcquireProfileCache()
 	require.Error(t, err)
@@ -110,9 +115,102 @@ traps:
 	require.NoError(t, err)
 	defer ReleaseProfileCache()
 	assert.NotNil(t, reloaded.Lookup("1.3.6.1.6.3.1.1.5.4"))
+	assert.NotEqual(t, previousFingerprint, watcher.lastFingerprint)
 }
 
-func TestUserProfileFingerprintIgnoresStockProfileDirectory(t *testing.T) {
+func TestUserProfileWatcherStartStopRunLoopReloadsUserProfiles(t *testing.T) {
+	dir := t.TempDir()
+	watcher := newUserProfileWatcher([]string{dir})
+
+	runWatcherReloadTest(t, watcher, dir)
+
+	assert.Nil(t, watcher.cancel)
+	assert.Nil(t, watcher.done)
+}
+
+func TestUserProfileWatcherStartFallsBackToPeriodicScans(t *testing.T) {
+	dir := t.TempDir()
+	watcher := newUserProfileWatcher([]string{dir})
+	watcher.newWatcher = func() (*fsnotify.Watcher, error) {
+		return nil, errors.New("watcher unavailable")
+	}
+
+	runWatcherReloadTest(t, watcher, dir)
+
+	assert.Nil(t, watcher.watcher)
+	assert.Nil(t, watcher.cancel)
+	assert.Nil(t, watcher.done)
+}
+
+func runWatcherReloadTest(t *testing.T, watcher *profileWatcher, dir string) {
+	t.Helper()
+
+	watcher.refreshEvery = 10 * time.Millisecond
+	watcher.eventSettle = time.Millisecond
+
+	initialFingerprint := make(chan struct{})
+	var initialOnce sync.Once
+	watcher.fingerprint = func(dirs []string) (string, error) {
+		fp, err := fingerprintUserProfileFiles(dirs)
+		initialOnce.Do(func() {
+			close(initialFingerprint)
+		})
+		return fp, err
+	}
+
+	reloaded := make(chan struct{}, 1)
+	watcher.markDirty = func() {}
+	watcher.reload = func() error {
+		select {
+		case reloaded <- struct{}{}:
+		default:
+		}
+		return nil
+	}
+
+	require.NoError(t, watcher.Start())
+	defer watcher.Stop()
+
+	require.Eventually(t, func() bool {
+		select {
+		case <-initialFingerprint:
+			return true
+		default:
+			return false
+		}
+	}, time.Second, 10*time.Millisecond)
+
+	writeProfileYAML(t, dir, "new.yaml", `
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.4
+    name: IF-MIB::linkUp
+    category: state_change
+    severity: notice
+`)
+
+	require.Eventually(t, func() bool {
+		select {
+		case <-reloaded:
+			return true
+		default:
+			return false
+		}
+	}, 2*time.Second, 10*time.Millisecond)
+
+	watcher.Stop()
+}
+
+func TestUserProfileWatcherForgetsRemovedDirectoryWatch(t *testing.T) {
+	dir := filepath.Clean(t.TempDir())
+	watcher := newUserProfileWatcher([]string{dir})
+	watcher.watches = map[string]struct{}{dir: {}}
+
+	watcher.forgetRemovedWatch(fsnotify.Event{Name: dir, Op: fsnotify.Remove})
+
+	assert.NotContains(t, watcher.watches, dir)
+}
+
+func TestUserProfileFingerprintOnlyWalksGivenDirs(t *testing.T) {
 	userDir := t.TempDir()
 	stockDir := t.TempDir()
 	writeProfileYAML(t, userDir, "user.yaml", `

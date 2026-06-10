@@ -36,6 +36,7 @@ type profileWatcher struct {
 	dirs         []string
 	refreshEvery time.Duration
 	eventSettle  time.Duration
+	newWatcher   func() (*fsnotify.Watcher, error)
 	reload       func() error
 	markDirty    func()
 	fingerprint  func([]string) (string, error)
@@ -53,6 +54,7 @@ func newUserProfileWatcher(dirs []string) *profileWatcher {
 		dirs:         cleanProfileWatcherDirs(dirs),
 		refreshEvery: profileWatcherRefreshEvery,
 		eventSettle:  profileWatcherEventSettle,
+		newWatcher:   fsnotify.NewWatcher,
 		reload:       ReloadUserProfileCache,
 		markDirty:    MarkProfileCacheDirty,
 		fingerprint:  fingerprintUserProfileFiles,
@@ -80,10 +82,9 @@ func (w *profileWatcher) Start() error {
 	if len(w.dirs) == 0 {
 		return nil
 	}
-	fsw, err := fsnotify.NewWatcher()
+	fsw, err := w.newWatcher()
 	if err != nil {
-		w.log.Warningf("SNMP trap user profile watcher initialization failed: %v", err)
-		return err
+		w.log.Warningf("SNMP trap user profile watcher initialization failed; falling back to periodic profile scans: %v", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -110,7 +111,16 @@ func (w *profileWatcher) Stop() {
 
 func (w *profileWatcher) run(ctx context.Context) {
 	defer close(w.done)
-	defer w.watcher.Close()
+	if w.watcher != nil {
+		defer w.watcher.Close()
+	}
+
+	var events <-chan fsnotify.Event
+	var watchErrors <-chan error
+	if w.watcher != nil {
+		events = w.watcher.Events
+		watchErrors = w.watcher.Errors
+	}
 
 	w.addWatches()
 	if fp, err := w.fingerprint(w.dirs); err != nil {
@@ -128,16 +138,17 @@ func (w *profileWatcher) run(ctx context.Context) {
 			return
 		case <-ticker.C:
 			w.refresh(ctx)
-		case event, ok := <-w.watcher.Events:
+		case event, ok := <-events:
 			if !ok {
 				return
 			}
 			if !w.shouldRefreshForEvent(event) {
 				continue
 			}
+			w.forgetRemovedWatch(event)
 			sleepWithContext(ctx, w.eventSettle)
 			w.refresh(ctx)
-		case err, ok := <-w.watcher.Errors:
+		case err, ok := <-watchErrors:
 			if !ok {
 				return
 			}
@@ -164,7 +175,6 @@ func (w *profileWatcher) refresh(ctx context.Context) {
 	if fp == w.lastFingerprint {
 		return
 	}
-	w.lastFingerprint = fp
 	w.markDirty()
 
 	if err := w.reload(); err != nil {
@@ -173,6 +183,7 @@ func (w *profileWatcher) refresh(ctx context.Context) {
 		}
 		return
 	}
+	w.lastFingerprint = fp
 	w.log.Infof("SNMP trap user profiles reloaded")
 }
 
@@ -190,7 +201,6 @@ func (w *profileWatcher) addWatches() {
 	}
 
 	for _, dir := range w.dirs {
-		w.addWatch(filepath.Dir(dir))
 		_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				if errors.Is(err, os.ErrNotExist) || errors.Is(err, os.ErrPermission) {
@@ -212,18 +222,27 @@ func (w *profileWatcher) addWatch(path string) {
 		return
 	}
 	path = filepath.Clean(path)
-	if _, ok := w.watches[path]; ok {
-		return
-	}
 	info, err := os.Stat(path)
 	if err != nil || !info.IsDir() {
+		delete(w.watches, path)
+		return
+	}
+	if _, ok := w.watches[path]; ok {
 		return
 	}
 	if err := w.watcher.Add(path); err != nil {
 		w.log.Warningf("SNMP trap user profile watcher cannot watch '%s': %v", path, err)
+		delete(w.watches, path)
 		return
 	}
 	w.watches[path] = struct{}{}
+}
+
+func (w *profileWatcher) forgetRemovedWatch(event fsnotify.Event) {
+	if !event.Has(fsnotify.Remove) && !event.Has(fsnotify.Rename) {
+		return
+	}
+	delete(w.watches, filepath.Clean(event.Name))
 }
 
 func (w *profileWatcher) shouldRefreshForEvent(event fsnotify.Event) bool {
@@ -241,9 +260,6 @@ func (w *profileWatcher) shouldRefreshForEvent(event fsnotify.Event) bool {
 	path := filepath.Clean(event.Name)
 	for _, dir := range w.dirs {
 		if path == dir || strings.HasPrefix(path, dir+string(os.PathSeparator)) {
-			return true
-		}
-		if filepath.Dir(path) == filepath.Dir(dir) && filepath.Base(path) == filepath.Base(dir) {
 			return true
 		}
 	}
@@ -270,7 +286,7 @@ func fingerprintUserProfileFiles(dirs []string) (string, error) {
 			if d.IsDir() || !isProfileFileName(d.Name()) {
 				return nil
 			}
-			info, err := os.Stat(path)
+			info, err := d.Info()
 			if err != nil {
 				if errors.Is(err, os.ErrNotExist) {
 					return nil
