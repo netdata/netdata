@@ -418,10 +418,117 @@ void ml_init()
 
     // open sqlite db
     char path[FILENAME_MAX];
-    snprintfz(path, FILENAME_MAX - 1, "%s/%s", netdata_configured_cache_dir, "ml.db");
+    snprintfz(path, sizeof(path), "%s/%s", netdata_configured_cache_dir, "ml.db");
+
+    // Consume the quarantine sentinel dropped by ml_db_mark_corrupt() in a
+    // prior session: rename the corrupt ml.db to a timestamped ml.db.bad.*
+    // and drop the WAL siblings so sqlite3_open recreates a fresh DB.
+    // No .recover variant -- ml.db only holds k-means models and is cheap
+    // to rebuild.
+    //
+    // Use unlink() itself as the existence check (no separate stat/access
+    // probe) to avoid a TOCTOU race between check and use. If the
+    // quarantine rename then fails, restore the sentinel so the next start
+    // retries. Always use a timestamped destination so rename() never
+    // collides with a pre-existing ml.db.bad on Windows (which refuses to
+    // overwrite) and never silently overwrites one on POSIX.
+    char sentinel[FILENAME_MAX + 1];
+    snprintfz(sentinel, sizeof(sentinel), "%s/.ml.db.delete", netdata_configured_cache_dir);
+
+    // Attempt to consume the sentinel via unlink(). Three outcomes:
+    //  - unlink() == 0:    sentinel existed, removed -> proceed with quarantine.
+    //  - errno == ENOENT:  no sentinel -> normal startup, no quarantine.
+    //  - any other errno:  sentinel exists but couldn't be removed (EACCES,
+    //                      EROFS, EISDIR, ...). DO NOT proceed -- if we
+    //                      quarantine without consuming the sentinel, the next
+    //                      startup would re-quarantine the freshly created
+    //                      ml.db, looping indefinitely. Log loudly and skip;
+    //                      operator must remove the sentinel manually.
+    int unlink_rc = unlink(sentinel);
+    if (int unlink_err = errno; unlink_rc == -1 && unlink_err != ENOENT) {
+        // The sentinel from a prior session is on disk but we can't remove
+        // it (EACCES, EROFS, EISDIR, ...). The DB was previously flagged
+        // corrupt; falling through to open it would just retrigger CORRUPT
+        // errors all session long. Mark the DB unusable in-memory and skip
+        // the open entirely -- ML runs without persistence until the
+        // operator removes the sentinel manually.
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "ML: sentinel %s exists but unlink() failed (errno=%d). "
+               "Marking ml.db unusable for this session and skipping the open. "
+               "ML will run without persistence; operator must remove %s manually.",
+               sentinel, unlink_err, sentinel);
+        ml_db_force_unusable();
+        return;
+    }
+    if (unlink_rc == 0) {
+        char bad_path[FILENAME_MAX + 1];
+        // Microsecond resolution so back-to-back restarts within the same
+        // wall-clock second don't collide: a second-resolution suffix would
+        // either silently overwrite the prior .bad on POSIX (forensic loss)
+        // or fail rename() with EEXIST on Windows (sentinel kept restoring).
+        snprintfz(bad_path, sizeof(bad_path), "%s/ml.db.bad.%llu",
+                  netdata_configured_cache_dir, (unsigned long long) now_realtime_usec());
+
+        int rename_rc = rename(path, bad_path);
+        if (rename_rc == 0 || errno == ENOENT) {
+            // Quarantine succeeded, or there was nothing to quarantine
+            // (ml.db didn't exist). Either way, clean up the WAL/SHM
+            // siblings so the fresh sqlite3_open() starts clean.
+            char wal_path[FILENAME_MAX + 1];
+            snprintfz(wal_path, sizeof(wal_path), "%s-wal", path);
+            (void) unlink(wal_path);
+            snprintfz(wal_path, sizeof(wal_path), "%s-shm", path);
+            (void) unlink(wal_path);
+            if (rename_rc == 0) {
+                nd_log(NDLS_DAEMON, NDLP_WARNING,
+                       "ML: quarantined corrupt %s as %s; a fresh ml.db will be created. "
+                       "Inspect or remove the .bad file manually.",
+                       path, bad_path);
+            }
+        } else {
+            // Quarantine failed for a reason other than "source doesn't
+            // exist". Restore the sentinel so we retry on next start
+            // instead of silently re-opening the same corrupt file.
+            //
+            // Use O_CREAT|O_EXCL (atomic create-or-fail) rather than
+            // O_CREAT|O_TRUNC so a symlink swap between our earlier
+            // unlink() and this open() cannot redirect the write -- if
+            // anything (legitimate or hostile) re-created the path in
+            // that window, open() fails with EEXIST.
+            int rerr = errno;
+            int fd = open(sentinel, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+            int oerr = errno;
+            if (fd >= 0) {
+                close(fd);
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "ML: failed to quarantine %s to %s (errno=%d); sentinel %s restored, will retry on next start.",
+                       path, bad_path, rerr, sentinel);
+            } else if (oerr == EEXIST) {
+                // Something occupies the path already (race or stale file).
+                // Next start's unlink() will remove it and trigger quarantine
+                // regardless of what it is, so retry is still effective.
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "ML: failed to quarantine %s to %s (errno=%d); sentinel path %s already occupied, will retry on next start.",
+                       path, bad_path, rerr, sentinel);
+            } else {
+                // Sentinel restore actually failed (permission, ENOSPC,
+                // read-only FS, etc.). Retry on next start is NOT guaranteed
+                // -- be honest with the operator.
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "ML: failed to quarantine %s to %s (rename errno=%d) AND failed to restore sentinel %s (open errno=%d). "
+                       "Retry will NOT happen on next start; remove ml.db or recreate the sentinel manually.",
+                       path, bad_path, rerr, sentinel, oerr);
+            }
+        }
+    }
+
     int rc = sqlite3_open(path, &ml_db);
     if (rc != SQLITE_OK) {
         error_report("Failed to initialize database at %s, due to \"%s\"", path, sqlite3_errstr(rc));
+        // Drop the sentinel now so the next start quarantines the file;
+        // otherwise a corrupt header here leaves ml.db on disk and we'd
+        // hit the same open() failure forever.
+        ml_db_mark_if_corrupt(rc);
         sqlite3_close(ml_db);
         ml_db = NULL;
     }
@@ -430,7 +537,12 @@ void ml_init()
     if (ml_db) {
         int target_version = perform_ml_database_migration(ml_db, ML_METADATA_VERSION);
         if (configure_sqlite_database(ml_db, target_version, "ml_config")) {
-            error_report("Failed to setup ML database");
+            // configure_sqlite_database() returns 0/1 and loses the SQLite rc;
+            // recover the last error from the connection before close() so
+            // corruption surfaced by PRAGMA/migration drops the sentinel too.
+            int errc = sqlite3_extended_errcode(ml_db);
+            error_report("Failed to setup ML database (errcode=%d)", errc);
+            ml_db_mark_if_corrupt(errc);
             sqlite3_close(ml_db);
             ml_db = NULL;
         }
@@ -439,6 +551,7 @@ void ml_init()
             int rc = sqlite3_exec(ml_db, db_models_create_table, NULL, NULL, &err);
             if (rc != SQLITE_OK) {
                 error_report("Failed to create models table (%s, %s)", sqlite3_errstr(rc), err ? err : "");
+                ml_db_mark_if_corrupt(rc);
                 sqlite3_close(ml_db);
                 sqlite3_free(err);
                 ml_db = NULL;
