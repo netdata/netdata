@@ -77,6 +77,26 @@ func TestParseOTLPEndpoint(t *testing.T) {
 	}
 }
 
+func TestOTLPTargetIsLoopback(t *testing.T) {
+	tests := map[string]struct {
+		target string
+		want   bool
+	}{
+		"ipv4 loopback": {target: "127.0.0.1:4317", want: true},
+		"ipv6 loopback": {target: "[::1]:4317", want: true},
+		"localhost":     {target: "localhost:4317", want: true},
+		"remote ipv4":   {target: "192.0.2.10:4317", want: false},
+		"remote dns":    {target: "otel.example.test:4317", want: false},
+		"invalid":       {target: "otel.example.test", want: false},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, otlpTargetIsLoopback(tc.target))
+		})
+	}
+}
+
 func TestValidateOTLPConfig(t *testing.T) {
 	tests := map[string]struct {
 		cfg     OTLPConfig

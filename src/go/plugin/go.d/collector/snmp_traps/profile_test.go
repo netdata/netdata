@@ -336,6 +336,35 @@ func TestStockProfileStoreUsesCatalogueWithoutParsingProfiles(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to lazy-load stock trap profile")
 }
 
+func TestStockProfileStoreRejectsCatalogueEntryWithoutTrapOIDs(t *testing.T) {
+	rootDir := t.TempDir()
+	stockDir := filepath.Join(rootDir, "default")
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+	writeProfileYAMLZstd(t, stockDir, "ciscosystems.yaml.zst", `
+traps:
+  - oid: 1.3.6.1.4.1.9.1.0.1
+    name: TEST-CISCO-MIB::testTrap
+    category: diagnostic
+    severity: warning
+`)
+	writeProfileYAMLZstd(t, rootDir, "catalogue.json.zst", `{
+  "ciscosystems": {
+    "file": "ciscosystems.yaml",
+    "trap_count": 1,
+    "trap_oids": []
+  }
+}`)
+
+	idx := &ProfileIndex{
+		trapsByOID:      make(map[string]*TrapDef),
+		namesByTrapName: make(map[string]*TrapDef),
+	}
+	store, err := buildStockProfileStore(stockDir, multipath.New(stockDir), nil, idx)
+	require.Error(t, err)
+	assert.Nil(t, store)
+	assert.Contains(t, err.Error(), "has no trap_oids")
+}
+
 func TestOverridesApplyToLazyLoadedStockProfiles(t *testing.T) {
 	stockDir := t.TempDir()
 	const oid = "1.3.6.1.4.1.9.1.0.1"

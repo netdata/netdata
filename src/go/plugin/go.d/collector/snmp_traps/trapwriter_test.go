@@ -71,7 +71,7 @@ func TestFanoutTrapWriterSecondaryFailureDoesNotFailPrimaryWrite(t *testing.T) {
 	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed)
 }
 
-func TestFanoutTrapWriterPrimaryFailureStopsSecondaryWrite(t *testing.T) {
+func TestFanoutTrapWriterPrimaryFailureStillAttemptsSecondaryWrite(t *testing.T) {
 	primaryErr := errors.New("primary failed")
 	primary := &mockTrapWriter{err: primaryErr}
 	secondary := &mockTrapWriter{}
@@ -81,7 +81,7 @@ func TestFanoutTrapWriterPrimaryFailureStopsSecondaryWrite(t *testing.T) {
 	err := writer.Write(&TrapEntry{JobName: "local", Message: "trap"})
 	require.ErrorIs(t, err, primaryErr)
 	assert.Len(t, primary.entries, 0)
-	assert.Len(t, secondary.entries, 0)
+	assert.Len(t, secondary.entries, 1)
 	assert.Equal(t, uint64(0), metrics.errors.otlpExportFailed)
 }
 

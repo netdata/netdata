@@ -1953,6 +1953,88 @@ Rejected or deferred final-pass findings:
 - C-side `TRAP_TAG_*` unit coverage and SELinux policy packaging remain
   follow-up candidates unless maintainers make them merge blockers.
 
+### 2026-06-10 Post-Rebase External Review Batch
+
+Reviewers run after rebasing onto `upstream/master`:
+
+- `glm-5.1`
+- `minimax-m3-coder`
+- `kimi-k2.6`
+- `qwen3.7-plus`
+- `deepseek-v4-pro`
+
+Reviewer execution notes:
+
+- `mimo` was intentionally skipped because it is out of quota.
+- All reviewer sessions were read-only and were run with stdin disabled.
+- The `minimax-m3-coder` session timed out before emitting a final report, but
+  it emitted useful evidence during its run. Findings from that partial run were
+  still verified locally before classification.
+
+Accepted findings fixed locally:
+
+- **Rate limiter map-full DoS.**
+  - Evidence: `ratelimit.go` rejected every new source when `len(buckets) >=
+    maxSources`; a burst of unique spoofed IPs could pin the map until the
+    normal idle sweep.
+  - Fix: at capacity, the limiter now performs an immediate idle sweep and then
+    evicts the oldest tracked source before rejecting the new source.
+  - Test: `TestRateLimiterEvictsOldestTrackedSourceAtCapacity`.
+- **Journal/OTLP fanout shared fate.**
+  - Evidence: `fanoutTrapWriter.Write()` returned immediately on primary
+    journal write failure, so an enabled OTLP secondary never received that trap.
+  - Fix: fanout now attempts the secondary write even when the primary fails,
+    while preserving the primary error as the returned status.
+  - Test: `TestFanoutTrapWriterPrimaryFailureStillAttemptsSecondaryWrite`.
+- **Malformed stock catalogue fallback.**
+  - Evidence: a catalogue entry with an empty `trap_oids` list returned the
+    "catalogue unavailable" path, which would fall back to eager loading all
+    stock profiles and violate the lazy-loading footprint goal.
+  - Fix: empty `trap_oids` is now an explicit catalogue error.
+  - Test: `TestStockProfileStoreRejectsCatalogueEntryWithoutTrapOIDs`.
+- **IANA PEN first-error cache.**
+  - Evidence: the lazy PEN loader used `sync.Once`; a missing/unreadable file on
+    the first lookup made vendor lookup fail for the process lifetime.
+  - Fix: the loader keeps successful values cached, but retries after failures
+    and logs the first failure at warning level.
+  - Test: `TestLookupEnterpriseNumberRetriesAfterMissingRegistry`.
+- **Remote plaintext OTLP visibility.**
+  - Evidence: `http://` and bare `host:port` OTLP endpoints use plaintext
+    gRPC. The localhost default is intentional, but remote plaintext should be
+    visible to operators.
+  - Fix: collector initialization now warns for insecure non-loopback OTLP
+    targets.
+  - Test: `TestOTLPTargetIsLoopback`.
+- **Dead OTLP validation branches.**
+  - Evidence: zero-value checks after defaulting `batch_size` and
+    `queue_capacity` were unreachable.
+  - Fix: removed the unreachable checks; negative values remain rejected.
+
+Rejected or non-blocking findings after local verification:
+
+- **RPM missing capability setup** was rejected. `netdata.spec.in` already uses
+  `%caps(cap_dac_read_search,cap_net_admin,cap_net_raw,cap_net_bind_service=eip)`
+  for `go.d.plugin`.
+- **`TRAP_JOB` not populated** was rejected. Normal traps use
+  `trapEntryFromPDU(c.jobName, ...)`, decode errors pass `jobName`, and dedup
+  summaries use `d.jobName`.
+- **Repository stock profiles are not compressed** was rejected as a product
+  requirement. Repository YAML remains uncompressed for review and generation;
+  CMake installs stock profiles and catalogue compressed as `.zst`.
+- **`TRAP_JSON` in C-side systemd-journal facets** remains intentionally not a
+  default facet because it is large/high-cardinality. The embedded `snmp:traps`
+  Function is the primary varbind-search path. If maintainers require parity
+  for the C systemd-journal Function, add `TRAP_JSON` as an FTS-only /
+  never-facet key, not as a normal facet.
+- **Unconditional `CAP_NET_BIND_SERVICE` on `go.d.plugin`** is accepted as a
+  documented trade-off required for UDP/162. It follows the existing go.d
+  single-binary capability pattern for ping/WireGuard.
+
+Validation evidence:
+
+- `GOTOOLCHAIN=go1.26.0 go test -count=1
+  ./plugin/go.d/collector/snmp_traps ./plugin/go.d/pkg/snmputils` passed.
+
 ## Artifact Maintenance Gate
 
 - Specs, generated integration docs, and the operator skill have already been

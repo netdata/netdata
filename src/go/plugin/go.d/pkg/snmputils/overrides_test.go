@@ -160,6 +160,20 @@ func TestLookupEnterpriseNumberMissingRegistryReturnsEmpty(t *testing.T) {
 	assert.Empty(t, lookupEnterpriseNumber("1.3.6.1.4.1.424242.1"))
 }
 
+func TestLookupEnterpriseNumberRetriesAfterMissingRegistry(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "iana-enterprise-numbers.txt")
+	withEnterpriseNumbersFile(t, path)
+
+	assert.Empty(t, lookupEnterpriseNumber("1.3.6.1.4.1.424242.1"))
+
+	require.NoError(t, os.WriteFile(path, []byte(`
+424242
+  Example Devices Inc.
+`), 0644))
+
+	assert.Equal(t, "Example Devices Inc.", lookupEnterpriseNumber("1.3.6.1.4.1.424242.1"))
+}
+
 func TestLookupEnterpriseNumberNonEnterpriseOIDDoesNotLoadRegistry(t *testing.T) {
 	withEnterpriseNumbersFile(t, filepath.Join(t.TempDir(), "missing.txt"))
 

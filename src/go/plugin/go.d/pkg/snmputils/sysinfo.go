@@ -141,9 +141,10 @@ func updateMetadata(si *SysInfo) {
 }
 
 type enterpriseNumbersCache struct {
-	once   sync.Once
+	mu     sync.Mutex
 	values map[string]string
 	err    error
+	warned bool
 }
 
 var (
@@ -170,12 +171,22 @@ func lookupEnterpriseNumber(sysObject string) string {
 }
 
 func enterpriseNumbersMapping() (map[string]string, error) {
-	enterpriseNumbers.once.Do(func() {
-		enterpriseNumbers.values, enterpriseNumbers.err = loadEnterpriseNumbers(enterpriseNumbersFilePath())
-		if enterpriseNumbers.err != nil {
-			log.Debugf("cannot load IANA PEN registry: %v", enterpriseNumbers.err)
+	enterpriseNumbers.mu.Lock()
+	defer enterpriseNumbers.mu.Unlock()
+
+	if enterpriseNumbers.values != nil {
+		return enterpriseNumbers.values, nil
+	}
+
+	enterpriseNumbers.values, enterpriseNumbers.err = loadEnterpriseNumbers(enterpriseNumbersFilePath())
+	if enterpriseNumbers.err != nil {
+		if !enterpriseNumbers.warned {
+			log.Warningf("cannot load IANA PEN registry: %v", enterpriseNumbers.err)
+			enterpriseNumbers.warned = true
 		}
-	})
+		return nil, enterpriseNumbers.err
+	}
+	enterpriseNumbers.warned = false
 	return enterpriseNumbers.values, enterpriseNumbers.err
 }
 

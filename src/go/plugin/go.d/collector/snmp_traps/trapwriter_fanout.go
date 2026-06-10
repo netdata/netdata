@@ -25,13 +25,11 @@ func newFanoutTrapWriter(primary, secondary TrapWriter, metrics *perJobMetrics) 
 }
 
 func (w *fanoutTrapWriter) Write(entry *TrapEntry) error {
-	if err := w.primary.Write(entry); err != nil {
-		return err
-	}
+	primaryErr := w.primary.Write(entry)
 	if err := w.secondary.Write(entry); err != nil {
 		w.incOTLPExportFailed(1)
 	}
-	return nil
+	return primaryErr
 }
 
 func (w *fanoutTrapWriter) Flush() error {

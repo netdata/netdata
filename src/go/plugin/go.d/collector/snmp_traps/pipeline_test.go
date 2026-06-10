@@ -978,26 +978,39 @@ func TestRateLimiterDefaults(t *testing.T) {
 	}
 }
 
-func TestRateLimiterCapsTrackedSources(t *testing.T) {
+func TestRateLimiterEvictsOldestTrackedSourceAtCapacity(t *testing.T) {
 	rl := newRateLimiter(true, 100, "drop")
 	rl.maxSources = 2
 
-	if allowed, _ := rl.Allow(netip.MustParseAddr("10.0.0.1")); !allowed {
+	first := netip.MustParseAddr("10.0.0.1")
+	second := netip.MustParseAddr("10.0.0.2")
+	third := netip.MustParseAddr("10.0.0.3")
+
+	if allowed, _ := rl.Allow(first); !allowed {
 		t.Fatal("expected first source to be allowed")
 	}
-	if allowed, _ := rl.Allow(netip.MustParseAddr("10.0.0.2")); !allowed {
+	if allowed, _ := rl.Allow(second); !allowed {
 		t.Fatal("expected second source to be allowed")
 	}
 
-	allowed, mode := rl.Allow(netip.MustParseAddr("10.0.0.3"))
-	if allowed {
-		t.Fatal("expected new source above cap to be rate limited")
+	allowed, mode := rl.Allow(third)
+	if !allowed {
+		t.Fatal("expected new source above cap to evict the oldest tracked source")
 	}
 	if mode != rateLimitModeDrop {
 		t.Fatalf("mode = %v, want drop", mode)
 	}
 	if got := len(rl.buckets); got != 2 {
 		t.Fatalf("tracked sources = %d, want 2", got)
+	}
+	if _, ok := rl.buckets[first]; ok {
+		t.Fatal("expected oldest tracked source to be evicted")
+	}
+	if _, ok := rl.buckets[second]; !ok {
+		t.Fatal("expected second tracked source to remain")
+	}
+	if _, ok := rl.buckets[third]; !ok {
+		t.Fatal("expected new tracked source to be admitted")
 	}
 }
 

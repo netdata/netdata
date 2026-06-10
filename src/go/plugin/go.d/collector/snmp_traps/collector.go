@@ -300,6 +300,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	listener.onReadError = c.logListenerReadError
 	var secondaryWriter TrapWriter
 	if c.OTLP.Enabled {
+		c.warnPlaintextOTLP()
 		secondaryWriter, err = newOTLPTrapWriter(ctx, c.jobName, c.OTLP, metrics)
 		if err != nil {
 			removeJobMetrics(c.jobName)
@@ -653,6 +654,14 @@ func (c *Collector) warnf(format string, args ...any) {
 	if c.Logger != nil {
 		c.Warningf(format, args...)
 	}
+}
+
+func (c *Collector) warnPlaintextOTLP() {
+	ep, err := parseOTLPEndpoint(c.OTLP.Endpoint)
+	if err != nil || !ep.insecure || otlpTargetIsLoopback(ep.target) {
+		return
+	}
+	c.warnf("SNMP trap OTLP endpoint %q uses plaintext transport; use https:// for remote collectors", ep.target)
 }
 
 func (c *Collector) logListenerReadError(ep EndpointConfig, err error) {

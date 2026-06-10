@@ -644,7 +644,7 @@ func buildStockProfileStoreFromCatalogue(
 			return nil, true, fmt.Errorf("stock trap profile catalogue entry %q has empty file", vendor)
 		}
 		if len(entry.TrapOIDs) == 0 {
-			return nil, false, nil
+			return nil, true, fmt.Errorf("stock trap profile catalogue entry %q for file %q has no trap_oids", vendor, entry.File)
 		}
 
 		path, name, err := catalogueProfilePath(dir, entry.File)

@@ -81,7 +81,13 @@ func (rl *rateLimiter) Allow(addr netip.Addr) (allowed bool, mode rateLimitMode)
 	tb, ok := rl.buckets[addr]
 	if !ok {
 		if len(rl.buckets) >= rl.maxSources {
-			return false, rl.mode
+			rl.sweepIdleLocked(now)
+			if len(rl.buckets) >= rl.maxSources {
+				rl.evictOldestLocked()
+			}
+			if len(rl.buckets) >= rl.maxSources {
+				return false, rl.mode
+			}
 		}
 		tb = &tokenBucket{
 			tokens:   float64(rl.burst),
@@ -113,10 +119,28 @@ func (rl *rateLimiter) maybeSweep(now time.Time) {
 	if now.Sub(rl.lastSweep) < 5*time.Minute {
 		return
 	}
+	rl.sweepIdleLocked(now)
+	rl.lastSweep = now
+}
+
+func (rl *rateLimiter) sweepIdleLocked(now time.Time) {
 	for addr, tb := range rl.buckets {
 		if now.Sub(tb.lastFill) > 10*time.Minute {
 			delete(rl.buckets, addr)
 		}
 	}
-	rl.lastSweep = now
+}
+
+func (rl *rateLimiter) evictOldestLocked() {
+	var oldestAddr netip.Addr
+	var oldestTime time.Time
+	for addr, tb := range rl.buckets {
+		if oldestTime.IsZero() || tb.lastFill.Before(oldestTime) {
+			oldestAddr = addr
+			oldestTime = tb.lastFill
+		}
+	}
+	if !oldestTime.IsZero() {
+		delete(rl.buckets, oldestAddr)
+	}
 }

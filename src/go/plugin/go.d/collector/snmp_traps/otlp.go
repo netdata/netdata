@@ -130,9 +130,6 @@ func validateOTLPConfig(cfg OTLPConfig) (otlpRuntimeConfig, error) {
 	if batchSize < 0 {
 		return otlpRuntimeConfig{}, fmt.Errorf("otlp.batch_size must be positive, got %d", cfg.BatchSize)
 	}
-	if batchSize == 0 {
-		return otlpRuntimeConfig{}, errors.New("otlp.batch_size must be positive")
-	}
 
 	queueCapacity := cfg.QueueCapacity
 	if queueCapacity == 0 {
@@ -140,9 +137,6 @@ func validateOTLPConfig(cfg OTLPConfig) (otlpRuntimeConfig, error) {
 	}
 	if queueCapacity < 0 {
 		return otlpRuntimeConfig{}, fmt.Errorf("otlp.queue_capacity must be positive, got %d", cfg.QueueCapacity)
-	}
-	if queueCapacity == 0 {
-		return otlpRuntimeConfig{}, errors.New("otlp.queue_capacity must be positive")
 	}
 
 	headers, err := buildOTLPMetadata(cfg.Headers)
@@ -217,6 +211,18 @@ func parseOTLPEndpoint(raw string) (otlpEndpoint, error) {
 		return otlpEndpoint{}, err
 	}
 	return otlpEndpoint{target: raw, insecure: true}, nil
+}
+
+func otlpTargetIsLoopback(target string) bool {
+	host, _, err := net.SplitHostPort(target)
+	if err != nil {
+		return false
+	}
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	return ip != nil && ip.IsLoopback()
 }
 
 func validateOTLPTarget(target string) error {
