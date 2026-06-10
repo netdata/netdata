@@ -59,6 +59,12 @@ fi
 export PATH="/ucrt64/bin:/ucrt64/sbin:${PATH}"
 unset CC CXX
 
+# Restrict pkg-config to UCRT64 paths only. Without this, pkg-config may find MSYS
+# subsystem packages (e.g. msys/libuv-devel) whose .pc files add -isystem /usr/include,
+# injecting POSIX/Cygwin headers into the UCRT64 compile and causing type conflicts.
+export PKG_CONFIG_PATH="/ucrt64/lib/pkgconfig:/ucrt64/share/pkgconfig"
+export PKG_CONFIG_LIBDIR="/ucrt64/lib/pkgconfig:/ucrt64/share/pkgconfig"
+
 if [ -d "${build}" ]; then
 	rm -rf "${build}"
 fi
