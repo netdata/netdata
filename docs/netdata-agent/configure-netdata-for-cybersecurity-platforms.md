@@ -152,12 +152,14 @@ For firewall and proxy allowlisting, your Netdata Agents need the following netw
 
 | Direction | Port        | Protocol  | Purpose                                            |
 |-----------|-------------|-----------|----------------------------------------------------|
-| Inbound   | 19999/TCP   | TCP       | Local dashboard access and streaming from Child Agents |
+| Inbound   | 19999/TCP   | TCP (HTTP / custom binary protocol) | Local dashboard access and streaming from Child Agents |
 | Outbound  | 443/TCP     | WSS/HTTPS | Agent-Cloud Link (ACLK) and node claiming          |
 
 :::note
 
-You can disable inbound access on port `19999` by setting `mode = none` in `netdata.conf` when using Cloud-only access. See [Configure Cloud-only access](#configure-cloud-only-access) for details.
+Port 19999 is multiplexed: the same port handles both dashboard HTTP requests and the Netdata streaming protocol (a custom binary protocol over TCP). The server auto-detects which protocol the client is using based on the initial handshake. From a firewall perspective, both are simply TCP on port 19999.
+
+You can disable inbound access on port `19999` by setting `mode = none` in `netdata.conf` when using Cloud-only access. This also disables inbound streaming. See [Configure Cloud-only access](#configure-cloud-only-access) for details.
 
 :::
 
