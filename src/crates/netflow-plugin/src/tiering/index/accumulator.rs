@@ -97,6 +97,9 @@ impl TierAccumulator {
         self.buckets.get(&bucket_start).map(HashMap::capacity)
     }
 
+    /// Legacy row-expanding flush, kept as the reference implementation for
+    /// the `take_closed_buckets` equivalence tests.
+    #[cfg(test)]
     pub(crate) fn flush_closed_rows(&mut self, now_usec: u64) -> Vec<OpenTierRow> {
         let mut closable = Vec::new();
         for start in self.buckets.keys().copied() {

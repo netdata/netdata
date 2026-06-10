@@ -270,3 +270,27 @@ impl IngestMetrics {
         stats
     }
 }
+
+impl IngestMetrics {
+    /// Per-tier write counters, callable from any thread (Relaxed atomics).
+    pub(super) fn increment_materialized_tier(&self, tier: TierKind, logical_bytes: u64) {
+        match tier {
+            TierKind::Minute1 => {
+                self.minute_1_entries_written.fetch_add(1, Ordering::Relaxed);
+                self.minute_1_logical_bytes
+                    .fetch_add(logical_bytes, Ordering::Relaxed);
+            }
+            TierKind::Minute5 => {
+                self.minute_5_entries_written.fetch_add(1, Ordering::Relaxed);
+                self.minute_5_logical_bytes
+                    .fetch_add(logical_bytes, Ordering::Relaxed);
+            }
+            TierKind::Hour1 => {
+                self.hour_1_entries_written.fetch_add(1, Ordering::Relaxed);
+                self.hour_1_logical_bytes
+                    .fetch_add(logical_bytes, Ordering::Relaxed);
+            }
+            TierKind::Raw => {}
+        }
+    }
+}

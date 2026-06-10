@@ -67,61 +67,32 @@ impl IngestService {
     }
 
     pub(in crate::ingest) fn flush_closed_tiers(&mut self, now_usec: u64) -> Result<()> {
-        let tier_flow_indexes = self
-            .tier_flow_indexes
-            .read()
-            .map_err(|_| anyhow!("failed to lock tier flow index store for read"))?;
         for tier in MATERIALIZED_TIERS {
-            let rows = if let Some(acc) = self.tier_accumulators.get_mut(&tier) {
-                acc.flush_closed_rows(now_usec)
-            } else {
-                Vec::new()
+            let Some(acc) = self.tier_accumulators.get_mut(&tier) else {
+                continue;
             };
-
-            if rows.is_empty() {
+            let bucket_usec = acc.bucket_usec();
+            let taken = acc.take_closed_buckets(now_usec);
+            if taken.is_empty() {
                 continue;
             }
 
-            for row in rows {
-                let Some(contribution) =
-                    tier_flow_indexes.emit_row(row.flow_ref, row.metrics, &mut self.encode_buf)
-                else {
-                    tracing::warn!("failed to emit tier flow {:?} for {:?}", row.flow_ref, tier);
-                    continue;
-                };
-                let logical_bytes = self.encode_buf.encoded_len();
-                let timestamps = EntryTimestamps::default()
-                    .with_source_realtime_usec(row.timestamp_usec)
-                    .with_entry_realtime_usec(row.timestamp_usec);
-                let write_result = {
-                    let writer = self.tier_writers.get_mut(tier);
-                    self.encode_buf.write_encoded(writer, timestamps)
-                };
-                if let Err(err) = write_result {
-                    self.metrics
-                        .tier_write_errors
-                        .fetch_add(1, Ordering::Relaxed);
-                    tracing::warn!("tier writer {:?} write failed: {}", tier, err);
-                    continue;
+            super::tier_commit::commit_batch(
+                tier,
+                bucket_usec,
+                &taken,
+                &self.tier_flow_indexes,
+                self.tier_writers.get_mut(tier),
+                &mut self.encode_buf,
+                &self.facet_runtime,
+                &self.metrics,
+            );
+
+            if let Some(acc) = self.tier_accumulators.get_mut(&tier) {
+                for (_, container) in taken {
+                    acc.recycle(container);
                 }
-                if let Some(active_file) = self.tier_writers.get_mut(tier).active_file() {
-                    if let Err(err) = self
-                        .facet_runtime
-                        .observe_active_contribution(Path::new(active_file.path()), &contribution)
-                    {
-                        tracing::warn!(
-                            "facet runtime tier {:?} write update failed: {}",
-                            tier,
-                            err
-                        );
-                    }
-                }
-                self.metrics
-                    .tier_entries_written
-                    .fetch_add(1, Ordering::Relaxed);
-                self.increment_materialized_tier_metrics(tier, logical_bytes);
             }
-            self.metrics.tier_flushes.fetch_add(1, Ordering::Relaxed);
         }
 
         Ok(())
@@ -160,33 +131,4 @@ impl IngestService {
         }
     }
 
-    fn increment_materialized_tier_metrics(&self, tier: TierKind, logical_bytes: u64) {
-        match tier {
-            TierKind::Minute1 => {
-                self.metrics
-                    .minute_1_entries_written
-                    .fetch_add(1, Ordering::Relaxed);
-                self.metrics
-                    .minute_1_logical_bytes
-                    .fetch_add(logical_bytes, Ordering::Relaxed);
-            }
-            TierKind::Minute5 => {
-                self.metrics
-                    .minute_5_entries_written
-                    .fetch_add(1, Ordering::Relaxed);
-                self.metrics
-                    .minute_5_logical_bytes
-                    .fetch_add(logical_bytes, Ordering::Relaxed);
-            }
-            TierKind::Hour1 => {
-                self.metrics
-                    .hour_1_entries_written
-                    .fetch_add(1, Ordering::Relaxed);
-                self.metrics
-                    .hour_1_logical_bytes
-                    .fetch_add(logical_bytes, Ordering::Relaxed);
-            }
-            TierKind::Raw => {}
-        }
-    }
 }

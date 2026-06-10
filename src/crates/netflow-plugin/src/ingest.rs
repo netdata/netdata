@@ -38,6 +38,7 @@ const DECODER_STATE_PERSIST_INTERVAL_USEC: u64 = 30 * 1_000_000;
 mod encode;
 mod metrics;
 mod persistence;
+mod tier_commit;
 mod rebuild;
 mod service;
 
