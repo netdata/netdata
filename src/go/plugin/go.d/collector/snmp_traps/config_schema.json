@@ -155,7 +155,7 @@
       },
       "local_engine_id": {
         "title": "Local engine ID",
-        "description": "Receiver-local SNMPv3 engine ID for v3 INFORM authentication (hex string, 5-32 bytes). When omitted or empty, Netdata generates and persists a stable per-job engine ID at /var/lib/netdata/snmp-trap/{job_name}/local-engine-id.",
+        "description": "Receiver-local SNMPv3 engine ID for v3 INFORM authentication (hex string, 5-32 bytes). When omitted or empty, Netdata generates and persists a stable per-job engine ID under the Netdata lib directory at snmp-trap/{job_name}/local-engine-id (default /var/lib/netdata/snmp-trap/{job_name}/local-engine-id).",
         "type": "string",
         "pattern": "^(|[0-9A-Fa-f]{10,64})$"
       },
@@ -294,7 +294,7 @@
         "properties": {
           "enabled": {
             "title": "Enabled",
-            "description": "Write traps to local direct journal files and expose the SNMP traps logs Function. Disable only when another backend, such as OTLP, is enabled.",
+            "description": "Write traps to local direct journal files under /var/log/journal/netdata/snmp-traps/{job_name}/ and expose the SNMP traps logs Function. Requires /var/log/journal to already exist. Disable only when another backend, such as OTLP, is enabled.",
             "type": "boolean",
             "default": true
           }

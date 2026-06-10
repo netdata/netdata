@@ -12,9 +12,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 )
 
-var engineBootsDirBase = "/var/lib/netdata/snmp-trap"
+var engineBootsDirBase string
 
 const (
 	maxSnmpEngineBoots = 2147483647
@@ -22,7 +24,17 @@ const (
 )
 
 func engineBootsDir(jobName string) string {
-	return filepath.Join(engineBootsDirBase, jobName)
+	return filepath.Join(engineBootsBaseDir(), jobName)
+}
+
+func engineBootsBaseDir() string {
+	if engineBootsDirBase != "" {
+		return engineBootsDirBase
+	}
+	if dir := pluginconfig.VarLibDir(); dir != "" {
+		return filepath.Join(dir, "snmp-trap")
+	}
+	return "/var/lib/netdata/snmp-trap"
 }
 
 func engineBootsPath(jobName string) string {

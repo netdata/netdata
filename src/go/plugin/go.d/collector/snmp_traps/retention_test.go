@@ -3,7 +3,9 @@
 package snmp_traps
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -320,11 +322,43 @@ func TestParseRetentionConfigRotationDurationDisabled(t *testing.T) {
 }
 
 func TestJournalRoot(t *testing.T) {
-	cacheDir := withTestCacheDir(t)
+	withTestCacheDir(t)
 	root := journalRoot("local")
-	want := filepath.Join(cacheDir, "traps", "local")
+	want := filepath.Join(persistentSystemdJournalRoot, "netdata", "snmp-traps", "local")
 	if root != want {
 		t.Fatalf("expected %q, got %q", want, root)
+	}
+}
+
+func TestValidatePersistentJournalRootRequiresExistingDirectory(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "missing")
+	withPersistentJournalRoot(t, root)
+
+	err := validatePersistentJournalRoot()
+	if err == nil {
+		t.Fatal("expected missing persistent journal root error")
+	}
+	if !strings.Contains(err.Error(), "does not exist") {
+		t.Fatalf("expected missing root error, got %v", err)
+	}
+	if _, statErr := os.Stat(root); !os.IsNotExist(statErr) {
+		t.Fatalf("persistent journal root was created unexpectedly: %v", statErr)
+	}
+}
+
+func TestValidatePersistentJournalRootRejectsFile(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "journal")
+	if err := os.WriteFile(root, []byte("not a directory"), 0640); err != nil {
+		t.Fatalf("create test file: %v", err)
+	}
+	withPersistentJournalRoot(t, root)
+
+	err := validatePersistentJournalRoot()
+	if err == nil {
+		t.Fatal("expected non-directory persistent journal root error")
+	}
+	if !strings.Contains(err.Error(), "not a directory") {
+		t.Fatalf("expected non-directory root error, got %v", err)
 	}
 }
 

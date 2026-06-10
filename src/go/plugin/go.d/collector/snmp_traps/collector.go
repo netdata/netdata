@@ -210,6 +210,10 @@ func (c *Collector) Init(ctx context.Context) error {
 
 	var journalWriter *JournalWriter
 	if journalEnabled {
+		if err := validatePersistentJournalRoot(); err != nil {
+			releaseProfiles()
+			return dyncfgStartupError(err)
+		}
 		dir := journalRoot(c.jobName)
 		journalCfg := retCfg.makeJournalConfig()
 		var err error

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -430,9 +431,34 @@ func TestCollectorInit_NoOutputBackendIsCodedError(t *testing.T) {
 	assert.Nil(t, c.listener)
 }
 
+func TestCollectorInit_MissingPersistentJournalRootIsRetryableCodedError(t *testing.T) {
+	setMinimalProfileDir(t)
+	root := filepath.Join(t.TempDir(), "missing")
+	withPersistentJournalRoot(t, root)
+
+	c := New()
+	c.SetJobName("local")
+	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
+
+	startJournalJobs := activeDirectJournalJobs.Load()
+	err := c.Init(context.Background())
+	require.Error(t, err)
+
+	var coded interface{ Code() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 503, coded.Code())
+	var retryable interface{ Retryable() bool }
+	require.ErrorAs(t, err, &retryable)
+	assert.True(t, retryable.Retryable())
+	assert.Contains(t, err.Error(), "persistent systemd journal directory")
+	assert.Nil(t, c.listener)
+	assert.Equal(t, startJournalJobs, activeDirectJournalJobs.Load())
+	assert.NoDirExists(t, root)
+}
+
 func TestCollectorInit_OTELOnlySkipsJournalCreation(t *testing.T) {
 	setMinimalProfileDir(t)
-	cacheDir := withTestCacheDir(t)
+	withTestCacheDir(t)
 	disabled := false
 	badRetention := "not-a-size"
 	srv := startOTLPFixture(t, nil)
@@ -457,7 +483,6 @@ func TestCollectorInit_OTELOnlySkipsJournalCreation(t *testing.T) {
 	assert.Equal(t, startJournalJobs, activeDirectJournalJobs.Load())
 	assert.NoDirExists(t, journalRoot(jobName))
 	assert.Equal(t, trapWriteFailureOTLP, c.trapWriteFailureDim())
-	assert.NoDirExists(t, cacheDir+"/traps")
 
 	c.Cleanup(context.Background())
 	require.Nil(t, c.listener)

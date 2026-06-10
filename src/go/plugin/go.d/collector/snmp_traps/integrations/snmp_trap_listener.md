@@ -32,7 +32,7 @@ This collector listens for incoming SNMP Trap and INFORM notifications from netw
 - **Deduplication**: Optional configurable per-job dedup that suppresses repeated identical traps within a window. The first matching trap is journaled immediately; subsequent matches increment a summary counter and a periodic summary entry is written.
 - **Per-OID overrides**: Operators can override the profile-assigned category, severity, and labels for specific OIDs without editing profiles.
 - **Per-OID metric opt-in**: Operators can promote selected trap OIDs to dedicated Netdata metric charts for finer-grained alerting and dashboards. Each metric entry selects an OID, a context name under `snmp.trap.`, and optionally a bounded-cardinality varbind for multi-dimensional counting.
-- **Direct journal storage**: Enabled by default for explicit jobs. Stores traps as local direct journal files and exposes the embedded `snmp:traps` Function. Direct-journal jobs appear as `__logs_sources` options.
+- **Direct journal storage**: Enabled by default for explicit jobs. Stores traps under `/var/log/journal/netdata/snmp-traps/<job>/` and exposes the embedded `snmp:traps` Function. Direct-journal jobs appear as `__logs_sources` options.
 - **OTLP/gRPC export**: Optional backend that exports traps as OTLP LogRecords. When `otlp.enabled` is `true`, traps are exported through OTLP regardless of `journal.enabled`; if direct journal storage is also enabled, both backends receive traps.
 - **Self-metrics**: Per-job counters for trap events (by category and severity), processing errors (by type), and dedup suppression (when enabled).
 
@@ -153,6 +153,12 @@ Configure the network devices sending traps:
 - For v3 traps, configure the device's engine ID and USM user with the matching auth and privacy protocols.
 
 
+#### Enable persistent systemd journal storage
+
+Direct-journal jobs write under `/var/log/journal/netdata/snmp-traps/` and require `/var/log/journal` to already exist.
+If `/var/log/journal` is absent, create it intentionally before enabling direct journals. For OTLP-only jobs, set `journal.enabled: false` and `otlp.enabled: true`.
+
+
 #### Add custom trap profiles (optional)
 
 If the stock trap profiles do not cover a device, convert vendor MIBs with the installed `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` helper and place the resulting YAML profiles under `/etc/netdata/go.d/snmp.trap-profiles/`.
@@ -241,7 +247,7 @@ Each user has:
 <a id="option-direct-journal-journal"></a>
 ##### journal
 
-- `enabled`: Write traps to local direct journal files and expose the job as a `__logs_sources` option in the embedded `snmp:traps` Function.
+- `enabled`: Write traps to local direct journal files under `/var/log/journal/netdata/snmp-traps/<job>/` and expose the job as a `__logs_sources` option in the embedded `snmp:traps` Function. Requires `/var/log/journal` to already exist.
 - Set `enabled: false` only when another output backend, such as OTLP, is enabled.
 
 

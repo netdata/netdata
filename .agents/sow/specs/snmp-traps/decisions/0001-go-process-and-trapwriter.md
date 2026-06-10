@@ -1,6 +1,6 @@
 # ADR-0001: Go Process Model, Journal Writer Backend, and TrapWriter Contract
 
-**Status**: Accepted for SOW-0035 implementation after reviewer round 5; amended on 2026-05-26 to use the published Go journal SDK `go/v0.1.0`; amended on 2026-05-28 to use SDK `go/v0.3.0`; amended on 2026-05-31 to use SDK `go/v0.4.0`; amended on 2026-06-01 by SOW-0045 to route the trap writer hot path through reusable raw journal payload serialization
+**Status**: Accepted for SOW-0035 implementation after reviewer round 5; amended on 2026-05-26 to use the published Go journal SDK `go/v0.1.0`; amended on 2026-05-28 to use SDK `go/v0.3.0`; amended on 2026-05-31 to use SDK `go/v0.4.0`; amended on 2026-06-01 by SOW-0045 to route the trap writer hot path through reusable raw journal payload serialization; amended on 2026-06-10 to use SDK `go/v0.6.3`, place direct journals under `/var/log/journal/netdata/snmp-traps/`, and classify startup environment failures as retryable HTTP-503 coded errors.
 **Date**: 2026-05-25
 **SOW**: SOW-0035 M1
 
@@ -9,10 +9,10 @@
 The Netdata SNMP trap subsystem (design spec: `.agents/sow/specs/snmp-traps/netdata.md`) needs a concrete implementation architecture decision for three interlocking concerns:
 
 1. **Process model**: Where does the trap plugin live in the Netdata process tree?
-2. **Journal writer backend**: How do we write per-job journal files at `/var/cache/netdata/traps/{job_name}/` in Go, compatible with `journalctl --directory=...` queries?
+2. **Journal writer backend**: How do we write per-job journal files at `/var/log/journal/netdata/snmp-traps/{job_name}/` in Go, compatible with `journalctl --directory=...` queries and discoverable by systemd-journal.plugin's default `/var/log/journal` watcher?
 3. **TrapWriter interface + TrapEntry shape**: What is the concrete Go contract between the trap pipeline and storage backends?
 
-The implementation language is **Go** (user decision, 2026-05-25). The journal writer must produce real systemd journal binary-format files so end-to-end acceptance criteria (M4: `journalctl --directory=/var/cache/netdata/traps/test/ TRAP_CATEGORY=security`) passes.
+The implementation language is **Go** (user decision, 2026-05-25). The journal writer must produce real systemd journal binary-format files so end-to-end acceptance criteria (M4: `journalctl --directory=/var/log/journal/netdata/snmp-traps/test/ TRAP_CATEGORY=security`) passes.
 
 ## Decision Drivers
 
@@ -189,7 +189,10 @@ type JournalConfig struct {
 **SDK configuration**:
 
 - `journal.NewLog(dir, journal.LogConfig{...})` receives the configured
-  per-job root `/var/cache/netdata/traps/{job_name}/`.
+  per-job root `/var/log/journal/netdata/snmp-traps/{job_name}/`.
+- The plugin checks that `/var/log/journal` already exists before calling the
+  SDK. It creates only the Netdata-owned child tree so it does not accidentally
+  enable persistent journald storage on hosts where the parent was absent.
 - The SDK appends `<machine-id>/`; `JournalWriter.JournalDirectory()` returns
   the effective query directory for `journalctl --directory`.
 - `LogOpenEager` is mandatory so active journal file creation/open and writer
@@ -237,7 +240,7 @@ Per spec §19, proposed:
 ```go
 // TrapWriter is the contract between the trap pipeline and storage backends.
 // Each job has exactly one TrapWriter. The journal-direct backend writes to
-// /var/cache/netdata/traps/{job_name}/; the OTLP backend (SOW-0038) implements
+// /var/log/journal/netdata/snmp-traps/{job_name}/; the OTLP backend (SOW-0038) implements
 // the same interface with protobuf serialization.
 type TrapWriter interface {
     Write(entry *TrapEntry) error   // Fast accept into backend-owned queue or return drop-worthy error
@@ -393,12 +396,13 @@ All job resources are validated synchronously in the go.d framework's job `Start
 |---|---|---|
 | Job name | `^[a-zA-Z0-9][a-zA-Z0-9_-]*$`, max 64 chars, no path separators/dots | HTTP-422 |
 | Endpoint list | At least one endpoint, protocol supported (udp), address/port parseable | HTTP-422 |
-| Endpoint bind | `net.ListenUDP()` on every configured endpoint; all-or-nothing cleanup on partial failure | HTTP-422 |
+| Endpoint bind | `net.ListenUDP()` on every configured endpoint; all-or-nothing cleanup on partial failure | HTTP-503 retryable |
 | Profile cache | `AcquireProfileCache()` returns error on load/parse failure | HTTP-422 |
-| Journal directory | `os.MkdirAll()` + writability check on `/var/cache/netdata/traps/{job_name}/` | HTTP-422 |
-| Journal writer | `NewJournalWriter(dir, cfg)` validates directory and retention config | HTTP-422 |
+| Persistent journal parent | `os.Stat("/var/log/journal")`; parent must already exist and be a directory | HTTP-503 retryable |
+| Journal directory | SDK creates/opens `/var/log/journal/netdata/snmp-traps/{job_name}/`; failure is all-or-nothing cleanup | HTTP-503 retryable |
+| Journal writer | `NewJournalWriter(dir, cfg)` validates directory and retention config | HTTP-503 retryable for environment failures; HTTP-422 for invalid retention config |
 
-These errors must flow through DynCfg as `CodedError{code: 422}`. The current framework does **not** do this for every path:
+These errors must flow through DynCfg as coded errors with the resource-specific code above. Non-retryable configuration/profile errors use HTTP-422; retryable startup/environment errors use HTTP-503 and implement `Retryable() bool` so file-configured jobs can retry after the transient condition clears.
 
 - `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go:88-90` wraps `Start()` `createCollectorJob()` failures as `codedError{code: 400}`, hiding any inner 422.
 - `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go:93-96` schedules retry and returns a plain error for `Start()` `AutoDetection()` failures.
@@ -408,7 +412,7 @@ These errors must flow through DynCfg as `CodedError{code: 422}`. The current fr
 **Framework change needed** (small jobmgr + DynCfg handler edit, scoped to SOW-0035 M2):
 
 1. Preserve an inner `CodedError` from `createCollectorJob()` instead of replacing it with hardcoded HTTP 400.
-2. If `AutoDetection()` returns a `CodedError`, call `Cleanup()` and return that error without scheduling a retry; plain non-coded `AutoDetection()` errors keep the existing retry behavior for other collectors.
+2. If `AutoDetection()` returns a `CodedError`, call `Cleanup()` and return that error. Schedule a retry only when the error also implements `Retryable() bool` and returns `true`; plain non-coded `AutoDetection()` errors keep the existing retry behavior for other collectors.
 3. Make `Update()` mirror `Start()` for both `createCollectorJob()` and `AutoDetection()` coded errors.
 4. Make the `CmdUpdate` callback error path at `src/go/plugin/framework/dyncfg/handler.go:683` honor `CodedError` response codes like `CmdEnable` does, instead of always sending HTTP 200 for `cb.Start()` / `cb.Update()` failure. Preserve the existing `ErrNonDisruptiveUpdate` rollback path at `handler.go:667-677` as HTTP 200 because the old config remains effective and runtime state did not change; trap creation-time failures must not use `ErrNonDisruptiveUpdate`.
 

@@ -206,7 +206,7 @@ Originally classified blocker in iter-1. Codex iter-2 correctly noted the "dedup
 - **Recommended fix**: elevate from minor to blocker. Require:
   1. Hot-registration is **opt-in via plugin config** (default: pre-configured engineIDs only, matching CheckMK/Splunk default).
   2. When hot-registration is enabled, the pair is logged to the journal with `SNMP_USM_HOT_REGISTERED=true` for operator audit, and the operator must explicitly confirm via dyncfg before the pair is considered trusted.
-  3. `snmpEngineBoots` is persisted to disk (`/var/lib/netdata/snmp-trap/engine-boots`) and survives plugin restart; document the restart-recovery behaviour for INFORM Response.
+  3. Per-job `snmpEngineBoots` is persisted to disk (`${NETDATA_LIB_DIR:-/var/lib/netdata}/snmp-trap/{job_name}/engine-boots`) and survives plugin restart; document the restart-recovery behaviour for INFORM Response.
   4. Hot-registered pairs expire after a configurable TTL (default 24h) and require re-confirmation.
 
 ### W10. (minor) "Stock vendor pack for top-5 vendors" lacks a coverage commitment

@@ -116,7 +116,7 @@ The plugin is a **DynCfg-managed jobs orchestrator**. Each **job is one listener
 
 Job lifecycle mirrors the established go.d pattern (`src/go/plugin/framework/jobruntime/job_v1.go`; orchestration in `src/go/plugin/agent/jobmgr/dyncfg_collector_callbacks.go`):
 
-- **Add / Enable** — create job and synchronously preflight every required resource. Endpoint bind failures (EACCES for privileged port, EADDRINUSE for port collision, etc.), unsupported endpoint protocol, invalid job name, invalid v3 USM passphrases, profile-load failure, journal directory create/open failure, writer initialization failure, and retention configuration failure all return coded errors (HTTP 422) surfaced in the DynCfg UI. The job is not reported as started when creation fails.
+- **Add / Enable** — create job and synchronously preflight every required resource. Invalid configuration and profile errors return non-retryable coded errors (HTTP 422). Startup/environment failures such as endpoint bind failures (EACCES for privileged port, EADDRINUSE for port collision, etc.), persistent journal directory absence, journal directory create/open failure, writer initialization failure, SNMPv3 state persistence failure, and OTLP preflight failure are still surfaced during DynCfg apply/job creation, but are classified as retryable coded errors (HTTP 503) so file-configured jobs can recover after transient conditions clear. The job is not reported as started when creation fails.
 - **Update** — stop the running job, recreate from new config, and preflight every required resource. Atomic restart, no plugin-wide restart.
 - **Disable / Remove** — stop the job, close all sockets, retain the journal directory (for forensics) but stop writing.
 
@@ -130,9 +130,9 @@ Trap job names are path and journal identifiers. The trap plugin applies an addi
 
 | Path | Purpose |
 |---|---|
-| `/var/cache/netdata/traps/{job_name}/` | Per-job journal directory (one journal file family per job) |
-| `/var/lib/netdata/snmp-trap/{job_name}/engine-boots` | Per-job `snmpEngineBoots` counter for SNMPv3 INFORM correctness (see §6) |
-| `/var/lib/netdata/snmp-trap/{job_name}/local-engine-id` | Per-job receiver-local SNMPv3 engine ID used for INFORM authentication/Responses when `local_engine_id` is omitted |
+| `/var/log/journal/netdata/snmp-traps/{job_name}/` | Per-job journal directory (one journal file family per job). The plugin requires the parent `/var/log/journal` to already exist and MUST NOT create it. |
+| `${NETDATA_LIB_DIR:-/var/lib/netdata}/snmp-trap/{job_name}/engine-boots` | Per-job `snmpEngineBoots` counter for SNMPv3 INFORM correctness (see §6) |
+| `${NETDATA_LIB_DIR:-/var/lib/netdata}/snmp-trap/{job_name}/local-engine-id` | Per-job receiver-local SNMPv3 engine ID used for INFORM authentication/Responses when `local_engine_id` is omitted |
 
 ### Language and process model
 
@@ -140,20 +140,20 @@ The implementation language is **Go** (user decision recorded on 2026-05-25). Th
 
 **Process model** (accepted by SOW-0035 M1 ADR-0001): The trap plugin is a **standard in-process go.d collector V2 module** at `src/go/plugin/go.d/collector/snmp_traps/`, registered as `snmp_traps`. No separate process, no CGo, no subprocess bridge.
 
-**Journal writer backend**: The trap collector uses the Go systemd journal SDK module `github.com/netdata/systemd-journal-sdk/go/journal` at `go/v0.5.1` behind the local `TrapWriter` abstraction. `NewJournalWriter()` constructs `journal.NewLog()` with `LogOpenEager` and `LogIdentityStrict`, so journal directory creation/open, active file creation, writer lock acquisition, machine ID parsing, boot ID parsing, rotation policy validation, and retention policy validation are proven during job creation before DynCfg apply succeeds when direct journal output is enabled.
+**Journal writer backend**: The trap collector uses the Go systemd journal SDK module `github.com/netdata/systemd-journal-sdk/go/journal` at `go/v0.6.3` behind the local `TrapWriter` abstraction. `NewJournalWriter()` constructs `journal.NewLog()` with `LogOpenEager` and `LogIdentityStrict`, so journal directory creation/open, active file creation, writer lock acquisition, machine ID parsing, boot ID parsing, rotation policy validation, and retention policy validation are proven during job creation before DynCfg apply succeeds when direct journal output is enabled.
 
-The configured per-job root remains `/var/cache/netdata/traps/{job_name}/`. The SDK appends the machine-id child directory, so the effective query directory is `/var/cache/netdata/traps/{job_name}/{machine_id}/`. Use the SDK-backed writer's effective `JournalDirectory()` for `journalctl --directory` validation.
+The configured per-job root is `/var/log/journal/netdata/snmp-traps/{job_name}/`. The plugin validates that `/var/log/journal` already exists before creating the Netdata-owned child tree, because creating `/var/log/journal` can change journald persistent-storage behavior on hosts where it was intentionally absent. The SDK appends the machine-id child directory, so the effective query directory is `/var/log/journal/netdata/snmp-traps/{job_name}/{machine_id}/`. Use the SDK-backed writer's effective `JournalDirectory()` for `journalctl --directory` validation.
 
 **Output backend selection**:
 
-- `journal.enabled` defaults to `true`. When enabled, the job preflights direct journal creation/open and retention config at job creation time.
+- `journal.enabled` defaults to `true`. When enabled, the job preflights `/var/log/journal` availability, direct journal creation/open, and retention config at job creation time.
 - `journal.enabled: false` disables direct journal creation and skips direct-journal preflight. Retention settings are ignored because the backend is disabled.
 - `otlp.enabled` defaults to `false`. When enabled, the job preflights the OTLP receiver at job creation time.
 - At least one backend must be enabled. `journal.enabled: false` with `otlp.enabled: false` fails job creation with HTTP-422.
 - Direct journal + OTLP fanout is supported. Direct journal is the primary local forensic backend; OTLP export failures are counted separately and do not make a successful direct journal write fail.
 - Direct journal files are written in SDK compact mode with compression disabled and FSS/sealing disabled. Existing readable non-compact files remain queryable by the SDK reader; new files use the compact format.
 
-**Embedded logs Function**: `go.d.plugin` exposes one module Function named `snmp:traps`. It uses the journal SDK Netdata Function API against the shared traps root (`/var/cache/netdata/traps/`) and maps each direct-journal job directory to one `__logs_sources` option named after the job. The SDK selects all direct-journal sources by default; operators can narrow to one job with `selections.__logs_sources=["{job_name}"]`. OTEL-only jobs do not create direct journal directories and therefore do not appear as log sources. Until Netdata's dedicated Function deletion protocol lands, a node with no direct-journal trap sources may still show `snmp:traps`; the Function must return no sources or an unavailable response instead of pretending a source exists.
+**Embedded logs Function**: `go.d.plugin` exposes one module Function named `snmp:traps`. It uses the journal SDK Netdata Function API against the shared traps root (`/var/log/journal/netdata/snmp-traps/`) and maps each direct-journal job directory to one `__logs_sources` option named after the job. The SDK selects all direct-journal sources by default; operators can narrow to one job with `selections.__logs_sources=["{job_name}"]`. OTEL-only jobs do not create direct journal directories and therefore do not appear as log sources. Until Netdata's dedicated Function deletion protocol lands, stale function advertisement is avoided by only registering the logs method when direct-journal jobs exist.
 
 **Rationale**: In-process module code means no IPC for cross-plugin enrichment (SOW-0037), trivially shared profile cache (Go package-level state + refcount), and the well-understood go.d job lifecycle. A CGo bridge to libsystemd cannot set `_HOSTNAME` (journald owns trusted fields); a subprocess Rust bridge adds process management complexity. The SDK-backed writer preserves direct journal file control, creation-time failure detection, and `journalctl` compatibility without maintaining a package-local copy of the journal binary format.
 
@@ -162,7 +162,7 @@ The configured per-job root remains `/var/cache/netdata/traps/{job_name}/`. The 
 ### Concurrency model
 
 - **Hot path** (per-packet decode + enrich + counter increment): one receive loop per endpoint with reusable buffers; no per-packet heap allocation target; shared per-listener decoder/resolver/writer pipeline. One job = one listener = one or more endpoints = one writer. Multiple endpoint receive loops in the same job fan into one concurrency-safe bounded writer queue; one worker drains that queue and writes journal entries sequentially.
-- **Journal write**: per-job writer thread, one journal file family per job (under `/var/cache/netdata/traps/{job_name}/`). SOW-0045 measured about 62K-73K persisted traps/sec for the full synthetic packet-to-journal path on the workstation, but this is local benchmark evidence, not a portable hardware guarantee. To exceed one writer's ceiling for a single high-volume listener, operators add more jobs for scaling/isolation. Multi-writer partitioning **within a single listener** is out of scope for SOW-0035–SOW-0038; if it becomes necessary it joins a future SOW.
+- **Journal write**: per-job writer thread, one journal file family per job (under `/var/log/journal/netdata/snmp-traps/{job_name}/`). SOW-0045 measured about 62K-73K persisted traps/sec for the full synthetic packet-to-journal path on the workstation, but this is local benchmark evidence, not a portable hardware guarantee. To exceed one writer's ceiling for a single high-volume listener, operators add more jobs for scaling/isolation. Multi-writer partitioning **within a single listener** is out of scope for SOW-0035–SOW-0038; if it becomes necessary it joins a future SOW.
 
 ### Process model
 
@@ -215,7 +215,7 @@ Reception is **per-job** (§5). Each listener (job) opens all configured endpoin
 
 - **UDP/162** is the standard SNMP trap endpoint. Privileged ports (<1024) require `CAP_NET_BIND_SERVICE` on the binary or process.
 - **Stock default job `local`** binds a UDP port 162 endpoint. Netdata packages grant `CAP_NET_BIND_SERVICE` to `go.d.plugin` and include the capability in the installed `netdata.service` bounding set, so the packaged Agent can bind the standard trap port while still running unprivileged. If a custom/manual install lacks that capability, or runs under a systemd service that excludes it from `CapabilityBoundingSet`, the bind or plugin exec fails and the job does not start — no automatic fallback to a high port. Custom operators choose one of: (a) grant the capability (`setcap CAP_NET_BIND_SERVICE=eip <binary>` and allow it in the service bounding set, or use systemd `AmbientCapabilities=CAP_NET_BIND_SERVICE`), or (b) reconfigure the job to a non-privileged port and configure the sending devices accordingly.
-- **Any endpoint bind failure is fatal for the job** — the job init returns an HTTP-422 coded error to DynCfg; the operator sees the error in the dashboard. No silent degradation, no "try a random free port" behavior. This makes listener behavior predictable for operators: every configured endpoint binds exactly as requested or the job is not started.
+- **Any endpoint bind failure is fatal for the job** — the job init returns a retryable HTTP-503 coded error to DynCfg; the operator sees the error in the dashboard and the job is not reported as started. No silent degradation, no "try a random free port" behavior. This makes listener behavior predictable for operators: every configured endpoint binds exactly as requested or the job is not started.
 - **Unsupported endpoint protocols fail at job creation** — the endpoint schema is protocol-aware. A protocol listed in config but not supported by the implementation returns HTTP-422 during DynCfg apply; unsupported endpoints are never ignored.
 
 ### Protocols and crypto
@@ -239,8 +239,8 @@ Reception is **per-job** (§5). Each listener (job) opens all configured endpoin
 - **Same UDP socket as receive** — guarantees correct source-port and source-IP, including under NAT. Required per RFC 3414 §3.
 - **Retransmits handled by idempotency** — if the sender retransmits the same InformRequest (same `request-id`), the receiver re-emits the same Response. The plugin does not track in-flight informs.
 - **Response send failure** is logged + `snmp.trap.errors.inform_response_failed` counter increment; the trap itself is still processed (the sender's retransmit per RFC 3414 will eventually succeed or the operator's monitoring will catch the persistent failure).
-- **Receiver-local engine identity for v3 INFORM** — per RFC 3414 confirmed-class message semantics, the receiver is authoritative for INFORM authentication and Response PDUs. The job uses `local_engine_id` when configured; when omitted, Netdata generates a stable per-job value at job creation and persists it at `/var/lib/netdata/snmp-trap/{job_name}/local-engine-id`. Remote sender engine IDs in `engine_id_whitelist` remain the v3 Trap allowlist and are not used as the receiver-local INFORM engine ID.
-- **`snmpEngineBoots` persistence for v3 INFORM** — per §5, the receiver-local boot counter is persisted at `/var/lib/netdata/snmp-trap/{job_name}/engine-boots`. Without persistence, devices that cached the old boot counter reject our INFORM Response PDUs as replay attacks after every Netdata restart.
+- **Receiver-local engine identity for v3 INFORM** — per RFC 3414 confirmed-class message semantics, the receiver is authoritative for INFORM authentication and Response PDUs. The job uses `local_engine_id` when configured; when omitted, Netdata generates a stable per-job value at job creation and persists it at `${NETDATA_LIB_DIR:-/var/lib/netdata}/snmp-trap/{job_name}/local-engine-id`. Remote sender engine IDs in `engine_id_whitelist` remain the v3 Trap allowlist and are not used as the receiver-local INFORM engine ID.
+- **`snmpEngineBoots` persistence for v3 INFORM** — per §5, the receiver-local boot counter is persisted at `${NETDATA_LIB_DIR:-/var/lib/netdata}/snmp-trap/{job_name}/engine-boots`. Without persistence, devices that cached the old boot counter reject our INFORM Response PDUs as replay attacks after every Netdata restart.
 - **Creation-time failure semantics** — failure to create, read, validate, write, fsync, or rename either `local-engine-id` or `engine-boots` fails job creation/DynCfg apply. The job is not reported as started and does not rely on runtime-only log errors for these state files.
 
 ### Out of scope (deliberate, this design pass)
@@ -411,7 +411,7 @@ The plugin's own configuration (`/etc/netdata/go.d/snmp.trap.conf`, DynCfg-edita
 update_every: 1   # seconds
 
 jobs:
-  - name: local                           # job name → /var/cache/netdata/traps/local/
+  - name: local                           # job name → /var/log/journal/netdata/snmp-traps/local/
     enabled: false                        # stock default = disabled; operator enables
     listen:
       endpoints:
@@ -502,7 +502,7 @@ If `dimension_from_varbind` references a varbind that can take unbounded values 
 
 ### OTLP exporter config
 
-The `otlp:` block is per-job and disabled by default. When enabled, job creation preflights the OTLP gRPC endpoint before DynCfg apply succeeds: the plugin creates the gRPC client, waits for connection readiness within `request_timeout`, and sends an empty OTLP Logs `Export` request with configured headers. Connection failures, TLS/auth failures, missing LogsService support, invalid endpoints, invalid durations, invalid batch/queue sizes, or invalid header names fail job creation with HTTP 422; the listener is not reported as started.
+The `otlp:` block is per-job and disabled by default. When enabled, job creation preflights the OTLP gRPC endpoint before DynCfg apply succeeds: the plugin creates the gRPC client, waits for connection readiness within `request_timeout`, and sends an empty OTLP Logs `Export` request with configured headers. Connection failures, TLS/auth failures, or missing LogsService support fail job creation with retryable HTTP-503 coded errors; invalid endpoints, invalid durations, invalid batch/queue sizes, or invalid header names fail with non-retryable HTTP-422 coded errors. The listener is not reported as started.
 
 Endpoint syntax:
 
@@ -585,7 +585,7 @@ Aim for the LibreNMS-to-Datadog band: ~2,000-12,000 OID families across major ve
 
 To exceed one writer's measured ceiling, scale **horizontally with per-job isolation** (§5 listener-as-job model):
 
-- Each listener job is its own writer thread and its own journal directory at `/var/cache/netdata/traps/{job_name}/`.
+- Each listener job is its own writer thread and its own journal directory at `/var/log/journal/netdata/snmp-traps/{job_name}/`.
 - Operators scale by adding more jobs (each bound to a different port and/or with different community/USM/source-IP allowlists), partitioning the trap stream at the listener layer.
 - Intra-listener multi-writer sharding (one listener feeding multiple writer threads by source-IP hash) is explicitly out of scope (§14 Non-Goals); if a single high-volume sender exceeds one writer's ceiling, the operator splits the sender's traffic across multiple jobs.
 
@@ -681,13 +681,15 @@ Dedup collapses **identical** repeated traps. Per-source rate-limiting (§7.5 `r
 Each listener job (§5) owns its own configured journal root:
 
 ```
-/var/cache/netdata/traps/{job_name}/   ← configured per-job root (one writer thread per job)
+/var/log/journal/netdata/snmp-traps/{job_name}/   ← configured per-job root (one writer thread per job)
 ```
+
+The plugin requires `/var/log/journal` to exist before direct-journal job creation. It creates only the Netdata-owned child directories under it.
 
 The SDK-backed writer stores files under the machine-id child directory:
 
 ```
-/var/cache/netdata/traps/{job_name}/{machine_id}/   ← effective journalctl --directory path
+/var/log/journal/netdata/snmp-traps/{job_name}/{machine_id}/   ← effective journalctl --directory path
 ```
 
 Per-job retention policy mirrors the retention semantics used by the NetFlow plugin (`src/crates/netflow-plugin/src/plugin_config/types/journal.rs`), with intentional deviation on defaults — the trap plugin ships with size-only eviction by default (no time-based cap). Time-based retention is operator opt-in. The Go implementation maps these knobs to the SDK `RotationPolicy` and `RetentionPolicy`. Rationale: traps are operator-relevant forensic data with low per-event rates in typical deployments; aging entries out by time discards forensic value before the operator's investigation window closes. A follow-up will align NetFlow's default to match. The trap plugin's per-job knobs:
@@ -1031,7 +1033,7 @@ In addition to the two plugin-self contexts, operator-selected OIDs (via §7.5) 
 
 Phase B resolved most of the original questions. What remains:
 
-1. **Go process / writer backend** — **ACCEPTED (SOW-0035 M1, ADR-0001; amended 2026-05-26 for the SDK integration, 2026-05-28 for SDK `go/v0.3.0`, 2026-05-31 for SDK `go/v0.4.0`, and 2026-06-08 for SDK `go/v0.5.1`)**: Standard in-process go.d collector V2 module with a thin SDK-backed Go journal adapter over `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.5.1`. No separate process, no CGo, no subprocess bridge. See `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md`.
+1. **Go process / writer backend** — **ACCEPTED (SOW-0035 M1, ADR-0001; amended 2026-05-26 for the SDK integration, 2026-05-28 for SDK `go/v0.3.0`, 2026-05-31 for SDK `go/v0.4.0`, 2026-06-08 for SDK `go/v0.5.1`, and 2026-06-10 for SDK `go/v0.6.3` plus persistent-journal placement)**: Standard in-process go.d collector V2 module with a thin SDK-backed Go journal adapter over `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.6.3`. No separate process, no CGo, no subprocess bridge. See `.agents/sow/specs/snmp-traps/decisions/0001-go-process-and-trapwriter.md`.
 
 2. **Profile YAML hot-reload mechanism — ACCEPTED (SOW-0037 M3)**: operators add or edit YAML files under `/etc/netdata/go.d/snmp.trap-profiles/` and trigger the agent-wide `reload-profiles` Function through the Functions/DynCfg surface. The plugin parses and validates all profile files, builds a full replacement OID index, and atomically swaps it into the shared cache only after the new index is complete. Failed reloads keep the previous index active, return an operator-visible error, log the profile loader error with file/path detail, and increment `snmp.trap.errors.profile_load_failed`. Reload without an active `snmp_traps` job returns unavailable because profile memory is intentionally not retained while idle. The current Function framework still dispatches agent-wide methods through one running job instance, but this method does not expose a job selector and the reload applies to the shared profile cache used by all listeners. Profile memory is still loaded on first runnable trap job creation and released after the last runnable trap job stops. Runtime MIB compilation remains out of scope.
 
@@ -1061,8 +1063,8 @@ Phase B resolved most of the original questions. What remains:
 - **Spec example varbind layout** — file-scoped table (matches the shipped `profile-format.md` schema).
 - **Collector consistency bundle** — owned by SOW-0039 (the final SOW); SOW-0035–0038 are not independently mergeable (single PR sequence ending at SOW-0039 M6).
 - **OTel severity mapping** — corrected to OTel Logs Data Model Appendix B values (§11b).
-- **SNMPv3 receiver-local engine ID** — `local_engine_id` is optional; when omitted, Netdata generates and persists a stable per-job value at `/var/lib/netdata/snmp-trap/{job_name}/local-engine-id`. This state is used for v3 INFORM authentication/Responses and is separate from the v3 Trap sender `engine_id_whitelist`.
-- **snmpEngineBoots persistence** — per-job receiver-local counter at `/var/lib/netdata/snmp-trap/{job_name}/engine-boots` (SOW-0036 M1).
+- **SNMPv3 receiver-local engine ID** — `local_engine_id` is optional; when omitted, Netdata generates and persists a stable per-job value at `${NETDATA_LIB_DIR:-/var/lib/netdata}/snmp-trap/{job_name}/local-engine-id`. This state is used for v3 INFORM authentication/Responses and is separate from the v3 Trap sender `engine_id_whitelist`.
+- **snmpEngineBoots persistence** — per-job receiver-local counter at `${NETDATA_LIB_DIR:-/var/lib/netdata}/snmp-trap/{job_name}/engine-boots` (SOW-0036 M1).
 - **CWE-117 scope** — applies to the journal writer path; OTLP path is wire-safe via protobuf encoding. Downstream OTLP receivers' encoding choices are out of scope.
 
 ## 14. Non-Goals (deliberately not building)
@@ -1117,7 +1119,7 @@ The implementation is tracked through five sequential SOWs under `.agents/sow/pe
 
 | SOW | Scope | Acceptance |
 |---|---|---|
-| **SOW-0035** | Go implementation architecture decision (process model, journal-writer backend, TrapWriter interface contract); multi-endpoint listener (per-job DynCfg orchestration; every configured endpoint binds or job creation fails with HTTP-422 surfaced in DynCfg — no automatic high-port fallback) + SNMPv1/v2c decode + source identification + replayable pcap test corpus; shared lazy profile YAML loader loaded on first runnable job creation (multipath, filename-dedup, extends-chain merge — mirroring the SNMP polling plugin) + OID index + 2-tier varbind resolution + template rendering; journal writer per-job (one journal directory per job at `/var/cache/netdata/traps/{job_name}/`, retention config with intentional deviation on the `max_duration` default) with creation-time directory/writer preflight and CWE-117 binary-field encoding | Operator sees decoded trap from a replayed pcap in a per-job journal directory |
+| **SOW-0035** | Go implementation architecture decision (process model, journal-writer backend, TrapWriter interface contract); multi-endpoint listener (per-job DynCfg orchestration; every configured endpoint binds or job creation fails with retryable HTTP-503 surfaced in DynCfg — no automatic high-port fallback) + SNMPv1/v2c decode + source identification + replayable pcap test corpus; shared lazy profile YAML loader loaded on first runnable job creation (multipath, filename-dedup, extends-chain merge — mirroring the SNMP polling plugin) + OID index + 2-tier varbind resolution + template rendering; journal writer per-job (one journal directory per job at `/var/log/journal/netdata/snmp-traps/{job_name}/`, retention config with intentional deviation on the `max_duration` default) with creation-time directory/writer preflight and CWE-117 binary-field encoding | Operator sees decoded trap from a replayed pcap in a per-job journal directory |
 | **SOW-0036** | SNMPv3 USM (static engineID whitelist, per-job) + INFORM acknowledgement + `snmpEngineBoots` persistence per job; per-job allowlist + rate limiting; plugin configuration schema + DynCfg per-job orchestration refinement; plugin-self NIDL metrics (per-job dimensions, full error universe per §12, including BER limit violations from §18) | Production-grade per-job auth + rate limiting + telemetry |
 | **SOW-0037** | Cross-plugin enrichment (sysName/vendor/topology); **opt-in** deduplication (per-job, disabled by default — see §10) with periodic summary entries; profile YAML hot-reload via DynCfg (no runtime MIB compilation per §14); operator per-OID metric opt-in | Operational depth: enriched, optionally deduped, hot-reloadable |
 | **SOW-0038** | Throughput benchmark harness; SNMPv3 dynamic engineID discovery (opt-in); standards-compliant OTLP exporter (§11b — optional, vendor-neutral; works with Netdata's OTEL plugin and any OTLP-compliant receiver) | Scale + interop |

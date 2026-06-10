@@ -13,8 +13,6 @@ import (
 	"time"
 
 	sdkjournal "github.com/netdata/systemd-journal-sdk/go/journal"
-
-	buildinfo "github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 )
 
 var (
@@ -28,6 +26,8 @@ var (
 	errNegativeTimestamp = errors.New("negative timestamp")
 	errMissingTrapOID    = errors.New("missing trap OID for trap report")
 )
+
+var persistentSystemdJournalRoot = "/var/log/journal"
 
 type JournalField = sdkjournal.Field
 
@@ -53,11 +53,21 @@ func journalRoot(jobName string) string {
 }
 
 func journalBaseRoot() string {
-	cache := buildinfo.CacheDir
-	if cache == "" {
-		cache = "/var/cache/netdata"
+	return filepath.Join(persistentSystemdJournalRoot, "netdata", "snmp-traps")
+}
+
+func validatePersistentJournalRoot() error {
+	info, err := os.Stat(persistentSystemdJournalRoot)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("persistent systemd journal directory %s does not exist; enable persistent journald storage before enabling direct SNMP trap journals", persistentSystemdJournalRoot)
+		}
+		return fmt.Errorf("stat persistent systemd journal directory %s: %w", persistentSystemdJournalRoot, err)
 	}
-	return filepath.Join(cache, "traps")
+	if !info.IsDir() {
+		return fmt.Errorf("persistent systemd journal path %s is not a directory", persistentSystemdJournalRoot)
+	}
+	return nil
 }
 
 func NewJournalWriter(dir string, cfg JournalConfig) (*JournalWriter, error) {

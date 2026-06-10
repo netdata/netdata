@@ -175,7 +175,7 @@ These choices in `netdata.md` require redesign before implementation begins.
 - **Stress-test reference**: W9 (re-classified blocker), Q8, M3.
 - **What's wrong**: original §1 commit C6 was internally inconsistent with Risk 3 (INFORM verification needed). Plus the v3 INFORM Response requires `snmpEngineBoots` persistence across plugin restart (RFC 3414 §2.2.2); the design's "plugin lifecycle follows the Netdata agent's lifecycle" (`netdata.md §5 L130`) means boot counter resets every Netdata restart, breaking devices that cached the old counter.
 - **Recommended approach**:
-  1. Persist `snmpEngineBoots` to `/var/lib/netdata/snmp-trap/engine-boots` and increment on each plugin start.
+  1. Persist per-job `snmpEngineBoots` to `${NETDATA_LIB_DIR:-/var/lib/netdata}/snmp-trap/{job_name}/engine-boots` and increment on each plugin start.
   2. Document the recovery behaviour for INFORM Response after plugin restart.
   3. Add integration test with a real Cisco device sending v2c INFORM and v3 INFORM; verify Response PDU shape via tcpdump.
   4. State that INFORM Response uses the receive-side UDP socket under multi-listener configs.
