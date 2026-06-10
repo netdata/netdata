@@ -1446,7 +1446,7 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 
 			for i := range 10 {
 				t.Run(fmt.Sprintf("parse num %d", i+1), func(t *testing.T) {
-					mfs, err := p.parseToMetricFamilies(test.input, nil)
+					mfs, err := p.parseToMetricFamilies(test.input)
 					if len(test.want) > 0 {
 						assert.Equal(t, test.want, mfs)
 					} else {
@@ -1481,7 +1481,7 @@ test_gauge_metric_2{label1="value2"} 1
 		},
 	}
 
-	mfs, err := p.parseToMetricFamilies(txt, nil)
+	mfs, err := p.parseToMetricFamilies(txt)
 
 	require.NoError(t, err)
 	assert.Equal(t, want, mfs)
@@ -1787,7 +1787,7 @@ DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
 DCGM_FI_DEV_REQUESTED_POWER_PROFILE_MASK{UUID="GPU-aaa",gpu="0"} ERROR - FAILED TO CONVERT TO STRING
 `)
 
-	_, err := p.parseToMetricFamilies(txt, nil)
+	_, err := p.parseToMetricFamilies(txt)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse prometheus metrics")
 }
@@ -1961,24 +1961,27 @@ rpc{quantile="0.99",path="/a"} 0.5
 	}, got)
 }
 
-// A transform's mutations — a renamed Name and changed Labels — are what the
-// assembler folds: parseToMetricFamilies must assemble the TRANSFORMED sample, not
-// the original. Mutating Labels in place also exercises ownLabels=true.
-func TestPromTextParser_parseToMetricFamilies_transformMutatesAssembledOutput(t *testing.T) {
+// A relabel step's mutations — a renamed Name and changed Labels — are what Assemble
+// folds: it must assemble the MUTATED sample, not the original. Mutating Labels in
+// place also exercises the ownLabels=true sample stream from parseToSamples.
+func TestAssemble_reflectsMutatedSamples(t *testing.T) {
 	input := []byte("# TYPE old_name gauge\nold_name{keep=\"yes\",drop=\"me\"} 42\n")
 
-	// Rename the metric and drop the "drop" label in place (the sample owns its labels).
-	transform := func(s Sample) (Sample, bool, error) {
-		s.Name = "new_name"
-		kept := s.Labels[:0]
-		for _, l := range s.Labels {
+	var p promTextParser
+	batch, err := p.parseToSamples(input)
+	require.NoError(t, err)
+
+	// Rename the metric and drop the "drop" label in place (each sample owns its labels).
+	for i := range batch.Samples {
+		batch.Samples[i].Name = "new_name"
+		kept := batch.Samples[i].Labels[:0]
+		for _, l := range batch.Samples[i].Labels {
 			if l.Name == "drop" {
 				continue
 			}
 			kept = append(kept, l)
 		}
-		s.Labels = kept
-		return s, true, nil
+		batch.Samples[i].Labels = kept
 	}
 
 	want := MetricFamilies{
@@ -1991,8 +1994,7 @@ func TestPromTextParser_parseToMetricFamilies_transformMutatesAssembledOutput(t 
 		},
 	}
 
-	var p promTextParser
-	mfs, err := p.parseToMetricFamilies(input, transform)
+	mfs, err := Assemble(batch)
 	require.NoError(t, err)
 	assert.Equal(t, want, mfs)
 }

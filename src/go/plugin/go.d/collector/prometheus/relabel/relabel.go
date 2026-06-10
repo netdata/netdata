@@ -8,6 +8,7 @@ package relabel
 import (
 	"crypto/md5"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -95,33 +96,179 @@ type DropInfo struct {
 // Dropped reports whether the sample was dropped.
 func (d DropInfo) Dropped() bool { return d.Reason != DropReasonNone }
 
-// DropObserver is called by the SampleTransform returned from NewTransform for
-// each dropped sample. Implementations SHOULD log the reason/rule/action but
-// MUST NOT log label values (cardinality and privacy).
-type DropObserver func(sample prompkg.Sample, drop DropInfo)
-
 // Config is one relabeling rule. Construct it directly using the Action constants
-// and exported fields; rules are validated (and the Action canonicalized) by New.
+// and exported fields, or unmarshal it from YAML/JSON; rules are validated (and the
+// Action canonicalized) by New.
 //
 // The unexported separatorSet/replacementSet/sourceLabelsSet fields distinguish an
 // explicitly-empty field from an unset one (they are read by withDefaults, validate
-// and applyReplace). They are settable only within this package; callers outside the
-// package cannot express explicit-empty Separator/Replacement/SourceLabels via normal
-// struct literals or standard YAML/JSON unmarshaling (unexported fields are ignored),
-// so a dedicated config loader must set them when that behavior is needed.
+// and applyReplace). They are settable only within this package; a struct literal
+// cannot express explicit-empty Separator/Replacement/SourceLabels, but UnmarshalYAML
+// and UnmarshalJSON set them from the presence of the key (a pointer-shadow struct
+// distinguishes an absent key from an explicit empty value).
 type Config struct {
-	SourceLabels []string
-	Separator    string
-	Regex        Regexp
-	Modulus      uint64
-	TargetLabel  string
-	Replacement  string
-	Action       Action
-	NameScheme   commonmodel.ValidationScheme
+	SourceLabels []string                     `yaml:"source_labels,flow,omitempty" json:"source_labels,omitempty"`
+	Separator    string                       `yaml:"separator,omitempty" json:"separator,omitempty"`
+	Regex        Regexp                       `yaml:"regex,omitempty" json:"regex,omitempty"`
+	Modulus      uint64                       `yaml:"modulus,omitempty" json:"modulus,omitempty"`
+	TargetLabel  string                       `yaml:"target_label,omitempty" json:"target_label,omitempty"`
+	Replacement  string                       `yaml:"replacement,omitempty" json:"replacement,omitempty"`
+	Action       Action                       `yaml:"action,omitempty" json:"action,omitempty"`
+	NameScheme   commonmodel.ValidationScheme `yaml:"-" json:"-"`
 
 	separatorSet    bool
 	replacementSet  bool
 	sourceLabelsSet bool
+}
+
+// UnmarshalYAML loads a rule from YAML, starting from the rule defaults and
+// recording which optional fields the document set (so an explicit empty
+// separator/replacement/source_labels survives withDefaults). Validation happens
+// later in New.
+func (c *Config) UnmarshalYAML(unmarshal func(any) error) error {
+	type rawConfig struct {
+		SourceLabels *[]string `yaml:"source_labels,flow,omitempty"`
+		Separator    *string   `yaml:"separator,omitempty"`
+		Regex        *Regexp   `yaml:"regex,omitempty"`
+		Modulus      *uint64   `yaml:"modulus,omitempty"`
+		TargetLabel  *string   `yaml:"target_label,omitempty"`
+		Replacement  *string   `yaml:"replacement,omitempty"`
+		Action       *Action   `yaml:"action,omitempty"`
+	}
+
+	var raw rawConfig
+	if err := unmarshal(&raw); err != nil {
+		return err
+	}
+	c.applyRaw(raw.SourceLabels, raw.Separator, raw.Regex, raw.Modulus, raw.TargetLabel, raw.Replacement, raw.Action)
+	return nil
+}
+
+// UnmarshalJSON mirrors UnmarshalYAML for JSON (the agent serializes job config as
+// JSON for dyncfg).
+func (c *Config) UnmarshalJSON(b []byte) error {
+	type rawConfig struct {
+		SourceLabels *[]string `json:"source_labels,omitempty"`
+		Separator    *string   `json:"separator,omitempty"`
+		Regex        *Regexp   `json:"regex,omitempty"`
+		Modulus      *uint64   `json:"modulus,omitempty"`
+		TargetLabel  *string   `json:"target_label,omitempty"`
+		Replacement  *string   `json:"replacement,omitempty"`
+		Action       *Action   `json:"action,omitempty"`
+	}
+
+	var raw rawConfig
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	c.applyRaw(raw.SourceLabels, raw.Separator, raw.Regex, raw.Modulus, raw.TargetLabel, raw.Replacement, raw.Action)
+	return nil
+}
+
+// applyRaw seeds the rule with defaults and overlays the fields a document set,
+// tracking explicit-empty separator/replacement/source_labels.
+func (c *Config) applyRaw(sourceLabels *[]string, separator *string, regex *Regexp, modulus *uint64, targetLabel, replacement *string, action *Action) {
+	*c = defaultConfig
+	c.NameScheme = defaultNameValidationScheme
+
+	if sourceLabels != nil {
+		c.SourceLabels = append(c.SourceLabels[:0], (*sourceLabels)...)
+		c.sourceLabelsSet = true
+	}
+	if separator != nil {
+		c.Separator = *separator
+		c.separatorSet = true
+	}
+	if regex != nil {
+		c.Regex = *regex
+	}
+	if modulus != nil {
+		c.Modulus = *modulus
+	}
+	if targetLabel != nil {
+		c.TargetLabel = *targetLabel
+	}
+	if replacement != nil {
+		c.Replacement = *replacement
+		c.replacementSet = true
+	}
+	if action != nil {
+		c.Action = *action
+	}
+}
+
+// configShadow mirrors Config for marshaling. Separator/Replacement/SourceLabels are
+// pointers so an explicit-empty value (recorded by the *Set flags on unmarshal) is
+// emitted rather than dropped by omitempty — keeping a marshal -> unmarshal round-trip
+// faithful (the agent serializes job config as JSON for dyncfg). The unexported *Set
+// flags themselves are derived from key presence, so they need not be marshaled.
+type configShadow struct {
+	SourceLabels *[]string                    `yaml:"source_labels,flow,omitempty" json:"source_labels,omitempty"`
+	Separator    *string                      `yaml:"separator,omitempty" json:"separator,omitempty"`
+	Regex        Regexp                       `yaml:"regex,omitempty" json:"regex,omitempty"`
+	Modulus      uint64                       `yaml:"modulus,omitempty" json:"modulus,omitempty"`
+	TargetLabel  string                       `yaml:"target_label,omitempty" json:"target_label,omitempty"`
+	Replacement  *string                      `yaml:"replacement,omitempty" json:"replacement,omitempty"`
+	Action       Action                       `yaml:"action,omitempty" json:"action,omitempty"`
+	NameScheme   commonmodel.ValidationScheme `yaml:"-" json:"-"`
+}
+
+func (c Config) toShadow() configShadow {
+	s := configShadow{
+		Regex:       c.Regex,
+		Modulus:     c.Modulus,
+		TargetLabel: c.TargetLabel,
+		Action:      c.Action,
+	}
+	if c.sourceLabelsSet || len(c.SourceLabels) > 0 {
+		v := c.SourceLabels
+		if v == nil {
+			// A non-nil empty slice marshals to [] in both YAML and JSON; a nil one
+			// marshals to JSON null, which unmarshals back as unset (losing the
+			// explicit-empty). Normalize so the round-trip is faithful.
+			v = []string{}
+		}
+		s.SourceLabels = &v
+	}
+	if c.separatorSet || c.Separator != "" {
+		v := c.Separator
+		s.Separator = &v
+	}
+	if c.replacementSet || c.Replacement != "" {
+		v := c.Replacement
+		s.Replacement = &v
+	}
+	return s
+}
+
+func (c Config) MarshalYAML() (any, error) { return c.toShadow(), nil }
+
+func (c Config) MarshalJSON() ([]byte, error) { return json.Marshal(c.toShadow()) }
+
+func (a *Action) UnmarshalYAML(unmarshal func(any) error) error {
+	var s string
+	if err := unmarshal(&s); err != nil {
+		return err
+	}
+	act, err := parseAction(s)
+	if err != nil {
+		return err
+	}
+	*a = act
+	return nil
+}
+
+func (a *Action) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	act, err := parseAction(s)
+	if err != nil {
+		return err
+	}
+	*a = act
+	return nil
 }
 
 // Regexp is a relabel regular expression: a regexp.Regexp compiled fully anchored
@@ -159,32 +306,6 @@ func New(cfgs []Config) (*Processor, error) {
 	return &Processor{
 		cfgs:    compiled,
 		builder: labels.NewBuilder(nil),
-	}, nil
-}
-
-// NewTransform builds a prompkg.SampleTransform from the rules. It returns a nil
-// transform when there are no rules, so the scraper keeps its no-transform fast
-// path. onDrop, if non-nil, is called for each dropped sample. The returned
-// transform closes over a single reusable Processor, so it is NOT goroutine-safe;
-// use one transform per scrape goroutine.
-func NewTransform(cfgs []Config, onDrop DropObserver) (prompkg.SampleTransform, error) {
-	p, err := New(cfgs)
-	if err != nil {
-		return nil, err
-	}
-	if len(p.cfgs) == 0 {
-		return nil, nil
-	}
-
-	return func(s prompkg.Sample) (prompkg.Sample, bool, error) {
-		out, drop := p.Apply(s)
-		if drop.Dropped() {
-			if onDrop != nil {
-				onDrop(out, drop)
-			}
-			return prompkg.Sample{}, false, nil
-		}
-		return out, true, nil
 	}, nil
 }
 
@@ -283,6 +404,53 @@ func MustNewRegexp(s string) Regexp {
 // compiled form, so it is safe on a Regexp wrapping an arbitrary *regexp.Regexp.
 func (re Regexp) String() string {
 	return re.original
+}
+
+// UnmarshalYAML reads the un-anchored pattern string and compiles it (NewRegexp
+// fully anchors it, matching Prometheus).
+func (re *Regexp) UnmarshalYAML(unmarshal func(any) error) error {
+	var s string
+	if err := unmarshal(&s); err != nil {
+		return err
+	}
+	r, err := NewRegexp(s)
+	if err != nil {
+		return err
+	}
+	*re = r
+	return nil
+}
+
+func (re *Regexp) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	r, err := NewRegexp(s)
+	if err != nil {
+		return err
+	}
+	*re = r
+	return nil
+}
+
+// MarshalYAML and MarshalJSON emit the original un-anchored pattern, so a
+// marshal/unmarshal round-trip is stable.
+func (re Regexp) MarshalYAML() (any, error) {
+	if re.original == "" {
+		return nil, nil
+	}
+	return re.original, nil
+}
+
+func (re Regexp) MarshalJSON() ([]byte, error) {
+	return json.Marshal(re.original)
+}
+
+// IsZero reports whether the regex is unset or the shared default "(.*)", so
+// omitempty drops it from marshaled output.
+func (re Regexp) IsZero() bool {
+	return re.Regexp == nil || re.Regexp == defaultConfig.Regex.Regexp
 }
 
 // Apply runs the rules against one sample. It returns the (possibly mutated)

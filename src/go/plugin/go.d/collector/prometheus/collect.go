@@ -8,14 +8,13 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
 // collect scrapes the endpoint and writes the metric families to the metrix store. The
 // store cycle (begin/commit) is driven by the framework around Collect, so this only
 // writes observations and returns an error to abort the cycle.
 func (c *Collector) collect(ctx context.Context) error {
-	mfs, err := c.scrape(ctx)
+	mfs, err := c.scrape(ctx, false)
 	if err != nil {
 		return err
 	}
@@ -27,7 +26,7 @@ func (c *Collector) collect(ctx context.Context) error {
 // the expected-prefix guard and the total time-series limit. Unlike V1 these are read-only
 // (V1 mutated Config to make them one-shot); they run only at Check, i.e. autodetection.
 func (c *Collector) check(ctx context.Context) error {
-	mfs, err := c.scrape(ctx)
+	mfs, err := c.scrape(ctx, true)
 	if err != nil {
 		return err
 	}
@@ -46,9 +45,10 @@ func (c *Collector) check(ctx context.Context) error {
 }
 
 // scrape fetches the endpoint and enforces the empty-scrape contract: an empty scrape is
-// an error (endpoint down or exposing nothing), not silent no-data.
-func (c *Collector) scrape(ctx context.Context) (prometheus.MetricFamilies, error) {
-	mfs, err := c.prom.ScrapeWithTransform(ctx, c.relabelTransform)
+// an error (endpoint down or exposing nothing), not silent no-data. checking is true under
+// Check, where relabel-corrupted typed families are a hard error rather than dropped.
+func (c *Collector) scrape(ctx context.Context, checking bool) (prometheus.MetricFamilies, error) {
+	mfs, err := c.scrapeMetricFamilies(ctx, checking)
 	if err != nil {
 		return nil, err
 	}
@@ -56,6 +56,22 @@ func (c *Collector) scrape(ctx context.Context) (prometheus.MetricFamilies, erro
 		return nil, fmt.Errorf("endpoint '%s' returned 0 metric families", c.URL)
 	}
 	return mfs, nil
+}
+
+// scrapeMetricFamilies fetches and assembles. With no relabel rules it uses the direct,
+// no-buffering Scrape path (steady-state cost unchanged). With rules it scrapes the flat
+// classified sample stream and runs the relabel pipeline (relabel, assemble, curate typed
+// families) in relabelAndAssemble.
+func (c *Collector) scrapeMetricFamilies(ctx context.Context, checking bool) (prometheus.MetricFamilies, error) {
+	if len(c.relabelBlocks) == 0 {
+		return c.prom.ScrapeContext(ctx)
+	}
+
+	batch, err := c.prom.ScrapeSamples(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return c.relabelAndAssemble(batch, checking)
 }
 
 func hasPrefix(mfs prometheus.MetricFamilies, prefix string) bool {
@@ -73,13 +89,4 @@ func calcMetrics(mfs prometheus.MetricFamilies) int {
 		n += len(mf.Metrics())
 	}
 	return n
-}
-
-// onRelabelDrop logs why a relabel rule dropped a sample, at debug level. It logs
-// the metric name and the rule outcome, never label values (cardinality/PII).
-func (c *Collector) onRelabelDrop(s prometheus.Sample, d relabel.DropInfo) {
-	c.When(d.RuleIndex >= 0).
-		Debugf("relabel dropped metric %q: %s (rule %d, action %q)", s.Name, d.Reason, d.RuleIndex, d.Action).
-		Else().
-		Debugf("relabel dropped metric %q: %s", s.Name, d.Reason)
 }

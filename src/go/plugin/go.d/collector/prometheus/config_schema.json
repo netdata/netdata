@@ -41,11 +41,6 @@
         "description": "If an endpoint does not return at least one metric with the specified prefix, the data is not processed.",
         "type": "string"
       },
-      "label_prefix": {
-        "title": "Label prefix",
-        "description": "An optional prefix that will be added to all labels of all charts. If set, the label names will be automatically formatted as `prefix_name` (the prefix followed by an underscore and the original name).",
-        "type": "string"
-      },
       "app": {
         "title": "Application",
         "description": "If set, this value will be used in the chart context as 'prometheus.{app}.{metric_name}'.",
@@ -90,6 +85,99 @@
             },
             "uniqueItems": true
           }
+        }
+      },
+      "relabeling": {
+        "title": "Metric relabeling",
+        "description": "Prometheus-compatible metric relabeling applied before charts are built. Each block scopes its rules to the metrics whose name matches `match`.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Relabeling block",
+          "type": "object",
+          "properties": {
+            "match": {
+              "title": "Match",
+              "description": "Netdata simple patterns matched against the full metric name (including any _bucket/_sum/_count suffix, so prefer globs like `app_lat*`). Use `*` to target every metric.",
+              "type": "string"
+            },
+            "metric_relabel_configs": {
+              "title": "Rules",
+              "description": "Prometheus relabel rules applied, in order, to the matched metrics.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "title": "Rule",
+                "type": "object",
+                "properties": {
+                  "source_labels": {
+                    "title": "Source labels",
+                    "description": "Labels whose values are joined (by separator) to form the rule input.",
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "title": "Label",
+                      "type": "string"
+                    }
+                  },
+                  "separator": {
+                    "title": "Separator",
+                    "description": "Separator used to join source label values.",
+                    "type": "string"
+                  },
+                  "regex": {
+                    "title": "Regex",
+                    "description": "Regular expression matched against the joined source label values.",
+                    "type": "string"
+                  },
+                  "modulus": {
+                    "title": "Modulus",
+                    "description": "Modulus for the hashmod action.",
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "target_label": {
+                    "title": "Target label",
+                    "description": "Label (or `__name__` for the metric name) written by the action.",
+                    "type": "string"
+                  },
+                  "replacement": {
+                    "title": "Replacement",
+                    "description": "Replacement value (regex capture groups allowed, e.g. `${1}`).",
+                    "type": "string"
+                  },
+                  "action": {
+                    "title": "Action",
+                    "description": "Relabeling action to perform.",
+                    "type": "string",
+                    "enum": [
+                      "replace",
+                      "keep",
+                      "drop",
+                      "keepequal",
+                      "dropequal",
+                      "hashmod",
+                      "labelmap",
+                      "labeldrop",
+                      "labelkeep",
+                      "lowercase",
+                      "uppercase"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "match",
+            "metric_relabel_configs"
+          ]
         }
       },
       "max_time_series": {
@@ -252,6 +340,12 @@
           "title": "Selectors",
           "fields": [
             "selector"
+          ]
+        },
+        {
+          "title": "Relabeling",
+          "fields": [
+            "relabeling"
           ]
         },
         {

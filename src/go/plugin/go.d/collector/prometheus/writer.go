@@ -22,7 +22,6 @@ import (
 const seriesCacheRetentionCycles = 10
 
 type metricFamilyWriterPolicy struct {
-	labelPrefix           string
 	maxTSPerMetric        int
 	isFallbackTypeGauge   matcher.Matcher
 	isFallbackTypeCounter matcher.Matcher
@@ -319,7 +318,7 @@ func evictStaleInstruments[T any](m map[string]*cachedInstrument[T], cycle uint6
 	}
 }
 
-// seriesSig builds a collision-safe key identifying a scraped series by its (prefixed) label tuple.
+// seriesSig builds a collision-safe key identifying a scraped series by its label tuple.
 // Prometheus labels are sorted by name, so the key is stable for a given series.
 func (w *metricFamilyWriter) seriesSig(metric prompkg.Metric) string {
 	lbs := metric.Labels()
@@ -328,13 +327,9 @@ func (w *metricFamilyWriter) seriesSig(metric prompkg.Metric) string {
 	}
 	var b strings.Builder
 	for _, l := range lbs {
-		key := l.Name
-		if w.policy.labelPrefix != "" {
-			key = w.policy.labelPrefix + "_" + l.Name
-		}
-		b.WriteString(strconv.Itoa(len(key)))
+		b.WriteString(strconv.Itoa(len(l.Name)))
 		b.WriteByte(':')
-		b.WriteString(key)
+		b.WriteString(l.Name)
 		b.WriteByte('=')
 		b.WriteString(strconv.Itoa(len(l.Value)))
 		b.WriteByte(':')
@@ -344,17 +339,12 @@ func (w *metricFamilyWriter) seriesSig(metric prompkg.Metric) string {
 	return b.String()
 }
 
-// seriesLabels converts a scraped series' labels into metrix labels, applying the configured
-// label_prefix to each label key (V1 prepended "<prefix>_" to label keys).
+// seriesLabels converts a scraped series' labels into metrix labels.
 func (w *metricFamilyWriter) seriesLabels(metric prompkg.Metric) []metrix.Label {
 	lbs := metric.Labels()
 	out := make([]metrix.Label, 0, len(lbs))
 	for _, l := range lbs {
-		key := l.Name
-		if w.policy.labelPrefix != "" {
-			key = w.policy.labelPrefix + "_" + l.Name
-		}
-		out = append(out, metrix.Label{Key: key, Value: l.Value})
+		out = append(out, metrix.Label{Key: l.Name, Value: l.Value})
 	}
 	return out
 }

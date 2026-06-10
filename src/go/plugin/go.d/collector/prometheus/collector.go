@@ -51,29 +51,37 @@ type Config struct {
 	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	web.HTTPConfig     `yaml:",inline" json:""`
-	Name               string        `yaml:"name,omitempty" json:"name"`
-	Application        string        `yaml:"app,omitempty" json:"app"`
-	LabelPrefix        string        `yaml:"label_prefix,omitempty" json:"label_prefix"`
-	Selector           selector.Expr `yaml:"selector,omitempty" json:"selector"`
-	ExpectedPrefix     string        `yaml:"expected_prefix,omitempty" json:"expected_prefix"`
-	MaxTS              int           `yaml:"max_time_series" json:"max_time_series"`
-	MaxTSPerMetric     int           `yaml:"max_time_series_per_metric" json:"max_time_series_per_metric"`
+	Name               string         `yaml:"name,omitempty" json:"name"`
+	Application        string         `yaml:"app,omitempty" json:"app"`
+	Selector           selector.Expr  `yaml:"selector,omitempty" json:"selector"`
+	Relabeling         []RelabelBlock `yaml:"relabeling,omitempty" json:"relabeling,omitempty"`
+	ExpectedPrefix     string         `yaml:"expected_prefix,omitempty" json:"expected_prefix"`
+	MaxTS              int            `yaml:"max_time_series" json:"max_time_series"`
+	MaxTSPerMetric     int            `yaml:"max_time_series_per_metric" json:"max_time_series_per_metric"`
 	FallbackType       struct {
 		Gauge   []string `yaml:"gauge,omitempty" json:"gauge"`
 		Counter []string `yaml:"counter,omitempty" json:"counter"`
 	} `yaml:"fallback_type,omitempty" json:"fallback_type"`
 }
 
+// RelabelBlock is one job-level metric-relabeling block: a required metric-name
+// match that scopes a list of Prometheus relabel rules to a metric-name subset.
+// Use match "*" to target every metric. Rules run pre-assembly on the sample
+// stream, in block order.
+type RelabelBlock struct {
+	Match                string           `yaml:"match" json:"match"`
+	MetricRelabelConfigs []relabel.Config `yaml:"metric_relabel_configs" json:"metric_relabel_configs"`
+}
+
 type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	prom             prometheus.Prometheus
-	relabelConfigs   []relabel.Config
-	relabelTransform prometheus.SampleTransform
-	store            metrix.CollectorStore
-	writer           *metricFamilyWriter
-	chartTemplate    string
+	prom          prometheus.Prometheus
+	relabelBlocks []relabelBlock
+	store         metrix.CollectorStore
+	writer        *metricFamilyWriter
+	chartTemplate string
 }
 
 func (c *Collector) Configuration() any {
@@ -91,14 +99,13 @@ func (c *Collector) Init(context.Context) error {
 	}
 	c.prom = prom
 
-	// relabelConfigs are empty in this PR (rules are set by tests; profiles populate
-	// them later), so NewTransform returns a nil transform and Scrape keeps its
-	// no-transform fast path. A non-empty, invalid rule set fails Init here.
-	transform, err := relabel.NewTransform(c.relabelConfigs, c.onRelabelDrop)
+	// With no relabeling blocks the scrape keeps the direct, no-buffering Scrape fast
+	// path; invalid rules or match patterns fail Init here.
+	blocks, err := c.initRelabelBlocks()
 	if err != nil {
-		return fmt.Errorf("init relabel: %v", err)
+		return fmt.Errorf("init relabeling: %v", err)
 	}
-	c.relabelTransform = transform
+	c.relabelBlocks = blocks
 
 	gaugeFallback, err := c.initFallbackTypeMatcher(c.FallbackType.Gauge)
 	if err != nil {
@@ -110,7 +117,6 @@ func (c *Collector) Init(context.Context) error {
 	}
 
 	c.writer = newMetricFamilyWriter(c.store, metricFamilyWriterPolicy{
-		labelPrefix:           c.LabelPrefix,
 		maxTSPerMetric:        c.MaxTSPerMetric,
 		isFallbackTypeGauge:   gaugeFallback,
 		isFallbackTypeCounter: counterFallback,
