@@ -80,10 +80,10 @@ dump as finding evidence. If GitHub check-run annotations are empty too, use
 and re-check after the next push.
 
 One common local cause is gitignored generated output with restrictive file
-permissions. For example, if `tools/snmp-traps-profile-gen/output/` contains
-files not readable by the Docker container, Codacy logs `Could not read file`
-messages and the saved `.json` dump is plain text. Fix or move the local
-generated output before trusting local analyzer output.
+permissions. For example, if local scratch output under `.local/` contains files
+not readable by the Docker container, Codacy logs `Could not read file` messages
+and the saved `.json` dump is plain text. Fix or move the local generated output
+before trusting local analyzer output.
 
 Operational gotcha: the public Codacy v3 analysis endpoint can expose PR issue
 details even when GitHub check-run annotations are empty and no `CODACY_TOKEN`

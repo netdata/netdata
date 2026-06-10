@@ -2364,8 +2364,8 @@ func defaultPENFilePath() string {
 		return filepath.Join(dir, "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt")
 	}
 	for _, candidate := range []string{
-		"../../tools/snmp-traps-profile-gen/iana-enterprise-numbers.txt",
-		"tools/snmp-traps-profile-gen/iana-enterprise-numbers.txt",
+		"plugin/go.d/config/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt",
+		"src/go/plugin/go.d/config/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt",
 		"iana-enterprise-numbers.txt",
 	} {
 		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {

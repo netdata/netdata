@@ -756,7 +756,7 @@ Runtime input skills:
   Purpose: require MIB `MAX-ACCESS` checks and index-derived extraction for `not-accessible` INDEX objects.
 
 - `.agents/skills/project-snmp-trap-profiles-authoring/`
-  Trigger: editing SNMP trap profile YAMLs under `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/`, the trap profile-format documentation, the snmp-traps-profile-gen tooling (`tools/snmp-traps-profile-gen/extract.py`, `classify.py`, `emit.py`), or running a regeneration of the OOB trap profile pack.
+  Trigger: editing SNMP trap profile YAMLs under `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/`, the trap profile-format documentation, the `src/go/cmd/snmptrapprofilegen/` Go helper, or running a regeneration of the OOB trap profile pack.
   Purpose: enforce the closed 8-category / 8-severity taxonomy, the file-scoped `varbinds:` table pattern, cardinality discipline on `labels:`, and stock/operator separation. Documents the regeneration recipe.
 
 - `.agents/skills/project-writing-collectors/`

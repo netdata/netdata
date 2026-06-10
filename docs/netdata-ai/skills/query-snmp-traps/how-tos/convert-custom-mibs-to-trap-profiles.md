@@ -141,11 +141,10 @@ durable artifacts.
 
 ## Notes / gotchas
 
-- The installed Go helper is the supported operator path and has no
-  Python or `pysmi` dependency.
-- The legacy Python scripts under `tools/snmp-traps-profile-gen/` are
-  retained for historical/reference use. Use them only when working
-  from the source tree and deliberately testing the old pipeline.
+- The installed helper is the supported operator path for custom
+  trap profile conversion.
+- Use the Go helper for both operator conversion and stock profile
+  regeneration.
 - Helper output is mechanical unless `--classify` is used with an
   OpenAI-compatible endpoint. Review generated category, severity, and
   descriptions before installing profiles for production use.

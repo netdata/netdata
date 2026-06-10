@@ -1,6 +1,6 @@
 ---
 name: project-snmp-trap-profiles-authoring
-description: Use when editing Netdata SNMP trap profile YAMLs, the trap profile-format documentation, the snmp-trap-profile-gen Go helper, legacy snmp-traps-profile-gen tooling, or running a regeneration of the OOB trap profile pack. Enforces the closed 8-category / 8-severity taxonomy, the file-scoped varbinds-table pattern, cardinality discipline on labels, and stock/operator separation.
+description: Use when editing Netdata SNMP trap profile YAMLs, the trap profile-format documentation, the snmp-trap-profile-gen Go helper, or running a regeneration of the OOB trap profile pack. Enforces the closed 8-category / 8-severity taxonomy, the file-scoped varbinds-table pattern, cardinality discipline on labels, and stock/operator separation.
 ---
 
 # SNMP Trap Profile Authoring
@@ -9,7 +9,6 @@ Use this skill before editing files under:
 
 - `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/`
 - `src/go/cmd/snmptrapprofilegen/` (shipped helper source)
-- `tools/snmp-traps-profile-gen/` (legacy Python pipeline and PEN snapshot)
 - `.agents/sow/specs/snmp-traps/netdata.md` (when the change touches profile schema or trap subsystem decisions that the profiles encode)
 
 The authoritative schema reference is
@@ -152,9 +151,10 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
      OID then name) so regenerations produce reviewable diffs.
 
 6. **PEN registry handling** must use the bundled snapshot by default. CMake
-   installs `tools/snmp-traps-profile-gen/iana-enterprise-numbers.txt` under
-   `usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/`. `--refresh-pen` may fetch
-   the current IANA registry when explicitly requested.
+   installs
+   `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt`
+   under `usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/`. `--refresh-pen`
+   may fetch the current IANA registry when explicitly requested.
 
 7. **Regenerating the stock pack** uses the Go helper:
 
@@ -198,8 +198,8 @@ These are closed sets enforced in three places that must stay in sync:
 
 A taxonomy change without all three updates is incomplete and will be
 rejected at review. Any taxonomy change also requires a re-run of
-`classify.py` against the full corpus (the existing classifications were
-done under the prior taxonomy and are now stale).
+the Go helper's classification path against the full corpus (the existing
+classifications were done under the prior taxonomy and are now stale).
 
 ## File size discipline
 

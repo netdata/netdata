@@ -206,7 +206,8 @@ OpenNMS/Zenoss/CheckMK/Centreon/LogicMonitor UI workflows.
 The important release requirement is documentation clarity:
 
 - The installed helper is the operator path.
-- The legacy Python tooling is source-tree reference tooling.
+- The Go helper is the only maintained profile-generation path in the source
+  tree.
 - Reload uses the Function name `snmp_traps:reload-profiles`, not a JSON
   method wrapper.
 

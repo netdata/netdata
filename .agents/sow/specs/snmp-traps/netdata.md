@@ -750,8 +750,8 @@ ND_LOG_SOURCE=snmp-trap                          # marks this log family
 ND_NIDL_NODE=<source device's Netdata vnode>     # ties this entry to the same vnode used by SNMP polling metrics for the device
 ```
 
-The closed 8-severity set (matches RFC 5424 / syslog and the values
-enforced in `classify.py` + `profile-format.md`):
+The closed 8-severity set (matches RFC 5424 / syslog and the values enforced
+in the Go profile generator + `profile-format.md`):
 
 | Profile slug | PRIORITY | When to use |
 |---|---|---|

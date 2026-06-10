@@ -156,7 +156,7 @@ Configure the network devices sending traps:
 #### Add custom trap profiles (optional)
 
 If the stock trap profiles do not cover a device, convert vendor MIBs with the installed `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` helper and place the resulting YAML profiles under `/etc/netdata/go.d/snmp.trap-profiles/`.
-The installed helper is a Go binary and does not require Python or `pysmi`; the legacy Python scripts under `tools/snmp-traps-profile-gen/` are source-tree reference tooling only.
+This is the supported workflow for adding custom trap profile coverage.
 Profile YAML syntax is documented in [SNMP trap profile format](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md).
 
 
