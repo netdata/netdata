@@ -2342,9 +2342,11 @@ target_compile_options(judy PRIVATE
         -Wformat
 )
 
-target_compile_definitions(judy PRIVATE
-        JUDYL
-        $<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:JU_64BIT>
+target_compile_definitions(judy
+        PRIVATE JUDYL
+        # JU_64BIT must be PUBLIC so consumer headers (judyl-typed.h -> Judy.h)
+        # get the correct Word_t = unsigned long long on 64-bit Windows (LLP64).
+        PUBLIC $<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:JU_64BIT>
 )
 
 target_include_directories(judy PUBLIC
