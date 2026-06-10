@@ -49,9 +49,14 @@ extern "C" {
 
 // rand_s() is a UCRT extension that requires _CRT_RAND_S before stdlib.h is processed.
 // CMake's feature-check defines it in the test code but not in the build; define it here.
+// sigset_t must be defined before <pthread.h> so MinGW's pthread_sigmask() prototype compiles.
 #ifdef _WIN32
 #ifndef _CRT_RAND_S
 #define _CRT_RAND_S
+#endif
+#ifndef _SIGSET_T
+#define _SIGSET_T
+typedef unsigned long sigset_t;
 #endif
 #endif
 
@@ -628,12 +633,75 @@ static inline int getgrgid_r(gid_t gid __maybe_unused,
 #define WTERMSIG(status)     (0)
 #endif
 
-// ── SIGPIPE / SIGTRAP ── absent from UCRT64 signal.h ─────────────────────────
-#ifndef SIGPIPE
-#define SIGPIPE  13
+// ── POSIX signal numbers absent from UCRT64 ──────────────────────────────────
+// UCRT only defines SIGINT(2), SIGILL(4), SIGFPE(8), SIGSEGV(11), SIGTERM(15),
+// SIGBREAK(21), SIGABRT(22).  Define the rest with POSIX-standard numbers so
+// cross-platform code compiles; they are never raised on Windows.
+#ifndef SIGHUP
+#define SIGHUP      1
+#endif
+#ifndef SIGQUIT
+#define SIGQUIT     3
 #endif
 #ifndef SIGTRAP
-#define SIGTRAP   5
+#define SIGTRAP     5
+#endif
+#ifndef SIGBUS
+#define SIGBUS      7
+#endif
+#ifndef SIGKILL
+#define SIGKILL     9
+#endif
+#ifndef SIGUSR1
+#define SIGUSR1    10
+#endif
+#ifndef SIGPIPE
+#define SIGPIPE    13
+#endif
+#ifndef SIGALRM
+#define SIGALRM    14
+#endif
+#ifndef SIGUSR2
+#define SIGUSR2    12
+#endif
+#ifndef SIGCHLD
+#define SIGCHLD    17
+#endif
+#ifndef SIGCONT
+#define SIGCONT    18
+#endif
+#ifndef SIGSTOP
+#define SIGSTOP    19
+#endif
+#ifndef SIGTSTP
+#define SIGTSTP    20
+#endif
+#ifndef SIGTTIN
+#define SIGTTIN    23
+#endif
+#ifndef SIGTTOU
+#define SIGTTOU    24
+#endif
+#ifndef SIGURG
+#define SIGURG     25
+#endif
+#ifndef SIGXCPU
+#define SIGXCPU    26
+#endif
+#ifndef SIGXFSZ
+#define SIGXFSZ    27
+#endif
+#ifndef SIGVTALRM
+#define SIGVTALRM  28
+#endif
+#ifndef SIGPROF
+#define SIGPROF    29
+#endif
+#ifndef SIGWINCH
+#define SIGWINCH   30
+#endif
+#ifndef SIGSYS
+#define SIGSYS     31
 #endif
 
 // ── pipe() ── POSIX 2-arg version; UCRT64 only has _pipe(fds, size, mode) ───
@@ -647,6 +715,75 @@ static inline int kill(pid_t pid __maybe_unused, int sig __maybe_unused) {
     errno = ESRCH;
     return -1;
 }
+
+// ── sigset_t operations + pthread_sigmask ── POSIX signal masking, absent from UCRT64 ─
+// Windows has no per-thread signal masks; make these no-ops so code that
+// calls sigfillset/sigemptyset/sigaddset/pthread_sigmask compiles.
+// sigset_t itself is typedef'd before <pthread.h> above (pre-include block).
+#ifndef SIG_BLOCK
+#define SIG_BLOCK   0
+#define SIG_UNBLOCK 1
+#define SIG_SETMASK 2
+#endif
+static inline int sigfillset(sigset_t *set)  { *set = ~0UL; return 0; }
+static inline int sigemptyset(sigset_t *set) { *set =  0UL; return 0; }
+static inline int sigaddset(sigset_t *set, int signo __maybe_unused) { return 0; }
+static inline int sigdelset(sigset_t *set, int signo __maybe_unused) { return 0; }
+// pthread_sigmask is declared in MinGW's <pthread.h> when sigset_t is available;
+// guard to avoid a duplicate definition.
+#ifndef pthread_sigmask
+static inline int pthread_sigmask(int how __maybe_unused,
+                                  const sigset_t *set __maybe_unused,
+                                  sigset_t *old __maybe_unused) { return 0; }
+#endif
+
+// ── SI_CODE values ── POSIX siginfo_t si_code constants, absent from UCRT64 ──
+// Used by signal-code.c's ENUM_STR_MAP_DEFINE table (not guarded there).
+// Values are POSIX-standard; they are never produced on Windows.
+#ifndef SI_USER
+#define SI_USER      0
+#define SI_QUEUE    (-1)
+#define SI_TIMER    (-2)
+#define SI_ASYNCIO  (-3)
+#define SI_MESGQ    (-4)
+#endif
+
+// ── SIGILL si_code values ── absent from UCRT64 ──────────────────────────────
+#ifndef ILL_ILLOPC
+#define ILL_ILLOPC  1
+#define ILL_ILLOPN  2
+#define ILL_ILLADR  3
+#define ILL_ILLTRP  4
+#define ILL_PRVOPC  5
+#define ILL_PRVREG  6
+#define ILL_COPROC  7
+#define ILL_BADSTK  8
+#endif
+
+// ── SIGFPE si_code values ── absent from UCRT64 ──────────────────────────────
+#ifndef FPE_INTDIV
+#define FPE_INTDIV  1
+#define FPE_INTOVF  2
+#define FPE_FLTDIV  3
+#define FPE_FLTOVF  4
+#define FPE_FLTUND  5
+#define FPE_FLTRES  6
+#define FPE_FLTINV  7
+#define FPE_FLTSUB  8
+#endif
+
+// ── SIGSEGV si_code values ── absent from UCRT64 ─────────────────────────────
+#ifndef SEGV_MAPERR
+#define SEGV_MAPERR  1
+#define SEGV_ACCERR  2
+#endif
+
+// ── SIGBUS si_code values ── absent from UCRT64 ──────────────────────────────
+#ifndef BUS_ADRALN
+#define BUS_ADRALN  1
+#define BUS_ADRERR  2
+#define BUS_OBJERR  3
+#endif
 
 // ── struct statfs / statfs() ── absent from UCRT64 ───────────────────────────
 // paths.c uses statfs() only to detect procfs/sysfs (Linux-only fs types).
@@ -737,6 +874,12 @@ typedef struct {
     int   si_code;
     void *si_addr;
 } siginfo_t;
+#endif
+
+// ── lstat() ── POSIX, absent from UCRT64 ─────────────────────────────────────
+// Windows has no symlinks to follow; stat() and lstat() are semantically identical.
+#ifndef lstat
+#define lstat(path, buf) stat(path, buf)
 #endif
 
 // ── posix_memalign() ── POSIX aligned malloc, absent from UCRT64 ─────────────
