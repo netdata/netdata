@@ -78,6 +78,7 @@ require (
 	github.com/catonetworks/cato-go-sdk v0.2.6
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/docker/go-units v0.5.0
+	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc
 	github.com/ibm-messaging/mq-golang/v5 v5.7.1
 	github.com/maxmind/mmdbwriter v1.2.0
 	github.com/microsoft/go-mssqldb v1.10.0
@@ -126,7 +127,6 @@ require (
 	github.com/google/certificate-transparency-go v1.1.7 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect

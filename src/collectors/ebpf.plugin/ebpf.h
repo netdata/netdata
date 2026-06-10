@@ -35,7 +35,6 @@
 
 extern size_t ebpf_hash_table_pids_count;
 #ifdef LIBBPF_MAJOR_VERSION // BTF code
-#include "cachestat.skel.h"
 #include "dc.skel.h"
 #include "disk.skel.h"
 #include "fd.skel.h"
@@ -50,7 +49,6 @@ extern size_t ebpf_hash_table_pids_count;
 #include "swap.skel.h"
 #include "vfs.skel.h"
 
-extern struct cachestat_bpf *cachestat_bpf_obj;
 extern struct dc_bpf *dc_bpf_obj;
 extern struct disk_bpf *disk_bpf_obj;
 extern struct fd_bpf *fd_bpf_obj;
@@ -293,11 +291,9 @@ extern const char *btf_path;
 // Common functions
 void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr);
 void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr);
-void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *root);
 
 // BPF teardown callbacks — called by main thread after all module threads have been joined
 void ebpf_unload_legacy_bpf(ebpf_module_t *em); // legacy-only modules: process, disk, softirq, oomkill, mdflush
-void ebpf_cachestat_unload_bpf(ebpf_module_t *em);
 void ebpf_dcstat_unload_bpf(ebpf_module_t *em);
 void ebpf_swap_unload_bpf(ebpf_module_t *em);
 void ebpf_vfs_unload_bpf(ebpf_module_t *em);

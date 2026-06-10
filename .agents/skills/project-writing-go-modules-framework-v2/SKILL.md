@@ -78,6 +78,19 @@ source files for evidence.
   gauges.
 - Put multipliers, divisors, hidden flags, and float formatting in the chart
   template, not ad hoc chart-emission code.
+- `metrix` registers a descriptor per metric NAME permanently (no unregister), so
+  re-registering a name with a changed kind, summary quantile set, or histogram
+  bounds PANICS. When a name's contract can drift across cycles, keep the per-name
+  handle for the job lifetime and SKIP a drifted series instead of re-registering.
+- To reproduce a V1 chart context in a migration, inject `context_namespace` (the
+  fixed prefix, or `prefix.<app>` per job) so autogen rebuilds `prefix.<metric>` /
+  `prefix.<app>.<metric>` without hand-built chart IDs.
+- Skip empty distributions -- e.g. a summary whose every quantile is NaN -- so a
+  chart waits for real data, matching how scalar NaN values are already skipped.
+- For dynamic surfaces whose label sets churn, `metrix`'s `Vec` handle cache is
+  unbounded; cache per-series instruments yourself and evict handles unseen for N
+  cycles to stay bounded. Prefer a framework fix if the need is general
+  (Decision Discipline).
 
 ## Compatibility Rules
 

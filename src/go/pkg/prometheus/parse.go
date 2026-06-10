@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 
 	"github.com/prometheus/common/model"
@@ -39,13 +38,31 @@ type promTextParser struct {
 	series Series
 }
 
-func (p *promTextParser) parseToMetricFamilies(text []byte) (MetricFamilies, error) {
+func (p *promTextParser) parseToMetricFamilies(text []byte, transform SampleTransform) (MetricFamilies, error) {
 	p.driver.sr = p.sr
 	p.asm.reset()
 
-	// ownLabels=false: the assembler copies labels into its own buffers, so the
-	// driver may lend the scratch label set (the no-allocation fast path).
-	if err := p.driver.parseSamples(text, false, p.asm.applyHelp, p.asm.applySample); err != nil {
+	// With no transform, ownLabels=false: the assembler copies labels into its own
+	// buffers, so the driver may lend the scratch label set (the no-allocation fast
+	// path). A transform may mutate or retain a sample's labels, so it needs the
+	// sample to own them (ownLabels=true).
+	onSample := p.asm.applySample
+	ownLabels := false
+	if transform != nil {
+		ownLabels = true
+		onSample = func(s Sample) error {
+			s, keep, err := transform(s)
+			if err != nil {
+				return err
+			}
+			if !keep {
+				return nil
+			}
+			return p.asm.applySample(s)
+		}
+	}
+
+	if err := p.driver.parseSamples(text, ownLabels, p.asm.applyHelp, onSample); err != nil {
 		return nil, err
 	}
 
@@ -71,17 +88,6 @@ func (p *promTextParser) parseToSeries(text []byte) (Series, error) {
 	p.series.Sort()
 
 	return p.series, nil
-}
-
-func (p *promTextParser) parseToStream(text []byte, onHelp func(name, help string), onSample func(Sample) error) error {
-	if onSample == nil {
-		return nil
-	}
-	p.driver.sr = p.sr
-
-	// ownLabels=true: each Sample must own its labels because the consumer may
-	// retain or mutate them (e.g. relabeling) past the next sample.
-	return p.driver.parseSamples(text, true, onHelp, onSample)
 }
 
 // parseDriver runs the single exposition parse pass (iterate). On top of it,
@@ -174,7 +180,7 @@ func (d *parseDriver) iterate(
 // turns each series into a Sample (Kind + FamilyType) and defers a _sum/_count
 // whose family type is not yet known, back-resolving it once the type appears (a
 // later # TYPE, _bucket, or quantile series) or flushing it at EOF. Deferral can
-// emit a _sum/_count after a later, unrelated series — see ScrapeStream's doc.
+// emit a _sum/_count after a later, unrelated series — see ScrapeWithTransform's doc.
 func (d *parseDriver) parseSamples(text []byte, ownLabels bool, onHelp func(name, help string), onSample func(Sample) error) error {
 	d.reset()
 
@@ -389,340 +395,6 @@ func emitResolvedPending(pending []pendingSample, baseName string, typ model.Met
 	}
 
 	return out, nil
-}
-
-// assembler folds the driver's classified sample stream into typed
-// MetricFamilies. Grouping of summary quantiles / histogram buckets with their
-// _sum/_count is keyed by (family name, hash of the base labels). Buffers are
-// reused across cycles via reset().
-type assembler struct {
-	metrics    MetricFamilies
-	summaries  map[assemblyKey]*Summary
-	histograms map[assemblyKey]*Histogram
-	scratch    labels.Labels
-
-	// currName/currFamily cache the most recent family to skip the metrics map
-	// lookup for the common case of consecutive samples in the same family.
-	currName   string
-	currFamily *MetricFamily
-}
-
-type assemblyKey struct {
-	name string
-	hash uint64
-}
-
-func (a *assembler) reset() {
-	a.currName = ""
-	a.currFamily = nil
-
-	if a.metrics == nil {
-		a.metrics = make(MetricFamilies)
-	}
-	for _, mf := range a.metrics {
-		mf.help = ""
-		mf.typ = ""
-		mf.metrics = mf.metrics[:0]
-	}
-
-	if a.summaries == nil {
-		a.summaries = make(map[assemblyKey]*Summary)
-	}
-	for k := range a.summaries {
-		delete(a.summaries, k)
-	}
-
-	if a.histograms == nil {
-		a.histograms = make(map[assemblyKey]*Histogram)
-	}
-	for k := range a.histograms {
-		delete(a.histograms, k)
-	}
-}
-
-func (a *assembler) applyHelp(name, help string) {
-	mf := a.ensureFamily(name)
-	mf.help = help
-}
-
-func (a *assembler) applySample(sample Sample) error {
-	switch sample.Kind {
-	case SampleKindSummaryQuantile:
-		a.addSummaryQuantile(sample)
-	case SampleKindSummarySum:
-		a.addSummarySum(sample)
-	case SampleKindSummaryCount:
-		a.addSummaryCount(sample)
-	case SampleKindHistogramBucket:
-		a.addHistogramBucket(sample)
-	case SampleKindHistogramSum:
-		a.addHistogramSum(sample)
-	case SampleKindHistogramCount:
-		a.addHistogramCount(sample)
-	default:
-		switch sample.FamilyType {
-		case model.MetricTypeSummary:
-			mf := a.summaryFamily(sample.Name)
-			a.summaryFor(mf, assemblyKey{name: sample.Name, hash: sample.Labels.Hash()}, sample.Labels)
-		case model.MetricTypeHistogram:
-			mf := a.histogramFamily(sample.Name)
-			a.histogramFor(mf, assemblyKey{name: sample.Name, hash: sample.Labels.Hash()}, sample.Labels)
-		default:
-			a.addScalar(sample)
-		}
-	}
-	return nil
-}
-
-func (a *assembler) families() MetricFamilies {
-	for name, mf := range a.metrics {
-		if len(mf.metrics) == 0 {
-			delete(a.metrics, name)
-		}
-	}
-	return a.metrics
-}
-
-func (a *assembler) addScalar(sample Sample) {
-	mf := a.ensureFamily(sample.Name)
-
-	typ := sample.FamilyType
-	if typ == "" {
-		typ = model.MetricTypeUnknown
-	}
-	if mf.typ == "" || mf.typ == model.MetricTypeUnknown {
-		mf.typ = typ
-	}
-
-	m := a.appendMetric(mf, sample.Labels)
-
-	switch typ {
-	case model.MetricTypeGauge:
-		if m.gauge == nil {
-			m.gauge = &Gauge{}
-		}
-		m.gauge.value = sample.Value
-	case model.MetricTypeCounter:
-		if m.counter == nil {
-			m.counter = &Counter{}
-		}
-		m.counter.value = sample.Value
-	default:
-		if m.untyped == nil {
-			m.untyped = &Untyped{}
-		}
-		m.untyped.value = sample.Value
-	}
-}
-
-func (a *assembler) addSummaryQuantile(sample Sample) {
-	mf := a.summaryFamily(sample.Name)
-	base, qv, ok := a.stripLabel(sample.Labels, quantileLabel)
-	key := assemblyKey{name: sample.Name}
-	if ok {
-		key.hash = labels.Labels(base).Hash()
-	} else {
-		base = sample.Labels
-		key.hash = sample.Labels.Hash()
-	}
-
-	s := a.summaryFor(mf, key, base)
-	if !ok {
-		return
-	}
-	quantile, _ := strconv.ParseFloat(qv, 64)
-	s.quantiles = append(s.quantiles, Quantile{quantile: quantile, value: sample.Value})
-}
-
-func (a *assembler) addSummarySum(sample Sample) {
-	name := strings.TrimSuffix(sample.Name, sumSuffix)
-	mf := a.summaryFamily(name)
-	s := a.summaryFor(mf, assemblyKey{name: name, hash: sample.Labels.Hash()}, sample.Labels)
-	s.sum = sample.Value
-}
-
-func (a *assembler) addSummaryCount(sample Sample) {
-	name := strings.TrimSuffix(sample.Name, countSuffix)
-	mf := a.summaryFamily(name)
-	s := a.summaryFor(mf, assemblyKey{name: name, hash: sample.Labels.Hash()}, sample.Labels)
-	s.count = sample.Value
-}
-
-func (a *assembler) addHistogramBucket(sample Sample) {
-	name := strings.TrimSuffix(sample.Name, bucketSuffix)
-	mf := a.histogramFamily(name)
-	base, lev, ok := a.stripLabel(sample.Labels, bucketLabel)
-	key := assemblyKey{name: name}
-	if ok {
-		key.hash = labels.Labels(base).Hash()
-	} else {
-		base = sample.Labels
-		key.hash = sample.Labels.Hash()
-	}
-
-	h := a.histogramFor(mf, key, base)
-	if !ok {
-		return
-	}
-	bound, _ := strconv.ParseFloat(lev, 64)
-	h.buckets = append(h.buckets, Bucket{upperBound: bound, cumulativeCount: sample.Value})
-}
-
-func (a *assembler) addHistogramSum(sample Sample) {
-	name := strings.TrimSuffix(sample.Name, sumSuffix)
-	mf := a.histogramFamily(name)
-	h := a.histogramFor(mf, assemblyKey{name: name, hash: sample.Labels.Hash()}, sample.Labels)
-	h.sum = sample.Value
-}
-
-func (a *assembler) addHistogramCount(sample Sample) {
-	name := strings.TrimSuffix(sample.Name, countSuffix)
-	mf := a.histogramFamily(name)
-	h := a.histogramFor(mf, assemblyKey{name: name, hash: sample.Labels.Hash()}, sample.Labels)
-	h.count = sample.Value
-}
-
-func (a *assembler) summaryFamily(name string) *MetricFamily {
-	mf := a.ensureFamily(name)
-	mf.typ = model.MetricTypeSummary
-	return mf
-}
-
-func (a *assembler) histogramFamily(name string) *MetricFamily {
-	mf := a.ensureFamily(name)
-	mf.typ = model.MetricTypeHistogram
-	return mf
-}
-
-func (a *assembler) summaryFor(mf *MetricFamily, key assemblyKey, lbs labels.Labels) *Summary {
-	if s, ok := a.summaries[key]; ok {
-		return s
-	}
-
-	m := a.appendMetric(mf, lbs)
-	if m.summary == nil {
-		m.summary = &Summary{}
-	} else {
-		m.summary.sum = 0
-		m.summary.count = 0
-		m.summary.quantiles = m.summary.quantiles[:0]
-	}
-
-	a.summaries[key] = m.summary
-	return m.summary
-}
-
-func (a *assembler) histogramFor(mf *MetricFamily, key assemblyKey, lbs labels.Labels) *Histogram {
-	if h, ok := a.histograms[key]; ok {
-		return h
-	}
-
-	m := a.appendMetric(mf, lbs)
-	if m.histogram == nil {
-		m.histogram = &Histogram{}
-	} else {
-		m.histogram.sum = 0
-		m.histogram.count = 0
-		m.histogram.buckets = m.histogram.buckets[:0]
-	}
-
-	a.histograms[key] = m.histogram
-	return m.histogram
-}
-
-// appendMetric grows mf.metrics by one, reusing the backing array across cycles
-// and storing a copy of lbs. Instrument pointers on a reused slot are left in
-// place: a family keeps a stable type across scrapes, so the caller reuses the
-// existing instrument and allocates only when its pointer is nil. This preserves
-// the legacy allocation profile (no per-scrape instrument churn).
-func (a *assembler) appendMetric(mf *MetricFamily, lbs labels.Labels) *Metric {
-	idx := len(mf.metrics)
-	if idx == cap(mf.metrics) {
-		mf.metrics = append(mf.metrics, Metric{})
-	} else {
-		mf.metrics = mf.metrics[:idx+1]
-	}
-
-	m := &mf.metrics[idx]
-	m.labels = m.labels[:0]
-	m.labels = append(m.labels, lbs...)
-	return m
-}
-
-func (a *assembler) ensureFamily(name string) *MetricFamily {
-	if a.currFamily != nil && a.currName == name {
-		return a.currFamily
-	}
-	mf, ok := a.metrics[name]
-	if !ok {
-		mf = &MetricFamily{name: name, typ: model.MetricTypeUnknown}
-		a.metrics[name] = mf
-	}
-	a.currName = name
-	a.currFamily = mf
-	return mf
-}
-
-// stripLabel returns the label set without name and the removed value, using a
-// reusable scratch buffer. The result is valid only until the next stripLabel.
-func (a *assembler) stripLabel(lbs labels.Labels, name string) (labels.Labels, string, bool) {
-	a.scratch = a.scratch[:0]
-	var (
-		value string
-		found bool
-	)
-	for _, lb := range lbs {
-		if lb.Name == name {
-			value = lb.Value
-			found = true
-			continue
-		}
-		a.scratch = append(a.scratch, lb)
-	}
-	if !found {
-		return nil, "", false
-	}
-	return a.scratch, value, true
-}
-
-func copyLabels(lbs []labels.Label) []labels.Label {
-	return append([]labels.Label(nil), lbs...)
-}
-
-// copyLabelsWithoutName returns a fresh copy of lbs with __name__ removed. In the
-// common case __name__ sorts first (it precedes lowercase label names), so the
-// remainder is contiguous and copied directly; otherwise a rare label that sorts
-// before __name__ (e.g. "UUID") is skipped element by element.
-func copyLabelsWithoutName(lbs labels.Labels) labels.Labels {
-	if len(lbs) > 0 && lbs[0].Name == labels.MetricName {
-		return copyLabels(lbs[1:])
-	}
-	out := make([]labels.Label, 0, len(lbs))
-	for _, lb := range lbs {
-		if lb.Name == labels.MetricName {
-			continue
-		}
-		out = append(out, lb)
-	}
-	return out
-}
-
-func removeLabel(lbs labels.Labels, name string) (labels.Labels, string, bool) {
-	for i, v := range lbs {
-		if v.Name == name {
-			return append(lbs[:i], lbs[i+1:]...), v.Value, true
-		}
-	}
-	return lbs, "", false
-}
-
-func metricNameValue(lbs labels.Labels) (string, bool) {
-	for _, v := range lbs {
-		if v.Name == labels.MetricName {
-			return v.Value, true
-		}
-	}
-	return "", false
 }
 
 func sanitizeHelp(help string) string {

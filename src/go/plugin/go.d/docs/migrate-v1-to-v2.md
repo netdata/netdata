@@ -351,6 +351,37 @@ variable-equivalent design, or approved alert change.
 Prefer table-driven tests using `map[string]struct{}` keyed by case name when
 cases share setup and assertion shape.
 
+### Parity manifest recipe
+
+When chart-identity parity needs the compiled fields above and no shared helper
+observes them, this is a concrete form of that "manual comparison recipe": prove
+context/dimension/value parity by rendering BOTH collectors into one manifest
+shape, without depending on chart-ID string equality.
+
+1. Freeze the V1 output as a golden manifest. For representative fixtures, run
+   the V1 `Collect()` + `Charts()` and serialize, per chart: context, type,
+   family, units, priority, and per dimension the name, algorithm, and de-scaled
+   value (the V1 `map[string]int64` value divided by the dimension `Div`). Commit
+   the goldens under `testdata/`.
+2. Render the V2 path into the same shape. Load the collector's LIVE
+   `ChartTemplateYAML()` into a real `chartengine`, run a cycle through the real
+   `Collect()` and `metrix` store, plan against the store, and read the plan's
+   create/update actions into the same per-chart structure.
+3. Compare structurally with a float tolerance. V1 truncates `value*Div` to
+   `int64` while V2 stores the true float, so compare values within a tolerance
+   (for example `1e-3`), not for exact equality. Assert that context, family,
+   units, dimension names, and dimension algorithms match.
+
+Compare chart IDs too when the migration preserves them (the default). Omit only
+chart-ID equality when the user approved a breaking chart-ID change -- then the
+preserved contract is the context, and chart-ID-keyed alert examples in
+`src/health/REFERENCE.md` must be updated. A gap (NaN or absent value) MUST fail
+the comparison loudly; never silently map it to 0.
+
+The render MUST go through the collector's LIVE `ChartTemplateYAML()` and store,
+not a separately rebuilt template -- a test that rebuilds the template can pass
+even when the shipped `ChartTemplateYAML()` is wrong.
+
 ## Validation
 
 Run the narrowest commands that prove the changed contract. Typical migration

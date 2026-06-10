@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "proto/context/v1/context.pb.h"
+#include "context/v1/context.pb.h"
 
 #include "libnetdata/libnetdata.h"
 

@@ -6,6 +6,20 @@
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
 
+#if defined(OS_LINUX)
+#include "../ebpf.plugin/ebpfgo.plugin/apps_ebpf_shared_pid_row.h"
+#ifndef NETDATA_APP_FAMILY
+#define NETDATA_APP_FAMILY "app"
+#endif
+
+struct apps_ebpf_cachestat_totals {
+    uint64_t account_page_dirtied;
+    uint64_t add_to_page_cache_lru;
+    uint64_t mark_buffer_dirty;
+    uint64_t mark_page_accessed;
+};
+#endif
+
 #define OS_FUNC_CONCAT(a, b) a##b
 
 #if defined(OS_FREEBSD)
@@ -420,6 +434,12 @@ struct target {
     kernel_uint_t uptime_min;
     kernel_uint_t uptime_max;
 
+#if defined(OS_LINUX)
+    struct ebpf_publish_cachestat cachestat;
+    struct apps_ebpf_cachestat_totals cachestat_totals;
+    struct apps_ebpf_cachestat_totals cachestat_totals_prev;
+#endif
+
 #if (PROCESSES_HAVE_FDS == 1)
     struct openfds openfds;
     NETDATA_DOUBLE max_open_files_percent;
@@ -618,6 +638,11 @@ struct pid_stat {
     size_t last_pss_iteration;
     kernel_uint_t pss_bytes;
 #endif
+
+    struct ebpf_pid_stat ebpf;
+    // last cachestat ct we consumed; gates per-PID delta accumulation
+    uint64_t ebpf_cachestat_ct;
+    bool has_ebpf:1;
 #endif
 };
 
@@ -770,6 +795,13 @@ void function_processes(const char *transaction, char *function,
                         usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
                         BUFFER *payload __maybe_unused, HTTP_ACCESS access,
                         const char *source __maybe_unused, void *data __maybe_unused);
+
+#if defined(OS_LINUX)
+bool apps_ebpf_shared_memory_refresh(void);
+bool apps_ebpf_sync_pid_stat(struct pid_stat *p);
+void apps_ebpf_accumulate_cachestat(void);
+bool apps_ebpf_cachestat_is_available(void);
+#endif
 
 // --------------------------------------------------------------------------------------------------------------------
 // operating system functions

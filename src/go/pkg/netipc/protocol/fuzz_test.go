@@ -213,6 +213,152 @@ func FuzzDecodeCgroupsResponse(f *testing.F) {
 	})
 }
 
+func FuzzDecodeCgroupsLookupRequest(f *testing.F) {
+	var seed [128]byte
+	n, err := EncodeCgroupsLookupRequest([][]byte{[]byte("/a"), []byte("/b/c")}, seed[:])
+	if err == nil {
+		f.Add(seed[:n])
+	}
+	f.Add([]byte{})
+	f.Add(make([]byte, CgroupsLookupReqHdr-1))
+	f.Add(make([]byte, CgroupsLookupReqHdr))
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		view, err := DecodeCgroupsLookupRequest(data)
+		if err != nil {
+			return
+		}
+		for i := uint32(0); i < view.ItemCount; i++ {
+			item, ierr := view.Item(i)
+			if ierr == nil {
+				_ = item.Bytes()
+				_ = item.String()
+			}
+		}
+		_, _ = view.Item(view.ItemCount)
+	})
+}
+
+func FuzzDecodeCgroupsLookupResponse(f *testing.F) {
+	var empty [128]byte
+	eb := NewCgroupsLookupBuilder(empty[:], 0, 0)
+	f.Add(empty[:eb.Finish()])
+
+	var seed [512]byte
+	builder := NewCgroupsLookupBuilder(seed[:], 1, 1)
+	if err := builder.Add(
+		CgroupLookupKnown,
+		OrchestratorK8s,
+		[]byte("/a"),
+		[]byte("pod-a"),
+		[]struct{ Key, Value []byte }{{Key: []byte("namespace"), Value: []byte("default")}},
+	); err == nil {
+		f.Add(seed[:builder.Finish()])
+	}
+	f.Add([]byte{})
+	f.Add(make([]byte, CgroupsLookupRespHdr-1))
+	f.Add(make([]byte, CgroupsLookupRespHdr))
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		view, err := DecodeCgroupsLookupResponse(data)
+		if err != nil {
+			return
+		}
+		for i := uint32(0); i < view.ItemCount; i++ {
+			item, ierr := view.Item(i)
+			if ierr != nil {
+				continue
+			}
+			_ = item.Path.Bytes()
+			_ = item.Name.String()
+			for j := uint32(0); j < uint32(item.LabelCount); j++ {
+				label, lerr := item.Label(j)
+				if lerr == nil {
+					_ = label.Key.String()
+					_ = label.Value.String()
+				}
+			}
+		}
+		_, _ = view.Item(view.ItemCount)
+	})
+}
+
+func FuzzDecodeAppsLookupRequest(f *testing.F) {
+	var seed [128]byte
+	n, err := EncodeAppsLookupRequest([]uint32{0, 1234}, seed[:])
+	if err == nil {
+		f.Add(seed[:n])
+	}
+	f.Add([]byte{})
+	f.Add(make([]byte, AppsLookupReqHdr-1))
+	f.Add(make([]byte, AppsLookupReqHdr))
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		view, err := DecodeAppsLookupRequest(data)
+		if err != nil {
+			return
+		}
+		for i := uint32(0); i < view.ItemCount; i++ {
+			pid, ierr := view.Item(i)
+			if ierr == nil {
+				_ = pid
+			}
+		}
+		_, _ = view.Item(view.ItemCount)
+	})
+}
+
+func FuzzDecodeAppsLookupResponse(f *testing.F) {
+	var empty [128]byte
+	eb := NewAppsLookupBuilder(empty[:], 0, 0)
+	f.Add(empty[:eb.Finish()])
+
+	var seed [1024]byte
+	builder := NewAppsLookupBuilder(seed[:], 1, 1)
+	if err := builder.Add(
+		PidLookupKnown,
+		AppsCgroupKnown,
+		OrchestratorDocker,
+		1234,
+		1,
+		1000,
+		42,
+		[]byte("nginx"),
+		[]byte("/docker/abc"),
+		[]byte("container-a"),
+		[]struct{ Key, Value []byte }{{Key: []byte("image"), Value: []byte("nginx:latest")}},
+	); err == nil {
+		f.Add(seed[:builder.Finish()])
+	}
+	f.Add([]byte{})
+	f.Add(make([]byte, AppsLookupRespHdr-1))
+	f.Add(make([]byte, AppsLookupRespHdr))
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		view, err := DecodeAppsLookupResponse(data)
+		if err != nil {
+			return
+		}
+		for i := uint32(0); i < view.ItemCount; i++ {
+			item, ierr := view.Item(i)
+			if ierr != nil {
+				continue
+			}
+			_ = item.Comm.String()
+			_ = item.CgroupPath.Bytes()
+			_ = item.CgroupName.String()
+			for j := uint32(0); j < uint32(item.LabelCount); j++ {
+				label, lerr := item.Label(j)
+				if lerr == nil {
+					_ = label.Key.String()
+					_ = label.Value.String()
+				}
+			}
+		}
+		_, _ = view.Item(view.ItemCount)
+	})
+}
+
 func FuzzBatchDirDecode(f *testing.F) {
 	// Seed: valid 2-entry directory.
 	var seed [16]byte

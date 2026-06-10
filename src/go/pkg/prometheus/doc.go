@@ -10,8 +10,10 @@
 //     into their families.
 //   - [Prometheus.ScrapeSeries] returns the raw [Series]: one [SeriesSample] per
 //     scraped series, with labels in textparse-sorted order.
-//   - [Prometheus.ScrapeStream] exposes a flat [Sample] stream before typed
-//     assembly — the form a Prometheus metric-relabeling step operates on.
+//   - [Prometheus.ScrapeWithTransform] runs a per-sample transform — the form a
+//     Prometheus metric-relabeling step operates on — over the flat [Sample]
+//     stream before assembling the kept samples into typed [MetricFamilies]; a
+//     nil transform behaves like Scrape.
 //
 // Results are valid only until the next scrape on the same instance; buffers are
 // reused across scrapes. An optional selector (see the selector subpackage)

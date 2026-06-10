@@ -170,6 +170,11 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
         rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
+    if(rrdmetric_algorithm_atomic_load(rm) != rm_new->algorithm) {
+        rrdmetric_algorithm_atomic_store(rm, rm_new->algorithm);
+        rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
+    }
+
     if(!rm->first_time_s || (rm_new->first_time_s && rm_new->first_time_s < rm->first_time_s)) {
         rm->first_time_s = rm_new->first_time_s;
         rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_FIRST_TIME_T);
@@ -256,6 +261,7 @@ void rrdmetric_from_rrddim(RRDDIM *rd) {
             .name = string_dup(rd->name),
             .flags = RRD_FLAG_NONE, // no need for atomics
             .rrddim = rd,
+            .algorithm = rd->algorithm,
     };
 
     RRDMETRIC_ACQUIRED *rma = (RRDMETRIC_ACQUIRED *)dictionary_set_and_acquire_item(ri->rrdmetrics, string2str(trm.id), &trm, sizeof(trm));
@@ -309,6 +315,20 @@ inline void rrdmetric_updated_rrddim_flags(RRDDIM *rd) {
     if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
         if(unlikely(rrd_flag_is_collected(rm)))
             rrdmetric_set_archived(rm);
+    }
+
+    rrdmetric_trigger_updates(rm, __FUNCTION__ );
+}
+
+inline void rrdmetric_updated_rrddim_algorithm(RRDDIM *rd) {
+    rrdmetric_not_collected_rrddim(rd);
+
+    RRDMETRIC *rm = rrddim_get_rrdmetric(rd);
+    if(unlikely(!rm)) return;
+
+    if(rrdmetric_algorithm_atomic_load(rm) != rd->algorithm) {
+        rrdmetric_algorithm_atomic_store(rm, rd->algorithm);
+        rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     rrdmetric_trigger_updates(rm, __FUNCTION__ );

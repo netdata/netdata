@@ -21,8 +21,12 @@ func StringReverseEncode(s string, buf []byte) int {
 	if len(buf) < total {
 		return 0
 	}
+	strLen, ok := checkedU32Int(len(s))
+	if !ok {
+		return 0
+	}
 	ne.PutUint32(buf[0:4], uint32(StringReverseHdrSize)) // str_offset
-	ne.PutUint32(buf[4:8], uint32(len(s)))               // str_length
+	ne.PutUint32(buf[4:8], strLen)                       // str_length
 	if len(s) > 0 {
 		copy(buf[8:8+len(s)], s)
 	}
@@ -35,17 +39,29 @@ func StringReverseDecode(buf []byte) (StringReverseView, error) {
 	if len(buf) < StringReverseHdrSize {
 		return StringReverseView{}, ErrTruncated
 	}
-	strOffset := int(ne.Uint32(buf[0:4]))
-	strLength := int(ne.Uint32(buf[4:8]))
-	if strOffset+strLength+1 > len(buf) {
+	strOffset, err := checkedWireU32Int(buf, 0)
+	if err != nil {
+		return StringReverseView{}, err
+	}
+	strLength, err := checkedWireU32Int(buf, 4)
+	if err != nil {
+		return StringReverseView{}, err
+	}
+	strLength32 := ne.Uint32(buf[4:8])
+	strEnd, ok := checkedAddInt(strOffset, strLength)
+	if !ok {
 		return StringReverseView{}, ErrOutOfBounds
 	}
-	if buf[strOffset+strLength] != 0 {
+	strNulEnd, ok := checkedAddInt(strEnd, 1)
+	if !ok || strNulEnd > len(buf) {
+		return StringReverseView{}, ErrOutOfBounds
+	}
+	if buf[strEnd] != 0 {
 		return StringReverseView{}, ErrMissingNul
 	}
 	return StringReverseView{
-		Str:    string(buf[strOffset : strOffset+strLength]),
-		StrLen: uint32(strLength),
+		Str:    string(buf[strOffset:strEnd]),
+		StrLen: strLength32,
 	}, nil
 }
 

@@ -449,6 +449,37 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     return spawn_server_exec_wait(server, si);
 }
 
+SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, int *status) {
+    if(!si) { if(status) *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
+
+    if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
+    if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
+
+    // a negative timeout would become a huge DWORD (~INFINITE) to WaitForSingleObject; clamp to poll-once
+    if(timeout_ms < 0) timeout_ms = 0;
+
+    DWORD wait_rc = WaitForSingleObject(si->process_handle, (DWORD)timeout_ms);
+    if(wait_rc == WAIT_TIMEOUT)
+        // the process is still running; the caller decides whether to keep waiting or kill it
+        return SPAWN_TIMEDWAIT_RUNNING;
+
+    if(wait_rc == WAIT_FAILED) {
+        // the handle is unusable, so we cannot confirm the process exited. We must NOT resolve as
+        // EXITED and free the instance (it may still be alive), and we must NOT report RUNNING
+        // either (a caller looping on RUNNING with a 0/"wait forever" timeout would spin forever).
+        // Report ERROR: the caller keeps the instance and reclaims it by killing it.
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: WaitForSingleObject() failed (err %lu) for request No %zu, pid %d (winpid %u)",
+               (unsigned long)GetLastError(), si->request_id, (int)si->child_pid, si->dwProcessId);
+        return SPAWN_TIMEDWAIT_ERROR;
+    }
+
+    // WAIT_OBJECT_0: the process exited; the blocking wait returns immediately now.
+    int st = spawn_server_exec_wait(server, si);
+    if(status) *status = st;
+    return SPAWN_TIMEDWAIT_EXITED;
+}
+
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {
     if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
     if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }

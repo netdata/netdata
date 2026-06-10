@@ -50,7 +50,7 @@ ALWAYS_INLINE void rrdcontext_removed_rrddim(RRDDIM *rd) {
 }
 
 ALWAYS_INLINE void rrdcontext_updated_rrddim_algorithm(RRDDIM *rd) {
-    rrdmetric_updated_rrddim_flags(rd);
+    rrdmetric_updated_rrddim_algorithm(rd);
 }
 
 ALWAYS_INLINE void rrdcontext_updated_rrddim_multiplier(RRDDIM *rd) {
