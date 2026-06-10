@@ -152,10 +152,13 @@ static __always_inline SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(cons
     /* --- NETDATA SNMP TRAPS --- */                                                                                           \
                                                                                                                                \
     "|TRAP_REPORT_TYPE"                                                                                                        \
+    "|TRAP_REPORT_PERIOD_SEC"                                                                                                  \
     "|TRAP_OID"                                                                                                                \
     "|TRAP_NAME"                                                                                                               \
     "|TRAP_CATEGORY"                                                                                                           \
     "|TRAP_SEVERITY"                                                                                                           \
+    "|TRAP_SUPPRESSED_COUNT"                                                                                                   \
+    "|TRAP_SUPPRESSED_FINGERPRINTS"                                                                                            \
     "|TRAP_PDU_TYPE"                                                                                                           \
     "|TRAP_VERSION"                                                                                                            \
     "|TRAP_SOURCE_IP"                                                                                                          \
