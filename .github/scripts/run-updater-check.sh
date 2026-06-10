@@ -1,11 +1,11 @@
 #!/bin/sh
 
 echo "::group::>>> Installing CI support packages..."
-sh -x .github/scripts/ci-support-pkgs.sh
+sh -x .github/scripts/ci-support-pkgs.sh || exit 1
 echo "::endgroup::"
 mkdir -p /etc/cron.daily # Needed to make auto-update checking work correctly on some platforms.
 echo "::group::>>> Installing Netdata..."
-sh -x packaging/installer/kickstart.sh --dont-wait --build-only --dont-start-it --disable-telemetry "${EXTRA_INSTALL_FLAGS:+--local-build-options "${EXTRA_INSTALL_FLAGS}"}" || exit 1
+sh -x packaging/installer/kickstart.sh --dont-wait --build-only --dont-start-it --disable-telemetry ${EXTRA_INSTALL_FLAGS:+--local-build-options "${EXTRA_INSTALL_FLAGS}"} || exit 1
 echo "::endgroup::"
 echo "::group::>>> Pre-Update Environment File Contents"
 cat /etc/netdata/.environment
