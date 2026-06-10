@@ -254,20 +254,27 @@ Use `uppercase` for the opposite. These actions take only `source_labels` and `t
 
 ### Prefix label names (replaces `label_prefix`)
 
-Copy every label to a prefixed name using `labelmap`:
+When these metrics are re-exported in Prometheus format, Netdata adds its own `instance`, `family`, `chart`, and
+`dimension` labels. If the scraped endpoint already uses one of those names, the re-export emits a duplicate label and a
+downstream Prometheus rejects the scrape. Rename the colliding labels — copy them to a prefixed name with `labelmap`,
+then drop the originals with `labeldrop`:
 
 ```yaml
 relabeling:
   - match: '*'
     metric_relabel_configs:
-      - regex: '(.*)'
+      - regex: '(instance|family)'
         action: labelmap
         replacement: 'app_$1'
+      - regex: '(instance|family)'
+        action: labeldrop
 ```
 
-A label `region` becomes `app_region`; the metric name (`__name__`) is left untouched. `labelmap` matches against label
-**names** and writes the new name from `replacement`; the original labels remain, so add a [`labeldrop`](#remove-a-high-cardinality-label)
-rule afterwards if you want them removed.
+`labelmap` copies `instance` → `app_instance` and `family` → `app_family` (the `( )` capture feeds `$1` in
+`replacement`); the `labeldrop` then removes the originals — its anchored regex matches those names exactly, not the new
+`app_` ones. Add more names to the
+alternation for other collisions; `__name__` is never affected. This is the use case the removed `label_prefix` option
+served.
 
 ### Scope rules to a subset of metrics
 
