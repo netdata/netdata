@@ -3,6 +3,7 @@
 package jobruntime
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -62,6 +63,15 @@ func retryAutoDetection(autoDetectEvery, autoDetectTries int) bool {
 
 func disableAutoDetection(autoDetectEvery *int) {
 	*autoDetectEvery = 0
+}
+
+type retryableError interface {
+	Retryable() bool
+}
+
+func isRetryableError(err error) bool {
+	var re retryableError
+	return errors.As(err, &re) && re.Retryable()
 }
 
 func consumeAutoDetectTry(autoDetectTries *int) {

@@ -2,6 +2,8 @@
 
 package snmp_traps
 
+import "errors"
+
 type fanoutTrapWriter struct {
 	primary   TrapWriter
 	secondary TrapWriter
@@ -38,7 +40,7 @@ func (w *fanoutTrapWriter) Flush() error {
 	if secondaryErr != nil {
 		w.incOTLPExportFailed(1)
 	}
-	return primaryErr
+	return errors.Join(primaryErr, secondaryErr)
 }
 
 func (w *fanoutTrapWriter) Close() error {
@@ -46,7 +48,7 @@ func (w *fanoutTrapWriter) Close() error {
 	if secondaryErr != nil {
 		w.incOTLPExportFailed(1)
 	}
-	return w.primary.Close()
+	return errors.Join(w.primary.Close(), secondaryErr)
 }
 
 func (w *fanoutTrapWriter) SanitizedFields() uint64 {

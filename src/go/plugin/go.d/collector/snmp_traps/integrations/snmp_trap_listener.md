@@ -492,6 +492,7 @@ The following alerts are available:
 | [ snmp_trap_profile_load_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf) | snmp.trap.errors | The SNMP trap listener failed to load or reload trap profiles. |
 | [ snmp_trap_journal_write_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf) | snmp.trap.errors | The SNMP trap listener failed to write traps to the systemd-journal. |
 | [ snmp_trap_otlp_export_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf) | snmp.trap.errors | The SNMP trap listener failed to export traps through OTLP. |
+| [ snmp_trap_listener_read_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf) | snmp.trap.errors | The SNMP trap listener failed to read UDP packets from a bound socket. |
 | [ snmp_trap_high_dedup_suppression ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf) | snmp.trap.dedup_suppressed | The SNMP trap listener is suppressing a high volume of duplicate traps. |
 
 
@@ -536,7 +537,7 @@ Metrics:
 |:------|:----------|:----|
 | snmp.trap.events | state_change, config_change, security, auth, license, mobility, diagnostic, unknown | events/s |
 | snmp.trap.severity | emerg, alert, crit, err, warning, notice, info, debug | events/s |
-| snmp.trap.errors | unknown_oid, decode_failed, template_unresolved, malformed_pdu, dropped_allowlist, rate_limited, auth_failures, usm_failures, unknown_engine_id, inform_response_failed, sanitized, profile_load_failed, journal_write_failed, otlp_export_failed | errors/s |
+| snmp.trap.errors | unknown_oid, decode_failed, template_unresolved, malformed_pdu, dropped_allowlist, rate_limited, auth_failures, usm_failures, unknown_engine_id, inform_response_failed, sanitized, profile_load_failed, journal_write_failed, otlp_export_failed, listener_read_failed | errors/s |
 | snmp.trap.dedup_suppressed | suppressed | events/s |
 
 

@@ -4,15 +4,18 @@ package snmputils
 
 import (
 	"bufio"
-	"bytes"
-	_ "embed"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gosnmp/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 )
 
 var log = logger.New().With("component", "snmp/sysinfo")
@@ -136,53 +139,15 @@ func updateMetadata(si *SysInfo) {
 	si.Vendor = finalVendor
 }
 
+type enterpriseNumbersCache struct {
+	once   sync.Once
+	values map[string]string
+	err    error
+}
+
 var (
-	// https://www.iana.org/assignments/enterprise-numbers.txt
-	//go:embed "enterprise-numbers.txt"
-	enterpriseNumberTxt []byte
-
-	enterpriseNumbers = func() map[string]string {
-		if len(enterpriseNumberTxt) == 0 {
-			panic("snmp: enterprise-numbers.txt is empty")
-		}
-
-		mapping := make(map[string]string, 65000)
-
-		var id string
-
-		sc := bufio.NewScanner(bytes.NewReader(enterpriseNumberTxt))
-
-		for sc.Scan() {
-			line := strings.TrimSpace(sc.Text())
-			if line == "" {
-				continue
-			}
-
-			if _, err := strconv.Atoi(line); err == nil {
-				if id == "" {
-					id = line
-					if _, ok := mapping[id]; ok {
-						panic("snmp: duplicate entry number: " + line)
-					}
-				}
-				continue
-			}
-			if id != "" {
-				if line == "---none---" || line == "Reserved" {
-					id = ""
-					continue
-				}
-				mapping[id] = line
-				id = ""
-			}
-		}
-
-		if len(mapping) == 0 {
-			panic("snmp: enterprise-numbers mapping is empty after reading enterprise-numbers.txt")
-		}
-
-		return mapping
-	}()
+	enterpriseNumbers             enterpriseNumbersCache
+	enterpriseNumbersPathOverride string
 )
 
 func lookupEnterpriseNumber(sysObject string) string {
@@ -195,7 +160,93 @@ func lookupEnterpriseNumber(sysObject string) string {
 	if !ok {
 		return ""
 	}
-	return enterpriseNumbers[num]
+
+	mapping, err := enterpriseNumbersMapping()
+	if err != nil {
+		return ""
+	}
+	return mapping[num]
+}
+
+func enterpriseNumbersMapping() (map[string]string, error) {
+	enterpriseNumbers.once.Do(func() {
+		enterpriseNumbers.values, enterpriseNumbers.err = loadEnterpriseNumbers(enterpriseNumbersFilePath())
+		if enterpriseNumbers.err != nil {
+			log.Debugf("cannot load IANA PEN registry: %v", enterpriseNumbers.err)
+		}
+	})
+	return enterpriseNumbers.values, enterpriseNumbers.err
+}
+
+func enterpriseNumbersFilePath() string {
+	if path := strings.TrimSpace(enterpriseNumbersPathOverride); path != "" {
+		return path
+	}
+	if dir := strings.TrimSpace(buildinfo.StockConfigDir); dir != "" {
+		return filepath.Join(dir, "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt")
+	}
+	for _, candidate := range []string{
+		filepath.Join("..", "..", "config", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt"),
+		filepath.Join("plugin", "go.d", "config", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt"),
+		filepath.Join("src", "go", "plugin", "go.d", "config", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt"),
+	} {
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+	}
+	return filepath.Join("/usr/lib/netdata/conf.d", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt")
+}
+
+func loadEnterpriseNumbers(path string) (map[string]string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	mapping, err := parseEnterpriseNumbers(file)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	if len(mapping) == 0 {
+		return nil, fmt.Errorf("%s: empty IANA PEN registry", path)
+	}
+	return mapping, nil
+}
+
+func parseEnterpriseNumbers(r io.Reader) (map[string]string, error) {
+	mapping := make(map[string]string, 65000)
+	var id string
+
+	sc := bufio.NewScanner(r)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" {
+			continue
+		}
+
+		if _, err := strconv.Atoi(line); err == nil {
+			if id == "" {
+				id = line
+				if _, ok := mapping[id]; ok {
+					return nil, fmt.Errorf("duplicate entry number: %s", line)
+				}
+			}
+			continue
+		}
+		if id != "" {
+			if line == "---none---" || line == "Reserved" {
+				id = ""
+				continue
+			}
+			mapping[id] = line
+			id = ""
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return nil, err
+	}
+	return mapping, nil
 }
 
 func PduToString(pdu gosnmp.SnmpPDU) (string, error) {

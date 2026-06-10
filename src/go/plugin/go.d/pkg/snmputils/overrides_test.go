@@ -1,6 +1,8 @@
 package snmputils
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/gosnmp/gosnmp"
@@ -111,6 +113,53 @@ func TestLookupEnterpriseNumber(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLookupEnterpriseNumberLoadsRegistryFromDisk(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "iana-enterprise-numbers.txt")
+	require.NoError(t, os.WriteFile(path, []byte(`
+424242
+  Example Devices Inc.
+    Contact
+424243
+  Reserved
+424244
+  ---none---
+424245
+  Other Devices Inc.
+`), 0644))
+	withEnterpriseNumbersFile(t, path)
+
+	assert.Equal(t, "Example Devices Inc.", lookupEnterpriseNumber("1.3.6.1.4.1.424242.1"))
+	assert.Empty(t, lookupEnterpriseNumber("1.3.6.1.4.1.424243.1"))
+	assert.Empty(t, lookupEnterpriseNumber("1.3.6.1.4.1.424244.1"))
+	assert.Equal(t, "Other Devices Inc.", lookupEnterpriseNumber("1.3.6.1.4.1.424245.1"))
+}
+
+func TestLookupEnterpriseNumberMissingRegistryReturnsEmpty(t *testing.T) {
+	withEnterpriseNumbersFile(t, filepath.Join(t.TempDir(), "missing.txt"))
+
+	assert.Empty(t, lookupEnterpriseNumber("1.3.6.1.4.1.424242.1"))
+}
+
+func TestLookupEnterpriseNumberNonEnterpriseOIDDoesNotLoadRegistry(t *testing.T) {
+	withEnterpriseNumbersFile(t, filepath.Join(t.TempDir(), "missing.txt"))
+
+	assert.Empty(t, lookupEnterpriseNumber("1.3.6.1.2.1.1.2.0"))
+	assert.Nil(t, enterpriseNumbers.values)
+	assert.NoError(t, enterpriseNumbers.err)
+}
+
+func withEnterpriseNumbersFile(t *testing.T, path string) {
+	t.Helper()
+
+	oldPath := enterpriseNumbersPathOverride
+	enterpriseNumbersPathOverride = path
+	enterpriseNumbers = enterpriseNumbersCache{}
+	t.Cleanup(func() {
+		enterpriseNumbersPathOverride = oldPath
+		enterpriseNumbers = enterpriseNumbersCache{}
+	})
 }
 
 func TestPduToString(t *testing.T) {

@@ -689,6 +689,28 @@ END`, chartengine.Priority, chartengine.Priority))
 				assert.False(t, job.RetryAutoDetection())
 			},
 		},
+		"autodetection retryable init failure keeps retry": {
+			run: func(t *testing.T) {
+				mod := &mockModuleV2{
+					initFunc: func(context.Context) error {
+						return retryableTestError{error: errors.New("init failed")}
+					},
+				}
+				job := NewJobV2(JobV2Config{
+					PluginName:      pluginName,
+					Name:            jobName,
+					ModuleName:      modName,
+					FullName:        modName + "_" + jobName,
+					Module:          mod,
+					Out:             &bytes.Buffer{},
+					UpdateEvery:     1,
+					AutoDetectEvery: 1,
+				})
+
+				require.Error(t, job.AutoDetection())
+				assert.True(t, job.RetryAutoDetection())
+			},
+		},
 		"autodetection panic disables retry": {
 			run: func(t *testing.T) {
 				mod := &mockModuleV2{

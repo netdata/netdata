@@ -85,28 +85,44 @@ func TestFanoutTrapWriterPrimaryFailureStopsSecondaryWrite(t *testing.T) {
 	assert.Equal(t, uint64(0), metrics.errors.otlpExportFailed)
 }
 
-func TestFanoutTrapWriterSecondaryFlushFailureDoesNotFailPrimary(t *testing.T) {
+func TestFanoutTrapWriterSecondaryFlushFailureReturnsErrorAfterPrimaryFlush(t *testing.T) {
+	secondaryErr := errors.New("secondary failed")
 	primary := &mockTrapWriter{}
-	secondary := &mockTrapWriter{err: errors.New("secondary failed")}
+	secondary := &mockTrapWriter{err: secondaryErr}
 	metrics := &perJobMetrics{}
 	writer := newFanoutTrapWriter(primary, secondary, metrics)
 
 	err := writer.Flush()
-	require.NoError(t, err)
+	require.ErrorIs(t, err, secondaryErr)
 	assert.Equal(t, 1, primary.flushes)
 	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed)
 }
 
-func TestFanoutTrapWriterSecondaryCloseFailureDoesNotFailPrimary(t *testing.T) {
+func TestFanoutTrapWriterSecondaryCloseFailureReturnsErrorAfterPrimaryClose(t *testing.T) {
+	secondaryErr := errors.New("secondary failed")
 	primary := &mockTrapWriter{}
-	secondary := &mockTrapWriter{err: errors.New("secondary failed")}
+	secondary := &mockTrapWriter{err: secondaryErr}
 	metrics := &perJobMetrics{}
 	writer := newFanoutTrapWriter(primary, secondary, metrics)
 
 	err := writer.Close()
-	require.NoError(t, err)
+	require.ErrorIs(t, err, secondaryErr)
 	assert.True(t, primary.closed)
 	assert.False(t, secondary.closed)
+	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed)
+}
+
+func TestFanoutTrapWriterCloseReturnsPrimaryAndSecondaryErrors(t *testing.T) {
+	primaryErr := errors.New("primary failed")
+	secondaryErr := errors.New("secondary failed")
+	primary := &mockTrapWriter{err: primaryErr}
+	secondary := &mockTrapWriter{err: secondaryErr}
+	metrics := &perJobMetrics{}
+	writer := newFanoutTrapWriter(primary, secondary, metrics)
+
+	err := writer.Close()
+	require.ErrorIs(t, err, primaryErr)
+	require.ErrorIs(t, err, secondaryErr)
 	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed)
 }
 

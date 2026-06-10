@@ -621,6 +621,7 @@ func TestCollectMetricsEmitsCounters(t *testing.T) {
 	incTrapEvents(jobName, "security")
 	incTrapError(jobName, "decode_failed")
 	getJobMetrics(jobName).addError("otlp_export_failed", 3)
+	getJobMetrics(jobName).addError("listener_read_failed", 2)
 
 	store := metrix.NewCollectorStore()
 	managed, ok := metrix.AsCycleManagedStore(store)
@@ -643,6 +644,9 @@ func TestCollectMetricsEmitsCounters(t *testing.T) {
 	}
 	if v, ok := store.Read().Value("snmp_trap_errors_otlp_export_failed", labels); !ok || v != 3 {
 		t.Fatalf("errors otlp_export_failed value = %v/%v, want 3/true", v, ok)
+	}
+	if v, ok := store.Read().Value("snmp_trap_errors_listener_read_failed", labels); !ok || v != 2 {
+		t.Fatalf("errors listener_read_failed value = %v/%v, want 2/true", v, ok)
 	}
 }
 

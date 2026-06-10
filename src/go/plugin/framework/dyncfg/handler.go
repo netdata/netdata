@@ -510,8 +510,9 @@ func (h *Handler[C]) CmdEnable(fn Function) {
 		}
 		h.api.SendCodef(fn, code, "%v", err)
 
-		// Stock removal only for non-CodedError failures (runtime detection failures).
-		// CodedError = validation error (e.g. createCollectorJob → 400, no stock removal).
+		// Stock removal only for plain runtime detection failures.
+		// CodedError carries an explicit status code, so the component owns the
+		// failure semantics and whether the job should be retried.
 		if h.removeStockOnEnableFail && !isCodedError(err) && entry.Cfg.SourceType() == "stock" {
 			h.exposed.Remove(entry.Cfg)
 			h.NotifyJobRemove(entry.Cfg)

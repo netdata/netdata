@@ -489,6 +489,10 @@ modules:
         metric: snmp.trap.errors
         info: The SNMP trap listener failed to export traps through OTLP.
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
+      - name: snmp_trap_listener_read_failures
+        metric: snmp.trap.errors
+        info: The SNMP trap listener failed to read UDP packets from a bound socket.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_trap.conf
       - name: snmp_trap_high_dedup_suppression
         metric: snmp.trap.dedup_suppressed
         info: The SNMP trap listener is suppressing a high volume of duplicate traps.
@@ -601,6 +605,8 @@ modules:
                   description: Systemd-journal write errors
                 - name: otlp_export_failed
                   description: OTLP export errors (only when OTLP is enabled)
+                - name: listener_read_failed
+                  description: UDP socket read errors after a listener was successfully bound
             - name: snmp.trap.dedup_suppressed
               description: Per-second rate of traps suppressed by deduplication (only emitted when dedup is enabled)
               unit: events/s

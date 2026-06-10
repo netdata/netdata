@@ -102,65 +102,65 @@ func (c *Collector) SetJobName(name string) {
 
 func (c *Collector) Init(ctx context.Context) error {
 	if err := validateJobName(c.jobName); err != nil {
-		return &dyncfgCodedError{err: err, code: 422}
+		return dyncfgConfigError(err)
 	}
 
 	if err := validateEndpoints(c.Listen.Endpoints); err != nil {
-		return &dyncfgCodedError{err: err, code: 422}
+		return dyncfgConfigError(err)
 	}
 
 	versions, err := validateVersions(c.Versions)
 	if err != nil {
-		return &dyncfgCodedError{err: err, code: 422}
+		return dyncfgConfigError(err)
 	}
 	v3Enabled := versionListContains(versions, "v3")
 
 	if err := validateUSMUsers(c.USMUsers, c.DynamicEngineID); err != nil {
-		return &dyncfgCodedError{err: err, code: 422}
+		return dyncfgConfigError(err)
 	}
 
 	if err := validateEngineIDWhitelist(c.EngineIDWhitelist); err != nil {
-		return &dyncfgCodedError{err: err, code: 422}
+		return dyncfgConfigError(err)
 	}
 
 	if err := validateLocalEngineID(c.LocalEngineID); err != nil {
-		return &dyncfgCodedError{err: err, code: 422}
+		return dyncfgConfigError(err)
 	}
 
 	allowlistPrefixes, err := validateAllowlist(c.Allowlist)
 	if err != nil {
-		return &dyncfgCodedError{err: err, code: 422}
+		return dyncfgConfigError(err)
 	}
 
 	if err := validateRateLimit(c.RateLimit); err != nil {
-		return &dyncfgCodedError{err: err, code: 422}
+		return dyncfgConfigError(err)
 	}
 	if err := validateDedupConfig(c.Dedup); err != nil {
-		return &dyncfgCodedError{err: err, code: 422}
+		return dyncfgConfigError(err)
 	}
 	if _, err := validateOTLPConfig(c.OTLP); err != nil {
-		return &dyncfgCodedError{err: err, code: 422}
+		return dyncfgConfigError(err)
 	}
 	journalEnabled := c.Journal.enabled()
 	if !journalEnabled && !c.OTLP.Enabled {
-		return &dyncfgCodedError{err: errors.New("at least one SNMP trap output backend must be enabled: journal.enabled or otlp.enabled"), code: 422}
+		return dyncfgConfigError(errors.New("at least one SNMP trap output backend must be enabled: journal.enabled or otlp.enabled"))
 	}
 	if journalEnabled && runtime.GOOS != "linux" {
-		return &dyncfgCodedError{err: errors.New("SNMP trap journal backend requires Linux"), code: 422}
+		return dyncfgConfigError(errors.New("SNMP trap journal backend requires Linux"))
 	}
 
 	if err := validateOverrides(c.Overrides); err != nil {
-		return &dyncfgCodedError{err: err, code: 422}
+		return dyncfgConfigError(err)
 	}
 	if err := validateDeferredConfig(c.Config); err != nil {
-		return &dyncfgCodedError{err: err, code: 422}
+		return dyncfgConfigError(err)
 	}
 	if v3Enabled {
 		if len(c.USMUsers) == 0 {
-			return &dyncfgCodedError{err: errors.New("SNMPv3 requires at least one usm_users entry"), code: 422}
+			return dyncfgConfigError(errors.New("SNMPv3 requires at least one usm_users entry"))
 		}
 		if !c.DynamicEngineID && len(c.EngineIDWhitelist) == 0 {
-			return &dyncfgCodedError{err: errors.New("SNMPv3 requires engine_id_whitelist when dynamic_engine_id_discovery is disabled"), code: 422}
+			return dyncfgConfigError(errors.New("SNMPv3 requires engine_id_whitelist when dynamic_engine_id_discovery is disabled"))
 		}
 	}
 
@@ -168,7 +168,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	if journalEnabled {
 		ret, err := parseRetentionConfig(c.Retention)
 		if err != nil {
-			return &dyncfgCodedError{err: err, code: 422}
+			return dyncfgConfigError(err)
 		}
 		retCfg = ret
 	}
@@ -180,7 +180,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.dynamicChartYAML = ""
 
 	if _, err := AcquireProfileCache(); err != nil {
-		return &dyncfgCodedError{err: err, code: 422}
+		return dyncfgConfigError(err)
 	}
 	releaseProfileCache := true
 	releaseProfiles := func() {
@@ -193,17 +193,17 @@ func (c *Collector) Init(ctx context.Context) error {
 	idx := CurrentProfileIndex()
 	if idx == nil {
 		releaseProfiles()
-		return &dyncfgCodedError{err: errors.New("profile index not available"), code: 422}
+		return dyncfgConfigError(errors.New("profile index not available"))
 	}
 	if err := validateMetrics(c.Metrics, idx); err != nil {
 		releaseProfiles()
-		return &dyncfgCodedError{err: err, code: 422}
+		return dyncfgConfigError(err)
 	}
 	if len(c.Metrics) > 0 {
 		tmpl, err := buildChartTemplateYAML(c.Metrics)
 		if err != nil {
 			releaseProfiles()
-			return &dyncfgCodedError{err: err, code: 422}
+			return dyncfgConfigError(err)
 		}
 		c.dynamicChartYAML = tmpl
 	}
@@ -216,7 +216,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		journalWriter, err = NewJournalWriter(dir, journalCfg)
 		if err != nil {
 			releaseProfiles()
-			return &dyncfgCodedError{err: err, code: 422}
+			return dyncfgStartupError(err)
 		}
 	}
 
@@ -226,7 +226,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		if journalWriter != nil {
 			journalWriter.Close()
 		}
-		return &dyncfgCodedError{err: err, code: 422}
+		return dyncfgStartupError(err)
 	}
 	cleanupPreflight := func() {
 		releaseProfiles()
@@ -255,37 +255,38 @@ func (c *Collector) Init(ctx context.Context) error {
 		if err != nil {
 			cleanupCreatedState()
 			cleanupPreflight()
-			return &dyncfgCodedError{err: err, code: 422}
+			return dyncfgConfigError(err)
 		}
 		engineIDWhitelist, err = buildEngineIDWhitelist(c.EngineIDWhitelist)
 		if err != nil {
 			cleanupCreatedState()
 			cleanupPreflight()
-			return &dyncfgCodedError{err: err, code: 422}
+			return dyncfgConfigError(err)
 		}
 
 		lid, err = NewLocalEngineID(c.jobName, c.LocalEngineID)
 		if err != nil {
 			cleanupCreatedState()
 			cleanupPreflight()
-			return &dyncfgCodedError{err: err, code: 422}
+			return dyncfgStartupError(err)
 		}
 		if err := registerUSMUsersWithLocalEngineID(v3Table, c.USMUsers, lid.Bytes()); err != nil {
 			cleanupCreatedState()
 			cleanupPreflight()
-			return &dyncfgCodedError{err: err, code: 422}
+			return dyncfgConfigError(err)
 		}
 
 		eb, err = NewEngineBoots(c.jobName)
 		if err != nil {
 			cleanupCreatedState()
 			cleanupPreflight()
-			return &dyncfgCodedError{err: err, code: 422}
+			return dyncfgStartupError(err)
 		}
 	}
 
 	overrides := buildOverrideMap(c.Overrides)
 	metrics := getJobMetrics(c.jobName)
+	listener.metrics = metrics
 	var secondaryWriter TrapWriter
 	if c.OTLP.Enabled {
 		secondaryWriter, err = newOTLPTrapWriter(ctx, c.jobName, c.OTLP, metrics)
@@ -293,7 +294,7 @@ func (c *Collector) Init(ctx context.Context) error {
 			removeJobMetrics(c.jobName)
 			cleanupCreatedState()
 			cleanupPreflight()
-			return &dyncfgCodedError{err: err, code: 422}
+			return dyncfgStartupError(err)
 		}
 	}
 	var primaryWriter TrapWriter
@@ -709,10 +710,20 @@ func versionListContains(versions []string, version string) bool {
 }
 
 type dyncfgCodedError struct {
-	err  error
-	code int
+	err       error
+	code      int
+	retryable bool
 }
 
-func (e *dyncfgCodedError) Error() string { return e.err.Error() }
-func (e *dyncfgCodedError) Unwrap() error { return e.err }
-func (e *dyncfgCodedError) Code() int     { return e.code }
+func dyncfgConfigError(err error) *dyncfgCodedError {
+	return &dyncfgCodedError{err: err, code: 422}
+}
+
+func dyncfgStartupError(err error) *dyncfgCodedError {
+	return &dyncfgCodedError{err: err, code: 503, retryable: true}
+}
+
+func (e *dyncfgCodedError) Error() string   { return e.err.Error() }
+func (e *dyncfgCodedError) Unwrap() error   { return e.err }
+func (e *dyncfgCodedError) Code() int       { return e.code }
+func (e *dyncfgCodedError) Retryable() bool { return e.retryable }

@@ -22,6 +22,7 @@ type listenerEndpoint struct {
 type Listener struct {
 	jobName   string
 	endpoints []listenerEndpoint
+	metrics   *perJobMetrics
 	mu        sync.Mutex
 	closed    bool
 	wg        sync.WaitGroup
@@ -74,6 +75,9 @@ func (l *Listener) readLoop(ep listenerEndpoint, handler func([]byte, net.IP, *n
 		if err != nil {
 			if l.isClosed() {
 				return
+			}
+			if l.metrics != nil {
+				l.metrics.incError("listener_read_failed")
 			}
 			time.Sleep(listenerReadErrorBackoff)
 			continue

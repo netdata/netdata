@@ -393,6 +393,9 @@ func TestCollectorInit_InvalidJobNameIsCodedError(t *testing.T) {
 	var coded interface{ Code() int }
 	require.ErrorAs(t, err, &coded)
 	assert.Equal(t, 422, coded.Code())
+	var retryable interface{ Retryable() bool }
+	require.ErrorAs(t, err, &retryable)
+	assert.False(t, retryable.Retryable())
 	assert.Nil(t, c.listener)
 }
 
@@ -461,6 +464,37 @@ func TestCollectorInit_OTELOnlySkipsJournalCreation(t *testing.T) {
 	assert.Equal(t, startJournalJobs, activeDirectJournalJobs.Load())
 }
 
+func TestCollectorInit_OTLPPreflightFailureIsRetryableCodedError(t *testing.T) {
+	setMinimalProfileDir(t)
+	withTestCacheDir(t)
+	disabled := false
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	endpoint := "http://" + ln.Addr().String()
+	require.NoError(t, ln.Close())
+
+	c := New()
+	c.SetJobName("otlp-preflight")
+	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
+	c.Journal.Enabled = &disabled
+	c.OTLP = OTLPConfig{
+		Enabled:        true,
+		Endpoint:       endpoint,
+		RequestTimeout: "50ms",
+	}
+
+	err = c.Init(context.Background())
+	require.Error(t, err)
+	var coded interface{ Code() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 503, coded.Code())
+	var retryable interface{ Retryable() bool }
+	require.ErrorAs(t, err, &retryable)
+	assert.True(t, retryable.Retryable())
+	assert.Nil(t, c.listener)
+	assert.Empty(t, c.journalDir)
+}
+
 func TestCollectorInit_BindsMultipleEndpoints(t *testing.T) {
 	setMinimalProfileDir(t)
 	withTestCacheDir(t)
@@ -490,7 +524,7 @@ func TestCollectorInit_BindsMultipleEndpoints(t *testing.T) {
 	require.NoError(t, secondConn.Close())
 }
 
-func TestCollectorInit_BindFailureIsCodedError(t *testing.T) {
+func TestCollectorInit_BindFailureIsRetryableCodedError(t *testing.T) {
 	setMinimalProfileDir(t)
 	withTestCacheDir(t)
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
@@ -507,7 +541,10 @@ func TestCollectorInit_BindFailureIsCodedError(t *testing.T) {
 	require.Error(t, err)
 	var coded interface{ Code() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.Code())
+	assert.Equal(t, 503, coded.Code())
+	var retryable interface{ Retryable() bool }
+	require.ErrorAs(t, err, &retryable)
+	assert.True(t, retryable.Retryable())
 	assert.Nil(t, c.listener)
 }
 

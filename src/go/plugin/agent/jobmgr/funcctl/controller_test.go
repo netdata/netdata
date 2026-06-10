@@ -804,6 +804,48 @@ func TestControllerRawModuleMethodRequest(t *testing.T) {
 	}
 }
 
+func TestControllerModuleMethodRequestContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var gotCode int
+	var gotResp map[string]any
+	reg := newTestFunctionRegistry()
+	controller := New(Options{
+		FnReg: reg,
+		JSONWriter: func(data []byte, code int) {
+			gotCode = code
+			require.NoError(t, json.Unmarshal(data, &gotResp))
+		},
+	})
+	controller.RegisterModules(collectorapi.Registry{
+		"mod": collectorapi.Creator{
+			Methods: func() []funcapi.MethodConfig {
+				return []funcapi.MethodConfig{{ID: "query"}}
+			},
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return &rawTestHandler{
+					handle: func(ctx context.Context, _ string, _ funcapi.ResolvedParams) *funcapi.FunctionResponse {
+						assert.ErrorIs(t, ctx.Err(), context.Canceled)
+						return funcapi.ErrorResponse(499, "Request cancelled.")
+					},
+				}
+			},
+		},
+	})
+	controller.OnJobStart(newTestRuntimeJob("mod", "job1", true))
+
+	reg.handlers["mod:query"](functions.Function{
+		UID:     "normal-cancel",
+		Context: ctx,
+		Timeout: time.Second,
+	})
+
+	assert.Equal(t, 499, gotCode)
+	assert.Equal(t, float64(499), gotResp["status"])
+	assert.Equal(t, "Request cancelled.", gotResp["errorMessage"])
+}
+
 func TestControllerRawJobMethodRequest(t *testing.T) {
 	tests := map[string]rawControllerMethodCase{
 		"raw query response is passed through": {
