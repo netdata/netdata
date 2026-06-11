@@ -30,7 +30,7 @@ For firewall and proxy allowlisting, your Netdata Agents need the following netw
 
 :::note
 
-Port `19999` is the default and is configurable via `[web] port` in `netdata.conf`. Port `19999` is multiplexed: the same port handles both dashboard HTTP requests and the Netdata streaming protocol (a custom binary protocol over TCP). The server auto-detects which protocol the client is using based on the initial handshake. From a firewall perspective, both are simply TCP on port `19999`.
+Port `19999` is the default, configurable via `[web] port` in `netdata.conf`, and is multiplexed: the same port handles both dashboard HTTP requests and the Netdata streaming protocol (a custom binary protocol over TCP). The server auto-detects which protocol the client is using based on the initial handshake. From a firewall perspective, both are simply TCP on port `19999`.
 
 You can disable inbound access on port `19999` by setting `mode = none` in `netdata.conf` when using Cloud-only access. This also disables inbound streaming. See [Configure Cloud-only access](#configure-cloud-only-access) for details.
 
