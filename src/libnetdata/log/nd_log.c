@@ -534,7 +534,7 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
         int n = snprintf(msg, sizeof(msg),
                 "\nRECURSIVE FATAL STATEMENTS, latest from %s() of %lu@%s, EXITING NOW! 23e93dfccbf64e11aac858b9410d8a82\n",
                 function, line, file);
-        if(n > 0 && write(STDERR_FILENO, msg, (size_t)((n < (int)sizeof(msg)) ? n : (int)sizeof(msg))) < 0) { /* best effort */ }
+        if(n > 0 && write(STDERR_FILENO, msg, (size_t)((n < (int)sizeof(msg)) ? n : (int)sizeof(msg) - 1)) < 0) { /* best effort */ }
         recursive_fatal_abort();
     }
     this_thread_in_fatal = true;
@@ -546,7 +546,7 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
         int n = snprintf(msg, sizeof(msg),
                 "\nCONCURRENT FATAL from %s() of %lu@%s, deferring to the first fatal and exiting.\n",
                 function, line, file);
-        if(n > 0 && write(STDERR_FILENO, msg, (size_t)((n < (int)sizeof(msg)) ? n : (int)sizeof(msg))) < 0) { /* best effort */ }
+        if(n > 0 && write(STDERR_FILENO, msg, (size_t)((n < (int)sizeof(msg)) ? n : (int)sizeof(msg) - 1)) < 0) { /* best effort */ }
         sleep(2); // give the first fatal the chance to be written
         _exit(1);
     }
