@@ -200,7 +200,10 @@ static int do_migration_v3_v4(sqlite3 *database)
     }
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-         char *table = strdupz((char *) sqlite3_column_text(res, 0));
+         const char *name = (const char *) sqlite3_column_text(res, 0);
+         if (unlikely(!name))
+             continue;
+         char *table = strdupz(name);
          if (!column_exists_in_table(database, table, "chart_context")) {
              snprintfz(sql, sizeof(sql) - 1, "ALTER TABLE %s ADD chart_context text", table);
              sqlite3_exec_monitored(database, sql, 0, 0, NULL);
@@ -237,7 +240,10 @@ static int do_migration_v6_v7(sqlite3 *database)
     }
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-         char *table = strdupz((char *) sqlite3_column_text(res, 0));
+         const char *name = (const char *) sqlite3_column_text(res, 0);
+         if (unlikely(!name))
+             continue;
+         char *table = strdupz(name);
          if (!column_exists_in_table(database, table, "filtered_alert_unique_id")) {
              snprintfz(sql, sizeof(sql) - 1, "ALTER TABLE %s ADD filtered_alert_unique_id", table);
              sqlite3_exec_monitored(database, sql, 0, 0, NULL);
@@ -266,7 +272,10 @@ static int do_migration_v7_v8(sqlite3 *database)
     }
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-         char *table = strdupz((char *) sqlite3_column_text(res, 0));
+         const char *name = (const char *) sqlite3_column_text(res, 0);
+         if (unlikely(!name))
+             continue;
+         char *table = strdupz(name);
          if (!column_exists_in_table(database, table, "transition_id")) {
              snprintfz(sql, sizeof(sql) - 1, "ALTER TABLE %s ADD transition_id blob", table);
              sqlite3_exec_monitored(database, sql, 0, 0, NULL);
@@ -327,7 +336,10 @@ static int do_migration_v8_v9(sqlite3 *database)
     DICTIONARY *dict_tables = dictionary_create(DICT_OPTION_NONE);
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        char *table = strdupz((char *) sqlite3_column_text(res, 0));
+        const char *name = (const char *) sqlite3_column_text(res, 0);
+        if (unlikely(!name))
+            continue;
+        char *table = strdupz(name);
         if (health_migrate_old_health_log_table(table)) {
             dictionary_set(dict_tables, table, NULL, 0);
         }
@@ -395,7 +407,10 @@ static int do_migration_v14_v15(sqlite3 *database)
     BUFFER *wb = buffer_create(128, NULL);
     size_t count = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        buffer_sprintf(wb, "DROP INDEX IF EXISTS %s; ", (char *)sqlite3_column_text(res, 0));
+        const char *name = (const char *) sqlite3_column_text(res, 0);
+        if (unlikely(!name))
+            continue;
+        buffer_sprintf(wb, "DROP INDEX IF EXISTS %s; ", name);
         count++;
     }
 
@@ -424,7 +439,10 @@ static int do_migration_v15_v16(sqlite3 *database)
     BUFFER *wb = buffer_create(128, NULL);
     size_t count = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        buffer_sprintf(wb, "ANALYZE %s ; ", (char *)sqlite3_column_text(res, 0));
+        const char *name = (const char *) sqlite3_column_text(res, 0);
+        if (unlikely(!name))
+            continue;
+        buffer_sprintf(wb, "ANALYZE %s ; ", name);
         count++;
     }
 
