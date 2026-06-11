@@ -198,7 +198,7 @@ struct cgroup {
     uint32_t hash_chart_id;
 
     // 'cgroup_name' label value.
-    // by default this is the *id (path), later changed to the resolved name (cgroup-name.sh) or systemd service name.
+    // by default this is the *id (path), later changed to the resolved name (cgroup-name) or systemd service name.
     char *name;
 
     RRDLABELS *chart_labels;
@@ -339,6 +339,7 @@ extern bool cgroup_enable_pressure;
 extern bool cgroup_enable_cpuacct_cpu_shares;
 
 extern int cgroup_check_for_new_every;
+extern int cgroup_name_timeout_ms;
 extern int cgroup_update_every;
 
 extern char *cgroup_cpuacct_base;

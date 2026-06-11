@@ -187,7 +187,7 @@ fi
 
 progress "changing plugins ownership and permissions"
 
-for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin ebpf-go.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin snmp-trap-profile-gen ioping.plugin cgroup-network-helper.sh otel-plugin systemd-journal.plugin macos-logs.plugin netflow-plugin; do
+for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin ebpf-go.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin snmp-trap-profile-gen ioping.plugin cgroup-network-helper.sh cgroup-name otel-plugin systemd-journal.plugin macos-logs.plugin netflow-plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
   if [ -f "${f}" ]; then
     run chown root:${NETDATA_GROUP} "${f}"
@@ -245,7 +245,7 @@ for x in ndsudo freeipmi.plugin ioping cgroup-network local-listeners network-vi
   fi
 done
 
-for x in otel-plugin netflow-plugin snmp-trap-profile-gen; do
+for x in otel-plugin netflow-plugin snmp-trap-profile-gen cgroup-name; do
   f="usr/libexec/netdata/plugins.d/${x}"
   if [ -f "${f}" ]; then
     run chmod 0750 "${f}"

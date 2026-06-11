@@ -105,17 +105,16 @@ Renaming is configured with the following options:
 ```text
 [plugin:cgroups]
  run script to rename cgroups matching =  !/  !*.mount  !*.socket  !*.partition  /machine.slice/*.service  !*.service  !*.slice  !*.swap  !*.user  !init.scope  !*.scope/vcpu*  !*.scope/emulator  *.scope  *docker*  *lxc*  *qemu*  */kubepods/pod*/*  */kubepods/*/pod*/*  */*-kubepods-pod*/*  */*-kubepods-*-pod*/*  !*kubepods*  !*kubelet*  *.libvirt-qemu  *
- script to get cgroup names = /usr/libexec/netdata/plugins.d/cgroup-name.sh
+ script to get cgroup names = /usr/libexec/netdata/plugins.d/cgroup-name
 ```
 
-The additional pattern list serves to limit the number of times the script will be called. Without it, the script
+The additional pattern list serves to limit the number of times the resolver will be called. Without it, the resolver
 might be called thousands of times, depending on the number of cgroups available in the system.
 
 The above pattern list is matched against the path of the cgroup. For matched
-cgroups, Netdata calls the
-script [cgroup-name.sh.in](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/cgroup-name.sh.in)
-to get its name. This script queries `docker`, `kubectl`, `podman`, or applies
-heuristics to find a name for the cgroup.
+cgroups, Netdata calls the `cgroup-name` helper to get its name. This helper
+queries `docker`, `kubectl`, `podman`, or applies heuristics to find a name for
+the cgroup.
 
 #### Note on Podman container names
 
