@@ -5,6 +5,7 @@ package funcctl
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sort"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -115,9 +116,7 @@ func (c *Controller) moduleMethodPublicNameCollision(moduleName string, methods 
 			modulePlanned[functionName] = owner
 		}
 	}
-	for functionName, owner := range modulePlanned {
-		planned[functionName] = owner
-	}
+	maps.Copy(planned, modulePlanned)
 	return "", "", false
 }
 

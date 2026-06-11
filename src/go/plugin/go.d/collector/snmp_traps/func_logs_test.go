@@ -208,7 +208,7 @@ func writeHighVarbindTrapJournal(t *testing.T, root, jobName string, varbinds in
 	for i := range varbinds {
 		fields = append(fields, JournalField{
 			Name:  fmt.Sprintf("TRAP_VAR_SYNTHETIC_%03d", i),
-			Value: []byte(fmt.Sprintf("enum-%03d", i)),
+			Value: fmt.Appendf(nil, "enum-%03d", i),
 		})
 	}
 	fields = append(fields, JournalField{

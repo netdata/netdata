@@ -242,7 +242,7 @@ func TestDecodeRejectsOctetStringOverLimit(t *testing.T) {
 
 func TestDecodeV3AuthPrivAllowsEncryptedScopedPDUOverOctetStringLimit(t *testing.T) {
 	var extra []gosnmp.SnmpPDU
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		extra = append(extra, gosnmp.SnmpPDU{
 			Name:  "1.3.6.1.4.1.999.1." + strconv.Itoa(i+1),
 			Type:  gosnmp.OctetString,
