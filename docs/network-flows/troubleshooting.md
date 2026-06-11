@@ -174,6 +174,17 @@ See [Sizing and Capacity Planning](/docs/network-flows/sizing-capacity.md) for m
 - If `tier_indexes` or `open_tiers` is the climbing dimension, ingest is outpacing tier flushes. Check `netflow.materialized_tier_ops` for `flushes` rate and `*_errors`.
 - If `netflow.decoder_scopes` is growing without bound, your exporter is rotating template IDs. Investigate per-router behaviour.
 
+**Tier commit worker health:**
+
+Rollup tiers (1m / 5m / 1h) are committed to disk by dedicated worker threads so the receive path never blocks on tier disk I/O. Four charts expose their health:
+
+- `netflow.tier_commit_age` — seconds since each tier's worker last completed a claim cycle. This tracks worker liveness, not tier traffic: it stays low even on an idle tier. A steadily climbing age means the worker is stuck (most likely blocked on disk I/O) — check disk latency on the journal volume.
+- `netflow.tier_commit_duration` — how long the last commit batch took, fsync included. Sustained growth means the disk is falling behind the rollup volume.
+- `netflow.tier_commit_batches` — commit batches per second; each tier normally commits once per its bucket interval.
+- `netflow.tier_commit_stretched` — commit windows that carried more than one closed bucket because the worker missed an anniversary. Occasional events after a restart (catch-up) are normal; a steady rate means the disk cannot keep up with the rollup cadence. Data is not lost — windows stretch (a 1m rollup may become a 70-80s rollup) — but investigate disk throughput.
+
+Note: the live (open) tier rows shown by queries refresh on a 1-second cadence, so the current minute's in-progress rollup can lag the raw tier by up to one second.
+
 **Disk fill:**
 
 ```bash

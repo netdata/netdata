@@ -247,9 +247,11 @@ fn worker_loop(shared: &TierHandoffShared, mut worker: TierWorker) {
 
     loop {
         // Sleep to the next anniversary (or immediately on the first pass),
-        // waking early on shutdown or an early response. All blocking goes
-        // through wait_timeout_while with the predicate evaluated under the
-        // slot mutex — lost wakeups are impossible by construction.
+        // waking early on shutdown or an early response. Both wait sites
+        // evaluate their predicates under the slot mutex (this manual
+        // wait_timeout loop and the doorbell wait_while below), and every
+        // notify is sent under that mutex — lost wakeups are impossible by
+        // construction.
         let sync = &shared.slots[worker.index];
         {
             let mut slot = sync.slot.lock().unwrap_or_else(|_| std::process::abort());

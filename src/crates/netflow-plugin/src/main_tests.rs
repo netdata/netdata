@@ -416,7 +416,9 @@ async fn e2e_tier_commit_workers_roundtrip() {
     // assertions stay exact.
     let expected_rows = 4; // 2 protocol rows in the 1m bucket + 2 in the 5m.
     let mut committed = 0;
-    for _ in 0..300 {
+    // Generous bound: on a machine still digesting a rebuild, worker
+    // commits can lag the poll by whole seconds.
+    for _ in 0..1_000 {
         service.handle_tier_handoffs_for_test();
         committed = metrics.tier_entries_written.load(Ordering::Relaxed);
         if committed >= expected_rows {
@@ -432,7 +434,7 @@ async fn e2e_tier_commit_workers_roundtrip() {
     // The tick mirrors slot telemetry into the chart atomics. The entry
     // counter increments before the worker stamps its slot, so poll the
     // mirrored values rather than asserting after a single tick.
-    for _ in 0..300 {
+    for _ in 0..1_000 {
         service.handle_sync_tick_for_test(0);
         if metrics.minute_1_commit_batches.load(Ordering::Relaxed) >= 1
             && metrics.minute_5_commit_batches.load(Ordering::Relaxed) >= 1
