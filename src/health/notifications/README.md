@@ -294,6 +294,39 @@ Works for all supported methods: email, Slack, Telegram, Twilio, Discord, etc.
 </details>
 
 <details>
+<summary><strong>Controlling Recovered (CLEAR) Notifications</strong></summary><br/>
+
+When an alert returns to normal, Netdata sends a **CLEAR** (recovered) notification. You can control when and whether these are sent.
+
+**Default behavior:** Netdata suppresses CLEAR notifications when the alert was never in a WARNING or CRITICAL state. If `old_status` was not WARNING or CRITICAL and the alert transitions to CLEAR, no notification is sent. This prevents noise from alerts that flap without ever reaching a problem state.
+
+**Enable CLEAR for all transitions:** If your downstream system handles deduplication, set `clear_alarm_always` in `health_alarm_notify.conf` to override the default suppression and send a CLEAR notification regardless of the previous status:
+
+```ini
+clear_alarm_always='YES'
+```
+
+**Suppress CLEAR with the `|critical` modifier:** Adding `|critical` to a recipient filters notifications so only alerts that reached CRITICAL status are forwarded. For these recipients, CLEAR notifications are only sent when the alert previously passed through CRITICAL. If the alert only went through WARNING → CLEAR, the CLEAR is not forwarded:
+
+```ini
+role_recipients_email[sysadmin]="admin@example.com|critical"
+```
+
+**Suppress all CLEAR notifications:** Use the `|noclear` modifier to completely block CLEAR notifications for a recipient while still receiving WARNING and CRITICAL alerts:
+
+```ini
+role_recipients_email[sysadmin]="admin@example.com|noclear"
+```
+
+You can combine modifiers. This example sends only notifications for alarms that reached CRITICAL, and excludes CLEAR notifications entirely:
+
+```ini
+role_recipients_email[sysadmin]="admin@example.com|critical|noclear"
+```
+
+</details>
+
+<details>
 <summary><strong>Proxy Settings</strong></summary><br/>
 
 To send notifications via a proxy, set these environment variables:
