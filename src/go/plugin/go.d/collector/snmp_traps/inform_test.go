@@ -5,7 +5,6 @@ package snmp_traps
 import (
 	"net"
 	"reflect"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -90,7 +89,7 @@ func TestCollectorHandlePacketRespondsBeforeRateLimitDrop(t *testing.T) {
 	}
 
 	m := getJobMetrics(jobName)
-	if v := atomic.LoadUint64(&m.errors.rateLimited); v != 1 {
+	if v := m.errors.rateLimited.Load(); v != 1 {
 		t.Fatalf("rate_limited = %d, want 1", v)
 	}
 }
@@ -120,7 +119,7 @@ func TestCollectorHandlePacketIncrementsInformResponseFailed(t *testing.T) {
 	c.handlePacket(reqData, peer.IP, listenerConn, peer)
 
 	m := getJobMetrics(jobName)
-	if v := atomic.LoadUint64(&m.errors.informResponseFail); v != 1 {
+	if v := m.errors.informResponseFail.Load(); v != 1 {
 		t.Fatalf("inform_response_failed = %d, want 1", v)
 	}
 }

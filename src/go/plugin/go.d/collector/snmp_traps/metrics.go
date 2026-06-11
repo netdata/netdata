@@ -10,48 +10,48 @@ import (
 )
 
 type trapErrors struct {
-	unknownOID         uint64
-	decodeFailed       uint64
-	templateUnresolved uint64
-	malformedPDU       uint64
-	droppedAllowlist   uint64
-	rateLimited        uint64
-	authFailures       uint64
-	usmFailures        uint64
-	unknownEngineID    uint64
-	informResponseFail uint64
-	binaryEncoded      uint64
-	profileLoadFailed  uint64
-	journalWriteFailed uint64
-	otlpExportFailed   uint64
-	listenerReadFailed uint64
+	unknownOID         atomic.Uint64
+	decodeFailed       atomic.Uint64
+	templateUnresolved atomic.Uint64
+	malformedPDU       atomic.Uint64
+	droppedAllowlist   atomic.Uint64
+	rateLimited        atomic.Uint64
+	authFailures       atomic.Uint64
+	usmFailures        atomic.Uint64
+	unknownEngineID    atomic.Uint64
+	informResponseFail atomic.Uint64
+	binaryEncoded      atomic.Uint64
+	profileLoadFailed  atomic.Uint64
+	journalWriteFailed atomic.Uint64
+	otlpExportFailed   atomic.Uint64
+	listenerReadFailed atomic.Uint64
 }
 
 type trapEvents struct {
-	stateChange  uint64
-	configChange uint64
-	security     uint64
-	auth         uint64
-	license      uint64
-	mobility     uint64
-	diagnostic   uint64
-	unknown      uint64
+	stateChange  atomic.Uint64
+	configChange atomic.Uint64
+	security     atomic.Uint64
+	auth         atomic.Uint64
+	license      atomic.Uint64
+	mobility     atomic.Uint64
+	diagnostic   atomic.Uint64
+	unknown      atomic.Uint64
 }
 
 type trapSeverities struct {
-	emerg   uint64
-	alert   uint64
-	crit    uint64
-	err     uint64
-	warning uint64
-	notice  uint64
-	info    uint64
-	debug   uint64
+	emerg   atomic.Uint64
+	alert   atomic.Uint64
+	crit    atomic.Uint64
+	err     atomic.Uint64
+	warning atomic.Uint64
+	notice  atomic.Uint64
+	info    atomic.Uint64
+	debug   atomic.Uint64
 }
 
 type trapDedupMetrics struct {
 	enabled    atomic.Bool
-	suppressed uint64
+	suppressed atomic.Uint64
 }
 
 type trapMetrics struct {
@@ -121,44 +121,44 @@ func (c *Collector) trapMetrics() *perJobMetrics {
 func (m *perJobMetrics) incEvent(category Category) {
 	switch category {
 	case "state_change":
-		atomic.AddUint64(&m.events.stateChange, 1)
+		m.events.stateChange.Add(1)
 	case "config_change":
-		atomic.AddUint64(&m.events.configChange, 1)
+		m.events.configChange.Add(1)
 	case "security":
-		atomic.AddUint64(&m.events.security, 1)
+		m.events.security.Add(1)
 	case "auth":
-		atomic.AddUint64(&m.events.auth, 1)
+		m.events.auth.Add(1)
 	case "license":
-		atomic.AddUint64(&m.events.license, 1)
+		m.events.license.Add(1)
 	case "mobility":
-		atomic.AddUint64(&m.events.mobility, 1)
+		m.events.mobility.Add(1)
 	case "diagnostic":
-		atomic.AddUint64(&m.events.diagnostic, 1)
+		m.events.diagnostic.Add(1)
 	default:
-		atomic.AddUint64(&m.events.unknown, 1)
+		m.events.unknown.Add(1)
 	}
 }
 
 func (m *perJobMetrics) incSeverity(severity Severity) {
 	switch severity {
 	case "emerg":
-		atomic.AddUint64(&m.severities.emerg, 1)
+		m.severities.emerg.Add(1)
 	case "alert":
-		atomic.AddUint64(&m.severities.alert, 1)
+		m.severities.alert.Add(1)
 	case "crit":
-		atomic.AddUint64(&m.severities.crit, 1)
+		m.severities.crit.Add(1)
 	case "err":
-		atomic.AddUint64(&m.severities.err, 1)
+		m.severities.err.Add(1)
 	case "warning":
-		atomic.AddUint64(&m.severities.warning, 1)
+		m.severities.warning.Add(1)
 	case "notice":
-		atomic.AddUint64(&m.severities.notice, 1)
+		m.severities.notice.Add(1)
 	case "info":
-		atomic.AddUint64(&m.severities.info, 1)
+		m.severities.info.Add(1)
 	case "debug":
-		atomic.AddUint64(&m.severities.debug, 1)
+		m.severities.debug.Add(1)
 	default:
-		atomic.AddUint64(&m.severities.notice, 1)
+		m.severities.notice.Add(1)
 	}
 }
 
@@ -172,41 +172,41 @@ func (m *perJobMetrics) addError(dim string, n uint64) {
 	}
 	switch dim {
 	case "unknown_oid":
-		atomic.AddUint64(&m.errors.unknownOID, n)
+		m.errors.unknownOID.Add(n)
 	case "decode_failed":
-		atomic.AddUint64(&m.errors.decodeFailed, n)
+		m.errors.decodeFailed.Add(n)
 	case "template_unresolved":
-		atomic.AddUint64(&m.errors.templateUnresolved, n)
+		m.errors.templateUnresolved.Add(n)
 	case "malformed_pdu":
-		atomic.AddUint64(&m.errors.malformedPDU, n)
+		m.errors.malformedPDU.Add(n)
 	case "dropped_allowlist":
-		atomic.AddUint64(&m.errors.droppedAllowlist, n)
+		m.errors.droppedAllowlist.Add(n)
 	case "rate_limited":
-		atomic.AddUint64(&m.errors.rateLimited, n)
+		m.errors.rateLimited.Add(n)
 	case "auth_failures":
-		atomic.AddUint64(&m.errors.authFailures, n)
+		m.errors.authFailures.Add(n)
 	case "usm_failures":
-		atomic.AddUint64(&m.errors.usmFailures, n)
+		m.errors.usmFailures.Add(n)
 	case "unknown_engine_id":
-		atomic.AddUint64(&m.errors.unknownEngineID, n)
+		m.errors.unknownEngineID.Add(n)
 	case "inform_response_failed":
-		atomic.AddUint64(&m.errors.informResponseFail, n)
+		m.errors.informResponseFail.Add(n)
 	case "binary_encoded":
-		atomic.AddUint64(&m.errors.binaryEncoded, n)
+		m.errors.binaryEncoded.Add(n)
 	case "profile_load_failed":
-		atomic.AddUint64(&m.errors.profileLoadFailed, n)
+		m.errors.profileLoadFailed.Add(n)
 	case "journal_write_failed":
-		atomic.AddUint64(&m.errors.journalWriteFailed, n)
+		m.errors.journalWriteFailed.Add(n)
 	case "otlp_export_failed":
-		atomic.AddUint64(&m.errors.otlpExportFailed, n)
+		m.errors.otlpExportFailed.Add(n)
 	case "listener_read_failed":
-		atomic.AddUint64(&m.errors.listenerReadFailed, n)
+		m.errors.listenerReadFailed.Add(n)
 	}
 }
 
 func (m *perJobMetrics) setBinaryEncoded(v uint64) {
 	// Binary encoded fields are the writer's absolute cumulative total.
-	atomic.StoreUint64(&m.errors.binaryEncoded, v)
+	m.errors.binaryEncoded.Store(v)
 }
 
 func (m *perJobMetrics) setDedupEnabled(enabled bool) {
@@ -214,14 +214,14 @@ func (m *perJobMetrics) setDedupEnabled(enabled bool) {
 }
 
 func (m *perJobMetrics) incDedupSuppressed() {
-	atomic.AddUint64(&m.dedup.suppressed, 1)
+	m.dedup.suppressed.Add(1)
 }
 
 func incAllJobsProfileLoadFailed() {
 	globalMetrics.mu.Lock()
 	defer globalMetrics.mu.Unlock()
 	for _, m := range globalMetrics.jobs {
-		atomic.AddUint64(&m.errors.profileLoadFailed, 1)
+		m.errors.profileLoadFailed.Add(1)
 	}
 }
 
@@ -241,47 +241,47 @@ func collectMetrics(store metrix.CollectorStore, jobName string) {
 func collectEvents(store metrix.CollectorStore, jobName string, m *perJobMetrics) {
 	meter := store.Write().SnapshotMeter("").WithLabels(metrix.Label{Key: "job_name", Value: jobName})
 
-	meter.Counter("snmp_trap_events_state_change").ObserveTotal(float64(atomic.LoadUint64(&m.events.stateChange)))
-	meter.Counter("snmp_trap_events_config_change").ObserveTotal(float64(atomic.LoadUint64(&m.events.configChange)))
-	meter.Counter("snmp_trap_events_security").ObserveTotal(float64(atomic.LoadUint64(&m.events.security)))
-	meter.Counter("snmp_trap_events_auth").ObserveTotal(float64(atomic.LoadUint64(&m.events.auth)))
-	meter.Counter("snmp_trap_events_license").ObserveTotal(float64(atomic.LoadUint64(&m.events.license)))
-	meter.Counter("snmp_trap_events_mobility").ObserveTotal(float64(atomic.LoadUint64(&m.events.mobility)))
-	meter.Counter("snmp_trap_events_diagnostic").ObserveTotal(float64(atomic.LoadUint64(&m.events.diagnostic)))
-	meter.Counter("snmp_trap_events_unknown").ObserveTotal(float64(atomic.LoadUint64(&m.events.unknown)))
+	meter.Counter("snmp_trap_events_state_change").ObserveTotal(float64(m.events.stateChange.Load()))
+	meter.Counter("snmp_trap_events_config_change").ObserveTotal(float64(m.events.configChange.Load()))
+	meter.Counter("snmp_trap_events_security").ObserveTotal(float64(m.events.security.Load()))
+	meter.Counter("snmp_trap_events_auth").ObserveTotal(float64(m.events.auth.Load()))
+	meter.Counter("snmp_trap_events_license").ObserveTotal(float64(m.events.license.Load()))
+	meter.Counter("snmp_trap_events_mobility").ObserveTotal(float64(m.events.mobility.Load()))
+	meter.Counter("snmp_trap_events_diagnostic").ObserveTotal(float64(m.events.diagnostic.Load()))
+	meter.Counter("snmp_trap_events_unknown").ObserveTotal(float64(m.events.unknown.Load()))
 }
 
 func collectSeverities(store metrix.CollectorStore, jobName string, m *perJobMetrics) {
 	meter := store.Write().SnapshotMeter("").WithLabels(metrix.Label{Key: "job_name", Value: jobName})
 
-	meter.Counter("snmp_trap_severity_emerg").ObserveTotal(float64(atomic.LoadUint64(&m.severities.emerg)))
-	meter.Counter("snmp_trap_severity_alert").ObserveTotal(float64(atomic.LoadUint64(&m.severities.alert)))
-	meter.Counter("snmp_trap_severity_crit").ObserveTotal(float64(atomic.LoadUint64(&m.severities.crit)))
-	meter.Counter("snmp_trap_severity_err").ObserveTotal(float64(atomic.LoadUint64(&m.severities.err)))
-	meter.Counter("snmp_trap_severity_warning").ObserveTotal(float64(atomic.LoadUint64(&m.severities.warning)))
-	meter.Counter("snmp_trap_severity_notice").ObserveTotal(float64(atomic.LoadUint64(&m.severities.notice)))
-	meter.Counter("snmp_trap_severity_info").ObserveTotal(float64(atomic.LoadUint64(&m.severities.info)))
-	meter.Counter("snmp_trap_severity_debug").ObserveTotal(float64(atomic.LoadUint64(&m.severities.debug)))
+	meter.Counter("snmp_trap_severity_emerg").ObserveTotal(float64(m.severities.emerg.Load()))
+	meter.Counter("snmp_trap_severity_alert").ObserveTotal(float64(m.severities.alert.Load()))
+	meter.Counter("snmp_trap_severity_crit").ObserveTotal(float64(m.severities.crit.Load()))
+	meter.Counter("snmp_trap_severity_err").ObserveTotal(float64(m.severities.err.Load()))
+	meter.Counter("snmp_trap_severity_warning").ObserveTotal(float64(m.severities.warning.Load()))
+	meter.Counter("snmp_trap_severity_notice").ObserveTotal(float64(m.severities.notice.Load()))
+	meter.Counter("snmp_trap_severity_info").ObserveTotal(float64(m.severities.info.Load()))
+	meter.Counter("snmp_trap_severity_debug").ObserveTotal(float64(m.severities.debug.Load()))
 }
 
 func collectErrors(store metrix.CollectorStore, jobName string, m *perJobMetrics) {
 	meter := store.Write().SnapshotMeter("").WithLabels(metrix.Label{Key: "job_name", Value: jobName})
 
-	meter.Counter("snmp_trap_errors_unknown_oid").ObserveTotal(float64(atomic.LoadUint64(&m.errors.unknownOID)))
-	meter.Counter("snmp_trap_errors_decode_failed").ObserveTotal(float64(atomic.LoadUint64(&m.errors.decodeFailed)))
-	meter.Counter("snmp_trap_errors_template_unresolved").ObserveTotal(float64(atomic.LoadUint64(&m.errors.templateUnresolved)))
-	meter.Counter("snmp_trap_errors_malformed_pdu").ObserveTotal(float64(atomic.LoadUint64(&m.errors.malformedPDU)))
-	meter.Counter("snmp_trap_errors_dropped_allowlist").ObserveTotal(float64(atomic.LoadUint64(&m.errors.droppedAllowlist)))
-	meter.Counter("snmp_trap_errors_rate_limited").ObserveTotal(float64(atomic.LoadUint64(&m.errors.rateLimited)))
-	meter.Counter("snmp_trap_errors_auth_failures").ObserveTotal(float64(atomic.LoadUint64(&m.errors.authFailures)))
-	meter.Counter("snmp_trap_errors_usm_failures").ObserveTotal(float64(atomic.LoadUint64(&m.errors.usmFailures)))
-	meter.Counter("snmp_trap_errors_unknown_engine_id").ObserveTotal(float64(atomic.LoadUint64(&m.errors.unknownEngineID)))
-	meter.Counter("snmp_trap_errors_inform_response_failed").ObserveTotal(float64(atomic.LoadUint64(&m.errors.informResponseFail)))
-	meter.Counter("snmp_trap_errors_binary_encoded").ObserveTotal(float64(atomic.LoadUint64(&m.errors.binaryEncoded)))
-	meter.Counter("snmp_trap_errors_profile_load_failed").ObserveTotal(float64(atomic.LoadUint64(&m.errors.profileLoadFailed)))
-	meter.Counter("snmp_trap_errors_journal_write_failed").ObserveTotal(float64(atomic.LoadUint64(&m.errors.journalWriteFailed)))
-	meter.Counter("snmp_trap_errors_otlp_export_failed").ObserveTotal(float64(atomic.LoadUint64(&m.errors.otlpExportFailed)))
-	meter.Counter("snmp_trap_errors_listener_read_failed").ObserveTotal(float64(atomic.LoadUint64(&m.errors.listenerReadFailed)))
+	meter.Counter("snmp_trap_errors_unknown_oid").ObserveTotal(float64(m.errors.unknownOID.Load()))
+	meter.Counter("snmp_trap_errors_decode_failed").ObserveTotal(float64(m.errors.decodeFailed.Load()))
+	meter.Counter("snmp_trap_errors_template_unresolved").ObserveTotal(float64(m.errors.templateUnresolved.Load()))
+	meter.Counter("snmp_trap_errors_malformed_pdu").ObserveTotal(float64(m.errors.malformedPDU.Load()))
+	meter.Counter("snmp_trap_errors_dropped_allowlist").ObserveTotal(float64(m.errors.droppedAllowlist.Load()))
+	meter.Counter("snmp_trap_errors_rate_limited").ObserveTotal(float64(m.errors.rateLimited.Load()))
+	meter.Counter("snmp_trap_errors_auth_failures").ObserveTotal(float64(m.errors.authFailures.Load()))
+	meter.Counter("snmp_trap_errors_usm_failures").ObserveTotal(float64(m.errors.usmFailures.Load()))
+	meter.Counter("snmp_trap_errors_unknown_engine_id").ObserveTotal(float64(m.errors.unknownEngineID.Load()))
+	meter.Counter("snmp_trap_errors_inform_response_failed").ObserveTotal(float64(m.errors.informResponseFail.Load()))
+	meter.Counter("snmp_trap_errors_binary_encoded").ObserveTotal(float64(m.errors.binaryEncoded.Load()))
+	meter.Counter("snmp_trap_errors_profile_load_failed").ObserveTotal(float64(m.errors.profileLoadFailed.Load()))
+	meter.Counter("snmp_trap_errors_journal_write_failed").ObserveTotal(float64(m.errors.journalWriteFailed.Load()))
+	meter.Counter("snmp_trap_errors_otlp_export_failed").ObserveTotal(float64(m.errors.otlpExportFailed.Load()))
+	meter.Counter("snmp_trap_errors_listener_read_failed").ObserveTotal(float64(m.errors.listenerReadFailed.Load()))
 }
 
 func collectDedup(store metrix.CollectorStore, jobName string, m *perJobMetrics) {
@@ -289,5 +289,5 @@ func collectDedup(store metrix.CollectorStore, jobName string, m *perJobMetrics)
 		return
 	}
 	meter := store.Write().SnapshotMeter("").WithLabels(metrix.Label{Key: "job_name", Value: jobName})
-	meter.Counter("snmp_trap_dedup_suppressed").ObserveTotal(float64(atomic.LoadUint64(&m.dedup.suppressed)))
+	meter.Counter("snmp_trap_dedup_suppressed").ObserveTotal(float64(m.dedup.suppressed.Load()))
 }

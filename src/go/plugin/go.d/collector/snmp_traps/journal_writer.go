@@ -44,7 +44,7 @@ type JournalWriter struct {
 	cfg                 JournalConfig
 	journalDir          string
 	activePath          string
-	binaryEncodedFields uint64
+	binaryEncodedFields atomic.Uint64
 }
 
 func journalRoot(jobName string) string {
@@ -171,7 +171,7 @@ func (w *JournalWriter) WriteEntry(fields []JournalField, realtimeUsec, monotoni
 		return err
 	}
 	if count > 0 {
-		atomic.AddUint64(&w.binaryEncodedFields, uint64(count))
+		w.binaryEncodedFields.Add(uint64(count))
 	}
 	if activePath := w.log.ActivePath(); activePath != "" {
 		w.activePath = activePath
@@ -198,7 +198,7 @@ func (w *JournalWriter) WriteRawEntry(payloads [][]byte, binaryEncodedFields int
 		return err
 	}
 	if binaryEncodedFields > 0 {
-		atomic.AddUint64(&w.binaryEncodedFields, uint64(binaryEncodedFields))
+		w.binaryEncodedFields.Add(uint64(binaryEncodedFields))
 	}
 	if activePath := w.log.ActivePath(); activePath != "" {
 		w.activePath = activePath
@@ -207,7 +207,7 @@ func (w *JournalWriter) WriteRawEntry(payloads [][]byte, binaryEncodedFields int
 }
 
 func (w *JournalWriter) BinaryEncodedFields() uint64 {
-	return atomic.LoadUint64(&w.binaryEncodedFields)
+	return w.binaryEncodedFields.Load()
 }
 
 func (w *JournalWriter) SweepRetention() error {

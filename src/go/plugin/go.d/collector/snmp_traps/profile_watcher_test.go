@@ -95,7 +95,7 @@ traps:
 	watcher.refresh(context.Background())
 
 	assert.Same(t, idx, CurrentProfileIndex())
-	assert.Equal(t, uint64(1), atomic.LoadUint64(&metrics.errors.profileLoadFailed))
+	assert.Equal(t, uint64(1), metrics.errors.profileLoadFailed.Load())
 	assert.Equal(t, previousFingerprint, watcher.lastFingerprint)
 
 	_, err = AcquireProfileCache()

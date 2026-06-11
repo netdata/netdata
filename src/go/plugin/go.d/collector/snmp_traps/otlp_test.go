@@ -381,7 +381,7 @@ func TestOTLPTrapWriterPreflightHeadersAndFlush(t *testing.T) {
 	reqs := srv.requests()
 	require.Len(t, reqs, 2)
 	require.Len(t, reqs[1].ResourceLogs[0].ScopeLogs[0].LogRecords, 1)
-	assert.Equal(t, uint64(0), metrics.errors.otlpExportFailed)
+	assert.Equal(t, uint64(0), metrics.errors.otlpExportFailed.Load())
 }
 
 func TestOTLPTrapWriterPreflightFailure(t *testing.T) {

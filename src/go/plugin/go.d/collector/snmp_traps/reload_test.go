@@ -212,8 +212,8 @@ traps:
 	err = ReloadProfileCache()
 	require.Error(t, err)
 
-	assert.Equal(t, uint64(1), atomic.LoadUint64(&mA.errors.profileLoadFailed))
-	assert.Equal(t, uint64(1), atomic.LoadUint64(&mB.errors.profileLoadFailed))
+	assert.Equal(t, uint64(1), mA.errors.profileLoadFailed.Load())
+	assert.Equal(t, uint64(1), mB.errors.profileLoadFailed.Load())
 }
 
 func TestReloadProfileCacheConcurrentLookups(t *testing.T) {
@@ -357,7 +357,7 @@ traps:
 	close(releaseDone)
 
 	require.ErrorIs(t, <-reloadDone, errNoActiveProfileJobs)
-	assert.Equal(t, uint64(0), atomic.LoadUint64(&m.errors.profileLoadFailed))
+	assert.Equal(t, uint64(0), m.errors.profileLoadFailed.Load())
 	assert.Nil(t, CurrentProfileIndex())
 }
 

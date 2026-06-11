@@ -69,7 +69,7 @@ func TestFanoutTrapWriterSecondaryFailureDoesNotFailPrimaryWrite(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, primary.entries, 1)
 	assert.Len(t, secondary.entries, 0)
-	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed)
+	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
 }
 
 func TestFanoutTrapWriterPrimaryFailureStillAttemptsSecondaryWrite(t *testing.T) {
@@ -83,7 +83,7 @@ func TestFanoutTrapWriterPrimaryFailureStillAttemptsSecondaryWrite(t *testing.T)
 	require.ErrorIs(t, err, primaryErr)
 	assert.Len(t, primary.entries, 0)
 	assert.Len(t, secondary.entries, 1)
-	assert.Equal(t, uint64(0), metrics.errors.otlpExportFailed)
+	assert.Equal(t, uint64(0), metrics.errors.otlpExportFailed.Load())
 }
 
 func TestFanoutTrapWriterSecondaryFlushFailureReturnsErrorAfterPrimaryFlush(t *testing.T) {
@@ -96,7 +96,7 @@ func TestFanoutTrapWriterSecondaryFlushFailureReturnsErrorAfterPrimaryFlush(t *t
 	err := writer.Flush()
 	require.ErrorIs(t, err, secondaryErr)
 	assert.Equal(t, 1, primary.flushes)
-	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed)
+	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
 }
 
 func TestFanoutTrapWriterSecondaryCloseFailureReturnsErrorAfterPrimaryClose(t *testing.T) {
@@ -110,7 +110,7 @@ func TestFanoutTrapWriterSecondaryCloseFailureReturnsErrorAfterPrimaryClose(t *t
 	require.ErrorIs(t, err, secondaryErr)
 	assert.True(t, primary.closed)
 	assert.False(t, secondary.closed)
-	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed)
+	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
 }
 
 func TestFanoutTrapWriterCloseReturnsPrimaryAndSecondaryErrors(t *testing.T) {
@@ -124,7 +124,7 @@ func TestFanoutTrapWriterCloseReturnsPrimaryAndSecondaryErrors(t *testing.T) {
 	err := writer.Close()
 	require.ErrorIs(t, err, primaryErr)
 	require.ErrorIs(t, err, secondaryErr)
-	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed)
+	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
 }
 
 func TestFanoutTrapWriterForwardsBinaryEncodedFieldsFromPrimary(t *testing.T) {

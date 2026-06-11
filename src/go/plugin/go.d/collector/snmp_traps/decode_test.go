@@ -221,6 +221,13 @@ func TestDecodeMalformed(t *testing.T) {
 	}
 }
 
+func TestSniffSNMPVersionRejectsHugeBERLength(t *testing.T) {
+	_, ok := sniffSNMPVersion([]byte{tagSequence, 0x84, 0x80, 0x00, 0x00, 0x00})
+	if ok {
+		t.Fatal("expected huge BER length to be rejected")
+	}
+}
+
 func TestDecodeRejectsOctetStringOverLimit(t *testing.T) {
 	longValue := make([]byte, maxOctetStringLen+1)
 	data := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1", gosnmp.SnmpPDU{
@@ -392,7 +399,8 @@ func TestV1TrapOID(t *testing.T) {
 	}
 
 	if strconv.IntSize > 32 {
-		specificTrap := int(int64(maxSNMPv1SpecificTrap) + 1)
+		specificTrap64 := int64(maxSNMPv1SpecificTrap)
+		specificTrap := int(specificTrap64 + 1)
 		if got := v1TrapOID("1.3.6.1.4.1.9", 6, specificTrap); got != "" {
 			t.Errorf("expected empty OID for out-of-range specificTrap, got %s", got)
 		}

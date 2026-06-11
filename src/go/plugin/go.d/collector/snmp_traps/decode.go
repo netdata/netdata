@@ -232,7 +232,7 @@ func extractSNMPv3EngineIDHex(data []byte) (string, bool, error) {
 }
 
 func readBERElement(data []byte, pos int) (tag byte, valueStart, valueEnd, next int, err error) {
-	if pos < 0 || pos+2 > len(data) {
+	if pos < 0 || pos > len(data) || len(data)-pos < 2 {
 		return 0, 0, 0, 0, fmt.Errorf("BER: truncated element at offset %d", pos)
 	}
 
@@ -242,9 +242,9 @@ func readBERElement(data []byte, pos int) (tag byte, valueStart, valueEnd, next 
 	lengthByte := data[pos]
 	pos++
 
-	length := 0
+	var length uint64
 	if lengthByte&0x80 == 0 {
-		length = int(lengthByte)
+		length = uint64(lengthByte)
 	} else {
 		n := int(lengthByte & 0x7f)
 		if n == 0 {
@@ -257,16 +257,23 @@ func readBERElement(data []byte, pos int) (tag byte, valueStart, valueEnd, next 
 			return 0, 0, 0, 0, fmt.Errorf("BER: truncated length at offset %d", pos)
 		}
 		for i := range n {
-			length = (length << 8) | int(data[pos+i])
+			length = (length << 8) | uint64(data[pos+i])
+			if length > uint64(maxDatagramSize) {
+				return 0, 0, 0, 0, fmt.Errorf("BER: value length %d exceeds maximum datagram size %d", length, maxDatagramSize)
+			}
 		}
 		pos += n
 	}
 
-	valueStart = pos
-	valueEnd = pos + length
-	if valueEnd > len(data) {
+	if length > uint64(maxDatagramSize) {
+		return 0, 0, 0, 0, fmt.Errorf("BER: value length %d exceeds maximum datagram size %d", length, maxDatagramSize)
+	}
+	if length > uint64(len(data)-pos) {
 		return 0, 0, 0, 0, fmt.Errorf("BER: value length %d exceeds remaining bytes %d", length, len(data)-pos)
 	}
+
+	valueStart = pos
+	valueEnd = pos + int(length)
 	return tag, valueStart, valueEnd, valueEnd, nil
 }
 

@@ -9,7 +9,6 @@ import (
 	"net/netip"
 	"os"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -31,14 +30,14 @@ func assertSeverityCounters(t *testing.T, metrics *perJobMetrics, want map[strin
 	t.Helper()
 
 	got := map[string]uint64{
-		"emerg":   atomic.LoadUint64(&metrics.severities.emerg),
-		"alert":   atomic.LoadUint64(&metrics.severities.alert),
-		"crit":    atomic.LoadUint64(&metrics.severities.crit),
-		"err":     atomic.LoadUint64(&metrics.severities.err),
-		"warning": atomic.LoadUint64(&metrics.severities.warning),
-		"notice":  atomic.LoadUint64(&metrics.severities.notice),
-		"info":    atomic.LoadUint64(&metrics.severities.info),
-		"debug":   atomic.LoadUint64(&metrics.severities.debug),
+		"emerg":   metrics.severities.emerg.Load(),
+		"alert":   metrics.severities.alert.Load(),
+		"crit":    metrics.severities.crit.Load(),
+		"err":     metrics.severities.err.Load(),
+		"warning": metrics.severities.warning.Load(),
+		"notice":  metrics.severities.notice.Load(),
+		"info":    metrics.severities.info.Load(),
+		"debug":   metrics.severities.debug.Load(),
 	}
 
 	for name, value := range got {
@@ -47,6 +46,12 @@ func assertSeverityCounters(t *testing.T, metrics *perJobMetrics, want map[strin
 		}
 	}
 }
+
+type panicTrapWriter struct{}
+
+func (panicTrapWriter) Write(*TrapEntry) error { panic("trap writer panic") }
+func (panicTrapWriter) Flush() error           { return nil }
+func (panicTrapWriter) Close() error           { return nil }
 
 func TestCollectorHandlePacketWritesProfileResolvedTrapEntry(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
@@ -69,6 +74,21 @@ func TestCollectorHandlePacketWritesProfileResolvedTrapEntry(t *testing.T) {
 	}
 	if entry.Message != "security coldStart from 198.51.100.10" {
 		t.Fatalf("Message = %q", entry.Message)
+	}
+}
+
+func TestCollectorHandlePacketRecoversFromPanic(t *testing.T) {
+	packet := readColdStartUDPPacket(t)
+	trap := testColdStartTrap("security", "warning", "security coldStart from {TRAP_SOURCE_IP}")
+	setSingleTestTrap(t, trap)
+	metrics := withCleanJobMetrics(t, "panic-recover")
+	c := newTestV2Collector("panic-recover", panicTrapWriter{}, nil, []string{"public"})
+	c.metrics = metrics
+
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
+
+	if got := metrics.errors.decodeFailed.Load(); got != 1 {
+		t.Fatalf("decode_failed = %d, want 1", got)
 	}
 }
 
@@ -184,20 +204,20 @@ func TestCollectorHandlePacketDedupSuppressesDuplicates(t *testing.T) {
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
 	}
-	if got := atomic.LoadUint64(&metrics.dedup.suppressed); got != 1 {
+	if got := metrics.dedup.suppressed.Load(); got != 1 {
 		t.Fatalf("dedup suppressed = %d, want 1", got)
 	}
-	if got := atomic.LoadUint64(&metrics.events.security); got != 1 {
+	if got := metrics.events.security.Load(); got != 1 {
 		t.Fatalf("security events = %d, want 1", got)
 	}
 	assertSeverityCounters(t, metrics, map[string]uint64{"warning": 1})
-	if got := atomic.LoadUint64(&metrics.errors.unknownOID); got != 0 {
+	if got := metrics.errors.unknownOID.Load(); got != 0 {
 		t.Fatalf("unknown OID errors = %d, want 0", got)
 	}
-	if got := atomic.LoadUint64(&metrics.errors.templateUnresolved); got != 0 {
+	if got := metrics.errors.templateUnresolved.Load(); got != 0 {
 		t.Fatalf("template unresolved errors = %d, want 0", got)
 	}
-	if got := atomic.LoadUint64(&metrics.errors.journalWriteFailed); got != 0 {
+	if got := metrics.errors.journalWriteFailed.Load(); got != 0 {
 		t.Fatalf("journal write failures = %d, want 0", got)
 	}
 }
@@ -218,13 +238,13 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 		if len(writer.entries) != 1 {
 			t.Fatalf("written entries = %d, want 1", len(writer.entries))
 		}
-		if got := atomic.LoadUint64(&metrics.dedup.suppressed); got != 1 {
+		if got := metrics.dedup.suppressed.Load(); got != 1 {
 			t.Fatalf("dedup suppressed = %d, want 1", got)
 		}
-		if got := atomic.LoadUint64(&metrics.errors.unknownOID); got != 2 {
+		if got := metrics.errors.unknownOID.Load(); got != 2 {
 			t.Fatalf("unknown OID errors = %d, want 2", got)
 		}
-		if got := atomic.LoadUint64(&metrics.events.unknown); got != 1 {
+		if got := metrics.events.unknown.Load(); got != 1 {
 			t.Fatalf("unknown events = %d, want 1", got)
 		}
 		assertSeverityCounters(t, metrics, map[string]uint64{"notice": 1})
@@ -245,13 +265,13 @@ func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
 		if len(writer.entries) != 1 {
 			t.Fatalf("written entries = %d, want 1", len(writer.entries))
 		}
-		if got := atomic.LoadUint64(&metrics.dedup.suppressed); got != 1 {
+		if got := metrics.dedup.suppressed.Load(); got != 1 {
 			t.Fatalf("dedup suppressed = %d, want 1", got)
 		}
-		if got := atomic.LoadUint64(&metrics.errors.templateUnresolved); got != 2 {
+		if got := metrics.errors.templateUnresolved.Load(); got != 2 {
 			t.Fatalf("template unresolved errors = %d, want 2", got)
 		}
-		if got := atomic.LoadUint64(&metrics.events.security); got != 1 {
+		if got := metrics.events.security.Load(); got != 1 {
 			t.Fatalf("security events = %d, want 1", got)
 		}
 		assertSeverityCounters(t, metrics, map[string]uint64{"warning": 1})
@@ -268,10 +288,10 @@ func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *test
 	c, metrics := newDedupTestV2Collector(t, jobName, writer)
 
 	c.handlePacket(packet.payload, packet.peer, nil, nil)
-	if got := atomic.LoadUint64(&metrics.errors.journalWriteFailed); got != 1 {
+	if got := metrics.errors.journalWriteFailed.Load(); got != 1 {
 		t.Fatalf("journal write failures = %d, want 1", got)
 	}
-	if got := atomic.LoadUint64(&metrics.dedup.suppressed); got != 0 {
+	if got := metrics.dedup.suppressed.Load(); got != 0 {
 		t.Fatalf("dedup suppressed after failed first write = %d, want 0", got)
 	}
 
@@ -281,10 +301,10 @@ func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *test
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries after rollback = %d, want 1", len(writer.entries))
 	}
-	if got := atomic.LoadUint64(&metrics.dedup.suppressed); got != 0 {
+	if got := metrics.dedup.suppressed.Load(); got != 0 {
 		t.Fatalf("dedup suppressed after rollback retry = %d, want 0", got)
 	}
-	if got := atomic.LoadUint64(&metrics.events.security); got != 1 {
+	if got := metrics.events.security.Load(); got != 1 {
 		t.Fatalf("security events = %d, want 1", got)
 	}
 	assertSeverityCounters(t, metrics, map[string]uint64{"warning": 1})
@@ -307,7 +327,7 @@ func TestCollectorHandlePacketDropsDisallowedVersion(t *testing.T) {
 		t.Fatalf("expected 0 entries for disallowed version, got %d", len(writer.entries))
 	}
 	m := getJobMetrics("test")
-	if dr := atomic.LoadUint64(&m.errors.droppedAllowlist); dr != 1 {
+	if dr := m.errors.droppedAllowlist.Load(); dr != 1 {
 		t.Errorf("expected 1 dropped_allowlist, got %d", dr)
 	}
 	removeJobMetrics("test")
@@ -333,13 +353,13 @@ func TestCollectorHandlePacketDropsDisallowedV3BeforeDecode(t *testing.T) {
 		t.Fatalf("expected 0 entries for disallowed v3 packet, got %d", len(writer.entries))
 	}
 	m := getJobMetrics(jobName)
-	if v := atomic.LoadUint64(&m.errors.droppedAllowlist); v != 1 {
+	if v := m.errors.droppedAllowlist.Load(); v != 1 {
 		t.Fatalf("dropped_allowlist = %d, want 1", v)
 	}
-	if v := atomic.LoadUint64(&m.errors.authFailures); v != 0 {
+	if v := m.errors.authFailures.Load(); v != 0 {
 		t.Fatalf("auth_failures = %d, want 0", v)
 	}
-	if v := atomic.LoadUint64(&m.errors.decodeFailed); v != 0 {
+	if v := m.errors.decodeFailed.Load(); v != 0 {
 		t.Fatalf("decode_failed = %d, want 0", v)
 	}
 }
@@ -385,7 +405,7 @@ func TestCollectorHandlePacketWritesDecodeErrorEntry(t *testing.T) {
 	if !strings.Contains(entry.Message, "malformed_pdu") {
 		t.Fatalf("Message = %q, want malformed_pdu", entry.Message)
 	}
-	if got := atomic.LoadUint64(&metrics.errors.malformedPDU); got != 1 {
+	if got := metrics.errors.malformedPDU.Load(); got != 1 {
 		t.Fatalf("malformed_pdu = %d, want 1", got)
 	}
 }
@@ -402,10 +422,10 @@ func TestCollectorHandlePacketDecodeErrorHonorsAllowlist(t *testing.T) {
 	if len(writer.entries) != 0 {
 		t.Fatalf("written entries = %d, want 0", len(writer.entries))
 	}
-	if got := atomic.LoadUint64(&metrics.errors.droppedAllowlist); got != 1 {
+	if got := metrics.errors.droppedAllowlist.Load(); got != 1 {
 		t.Fatalf("dropped_allowlist = %d, want 1", got)
 	}
-	if got := atomic.LoadUint64(&metrics.errors.decodeFailed); got != 0 {
+	if got := metrics.errors.decodeFailed.Load(); got != 0 {
 		t.Fatalf("decode_failed = %d, want 0", got)
 	}
 }
@@ -425,10 +445,10 @@ func TestCollectorHandlePacketDecodeErrorHonorsRateLimitDrop(t *testing.T) {
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
 	}
-	if got := atomic.LoadUint64(&metrics.errors.malformedPDU); got != 2 {
+	if got := metrics.errors.malformedPDU.Load(); got != 2 {
 		t.Fatalf("malformed_pdu = %d, want 2", got)
 	}
-	if got := atomic.LoadUint64(&metrics.errors.rateLimited); got != 1 {
+	if got := metrics.errors.rateLimited.Load(); got != 1 {
 		t.Fatalf("rate_limited = %d, want 1", got)
 	}
 }
@@ -465,7 +485,7 @@ func TestCollectorHandlePacketDropsWhenAllowlistCannotDetermineSource(t *testing
 	if len(writer.entries) != 0 {
 		t.Fatalf("written entries = %d, want 0", len(writer.entries))
 	}
-	if got := atomic.LoadUint64(&metrics.errors.droppedAllowlist); got != 1 {
+	if got := metrics.errors.droppedAllowlist.Load(); got != 1 {
 		t.Fatalf("dropped_allowlist = %d, want 1", got)
 	}
 }
@@ -507,7 +527,7 @@ func TestCollectorHandlePacketIncrementsEventsMetric(t *testing.T) {
 	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	m := getJobMetrics("test")
-	ev := atomic.LoadUint64(&m.events.stateChange)
+	ev := m.events.stateChange.Load()
 	if ev != 1 {
 		t.Errorf("expected 1 state_change event, got %d", ev)
 	}
@@ -534,7 +554,7 @@ func TestPerJobMetricsIncSeverityFallsBackToNotice(t *testing.T) {
 	m.incSeverity("")
 	m.incSeverity("not_a_severity")
 
-	if v := atomic.LoadUint64(&m.severities.notice); v != 2 {
+	if v := m.severities.notice.Load(); v != 2 {
 		t.Fatalf("notice severity = %d, want 2", v)
 	}
 	assertSeverityCounters(t, m, map[string]uint64{"notice": 2})
@@ -589,7 +609,7 @@ func TestCollectorHandlePacketIncrementsTemplateUnresolved(t *testing.T) {
 	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	m := getJobMetrics("test")
-	if v := atomic.LoadUint64(&m.errors.templateUnresolved); v != 1 {
+	if v := m.errors.templateUnresolved.Load(); v != 1 {
 		t.Errorf("expected 1 template_unresolved, got %d", v)
 	}
 }
@@ -603,7 +623,7 @@ func TestCollectorHandlePacketIncrementsAllowlistDrop(t *testing.T) {
 	c.handlePacket(packet.payload, packet.peer, nil, nil)
 
 	m := getJobMetrics("test")
-	dr := atomic.LoadUint64(&m.errors.droppedAllowlist)
+	dr := m.errors.droppedAllowlist.Load()
 	if dr != 1 {
 		t.Errorf("expected 1 dropped_allowlist, got %d", dr)
 	}
@@ -629,7 +649,7 @@ func TestCollectorHandlePacketRejectsUnknownV3EngineID(t *testing.T) {
 		t.Fatalf("expected unknown engine ID to drop trap, got %d entries", len(writer.entries))
 	}
 	m := getJobMetrics(jobName)
-	if v := atomic.LoadUint64(&m.errors.unknownEngineID); v != 1 {
+	if v := m.errors.unknownEngineID.Load(); v != 1 {
 		t.Fatalf("unknown_engine_id = %d, want 1", v)
 	}
 }
@@ -667,10 +687,10 @@ func TestCollectorHandlePacketClassifiesAuthFailureUnknownV3EngineID(t *testing.
 	c.handlePacket(data, net.ParseIP("10.1.2.3"), nil, &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162})
 
 	m := getJobMetrics(jobName)
-	if v := atomic.LoadUint64(&m.errors.unknownEngineID); v != 1 {
+	if v := m.errors.unknownEngineID.Load(); v != 1 {
 		t.Fatalf("unknown_engine_id = %d, want 1", v)
 	}
-	if v := atomic.LoadUint64(&m.errors.authFailures); v != 0 {
+	if v := m.errors.authFailures.Load(); v != 0 {
 		t.Fatalf("auth_failures = %d, want 0", v)
 	}
 }
@@ -735,7 +755,7 @@ func TestCollectorHandlePacketRateLimitSampleWritesTrap(t *testing.T) {
 		t.Fatalf("sample-mode rate-limited trap should be written, got %d entries", len(writer.entries))
 	}
 	m := getJobMetrics(jobName)
-	if v := atomic.LoadUint64(&m.errors.rateLimited); v != 1 {
+	if v := m.errors.rateLimited.Load(); v != 1 {
 		t.Fatalf("rate_limited = %d, want 1", v)
 	}
 }

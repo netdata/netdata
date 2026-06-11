@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"net"
 	"sync"
-	"sync/atomic"
 	"testing"
 
 	"github.com/gosnmp/gosnmp"
@@ -85,7 +84,7 @@ func TestDynamicEngineIDTrapRegistration(t *testing.T) {
 		t.Fatalf("journaled entries = %d, want 2", got)
 	}
 	m := getJobMetrics(jobName)
-	if v := atomic.LoadUint64(&m.errors.unknownEngineID); v != 1 {
+	if v := m.errors.unknownEngineID.Load(); v != 1 {
 		t.Fatalf("unknown_engine_id = %d, want 1", v)
 	}
 	if got := c.dynamicEngineIDReg.size(); got != 1 {
@@ -110,7 +109,7 @@ func TestDynamicEngineIDCapRejectsNewPairs(t *testing.T) {
 		t.Fatalf("journaled entries = %d, want 1", got)
 	}
 	m := getJobMetrics(jobName)
-	if v := atomic.LoadUint64(&m.errors.unknownEngineID); v != 2 {
+	if v := m.errors.unknownEngineID.Load(); v != 2 {
 		t.Fatalf("unknown_engine_id = %d, want 2", v)
 	}
 	if got := c.dynamicEngineIDReg.size(); got != 1 {
@@ -156,7 +155,7 @@ func TestDynamicEngineIDConcurrentDuplicateRegistration(t *testing.T) {
 		t.Fatalf("journaled entries = %d, want 16", gotEntries)
 	}
 	m := getJobMetrics(jobName)
-	if v := atomic.LoadUint64(&m.errors.unknownEngineID); v != 1 {
+	if v := m.errors.unknownEngineID.Load(); v != 1 {
 		t.Fatalf("unknown_engine_id = %d, want 1", v)
 	}
 	if got := c.dynamicEngineIDReg.size(); got != 1 {
@@ -222,7 +221,7 @@ func TestDynamicEngineIDRateLimitDropSkipsRetry(t *testing.T) {
 		t.Fatalf("journaled entries = %d, want 0", got)
 	}
 	m := getJobMetrics(jobName)
-	if v := atomic.LoadUint64(&m.errors.rateLimited); v != 1 {
+	if v := m.errors.rateLimited.Load(); v != 1 {
 		t.Fatalf("rate_limited = %d, want 1", v)
 	}
 	if got := c.dynamicEngineIDReg.size(); got != 0 {
@@ -252,10 +251,10 @@ func TestDynamicEngineIDRateLimitSampleAllowsRetry(t *testing.T) {
 		t.Fatalf("journaled entries = %d, want 1", got)
 	}
 	m := getJobMetrics(jobName)
-	if v := atomic.LoadUint64(&m.errors.rateLimited); v != 1 {
+	if v := m.errors.rateLimited.Load(); v != 1 {
 		t.Fatalf("rate_limited = %d, want 1", v)
 	}
-	if v := atomic.LoadUint64(&m.errors.unknownEngineID); v != 1 {
+	if v := m.errors.unknownEngineID.Load(); v != 1 {
 		t.Fatalf("unknown_engine_id = %d, want 1", v)
 	}
 	if got := c.dynamicEngineIDReg.size(); got != 1 {

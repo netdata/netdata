@@ -458,6 +458,13 @@ func (c *Collector) collect(ctx context.Context) error {
 }
 
 func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, peer *net.UDPAddr) {
+	defer func() {
+		if v := recover(); v != nil {
+			c.incTrapError("decode_failed")
+			c.Errorf("SNMP trap packet handling panic from %s: %v", peerIP, v)
+		}
+	}()
+
 	decodePeerIP := peerIP
 	rateLimitChecked := false
 	if srcAddr, ok := packetSourceAddr(peerIP, peer); ok {

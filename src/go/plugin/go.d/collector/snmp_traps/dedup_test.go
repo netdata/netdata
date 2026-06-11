@@ -4,7 +4,6 @@ package snmp_traps
 
 import (
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -353,7 +352,7 @@ func TestTrapDeduperSummaryEntry(t *testing.T) {
 	if _, ok := fieldMap["ND_NIDL_NODE"]; ok {
 		t.Fatal("dedup summary unexpectedly emitted ND_NIDL_NODE")
 	}
-	if got := atomic.LoadUint64(&metrics.dedup.suppressed); got != 2 {
+	if got := metrics.dedup.suppressed.Load(); got != 2 {
 		t.Fatalf("dedup suppressed metric = %d, want 2", got)
 	}
 }

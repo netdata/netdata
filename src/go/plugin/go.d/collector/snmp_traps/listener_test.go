@@ -52,7 +52,7 @@ func TestListenerReadLoopCountsUnexpectedReadErrors(t *testing.T) {
 		t.Fatal("read error callback was not called")
 	}
 	require.Eventually(t, func() bool {
-		return atomic.LoadUint64(&metrics.errors.listenerReadFailed) > 0
+		return metrics.errors.listenerReadFailed.Load() > 0
 	}, time.Second, 10*time.Millisecond)
 }
 

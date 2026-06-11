@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"net"
 	"os"
-	"sync/atomic"
 	"testing"
 
 	"github.com/gosnmp/gosnmp"
@@ -220,7 +219,7 @@ func TestV3InformAcceptedWithLocalEngineID(t *testing.T) {
 	c.handlePacket(data, net.ParseIP("10.1.2.3"), nil, &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162})
 
 	m := getJobMetrics(jobName)
-	if v := atomic.LoadUint64(&m.errors.unknownEngineID); v != 0 {
+	if v := m.errors.unknownEngineID.Load(); v != 0 {
 		t.Fatalf("v3 INFORM with local engine ID should be accepted, got unknown_engine_id = %d", v)
 	}
 }
@@ -248,7 +247,7 @@ func TestV3InformRejectedWithNonLocalEngineID(t *testing.T) {
 	c.handlePacket(data, net.ParseIP("10.1.2.3"), nil, &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162})
 
 	m := getJobMetrics(jobName)
-	if v := atomic.LoadUint64(&m.errors.unknownEngineID); v != 1 {
+	if v := m.errors.unknownEngineID.Load(); v != 1 {
 		t.Fatalf("v3 INFORM with non-local engine ID should be rejected, got unknown_engine_id = %d", v)
 	}
 	if len(writer.entries) != 0 {
@@ -282,7 +281,7 @@ func TestV3TrapStillRequiresSenderEngineWhitelist(t *testing.T) {
 	c.handlePacket(data, net.ParseIP("10.1.2.3"), nil, &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162})
 
 	m := getJobMetrics(jobName)
-	if v := atomic.LoadUint64(&m.errors.unknownEngineID); v != 1 {
+	if v := m.errors.unknownEngineID.Load(); v != 1 {
 		t.Fatalf("v3 Trap should be rejected when sender engine ID not in whitelist, got unknown_engine_id = %d", v)
 	}
 }
