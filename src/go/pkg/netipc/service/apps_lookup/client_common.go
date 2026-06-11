@@ -2,6 +2,7 @@ package apps_lookup
 
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/service/internal/transportconfig"
 	raw "github.com/netdata/netdata/go/plugins/pkg/netipc/service/raw"
 )
 
@@ -10,7 +11,9 @@ type Client struct {
 }
 
 func NewClient(runDir, serviceName string, config ClientConfig) *Client {
-	return &Client{inner: raw.NewAppsLookupClient(runDir, serviceName, clientConfigToTransport(config))}
+	inner := raw.NewAppsLookupClient(runDir, serviceName, clientConfigToTransport(config))
+	inner.SetCallTimeout(transportconfig.TypedConfig(config).CallTimeoutMs)
+	return &Client{inner: inner}
 }
 
 func (c *Client) Refresh() bool { return c.inner.Refresh() }
@@ -18,8 +21,14 @@ func (c *Client) Ready() bool   { return c.inner.Ready() }
 func (c *Client) Status() ClientStatus {
 	return c.inner.Status()
 }
+func (c *Client) SetCallTimeout(timeoutMs uint32) { c.inner.SetCallTimeout(timeoutMs) }
+func (c *Client) Abort()                          { c.inner.Abort() }
+func (c *Client) ClearAbort()                     { c.inner.ClearAbort() }
 func (c *Client) Call(pids []uint32) (*protocol.AppsLookupResponseView, error) {
-	return c.inner.CallAppsLookup(pids)
+	return c.CallWithTimeout(pids, 0)
+}
+func (c *Client) CallWithTimeout(pids []uint32, timeoutMs uint32) (*protocol.AppsLookupResponseView, error) {
+	return c.inner.CallAppsLookupWithTimeout(pids, timeoutMs)
 }
 func (c *Client) Close() { c.inner.Close() }
 

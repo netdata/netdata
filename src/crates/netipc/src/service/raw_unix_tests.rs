@@ -11,8 +11,9 @@ use crate::protocol::{
 use std::os::fd::RawFd;
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
+use std::sync::mpsc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const TEST_RUN_DIR: &str = "/tmp/nipc_svc_rust_test";
 const AUTH_TOKEN: u64 = 0xDEADBEEFCAFEBABE;
@@ -163,6 +164,75 @@ fn connect_ready(client: &mut RawClient) {
     }
 
     panic!("client did not reach READY state");
+}
+
+#[test]
+fn test_client_call_timeout_on_wedged_peer() {
+    let svc = unique_service("rs_call_timeout");
+    let mut server =
+        start_raw_session_server(&svc, server_config(), move |_session, _hdr, _payload| {
+            thread::sleep(Duration::from_millis(150));
+            Ok(())
+        });
+
+    let mut client = increment_client(&svc, client_config());
+    connect_ready(&mut client);
+
+    let start = Instant::now();
+    let err = client
+        .call_increment_with_timeout(41, 30)
+        .expect_err("wedged peer should time out");
+    assert_eq!(err, NipcError::Timeout);
+    assert!(
+        start.elapsed() < Duration::from_secs(1),
+        "timeout took too long: {:?}",
+        start.elapsed()
+    );
+
+    client.close();
+    server.wait();
+    cleanup_all(&svc);
+}
+
+#[test]
+fn test_client_abort_unblocks_call() {
+    let svc = unique_service("rs_call_abort");
+    let (entered_tx, entered_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel();
+    let mut server =
+        start_raw_session_server(&svc, server_config(), move |_session, _hdr, _payload| {
+            let _ = entered_tx.send(());
+            let _ = release_rx.recv_timeout(Duration::from_secs(5));
+            Ok(())
+        });
+
+    let mut client = increment_client(&svc, client_config());
+    connect_ready(&mut client);
+    let abort = client.abort_handle();
+
+    let call_thread = thread::spawn(move || {
+        client
+            .call_increment_with_timeout(41, 5_000)
+            .expect_err("aborted call should fail")
+    });
+
+    entered_rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("server handler should receive request");
+
+    let start = Instant::now();
+    abort.abort();
+    let err = call_thread.join().expect("call thread should not panic");
+    assert_eq!(err, NipcError::Aborted);
+    assert!(
+        start.elapsed() < Duration::from_secs(1),
+        "abort took too long: {:?}",
+        start.elapsed()
+    );
+
+    release_tx.send(()).expect("release handler");
+    server.wait();
+    cleanup_all(&svc);
 }
 
 fn fill_test_cgroups_snapshot(builder: &mut CgroupsBuilder<'_>) -> bool {
@@ -1156,7 +1226,10 @@ fn test_server_falls_back_to_baseline_when_linux_shm_prepare_fails() {
 
     let shm_path = format!("{TEST_RUN_DIR}/{svc}-{:016x}.ipcshm", 1u64);
     let _ = std::fs::remove_dir_all(&shm_path);
+    // A non-empty directory cannot be reclaimed by stale recovery, so SHM
+    // prepare keeps failing and the server must fall back to baseline.
     std::fs::create_dir(&shm_path).expect("create SHM obstruction directory");
+    std::fs::write(format!("{shm_path}/keep"), b"x").expect("populate obstruction");
 
     let mut server = TestServer::start_with(
         svc,
@@ -4342,7 +4415,7 @@ fn test_shm_batch_request_item_decode_failure_returns_bad_envelope() {
         .send(&msg)
         .expect("send malformed batch request");
 
-    let (resp_hdr, response) = client.transport_receive().expect("receive response");
+    let (resp_hdr, response) = client.transport_receive(0).expect("receive response");
     assert_eq!(resp_hdr.kind, KIND_RESPONSE);
     assert_eq!(resp_hdr.code, METHOD_INCREMENT);
     assert_eq!(resp_hdr.transport_status, STATUS_BAD_ENVELOPE);

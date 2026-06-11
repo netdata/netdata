@@ -24,6 +24,17 @@ impl RawClient {
         &mut self,
         paths: &[&[u8]],
     ) -> Result<CgroupsLookupResponseView<'_>, NipcError> {
+        self.call_cgroups_lookup_with_timeout(paths, 0)
+    }
+
+    /// Blocking typed call with an explicit timeout in milliseconds.
+    ///
+    /// A zero timeout uses the client's context-level default.
+    pub fn call_cgroups_lookup_with_timeout(
+        &mut self,
+        paths: &[&[u8]],
+        timeout_ms: u32,
+    ) -> Result<CgroupsLookupResponseView<'_>, NipcError> {
         self.validate_method(METHOD_CGROUPS_LOOKUP)?;
 
         let dir_size = paths
@@ -50,8 +61,12 @@ impl RawClient {
             let req_buf = self.request_scratch(req_size);
             protocol::encode_cgroups_lookup_request(paths, req_buf)?
         };
-        let response =
-            self.raw_call_with_retry(METHOD_CGROUPS_LOOKUP, req_len, RawCallKind::single())?;
+        let response = self.raw_call_with_retry_timeout(
+            METHOD_CGROUPS_LOOKUP,
+            req_len,
+            RawCallKind::single(),
+            timeout_ms,
+        )?;
         let view = CgroupsLookupResponseView::decode(self.response_payload(response)?)?;
         if view.item_count != paths.len() as u32 {
             return Err(NipcError::BadItemCount);

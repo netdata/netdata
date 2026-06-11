@@ -10,8 +10,20 @@ ebpf_cgroup_target_t *ebpf_cgroup_pids = NULL;
 _Atomic int send_cgroup_chart = 0;
 
 #ifdef OS_LINUX
+#define EBPF_CGROUP_NETIPC_CALL_TIMEOUT_MS 5000u
+
 static nipc_cgroups_cache_t ebpf_cgroup_cache;
 static bool ebpf_cgroup_cache_initialized = false;
+
+static bool ebpf_cgroup_cache_is_initialized(void)
+{
+    return __atomic_load_n(&ebpf_cgroup_cache_initialized, __ATOMIC_ACQUIRE);
+}
+
+static void ebpf_cgroup_cache_set_initialized(bool initialized)
+{
+    __atomic_store_n(&ebpf_cgroup_cache_initialized, initialized, __ATOMIC_RELEASE);
+}
 
 static const char *ebpf_netipc_client_state_name(nipc_client_state_t state)
 {
@@ -283,7 +295,7 @@ void ebpf_reset_updated_var()
 static void ebpf_cgroup_cache_init(void)
 {
 #ifdef OS_LINUX
-    if (ebpf_cgroup_cache_initialized)
+    if (ebpf_cgroup_cache_is_initialized())
         return;
 
     uint64_t auth = netipc_auth_token();
@@ -292,6 +304,7 @@ static void ebpf_cgroup_cache_init(void)
         .supported_profiles = NIPC_PROFILE_BASELINE | NIPC_PROFILE_SHM_HYBRID | NIPC_PROFILE_SHM_FUTEX,
         .preferred_profiles = NIPC_PROFILE_SHM_FUTEX,
         .auth_token = auth,
+        .call_timeout_ms = EBPF_CGROUP_NETIPC_CALL_TIMEOUT_MS,
     };
 
     nipc_cgroups_cache_init(&ebpf_cgroup_cache,
@@ -299,7 +312,15 @@ static void ebpf_cgroup_cache_init(void)
                              "cgroups-snapshot",
                              &config);
 
-    ebpf_cgroup_cache_initialized = true;
+    ebpf_cgroup_cache_set_initialized(true);
+#endif
+}
+
+void ebpf_cgroup_cache_abort(void)
+{
+#ifdef OS_LINUX
+    if (ebpf_cgroup_cache_is_initialized())
+        nipc_client_abort(&ebpf_cgroup_cache.client);
 #endif
 }
 
@@ -309,9 +330,10 @@ static void ebpf_cgroup_cache_init(void)
 void ebpf_cgroup_cache_cleanup(void)
 {
 #ifdef OS_LINUX
-    if (ebpf_cgroup_cache_initialized) {
+    if (ebpf_cgroup_cache_is_initialized()) {
+        nipc_client_abort(&ebpf_cgroup_cache.client);
         nipc_cgroups_cache_close(&ebpf_cgroup_cache);
-        ebpf_cgroup_cache_initialized = false;
+        ebpf_cgroup_cache_set_initialized(false);
     }
 #endif
 }
@@ -331,7 +353,7 @@ static void ebpf_parse_cgroup_netipc_data(void)
     static int previous_integration_active = -1;
     static int previous_systemd_enabled = -1;
 
-    if (!ebpf_cgroup_cache_initialized)
+    if (!ebpf_cgroup_cache_is_initialized())
         return;
 
     static int refresh_fail_count = 0;
@@ -532,8 +554,11 @@ void ebpf_cgroup_integration(void *ptr __maybe_unused)
         // refresh every NETDATA_EBPF_CGROUP_UPDATE seconds
         if (++counter >= NETDATA_EBPF_CGROUP_UPDATE) {
             counter = 0;
-            if (!ebpf_cgroup_cache_initialized)
+            if (!ebpf_cgroup_cache_is_initialized())
                 ebpf_cgroup_cache_init();
+
+            if (ebpf_plugin_stop())
+                break;
 
             ebpf_parse_cgroup_netipc_data();
         }

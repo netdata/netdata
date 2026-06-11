@@ -23,6 +23,17 @@ impl RawClient {
         &mut self,
         s: &str,
     ) -> Result<protocol::StringReverseView<'_>, NipcError> {
+        self.call_string_reverse_with_timeout(s, 0)
+    }
+
+    /// Blocking typed call with an explicit timeout in milliseconds.
+    ///
+    /// A zero timeout uses the client's context-level default.
+    pub fn call_string_reverse_with_timeout(
+        &mut self,
+        s: &str,
+        timeout_ms: u32,
+    ) -> Result<protocol::StringReverseView<'_>, NipcError> {
         self.validate_method(METHOD_STRING_REVERSE)?;
         let req_size = STRING_REVERSE_HDR_SIZE
             .checked_add(s.len())
@@ -37,8 +48,12 @@ impl RawClient {
             req_len
         };
 
-        let response =
-            self.raw_call_with_retry(METHOD_STRING_REVERSE, req_len, RawCallKind::single())?;
+        let response = self.raw_call_with_retry_timeout(
+            METHOD_STRING_REVERSE,
+            req_len,
+            RawCallKind::single(),
+            timeout_ms,
+        )?;
         string_reverse_decode(self.response_payload(response)?)
     }
 }

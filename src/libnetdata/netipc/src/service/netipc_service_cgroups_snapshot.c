@@ -35,6 +35,7 @@ static nipc_error_t cgroups_snapshot_dispatch(void *user,
 
 typedef struct {
     nipc_cgroups_resp_view_t *view_out;
+    uint32_t timeout_ms;
 } cgroups_snapshot_call_state_t;
 
 static nipc_error_t do_cgroups_snapshot_attempt(nipc_client_ctx_t *ctx,
@@ -52,7 +53,7 @@ static nipc_error_t do_cgroups_snapshot_attempt(nipc_client_ctx_t *ctx,
     size_t payload_len;
     nipc_error_t err = nipc_service_platform_do_raw_call(
         ctx, NIPC_METHOD_CGROUPS_SNAPSHOT, req_buf, req_len,
-        &payload, &payload_len);
+        &payload, &payload_len, s->timeout_ms);
     if (err != NIPC_OK)
         return err;
 
@@ -63,8 +64,17 @@ nipc_error_t nipc_client_call_cgroups_snapshot(
     nipc_client_ctx_t *ctx,
     nipc_cgroups_resp_view_t *view_out)
 {
+    return nipc_client_call_cgroups_snapshot_timeout(ctx, view_out, 0);
+}
+
+nipc_error_t nipc_client_call_cgroups_snapshot_timeout(
+    nipc_client_ctx_t *ctx,
+    nipc_cgroups_resp_view_t *view_out,
+    uint32_t timeout_ms)
+{
     cgroups_snapshot_call_state_t state = {
         .view_out = view_out,
+        .timeout_ms = timeout_ms,
     };
     return nipc_service_platform_call_with_retry(
         ctx, do_cgroups_snapshot_attempt, &state);

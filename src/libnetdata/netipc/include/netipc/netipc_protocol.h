@@ -97,6 +97,8 @@ typedef enum {
     NIPC_ERR_OVERFLOW,        /* builder ran out of space */
     NIPC_ERR_HANDLER_FAILED,  /* typed handler rejected an otherwise valid request */
     NIPC_ERR_NOT_READY,       /* client not connected / service unavailable */
+    NIPC_ERR_TIMEOUT,         /* synchronous call deadline expired */
+    NIPC_ERR_ABORTED,         /* synchronous call aborted by caller */
 } nipc_error_t;
 
 /* ------------------------------------------------------------------ */

@@ -4,6 +4,8 @@ package raw
 
 import (
 	"errors"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
@@ -29,6 +31,11 @@ type Client struct {
 	reconnectCount uint32
 	callCount      uint32
 	errorCount     uint32
+
+	callTimeoutMs  uint32
+	abortRequested atomic.Bool
+	abortMu        sync.Mutex
+	abortCh        chan struct{}
 }
 
 func newClient(runDir, serviceName string, config windows.ClientConfig, expectedMethodCode uint16) *Client {
@@ -38,6 +45,8 @@ func newClient(runDir, serviceName string, config windows.ClientConfig, expected
 		serviceName:        serviceName,
 		expectedMethodCode: expectedMethodCode,
 		config:             config,
+		callTimeoutMs:      ClientCallTimeoutDefaultMs,
+		abortCh:            make(chan struct{}),
 	}
 }
 
@@ -148,30 +157,65 @@ func (c *Client) transportSend(hdr *protocol.Header, payload []byte) error {
 }
 
 func (c *Client) transportReceive() (protocol.Header, []byte, error) {
+	return c.transportReceiveWithControl(c.resolvedCallTimeout(0), c.abortSignal())
+}
+
+func (c *Client) transportReceiveWithControl(timeoutMs uint32, abortCh <-chan struct{}) (protocol.Header, []byte, error) {
 	scratch := ensureClientScratch(&c.transportBuf, c.maxReceiveMessageBytes())
 
 	if c.shm != nil {
-		mlen, err := c.shm.WinShmReceive(scratch, 30000)
-		if err != nil {
-			return protocol.Header{}, nil, protocol.ErrTruncated
-		}
-		if mlen < protocol.HeaderSize {
-			return protocol.Header{}, nil, protocol.ErrTruncated
-		}
+		deadline := time.Now().Add(time.Duration(timeoutMs) * time.Millisecond)
+		for {
+			select {
+			case <-abortCh:
+				return protocol.Header{}, nil, protocol.ErrAborted
+			default:
+			}
 
-		hdr, err := protocol.DecodeHeader(scratch[:mlen])
-		if err != nil {
-			return protocol.Header{}, nil, err
+			if timeoutMs != 0 && !time.Now().Before(deadline) {
+				return protocol.Header{}, nil, protocol.ErrTimeout
+			}
+
+			waitMs := clientAbortPollMs
+			if timeoutMs != 0 {
+				remaining := time.Until(deadline)
+				if remaining <= 0 {
+					return protocol.Header{}, nil, protocol.ErrTimeout
+				}
+				waitMs = boundedClientWaitMs(remaining, waitMs)
+			}
+
+			mlen, err := c.shm.WinShmReceive(scratch, waitMs)
+			if err != nil {
+				if errors.Is(err, windows.ErrWinShmTimeout) {
+					continue
+				}
+				return protocol.Header{}, nil, protocol.ErrTruncated
+			}
+			if mlen < protocol.HeaderSize {
+				return protocol.Header{}, nil, protocol.ErrTruncated
+			}
+
+			hdr, err := protocol.DecodeHeader(scratch[:mlen])
+			if err != nil {
+				return protocol.Header{}, nil, err
+			}
+			return hdr, scratch[protocol.HeaderSize:mlen], nil
 		}
-		return hdr, scratch[protocol.HeaderSize:mlen], nil
 	}
 
 	if c.session == nil {
 		return protocol.Header{}, nil, protocol.ErrTruncated
 	}
 
-	hdr, payload, err := c.session.Receive(scratch)
+	hdr, payload, err := c.session.ReceiveTimeout(scratch, timeoutMs, abortCh)
 	if err != nil {
+		if errors.Is(err, windows.ErrTimeout) {
+			return protocol.Header{}, nil, protocol.ErrTimeout
+		}
+		if errors.Is(err, windows.ErrAborted) {
+			return protocol.Header{}, nil, protocol.ErrAborted
+		}
 		return protocol.Header{}, nil, protocol.ErrTruncated
 	}
 	return hdr, payload, nil

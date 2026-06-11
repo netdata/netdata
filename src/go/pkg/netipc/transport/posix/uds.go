@@ -55,6 +55,8 @@ var (
 	ErrBadParam       = errors.New("invalid argument")
 	ErrDuplicateMsgID = errors.New("duplicate message_id")
 	ErrUnknownMsgID   = errors.New("unknown response message_id")
+	ErrTimeout        = errors.New("receive deadline expired")
+	ErrAborted        = errors.New("receive aborted")
 )
 
 // wrapErr creates a descriptive error wrapping a sentinel.

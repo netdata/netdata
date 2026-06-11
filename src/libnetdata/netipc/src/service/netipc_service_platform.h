@@ -35,7 +35,8 @@ nipc_error_t nipc_service_platform_do_raw_call(
     const void *request_payload,
     size_t request_len,
     const void **response_payload_out,
-    size_t *response_len_out);
+    size_t *response_len_out,
+    uint32_t timeout_ms);
 
 nipc_error_t nipc_service_platform_call_with_retry(
     nipc_client_ctx_t *ctx,

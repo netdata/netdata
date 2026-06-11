@@ -8,6 +8,10 @@ type StringReverseHandler func(string) (string, bool)
 // CallStringReverse performs a blocking STRING_REVERSE call.
 // The returned view is valid until the next typed call on this client.
 func (c *Client) CallStringReverse(requestStr string) (*protocol.StringReverseView, error) {
+	return c.CallStringReverseWithTimeout(requestStr, 0)
+}
+
+func (c *Client) CallStringReverseWithTimeout(requestStr string, timeoutMs uint32) (*protocol.StringReverseView, error) {
 	if err := c.validateMethod(protocol.MethodStringReverse); err != nil {
 		return nil, err
 	}
@@ -20,7 +24,7 @@ func (c *Client) CallStringReverse(requestStr string) (*protocol.StringReverseVi
 			return protocol.ErrTruncated
 		}
 
-		_, payload, rerr := c.doRawCall(protocol.MethodStringReverse, reqBuf)
+		_, payload, rerr := c.doRawCallWithTimeout(protocol.MethodStringReverse, reqBuf, timeoutMs)
 		if rerr != nil {
 			return rerr
 		}

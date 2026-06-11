@@ -23,6 +23,7 @@ type Receiver struct {
 	Recv                func([]byte) (int, error)
 	EnsurePacketScratch func(*[]byte, int) []byte
 	OnRecvError         func(error)
+	PropagateRecvError  func(error) bool
 
 	ErrLimitExceeded func(string) error
 	ErrProtocol      func(string) error
@@ -47,6 +48,7 @@ type SessionReceiveConfig struct {
 	Recv                func([]byte) (int, error)
 	EnsurePacketScratch func(*[]byte, int) []byte
 	IsRecvDisconnect    func(error) bool
+	PropagateRecvError  func(error) bool
 	FailAllInflight     func()
 
 	ErrLimitExceeded func(string) error
@@ -74,6 +76,7 @@ func SessionReceive(config SessionReceiveConfig, buf []byte) (protocol.Header, [
 		PacketBuf:           config.PacketBuf,
 		Recv:                config.Recv,
 		EnsurePacketScratch: config.EnsurePacketScratch,
+		PropagateRecvError:  config.PropagateRecvError,
 		OnRecvError: func(err error) {
 			if config.IsRecvDisconnect(err) {
 				config.FailAllInflight()
@@ -133,8 +136,10 @@ func (r Receiver) Receive(buf []byte) (protocol.Header, []byte, error) {
 func (r Receiver) totalMessageLen(hdr protocol.Header) (int, error) {
 	maxInt := uint64(int(^uint(0) >> 1))
 	totalMsg := uint64(protocol.HeaderSize) + uint64(hdr.PayloadLen)
-	if totalMsg > maxInt {
-		return 0, r.ErrLimitExceeded("total message length exceeds platform limit")
+	// The u32 bound mirrors the C implementation (nipc_uds_header_payload_len):
+	// total_message_len is a u32 wire field, so larger totals are unrepresentable.
+	if totalMsg > uint64(^uint32(0)) || totalMsg > maxInt {
+		return 0, r.ErrLimitExceeded("total message length exceeds protocol limit")
 	}
 	return int(totalMsg), nil
 }
@@ -185,7 +190,10 @@ func (r Receiver) validateBatchPayload(hdr protocol.Header, payload []byte) erro
 	if len(payload) < dirAligned {
 		return r.ErrProtocol("batch dir exceeds payload")
 	}
-	packedAreaLen := uint32(len(payload) - dirAligned)
+	packedAreaLen, ok := checkedU32(len(payload) - dirAligned)
+	if !ok {
+		return r.ErrProtocol("packed area exceeds protocol limit")
+	}
 	if err := protocol.BatchDirValidate(payload[:dirBytes], hdr.ItemCount, packedAreaLen); err != nil {
 		return r.ErrProtocol("batch dir: " + err.Error())
 	}
@@ -209,8 +217,11 @@ func (r Receiver) receiveChunked(
 
 	assembled := firstPayloadBytes
 	chunkPayloadBudget := int(r.PacketSize) - protocol.HeaderSize
-	expectedChunkCount := expectedReceiveChunkCount(
+	expectedChunkCount, ok := expectedReceiveChunkCount(
 		int(hdr.PayloadLen), firstPayloadBytes, chunkPayloadBudget)
+	if !ok {
+		return protocol.Header{}, nil, r.ErrProtocol("chunk count exceeds protocol limit")
+	}
 
 	pktBuf := r.EnsurePacketScratch(r.PacketBuf, int(r.PacketSize))
 	for ci := uint32(1); assembled < int(hdr.PayloadLen); ci++ {
@@ -228,13 +239,13 @@ func (r Receiver) receiveChunked(
 	return hdr, payload, nil
 }
 
-func expectedReceiveChunkCount(payloadLen, firstPayloadBytes, chunkPayloadBudget int) uint32 {
+func expectedReceiveChunkCount(payloadLen, firstPayloadBytes, chunkPayloadBudget int) (uint32, bool) {
 	remainingAfterFirst := payloadLen - firstPayloadBytes
-	expectedContinuations := uint32(0)
+	expectedContinuations := 0
 	if remainingAfterFirst > 0 && chunkPayloadBudget > 0 {
-		expectedContinuations = uint32(1 + ((remainingAfterFirst - 1) / chunkPayloadBudget))
+		expectedContinuations = 1 + ((remainingAfterFirst - 1) / chunkPayloadBudget)
 	}
-	return 1 + expectedContinuations
+	return checkedU32(1 + expectedContinuations)
 }
 
 func (r Receiver) receiveOneChunk(
@@ -248,6 +259,9 @@ func (r Receiver) receiveOneChunk(
 	cn, err := r.Recv(pktBuf)
 	if err != nil {
 		r.noteRecvError(err)
+		if r.PropagateRecvError != nil && r.PropagateRecvError(err) {
+			return err
+		}
 		return r.ErrRecv("continuation recv: " + err.Error())
 	}
 	if cn < protocol.HeaderSize {
@@ -293,7 +307,10 @@ func (r Receiver) validateReceiveChunk(
 	if chk.ChunkCount != expectedChunkCount {
 		return r.ErrChunk("chunk_count mismatch")
 	}
-	if chk.TotalMessageLen != uint32(totalMsg) {
+	// checkedU32 prevents a truncated comparison from falsely matching a
+	// crafted total_message_len when totalMsg exceeds the u32 wire range.
+	totalMsgU32, ok := checkedU32(totalMsg)
+	if !ok || chk.TotalMessageLen != totalMsgU32 {
 		return r.ErrChunk("total_message_len mismatch")
 	}
 	return nil

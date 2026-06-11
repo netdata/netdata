@@ -16,7 +16,11 @@ func HeaderPayloadLen(payloadLen int) (int, uint32, bool) {
 	if totalMsg > uint64(^uint32(0)) || totalMsg > uint64(int(^uint(0)>>1)) {
 		return 0, 0, false
 	}
-	return int(totalMsg), uint32(payloadLen), true
+	payloadU32, ok := checkedU32(payloadLen)
+	if !ok {
+		return 0, 0, false
+	}
+	return int(totalMsg), payloadU32, true
 }
 
 // FillMessageHeader applies the common NetIPC message header fields.
@@ -115,11 +119,18 @@ func (s Sender) Send(hdr *protocol.Header, payload []byte, totalMsg int) error {
 
 	firstChunkPayload := minInt(len(payload), chunkPayloadBudget)
 	remainingAfterFirst := len(payload) - firstChunkPayload
-	continuationChunks := uint32(0)
+	continuationChunks := 0
 	if remainingAfterFirst > 0 {
-		continuationChunks = uint32(1 + ((remainingAfterFirst - 1) / chunkPayloadBudget))
+		continuationChunks = 1 + ((remainingAfterFirst - 1) / chunkPayloadBudget)
 	}
-	chunkCount := 1 + continuationChunks
+	chunkCount, ok := checkedU32(1 + continuationChunks)
+	if !ok {
+		return s.ErrBadParam("chunk count exceeds protocol limit")
+	}
+	totalMsgU32, ok := checkedU32(totalMsg)
+	if !ok {
+		return s.ErrBadParam("total message length exceeds protocol limit")
+	}
 
 	if err := s.SendFirstPacket(hdr, payload[:firstChunkPayload],
 		protocol.HeaderSize+firstChunkPayload); err != nil {
@@ -140,7 +151,7 @@ func (s Sender) Send(hdr *protocol.Header, payload []byte, totalMsg int) error {
 			Version:         protocol.Version,
 			Flags:           0,
 			MessageID:       hdr.MessageID,
-			TotalMessageLen: uint32(totalMsg),
+			TotalMessageLen: totalMsgU32,
 			ChunkIndex:      ci,
 			ChunkCount:      chunkCount,
 			ChunkPayloadLen: chunkLen,
