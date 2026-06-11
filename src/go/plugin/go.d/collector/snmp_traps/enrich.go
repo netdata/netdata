@@ -432,11 +432,11 @@ func enrichTrapEntry(entry *TrapEntry, useReverseDNS bool, dns *reverseDNSResolv
 			}
 		}
 	} else if audit.Interface == nil {
-		audit.Interface = skippedTopologyInterfaceAudit(trapIfIndex, topologyTrusted)
-		audit.Neighbors = skippedTopologyNeighborsAudit(trapIfIndex, topologyTrusted)
+		audit.Interface = skippedTopologyIfIndexAudit(trapIfIndex, topologyTrusted)
+		audit.Neighbors = skippedTopologyIfIndexAudit(trapIfIndex, topologyTrusted)
 	}
 	if audit.Neighbors == nil && entry.TopologyNeighbors == "" {
-		audit.Neighbors = skippedTopologyNeighborsAudit(trapIfIndex, topologyTrusted)
+		audit.Neighbors = skippedTopologyIfIndexAudit(trapIfIndex, topologyTrusted)
 	}
 
 	if useReverseDNS && entry.DeviceHostname == "" {
@@ -578,21 +578,7 @@ func topologyInterfaceAudit(topo *snmptopology.TrapTopologyEnrichment, matched b
 	return audit
 }
 
-func skippedTopologyInterfaceAudit(trapIfIndex string, topologyTrusted bool) *TrapEnrichmentLookup {
-	audit := &TrapEnrichmentLookup{
-		Key:    trapIfIndex,
-		Status: "skipped",
-		Method: "topology_ifindex",
-	}
-	if trapIfIndex == "" {
-		audit.Reason = "missing_trap_ifindex"
-	} else if !topologyTrusted {
-		audit.Reason = "no_exact_topology_device_match"
-	}
-	return audit
-}
-
-func skippedTopologyNeighborsAudit(trapIfIndex string, topologyTrusted bool) *TrapEnrichmentLookup {
+func skippedTopologyIfIndexAudit(trapIfIndex string, topologyTrusted bool) *TrapEnrichmentLookup {
 	audit := &TrapEnrichmentLookup{
 		Key:    trapIfIndex,
 		Status: "skipped",
