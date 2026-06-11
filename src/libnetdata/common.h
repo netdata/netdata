@@ -1089,6 +1089,28 @@ static inline int unsetenv(const char *name) {
     return SetEnvironmentVariableA(name, NULL) ? 0 : -1;
 }
 
+// ── SHUT_* ── POSIX shutdown(2) direction constants, absent from UCRT64 ──────
+// Winsock2 uses SD_RECEIVE/SD_SEND/SD_BOTH with identical numeric values.
+#ifndef SHUT_RDWR
+#  define SHUT_RD   0
+#  define SHUT_WR   1
+#  define SHUT_RDWR 2
+#endif
+
+// ── random() / srandom() ── POSIX PRNG, absent from UCRT64 ───────────────────
+// Map to rand()/srand(); sufficient for stress-test and non-cryptographic use.
+static inline long random(void)          { return (long)rand(); }
+static inline void srandom(unsigned seed) { srand(seed); }
+
+// ── link() ── POSIX hard-link creation, absent from UCRT64 ───────────────────
+// CreateHardLinkA argument order is (newpath, existingpath) — the reverse of link().
+static inline int link(const char *oldpath, const char *newpath) {
+    if (CreateHardLinkA(newpath, oldpath, NULL))
+        return 0;
+    errno = EACCES;
+    return -1;
+}
+
 #endif // OS_WINDOWS
 
 // --------------------------------------------------------------------------------------------------------------------
