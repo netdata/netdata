@@ -21,7 +21,7 @@ Module: /sys/fs/cgroup
 
 ## Overview
 
-Monitor containers and virtual machines resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups.
+Monitor containers and virtual machines resource utilization — CPU, memory, disk I/O, network, and page cache activity — via Linux cgroups.
 
 
 

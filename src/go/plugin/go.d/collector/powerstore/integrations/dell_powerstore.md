@@ -253,6 +253,34 @@ jobs:
 ```
 </details>
 
+###### With virtual node
+
+Associate the PowerStore job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes) so its metrics appear under a separate host in Netdata Cloud.
+
+First, define the vnode in `/etc/netdata/vnodes/vnodes.conf`:
+
+```yaml
+- hostname: my_powerstore
+  guid: <your-uuid-here>
+```
+
+Then reference that hostname in the collector job's `vnode` field. The `vnode` value must match the `hostname` in vnodes.conf exactly (case-sensitive).
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: ps-san
+    url: https://10.0.0.1
+    username: monitor
+    password: monitor123
+    tls_skip_verify: yes
+    vnode: my_powerstore
+
+```
+</details>
+
 
 
 ## Alerts
@@ -528,6 +556,17 @@ automatically re-authenticates on 403, but if you see persistent 403 errors:
 1. Verify the user account still has API access.
 2. Check if the array's security policy has been changed to restrict API access.
 3. Ensure no IP-based access controls are blocking the Netdata Agent host.
+
+
+### Virtual node not found
+
+If the collector reports that a vnode does not exist:
+
+1. Verify the vnode hostname is defined in `/etc/netdata/vnodes/vnodes.conf`.
+2. Ensure the `vnode` field in the collector job exactly matches the `hostname`
+   in vnodes.conf — the match is case-sensitive.
+3. Confirm the vnodes.conf file uses valid YAML format with correct `guid` values
+   (a valid UUID string).
 
 
 
