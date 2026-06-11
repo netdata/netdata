@@ -2474,11 +2474,11 @@ func loadPENs(opts generatorOptions) (map[string]string, error) {
 
 func defaultPENFilePath() string {
 	if dir := strings.TrimSpace(buildinfo.StockConfigDir); dir != "" {
-		return filepath.Join(dir, "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt")
+		return filepath.Join(dir, "go.d", "snmp.profiles", "metadata", "iana-enterprise-numbers.txt")
 	}
 	for _, candidate := range []string{
-		"plugin/go.d/config/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt",
-		"src/go/plugin/go.d/config/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt",
+		"plugin/go.d/config/go.d/snmp.profiles/metadata/iana-enterprise-numbers.txt",
+		"src/go/plugin/go.d/config/go.d/snmp.profiles/metadata/iana-enterprise-numbers.txt",
 		"iana-enterprise-numbers.txt",
 	} {
 		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {

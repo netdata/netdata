@@ -4378,6 +4378,9 @@ if(ENABLE_PLUGIN_GO)
     install(FILES ${GO_SNMP_META_FILES}
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata)
+    install(FILES src/go/plugin/go.d/config/go.d/snmp.profiles/metadata/iana-enterprise-numbers.txt
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata)
 
     install(DIRECTORY
             COMPONENT plugin-go
@@ -4435,9 +4438,6 @@ if(ENABLE_PLUGIN_GO)
                 PATTERN "*.yaml.zst"
                 PATTERN "*.yml.zst")
     install(FILES "${SNMP_TRAP_PROFILE_PACK_DIR}/catalogue.json.zst"
-            COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
-    install(FILES src/go/plugin/go.d/config/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
     install(FILES src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md

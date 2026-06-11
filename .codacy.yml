@@ -19,6 +19,6 @@ exclude_paths:
   - src/go/pkg/l2topology/parity/evidence/**
   - src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/**
   - src/go/plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json
-  - src/go/plugin/go.d/config/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt
+  - src/go/plugin/go.d/config/go.d/snmp.profiles/metadata/iana-enterprise-numbers.txt
   - .agents/**
   - docs/netdata-ai/skills/**

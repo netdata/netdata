@@ -404,7 +404,7 @@ func TestDefaultPENFilePathUsesStockConfigDir(t *testing.T) {
 	})
 	buildinfo.StockConfigDir = "/usr/lib/netdata/conf.d"
 
-	want := filepath.Join("/usr/lib/netdata/conf.d", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt")
+	want := filepath.Join("/usr/lib/netdata/conf.d", "go.d", "snmp.profiles", "metadata", "iana-enterprise-numbers.txt")
 	if got := defaultPENFilePath(); got != want {
 		t.Fatalf("defaultPENFilePath() = %q, want %q", got, want)
 	}

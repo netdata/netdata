@@ -137,7 +137,11 @@ func updateMetadata(si *SysInfo) {
 		}
 	}
 
-	si.Organization = valueSanitizer.Replace(rawOrg)
+	if org := valueSanitizer.Replace(rawOrg); org != "" {
+		si.Organization = org
+	} else if si.Organization == "" {
+		si.Organization = "Unknown"
+	}
 	si.Category = finalCategory
 	si.Model = finalModel
 	si.Vendor = finalVendor
@@ -206,24 +210,24 @@ func enterpriseNumbersFilePath() string {
 		return path
 	}
 	if dir := strings.TrimSpace(pluginconfig.CollectorsStockDir()); dir != "" {
-		return filepath.Join(dir, "snmp.trap-profiles", "iana-enterprise-numbers.txt")
+		return filepath.Join(dir, "snmp.profiles", "metadata", "iana-enterprise-numbers.txt")
 	}
 	for _, candidate := range enterpriseNumbersFileCandidates() {
 		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
 			return candidate
 		}
 	}
-	return filepath.Join("/usr/lib/netdata/conf.d", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt")
+	return filepath.Join("/usr/lib/netdata/conf.d", "go.d", "snmp.profiles", "metadata", "iana-enterprise-numbers.txt")
 }
 
 func enterpriseNumbersFileCandidates() []string {
 	candidates := []string{
-		filepath.Join("..", "..", "config", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt"),
-		filepath.Join("plugin", "go.d", "config", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt"),
-		filepath.Join("src", "go", "plugin", "go.d", "config", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt"),
+		filepath.Join("..", "..", "config", "go.d", "snmp.profiles", "metadata", "iana-enterprise-numbers.txt"),
+		filepath.Join("plugin", "go.d", "config", "go.d", "snmp.profiles", "metadata", "iana-enterprise-numbers.txt"),
+		filepath.Join("src", "go", "plugin", "go.d", "config", "go.d", "snmp.profiles", "metadata", "iana-enterprise-numbers.txt"),
 	}
 	if _, file, _, ok := runtime.Caller(0); ok {
-		sourceCandidate := filepath.Join(filepath.Dir(file), "..", "..", "config", "go.d", "snmp.trap-profiles", "iana-enterprise-numbers.txt")
+		sourceCandidate := filepath.Join(filepath.Dir(file), "..", "..", "config", "go.d", "snmp.profiles", "metadata", "iana-enterprise-numbers.txt")
 		candidates = append([]string{sourceCandidate}, candidates...)
 	}
 	return candidates

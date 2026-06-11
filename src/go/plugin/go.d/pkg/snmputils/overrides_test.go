@@ -71,6 +71,7 @@ func TestPenToVendorMappingDoesNotRequireRegistry(t *testing.T) {
 	updateMetadata(si)
 
 	assert.Equal(t, "CanonicalVendor", si.Vendor, "vendor mapping via pen_to_vendor failed")
+	assert.Equal(t, "Unknown", si.Organization)
 }
 
 func TestPenToVendorMappingTakesPrecedenceOverOrgToVendor(t *testing.T) {
@@ -175,7 +176,7 @@ func TestEnterpriseNumbersFilePathFindsSourceTreeRegistry(t *testing.T) {
 	path := enterpriseNumbersFilePath()
 
 	require.FileExists(t, path)
-	assert.Contains(t, filepath.ToSlash(path), "plugin/go.d/config/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt")
+	assert.Contains(t, filepath.ToSlash(path), "plugin/go.d/config/go.d/snmp.profiles/metadata/iana-enterprise-numbers.txt")
 }
 
 func TestLookupEnterpriseNumberMissingRegistryReturnsEmpty(t *testing.T) {

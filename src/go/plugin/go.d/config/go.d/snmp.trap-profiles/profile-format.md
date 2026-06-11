@@ -406,7 +406,7 @@ offline:
 ```
 
 By default the helper reads the bundled IANA PEN snapshot from
-`/usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt`.
+`/usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata/iana-enterprise-numbers.txt`.
 Pass `--refresh-pen` to fetch the current IANA registry before emission.
 The run also writes review artifacts under `--out-dir`: `traps.jsonl`,
 `extraction-report.json`, `conflicts.json` for duplicate trap OIDs, and
