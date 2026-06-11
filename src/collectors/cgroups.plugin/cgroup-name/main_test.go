@@ -227,3 +227,59 @@ func TestK8sContainerCachePath(t *testing.T) {
 		t.Fatalf("stdout:\nwant %q\n got %q", want, out.String())
 	}
 }
+
+func TestMachineNameMatchesShellSedSemantics(t *testing.T) {
+	// the shell stripped the libvirt id segment with a non-global sed
+	// expression; digits after LATER x2d markers belong to the machine name
+	tests := map[string]struct {
+		input  string
+		marker string
+		want   string
+	}{
+		"shell documented qemu example": {
+			input:  "machine.slice_machine-qemu_x2d1_x2dopnsense.scope",
+			marker: "-qemu",
+			want:   "opnsense",
+		},
+		"digits after later markers survive": {
+			input:  "machine.slice_machine-qemu_x2d2_x2dweb_x2d02.scope",
+			marker: "-qemu",
+			want:   "web02",
+		},
+		"similarly named machines stay distinct": {
+			input:  "machine.slice_machine-qemu_x2d1_x2dweb_x2d01.scope",
+			marker: "-qemu",
+			want:   "web01",
+		},
+		"shell documented nested lxc example": {
+			input:  "machine.slice_machine-lxc/x2d969/x2dhubud0xians01.scope/libvirt_init.scope",
+			marker: "-lxc",
+			want:   "hubud0xians01/libvirt_init",
+		},
+		"plain lxc machine": {
+			input:  "machine.slice_machine-lxc/x2d969/x2dhubud0xians01.scope",
+			marker: "-lxc",
+			want:   "hubud0xians01",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := machineName(tc.input, tc.marker); got != tc.want {
+				t.Fatalf("machineName(%q, %q) = %q, want %q", tc.input, tc.marker, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestHostPathKeepsAbsolutePathsWithEmptyPrefix(t *testing.T) {
+	t.Setenv("NETDATA_HOST_PREFIX", "")
+	if got := hostPath("/etc/pve"); got != "/etc/pve" {
+		t.Fatalf("hostPath with empty prefix = %q, want /etc/pve", got)
+	}
+
+	t.Setenv("NETDATA_HOST_PREFIX", "/host")
+	if got := hostPath("/etc/pve"); got != "/host/etc/pve" {
+		t.Fatalf("hostPath with /host prefix = %q, want /host/etc/pve", got)
+	}
+}

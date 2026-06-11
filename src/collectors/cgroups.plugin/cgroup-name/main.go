@@ -234,17 +234,17 @@ func (r *resolver) dispatchNonK8s(cgroup string) {
 		name = strings.TrimSuffix(name, ".libvirt-qemu")
 		name = strings.Replace(name, "-", "_", 1)
 		r.name = "qemu_" + name
-	case reProxmoxQemu.MatchString(cgroup) && isDir(filepath.Join(os.Getenv("NETDATA_HOST_PREFIX"), "etc/pve")):
+	case reProxmoxQemu.MatchString(cgroup) && isDir(hostPath("/etc/pve")):
 		m := reProxmoxQemu.FindStringSubmatch(cgroup)
-		filename := filepath.Join(os.Getenv("NETDATA_HOST_PREFIX"), "etc/pve/qemu-server", m[1]+".conf")
+		filename := hostPath("/etc/pve/qemu-server/" + m[1] + ".conf")
 		if fileReadable(filename) {
 			r.name = "qemu_" + firstConfigValue(filename, regexp.MustCompile(`\s*name\s*:\s*(.*)?$`), "^name: ")
 		} else {
 			r.error(fmt.Sprintf("proxmox config file missing %s or netdata does not have read access.  Please ensure netdata is a member of www-data group.", filename))
 		}
-	case reProxmoxLXC.MatchString(cgroup) && isDir(filepath.Join(os.Getenv("NETDATA_HOST_PREFIX"), "etc/pve")):
+	case reProxmoxLXC.MatchString(cgroup) && isDir(hostPath("/etc/pve")):
 		m := reProxmoxLXC.FindStringSubmatch(cgroup)
-		filename := filepath.Join(os.Getenv("NETDATA_HOST_PREFIX"), "etc/pve/lxc", m[1]+".conf")
+		filename := hostPath("/etc/pve/lxc/" + m[1] + ".conf")
 		if fileReadable(filename) {
 			r.name = firstConfigValue(filename, regexp.MustCompile(`\s*hostname\s*:\s*(.*)?$`), "^hostname: ")
 		} else {
@@ -272,12 +272,22 @@ func lxcMachineName(s string) string {
 	return name
 }
 
+var reMachineIDSegment = regexp.MustCompile(`[\/_]x2d[[:digit:]]*`)
+
+// machineName mirrors the shell's sed pipeline: strip everything up to the
+// marker, remove only the FIRST `[\/_]x2dNNN` segment (the libvirt machine id;
+// the shell expression had no /g), then drop the remaining x2d markers keeping
+// the bytes after them, then drop ".scope". A global digit strip would eat
+// digits belonging to the machine name itself, collapsing names like web-01
+// and web-02 both to "web".
 func machineName(s, marker string) string {
 	i := strings.LastIndex(s, marker)
 	if i >= 0 {
 		s = s[i+len(marker):]
 	}
-	s = regexp.MustCompile(`[\/_]x2d[[:digit:]]*`).ReplaceAllString(s, "")
+	if loc := reMachineIDSegment.FindStringIndex(s); loc != nil {
+		s = s[:loc[0]] + s[loc[1]:]
+	}
 	s = strings.ReplaceAll(s, "/x2d", "")
 	s = strings.ReplaceAll(s, "_x2d", "")
 	s = strings.ReplaceAll(s, ".scope", "")
@@ -636,9 +646,16 @@ func argOrEmpty(args []string, idx int) string {
 	return ""
 }
 
+// hostPath joins NETDATA_HOST_PREFIX with an absolute host path using string
+// concatenation, like the shell helper did: with an empty prefix the result
+// must stay absolute, while filepath.Join("", "etc/pve") would yield a
+// relative path resolved against the helper's working directory.
+func hostPath(path string) string {
+	return os.Getenv("NETDATA_HOST_PREFIX") + path
+}
+
 func (r *resolver) k8sIsPauseContainer(cgroupPath string) bool {
-	prefix := os.Getenv("NETDATA_HOST_PREFIX")
-	base := filepath.Join(prefix, "sys/fs/cgroup")
+	base := hostPath("/sys/fs/cgroup")
 	file := filepath.Join(base, cgroupPath, "cgroup.procs")
 	if isDir(filepath.Join(base, "cpuacct")) {
 		file = filepath.Join(base, "cpuacct", cgroupPath, "cgroup.procs")
