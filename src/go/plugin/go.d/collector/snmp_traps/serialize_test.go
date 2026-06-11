@@ -81,6 +81,8 @@ func TestSerializeToJournalFields(t *testing.T) {
 	assertField(t, fieldMap, "TRAP_DEVICE_VENDOR", "cisco")
 	assertField(t, fieldMap, "TRAP_TAG_INTERFACE", "eth0")
 	assertField(t, fieldMap, "TRAP_TAG_VLAN", "10")
+	assertField(t, fieldMap, "TRAP_VAR_IFINDEX", "1")
+	assertField(t, fieldMap, "TRAP_VAR_IFDESCR", "eth0")
 
 	if fieldMap["TRAP_JSON"] == "" {
 		t.Fatal("TRAP_JSON is empty")
@@ -88,7 +90,7 @@ func TestSerializeToJournalFields(t *testing.T) {
 	if fieldMap["TRAP_ENRICHMENT"] == "" {
 		t.Fatal("TRAP_ENRICHMENT is empty")
 	}
-	assertFieldOrder(t, journalFieldNames(fields), "TRAP_TAG_VLAN", "TRAP_ENRICHMENT", "TRAP_JSON")
+	assertFieldOrder(t, journalFieldNames(fields), "TRAP_TAG_VLAN", "TRAP_VAR_IFINDEX", "TRAP_ENRICHMENT", "TRAP_JSON")
 }
 
 func TestJournalSerializersAppendLargeJSONFieldsLast(t *testing.T) {
@@ -115,14 +117,14 @@ func TestJournalSerializersAppendLargeJSONFieldsLast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("serializeToJournalFields: %v", err)
 	}
-	assertFieldOrder(t, journalFieldNames(fields), "TRAP_TAG_SITE", "TRAP_ENRICHMENT", "TRAP_JSON")
+	assertFieldOrder(t, journalFieldNames(fields), "TRAP_TAG_SITE", "TRAP_VAR_IFINDEX", "TRAP_ENRICHMENT", "TRAP_JSON")
 
 	var s journalHotSerializer
 	payloads, _, err := s.serialize(entry)
 	if err != nil {
 		t.Fatalf("journalHotSerializer.serialize: %v", err)
 	}
-	assertFieldOrder(t, payloadFieldNames(payloads), "TRAP_TAG_SITE", "TRAP_ENRICHMENT", "TRAP_JSON")
+	assertFieldOrder(t, payloadFieldNames(payloads), "TRAP_TAG_SITE", "TRAP_VAR_IFINDEX", "TRAP_ENRICHMENT", "TRAP_JSON")
 }
 
 func TestSerializeToJournalFieldsNoHostname(t *testing.T) {
@@ -464,6 +466,76 @@ func TestSerializeToJournalFieldsTRAPJSONOmitsCommunityVarbind(t *testing.T) {
 	if _, ok := obj["ifIndex"]; !ok {
 		t.Fatal("TRAP_JSON dropped non-sensitive varbind")
 	}
+}
+
+func TestSerializeToJournalFieldsTrapVarbindJournalFields(t *testing.T) {
+	entry := &TrapEntry{
+		JobName:               "local",
+		ReportType:            ReportTypeTrap,
+		ReceivedRealtimeUsec:  1000000,
+		ReceivedMonotonicUsec: 1000,
+		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
+		Message:               "test",
+		SourceIP:              "10.0.0.1",
+		PduType:               PduTypeTrap,
+		SnmpVersion:           SnmpVersionV1,
+		Varbinds: []VarbindValue{
+			{OID: sysUpTimeOID, Name: "sysUpTime.0", Type: "TimeTicks", Value: uint64(129665677)},
+			{OID: snmpTrapOIDOID, Name: "snmpTrapOID.0", Type: "ObjectIdentifier", Value: "1.3.6.1.6.3.1.1.5.3"},
+			{OID: snmpTrapAddressOID, Name: "snmpTrapAddress.0", Type: "IPAddress", Value: "0.0.0.0"},
+			{OID: snmpTrapEnterpriseOID, Name: "snmpTrapEnterprise.0", Type: "ObjectIdentifier", Value: "1.3.6.1.6.3.1.1.5.3"},
+			{OID: snmpTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
+			{OID: "1.3.6.1.2.1.2.2.1.7.29", Name: "ifAdminStatus", Type: "INTEGER", Value: int64(1), Enum: "up"},
+			{OID: "1.3.6.1.2.1.2.2.1.1.29", Name: "ifIndex", Type: "InterfaceIndex", Value: int64(29)},
+			{OID: "1.3.6.1.2.1.2.2.1.8.29", Name: "ifOperStatus", Type: "INTEGER", Value: int64(2), Enum: "down"},
+		},
+	}
+
+	fields, err := serializeToJournalFields(entry)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fieldMap := fieldsToMap(fields)
+
+	assertField(t, fieldMap, "TRAP_VAR_IFADMINSTATUS", "up")
+	assertField(t, fieldMap, "TRAP_VAR_IFADMINSTATUS_RAW", "1")
+	assertField(t, fieldMap, "TRAP_VAR_IFINDEX", "29")
+	assertField(t, fieldMap, "TRAP_VAR_IFOPERSTATUS", "down")
+	assertField(t, fieldMap, "TRAP_VAR_IFOPERSTATUS_RAW", "2")
+	assertFieldAbsent(t, fieldMap, "TRAP_VAR_SYSUPTIME_0")
+	assertFieldAbsent(t, fieldMap, "TRAP_VAR_SNMPTRAPOID_0")
+	assertFieldAbsent(t, fieldMap, "TRAP_VAR_SNMPTRAPADDRESS_0")
+	assertFieldAbsent(t, fieldMap, "TRAP_VAR_SNMPTRAPENTERPRISE_0")
+	assertFieldAbsent(t, fieldMap, "TRAP_VAR_SNMPTRAPCOMMUNITY_0")
+}
+
+func TestSerializeToJournalFieldsTrapVarbindJournalFieldNames(t *testing.T) {
+	entry := &TrapEntry{
+		JobName:               "local",
+		ReportType:            ReportTypeTrap,
+		ReceivedRealtimeUsec:  1000000,
+		ReceivedMonotonicUsec: 1000,
+		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
+		Message:               "test",
+		SourceIP:              "10.0.0.1",
+		PduType:               PduTypeTrap,
+		SnmpVersion:           SnmpVersionV2c,
+		Varbinds: []VarbindValue{
+			{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
+			{OID: "1.3.6.1.2.1.2.2.1.2", Name: "ifIndex", Type: "INTEGER", Value: int64(2)},
+			{OID: "1.3.6.1.4.1.999.1", Type: "OctetString", Value: "raw-oid-name"},
+		},
+	}
+
+	fields, err := serializeToJournalFields(entry)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fieldMap := fieldsToMap(fields)
+
+	assertField(t, fieldMap, "TRAP_VAR_IFINDEX", "1")
+	assertField(t, fieldMap, "TRAP_VAR_IFINDEX_2", "2")
+	assertField(t, fieldMap, "TRAP_VAR_OID_1_3_6_1_4_1_999_1", "raw-oid-name")
 }
 
 func TestSerializeToJournalFieldsTRAPJSONUsesProfileNamesForTabularVarbindInstances(t *testing.T) {

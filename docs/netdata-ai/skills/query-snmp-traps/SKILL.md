@@ -1,6 +1,6 @@
 ---
 name: query-snmp-traps
-description: Query SNMP trap logs through Netdata Cloud or directly from a Netdata Agent. Use when the user asks about SNMP traps, trap journal entries, trap severities, trap categories, trap senders, deduplication summaries, decode errors, TRAP_* fields, TRAP_JSON varbind searches, or how to inspect received traps in the Logs UI/API.
+description: Query SNMP trap logs through Netdata Cloud or directly from a Netdata Agent. Use when the user asks about SNMP traps, trap journal entries, trap severities, trap categories, trap senders, deduplication summaries, decode errors, TRAP_* fields, TRAP_VAR_* indexed varbind fields, TRAP_JSON varbind audit data, or how to inspect received traps in the Logs UI/API.
 ---
 
 # Query SNMP traps
@@ -25,7 +25,7 @@ Log Function request shape from
 | Critical and emergency traps across a room | [how-tos/filter-by-severity-across-fleet.md](./how-tos/filter-by-severity-across-fleet.md) |
 | Top trap senders in the last hour | [how-tos/top-trap-senders-last-hour.md](./how-tos/top-trap-senders-last-hour.md) |
 | Dedup summaries during a flap storm | [how-tos/inspect-dedup-summary-entries.md](./how-tos/inspect-dedup-summary-entries.md) |
-| Search varbind content in `TRAP_JSON` | [how-tos/search-varbind-value-in-trap-json.md](./how-tos/search-varbind-value-in-trap-json.md) |
+| Filter by indexed varbind fields; inspect `TRAP_JSON` when needed | [how-tos/search-varbind-value-in-trap-json.md](./how-tos/search-varbind-value-in-trap-json.md) |
 | Convert custom MIBs into trap profiles | [how-tos/convert-custom-mibs-to-trap-profiles.md](./how-tos/convert-custom-mibs-to-trap-profiles.md) |
 | Operational how-tos catalog | [how-tos/INDEX.md](./how-tos/INDEX.md) |
 
@@ -83,8 +83,9 @@ The collector writes structured fields that are useful for queries:
 | `TRAP_INTERFACE` | Topology interface when enrichment is available |
 | `TRAP_NEIGHBORS` | Topology neighbors when enrichment is available |
 | `TRAP_TAG_*` | Profile/operator labels, selectable but not default facets |
+| `TRAP_VAR_*` | Indexed decoded event varbind fields. Enum-backed varbinds use the enum label, with `_RAW` carrying the numeric value. Sensitive and redundant protocol-control varbinds are skipped. |
 | `TRAP_ENRICHMENT` | JSON audit trail for source selection and enrichment decisions; search carefully, avoid faceting on it |
-| `TRAP_JSON` | Structured varbind payload, including `netdata_packet_sequence`; search carefully, avoid faceting on it |
+| `TRAP_JSON` | Structured varbind payload and audit copy, including `netdata_packet_sequence`; prefer `TRAP_VAR_*` for normal filtering |
 | `TRAP_SUPPRESSED_COUNT` | Dedup summary only |
 | `TRAP_SUPPRESSED_FINGERPRINTS` | Dedup summary only |
 | `TRAP_REPORT_PERIOD_SEC` | Dedup summary only |

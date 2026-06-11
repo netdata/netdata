@@ -40,5 +40,5 @@ full trap payloads in durable artifacts.
 - [Filter by severity across a room](./filter-by-severity-across-fleet.md)
 - [Top trap senders in the last hour](./top-trap-senders-last-hour.md)
 - [Inspect dedup summary entries during a flap storm](./inspect-dedup-summary-entries.md)
-- [Search a varbind value in `TRAP_JSON`](./search-varbind-value-in-trap-json.md)
+- [Filter an indexed varbind field and inspect `TRAP_JSON`](./search-varbind-value-in-trap-json.md)
 - [Convert custom MIBs into trap profiles](./convert-custom-mibs-to-trap-profiles.md)

@@ -84,7 +84,7 @@ Cardinality discipline applies **only** to metric labels and dimensions. The jou
 | Surface | Cardinality rule | Why |
 |---|---|---|
 | Description template → `MESSAGE` field | **No restriction** — use any varbind | MESSAGE is per-row free-form text. 10k distinct MAC values = 10k journal entries with different MESSAGEs. That's normal journal behavior; it is **the** place high-cardinality detail belongs. |
-| Varbind capture → `TRAP_JSON` field | **No restriction** — all varbinds always | Single structured field; per-row JSON. No per-OID journal-field-name pollution. |
+| Varbind capture → `TRAP_VAR_*` fields and `TRAP_JSON` | **No restriction** for non-sensitive event data | `TRAP_VAR_*` gives indexed journal filtering. `TRAP_JSON` remains the full audit/debug copy with OID/type/value provenance. |
 | Label template → metric labels | **Bounded cardinality only** | Labels propagate to time-series storage. 10k distinct label values = 10k time-series = cardinality explosion. |
 | Profile dimension declaration → metric dimensions | **Bounded enum only** | Same reasoning. |
 
@@ -104,7 +104,7 @@ Cardinality discipline applies **only** to metric labels and dimensions. The jou
 - RAID array element ID
 - Any per-event identifier
 
-The forensic question "which MAC violated port-security on switch X today" is a journal query (Logs UI), not an alert. The metric "port-security violations on switch X" fires the alert; the operator clicks through to the journal — where the MAC is in the templated MESSAGE field and in the `TRAP_JSON` structured varbind payload.
+The forensic question "which MAC violated port-security on switch X today" is a journal query (Logs UI), not an alert. The metric "port-security violations on switch X" fires the alert; the operator clicks through to the journal — where the MAC is in the templated MESSAGE field, an indexed `TRAP_VAR_*` field, and the `TRAP_JSON` structured varbind payload.
 
 Plugin enforces this structurally: label templates with unbounded-cardinality varbind references are **rejected at config-load** with a clear error. Description templates have no such check.
 
@@ -249,7 +249,7 @@ Reception is **per-job** (§5). Each listener (job) opens all configured endpoin
 
 ## 7. Profile YAML — vendor knowledge only
 
-Profile YAML defines vendor-curated knowledge ONLY. It does NOT define journal field names (the journal always captures all varbinds — see §11), and it does NOT define metric emission (that lives in plugin configuration — see §7.5).
+Profile YAML defines vendor-curated knowledge ONLY. It does NOT define journal field names manually (the plugin derives indexed `TRAP_VAR_*` fields from received non-sensitive, non-redundant event varbinds and keeps the audit copy in `TRAP_JSON` — see §11), and it does NOT define metric emission (that lives in plugin configuration — see §7.5).
 
 The authoritative profile schema is `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md` (shipped with the OOB pack). The example below is illustrative of the schema; the schema doc is the ground truth.
 
@@ -333,7 +333,7 @@ The plugin resolves each varbind in the PDU in this order:
    shipped OOB pack covers 437 vendor PENs / 71,787 traps with file-scoped
    varbind metadata — operators get rich decoding for top vendors without
    installing any MIB file.
-2. **Raw fallback** — varbind not in any loaded profile. Render as OID-keyed entry with the ASN.1-decoded type only. The varbind still lands in `TRAP_JSON` (§11) with its OID and value; just without a symbolic name.
+2. **Raw fallback** — varbind not in any loaded profile. Render as OID-keyed entry with the ASN.1-decoded type only. The varbind still lands in `TRAP_JSON` (§11) with its OID and value; if it is not sensitive or a protocol-control duplicate, it also lands in an indexed `TRAP_VAR_OID_<NUMERIC_OID>` field.
 
 There is **no runtime MIB compilation tier**. The plugin does not parse SMIv1/v2 MIB files at runtime; there is no `pysmi`/`gosmi`/Rust-MIB-crate dependency. Operators who need coverage for a vendor MIB not in the shipped OOB pack convert their MIB files to profile YAMLs **offline** using the shipped helper `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` and drop the resulting YAML into `/etc/netdata/go.d/snmp.trap-profiles/` (per the SNMP polling plugin pattern — see §15 and the user-facing documentation shipped with the plugin).
 
@@ -370,11 +370,11 @@ Templates are compiled and validated at profile-load. Runtime rendering uses the
 pre-validated template with per-trap functions. MESSAGE capped at 512 bytes
 (post-substitution); truncated with ASCII `...` marker if exceeded. The
 512-byte cap includes the marker bytes. Full forensic data remains in
-`TRAP_JSON`.
+`TRAP_VAR_*` fields and `TRAP_JSON`.
 
 ### No `journal_fields:` list, no `metric:` block
 
-The journal captures every varbind always (§11). The plugin emits its own self-metrics always (§12). Operator-defined per-OID metrics are configured separately (§7.5).
+The journal captures every non-sensitive event varbind as an indexed `TRAP_VAR_*` field and keeps the structured audit copy in `TRAP_JSON` (§11). The plugin emits its own self-metrics always (§12). Operator-defined per-OID metrics are configured separately (§7.5).
 
 ### Profile loading — lazy shared cache, multipath, filename-dedup, field-merge on extends-chain
 
@@ -777,8 +777,9 @@ in the Go profile generator + `profile-format.md`):
 | `ND_LOG_SOURCE`, `ND_NIDL_NODE` | Existing Netdata fields the plugin populates for correlation with metrics + logs | Plugin via Netdata state |
 | `TRAP_*` (closed reserved set) | Plugin-controlled trap-content fields (OID, name, category, severity, …) present on every entry | Plugin |
 | `TRAP_TAG_*` | Labels — from profile `labels:` (vendor-curated) AND from operator per-job `labels:` config | Profile or operator config (rendered by the plugin from templates) |
+| `TRAP_VAR_*` | Decoded, non-sensitive event varbind values for indexed journal filtering | Plugin from received PDU varbinds |
 
-The plugin's reserved `TRAP_*` field set is the closed list documented later in this section. The `TRAP_TAG_*` namespace is dedicated to all labels regardless of source — separating labels from plugin-controlled fields removes any possibility of profile-label or operator-label collisions with plugin field names (now or in any future plugin release). The variable per-trap data (varbinds) lives in a single well-known JSON-valued field (`TRAP_JSON`), not in dynamically-named per-OID fields, keeping the journal's field universe stable; `journalctl --fields` does not grow unboundedly with each new vendor MIB.
+The plugin's reserved `TRAP_*` field set is the closed list documented later in this section. The `TRAP_TAG_*` namespace is dedicated to all labels regardless of source — separating labels from plugin-controlled fields removes any possibility of profile-label or operator-label collisions with plugin field names (now or in any future plugin release). The variable per-trap data (varbinds) is intentionally exposed twice: `TRAP_VAR_*` gives indexed journal filtering, while `TRAP_JSON` keeps the full audit/debug copy with OID/type/value provenance.
 
 **Closed reserved `TRAP_*` field set** (operators cannot use `TRAP_TAG_*` keys that uppercase to any of these — but since labels are namespaced under `TRAP_TAG_*`, collision is structurally impossible):
 
@@ -808,6 +809,15 @@ TRAP_LISTENER             Decode-error entries only; listener endpoint when know
 TRAP_ENGINE_ID            Decode-error entries only; SNMPv3 engine ID when safely extractable
 ```
 
+`TRAP_VAR_*` is a dynamic sub-namespace, not a profile-authored field list.
+The plugin derives names from received symbolic varbind names when known
+(`ifOperStatus` → `TRAP_VAR_IFOPERSTATUS`) or from the numeric OID otherwise
+(`TRAP_VAR_OID_1_3_6_1_4_1_999_1`). Enum-backed values write the enum label to
+the main field and the numeric value to `<FIELD>_RAW`. Protocol/control
+varbinds that duplicate first-class fields (`sysUpTime.0`, `snmpTrapOID.0`,
+`snmpTrapAddress.0`, `snmpTrapEnterprise.0`) are retained in `TRAP_JSON` but
+not emitted as `TRAP_VAR_*`; the sensitive SNMP community varbind is omitted.
+
 Real trap entries use `trap`; deduplication summary entries use `deduplication_summary`; accepted-source decode failures use `decode_error`.
 
 ### Real trap entry (full example)
@@ -835,6 +845,10 @@ TRAP_TAG_INTERFACE=GigabitEthernet0/1
 TRAP_TAG_VLAN=10
 TRAP_TAG_COMPLIANCE=pci
 TRAP_TAG_TENANT=acme
+TRAP_VAR_CPSIFVIOLATIONMACADDRESS=aa:bb:cc:dd:ee:ff
+TRAP_VAR_CPSIFVIOLATIONVLAN=10
+TRAP_VAR_IFINDEX=12
+TRAP_VAR_IFDESCR=GigabitEthernet0/1
 TRAP_JSON={"cpsIfViolationMacAddress":{"oid":"1.3.6.1.4.1.9.9.315.1.2.1.1.1","type":"OctetString","value":"aa:bb:cc:dd:ee:ff"},"cpsIfViolationVlan":{"oid":"1.3.6.1.4.1.9.9.315.1.2.1.1.2","type":"INTEGER","value":10},"ifIndex":{"oid":"1.3.6.1.2.1.2.2.1.1","type":"INTEGER","value":12},"ifDescr":{"oid":"1.3.6.1.2.1.31.1.1.1.1","type":"OctetString","value":"GigabitEthernet0/1"}}
 ```
 
@@ -842,7 +856,7 @@ Note `SYSLOG_IDENTIFIER=local` (the job name — operator-meaningful) and `_HOST
 
 `TRAP_INTERFACE` is the topology interface that owns the trap source IP in the co-located topology cache. `TRAP_NEIGHBORS` is the sorted, de-duplicated set of known LLDP/CDP neighbor sysNames for that source device cache; it is device-level topology context, not a claim that every listed neighbor is involved in the specific trap event. When the source IP matches the topology cache's local device management IP but has no interface-IP mapping, `TRAP_NEIGHBORS` can still be emitted while `TRAP_INTERFACE` is omitted.
 
-**Cardinality contract** is visible: the MAC (`aa:bb:cc:dd:ee:ff`) appears in **MESSAGE** (templated, free-form) and in **TRAP_JSON** (full structured form). It does **NOT** appear in any `TRAP_TAG_*` operator label. The MAC is fully searchable in the journal (Logs UI substring search, `journalctl -g aa:bb:cc` for MESSAGE substring match, or `jq` against `TRAP_JSON`) without polluting metric label cardinality.
+**Cardinality contract** is visible: the MAC (`aa:bb:cc:dd:ee:ff`) appears in **MESSAGE** (templated, free-form), in an indexed **TRAP_VAR_CPSIFVIOLATIONMACADDRESS** field, and in **TRAP_JSON** (full structured form). It does **NOT** appear in any `TRAP_TAG_*` operator label. The MAC is filterable in the journal without polluting metric label cardinality.
 
 ### Deduplication summary entry (full example)
 
@@ -904,7 +918,7 @@ decode-error details as the dedicated fields: `kind`, `error`, `packet_size`,
 `packet_sha256`, and optional `source_udp_port`, `listener`, `snmp_version`,
 and `engine_id`.
 
-This guarantees forensic completeness: even with zero profile coverage and no MIB loaded, the journal contains everything needed to reconstruct what arrived on the wire. The fixed field name avoids the per-OID field-name explosion of older designs.
+This guarantees forensic completeness: even with zero profile coverage and no MIB loaded, the journal contains everything needed to reconstruct what arrived on the wire. `TRAP_VAR_*` is the indexed filtering surface; `TRAP_JSON` is the audit/debug copy.
 
 ### Varbind value sanitization — binary field encoding (CWE-117 protection)
 
@@ -920,7 +934,7 @@ The plugin chooses encoding per-field at write time:
 
 This eliminates **CWE-117 (log injection)** structurally. A malicious varbind value of `injected_value\nFAKE_FIELD=spoofed\n` lands as ONE field with the bytes `injected_value\nFAKE_FIELD=spoofed\n` as its value — never as two separate journal fields. The selected writer backend's binary-field encoding handles this transparently when the writer chooses the binary form for fields containing control bytes.
 
-The plugin's journal-write path applies this check uniformly to `MESSAGE`, all `TRAP_*` and `TRAP_TAG_*` fields, `ND_LOG_SOURCE`, `ND_NIDL_NODE`, `_HOSTNAME`, and `TRAP_JSON` values. No field bypasses the check.
+The plugin's journal-write path applies this check uniformly to `MESSAGE`, all `TRAP_*`, `TRAP_TAG_*`, and `TRAP_VAR_*` fields, `ND_LOG_SOURCE`, `ND_NIDL_NODE`, `_HOSTNAME`, and `TRAP_JSON` values. No field bypasses the check.
 
 ### Forensics
 
@@ -1105,7 +1119,7 @@ Phase B resolved most of the original questions. What remains:
 
 6. **Northbound trap re-emit**: SaaS-cohort lacks this. Marked Non-Goal for SOW-0035–SOW-0039 (§14). The journal-as-source design enables a future SOW to add this cleanly when operator demand surfaces.
 
-7. **`TRAP_JSON` shape**: object keyed by symbolic name with OID + type + value inside each entry. Profile-extracted names ensure stability across re-extractions. Edge case for vendors with duplicate symbolic names within a single MIB module (rare) — fall back to OID-keyed for the duplicates, documented in `profile-format.md`.
+7. **`TRAP_JSON` shape**: object keyed by symbolic name with OID + type + value inside each entry. Profile-extracted names ensure stability across re-extractions. Edge case for vendors with duplicate symbolic names within a single MIB module (rare) — later duplicates receive deterministic suffixed keys, documented in `profile-format.md`.
 
 ### Resolved by user decisions (this design pass)
 
@@ -1135,7 +1149,7 @@ Phase B resolved most of the original questions. What remains:
 - Built-in alarm-lifecycle state machine (open/ack/clear, paired-clear linking `linkUp` to `linkDown`) — alert-engine territory; out of scope for this design pass.
 - Central correlation across hubs (hub-local by design choice).
 - Automatic device profiling (Rule 4 — operator drops a profile YAML; everything else decodes automatically).
-- Profile YAML controlling journal field names (the journal always captures all varbinds; no profile knob needed).
+- Profile YAML manually controlling journal field names (`TRAP_VAR_*` is derived from received varbind metadata; no profile knob needed).
 - Profile YAML controlling metric emission (metric emission is operator choice in plugin config).
 - **Runtime MIB compilation** — no `pysmi`/`gosmi`/Rust-MIB-crate dependency at runtime. Operators convert MIBs to profile YAMLs offline using `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` (see §7). This mirrors the SNMP polling plugin's pattern.
 - **DTLS / TLS-TM** — Phase A finding: zero cohort systems support this (universal gap). Defer until production demand surfaces and mature libraries exist.
@@ -1259,7 +1273,7 @@ Semantics:
 | `SourceVnodeID` | string | Source device's Netdata vnode identity. Journal serializer maps to `ND_NIDL_NODE`; OTLP serializer maps to `netdata.nidl.node`. Empty when SNMP polling has no state for the device. |
 | `TopologyInterface`, `TopologyNeighbors` | string, string | Enrichment; omitted from journal and OTLP output when empty |
 | `Labels` | map<string, string> | Profile + operator labels. Nil means no labels. Lowercase keys → `TRAP_TAG_<KEY>` in journal, `trap.<key>` in OTLP |
-| `Varbinds` | ordered list of `{Name, OID, Type, Value, Enum?}` | Structured; writer serializes to `TRAP_JSON` or `snmp.varbinds`; `display_hint` is reserved and not emitted initially |
+| `Varbinds` | ordered list of `{Name, OID, Type, Value, Enum?}` | Structured; direct-journal writer serializes non-sensitive event varbinds to indexed `TRAP_VAR_*` fields plus `TRAP_JSON`; OTLP writer serializes to `snmp.varbinds`; `display_hint` is reserved and not emitted initially |
 | `SummaryCounts` | optional `{TotalSuppressed, Fingerprints, PeriodSec, ByTrap}` | Only when `ReportType=deduplication_summary`; `ByTrap` is keyed by numeric OID and the MESSAGE renderer resolves names from the profile index when available |
 | `DecodeError` | optional `{Kind, Error, PacketSize, PacketSHA256, SourceUDPPort?, Listener?, SnmpVersion?, EngineID?}` | Only when `ReportType=decode_error`; raw packet bytes are not stored |
 

@@ -43,9 +43,10 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
 
 3. **Identify the source MIB object for every varbind.** Check the object's
    `MAX-ACCESS`. `not-accessible` index objects must still be declared in the
-   table (they ship inside `TRAP_JSON`), but never as a `description:`
-   template variable on its own — varbinds an SNMP entity will not send in a
-   trap PDU never resolve at runtime.
+   table (they ship inside `TRAP_JSON` and, when non-sensitive/non-redundant,
+   indexed `TRAP_VAR_*` fields), but never as a `description:` template
+   variable on its own — varbinds an SNMP entity will not send in a trap PDU
+   never resolve at runtime.
 
 4. **File-scoped `varbinds:` table entries require both `oid` and `type`.**
    Varbind records with `resolved: false` (the MIB-extractor couldn't
@@ -73,8 +74,8 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
    bounded-cardinality varbinds only. Reject (do not commit) labels that
    reference MAC addresses, source IPs, usernames, packet contents, RAID
    slot IDs, or any per-event identifier. High-cardinality content belongs
-   in `description:` (rendered into MESSAGE) and in `TRAP_JSON`, not in
-   metric-propagating labels.
+   in `description:` (rendered into MESSAGE), indexed `TRAP_VAR_*` journal
+   fields, and `TRAP_JSON`, not in metric-propagating labels.
 
 8. **Label keys use a structurally-safe namespace.** All labels (from
    profile `labels:` AND operator config `labels:`) emit as
@@ -98,9 +99,11 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
     stay vendor-curated knowledge; per-installation choices stay operator-
     editable in plugin config.
 
-11. **No `journal_fields:` list in profiles.** The plugin always captures
-    all varbinds into the fixed `TRAP_JSON` field. There is no profile
-    knob to add per-OID journal field names.
+11. **No `journal_fields:` list in profiles.** The plugin derives indexed
+    `TRAP_VAR_*` journal fields automatically from received non-sensitive,
+    non-redundant event varbinds, and keeps the structured audit copy in
+    `TRAP_JSON`. There is no profile knob to hand-author per-OID journal
+    field names.
 
 12. **`display_hint` is reserved, not yet emitted.** `profile-format.md`
     documents `display_hint` (e.g. `1x:` for MAC, `1d.1d.1d.1d` for IPv4)

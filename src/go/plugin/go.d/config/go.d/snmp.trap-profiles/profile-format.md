@@ -20,10 +20,12 @@ A profile tells the Netdata SNMP trap plugin:
 - how to **classify** each trap (category + severity)
 - how to **render** each trap into a human-readable journal `MESSAGE`
 
-Trap profiles do **not** define journal field names (the plugin always captures
-all varbinds in a fixed schema — see the SNMP trap subsystem design doc) and
-do **not** define per-trap metric emission (operators opt-in OIDs to metric
-emission in plugin configuration, not in profiles).
+Trap profiles do **not** define journal field names manually. The plugin derives
+indexed `TRAP_VAR_*` journal fields from received non-sensitive, non-redundant
+event varbinds, and also keeps the complete structured audit copy in
+`TRAP_JSON` (see the SNMP trap subsystem design doc). Profiles also do **not**
+define per-trap metric emission; operators opt-in OIDs to metric emission in
+plugin configuration, not in profiles.
 
 A profile is a single YAML file. One file per vendor by convention; stock
 profiles ship under `default/` and are organized by inferred enterprise-PEN
@@ -134,31 +136,38 @@ profile YAMLs offline with the installed helper
 `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` and drop the generated
 YAML files under `/etc/netdata/go.d/snmp.trap-profiles/`. The varbind still
 lands in the `TRAP_JSON` journal field with its OID, ASN.1-decoded type, and
-value.
+value. If it is not a sensitive or protocol-control varbind, the plugin also
+emits an indexed `TRAP_VAR_OID_<NUMERIC_OID>` journal field.
 
-### Duplicate symbolic name handling in `TRAP_JSON`
+### Duplicate symbolic name handling in `TRAP_JSON` and `TRAP_VAR_*`
 
 `TRAP_JSON` is an object keyed by varbind symbolic name. In the rare case
 where two varbinds in a single trap share the same symbolic name (e.g.
 two vendor MIBs each import a varbind that resolved to the same display
-name), the duplicates fall back to OID-keyed entries within the same
-JSON object to avoid key collision. If malformed input still creates a
-duplicate key after OID fallback, later entries use deterministic suffixes
-(`#2`, `#3`, ...). Example:
+name), later entries use deterministic suffixes (`#2`, `#3`, ...) to avoid
+duplicate JSON object keys. Example:
 
 ```json
 {
   "ifDescr":            {"oid": "1.3.6.1.2.1.31.1.1.1.1",     "type": "OctetString", "value": "Gi0/1"},
-  "1.3.6.1.4.1.99.1.1": {"oid": "1.3.6.1.4.1.99.1.1",          "type": "OctetString", "value": "Gi0/2"}
+  "ifDescr#2":          {"oid": "1.3.6.1.4.1.99.1.1",          "type": "OctetString", "value": "Gi0/2"}
 }
 ```
 
 The first occurrence wins the symbolic name; subsequent duplicates use
-the numeric OID as the key, then suffixed keys if the OID also repeats.
-Profile authors should avoid this by giving the conflicting varbinds
-distinct symbolic names in the file-scoped `varbinds:` table; the fallback
-exists only for cases where no such authoring control is possible at
+suffixed keys. Profile authors should avoid this by giving the conflicting
+varbinds distinct symbolic names in the file-scoped `varbinds:` table; the
+fallback exists only for cases where no such authoring control is possible at
 extraction time or where malformed senders repeat OIDs.
+
+Indexed journal fields use a separate collision-safe namespace. A received
+symbolic varbind `ifOperStatus` emits `TRAP_VAR_IFOPERSTATUS`; if its value has
+an enum label, the label is written to `TRAP_VAR_IFOPERSTATUS` and the numeric
+value is written to `TRAP_VAR_IFOPERSTATUS_RAW`. Duplicate/sanitized field-name
+collisions receive deterministic suffixes (`_2`, `_3`, ...). Protocol-control
+varbinds that duplicate first-class fields (`sysUpTime.0`, `snmpTrapOID.0`,
+`snmpTrapAddress.0`, `snmpTrapEnterprise.0`) are kept in `TRAP_JSON` but not
+emitted as `TRAP_VAR_*`; the sensitive SNMP community varbind is omitted.
 
 Generator rule: a varbind record produced by the MIB extractor that does
 NOT have both a resolvable `oid` AND a `type` (MIB syntax) is dropped at
@@ -329,7 +338,8 @@ In profile terms:
 
 - `description:` and `varbinds:` references — **no restriction**. Free use of
   any varbind including high-cardinality data (MAC, IP, username, packet
-  content). These land in MESSAGE / TRAP_JSON.
+  content). These land in MESSAGE, indexed `TRAP_VAR_*` journal fields, and
+  `TRAP_JSON` unless the varbind is sensitive or a protocol-control duplicate.
 - `labels:` — **bounded-cardinality only**. Templates that reference
   unbounded varbinds (MAC, IP, username) are rejected at profile load with
   a clear error. Labels become `TRAP_TAG_<KEY>=<VALUE>` journal fields and
