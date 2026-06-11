@@ -367,8 +367,8 @@ func TestIdentifySourceCascade(t *testing.T) {
 		{OID: snmpTrapAddressOID, Value: "192.168.1.1", Type: "IPAddress"},
 	}
 	addr := identifySource(vbsWithSource, peer)
-	if addr != "192.168.1.1" {
-		t.Errorf("expected snmpTrapAddress.0 value, got %q", addr)
+	if addr != "10.0.0.5" {
+		t.Errorf("expected UDP peer to win over snmpTrapAddress.0, got %q", addr)
 	}
 
 	vbsNoSource := []VarbindValue{
@@ -382,6 +382,34 @@ func TestIdentifySourceCascade(t *testing.T) {
 	addr = identifySource(vbsNoSource, nil)
 	if addr != "" {
 		t.Errorf("expected empty for nil peer, got %q", addr)
+	}
+
+	addr = identifySource(vbsWithSource, nil)
+	if addr != "192.168.1.1" {
+		t.Errorf("expected snmpTrapAddress.0 value without UDP peer, got %q", addr)
+	}
+
+	vbsUnspecifiedSource := []VarbindValue{
+		{OID: snmpTrapAddressOID, Value: "0.0.0.0", Type: "IPAddress"},
+	}
+	addr = identifySource(vbsUnspecifiedSource, peer)
+	if addr != "10.0.0.5" {
+		t.Errorf("expected UDP peer when snmpTrapAddress.0 is unspecified, got %q", addr)
+	}
+	selected := selectTrapSource(vbsUnspecifiedSource, peer)
+	if selected.audit == nil {
+		t.Fatal("missing source audit")
+	}
+	if selected.audit.Method != "udp_peer" || selected.audit.Selected != "10.0.0.5" {
+		t.Fatalf("source audit = %+v, want UDP peer selected", selected.audit)
+	}
+	if len(selected.audit.RejectedCandidates) != 1 || selected.audit.RejectedCandidates[0] != "snmpTrapAddress.0:unspecified_ip" {
+		t.Fatalf("source audit rejected candidates = %+v, want unspecified snmpTrapAddress.0 rejection", selected.audit.RejectedCandidates)
+	}
+
+	addr = identifySource(vbsUnspecifiedSource, nil)
+	if addr != "" {
+		t.Errorf("expected empty without UDP peer when snmpTrapAddress.0 is unspecified, got %q", addr)
 	}
 }
 
@@ -451,7 +479,7 @@ func TestV1DecodeConvertsAgentAddressAndSyntheticVarbinds(t *testing.T) {
 	if pdu.OID != "1.3.6.1.4.1.9.0.42" {
 		t.Errorf("trap OID mismatch: %s", pdu.OID)
 	}
-	if pdu.SourceIP != "192.0.2.10" {
+	if pdu.SourceIP != "10.1.2.3" {
 		t.Errorf("source IP mismatch: %s", pdu.SourceIP)
 	}
 	if len(pdu.Varbinds) < 5 {

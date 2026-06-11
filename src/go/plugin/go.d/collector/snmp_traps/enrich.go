@@ -4,6 +4,7 @@ package snmp_traps
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/netip"
 	"sort"
@@ -274,31 +275,34 @@ type deviceEnrichment struct {
 	deviceHostname string
 	deviceVendor   string
 	vnodeID        string
+	matches        int
 }
 
-var trapTopologyEnrichmentForIP = snmptopology.TrapEnrichmentForIP
+var trapTopologyEnrichmentForSource = snmptopology.TrapEnrichmentForSource
 
 func resolveDeviceEnrichment(sourceIP string) deviceEnrichment {
-	if dev, ok := ddsnmp.DeviceRegistry.DeviceByHostname(sourceIP); ok {
-		enrich := deviceEnrichment{}
-
-		if dev.VnodeHostname != "" && !isUnresolvedSysName(dev.VnodeHostname) {
-			enrich.deviceHostname = dev.VnodeHostname
-		} else if dev.SysName != "" && !isUnresolvedSysName(dev.SysName) {
-			enrich.deviceHostname = dev.SysName
-		}
-
-		if dev.Vendor != "" {
-			enrich.deviceVendor = dev.Vendor
-		}
-		if dev.VnodeGUID != "" {
-			enrich.vnodeID = dev.VnodeGUID
-		}
-
+	devices := ddsnmp.DeviceRegistry.DevicesByHostname(sourceIP)
+	enrich := deviceEnrichment{matches: len(devices)}
+	if len(devices) != 1 {
 		return enrich
 	}
 
-	return deviceEnrichment{}
+	dev := devices[0]
+
+	if dev.VnodeHostname != "" && !isUnresolvedSysName(dev.VnodeHostname) {
+		enrich.deviceHostname = dev.VnodeHostname
+	} else if dev.SysName != "" && !isUnresolvedSysName(dev.SysName) {
+		enrich.deviceHostname = dev.SysName
+	}
+
+	if dev.Vendor != "" {
+		enrich.deviceVendor = dev.Vendor
+	}
+	if dev.VnodeGUID != "" {
+		enrich.vnodeID = dev.VnodeGUID
+	}
+
+	return enrich
 }
 
 func enrichTrapEntry(entry *TrapEntry, useReverseDNS bool, dns *reverseDNSResolver) {
@@ -306,49 +310,298 @@ func enrichTrapEntry(entry *TrapEntry, useReverseDNS bool, dns *reverseDNSResolv
 		return
 	}
 
+	audit := ensureTrapEnrichmentAudit(entry)
 	sourceIP := entry.SourceIP
 	if sourceIP == "" {
 		sourceIP = entry.SourceUDPPeer
 	}
 	if sourceIP == "" {
+		audit.Registry = &TrapEnrichmentLookup{Status: "skipped", Reason: "missing_source"}
+		audit.Topology = &TrapEnrichmentLookup{Status: "skipped", Reason: "missing_source"}
 		return
+	}
+	if audit.Source == nil {
+		audit.Source = &TrapSourceAudit{Selected: sourceIP, Method: "entry_source"}
 	}
 
 	enrich := resolveDeviceEnrichment(sourceIP)
+	audit.Registry = &TrapEnrichmentLookup{
+		Key:     sourceIP,
+		Status:  lookupStatus(enrich.matches),
+		Method:  "hostname_or_ip",
+		Matches: enrich.matches,
+	}
+	if enrich.matches > 1 {
+		audit.Registry.Reason = "ambiguous_source"
+	}
 
-	if enrich.deviceHostname != "" {
+	registryMatched := enrich.matches == 1
+	if registryMatched && enrich.deviceHostname != "" {
 		entry.DeviceHostname = enrich.deviceHostname
+		addTrapEnrichmentApplied(audit, "_HOSTNAME", enrich.deviceHostname)
+		audit.Registry.Fields = append(audit.Registry.Fields, "_HOSTNAME")
 	}
-	if enrich.deviceVendor != "" {
+	if registryMatched && enrich.deviceVendor != "" {
 		entry.DeviceVendor = enrich.deviceVendor
+		addTrapEnrichmentApplied(audit, "TRAP_DEVICE_VENDOR", enrich.deviceVendor)
+		audit.Registry.Fields = append(audit.Registry.Fields, "TRAP_DEVICE_VENDOR")
 	}
-	if enrich.vnodeID != "" {
+	if registryMatched && enrich.vnodeID != "" {
 		entry.SourceVnodeID = enrich.vnodeID
+		addTrapEnrichmentApplied(audit, "ND_NIDL_NODE", enrich.vnodeID)
+		audit.Registry.Fields = append(audit.Registry.Fields, "ND_NIDL_NODE")
 	}
 
-	if topo := trapTopologyEnrichmentForIP(sourceIP); topo != nil {
+	trapIfIndex := trapIfIndexFromVarbinds(entry.Varbinds)
+	if iface, key := trapInterfaceNameFromVarbinds(entry.Varbinds); iface != "" {
+		entry.TopologyInterface = iface
+		audit.Interface = &TrapEnrichmentLookup{
+			Key:    key,
+			Status: "matched",
+			Method: "trap_varbind",
+			Fields: []string{"TRAP_INTERFACE"},
+		}
+		addTrapEnrichmentApplied(audit, "TRAP_INTERFACE", iface)
+	}
+
+	topo := trapTopologyEnrichmentForSource(sourceIP, trapIfIndex)
+	topologyTrusted := topo != nil && topo.DeviceStatus == "matched"
+	if topo != nil {
+		audit.Topology = &TrapEnrichmentLookup{
+			Key:     sourceIP,
+			Status:  topo.DeviceStatus,
+			Method:  topo.DeviceMethod,
+			Matches: topo.DeviceMatches,
+		}
+		if topo.DeviceStatus == "ambiguous" {
+			audit.Topology.Reason = "ambiguous_source"
+		}
+		if registryMatched && entry.SourceVnodeID != "" && topo.SourceVnodeID != "" && entry.SourceVnodeID != topo.SourceVnodeID {
+			topologyTrusted = false
+			audit.Topology.Status = "conflict"
+			audit.Topology.Reason = "vnode_mismatch"
+		}
+	} else {
+		audit.Topology = &TrapEnrichmentLookup{Key: sourceIP, Status: "no_match", Matches: 0}
+	}
+
+	if topologyTrusted {
 		if entry.DeviceHostname == "" && !isUnresolvedSysName(topo.DeviceHostname) {
 			entry.DeviceHostname = topo.DeviceHostname
+			addTrapEnrichmentApplied(audit, "_HOSTNAME", topo.DeviceHostname)
+			audit.Topology.Fields = append(audit.Topology.Fields, "_HOSTNAME")
 		}
 		if entry.DeviceVendor == "" && topo.DeviceVendor != "" {
 			entry.DeviceVendor = topo.DeviceVendor
+			addTrapEnrichmentApplied(audit, "TRAP_DEVICE_VENDOR", topo.DeviceVendor)
+			audit.Topology.Fields = append(audit.Topology.Fields, "TRAP_DEVICE_VENDOR")
 		}
 		if entry.SourceVnodeID == "" && topo.SourceVnodeID != "" {
 			entry.SourceVnodeID = topo.SourceVnodeID
+			addTrapEnrichmentApplied(audit, "ND_NIDL_NODE", topo.SourceVnodeID)
+			audit.Topology.Fields = append(audit.Topology.Fields, "ND_NIDL_NODE")
 		}
-		if topo.Interface != "" {
+
+		if entry.TopologyInterface == "" && topo.Interface != "" {
 			entry.TopologyInterface = topo.Interface
+			addTrapEnrichmentApplied(audit, "TRAP_INTERFACE", topo.Interface)
+		}
+		if audit.Interface == nil {
+			audit.Interface = topologyInterfaceAudit(topo, entry.TopologyInterface != "")
+			if entry.TopologyInterface != "" {
+				audit.Interface.Fields = append(audit.Interface.Fields, "TRAP_INTERFACE")
+			}
 		}
 		if len(topo.Neighbors) > 0 {
 			entry.TopologyNeighbors = strings.Join(topo.Neighbors, ",")
+			addTrapEnrichmentApplied(audit, "TRAP_NEIGHBORS", entry.TopologyNeighbors)
+			audit.Neighbors = &TrapEnrichmentLookup{
+				Key:    topo.InterfaceIndex,
+				Status: topo.NeighborStatus,
+				Method: "topology_ifindex",
+				Fields: []string{"TRAP_NEIGHBORS"},
+			}
+		} else {
+			audit.Neighbors = &TrapEnrichmentLookup{
+				Key:    topo.InterfaceIndex,
+				Status: topo.NeighborStatus,
+				Method: "topology_ifindex",
+			}
+			if topo.InterfaceIndex == "" {
+				audit.Neighbors.Reason = "missing_trap_ifindex"
+			}
 		}
+	} else if audit.Interface == nil {
+		audit.Interface = skippedTopologyInterfaceAudit(trapIfIndex, topologyTrusted)
+		audit.Neighbors = skippedTopologyNeighborsAudit(trapIfIndex, topologyTrusted)
+	}
+	if audit.Neighbors == nil && entry.TopologyNeighbors == "" {
+		audit.Neighbors = skippedTopologyNeighborsAudit(trapIfIndex, topologyTrusted)
 	}
 
 	if useReverseDNS && entry.DeviceHostname == "" {
+		audit.ReverseDNS = &TrapEnrichmentLookup{Key: sourceIP, Method: "reverse_dns"}
 		if name := dns.lookupCached(sourceIP); name != "" {
 			entry.DeviceHostname = name
+			audit.ReverseDNS.Status = "matched"
+			audit.ReverseDNS.Fields = []string{"_HOSTNAME"}
+			addTrapEnrichmentApplied(audit, "_HOSTNAME", name)
 		} else {
+			audit.ReverseDNS.Status = "pending"
 			dns.resolveAsync(sourceIP)
 		}
 	}
+}
+
+func ensureTrapEnrichmentAudit(entry *TrapEntry) *TrapEnrichmentAudit {
+	if entry.Enrichment == nil {
+		entry.Enrichment = &TrapEnrichmentAudit{}
+	}
+	return entry.Enrichment
+}
+
+func lookupStatus(matches int) string {
+	switch matches {
+	case 0:
+		return "no_match"
+	case 1:
+		return "matched"
+	default:
+		return "ambiguous"
+	}
+}
+
+func addTrapEnrichmentApplied(audit *TrapEnrichmentAudit, field, value string) {
+	if audit == nil || field == "" || value == "" {
+		return
+	}
+	if audit.Applied == nil {
+		audit.Applied = make(map[string]string)
+	}
+	audit.Applied[field] = value
+}
+
+const (
+	ifIndexOIDPrefix = "1.3.6.1.2.1.2.2.1.1"
+	ifDescrOIDPrefix = "1.3.6.1.2.1.2.2.1.2"
+	ifNameOIDPrefix  = "1.3.6.1.2.1.31.1.1.1.1"
+)
+
+func trapIfIndexFromVarbinds(vbs []VarbindValue) string {
+	for _, vb := range vbs {
+		if isIfIndexVarbind(vb) {
+			return strings.TrimSpace(varbindScalarString(vb.Value))
+		}
+	}
+	return ""
+}
+
+func trapInterfaceNameFromVarbinds(vbs []VarbindValue) (string, string) {
+	for _, want := range []struct {
+		name string
+		oid  string
+	}{
+		{name: "ifName", oid: ifNameOIDPrefix},
+		{name: "ifDescr", oid: ifDescrOIDPrefix},
+	} {
+		for _, vb := range vbs {
+			if !isNamedOrOIDPrefixedVarbind(vb, want.name, want.oid) {
+				continue
+			}
+			value := strings.TrimSpace(varbindScalarString(vb.Value))
+			if value != "" {
+				return value, want.name
+			}
+		}
+	}
+	return "", ""
+}
+
+func isIfIndexVarbind(vb VarbindValue) bool {
+	return isNamedOrOIDPrefixedVarbind(vb, "ifIndex", ifIndexOIDPrefix)
+}
+
+func isNamedOrOIDPrefixedVarbind(vb VarbindValue, name, oidPrefix string) bool {
+	vbName := strings.TrimSpace(vb.Name)
+	if vbName == name || strings.HasPrefix(vbName, name+".") {
+		return true
+	}
+	oid := normalizeOID(vb.OID)
+	return oid == oidPrefix || strings.HasPrefix(oid, oidPrefix+".")
+}
+
+func varbindScalarString(value any) string {
+	switch v := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return v
+	case int:
+		return fmt.Sprintf("%d", v)
+	case int8:
+		return fmt.Sprintf("%d", v)
+	case int16:
+		return fmt.Sprintf("%d", v)
+	case int32:
+		return fmt.Sprintf("%d", v)
+	case int64:
+		return fmt.Sprintf("%d", v)
+	case uint:
+		return fmt.Sprintf("%d", v)
+	case uint8:
+		return fmt.Sprintf("%d", v)
+	case uint16:
+		return fmt.Sprintf("%d", v)
+	case uint32:
+		return fmt.Sprintf("%d", v)
+	case uint64:
+		return fmt.Sprintf("%d", v)
+	default:
+		return strings.TrimSpace(fmt.Sprintf("%v", v))
+	}
+}
+
+func topologyInterfaceAudit(topo *snmptopology.TrapTopologyEnrichment, matched bool) *TrapEnrichmentLookup {
+	if topo == nil {
+		return &TrapEnrichmentLookup{Status: "skipped", Reason: "no_topology_match"}
+	}
+	audit := &TrapEnrichmentLookup{
+		Key:    topo.InterfaceIndex,
+		Status: topo.InterfaceStatus,
+		Method: "topology_ifindex",
+	}
+	if topo.InterfaceIndex == "" {
+		audit.Reason = "missing_trap_ifindex"
+	} else if !matched {
+		audit.Reason = "ifindex_not_found"
+	}
+	return audit
+}
+
+func skippedTopologyInterfaceAudit(trapIfIndex string, topologyTrusted bool) *TrapEnrichmentLookup {
+	audit := &TrapEnrichmentLookup{
+		Key:    trapIfIndex,
+		Status: "skipped",
+		Method: "topology_ifindex",
+	}
+	if trapIfIndex == "" {
+		audit.Reason = "missing_trap_ifindex"
+	} else if !topologyTrusted {
+		audit.Reason = "no_exact_topology_device_match"
+	}
+	return audit
+}
+
+func skippedTopologyNeighborsAudit(trapIfIndex string, topologyTrusted bool) *TrapEnrichmentLookup {
+	audit := &TrapEnrichmentLookup{
+		Key:    trapIfIndex,
+		Status: "skipped",
+		Method: "topology_ifindex",
+	}
+	if trapIfIndex == "" {
+		audit.Reason = "missing_trap_ifindex"
+	} else if !topologyTrusted {
+		audit.Reason = "no_exact_topology_device_match"
+	}
+	return audit
 }

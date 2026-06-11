@@ -83,7 +83,8 @@ The collector writes structured fields that are useful for queries:
 | `TRAP_INTERFACE` | Topology interface when enrichment is available |
 | `TRAP_NEIGHBORS` | Topology neighbors when enrichment is available |
 | `TRAP_TAG_*` | Profile/operator labels, selectable but not default facets |
-| `TRAP_JSON` | Structured varbind payload; search carefully, avoid faceting on it |
+| `TRAP_ENRICHMENT` | JSON audit trail for source selection and enrichment decisions; search carefully, avoid faceting on it |
+| `TRAP_JSON` | Structured varbind payload, including `netdata_packet_sequence`; search carefully, avoid faceting on it |
 | `TRAP_SUPPRESSED_COUNT` | Dedup summary only |
 | `TRAP_SUPPRESSED_FINGERPRINTS` | Dedup summary only |
 | `TRAP_REPORT_PERIOD_SEC` | Dedup summary only |

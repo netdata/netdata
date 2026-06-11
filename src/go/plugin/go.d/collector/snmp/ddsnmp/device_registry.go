@@ -5,6 +5,7 @@ package ddsnmp
 import (
 	"maps"
 	"net/netip"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -48,13 +49,13 @@ type DeviceConnectionInfo struct {
 // info so the topology collector can discover which devices to poll.
 var DeviceRegistry = &deviceRegistry{
 	devices:    make(map[string]DeviceConnectionInfo),
-	byHostname: make(map[string]string),
+	byHostname: make(map[string]map[string]struct{}),
 }
 
 type deviceRegistry struct {
 	mu         sync.RWMutex
 	devices    map[string]DeviceConnectionInfo
-	byHostname map[string]string
+	byHostname map[string]map[string]struct{}
 }
 
 // Register adds or updates a device in the registry.
@@ -66,9 +67,7 @@ func (r *deviceRegistry) Register(key string, info DeviceConnectionInfo) {
 		r.removeHostnameIndexLocked(key, old.Hostname)
 	}
 	r.devices[key] = cloneDeviceConnectionInfo(info)
-	if hostnameKey := deviceHostnameIndexKey(info.Hostname); hostnameKey != "" {
-		r.byHostname[hostnameKey] = key
-	}
+	r.addHostnameIndexLocked(key, info.Hostname)
 	r.mu.Unlock()
 }
 
@@ -98,32 +97,53 @@ func (r *deviceRegistry) Devices() []DeviceConnectionInfo {
 // hostname matches the provided value. IP literals are normalized before
 // comparison; DNS names are matched case-insensitively.
 func (r *deviceRegistry) DeviceByHostname(hostname string) (DeviceConnectionInfo, bool) {
+	devices := r.DevicesByHostname(hostname)
+	if len(devices) == 0 {
+		return DeviceConnectionInfo{}, false
+	}
+	return devices[0], true
+}
+
+// DevicesByHostname returns all deep-copied registered devices whose configured
+// hostname matches the provided value. IP literals are normalized before
+// comparison; DNS names are matched case-insensitively.
+func (r *deviceRegistry) DevicesByHostname(hostname string) []DeviceConnectionInfo {
 	hostnameKey := deviceHostnameIndexKey(hostname)
 	if hostnameKey == "" {
-		return DeviceConnectionInfo{}, false
+		return nil
 	}
 
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	if r.byHostname != nil {
-		key, ok := r.byHostname[hostnameKey]
-		if !ok {
-			return DeviceConnectionInfo{}, false
+		keySet := r.byHostname[hostnameKey]
+		if len(keySet) == 0 {
+			return nil
 		}
-		info, ok := r.devices[key]
-		if !ok {
-			return DeviceConnectionInfo{}, false
+		keys := make([]string, 0, len(keySet))
+		for key := range keySet {
+			keys = append(keys, key)
 		}
-		return cloneDeviceConnectionInfo(info), true
+		sort.Strings(keys)
+
+		devices := make([]DeviceConnectionInfo, 0, len(keys))
+		for _, key := range keys {
+			info, ok := r.devices[key]
+			if ok {
+				devices = append(devices, cloneDeviceConnectionInfo(info))
+			}
+		}
+		return devices
 	}
 
+	devices := make([]DeviceConnectionInfo, 0, 1)
 	for _, info := range r.devices {
 		if deviceHostnameIndexKey(info.Hostname) == hostnameKey {
-			return cloneDeviceConnectionInfo(info), true
+			devices = append(devices, cloneDeviceConnectionInfo(info))
 		}
 	}
-	return DeviceConnectionInfo{}, false
+	return devices
 }
 
 // Len returns the number of registered devices.
@@ -151,27 +171,41 @@ func (r *deviceRegistry) ensureMapsLocked() {
 		r.devices = make(map[string]DeviceConnectionInfo)
 	}
 	if r.byHostname == nil {
-		r.byHostname = make(map[string]string)
+		r.byHostname = make(map[string]map[string]struct{})
 		for key, info := range r.devices {
-			if hostnameKey := deviceHostnameIndexKey(info.Hostname); hostnameKey != "" {
-				r.byHostname[hostnameKey] = key
-			}
+			r.addHostnameIndexLocked(key, info.Hostname)
 		}
 	}
 }
 
-func (r *deviceRegistry) removeHostnameIndexLocked(key, hostname string) {
+func (r *deviceRegistry) addHostnameIndexLocked(key, hostname string) {
 	hostnameKey := deviceHostnameIndexKey(hostname)
-	if hostnameKey == "" || r.byHostname == nil || r.byHostname[hostnameKey] != key {
+	if hostnameKey == "" {
 		return
 	}
+	if r.byHostname == nil {
+		r.byHostname = make(map[string]map[string]struct{})
+	}
+	keySet := r.byHostname[hostnameKey]
+	if keySet == nil {
+		keySet = make(map[string]struct{})
+		r.byHostname[hostnameKey] = keySet
+	}
+	keySet[key] = struct{}{}
+}
 
-	delete(r.byHostname, hostnameKey)
-	for otherKey, info := range r.devices {
-		if otherKey != key && deviceHostnameIndexKey(info.Hostname) == hostnameKey {
-			r.byHostname[hostnameKey] = otherKey
-			return
-		}
+func (r *deviceRegistry) removeHostnameIndexLocked(key, hostname string) {
+	hostnameKey := deviceHostnameIndexKey(hostname)
+	if hostnameKey == "" || r.byHostname == nil {
+		return
+	}
+	keySet := r.byHostname[hostnameKey]
+	if keySet == nil {
+		return
+	}
+	delete(keySet, key)
+	if len(keySet) == 0 {
+		delete(r.byHostname, hostnameKey)
 	}
 }
 

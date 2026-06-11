@@ -92,6 +92,7 @@ type Collector struct {
 	reverseDNS         *reverseDNSResolver
 	reverseDNSEnabled  bool
 	deduper            *trapDeduper
+	packetSequence     atomic.Uint64
 	profileCacheHeld   bool
 	operatorMetrics    *operatorMetrics
 	dynamicChartYAML   string
@@ -458,6 +459,8 @@ func (c *Collector) collect(ctx context.Context) error {
 }
 
 func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, peer *net.UDPAddr) {
+	packetSequence := c.packetSequence.Add(1)
+
 	defer func() {
 		if v := recover(); v != nil {
 			c.incTrapError("decode_failed")
@@ -518,6 +521,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 				peerIP:         decodePeerIP,
 				conn:           conn,
 				peer:           peer,
+				packetSequence: packetSequence,
 				kind:           dim,
 				err:            err,
 				sniffedVersion: sniffedVersion,
@@ -599,6 +603,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 	}
 
 	entry := trapEntryFromPDU(c.jobName, pdu, td, time.Now().UnixMicro(), monotonicUsec())
+	entry.PacketSequence = packetSequence
 	enrichTrapEntry(entry, c.reverseDNSEnabled, c.reverseDNS)
 	renderTrapEntryTemplates(entry, td)
 	if unknownOID {

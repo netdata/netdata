@@ -75,6 +75,30 @@ func TestCollectorHandlePacketWritesProfileResolvedTrapEntry(t *testing.T) {
 	if entry.Message != "security coldStart from 198.51.100.10" {
 		t.Fatalf("Message = %q", entry.Message)
 	}
+	if entry.PacketSequence != 1 {
+		t.Fatalf("PacketSequence = %d, want 1", entry.PacketSequence)
+	}
+}
+
+func TestCollectorHandlePacketAssignsReceiveSequencePerPacket(t *testing.T) {
+	packet := readColdStartUDPPacket(t)
+	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	setSingleTestTrap(t, trap)
+	writer := &mockTrapWriter{}
+	c := newDefaultTestV2Collector(writer)
+
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
+
+	if len(writer.entries) != 2 {
+		t.Fatalf("written entries = %d, want 2", len(writer.entries))
+	}
+	for i, entry := range writer.entries {
+		want := uint64(i + 1)
+		if entry.PacketSequence != want {
+			t.Fatalf("entry %d PacketSequence = %d, want %d", i, entry.PacketSequence, want)
+		}
+	}
 }
 
 func TestCollectorHandlePacketRecoversFromPanic(t *testing.T) {
@@ -137,20 +161,26 @@ func TestCollectorHandlePacketDoesNotUseListenerVnodeAsSourceNode(t *testing.T) 
 
 func TestCollectorHandlePacketRendersTopologyEnrichmentBeforeReverseDNS(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
-	prev := trapTopologyEnrichmentForIP
-	trapTopologyEnrichmentForIP = func(ip string) *snmptopology.TrapTopologyEnrichment {
+	prev := trapTopologyEnrichmentForSource
+	trapTopologyEnrichmentForSource = func(ip, ifIndex string) *snmptopology.TrapTopologyEnrichment {
 		if ip != "198.51.100.10" {
 			t.Fatalf("topology enrichment looked up IP %q, want 198.51.100.10", ip)
 		}
+		if ifIndex != "" {
+			t.Fatalf("topology enrichment got trap ifIndex %q, want empty for coldStart", ifIndex)
+		}
 		return &snmptopology.TrapTopologyEnrichment{
-			DeviceHostname: "topo-sw-01",
-			DeviceVendor:   "arista",
-			SourceVnodeID:  "topo-vnode-id",
-			Interface:      "Gi0/1",
-			Neighbors:      []string{"dist-a", "dist-b"},
+			DeviceStatus:    "matched",
+			DeviceMethod:    "management_ip",
+			DeviceMatches:   1,
+			DeviceHostname:  "topo-sw-01",
+			DeviceVendor:    "arista",
+			SourceVnodeID:   "topo-vnode-id",
+			InterfaceStatus: "skipped",
+			NeighborStatus:  "skipped",
 		}
 	}
-	t.Cleanup(func() { trapTopologyEnrichmentForIP = prev })
+	t.Cleanup(func() { trapTopologyEnrichmentForSource = prev })
 
 	dns := newReverseDNSResolver()
 	dns.cache["198.51.100.10"] = reverseDNSCacheEntry{
@@ -162,7 +192,7 @@ func TestCollectorHandlePacketRendersTopologyEnrichmentBeforeReverseDNS(t *testi
 	trap := testColdStartTrap(
 		"security",
 		"warning",
-		"trap on {_HOSTNAME} vendor {TRAP_DEVICE_VENDOR} iface {TRAP_INTERFACE} neighbors {TRAP_NEIGHBORS}",
+		"trap on {_HOSTNAME} vendor {TRAP_DEVICE_VENDOR}",
 	)
 	setSingleTestTrap(t, trap)
 	writer := &mockTrapWriter{}
@@ -176,7 +206,7 @@ func TestCollectorHandlePacketRendersTopologyEnrichmentBeforeReverseDNS(t *testi
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
 	}
 	entry := writer.entries[0]
-	if entry.Message != "trap on topo-sw-01 vendor arista iface Gi0/1 neighbors dist-a,dist-b" {
+	if entry.Message != "trap on topo-sw-01 vendor arista" {
 		t.Fatalf("Message = %q", entry.Message)
 	}
 	if entry.DeviceHostname != "topo-sw-01" {
@@ -203,6 +233,12 @@ func TestCollectorHandlePacketDedupSuppressesDuplicates(t *testing.T) {
 
 	if len(writer.entries) != 1 {
 		t.Fatalf("written entries = %d, want 1", len(writer.entries))
+	}
+	if got := writer.entries[0].PacketSequence; got != 1 {
+		t.Fatalf("written PacketSequence = %d, want 1", got)
+	}
+	if got := c.packetSequence.Load(); got != 2 {
+		t.Fatalf("collector packetSequence = %d, want 2", got)
 	}
 	if got := metrics.dedup.suppressed.Load(); got != 1 {
 		t.Fatalf("dedup suppressed = %d, want 1", got)
@@ -389,6 +425,9 @@ func TestCollectorHandlePacketWritesDecodeErrorEntry(t *testing.T) {
 	}
 	if entry.DecodeError.PacketSize != maxDatagramSize+1 {
 		t.Fatalf("DecodeError.PacketSize = %d, want %d", entry.DecodeError.PacketSize, maxDatagramSize+1)
+	}
+	if entry.PacketSequence != 1 {
+		t.Fatalf("PacketSequence = %d, want 1", entry.PacketSequence)
 	}
 	if len(entry.DecodeError.PacketSHA256) != 64 {
 		t.Fatalf("DecodeError.PacketSHA256 length = %d, want 64", len(entry.DecodeError.PacketSHA256))

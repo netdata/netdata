@@ -27,6 +27,26 @@ func TestSerializeToJournalFields(t *testing.T) {
 		PduType:               PduTypeTrap,
 		SnmpVersion:           SnmpVersionV2c,
 		Labels:                map[string]string{"interface": "eth0", "vlan": "10"},
+		Enrichment: &TrapEnrichmentAudit{
+			Source: &TrapSourceAudit{
+				UDPPeer:            "10.0.0.1",
+				SnmpTrapAddress:    "192.0.2.1",
+				Selected:           "10.0.0.1",
+				Method:             "udp_peer",
+				RejectedCandidates: []string{"snmpTrapAddress.0:direct_listener_uses_udp_peer"},
+			},
+			Registry: &TrapEnrichmentLookup{
+				Key:     "10.0.0.1",
+				Status:  "matched",
+				Method:  "hostname_or_ip",
+				Matches: 1,
+				Fields:  []string{"_HOSTNAME", "TRAP_DEVICE_VENDOR"},
+			},
+			Applied: map[string]string{
+				"_HOSTNAME":          "core-sw-01",
+				"TRAP_DEVICE_VENDOR": "cisco",
+			},
+		},
 		Varbinds: []VarbindValue{
 			{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
 			{OID: "1.3.6.1.2.1.2.2.1.2", Name: "ifDescr", Type: "OctetString", Value: "eth0"},
@@ -65,6 +85,44 @@ func TestSerializeToJournalFields(t *testing.T) {
 	if fieldMap["TRAP_JSON"] == "" {
 		t.Fatal("TRAP_JSON is empty")
 	}
+	if fieldMap["TRAP_ENRICHMENT"] == "" {
+		t.Fatal("TRAP_ENRICHMENT is empty")
+	}
+	assertFieldOrder(t, journalFieldNames(fields), "TRAP_TAG_VLAN", "TRAP_ENRICHMENT", "TRAP_JSON")
+}
+
+func TestJournalSerializersAppendLargeJSONFieldsLast(t *testing.T) {
+	entry := &TrapEntry{
+		JobName:               "local",
+		ReportType:            ReportTypeTrap,
+		ReceivedRealtimeUsec:  1000000,
+		ReceivedMonotonicUsec: 1000,
+		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
+		Message:               "test",
+		SourceIP:              "10.0.0.1",
+		PduType:               PduTypeTrap,
+		SnmpVersion:           SnmpVersionV2c,
+		Labels:                map[string]string{"site": "lab"},
+		Enrichment: &TrapEnrichmentAudit{
+			Source: &TrapSourceAudit{Selected: "10.0.0.1", Method: "udp_peer"},
+		},
+		Varbinds: []VarbindValue{
+			{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
+		},
+	}
+
+	fields, err := serializeToJournalFields(entry)
+	if err != nil {
+		t.Fatalf("serializeToJournalFields: %v", err)
+	}
+	assertFieldOrder(t, journalFieldNames(fields), "TRAP_TAG_SITE", "TRAP_ENRICHMENT", "TRAP_JSON")
+
+	var s journalHotSerializer
+	payloads, _, err := s.serialize(entry)
+	if err != nil {
+		t.Fatalf("journalHotSerializer.serialize: %v", err)
+	}
+	assertFieldOrder(t, payloadFieldNames(payloads), "TRAP_TAG_SITE", "TRAP_ENRICHMENT", "TRAP_JSON")
 }
 
 func TestSerializeToJournalFieldsNoHostname(t *testing.T) {
@@ -142,6 +200,7 @@ func TestSerializeToJournalFieldsDecodeError(t *testing.T) {
 		SourceIP:              "10.0.0.1",
 		SourceUDPPeer:         "10.0.0.1",
 		SnmpVersion:           SnmpVersionV2c,
+		PacketSequence:        7,
 		DecodeError: &DecodeErrorInfo{
 			Kind:          "malformed_pdu",
 			Error:         "BER: trailing data",
@@ -185,6 +244,9 @@ func TestSerializeToJournalFieldsDecodeError(t *testing.T) {
 	}
 	if got := details["packet_sha256"]; got != strings.Repeat("a", 64) {
 		t.Fatalf("TRAP_JSON packet_sha256 = %v", got)
+	}
+	if got := details["netdata_packet_sequence"]; got != float64(7) {
+		t.Fatalf("TRAP_JSON netdata_packet_sequence = %v, want 7", got)
 	}
 }
 
@@ -296,6 +358,7 @@ func TestSerializeToJournalFieldsTRAPJSONShape(t *testing.T) {
 		SourceIP:              "10.0.0.1",
 		PduType:               PduTypeTrap,
 		SnmpVersion:           SnmpVersionV2c,
+		PacketSequence:        42,
 		Varbinds: []VarbindValue{
 			{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
 			{OID: "1.3.6.1.2.1.2.2.1.2", Name: "ifDescr", Type: "OctetString", Value: "eth0"},
@@ -322,6 +385,45 @@ func TestSerializeToJournalFieldsTRAPJSONShape(t *testing.T) {
 	}
 	if ifIdx["type"] != "INTEGER" {
 		t.Fatalf("expected type INTEGER in ifIndex entry")
+	}
+	if got := obj["netdata_packet_sequence"]; got != float64(42) {
+		t.Fatalf("TRAP_JSON netdata_packet_sequence = %v, want 42", got)
+	}
+}
+
+func TestSerializeToJournalFieldsTRAPJSONSequenceKeyCollision(t *testing.T) {
+	entry := &TrapEntry{
+		JobName:               "local",
+		ReportType:            ReportTypeTrap,
+		ReceivedRealtimeUsec:  1000000,
+		ReceivedMonotonicUsec: 1000,
+		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
+		Message:               "test",
+		SourceIP:              "10.0.0.1",
+		PduType:               PduTypeTrap,
+		SnmpVersion:           SnmpVersionV2c,
+		PacketSequence:        42,
+		Varbinds: []VarbindValue{
+			{OID: "1.3.6.1.2.1.2.2.1.1", Name: trapJSONPacketSequenceKey, Type: "INTEGER", Value: int64(999)},
+		},
+	}
+
+	fields, err := serializeToJournalFields(entry)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fieldMap := fieldsToMap(fields)
+
+	var obj map[string]any
+	if err := json.Unmarshal([]byte(fieldMap["TRAP_JSON"]), &obj); err != nil {
+		t.Fatalf("TRAP_JSON not valid: %v", err)
+	}
+
+	if got := obj["netdata_packet_sequence"]; got != float64(42) {
+		t.Fatalf("TRAP_JSON netdata_packet_sequence = %v, want 42", got)
+	}
+	if _, ok := obj["netdata_packet_sequence#2"]; !ok {
+		t.Fatal("TRAP_JSON did not suffix colliding varbind key")
 	}
 }
 
@@ -615,6 +717,49 @@ func rawPayloadsToMap(payloads [][]byte) map[string]string {
 		m[string(name)] = string(value)
 	}
 	return m
+}
+
+func journalFieldNames(fields []JournalField) []string {
+	names := make([]string, 0, len(fields))
+	for _, field := range fields {
+		names = append(names, field.Name)
+	}
+	return names
+}
+
+func payloadFieldNames(payloads [][]byte) []string {
+	names := make([]string, 0, len(payloads))
+	for _, payload := range payloads {
+		name, _, ok := bytes.Cut(payload, []byte{'='})
+		if ok {
+			names = append(names, string(name))
+		}
+	}
+	return names
+}
+
+func assertFieldOrder(t *testing.T, names []string, ordered ...string) {
+	t.Helper()
+	previous := -1
+	for _, want := range ordered {
+		found := -1
+		for i, name := range names {
+			if name == want {
+				found = i
+				break
+			}
+		}
+		if found == -1 {
+			t.Fatalf("field %q not found in %v", want, names)
+		}
+		if previous >= 0 && found <= previous {
+			t.Fatalf("field %q at index %d should be after previous ordered field at index %d in %v", want, found, previous, names)
+		}
+		previous = found
+	}
+	if last := ordered[len(ordered)-1]; names[len(names)-1] != last {
+		t.Fatalf("last field = %q, want %q; order: %v", names[len(names)-1], last, names)
+	}
 }
 
 func mapsEqual(a, b map[string]string) bool {

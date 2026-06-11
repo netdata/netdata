@@ -8,18 +8,35 @@ import (
 )
 
 type TrapTopologyEnrichment struct {
-	DeviceHostname string
-	DeviceVendor   string
-	SourceVnodeID  string
-	Interface      string
-	Neighbors      []string
+	SourceIP        string
+	DeviceStatus    string
+	DeviceMethod    string
+	DeviceMatches   int
+	DeviceHostname  string
+	DeviceVendor    string
+	SourceVnodeID   string
+	InterfaceIndex  string
+	InterfaceStatus string
+	Interface       string
+	NeighborStatus  string
+	Neighbors       []string
 }
 
-// TrapEnrichmentForIP returns topology enrichment data for a trap received from
-// the given source IP. Returns nil when no topology state exists for that IP.
+// TrapEnrichmentForIP returns source-device topology enrichment for a trap
+// received from the given source IP. It intentionally does not infer a trap
+// interface from the source IP.
+func TrapEnrichmentForIP(ip string) *TrapTopologyEnrichment {
+	return TrapEnrichmentForSource(ip, "")
+}
+
+// TrapEnrichmentForSource returns topology enrichment data for a trap received
+// from the given source IP and, when available, the trap subject ifIndex.
+// Interface and neighbor enrichment only use the trap ifIndex after the source
+// IP matches exactly one local topology cache.
+//
 // It copies active cache pointers under the registry lock, reads each cache
 // under its own lock, and never blocks on I/O.
-func TrapEnrichmentForIP(ip string) *TrapTopologyEnrichment {
+func TrapEnrichmentForSource(ip, trapIfIndex string) *TrapTopologyEnrichment {
 	ip = normalizeIPAddress(ip)
 	if ip == "" {
 		return nil
@@ -30,26 +47,43 @@ func TrapEnrichmentForIP(ip string) *TrapTopologyEnrichment {
 		return nil
 	}
 
+	matches := make([]*TrapTopologyEnrichment, 0, 1)
 	for _, cache := range caches {
-		if enrichment := cache.trapEnrichmentForIP(ip); enrichment != nil {
-			return enrichment
+		if enrichment := cache.trapEnrichmentForSource(ip, trapIfIndex); enrichment != nil {
+			matches = append(matches, enrichment)
 		}
 	}
-	return nil
+	if len(matches) != 1 {
+		status := "no_match"
+		if len(matches) > 1 {
+			status = "ambiguous"
+		}
+		return &TrapTopologyEnrichment{
+			SourceIP:      ip,
+			DeviceStatus:  status,
+			DeviceMatches: len(matches),
+		}
+	}
+	matches[0].DeviceMatches = 1
+	return matches[0]
 }
 
-func (c *topologyCache) trapEnrichmentForIP(ip string) *TrapTopologyEnrichment {
+func (c *topologyCache) trapEnrichmentForSource(ip, trapIfIndex string) *TrapTopologyEnrichment {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	ifIndex, ok := c.ifIndexByIP[ip]
-	if !ok || ifIndex == "" {
-		if !c.localDeviceHasIP(ip) {
-			return nil
-		}
+	method := c.localDeviceIPMatchMethod(ip)
+	if method == "" {
+		return nil
 	}
 
-	enrich := &TrapTopologyEnrichment{}
+	trapIfIndex = strings.TrimSpace(trapIfIndex)
+	enrich := &TrapTopologyEnrichment{
+		SourceIP:      ip,
+		DeviceStatus:  "matched",
+		DeviceMethod:  method,
+		DeviceMatches: 1,
+	}
 
 	if sysName := strings.TrimSpace(c.localDevice.SysName); sysName != "" {
 		enrich.DeviceHostname = sysName
@@ -63,12 +97,23 @@ func (c *topologyCache) trapEnrichmentForIP(ip string) *TrapTopologyEnrichment {
 		enrich.SourceVnodeID = nodeID
 	}
 
-	if ifName, ok := c.ifNamesByIndex[ifIndex]; ok && ifName != "" {
-		enrich.Interface = ifName
+	if trapIfIndex == "" {
+		enrich.InterfaceStatus = "skipped"
+		enrich.NeighborStatus = "skipped"
+		return enrich
 	}
 
-	if ifIndex != "" {
-		enrich.Neighbors = c.trapNeighborNamesForInterface(ifIndex)
+	enrich.InterfaceIndex = trapIfIndex
+	enrich.InterfaceStatus = "no_match"
+	if ifName, ok := c.ifNamesByIndex[trapIfIndex]; ok && strings.TrimSpace(ifName) != "" {
+		enrich.Interface = ifName
+		enrich.InterfaceStatus = "matched"
+	}
+
+	enrich.NeighborStatus = "no_match"
+	enrich.Neighbors = c.trapNeighborNamesForInterface(trapIfIndex)
+	if len(enrich.Neighbors) > 0 {
+		enrich.NeighborStatus = "matched"
 	}
 
 	return enrich
@@ -124,14 +169,17 @@ func cdpRemoteIfIndex(key string, r *cdpRemote) string {
 	return ""
 }
 
-func (c *topologyCache) localDeviceHasIP(ip string) bool {
+func (c *topologyCache) localDeviceIPMatchMethod(ip string) string {
 	if normalizeIPAddress(c.localDevice.ManagementIP) == ip {
-		return true
+		return "management_ip"
 	}
 	for _, addr := range c.localDevice.ManagementAddresses {
 		if normalizeIPAddress(addr.Address) == ip {
-			return true
+			return "management_address"
 		}
 	}
-	return false
+	if _, ok := c.ifIndexByIP[ip]; ok {
+		return "local_interface_ip"
+	}
+	return ""
 }

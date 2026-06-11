@@ -101,17 +101,27 @@ func TestEnrichTrapEntryRegistryHostnameWinsOverTopologyAndReverseDNS(t *testing
 		},
 	}
 
-	prev := trapTopologyEnrichmentForIP
-	trapTopologyEnrichmentForIP = func(string) *snmptopology.TrapTopologyEnrichment {
+	prev := trapTopologyEnrichmentForSource
+	trapTopologyEnrichmentForSource = func(ip, ifIndex string) *snmptopology.TrapTopologyEnrichment {
+		vnodeID := "topology-vnode-id"
+		if ip == "10.1.2.6" {
+			vnodeID = "registry-vnode-id"
+		}
 		return &snmptopology.TrapTopologyEnrichment{
-			DeviceHostname: "topology-sysname",
-			DeviceVendor:   "topology-vendor",
-			SourceVnodeID:  "topology-vnode-id",
-			Interface:      "Gi0/1",
-			Neighbors:      []string{"topo-neighbor"},
+			DeviceStatus:    "matched",
+			DeviceMethod:    "management_ip",
+			DeviceMatches:   1,
+			DeviceHostname:  "topology-sysname",
+			DeviceVendor:    "topology-vendor",
+			SourceVnodeID:   vnodeID,
+			InterfaceIndex:  ifIndex,
+			InterfaceStatus: "matched",
+			Interface:       "Gi0/1",
+			NeighborStatus:  "matched",
+			Neighbors:       []string{"topo-neighbor"},
 		}
 	}
-	t.Cleanup(func() { trapTopologyEnrichmentForIP = prev })
+	t.Cleanup(func() { trapTopologyEnrichmentForSource = prev })
 
 	for tcName, tc := range tests {
 		t.Run(tcName, func(t *testing.T) {
@@ -126,7 +136,12 @@ func TestEnrichTrapEntryRegistryHostnameWinsOverTopologyAndReverseDNS(t *testing
 			}
 			defer dns.Close()
 
-			entry := &TrapEntry{SourceIP: tc.info.Hostname}
+			entry := &TrapEntry{
+				SourceIP: tc.info.Hostname,
+				Varbinds: []VarbindValue{
+					{Name: "ifIndex", OID: ifIndexOIDPrefix + ".1", Type: "InterfaceIndex", Value: int64(1)},
+				},
+			}
 			enrichTrapEntry(entry, true, dns)
 
 			if entry.DeviceHostname != tc.wantHost {
@@ -193,6 +208,121 @@ func TestEnrichTrapEntryNoDeviceRegistryMatch(t *testing.T) {
 	}
 	if entry.SourceVnodeID != "" {
 		t.Errorf("SourceVnodeID = %q, want empty", entry.SourceVnodeID)
+	}
+}
+
+func TestEnrichTrapEntryAmbiguousDeviceRegistryMatchDoesNotEnrich(t *testing.T) {
+	ddsnmp.DeviceRegistry.Register("job-a:10.9.9.1:162", ddsnmp.DeviceConnectionInfo{
+		Hostname: "10.9.9.1",
+		SysName:  "switch-a",
+		Vendor:   "vendor-a",
+	})
+	defer ddsnmp.DeviceRegistry.Unregister("job-a:10.9.9.1:162")
+	ddsnmp.DeviceRegistry.Register("job-b:10.9.9.1:162", ddsnmp.DeviceConnectionInfo{
+		Hostname: "10.9.9.1",
+		SysName:  "switch-b",
+		Vendor:   "vendor-b",
+	})
+	defer ddsnmp.DeviceRegistry.Unregister("job-b:10.9.9.1:162")
+
+	entry := &TrapEntry{SourceIP: "10.9.9.1"}
+	enrichTrapEntry(entry, false, nil)
+
+	if entry.DeviceHostname != "" {
+		t.Errorf("DeviceHostname = %q, want empty for ambiguous registry source", entry.DeviceHostname)
+	}
+	if entry.DeviceVendor != "" {
+		t.Errorf("DeviceVendor = %q, want empty for ambiguous registry source", entry.DeviceVendor)
+	}
+	if entry.Enrichment == nil || entry.Enrichment.Registry == nil {
+		t.Fatal("missing enrichment registry audit")
+	}
+	if entry.Enrichment.Registry.Status != "ambiguous" || entry.Enrichment.Registry.Matches != 2 {
+		t.Fatalf("registry audit = %+v, want ambiguous with 2 matches", entry.Enrichment.Registry)
+	}
+}
+
+func TestEnrichTrapEntryDoesNotUseTopologyOnVnodeConflict(t *testing.T) {
+	prev := trapTopologyEnrichmentForSource
+	trapTopologyEnrichmentForSource = func(_, ifIndex string) *snmptopology.TrapTopologyEnrichment {
+		return &snmptopology.TrapTopologyEnrichment{
+			DeviceStatus:    "matched",
+			DeviceMethod:    "management_ip",
+			DeviceMatches:   1,
+			DeviceHostname:  "topology-sysname",
+			DeviceVendor:    "topology-vendor",
+			SourceVnodeID:   "topology-vnode-id",
+			InterfaceIndex:  ifIndex,
+			InterfaceStatus: "matched",
+			Interface:       "Gi0/1",
+			NeighborStatus:  "matched",
+			Neighbors:       []string{"dist-a"},
+		}
+	}
+	t.Cleanup(func() { trapTopologyEnrichmentForSource = prev })
+
+	ddsnmp.DeviceRegistry.Register("job-a:10.9.9.2:162", ddsnmp.DeviceConnectionInfo{
+		Hostname:  "10.9.9.2",
+		SysName:   "registry-switch",
+		VnodeGUID: "registry-vnode-id",
+	})
+	defer ddsnmp.DeviceRegistry.Unregister("job-a:10.9.9.2:162")
+
+	entry := &TrapEntry{
+		SourceIP: "10.9.9.2",
+		Varbinds: []VarbindValue{
+			{Name: "ifIndex", OID: ifIndexOIDPrefix + ".1", Type: "InterfaceIndex", Value: int64(1)},
+		},
+	}
+	enrichTrapEntry(entry, false, nil)
+
+	if entry.DeviceHostname != "registry-switch" {
+		t.Errorf("DeviceHostname = %q, want registry-switch", entry.DeviceHostname)
+	}
+	if entry.TopologyInterface != "" {
+		t.Errorf("TopologyInterface = %q, want empty on vnode conflict", entry.TopologyInterface)
+	}
+	if entry.TopologyNeighbors != "" {
+		t.Errorf("TopologyNeighbors = %q, want empty on vnode conflict", entry.TopologyNeighbors)
+	}
+	if entry.Enrichment == nil || entry.Enrichment.Topology == nil {
+		t.Fatal("missing topology audit")
+	}
+	if entry.Enrichment.Topology.Status != "conflict" || entry.Enrichment.Topology.Reason != "vnode_mismatch" {
+		t.Fatalf("topology audit = %+v, want vnode conflict", entry.Enrichment.Topology)
+	}
+}
+
+func TestEnrichTrapEntryUsesTrapVarbindInterfaceWithoutTopology(t *testing.T) {
+	prev := trapTopologyEnrichmentForSource
+	trapTopologyEnrichmentForSource = func(_, _ string) *snmptopology.TrapTopologyEnrichment {
+		return nil
+	}
+	t.Cleanup(func() { trapTopologyEnrichmentForSource = prev })
+
+	entry := &TrapEntry{
+		SourceIP: "10.9.9.3",
+		Varbinds: []VarbindValue{
+			{Name: "ifIndex", OID: ifIndexOIDPrefix + ".29", Type: "InterfaceIndex", Value: int64(29)},
+			{Name: "ifName", OID: ifNameOIDPrefix + ".29", Type: "OctetString", Value: "uplink-29"},
+		},
+	}
+	enrichTrapEntry(entry, false, nil)
+
+	if entry.TopologyInterface != "uplink-29" {
+		t.Errorf("TopologyInterface = %q, want uplink-29", entry.TopologyInterface)
+	}
+	if entry.TopologyNeighbors != "" {
+		t.Errorf("TopologyNeighbors = %q, want empty without exact topology device", entry.TopologyNeighbors)
+	}
+	if entry.Enrichment == nil || entry.Enrichment.Interface == nil {
+		t.Fatal("missing interface audit")
+	}
+	if entry.Enrichment.Interface.Method != "trap_varbind" || entry.Enrichment.Interface.Status != "matched" {
+		t.Fatalf("interface audit = %+v, want trap_varbind matched", entry.Enrichment.Interface)
+	}
+	if entry.Enrichment.Neighbors == nil || entry.Enrichment.Neighbors.Reason != "no_exact_topology_device_match" {
+		t.Fatalf("neighbors audit = %+v, want skipped without exact topology device", entry.Enrichment.Neighbors)
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 
@@ -45,14 +46,15 @@ var (
 )
 
 type TrapPDU struct {
-	OID       string
-	SourceIP  string
-	PeerIP    string
-	Community string
-	Version   SnmpVersion
-	PduType   PduType
-	Varbinds  []VarbindValue
-	RequestID uint32
+	OID         string
+	SourceIP    string
+	PeerIP      string
+	Community   string
+	Version     SnmpVersion
+	PduType     PduType
+	Varbinds    []VarbindValue
+	RequestID   uint32
+	SourceAudit *TrapSourceAudit
 }
 
 type TrapPacketContext struct {
@@ -91,15 +93,18 @@ func DecodeTrap(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3SecurityPara
 		peerIP = udpPeer.String()
 	}
 
+	source := selectTrapSource(varbinds, udpPeer)
+
 	tpdu := &TrapPDU{
-		OID:       trapOID,
-		SourceIP:  identifySource(varbinds, udpPeer),
-		PeerIP:    peerIP,
-		Community: pkt.Community,
-		Version:   version,
-		PduType:   pduType,
-		Varbinds:  varbinds,
-		RequestID: pkt.RequestID,
+		OID:         trapOID,
+		SourceIP:    source.sourceIP,
+		PeerIP:      peerIP,
+		Community:   pkt.Community,
+		Version:     version,
+		PduType:     pduType,
+		Varbinds:    varbinds,
+		RequestID:   pkt.RequestID,
+		SourceAudit: source.audit,
 	}
 
 	return &TrapPacketContext{
@@ -448,43 +453,106 @@ func trapOIDFromVarbinds(vbs []VarbindValue) string {
 	return ""
 }
 
+type trapSourceSelection struct {
+	sourceIP string
+	audit    *TrapSourceAudit
+}
+
 func identifySource(vbs []VarbindValue, udpPeer net.IP) string {
-	if addr := sourceFromVarbind(vbs, snmpTrapAddressOID); addr != "" {
-		return addr
+	return selectTrapSource(vbs, udpPeer).sourceIP
+}
+
+func selectTrapSource(vbs []VarbindValue, udpPeer net.IP) trapSourceSelection {
+	peer := validIPString(ipString(udpPeer))
+	trapAddr, trapAddrReject := sourceFromVarbindWithRejectReason(vbs, snmpTrapAddressOID)
+
+	audit := &TrapSourceAudit{
+		UDPPeer:         peer,
+		SnmpTrapAddress: trapAddr,
 	}
-	if udpPeer != nil {
-		return udpPeer.String()
+
+	if peer != "" {
+		audit.Selected = peer
+		audit.Method = "udp_peer"
+		if trapAddr != "" {
+			audit.RejectedCandidates = append(audit.RejectedCandidates, "snmpTrapAddress.0:direct_listener_uses_udp_peer")
+		} else if trapAddrReject != "" {
+			audit.RejectedCandidates = append(audit.RejectedCandidates, "snmpTrapAddress.0:"+trapAddrReject)
+		}
+		return trapSourceSelection{sourceIP: peer, audit: audit}
 	}
-	return ""
+
+	if trapAddr != "" {
+		audit.Selected = trapAddr
+		audit.Method = "snmpTrapAddress.0"
+		return trapSourceSelection{sourceIP: trapAddr, audit: audit}
+	}
+	if trapAddrReject != "" {
+		audit.RejectedCandidates = append(audit.RejectedCandidates, "snmpTrapAddress.0:"+trapAddrReject)
+	}
+	return trapSourceSelection{audit: audit}
 }
 
 func sourceFromVarbind(vbs []VarbindValue, oid string) string {
+	source, _ := sourceFromVarbindWithRejectReason(vbs, oid)
+	return source
+}
+
+func sourceFromVarbindWithRejectReason(vbs []VarbindValue, oid string) (string, string) {
 	for _, vb := range vbs {
 		if vb.OID != oid {
 			continue
 		}
 		switch v := vb.Value.(type) {
 		case string:
-			return validIPString(v)
+			return validIPStringWithRejectReason(v)
 		case []byte:
 			if len(v) == net.IPv4len || len(v) == net.IPv6len {
-				return net.IP(v).String()
+				return validIPStringWithRejectReason(net.IP(v).String())
 			}
-			return validIPString(string(v))
+			return validIPStringWithRejectReason(string(v))
 		case net.IP:
 			if v == nil {
-				return ""
+				return "", "invalid_ip"
 			}
-			return v.String()
+			return validIPStringWithRejectReason(v.String())
 		default:
-			return ""
+			return "", "invalid_type"
 		}
 	}
-	return ""
+	return "", ""
 }
 
 func validIPString(s string) string {
-	ip := net.ParseIP(s)
+	ip, _ := validIPStringWithRejectReason(s)
+	return ip
+}
+
+func validIPStringWithRejectReason(s string) (string, string) {
+	s = strings.TrimSpace(s)
+	addr, err := netip.ParseAddr(s)
+	if err != nil {
+		ip := net.ParseIP(s)
+		if ip == nil {
+			return "", "invalid_ip"
+		}
+		parsed, ok := netip.AddrFromSlice(ip)
+		if !ok {
+			return "", "invalid_ip"
+		}
+		addr = parsed
+	}
+	addr = addr.Unmap()
+	if addr.IsUnspecified() {
+		return "", "unspecified_ip"
+	}
+	if addr.IsMulticast() {
+		return "", "multicast_ip"
+	}
+	return addr.String(), ""
+}
+
+func ipString(ip net.IP) string {
 	if ip == nil {
 		return ""
 	}

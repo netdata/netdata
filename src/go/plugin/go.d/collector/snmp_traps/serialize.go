@@ -25,6 +25,8 @@ var severityToPriority = map[Severity]string{
 	"debug":   "7",
 }
 
+const trapJSONPacketSequenceKey = "netdata_packet_sequence"
+
 func severityPriority(sev Severity) string {
 	if p, ok := severityToPriority[sev]; ok {
 		return p
@@ -125,12 +127,6 @@ func serializeToJournalFields(entry *TrapEntry) ([]JournalField, error) {
 		}
 	}
 
-	trapJSON, err := buildTrapJSON(entry)
-	if err != nil {
-		return nil, fmt.Errorf("TRAP_JSON: %w", err)
-	}
-	fields = append(fields, JournalField{Name: "TRAP_JSON", Value: trapJSON})
-
 	if isDedupSummary && entry.SummaryCounts != nil {
 		sc := entry.SummaryCounts
 		fields = append(fields, JournalField{Name: "TRAP_SUPPRESSED_COUNT", Value: fmt.Appendf(nil, "%d", sc.TotalSuppressed)})
@@ -150,6 +146,20 @@ func serializeToJournalFields(entry *TrapEntry) ([]JournalField, error) {
 		}
 		fields = append(fields, JournalField{Name: "TRAP_TAG_" + upperKey, Value: []byte(val)})
 	}
+
+	if entry.Enrichment != nil {
+		enrichmentJSON, err := buildTrapEnrichmentJSON(entry)
+		if err != nil {
+			return nil, fmt.Errorf("TRAP_ENRICHMENT: %w", err)
+		}
+		fields = append(fields, JournalField{Name: "TRAP_ENRICHMENT", Value: enrichmentJSON})
+	}
+
+	trapJSON, err := buildTrapJSON(entry)
+	if err != nil {
+		return nil, fmt.Errorf("TRAP_JSON: %w", err)
+	}
+	fields = append(fields, JournalField{Name: "TRAP_JSON", Value: trapJSON})
 
 	return fields, nil
 }
@@ -174,11 +184,17 @@ func isValidTrapTagKey(upperKey string) bool {
 
 func buildTrapJSON(entry *TrapEntry) ([]byte, error) {
 	if entry.DecodeError != nil {
-		return json.Marshal(entry.DecodeError)
+		return json.Marshal(decodeErrorJSON{
+			DecodeErrorInfo: entry.DecodeError,
+			PacketSequence:  entry.PacketSequence,
+		})
 	}
 
 	obj := make(map[string]jsonVarbindEntry)
 	seenKeys := make(map[string]int)
+	if entry.PacketSequence > 0 {
+		seenKeys[trapJSONPacketSequenceKey] = 1
+	}
 
 	for _, vb := range entry.Varbinds {
 		if isSensitiveTrapVarbind(vb) {
@@ -230,7 +246,10 @@ func buildTrapJSON(entry *TrapEntry) ([]byte, error) {
 	}
 	sort.Strings(sortedKeys)
 
-	ordered := make([]jsonMapEntry, 0, len(obj))
+	ordered := make([]jsonMapEntry, 0, len(obj)+1)
+	if entry.PacketSequence > 0 {
+		ordered = append(ordered, jsonMapEntry{Key: trapJSONPacketSequenceKey, Value: entry.PacketSequence})
+	}
 	for _, k := range sortedKeys {
 		ordered = append(ordered, jsonMapEntry{Key: k, Value: obj[k]})
 	}
@@ -240,6 +259,18 @@ func buildTrapJSON(entry *TrapEntry) ([]byte, error) {
 		return nil, err
 	}
 	return result, nil
+}
+
+type decodeErrorJSON struct {
+	*DecodeErrorInfo
+	PacketSequence uint64 `json:"netdata_packet_sequence,omitempty"`
+}
+
+func buildTrapEnrichmentJSON(entry *TrapEntry) ([]byte, error) {
+	if entry == nil || entry.Enrichment == nil {
+		return nil, nil
+	}
+	return json.Marshal(entry.Enrichment)
 }
 
 func isSensitiveTrapVarbind(vb VarbindValue) bool {
@@ -420,10 +451,6 @@ func (s *journalHotSerializer) serialize(entry *TrapEntry) ([][]byte, int, error
 		}
 	}
 
-	if err := s.addTrapJSONField(entry); err != nil {
-		return nil, 0, fmt.Errorf("TRAP_JSON: %w", err)
-	}
-
 	if isDedupSummary && entry.SummaryCounts != nil {
 		sc := entry.SummaryCounts
 		s.addIntField("TRAP_SUPPRESSED_COUNT", sc.TotalSuppressed)
@@ -441,6 +468,16 @@ func (s *journalHotSerializer) serialize(entry *TrapEntry) ([][]byte, int, error
 			return nil, 0, fmt.Errorf("invalid label key for TRAP_TAG: %q", key)
 		}
 		s.addStringField("TRAP_TAG_"+upperKey, val)
+	}
+
+	if entry.Enrichment != nil {
+		if err := s.addTrapEnrichmentField(entry); err != nil {
+			return nil, 0, fmt.Errorf("TRAP_ENRICHMENT: %w", err)
+		}
+	}
+
+	if err := s.addTrapJSONField(entry); err != nil {
+		return nil, 0, fmt.Errorf("TRAP_JSON: %w", err)
 	}
 
 	return s.payloads, s.binaryEncodedFields, nil
@@ -532,6 +569,21 @@ func (s *journalHotSerializer) addTrapJSONField(entry *TrapEntry) error {
 	return nil
 }
 
+func (s *journalHotSerializer) addTrapEnrichmentField(entry *TrapEntry) error {
+	enrichmentJSON, err := buildTrapEnrichmentJSON(entry)
+	if err != nil {
+		return err
+	}
+
+	start := len(s.buf)
+	s.buf = append(s.buf, "TRAP_ENRICHMENT"...)
+	s.buf = append(s.buf, '=')
+	valueStart := len(s.buf)
+	s.buf = append(s.buf, enrichmentJSON...)
+	s.addPayload(start, valueStart)
+	return nil
+}
+
 func appendDecodeErrorJournalFields(fields *[]JournalField, info *DecodeErrorInfo) {
 	if info.Kind != "" {
 		*fields = append(*fields, JournalField{Name: "TRAP_DECODE_ERROR_KIND", Value: []byte(info.Kind)})
@@ -568,6 +620,9 @@ func (s *journalHotSerializer) appendTrapJSONObject(entry *TrapEntry) error {
 			delete(s.seenJSONKeys, key)
 		}
 	}
+	if entry.PacketSequence > 0 {
+		s.seenJSONKeys[trapJSONPacketSequenceKey] = 1
+	}
 
 	for _, vb := range entry.Varbinds {
 		if isSensitiveTrapVarbind(vb) {
@@ -592,13 +647,21 @@ func (s *journalHotSerializer) appendTrapJSONObject(entry *TrapEntry) error {
 	})
 
 	s.buf = append(s.buf, '{')
+	wrote := false
+	if entry.PacketSequence > 0 {
+		s.appendJSONString(trapJSONPacketSequenceKey)
+		s.buf = append(s.buf, ':')
+		s.buf = strconv.AppendUint(s.buf, entry.PacketSequence, 10)
+		wrote = true
+	}
 	for i, entry := range s.jsonEntries {
-		if i > 0 {
+		if wrote || i > 0 {
 			s.buf = append(s.buf, ',')
 		}
 		s.appendJSONString(entry.key)
 		s.buf = append(s.buf, ':')
 		s.appendJSONVarbind(entry.vb)
+		wrote = true
 	}
 	s.buf = append(s.buf, '}')
 	return nil

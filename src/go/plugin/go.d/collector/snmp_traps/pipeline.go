@@ -18,6 +18,7 @@ func trapEntryFromPDU(jobName string, pdu *TrapPDU, td *TrapDef, realtimeUsec, m
 		PduType:               pdu.PduType,
 		SnmpVersion:           pdu.Version,
 		Varbinds:              pdu.Varbinds,
+		Enrichment:            &TrapEnrichmentAudit{Source: pdu.SourceAudit},
 	}
 
 	if td != nil {

@@ -57,6 +57,33 @@ type DecodeErrorInfo struct {
 	EngineID      string `json:"engine_id,omitempty"`
 }
 
+type TrapSourceAudit struct {
+	UDPPeer            string   `json:"udp_peer,omitempty"`
+	SnmpTrapAddress    string   `json:"snmp_trap_address,omitempty"`
+	Selected           string   `json:"selected,omitempty"`
+	Method             string   `json:"method,omitempty"`
+	RejectedCandidates []string `json:"rejected_candidates,omitempty"`
+}
+
+type TrapEnrichmentAudit struct {
+	Source     *TrapSourceAudit      `json:"source,omitempty"`
+	Registry   *TrapEnrichmentLookup `json:"registry,omitempty"`
+	Topology   *TrapEnrichmentLookup `json:"topology,omitempty"`
+	Interface  *TrapEnrichmentLookup `json:"interface,omitempty"`
+	Neighbors  *TrapEnrichmentLookup `json:"neighbors,omitempty"`
+	ReverseDNS *TrapEnrichmentLookup `json:"reverse_dns,omitempty"`
+	Applied    map[string]string     `json:"applied,omitempty"`
+}
+
+type TrapEnrichmentLookup struct {
+	Key     string   `json:"key,omitempty"`
+	Status  string   `json:"status,omitempty"`
+	Method  string   `json:"method,omitempty"`
+	Matches int      `json:"matches,omitempty"`
+	Reason  string   `json:"reason,omitempty"`
+	Fields  []string `json:"fields,omitempty"`
+}
+
 type TrapEntry struct {
 	JobName               string
 	ReportType            ReportType
@@ -76,8 +103,10 @@ type TrapEntry struct {
 	SourceVnodeID         string
 	TopologyInterface     string
 	TopologyNeighbors     string
+	PacketSequence        uint64
 	Labels                map[string]string
 	Varbinds              []VarbindValue
+	Enrichment            *TrapEnrichmentAudit
 	SummaryCounts         *DedupSummary
 	DecodeError           *DecodeErrorInfo
 }

@@ -19,6 +19,7 @@ type decodeErrorRecord struct {
 	peerIP         net.IP
 	conn           *net.UDPConn
 	peer           *net.UDPAddr
+	packetSequence uint64
 	kind           string
 	err            error
 	sniffedVersion SnmpVersion
@@ -91,6 +92,7 @@ func newDecodeErrorEntry(jobName string, rec decodeErrorRecord) *TrapEntry {
 		SourceIP:              sourceIP,
 		SourceUDPPeer:         sourcePeer,
 		SnmpVersion:           rec.sniffedVersion,
+		PacketSequence:        rec.packetSequence,
 		DecodeError:           info,
 	}
 }
