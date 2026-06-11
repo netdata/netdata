@@ -101,8 +101,8 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 		return CachestatLegacyConfig{}, err
 	}
 	cfg.ConfigFound = found
-	if fileCfg.Enabled != nil {
-		cfg.Enabled = *fileCfg.Enabled
+	if fileCfg.Cachestat != nil {
+		cfg.Enabled = *fileCfg.Cachestat
 	}
 	if fileCfg.Socket != nil {
 		cfg.SocketEnabled = *fileCfg.Socket
