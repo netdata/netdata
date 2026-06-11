@@ -498,11 +498,13 @@ static inline ssize_t readlink(const char *path __maybe_unused,
 // ── sysconf() ── UCRT64 has no sysconf; provide the values callers need ───────
 #ifndef _SC_CLK_TCK
 #  define _SC_CLK_TCK            2
+#  define _SC_NGROUPS_MAX        3
 #  define _SC_PAGESIZE           30
 #  define _SC_PAGE_SIZE          _SC_PAGESIZE
 #  define _SC_NPROCESSORS_ONLN   84
 static inline long sysconf(int name) {
     if (name == _SC_CLK_TCK)           return 100;
+    if (name == _SC_NGROUPS_MAX)       return 65536;
     if (name == _SC_PAGESIZE)          return 4096;
     if (name == _SC_NPROCESSORS_ONLN)  return 1;
     errno = EINVAL;
@@ -597,15 +599,21 @@ static inline int fcntl(int fd, int cmd, ...) {
 }
 #endif // F_GETFL
 
-// ── struct passwd / getpwuid_r ── pwd.h absent on UCRT64 ────────────────────
-// Stub always reports "not found" so callers fall back to numeric UID string.
+// ── struct passwd / getpwnam / getpwuid / getpwuid_r ── pwd.h absent on UCRT64 ─
+// Stubs always report "not found" so callers fall back to numeric UID string.
 #ifndef _PASSWD_DEFINED
 #define _PASSWD_DEFINED
 struct passwd {
     char  *pw_name;
+    char  *pw_passwd;
     uid_t  pw_uid;
     gid_t  pw_gid;
+    char  *pw_gecos;
+    char  *pw_dir;
+    char  *pw_shell;
 };
+static inline struct passwd *getpwnam(const char *name __maybe_unused) { return NULL; }
+static inline struct passwd *getpwuid(uid_t uid __maybe_unused) { return NULL; }
 static inline int getpwuid_r(uid_t uid __maybe_unused,
                               struct passwd *pwd __maybe_unused,
                               char *buf __maybe_unused,
@@ -972,6 +980,73 @@ static inline int statvfs(const char *path, struct statvfs *buf) {
 static inline int posix_memalign(void **memptr, size_t alignment, size_t size) {
     *memptr = _aligned_malloc(size, alignment);
     return *memptr ? 0 : ENOMEM;
+}
+#endif
+
+// ── POSIX user/group ID functions ── absent from UCRT64 ──────────────────────
+// Windows runs without POSIX user IDs; always report root (0) and no-op setters.
+static inline uid_t getuid(void)  { return 0; }
+static inline gid_t getgid(void)  { return 0; }
+static inline int setuid(uid_t uid __maybe_unused)   { return 0; }
+static inline int setgid(gid_t gid __maybe_unused)   { return 0; }
+static inline int seteuid(uid_t uid __maybe_unused)  { return 0; }
+static inline int setegid(gid_t gid __maybe_unused)  { return 0; }
+static inline int setgroups(size_t n __maybe_unused, const gid_t *gids __maybe_unused) { return 0; }
+
+// ── chown() ── POSIX path-based ownership, absent from UCRT64 ────────────────
+// File ownership is meaningless on Windows; no-op returning success.
+static inline int chown(const char *path __maybe_unused, uid_t uid __maybe_unused, gid_t gid __maybe_unused) {
+    return 0;
+}
+
+// ── dirfd() / unlinkat() ── POSIX dir-relative file ops, absent from UCRT64 ──
+// dirfd() has no Windows equivalent; unlinkat() is used only in clean_directory()
+// where dir-relative semantics are unavailable. Both become silent no-ops.
+static inline int dirfd(DIR *dirp __maybe_unused) { return -1; }
+static inline int unlinkat(int fd __maybe_unused, const char *pathname __maybe_unused, int flags __maybe_unused) {
+    return 0;
+}
+
+// ── fork() / setsid() ── POSIX process creation, absent from UCRT64 ──────────
+// Windows cannot fork(). Netdata on Windows starts with --no-fork so become_daemon()
+// never reaches fork(); returning -1 causes a fatal if the code path is ever hit.
+static inline int fork(void) { errno = ENOSYS; return -1; }
+static inline pid_t setsid(void) { return (pid_t)GetCurrentProcessId(); }
+
+// ── sched_getparam() ── POSIX scheduler query, absent from UCRT64 winpthreads ─
+// struct sched_param is defined by <sched.h> (included by daemon.c after this header).
+// Forward-declare the struct so the stub compiles without dereferencing it;
+// <sched.h>'s full definition is compatible with this forward declaration.
+struct sched_param;
+static inline int sched_getparam(pid_t pid __maybe_unused, struct sched_param *param __maybe_unused) {
+    errno = ENOSYS;
+    return -1;
+}
+
+// ── struct sigaction / sigaction() / SA_SIGINFO ── POSIX signal handling, absent from UCRT64 ─
+// UCRT64 provides signal() and raise() but not the POSIX sigaction interface.
+// siginfo_t is already defined above; stubs allow signal-handler.c to compile.
+// Signal chaining is a no-op on Windows — SEH handles fault signals instead.
+#ifndef _SIGACTION_DEFINED
+#define _SIGACTION_DEFINED
+struct sigaction {
+    union {
+        void (*sa_handler)(int);
+        void (*sa_sigaction)(int, siginfo_t *, void *);
+    };
+    sigset_t sa_mask;
+    int      sa_flags;
+};
+#define SA_SIGINFO    4
+#define SA_RESTART    0x10000000
+#ifndef SA_NOCLDSTOP
+#define SA_NOCLDSTOP  1
+#endif
+static inline int sigaction(int signo __maybe_unused,
+                             const struct sigaction *act __maybe_unused,
+                             struct sigaction *oldact __maybe_unused) {
+    if (oldact) memset(oldact, 0, sizeof(*oldact));
+    return 0;
 }
 #endif
 

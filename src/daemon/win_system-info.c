@@ -40,7 +40,7 @@ static char *netdata_windows_arch(DWORD value)
 
 static DWORD netdata_windows_cpu_frequency(HKEY lKey)
 {
-    DWORD freq = 0;
+    unsigned int freq = 0;
     long ret = netdata_registry_get_dword_from_open_key(&freq, lKey, "~MHz");
     if (ret != ERROR_SUCCESS)
         return freq;
@@ -243,7 +243,7 @@ static void netdata_windows_discover_os_version(char *os, size_t length, DWORD b
 
 static void netdata_windows_os_kernel_version(char *out, DWORD length, DWORD build)
 {
-    DWORD major, minor;
+    unsigned int major, minor;
     if (!netdata_registry_get_dword(&major,
                                     HKEY_LOCAL_MACHINE,
                                     "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
