@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "cgroup-internals.h"
+#include "cgroup-snapshot-store.h"
 #include "libnetdata/netipc/netipc_netdata.h"
 
 #ifdef OS_LINUX
@@ -32,62 +33,97 @@ static bool cgroup_find_procs_path_v1(char *path_buf, size_t path_buf_size, cons
     return false;
 }
 
+static int cgroup_snapshot_label_cb(
+    const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data) {
+    cgroup_snapshot_entry_add_label((CGROUP_SNAPSHOT_ENTRY *)data, name, value);
+    return 0;
+}
+
+// Build the immutable snapshot store from cgroup_root and publish it. Called by
+// the discovery thread right after the splice: discovery is the only writer of
+// the fields read here and is not splicing again until next cycle, so this runs
+// lock-free against the collection loop (which only reads its own metric fields)
+// and moves the per-cgroup cgroup.procs stat() off the snapshot handler's hot
+// path and off cgroup_root_mutex.
+void cgroup_snapshot_rebuild_and_publish(void) {
+    uint64_t generation = __atomic_load_n(&cgroup_discovery_generation, __ATOMIC_ACQUIRE);
+    CGROUP_SNAPSHOT_BUILDER *sb = cgroup_snapshot_builder_create(generation, (size_t)cgroup_root_count);
+
+    char name_buf[256];
+    char path_buf[FILENAME_MAX + 1];
+
+    for (struct cgroup *cg = cgroup_root; cg; cg = cg->next) {
+        CGROUP_SNAPSHOT_ENTRY *e = cgroup_snapshot_builder_add_entry(sb, cg->id);
+        if (!e)
+            continue; // duplicate id, first wins
+
+        discovery_classify_orchestrator(cg);
+
+        const char *prefix = is_cgroup_systemd_service(cg) ? services_chart_id_prefix : cgroup_chart_id_prefix;
+        snprintfz(name_buf, sizeof(name_buf) - 1, "%s%s", prefix, cg->chart_id);
+
+        uint32_t enabled = cg->enabled;
+        if (cgroup_use_unified_cgroups) {
+            struct stat st;
+            snprintfz(path_buf, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_unified_base, cg->id);
+            if (stat(path_buf, &st) == -1) {
+                path_buf[0] = '\0';
+                enabled = 0;
+            }
+        } else if (!cgroup_find_procs_path_v1(path_buf, sizeof(path_buf), cg->id)) {
+            enabled = 0;
+        }
+
+        e->known = (cg->processed && cg->pending_renames == 0);
+        e->orchestrator = (uint16_t)cg->container_orchestrator;
+        e->name = string_strdupz(cg->name ? cg->name : "");
+        e->chart_name = string_strdupz(name_buf);
+        e->hash = simple_hash(name_buf);
+        e->options = cg->options;
+        e->enabled = enabled;
+        e->procs_path = string_strdupz(path_buf);
+
+        if (cg->chart_labels)
+            rrdlabels_walkthrough_read(cg->chart_labels, cgroup_snapshot_label_cb, e);
+    }
+
+    cgroup_snapshot_store_publish(cgroup_snapshot_builder_finalize(sb));
+}
+
 // handler callback invoked by netipc worker threads when a client requests a snapshot
 static bool cgroups_snapshot_handler(void *user __maybe_unused,
                                      const nipc_cgroups_req_t *request __maybe_unused,
                                      nipc_cgroups_builder_t *builder) {
     static uint64_t last_logged_zero_generation = 0;
     static uint64_t last_logged_truncated_generation = 0;
-    uint64_t snapshot_generation;
-    char name_buf[256];
-    char path_buf[FILENAME_MAX + 1];
 
-    netdata_mutex_lock(&cgroup_root_mutex);
+    const CGROUP_SNAPSHOT_STORE *store = cgroup_snapshot_store_acquire();
 
-    // set snapshot header — systemd is always enabled in this codebase
-    snapshot_generation = __atomic_load_n(&cgroup_discovery_generation, __ATOMIC_ACQUIRE);
+    uint64_t snapshot_generation = cgroup_snapshot_store_generation(store);
     nipc_cgroups_builder_set_header(builder, CONFIG_BOOLEAN_YES, snapshot_generation);
 
-    struct cgroup *cg;
-    int count;
+    size_t total = cgroup_snapshot_store_count(store);
+    int count = 0;
     int enabled_count = 0;
     bool truncated = false;
-    for (cg = cgroup_root, count = 0; cg && count < cgroup_root_max; cg = cg->next, count++) {
-        const char *prefix = is_cgroup_systemd_service(cg)
-            ? services_chart_id_prefix
-            : cgroup_chart_id_prefix;
+    for (size_t i = 0; i < total && count < cgroup_root_max; i++, count++) {
+        const CGROUP_SNAPSHOT_ENTRY *e = cgroup_snapshot_store_at(store, i);
 
-        snprintfz(name_buf, sizeof(name_buf) - 1, "%s%s", prefix, cg->chart_id);
-        uint32_t hash = simple_hash(name_buf);
-        uint32_t options = cg->options;
-        uint32_t enabled = cg->enabled;
-
-        // find the cgroup.procs path
-        if (cgroup_use_unified_cgroups) {
-            struct stat buf;
-            snprintfz(path_buf, FILENAME_MAX, "%s%s/cgroup.procs", cgroup_unified_base, cg->id);
-            if (stat(path_buf, &buf) == -1) {
-                path_buf[0] = '\0';
-                enabled = 0;
-            }
-        } else {
-            if (!cgroup_find_procs_path_v1(path_buf, sizeof(path_buf), cg->id))
-                enabled = 0;
-        }
-
-        if (enabled)
+        if (e->enabled)
             enabled_count++;
 
         nipc_error_t err = nipc_cgroups_builder_add(
-            builder, hash, options, enabled,
-            name_buf, (uint32_t)strlen(name_buf),
-            path_buf, (uint32_t)strlen(path_buf));
+            builder, e->hash, e->options, e->enabled,
+            string2str(e->chart_name), string_strlen(e->chart_name),
+            string2str(e->procs_path), string_strlen(e->procs_path));
 
         if (err == NIPC_ERR_OVERFLOW) {
             truncated = true;
             break; // buffer full — send what we have
         }
     }
+
+    cgroup_snapshot_store_release();
 
     bool log_zero_generation = false;
     bool log_truncated_generation = false;
@@ -101,8 +137,6 @@ static bool cgroups_snapshot_handler(void *user __maybe_unused,
         last_logged_truncated_generation = snapshot_generation;
         log_truncated_generation = true;
     }
-
-    netdata_mutex_unlock(&cgroup_root_mutex);
 
     if (log_zero_generation) {
         collector_info("CGROUP: netipc snapshot generation=%llu returned zero items",

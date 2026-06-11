@@ -2,13 +2,16 @@
 
 #include "../cgroup-internals.h"
 #include "../cgroup-netipc.h"
+#include "../cgroup-snapshot-store.h"
 #include "libnetdata/netipc/netipc_netdata.h"
 
 SIMPLE_PATTERN *systemd_services_cgroups = NULL;
+SIMPLE_PATTERN *search_cgroup_paths = NULL;
 RRDHOST *localhost = NULL;
 struct cgroup *cgroup_root = NULL;
 netdata_mutex_t cgroup_root_mutex;
 struct discovery_thread discovery_thread = { 0 };
+int cgroup_max_depth = 0;
 int cgroup_lookup_reaped_set_size = 4;
 bool discovery_signal_pending = false;
 uint64_t cgroup_discovery_generation = 0;
@@ -151,6 +154,24 @@ static bool expect_item(
     return true;
 }
 
+// Publish a snapshot store holding the known (resolved) and retry (discovered
+// but not yet resolved) cgroups, mirroring what discovery's rebuild would build.
+static void publish_test_store(const char *known_path, const char *retry_path)
+{
+    CGROUP_SNAPSHOT_BUILDER *builder = cgroup_snapshot_builder_create(1, 2);
+
+    CGROUP_SNAPSHOT_ENTRY *known = cgroup_snapshot_builder_add_entry(builder, known_path);
+    known->known = true;
+    known->orchestrator = (uint16_t)CGROUPS_ORCHESTRATOR_DOCKER;
+    known->name = string_strdupz("known-container");
+    cgroup_snapshot_entry_add_label(known, "image", "netdata/test");
+
+    // discovered but unresolved: known stays false -> RETRY_LATER without a name
+    (void)cgroup_snapshot_builder_add_entry(builder, retry_path);
+
+    cgroup_snapshot_store_publish(cgroup_snapshot_builder_finalize(builder));
+}
+
 int main(void)
 {
     char temp_dir[] = "./cgroup-lookup-netipc-test.XXXXXX";
@@ -159,6 +180,7 @@ int main(void)
     const char *retry_path = "/docker/aaaaaaaaaaaaaaaa";
     const char *gone_path = "/docker/bbbbbbbbbbbbbbbb";
     const char *missing_path = "/docker/cccccccccccccccc";
+    const char *unreachable_path = "/system/some.scope"; // ancestor "/system" is excluded from the walk
     int rc = 1;
 
     netdata_configured_host_prefix = "";
@@ -169,9 +191,17 @@ int main(void)
 
     snprintfz(service_name, sizeof(service_name) - 1, "cgroups-lookup-test-%d", getpid());
 
+    // classifier input: mirror the real default so /docker/* is reachable (a
+    // transient miss) while /system/* is not (a permanent miss).
+    search_cgroup_paths = simple_pattern_create(" !/system !/systemd !/user * ", NULL, SIMPLE_PATTERN_EXACT, true);
+    if (!search_cgroup_paths) {
+        fprintf(stderr, "failed to create search_cgroup_paths pattern\n");
+        goto cleanup_dir;
+    }
+
     if (netdata_mutex_init(&cgroup_root_mutex) != 0) {
         fprintf(stderr, "failed to initialize cgroup_root_mutex\n");
-        goto cleanup_dir;
+        goto cleanup_pattern;
     }
 
     if (netdata_mutex_init(&discovery_thread.mutex) != 0) {
@@ -184,26 +214,14 @@ int main(void)
         goto cleanup_discovery_mutex;
     }
 
-    struct cgroup retry_cgroup = {
-        .id = (char *)retry_path,
-        .name = (char *)"not-ready",
-        .processed = 0,
-        .pending_renames = 0,
-    };
-    struct cgroup known_cgroup = {
-        .id = (char *)known_path,
-        .name = (char *)"known-container",
-        .processed = 1,
-        .pending_renames = 0,
-        .next = &retry_cgroup,
-    };
-    known_cgroup.chart_labels = (RRDLABELS *)&known_cgroup;
+    cgroup_snapshot_store_init();
+    cgroup_snapshot_reaped_set_max((size_t)cgroup_lookup_reaped_set_size);
+    cgroup_snapshot_reaped_set_accepting(true);
 
-    cgroup_lookup_set_cgroup_root_for_testing(&known_cgroup);
-    __atomic_store_n(&cgroup_discovery_generation, 1, __ATOMIC_RELEASE);
+    publish_test_store(known_path, retry_path);
+    cgroup_snapshot_reaped_add(gone_path);
 
     cgroup_netipc_lookup_init_for_testing(temp_dir, service_name);
-    cgroup_netipc_lookup_reaped_set_insert(gone_path);
 
     nipc_client_config_t config = {
         .supported_profiles = NIPC_PROFILE_BASELINE | NIPC_PROFILE_SHM_HYBRID | NIPC_PROFILE_SHM_FUTEX,
@@ -223,21 +241,22 @@ int main(void)
         retry_path,
         gone_path,
         missing_path,
+        unreachable_path,
     };
-    nipc_str_view_t paths[4];
-    for (size_t i = 0; i < 4; i++) {
+    nipc_str_view_t paths[5];
+    for (size_t i = 0; i < 5; i++) {
         paths[i].ptr = path_strings[i];
         paths[i].len = (uint32_t)strlen(path_strings[i]);
     }
 
     nipc_cgroups_lookup_resp_view_t response;
-    nipc_error_t err = nipc_client_call_cgroups_lookup(&client, paths, 4, &response);
+    nipc_error_t err = nipc_client_call_cgroups_lookup(&client, paths, 5, &response);
     if (err != NIPC_OK) {
         fprintf(stderr, "lookup call failed: %u\n", (unsigned int)err);
         goto cleanup_client;
     }
 
-    if (response.generation != 1 || response.item_count != 4) {
+    if (response.generation != 1 || response.item_count != 5) {
         fprintf(stderr, "response header mismatch: generation=%llu items=%u\n",
                 (unsigned long long)response.generation, response.item_count);
         goto cleanup_client;
@@ -246,39 +265,43 @@ int main(void)
     if (!expect_item(&response, 0, known_path, NIPC_CGROUP_LOOKUP_KNOWN, NIPC_ORCHESTRATOR_DOCKER, "known-container", 1) ||
         !expect_item(&response, 1, retry_path, NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, NIPC_ORCHESTRATOR_UNKNOWN, "", 0) ||
         !expect_item(&response, 2, gone_path, NIPC_CGROUP_LOOKUP_UNKNOWN_PERMANENT, NIPC_ORCHESTRATOR_UNKNOWN, "", 0) ||
-        !expect_item(&response, 3, missing_path, NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, NIPC_ORCHESTRATOR_UNKNOWN, "", 0))
+        !expect_item(&response, 3, missing_path, NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, NIPC_ORCHESTRATOR_UNKNOWN, "", 0) ||
+        !expect_item(&response, 4, unreachable_path, NIPC_CGROUP_LOOKUP_UNKNOWN_PERMANENT, NIPC_ORCHESTRATOR_UNKNOWN, "", 0))
         goto cleanup_client;
 
     if (!__atomic_load_n(&discovery_signal_pending, __ATOMIC_ACQUIRE)) {
-        fprintf(stderr, "lookup miss did not arm discovery signal flag\n");
+        fprintf(stderr, "reachable lookup miss did not arm discovery signal flag\n");
         goto cleanup_client;
     }
 
     __atomic_store_n(&discovery_signal_pending, false, __ATOMIC_RELEASE);
 
-    nipc_str_view_t no_signal_paths[2] = {
+    // none of these must wake discovery: retry is known-but-unresolved, gone is
+    // reaped (permanent), unreachable is walk-excluded (permanent)
+    nipc_str_view_t no_signal_paths[3] = {
         paths[1],
         paths[2],
+        paths[4],
     };
-    err = nipc_client_call_cgroups_lookup(&client, no_signal_paths, 2, &response);
+    err = nipc_client_call_cgroups_lookup(&client, no_signal_paths, 3, &response);
     if (err != NIPC_OK) {
-        fprintf(stderr, "retry/reaped lookup call failed: %u\n", (unsigned int)err);
+        fprintf(stderr, "retry/reaped/unreachable lookup call failed: %u\n", (unsigned int)err);
         goto cleanup_client;
     }
 
     if (__atomic_load_n(&discovery_signal_pending, __ATOMIC_ACQUIRE)) {
-        fprintf(stderr, "present-unprocessed or reaped lookup incorrectly armed discovery signal flag\n");
+        fprintf(stderr, "unresolved/reaped/unreachable lookup incorrectly armed discovery signal flag\n");
         goto cleanup_client;
     }
 
-    err = nipc_client_call_cgroups_lookup(&client, paths, 4, &response);
+    err = nipc_client_call_cgroups_lookup(&client, paths, 5, &response);
     if (err != NIPC_OK) {
         fprintf(stderr, "second lookup call failed: %u\n", (unsigned int)err);
         goto cleanup_client;
     }
 
     if (!__atomic_load_n(&discovery_signal_pending, __ATOMIC_ACQUIRE)) {
-        fprintf(stderr, "second lookup miss did not re-arm discovery signal flag\n");
+        fprintf(stderr, "second reachable lookup miss did not re-arm discovery signal flag\n");
         goto cleanup_client;
     }
 
@@ -287,13 +310,15 @@ int main(void)
 cleanup_client:
     nipc_client_close(&client);
 cleanup_server:
-    cgroup_lookup_set_cgroup_root_for_testing(NULL);
     cgroup_netipc_lookup_cleanup();
+    cgroup_snapshot_store_shutdown();
     netdata_cond_destroy(&discovery_thread.cond_var);
 cleanup_discovery_mutex:
     netdata_mutex_destroy(&discovery_thread.mutex);
 cleanup_root_mutex:
     netdata_mutex_destroy(&cgroup_root_mutex);
+cleanup_pattern:
+    simple_pattern_free(search_cgroup_paths);
 cleanup_dir:
     (void)rmdir(temp_dir);
     return rc;

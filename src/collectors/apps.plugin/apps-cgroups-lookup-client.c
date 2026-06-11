@@ -20,6 +20,11 @@ static DICTIONARY *cgroups_lookup_cache = NULL;
 static size_t cgroups_lookup_cache_entries = 0;
 static uint64_t cgroups_lookup_cache_iteration = 0;
 
+// Highest cgroups.plugin snapshot generation observed in a lookup response.
+// Written by the lookup worker and read by the scan, both under apps_pids_mutex.
+// Gates RETRY_LATER re-asks to once per discovery cycle instead of every scan.
+static uint64_t cgroups_lookup_latest_generation = 0;
+
 static netdata_mutex_t cgroups_lookup_queue_mutex;
 static netdata_cond_t cgroups_lookup_queue_cond;
 static bool cgroups_lookup_queue_initialized = false;
@@ -447,7 +452,6 @@ static void cgroups_lookup_worker(void *arg __maybe_unused)
 
     bool was_ready = false;
     usec_t next_retry_ut = 0;
-    uint64_t last_observed_generation = 0;
     bool request_failure_logged = false;
 
     while (!__atomic_load_n(&cgroups_lookup_worker_stop, __ATOMIC_ACQUIRE)) {
@@ -532,8 +536,8 @@ static void cgroups_lookup_worker(void *arg __maybe_unused)
             cgroups_lookup_counter_inc(&cgroups_lookup_requests_responded);
 
             netdata_mutex_lock(&apps_pids_mutex);
-            if (response.generation > last_observed_generation)
-                last_observed_generation = response.generation;
+            if (response.generation > cgroups_lookup_latest_generation)
+                cgroups_lookup_latest_generation = response.generation;
 
             for (uint32_t i = 0; i < response.item_count; i++)
                 cgroups_lookup_commit_response_item(&items[i], response.generation);
@@ -577,11 +581,16 @@ void apps_cgroups_lookup_scan_pids(void)
             entry->last_used_iteration = ++cgroups_lookup_cache_iteration;
         }
 
-        if (p->cgroup_cache->cgroup_status == NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER &&
-            !p->cgroup_cache->pending) {
-            p->cgroup_cache->pending = true;
+        // R09: re-ask a RETRY_LATER cgroup only when discovery has published a
+        // newer snapshot than the one that produced this answer. generation == 0
+        // means it has never had a published answer yet, so ask it once; after
+        // that it is re-asked once per discovery cycle instead of every scan.
+        struct cgroup_lookup_entry *entry = p->cgroup_cache;
+        if (entry->cgroup_status == NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER && !entry->pending &&
+            (entry->generation == 0 || cgroups_lookup_latest_generation > entry->generation)) {
+            entry->pending = true;
             if (!cgroups_lookup_queue_push(p->cgroup_path))
-                p->cgroup_cache->pending = false;
+                entry->pending = false;
         }
     }
 }

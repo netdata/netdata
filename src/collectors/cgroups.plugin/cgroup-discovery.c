@@ -2,6 +2,7 @@
 
 #include "cgroup-internals.h"
 #include "cgroup-netipc.h"
+#include "cgroup-snapshot-store.h"
 
 // grace period added on top of the cgroup-name timeout: the helper self-bounds
 // at the operator timeout, this is the extra slack before discovery kills it
@@ -852,7 +853,7 @@ static inline void discovery_cleanup_all_cgroups() {
             else
                 last->discovered_next = cg->discovered_next;
 
-            cgroup_netipc_lookup_reaped_path_add(cg->id);
+            cgroup_snapshot_reaped_add(cg->id);
             cgroup_free(cg);
 
             if(!last)
@@ -1237,7 +1238,10 @@ static inline void discovery_find_all_cgroups() {
 
     netdata_mutex_unlock(&cgroup_root_mutex);
 
-    // cgroup metadata is now served on-demand via netipc (cgroup-netipc.c)
+    // Build and publish the immutable snapshot the netipc handlers serve. This
+    // runs after the splice unlock and off cgroup_root_mutex: discovery is the
+    // sole writer of the fields it reads and will not splice again this cycle.
+    cgroup_snapshot_rebuild_and_publish();
 
     netdata_log_debug(D_CGROUP, "done searching for cgroups");
 }
@@ -1311,6 +1315,10 @@ void cgroup_discovery_worker(void *ptr)
 
     service_register(NULL, NULL, NULL);
 
+    cgroup_snapshot_store_init();
+    cgroup_snapshot_reaped_set_max((size_t)cgroup_lookup_reaped_set_size);
+    cgroup_snapshot_reaped_set_accepting(true);
+
     cgroup_netipc_init();
     cgroup_netipc_lookup_init();
 
@@ -1345,9 +1353,11 @@ void cgroup_discovery_worker(void *ptr)
         }
     }
 
-    // Stop the netipc server first so its worker threads cannot iterate cgroup_root while we free it.
+    // Stop both netipc servers first so their worker threads cannot read the
+    // snapshot store; then tear the store (and its reaped set) down.
     cgroup_netipc_lookup_cleanup();
     cgroup_netipc_cleanup();
+    cgroup_snapshot_store_shutdown();
     discovery_walkdir_open_errors_cleanup();
 
     // free all cgroups

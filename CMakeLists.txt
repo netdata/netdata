@@ -2066,6 +2066,8 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/cgroup-netipc.c
         "$<$<BOOL:${ENABLE_CGROUPS_LOOKUP_SERVER}>:src/collectors/cgroups.plugin/cgroup-lookup-netipc.c>"
         src/collectors/cgroups.plugin/cgroup-netipc.h
+        src/collectors/cgroups.plugin/cgroup-snapshot-store.c
+        src/collectors/cgroups.plugin/cgroup-snapshot-store.h
         src/collectors/cgroups.plugin/cgroup_ebpfgo_cachestat.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.h
@@ -3059,6 +3061,7 @@ if(ENABLE_CGROUPS_LOOKUP_SERVER)
     add_executable(cgroup-lookup-netipc-test EXCLUDE_FROM_ALL
             src/collectors/cgroups.plugin/tests/test_cgroup_lookup_netipc.c
             src/collectors/cgroups.plugin/cgroup-lookup-netipc.c
+            src/collectors/cgroups.plugin/cgroup-snapshot-store.c
             src/collectors/cgroups.plugin/cgroup-orchestrator.c)
     target_compile_definitions(cgroup-lookup-netipc-test PRIVATE NETDATA_INTERNAL_CHECKS=1)
     target_link_libraries(cgroup-lookup-netipc-test libnetdata)
