@@ -13,6 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 )
 
 //go:embed "config_schema.json"
@@ -41,7 +42,8 @@ func New() *Collector {
 			MaxTSPerMetric: 200,
 			Profiles:       ProfilesConfig{Mode: profilesModeAuto},
 		},
-		store: metrix.NewCollectorStore(),
+		store:              metrix.NewCollectorStore(),
+		loadProfileCatalog: promprofiles.DefaultCatalog,
 	}
 }
 
@@ -53,7 +55,10 @@ type Collector struct {
 	relabelBlocks []relabelBlock
 	store         metrix.CollectorStore
 	writer        *metricFamilyWriter
-	chartTemplate string
+	runtime       *promRuntime
+
+	// loadProfileCatalog resolves the profile catalog; a field so tests inject a fake.
+	loadProfileCatalog func() (promprofiles.Catalog, error)
 }
 
 func (c *Collector) Configuration() any {
@@ -94,12 +99,6 @@ func (c *Collector) Init(context.Context) error {
 		isFallbackTypeCounter: counterFallback,
 	}, c.Logger)
 
-	tmpl, err := buildChartTemplate(c.application())
-	if err != nil {
-		return fmt.Errorf("build chart template: %v", err)
-	}
-	c.chartTemplate = tmpl
-
 	return nil
 }
 
@@ -112,6 +111,7 @@ func (c *Collector) Collect(ctx context.Context) error {
 }
 
 func (c *Collector) Cleanup(context.Context) {
+	c.runtime = nil
 	if c.prom != nil && c.prom.HTTPClient() != nil {
 		c.prom.HTTPClient().CloseIdleConnections()
 	}
@@ -122,5 +122,8 @@ func (c *Collector) MetricStore() metrix.CollectorStore {
 }
 
 func (c *Collector) ChartTemplateYAML() string {
-	return c.chartTemplate
+	if c.runtime == nil {
+		return ""
+	}
+	return c.runtime.chartTemplate
 }
