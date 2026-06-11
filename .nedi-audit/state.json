@@ -1,0 +1,83 @@
+{
+  "execution": {
+    "status": "ok",
+    "mode": "full",
+    "summary": "Added a 'Controlling Recovered (CLEAR) Notifications' collapsible section to the Agent notification README, covering default CLEAR suppression behavior, the clear_alarm_always option, the |critical modifier, and the |noclear modifier.",
+    "repo": "netdata",
+    "edited_files": [
+      "src/health/notifications/README.md"
+    ],
+    "no_file_edits": false,
+    "evidence_refs": [
+      "src/health/notifications/alarm-notify.sh.in:365-369 — default CLEAR suppression when old_status was not WARNING or CRITICAL",
+      "src/health/notifications/health_alarm_notify.conf:144 — clear_alarm_always commented-out default",
+      "src/health/notifications/health_alarm_notify.conf:164-168 — |critical, |nowarn, |noclear modifier documentation",
+      "src/health/notifications/alarm-notify.sh.in:585-674 — filter_recipient_by_criticality() function implementing modifier logic"
+    ],
+    "acceptance_checks": [
+      "New section appears in src/health/notifications/README.md after the Alert Severity Filtering section (line 296).",
+      "Section explains the default CLEAR suppression behavior (CLEAR skipped when old_status was not WARNING or CRITICAL).",
+      "Section documents the clear_alarm_always='YES' configuration option in health_alarm_notify.conf.",
+      "Section explains the |critical modifier's effect on CLEAR/recovered notifications.",
+      "Section explains the |noclear modifier for completely suppressing CLEAR notifications.",
+      "Configuration examples use proper code blocks with ini syntax.",
+      "No changes to source code files — documentation-only edit.",
+      "Content is consistent with the existing style (collapsible <details> sections, practical examples)."
+    ],
+    "commit_title": "docs: add controlling recovered CLEAR notifications section to notification README",
+    "pr_title": "docs: add controlling recovered CLEAR notifications section to notification README",
+    "pr_body": "## Summary\nAdds a collapsible section to the Agent notification README explaining how to control recovered (CLEAR) notification emails.\n\n## User Request\nUser asked whether it is possible to stop alarm recovered notification emails.\n\n## Reason for Change\nThe notification README did not document the default CLEAR suppression behavior, the `clear_alarm_always` configuration option, or the `|critical` and `|noclear` recipient modifiers that control CLEAR notification delivery. This information is essential for users who want to suppress or customize recovered notification emails.\n\n### Audit Context\n- **Topic:** netdata_stop_alarm_recovered_clear_notification_emails\n- **Decision verdict:** surgical_edit\n- **Source verification:** Default CLEAR suppression confirmed at alarm-notify.sh.in:365-369, clear_alarm_always at health_alarm_notify.conf:144, modifier logic at alarm-notify.sh.in:585-674.",
+    "pr_draft": true,
+    "pr_labels": [
+      "nedi-audit"
+    ]
+  },
+  "context": {
+    "lane": "audit",
+    "attempt": 0,
+    "push_recovery_required": false,
+    "push_recovery_reason": null,
+    "user_request": "Is that possible to stop the alarm recovered notification email?",
+    "plan_item": {
+      "summary": "Task class: improve_docs — Add a 'Controlling Recovered (CLEAR) Notifications' section to the Agent notification README explaining the default CLEAR suppression behavior, the clear_alarm_always configuration option, and how the |critical modifier filters out CLEAR notifications.",
+      "map_update_required": false,
+      "generalization_required": false,
+      "targets": [
+        "netdata/src/health/notifications/README.md"
+      ],
+      "edit_guidance": "Add a new collapsible section (using <details>/<summary>) titled 'Controlling Recovered (CLEAR) Notifications' after the existing 'Alert Severity Filtering' section (around line 294). The section should cover three topics: (1) Default behavior — explain that Netdata already suppresses CLEAR notifications when the previous status was not WARNING or CRITICAL (i.e., if an alert was never in a problem state, no recovery email is sent). Reference alarm-notify.sh.in lines 365-369. (2) The clear_alarm_always option — show how to set clear_alarm_always='YES' in health_alarm_notify.conf to always send CLEAR notifications even when the previous state was not WARNING/CRITICAL. Mention this is useful if your downstream system handles deduplication. (3) The |critical modifier — explain that adding |critical to a recipient (e.g., role_recipients_email[sysadmin]=\"admin@example.com|critical\") suppresses CLEAR notifications for that recipient, since only notifications that passed through WARNING or CRITICAL are forwarded. Keep the section concise, practical, and consistent with the existing tone and formatting of the README. Use code blocks for configuration examples.",
+      "acceptance_checks": [
+        "New section appears in src/health/notifications/README.md after the Alert Severity Filtering section.",
+        "Section explains the default CLEAR suppression behavior (CLEAR skipped when old_status was not WARNING or CRITICAL).",
+        "Section documents the clear_alarm_always='YES' configuration option in health_alarm_notify.conf.",
+        "Section explains the |critical modifier's effect on CLEAR/recovered notifications.",
+        "Configuration examples use proper code blocks with ini syntax.",
+        "No changes to source code files — documentation-only edit.",
+        "Content is consistent with the existing style (collapsible <details> sections, practical examples)."
+      ],
+      "processed": true
+    },
+    "executor_summary": "",
+    "diff": "diff --git a/src/health/notifications/README.md b/src/health/notifications/README.md\nindex 4484241b2..0be2b5d36 100644\n--- a/src/health/notifications/README.md\n+++ b/src/health/notifications/README.md\n@@ -293,6 +293,39 @@ This setup:\n Works for all supported methods: email, Slack, Telegram, Twilio, Discord, etc.\n </details>\n \n+<details>\n+<summary><strong>Controlling Recovered (CLEAR) Notifications</strong></summary><br/>\n+\n+When an alert returns to normal, Netdata sends a **CLEAR** (recovered) notification. You can control when and whether these are sent.\n+\n+**Default behavior:** Netdata suppresses CLEAR notifications when the alert was never in a WARNING or CRITICAL state. If `old_status` was not WARNING or CRITICAL and the alert transitions to CLEAR, no notification is sent. This prevents noise from alerts that flap without ever reaching a problem state.\n+\n+**Enable CLEAR for all transitions:** If your downstream system handles deduplication, set `clear_alarm_always` in `health_alarm_notify.conf` to override the default suppression and send a CLEAR notification regardless of the previous status:\n+\n+```ini\n+clear_alarm_always='YES'\n+```\n+\n+**Suppress CLEAR with the `|critical` modifier:** Adding `|critical` to a recipient filters notifications so only alerts that reached CRITICAL status are forwarded. For these recipients, CLEAR notifications are only sent when the alert previously passed through CRITICAL. If the alert only went through WARNING → CLEAR, the CLEAR is not forwarded:\n+\n+```ini\n+role_recipients_email[sysadmin]=\"admin@example.com|critical\"\n+```\n+\n+**Suppress all CLEAR notifications:** Use the `|noclear` modifier to completely block CLEAR notifications for a recipient while still receiving WARNING and CRITICAL alerts:\n+\n+```ini\n+role_recipients_email[sysadmin]=\"admin@example.com|noclear\"\n+```\n+\n+You can combine modifiers. This example sends only notifications for alarms that reached CRITICAL, and excludes... (line truncated to 2000 chars)",
+    "feedback_request": null,
+    "prior_review_findings": null,
+    "git_state_before": {
+      "rebase": false,
+      "merge": false,
+      "cherry_pick": false,
+      "revert": false
+    },
+    "git_cleanup_operations": [],
+    "git_state_after": {
+      "rebase": false,
+      "merge": false,
+      "cherry_pick": false,
+      "revert": false
+    }
+  },
+  "review": {
+    "status": "ok",
+    "findings": "",
+    "updated_prompt": ""
+  }
+}
