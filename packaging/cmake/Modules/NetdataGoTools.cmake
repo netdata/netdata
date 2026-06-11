@@ -21,8 +21,7 @@ set(GO_LDFLAGS "${GO_LDFLAGS} -X ${BUILDINFO_PKG}.LogDir=${LOG_DIR}")
 #
 # Takes four arguments, the target name, the output artifact name, the
 # source tree for the Go module, and the sub-directory of that source tree
-# to pass to `go build`. Optional EXTRA_LDFLAGS are appended to the shared
-# Go linker flags for this target only.
+# to pass to `go build`.
 #
 # The target itself will invoke `go build` in the specified source tree,
 # using the `-o` option to produce the final output artifact, and passing
@@ -33,21 +32,15 @@ set(GO_LDFLAGS "${GO_LDFLAGS} -X ${BUILDINFO_PKG}.LogDir=${LOG_DIR}")
 # and then appending the go.mod and go.sum files from the root of the
 # source tree.
 macro(add_go_target target output build_src build_dir)
-    cmake_parse_arguments(ARG "" "EXTRA_LDFLAGS" "" ${ARGN})
     file(GLOB_RECURSE ${target}_DEPS CONFIGURE_DEPENDS "${build_src}/*.go")
     list(APPEND ${target}_DEPS
         "${build_src}/go.mod"
         "${build_src}/go.sum"
     )
 
-    set(${target}_GO_LDFLAGS "${GO_LDFLAGS}")
-    if(ARG_EXTRA_LDFLAGS)
-        set(${target}_GO_LDFLAGS "${${target}_GO_LDFLAGS} ${ARG_EXTRA_LDFLAGS}")
-    endif()
-
     add_custom_command(
         OUTPUT ${output}
-        COMMAND "${CMAKE_COMMAND}" -E env GOROOT=${GO_ROOT} CGO_ENABLED=0 GOPROXY=https://proxy.golang.org,direct "${GO_EXECUTABLE}" build -buildvcs=false -ldflags "${${target}_GO_LDFLAGS}" -o "${CMAKE_BINARY_DIR}/${output}" "./${build_dir}"
+        COMMAND "${CMAKE_COMMAND}" -E env GOROOT=${GO_ROOT} CGO_ENABLED=0 GOPROXY=https://proxy.golang.org,direct "${GO_EXECUTABLE}" build -buildvcs=false -ldflags "${GO_LDFLAGS}" -o "${CMAKE_BINARY_DIR}/${output}" "./${build_dir}"
         DEPENDS ${${target}_DEPS}
         COMMENT "Building Go component ${output}"
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/${build_src}"
