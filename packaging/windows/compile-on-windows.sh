@@ -90,10 +90,18 @@ COMMON_CFLAGS="-Wa,-mbig-obj -pipe -D_FILE_OFFSET_BITS=64 -D__USE_MINGW_ANSI_STD
 # dependency for the link of netdata.exe; install it via
 # packaging/windows/msys2-dependencies.sh (which pulls
 # mingw-w64-ucrt-x86_64-lld).
+#
+# Why CMAKE_LINKER instead of -fuse-ld=lld: passing -fuse-ld=lld through
+# CMAKE_EXE_LINKER_FLAGS depends on the compiler driver re-routing the link
+# to ld.lld. CMAKE_LINKER points CMake directly at ld.lld, which is honored
+# at link-rule generation time regardless of compiler-driver behaviour.
+# --no-keep-memory is passed to lld itself (not the driver) to trade link
+# speed for a lower memory peak during the 700+-object RelWithDebInfo link.
 linker_cmake_flags=()
 if [ -x "/ucrt64/bin/ld.lld" ]; then
-    linker_cmake_flags=("-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld"
-                        "-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld")
+    linker_cmake_flags=("-DCMAKE_LINKER=/ucrt64/bin/ld.lld"
+                        "-DCMAKE_EXE_LINKER_FLAGS=-Wl,--no-keep-memory"
+                        "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,--no-keep-memory")
 else
     echo "WARNING: /ucrt64/bin/ld.lld not found." >&2
     echo "  The link of netdata.exe with the default BFD ld.exe is known to" >&2
@@ -146,7 +154,29 @@ ${GITHUB_ACTIONS+echo "::endgroup::"}
 ${GITHUB_ACTIONS+echo "::group::Building"}
 # shellcheck disable=SC2086
 cmake --build "${build}" -- ${build_args}
+build_rc=$?
 ${GITHUB_ACTIONS+echo "::endgroup::"}
+
+if [ "${build_rc}" -ne 0 ]; then
+    echo "ERROR: cmake --build exited with ${build_rc}." >&2
+    echo "  The most common cause on Windows UCRT64 is the netdata.exe link" >&2
+    echo "  being killed (OOM, session timeout) or BFD ld.exe hanging." >&2
+    echo "  Ensure mingw-w64-ucrt-x86_64-lld is installed:" >&2
+    echo "    pacman -S mingw-w64-ucrt-x86_64-lld" >&2
+    exit "${build_rc}"
+fi
+
+# Verify the netdata.exe artifact actually exists. cmake --build can return
+# 0 even when the linker was killed (e.g. by Windows OOM or a session timer)
+# because ninja's child-process exit mapping is implementation-defined.
+# This guard makes a silent-kill failure impossible to mistake for success.
+if [ ! -x "${build}/netdata.exe" ]; then
+    echo "ERROR: cmake --build returned 0 but ${build}/netdata.exe is missing." >&2
+    echo "  The link of netdata.exe was likely killed (OOM, session timeout)" >&2
+    echo "  or hung. See the last lines of the build output above for the" >&2
+    echo "  point at which it stopped." >&2
+    exit 1
+fi
 
 ${GITHUB_ACTIONS+echo "::group::Netdata buildinfo"}
 "${build}/netdata.exe" -W buildinfo || true
