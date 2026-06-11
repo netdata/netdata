@@ -23,6 +23,7 @@ bool cgroup_enable_cpuacct = true;
 bool cgroup_enable_cpuacct_cpu_shares = false;
 
 int cgroup_check_for_new_every = 10;
+int cgroup_name_timeout_ms = 15000;
 int cgroup_update_every = 1;
 char *cgroup_cpuacct_base = NULL;
 char *cgroup_cpuset_base = NULL;
@@ -370,8 +371,24 @@ void read_cgroup_plugin_configuration() {
                        " * "
             ), NULL, SIMPLE_PATTERN_EXACT, true);
 
-    snprintfz(filename, FILENAME_MAX, "%s/cgroup-name.sh", netdata_configured_primary_plugins_dir);
+    snprintfz(filename, FILENAME_MAX, "%s/cgroup-name", netdata_configured_primary_plugins_dir);
     cgroups_rename_script = inicfg_get(&netdata_config, "plugin:cgroups", "script to get cgroup names", filename);
+
+    // single operator knob for the whole cgroup-name invocation: the helper
+    // receives it and self-terminates by then; discovery waits this long plus a
+    // grace period before killing the helper. 0 means unbounded (legacy).
+    cgroup_name_timeout_ms = (int)inicfg_get_duration_seconds(
+        &netdata_config, "plugin:cgroups", "cgroup-name timeout", 15) * MSEC_PER_SEC;
+    if (cgroup_name_timeout_ms < 0)
+        cgroup_name_timeout_ms = 0;
+
+    // the helper inherits this and self-terminates by then; discovery enforces
+    // the same budget plus a grace period on the parent side
+    {
+        char timeout_env[32];
+        snprintfz(timeout_env, sizeof(timeout_env), "%d", cgroup_name_timeout_ms);
+        nd_setenv("NETDATA_CGROUP_NAME_TIMEOUT_MS", timeout_env, 1);
+    }
 
     snprintfz(filename, FILENAME_MAX, "%s/cgroup-network", netdata_configured_primary_plugins_dir);
     cgroups_network_interface_script = inicfg_get(&netdata_config, "plugin:cgroups", "script to get cgroup network interfaces", filename);
