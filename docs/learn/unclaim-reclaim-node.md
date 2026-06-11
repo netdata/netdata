@@ -120,6 +120,17 @@ To remove a node from your Space and connect it to another, follow these steps:
 
 </details>
 
+:::warning
+
+**Auto-reclaim from existing claim.conf**
+
+If `claim.conf` or environment variables with the **old** Space credentials still exist, the Agent will automatically re-claim to the old Space when it restarts. Before restarting, either:
+
+- Remove the old `claim.conf`: `sudo rm /INSTALL_PREFIX/etc/netdata/claim.conf`
+- Or update `claim.conf` with the new Space token (see Step 2)
+
+:::
+
 ## Step 2: Reclaim to New Space
 
 ### Option 1: Quick Reclaim (Recommended)
@@ -192,7 +203,8 @@ After reclaiming, verify the node appears in:
 
 **Reconnection fails:**
 
-- Check connection status: `curl http://localhost:19999/api/v1/aclk`
+- Check connection status: `sudo netdatacli aclk-state`
+- Or check the Cloud section in the agent info: `curl http://localhost:19999/api/v3/info`
 - Ensure the agent has internet access to `app.netdata.cloud`
 - Check for firewall blocking port 443
 
