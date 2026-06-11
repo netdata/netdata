@@ -14,6 +14,8 @@ static const char *test_os_run_dir(bool rw __maybe_unused)
 #undef os_run_dir
 
 static uint64_t mock_requests = 0;
+static uint64_t blocking_mock_requests = 0;
+static bool blocking_mock_release = false;
 
 static bool expect_ok(bool condition, const char *message)
 {
@@ -151,20 +153,58 @@ static void mock_server_thread(void *arg)
     nipc_server_run((nipc_managed_server_t *)arg);
 }
 
-int main(void)
+static bool blocking_apps_lookup_handler(
+    void *user __maybe_unused,
+    const nipc_apps_lookup_req_view_t *request,
+    nipc_apps_lookup_builder_t *builder)
 {
-    char temp_dir[] = "./network-viewer-apps-lookup-test.XXXXXX";
+    __atomic_add_fetch(&blocking_mock_requests, 1, __ATOMIC_RELEASE);
+    while (!__atomic_load_n(&blocking_mock_release, __ATOMIC_ACQUIRE))
+        sleep_usec(10000);
+
+    nipc_apps_lookup_builder_set_generation(builder, 2);
+    for (uint32_t i = 0; i < request->item_count; i++) {
+        nipc_apps_lookup_req_item_t req_item;
+        nipc_error_t err = nipc_apps_lookup_req_item(request, i, &req_item);
+        if (err != NIPC_OK) {
+            builder->error = err;
+            return false;
+        }
+
+        err = nipc_apps_lookup_builder_add(
+            builder,
+            NIPC_PID_LOOKUP_UNKNOWN,
+            0,
+            0,
+            req_item.pid,
+            0,
+            NIPC_UID_UNSET,
+            0,
+            NULL,
+            0,
+            NULL,
+            0,
+            NULL,
+            0,
+            NULL,
+            0);
+        if (err != NIPC_OK) {
+            builder->error = err;
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static bool run_roundtrip_test(const char *run_dir)
+{
     int rc = 1;
     bool plugin_should_exit = false;
-    nipc_managed_server_t server;
+    nipc_managed_server_t server = { 0 };
     ND_THREAD *server_thread = NULL;
-
-    netdata_configured_host_prefix = "";
-    if (!mkdtemp(temp_dir)) {
-        perror("mkdtemp");
-        return 1;
-    }
-    test_run_dir = temp_dir;
+    bool server_initialized = false;
+    bool client_initialized = false;
 
     nipc_server_config_t config = {
         .supported_profiles = NIPC_PROFILE_BASELINE,
@@ -178,13 +218,14 @@ int main(void)
 
     nipc_error_t err = nipc_server_init_apps_lookup(
         &server,
-        temp_dir,
+        run_dir,
         NV_APPS_LOOKUP_SERVICE_NAME,
         &config,
         1,
         &handler);
     if (!expect_ok(err == NIPC_OK, "mock APPS_LOOKUP server init failed"))
-        goto cleanup_dir;
+        goto cleanup_server;
+    server_initialized = true;
 
     server_thread = nd_thread_create("appslookup-t", 0, mock_server_thread, &server);
     if (!expect_ok(server_thread != NULL, "mock APPS_LOOKUP server thread creation failed"))
@@ -192,6 +233,7 @@ int main(void)
 
     nv_apps_lookup_init(&plugin_should_exit);
     nv_apps_lookup_start();
+    client_initialized = true;
 
     uint32_t pids[] = { 100, 200 };
     nv_apps_lookup_warm_pids(pids, _countof(pids));
@@ -260,15 +302,119 @@ int main(void)
     rc = 0;
 
 cleanup_client:
-    __atomic_store_n(&plugin_should_exit, true, __ATOMIC_RELEASE);
-    nv_apps_lookup_stop();
+    if (client_initialized) {
+        __atomic_store_n(&plugin_should_exit, true, __ATOMIC_RELEASE);
+        nv_apps_lookup_stop();
+    }
 cleanup_server:
-    nipc_server_stop(&server);
+    if (server_initialized)
+        nipc_server_stop(&server);
     if (server_thread)
         nd_thread_join(server_thread);
-    nipc_server_drain(&server, 5000);
-    nipc_server_destroy(&server);
-cleanup_dir:
+    if (server_initialized) {
+        nipc_server_drain(&server, 5000);
+        nipc_server_destroy(&server);
+    }
+    return rc == 0;
+}
+
+static bool run_abort_during_call_test(const char *run_dir)
+{
+    bool plugin_should_exit = false;
+    nipc_managed_server_t server = { 0 };
+    ND_THREAD *server_thread = NULL;
+    bool server_initialized = false;
+    bool client_initialized = false;
+    bool ok = false;
+
+    __atomic_store_n(&blocking_mock_requests, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&blocking_mock_release, false, __ATOMIC_RELEASE);
+
+    nipc_server_config_t config = {
+        .supported_profiles = NIPC_PROFILE_BASELINE,
+        .preferred_profiles = NIPC_PROFILE_BASELINE,
+        .auth_token = netipc_auth_token(),
+    };
+    nipc_apps_lookup_service_handler_t handler = {
+        .handle = blocking_apps_lookup_handler,
+        .user = NULL,
+    };
+
+    nipc_error_t err = nipc_server_init_apps_lookup(
+        &server,
+        run_dir,
+        NV_APPS_LOOKUP_SERVICE_NAME,
+        &config,
+        1,
+        &handler);
+    if (!expect_ok(err == NIPC_OK, "blocking APPS_LOOKUP server init failed"))
+        goto cleanup_server;
+    server_initialized = true;
+
+    server_thread = nd_thread_create("appslookup-b", 0, mock_server_thread, &server);
+    if (!expect_ok(server_thread != NULL, "blocking APPS_LOOKUP server thread creation failed"))
+        goto cleanup_server;
+
+    nv_apps_lookup_init(&plugin_should_exit);
+    nv_apps_lookup_start();
+    client_initialized = true;
+
+    uint32_t pid = 300;
+    nv_apps_lookup_warm_pids(&pid, 1);
+
+    if (!expect_ok(wait_for_counter(&blocking_mock_requests, 1), "worker did not enter blocking APPS_LOOKUP call"))
+        goto cleanup_client;
+
+    __atomic_store_n(&plugin_should_exit, true, __ATOMIC_RELEASE);
+    usec_t started_ut = now_monotonic_usec();
+    nv_apps_lookup_stop();
+    usec_t elapsed_ut = now_monotonic_usec() - started_ut;
+    client_initialized = false;
+
+    fprintf(
+        stderr,
+        "APPS_LOOKUP abort-during-call stop elapsed=%" PRIu64 "us requests=%" PRIu64 "\n",
+        (uint64_t)elapsed_ut,
+        __atomic_load_n(&blocking_mock_requests, __ATOMIC_ACQUIRE));
+
+    ok =
+        expect_ok(nv_apps_lookup_worker_exited(), "APPS_LOOKUP worker did not report exit") &&
+        expect_ok(elapsed_ut < 2 * USEC_PER_SEC, "APPS_LOOKUP stop waited for timeout instead of aborting the call");
+
+cleanup_client:
+    __atomic_store_n(&blocking_mock_release, true, __ATOMIC_RELEASE);
+    if (client_initialized) {
+        __atomic_store_n(&plugin_should_exit, true, __ATOMIC_RELEASE);
+        nv_apps_lookup_stop();
+    }
+cleanup_server:
+    __atomic_store_n(&blocking_mock_release, true, __ATOMIC_RELEASE);
+    if (server_initialized)
+        nipc_server_stop(&server);
+    if (server_thread)
+        nd_thread_join(server_thread);
+    if (server_initialized) {
+        nipc_server_drain(&server, 5000);
+        nipc_server_destroy(&server);
+    }
+
+    return ok;
+}
+
+int main(void)
+{
+    char temp_dir[] = "./network-viewer-apps-lookup-test.XXXXXX";
+    bool ok = false;
+
+    netdata_configured_host_prefix = "";
+    if (!mkdtemp(temp_dir)) {
+        perror("mkdtemp");
+        return 1;
+    }
+    test_run_dir = temp_dir;
+
+    ok = run_roundtrip_test(temp_dir) && run_abort_during_call_test(temp_dir);
+
     (void)rmdir(temp_dir);
-    return rc;
+    return ok ? 0 : 1;
 }

@@ -153,6 +153,51 @@ static bool test_missing_and_fallback_labels(void)
     return ok;
 }
 
+static bool test_container_identity_gating(void)
+{
+    bool ok = true;
+
+    NV_APPS_LOOKUP_FIELDS rootless_docker = {
+        .cgroup_status = NIPC_APPS_CGROUP_KNOWN,
+        .orchestrator = NIPC_ORCHESTRATOR_DOCKER,
+        .cgroup_path = "/sys/fs/cgroup/user.slice/user-1000.slice/docker-abcdef.scope",
+        .cgroup_name = "rootless-docker",
+    };
+    ok = expect_true(
+             nv_cgroup_fields_have_container_identity(&rootless_docker),
+             "known rootless Docker cgroup should keep cgroups-provided identity") && ok;
+
+    NV_APPS_LOOKUP_LABEL labels[] = {
+        label("container_name", "labeled-container"),
+    };
+    NV_APPS_LOOKUP_FIELDS labeled_container = fields_from_labels(labels, _countof(labels));
+    labeled_container.cgroup_path = "/sys/fs/cgroup/user.slice/user-1001.slice/docker-fedcba.scope";
+    ok = expect_true(
+             nv_cgroup_fields_have_container_identity(&labeled_container),
+             "known cgroup with container label should keep cgroups-provided identity") && ok;
+
+    NV_APPS_LOOKUP_FIELDS user_slice_retry = {
+        .cgroup_status = NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER,
+        .orchestrator = NIPC_ORCHESTRATOR_UNKNOWN,
+        .cgroup_path = "/sys/fs/cgroup/user.slice/user-1002.slice/app.slice/app-code.scope",
+        .cgroup_name = "ignored-user-session",
+    };
+    ok = expect_true(
+             !nv_cgroup_fields_have_container_identity(&user_slice_retry),
+             "unknown user.slice cgroup should use network-viewer user fallback") && ok;
+
+    NV_APPS_LOOKUP_FIELDS known_without_name = {
+        .cgroup_status = NIPC_APPS_CGROUP_KNOWN,
+        .orchestrator = NIPC_ORCHESTRATOR_UNKNOWN,
+        .cgroup_path = "/sys/fs/cgroup/user.slice/user-1003.slice/session-2.scope",
+    };
+    ok = expect_true(
+             !nv_cgroup_fields_have_container_identity(&known_without_name),
+             "known cgroup without name or labels should still allow user fallback") && ok;
+
+    return ok;
+}
+
 static bool test_systemd_and_orchestrator(void)
 {
     char value[NV_TOPOLOGY_SYSTEMD_UNIT_MAX];
@@ -251,6 +296,7 @@ int main(void)
     ok = test_k8s_direct_labels() && ok;
     ok = test_k8s_workload_fallbacks() && ok;
     ok = test_missing_and_fallback_labels() && ok;
+    ok = test_container_identity_gating() && ok;
     ok = test_systemd_and_orchestrator() && ok;
 
     return ok ? 0 : 1;

@@ -505,6 +505,12 @@ modal tables. It now emits compact graph presentation metadata in type
 definitions plus `data.presentation`, and repeated string columns use
 dictionary encoding when it reduces raw payload size.
 
+`topology:network-connections` enforces a producer-side fixed response budget of
+64 MiB. When a requested live topology would exceed that budget, the Function
+returns a normal Function error with HTTP status `413` instead of emitting a
+partial topology. This keeps the producer below the plugins.d deferred-response
+hard stop and preserves the contract that evidence is never silently truncated.
+
 Network-connections distinguishes unresolved endpoint links from aggregator
 correlation output. `endpoint_socket` connects a process to a visible unresolved
 endpoint actor and must not use the farthest layout distance because that makes
@@ -536,16 +542,21 @@ columns with declared `set` aggregation, not as arbitrary scalar replacements.
 runtime-specific actor types such as Docker containers, Kubernetes containers,
 VMs, systemd services, user slices, and process fallbacks are producer-declared
 actor types that share the `container` aggregation scope. Systemd services use
-the service unit name. `user.slice/user-UID.slice` paths use the resolved
-username as the grouped actor name, or `user${UID}` when username resolution is
-unavailable, while leaf scopes stay in cgroup/detail evidence. Known host/root
-processes fall back to process name, and unresolved retry-later lookups remain
-explicit pending/unknown container identity instead of being fabricated as final
-process-name containers. The three aggregation scopes use `evidence_policy:
-"preserve"`.
+the service unit name. `user.slice/user-UID.slice` paths use a composed user
+actor only when cgroups did not return a usable container name: the grouped
+actor name is the process UID's resolved username, or `user${UID}` when username
+resolution is unavailable, while leaf scopes stay in cgroup/detail evidence.
+Rootless Docker and any other known cgroup with a container label or cgroup name
+keep the cgroups-provided container identity instead of being absorbed into the
+user actor. Known host/root processes fall back to process name, and unresolved
+retry-later lookups remain explicit pending/unknown container identity instead
+of being fabricated as final process-name containers. The three aggregation
+scopes use `evidence_policy: "preserve"`.
 
 Network-connections topology keeps cgroup metric-monitoring rules separate from
-topology display classification rules. Topology producers may derive
+topology display classification rules. `apps.plugin` exposes per-PID facts;
+network-connections may compose user-activity actors from those facts for the
+dependency map. Topology producers may derive
 `systemd_unit_name`, `systemd_unit_kind`, `actor_kind`, specific actor types,
 and display icons from cgroup path/orchestrator rule modules without widening
 the netipc orchestrator enum for each display subtype.

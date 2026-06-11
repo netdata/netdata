@@ -26,6 +26,46 @@ static uint64_t apps_lookup_duration_le_500ms = 0;
 static uint64_t apps_lookup_duration_le_1000ms = 0;
 static uint64_t apps_lookup_duration_gt_1000ms = 0;
 
+#ifdef NETDATA_APPS_LOOKUP_TEST_HOOKS
+static usec_t apps_lookup_test_lock_started_ut = 0;
+static usec_t apps_lookup_test_max_lock_hold_ut = 0;
+static uint64_t apps_lookup_test_lock_acquisitions = 0;
+static uint64_t apps_lookup_test_emit_calls = 0;
+static uint64_t apps_lookup_test_emit_calls_while_locked = 0;
+static bool apps_lookup_test_lock_held = false;
+
+static void apps_lookup_test_lock_acquired(void)
+{
+    apps_lookup_test_lock_held = true;
+    apps_lookup_test_lock_started_ut = now_monotonic_usec();
+    apps_lookup_test_lock_acquisitions++;
+}
+
+static void apps_lookup_test_lock_released(void)
+{
+    usec_t now_ut = now_monotonic_usec();
+    if (apps_lookup_test_lock_started_ut && now_ut >= apps_lookup_test_lock_started_ut) {
+        usec_t held_ut = now_ut - apps_lookup_test_lock_started_ut;
+        if (held_ut > apps_lookup_test_max_lock_hold_ut)
+            apps_lookup_test_max_lock_hold_ut = held_ut;
+    }
+
+    apps_lookup_test_lock_held = false;
+    apps_lookup_test_lock_started_ut = 0;
+}
+
+static void apps_lookup_test_before_emit(void)
+{
+    apps_lookup_test_emit_calls++;
+    if (apps_lookup_test_lock_held)
+        apps_lookup_test_emit_calls_while_locked++;
+}
+#else
+#define apps_lookup_test_lock_acquired() do {} while(0)
+#define apps_lookup_test_lock_released() do {} while(0)
+#define apps_lookup_test_before_emit() do {} while(0)
+#endif
+
 static void apps_lookup_counter_inc(uint64_t *counter)
 {
     __atomic_add_fetch(counter, 1, __ATOMIC_RELAXED);
@@ -153,6 +193,8 @@ static void apps_lookup_free_staged_pid(struct apps_lookup_staged_pid *staged)
 static nipc_error_t apps_lookup_emit_staged(
     nipc_apps_lookup_builder_t *builder, const struct apps_lookup_staged_pid *staged)
 {
+    apps_lookup_test_before_emit();
+
     if (!staged->found)
         return nipc_apps_lookup_builder_add(
             builder, NIPC_PID_LOOKUP_UNKNOWN, 0, 0, staged->pid, 0, NIPC_UID_UNSET, 0,
@@ -224,6 +266,7 @@ static bool apps_lookup_handler(
 
     // Phase 1: snapshot each requested PID under the lock (find + refcount-dup).
     netdata_mutex_lock(&apps_pids_mutex);
+    apps_lookup_test_lock_acquired();
     nipc_apps_lookup_builder_set_generation(
         builder,
         __atomic_load_n(&apps_collection_generation, __ATOMIC_ACQUIRE));
@@ -240,6 +283,7 @@ static bool apps_lookup_handler(
         apps_lookup_stage_pid((uint32_t)item.pid, &staged[staged_count++]);
     }
 
+    apps_lookup_test_lock_released();
     netdata_mutex_unlock(&apps_pids_mutex);
 
     // Phase 2: wire-encode the snapshot with the lock released (the real cost,

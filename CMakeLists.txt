@@ -3055,6 +3055,14 @@ if(OS_LINUX)
     add_executable(apps-lookup-protocol-test EXCLUDE_FROM_ALL
             src/collectors/apps.plugin/tests/test_apps_lookup_protocol.c)
     target_link_libraries(apps-lookup-protocol-test libnetdata)
+
+    add_executable(apps-lookup-netipc-lock-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_lookup_netipc_lock.c)
+    target_link_libraries(apps-lookup-netipc-lock-test libnetdata)
+
+    add_executable(apps-cgroups-lookup-client-abort-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_cgroups_lookup_client_abort.c)
+    target_link_libraries(apps-cgroups-lookup-client-abort-test libnetdata)
 endif()
 
 if(ENABLE_CGROUPS_LOOKUP_SERVER)

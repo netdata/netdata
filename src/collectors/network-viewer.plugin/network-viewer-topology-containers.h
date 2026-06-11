@@ -21,6 +21,7 @@ SIMPLE_PATTERN *nv_label_whitelist_parse(const char *pattern);
 const char *nv_cgroup_status_name(uint16_t cgroup_status);
 const char *nv_orchestrator_name(uint16_t cgroup_status, uint16_t orchestrator);
 const char *nv_cached_label_value(const NV_APPS_LOOKUP_FIELDS *fields, const char *key);
+bool nv_cgroup_fields_have_container_identity(const NV_APPS_LOOKUP_FIELDS *fields);
 
 void nv_derive_k8s_pod_name(const NV_APPS_LOOKUP_FIELDS *fields, char *dst, size_t dst_size);
 void nv_derive_k8s_namespace(const NV_APPS_LOOKUP_FIELDS *fields, char *dst, size_t dst_size);

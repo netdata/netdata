@@ -165,6 +165,7 @@ void apps_process_enrichment_fill(struct pid_stat *p, APPS_PROCESS_ENRICHMENT *o
     *out = (APPS_PROCESS_ENRICHMENT){ 0 };
     strncpyz(out->container_name, APPS_ENRICHMENT_PENDING_CONTAINER_NAME, sizeof(out->container_name) - 1);
     strncpyz(out->cgroup_status, cgroup_topology_cgroup_status_name(NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER), sizeof(out->cgroup_status) - 1);
+    strncpyz(out->actor_type, "container", sizeof(out->actor_type) - 1);
 
     const char *process = p && p->comm ? string2str(p->comm) : "[unknown]";
     if(!p || !p->cgroup_path)
@@ -179,6 +180,7 @@ void apps_process_enrichment_fill(struct pid_stat *p, APPS_PROCESS_ENRICHMENT *o
         strncpyz(out->cgroup_status, cgroup_topology_cgroup_status_name(NIPC_APPS_CGROUP_HOST_ROOT), sizeof(out->cgroup_status) - 1);
         strncpyz(out->orchestrator, classification.effective_orchestrator, sizeof(out->orchestrator) - 1);
         strncpyz(out->actor_kind, classification.actor_kind, sizeof(out->actor_kind) - 1);
+        strncpyz(out->actor_type, classification.actor_type, sizeof(out->actor_type) - 1);
         strncpyz(out->container_name, process && *process ? process : "[unknown]", sizeof(out->container_name) - 1);
         return;
     }
@@ -206,6 +208,7 @@ void apps_process_enrichment_fill(struct pid_stat *p, APPS_PROCESS_ENRICHMENT *o
     strncpyz(out->systemd_unit_name, classification.systemd_unit_name, sizeof(out->systemd_unit_name) - 1);
     strncpyz(out->systemd_unit_kind, classification.systemd_unit_kind, sizeof(out->systemd_unit_kind) - 1);
     strncpyz(out->actor_kind, classification.actor_kind, sizeof(out->actor_kind) - 1);
+    strncpyz(out->actor_type, classification.actor_type, sizeof(out->actor_type) - 1);
     bool use_systemd_unit_name = strncmp(classification.actor_type, "systemd_", strlen("systemd_")) == 0;
 
     if(cgroup_status != NIPC_APPS_CGROUP_KNOWN) {
@@ -261,6 +264,7 @@ void apps_emit_process_enrichment_values(BUFFER *wb, const APPS_PROCESS_ENRICHME
     apps_add_enrichment_value(wb, enrichment->systemd_unit_name);
     apps_add_enrichment_value(wb, enrichment->systemd_unit_kind);
     apps_add_enrichment_value(wb, enrichment->actor_kind);
+    apps_add_enrichment_value(wb, enrichment->actor_type);
 }
 
 #endif

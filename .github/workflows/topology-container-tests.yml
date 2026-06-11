@@ -28,6 +28,8 @@ env:
   TEST_TARGETS: >-
     apps-cgroups-path-test
     apps-lookup-protocol-test
+    apps-lookup-netipc-lock-test
+    apps-cgroups-lookup-client-abort-test
     cgroup-lookup-netipc-test
     cgroup-orchestrator-test
     network-viewer-apps-lookup-client-test

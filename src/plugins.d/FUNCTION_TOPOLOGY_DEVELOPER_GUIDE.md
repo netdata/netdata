@@ -1052,9 +1052,12 @@ attached to their owner. Do not silently drop rows.
   emit raw per-PID fields.
 - `group_by:container`: one `container` actor per canonical `container_name`.
   For systemd services, `container_name` is the service name. For
-  `user.slice/user-UID.slice`, it is the resolved username, or `user${UID}` if
-  username resolution is unavailable. For non-container, non-service processes,
-  it falls back to process name.
+  `user.slice/user-UID.slice`, network-connections uses a composed user actor
+  only when cgroups did not return a usable container name; the actor name is
+  the process UID's resolved username, or `user${UID}` if username resolution is
+  unavailable. Known rootless Docker and other known cgroups with a container
+  label or cgroup name keep their cgroups-provided container identity. For
+  non-container, non-service processes, it falls back to process name.
 
 The actor columns are:
 
@@ -1062,7 +1065,7 @@ The actor columns are:
 |---|---|---|
 | `process` | group key | process name; populated for `process_name` and `pid` modes |
 | `pid` | identity | host PID; populated only for `group_by:pid` |
-| `container_name` | group key | user-slice username, systemd unit, Docker/Kubernetes container name, cgroup name, then process fallback |
+| `container_name` | group key | cgroups-provided container name or cgroup name when known; otherwise user-slice username, systemd unit, then process fallback |
 | `cgroup_path` | attribute | APPS_LOOKUP cgroup path; populated only for `group_by:pid` |
 | `cgroup_name` | attribute | APPS_LOOKUP cgroup name; populated only for `group_by:pid` |
 | `orchestrator` | attribute | rendered from APPS_LOOKUP cgroup status and orchestrator enum; populated only for `group_by:pid` |
@@ -1197,6 +1200,12 @@ Do not emit these per socket:
 In the measured Cloud corpus, this production-only socket evidence shape was
 about 7.25 MB raw for 323,077 socket evidence rows, or about 11.25 MB raw when
 including current RTT/retransmission metrics.
+
+`topology:network-connections` has a fixed producer-side response budget of
+64 MiB. If a live request would exceed that budget, return a Function error with
+HTTP status `413`; do not emit a truncated topology and do not add
+partial-topology metadata unless a future product/schema decision introduces that
+contract.
 
 Network-connections graph direction is dependency direction: link types use
 `direction_role: "dependency"`, the client actor is always `src_actor`, and the

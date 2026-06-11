@@ -33,6 +33,16 @@ const char *nv_cached_label_value(const NV_APPS_LOOKUP_FIELDS *fields, const cha
     return NULL;
 }
 
+bool nv_cgroup_fields_have_container_identity(const NV_APPS_LOOKUP_FIELDS *fields)
+{
+    if(!fields || fields->cgroup_status != NIPC_APPS_CGROUP_KNOWN)
+        return false;
+
+    char container_name[NV_TOPOLOGY_CONTAINER_NAME_MAX];
+    nv_derive_docker_container_name(fields, fields->cgroup_name, container_name, sizeof(container_name));
+    return container_name[0] != '\0';
+}
+
 static void nv_copy_label(const NV_APPS_LOOKUP_FIELDS *fields, const char *key, char *dst, size_t dst_size)
 {
     if (!dst || !dst_size)

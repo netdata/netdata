@@ -40,6 +40,7 @@ static SPAWN_SERVER *spawn_srv = NULL;
 #define NETWORK_TOPOLOGY_LAYER "network"
 #define NV_TOPOLOGY_MAX_PPID_DEPTH 64
 #define NV_TOPOLOGY_PENDING_CONTAINER_NAME "[pending]"
+#define NV_TOPOLOGY_RESPONSE_SIZE_LIMIT (64ULL * 1024ULL * 1024ULL)
 
 #define NV_TOPOLOGY_USERNAME_MAX 128
 #define NV_TOPOLOGY_CMDLINE_MAX 512
@@ -139,6 +140,13 @@ typedef struct {
     bool sockets_selected_explicitly;
 } NV_TOPOLOGY_PARSE_STATE;
 
+typedef enum {
+    NV_TOPOLOGY_ABORT_NONE = 0,
+    NV_TOPOLOGY_ABORT_CANCELLED,
+    NV_TOPOLOGY_ABORT_TIMED_OUT,
+    NV_TOPOLOGY_ABORT_TOO_LARGE,
+} NV_TOPOLOGY_ABORT_STATUS;
+
 typedef struct {
     DICTIONARY *process_actors;
     DICTIONARY *remote_actors;
@@ -150,6 +158,9 @@ typedef struct {
     DICTIONARY *links;
     DICTIONARY *container_field_snapshot;
     usec_t now_ut;
+    usec_t *stop_monotonic_ut;
+    bool *cancelled;
+    NV_TOPOLOGY_ABORT_STATUS abort_status;
     uint64_t sockets_total;
     uint64_t skipped_sockets;
     char hostname[256];
@@ -169,6 +180,75 @@ typedef struct {
     size_t ownership_link_count;
     char host_actor_id[NV_TOPOLOGY_KEY_MAX];
 } NV_TOPOLOGY_RENDER_STATE;
+
+static NV_TOPOLOGY_ABORT_STATUS topology_function_abort_state(usec_t *stop_monotonic_ut, bool *cancelled)
+{
+    if(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED))
+        return NV_TOPOLOGY_ABORT_CANCELLED;
+
+    if(stop_monotonic_ut) {
+        usec_t stop_ut = __atomic_load_n(stop_monotonic_ut, __ATOMIC_RELAXED);
+        if(stop_ut && now_monotonic_usec() >= stop_ut)
+            return NV_TOPOLOGY_ABORT_TIMED_OUT;
+    }
+
+    return NV_TOPOLOGY_ABORT_NONE;
+}
+
+static NV_TOPOLOGY_ABORT_STATUS topology_context_check_abort(NV_TOPOLOGY_CONTEXT *ctx)
+{
+    if(!ctx)
+        return NV_TOPOLOGY_ABORT_NONE;
+
+    if(ctx->abort_status != NV_TOPOLOGY_ABORT_NONE)
+        return ctx->abort_status;
+
+    ctx->abort_status = topology_function_abort_state(ctx->stop_monotonic_ut, ctx->cancelled);
+    return ctx->abort_status;
+}
+
+static bool topology_abort_iteration_checkpoint(size_t iteration)
+{
+    return (iteration & 0xFF) == 0;
+}
+
+static NV_TOPOLOGY_ABORT_STATUS topology_response_check(BUFFER *wb, NV_TOPOLOGY_CONTEXT *ctx)
+{
+    NV_TOPOLOGY_ABORT_STATUS status = topology_context_check_abort(ctx);
+    if(status != NV_TOPOLOGY_ABORT_NONE)
+        return status;
+
+    if(wb && buffer_strlen(wb) > NV_TOPOLOGY_RESPONSE_SIZE_LIMIT) {
+        if(ctx)
+            ctx->abort_status = NV_TOPOLOGY_ABORT_TOO_LARGE;
+        return NV_TOPOLOGY_ABORT_TOO_LARGE;
+    }
+
+    return NV_TOPOLOGY_ABORT_NONE;
+}
+
+static int topology_abort_http_code(NV_TOPOLOGY_ABORT_STATUS status)
+{
+    if(status == NV_TOPOLOGY_ABORT_TOO_LARGE)
+        return HTTP_RESP_CONTENT_TOO_LONG;
+
+    return status == NV_TOPOLOGY_ABORT_CANCELLED ?
+        HTTP_RESP_CLIENT_CLOSED_REQUEST : HTTP_RESP_GATEWAY_TIMEOUT;
+}
+
+static const char *topology_abort_message(NV_TOPOLOGY_ABORT_STATUS status)
+{
+    switch(status) {
+        case NV_TOPOLOGY_ABORT_CANCELLED:
+            return "Request cancelled.";
+        case NV_TOPOLOGY_ABORT_TOO_LARGE:
+            return "Topology response exceeded the producer size budget.";
+        case NV_TOPOLOGY_ABORT_TIMED_OUT:
+        case NV_TOPOLOGY_ABORT_NONE:
+        default:
+            return "Request timed out.";
+    }
+}
 
 typedef struct {
     char cgroup_path[NV_TOPOLOGY_CGROUP_PATH_MAX];
@@ -1089,7 +1169,9 @@ static void topology_container_fields_fill(
     strncpyz(fields->systemd_unit_kind, classification.systemd_unit_kind, sizeof(fields->systemd_unit_kind) - 1);
     strncpyz(fields->actor_kind, classification.actor_kind, sizeof(fields->actor_kind) - 1);
     strncpyz(fields->actor_type, classification.actor_type, sizeof(fields->actor_type) - 1);
-    bool use_user_slice_name = topology_container_fields_apply_user_slice(cached.cgroup_path, uid, fields);
+    bool use_user_slice_name =
+        !nv_cgroup_fields_have_container_identity(&cached) &&
+        topology_container_fields_apply_user_slice(cached.cgroup_path, uid, fields);
     bool use_systemd_unit_name = !use_user_slice_name && strncmp(fields->actor_type, "systemd_", strlen("systemd_")) == 0;
 
     if(cached.cgroup_status != NIPC_APPS_CGROUP_KNOWN) {
@@ -1609,10 +1691,17 @@ static bool topology_socket_direction_selected(const NV_TOPOLOGY_CONTEXT *ctx, S
 }
 
 static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, void *data) {
+    NV_TOPOLOGY_CONTEXT *ctx = data;
+    if(!ctx)
+        return;
+
+    if(topology_abort_iteration_checkpoint(ctx->sockets_total) &&
+       topology_context_check_abort(ctx) != NV_TOPOLOGY_ABORT_NONE)
+        return;
+
     if(n->direction == SOCKET_DIRECTION_NONE)
         return;
 
-    NV_TOPOLOGY_CONTEXT *ctx = data;
     ctx->sockets_total++;
     bool selected_socket = topology_socket_direction_selected(ctx, n->direction);
     bool hidden_listen_socket = (n->direction == SOCKET_DIRECTION_LISTEN && !ctx->options.sockets_listening);
@@ -1884,22 +1973,32 @@ static void nv_pid_append(uint32_t **pids, size_t *count, size_t *capacity, pid_
     (*pids)[(*count)++] = (uint32_t)pid;
 }
 
-static void nv_warm_cache_from_topology_actors(NV_TOPOLOGY_CONTEXT *ctx)
+static NV_TOPOLOGY_ABORT_STATUS nv_warm_cache_from_topology_actors(NV_TOPOLOGY_CONTEXT *ctx)
 {
     if (!ctx || !ctx->process_actors)
-        return;
+        return NV_TOPOLOGY_ABORT_NONE;
 
     uint32_t *pids = NULL;
     size_t count = 0, capacity = 0;
     NV_PROCESS_ACTOR *pa;
     dfe_start_read(ctx->process_actors, pa) {
+        if(topology_abort_iteration_checkpoint(count) &&
+           topology_context_check_abort(ctx) != NV_TOPOLOGY_ABORT_NONE)
+            break;
+
         nv_pid_append(&pids, &count, &capacity, pa->pid);
     }
     dfe_done(pa);
 
+    if(topology_context_check_abort(ctx) != NV_TOPOLOGY_ABORT_NONE) {
+        freez(pids);
+        return ctx->abort_status;
+    }
+
     count = nv_pid_sort_unique(pids, count);
     nv_apps_lookup_warm_pids(pids, count);
     freez(pids);
+    return topology_context_check_abort(ctx);
 }
 
 static void nv_warm_cache_from_aggregated_sockets(LOCAL_SOCKET **sockets, size_t count)
@@ -1917,14 +2016,24 @@ static void nv_warm_cache_from_aggregated_sockets(LOCAL_SOCKET **sockets, size_t
     freez(pids);
 }
 
-static bool topology_prepare_context(NV_TOPOLOGY_CONTEXT *ctx, usec_t now_ut, const NV_TOPOLOGY_OPTIONS *options) {
+static bool topology_prepare_context(
+    NV_TOPOLOGY_CONTEXT *ctx,
+    usec_t now_ut,
+    const NV_TOPOLOGY_OPTIONS *options,
+    usec_t *stop_monotonic_ut,
+    bool *cancelled) {
     if(!ctx)
         return false;
 
     memset(ctx, 0, sizeof(*ctx));
     ctx->now_ut = now_ut;
+    ctx->stop_monotonic_ut = stop_monotonic_ut;
+    ctx->cancelled = cancelled;
     if(options)
         ctx->options = *options;
+
+    if(topology_context_check_abort(ctx) != NV_TOPOLOGY_ABORT_NONE)
+        return false;
 
     if(ctx->options.info_only)
         return true;
@@ -1985,7 +2094,7 @@ static bool topology_prepare_context(NV_TOPOLOGY_CONTEXT *ctx, usec_t now_ut, co
     };
 
     local_sockets_process(&ls);
-    return true;
+    return topology_context_check_abort(ctx) == NV_TOPOLOGY_ABORT_NONE;
 }
 
 static void topology_render_state_init(NV_TOPOLOGY_RENDER_STATE *state, const NV_TOPOLOGY_CONTEXT *ctx) {
@@ -2011,6 +2120,13 @@ static void topology_finalize_response(const char *transaction, BUFFER *wb, time
     wb->content_type = CT_APPLICATION_JSON;
     wb->expires = now_s + NETWORK_VIEWER_RESPONSE_UPDATE_EVERY;
     pluginsd_function_result_to_stdout(transaction, wb);
+    netdata_mutex_unlock(&stdout_mutex);
+}
+
+static void topology_send_error(const char *transaction, int code, const char *message)
+{
+    netdata_mutex_lock(&stdout_mutex);
+    pluginsd_function_json_error_to_stdout(transaction, code, message);
     netdata_mutex_unlock(&stdout_mutex);
 }
 
@@ -2718,99 +2834,48 @@ static void topology_v1_enrich_process_actor_from_cache(
     if(!ctx || !payload || !actor || !pid)
         return;
 
-    char cgroup_status[32] = "retry_later";
-    char cgroup_path[NV_TOPOLOGY_CGROUP_PATH_MAX] = "";
-    char cgroup_name[NV_TOPOLOGY_CGROUP_NAME_MAX] = "";
-    char container_name[NV_TOPOLOGY_CONTAINER_NAME_MAX] = NV_TOPOLOGY_PENDING_CONTAINER_NAME;
-    char orchestrator_value[NV_TOPOLOGY_ORCHESTRATOR_MAX] = "";
-    char k8s_pod_name[NV_TOPOLOGY_K8S_NAME_MAX] = "";
-    char k8s_namespace[NV_TOPOLOGY_K8S_NAME_MAX] = "";
-    char k8s_workload[NV_TOPOLOGY_K8S_NAME_MAX] = "";
-    char docker_container_name[NV_TOPOLOGY_CGROUP_NAME_MAX] = "";
-    char docker_image[NV_TOPOLOGY_DOCKER_IMAGE_MAX] = "";
-    char systemd_unit_name[NV_TOPOLOGY_SYSTEMD_UNIT_MAX] = "";
-    char systemd_unit_kind[NV_TOPOLOGY_SYSTEMD_KIND_MAX] = "";
-    char actor_kind[NV_TOPOLOGY_ACTOR_KIND_MAX] = "pending";
-    char actor_type[NV_TOPOLOGY_ACTOR_TYPE_MAX] = "container";
+    NV_TOPOLOGY_CONTAINER_FIELDS fields = { 0 };
+    topology_container_fields_snapshot(ctx, pid, uid, actor->process, &fields);
+
     bool have_cached = false;
     NV_APPS_LOOKUP_FIELDS cached;
 
-    if(nv_cache_lookup_pid(pid, &cached)) {
+    if(ctx->options.label_whitelist && nv_cache_lookup_pid(pid, &cached))
         have_cached = true;
 
-        CGROUP_TOPOLOGY_CLASSIFICATION classification;
-        cgroup_topology_classify(cached.cgroup_status, cached.orchestrator, cached.cgroup_path, &classification);
-        topology_v1_strncpy(cgroup_status, sizeof(cgroup_status), nv_cgroup_status_name(cached.cgroup_status));
-        topology_v1_strncpy(cgroup_path, sizeof(cgroup_path), cached.cgroup_path);
-        topology_v1_strncpy(cgroup_name, sizeof(cgroup_name), cached.cgroup_name);
-        topology_v1_strncpy(orchestrator_value, sizeof(orchestrator_value), classification.effective_orchestrator);
-        topology_v1_strncpy(systemd_unit_name, sizeof(systemd_unit_name), classification.systemd_unit_name);
-        topology_v1_strncpy(systemd_unit_kind, sizeof(systemd_unit_kind), classification.systemd_unit_kind);
-        topology_v1_strncpy(actor_kind, sizeof(actor_kind), classification.actor_kind);
-        topology_v1_strncpy(actor_type, sizeof(actor_type), classification.actor_type);
-        char user_slice_name[NV_TOPOLOGY_USERNAME_MAX] = "";
-        bool use_user_slice_name =
-            topology_user_slice_actor_name(cached.cgroup_path, uid, user_slice_name, sizeof(user_slice_name));
-        if(use_user_slice_name) {
-            topology_v1_strncpy(orchestrator_value, sizeof(orchestrator_value), "systemd");
-            topology_v1_strncpy(actor_kind, sizeof(actor_kind), "user");
-            topology_v1_strncpy(actor_type, sizeof(actor_type), "user");
-        }
-        bool use_systemd_unit_name = !use_user_slice_name && strncmp(actor_type, "systemd_", strlen("systemd_")) == 0;
-
-        nv_derive_k8s_pod_name(&cached, k8s_pod_name, sizeof(k8s_pod_name));
-        nv_derive_k8s_namespace(&cached, k8s_namespace, sizeof(k8s_namespace));
-        nv_derive_k8s_workload(&cached, k8s_workload, sizeof(k8s_workload));
-        nv_derive_docker_container_name(
-            &cached, cgroup_name, docker_container_name, sizeof(docker_container_name));
-        nv_derive_docker_image(&cached, docker_image, sizeof(docker_image));
-        if(use_user_slice_name)
-            topology_v1_strncpy(container_name, sizeof(container_name), user_slice_name);
-        else if(use_systemd_unit_name && systemd_unit_name[0])
-            topology_v1_strncpy(container_name, sizeof(container_name), systemd_unit_name);
-        else if(docker_container_name[0])
-            topology_v1_strncpy(container_name, sizeof(container_name), docker_container_name);
-        else if(cgroup_name[0])
-            topology_v1_strncpy(container_name, sizeof(container_name), cgroup_name);
-        else if((cached.cgroup_status == NIPC_APPS_CGROUP_HOST_ROOT ||
-                 cached.cgroup_status == NIPC_APPS_CGROUP_UNKNOWN_PERMANENT) &&
-                actor->process[0])
-            topology_v1_strncpy(container_name, sizeof(container_name), actor->process);
-    }
-
     if(fill_actor_fields) {
-        topology_v1_strncpy(actor->cgroup_status, sizeof(actor->cgroup_status), cgroup_status);
-        topology_v1_strncpy(actor->cgroup_path, sizeof(actor->cgroup_path), cgroup_path);
-        topology_v1_strncpy(actor->cgroup_name, sizeof(actor->cgroup_name), cgroup_name);
-        topology_v1_strncpy(actor->container_name, sizeof(actor->container_name), container_name);
-        topology_v1_strncpy(actor->orchestrator, sizeof(actor->orchestrator), orchestrator_value);
-        topology_v1_strncpy(actor->k8s_pod_name, sizeof(actor->k8s_pod_name), k8s_pod_name);
-        topology_v1_strncpy(actor->k8s_namespace, sizeof(actor->k8s_namespace), k8s_namespace);
-        topology_v1_strncpy(actor->k8s_workload, sizeof(actor->k8s_workload), k8s_workload);
-        topology_v1_strncpy(actor->docker_container_name, sizeof(actor->docker_container_name), docker_container_name);
-        topology_v1_strncpy(actor->docker_image, sizeof(actor->docker_image), docker_image);
-        topology_v1_strncpy(actor->systemd_unit_name, sizeof(actor->systemd_unit_name), systemd_unit_name);
-        topology_v1_strncpy(actor->systemd_unit_kind, sizeof(actor->systemd_unit_kind), systemd_unit_kind);
-        topology_v1_strncpy(actor->actor_kind, sizeof(actor->actor_kind), actor_kind);
+        topology_v1_strncpy(actor->cgroup_status, sizeof(actor->cgroup_status), fields.cgroup_status);
+        topology_v1_strncpy(actor->cgroup_path, sizeof(actor->cgroup_path), fields.cgroup_path);
+        topology_v1_strncpy(actor->cgroup_name, sizeof(actor->cgroup_name), fields.cgroup_name);
+        topology_v1_strncpy(actor->container_name, sizeof(actor->container_name), fields.container_name);
+        topology_v1_strncpy(actor->orchestrator, sizeof(actor->orchestrator), fields.orchestrator);
+        topology_v1_strncpy(actor->k8s_pod_name, sizeof(actor->k8s_pod_name), fields.k8s_pod_name);
+        topology_v1_strncpy(actor->k8s_namespace, sizeof(actor->k8s_namespace), fields.k8s_namespace);
+        topology_v1_strncpy(actor->k8s_workload, sizeof(actor->k8s_workload), fields.k8s_workload);
+        topology_v1_strncpy(actor->docker_container_name, sizeof(actor->docker_container_name), fields.docker_container_name);
+        topology_v1_strncpy(actor->docker_image, sizeof(actor->docker_image), fields.docker_image);
+        topology_v1_strncpy(actor->systemd_unit_name, sizeof(actor->systemd_unit_name), fields.systemd_unit_name);
+        topology_v1_strncpy(actor->systemd_unit_kind, sizeof(actor->systemd_unit_kind), fields.systemd_unit_kind);
+        topology_v1_strncpy(actor->actor_kind, sizeof(actor->actor_kind), fields.actor_kind);
         if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
-            topology_v1_strncpy(actor->type, sizeof(actor->type), actor_type);
+            topology_v1_strncpy(actor->type, sizeof(actor->type), fields.actor_type);
     }
 
-    topology_v1_add_actor_label_if_set(payload, actor_index, "cgroup_status", cgroup_status, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "cgroup_path", cgroup_path, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "cgroup_name", cgroup_name, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "cgroup_status", fields.cgroup_status, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "cgroup_path", fields.cgroup_path, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "cgroup_name", fields.cgroup_name, "attribute");
     if(!(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER &&
-         strcmp(actor->container_name, container_name) == 0))
-        topology_v1_add_actor_label_if_set(payload, actor_index, "container_name", container_name, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "orchestrator", orchestrator_value, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_pod_name", k8s_pod_name, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_namespace", k8s_namespace, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_workload", k8s_workload, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "docker_container_name", docker_container_name, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "docker_image", docker_image, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "systemd_unit_name", systemd_unit_name, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "systemd_unit_kind", systemd_unit_kind, "attribute");
-    topology_v1_add_actor_label_if_set(payload, actor_index, "actor_kind", actor_kind, "attribute");
+         strcmp(actor->container_name, fields.container_name) == 0))
+        topology_v1_add_actor_label_if_set(payload, actor_index, "container_name", fields.container_name, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "orchestrator", fields.orchestrator, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_pod_name", fields.k8s_pod_name, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_namespace", fields.k8s_namespace, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "k8s_workload", fields.k8s_workload, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "docker_container_name", fields.docker_container_name, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "docker_image", fields.docker_image, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "systemd_unit_name", fields.systemd_unit_name, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "systemd_unit_kind", fields.systemd_unit_kind, "attribute");
+    topology_v1_add_actor_label_if_set(payload, actor_index, "actor_kind", fields.actor_kind, "attribute");
 
     if(have_cached && ctx->options.label_whitelist) {
         for(uint16_t i = 0; i < cached.cgroup_label_count; i++) {
@@ -2955,10 +3020,14 @@ static bool topology_v1_should_emit_endpoint_actor(
     return !topology_ip_belongs_to_self(ctx, actor->ip, actor->address_space);
 }
 
-static void topology_v1_collect_actors(
-    const NV_TOPOLOGY_CONTEXT *ctx,
+static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_actors(
+    NV_TOPOLOGY_CONTEXT *ctx,
     NV_TOPOLOGY_RENDER_STATE *state,
     NV_TOPOLOGY_V1_PAYLOAD *payload) {
+    NV_TOPOLOGY_ABORT_STATUS abort_status = topology_context_check_abort(ctx);
+    if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+        return abort_status;
+
     NV_TOPOLOGY_V1_ACTOR *self = topology_v1_add_actor(payload, state->host_actor_id);
     topology_v1_strncpy(self->type, sizeof(self->type), "self");
     topology_v1_strncpy(self->machine_guid, sizeof(self->machine_guid), ctx->machine_guid);
@@ -2976,7 +3045,12 @@ static void topology_v1_collect_actors(
     topology_v1_add_actor_label_uint(payload, self_index, "local_ip_count", self->local_ip_count, "metric");
 
     NV_PROCESS_ACTOR *pa;
+    size_t actor_iteration = 0;
     dfe_start_read(ctx->process_actors, pa) {
+        if(topology_abort_iteration_checkpoint(actor_iteration++) &&
+           (abort_status = topology_context_check_abort(ctx)) != NV_TOPOLOGY_ABORT_NONE)
+            return abort_status;
+
         char actor_id[NV_TOPOLOGY_KEY_MAX];
         char display_name[NV_TOPOLOGY_KEY_MAX];
         NV_TOPOLOGY_CONTAINER_FIELDS container_fields = { 0 };
@@ -3109,12 +3183,21 @@ static void topology_v1_collect_actors(
     dfe_done(pa);
 
     for(uint64_t i = 0; i < payload->actors_used; i++) {
+        if(topology_abort_iteration_checkpoint((size_t)i) &&
+           (abort_status = topology_context_check_abort(ctx)) != NV_TOPOLOGY_ABORT_NONE)
+            return abort_status;
+
         if(strcmp(payload->actors[i].type, "process") == 0 || strcmp(payload->actors[i].type, "container") == 0)
             topology_v1_add_actor_label_uint(payload, i, "socket_count", payload->actors[i].sockets, "metric");
     }
 
     NV_REMOTE_ACTOR *ra;
+    size_t remote_iteration = 0;
     dfe_start_read(ctx->remote_actors, ra) {
+        if(topology_abort_iteration_checkpoint(remote_iteration++) &&
+           (abort_status = topology_context_check_abort(ctx)) != NV_TOPOLOGY_ABORT_NONE)
+            return abort_status;
+
         // Remote actors are discovered while sockets are scanned, before all
         // local IPs may be known. Recheck with the final local-IP set so actor
         // emission and link destination resolution use the same self test.
@@ -3139,6 +3222,8 @@ static void topology_v1_collect_actors(
         state->endpoint_actor_count++;
     }
     dfe_done(ra);
+
+    return topology_context_check_abort(ctx);
 }
 
 static bool topology_v1_process_actor_index(
@@ -3250,15 +3335,24 @@ static bool topology_v1_socket_peer_actor_index(
     return topology_v1_endpoint_actor_index(ctx, payload, ip, address_space, actor);
 }
 
-static void topology_v1_collect_links(
-    const NV_TOPOLOGY_CONTEXT *ctx,
+static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_links(
+    NV_TOPOLOGY_CONTEXT *ctx,
     NV_TOPOLOGY_RENDER_STATE *state,
     NV_TOPOLOGY_V1_PAYLOAD *payload) {
+    NV_TOPOLOGY_ABORT_STATUS abort_status = topology_context_check_abort(ctx);
+    if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+        return abort_status;
+
     uint64_t host_actor = 0;
     topology_v1_actor_index_get(payload, state->host_actor_id, &host_actor);
 
     NV_PROCESS_ACTOR *pa;
+    size_t process_iteration = 0;
     dfe_start_read(ctx->process_actors, pa) {
+        if(topology_abort_iteration_checkpoint(process_iteration++) &&
+           (abort_status = topology_context_check_abort(ctx)) != NV_TOPOLOGY_ABORT_NONE)
+            return abort_status;
+
         uint64_t process_actor;
         if(!topology_v1_process_actor_index(ctx, payload, pa->pid, pa->uid, pa->net_ns_inode, pa->process, &process_actor))
             continue;
@@ -3272,7 +3366,12 @@ static void topology_v1_collect_links(
     dfe_done(pa);
 
     NV_TOPOLOGY_LINK *source;
+    size_t link_iteration = 0;
     dfe_start_read(ctx->links, source) {
+        if(topology_abort_iteration_checkpoint(link_iteration++) &&
+           (abort_status = topology_context_check_abort(ctx)) != NV_TOPOLOGY_ABORT_NONE)
+            return abort_status;
+
         uint64_t src_actor;
         if(!topology_v1_process_actor_index(ctx, payload,
                                             source->pid, source->uid, source->net_ns_inode,
@@ -3348,6 +3447,8 @@ static void topology_v1_collect_links(
             topology_v1_add_connection_row(payload, client_actor, server_actor, source);
     }
     dfe_done(source);
+
+    return topology_context_check_abort(ctx);
 }
 
 static void topology_v1_emit_column(
@@ -4785,7 +4886,14 @@ static void topology_v1_emit_presentation(BUFFER *wb) {
     buffer_json_object_close(wb);
 }
 
-static void topology_v1_emit_actor_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOAD *payload) {
+static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_actor_table(
+    BUFFER *wb,
+    NV_TOPOLOGY_V1_PAYLOAD *payload,
+    NV_TOPOLOGY_CONTEXT *ctx) {
+    NV_TOPOLOGY_ABORT_STATUS abort_status = topology_response_check(wb, ctx);
+    if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+        return abort_status;
+
     buffer_json_member_add_object(wb, "actors");
     {
         buffer_json_member_add_uint64(wb, "rows", payload->actors_used);
@@ -4796,14 +4904,22 @@ static void topology_v1_emit_actor_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOAD *pay
 
 #define NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(member) do { \
             topology_v1_values_start(wb); \
-            for(size_t i = 0; i < payload->actors_used; i++) \
+            for(size_t i = 0; i < payload->actors_used; i++) { \
+                if(topology_abort_iteration_checkpoint(i) && \
+                   (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                    return abort_status; \
                 buffer_json_add_array_item_string(wb, payload->actors[i].member[0] ? payload->actors[i].member : NULL); \
+            } \
             topology_v1_values_end(wb); \
         } while(0)
 #define NV_TOPOLOGY_V1_ACTOR_UINT_VALUES(member, has_member) do { \
             topology_v1_values_start(wb); \
-            for(size_t i = 0; i < payload->actors_used; i++) \
+            for(size_t i = 0; i < payload->actors_used; i++) { \
+                if(topology_abort_iteration_checkpoint(i) && \
+                   (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                    return abort_status; \
                 topology_v1_add_nullable_uint(wb, payload->actors[i].has_member, payload->actors[i].member); \
+            } \
             topology_v1_values_end(wb); \
         } while(0)
 
@@ -4840,8 +4956,12 @@ static void topology_v1_emit_actor_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOAD *pay
         NV_TOPOLOGY_V1_ACTOR_STRING_VALUES(display_name);
 
         topology_v1_values_start(wb);
-        for(size_t i = 0; i < payload->actors_used; i++)
+        for(size_t i = 0; i < payload->actors_used; i++) {
+            if(topology_abort_iteration_checkpoint(i) &&
+               (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
+                return abort_status;
             buffer_json_add_array_item_uint64(wb, payload->actors[i].sockets);
+        }
         topology_v1_values_end(wb);
 
         NV_TOPOLOGY_V1_ACTOR_UINT_VALUES(local_ip_count, has_local_ip_count);
@@ -4852,9 +4972,17 @@ static void topology_v1_emit_actor_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOAD *pay
         buffer_json_array_close(wb);
     }
     buffer_json_object_close(wb);
+    return topology_response_check(wb, ctx);
 }
 
-static void topology_v1_emit_link_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOAD *payload) {
+static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_link_table(
+    BUFFER *wb,
+    NV_TOPOLOGY_V1_PAYLOAD *payload,
+    NV_TOPOLOGY_CONTEXT *ctx) {
+    NV_TOPOLOGY_ABORT_STATUS abort_status = topology_response_check(wb, ctx);
+    if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+        return abort_status;
+
     buffer_json_member_add_object(wb, "links");
     {
         buffer_json_member_add_uint64(wb, "rows", payload->links_used);
@@ -4865,17 +4993,28 @@ static void topology_v1_emit_link_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOAD *payl
 
 #define NV_TOPOLOGY_V1_LINK_UINT_VALUES(member) do { \
             topology_v1_values_start(wb); \
-            for(size_t i = 0; i < payload->links_used; i++) \
+            for(size_t i = 0; i < payload->links_used; i++) { \
+                if(topology_abort_iteration_checkpoint(i) && \
+                   (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                    return abort_status; \
                 buffer_json_add_array_item_uint64(wb, payload->links[i].member); \
+            } \
             topology_v1_values_end(wb); \
         } while(0)
 #define NV_TOPOLOGY_V1_LINK_STRING_VALUES(member) do { \
             NV_TOPOLOGY_V1_STRING_COLUMN column; \
             topology_v1_string_column_init(&column, payload->links_used); \
-            for(size_t i = 0; i < payload->links_used; i++) \
+            for(size_t i = 0; i < payload->links_used; i++) { \
+                if(topology_abort_iteration_checkpoint(i) && \
+                   (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                    break; \
                 topology_v1_string_column_add(&column, payload->links[i].member); \
-            topology_v1_emit_auto_string_column(wb, &column); \
+            } \
+            if(abort_status == NV_TOPOLOGY_ABORT_NONE) \
+                topology_v1_emit_auto_string_column(wb, &column); \
             topology_v1_string_column_free(&column); \
+            if(abort_status != NV_TOPOLOGY_ABORT_NONE) \
+                return abort_status; \
         } while(0)
 
         NV_TOPOLOGY_V1_LINK_UINT_VALUES(src_actor);
@@ -4888,13 +5027,21 @@ static void topology_v1_emit_link_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOAD *payl
         NV_TOPOLOGY_V1_LINK_UINT_VALUES(retransmissions);
 
         topology_v1_values_start(wb);
-        for(size_t i = 0; i < payload->links_used; i++)
+        for(size_t i = 0; i < payload->links_used; i++) {
+            if(topology_abort_iteration_checkpoint(i) &&
+               (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
+                return abort_status;
             buffer_json_add_array_item_double(wb, (double)payload->links[i].max_rtt_usec / (double)USEC_PER_MS);
+        }
         topology_v1_values_end(wb);
 
         topology_v1_values_start(wb);
-        for(size_t i = 0; i < payload->links_used; i++)
+        for(size_t i = 0; i < payload->links_used; i++) {
+            if(topology_abort_iteration_checkpoint(i) &&
+               (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
+                return abort_status;
             buffer_json_add_array_item_double(wb, (double)payload->links[i].max_rcv_rtt_usec / (double)USEC_PER_MS);
+        }
         topology_v1_values_end(wb);
 
 #undef NV_TOPOLOGY_V1_LINK_UINT_VALUES
@@ -4903,9 +5050,17 @@ static void topology_v1_emit_link_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOAD *payl
         buffer_json_array_close(wb);
     }
     buffer_json_object_close(wb);
+    return topology_response_check(wb, ctx);
 }
 
-static void topology_v1_emit_socket_port_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOAD *payload) {
+static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_port_table(
+    BUFFER *wb,
+    NV_TOPOLOGY_V1_PAYLOAD *payload,
+    NV_TOPOLOGY_CONTEXT *ctx) {
+    NV_TOPOLOGY_ABORT_STATUS abort_status = topology_response_check(wb, ctx);
+    if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+        return abort_status;
+
     buffer_json_member_add_object(wb, "tables");
     {
         buffer_json_member_add_object(wb, "actor");
@@ -4923,17 +5078,28 @@ static void topology_v1_emit_socket_port_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOA
 
 #define NV_TOPOLOGY_V1_PORT_UINT_VALUES(member) do { \
                     topology_v1_values_start(wb); \
-                    for(size_t i = 0; i < payload->ports_used; i++) \
+                    for(size_t i = 0; i < payload->ports_used; i++) { \
+                        if(topology_abort_iteration_checkpoint(i) && \
+                           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                            return abort_status; \
                         buffer_json_add_array_item_uint64(wb, payload->ports[i].member); \
+                    } \
                     topology_v1_values_end(wb); \
                 } while(0)
 #define NV_TOPOLOGY_V1_PORT_STRING_VALUES(member) do { \
                     NV_TOPOLOGY_V1_STRING_COLUMN column; \
                     topology_v1_string_column_init(&column, payload->ports_used); \
-                    for(size_t i = 0; i < payload->ports_used; i++) \
+                    for(size_t i = 0; i < payload->ports_used; i++) { \
+                        if(topology_abort_iteration_checkpoint(i) && \
+                           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                            break; \
                         topology_v1_string_column_add(&column, payload->ports[i].member); \
-                    topology_v1_emit_auto_string_column(wb, &column); \
+                    } \
+                    if(abort_status == NV_TOPOLOGY_ABORT_NONE) \
+                        topology_v1_emit_auto_string_column(wb, &column); \
                     topology_v1_string_column_free(&column); \
+                    if(abort_status != NV_TOPOLOGY_ABORT_NONE) \
+                        return abort_status; \
                 } while(0)
 
                     NV_TOPOLOGY_V1_PORT_UINT_VALUES(actor);
@@ -4963,17 +5129,28 @@ static void topology_v1_emit_socket_port_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOA
 
 #define NV_TOPOLOGY_V1_PROCESS_UINT_VALUES(member) do { \
                     topology_v1_values_start(wb); \
-                    for(size_t i = 0; i < payload->processes_used; i++) \
+                    for(size_t i = 0; i < payload->processes_used; i++) { \
+                        if(topology_abort_iteration_checkpoint(i) && \
+                           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                            return abort_status; \
                         buffer_json_add_array_item_uint64(wb, payload->processes[i].member); \
+                    } \
                     topology_v1_values_end(wb); \
                 } while(0)
 #define NV_TOPOLOGY_V1_PROCESS_STRING_VALUES(member) do { \
                     NV_TOPOLOGY_V1_STRING_COLUMN column; \
                     topology_v1_string_column_init(&column, payload->processes_used); \
-                    for(size_t i = 0; i < payload->processes_used; i++) \
+                    for(size_t i = 0; i < payload->processes_used; i++) { \
+                        if(topology_abort_iteration_checkpoint(i) && \
+                           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                            break; \
                         topology_v1_string_column_add(&column, payload->processes[i].member); \
-                    topology_v1_emit_auto_string_column(wb, &column); \
+                    } \
+                    if(abort_status == NV_TOPOLOGY_ABORT_NONE) \
+                        topology_v1_emit_auto_string_column(wb, &column); \
                     topology_v1_string_column_free(&column); \
+                    if(abort_status != NV_TOPOLOGY_ABORT_NONE) \
+                        return abort_status; \
                 } while(0)
 
                     NV_TOPOLOGY_V1_PROCESS_UINT_VALUES(actor);
@@ -5010,17 +5187,28 @@ static void topology_v1_emit_socket_port_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOA
 
 #define NV_TOPOLOGY_V1_CGROUP_UINT_VALUES(member) do { \
                     topology_v1_values_start(wb); \
-                    for(size_t i = 0; i < payload->cgroups_used; i++) \
+                    for(size_t i = 0; i < payload->cgroups_used; i++) { \
+                        if(topology_abort_iteration_checkpoint(i) && \
+                           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                            return abort_status; \
                         buffer_json_add_array_item_uint64(wb, payload->cgroups[i].member); \
+                    } \
                     topology_v1_values_end(wb); \
                 } while(0)
 #define NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(member) do { \
                     NV_TOPOLOGY_V1_STRING_COLUMN column; \
                     topology_v1_string_column_init(&column, payload->cgroups_used); \
-                    for(size_t i = 0; i < payload->cgroups_used; i++) \
+                    for(size_t i = 0; i < payload->cgroups_used; i++) { \
+                        if(topology_abort_iteration_checkpoint(i) && \
+                           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                            break; \
                         topology_v1_string_column_add(&column, payload->cgroups[i].member); \
-                    topology_v1_emit_auto_string_column(wb, &column); \
+                    } \
+                    if(abort_status == NV_TOPOLOGY_ABORT_NONE) \
+                        topology_v1_emit_auto_string_column(wb, &column); \
                     topology_v1_string_column_free(&column); \
+                    if(abort_status != NV_TOPOLOGY_ABORT_NONE) \
+                        return abort_status; \
                 } while(0)
 
                     NV_TOPOLOGY_V1_CGROUP_UINT_VALUES(actor);
@@ -5061,17 +5249,28 @@ static void topology_v1_emit_socket_port_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOA
 
 #define NV_TOPOLOGY_V1_LABEL_UINT_VALUES(member) do { \
                     topology_v1_values_start(wb); \
-                    for(size_t i = 0; i < payload->labels_used; i++) \
+                    for(size_t i = 0; i < payload->labels_used; i++) { \
+                        if(topology_abort_iteration_checkpoint(i) && \
+                           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                            return abort_status; \
                         buffer_json_add_array_item_uint64(wb, payload->labels[i].member); \
+                    } \
                     topology_v1_values_end(wb); \
                 } while(0)
 #define NV_TOPOLOGY_V1_LABEL_STRING_VALUES(member) do { \
                     NV_TOPOLOGY_V1_STRING_COLUMN column; \
                     topology_v1_string_column_init(&column, payload->labels_used); \
-                    for(size_t i = 0; i < payload->labels_used; i++) \
+                    for(size_t i = 0; i < payload->labels_used; i++) { \
+                        if(topology_abort_iteration_checkpoint(i) && \
+                           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                            break; \
                         topology_v1_string_column_add(&column, payload->labels[i].member); \
-                    topology_v1_emit_auto_string_column(wb, &column); \
+                    } \
+                    if(abort_status == NV_TOPOLOGY_ABORT_NONE) \
+                        topology_v1_emit_auto_string_column(wb, &column); \
                     topology_v1_string_column_free(&column); \
+                    if(abort_status != NV_TOPOLOGY_ABORT_NONE) \
+                        return abort_status; \
                 } while(0)
 
                     NV_TOPOLOGY_V1_LABEL_UINT_VALUES(actor);
@@ -5081,8 +5280,12 @@ static void topology_v1_emit_socket_port_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOA
                     NV_TOPOLOGY_V1_LABEL_STRING_VALUES(kind);
 
                     topology_v1_values_start(wb);
-                    for(size_t i = 0; i < payload->labels_used; i++)
+                    for(size_t i = 0; i < payload->labels_used; i++) {
+                        if(topology_abort_iteration_checkpoint(i) &&
+                           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
+                            return abort_status;
                         topology_v1_add_nullable_uint(wb, payload->labels[i].has_value_index, payload->labels[i].value_index);
+                    }
                     topology_v1_values_end(wb);
 
 #undef NV_TOPOLOGY_V1_LABEL_UINT_VALUES
@@ -5112,17 +5315,28 @@ static void topology_v1_emit_socket_port_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOA
 
 #define NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES(member) do { \
                             topology_v1_values_start(wb); \
-                            for(size_t i = 0; i < payload->connections_used; i++) \
+                            for(size_t i = 0; i < payload->connections_used; i++) { \
+                                if(topology_abort_iteration_checkpoint(i) && \
+                                   (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                                    return abort_status; \
                                 buffer_json_add_array_item_uint64(wb, payload->connections[i].member); \
+                            } \
                             topology_v1_values_end(wb); \
                         } while(0)
 #define NV_TOPOLOGY_V1_CONNECTION_STRING_VALUES(member) do { \
                             NV_TOPOLOGY_V1_STRING_COLUMN column; \
                             topology_v1_string_column_init(&column, payload->connections_used); \
-                            for(size_t i = 0; i < payload->connections_used; i++) \
+                            for(size_t i = 0; i < payload->connections_used; i++) { \
+                                if(topology_abort_iteration_checkpoint(i) && \
+                                   (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                                    break; \
                                 topology_v1_string_column_add(&column, payload->connections[i].member); \
-                            topology_v1_emit_auto_string_column(wb, &column); \
+                            } \
+                            if(abort_status == NV_TOPOLOGY_ABORT_NONE) \
+                                topology_v1_emit_auto_string_column(wb, &column); \
                             topology_v1_string_column_free(&column); \
+                            if(abort_status != NV_TOPOLOGY_ABORT_NONE) \
+                                return abort_status; \
                         } while(0)
 
                         NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES(src_actor);
@@ -5135,13 +5349,21 @@ static void topology_v1_emit_socket_port_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOA
                         NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES(retransmissions);
 
                         topology_v1_values_start(wb);
-                        for(size_t i = 0; i < payload->connections_used; i++)
+                        for(size_t i = 0; i < payload->connections_used; i++) {
+                            if(topology_abort_iteration_checkpoint(i) &&
+                               (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
+                                return abort_status;
                             buffer_json_add_array_item_double(wb, (double)payload->connections[i].max_rtt_usec / (double)USEC_PER_MS);
+                        }
                         topology_v1_values_end(wb);
 
                         topology_v1_values_start(wb);
-                        for(size_t i = 0; i < payload->connections_used; i++)
+                        for(size_t i = 0; i < payload->connections_used; i++) {
+                            if(topology_abort_iteration_checkpoint(i) &&
+                               (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
+                                return abort_status;
                             buffer_json_add_array_item_double(wb, (double)payload->connections[i].max_rcv_rtt_usec / (double)USEC_PER_MS);
+                        }
                         topology_v1_values_end(wb);
 
 #undef NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES
@@ -5157,9 +5379,17 @@ static void topology_v1_emit_socket_port_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOA
         }
     }
     buffer_json_object_close(wb);
+    return topology_response_check(wb, ctx);
 }
 
-static void topology_v1_emit_socket_evidence_table(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOAD *payload) {
+static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_evidence_table(
+    BUFFER *wb,
+    NV_TOPOLOGY_V1_PAYLOAD *payload,
+    NV_TOPOLOGY_CONTEXT *ctx) {
+    NV_TOPOLOGY_ABORT_STATUS abort_status = topology_response_check(wb, ctx);
+    if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+        return abort_status;
+
     buffer_json_member_add_object(wb, "evidence");
     {
         buffer_json_member_add_object(wb, "socket");
@@ -5175,23 +5405,38 @@ static void topology_v1_emit_socket_evidence_table(BUFFER *wb, NV_TOPOLOGY_V1_PA
 
 #define NV_TOPOLOGY_V1_EVIDENCE_UINT_VALUES(member) do { \
                 topology_v1_values_start(wb); \
-                for(size_t i = 0; i < payload->evidence_used; i++) \
+                for(size_t i = 0; i < payload->evidence_used; i++) { \
+                    if(topology_abort_iteration_checkpoint(i) && \
+                       (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                        return abort_status; \
                     buffer_json_add_array_item_uint64(wb, payload->evidence[i].member); \
+                } \
                 topology_v1_values_end(wb); \
             } while(0)
 #define NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(member) do { \
                 topology_v1_values_start(wb); \
-                for(size_t i = 0; i < payload->evidence_used; i++) \
+                for(size_t i = 0; i < payload->evidence_used; i++) { \
+                    if(topology_abort_iteration_checkpoint(i) && \
+                       (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                        return abort_status; \
                     buffer_json_add_array_item_uint64(wb, payload->evidence[i].source->member); \
+                } \
                 topology_v1_values_end(wb); \
             } while(0)
 #define NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(member) do { \
                 NV_TOPOLOGY_V1_STRING_COLUMN column; \
                 topology_v1_string_column_init(&column, payload->evidence_used); \
-                for(size_t i = 0; i < payload->evidence_used; i++) \
+                for(size_t i = 0; i < payload->evidence_used; i++) { \
+                    if(topology_abort_iteration_checkpoint(i) && \
+                       (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                        break; \
                     topology_v1_string_column_add(&column, payload->evidence[i].source->member); \
-                topology_v1_emit_auto_string_column(wb, &column); \
+                } \
+                if(abort_status == NV_TOPOLOGY_ABORT_NONE) \
+                    topology_v1_emit_auto_string_column(wb, &column); \
                 topology_v1_string_column_free(&column); \
+                if(abort_status != NV_TOPOLOGY_ABORT_NONE) \
+                    return abort_status; \
             } while(0)
 
                 NV_TOPOLOGY_V1_EVIDENCE_UINT_VALUES(link);
@@ -5215,13 +5460,21 @@ static void topology_v1_emit_socket_evidence_table(BUFFER *wb, NV_TOPOLOGY_V1_PA
                 NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(retransmissions);
 
                 topology_v1_values_start(wb);
-                for(size_t i = 0; i < payload->evidence_used; i++)
+                for(size_t i = 0; i < payload->evidence_used; i++) {
+                    if(topology_abort_iteration_checkpoint(i) &&
+                       (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
+                        return abort_status;
                     buffer_json_add_array_item_double(wb, (double)payload->evidence[i].source->max_rtt_usec / (double)USEC_PER_MS);
+                }
                 topology_v1_values_end(wb);
 
                 topology_v1_values_start(wb);
-                for(size_t i = 0; i < payload->evidence_used; i++)
+                for(size_t i = 0; i < payload->evidence_used; i++) {
+                    if(topology_abort_iteration_checkpoint(i) &&
+                       (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
+                        return abort_status;
                     buffer_json_add_array_item_double(wb, (double)payload->evidence[i].source->max_rcv_rtt_usec / (double)USEC_PER_MS);
+                }
                 topology_v1_values_end(wb);
 
 #undef NV_TOPOLOGY_V1_EVIDENCE_UINT_VALUES
@@ -5235,12 +5488,18 @@ static void topology_v1_emit_socket_evidence_table(BUFFER *wb, NV_TOPOLOGY_V1_PA
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
+    return topology_response_check(wb, ctx);
 }
 
-static void topology_v1_emit_correlation_table(
+static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_correlation_table(
     BUFFER *wb,
     const NV_TOPOLOGY_V1_CORRELATION_ROW *rows,
-    size_t rows_used) {
+    size_t rows_used,
+    NV_TOPOLOGY_CONTEXT *ctx) {
+    NV_TOPOLOGY_ABORT_STATUS abort_status = topology_response_check(wb, ctx);
+    if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+        return abort_status;
+
     buffer_json_member_add_uint64(wb, "rows", rows_used);
 
     buffer_json_member_add_array(wb, "columns");
@@ -5255,8 +5514,12 @@ static void topology_v1_emit_correlation_table(
     buffer_json_member_add_array(wb, "values");
 
     topology_v1_values_start(wb);
-    for(size_t i = 0; i < rows_used; i++)
+    for(size_t i = 0; i < rows_used; i++) {
+        if(topology_abort_iteration_checkpoint(i) &&
+           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
+            return abort_status;
         buffer_json_add_array_item_uint64(wb, rows[i].actor);
+    }
     topology_v1_values_end(wb);
 
     topology_v1_const_string(wb, "socket_exact");
@@ -5264,10 +5527,17 @@ static void topology_v1_emit_correlation_table(
 #define NV_TOPOLOGY_V1_CORRELATION_STRING_VALUES(member) do { \
         NV_TOPOLOGY_V1_STRING_COLUMN column; \
         topology_v1_string_column_init(&column, rows_used); \
-        for(size_t i = 0; i < rows_used; i++) \
+        for(size_t i = 0; i < rows_used; i++) { \
+            if(topology_abort_iteration_checkpoint(i) && \
+               (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                break; \
             topology_v1_string_column_add(&column, rows[i].member); \
-        topology_v1_emit_auto_string_column(wb, &column); \
+        } \
+        if(abort_status == NV_TOPOLOGY_ABORT_NONE) \
+            topology_v1_emit_auto_string_column(wb, &column); \
         topology_v1_string_column_free(&column); \
+        if(abort_status != NV_TOPOLOGY_ABORT_NONE) \
+            return abort_status; \
     } while(0)
 
     NV_TOPOLOGY_V1_CORRELATION_STRING_VALUES(protocol);
@@ -5277,14 +5547,26 @@ static void topology_v1_emit_correlation_table(
 #undef NV_TOPOLOGY_V1_CORRELATION_STRING_VALUES
 
     topology_v1_values_start(wb);
-    for(size_t i = 0; i < rows_used; i++)
+    for(size_t i = 0; i < rows_used; i++) {
+        if(topology_abort_iteration_checkpoint(i) &&
+           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
+            return abort_status;
         buffer_json_add_array_item_uint64(wb, rows[i].port);
+    }
     topology_v1_values_end(wb);
 
     buffer_json_array_close(wb);
+    return topology_response_check(wb, ctx);
 }
 
-static void topology_v1_emit_correlation(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOAD *payload) {
+static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_correlation(
+    BUFFER *wb,
+    NV_TOPOLOGY_V1_PAYLOAD *payload,
+    NV_TOPOLOGY_CONTEXT *ctx) {
+    NV_TOPOLOGY_ABORT_STATUS abort_status = topology_response_check(wb, ctx);
+    if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+        return abort_status;
+
     buffer_json_member_add_object(wb, "correlation");
     {
         buffer_json_member_add_object(wb, "rules");
@@ -5337,19 +5619,30 @@ static void topology_v1_emit_correlation(BUFFER *wb, NV_TOPOLOGY_V1_PAYLOAD *pay
         buffer_json_object_close(wb);
 
         buffer_json_member_add_object(wb, "points");
-        topology_v1_emit_correlation_table(wb, payload->correlation_points, payload->correlation_points_used);
+        abort_status = topology_v1_emit_correlation_table(
+            wb, payload->correlation_points, payload->correlation_points_used, ctx);
+        if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+            return abort_status;
         buffer_json_object_close(wb);
 
         buffer_json_member_add_object(wb, "claims");
-        topology_v1_emit_correlation_table(wb, payload->correlation_claims, payload->correlation_claims_used);
+        abort_status = topology_v1_emit_correlation_table(
+            wb, payload->correlation_claims, payload->correlation_claims_used, ctx);
+        if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+            return abort_status;
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
+    return topology_response_check(wb, ctx);
 }
 
-static void topology_write_data(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx) {
+static NV_TOPOLOGY_ABORT_STATUS topology_write_data(BUFFER *wb, NV_TOPOLOGY_CONTEXT *ctx) {
     if(!ctx || ctx->options.info_only || !ctx->process_actors || !ctx->remote_actors || !ctx->local_ips || !ctx->links)
-        return;
+        return NV_TOPOLOGY_ABORT_NONE;
+
+    NV_TOPOLOGY_ABORT_STATUS abort_status = topology_response_check(wb, ctx);
+    if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+        return abort_status;
 
     NV_TOPOLOGY_RENDER_STATE state;
     topology_render_state_init(&state, ctx);
@@ -5388,14 +5681,22 @@ static void topology_write_data(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx) {
        !topology.process_index || !topology.cgroup_index ||
        !topology.correlation_point_index || !topology.correlation_claim_index || !topology.label_index) {
         topology_v1_free(&topology);
-        return;
+        return NV_TOPOLOGY_ABORT_NONE;
     }
 
-    topology_v1_collect_actors(ctx, &state, &topology);
-    topology_v1_collect_links(ctx, &state, &topology);
+    abort_status = topology_v1_collect_actors(ctx, &state, &topology);
+    if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+        goto cleanup;
+
+    abort_status = topology_v1_collect_links(ctx, &state, &topology);
+    if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+        goto cleanup;
 
     buffer_json_member_add_object(wb, "data");
     {
+        if((abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
+            goto cleanup;
+
         buffer_json_member_add_string(wb, "schema_version", NETWORK_TOPOLOGY_SCHEMA_VERSION);
         buffer_json_member_add_object(wb, "producer");
         {
@@ -5435,14 +5736,38 @@ static void topology_write_data(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx) {
         }
         buffer_json_object_close(wb);
 
+        if((abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
+            goto cleanup;
+
         topology_v1_emit_type_registry(wb, ctx->options.group_by, ctx->options.detailed);
+        if((abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
+            goto cleanup;
+
         topology_v1_emit_presentation(wb);
-        topology_v1_emit_correlation(wb, &topology);
-        topology_v1_emit_actor_table(wb, &topology);
-        topology_v1_emit_link_table(wb, &topology);
-        topology_v1_emit_socket_port_table(wb, &topology);
-        if(ctx->options.detailed)
-            topology_v1_emit_socket_evidence_table(wb, &topology);
+        if((abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
+            goto cleanup;
+
+        abort_status = topology_v1_emit_correlation(wb, &topology, ctx);
+        if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+            goto cleanup;
+
+        abort_status = topology_v1_emit_actor_table(wb, &topology, ctx);
+        if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+            goto cleanup;
+
+        abort_status = topology_v1_emit_link_table(wb, &topology, ctx);
+        if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+            goto cleanup;
+
+        abort_status = topology_v1_emit_socket_port_table(wb, &topology, ctx);
+        if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+            goto cleanup;
+
+        if(ctx->options.detailed) {
+            abort_status = topology_v1_emit_socket_evidence_table(wb, &topology, ctx);
+            if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+                goto cleanup;
+        }
 
         buffer_json_member_add_object(wb, "stats");
         {
@@ -5475,24 +5800,37 @@ static void topology_write_data(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx) {
     }
     buffer_json_object_close(wb);
 
+cleanup:
     topology_v1_free(&topology);
+    return abort_status;
 }
 
 static void network_viewer_topology_function(
-    const char *transaction, char *function, usec_t *stop_monotonic_ut __maybe_unused,
-    bool *cancelled __maybe_unused, BUFFER *payload, HTTP_ACCESS access __maybe_unused,
+    const char *transaction, char *function, usec_t *stop_monotonic_ut,
+    bool *cancelled, BUFFER *payload, HTTP_ACCESS access __maybe_unused,
     const char *source __maybe_unused, void *data __maybe_unused) {
 
     time_t now_s = now_realtime_sec();
     usec_t now_ut = now_realtime_usec();
     NV_TOPOLOGY_OPTIONS options = { 0 };
+    NV_TOPOLOGY_ABORT_STATUS abort_status = topology_function_abort_state(stop_monotonic_ut, cancelled);
+    if(abort_status != NV_TOPOLOGY_ABORT_NONE) {
+        topology_send_error(transaction, topology_abort_http_code(abort_status), topology_abort_message(abort_status));
+        return;
+    }
+
     topology_parse_options(function, &options);
     CLEAN_BUFFER *error = buffer_create(0, NULL);
     if(!topology_parse_payload_options(payload, &options, error)) {
         simple_pattern_free(options.label_whitelist);
-        netdata_mutex_lock(&stdout_mutex);
-        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
-        netdata_mutex_unlock(&stdout_mutex);
+        topology_send_error(transaction, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
+        return;
+    }
+
+    abort_status = topology_function_abort_state(stop_monotonic_ut, cancelled);
+    if(abort_status != NV_TOPOLOGY_ABORT_NONE) {
+        simple_pattern_free(options.label_whitelist);
+        topology_send_error(transaction, topology_abort_http_code(abort_status), topology_abort_message(abort_status));
         return;
     }
 
@@ -5503,15 +5841,22 @@ static void network_viewer_topology_function(
 
     topology_write_response_metadata(wb);
 
-    NV_TOPOLOGY_CONTEXT ctx;
-    bool ctx_ready = topology_prepare_context(&ctx, now_ut, &options);
+    NV_TOPOLOGY_CONTEXT ctx = { 0 };
+    bool ctx_ready = topology_prepare_context(&ctx, now_ut, &options, stop_monotonic_ut, cancelled);
+    abort_status = ctx.abort_status;
     if(ctx_ready) {
-        nv_warm_cache_from_topology_actors(&ctx);
-        topology_write_data(wb, &ctx);
+        abort_status = nv_warm_cache_from_topology_actors(&ctx);
+        if(abort_status == NV_TOPOLOGY_ABORT_NONE)
+            abort_status = topology_write_data(wb, &ctx);
     }
 
     topology_context_destroy(&ctx);
     simple_pattern_free(options.label_whitelist);
+    if(abort_status != NV_TOPOLOGY_ABORT_NONE) {
+        topology_send_error(transaction, topology_abort_http_code(abort_status), topology_abort_message(abort_status));
+        return;
+    }
+
     topology_finalize_response(transaction, wb, now_s);
 }
 
