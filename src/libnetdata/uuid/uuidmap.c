@@ -7,6 +7,8 @@ struct uuidmap_entry {
     REFCOUNT refcount;
 };
 
+// each partition on its own cache line(s), so the heavily contended lock
+// words of adjacent partitions do not false-share
 struct uuidmap_partition {
     Pvoid_t uuid_to_id;         // JudyL: UUID string -> ID
     Pvoid_t id_to_uuid;         // JudyL: ID -> UUID binary
@@ -15,7 +17,7 @@ struct uuidmap_partition {
 
     int64_t memory;
     int32_t entries;
-};
+} __attribute__((aligned(64)));
 
 static struct {
     struct uuidmap_partition p[UUIDMAP_PARTITIONS];
@@ -61,7 +63,7 @@ static void uuidmap_init_aral(void) {
 
 static UUIDMAP_ID get_next_id_unsafe(struct uuidmap_partition *partition) {
     // Check if we've reached the maximum ID value
-    if (unlikely(partition->next_id >= 0x1FFFFFFF))
+    if (unlikely(partition->next_id >= UUIDMAP_ID_SEQ_MASK))
         fatal("UUIDMAP: Maximum ID limit reached for partition %u. UUIDs exhausted.",
               (unsigned int)(partition - uuid_map.p));
 

@@ -52,6 +52,8 @@ struct metric {
 extern struct aral_statistics mrg_aral_statistics;
 
 struct mrg {
+    // each partition 64-aligned so the contended rw_spinlock words of
+    // adjacent partitions do not false-share a cache line
     struct mrg_partition {
         ARAL *aral;                 // not protected by our spinlock - it has its own
 
@@ -59,7 +61,7 @@ struct mrg {
         Pvoid_t uuid_judy;          // JudyL: each UUID has a JudyL of sections (tiers)
 
         struct mrg_statistics stats;
-    } index[UUIDMAP_PARTITIONS];
+    } __attribute__((aligned(64))) index[UUIDMAP_PARTITIONS];
 };
 
 static inline void MRG_STATS_DUPLICATE_ADD(MRG *mrg, size_t partition) {
