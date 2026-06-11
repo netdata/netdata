@@ -9,10 +9,10 @@
 //!   handed, one fsync per batch;
 //! - containers ping-pong back through the slot for allocation-free reuse.
 //!
-//! This module deliberately contains no thread spawning yet: `commit_batch`
-//! has two callers — the rebuild path (inline, before workers exist) and the
-//! workers (step 3) — and the shared `flush_closed_tiers` goes through it so
-//! the existing test suite proves behavioral equivalence.
+//! `commit_batch` has two callers — the pre-worker inline path (rebuild,
+//! in-process tests, benchmarks) and the workers spawned here — and the
+//! shared `flush_closed_tiers` goes through it so the inline test suite
+//! proves behavioral equivalence with the worker path.
 
 use super::*;
 use crate::tiering::MetricBucket;
@@ -594,12 +594,14 @@ mod tests {
         // that matters is DROP-SAFETY: the reader (worker) is active only
         // during a commit burst (≤ once per minute per tier), and the
         // receive thread's accumulated extra latency during such a burst —
-        // avg-wait × flows-in-burst — must stay far below the UDP socket
-        // buffer's absorption (~seconds at the 64MiB request). avg ≤ 25µs
-        // bounds that to <1% of the buffer even for an hour-bucket burst;
-        // max ≤ 50ms bounds any single preemption spike to a trivial queue
-        // depth. A p99-under-continuous-saturation bound mis-measures the
-        // production duty cycle and was retired after measurement.
+        // avg-wait × rows-in-burst — must stay within the UDP socket
+        // buffer's absorption (~1s at the 64MiB request and ~100k flows/s).
+        // At the 25µs budget a 30k-row burst accumulates ~750ms (measured
+        // 8-12µs ⇒ ~250-350ms, a 2-3x margin), spread over the burst's
+        // multi-second commit window rather than a single stall; max ≤ 50ms
+        // bounds any single preemption spike to a trivial queue depth. A
+        // p99-under-continuous-saturation bound mis-measures the production
+        // duty cycle and was retired after measurement.
         let (stats, _) = lock_wait_stats(waits.clone());
         eprintln!("main-thread write-lock acquire under continuous reader: {stats}");
         let avg = waits.iter().sum::<u64>() / waits.len().max(1) as u64;
