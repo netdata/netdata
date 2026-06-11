@@ -18,8 +18,10 @@ import (
 )
 
 const (
-	LogsMethodID = "logs"
-	FunctionName = "snmp:traps"
+	LogsMethodID           = "logs"
+	FunctionName           = "snmp:traps"
+	logsSourceSelectorName = "Trap Jobs"
+	logsSourceSelectorHelp = "Select the trap jobs to query"
 )
 
 type Handler struct {
@@ -92,6 +94,8 @@ func (h *Handler) Cleanup(context.Context) {
 func NewJournalFunction() sdkjournal.NetdataJournalFunction {
 	cfg := sdkjournal.SystemdJournalNetdataFunctionConfig()
 	cfg.FunctionName = FunctionName
+	cfg.SourceSelectorName = logsSourceSelectorName
+	cfg.SourceSelectorHelp = logsSourceSelectorHelp
 	cfg.DefaultFacets = DefaultLogFacets()
 	cfg.DefaultViewKeys = DefaultViewKeys()
 	cfg.DefaultHistogram = "TRAP_NAME"

@@ -38,6 +38,8 @@ func TestSNMPTrapsMethodsExposeLogsOnly(t *testing.T) {
 func TestSNMPTrapsJournalFunctionUsesPublicFunctionName(t *testing.T) {
 	fn := snmptrapsfunc.NewJournalFunction()
 	assert.Equal(t, snmpTrapsFunctionName, fn.Config.FunctionName)
+	assert.Equal(t, "Trap Jobs", fn.Config.SourceSelectorName)
+	assert.Equal(t, "Select the trap jobs to query", fn.Config.SourceSelectorHelp)
 	assert.Equal(t, "TRAP_NAME", fn.Config.DefaultHistogram)
 }
 
@@ -60,6 +62,7 @@ func TestSNMPTrapsLogsFunctionInfoAndQuery(t *testing.T) {
 	assert.Contains(t, string(rawInfo), "all")
 	assert.Contains(t, string(rawInfo), "local")
 	assert.Contains(t, string(rawInfo), "remote")
+	assertLogsSourceSelectorMetadata(t, info.RawResponse)
 
 	defaults := handler.HandleRaw(context.Background(), funcapiRawRequest("logs", false, []byte(`{
   "last": 10,
@@ -192,4 +195,21 @@ func assertResponseColumnVisible(t *testing.T, response map[string]any, key stri
 	column, ok := columns[key].(map[string]any)
 	require.True(t, ok, "missing column %s in %#v", key, columns)
 	assert.Equal(t, true, column["visible"])
+}
+
+func assertLogsSourceSelectorMetadata(t *testing.T, response map[string]any) {
+	t.Helper()
+	params, ok := response["required_params"].([]any)
+	require.True(t, ok, "required_params type = %T", response["required_params"])
+	for _, paramAny := range params {
+		param, ok := paramAny.(map[string]any)
+		require.True(t, ok, "required param type = %T", paramAny)
+		if param["id"] != "__logs_sources" {
+			continue
+		}
+		assert.Equal(t, "Trap Jobs", param["name"])
+		assert.Equal(t, "Select the trap jobs to query", param["help"])
+		return
+	}
+	require.Fail(t, "required_params missing __logs_sources", "%#v", params)
 }
