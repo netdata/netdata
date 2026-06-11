@@ -219,6 +219,90 @@ func TestExtractFixtureCoversSMIv1AndSMIv2Traps(t *testing.T) {
 	})
 }
 
+func TestExtractSkipsBareNotificationOIDs(t *testing.T) {
+	dir := t.TempDir()
+	writeTestMIB(t, dir, "TEST-BARE-NOTIFICATION-MIB.mib", testBareNotificationOIDMIB)
+
+	records, report, _, err := extract(generatorOptions{
+		SourceDirs: []string{dir},
+		AllModules: true,
+		BatchSize:  8,
+	})
+	if err != nil {
+		t.Fatalf("extract fixture failed: %v", err)
+	}
+	if len(records) != 0 {
+		t.Fatalf("extracted records = %d, want 0: %#v", len(records), records)
+	}
+	if report.SkippedTrapRecords != 1 {
+		t.Fatalf("skipped trap records = %d, want 1", report.SkippedTrapRecords)
+	}
+}
+
+func TestEmitProfilesSkipsInvalidOIDsAndStatuses(t *testing.T) {
+	dir := t.TempDir()
+	penPath := filepath.Join(dir, "enterprise-numbers.txt")
+	if err := os.WriteFile(penPath, []byte("9\n  Cisco Systems, Inc.\n"), 0o640); err != nil {
+		t.Fatalf("write PEN file: %v", err)
+	}
+	profilesDir := filepath.Join(dir, "profiles")
+	cataloguePath := filepath.Join(profilesDir, "catalogue.json")
+
+	records := []TrapRecord{
+		{
+			OID:           "11603",
+			QualifiedName: "BAD-MIB::bare",
+			MIB:           "BAD-MIB",
+			Category:      "unknown",
+			Severity:      "notice",
+			Description:   "Bad trap on {{hostname}}.",
+			TrapStatus:    "current",
+		},
+		{
+			OID:           "1.3.6.1.4.1.9.0.2",
+			QualifiedName: "BAD-MIB::badStatus",
+			MIB:           "BAD-MIB",
+			Category:      "unknown",
+			Severity:      "notice",
+			Description:   "Bad status on {{hostname}}.",
+			TrapStatus:    "Status(99)",
+		},
+		{
+			OID:           "1.3.6.1.4.1.9.0.1",
+			QualifiedName: "GOOD-MIB::good",
+			MIB:           "GOOD-MIB",
+			Category:      "unknown",
+			Severity:      "notice",
+			Description:   "Good trap on {{hostname}}.",
+			TrapStatus:    "current",
+		},
+	}
+
+	counts, err := emitProfiles(generatorOptions{
+		ProfilesOutDir: profilesDir,
+		CataloguePath:  cataloguePath,
+		PENFile:        penPath,
+	}, records)
+	if err != nil {
+		t.Fatalf("emitProfiles failed: %v", err)
+	}
+	if got := counts["cisco-systems-inc"]; got != 1 {
+		t.Fatalf("cisco profile count = %d, want 1; counts=%#v", got, counts)
+	}
+	for _, file := range []string{"oid-11603.yaml", "bad-mib.yaml"} {
+		if _, err := os.Stat(filepath.Join(profilesDir, file)); !os.IsNotExist(err) {
+			t.Fatalf("invalid profile %s exists or stat failed unexpectedly: %v", file, err)
+		}
+	}
+	catalogue, err := os.ReadFile(cataloguePath)
+	if err != nil {
+		t.Fatalf("read catalogue: %v", err)
+	}
+	if strings.Contains(string(catalogue), "badStatus") || strings.Contains(string(catalogue), "11603") {
+		t.Fatalf("catalogue contains invalid traps: %s", catalogue)
+	}
+}
+
 func TestBuildSourceReportsDuplicateModules(t *testing.T) {
 	first := t.TempDir()
 	second := t.TempDir()
@@ -974,6 +1058,30 @@ testSmiv2Notification NOTIFICATION-TYPE
     STATUS current
     DESCRIPTION "Notification."
     ::= { testSmiv2Notifications 1 }
+
+END
+`
+
+const testBareNotificationOIDMIB = `TEST-BARE-NOTIFICATION-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    OBJECT-TYPE, NOTIFICATION-TYPE, Integer32, enterprises
+        FROM SNMPv2-SMI;
+
+testBareRoot OBJECT IDENTIFIER ::= { enterprises 99996 }
+
+testBareValue OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Value."
+    ::= { testBareRoot 1 }
+
+testBareNotification NOTIFICATION-TYPE
+    OBJECTS { testBareValue }
+    STATUS current
+    DESCRIPTION "Malformed notification with a bare numeric OID."
+    ::= { 11603 }
 
 END
 `

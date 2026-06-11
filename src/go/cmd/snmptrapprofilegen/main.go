@@ -77,6 +77,14 @@ var validSeverities = map[string]bool{
 	"debug":   true,
 }
 
+var validTrapStatuses = map[string]bool{
+	"current":    true,
+	"deprecated": true,
+	"mandatory":  true,
+	"obsolete":   true,
+	"optional":   true,
+}
+
 var severityPriority = map[string]int{
 	"emerg": 0, "alert": 1, "crit": 2, "err": 3,
 	"warning": 4, "notice": 5, "info": 6, "debug": 7,
@@ -216,6 +224,7 @@ type ExtractionReport struct {
 	RawTrapRecords      int             `json:"raw_trap_records"`
 	OutputTrapRecords   int             `json:"output_trap_records"`
 	UniqueOIDs          int             `json:"unique_oids"`
+	SkippedTrapRecords  int             `json:"skipped_trap_records,omitempty"`
 	ConflictOIDs        int             `json:"conflict_oids,omitempty"`
 	DotZeroConflicts    int             `json:"dot0_conflict_oids,omitempty"`
 	LogicalTrapOIDs     int             `json:"logical_trap_oids,omitempty"`
@@ -711,6 +720,11 @@ func extractFromMIB(m *gomibmib.Mib, modules []string, seenTrap map[string]bool,
 			}
 			seenTrap[key] = true
 			rec := trapRecordFromNotification(mod, n)
+			if err := validateTrapRecord(rec); err != nil {
+				report.SkippedTrapRecords++
+				log.Printf("skip trap %s: %v", rec.QualifiedName, err)
+				continue
+			}
 			rec.Hash = hashTrap(rec)
 			*records = append(*records, rec)
 			report.TrapsByModule[rec.MIB]++
@@ -833,7 +847,7 @@ func trapRecordFromNotification(mod *gomibmib.Module, n *gomibmib.Notification) 
 		Priority:        severityPriority["notice"],
 		Description:     fmt.Sprintf("%s on {{hostname}}.", qname),
 		TrapDescription: cleanText(n.Description()),
-		TrapStatus:      fmt.Sprint(n.Status()),
+		TrapStatus:      normalizeTrapStatus(fmt.Sprint(n.Status())),
 		TrapReference:   cleanText(n.Reference()),
 		MIBDescription:  cleanText(mod.Description()),
 		MIBOrganization: cleanText(mod.Organization()),
@@ -915,6 +929,29 @@ func oidString(oid gomibmib.OID) string {
 		return ""
 	}
 	return oid.String()
+}
+
+func normalizeTrapStatus(status string) string {
+	return strings.ToLower(strings.TrimSpace(status))
+}
+
+func validateTrapRecord(rec TrapRecord) error {
+	if !validTrapOID(rec.OID) {
+		return fmt.Errorf("invalid trap OID %q", rec.OID)
+	}
+	if rec.TrapStatus != "" && !validTrapStatuses[rec.TrapStatus] {
+		return fmt.Errorf("invalid trap status %q", rec.TrapStatus)
+	}
+	return nil
+}
+
+func validTrapOID(oid string) bool {
+	oid = strings.TrimPrefix(strings.TrimSpace(oid), ".")
+	if !strings.Contains(oid, ".") {
+		return false
+	}
+	parsed, err := gomibmib.ParseOID(oid)
+	return err == nil && len(parsed) >= 2
 }
 
 func writeExtractionArtifacts(opts generatorOptions, records []TrapRecord, report ExtractionReport, conflicts []Conflict, dotZeroConflicts []Conflict, sourceConflicts []SourceModuleConflict, overlap *OverlapReport) error {
@@ -2000,6 +2037,7 @@ func emitProfiles(opts generatorOptions, records []TrapRecord) (map[string]int, 
 	if err != nil {
 		return nil, err
 	}
+	records = filterValidTrapRecords(records)
 	byVendor := map[string][]TrapRecord{}
 	for _, rec := range records {
 		vendor := vendorForOID(rec.OID, pens)
@@ -2044,6 +2082,19 @@ func emitProfiles(opts generatorOptions, records []TrapRecord) (map[string]int, 
 		}
 	}
 	return counts, nil
+}
+
+func filterValidTrapRecords(records []TrapRecord) []TrapRecord {
+	filtered := records[:0]
+	for _, rec := range records {
+		rec.TrapStatus = normalizeTrapStatus(rec.TrapStatus)
+		if err := validateTrapRecord(rec); err != nil {
+			log.Printf("skip trap %s: %v", rec.QualifiedName, err)
+			continue
+		}
+		filtered = append(filtered, rec)
+	}
+	return filtered
 }
 
 func buildProfile(vendor string, records []TrapRecord) profileFile {

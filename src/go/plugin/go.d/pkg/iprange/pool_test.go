@@ -156,10 +156,10 @@ func TestPool_NilSafety(t *testing.T) {
 	assert.Nil(t, pool.Clone())
 
 	// Iterators should not panic
-	for _ = range pool.Iterate() {
+	for range pool.Iterate() {
 		t.Fatal("nil pool should not yield any addresses")
 	}
-	for _ = range pool.IterateRanges() {
+	for range pool.IterateRanges() {
 		t.Fatal("nil pool should not yield any ranges")
 	}
 }
@@ -481,7 +481,7 @@ func BenchmarkPool_Iterate(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		count := 0
-		for _ = range pool.Iterate() {
+		for range pool.Iterate() {
 			count++
 		}
 	}

@@ -527,6 +527,11 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 						err = nil
 					}
 				} else if rawCtx.discoveryProbe() && conn != nil && peer != nil {
+					allowed, checked := c.allowRateLimitedPacket(peer)
+					rateLimitChecked = rateLimitChecked || checked
+					if !allowed {
+						return
+					}
 					c.sendDiscoveryReport(rawCtx, conn, peer)
 				}
 			}
@@ -597,16 +602,10 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		}
 	}
 
-	if c.rateLimiter != nil && peer != nil && !rateLimitChecked {
-		srcAddr, ok := udpPeerAddr(peer)
-		if ok {
-			allowed, mode := c.rateLimiter.Allow(srcAddr)
-			if !allowed {
-				c.incTrapError("rate_limited")
-				if mode == rateLimitModeDrop {
-					return
-				}
-			}
+	if !rateLimitChecked {
+		allowed, _ := c.allowRateLimitedPacket(peer)
+		if !allowed {
+			return
 		}
 	}
 

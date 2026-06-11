@@ -171,6 +171,10 @@ func (c *Collector) registerDynamicEngineID(engineIDHex, username string) bool {
 }
 
 func (c *Collector) allowDynamicRetry(peer *net.UDPAddr) (bool, bool) {
+	return c.allowRateLimitedPacket(peer)
+}
+
+func (c *Collector) allowRateLimitedPacket(peer *net.UDPAddr) (bool, bool) {
 	if c.rateLimiter == nil || peer == nil {
 		return true, false
 	}

@@ -7,6 +7,7 @@ import (
 	"net"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gosnmp/gosnmp"
 )
@@ -262,6 +263,49 @@ func TestDynamicEngineIDRateLimitSampleAllowsRetry(t *testing.T) {
 	}
 }
 
+func TestDiscoveryReportRateLimitDropSkipsResponse(t *testing.T) {
+	const jobName = "test-discovery-report-rate-drop"
+
+	data := buildV3DiscoveryProbe(t, 99)
+	listenerConn, peerConn := informUDPConnPair(t)
+	defer listenerConn.Close()
+	defer peerConn.Close()
+
+	rl := newRateLimiter(true, 1, "drop")
+	c, writer, _ := newDynamicEngineIDTestCollector(t, jobName, data, func(c *Collector) {
+		c.rateLimiter = rl
+	})
+	peer := peerConn.LocalAddr().(*net.UDPAddr)
+	srcAddr, ok := udpPeerAddr(peer)
+	if !ok {
+		t.Fatal("failed to convert UDP peer address")
+	}
+	if allowed, _ := rl.Allow(srcAddr); !allowed {
+		t.Fatal("expected first token to be available")
+	}
+
+	c.handlePacket(data, peer.IP, listenerConn, peer)
+
+	if got := len(writer.entries); got != 0 {
+		t.Fatalf("journaled entries = %d, want 0", got)
+	}
+	m := getJobMetrics(jobName)
+	if v := m.errors.rateLimited.Load(); v != 1 {
+		t.Fatalf("rate_limited = %d, want 1", v)
+	}
+	if err := peerConn.SetReadDeadline(time.Now().Add(50 * time.Millisecond)); err != nil {
+		t.Fatalf("set read deadline: %v", err)
+	}
+	buf := make([]byte, maxDatagramSize)
+	_, _, err := peerConn.ReadFromUDP(buf)
+	if err == nil {
+		t.Fatal("expected discovery Report to be rate-limited")
+	}
+	if ne, ok := err.(net.Error); !ok || !ne.Timeout() {
+		t.Fatalf("read response error = %v, want timeout", err)
+	}
+}
+
 func TestSendDiscoveryReportWireFormat(t *testing.T) {
 	withEngineStateDir(t)
 
@@ -302,6 +346,26 @@ func TestSendDiscoveryReportWireFormat(t *testing.T) {
 	if usp.AuthoritativeEngineBoots == 0 {
 		t.Fatal("response engine boots is zero")
 	}
+}
+
+func buildV3DiscoveryProbe(t *testing.T, msgID uint32) []byte {
+	t.Helper()
+
+	pkt := &gosnmp.SnmpPacket{
+		Version:            gosnmp.Version3,
+		MsgFlags:           gosnmp.Reportable,
+		SecurityModel:      gosnmp.UserSecurityModel,
+		SecurityParameters: &gosnmp.UsmSecurityParameters{},
+		PDUType:            gosnmp.GetRequest,
+		MsgID:              msgID,
+		RequestID:          42,
+		MsgMaxSize:         maxDatagramSize,
+	}
+	data, err := pkt.MarshalMsg()
+	if err != nil {
+		t.Fatalf("MarshalMsg failed: %v", err)
+	}
+	return data
 }
 
 func clearV3ReportableFlag(t *testing.T, data []byte) []byte {

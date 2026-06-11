@@ -173,8 +173,18 @@ func (tw *journalTrapWriter) sync() error {
 }
 
 func journalRetentionSweepInterval(j *JournalWriter) time.Duration {
-	if j == nil || j.cfg.MaxDuration <= 0 {
+	if j == nil {
 		return 0
+	}
+	if j.cfg.MaxDuration <= 0 {
+		if j.cfg.MaxSize == 0 {
+			return 0
+		}
+		interval := maxRetentionSweepInterval
+		if j.cfg.RotateDur > 0 && j.cfg.RotateDur < interval {
+			interval = j.cfg.RotateDur
+		}
+		return interval
 	}
 
 	interval := min(max(j.cfg.MaxDuration/2, minRetentionSweepInterval), maxRetentionSweepInterval)

@@ -175,3 +175,41 @@ func TestJournalTrapWriterConcurrentWriteCloseDoesNotPanic(t *testing.T) {
 		}
 	}
 }
+
+func TestJournalRetentionSweepInterval(t *testing.T) {
+	tests := map[string]struct {
+		cfg  JournalConfig
+		want time.Duration
+	}{
+		"no retention": {
+			cfg:  JournalConfig{},
+			want: 0,
+		},
+		"size only": {
+			cfg:  JournalConfig{MaxSize: defaultMaxSize},
+			want: maxRetentionSweepInterval,
+		},
+		"duration below minimum": {
+			cfg:  JournalConfig{MaxDuration: time.Second},
+			want: minRetentionSweepInterval,
+		},
+		"duration capped": {
+			cfg:  JournalConfig{MaxDuration: 4 * maxRetentionSweepInterval},
+			want: maxRetentionSweepInterval,
+		},
+		"rotation duration caps size only": {
+			cfg:  JournalConfig{MaxSize: defaultMaxSize, RotateDur: 5 * time.Minute},
+			want: 5 * time.Minute,
+		},
+	}
+
+	if got := journalRetentionSweepInterval(nil); got != 0 {
+		t.Fatalf("nil journal interval = %v, want 0", got)
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := journalRetentionSweepInterval(&JournalWriter{cfg: tc.cfg})
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
