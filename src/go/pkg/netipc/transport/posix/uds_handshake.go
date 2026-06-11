@@ -138,10 +138,6 @@ func serverHandshake(fd int, config *ServerConfig, sessionID uint64) (*Session, 
 	}, nil
 }
 
-func sendRejection(fd int, status uint16) {
-	_ = sendHelloAck(fd, status, protocol.HelloAck{LayoutVersion: 1})
-}
-
 func sendHelloAck(fd int, status uint16, ack protocol.HelloAck) error {
 	pkt := framing.BuildHelloAckPacket(status, ack)
 

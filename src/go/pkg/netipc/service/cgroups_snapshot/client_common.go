@@ -2,6 +2,7 @@ package cgroups_snapshot
 
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/service/internal/transportconfig"
 	raw "github.com/netdata/netdata/go/plugins/pkg/netipc/service/raw"
 )
 
@@ -16,7 +17,9 @@ type Client struct {
 
 // NewClient creates a new client context. Does NOT connect.
 func NewClient(runDir, serviceName string, config ClientConfig) *Client {
-	return &Client{inner: raw.NewSnapshotClient(runDir, serviceName, clientConfigToTransport(config))}
+	inner := raw.NewSnapshotClient(runDir, serviceName, clientConfigToTransport(config))
+	inner.SetCallTimeout(transportconfig.TypedConfig(config).CallTimeoutMs)
+	return &Client{inner: inner}
 }
 
 // Refresh attempts connect if DISCONNECTED/NOT_FOUND, reconnect if BROKEN.
@@ -34,9 +37,30 @@ func (c *Client) Status() ClientStatus {
 	return c.inner.Status()
 }
 
+// SetCallTimeout sets the context-level default timeout for blocking calls.
+func (c *Client) SetCallTimeout(timeoutMs uint32) {
+	c.inner.SetCallTimeout(timeoutMs)
+}
+
+// Abort unblocks an in-flight synchronous call.
+func (c *Client) Abort() {
+	c.inner.Abort()
+}
+
+// ClearAbort clears a previous abort request so the client can be reused.
+func (c *Client) ClearAbort() {
+	c.inner.ClearAbort()
+}
+
 // CallSnapshot performs a blocking typed cgroups snapshot call.
 func (c *Client) CallSnapshot() (*protocol.CgroupsResponseView, error) {
-	return c.inner.CallSnapshot()
+	return c.CallSnapshotWithTimeout(0)
+}
+
+// CallSnapshotWithTimeout performs a blocking typed call with an explicit
+// timeout. A zero timeout uses the client's context-level default.
+func (c *Client) CallSnapshotWithTimeout(timeoutMs uint32) (*protocol.CgroupsResponseView, error) {
+	return c.inner.CallSnapshotWithTimeout(timeoutMs)
 }
 
 // Close tears down the connection and releases resources.

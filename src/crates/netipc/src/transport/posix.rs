@@ -12,10 +12,10 @@ use crate::protocol::{
 use std::collections::HashSet;
 use std::ffi::CString;
 use std::io;
-use std::os::unix::fs::MetadataExt;
 use std::os::unix::io::RawFd;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::{Duration, Instant};
 
 // ---------------------------------------------------------------------------
 //  Constants
@@ -46,6 +46,10 @@ pub enum UdsError {
     Send(i32),
     /// recv() failed or peer disconnected.
     Recv(i32),
+    /// Receive timed out before a complete message arrived.
+    Timeout,
+    /// Receive was aborted by the caller.
+    Aborted,
     /// Handshake protocol error.
     Handshake(String),
     /// Authentication token rejected.
@@ -81,6 +85,8 @@ impl std::fmt::Display for UdsError {
             UdsError::Accept(e) => write!(f, "accept failed: errno {e}"),
             UdsError::Send(e) => write!(f, "send failed: errno {e}"),
             UdsError::Recv(e) => write!(f, "recv failed: errno {e}"),
+            UdsError::Timeout => write!(f, "receive timed out"),
+            UdsError::Aborted => write!(f, "receive aborted"),
             UdsError::Handshake(s) => write!(f, "handshake error: {s}"),
             UdsError::AuthFailed => write!(f, "authentication token rejected"),
             UdsError::NoProfile => write!(f, "no common transport profile"),
@@ -337,6 +343,13 @@ impl UdsSession {
     /// Inner send logic, separated so the caller can rollback on failure.
     fn send_inner(&mut self, hdr: &mut Header, payload: &[u8]) -> Result<(), UdsError> {
         let total_msg = HEADER_SIZE + payload.len();
+        // total_message_len is a u32 wire field; larger totals are
+        // unrepresentable (parity with the C nipc_uds_header_payload_len).
+        if total_msg > u32::MAX as usize {
+            return Err(UdsError::BadParam(
+                "total message length exceeds protocol limit".into(),
+            ));
+        }
 
         // Single packet?
         if total_msg <= self.packet_size as usize {
@@ -398,12 +411,28 @@ impl UdsSession {
     /// On success, returns (header, payload_view). The payload view is valid
     /// until the next receive call on this session.
     pub fn receive<'a>(&'a mut self, buf: &'a mut [u8]) -> Result<(Header, &'a [u8]), UdsError> {
+        self.receive_with_control(buf, 0, None)
+    }
+
+    /// Receive one logical message with an optional deadline and abort flag.
+    ///
+    /// `timeout_ms == 0` waits indefinitely. When `abort` is set before a
+    /// complete message arrives, the call returns `UdsError::Aborted`.
+    pub fn receive_with_control<'a>(
+        &'a mut self,
+        buf: &'a mut [u8],
+        timeout_ms: u32,
+        abort: Option<&AtomicBool>,
+    ) -> Result<(Header, &'a [u8]), UdsError> {
         if self.fd < 0 {
             return Err(UdsError::BadParam("session closed".into()));
         }
 
+        let controlled = timeout_ms != 0 || abort.is_some();
+        let mut wait = ReceiveWait::new(timeout_ms, abort);
+
         // Read first packet
-        let n = match raw_recv(self.fd, buf) {
+        let n = match raw_recv_control(self.fd, buf, controlled, &mut wait) {
             Ok(n) => n,
             Err(err) => {
                 self.fail_all_inflight();
@@ -447,6 +476,14 @@ impl UdsSession {
         }
 
         let total_msg = HEADER_SIZE + hdr.payload_len as usize;
+        // total_message_len is a u32 wire field; reject unrepresentable totals
+        // so the chunk-header comparison below cannot truncate-match (parity
+        // with the C nipc_uds_header_payload_len).
+        if total_msg > u32::MAX as usize {
+            return Err(UdsError::Protocol(
+                "total message length exceeds protocol limit".into(),
+            ));
+        }
 
         if n > total_msg {
             return Err(UdsError::Protocol(
@@ -508,7 +545,7 @@ impl UdsSession {
 
         let mut ci = 1u32;
         while assembled < hdr.payload_len as usize {
-            let cn = match raw_recv(self.fd, &mut self.pkt_buf) {
+            let cn = match raw_recv_control(self.fd, &mut self.pkt_buf, controlled, &mut wait) {
                 Ok(n) => n,
                 Err(err) => {
                     self.fail_all_inflight();
@@ -602,7 +639,7 @@ impl UdsListener {
         let path = build_socket_path(run_dir, service_name)?;
 
         // Stale recovery
-        match check_and_recover_stale(&path, run_dir_allows_stale_unlink(run_dir)) {
+        match check_and_recover_stale(&path) {
             StaleResult::LiveServer => return Err(UdsError::AddrInUse),
             StaleResult::Stale | StaleResult::NotExist => { /* proceed */ }
         }
@@ -853,6 +890,105 @@ fn raw_recv(fd: RawFd, buf: &mut [u8]) -> Result<usize, UdsError> {
     Ok(n as usize)
 }
 
+struct ReceiveWait<'a> {
+    deadline: Option<Instant>,
+    abort: Option<&'a AtomicBool>,
+}
+
+impl<'a> ReceiveWait<'a> {
+    fn new(timeout_ms: u32, abort: Option<&'a AtomicBool>) -> Self {
+        Self {
+            deadline: (timeout_ms != 0)
+                .then(|| Instant::now() + Duration::from_millis(timeout_ms as u64)),
+            abort,
+        }
+    }
+
+    fn aborted(&self) -> bool {
+        self.abort
+            .map(|flag| flag.load(Ordering::Acquire))
+            .unwrap_or(false)
+    }
+
+    fn poll_timeout_ms(&self) -> Result<i32, UdsError> {
+        if self.aborted() {
+            return Err(UdsError::Aborted);
+        }
+
+        let mut wait_ms: Option<u64> = if let Some(deadline) = self.deadline {
+            let now = Instant::now();
+            if now >= deadline {
+                return Err(UdsError::Timeout);
+            }
+            Some(
+                deadline
+                    .duration_since(now)
+                    .as_millis()
+                    .min(i32::MAX as u128) as u64,
+            )
+        } else {
+            None
+        };
+
+        if self.abort.is_some() {
+            wait_ms = Some(wait_ms.map_or(100, |ms| ms.min(100)));
+        }
+
+        Ok(wait_ms.map_or(-1, |ms| ms as i32))
+    }
+}
+
+fn wait_fd_readable(fd: RawFd, wait: &ReceiveWait<'_>) -> Result<(), UdsError> {
+    loop {
+        let timeout = wait.poll_timeout_ms()?;
+        let mut pfd = libc::pollfd {
+            fd,
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        let rc = unsafe { libc::poll(&mut pfd, 1, timeout) };
+        if rc < 0 {
+            let err = errno();
+            if err == libc::EINTR {
+                continue;
+            }
+            return Err(UdsError::Recv(err));
+        }
+        if rc == 0 {
+            if wait.aborted() {
+                return Err(UdsError::Aborted);
+            }
+            return Err(UdsError::Timeout);
+        }
+        if wait.aborted() {
+            return Err(UdsError::Aborted);
+        }
+        return Ok(());
+    }
+}
+
+fn raw_recv_with_wait(
+    fd: RawFd,
+    buf: &mut [u8],
+    wait: &mut ReceiveWait<'_>,
+) -> Result<usize, UdsError> {
+    wait_fd_readable(fd, wait)?;
+    raw_recv(fd, buf)
+}
+
+fn raw_recv_control(
+    fd: RawFd,
+    buf: &mut [u8],
+    controlled: bool,
+    wait: &mut ReceiveWait<'_>,
+) -> Result<usize, UdsError> {
+    if controlled {
+        raw_recv_with_wait(fd, buf, wait)
+    } else {
+        raw_recv(fd, buf)
+    }
+}
+
 // ---------------------------------------------------------------------------
 //  Socket helpers
 // ---------------------------------------------------------------------------
@@ -919,17 +1055,7 @@ enum StaleResult {
     LiveServer,
 }
 
-fn run_dir_allows_stale_unlink(run_dir: &str) -> bool {
-    let metadata = match std::fs::metadata(run_dir) {
-        Ok(m) => m,
-        Err(_) => return false,
-    };
-    metadata.is_dir()
-        && metadata.uid() == unsafe { libc::geteuid() }
-        && metadata.mode() & 0o022 == 0
-}
-
-fn check_and_recover_stale(path: &str, allow_stale_unlink: bool) -> StaleResult {
+fn check_and_recover_stale(path: &str) -> StaleResult {
     if !Path::new(path).exists() {
         return StaleResult::NotExist;
     }
@@ -937,7 +1063,9 @@ fn check_and_recover_stale(path: &str, allow_stale_unlink: bool) -> StaleResult 
     // Try connecting to see if a live server is there
     let probe = unsafe { libc::socket(libc::AF_UNIX, libc::SOCK_SEQPACKET, 0) };
     if probe < 0 {
-        return StaleResult::NotExist;
+        // Cannot probe liveness (fd exhaustion) — keep the endpoint; the
+        // subsequent bind() fails instead of risking a live socket.
+        return StaleResult::LiveServer;
     }
 
     let result = match connect_unix(probe, path) {
@@ -946,22 +1074,20 @@ fn check_and_recover_stale(path: &str, allow_stale_unlink: bool) -> StaleResult 
             StaleResult::LiveServer
         }
         Err(UdsError::Connect(e)) if e == libc::ENOENT => StaleResult::NotExist,
-        Err(UdsError::Connect(e)) if e == libc::ECONNREFUSED => {
-            if !allow_stale_unlink {
-                StaleResult::LiveServer
-            } else {
-                // Connection refused means stale; unlink only in a private run dir.
-                match std::fs::remove_file(path) {
-                    Ok(()) => StaleResult::Stale,
-                    Err(err) if err.kind() == io::ErrorKind::NotFound => StaleResult::NotExist,
-                    Err(_) => StaleResult::LiveServer,
-                }
-            }
-        }
         Err(_) => {
-            // Other errors (EACCES, etc.) — can't determine ownership,
-            // treat as live to prevent overwriting
-            StaleResult::LiveServer
+            // Nothing accepted the connection: a dead server's socket, or a
+            // foreign file squatting on the endpoint path. Reclaim it.
+            match std::fs::remove_file(path) {
+                Ok(()) => StaleResult::Stale,
+                Err(err) if err.kind() == io::ErrorKind::NotFound => StaleResult::NotExist,
+                Err(err) if err.raw_os_error() == Some(libc::EISDIR) => {
+                    match std::fs::remove_dir(path) {
+                        Ok(()) => StaleResult::Stale,
+                        Err(_) => StaleResult::LiveServer,
+                    }
+                }
+                Err(_) => StaleResult::LiveServer,
+            }
         }
     };
 

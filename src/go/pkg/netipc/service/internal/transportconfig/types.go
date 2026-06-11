@@ -5,6 +5,7 @@ type TypedConfig struct {
 	PreferredProfiles       uint32
 	MaxRequestBatchItems    uint32
 	MaxResponsePayloadBytes uint32
+	CallTimeoutMs           uint32
 	AuthToken               uint64
 }
 

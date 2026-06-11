@@ -1,5 +1,3 @@
-#![cfg(unix)]
-
 use super::common::SERVER_POLL_TIMEOUT_MS;
 use super::server::{ManagedServer, ServerConfig};
 use super::server_session_unix::{handle_session_threaded, poll_fd};

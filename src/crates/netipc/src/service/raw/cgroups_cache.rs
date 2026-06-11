@@ -1,4 +1,4 @@
-use super::client::{ClientConfig, ClientState, RawClient};
+use super::client::{ClientAbortHandle, ClientConfig, ClientState, RawClient};
 use super::common::next_power_of_2_u32;
 
 /// Cached copy of a single cgroup item. Owns its strings.
@@ -197,6 +197,26 @@ impl CgroupsCache {
             connection_state: self.client.status().state,
             last_refresh_ts: self.last_refresh_ts,
         }
+    }
+
+    /// Set the context-level default timeout for blocking refresh calls.
+    pub fn set_call_timeout(&mut self, timeout_ms: u32) {
+        self.client.set_call_timeout(timeout_ms);
+    }
+
+    /// Return a cloneable handle that can abort refresh calls from another thread.
+    pub fn abort_handle(&self) -> ClientAbortHandle {
+        self.client.abort_handle()
+    }
+
+    /// Request abort of an in-flight or future refresh call.
+    pub fn abort(&self) {
+        self.client.abort();
+    }
+
+    /// Clear a previous abort request so the cache client can be reused.
+    pub fn clear_abort(&self) {
+        self.client.clear_abort();
     }
 
     /// Close the cache: free all cached items, close the L2 client.

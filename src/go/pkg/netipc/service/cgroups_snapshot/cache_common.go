@@ -29,6 +29,21 @@ func (c *Cache) Status() CacheStatus {
 	return c.inner.Status()
 }
 
+// SetCallTimeout sets the context-level default timeout for refresh calls.
+func (c *Cache) SetCallTimeout(timeoutMs uint32) {
+	c.inner.SetCallTimeout(timeoutMs)
+}
+
+// Abort unblocks an in-flight refresh call.
+func (c *Cache) Abort() {
+	c.inner.Abort()
+}
+
+// ClearAbort clears a previous abort request so the cache can be reused.
+func (c *Cache) ClearAbort() {
+	c.inner.ClearAbort()
+}
+
 // Close frees all cached items and closes the L2 client.
 func (c *Cache) Close() {
 	c.inner.Close()

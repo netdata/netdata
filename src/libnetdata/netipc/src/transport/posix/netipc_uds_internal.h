@@ -25,11 +25,9 @@ int nipc_uds_build_socket_name(char *dst, size_t dst_len,
 int nipc_uds_build_socket_path(char *dst, size_t dst_len,
                                const char *run_dir,
                                const char *service_name);
-bool nipc_uds_run_dir_allows_stale_unlink(const char *run_dir);
 int nipc_uds_check_and_recover_stale(const char *run_dir,
                                      const char *socket_name,
-                                     const char *path,
-                                     bool allow_stale_unlink);
+                                     const char *path);
 
 nipc_uds_error_t nipc_uds_client_handshake(int fd,
                                            const nipc_uds_client_config_t *cfg,

@@ -20,7 +20,10 @@ use crate::transport::windows::{
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-pub use raw::{CgroupsCacheItem, CgroupsCacheStatus, ClientState, ClientStatus, SnapshotHandler};
+pub use raw::{
+    CgroupsCacheItem, CgroupsCacheStatus, ClientAbortHandle, ClientState, ClientStatus,
+    SnapshotHandler,
+};
 
 /// Public L2/L3 client configuration for the cgroups-snapshot service.
 ///
@@ -129,9 +132,39 @@ impl CgroupsClient {
         self.inner.status()
     }
 
+    /// Set the context-level default timeout for blocking calls.
+    pub fn set_call_timeout(&mut self, timeout_ms: u32) {
+        self.inner.set_call_timeout(timeout_ms);
+    }
+
+    /// Return a cloneable handle that can abort calls from another thread.
+    pub fn abort_handle(&self) -> ClientAbortHandle {
+        self.inner.abort_handle()
+    }
+
+    /// Request abort of an in-flight or future synchronous call.
+    pub fn abort(&self) {
+        self.inner.abort();
+    }
+
+    /// Clear a previous abort request so the client can be reused.
+    pub fn clear_abort(&self) {
+        self.inner.clear_abort();
+    }
+
     /// Blocking typed call for the cgroups-snapshot service.
     pub fn call_snapshot(&mut self) -> Result<CgroupsResponseView<'_>, NipcError> {
-        self.inner.call_snapshot()
+        self.call_snapshot_with_timeout(0)
+    }
+
+    /// Blocking typed call with an explicit timeout in milliseconds.
+    ///
+    /// A zero timeout uses the client's context-level default.
+    pub fn call_snapshot_with_timeout(
+        &mut self,
+        timeout_ms: u32,
+    ) -> Result<CgroupsResponseView<'_>, NipcError> {
+        self.inner.call_snapshot_with_timeout(timeout_ms)
     }
 
     /// Tear down connection and release resources.
@@ -241,6 +274,26 @@ impl CgroupsCache {
     /// Fill a status snapshot for diagnostics.
     pub fn status(&self) -> CgroupsCacheStatus {
         self.inner.status()
+    }
+
+    /// Set the context-level default timeout for blocking refresh calls.
+    pub fn set_call_timeout(&mut self, timeout_ms: u32) {
+        self.inner.set_call_timeout(timeout_ms);
+    }
+
+    /// Return a cloneable handle that can abort refresh calls from another thread.
+    pub fn abort_handle(&self) -> ClientAbortHandle {
+        self.inner.abort_handle()
+    }
+
+    /// Request abort of an in-flight or future refresh call.
+    pub fn abort(&self) {
+        self.inner.abort();
+    }
+
+    /// Clear a previous abort request so the cache client can be reused.
+    pub fn clear_abort(&self) {
+        self.inner.clear_abort();
     }
 
     /// Close the cache and underlying L2 client.

@@ -39,6 +39,10 @@ func cgroupsLookupRequestSize(paths [][]byte) (int, error) {
 // CallCgroupsLookup performs a blocking typed CGROUPS_LOOKUP call.
 // The returned view is valid until the next typed call on this client.
 func (c *Client) CallCgroupsLookup(paths [][]byte) (*protocol.CgroupsLookupResponseView, error) {
+	return c.CallCgroupsLookupWithTimeout(paths, 0)
+}
+
+func (c *Client) CallCgroupsLookupWithTimeout(paths [][]byte, timeoutMs uint32) (*protocol.CgroupsLookupResponseView, error) {
 	if err := c.validateMethod(protocol.MethodCgroupsLookup); err != nil {
 		return nil, err
 	}
@@ -55,7 +59,7 @@ func (c *Client) CallCgroupsLookup(paths [][]byte) (*protocol.CgroupsLookupRespo
 			return err
 		}
 
-		_, payload, rerr := c.doRawCall(protocol.MethodCgroupsLookup, reqBuf[:reqLen])
+		_, payload, rerr := c.doRawCallWithTimeout(protocol.MethodCgroupsLookup, reqBuf[:reqLen], timeoutMs)
 		if rerr != nil {
 			return rerr
 		}

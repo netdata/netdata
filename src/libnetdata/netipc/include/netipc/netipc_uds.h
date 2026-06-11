@@ -41,6 +41,8 @@ typedef enum {
     NIPC_UDS_ERR_BAD_PARAM,         /* invalid argument */
     NIPC_UDS_ERR_DUPLICATE_MSG_ID,  /* message_id already in-flight */
     NIPC_UDS_ERR_UNKNOWN_MSG_ID,    /* response message_id not in-flight */
+    NIPC_UDS_ERR_TIMEOUT,           /* receive deadline expired */
+    NIPC_UDS_ERR_ABORTED,           /* receive aborted by caller */
 } nipc_uds_error_t;
 
 /* ------------------------------------------------------------------ */
@@ -204,6 +206,21 @@ nipc_uds_error_t nipc_uds_receive(nipc_uds_session_t *session,
                                    nipc_header_t *hdr_out,
                                    const void **payload_out,
                                    size_t *payload_len_out);
+
+/*
+ * Receive one logical message with an optional deadline and abort fd.
+ *
+ * timeout_ms == 0 waits indefinitely. abort_fd < 0 disables abort waiting.
+ * If abort_fd becomes readable before a complete message arrives, returns
+ * NIPC_UDS_ERR_ABORTED.
+ */
+nipc_uds_error_t nipc_uds_receive_timeout(nipc_uds_session_t *session,
+                                           void *buf, size_t buf_size,
+                                           nipc_header_t *hdr_out,
+                                           const void **payload_out,
+                                           size_t *payload_len_out,
+                                           uint32_t timeout_ms,
+                                           int abort_fd);
 
 /* ------------------------------------------------------------------ */
 /*  Utility                                                            */

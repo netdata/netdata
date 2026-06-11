@@ -125,6 +125,7 @@ void nipc_service_common_client_init(nipc_client_ctx_t *ctx,
     ctx->state = NIPC_CLIENT_DISCONNECTED;
     ctx->session_valid = false;
     ctx->shm = NULL;
+    ctx->call_timeout_ms = NIPC_CLIENT_CALL_TIMEOUT_DEFAULT_MS;
     nipc_service_common_copy_cstr_field(ctx->run_dir, sizeof(ctx->run_dir), run_dir);
     nipc_service_common_copy_cstr_field(ctx->service_name, sizeof(ctx->service_name), service_name);
 }
@@ -148,6 +149,21 @@ void nipc_service_common_client_close_buffers(nipc_client_ctx_t *ctx)
     ctx->response_buf_size = 0;
     ctx->send_buf_size = 0;
     ctx->state = NIPC_CLIENT_DISCONNECTED;
+}
+
+uint32_t nipc_service_common_client_call_timeout_ms(const nipc_client_ctx_t *ctx,
+                                                    uint32_t timeout_ms)
+{
+    if (timeout_ms != 0)
+        return timeout_ms;
+    if (ctx->call_timeout_ms != 0)
+        return ctx->call_timeout_ms;
+    return NIPC_CLIENT_CALL_TIMEOUT_DEFAULT_MS;
+}
+
+bool nipc_service_common_client_abort_requested(const nipc_client_ctx_t *ctx)
+{
+    return __atomic_load_n(&ctx->abort_requested, __ATOMIC_ACQUIRE) != 0;
 }
 
 bool nipc_service_common_client_refresh(nipc_client_ctx_t *ctx,
@@ -290,9 +306,13 @@ nipc_error_t nipc_service_common_do_raw_call(
     size_t request_len,
     const void **response_payload_out,
     size_t *response_len_out,
+    uint32_t timeout_ms,
     nipc_service_common_transport_send_fn send_fn,
     nipc_service_common_transport_receive_fn receive_fn)
 {
+    if (nipc_service_common_client_abort_requested(ctx))
+        return NIPC_ERR_ABORTED;
+
     nipc_header_t hdr = {0};
     hdr.kind             = NIPC_KIND_REQUEST;
     hdr.code             = method_code;
@@ -307,7 +327,8 @@ nipc_error_t nipc_service_common_do_raw_call(
 
     nipc_header_t resp_hdr;
     err = receive_fn(ctx, ctx->response_buf, ctx->response_buf_size,
-                     &resp_hdr, response_payload_out, response_len_out);
+                     &resp_hdr, response_payload_out, response_len_out,
+                     timeout_ms);
     if (err != NIPC_OK)
         return err;
 
@@ -342,6 +363,13 @@ nipc_error_t nipc_service_common_call_with_retry(
         if (err == NIPC_OK) {
             ctx->call_count++;
             return NIPC_OK;
+        }
+
+        if (err == NIPC_ERR_TIMEOUT || err == NIPC_ERR_ABORTED) {
+            ops->disconnect(ctx);
+            ctx->state = NIPC_CLIENT_BROKEN;
+            ctx->error_count++;
+            return err;
         }
 
         if (err != NIPC_ERR_OVERFLOW) {

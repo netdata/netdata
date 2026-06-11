@@ -8,8 +8,29 @@
 // Pure Go — no cgo. Works with CGO_ENABLED=0.
 package raw
 
+import "time"
+
 // Poll/receive timeout for server loops (ms). Controls shutdown detection latency.
 const serverPollTimeoutMs = 100
+
+// ClientCallTimeoutDefaultMs is the default synchronous client call timeout.
+const ClientCallTimeoutDefaultMs uint32 = 30000
+
+const clientAbortPollMs uint32 = 100
+
+func boundedClientWaitMs(remaining time.Duration, pollCapMs uint32) uint32 {
+	if remaining <= 0 {
+		return 0
+	}
+	if remaining >= time.Duration(pollCapMs)*time.Millisecond {
+		return pollCapMs
+	}
+	waitMs := uint32((remaining + time.Millisecond - 1) / time.Millisecond) // #nosec G115 -- remaining is positive and below pollCapMs here.
+	if waitMs == 0 {
+		return 1
+	}
+	return waitMs
+}
 
 // ---------------------------------------------------------------------------
 //  Client state (shared across platforms)

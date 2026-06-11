@@ -159,7 +159,7 @@ func ShmServerCreate(runDir, serviceName string, sessionID uint64, reqCapacity, 
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600) // #nosec G304 -- path is built from runDir, validated service name, and hex session ID.
 	if err != nil && os.IsExist(err) {
 		// File exists — do stale recovery and retry.
-		stale := checkShmStale(path, runDirAllowsStaleUnlink(runDir))
+		stale := checkShmStale(path)
 		if stale == shmStaleLive {
 			return nil, fmt.Errorf("%w: live server owns SHM region", ErrShmOpen)
 		}
@@ -742,14 +742,10 @@ func ShmCleanupStale(runDir, serviceName string) {
 	if err != nil {
 		return
 	}
-	allowStaleUnlink := runDirAllowsStaleUnlink(runDir)
 	prefix := serviceName + "-"
 	suffix := ".ipcshm"
 	for _, e := range entries {
 		name := e.Name()
-		if !e.Type().IsRegular() {
-			continue
-		}
 		if len(name) < len(prefix)+len(suffix) {
 			continue
 		}
@@ -757,7 +753,7 @@ func ShmCleanupStale(runDir, serviceName string) {
 			continue
 		}
 		path := filepath.Join(runDir, name)
-		result := checkShmStale(path, allowStaleUnlink)
+		result := checkShmStale(path)
 		_ = result // checkShmStale already unlinks stale/invalid files
 	}
 }
@@ -775,22 +771,20 @@ const (
 	shmStaleInvalid
 )
 
-func removeStalePath(path string, allowStaleUnlink bool) bool {
-	if !allowStaleUnlink {
-		return false
-	}
+func removeStalePath(path string) bool {
+	// os.Remove also reclaims a directory squatting on the endpoint path.
 	err := os.Remove(path)
 	return err == nil || os.IsNotExist(err)
 }
 
-func checkShmStale(path string, allowStaleUnlink bool) shmStaleResult {
+func checkShmStale(path string) shmStaleResult {
 	info, err := os.Stat(path)
 	if err != nil {
 		return shmStaleNotExist
 	}
 
 	if info.Size() < int64(shmHeaderLen) {
-		if !removeStalePath(path, allowStaleUnlink) {
+		if !removeStalePath(path) {
 			return shmStaleLive
 		}
 		return shmStaleInvalid
@@ -798,7 +792,12 @@ func checkShmStale(path string, allowStaleUnlink bool) shmStaleResult {
 
 	f, err := os.Open(path) // #nosec G304 -- path comes from the validated SHM cleanup scan or buildShmPath.
 	if err != nil {
-		if !removeStalePath(path, allowStaleUnlink) {
+		if errors.Is(err, syscall.EMFILE) || errors.Is(err, syscall.ENFILE) {
+			// Cannot probe liveness (fd exhaustion) — keep the endpoint
+			// rather than risk deleting a live region.
+			return shmStaleLive
+		}
+		if !removeStalePath(path) {
 			return shmStaleLive
 		}
 		return shmStaleInvalid
@@ -808,7 +807,7 @@ func checkShmStale(path string, allowStaleUnlink bool) shmStaleResult {
 		syscall.PROT_READ, syscall.MAP_SHARED)
 	_ = f.Close()
 	if err != nil {
-		if !removeStalePath(path, allowStaleUnlink) {
+		if !removeStalePath(path) {
 			return shmStaleLive
 		}
 		return shmStaleInvalid
@@ -817,7 +816,7 @@ func checkShmStale(path string, allowStaleUnlink bool) shmStaleResult {
 	magic := binary.NativeEndian.Uint32(data[shmHeaderMagicOff : shmHeaderMagicOff+4])
 	if magic != shmRegionMagic {
 		_ = syscall.Munmap(data)
-		if !removeStalePath(path, allowStaleUnlink) {
+		if !removeStalePath(path) {
 			return shmStaleLive
 		}
 		return shmStaleInvalid
@@ -832,7 +831,7 @@ func checkShmStale(path string, allowStaleUnlink bool) shmStaleResult {
 	}
 
 	// Dead owner or zero generation (PID reuse / legacy) — stale
-	if !removeStalePath(path, allowStaleUnlink) {
+	if !removeStalePath(path) {
 		return shmStaleLive
 	}
 	return shmStaleRecovered

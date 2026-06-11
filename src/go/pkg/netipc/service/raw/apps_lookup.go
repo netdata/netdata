@@ -24,6 +24,10 @@ func appsLookupRequestSize(pids []uint32) (int, error) {
 // CallAppsLookup performs a blocking typed APPS_LOOKUP call.
 // The returned view is valid until the next typed call on this client.
 func (c *Client) CallAppsLookup(pids []uint32) (*protocol.AppsLookupResponseView, error) {
+	return c.CallAppsLookupWithTimeout(pids, 0)
+}
+
+func (c *Client) CallAppsLookupWithTimeout(pids []uint32, timeoutMs uint32) (*protocol.AppsLookupResponseView, error) {
 	if err := c.validateMethod(protocol.MethodAppsLookup); err != nil {
 		return nil, err
 	}
@@ -40,7 +44,7 @@ func (c *Client) CallAppsLookup(pids []uint32) (*protocol.AppsLookupResponseView
 			return err
 		}
 
-		_, payload, rerr := c.doRawCall(protocol.MethodAppsLookup, reqBuf[:reqLen])
+		_, payload, rerr := c.doRawCallWithTimeout(protocol.MethodAppsLookup, reqBuf[:reqLen], timeoutMs)
 		if rerr != nil {
 			return rerr
 		}

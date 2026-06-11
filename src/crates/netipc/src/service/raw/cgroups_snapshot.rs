@@ -20,6 +20,16 @@ impl RawClient {
     ///
     /// The returned view is valid until the next typed call on this client.
     pub fn call_snapshot(&mut self) -> Result<CgroupsResponseView<'_>, NipcError> {
+        self.call_snapshot_with_timeout(0)
+    }
+
+    /// Blocking typed call with an explicit timeout in milliseconds.
+    ///
+    /// A zero timeout uses the client's context-level default.
+    pub fn call_snapshot_with_timeout(
+        &mut self,
+        timeout_ms: u32,
+    ) -> Result<CgroupsResponseView<'_>, NipcError> {
         self.validate_method(METHOD_CGROUPS_SNAPSHOT)?;
         let req = CgroupsRequest {
             layout_version: 1,
@@ -34,8 +44,12 @@ impl RawClient {
             req_len
         };
 
-        let response =
-            self.raw_call_with_retry(METHOD_CGROUPS_SNAPSHOT, req_len, RawCallKind::single())?;
+        let response = self.raw_call_with_retry_timeout(
+            METHOD_CGROUPS_SNAPSHOT,
+            req_len,
+            RawCallKind::single(),
+            timeout_ms,
+        )?;
         CgroupsResponseView::decode(self.response_payload(response)?)
     }
 }
