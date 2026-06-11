@@ -425,7 +425,46 @@ async fn e2e_tier_commit_workers_roundtrip() {
         "workers should commit the closed 1m and 5m buckets"
     );
 
+    // The tick mirrors slot telemetry into the chart atomics. The entry
+    // counter increments before the worker stamps its slot, so poll the
+    // mirrored values rather than asserting after a single tick.
+    for _ in 0..300 {
+        service.handle_sync_tick_for_test(0);
+        if metrics.minute_1_commit_batches.load(Ordering::Relaxed) >= 1
+            && metrics.minute_5_commit_batches.load(Ordering::Relaxed) >= 1
+        {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(
+        metrics.minute_1_commit_batches.load(Ordering::Relaxed) >= 1,
+        "tick must mirror the 1m worker's committed batches"
+    );
+    assert!(
+        metrics.minute_5_commit_batches.load(Ordering::Relaxed) >= 1,
+        "tick must mirror the 5m worker's committed batches"
+    );
+    assert!(
+        metrics.minute_1_commit_age_seconds.load(Ordering::Relaxed) <= 60,
+        "a just-committed tier must report a small commit age"
+    );
+    assert_eq!(
+        metrics.minute_1_commit_stretched.load(Ordering::Relaxed),
+        0,
+        "a single-bucket batch is not a stretched window"
+    );
+
+    // Shutdown must wake every worker promptly; a lost shutdown wakeup leaves
+    // a worker sleeping toward its next anniversary until the 30s join
+    // deadline abandons it. Normal drains take milliseconds.
+    let shutdown_started = std::time::Instant::now();
     service.finish_shutdown_for_test(0);
+    assert!(
+        shutdown_started.elapsed() < Duration::from_secs(15),
+        "worker shutdown took {:?}; a stuck worker burned the join deadline",
+        shutdown_started.elapsed()
+    );
 
     let minute_1 = timestamp_counts(&journal_source_realtime_timestamps(
         &cfg.journal.minute_1_tier_dir(),
@@ -484,7 +523,13 @@ async fn e2e_tier_commit_workers_shutdown_drains_residual_buckets() {
         "nothing responded yet; the closed buckets must still be residual"
     );
 
+    let shutdown_started = std::time::Instant::now();
     service.finish_shutdown_for_test(0);
+    assert!(
+        shutdown_started.elapsed() < Duration::from_secs(15),
+        "worker shutdown took {:?}; a stuck worker burned the join deadline",
+        shutdown_started.elapsed()
+    );
 
     assert_eq!(
         metrics.tier_entries_written.load(Ordering::Relaxed),

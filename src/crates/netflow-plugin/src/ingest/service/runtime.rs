@@ -54,6 +54,7 @@ impl IngestService {
         // and refreshes the open-tier snapshot — all moved here from the
         // per-packet path.
         self.handle_tier_handoffs();
+        self.mirror_tier_commit_telemetry(now);
         self.prune_unused_tier_flow_indexes();
         self.refresh_open_tier_state(now);
         let entries_since_sync = if self.periodic_sync_enabled() {
@@ -302,6 +303,17 @@ impl IngestService {
             for container in recycled {
                 acc.recycle(container);
             }
+        }
+    }
+
+    /// Mirror each tier slot's commit telemetry into the chart atomics.
+    /// Three short mutex holds per second; the workers touch those mutexes
+    /// at most once per anniversary.
+    fn mirror_tier_commit_telemetry(&self, now_usec: u64) {
+        for (index, tier) in MATERIALIZED_TIERS.iter().enumerate() {
+            let telemetry = self.tier_handoff.commit_telemetry(index);
+            self.metrics
+                .store_tier_commit_telemetry(*tier, now_usec, &telemetry);
         }
     }
 

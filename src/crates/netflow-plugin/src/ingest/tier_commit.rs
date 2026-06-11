@@ -63,10 +63,26 @@ struct TierSlot {
     /// Hours covered by `pending` — unioned into the prune's active set so
     /// flow-index entries a worker still needs are never pruned mid-commit.
     in_flight_hours: BTreeSet<u64>,
-    /// Observability, mirrored into charts by the tick.
+    /// Observability, mirrored into charts by the tick. `last_commit_usec`
+    /// is stamped on EVERY completed claim — including empty ones — so its
+    /// age measures worker liveness (commit lag), not tier traffic.
     last_commit_usec: u64,
     last_commit_duration_usec: u64,
     committed_batches: u64,
+    /// Claims that handed over more than one closed bucket: the worker
+    /// missed at least one anniversary (or caught up a spawn backlog) and
+    /// the window stretched, exactly as the design allows.
+    stretched_commits: u64,
+}
+
+/// One tier's commit telemetry, copied out of the slot by the tick and
+/// mirrored into `IngestMetrics` for the charts sampler.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) struct TierCommitTelemetry {
+    pub(super) last_commit_usec: u64,
+    pub(super) last_commit_duration_usec: u64,
+    pub(super) committed_batches: u64,
+    pub(super) stretched_commits: u64,
 }
 
 impl TierHandoffShared {
@@ -135,20 +151,31 @@ impl TierHandoffShared {
         }
     }
 
-    pub(super) fn commit_telemetry(&self, index: usize) -> (u64, u64, u64) {
+    pub(super) fn commit_telemetry(&self, index: usize) -> TierCommitTelemetry {
         match self.slots[index].slot.lock() {
-            Ok(slot) => (
-                slot.last_commit_usec,
-                slot.last_commit_duration_usec,
-                slot.committed_batches,
-            ),
-            Err(_) => (0, 0, 0),
+            Ok(slot) => TierCommitTelemetry {
+                last_commit_usec: slot.last_commit_usec,
+                last_commit_duration_usec: slot.last_commit_duration_usec,
+                committed_batches: slot.committed_batches,
+                stretched_commits: slot.stretched_commits,
+            },
+            Err(_) => TierCommitTelemetry::default(),
         }
     }
 
     pub(super) fn begin_shutdown(&self) {
         self.shutdown.store(true, Ordering::Relaxed);
         for sync in &self.slots {
+            // Notify under the slot mutex. The workers evaluate their wait
+            // predicates (which read `shutdown`) while holding it, so an
+            // unguarded notify could land in the gap between a predicate
+            // check and the re-wait — a lost wakeup that leaves the worker
+            // sleeping toward its next anniversary (or indefinitely in the
+            // doorbell wait) until the join deadline abandons it with its
+            // final batch uncommitted. Holding the mutex makes that gap
+            // unreachable: either the worker is already waiting and receives
+            // the notify, or its next predicate check observes the flag.
+            let _slot = sync.slot.lock().unwrap_or_else(|_| std::process::abort());
             sync.ready.notify_all();
         }
     }
@@ -282,8 +309,14 @@ fn commit_and_return(
     batch: Vec<(u64, MetricBucket)>,
 ) {
     if batch.is_empty() {
+        // Nothing to write, but the claim cycle completed: stamp liveness so
+        // the commit-age metric tracks a stuck worker, not an idle tier.
+        let sync = &shared.slots[worker.index];
+        let mut slot = sync.slot.lock().unwrap_or_else(|_| std::process::abort());
+        slot.last_commit_usec = now_usec();
         return;
     }
+    let stretched = batch.len() > 1;
     let started = Instant::now();
     commit_batch(
         worker.tier,
@@ -312,6 +345,9 @@ fn commit_and_return(
     slot.last_commit_usec = now_usec();
     slot.last_commit_duration_usec = duration_usec;
     slot.committed_batches = slot.committed_batches.wrapping_add(1);
+    if stretched {
+        slot.stretched_commits = slot.stretched_commits.wrapping_add(1);
+    }
 }
 
 /// Per-commit durability for the long-retention tiers, with the loud-failure
@@ -492,6 +528,48 @@ mod tests {
     fn journal_log_is_send() {
         fn assert_send<T: Send>() {}
         assert_send::<journal_log_writer::Log>();
+    }
+
+    /// Age semantics of the tick mirror: a never-claimed slot reports 0 (not
+    /// the distance to the epoch), a claimed slot reports seconds since the
+    /// claim, and the raw tier is a no-op.
+    #[test]
+    fn tier_commit_telemetry_age_semantics() {
+        let metrics = IngestMetrics::default();
+        let now = 10_000_000_000_u64;
+
+        metrics.store_tier_commit_telemetry(
+            TierKind::Minute1,
+            now,
+            &TierCommitTelemetry::default(),
+        );
+        assert_eq!(
+            metrics.minute_1_commit_age_seconds.load(Ordering::Relaxed),
+            0,
+            "no claim yet must read as age 0"
+        );
+
+        let telemetry = TierCommitTelemetry {
+            last_commit_usec: now - 5_000_000,
+            last_commit_duration_usec: 1234,
+            committed_batches: 7,
+            stretched_commits: 2,
+        };
+        metrics.store_tier_commit_telemetry(TierKind::Minute5, now, &telemetry);
+        assert_eq!(
+            metrics.minute_5_commit_age_seconds.load(Ordering::Relaxed),
+            5
+        );
+        assert_eq!(
+            metrics.minute_5_commit_duration_usec.load(Ordering::Relaxed),
+            1234
+        );
+        assert_eq!(metrics.minute_5_commit_batches.load(Ordering::Relaxed), 7);
+        assert_eq!(metrics.minute_5_commit_stretched.load(Ordering::Relaxed), 2);
+
+        metrics.store_tier_commit_telemetry(TierKind::Raw, now, &telemetry);
+        assert_eq!(metrics.minute_1_commit_batches.load(Ordering::Relaxed), 0);
+        assert_eq!(metrics.hour_1_commit_batches.load(Ordering::Relaxed), 0);
     }
 
     fn flow_record(seed: u32) -> FlowRecord {
