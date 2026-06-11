@@ -94,11 +94,13 @@ if [ -x "/ucrt64/bin/ld.lld" ]; then
                         "-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld")
 else
     # BFD fallback: reduce DWARF from level 2 (-g) to level 1 (-g1) so the
-    # linker's memory footprint stays within bounds.
+    # linker's memory footprint stays within bounds, and tell BFD to trade
+    # speed for lower memory via --no-keep-memory.
     # FLAGS variables are space-separated strings, not CMake lists — no semicolons.
     linker_cmake_flags=(
         "-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -g1 -DNDEBUG"
         "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -g1 -DNDEBUG"
+        "-DCMAKE_EXE_LINKER_FLAGS=-Wl,--no-keep-memory"
     )
 fi
 
@@ -116,6 +118,7 @@ CFLAGS="${BUILD_CFLAGS}" /ucrt64/bin/cmake \
     -G "${generator}" \
     "${cmake_make_program[@]}" \
     "${linker_cmake_flags[@]}" \
+    -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}" \
     -DCMAKE_INSTALL_PREFIX="/opt/netdata" \
     -DBUILD_FOR_PACKAGING=On \
     -DNETDATA_USER="${USER}" \
