@@ -484,10 +484,10 @@ func TestCollectorInit_NoOutputBackendIsCodedError(t *testing.T) {
 	assert.Nil(t, c.listener)
 }
 
-func TestCollectorInit_MissingPersistentJournalRootIsRetryableCodedError(t *testing.T) {
+func TestCollectorInit_MissingNetdataLogRootIsRetryableCodedError(t *testing.T) {
 	setMinimalProfileDir(t)
 	root := filepath.Join(t.TempDir(), "missing")
-	withPersistentJournalRoot(t, root)
+	withNetdataLogDir(t, root)
 
 	c := New()
 	c.SetJobName("local")
@@ -503,7 +503,7 @@ func TestCollectorInit_MissingPersistentJournalRootIsRetryableCodedError(t *test
 	var retryable interface{ DyncfgRetryable() bool }
 	require.ErrorAs(t, err, &retryable)
 	assert.True(t, retryable.DyncfgRetryable())
-	assert.Contains(t, err.Error(), "persistent systemd journal directory")
+	assert.Contains(t, err.Error(), "Netdata log directory")
 	assert.Nil(t, c.listener)
 	assert.Equal(t, startJournalJobs, activeDirectJournalJobs.Load())
 	assert.NoDirExists(t, root)

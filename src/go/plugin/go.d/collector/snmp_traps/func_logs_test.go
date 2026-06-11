@@ -38,6 +38,7 @@ func TestSNMPTrapsMethodsExposeLogsOnly(t *testing.T) {
 func TestSNMPTrapsJournalFunctionUsesPublicFunctionName(t *testing.T) {
 	fn := snmptrapsfunc.NewJournalFunction()
 	assert.Equal(t, snmpTrapsFunctionName, fn.Config.FunctionName)
+	assert.Equal(t, "TRAP_NAME", fn.Config.DefaultHistogram)
 }
 
 func TestSNMPTrapsLogsFunctionInfoAndQuery(t *testing.T) {

@@ -324,38 +324,49 @@ func TestParseRetentionConfigRotationDurationDisabled(t *testing.T) {
 func TestJournalRoot(t *testing.T) {
 	withTestCacheDir(t)
 	root := journalRoot("local")
-	want := filepath.Join(persistentSystemdJournalRoot, "netdata", "snmp-traps", "local")
+	want := filepath.Join(netdataLogDir(), "traps", "local")
 	if root != want {
 		t.Fatalf("expected %q, got %q", want, root)
 	}
 }
 
-func TestValidatePersistentJournalRootRequiresExistingDirectory(t *testing.T) {
-	root := filepath.Join(t.TempDir(), "missing")
-	withPersistentJournalRoot(t, root)
+func TestJournalRootPrefersNetdataLogDirEnv(t *testing.T) {
+	logDir := filepath.Join(t.TempDir(), "env-log")
+	withNetdataLogDir(t, logDir)
 
-	err := validatePersistentJournalRoot()
+	root := journalRoot("local")
+	want := filepath.Join(logDir, "traps", "local")
+	if root != want {
+		t.Fatalf("expected %q, got %q", want, root)
+	}
+}
+
+func TestValidateNetdataLogRootRequiresExistingDirectory(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "missing")
+	withNetdataLogDir(t, root)
+
+	err := validateNetdataLogRoot()
 	if err == nil {
-		t.Fatal("expected missing persistent journal root error")
+		t.Fatal("expected missing Netdata log root error")
 	}
 	if !strings.Contains(err.Error(), "does not exist") {
 		t.Fatalf("expected missing root error, got %v", err)
 	}
 	if _, statErr := os.Stat(root); !os.IsNotExist(statErr) {
-		t.Fatalf("persistent journal root was created unexpectedly: %v", statErr)
+		t.Fatalf("Netdata log root was created unexpectedly: %v", statErr)
 	}
 }
 
-func TestValidatePersistentJournalRootRejectsFile(t *testing.T) {
-	root := filepath.Join(t.TempDir(), "journal")
+func TestValidateNetdataLogRootRejectsFile(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "log")
 	if err := os.WriteFile(root, []byte("not a directory"), 0640); err != nil {
 		t.Fatalf("create test file: %v", err)
 	}
-	withPersistentJournalRoot(t, root)
+	withNetdataLogDir(t, root)
 
-	err := validatePersistentJournalRoot()
+	err := validateNetdataLogRoot()
 	if err == nil {
-		t.Fatal("expected non-directory persistent journal root error")
+		t.Fatal("expected non-directory Netdata log root error")
 	}
 	if !strings.Contains(err.Error(), "not a directory") {
 		t.Fatalf("expected non-directory root error, got %v", err)

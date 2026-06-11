@@ -94,7 +94,7 @@ func NewJournalFunction() sdkjournal.NetdataJournalFunction {
 	cfg.FunctionName = FunctionName
 	cfg.DefaultFacets = DefaultLogFacets()
 	cfg.DefaultViewKeys = DefaultViewKeys()
-	cfg.DefaultHistogram = "TRAP_SEVERITY"
+	cfg.DefaultHistogram = "TRAP_NAME"
 	return sdkjournal.NewNetdataJournalFunction(cfg, sdkjournal.SystemdJournalProfile{})
 }
 

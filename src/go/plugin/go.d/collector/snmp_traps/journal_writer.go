@@ -13,6 +13,8 @@ import (
 	"time"
 
 	sdkjournal "github.com/netdata/systemd-journal-sdk/go/journal"
+
+	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 )
 
 var (
@@ -27,7 +29,10 @@ var (
 	errMissingTrapOID    = errors.New("missing trap OID for trap report")
 )
 
-var persistentSystemdJournalRoot = "/var/log/journal"
+const (
+	netdataLogDirEnv     = "NETDATA_LOG_DIR"
+	defaultNetdataLogDir = "/var/log/netdata"
+)
 
 type JournalField = sdkjournal.Field
 
@@ -53,19 +58,30 @@ func journalRoot(jobName string) string {
 }
 
 func journalBaseRoot() string {
-	return filepath.Join(persistentSystemdJournalRoot, "netdata", "snmp-traps")
+	return filepath.Join(netdataLogDir(), "traps")
 }
 
-func validatePersistentJournalRoot() error {
-	info, err := os.Stat(persistentSystemdJournalRoot)
+func netdataLogDir() string {
+	if dir := strings.TrimSpace(os.Getenv(netdataLogDirEnv)); dir != "" {
+		return filepath.Clean(dir)
+	}
+	if dir := strings.TrimSpace(buildinfo.LogDir); dir != "" {
+		return filepath.Clean(dir)
+	}
+	return defaultNetdataLogDir
+}
+
+func validateNetdataLogRoot() error {
+	logDir := netdataLogDir()
+	info, err := os.Stat(logDir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("persistent systemd journal directory %s does not exist; enable persistent journald storage before enabling direct SNMP trap journals", persistentSystemdJournalRoot)
+			return fmt.Errorf("Netdata log directory %s does not exist; direct SNMP trap journals require a usable Netdata log directory", logDir)
 		}
-		return fmt.Errorf("stat persistent systemd journal directory %s: %w", persistentSystemdJournalRoot, err)
+		return fmt.Errorf("stat Netdata log directory %s: %w", logDir, err)
 	}
 	if !info.IsDir() {
-		return fmt.Errorf("persistent systemd journal path %s is not a directory", persistentSystemdJournalRoot)
+		return fmt.Errorf("Netdata log path %s is not a directory", logDir)
 	}
 	return nil
 }

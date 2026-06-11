@@ -217,7 +217,7 @@ func (c *Collector) Init(ctx context.Context) error {
 
 	var journalWriter *JournalWriter
 	if journalEnabled {
-		if err := validatePersistentJournalRoot(); err != nil {
+		if err := validateNetdataLogRoot(); err != nil {
 			releaseProfiles()
 			return dyncfgStartupError(err)
 		}

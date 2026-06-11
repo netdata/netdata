@@ -19,27 +19,30 @@ func withTestCacheDir(t testing.TB) string {
 	}
 
 	oldCacheDir := buildinfo.CacheDir
-	oldJournalRoot := persistentSystemdJournalRoot
+	oldLogDir := buildinfo.LogDir
 	buildinfo.CacheDir = dir
-	persistentSystemdJournalRoot = filepath.Join(dir, "journal")
-	if err := os.MkdirAll(persistentSystemdJournalRoot, 0750); err != nil {
-		t.Fatalf("create test persistent journal root: %v", err)
+	logDir := filepath.Join(dir, "log")
+	buildinfo.LogDir = logDir
+	t.Setenv(netdataLogDirEnv, logDir)
+	if err := os.MkdirAll(logDir, 0750); err != nil {
+		t.Fatalf("create test Netdata log dir: %v", err)
 	}
 	t.Cleanup(func() {
 		buildinfo.CacheDir = oldCacheDir
-		persistentSystemdJournalRoot = oldJournalRoot
+		buildinfo.LogDir = oldLogDir
 		_ = os.RemoveAll(dir)
 	})
 
 	return dir
 }
 
-func withPersistentJournalRoot(t testing.TB, root string) {
+func withNetdataLogDir(t testing.TB, root string) {
 	t.Helper()
 
-	oldJournalRoot := persistentSystemdJournalRoot
-	persistentSystemdJournalRoot = root
+	oldLogDir := buildinfo.LogDir
+	buildinfo.LogDir = root
+	t.Setenv(netdataLogDirEnv, root)
 	t.Cleanup(func() {
-		persistentSystemdJournalRoot = oldJournalRoot
+		buildinfo.LogDir = oldLogDir
 	})
 }

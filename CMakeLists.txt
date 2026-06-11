@@ -3791,6 +3791,7 @@ install(TARGETS netdata COMPONENT netdata DESTINATION "${BINDIR}")
 
 install(DIRECTORY COMPONENT netdata DESTINATION var/cache/netdata)
 install(DIRECTORY COMPONENT netdata DESTINATION var/log/netdata)
+install(DIRECTORY COMPONENT netdata DESTINATION var/log/netdata/traps)
 install(DIRECTORY COMPONENT netdata DESTINATION var/lib/netdata/registry)
 install(DIRECTORY COMPONENT netdata DESTINATION var/lib/netdata/cloud.d)
 install(DIRECTORY COMPONENT netdata DESTINATION var/run/netdata)
