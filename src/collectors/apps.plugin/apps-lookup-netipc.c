@@ -58,164 +58,148 @@ static void apps_lookup_duration_observe(usec_t duration_ut)
         apps_lookup_counter_inc(&apps_lookup_duration_gt_1000ms);
 }
 
-static void apps_lookup_free_label_views(struct apps_lookup_label_view_ctx *ctx)
-{
-    freez(ctx->views);
-    memset(ctx, 0, sizeof(*ctx));
-}
+struct apps_lookup_staged_label {
+    STRING *key;
+    STRING *value;
+};
 
-static void apps_lookup_label_views_from_entry(
-    const struct cgroup_lookup_entry *entry,
-    struct apps_lookup_label_view_ctx *ctx)
+// A request PID's response fields, snapshotted under apps_pids_mutex so the wire
+// encoding (the real cost on the 8192-PID network-viewer path) runs after the
+// lock is released. STRINGs are string_dup'd (O(1) refcount) so they stay valid
+// once the lock is dropped and the collector may mutate or evict the originals.
+struct apps_lookup_staged_pid {
+    bool found;               // PID exists
+    uint16_t cgroup_status;
+    uint16_t orchestrator;
+    uint32_t pid;
+    uint32_t ppid;
+    uint32_t uid;
+    uint64_t starttime;
+    STRING *comm;             // dup; NULL when the PID was not found
+    STRING *cgroup_path;      // dup; NULL means "do not encode a path"
+    STRING *cgroup_name;      // dup; NULL means none
+    struct apps_lookup_staged_label *labels;
+    uint16_t label_count;
+};
+
+// Phase 1 (under apps_pids_mutex): find the PID and refcount-dup the strings the
+// response needs. No wire encoding happens here.
+static void apps_lookup_stage_pid(uint32_t req_pid, struct apps_lookup_staged_pid *staged)
 {
-    if (!entry || entry->cgroup_label_count == 0)
+    *staged = (struct apps_lookup_staged_pid){ 0 };
+
+    struct pid_stat *p = find_pid_entry((pid_t)req_pid);
+    if (!p) {
+        staged->pid = req_pid;
         return;
-
-    ctx->views = callocz(entry->cgroup_label_count, sizeof(*ctx->views));
-    ctx->count = entry->cgroup_label_count;
-
-    for (uint16_t i = 0; i < entry->cgroup_label_count; i++) {
-        ctx->views[i].key.ptr = string2str(entry->cgroup_labels[i].key);
-        ctx->views[i].key.len = (uint32_t)string_strlen(entry->cgroup_labels[i].key);
-        ctx->views[i].value.ptr = string2str(entry->cgroup_labels[i].value);
-        ctx->views[i].value.len = (uint32_t)string_strlen(entry->cgroup_labels[i].value);
     }
+
+    staged->found = true;
+    staged->pid = (uint32_t)p->pid;
+    staged->ppid = (uint32_t)p->ppid;
+    staged->uid = NIPC_UID_UNSET;
+#if (PROCESSES_HAVE_UID == 1)
+    staged->uid = (uint32_t)p->uid;
+#endif
+    staged->starttime = p->starttime;
+    staged->comm = string_dup(p->comm);
+    staged->cgroup_status = NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER;
+    staged->orchestrator = NIPC_ORCHESTRATOR_UNKNOWN;
+
+    if (!p->cgroup_path)
+        return; // RETRY_LATER, no path encoded
+
+    if (apps_cgroups_lookup_is_host_root_path(string2str(p->cgroup_path))) {
+        staged->cgroup_status = NIPC_APPS_CGROUP_HOST_ROOT; // no path encoded
+        return;
+    }
+
+    staged->cgroup_path = string_dup(p->cgroup_path); // path encoded
+
+    const struct cgroup_lookup_entry *entry = p->cgroup_cache;
+    if (!entry)
+        return; // RETRY_LATER, with path
+
+    if (entry->cgroup_status == NIPC_CGROUP_LOOKUP_KNOWN) {
+        staged->cgroup_status = NIPC_APPS_CGROUP_KNOWN;
+        staged->orchestrator = entry->orchestrator;
+        staged->cgroup_name = string_dup(entry->cgroup_name);
+        if (entry->cgroup_label_count) {
+            staged->label_count = entry->cgroup_label_count;
+            staged->labels = callocz(entry->cgroup_label_count, sizeof(*staged->labels));
+            for (uint16_t i = 0; i < entry->cgroup_label_count; i++) {
+                staged->labels[i].key = string_dup(entry->cgroup_labels[i].key);
+                staged->labels[i].value = string_dup(entry->cgroup_labels[i].value);
+            }
+        }
+    }
+    else if (entry->cgroup_status == NIPC_CGROUP_LOOKUP_UNKNOWN_PERMANENT)
+        staged->cgroup_status = NIPC_APPS_CGROUP_UNKNOWN_PERMANENT;
 }
 
-static nipc_error_t apps_lookup_builder_add_unknown(nipc_apps_lookup_builder_t *builder, uint32_t pid)
+static void apps_lookup_free_staged_pid(struct apps_lookup_staged_pid *staged)
 {
-    return nipc_apps_lookup_builder_add(
-        builder,
-        NIPC_PID_LOOKUP_UNKNOWN,
-        0,
-        0,
-        pid,
-        0,
-        NIPC_UID_UNSET,
-        0,
-        NULL,
-        0,
-        NULL,
-        0,
-        NULL,
-        0,
-        NULL,
-        0);
+    string_freez(staged->comm);
+    string_freez(staged->cgroup_path);
+    string_freez(staged->cgroup_name);
+    for (uint16_t i = 0; i < staged->label_count; i++) {
+        string_freez(staged->labels[i].key);
+        string_freez(staged->labels[i].value);
+    }
+    freez(staged->labels);
 }
 
-static nipc_error_t apps_lookup_builder_add_known(nipc_apps_lookup_builder_t *builder, struct pid_stat *p)
+// Phase 2 (no lock): wire-encode a staged PID into the response.
+static nipc_error_t apps_lookup_emit_staged(
+    nipc_apps_lookup_builder_t *builder, const struct apps_lookup_staged_pid *staged)
 {
-    const char *comm = string2str(p->comm);
+    if (!staged->found)
+        return nipc_apps_lookup_builder_add(
+            builder, NIPC_PID_LOOKUP_UNKNOWN, 0, 0, staged->pid, 0, NIPC_UID_UNSET, 0,
+            NULL, 0, NULL, 0, NULL, 0, NULL, 0);
+
+    const char *comm = string2str(staged->comm);
     uint32_t comm_len = (uint32_t)MIN(strlen(comm), 15);
     if (comm_len == 0) {
         comm = "-";
         comm_len = 1;
     }
 
-    uint32_t uid = NIPC_UID_UNSET;
-#if (PROCESSES_HAVE_UID == 1)
-    uid = (uint32_t)p->uid;
-#endif
+    const char *path = staged->cgroup_path ? string2str(staged->cgroup_path) : NULL;
+    uint32_t path_len = staged->cgroup_path ? (uint32_t)string_strlen(staged->cgroup_path) : 0;
+    const char *cgroup_name = staged->cgroup_name ? string2str(staged->cgroup_name) : NULL;
+    uint32_t cgroup_name_len = staged->cgroup_name ? (uint32_t)string_strlen(staged->cgroup_name) : 0;
 
-    if (!p->cgroup_path) {
-        return nipc_apps_lookup_builder_add(
-            builder,
-            NIPC_PID_LOOKUP_KNOWN,
-            NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER,
-            NIPC_ORCHESTRATOR_UNKNOWN,
-            (uint32_t)p->pid,
-            (uint32_t)p->ppid,
-            uid,
-            p->starttime,
-            comm,
-            comm_len,
-            NULL,
-            0,
-            NULL,
-            0,
-            NULL,
-            0);
-    }
-
-    const char *path = string2str(p->cgroup_path);
-
-    if (apps_cgroups_lookup_is_host_root_path(path)) {
-        return nipc_apps_lookup_builder_add(
-            builder,
-            NIPC_PID_LOOKUP_KNOWN,
-            NIPC_APPS_CGROUP_HOST_ROOT,
-            NIPC_ORCHESTRATOR_UNKNOWN,
-            (uint32_t)p->pid,
-            (uint32_t)p->ppid,
-            uid,
-            p->starttime,
-            comm,
-            comm_len,
-            NULL,
-            0,
-            NULL,
-            0,
-            NULL,
-            0);
-    }
-
-    if (!p->cgroup_cache) {
-        return nipc_apps_lookup_builder_add(
-            builder,
-            NIPC_PID_LOOKUP_KNOWN,
-            NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER,
-            NIPC_ORCHESTRATOR_UNKNOWN,
-            (uint32_t)p->pid,
-            (uint32_t)p->ppid,
-            uid,
-            p->starttime,
-            comm,
-            comm_len,
-            path,
-            (uint32_t)string_strlen(p->cgroup_path),
-            NULL,
-            0,
-            NULL,
-            0);
-    }
-
-    struct cgroup_lookup_entry *entry = p->cgroup_cache;
-    uint16_t cgroup_status = NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER;
-    uint16_t orchestrator = NIPC_ORCHESTRATOR_UNKNOWN;
-    const char *cgroup_name = NULL;
-    uint32_t cgroup_name_len = 0;
-    struct apps_lookup_label_view_ctx labels = { 0 };
-
-    if (entry->cgroup_status == NIPC_CGROUP_LOOKUP_KNOWN) {
-        cgroup_status = NIPC_APPS_CGROUP_KNOWN;
-        orchestrator = entry->orchestrator;
-        cgroup_name = string2str(entry->cgroup_name);
-        cgroup_name_len = (uint32_t)string_strlen(entry->cgroup_name);
-        apps_lookup_label_views_from_entry(entry, &labels);
-    }
-    else if (entry->cgroup_status == NIPC_CGROUP_LOOKUP_UNKNOWN_PERMANENT) {
-        cgroup_status = NIPC_APPS_CGROUP_UNKNOWN_PERMANENT;
+    nipc_lookup_label_view_t *views = NULL;
+    if (staged->label_count) {
+        views = callocz(staged->label_count, sizeof(*views));
+        for (uint16_t i = 0; i < staged->label_count; i++) {
+            views[i].key.ptr = string2str(staged->labels[i].key);
+            views[i].key.len = (uint32_t)string_strlen(staged->labels[i].key);
+            views[i].value.ptr = string2str(staged->labels[i].value);
+            views[i].value.len = (uint32_t)string_strlen(staged->labels[i].value);
+        }
     }
 
     nipc_error_t err = nipc_apps_lookup_builder_add(
         builder,
         NIPC_PID_LOOKUP_KNOWN,
-        cgroup_status,
-        orchestrator,
-        (uint32_t)p->pid,
-        (uint32_t)p->ppid,
-        uid,
-        p->starttime,
+        staged->cgroup_status,
+        staged->orchestrator,
+        staged->pid,
+        staged->ppid,
+        staged->uid,
+        staged->starttime,
         comm,
         comm_len,
         path,
-        (uint32_t)string_strlen(p->cgroup_path),
+        path_len,
         cgroup_name,
         cgroup_name_len,
-        labels.views,
-        labels.count);
+        views,
+        staged->label_count);
 
-    apps_lookup_free_label_views(&labels);
+    freez(views);
     return err;
 }
 
@@ -232,7 +216,13 @@ static bool apps_lookup_handler(
         return false;
     }
 
+    struct apps_lookup_staged_pid *staged = NULL;
+    if (request->item_count)
+        staged = callocz(request->item_count, sizeof(*staged));
+    uint32_t staged_count = 0;
     bool ok = true;
+
+    // Phase 1: snapshot each requested PID under the lock (find + refcount-dup).
     netdata_mutex_lock(&apps_pids_mutex);
     nipc_apps_lookup_builder_set_generation(
         builder,
@@ -247,15 +237,21 @@ static bool apps_lookup_handler(
             break;
         }
 
-        struct pid_stat *p = find_pid_entry((pid_t)item.pid);
-        err = p ? apps_lookup_builder_add_known(builder, p) : apps_lookup_builder_add_unknown(builder, item.pid);
-        if (err != NIPC_OK) {
-            ok = false;
-            break;
-        }
+        apps_lookup_stage_pid((uint32_t)item.pid, &staged[staged_count++]);
     }
 
     netdata_mutex_unlock(&apps_pids_mutex);
+
+    // Phase 2: wire-encode the snapshot with the lock released (the real cost,
+    // up to 8192 PIDs on the network-viewer path).
+    for (uint32_t i = 0; ok && i < staged_count; i++) {
+        if (apps_lookup_emit_staged(builder, &staged[i]) != NIPC_OK)
+            ok = false;
+    }
+
+    for (uint32_t i = 0; i < staged_count; i++)
+        apps_lookup_free_staged_pid(&staged[i]);
+    freez(staged);
 
     apps_lookup_duration_observe(now_monotonic_usec() - started_ut);
 

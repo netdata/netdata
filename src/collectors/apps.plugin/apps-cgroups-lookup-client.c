@@ -337,31 +337,84 @@ static void cgroups_lookup_queue_drain(void)
     }
 }
 
-static bool cgroups_lookup_copy_labels_from_item(
-    struct cgroup_lookup_entry *entry,
-    const nipc_cgroups_lookup_item_view_t *item)
+// A response item's payload built off apps_pids_mutex, ready to be handed to a
+// cache entry under the lock (R08: allocation happens here, not under the lock).
+struct cgroups_lookup_staged_item {
+    uint16_t status;
+    uint16_t orchestrator;
+    STRING *cgroup_name;
+    struct cgroup_lookup_label *cgroup_labels;
+    uint16_t cgroup_label_count;
+    bool labels_ok;   // KNOWN label payload decoded successfully
+    bool committed;   // payload ownership handed to a cache entry
+};
+
+// Build a KNOWN item's label STRINGs from the worker-local response bytes. On
+// decode failure frees what it built and returns false.
+static bool cgroups_lookup_build_labels_from_item(
+    const nipc_cgroups_lookup_item_view_t *item,
+    struct cgroup_lookup_label **out_labels,
+    uint16_t *out_count)
 {
-    if (!entry || !item || item->label_count == 0)
+    *out_labels = NULL;
+    *out_count = 0;
+
+    if (!item || item->label_count == 0)
         return true;
 
-    entry->cgroup_labels = callocz(item->label_count, sizeof(*entry->cgroup_labels));
-    entry->cgroup_label_count = item->label_count;
+    struct cgroup_lookup_label *labels = callocz(item->label_count, sizeof(*labels));
 
     for (uint32_t i = 0; i < item->label_count; i++) {
         nipc_lookup_label_view_t label;
         if (nipc_cgroups_lookup_item_label(item, i, &label) != NIPC_OK) {
-            cgroups_lookup_entry_clear_payload(entry);
+            for (uint32_t j = 0; j < i; j++) {
+                string_freez(labels[j].key);
+                string_freez(labels[j].value);
+            }
+            freez(labels);
             return false;
         }
 
-        entry->cgroup_labels[i].key = string_strndupz(label.key.ptr, label.key.len);
-        entry->cgroup_labels[i].value = string_strndupz(label.value.ptr, label.value.len);
+        labels[i].key = string_strndupz(label.key.ptr, label.key.len);
+        labels[i].value = string_strndupz(label.value.ptr, label.value.len);
     }
 
+    *out_labels = labels;
+    *out_count = (uint16_t)item->label_count;
     return true;
 }
 
-static void cgroups_lookup_commit_response_item(const nipc_cgroups_lookup_item_view_t *item, uint64_t generation)
+// Phase 1 (no lock): build the per-item payload from the response bytes.
+static void cgroups_lookup_stage_item(
+    const nipc_cgroups_lookup_item_view_t *item, struct cgroups_lookup_staged_item *staged)
+{
+    *staged = (struct cgroups_lookup_staged_item){ .status = item->status, .labels_ok = true };
+
+    if (item->status != NIPC_CGROUP_LOOKUP_KNOWN)
+        return;
+
+    staged->orchestrator = item->orchestrator;
+    staged->cgroup_name = string_strndupz(item->name.ptr, item->name.len);
+    staged->labels_ok =
+        cgroups_lookup_build_labels_from_item(item, &staged->cgroup_labels, &staged->cgroup_label_count);
+}
+
+static void cgroups_lookup_free_staged_item(struct cgroups_lookup_staged_item *staged)
+{
+    string_freez(staged->cgroup_name);
+    for (uint16_t i = 0; i < staged->cgroup_label_count; i++) {
+        string_freez(staged->cgroup_labels[i].key);
+        string_freez(staged->cgroup_labels[i].value);
+    }
+    freez(staged->cgroup_labels);
+}
+
+// Phase 2 (under apps_pids_mutex): hand the prebuilt payload to the cache entry.
+// Only a dictionary lookup, a payload free, and pointer assignment happen here.
+static void cgroups_lookup_commit_staged(
+    const nipc_cgroups_lookup_item_view_t *item,
+    struct cgroups_lookup_staged_item *staged,
+    uint64_t generation)
 {
     struct cgroup_lookup_entry *entry =
         dictionary_get_advanced(cgroups_lookup_cache, item->path.ptr, item->path.len);
@@ -369,24 +422,29 @@ static void cgroups_lookup_commit_response_item(const nipc_cgroups_lookup_item_v
         return;
 
     cgroups_lookup_entry_clear_payload(entry);
-    entry->cgroup_status = item->status;
+    entry->cgroup_status = staged->status;
     entry->generation = generation;
     entry->pending = false;
     entry->last_used_iteration = ++cgroups_lookup_cache_iteration;
 
-    if (item->status == NIPC_CGROUP_LOOKUP_KNOWN) {
-        entry->orchestrator = item->orchestrator;
-        entry->cgroup_name = string_strndupz(item->name.ptr, item->name.len);
-        if (!cgroups_lookup_copy_labels_from_item(entry, item))
+    if (staged->status == NIPC_CGROUP_LOOKUP_KNOWN) {
+        if (staged->labels_ok) {
+            entry->orchestrator = staged->orchestrator;
+            entry->cgroup_name = staged->cgroup_name;
+            entry->cgroup_labels = staged->cgroup_labels;
+            entry->cgroup_label_count = staged->cgroup_label_count;
+            staged->committed = true;
+        }
+        else
+            // label decode failed: leave no payload and ask for a retry
             entry->cgroup_status = NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER;
+
         cgroups_lookup_counter_inc(&cgroups_lookup_cache_hits);
     }
-    else if (item->status == NIPC_CGROUP_LOOKUP_UNKNOWN_PERMANENT) {
+    else if (staged->status == NIPC_CGROUP_LOOKUP_UNKNOWN_PERMANENT)
         cgroups_lookup_counter_inc(&cgroups_lookup_cache_misses_permanent);
-    }
-    else {
+    else
         cgroups_lookup_counter_inc(&cgroups_lookup_cache_misses_retry);
-    }
 }
 
 static void cgroups_lookup_clear_pending_for_paths(STRING **paths, uint32_t count)
@@ -535,13 +593,24 @@ static void cgroups_lookup_worker(void *arg __maybe_unused)
             request_failure_logged = false;
             cgroups_lookup_counter_inc(&cgroups_lookup_requests_responded);
 
+            // R08: build the per-item payloads (string allocation) off the lock,
+            // then under apps_pids_mutex only look up each cache entry and hand it
+            // the prebuilt pointers; free any payload whose entry was evicted.
+            struct cgroups_lookup_staged_item staged[APPS_CGROUPS_LOOKUP_BATCH_MAX];
+            for (uint32_t i = 0; i < response.item_count; i++)
+                cgroups_lookup_stage_item(&items[i], &staged[i]);
+
             netdata_mutex_lock(&apps_pids_mutex);
             if (response.generation > cgroups_lookup_latest_generation)
                 cgroups_lookup_latest_generation = response.generation;
 
             for (uint32_t i = 0; i < response.item_count; i++)
-                cgroups_lookup_commit_response_item(&items[i], response.generation);
+                cgroups_lookup_commit_staged(&items[i], &staged[i], response.generation);
             netdata_mutex_unlock(&apps_pids_mutex);
+
+            for (uint32_t i = 0; i < response.item_count; i++)
+                if (!staged[i].committed)
+                    cgroups_lookup_free_staged_item(&staged[i]);
         }
 
 free_paths:
