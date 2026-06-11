@@ -164,6 +164,7 @@ static __always_inline SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(cons
     "|TRAP_LISTENER"                                                                                                           \
     "|TRAP_DEVICE_VENDOR"                                                                                                      \
     "|TRAP_TAG_*"                                                                                                              \
+    "|TRAP_VAR_*"                                                                                                              \
                                                                                                                                \
     ""
 

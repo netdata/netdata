@@ -303,7 +303,10 @@ func (s *trapVarbindFieldState) nextFieldNames(base string, includeRaw bool) (st
 		if includeRaw {
 			rawName = trapVarbindJournalFieldNameFor(base, duplicateSuffix, "_RAW")
 		}
-		if name == "" || s.has(name) || (rawName != "" && s.has(rawName)) {
+		if name == "" {
+			return "", ""
+		}
+		if s.has(name) || (rawName != "" && s.has(rawName)) {
 			continue
 		}
 
@@ -320,6 +323,9 @@ func (s *trapVarbindFieldState) has(name string) bool {
 	return ok
 }
 
+// trapVarbindJournalFieldNameFor keeps generated TRAP_VAR_* names inside
+// journald's 64-byte field-name limit while preserving a readable prefix.
+// The full varbind name and OID remain available in TRAP_JSON.
 func trapVarbindJournalFieldNameFor(base, duplicateSuffix, valueSuffix string) string {
 	maxBaseLen := maxJournalFieldNameLen - len(trapVarJournalFieldPrefix) - len(duplicateSuffix) - len(valueSuffix)
 	if maxBaseLen <= 0 {
