@@ -10,6 +10,8 @@ import (
 	"log/slog"
 	"os"
 	"os/user"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +31,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
@@ -146,23 +149,9 @@ func runFunctionCLI(opts *cli.Option) int {
 		return 1
 	}
 
-	moduleName, methodID, err := functions.SplitFunctionName(functionName)
+	moduleName, _, creator, err := resolveFunctionCLIRequest(functionName, collectorapi.DefaultRegistry)
 	if err != nil {
-		writeFunctionError(400, "%v", err)
-		return 1
-	}
-
-	creator, ok := collectorapi.DefaultRegistry.Lookup(moduleName)
-	if !ok {
-		writeFunctionError(404, "unknown module '%s'", moduleName)
-		return 1
-	}
-	if creator.Methods == nil {
-		writeFunctionError(404, "module '%s' does not expose functions", moduleName)
-		return 1
-	}
-	if methodID == "" {
-		writeFunctionError(400, "missing method name in function '%s'", functionName)
+		writeFunctionError(functionCLIResolutionStatus(err), "%v", err)
 		return 1
 	}
 
@@ -241,6 +230,78 @@ func runFunctionCLI(opts *cli.Option) int {
 	jobMgr.ExecuteFunction(functionName, fn)
 
 	return 0
+}
+
+type functionCLIResolutionError struct {
+	status int
+	err    error
+}
+
+func (e functionCLIResolutionError) Error() string {
+	return e.err.Error()
+}
+
+func functionCLIResolutionStatus(err error) int {
+	if e, ok := err.(functionCLIResolutionError); ok {
+		return e.status
+	}
+	return 500
+}
+
+func resolveFunctionCLIRequest(functionName string, registry collectorapi.Registry) (string, string, collectorapi.Creator, error) {
+	splitModuleName, splitMethodID, err := functions.SplitFunctionName(functionName)
+	if err != nil {
+		return "", "", collectorapi.Creator{}, functionCLIResolutionError{status: 400, err: err}
+	}
+	if splitMethodID == "" {
+		return "", "", collectorapi.Creator{}, functionCLIResolutionError{
+			status: 400,
+			err:    fmt.Errorf("missing method name in function '%s'", functionName),
+		}
+	}
+
+	if moduleName, methodID, creator, ok := resolveFunctionCLIRequestByPublicName(functionName, registry); ok {
+		return moduleName, methodID, creator, nil
+	}
+
+	creator, ok := registry.Lookup(splitModuleName)
+	if !ok {
+		return "", "", collectorapi.Creator{}, functionCLIResolutionError{
+			status: 404,
+			err:    fmt.Errorf("unknown module '%s'", splitModuleName),
+		}
+	}
+	if creator.Methods == nil {
+		return "", "", collectorapi.Creator{}, functionCLIResolutionError{
+			status: 404,
+			err:    fmt.Errorf("module '%s' does not expose functions", splitModuleName),
+		}
+	}
+	return splitModuleName, splitMethodID, creator, nil
+}
+
+func resolveFunctionCLIRequestByPublicName(functionName string, registry collectorapi.Registry) (string, string, collectorapi.Creator, bool) {
+	moduleNames := make([]string, 0, len(registry))
+	for moduleName := range registry {
+		moduleNames = append(moduleNames, moduleName)
+	}
+	sort.Strings(moduleNames)
+
+	for _, moduleName := range moduleNames {
+		creator := registry[moduleName]
+		if creator.Methods == nil {
+			continue
+		}
+		for _, method := range creator.Methods() {
+			if method.ID == "" {
+				continue
+			}
+			if slices.Contains(funcapi.MethodFunctionNames(moduleName, method), functionName) {
+				return moduleName, method.ID, creator, true
+			}
+		}
+	}
+	return "", "", collectorapi.Creator{}, false
 }
 
 func readFunctionPayload(raw string) ([]byte, time.Duration, error) {

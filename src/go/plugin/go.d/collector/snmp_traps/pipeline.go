@@ -1,0 +1,52 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package snmp_traps
+
+import "fmt"
+
+func trapEntryFromPDU(jobName string, pdu *TrapPDU, td *TrapDef, realtimeUsec, monotonicUsec int64) *TrapEntry {
+	entry := &TrapEntry{
+		JobName:               jobName,
+		ReportType:            ReportTypeTrap,
+		ReceivedRealtimeUsec:  realtimeUsec,
+		ReceivedMonotonicUsec: monotonicUsec,
+		TrapOID:               pdu.OID,
+		Category:              "unknown",
+		Severity:              "notice",
+		SourceIP:              pdu.SourceIP,
+		SourceUDPPeer:         pdu.PeerIP,
+		PduType:               pdu.PduType,
+		SnmpVersion:           pdu.Version,
+		Varbinds:              pdu.Varbinds,
+		Enrichment:            &TrapEnrichmentAudit{Source: pdu.SourceAudit},
+	}
+
+	if td != nil {
+		entry.TrapName = td.Name
+		entry.Category = Category(td.Category)
+		entry.Severity = Severity(td.Severity)
+
+		for i, vb := range entry.Varbinds {
+			entry.Varbinds[i] = resolve2TierVarbind(vb.OID, vb, td)
+		}
+	}
+
+	return entry
+}
+
+func renderTrapEntryTemplates(entry *TrapEntry, td *TrapDef) {
+	if entry == nil {
+		return
+	}
+	if td != nil {
+		entry.Message = renderMessage(entry, td)
+		entry.Labels = renderLabels(entry, td)
+		return
+	}
+
+	source := entry.SourceIP
+	if source == "" {
+		source = entry.SourceUDPPeer
+	}
+	entry.Message = fmt.Sprintf("SNMP trap %s from %s", entry.TrapOID, source)
+}

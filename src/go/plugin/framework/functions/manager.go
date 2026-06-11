@@ -22,8 +22,8 @@ import (
 )
 
 type functionSet struct {
-	direct   func(Function)            // for globally-unique names
-	prefixes map[string]func(Function) // for prefix-multiplexed names
+	direct   Handler            // for globally-unique names
+	prefixes map[string]Handler // for prefix-multiplexed names
 }
 
 const (
@@ -70,7 +70,7 @@ const (
 
 type invocationRequest struct {
 	fn          *Function
-	handler     func(Function)
+	handler     Handler
 	ctx         context.Context
 	scheduleKey string
 }
@@ -692,8 +692,8 @@ func (m *Manager) stopTimersLocked(rec *invocationRecord) {
 }
 
 type functionSnapshot struct {
-	direct   func(Function)
-	prefixes map[string]func(Function)
+	direct   Handler
+	prefixes map[string]Handler
 }
 
 func (m *Manager) snapshotFunction(name string) (functionSnapshot, bool) {
@@ -703,7 +703,7 @@ func (m *Manager) snapshotFunction(name string) (functionSnapshot, bool) {
 	if ok && fs != nil {
 		snap.direct = fs.direct
 		if len(fs.prefixes) > 0 {
-			snap.prefixes = make(map[string]func(Function), len(fs.prefixes))
+			snap.prefixes = make(map[string]Handler, len(fs.prefixes))
 			maps.Copy(snap.prefixes, fs.prefixes)
 		}
 	}
@@ -715,7 +715,7 @@ func (m *Manager) snapshotFunction(name string) (functionSnapshot, bool) {
 	return snap, true
 }
 
-func matchPrefix(prefixes map[string]func(Function), id string) (string, func(Function), bool) {
+func matchPrefix(prefixes map[string]Handler, id string) (string, Handler, bool) {
 	if len(prefixes) == 0 || id == "" {
 		return "", nil, false
 	}
@@ -729,7 +729,7 @@ func matchPrefix(prefixes map[string]func(Function), id string) (string, func(Fu
 	return "", nil, false
 }
 
-func (m *Manager) lookupFunctionRoute(fn Function) (handler func(Function), scheduleKey string, ok bool) {
+func (m *Manager) lookupFunctionRoute(fn Function) (handler Handler, scheduleKey string, ok bool) {
 	snap, ok := m.snapshotFunction(fn.Name)
 	if !ok {
 		return nil, "", false
@@ -768,25 +768,25 @@ func (m *Manager) lookupFunction(name string) (func(Function), bool) {
 			if len(f.Args) > 0 {
 				id := f.Args[0]
 				if _, handler, matched := matchPrefix(snap.prefixes, id); matched && handler != nil {
-					handler(f)
+					handler(context.Background(), f)
 					return
 				}
 			}
-			unknownHandler(f)
+			unknownHandler(context.Background(), f)
 			return
 		}
 
 		if snap.direct != nil {
-			snap.direct(f)
+			snap.direct(context.Background(), f)
 			return
 		}
 
-		unknownHandler(f)
+		unknownHandler(context.Background(), f)
 	}, true
 }
 
-func (m *Manager) unknownFunctionHandler() func(Function) {
-	return func(f Function) {
+func (m *Manager) unknownFunctionHandler() Handler {
+	return func(_ context.Context, f Function) {
 		m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
 	}
 }

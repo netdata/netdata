@@ -51,7 +51,20 @@ type Callbacks[C Config] interface {
 // CodedError allows callbacks to override the default response code.
 type CodedError interface {
 	error
-	Code() int
+	DyncfgCode() int
+}
+
+// RetryableError marks errors that should keep job auto-detection retry enabled.
+// The method name is intentionally Netdata-specific to avoid matching unrelated
+// dependency errors that happen to expose Retryable() bool.
+type RetryableError interface {
+	error
+	DyncfgRetryable() bool
+}
+
+func IsRetryableError(err error) bool {
+	var re RetryableError
+	return errors.As(err, &re) && re.DyncfgRetryable()
 }
 
 // CommandMessageSource optionally provides a success/warning message
@@ -506,12 +519,13 @@ func (h *Handler[C]) CmdEnable(fn Function) {
 		code := h.enableFailCode
 		var ce CodedError
 		if errors.As(err, &ce) {
-			code = ce.Code()
+			code = ce.DyncfgCode()
 		}
 		h.api.SendCodef(fn, code, "%v", err)
 
-		// Stock removal only for non-CodedError failures (runtime detection failures).
-		// CodedError = validation error (e.g. createCollectorJob → 400, no stock removal).
+		// Stock removal only for plain runtime detection failures.
+		// CodedError carries an explicit status code, so the component owns the
+		// failure semantics and whether the job should be retried.
 		if h.removeStockOnEnableFail && !isCodedError(err) && entry.Cfg.SourceType() == "stock" {
 			h.exposed.Remove(entry.Cfg)
 			h.NotifyJobRemove(entry.Cfg)
@@ -680,7 +694,12 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 		if isConversion {
 			h.NotifyJobCreate(newCfg, StatusFailed)
 		}
-		h.api.SendCodef(fn, 200, "%v", err)
+		code := 200
+		var ce CodedError
+		if errors.As(err, &ce) {
+			code = ce.DyncfgCode()
+		}
+		h.api.SendCodef(fn, code, "%v", err)
 		h.NotifyJobStatus(newCfg, StatusFailed)
 		h.cb.OnStatusChange(newEntry, oldStatus, fn)
 		return
@@ -735,7 +754,7 @@ func (h *Handler[C]) CmdRestart(fn Function) {
 		code := 422
 		var ce CodedError
 		if errors.As(err, &ce) {
-			code = ce.Code()
+			code = ce.DyncfgCode()
 		}
 		h.api.SendCodef(fn, code, "job restart failed: %v", err)
 		h.NotifyJobStatus(entry.Cfg, StatusFailed)

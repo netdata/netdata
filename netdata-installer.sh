@@ -278,6 +278,8 @@ REMOVE_BUILD=1
 
 RELEASE_CHANNEL="nightly" # valid values are 'nightly' and 'stable'
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY:-"no"}"
+# The parser keeps legacy no-op flags for command-line compatibility.
+# shellcheck disable=SC2034
 while [ -n "${1}" ]; do
   case "${1}" in
     "--zlib-is-really-here") LIBS_ARE_HERE=1 ;;
@@ -550,6 +552,7 @@ cmake_install() {
     fi
 }
 
+# shellcheck disable=SC2329
 build_error() {
   netdata_banner
   trap - EXIT
@@ -576,6 +579,7 @@ fi
 
 if [ "${NEED_GO_TOOLCHAIN}" -eq 1 ]; then
   progress "Checking for a usable Go toolchain and attempting to install one to /usr/local/go if needed."
+  # shellcheck source=/dev/null
   . "${NETDATA_SOURCE_DIR}/packaging/check-for-go-toolchain.sh"
 
   if ! ensure_go_toolchain; then
@@ -1006,7 +1010,7 @@ if [ "$(id -u)" -eq 0 ]; then
     capabilities=0
     if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
       run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
-      if run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"; then
+      if run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip cap_net_bind_service=eip" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"; then
         capabilities=1
       fi
     fi
@@ -1015,6 +1019,11 @@ if [ "$(id -u)" -eq 0 ]; then
       # fix go.d.plugin to be setuid to root
       run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
     fi
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen"
+    run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-plugin" ]; then
