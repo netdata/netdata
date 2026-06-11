@@ -2061,6 +2061,25 @@ func TestStockProfileCatalogueMatchesDefaultFiles(t *testing.T) {
 	assert.Equal(t, totalFiles, totalCatalogue, "catalogue trap_count sum must match profile files")
 }
 
+func TestStockProfileDefaultFilesParse(t *testing.T) {
+	stockDir := trapProfilesDirFromThisFile()
+	if stockDir == "" {
+		t.Skip("no stock profiles available")
+	}
+
+	files, err := loadProfilesFromDir(stockDir, multipath.New(stockDir))
+	require.NoError(t, err)
+	require.NotEmpty(t, files)
+
+	totalTraps := 0
+	for _, file := range files {
+		require.NotEmpty(t, file.name)
+		require.NotEmpty(t, file.traps, "stock profile %s parsed without traps", file.name)
+		totalTraps += len(file.traps)
+	}
+	require.Positive(t, totalTraps)
+}
+
 func TestStockIFMIBLinkMessagesDoNotDependOnIfOperStatus(t *testing.T) {
 	resetProfileCacheForTest()
 

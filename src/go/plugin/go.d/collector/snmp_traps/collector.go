@@ -777,7 +777,7 @@ func dyncfgStartupError(err error) *dyncfgCodedError {
 	return &dyncfgCodedError{err: err, code: 503, retryable: true}
 }
 
-func (e *dyncfgCodedError) Error() string   { return e.err.Error() }
-func (e *dyncfgCodedError) Unwrap() error   { return e.err }
-func (e *dyncfgCodedError) Code() int       { return e.code }
-func (e *dyncfgCodedError) Retryable() bool { return e.retryable }
+func (e *dyncfgCodedError) Error() string         { return e.err.Error() }
+func (e *dyncfgCodedError) Unwrap() error         { return e.err }
+func (e *dyncfgCodedError) Code() int             { return e.code }
+func (e *dyncfgCodedError) DyncfgRetryable() bool { return e.retryable }

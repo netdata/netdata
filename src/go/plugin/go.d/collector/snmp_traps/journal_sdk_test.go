@@ -35,6 +35,7 @@ func TestNewJournalWriterEagerOpenCreatesSDKJournalDirectory(t *testing.T) {
 	assert.DirExists(t, w.JournalDirectory())
 	assert.NotEmpty(t, w.ActivePath())
 	assert.FileExists(t, w.ActivePath())
+	assert.True(t, strings.HasPrefix(filepath.Base(w.ActivePath()), "snmp-traps@"), "active journal path = %s", w.ActivePath())
 }
 
 func TestNewJournalWriterCreatesCompactUnsealedUncompressedJournal(t *testing.T) {

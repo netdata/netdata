@@ -81,6 +81,7 @@ func NewJournalWriter(dir string, cfg JournalConfig) (*JournalWriter, error) {
 	}
 
 	logCfg := sdkjournal.LogConfig{
+		Source: "snmp-traps",
 		Options: sdkjournal.Options{
 			MachineID:   machineID,
 			BootID:      bootID,

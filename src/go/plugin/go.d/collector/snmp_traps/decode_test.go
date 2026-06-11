@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/gosnmp/gosnmp"
 )
@@ -219,18 +218,6 @@ func TestDecodeMalformed(t *testing.T) {
 	data := []byte{0x30, 0x01, 0x02}
 	if _, err := decodePacket(data, nil); err == nil {
 		t.Fatal("expected error for truncated packet")
-	}
-}
-
-func TestDecodeTrapReturnsBudgetExceeded(t *testing.T) {
-	prev := decodeBudgetTarget
-	decodeBudgetTarget = -1 * time.Nanosecond
-	t.Cleanup(func() { decodeBudgetTarget = prev })
-
-	data := buildV2cTrap(t, "c", "1.3.6.1.6.3.1.1.5.1")
-	_, err := DecodeTrap(data, net.ParseIP("10.1.2.3"), nil)
-	if !errors.Is(err, errDecodeBudgetExceeded) {
-		t.Fatalf("expected decode budget error, got %v", err)
 	}
 }
 

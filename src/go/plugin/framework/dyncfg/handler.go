@@ -54,6 +54,19 @@ type CodedError interface {
 	Code() int
 }
 
+// RetryableError marks errors that should keep job auto-detection retry enabled.
+// The method name is intentionally Netdata-specific to avoid matching unrelated
+// dependency errors that happen to expose Retryable() bool.
+type RetryableError interface {
+	error
+	DyncfgRetryable() bool
+}
+
+func IsRetryableError(err error) bool {
+	var re RetryableError
+	return errors.As(err, &re) && re.DyncfgRetryable()
+}
+
 // CommandMessageSource optionally provides a success/warning message
 // for the command that just completed.
 type CommandMessageSource interface {

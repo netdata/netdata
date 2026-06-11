@@ -472,7 +472,9 @@ func TestSnmpTrapsLogsMethodAvailabilityFollowsDirectJournalJobs(t *testing.T) {
 	activeDirectJournalJobs.Store(0)
 	t.Cleanup(func() { activeDirectJournalJobs.Store(startJournalJobs) })
 
-	logs := snmpTrapsLogsMethodConfig()
+	methods := snmpTrapsMethods()
+	require.Len(t, methods, 1)
+	logs := methods[0]
 	require.NotNil(t, logs.Available)
 	assert.False(t, logs.Available())
 

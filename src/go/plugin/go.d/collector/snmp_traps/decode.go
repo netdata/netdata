@@ -11,7 +11,6 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gosnmp/gosnmp"
 )
@@ -42,9 +41,7 @@ const (
 )
 
 var (
-	decodeBudgetTarget      = 1 * time.Millisecond
-	errDecodeBudgetExceeded = errors.New("decode budget exceeded")
-	trapDecodeLogger        = gosnmp.NewLogger(log.New(io.Discard, "", 0))
+	trapDecodeLogger = gosnmp.NewLogger(log.New(io.Discard, "", 0))
 )
 
 type TrapPDU struct {
@@ -64,23 +61,14 @@ type TrapPacketContext struct {
 }
 
 func DecodeTrap(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3SecurityParametersTable) (*TrapPacketContext, error) {
-	start := time.Now()
-
 	pkt, err := decodePacket(data, secTable)
 	if err != nil {
 		return nil, err
 	}
 
-	if time.Since(start) > decodeBudgetTarget {
-		return nil, errDecodeBudgetExceeded
-	}
-
 	varbinds, err := packetVarbinds(pkt)
 	if err != nil {
 		return nil, err
-	}
-	if time.Since(start) > decodeBudgetTarget {
-		return nil, errDecodeBudgetExceeded
 	}
 
 	version, err := snmpVersion(pkt.Version)
@@ -130,8 +118,6 @@ func ClassifyDecodeError(err error) string {
 	// errors for authentication, decryption, and engine-ID failures.
 	s := err.Error()
 	switch {
-	case errors.Is(err, errDecodeBudgetExceeded):
-		return "malformed_pdu"
 	case strings.Contains(s, "BER:"):
 		return "malformed_pdu"
 	case strings.Contains(s, "datagram too large"):

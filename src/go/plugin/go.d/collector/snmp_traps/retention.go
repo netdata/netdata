@@ -217,16 +217,6 @@ func formatHumanSize(bytes uint64) string {
 	}
 }
 
-//go:fix inline
-func uint64Ptr(u uint64) *uint64 {
-	return new(u)
-}
-
-//go:fix inline
-func durationPtr(d time.Duration) *time.Duration {
-	return new(d)
-}
-
 func humanDuration(d time.Duration) string {
 	if d == 0 {
 		return "0s"

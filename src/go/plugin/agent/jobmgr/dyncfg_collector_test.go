@@ -33,9 +33,18 @@ type externalCodedError struct {
 	retryable bool
 }
 
-func (e *externalCodedError) Error() string   { return e.err.Error() }
-func (e *externalCodedError) Code() int       { return e.code }
-func (e *externalCodedError) Retryable() bool { return e.retryable }
+func (e *externalCodedError) Error() string         { return e.err.Error() }
+func (e *externalCodedError) Code() int             { return e.code }
+func (e *externalCodedError) DyncfgRetryable() bool { return e.retryable }
+
+type foreignRetryableCodedError struct {
+	err  error
+	code int
+}
+
+func (e foreignRetryableCodedError) Error() string   { return e.err.Error() }
+func (e foreignRetryableCodedError) Code() int       { return e.code }
+func (e foreignRetryableCodedError) Retryable() bool { return true }
 
 type jobNameRequiredV2Collector struct {
 	collectorapi.Base
@@ -688,6 +697,33 @@ func TestCollectorCallbacks_Start_RetryableInitCodedError_PreservedSchedulesRetr
 	_, retryPending := mgr.retryingTasks.lookup(cfg)
 	assert.True(t, retryPending, "retryable coded init failure should schedule retry")
 	mgr.retryingTasks.remove(cfg)
+}
+
+func TestCollectorCallbacks_Start_ForeignRetryableCodedErrorDoesNotScheduleRetry(t *testing.T) {
+	mgr := newCollectorTestManager()
+	mgr.modules.Register("foreignretryable", collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				InitFunc: func(context.Context) error {
+					return foreignRetryableCodedError{err: errors.New("foreign retryable"), code: 503}
+				},
+			}
+		},
+	})
+	cb := &collectorCallbacks{mgr: mgr}
+
+	cfg := prepareDyncfgCfg("foreignretryable", "job").Set("autodetection_retry", 1)
+	err := cb.Start(cfg)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "foreign retryable")
+
+	var coded interface{ Code() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 503, coded.Code())
+
+	_, retryPending := mgr.retryingTasks.lookup(cfg)
+	assert.False(t, retryPending, "foreign Retryable() coded errors must not satisfy Netdata retryable semantics")
 }
 
 func TestCollectorCallbacks_Update_CreateCollectorJobPlainErrorPreserved(t *testing.T) {

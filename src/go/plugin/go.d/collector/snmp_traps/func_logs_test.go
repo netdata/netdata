@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/snmptrapsfunc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,7 +36,7 @@ func TestSNMPTrapsMethodsExposeLogsOnly(t *testing.T) {
 }
 
 func TestSNMPTrapsJournalFunctionUsesPublicFunctionName(t *testing.T) {
-	fn := newSNMPTrapsJournalFunction()
+	fn := snmptrapsfunc.NewJournalFunction()
 	assert.Equal(t, snmpTrapsFunctionName, fn.Config.FunctionName)
 }
 
@@ -44,8 +45,7 @@ func TestSNMPTrapsLogsFunctionInfoAndQuery(t *testing.T) {
 	writeTestTrapJournal(t, root, "local", "sdk local trap entry", "security")
 	writeTestTrapJournal(t, root, "remote", "sdk remote trap entry", "availability")
 
-	handler := newSNMPTrapsFunctionHandler(&Collector{})
-	handler.journalRoot = root
+	handler := snmptrapsfunc.NewHandler(root)
 
 	info := handler.HandleRaw(context.Background(), funcapiRawRequest("logs", true, nil))
 	require.NotNil(t, info)
@@ -68,7 +68,7 @@ func TestSNMPTrapsLogsFunctionInfoAndQuery(t *testing.T) {
 	require.NotNil(t, defaults)
 	require.NotNil(t, defaults.RawResponse)
 	assert.Equal(t, 200, defaults.RawResponse["status"])
-	assertResponseFacetIDs(t, defaults.RawResponse, snmpTrapsDefaultLogFacets())
+	assertResponseFacetIDs(t, defaults.RawResponse, snmptrapsfunc.DefaultLogFacets())
 	assertResponseColumnVisible(t, defaults.RawResponse, "TRAP_NAME")
 
 	query := handler.HandleRaw(context.Background(), funcapiRawRequest("logs", false, []byte(`{
@@ -105,8 +105,7 @@ func TestSNMPTrapsLogsFunctionInfoAndQuery(t *testing.T) {
 }
 
 func TestSNMPTrapsLogsFunctionUnavailableWithoutJournal(t *testing.T) {
-	handler := newSNMPTrapsFunctionHandler(&Collector{})
-	handler.journalRoot = filepath.Join(t.TempDir(), "missing")
+	handler := snmptrapsfunc.NewHandler(filepath.Join(t.TempDir(), "missing"))
 
 	resp := handler.HandleRaw(context.Background(), funcapiRawRequest("logs", false, []byte(`{}`)))
 	require.NotNil(t, resp)
@@ -115,8 +114,7 @@ func TestSNMPTrapsLogsFunctionUnavailableWithoutJournal(t *testing.T) {
 }
 
 func TestSNMPTrapsLogsFunctionRejectsUnknownMethod(t *testing.T) {
-	handler := newSNMPTrapsFunctionHandler(&Collector{})
-	handler.journalRoot = t.TempDir()
+	handler := snmptrapsfunc.NewHandler(t.TempDir())
 
 	resp := handler.HandleRaw(context.Background(), funcapiRawRequest("other", false, []byte(`{}`)))
 	require.NotNil(t, resp)
@@ -124,8 +122,7 @@ func TestSNMPTrapsLogsFunctionRejectsUnknownMethod(t *testing.T) {
 }
 
 func TestSNMPTrapsLogsFunctionRejectsInvalidJSON(t *testing.T) {
-	handler := newSNMPTrapsFunctionHandler(&Collector{})
-	handler.journalRoot = t.TempDir()
+	handler := snmptrapsfunc.NewHandler(t.TempDir())
 
 	resp := handler.HandleRaw(context.Background(), funcapiRawRequest("logs", false, []byte(`{`)))
 	require.NotNil(t, resp)

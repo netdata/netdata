@@ -25,7 +25,13 @@ type retryableTestError struct {
 	error
 }
 
-func (e retryableTestError) Retryable() bool { return true }
+func (e retryableTestError) DyncfgRetryable() bool { return true }
+
+type foreignRetryableTestError struct {
+	error
+}
+
+func (e foreignRetryableTestError) Retryable() bool { return true }
 
 func newTestJob() *Job {
 	return NewJob(
@@ -159,6 +165,21 @@ func TestJob_AutoDetection_RetryableFailInitKeepsRetry(t *testing.T) {
 
 	assert.Error(t, job.AutoDetection())
 	assert.True(t, job.RetryAutoDetection())
+	assert.True(t, m.CleanupDone)
+}
+
+func TestJob_AutoDetection_ForeignRetryableFailInitDisablesRetry(t *testing.T) {
+	job := newTestJob()
+	job.AutoDetectEvery = 1
+	m := &collectorapi.MockCollectorV1{
+		InitFunc: func(context.Context) error {
+			return foreignRetryableTestError{error: errors.New("init error")}
+		},
+	}
+	job.module = m
+
+	assert.Error(t, job.AutoDetection())
+	assert.False(t, job.RetryAutoDetection())
 	assert.True(t, m.CleanupDone)
 }
 

@@ -26,11 +26,6 @@ const (
 	profileWatcherEventSettle  = 200 * time.Millisecond
 )
 
-var userProfileWatcherLog = logger.With(
-	slog.String("collector", "snmp_traps"),
-	slog.String("component", "profile_watcher"),
-)
-
 type profileWatcher struct {
 	log          *logger.Logger
 	dirs         []string
@@ -50,7 +45,10 @@ type profileWatcher struct {
 
 func newUserProfileWatcher(dirs []string) *profileWatcher {
 	return &profileWatcher{
-		log:          userProfileWatcherLog,
+		log: logger.With(
+			slog.String("collector", "snmp_traps"),
+			slog.String("component", "profile_watcher"),
+		),
 		dirs:         cleanProfileWatcherDirs(dirs),
 		refreshEvery: profileWatcherRefreshEvery,
 		eventSettle:  profileWatcherEventSettle,

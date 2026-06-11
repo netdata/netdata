@@ -413,9 +413,9 @@ func TestCollectorInit_InvalidJobNameIsCodedError(t *testing.T) {
 	var coded interface{ Code() int }
 	require.ErrorAs(t, err, &coded)
 	assert.Equal(t, 422, coded.Code())
-	var retryable interface{ Retryable() bool }
+	var retryable interface{ DyncfgRetryable() bool }
 	require.ErrorAs(t, err, &retryable)
-	assert.False(t, retryable.Retryable())
+	assert.False(t, retryable.DyncfgRetryable())
 	assert.Nil(t, c.listener)
 }
 
@@ -500,9 +500,9 @@ func TestCollectorInit_MissingPersistentJournalRootIsRetryableCodedError(t *test
 	var coded interface{ Code() int }
 	require.ErrorAs(t, err, &coded)
 	assert.Equal(t, 503, coded.Code())
-	var retryable interface{ Retryable() bool }
+	var retryable interface{ DyncfgRetryable() bool }
 	require.ErrorAs(t, err, &retryable)
-	assert.True(t, retryable.Retryable())
+	assert.True(t, retryable.DyncfgRetryable())
 	assert.Contains(t, err.Error(), "persistent systemd journal directory")
 	assert.Nil(t, c.listener)
 	assert.Equal(t, startJournalJobs, activeDirectJournalJobs.Load())
@@ -566,9 +566,9 @@ func TestCollectorInit_OTLPPreflightFailureIsRetryableCodedError(t *testing.T) {
 	var coded interface{ Code() int }
 	require.ErrorAs(t, err, &coded)
 	assert.Equal(t, 503, coded.Code())
-	var retryable interface{ Retryable() bool }
+	var retryable interface{ DyncfgRetryable() bool }
 	require.ErrorAs(t, err, &retryable)
-	assert.True(t, retryable.Retryable())
+	assert.True(t, retryable.DyncfgRetryable())
 	assert.Nil(t, c.listener)
 	assert.Empty(t, c.journalDir)
 }
@@ -620,9 +620,9 @@ func TestCollectorInit_BindFailureIsRetryableCodedError(t *testing.T) {
 	var coded interface{ Code() int }
 	require.ErrorAs(t, err, &coded)
 	assert.Equal(t, 503, coded.Code())
-	var retryable interface{ Retryable() bool }
+	var retryable interface{ DyncfgRetryable() bool }
 	require.ErrorAs(t, err, &retryable)
-	assert.True(t, retryable.Retryable())
+	assert.True(t, retryable.DyncfgRetryable())
 	assert.Nil(t, c.listener)
 }
 
@@ -645,9 +645,9 @@ func TestCollectorInit_ReceiveBufferFailureIsRetryableCodedError(t *testing.T) {
 	var coded interface{ Code() int }
 	require.ErrorAs(t, err, &coded)
 	assert.Equal(t, 503, coded.Code())
-	var retryable interface{ Retryable() bool }
+	var retryable interface{ DyncfgRetryable() bool }
 	require.ErrorAs(t, err, &retryable)
-	assert.True(t, retryable.Retryable())
+	assert.True(t, retryable.DyncfgRetryable())
 	assert.Contains(t, err.Error(), "set receive buffer")
 	assert.Nil(t, c.listener)
 }

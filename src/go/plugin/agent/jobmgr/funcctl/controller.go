@@ -124,7 +124,7 @@ func (c *Controller) OnJobStart(job collectorapi.RuntimeJob) {
 	}
 
 	c.registry.addJob(job.ModuleName(), job.Name(), job)
-	c.registerModuleMethodsOnFirstJobStart(job.ModuleName())
+	c.registerModuleMethodsOnJobStart(job.ModuleName())
 
 	creator, ok := c.registry.getCreator(job.ModuleName())
 	if !ok || creator.JobMethods == nil {
@@ -155,7 +155,7 @@ func (c *Controller) Cleanup() {
 	}
 }
 
-func (c *Controller) registerModuleMethodsOnFirstJobStart(moduleName string) {
+func (c *Controller) registerModuleMethodsOnJobStart(moduleName string) {
 	creator, ok := c.registry.getCreator(moduleName)
 	if !ok || creator.Methods == nil {
 		return

@@ -152,6 +152,8 @@ func TestLookupEnterpriseNumberLoadsRegistryFromDisk(t *testing.T) {
 424244
   ---none---
 424245
+  Unassigned
+424246
   Other Devices Inc.
 `), 0644))
 	withEnterpriseNumbersFile(t, path)
@@ -159,7 +161,8 @@ func TestLookupEnterpriseNumberLoadsRegistryFromDisk(t *testing.T) {
 	assert.Equal(t, "Example Devices Inc.", lookupEnterpriseNumber("1.3.6.1.4.1.424242.1"))
 	assert.Empty(t, lookupEnterpriseNumber("1.3.6.1.4.1.424243.1"))
 	assert.Empty(t, lookupEnterpriseNumber("1.3.6.1.4.1.424244.1"))
-	assert.Equal(t, "Other Devices Inc.", lookupEnterpriseNumber("1.3.6.1.4.1.424245.1"))
+	assert.Empty(t, lookupEnterpriseNumber("1.3.6.1.4.1.424245.1"))
+	assert.Equal(t, "Other Devices Inc.", lookupEnterpriseNumber("1.3.6.1.4.1.424246.1"))
 }
 
 func TestEnterpriseNumbersFilePathFindsSourceTreeRegistry(t *testing.T) {

@@ -5,39 +5,20 @@ package snmp_traps
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/snmptrapsfunc"
 )
 
 const (
-	snmpTrapsLogsMethodID = "logs"
-	snmpTrapsFunctionName = "snmp:traps"
+	snmpTrapsLogsMethodID = snmptrapsfunc.LogsMethodID
+	snmpTrapsFunctionName = snmptrapsfunc.FunctionName
 )
 
 func snmpTrapsMethods() []funcapi.MethodConfig {
 	return []funcapi.MethodConfig{
-		snmpTrapsLogsMethodConfig(),
+		snmptrapsfunc.LogsMethodConfig(directJournalLogsAvailable),
 	}
 }
 
-func snmpTrapsLogsMethodConfig() funcapi.MethodConfig {
-	return funcapi.MethodConfig{
-		ID:           snmpTrapsLogsMethodID,
-		FunctionName: snmpTrapsFunctionName,
-		Name:         "SNMP Trap Logs",
-		UpdateEvery:  1,
-		Help:         "Query SNMP trap journal entries received by SNMP trap listener jobs",
-		RequireCloud: true,
-		Tags:         "logs",
-		ResponseType: "logs",
-		Available:    directJournalLogsAvailable,
-		RawRequest:   true,
-		AgentWide:    true,
-	}
-}
-
-func snmpTrapsMethodHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {
-	c, ok := job.Collector().(*Collector)
-	if !ok {
-		return nil
-	}
-	return newSNMPTrapsFunctionHandler(c)
+func snmpTrapsMethodHandler(_ collectorapi.RuntimeJob) funcapi.MethodHandler {
+	return snmptrapsfunc.NewHandler(journalBaseRoot())
 }

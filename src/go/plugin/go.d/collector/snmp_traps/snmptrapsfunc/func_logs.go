@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp_traps
+package snmptrapsfunc
 
 import (
 	"bytes"
@@ -17,30 +17,51 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 )
 
-func newSNMPTrapsFunctionHandler(_ *Collector) *snmpTrapsFunctionHandler {
-	return &snmpTrapsFunctionHandler{
-		logs:        newSNMPTrapsJournalFunction(),
-		journalRoot: journalBaseRoot(),
-	}
-}
+const (
+	LogsMethodID = "logs"
+	FunctionName = "snmp:traps"
+)
 
-type snmpTrapsFunctionHandler struct {
+type Handler struct {
 	logs        sdkjournal.NetdataJournalFunction
 	journalRoot string
 }
 
-var _ funcapi.RawMethodHandler = (*snmpTrapsFunctionHandler)(nil)
+var _ funcapi.RawMethodHandler = (*Handler)(nil)
 
-func (h *snmpTrapsFunctionHandler) MethodParams(_ context.Context, _ string) ([]funcapi.ParamConfig, error) {
+func NewHandler(journalRoot string) *Handler {
+	return &Handler{
+		logs:        NewJournalFunction(),
+		journalRoot: journalRoot,
+	}
+}
+
+func LogsMethodConfig(available func() bool) funcapi.MethodConfig {
+	return funcapi.MethodConfig{
+		ID:           LogsMethodID,
+		FunctionName: FunctionName,
+		Name:         "SNMP Trap Logs",
+		UpdateEvery:  1,
+		Help:         "Query SNMP trap journal entries received by SNMP trap listener jobs",
+		RequireCloud: true,
+		Tags:         "logs",
+		ResponseType: "logs",
+		Available:    available,
+		RawRequest:   true,
+		AgentWide:    true,
+	}
+}
+
+func (h *Handler) MethodParams(_ context.Context, _ string) ([]funcapi.ParamConfig, error) {
 	return nil, nil
 }
 
-func (h *snmpTrapsFunctionHandler) Handle(_ context.Context, method string, _ funcapi.ResolvedParams) *funcapi.FunctionResponse {
+func (h *Handler) Handle(_ context.Context, method string, _ funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	return funcapi.NotFoundResponse(method)
 }
 
-func (h *snmpTrapsFunctionHandler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
-	if !h.isLogsMethod(req.Method) {
+func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
+	if req.Method != LogsMethodID {
 		return funcapi.NotFoundResponse(req.Method)
 	}
 	root := h.journalRoot
@@ -64,24 +85,20 @@ func (h *snmpTrapsFunctionHandler) HandleRaw(ctx context.Context, req funcapi.Ra
 	return funcapi.RawResponse(resp)
 }
 
-func (h *snmpTrapsFunctionHandler) Cleanup(context.Context) {
+func (h *Handler) Cleanup(context.Context) {
 	// No owned resources: the SDK journal function is stateless between calls.
 }
 
-func (h *snmpTrapsFunctionHandler) isLogsMethod(method string) bool {
-	return method == snmpTrapsLogsMethodID
-}
-
-func newSNMPTrapsJournalFunction() sdkjournal.NetdataJournalFunction {
+func NewJournalFunction() sdkjournal.NetdataJournalFunction {
 	cfg := sdkjournal.SystemdJournalNetdataFunctionConfig()
-	cfg.FunctionName = snmpTrapsFunctionName
-	cfg.DefaultFacets = snmpTrapsDefaultLogFacets()
-	cfg.DefaultViewKeys = snmpTrapsDefaultViewKeys()
+	cfg.FunctionName = FunctionName
+	cfg.DefaultFacets = DefaultLogFacets()
+	cfg.DefaultViewKeys = DefaultViewKeys()
 	cfg.DefaultHistogram = "TRAP_SEVERITY"
 	return sdkjournal.NewNetdataJournalFunction(cfg, sdkjournal.SystemdJournalProfile{})
 }
 
-func snmpTrapsDefaultLogFacets() []string {
+func DefaultLogFacets() []string {
 	return []string{
 		"TRAP_CATEGORY",
 		"TRAP_DEVICE_VENDOR",
@@ -93,7 +110,7 @@ func snmpTrapsDefaultLogFacets() []string {
 	}
 }
 
-func snmpTrapsDefaultViewKeys() []string {
+func DefaultViewKeys() []string {
 	return []string{
 		"MESSAGE",
 		"_HOSTNAME",
@@ -137,7 +154,7 @@ func normalizeSNMPTrapsLogsRequestPayload(payload []byte) []byte {
 	if err := json.Unmarshal(facetsRaw, &facets); err != nil || len(facets) != 0 {
 		return payload
 	}
-	defaultFacets, err := json.Marshal(snmpTrapsDefaultLogFacets())
+	defaultFacets, err := json.Marshal(DefaultLogFacets())
 	if err != nil {
 		return payload
 	}
@@ -170,7 +187,7 @@ func netdataLogsRunOptions(ctx context.Context, timeout time.Duration, root stri
 	if timeout > 0 {
 		opts.Timeout = &timeout
 	}
-	opts.State = snmpTrapsLogsState{root: root}
+	opts.State = logsState{root: root}
 	opts.CancellationCallback = func() bool {
 		return ctx.Err() != nil
 	}
@@ -202,11 +219,11 @@ func validateNetdataLogsRequestPayload(payload []byte) error {
 	return nil
 }
 
-type snmpTrapsLogsState struct {
+type logsState struct {
 	root string
 }
 
-func (s snmpTrapsLogsState) FileMetadata(path string) *sdkjournal.NetdataJournalFileMetadata {
+func (s logsState) FileMetadata(path string) *sdkjournal.NetdataJournalFileMetadata {
 	rel, err := filepath.Rel(s.root, path)
 	if err != nil {
 		return nil
@@ -228,6 +245,6 @@ func (s snmpTrapsLogsState) FileMetadata(path string) *sdkjournal.NetdataJournal
 	}
 }
 
-func (s snmpTrapsLogsState) UpdateFileJournalVsRealtimeDeltaUsec(string, uint64) {
+func (s logsState) UpdateFileJournalVsRealtimeDeltaUsec(string, uint64) {
 	// SNMP trap logs do not publish per-file reader lag metrics today.
 }

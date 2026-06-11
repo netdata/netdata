@@ -788,7 +788,7 @@ install_netdata_snmp_trap_journal_dir() {
     warning "Failed to create /var/log/journal/netdata/snmp-traps. SNMP trap jobs using direct journals will fail until it is created manually."
     return 0
   fi
-  if ! run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" /var/log/journal/netdata; then
+  if ! run chown "${NETDATA_USER}:${NETDATA_GROUP}" /var/log/journal/netdata /var/log/journal/netdata/snmp-traps; then
     warning "Failed to set ownership on /var/log/journal/netdata. SNMP trap jobs using direct journals will fail until it is fixed manually."
     return 0
   fi

@@ -267,7 +267,7 @@ func parseEnterpriseNumbers(r io.Reader) (map[string]string, error) {
 			continue
 		}
 		if id != "" {
-			if line == "---none---" || line == "Reserved" {
+			if line == "---none---" || line == "Reserved" || line == "Unassigned" {
 				id = ""
 				continue
 			}

@@ -99,7 +99,7 @@ func (cb *collectorCallbacks) Start(cfg confgroup.Config) error {
 		job.Cleanup()
 		var ce dyncfg.CodedError
 		if errors.As(err, &ce) {
-			if isRetryableError(err) {
+			if dyncfg.IsRetryableError(err) {
 				cb.mgr.scheduleRetryTask(cfg, job)
 			}
 			return err
@@ -130,7 +130,7 @@ func (cb *collectorCallbacks) Update(oldCfg, newCfg confgroup.Config) error {
 		job.Cleanup()
 		var ce dyncfg.CodedError
 		if errors.As(err, &ce) {
-			if isRetryableError(err) {
+			if dyncfg.IsRetryableError(err) {
 				cb.mgr.scheduleRetryTask(newCfg, job)
 			}
 			return err
@@ -153,15 +153,6 @@ func (cb *collectorCallbacks) OnStatusChange(entry *dyncfg.Entry[confgroup.Confi
 	if entry.Status == dyncfg.StatusRunning && isDyncfg(entry.Cfg) {
 		cb.mgr.fileStatus.add(entry.Cfg, entry.Status.String())
 	}
-}
-
-type retryableError interface {
-	Retryable() bool
-}
-
-func isRetryableError(err error) bool {
-	var re retryableError
-	return errors.As(err, &re) && re.Retryable()
 }
 
 func (cb *collectorCallbacks) ConfigID(cfg confgroup.Config) string {

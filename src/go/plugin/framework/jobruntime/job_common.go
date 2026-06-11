@@ -3,12 +3,12 @@
 package jobruntime
 
 import (
-	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/tickstate"
 )
 
@@ -65,13 +65,8 @@ func disableAutoDetection(autoDetectEvery *int) {
 	*autoDetectEvery = 0
 }
 
-type retryableError interface {
-	Retryable() bool
-}
-
 func isRetryableError(err error) bool {
-	var re retryableError
-	return errors.As(err, &re) && re.Retryable()
+	return dyncfg.IsRetryableError(err)
 }
 
 func consumeAutoDetectTry(autoDetectTries *int) {
