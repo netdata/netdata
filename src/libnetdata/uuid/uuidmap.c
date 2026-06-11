@@ -67,6 +67,17 @@ static UUIDMAP_ID get_next_id_unsafe(struct uuidmap_partition *partition) {
         fatal("UUIDMAP: Maximum ID limit reached for partition %u. UUIDs exhausted.",
               (unsigned int)(partition - uuid_map.p));
 
+    // IDs are never reused, so the sequence space is lifetime capacity.
+    // next_id is monotonic and only changes under the partition write lock,
+    // so the equality check fires exactly once per partition.
+    if (unlikely(partition->next_id == (UUIDMAP_ID_SEQ_MASK / 10) * 9))
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "UUIDMAP: partition %u has used 90%% of its lifetime ID space (%u of %u). "
+               "When it is exhausted, netdata will exit. Restarting netdata resets it.",
+               (unsigned int)(partition - uuid_map.p),
+               (unsigned int)partition->next_id,
+               (unsigned int)UUIDMAP_ID_SEQ_MASK);
+
     // Simply increment and return the next ID
     return uuidmap_make_id(partition - uuid_map.p, ++partition->next_id);
 }
