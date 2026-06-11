@@ -324,15 +324,15 @@ func TestK8sTLSModesAgainstSelfSignedServer(t *testing.T) {
 	r := newResolver([]string{"cgroup-name"}, &bytes.Buffer{})
 
 	t.Setenv("K8S_TLS_INSECURE", "")
-	if _, err := httpGetWithContext(context.Background(), ts.URL, nil, r.k8sTLSConfig(tlsModeKubelet), true, true, 0, 0); err != nil {
+	if _, err := httpGetWithContext(context.Background(), ts.URL, httpGetOptions{tlsConfig: r.k8sTLSConfig(tlsModeKubelet), noProxy: true, fail: true}); err != nil {
 		t.Fatalf("kubelet mode must accept a self-signed certificate, got: %v", err)
 	}
-	if _, err := httpGetWithContext(context.Background(), ts.URL, nil, r.k8sTLSConfig(tlsModeAPIServer), true, true, 0, 0); err == nil {
+	if _, err := httpGetWithContext(context.Background(), ts.URL, httpGetOptions{tlsConfig: r.k8sTLSConfig(tlsModeAPIServer), noProxy: true, fail: true}); err == nil {
 		t.Fatal("API-server mode must reject a certificate that does not chain to the service-account CA")
 	}
 
 	t.Setenv("K8S_TLS_INSECURE", "1")
-	if _, err := httpGetWithContext(context.Background(), ts.URL, nil, r.k8sTLSConfig(tlsModeAPIServer), true, true, 0, 0); err != nil {
+	if _, err := httpGetWithContext(context.Background(), ts.URL, httpGetOptions{tlsConfig: r.k8sTLSConfig(tlsModeAPIServer), noProxy: true, fail: true}); err != nil {
 		t.Fatalf("API-server mode with K8S_TLS_INSECURE=1 must accept any certificate, got: %v", err)
 	}
 }
@@ -353,7 +353,7 @@ func TestSetupDeadlineBudget(t *testing.T) {
 	t.Run("unbounded when unset", func(t *testing.T) {
 		t.Setenv("NETDATA_CGROUP_NAME_TIMEOUT_MS", "")
 		r := newResolver([]string{"cgroup-name"}, &bytes.Buffer{})
-		cancel := r.setupDeadline()
+		_, cancel := r.setupDeadline()
 		defer cancel()
 		if !r.expiresAt.IsZero() {
 			t.Fatal("expiresAt must be zero when no timeout is configured")
@@ -366,7 +366,7 @@ func TestSetupDeadlineBudget(t *testing.T) {
 	t.Run("expires after the configured budget", func(t *testing.T) {
 		t.Setenv("NETDATA_CGROUP_NAME_TIMEOUT_MS", "10")
 		r := newResolver([]string{"cgroup-name"}, &bytes.Buffer{})
-		cancel := r.setupDeadline()
+		ctx, cancel := r.setupDeadline()
 		defer cancel()
 		if r.expiresAt.IsZero() {
 			t.Fatal("expiresAt must be set when a timeout is configured")
@@ -378,7 +378,7 @@ func TestSetupDeadlineBudget(t *testing.T) {
 		if !r.budgetExpired() {
 			t.Fatal("budget must report expired after the deadline passes")
 		}
-		if r.ctx.Err() == nil {
+		if ctx.Err() == nil {
 			t.Fatal("the deadline context must be done after the budget expires")
 		}
 	})

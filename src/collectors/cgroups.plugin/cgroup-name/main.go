@@ -76,11 +76,11 @@ type resolver struct {
 	dockerHost  string
 	podmanHost  string
 
-	// ctx carries the whole-invocation deadline; every external command and
-	// HTTP call shares it, so each call gets "whatever budget remains" and
-	// calls after expiry fail immediately
-	ctx       context.Context
-	expiresAt time.Time // zero when unbounded
+	// expiresAt is the whole-invocation deadline; budgetExpired() reports when
+	// it has passed so an unresolved name triggers the parent's retry ladder.
+	// Zero means unbounded. The matching context.Context is threaded through the
+	// resolver methods as an argument rather than stored on the struct.
+	expiresAt time.Time
 
 	callsMu sync.Mutex
 	calls   []callRecord
@@ -93,7 +93,7 @@ func main() {
 func run(args []string, stdout io.Writer) int {
 	setupEnvironment()
 	r := newResolver(args, stdout)
-	cancel := r.setupDeadline()
+	ctx, cancel := r.setupDeadline()
 	defer cancel()
 
 	r.dockerHost = defaultEnv("DOCKER_HOST", "unix:///var/run/docker.sock")
@@ -114,11 +114,11 @@ func run(args []string, stdout io.Writer) int {
 	}
 
 	if r.name == "" && strings.Contains(cgroup, "kubepods") {
-		r.k8sGetName(cgroupPath, cgroup)
+		r.k8sGetName(ctx, cgroupPath, cgroup)
 	}
 
 	if r.name == "" {
-		r.dispatchNonK8s(cgroup)
+		r.dispatchNonK8s(ctx, cgroup)
 		if r.name == "" {
 			if r.budgetExpired() {
 				// unresolved because discovery ran out of budget: exit with no
@@ -238,16 +238,15 @@ func (r *resolver) log(level int, message string) {
 // NETDATA_CGROUP_NAME_TIMEOUT_MS carries the operator budget X from
 // cgroups.plugin, which kills the helper at X plus a grace period; the
 // helper must stop all discovery work by X on its own.
-func (r *resolver) setupDeadline() context.CancelFunc {
-	r.ctx = context.Background()
+func (r *resolver) setupDeadline() (context.Context, context.CancelFunc) {
 	ms, _ := strconv.ParseInt(os.Getenv("NETDATA_CGROUP_NAME_TIMEOUT_MS"), 10, 64)
 	if ms <= 0 {
-		return func() {}
+		// unbounded: a cancelable context with no deadline; the returned cancel
+		// releases its resources when run() returns
+		return context.WithCancel(context.Background())
 	}
 	r.expiresAt = time.Now().Add(time.Duration(ms) * time.Millisecond)
-	ctx, cancel := context.WithDeadline(context.Background(), r.expiresAt)
-	r.ctx = ctx
-	return cancel
+	return context.WithDeadline(context.Background(), r.expiresAt)
 }
 
 func (r *resolver) budgetExpired() bool {
@@ -280,21 +279,21 @@ func (r *resolver) warning(message string) { r.log(ndlpWarn, message) }
 func (r *resolver) error(message string)   { r.log(ndlpErr, message) }
 func (r *resolver) fatal(message string)   { r.log(ndlpAlert, message) }
 
-func (r *resolver) dispatchNonK8s(cgroup string) {
+func (r *resolver) dispatchNonK8s(ctx context.Context, cgroup string) {
 	switch {
 	case reDockerDispatch.MatchString(cgroup):
-		r.dockerValidateID(extractOrOriginal(reDockerExtract, cgroup, 1))
+		r.dockerValidateID(ctx, extractOrOriginal(reDockerExtract, cgroup, 1))
 	case reECSDispatch.MatchString(cgroup):
-		r.dockerValidateID(extractOrOriginal(reECSExtract, cgroup, 1))
+		r.dockerValidateID(ctx, extractOrOriginal(reECSExtract, cgroup, 1))
 	case reContainerdDispatch.MatchString(cgroup):
-		r.dockerValidateID(extractOrOriginal(reContainerdExtract, cgroup, 1))
+		r.dockerValidateID(ctx, extractOrOriginal(reContainerdExtract, cgroup, 1))
 	case rePodmanDispatch.MatchString(cgroup):
 		m := rePodmanExtract.FindStringSubmatch(cgroup)
 		id := cgroup
 		if len(m) > 2 {
 			id = m[2]
 		}
-		r.podmanValidateID(id, cgroup)
+		r.podmanValidateID(ctx, id, cgroup)
 	case reNspawn.MatchString(cgroup):
 		r.name = reNspawn.ReplaceAllString(cgroup, "$1")
 	case strings.Contains(cgroup, "machine.slice_machine") && strings.Contains(cgroup, "-lxc"):
@@ -441,10 +440,10 @@ func (r *resolver) parseDockerLikeInspectOutput(output string) {
 	}
 }
 
-func (r *resolver) dockerLikeGetNameCommand(command, id string) bool {
+func (r *resolver) dockerLikeGetNameCommand(ctx context.Context, command, id string) bool {
 	format := "{{range .Config.Env}}{{println .}}{{end}}{{range $key, $value := .Config.Labels}}LABEL_{{$key}}={{$value}}{{println}}{{end}}IMAGE_NAME={{.Config.Image}}{{println}}CONT_NAME={{.Name}}"
 	defer r.track(command+"-inspect", time.Now())
-	cmd := exec.CommandContext(r.ctx, command, "inspect", "--format="+format, id)
+	cmd := exec.CommandContext(ctx, command, "inspect", "--format="+format, id)
 	cmd.Stderr = os.Stderr
 	out, err := cmd.Output()
 	if err == nil && len(out) > 0 {
@@ -453,7 +452,7 @@ func (r *resolver) dockerLikeGetNameCommand(command, id string) bool {
 	return true
 }
 
-func (r *resolver) dockerLikeGetNameAPI(hostVar, containerID string) bool {
+func (r *resolver) dockerLikeGetNameAPI(ctx context.Context, hostVar, containerID string) bool {
 	host := os.Getenv(hostVar)
 	path := "/containers/" + containerID + "/json"
 
@@ -477,10 +476,10 @@ func (r *resolver) dockerLikeGetNameAPI(hostVar, containerID string) bool {
 	defer r.track(strings.ToLower(strings.TrimSuffix(hostVar, "_HOST"))+"-api", time.Now())
 	if isSocket(address) {
 		r.info(fmt.Sprintf("Running API command: curl --unix-socket \"%s\" http://localhost%s", address, path))
-		body, err = httpUnixGet(r.ctx, address, "http://localhost"+path)
+		body, err = httpUnixGet(ctx, address, "http://localhost"+path)
 	} else {
 		r.info(fmt.Sprintf("Running API command: curl \"%s%s\"", address, path))
-		body, err = httpGetWithContext(r.ctx, defaultHTTPURL(address+path), nil, nil, false, false, 0, 0)
+		body, err = httpGetWithContext(ctx, defaultHTTPURL(address+path), httpGetOptions{})
 	}
 	if err != nil || len(body) == 0 {
 		return true
@@ -585,28 +584,40 @@ const (
 	k8sPodsBodyCap = 64 << 20
 )
 
-func httpGetWithContext(ctx context.Context, url string, headers map[string]string, tlsConfig *tls.Config, noProxy, fail bool, timeout time.Duration, maxBody int64) ([]byte, error) {
+// httpGetOptions bundles the optional knobs of httpGetWithContext; the zero
+// value is a plain proxied GET capped at defaultBodyCap with no TLS override.
+type httpGetOptions struct {
+	headers   map[string]string
+	tlsConfig *tls.Config
+	noProxy   bool
+	fail      bool // return an error on non-2xx HTTP status
+	timeout   time.Duration
+	maxBody   int64
+}
+
+func httpGetWithContext(ctx context.Context, url string, opts httpGetOptions) ([]byte, error) {
+	maxBody := opts.maxBody
 	if maxBody <= 0 {
 		maxBody = defaultBodyCap
 	}
 	tr := &http.Transport{}
-	if tlsConfig != nil {
-		tr.TLSClientConfig = tlsConfig
+	if opts.tlsConfig != nil {
+		tr.TLSClientConfig = opts.tlsConfig
 	}
-	if noProxy {
+	if opts.noProxy {
 		tr.Proxy = nil
 	} else {
 		tr.Proxy = http.ProxyFromEnvironment
 	}
 	client := &http.Client{Transport: tr}
-	if timeout > 0 {
-		client.Timeout = timeout
+	if opts.timeout > 0 {
+		client.Timeout = opts.timeout
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	for k, v := range headers {
+	for k, v := range opts.headers {
 		req.Header.Set(k, v)
 	}
 	resp, err := client.Do(req)
@@ -621,7 +632,7 @@ func httpGetWithContext(ctx context.Context, url string, headers map[string]stri
 	if int64(len(body)) > maxBody {
 		return nil, fmt.Errorf("response exceeds %d bytes", maxBody)
 	}
-	if fail && (resp.StatusCode < 200 || resp.StatusCode >= 300) {
+	if opts.fail && (resp.StatusCode < 200 || resp.StatusCode >= 300) {
 		return body, fmt.Errorf("http status %d", resp.StatusCode)
 	}
 	return body, nil
@@ -725,21 +736,21 @@ func rawJSONScalar(raw json.RawMessage) string {
 	return string(raw)
 }
 
-func (r *resolver) snapHasDocker() bool {
+func (r *resolver) snapHasDocker(ctx context.Context) bool {
 	if _, err := exec.LookPath("snap"); err != nil {
 		return false
 	}
 	defer r.track("snap-list-docker", time.Now())
-	return exec.CommandContext(r.ctx, "snap", "list", "docker").Run() == nil
+	return exec.CommandContext(ctx, "snap", "list", "docker").Run() == nil
 }
 
-func (r *resolver) dockerGetName(id string) {
-	if r.snapHasDocker() {
-		r.dockerLikeGetNameAPI("DOCKER_HOST", id)
+func (r *resolver) dockerGetName(ctx context.Context, id string) {
+	if r.snapHasDocker(ctx) {
+		r.dockerLikeGetNameAPI(ctx, "DOCKER_HOST", id)
 	} else if _, err := exec.LookPath("docker"); err == nil {
-		r.dockerLikeGetNameCommand("docker", id)
-	} else if !r.dockerLikeGetNameAPI("DOCKER_HOST", id) {
-		r.dockerLikeGetNameCommand("podman", id)
+		r.dockerLikeGetNameCommand(ctx, "docker", id)
+	} else if !r.dockerLikeGetNameAPI(ctx, "DOCKER_HOST", id) {
+		r.dockerLikeGetNameCommand(ctx, "podman", id)
 	}
 
 	if r.name == "" {
@@ -751,17 +762,17 @@ func (r *resolver) dockerGetName(id string) {
 	}
 }
 
-func (r *resolver) dockerValidateID(id string) {
+func (r *resolver) dockerValidateID(ctx context.Context, id string) {
 	if id != "" && (len(id) == 64 || len(id) == 12) {
-		r.dockerGetName(id)
+		r.dockerGetName(ctx, id)
 	} else {
 		r.error(fmt.Sprintf("a docker id cannot be extracted from docker cgroup '%s'.", strings.ReplaceAll(argOrEmpty(r.args, 2), "/", "_")))
 	}
 }
 
-func (r *resolver) podmanGetName(id string) {
-	if !r.dockerLikeGetNameAPI("PODMAN_HOST", id) {
-		r.dockerLikeGetNameCommand("podman", id)
+func (r *resolver) podmanGetName(ctx context.Context, id string) {
+	if !r.dockerLikeGetNameAPI(ctx, "PODMAN_HOST", id) {
+		r.dockerLikeGetNameCommand(ctx, "podman", id)
 	}
 
 	if r.name == "" {
@@ -773,9 +784,9 @@ func (r *resolver) podmanGetName(id string) {
 	}
 }
 
-func (r *resolver) podmanValidateID(id, cgroup string) {
+func (r *resolver) podmanValidateID(ctx context.Context, id, cgroup string) {
 	if id != "" && len(id) == 64 {
-		r.podmanGetName(id)
+		r.podmanGetName(ctx, id)
 	} else {
 		r.error(fmt.Sprintf("a podman id cannot be extracted from docker cgroup '%s'.", cgroup))
 	}
@@ -824,7 +835,7 @@ func (r *resolver) k8sIsPauseContainer(cgroupPath string) bool {
 	return strings.TrimRight(string(comm), "\n") == "pause"
 }
 
-func (r *resolver) k8sGCPGetClusterName() (string, bool) {
+func (r *resolver) k8sGCPGetClusterName(ctx context.Context) (string, bool) {
 	type result struct {
 		idx   int
 		value string
@@ -837,7 +848,7 @@ func (r *resolver) k8sGCPGetClusterName() (string, bool) {
 	}
 	headers := map[string]string{"Metadata-Flavor": "Google"}
 	defer r.track("gcp-metadata", time.Now())
-	ctx, cancel := context.WithCancel(r.ctx)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	ch := make(chan result, len(urls))
 	var wg sync.WaitGroup
@@ -845,7 +856,7 @@ func (r *resolver) k8sGCPGetClusterName() (string, bool) {
 		wg.Add(1)
 		go func(i int, url string) {
 			defer wg.Done()
-			body, err := httpGetWithContext(ctx, url, headers, nil, true, true, 3*time.Second, 0)
+			body, err := httpGetWithContext(ctx, url, httpGetOptions{headers: headers, noProxy: true, fail: true, timeout: 3 * time.Second})
 			if err != nil || len(body) == 0 {
 				cancel()
 			}
@@ -868,7 +879,7 @@ func (r *resolver) k8sGCPGetClusterName() (string, bool) {
 	return "gke_" + values[0] + "_" + values[1] + "_" + values[2], true
 }
 
-func (r *resolver) k8sGetKubePodName(cgroupPath, id string) (string, int) {
+func (r *resolver) k8sGetKubePodName(ctx context.Context, cgroupPath, id string) (string, int) {
 	const fn = "k8s_get_kubepod_name"
 	if !strings.Contains(id, "kubepods") {
 		r.warning(fmt.Sprintf("%s: '%s' is not kubepod cgroup.", fn, id))
@@ -936,7 +947,7 @@ func (r *resolver) k8sGetKubePodName(cgroupPath, id string) (string, int) {
 		kubeSystemUID = firstLineFile(tmpSystemUID)
 		kubeClusterName = firstLineFile(tmpCluster)
 		if kubeClusterName == "" {
-			if value, ok := r.k8sGCPGetClusterName(); ok {
+			if value, ok := r.k8sGCPGetClusterName(ctx); ok {
 				kubeClusterName = value
 			} else {
 				kubeClusterName = "unknown"
@@ -945,7 +956,7 @@ func (r *resolver) k8sGetKubePodName(cgroupPath, id string) (string, int) {
 		var kubeSystemNS string
 		var pods string
 		var code int
-		kubeSystemNS, pods, code = r.k8sFetchPods(fn, kubeSystemUID)
+		kubeSystemNS, pods, code = r.k8sFetchPods(ctx, fn, kubeSystemUID)
 		if code != 0 {
 			return "", code
 		}
@@ -1096,7 +1107,7 @@ func kubeletPodsURL() string {
 	return base + "/pods"
 }
 
-func (r *resolver) k8sFetchPods(fn, kubeSystemUID string) (string, string, int) {
+func (r *resolver) k8sFetchPods(ctx context.Context, fn, kubeSystemUID string) (string, string, int) {
 	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" && os.Getenv("KUBERNETES_PORT_443_TCP_PORT") != "" {
 		tokenBytes, _ := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
 		header := map[string]string{"Authorization": "Bearer " + string(tokenBytes)}
@@ -1105,7 +1116,7 @@ func (r *resolver) k8sFetchPods(fn, kubeSystemUID string) (string, string, int) 
 		if kubeSystemUID == "" {
 			url := "https://" + host + "/api/v1/namespaces/kube-system"
 			started := time.Now()
-			body, err := httpGetWithContext(r.ctx, url, header, r.k8sTLSConfig(tlsModeAPIServer), false, true, 0, 0)
+			body, err := httpGetWithContext(ctx, url, httpGetOptions{headers: header, tlsConfig: r.k8sTLSConfig(tlsModeAPIServer), fail: true})
 			r.track("k8s-api-namespace", started)
 			if err != nil {
 				r.warning(fmt.Sprintf("%s: error on curl '%s': %s.", fn, url, err.Error()))
@@ -1126,7 +1137,7 @@ func (r *resolver) k8sFetchPods(fn, kubeSystemUID string) (string, string, int) 
 			}
 		}
 		started := time.Now()
-		body, err := httpGetWithContext(r.ctx, url, header, r.k8sTLSConfig(tlsMode), false, true, 0, k8sPodsBodyCap)
+		body, err := httpGetWithContext(ctx, url, httpGetOptions{headers: header, tlsConfig: r.k8sTLSConfig(tlsMode), fail: true, maxBody: k8sPodsBodyCap})
 		r.track("k8s-pods", started)
 		if err != nil {
 			r.warning(fmt.Sprintf("%s: error on curl '%s': %s.", fn, url, err.Error()))
@@ -1135,12 +1146,12 @@ func (r *resolver) k8sFetchPods(fn, kubeSystemUID string) (string, string, int) 
 		return kubeSystemNS, string(body), 0
 	}
 
-	if r.kubeletProcessRunning() {
+	if r.kubeletProcessRunning(ctx) {
 		if _, err := exec.LookPath("kubectl"); err == nil {
 			kubeConfig := os.Getenv("KUBE_CONFIG")
 			var kubeSystemNS string
 			if kubeSystemUID == "" {
-				out, err := r.kubectlOutput(kubeConfig, "get", "namespaces", "kube-system", "-o", "json")
+				out, err := r.kubectlOutput(ctx, kubeConfig, "get", "namespaces", "kube-system", "-o", "json")
 				if err != nil {
 					r.warning(fmt.Sprintf("%s: error on 'kubectl': %s.", fn, strings.TrimRight(string(out), "\n")))
 				} else {
@@ -1150,7 +1161,7 @@ func (r *resolver) k8sFetchPods(fn, kubeSystemUID string) (string, string, int) 
 			if _, ok := os.LookupEnv("KUBE_CONFIG"); !ok {
 				kubeConfig = "/etc/kubernetes/admin.conf"
 			}
-			out, err := r.kubectlOutput(kubeConfig, "get", "pods", "--all-namespaces", "-o", "json")
+			out, err := r.kubectlOutput(ctx, kubeConfig, "get", "pods", "--all-namespaces", "-o", "json")
 			if err != nil {
 				r.warning(fmt.Sprintf("%s: error on 'kubectl': %s.", fn, strings.TrimRight(string(out), "\n")))
 				return kubeSystemNS, "", 1
@@ -1163,15 +1174,15 @@ func (r *resolver) k8sFetchPods(fn, kubeSystemUID string) (string, string, int) 
 	return "", "", 1
 }
 
-func (r *resolver) kubeletProcessRunning() bool {
+func (r *resolver) kubeletProcessRunning(ctx context.Context) bool {
 	defer r.track("ps-kubelet", time.Now())
-	return exec.CommandContext(r.ctx, "ps", "-C", "kubelet").Run() == nil
+	return exec.CommandContext(ctx, "ps", "-C", "kubelet").Run() == nil
 }
 
-func (r *resolver) kubectlOutput(kubeConfig string, args ...string) ([]byte, error) {
+func (r *resolver) kubectlOutput(ctx context.Context, kubeConfig string, args ...string) ([]byte, error) {
 	defer r.track("kubectl", time.Now())
 	full := append([]string{"--kubeconfig=" + kubeConfig}, args...)
-	cmd := exec.CommandContext(r.ctx, "kubectl", full...)
+	cmd := exec.CommandContext(ctx, "kubectl", full...)
 	return cmd.CombinedOutput()
 }
 
@@ -1304,8 +1315,8 @@ func removeLbl(labels, lblName string) string {
 	return strings.Join(out, ",")
 }
 
-func (r *resolver) k8sGetName(cgroupPath, id string) {
-	kubepodName, code := r.k8sGetKubePodName(cgroupPath, id)
+func (r *resolver) k8sGetName(ctx context.Context, cgroupPath, id string) {
+	kubepodName, code := r.k8sGetKubePodName(ctx, cgroupPath, id)
 	switch code {
 	case 0:
 		kubepodName = "k8s_" + kubepodName
