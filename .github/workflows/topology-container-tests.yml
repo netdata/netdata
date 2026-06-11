@@ -43,6 +43,11 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: src/go/go.mod
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -91,6 +96,11 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: src/go/go.mod
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -103,11 +113,13 @@ jobs:
             libmnl-dev libnetfilter-acct-dev
 
       - name: Configure
+        env:
+          CFLAGS: -fsanitize=address -fno-omit-frame-pointer
+          CXXFLAGS: -fsanitize=address -fno-omit-frame-pointer
+          LDFLAGS: -fsanitize=address
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DCMAKE_C_FLAGS="-fsanitize=address -fno-omit-frame-pointer" \
-            -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer" \
             -DENABLE_PLUGIN_GO=OFF \
             -DENABLE_PLUGIN_XENSTAT=OFF \
             -DENABLE_BUNDLED_PROTOBUF=Off

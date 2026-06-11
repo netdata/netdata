@@ -154,9 +154,20 @@ Kubernetes data source selection is a switch:
 
 - If `KUBERNETES_SERVICE_HOST` and `KUBERNETES_PORT_443_TCP_PORT` are set, use
   the in-cluster API. Read the bearer token from
-  `/var/run/secrets/kubernetes.io/serviceaccount/token`. Namespace and pod
-  calls use `curl --fail -sSk`, so Go uses TLS verification disabled and treats
-  non-2xx as failure.
+  `/var/run/secrets/kubernetes.io/serviceaccount/token`. Non-2xx responses are
+  failures. TLS verification deliberately differs from the shell's
+  `curl --fail -sSk`:
+  - API-server calls verify against the system pool plus the mounted
+    service-account CA (the in-cluster default of client-go and of netdata's
+    go.d collectors). Setting `K8S_TLS_INSECURE` to anything but
+    `0`/`false`/`no` disables this verification (escape hatch for custom-PKI
+    clusters) and logs a warning.
+  - Kubelet calls (`USE_KUBELET_FOR_PODS_METADATA`) never verify: stock
+    kubelet serving certificates are self-signed, and even cluster-CA-signed
+    ones carry only node-name/IP SANs, so verification of
+    `https://localhost:10250` cannot succeed on any cluster.
+  - `KUBELET_URL` is a base URL and always gets `/pods` appended, like the
+    shell's `${KUBELET_URL:-https://localhost:10250}/pods`.
 - Else, if `ps -C kubelet` succeeds and `kubectl` exists, invoke `kubectl`.
   The namespace lookup uses the current `KUBE_CONFIG` value. Before the pod
   lookup only, unset `KUBE_CONFIG` becomes `/etc/kubernetes/admin.conf`; an

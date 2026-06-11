@@ -3,6 +3,8 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"bytes"
 	"os"
 	"path/filepath"
@@ -281,5 +283,65 @@ func TestHostPathKeepsAbsolutePathsWithEmptyPrefix(t *testing.T) {
 	t.Setenv("NETDATA_HOST_PREFIX", "/host")
 	if got := hostPath("/etc/pve"); got != "/host/etc/pve" {
 		t.Fatalf("hostPath with /host prefix = %q, want /host/etc/pve", got)
+	}
+}
+
+func TestK8sTLSInsecureParsing(t *testing.T) {
+	tests := map[string]struct {
+		value string
+		want  bool
+	}{
+		"unset is secure":        {value: "", want: false},
+		"zero is secure":         {value: "0", want: false},
+		"false is secure":        {value: "false", want: false},
+		"FALSE is secure":        {value: "FALSE", want: false},
+		"no is secure":           {value: "no", want: false},
+		"one enables":            {value: "1", want: true},
+		"true enables":           {value: "true", want: true},
+		"yes enables":            {value: "yes", want: true},
+		"arbitrary text enables": {value: "on", want: true},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("K8S_TLS_INSECURE", tc.value)
+			if got := k8sTLSInsecure(); got != tc.want {
+				t.Fatalf("k8sTLSInsecure() with %q = %v, want %v", tc.value, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestK8sTLSModesAgainstSelfSignedServer(t *testing.T) {
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer ts.Close()
+
+	r := newResolver([]string{"cgroup-name"}, &bytes.Buffer{})
+
+	t.Setenv("K8S_TLS_INSECURE", "")
+	if _, err := httpGet(ts.URL, nil, r.k8sTLSConfig(tlsModeKubelet), true, true, 0); err != nil {
+		t.Fatalf("kubelet mode must accept a self-signed certificate, got: %v", err)
+	}
+	if _, err := httpGet(ts.URL, nil, r.k8sTLSConfig(tlsModeAPIServer), true, true, 0); err == nil {
+		t.Fatal("API-server mode must reject a certificate that does not chain to the service-account CA")
+	}
+
+	t.Setenv("K8S_TLS_INSECURE", "1")
+	if _, err := httpGet(ts.URL, nil, r.k8sTLSConfig(tlsModeAPIServer), true, true, 0); err != nil {
+		t.Fatalf("API-server mode with K8S_TLS_INSECURE=1 must accept any certificate, got: %v", err)
+	}
+}
+
+func TestKubeletPodsURLAppendsPods(t *testing.T) {
+	t.Setenv("KUBELET_URL", "")
+	if got := kubeletPodsURL(); got != "https://localhost:10250/pods" {
+		t.Fatalf("default kubelet url = %q", got)
+	}
+
+	t.Setenv("KUBELET_URL", "https://node-1:10250")
+	if got := kubeletPodsURL(); got != "https://node-1:10250/pods" {
+		t.Fatalf("configured kubelet url = %q, the base must get /pods appended like the shell did", got)
 	}
 }

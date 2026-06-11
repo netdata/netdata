@@ -406,7 +406,7 @@ func (r *resolver) dockerLikeGetNameAPI(hostVar, containerID string) bool {
 		body, err = httpUnixGet(address, "http://localhost"+path)
 	} else {
 		r.info(fmt.Sprintf("Running API command: curl \"%s%s\"", address, path))
-		body, err = httpGet(defaultHTTPURL(address+path), nil, false, false, false, 0)
+		body, err = httpGet(defaultHTTPURL(address+path), nil, nil, false, false, 0)
 	}
 	if err != nil || len(body) == 0 {
 		return true
@@ -446,14 +446,60 @@ func httpUnixGet(socketPath, url string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-func httpGet(url string, headers map[string]string, useServiceAccountCA, noProxy, fail bool, timeout time.Duration) ([]byte, error) {
-	return httpGetWithContext(context.Background(), url, headers, useServiceAccountCA, noProxy, fail, timeout)
+// k8sTLSMode selects the TLS policy of an HTTPS call.
+//
+// The API server is verified against the mounted service-account CA, the
+// in-cluster default of client-go and of netdata's own go.d collectors.
+// The kubelet is never verified: stock kubelet serving certificates are
+// self-signed, and even cluster-CA-signed ones carry only node-name/IP SANs,
+// so verification of https://localhost:10250 fails on every cluster.
+type k8sTLSMode int
+
+const (
+	tlsModeNone k8sTLSMode = iota
+	tlsModeAPIServer
+	tlsModeKubelet
+)
+
+// K8S_TLS_INSECURE disables verification for API-server calls - an escape
+// hatch for clusters whose API endpoint does not verify against the mounted
+// service-account CA (custom PKI, intercepting proxies). A security-relaxing
+// flag must not treat "=false" as enabled, so parsing is falsey-aware, unlike
+// the presence-only sibling variables.
+func k8sTLSInsecure() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("K8S_TLS_INSECURE"))) {
+	case "", "0", "false", "no":
+		return false
+	}
+	return true
 }
 
-func httpGetWithContext(ctx context.Context, url string, headers map[string]string, useServiceAccountCA, noProxy, fail bool, timeout time.Duration) ([]byte, error) {
+var k8sTLSInsecureWarned sync.Once
+
+func (r *resolver) k8sTLSConfig(mode k8sTLSMode) *tls.Config {
+	switch mode {
+	case tlsModeKubelet:
+		return &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: true}
+	case tlsModeAPIServer:
+		if k8sTLSInsecure() {
+			k8sTLSInsecureWarned.Do(func() {
+				r.warning("K8S_TLS_INSECURE is set: TLS verification of Kubernetes API calls is disabled")
+			})
+			return &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: true}
+		}
+		return k8sServiceAccountTLSConfig()
+	}
+	return nil
+}
+
+func httpGet(url string, headers map[string]string, tlsConfig *tls.Config, noProxy, fail bool, timeout time.Duration) ([]byte, error) {
+	return httpGetWithContext(context.Background(), url, headers, tlsConfig, noProxy, fail, timeout)
+}
+
+func httpGetWithContext(ctx context.Context, url string, headers map[string]string, tlsConfig *tls.Config, noProxy, fail bool, timeout time.Duration) ([]byte, error) {
 	tr := &http.Transport{}
-	if useServiceAccountCA {
-		tr.TLSClientConfig = k8sServiceAccountTLSConfig()
+	if tlsConfig != nil {
+		tr.TLSClientConfig = tlsConfig
 	}
 	if noProxy {
 		tr.Proxy = nil
@@ -695,7 +741,7 @@ func (r *resolver) k8sGCPGetClusterName() (string, bool) {
 		wg.Add(1)
 		go func(i int, url string) {
 			defer wg.Done()
-			body, err := httpGetWithContext(ctx, url, headers, false, true, true, 3*time.Second)
+			body, err := httpGetWithContext(ctx, url, headers, nil, true, true, 3*time.Second)
 			if err != nil || len(body) == 0 {
 				cancel()
 			}
@@ -936,6 +982,16 @@ func grepString(s, pattern string, max int) (string, bool) {
 	return strings.Join(matches, "\n"), true
 }
 
+// kubeletPodsURL treats KUBELET_URL as a base URL and always appends /pods,
+// matching the shell's `${KUBELET_URL:-https://localhost:10250}/pods`.
+func kubeletPodsURL() string {
+	base := os.Getenv("KUBELET_URL")
+	if base == "" {
+		base = "https://localhost:10250"
+	}
+	return base + "/pods"
+}
+
 func (r *resolver) k8sFetchPods(fn, kubeSystemUID string) (string, string, int) {
 	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" && os.Getenv("KUBERNETES_PORT_443_TCP_PORT") != "" {
 		tokenBytes, _ := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
@@ -944,25 +1000,26 @@ func (r *resolver) k8sFetchPods(fn, kubeSystemUID string) (string, string, int) 
 		var kubeSystemNS string
 		if kubeSystemUID == "" {
 			url := "https://" + host + "/api/v1/namespaces/kube-system"
-			body, err := httpGet(url, header, true, false, true, 0)
+			body, err := httpGet(url, header, r.k8sTLSConfig(tlsModeAPIServer), false, true, 0)
 			if err != nil {
 				r.warning(fmt.Sprintf("%s: error on curl '%s': %s.", fn, url, err.Error()))
 			} else {
 				kubeSystemNS = string(body)
 			}
 		}
-		url := os.Getenv("KUBELET_URL")
+		var url string
+		tlsMode := tlsModeAPIServer
 		if os.Getenv("USE_KUBELET_FOR_PODS_METADATA") != "" {
-			if url == "" {
-				url = "https://localhost:10250/pods"
-			}
+			// KUBELET_URL is a base URL; the shell always appended /pods
+			url = kubeletPodsURL()
+			tlsMode = tlsModeKubelet
 		} else {
 			url = "https://" + host + "/api/v1/pods"
 			if os.Getenv("MY_NODE_NAME") != "" {
 				url += "?fieldSelector=spec.nodeName==" + os.Getenv("MY_NODE_NAME")
 			}
 		}
-		body, err := httpGet(url, header, true, false, true, 0)
+		body, err := httpGet(url, header, r.k8sTLSConfig(tlsMode), false, true, 0)
 		if err != nil {
 			r.warning(fmt.Sprintf("%s: error on curl '%s': %s.", fn, url, err.Error()))
 			return kubeSystemNS, "", 1
