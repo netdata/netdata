@@ -1083,6 +1083,12 @@ static inline int fchmod(int fd __maybe_unused, int mode __maybe_unused) {
     return 0;
 }
 
+// ── unsetenv() ── POSIX env removal, absent from UCRT64 headers ──────────────
+// SetEnvironmentVariableA with NULL removes the variable from the process env.
+static inline int unsetenv(const char *name) {
+    return SetEnvironmentVariableA(name, NULL) ? 0 : -1;
+}
+
 #endif // OS_WINDOWS
 
 // --------------------------------------------------------------------------------------------------------------------
