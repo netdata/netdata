@@ -860,6 +860,9 @@ int main(int argc, char **argv) {
             printf("DISABLE\n");
             netdata_mutex_unlock(&apps_pids_mutex);
             netdata_mutex_unlock(&apps_and_stdout_mutex);
+            // stop the Function workers before destroying the caches they read
+            functions_evloop_cancel_threads(wg);
+            functions_evloop_join_threads(wg);
             apps_lookup_netipc_cleanup();
             apps_cgroups_lookup_cleanup();
             exit(1);
@@ -887,6 +890,8 @@ int main(int argc, char **argv) {
         if(unlikely(print_tree_and_exit)) {
             print_hierarchy(root_of_pids());
             netdata_mutex_unlock(&apps_and_stdout_mutex);
+            functions_evloop_cancel_threads(wg);
+            functions_evloop_join_threads(wg);
             apps_lookup_netipc_cleanup();
             apps_cgroups_lookup_cleanup();
             exit(0);
@@ -938,6 +943,12 @@ int main(int argc, char **argv) {
         debug_log("done Loop No %zu", global_iterations_counter);
     }
     netdata_mutex_unlock(&apps_and_stdout_mutex);
+
+    // stop the Function workers before destroying the caches their
+    // process-enrichment serialization still reads
+    functions_evloop_cancel_threads(wg);
+    functions_evloop_join_threads(wg);
+
     apps_lookup_netipc_cleanup();
     apps_cgroups_lookup_cleanup();
     exit(exit_status);
