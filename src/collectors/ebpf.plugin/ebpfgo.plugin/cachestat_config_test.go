@@ -227,6 +227,76 @@ func TestLoadCachestatConfigFilesPrefersUserAndLegacyOverlay(t *testing.T) {
 	}
 }
 
+func TestParseCachestatConfigFileEbpfPrograms(t *testing.T) {
+	tests := map[string]struct {
+		content       string
+		wantCachestat *bool
+		wantSocket    *bool
+	}{
+		"socket yes": {
+			content:    "[ebpf programs]\nsocket = yes\n",
+			wantSocket: boolPtr(true),
+		},
+		"socket no": {
+			content:    "[ebpf programs]\nsocket = no\n",
+			wantSocket: boolPtr(false),
+		},
+		"cachestat yes socket no": {
+			content:       "[ebpf programs]\ncachestat = yes\nsocket = no\n",
+			wantCachestat: boolPtr(true),
+			wantSocket:    boolPtr(false),
+		},
+		"cachestat no socket yes": {
+			content:       "[ebpf programs]\ncachestat = no\nsocket = yes\n",
+			wantCachestat: boolPtr(false),
+			wantSocket:    boolPtr(true),
+		},
+		"socket absent": {
+			content:       "[ebpf programs]\ncachestat = yes\n",
+			wantCachestat: boolPtr(true),
+			wantSocket:    nil,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "ebpf.d.conf")
+			if err := os.WriteFile(path, []byte(tc.content), 0o600); err != nil {
+				t.Fatalf("write config: %v", err)
+			}
+
+			cfg, ok, err := parseCachestatConfigFile(path)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+			if !ok {
+				t.Fatal("expected file to be detected as found")
+			}
+
+			if tc.wantSocket == nil {
+				if cfg.Socket != nil {
+					t.Fatalf("Socket should be nil, got %v", *cfg.Socket)
+				}
+			} else {
+				if cfg.Socket == nil || *cfg.Socket != *tc.wantSocket {
+					t.Fatalf("Socket = %v, want %v", cfg.Socket, *tc.wantSocket)
+				}
+			}
+
+			if tc.wantCachestat == nil {
+				if cfg.Enabled != nil {
+					t.Fatalf("Enabled should be nil, got %v", *cfg.Enabled)
+				}
+			} else {
+				if cfg.Enabled == nil || *cfg.Enabled != *tc.wantCachestat {
+					t.Fatalf("Enabled = %v, want %v", cfg.Enabled, *tc.wantCachestat)
+				}
+			}
+		})
+	}
+}
+
 func TestLoadCachestatConfigFilesMissingReturnsNotFound(t *testing.T) {
 	t.Setenv("NETDATA_USER_CONFIG_DIR", t.TempDir())
 	t.Setenv("NETDATA_STOCK_CONFIG_DIR", t.TempDir())

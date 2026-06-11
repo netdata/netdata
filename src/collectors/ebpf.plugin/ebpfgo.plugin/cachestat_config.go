@@ -20,6 +20,7 @@ const (
 
 type cachestatConfigFile struct {
 	Enabled         *bool
+	Socket          *bool // [ebpf programs] socket key
 	UpdateEvery     *int
 	AppsEnabled     *bool
 	Cgroups         *bool
@@ -106,12 +107,20 @@ func parseCachestatConfigFile(path string) (cachestatConfigFile, bool, error) {
 			}
 			key = strings.ToLower(strings.TrimSpace(key))
 			value = strings.TrimSpace(value)
-			if key == "cachestat" {
+			switch key {
+			case "cachestat":
 				b, ok := parseConfigBool(value)
 				if !ok {
 					return cachestatConfigFile{}, false, fmt.Errorf("%s: invalid cachestat %q", path, value)
 				}
 				cfg.Enabled = boolPtr(b)
+				found = true
+			case "socket":
+				b, ok := parseConfigBool(value)
+				if !ok {
+					return cachestatConfigFile{}, false, fmt.Errorf("%s: invalid socket %q", path, value)
+				}
+				cfg.Socket = boolPtr(b)
 				found = true
 			}
 			continue
@@ -218,6 +227,9 @@ func parseCachestatConfigFile(path string) (cachestatConfigFile, bool, error) {
 func (c *cachestatConfigFile) apply(other cachestatConfigFile) {
 	if other.Enabled != nil {
 		c.Enabled = other.Enabled
+	}
+	if other.Socket != nil {
+		c.Socket = other.Socket
 	}
 	if other.UpdateEvery != nil {
 		c.UpdateEvery = other.UpdateEvery

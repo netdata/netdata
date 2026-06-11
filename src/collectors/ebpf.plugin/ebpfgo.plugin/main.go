@@ -28,8 +28,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat config load failed: %v\n", err)
 		os.Exit(1)
 	}
-	if !cfg.Enabled {
-		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat collection disabled by configuration\n")
+	if !anyProgramEnabled(cfg) {
+		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: all eBPF programs disabled by configuration\n")
 		os.Exit(0)
 	}
 
@@ -52,4 +52,11 @@ func main() {
 	handle.UpdateEvery = updateEvery
 
 	runCachestatPlugin(handle, updateEvery)
+}
+
+// anyProgramEnabled returns true when at least one eBPF program is enabled.
+// The plugin exits early only when every known program is disabled so that
+// adding a new program requires only a new field here, not a structural change.
+func anyProgramEnabled(cfg CachestatLegacyConfig) bool {
+	return cfg.Enabled || cfg.SocketEnabled
 }
