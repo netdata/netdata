@@ -13,6 +13,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 static nipc_uds_client_config_t service_client_config_to_transport(
     const nipc_client_config_t *config)
@@ -30,6 +33,59 @@ static nipc_uds_client_config_t service_client_config_to_transport(
 static void client_sleep_ms(uint32_t ms)
 {
     nipc_service_posix_sleep_us(ms * 1000u);
+}
+
+static void close_abort_pipe(nipc_client_ctx_t *ctx)
+{
+    if (!ctx->abort_pipe_valid)
+        return;
+
+    if (ctx->abort_pipe[0] >= 0) {
+        close(ctx->abort_pipe[0]);
+        ctx->abort_pipe[0] = -1;
+    }
+    if (ctx->abort_pipe[1] >= 0) {
+        close(ctx->abort_pipe[1]);
+        ctx->abort_pipe[1] = -1;
+    }
+    ctx->abort_pipe_valid = false;
+}
+
+static void drain_abort_pipe(nipc_client_ctx_t *ctx)
+{
+    if (!ctx->abort_pipe_valid || ctx->abort_pipe[0] < 0)
+        return;
+
+    char buf[64];
+    for (;;) {
+        ssize_t n = read(ctx->abort_pipe[0], buf, sizeof(buf));
+        if (n > 0)
+            continue;
+        if (n < 0 && errno == EINTR)
+            continue;
+        break;
+    }
+}
+
+static void init_abort_pipe(nipc_client_ctx_t *ctx)
+{
+    ctx->abort_pipe[0] = -1;
+    ctx->abort_pipe[1] = -1;
+    ctx->abort_pipe_valid = false;
+
+    int fds[2];
+    if (pipe(fds) != 0)
+        return;
+
+    for (int i = 0; i < 2; i++) {
+        int flags = fcntl(fds[i], F_GETFL, 0);
+        if (flags >= 0)
+            (void)fcntl(fds[i], F_SETFL, flags | O_NONBLOCK);
+    }
+
+    ctx->abort_pipe[0] = fds[0];
+    ctx->abort_pipe[1] = fds[1];
+    ctx->abort_pipe_valid = true;
 }
 
 const nipc_service_common_client_ops_t *nipc_service_posix_client_ops(void)
@@ -69,8 +125,12 @@ void nipc_client_init(nipc_client_ctx_t *ctx,
 {
     nipc_service_common_client_init(ctx, run_dir, service_name);
     ctx->session.fd = -1;
+    init_abort_pipe(ctx);
 
     ctx->transport_config = service_client_config_to_transport(config);
+    ctx->call_timeout_ms = (config && config->call_timeout_ms != 0)
+        ? config->call_timeout_ms
+        : NIPC_CLIENT_CALL_TIMEOUT_DEFAULT_MS;
     if (ctx->transport_config.max_request_payload_bytes == 0)
         ctx->transport_config.max_request_payload_bytes =
             nipc_service_common_request_payload_default();
@@ -90,8 +150,43 @@ void nipc_client_status(const nipc_client_ctx_t *ctx,
     nipc_service_common_client_status(ctx, out);
 }
 
+void nipc_client_set_call_timeout(nipc_client_ctx_t *ctx, uint32_t timeout_ms)
+{
+    if (!ctx)
+        return;
+    ctx->call_timeout_ms = (timeout_ms != 0)
+        ? timeout_ms
+        : NIPC_CLIENT_CALL_TIMEOUT_DEFAULT_MS;
+}
+
+void nipc_client_abort(nipc_client_ctx_t *ctx)
+{
+    if (!ctx)
+        return;
+
+    __atomic_store_n(&ctx->abort_requested, 1u, __ATOMIC_RELEASE);
+    if (ctx->abort_pipe_valid && ctx->abort_pipe[1] >= 0) {
+        const char b = 1;
+        ssize_t n;
+        do {
+            n = write(ctx->abort_pipe[1], &b, 1);
+        } while (n < 0 && errno == EINTR);
+    }
+}
+
+void nipc_client_clear_abort(nipc_client_ctx_t *ctx)
+{
+    if (!ctx)
+        return;
+
+    drain_abort_pipe(ctx);
+    __atomic_store_n(&ctx->abort_requested, 0u, __ATOMIC_RELEASE);
+}
+
 void nipc_client_close(nipc_client_ctx_t *ctx)
 {
     nipc_service_posix_client_disconnect(ctx);
+    close_abort_pipe(ctx);
+    __atomic_store_n(&ctx->abort_requested, 0u, __ATOMIC_RELEASE);
     nipc_service_common_client_close_buffers(ctx);
 }

@@ -18,6 +18,17 @@ impl RawClient {
     /// Blocking typed call: INCREMENT method.
     /// Sends a u64 value, receives the incremented u64 back.
     pub fn call_increment(&mut self, value: u64) -> Result<u64, NipcError> {
+        self.call_increment_with_timeout(value, 0)
+    }
+
+    /// Blocking typed call with an explicit timeout in milliseconds.
+    ///
+    /// A zero timeout uses the client's context-level default.
+    pub fn call_increment_with_timeout(
+        &mut self,
+        value: u64,
+        timeout_ms: u32,
+    ) -> Result<u64, NipcError> {
         self.validate_method(METHOD_INCREMENT)?;
         let req_len = {
             let req_buf = self.request_scratch(INCREMENT_PAYLOAD_SIZE);
@@ -28,21 +39,36 @@ impl RawClient {
             req_len
         };
 
-        let response =
-            self.raw_call_with_retry(METHOD_INCREMENT, req_len, RawCallKind::single())?;
+        let response = self.raw_call_with_retry_timeout(
+            METHOD_INCREMENT,
+            req_len,
+            RawCallKind::single(),
+            timeout_ms,
+        )?;
         increment_decode(self.response_payload(response)?)
     }
 
     /// Blocking typed batch call: INCREMENT method.
     /// Sends multiple u64 values, receives the incremented u64s back.
     pub fn call_increment_batch(&mut self, values: &[u64]) -> Result<Vec<u64>, NipcError> {
+        self.call_increment_batch_with_timeout(values, 0)
+    }
+
+    /// Blocking typed batch call with an explicit timeout in milliseconds.
+    ///
+    /// A zero timeout uses the client's context-level default.
+    pub fn call_increment_batch_with_timeout(
+        &mut self,
+        values: &[u64],
+        timeout_ms: u32,
+    ) -> Result<Vec<u64>, NipcError> {
         self.validate_method(METHOD_INCREMENT)?;
         if values.is_empty() {
             return Ok(Vec::new());
         }
 
         if values.len() == 1 {
-            let r = self.call_increment(values[0])?;
+            let r = self.call_increment_with_timeout(values[0], timeout_ms)?;
             return Ok(vec![r]);
         }
 
@@ -64,8 +90,12 @@ impl RawClient {
             req_len
         };
 
-        let response =
-            self.raw_call_with_retry(METHOD_INCREMENT, req_len, RawCallKind::batch(count))?;
+        let response = self.raw_call_with_retry_timeout(
+            METHOD_INCREMENT,
+            req_len,
+            RawCallKind::batch(count),
+            timeout_ms,
+        )?;
         let resp_payload = self.response_payload(response)?;
         let mut results = Vec::with_capacity(values.len());
         for i in 0..count {

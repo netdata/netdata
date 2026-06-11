@@ -157,19 +157,6 @@ app_latency_count 1
 				assert.Equal(t, 0, written, "summary with an infinite quantile value must be skipped")
 			},
 		},
-		"applies label_prefix to label keys": {
-			exposition: `
-# TYPE app_temp gauge
-app_temp{sensor="cpu"} 7
-`,
-			policy: metricFamilyWriterPolicy{labelPrefix: "px"},
-			assert: func(t *testing.T, fr metrix.Reader, written int) {
-				assert.Equal(t, 1, written)
-				assert.InDelta(t, 7, value(t, fr, "app_temp", metrix.Labels{"px_sensor": "cpu"}), 1e-9)
-				_, ok := fr.Value("app_temp", metrix.Labels{"sensor": "cpu"})
-				assert.False(t, ok, "unprefixed label key must not exist")
-			},
-		},
 		"skips _info family": {
 			exposition: `
 # TYPE app_build_info gauge

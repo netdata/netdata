@@ -38,6 +38,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define NIPC_CLIENT_CALL_TIMEOUT_DEFAULT_MS 30000u
+#define NIPC_CLIENT_ABORT_POLL_MS 100u
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -86,6 +89,7 @@ typedef struct {
     uint32_t max_request_batch_items;
     uint32_t max_response_payload_bytes;
     uint64_t auth_token;
+    uint32_t call_timeout_ms;          /* 0 = use default (30000 ms) */
 } nipc_client_config_t;
 
 /*
@@ -123,6 +127,7 @@ typedef struct {
     nipc_np_session_t session;
     bool session_valid;
     nipc_win_shm_ctx_t *shm;  /* non-NULL if SHM profile negotiated */
+    HANDLE abort_event;
 #else
     nipc_uds_client_config_t transport_config;
 
@@ -130,7 +135,12 @@ typedef struct {
     nipc_uds_session_t session;
     bool session_valid;
     nipc_shm_ctx_t *shm;  /* non-NULL if SHM profile negotiated */
+    int abort_pipe[2];
+    bool abort_pipe_valid;
 #endif
+
+    uint32_t call_timeout_ms;
+    uint32_t abort_requested;
 
     /* Stats */
     uint32_t connect_count;
@@ -182,6 +192,24 @@ void nipc_client_status(const nipc_client_ctx_t *ctx,
                         nipc_client_status_t *out);
 
 /*
+ * Set the context-level default timeout used by typed calls when their
+ * per-call timeout argument is zero. Passing zero restores the library default.
+ */
+void nipc_client_set_call_timeout(nipc_client_ctx_t *ctx, uint32_t timeout_ms);
+
+/*
+ * Abort an in-flight synchronous client call from another thread. Abort is
+ * sticky: future calls fail with NIPC_ERR_ABORTED until nipc_client_clear_abort()
+ * or nipc_client_close() is called.
+ */
+void nipc_client_abort(nipc_client_ctx_t *ctx);
+
+/*
+ * Clear a previously requested abort so the context can be refreshed/reused.
+ */
+void nipc_client_clear_abort(nipc_client_ctx_t *ctx);
+
+/*
  * Tear down connection and release resources. Safe on a zero-init ctx.
  */
 void nipc_client_close(nipc_client_ctx_t *ctx);
@@ -211,17 +239,36 @@ nipc_error_t nipc_client_call_cgroups_snapshot(
     nipc_client_ctx_t *ctx,
     nipc_cgroups_resp_view_t *view_out);
 
+nipc_error_t nipc_client_call_cgroups_snapshot_timeout(
+    nipc_client_ctx_t *ctx,
+    nipc_cgroups_resp_view_t *view_out,
+    uint32_t timeout_ms);
+
 nipc_error_t nipc_client_call_cgroups_lookup(
     nipc_client_ctx_t *ctx,
     const nipc_str_view_t *paths,
     uint32_t path_count,
     nipc_cgroups_lookup_resp_view_t *view_out);
 
+nipc_error_t nipc_client_call_cgroups_lookup_timeout(
+    nipc_client_ctx_t *ctx,
+    const nipc_str_view_t *paths,
+    uint32_t path_count,
+    nipc_cgroups_lookup_resp_view_t *view_out,
+    uint32_t timeout_ms);
+
 nipc_error_t nipc_client_call_apps_lookup(
     nipc_client_ctx_t *ctx,
     const uint32_t *pids,
     uint32_t pid_count,
     nipc_apps_lookup_resp_view_t *view_out);
+
+nipc_error_t nipc_client_call_apps_lookup_timeout(
+    nipc_client_ctx_t *ctx,
+    const uint32_t *pids,
+    uint32_t pid_count,
+    nipc_apps_lookup_resp_view_t *view_out,
+    uint32_t timeout_ms);
 
 /* ------------------------------------------------------------------ */
 /*  Managed server                                                     */

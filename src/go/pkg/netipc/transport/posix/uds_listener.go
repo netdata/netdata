@@ -24,7 +24,7 @@ func Listen(runDir, serviceName string, config ServerConfig) (*Listener, error) 
 		return nil, err
 	}
 
-	stale := checkAndRecoverStale(path, runDirAllowsStaleUnlink(runDir))
+	stale := checkAndRecoverStale(path)
 	if stale == staleLiveServer {
 		return nil, ErrAddrInUse
 	}

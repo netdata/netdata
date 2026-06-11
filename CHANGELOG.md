@@ -306,6 +306,10 @@
 - Protect v2 journal populate walk from SIGBUS ([#22514](https://github.com/netdata/netdata/issues/22514))
 - Bump aclk-schemas and adapt to Buf v2 proto layout ([#22662](https://github.com/netdata/netdata/issues/22662))
 - Networ Viewer (FreeBSD) ([#22632](https://github.com/netdata/netdata/issues/22632))
+- Add safeguards against ML database corruption and streamline recovery process ([#22478](https://github.com/netdata/netdata/issues/22478))
+- Docs: disclose silent-by-default streaming alerts and enabling ([#22534](https://github.com/netdata/netdata/issues/22534))
+- Ebpfgo.plugin (Basis of new plugin) ([#22469](https://github.com/netdata/netdata/issues/22469))
+- Feat(go.d/prometheus): add job-level metric relabeling and drop label_prefix ([#22668](https://github.com/netdata/netdata/issues/22668))
 
 ## [2.10.0] - 2026-04-09
 

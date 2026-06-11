@@ -105,6 +105,10 @@ Metrics:
 | app.mem_private_usage | mem | MiB |
 | app.vmem_usage | vmem | MiB |
 | app.mem_page_faults | minor, major | pgfaults/s |
+| app.ebpf_cachestat_hit_ratio | ratio | % |
+| app.ebpf_cachestat_dirty_pages | pages | page/s |
+| app.ebpf_cachestat_access | hits | hits/s |
+| app.ebpf_cachestat_misses | misses | misses/s |
 | app.swap_usage | swap | MiB |
 | app.disk_physical_io | reads, writes | KiB/s |
 | app.disk_logical_io | reads, writes | KiB/s |

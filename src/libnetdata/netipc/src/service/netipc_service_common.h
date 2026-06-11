@@ -34,7 +34,8 @@ typedef nipc_error_t (*nipc_service_common_transport_receive_fn)(
     size_t buf_size,
     nipc_header_t *hdr_out,
     const void **payload_out,
-    size_t *payload_len_out);
+    size_t *payload_len_out,
+    uint32_t timeout_ms);
 
 typedef struct {
     void (*disconnect)(nipc_client_ctx_t *ctx);
@@ -90,6 +91,9 @@ void nipc_service_common_client_init(nipc_client_ctx_t *ctx,
 void nipc_service_common_client_status(const nipc_client_ctx_t *ctx,
                                        nipc_client_status_t *out);
 void nipc_service_common_client_close_buffers(nipc_client_ctx_t *ctx);
+uint32_t nipc_service_common_client_call_timeout_ms(const nipc_client_ctx_t *ctx,
+                                                    uint32_t timeout_ms);
+bool nipc_service_common_client_abort_requested(const nipc_client_ctx_t *ctx);
 bool nipc_service_common_client_refresh(nipc_client_ctx_t *ctx,
                                         const nipc_service_common_client_ops_t *ops);
 void nipc_service_common_client_note_request_capacity(nipc_client_ctx_t *ctx,
@@ -118,6 +122,7 @@ nipc_error_t nipc_service_common_do_raw_call(
     size_t request_len,
     const void **response_payload_out,
     size_t *response_len_out,
+    uint32_t timeout_ms,
     nipc_service_common_transport_send_fn send_fn,
     nipc_service_common_transport_receive_fn receive_fn);
 nipc_error_t nipc_service_common_call_with_retry(

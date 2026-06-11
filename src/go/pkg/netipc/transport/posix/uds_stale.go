@@ -24,19 +24,6 @@ const (
 	staleDialTimeout    = 1 * time.Second
 )
 
-func runDirAllowsStaleUnlink(runDir string) bool {
-	euid := uint32(os.Geteuid())
-	info, err := os.Stat(runDir)
-	if err != nil || !info.IsDir() {
-		return false
-	}
-	st, ok := info.Sys().(*syscall.Stat_t)
-	if !ok || st.Uid != euid {
-		return false
-	}
-	return info.Mode().Perm()&0022 == 0
-}
-
 func dialStaleCandidate(path string) error {
 	var err error
 	for attempt := range staleDialAttempts {
@@ -56,7 +43,7 @@ func dialStaleCandidate(path string) error {
 	return err
 }
 
-func checkAndRecoverStale(path string, allowStaleUnlink bool) staleResult {
+func checkAndRecoverStale(path string) staleResult {
 	_, err := os.Stat(path)
 	if err != nil {
 		return staleNotExist
@@ -70,17 +57,19 @@ func checkAndRecoverStale(path string, allowStaleUnlink bool) staleResult {
 	if errors.Is(err, syscall.ENOENT) {
 		return staleNotExist
 	}
-	if errors.Is(err, syscall.ECONNREFUSED) {
-		if !allowStaleUnlink {
-			return staleLiveServer
-		}
-		if removeErr := os.Remove(path); removeErr != nil {
-			if os.IsNotExist(removeErr) {
-				return staleNotExist
-			}
-			return staleLiveServer
-		}
-		return staleRecovered
+	if errors.Is(err, syscall.EMFILE) || errors.Is(err, syscall.ENFILE) {
+		// Cannot probe liveness (fd exhaustion) — keep the endpoint rather
+		// than risk deleting a live socket.
+		return staleLiveServer
 	}
-	return staleLiveServer
+	// Nothing accepted the connection: a dead server's socket, or a foreign
+	// file squatting on the endpoint path. Reclaim it (os.Remove also
+	// handles a directory at the path).
+	if removeErr := os.Remove(path); removeErr != nil {
+		if os.IsNotExist(removeErr) {
+			return staleNotExist
+		}
+		return staleLiveServer
+	}
+	return staleRecovered
 }

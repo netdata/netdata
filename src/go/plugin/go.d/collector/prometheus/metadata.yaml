@@ -129,11 +129,37 @@ modules:
                     - metric_name_pattern4
                 ```
 
-            - name: label_prefix
-              description: "Optional prefix added to all labels of all charts. Labels will be formatted as `prefix_name`."
+            - name: relabeling
+              description: Prometheus-compatible metric relabeling, applied before charts are built.
               default_value: ""
               required: false
               group: Customization
+              detailed_description: |
+                A list of relabeling blocks. Each block applies a list of Prometheus
+                `metric_relabel_configs` rules to the metrics whose name matches `match`. See the
+                [relabeling reference](/src/go/plugin/go.d/collector/prometheus/relabel/README.md)
+                for the full action set and more examples.
+
+                - `match`: Netdata simple patterns matched against the full metric name — including
+                  any `_bucket`/`_sum`/`_count` suffix, so prefer globs like `app_lat*` over an exact
+                  `app_lat` (space-separated; `*` matches any sequence, `?` any character, a leading
+                  `!` negates). Use `*` to target every metric. Required.
+                - `metric_relabel_configs`: Prometheus relabel rules (`source_labels`, `separator`,
+                  `regex`, `modulus`, `target_label`, `replacement`, `action`), applied in order to
+                  the scraped samples before charts are built.
+
+                Relabeling that would corrupt a histogram or summary — splitting it, dropping a
+                component, mutating the `le`/`quantile` label, or merging two families — is rejected.
+
+                ```yaml
+                relabeling:
+                  - match: 'http_*'
+                    metric_relabel_configs:
+                      - source_labels: [code]
+                        regex: '(\d)\d\d'
+                        target_label: code_class
+                        replacement: '${1}xx'
+                ```
 
             - name: username
               description: Username for Basic HTTP authentication.
@@ -273,9 +299,40 @@ modules:
                 jobs:
                   - name: local
                     url: http://127.0.0.1:9090/metrics
-                
+
                   - name: remote
                     url: http://192.0.2.1:9090/metrics
+            - name: Metric relabeling
+              description: Derive a `code_class` label (2xx, 4xx, ...) on metrics named `http_*`.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9090/metrics
+                    relabeling:
+                      - match: 'http_*'
+                        metric_relabel_configs:
+                          - source_labels: [code]
+                            regex: '(\d)\d\d'
+                            target_label: code_class
+                            replacement: '${1}xx'
+            - name: Rename labels that collide with Netdata's reserved labels
+              description: |
+                When these metrics are re-exported in Prometheus format, Netdata adds its own `instance`,
+                `family`, `chart`, and `dimension` labels. If the scraped endpoint already uses one of those
+                names, the re-export emits a duplicate label and a downstream Prometheus rejects the scrape.
+                Rename the colliding labels to avoid it (the use case the former `label_prefix` option served).
+              config: |
+                jobs:
+                  - name: coredns
+                    url: http://127.0.0.1:9153/metrics
+                    relabeling:
+                      - match: '*'
+                        metric_relabel_configs:
+                          - regex: '(instance|family)'
+                            action: labelmap
+                            replacement: 'coredns_$1'
+                          - regex: '(instance|family)'
+                            action: labeldrop
     troubleshooting:
       problems:
         list:

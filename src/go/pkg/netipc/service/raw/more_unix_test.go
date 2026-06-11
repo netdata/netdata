@@ -211,6 +211,87 @@ func refreshUnixClientReady(t *testing.T, client *Client) {
 	t.Fatalf("client not ready, state=%d", client.state)
 }
 
+func TestUnixClientCallTimeoutOnWedgedPeer(t *testing.T) {
+	cfg := testServerConfig()
+	svc := uniqueUnixService("go_unix_call_timeout")
+	srv := startRawPosixSessionServer(t, svc, cfg,
+		func(session *posix.Session, hdr protocol.Header, payload []byte) error {
+			_ = session
+			_ = hdr
+			_ = payload
+			time.Sleep(150 * time.Millisecond)
+			return nil
+		})
+
+	client := NewIncrementClient(testRunDir, svc, testClientConfig())
+	defer client.Close()
+	refreshUnixClientReady(t, client)
+
+	start := time.Now()
+	_, err := client.CallIncrementWithTimeout(41, 30)
+	elapsed := time.Since(start)
+	if !errors.Is(err, protocol.ErrTimeout) {
+		t.Fatalf("CallIncrementWithTimeout error = %v, want %v", err, protocol.ErrTimeout)
+	}
+	if elapsed > time.Second {
+		t.Fatalf("timeout took too long: %s", elapsed)
+	}
+
+	srv.wait(t)
+	cleanupAll(svc)
+}
+
+func TestUnixClientAbortUnblocksCall(t *testing.T) {
+	cfg := testServerConfig()
+	svc := uniqueUnixService("go_unix_call_abort")
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	srv := startRawPosixSessionServer(t, svc, cfg,
+		func(session *posix.Session, hdr protocol.Header, payload []byte) error {
+			_ = session
+			_ = hdr
+			_ = payload
+			close(entered)
+			<-release
+			return nil
+		})
+
+	client := NewIncrementClient(testRunDir, svc, testClientConfig())
+	defer client.Close()
+	refreshUnixClientReady(t, client)
+
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := client.CallIncrementWithTimeout(41, 5000)
+		errCh <- err
+	}()
+
+	select {
+	case <-entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("server handler did not receive request")
+	}
+
+	start := time.Now()
+	client.Abort()
+	var err error
+	select {
+	case err = <-errCh:
+	case <-time.After(time.Second):
+		t.Fatal("Abort did not unblock the call within one second")
+	}
+	if !errors.Is(err, protocol.ErrAborted) {
+		t.Fatalf("aborted call error = %v, want %v", err, protocol.ErrAborted)
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("abort took too long: %s", elapsed)
+	}
+
+	close(release)
+	srv.wait(t)
+	cleanupAll(svc)
+}
+
 func newRawPosixShmClient(t *testing.T) (*Client, *posix.ShmContext) {
 	t.Helper()
 

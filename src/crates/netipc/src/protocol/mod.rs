@@ -103,6 +103,10 @@ pub enum NipcError {
     BadItemCount,
     /// Builder ran out of space.
     Overflow,
+    /// Synchronous call timed out before a complete response arrived.
+    Timeout,
+    /// Synchronous call was aborted by the caller.
+    Aborted,
 }
 
 impl core::fmt::Display for NipcError {
@@ -119,6 +123,8 @@ impl core::fmt::Display for NipcError {
             NipcError::BadAlignment => write!(f, "item not 8-byte aligned"),
             NipcError::BadItemCount => write!(f, "item count inconsistent"),
             NipcError::Overflow => write!(f, "builder out of space"),
+            NipcError::Timeout => write!(f, "synchronous call timed out"),
+            NipcError::Aborted => write!(f, "synchronous call aborted"),
         }
     }
 }

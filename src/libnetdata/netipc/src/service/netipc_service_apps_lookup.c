@@ -46,6 +46,7 @@ typedef struct {
     const uint32_t *pids;
     uint32_t pid_count;
     nipc_apps_lookup_resp_view_t *view_out;
+    uint32_t timeout_ms;
 } apps_lookup_call_state_t;
 
 static nipc_error_t do_apps_lookup_attempt(nipc_client_ctx_t *ctx, void *state)
@@ -74,7 +75,7 @@ static nipc_error_t do_apps_lookup_attempt(nipc_client_ctx_t *ctx, void *state)
     size_t payload_len;
     nipc_error_t err = nipc_service_platform_do_raw_call(
         ctx, NIPC_METHOD_APPS_LOOKUP, ctx->send_buf, req_len,
-        &payload, &payload_len);
+        &payload, &payload_len, s->timeout_ms);
     if (err != NIPC_OK)
         return err;
 
@@ -100,10 +101,21 @@ nipc_error_t nipc_client_call_apps_lookup(
     uint32_t pid_count,
     nipc_apps_lookup_resp_view_t *view_out)
 {
+    return nipc_client_call_apps_lookup_timeout(ctx, pids, pid_count, view_out, 0);
+}
+
+nipc_error_t nipc_client_call_apps_lookup_timeout(
+    nipc_client_ctx_t *ctx,
+    const uint32_t *pids,
+    uint32_t pid_count,
+    nipc_apps_lookup_resp_view_t *view_out,
+    uint32_t timeout_ms)
+{
     apps_lookup_call_state_t state = {
         .pids = pids,
         .pid_count = pid_count,
         .view_out = view_out,
+        .timeout_ms = timeout_ms,
     };
     return nipc_service_platform_call_with_retry(
         ctx, do_apps_lookup_attempt, &state);

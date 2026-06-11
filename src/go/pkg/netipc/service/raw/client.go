@@ -30,6 +30,55 @@ func (c *Client) validateMethod(methodCode uint16) error {
 	return nil
 }
 
+func (c *Client) resolvedCallTimeout(timeoutMs uint32) uint32 {
+	if timeoutMs != 0 {
+		return timeoutMs
+	}
+	if c.callTimeoutMs != 0 {
+		return c.callTimeoutMs
+	}
+	return ClientCallTimeoutDefaultMs
+}
+
+func (c *Client) abortSignal() <-chan struct{} {
+	c.abortMu.Lock()
+	ch := c.abortCh
+	c.abortMu.Unlock()
+	return ch
+}
+
+// SetCallTimeout sets the context-level default timeout for typed calls.
+// Passing zero restores the library default.
+func (c *Client) SetCallTimeout(timeoutMs uint32) {
+	if timeoutMs == 0 {
+		timeoutMs = ClientCallTimeoutDefaultMs
+	}
+	c.callTimeoutMs = timeoutMs
+}
+
+// Abort unblocks an in-flight synchronous call. Abort is sticky until ClearAbort
+// or Close is called.
+func (c *Client) Abort() {
+	c.abortMu.Lock()
+	defer c.abortMu.Unlock()
+	if c.abortRequested.Load() {
+		return
+	}
+	c.abortRequested.Store(true)
+	close(c.abortCh)
+}
+
+// ClearAbort clears a previous Abort so the client can be refreshed/reused.
+func (c *Client) ClearAbort() {
+	c.abortMu.Lock()
+	defer c.abortMu.Unlock()
+	if !c.abortRequested.Load() {
+		return
+	}
+	c.abortCh = make(chan struct{})
+	c.abortRequested.Store(false)
+}
+
 // Refresh attempts connect if DISCONNECTED/NOT_FOUND, reconnect if BROKEN.
 // Returns true if the state changed.
 func (c *Client) Refresh() bool {
@@ -112,6 +161,10 @@ func (c *Client) callWithRetry(attempt func() error) error {
 		c.errorCount++
 		return protocol.ErrBadLayout
 	}
+	if c.abortRequested.Load() {
+		c.errorCount++
+		return protocol.ErrAborted
+	}
 
 	// Cap overflow-driven retries: payloads grow by powers of 2, so 8
 	// retries allows ~256x growth from the initial negotiated size.
@@ -126,6 +179,13 @@ func (c *Client) callWithRetry(attempt func() error) error {
 		if firstErr == nil {
 			c.callCount++
 			return nil
+		}
+
+		if errors.Is(firstErr, protocol.ErrTimeout) || errors.Is(firstErr, protocol.ErrAborted) {
+			c.disconnect()
+			c.state = StateBroken
+			c.errorCount++
+			return firstErr
 		}
 
 		if !errors.Is(firstErr, protocol.ErrOverflow) {
@@ -184,6 +244,10 @@ func (c *Client) callWithRetry(attempt func() error) error {
 // doRawCall sends a request and receives/validates the response envelope.
 // Returns the validated response header and a borrowed payload view.
 func (c *Client) doRawCall(methodCode uint16, reqPayload []byte) (protocol.Header, []byte, error) {
+	return c.doRawCallWithTimeout(methodCode, reqPayload, 0)
+}
+
+func (c *Client) doRawCallWithTimeout(methodCode uint16, reqPayload []byte, timeoutMs uint32) (protocol.Header, []byte, error) {
 	hdr := protocol.Header{
 		Kind:            protocol.KindRequest,
 		Code:            methodCode,
@@ -197,7 +261,7 @@ func (c *Client) doRawCall(methodCode uint16, reqPayload []byte) (protocol.Heade
 		return protocol.Header{}, nil, err
 	}
 
-	respHdr, payload, err := c.transportReceive()
+	respHdr, payload, err := c.transportReceiveWithControl(c.resolvedCallTimeout(timeoutMs), c.abortSignal())
 	if err != nil {
 		return protocol.Header{}, nil, err
 	}
@@ -232,5 +296,6 @@ func (c *Client) doRawCall(methodCode uint16, reqPayload []byte) (protocol.Heade
 // Close tears down the connection and releases resources.
 func (c *Client) Close() {
 	c.disconnect()
+	c.ClearAbort()
 	c.state = StateDisconnected
 }

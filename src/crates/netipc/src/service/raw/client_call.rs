@@ -1,25 +1,35 @@
-use super::client::{ClientResponseRef, ClientResponseSource, ClientState, RawCallKind, RawClient};
+use super::client::{
+    ClientResponseRef, ClientResponseSource, ClientState, RawCallKind, RawClient,
+    CLIENT_ABORT_POLL_MS,
+};
 use super::common::{ensure_client_scratch, CACHE_RESPONSE_BUF_SIZE};
 use crate::protocol::{
     self, Header, NipcError, HEADER_SIZE, KIND_REQUEST, KIND_RESPONSE, MAGIC_MSG,
     STATUS_LIMIT_EXCEEDED, STATUS_OK, VERSION,
 };
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant};
 
 impl RawClient {
-    /// Reconnect-driven recovery for raw calls.
-    ///
-    /// Ordinary failures retry once. Overflow-driven resize recovery may
-    /// reconnect more than once while negotiated capacities grow.
-    pub(super) fn raw_call_with_retry(
+    pub(super) fn raw_call_with_retry_timeout(
         &mut self,
         method_code: u16,
         req_len: usize,
         call: RawCallKind,
+        timeout_ms: u32,
     ) -> Result<ClientResponseRef, NipcError> {
         if self.state != ClientState::Ready {
             self.error_count += 1;
             return Err(NipcError::BadLayout);
         }
+        if self.abort_requested() {
+            self.disconnect();
+            self.state = ClientState::Broken;
+            self.error_count += 1;
+            return Err(NipcError::Aborted);
+        }
+
+        let timeout_ms = self.resolved_call_timeout(timeout_ms);
 
         let mut overflow_retries = 0u32;
         loop {
@@ -28,12 +38,19 @@ impl RawClient {
             let prev_cfg_req = self.transport_config.max_request_payload_bytes;
             let prev_cfg_resp = self.transport_config.max_response_payload_bytes;
 
-            match self.do_raw_call(method_code, req_len, call) {
+            match self.do_raw_call(method_code, req_len, call, timeout_ms) {
                 Ok(payload) => {
                     self.call_count += 1;
                     return Ok(payload);
                 }
                 Err(first_err) => {
+                    if first_err == NipcError::Timeout || first_err == NipcError::Aborted {
+                        self.disconnect();
+                        self.state = ClientState::Broken;
+                        self.error_count += 1;
+                        return Err(first_err);
+                    }
+
                     if first_err != NipcError::Overflow {
                         self.disconnect();
                         self.state = ClientState::Broken;
@@ -44,7 +61,7 @@ impl RawClient {
                         }
                         self.reconnect_count += 1;
 
-                        match self.do_raw_call(method_code, req_len, call) {
+                        match self.do_raw_call(method_code, req_len, call, timeout_ms) {
                             Ok(payload) => {
                                 self.call_count += 1;
                                 return Ok(payload);
@@ -96,7 +113,12 @@ impl RawClient {
         method_code: u16,
         req_len: usize,
         call: RawCallKind,
+        timeout_ms: u32,
     ) -> Result<ClientResponseRef, NipcError> {
+        if self.abort_requested() {
+            return Err(NipcError::Aborted);
+        }
+
         let mut hdr = Header {
             kind: KIND_REQUEST,
             code: method_code,
@@ -108,7 +130,7 @@ impl RawClient {
         };
 
         self.transport_send_request_buf(&mut hdr, req_len)?;
-        let (resp_hdr, response) = self.transport_receive()?;
+        let (resp_hdr, response) = self.transport_receive(timeout_ms)?;
 
         if resp_hdr.kind != KIND_RESPONSE {
             return Err(NipcError::BadKind);
@@ -250,16 +272,18 @@ impl RawClient {
     }
 
     /// Receive via the active transport. Returns (header, payload view).
-    pub(super) fn transport_receive(&mut self) -> Result<(Header, ClientResponseRef), NipcError> {
+    pub(super) fn transport_receive(
+        &mut self,
+        timeout_ms: u32,
+    ) -> Result<(Header, ClientResponseRef), NipcError> {
         let needed = self.max_receive_message_bytes();
+        let abort = self.abort_requested.clone();
         let scratch = ensure_client_scratch(&mut self.transport_buf, needed);
 
         #[cfg(target_os = "linux")]
         {
             if let Some(ref mut shm) = self.shm {
-                let mlen = shm
-                    .receive(scratch, 30000)
-                    .map_err(|_| NipcError::Truncated)?;
+                let mlen = receive_posix_shm_with_control(shm, scratch, timeout_ms, &abort)?;
 
                 if mlen < HEADER_SIZE {
                     return Err(NipcError::Truncated);
@@ -279,9 +303,7 @@ impl RawClient {
         #[cfg(windows)]
         {
             if let Some(ref mut shm) = self.shm {
-                let mlen = shm
-                    .receive(scratch, 30000)
-                    .map_err(|_| NipcError::Truncated)?;
+                let mlen = receive_win_shm_with_control(shm, scratch, timeout_ms, &abort)?;
 
                 if mlen < HEADER_SIZE {
                     return Err(NipcError::Truncated);
@@ -303,7 +325,9 @@ impl RawClient {
         #[cfg(unix)]
         {
             let scratch_payload_ptr = unsafe { scratch.as_ptr().add(HEADER_SIZE) };
-            let (hdr, payload) = session.receive(scratch).map_err(|_| NipcError::Truncated)?;
+            let (hdr, payload) = session
+                .receive_with_control(scratch, timeout_ms, Some(&abort))
+                .map_err(map_uds_receive_error)?;
             let source = if payload.as_ptr() == scratch_payload_ptr {
                 ClientResponseSource::TransportBuf
             } else {
@@ -321,7 +345,9 @@ impl RawClient {
         #[cfg(windows)]
         {
             let scratch_payload_ptr = unsafe { scratch.as_ptr().add(HEADER_SIZE) };
-            let (hdr, payload) = session.receive(scratch).map_err(|_| NipcError::Truncated)?;
+            let (hdr, payload) = session
+                .receive_with_control(scratch, timeout_ms, Some(&abort))
+                .map_err(map_np_receive_error)?;
             let source = if payload.as_ptr() == scratch_payload_ptr {
                 ClientResponseSource::TransportBuf
             } else {
@@ -382,5 +408,93 @@ impl RawClient {
             max_payload = CACHE_RESPONSE_BUF_SIZE;
         }
         HEADER_SIZE + max_payload
+    }
+}
+
+fn receive_deadline(timeout_ms: u32) -> Option<Instant> {
+    (timeout_ms != 0).then(|| Instant::now() + Duration::from_millis(timeout_ms as u64))
+}
+
+fn receive_wait_slice_ms(deadline: Option<Instant>, abort: &AtomicBool) -> Result<u32, NipcError> {
+    if abort.load(Ordering::Acquire) {
+        return Err(NipcError::Aborted);
+    }
+
+    let mut wait_ms: Option<u128> = if let Some(deadline) = deadline {
+        let now = Instant::now();
+        if now >= deadline {
+            return Err(NipcError::Timeout);
+        }
+        Some(deadline.duration_since(now).as_millis().max(1))
+    } else {
+        None
+    };
+
+    wait_ms = Some(wait_ms.map_or(CLIENT_ABORT_POLL_MS as u128, |ms| {
+        ms.min(CLIENT_ABORT_POLL_MS as u128)
+    }));
+
+    Ok(wait_ms.unwrap().min(u32::MAX as u128) as u32)
+}
+
+#[cfg(target_os = "linux")]
+fn receive_posix_shm_with_control(
+    shm: &mut crate::transport::shm::ShmContext,
+    scratch: &mut [u8],
+    timeout_ms: u32,
+    abort: &AtomicBool,
+) -> Result<usize, NipcError> {
+    use crate::transport::shm::ShmError;
+
+    let deadline = receive_deadline(timeout_ms);
+    loop {
+        let wait_ms = receive_wait_slice_ms(deadline, abort)?;
+        match shm.receive(scratch, wait_ms) {
+            Ok(mlen) => return Ok(mlen),
+            Err(ShmError::Timeout) => continue,
+            Err(ShmError::MsgTooLarge) => return Err(NipcError::Overflow),
+            Err(_) => return Err(NipcError::Truncated),
+        }
+    }
+}
+
+#[cfg(windows)]
+fn receive_win_shm_with_control(
+    shm: &mut crate::transport::win_shm::WinShmContext,
+    scratch: &mut [u8],
+    timeout_ms: u32,
+    abort: &AtomicBool,
+) -> Result<usize, NipcError> {
+    use crate::transport::win_shm::WinShmError;
+
+    let deadline = receive_deadline(timeout_ms);
+    loop {
+        let wait_ms = receive_wait_slice_ms(deadline, abort)?;
+        match shm.receive(scratch, wait_ms) {
+            Ok(mlen) => return Ok(mlen),
+            Err(WinShmError::Timeout) => continue,
+            Err(WinShmError::MsgTooLarge) => return Err(NipcError::Overflow),
+            Err(_) => return Err(NipcError::Truncated),
+        }
+    }
+}
+
+#[cfg(unix)]
+fn map_uds_receive_error(err: crate::transport::posix::UdsError) -> NipcError {
+    match err {
+        crate::transport::posix::UdsError::Timeout => NipcError::Timeout,
+        crate::transport::posix::UdsError::Aborted => NipcError::Aborted,
+        crate::transport::posix::UdsError::LimitExceeded => NipcError::Overflow,
+        _ => NipcError::Truncated,
+    }
+}
+
+#[cfg(windows)]
+fn map_np_receive_error(err: crate::transport::windows::NpError) -> NipcError {
+    match err {
+        crate::transport::windows::NpError::Timeout => NipcError::Timeout,
+        crate::transport::windows::NpError::Aborted => NipcError::Aborted,
+        crate::transport::windows::NpError::LimitExceeded => NipcError::Overflow,
+        _ => NipcError::Truncated,
     }
 }
