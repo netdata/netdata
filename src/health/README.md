@@ -488,9 +488,9 @@ Check:
 grep 'enable stock health configuration' /etc/netdata/netdata.conf
 ```
 
-Restore: set `enable stock health configuration = yes` (or remove the line to use the default), then reload health configuration:
+Restore: set `enable stock health configuration = yes` (or remove the line to use the default), then restart the Agent — `netdatacli reload-health` does not reload `netdata.conf`:
 ```bash
-sudo netdatacli reload-health
+sudo systemctl restart netdata
 ```
 
 #### 3. File shadowing
