@@ -575,6 +575,66 @@ mod tests {
         assert_eq!(metrics.hour_1_commit_batches.load(Ordering::Relaxed), 0);
     }
 
+    /// Manual measurement gate (SOW step 5, gate b): the tick's prune holds
+    /// the flow-index store WRITE lock while `BTreeMap::retain` drops
+    /// aged-out hours — at high cardinality that drop frees an entire
+    /// hour's FlowIndex under the lock, stalling the receive thread (and
+    /// any worker read). Two properties gated: the per-second steady-state
+    /// prune (nothing to drop) must be trivially cheap, and the
+    /// once-per-hour drop of a 200k-flow hour must stay well inside the
+    /// socket buffer's ~1s absorption. Fallback knob if this regresses:
+    /// prune every 10s instead of every tick.
+    #[test]
+    #[ignore = "manual prune-hold measurement gate (timing-sensitive)"]
+    fn prune_write_lock_hold_is_bounded_at_high_cardinality() {
+        const FLOWS_PER_HOUR: u32 = 200_000;
+        const HOUR_USEC: u64 = 3_600_000_000;
+
+        let hour_a = (1_700_000_000_000_000_u64 / HOUR_USEC) * HOUR_USEC;
+        let hour_b = hour_a + HOUR_USEC;
+        let store = std::sync::RwLock::new(TierFlowIndexStore::default());
+        {
+            let mut guard = store.write().expect("populate store");
+            for seed in 0..FLOWS_PER_HOUR {
+                let spread = (seed as u64 % 3_600) * 1_000_000;
+                let _ = guard.get_or_insert_record_flow(hour_a + spread, &flow_record(seed));
+                let _ = guard.get_or_insert_record_flow(hour_b + spread, &flow_record(seed));
+            }
+        }
+
+        // Steady state: the every-second prune with nothing to drop.
+        let keep_both: BTreeSet<u64> = [hour_a, hour_b].into_iter().collect();
+        let mut noop_waits = Vec::with_capacity(100);
+        for _ in 0..100 {
+            let begin = Instant::now();
+            let mut guard = store.write().expect("noop prune");
+            guard.prune_unused_hours(&keep_both);
+            drop(guard);
+            noop_waits.push(begin.elapsed().as_micros() as u64);
+        }
+        let noop_p99 = p99_usec(noop_waits);
+        assert!(
+            noop_p99 <= 1_000,
+            "steady-state prune held the write lock {noop_p99}µs at p99 — \
+             the per-second tick cannot afford this"
+        );
+
+        // Hour transition: drop the 200k-flow hour A under the lock.
+        let keep_b: BTreeSet<u64> = [hour_b].into_iter().collect();
+        let begin = Instant::now();
+        let mut guard = store.write().expect("drop prune");
+        guard.prune_unused_hours(&keep_b);
+        drop(guard);
+        let drop_hold_usec = begin.elapsed().as_micros() as u64;
+        eprintln!("prune drop-hold for a {FLOWS_PER_HOUR}-flow hour: {drop_hold_usec}µs");
+        assert!(
+            drop_hold_usec <= 500_000,
+            "dropping a {FLOWS_PER_HOUR}-flow hour held the write lock \
+             {drop_hold_usec}µs — exceeds the drop-safety budget; consider \
+             the 10s prune cadence fallback"
+        );
+    }
+
     fn flow_record(seed: u32) -> FlowRecord {
         let mut rec = FlowRecord::default();
         rec.protocol = 6;

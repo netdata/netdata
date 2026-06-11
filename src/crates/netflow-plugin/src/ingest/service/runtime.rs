@@ -456,6 +456,31 @@ impl IngestService {
         self.handle_sync_tick(entries_since_sync)
     }
 
+    /// Production-shaped batch path for worker-mode benchmarks: ingest the
+    /// records, serve raised doorbells (the per-packet cost), and apply the
+    /// sync threshold — exactly what `handle_received_packet` does, minus
+    /// the decode.
+    #[cfg(test)]
+    pub(crate) fn handle_decoded_batch_with_handoffs_for_test(
+        &mut self,
+        receive_time_usec: u64,
+        records: &[crate::flow::FlowRecord],
+        mut entries_since_sync: usize,
+    ) -> usize {
+        for record in records {
+            if self.ingest_decoded_record_internal(
+                receive_time_usec,
+                receive_time_usec,
+                record,
+                true,
+            ) {
+                entries_since_sync += 1;
+            }
+        }
+        self.handle_tier_handoffs();
+        self.sync_if_threshold_reached(entries_since_sync)
+    }
+
     #[cfg(test)]
     fn handle_decoded_batch_with_options_for_test(
         &mut self,
