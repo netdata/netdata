@@ -313,6 +313,9 @@ fn commit_and_return(
         // the commit-age metric tracks a stuck worker, not an idle tier.
         let sync = &shared.slots[worker.index];
         let mut slot = sync.slot.lock().unwrap_or_else(|_| std::process::abort());
+        // Already empty here (an empty respond extends nothing and the prior
+        // commit cleared it); the clear is defense in depth, not a fix.
+        slot.in_flight_hours.clear();
         slot.last_commit_usec = now_usec();
         return;
     }

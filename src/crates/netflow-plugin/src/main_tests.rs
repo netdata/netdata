@@ -409,7 +409,11 @@ async fn e2e_tier_commit_workers_roundtrip() {
     service.spawn_tier_commit_workers_for_test();
 
     // The workers raise their doorbells immediately (claim-on-spawn); play
-    // the receive thread's role and respond until the commits land.
+    // the receive thread's role and respond until the commits land. In the
+    // first ~25 minutes of an hour the back-dated timestamps fall in the
+    // previous hour, so the 1h bucket is closed too and contributes 2 more
+    // rows — the totals below are lower bounds; the per-tier journal
+    // assertions stay exact.
     let expected_rows = 4; // 2 protocol rows in the 1m bucket + 2 in the 5m.
     let mut committed = 0;
     for _ in 0..300 {
@@ -420,9 +424,9 @@ async fn e2e_tier_commit_workers_roundtrip() {
         }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
-    assert_eq!(
-        committed, expected_rows,
-        "workers should commit the closed 1m and 5m buckets"
+    assert!(
+        committed >= expected_rows,
+        "workers should commit the closed 1m and 5m buckets, got {committed}"
     );
 
     // The tick mirrors slot telemetry into the chart atomics. The entry
@@ -531,10 +535,13 @@ async fn e2e_tier_commit_workers_shutdown_drains_residual_buckets() {
         shutdown_started.elapsed()
     );
 
-    assert_eq!(
-        metrics.tier_entries_written.load(Ordering::Relaxed),
-        4,
-        "shutdown must drain the residual 1m and 5m buckets through the workers"
+    // The 1h bucket is also closed (and adds 2 rows) when the back-dated
+    // timestamps fall in the previous hour; the total is a lower bound and
+    // the per-tier journal assertions below stay exact.
+    let written = metrics.tier_entries_written.load(Ordering::Relaxed);
+    assert!(
+        written >= 4,
+        "shutdown must drain the residual 1m and 5m buckets through the workers, got {written}"
     );
     let minute_1 = timestamp_counts(&journal_source_realtime_timestamps(
         &cfg.journal.minute_1_tier_dir(),
