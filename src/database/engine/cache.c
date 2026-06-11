@@ -613,7 +613,7 @@ static void pgc_section_pages_static_aral_init(void) {
             "pgc-sections", sizeof(struct section_pages), 0, 0, &pgc_aral_statistics,
             NULL, NULL, false, false, false);
 
-        pulse_aral_register_statistics(&pgc_aral_statistics, "pgc");
+        dbengine_stats_register_aral_statistics(&pgc_aral_statistics, "pgc");
     }
 
     spinlock_unlock(&spinlock);
@@ -2030,7 +2030,7 @@ PGC *pgc_create(const char *name,
 
     cache->config.options = options;
     cache->config.additional_bytes_per_page = additional_bytes_per_page;
-    cache->config.stats = pulse_enabled;
+    cache->config.stats = dbengine_collect_stats();
 
     // flushing
     cache->config.max_flushes_inline            = (max_flushes_inline == 0) ? 2 : max_flushes_inline;

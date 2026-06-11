@@ -1810,6 +1810,7 @@ if(ENABLE_DBENGINE)
             src/database/engine/rrdenginelib.h
             src/database/engine/rrdengineapi.c
             src/database/engine/rrdengineapi.h
+            src/database/engine/dbengine-stats.h
             src/database/engine/pagecache.c
             src/database/engine/pagecache.h
             src/database/engine/page_test.cc
