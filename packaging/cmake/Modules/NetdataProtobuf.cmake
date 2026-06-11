@@ -110,7 +110,23 @@ macro(netdata_detect_protobuf)
                 endif()
                 set(PROTOBUF_CFLAGS_OTHER "")
                 set(PROTOBUF_INCLUDE_DIRS "")
-                set(PROTOBUF_LIBRARIES "-lprotobuf")
+
+                # Use CMake config mode so Abseil transitive deps are resolved
+                # automatically (protobuf v22+ depends on absl_* libraries).
+                # Falling back to a raw -lprotobuf flag drops the transitive
+                # deps and causes undefined-reference linker errors at final link.
+                find_package(Protobuf CONFIG QUIET)
+                if(TARGET protobuf::libprotobuf)
+                        set(PROTOBUF_LIBRARIES protobuf::libprotobuf)
+                else()
+                        # Module-mode fallback (older protobuf installs)
+                        find_package(Protobuf QUIET)
+                        if(TARGET protobuf::libprotobuf)
+                                set(PROTOBUF_LIBRARIES protobuf::libprotobuf)
+                        else()
+                                set(PROTOBUF_LIBRARIES "-lprotobuf")
+                        endif()
+                endif()
 
                 set(ENABLE_PROTOBUF True)
                 set(HAVE_PROTOBUF True)

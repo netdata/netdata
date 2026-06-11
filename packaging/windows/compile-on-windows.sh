@@ -84,6 +84,24 @@ fi
 
 COMMON_CFLAGS="-Wa,-mbig-obj -pipe -D_FILE_OFFSET_BITS=64 -D__USE_MINGW_ANSI_STDIO=1"
 
+# GNU BFD ld.exe crashes or OOMs on large RelWithDebInfo builds because it
+# cannot handle the combined DWARF load from 700+ objects + absl + protobuf.
+# lld handles this correctly and links ~10x faster.
+# Install with: pacman -S mingw-w64-ucrt-x86_64-lld
+linker_cmake_flags=()
+if [ -x "/ucrt64/bin/ld.lld" ]; then
+    linker_cmake_flags=("-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld"
+                        "-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld")
+else
+    # BFD fallback: reduce DWARF from level 2 (-g) to level 1 (-g1) so the
+    # linker's memory footprint stays within bounds.
+    # FLAGS variables are space-separated strings, not CMake lists — no semicolons.
+    linker_cmake_flags=(
+        "-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -g1 -DNDEBUG"
+        "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -g1 -DNDEBUG"
+    )
+fi
+
 if [ "${CMAKE_BUILD_TYPE}" = "Debug" ]; then
     BUILD_CFLAGS="-O0 -ggdb -Wall -Wextra -Wno-char-subscripts -DNETDATA_INTERNAL_CHECKS=1 ${COMMON_CFLAGS} ${CFLAGS:-}"
 else
@@ -97,6 +115,7 @@ CFLAGS="${BUILD_CFLAGS}" /ucrt64/bin/cmake \
     -B "${build}" \
     -G "${generator}" \
     "${cmake_make_program[@]}" \
+    "${linker_cmake_flags[@]}" \
     -DCMAKE_INSTALL_PREFIX="/opt/netdata" \
     -DBUILD_FOR_PACKAGING=On \
     -DNETDATA_USER="${USER}" \
