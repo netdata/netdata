@@ -95,6 +95,33 @@ void mrg_update_metric_retention_and_granularity_by_uuid(
     time_t now_s,
     uint64_t *journal_samples);
 
+// same retention/granularity update on a metric the caller has already
+// acquired (or that is pinned by the prepopulation references) - performs
+// NO refcount operations
+void mrg_metric_update_retention_and_granularity(
+    MRG *mrg,
+    METRIC *metric,
+    time_t first_time_s,
+    time_t last_time_s,
+    uint32_t update_every_s,
+    time_t now_s,
+    uint64_t *journal_samples);
+
+// --------------------------------------------------------------------------
+// prepopulation index
+//
+// Immutable open-addressing hash uuid -> METRIC* per tier, built while
+// mrg_load() prepopulates MRG from the metadata database, probed lock-free
+// by startup journal replay, and freed by mrg_metric_prepopulate_cleanup()
+// right before the prepopulated references are released - so every METRIC*
+// it returns is pinned for the whole life of the index.
+
+void mrg_prepopulation_index_init(size_t tiers);
+void mrg_prepopulation_index_insert(const nd_uuid_t uuid, size_t tier, METRIC *metric);
+METRIC *mrg_prepopulation_index_get(const nd_uuid_t uuid, size_t tier);
+void mrg_prepopulation_index_account(size_t hits, size_t misses);
+void mrg_prepopulation_index_free(void);
+
 bool mrg_save(MRG *mrg);
 bool mrg_load(MRG *mrg);
 void mrg_metric_prepopulate_cleanup(MRG *mrg);
