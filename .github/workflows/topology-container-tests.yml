@@ -1,0 +1,133 @@
+---
+name: Topology Container Tests
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/topology-container-tests.yml'
+      - 'src/collectors/cgroups.plugin/**'
+      - 'src/collectors/apps.plugin/**'
+      - 'src/collectors/network-viewer.plugin/**'
+      - 'src/collectors/common-cgroups/**'
+      - 'src/libnetdata/netipc/**'
+  pull_request:
+    paths:
+      - '.github/workflows/topology-container-tests.yml'
+      - 'src/collectors/cgroups.plugin/**'
+      - 'src/collectors/apps.plugin/**'
+      - 'src/collectors/network-viewer.plugin/**'
+      - 'src/collectors/common-cgroups/**'
+      - 'src/libnetdata/netipc/**'
+
+concurrency:
+  group: topology-container-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TEST_TARGETS: >-
+    apps-cgroups-path-test
+    apps-lookup-protocol-test
+    cgroup-lookup-netipc-test
+    cgroup-orchestrator-test
+    network-viewer-apps-lookup-client-test
+    network-viewer-topology-containers-test
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build pkg-config flex bison g++ \
+            libatomic1 libsystemd-dev libpcre2-dev libcurl4-openssl-dev \
+            liblz4-dev libzstd-dev libuv1-dev libssl-dev libelf-dev \
+            libjson-c-dev libyaml-dev zlib1g-dev \
+            libprotobuf-dev protobuf-compiler \
+            libmnl-dev libnetfilter-acct-dev
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DENABLE_PLUGIN_GO=OFF \
+            -DENABLE_PLUGIN_XENSTAT=OFF \
+            -DENABLE_BUNDLED_PROTOBUF=Off
+
+      - name: Build test binaries
+        run: echo "${TEST_TARGETS}" | xargs ninja -C build
+
+      - name: Run test binaries
+        run: |
+          set -euo pipefail
+          for t in ${TEST_TARGETS}; do
+            bin="$(find build -name "$t" -type f -executable | head -n 1)"
+            if [ -z "$bin" ]; then
+              echo "::error::test binary $t not found"
+              exit 1
+            fi
+            echo "--- running $t"
+            timeout 120 "$bin"
+            echo "--- $t OK"
+          done
+
+      - name: Validate topology fixtures
+        run: python3 src/collectors/network-viewer.plugin/tests/validate_topology_container_fixtures.py
+
+  asan-tests:
+    name: Unit Tests (ASAN)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build pkg-config flex bison g++ \
+            libatomic1 libsystemd-dev libpcre2-dev libcurl4-openssl-dev \
+            liblz4-dev libzstd-dev libuv1-dev libssl-dev libelf-dev \
+            libjson-c-dev libyaml-dev zlib1g-dev \
+            libprotobuf-dev protobuf-compiler \
+            libmnl-dev libnetfilter-acct-dev
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-fsanitize=address -fno-omit-frame-pointer" \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer" \
+            -DENABLE_PLUGIN_GO=OFF \
+            -DENABLE_PLUGIN_XENSTAT=OFF \
+            -DENABLE_BUNDLED_PROTOBUF=Off
+
+      - name: Build test binaries
+        run: echo "${TEST_TARGETS}" | xargs ninja -C build
+
+      - name: Run test binaries under ASAN
+        run: |
+          set -euo pipefail
+          # focus on use-after-free/overflows; the harnesses do not free
+          # everything on exit, so leak detection stays off here
+          export ASAN_OPTIONS="detect_leaks=0:abort_on_error=1"
+          for t in ${TEST_TARGETS}; do
+            bin="$(find build -name "$t" -type f -executable | head -n 1)"
+            if [ -z "$bin" ]; then
+              echo "::error::test binary $t not found"
+              exit 1
+            fi
+            echo "--- running $t (ASAN)"
+            timeout 300 "$bin"
+            echo "--- $t OK"
+          done
