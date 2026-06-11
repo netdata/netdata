@@ -168,6 +168,9 @@ collisions receive deterministic suffixes (`_2`, `_3`, ...). Protocol-control
 varbinds that duplicate first-class fields (`sysUpTime.0`, `snmpTrapOID.0`,
 `snmpTrapAddress.0`, `snmpTrapEnterprise.0`) are kept in `TRAP_JSON` but not
 emitted as `TRAP_VAR_*`; the sensitive SNMP community varbind is omitted.
+Generated field names are capped to journald's 64-byte field-name limit. Long
+symbolic/OID-derived names keep a readable prefix plus a stable hash suffix; the
+complete varbind identity stays in `TRAP_JSON`.
 
 Generator rule: a varbind record produced by the MIB extractor that does
 NOT have both a resolvable `oid` AND a `type` (MIB syntax) is dropped at

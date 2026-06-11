@@ -817,6 +817,10 @@ the main field and the numeric value to `<FIELD>_RAW`. Protocol/control
 varbinds that duplicate first-class fields (`sysUpTime.0`, `snmpTrapOID.0`,
 `snmpTrapAddress.0`, `snmpTrapEnterprise.0`) are retained in `TRAP_JSON` but
 not emitted as `TRAP_VAR_*`; the sensitive SNMP community varbind is omitted.
+Generated field names obey the journald 64-byte field-name limit. If a symbolic
+name or OID-derived name would exceed that limit, the plugin keeps a readable
+prefix and appends a stable hash suffix; the full OID/name/type/value provenance
+remains in `TRAP_JSON`.
 
 Real trap entries use `trap`; deduplication summary entries use `deduplication_summary`; accepted-source decode failures use `decode_error`.
 

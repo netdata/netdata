@@ -524,6 +524,10 @@ func TestSerializeToJournalFieldsTrapVarbindJournalFieldNames(t *testing.T) {
 			{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
 			{OID: "1.3.6.1.2.1.2.2.1.2", Name: "ifIndex", Type: "INTEGER", Value: int64(2)},
 			{OID: "1.3.6.1.4.1.999.1", Type: "OctetString", Value: "raw-oid-name"},
+			{OID: "1.3.6.1.4.1.999.2", Name: "ifOperStatus_raw", Type: "OctetString", Value: "manual-raw"},
+			{OID: "1.3.6.1.2.1.2.2.1.8", Name: "ifOperStatus", Type: "INTEGER", Value: int64(2), Enum: "down"},
+			{OID: "1.3.6.1.4.1.999.3", Name: "snmpTrapOID", Type: "OctetString", Value: "vendor-varbind"},
+			{Name: "snmpTrapAddress.0", Type: "IPAddress", Value: "192.0.2.1"},
 		},
 	}
 
@@ -536,6 +540,47 @@ func TestSerializeToJournalFieldsTrapVarbindJournalFieldNames(t *testing.T) {
 	assertField(t, fieldMap, "TRAP_VAR_IFINDEX", "1")
 	assertField(t, fieldMap, "TRAP_VAR_IFINDEX_2", "2")
 	assertField(t, fieldMap, "TRAP_VAR_OID_1_3_6_1_4_1_999_1", "raw-oid-name")
+	assertField(t, fieldMap, "TRAP_VAR_IFOPERSTATUS_RAW", "manual-raw")
+	assertField(t, fieldMap, "TRAP_VAR_IFOPERSTATUS_2", "down")
+	assertField(t, fieldMap, "TRAP_VAR_IFOPERSTATUS_2_RAW", "2")
+	assertField(t, fieldMap, "TRAP_VAR_SNMPTRAPOID", "vendor-varbind")
+	assertFieldAbsent(t, fieldMap, "TRAP_VAR_SNMPTRAPADDRESS_0")
+}
+
+func TestSerializeToJournalFieldsTrapVarbindJournalFieldNamesFitJournaldPolicy(t *testing.T) {
+	longOID := "1.3.6.1.4.1.9.9.315.1.2.1.1.1.2.3.4.5.6.7.8.9.10.11.12.13.14.15.16.17.18.19.20"
+	longName := "thisIsAnExtremelyLongVendorSpecificVarbindNameThatWouldNotFitInsideAJournaldFieldName"
+	entry := &TrapEntry{
+		JobName:               "local",
+		ReportType:            ReportTypeTrap,
+		ReceivedRealtimeUsec:  1000000,
+		ReceivedMonotonicUsec: 1000,
+		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
+		Message:               "test",
+		SourceIP:              "10.0.0.1",
+		PduType:               PduTypeTrap,
+		SnmpVersion:           SnmpVersionV2c,
+		Varbinds: []VarbindValue{
+			{OID: longOID, Type: "OctetString", Value: "long-oid"},
+			{OID: "1.3.6.1.4.1.999.4", Name: longName, Type: "INTEGER", Value: int64(42), Enum: "meaning"},
+		},
+	}
+
+	fields, err := serializeToJournalFields(entry)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, f := range fields {
+		if len(f.Name) > maxJournalFieldNameLen {
+			t.Fatalf("journal field name %q length = %d, want <= %d", f.Name, len(f.Name), maxJournalFieldNameLen)
+		}
+	}
+
+	fieldMap := fieldsToMap(fields)
+	assertFieldWithPrefix(t, fieldMap, "TRAP_VAR_OID_1_3_6_1_4_1_9_9_315_1_2_1_1_1_", "long-oid")
+	assertFieldWithPrefix(t, fieldMap, "TRAP_VAR_THISISANEXTREMELYLONGVENDORSPECIFICVARBIND", "meaning")
+	assertFieldWithPrefix(t, fieldMap, "TRAP_VAR_THISISANEXTREMELYLONGVENDORSPECIFICVAR", "42")
 }
 
 func TestSerializeToJournalFieldsTRAPJSONUsesProfileNamesForTabularVarbindInstances(t *testing.T) {
@@ -660,6 +705,7 @@ func TestJournalHotSerializerMatchesSerializeToJournalFields(t *testing.T) {
 			Labels:                map[string]string{"z_key": "z_val", "a_key": "a_val"},
 			Varbinds: []VarbindValue{
 				{OID: snmpTrapCommunityOID, Name: "snmpTrapCommunity.0", Type: "OctetString", Value: "private-community"},
+				{OID: "1.3.6.1.2.1.2.2.1.7", Name: "ifAdminStatus", Type: "INTEGER", Value: int64(1), Enum: "up"},
 				{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)},
 				{OID: "1.3.6.1.2.1.2.2.1.2", Name: "ifIndex", Type: "OctetString", Value: "eth0"},
 			},
@@ -671,6 +717,7 @@ func TestJournalHotSerializerMatchesSerializeToJournalFields(t *testing.T) {
 			ReceivedMonotonicUsec: 1000,
 			Severity:              "notice",
 			Message:               "summary",
+			Varbinds:              []VarbindValue{{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)}},
 			SummaryCounts: &DedupSummary{
 				TotalSuppressed: 12,
 				Fingerprints:    2,
@@ -710,6 +757,7 @@ func TestJournalHotSerializerMatchesSerializeToJournalFields(t *testing.T) {
 				Listener:      "0.0.0.0:162",
 				EngineID:      "8000000001020304",
 			},
+			Varbinds: []VarbindValue{{OID: "1.3.6.1.2.1.2.2.1.1", Name: "ifIndex", Type: "INTEGER", Value: int64(1)}},
 		},
 		"JSONEscapingAndValueTypes": {
 			JobName:               "local",
@@ -769,6 +817,16 @@ func assertFieldAbsent(t *testing.T, fieldMap map[string]string, name string) {
 	if got, ok := fieldMap[name]; ok {
 		t.Fatalf("field %q unexpectedly present with value %q", name, got)
 	}
+}
+
+func assertFieldWithPrefix(t *testing.T, fieldMap map[string]string, prefix, expected string) {
+	t.Helper()
+	for name, value := range fieldMap {
+		if strings.HasPrefix(name, prefix) && value == expected {
+			return
+		}
+	}
+	t.Fatalf("missing field with prefix %q and value %q", prefix, expected)
 }
 
 func fieldsToMap(fields []JournalField) map[string]string {

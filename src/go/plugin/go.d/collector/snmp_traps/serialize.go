@@ -25,8 +25,12 @@ var severityToPriority = map[Severity]string{
 	"debug":   "7",
 }
 
-const trapJSONPacketSequenceKey = "netdata_packet_sequence"
-const trapVarJournalFieldPrefix = "TRAP_VAR_"
+const (
+	trapJSONPacketSequenceKey = "netdata_packet_sequence"
+	trapVarJournalFieldPrefix = "TRAP_VAR_"
+	maxJournalFieldNameLen    = 64
+	trapVarFieldHashLen       = 8
+)
 
 func severityPriority(sev Severity) string {
 	if p, ok := severityToPriority[sev]; ok {
@@ -190,30 +194,29 @@ func isValidTrapTagKey(upperKey string) bool {
 func appendTrapVarbindJournalFields(fields *[]JournalField, entry *TrapEntry) {
 	state := newTrapVarbindFieldState(len(entry.Varbinds))
 	for _, vb := range entry.Varbinds {
-		name := trapVarbindJournalFieldName(vb, state)
+		name, rawName := trapVarbindJournalFieldNames(vb, state)
 		if name == "" {
 			continue
 		}
 
 		*fields = append(*fields, JournalField{Name: name, Value: []byte(trapVarbindJournalValue(vb, false))})
-		if vb.Enum != "" {
-			rawName := state.nextFieldName(name + "_RAW")
+		if rawName != "" {
 			*fields = append(*fields, JournalField{Name: rawName, Value: []byte(trapVarbindJournalValue(vb, true))})
 		}
 	}
 }
 
-func trapVarbindJournalFieldName(vb VarbindValue, state *trapVarbindFieldState) string {
+func trapVarbindJournalFieldNames(vb VarbindValue, state *trapVarbindFieldState) (string, string) {
 	if state == nil || shouldSkipTrapVarbindJournalField(vb) {
-		return ""
+		return "", ""
 	}
 
 	base := trapVarbindJournalFieldBase(vb)
 	if base == "" {
-		return ""
+		return "", ""
 	}
 
-	return state.nextFieldName(trapVarJournalFieldPrefix + base)
+	return state.nextFieldNames(base, vb.Enum != "")
 }
 
 func shouldSkipTrapVarbindJournalField(vb VarbindValue) bool {
@@ -229,12 +232,13 @@ func shouldSkipTrapVarbindJournalField(vb VarbindValue) bool {
 		return true
 	}
 
-	switch strings.TrimSuffix(vb.Name, ".0") {
-	case "sysUpTime", "snmpTrapOID", "snmpTrapAddress", "snmpTrapEnterprise", "snmpTrapCommunity":
-		return true
-	default:
-		return false
+	if oid == "" {
+		switch strings.TrimSuffix(vb.Name, ".0") {
+		case "sysUpTime", "snmpTrapOID", "snmpTrapAddress", "snmpTrapEnterprise", "snmpTrapCommunity":
+			return true
+		}
 	}
+	return false
 }
 
 func oidMatchesScalar(oid, scalar string) bool {
@@ -287,22 +291,67 @@ func newTrapVarbindFieldState(size int) *trapVarbindFieldState {
 	return &trapVarbindFieldState{used: make(map[string]struct{}, size*2)}
 }
 
-func (s *trapVarbindFieldState) nextFieldName(preferred string) string {
-	if preferred == "" {
+func (s *trapVarbindFieldState) nextFieldNames(base string, includeRaw bool) (string, string) {
+	for suffix := 1; ; suffix++ {
+		duplicateSuffix := ""
+		if suffix > 1 {
+			duplicateSuffix = "_" + strconv.Itoa(suffix)
+		}
+
+		name := trapVarbindJournalFieldNameFor(base, duplicateSuffix, "")
+		rawName := ""
+		if includeRaw {
+			rawName = trapVarbindJournalFieldNameFor(base, duplicateSuffix, "_RAW")
+		}
+		if name == "" || s.has(name) || (rawName != "" && s.has(rawName)) {
+			continue
+		}
+
+		s.used[name] = struct{}{}
+		if rawName != "" {
+			s.used[rawName] = struct{}{}
+		}
+		return name, rawName
+	}
+}
+
+func (s *trapVarbindFieldState) has(name string) bool {
+	_, ok := s.used[name]
+	return ok
+}
+
+func trapVarbindJournalFieldNameFor(base, duplicateSuffix, valueSuffix string) string {
+	maxBaseLen := maxJournalFieldNameLen - len(trapVarJournalFieldPrefix) - len(duplicateSuffix) - len(valueSuffix)
+	if maxBaseLen <= 0 {
 		return ""
 	}
-	if _, ok := s.used[preferred]; !ok {
-		s.used[preferred] = struct{}{}
-		return preferred
+	if len(base) <= maxBaseLen {
+		return trapVarJournalFieldPrefix + base + duplicateSuffix + valueSuffix
 	}
 
-	for suffix := 2; ; suffix++ {
-		candidate := fmt.Sprintf("%s_%d", preferred, suffix)
-		if _, ok := s.used[candidate]; !ok {
-			s.used[candidate] = struct{}{}
-			return candidate
+	hash := trapVarbindFieldHash(base)
+	keepLen := maxBaseLen - 1 - len(hash)
+	if keepLen <= 0 {
+		if len(hash) > maxBaseLen {
+			hash = hash[:maxBaseLen]
 		}
+		return trapVarJournalFieldPrefix + hash + duplicateSuffix + valueSuffix
 	}
+	return trapVarJournalFieldPrefix + base[:keepLen] + "_" + hash + duplicateSuffix + valueSuffix
+}
+
+func trapVarbindFieldHash(value string) string {
+	const (
+		offset32 = uint32(2166136261)
+		prime32  = uint32(16777619)
+	)
+
+	hash := offset32
+	for i := 0; i < len(value); i++ {
+		hash ^= uint32(value[i])
+		hash *= prime32
+	}
+	return fmt.Sprintf("%0*X", trapVarFieldHashLen, hash)
 }
 
 func buildTrapJSON(entry *TrapEntry) ([]byte, error) {
@@ -677,14 +726,13 @@ func (s *journalHotSerializer) sortedLabelKeys(labels map[string]string) []strin
 func (s *journalHotSerializer) addTrapVarbindFields(entry *TrapEntry) {
 	state := s.trapVarbindFieldState(len(entry.Varbinds))
 	for _, vb := range entry.Varbinds {
-		name := trapVarbindJournalFieldName(vb, state)
+		name, rawName := trapVarbindJournalFieldNames(vb, state)
 		if name == "" {
 			continue
 		}
 
 		s.addStringField(name, trapVarbindJournalValue(vb, false))
-		if vb.Enum != "" {
-			rawName := state.nextFieldName(name + "_RAW")
+		if rawName != "" {
 			s.addStringField(rawName, trapVarbindJournalValue(vb, true))
 		}
 	}
