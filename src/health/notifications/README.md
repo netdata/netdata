@@ -90,6 +90,7 @@ Use the `edit-config` script to safely edit configuration files. It automaticall
 :::
 
 1. Open the Agent's health notification config:
+
    ```bash
    sudo ./edit-config health_alarm_notify.conf
    ```
@@ -99,6 +100,7 @@ Use the `edit-config` script to safely edit configuration files. It automaticall
 3. Define recipients per **role** (see below).
 
 4. Restart the Agent for changes to take effect:
+
    ```bash
    sudo systemctl restart netdata
    ```
@@ -276,7 +278,7 @@ role_recipients_email[sysadmin]="disabled"
 If left empty, the default recipient for that method is used.
 </details>
 
-<details>
+<details id="alert-severity-filtering">
 <summary><strong>Alert Severity Filtering</strong></summary><br/>
 
 You can limit certain recipients to only receive **critical** alerts:
@@ -288,7 +290,7 @@ role_recipients_email[sysadmin]="user1@example.com user2@example.com|critical"
 This setup:
 
 - Sends all alerts to `user1@example.com`
-- Sends only critical-related alerts to `user2@example.com`
+- Sends notifications to `user2@example.com` only once the alarm reaches CRITICAL, then continues sending status changes (including WARNING and CLEAR) until the alarm is cleared.
 
 Works for all supported methods: email, Slack, Telegram, Twilio, Discord, etc.
 </details>
@@ -306,7 +308,10 @@ When an alert returns to normal, Netdata sends a **CLEAR** (recovered) notificat
 clear_alarm_always='YES'
 ```
 
-**Suppress CLEAR with the `|critical` modifier:** Adding `|critical` to a recipient filters notifications so only alerts that reached CRITICAL status are forwarded. For these recipients, CLEAR notifications are only sent when the alert previously passed through CRITICAL. If the alert only went through WARNING → CLEAR, the CLEAR is not forwarded:
+**Filter by CRITICAL history with the `|critical` modifier:** As described in [Alert Severity Filtering](#alert-severity-filtering) above, `|critical` forwards notifications only for alerts that have reached CRITICAL status. This affects both WARNING and CLEAR:
+
+- **WARNING** notifications are suppressed unless the alarm has previously reached CRITICAL.
+- **CLEAR** notifications are only sent when the alert previously passed through CRITICAL. If the alert only went through WARNING → CLEAR, the CLEAR is not forwarded.
 
 ```ini
 role_recipients_email[sysadmin]="admin@example.com|critical"
@@ -318,7 +323,7 @@ role_recipients_email[sysadmin]="admin@example.com|critical"
 role_recipients_email[sysadmin]="admin@example.com|noclear"
 ```
 
-You can combine modifiers. This example sends only notifications for alarms that reached CRITICAL, and excludes CLEAR notifications entirely:
+You can combine modifiers. This example notifies only for alarms that have reached CRITICAL (WARNING is suppressed until then), and excludes CLEAR notifications entirely:
 
 ```ini
 role_recipients_email[sysadmin]="admin@example.com|critical|noclear"
@@ -434,21 +439,25 @@ Here are solutions for common alert notification issues:
 ### Email Notifications Not Working
 
 1. Verify your email configuration:
+
    ```bash
    grep -E "SEND_EMAIL|DEFAULT_RECIPIENT_EMAIL" /etc/netdata/health_alarm_notify.conf
    ```
 
 2. Check if the system can send mail:
+
    ```bash
    echo "Test" | mail -s "Test Email" your@email.com
    ```
 
 3. Look for errors in the Netdata log:
+
    ```bash
    tail -f /var/log/netdata/error.log | grep "alarm notify"
    ```
 
 4. Test with debugging enabled:
+
    ```bash
    sudo su -s /bin/bash netdata
    export NETDATA_ALARM_NOTIFY_DEBUG=1
@@ -458,11 +467,13 @@ Here are solutions for common alert notification issues:
 ### Slack Notifications Failing
 
 1. Verify your webhook URL is correct:
+
    ```bash
    grep -E "SLACK_WEBHOOK_URL" /etc/netdata/health_alarm_notify.conf
    ```
 
 2. Check for network connectivity to Slack:
+
    ```bash
    curl -X POST -H "Content-type: application/json" --data '{"text":"Test"}' YOUR_WEBHOOK_URL
    ```
@@ -472,11 +483,13 @@ Here are solutions for common alert notification issues:
 ### PagerDuty Integration Issues
 
 1. Verify your service key:
+
    ```bash
    grep -E "PAGERDUTY_SERVICE_KEY" /etc/netdata/health_alarm_notify.conf
    ```
 
 2. Test the PagerDuty API directly:
+
    ```bash
    curl -H "Content-Type: application/json" -X POST -d '{"service_key":"YOUR_SERVICE_KEY","event_type":"trigger","description":"Test"}' https://events.pagerduty.com/generic/2010-04-15/create_event.json
    ```
