@@ -456,7 +456,16 @@ struct rlimit {
     rlim_t rlim_cur;
     rlim_t rlim_max;
 };
-#define RLIMIT_NOFILE 7
+#define RLIMIT_CPU     0
+#define RLIMIT_FSIZE   1
+#define RLIMIT_DATA    2
+#define RLIMIT_STACK   3
+#define RLIMIT_CORE    4
+#define RLIMIT_RSS     5
+#define RLIMIT_NPROC   6
+#define RLIMIT_NOFILE  7
+#define RLIMIT_MEMLOCK 8
+#define RLIMIT_AS      9
 static inline int getrlimit(int resource __maybe_unused, struct rlimit *rlim __maybe_unused) { return 0; }
 static inline int setrlimit(int resource __maybe_unused, const struct rlimit *rlim __maybe_unused) { return 0; }
 #endif // RLIM_INFINITY
@@ -1049,6 +1058,29 @@ static inline int sigaction(int signo __maybe_unused,
     return 0;
 }
 #endif
+
+// ── AT_FDCWD / utimensat() ── POSIX dir-relative timestamp update, absent from UCRT64 ─
+// machine-guid.c uses utimensat(AT_FDCWD, ...) to preserve file modification times.
+// Windows manages timestamps differently; stub returns success without modifying them.
+#ifndef AT_FDCWD
+#define AT_FDCWD  (-100)
+#endif
+static inline int utimensat(int dirfd __maybe_unused, const char *pathname __maybe_unused,
+                              const struct timespec times[2] __maybe_unused, int flags __maybe_unused) {
+    return 0;
+}
+
+// ── fsync() ── POSIX file flush, absent from UCRT64 ──────────────────────────
+// UCRT64 provides _commit(fd) which flushes the OS write buffers for a CRT fd.
+static inline int fsync(int fd) {
+    return _commit(fd);
+}
+
+// ── fchmod() ── POSIX fd-based permission bits, absent from UCRT64 ───────────
+// Windows ACL permissions are not controlled via Unix mode bits; no-op.
+static inline int fchmod(int fd __maybe_unused, int mode __maybe_unused) {
+    return 0;
+}
 
 #endif // OS_WINDOWS
 
