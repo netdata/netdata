@@ -96,6 +96,7 @@ var placeholderRefRe = regexp.MustCompile(`\{([^{}]+)\}`)
 var templateVarbindCallArgRe = regexp.MustCompile(`\b(value|raw)\s+"([^"]+)"`)
 var bareTemplateActionRe = regexp.MustCompile(`\{\{\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*\}\}`)
 var legacyTemplateRefRe = regexp.MustCompile(`(^|[^{])\{[^{}\n]+\}([^}]|$)`)
+var stateWordRe = regexp.MustCompile(`(^|[^a-z0-9])(up|down|state)([^a-z0-9]|$)`)
 var mibSourceExtensions = []string{"", ".mib", ".my", ".mi2", ".txt", ".trp", ".smi"}
 
 const classifierResponseSchemaJSON = `{
@@ -407,10 +408,11 @@ func run(args []string) error {
 }
 
 func usage(w io.Writer) {
-	fmt.Fprintln(w, "usage: snmp-trap-profile-gen <extract|classify|emit|generate> [flags]")
+	fmt.Fprintln(w, "usage: snmp-trap-profile-gen <extract|classify|emit|generate|compress-zstd> [flags]")
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "common example:")
 	fmt.Fprintln(w, "  snmp-trap-profile-gen generate --source-dir ./mibs --all --out-dir ./snmp-trap-profile-gen-output")
+	fmt.Fprintln(w, "  snmp-trap-profile-gen compress-zstd --rm ./snmp.trap-profiles/default")
 }
 
 func compressZstdCommand(args []string) error {
@@ -437,6 +439,9 @@ func compressZstdPath(path string, removeSource bool) error {
 		return err
 	}
 	if !info.IsDir() {
+		if isCompressedProfilePath(path) {
+			return nil
+		}
 		return compressZstdFile(path, removeSource)
 	}
 	return filepath.WalkDir(path, func(child string, d os.DirEntry, err error) error {
@@ -447,7 +452,7 @@ func compressZstdPath(path string, removeSource bool) error {
 			return nil
 		}
 		name := d.Name()
-		if strings.HasSuffix(name, ".zst") || strings.HasSuffix(name, ".gz") || strings.HasSuffix(name, ".tmp") {
+		if isCompressedProfilePath(name) {
 			return nil
 		}
 		info, err := d.Info()
@@ -461,7 +466,14 @@ func compressZstdPath(path string, removeSource bool) error {
 	})
 }
 
+func isCompressedProfilePath(path string) bool {
+	return strings.HasSuffix(path, ".zst") || strings.HasSuffix(path, ".gz") || strings.HasSuffix(path, ".tmp")
+}
+
 func compressZstdFile(path string, removeSource bool) error {
+	if isCompressedProfilePath(path) {
+		return nil
+	}
 	source, err := os.Open(path)
 	if err != nil {
 		return err
@@ -1849,12 +1861,16 @@ func mechanicalClassification(rec TrapRecord) (string, string, string) {
 		cat, sev = "license", "warning"
 	case strings.Contains(lower, "config"):
 		cat, sev = "config_change", "notice"
-	case strings.Contains(lower, "linkdown") || strings.Contains(lower, "down") || strings.Contains(lower, "up") || strings.Contains(lower, "state"):
+	case strings.Contains(lower, "linkdown") || strings.Contains(lower, "linkup") || containsStateWord(lower):
 		cat, sev = "state_change", "warning"
 	case strings.Contains(lower, "diagnostic") || strings.Contains(lower, "temperature") || strings.Contains(lower, "fan") || strings.Contains(lower, "power"):
 		cat, sev = "diagnostic", "warning"
 	}
 	return cat, sev, fmt.Sprintf("%s on {{hostname}}.", rec.QualifiedName)
+}
+
+func containsStateWord(s string) bool {
+	return stateWordRe.MatchString(s)
 }
 
 func applyClassification(rec *TrapRecord, c Classification) {
@@ -2462,12 +2478,9 @@ func loadPENs(opts generatorOptions) (map[string]string, error) {
 			if opts.PENFile != "" {
 				_ = atomicWrite(opts.PENFile, fetched, 0o644)
 			}
-		} else if err != nil {
-			return nil, fetchErr
+		} else {
+			return nil, fmt.Errorf("load IANA PEN registry: %w", fetchErr)
 		}
-	}
-	if err != nil && len(content) == 0 {
-		return nil, err
 	}
 	return parsePENs(content), nil
 }
@@ -2510,12 +2523,25 @@ func parsePENs(content []byte) map[string]string {
 			continue
 		}
 		org := strings.TrimSpace(lines[i+1])
-		if org == "" {
+		if org == "" || skipPENOrg(org) {
 			continue
 		}
 		out[id] = safeSlug(org)
 	}
 	return out
+}
+
+func skipPENOrg(org string) bool {
+	switch {
+	case org == "---none---":
+		return true
+	case strings.EqualFold(org, "reserved"):
+		return true
+	case strings.EqualFold(org, "unassigned"):
+		return true
+	default:
+		return false
+	}
 }
 
 func vendorForOID(oid string, pens map[string]string) string {

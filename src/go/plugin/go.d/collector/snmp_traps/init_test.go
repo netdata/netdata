@@ -45,6 +45,7 @@ func TestConfigSchemaDynCfgListFieldsHaveSafeDefaults(t *testing.T) {
 		{name: "usm_users", path: []string{"jsonSchema", "properties", "usm_users"}},
 		{name: "engine_id_whitelist", path: []string{"jsonSchema", "properties", "engine_id_whitelist"}},
 		{name: "allowlist.source_cidrs", path: []string{"jsonSchema", "properties", "allowlist", "properties", "source_cidrs"}, wantDefault: []any{"0.0.0.0/0", "::/0"}},
+		{name: "source.trusted_relays", path: []string{"jsonSchema", "properties", "source", "properties", "trusted_relays"}},
 		{name: "dedup.key_varbinds", path: []string{"jsonSchema", "properties", "dedup", "properties", "key_varbinds"}},
 		{name: "overrides", path: []string{"jsonSchema", "properties", "overrides"}},
 		{name: "metrics", path: []string{"jsonSchema", "properties", "metrics"}},
@@ -68,6 +69,7 @@ func TestConfigSchemaDynCfgObjectFieldsHaveSafeDefaults(t *testing.T) {
 		{name: "listen", path: []string{"jsonSchema", "properties", "listen"}},
 		{name: "reverse_dns", path: []string{"jsonSchema", "properties", "reverse_dns"}},
 		{name: "allowlist", path: []string{"jsonSchema", "properties", "allowlist"}},
+		{name: "source", path: []string{"jsonSchema", "properties", "source"}},
 		{name: "rate_limit", path: []string{"jsonSchema", "properties", "rate_limit"}},
 		{name: "dedup", path: []string{"jsonSchema", "properties", "dedup"}},
 		{name: "journal", path: []string{"jsonSchema", "properties", "journal"}},
@@ -139,7 +141,7 @@ func TestConfigSchemaDynCfgTabsRenderAllTopLevelFieldsOnce(t *testing.T) {
 			"dynamic_engine_id_discovery",
 			"dynamic_engine_id_max_pairs",
 		}},
-		{title: "Filtering", fields: []string{"allowlist", "rate_limit", "dedup"}},
+		{title: "Filtering", fields: []string{"allowlist", "source", "rate_limit", "dedup"}},
 		{title: "Outputs", fields: []string{"journal", "otlp"}},
 		{title: "Storage", fields: []string{"retention"}},
 		{title: "Enrichment", fields: []string{"reverse_dns", "overrides"}},
@@ -410,9 +412,9 @@ func TestCollectorInit_InvalidJobNameIsCodedError(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ Code() int }
+	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.Code())
+	assert.Equal(t, 422, coded.DyncfgCode())
 	var retryable interface{ DyncfgRetryable() bool }
 	require.ErrorAs(t, err, &retryable)
 	assert.False(t, retryable.DyncfgRetryable())
@@ -428,9 +430,9 @@ func TestCollectorInit_InvalidEndpointsIsCodedError(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ Code() int }
+	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.Code())
+	assert.Equal(t, 422, coded.DyncfgCode())
 	assert.Nil(t, c.listener)
 }
 
@@ -444,9 +446,9 @@ func TestCollectorInit_InvalidReceiveBufferIsCodedError(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ Code() int }
+	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.Code())
+	assert.Equal(t, 422, coded.DyncfgCode())
 	assert.Contains(t, err.Error(), "listen.receive_buffer")
 	assert.Nil(t, c.listener)
 }
@@ -461,9 +463,9 @@ func TestCollectorInit_TooLargeReceiveBufferIsCodedError(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ Code() int }
+	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.Code())
+	assert.Equal(t, 422, coded.DyncfgCode())
 	assert.Contains(t, err.Error(), "listen.receive_buffer")
 	assert.Nil(t, c.listener)
 }
@@ -477,9 +479,9 @@ func TestCollectorInit_NoOutputBackendIsCodedError(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ Code() int }
+	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.Code())
+	assert.Equal(t, 422, coded.DyncfgCode())
 	assert.Contains(t, err.Error(), "at least one SNMP trap output backend")
 	assert.Nil(t, c.listener)
 }
@@ -497,9 +499,9 @@ func TestCollectorInit_MissingNetdataLogRootIsRetryableCodedError(t *testing.T) 
 	err := c.Init(context.Background())
 	require.Error(t, err)
 
-	var coded interface{ Code() int }
+	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 503, coded.Code())
+	assert.Equal(t, 503, coded.DyncfgCode())
 	var retryable interface{ DyncfgRetryable() bool }
 	require.ErrorAs(t, err, &retryable)
 	assert.True(t, retryable.DyncfgRetryable())
@@ -563,9 +565,9 @@ func TestCollectorInit_OTLPPreflightFailureIsRetryableCodedError(t *testing.T) {
 
 	err = c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ Code() int }
+	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 503, coded.Code())
+	assert.Equal(t, 503, coded.DyncfgCode())
 	var retryable interface{ DyncfgRetryable() bool }
 	require.ErrorAs(t, err, &retryable)
 	assert.True(t, retryable.DyncfgRetryable())
@@ -617,9 +619,9 @@ func TestCollectorInit_BindFailureIsRetryableCodedError(t *testing.T) {
 
 	err = c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ Code() int }
+	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 503, coded.Code())
+	assert.Equal(t, 503, coded.DyncfgCode())
 	var retryable interface{ DyncfgRetryable() bool }
 	require.ErrorAs(t, err, &retryable)
 	assert.True(t, retryable.DyncfgRetryable())
@@ -642,9 +644,9 @@ func TestCollectorInit_ReceiveBufferFailureIsRetryableCodedError(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ Code() int }
+	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 503, coded.Code())
+	assert.Equal(t, 503, coded.DyncfgCode())
 	var retryable interface{ DyncfgRetryable() bool }
 	require.ErrorAs(t, err, &retryable)
 	assert.True(t, retryable.DyncfgRetryable())
@@ -662,9 +664,9 @@ func TestCollectorInit_InvalidVersionIsCodedError(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ Code() int }
+	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.Code())
+	assert.Equal(t, 422, coded.DyncfgCode())
 	assert.Nil(t, c.listener)
 }
 
@@ -680,9 +682,9 @@ func TestCollectorInit_ProfileLoadFailureIsCodedError(t *testing.T) {
 
 	err := c.Init(context.Background())
 	require.Error(t, err)
-	var coded interface{ Code() int }
+	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.Code())
+	assert.Equal(t, 422, coded.DyncfgCode())
 	assert.Nil(t, c.listener)
 	assert.Equal(t, []string{" V1 ", "V2C"}, c.Versions)
 }
@@ -710,6 +712,50 @@ func TestCollectorInit_PartialBindFailureClosesPriorSockets(t *testing.T) {
 	firstConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: firstPort})
 	require.NoError(t, err, "first endpoint should have been closed after partial bind failure")
 	require.NoError(t, firstConn.Close())
+}
+
+func TestEngineStatePathExistsCheckedReturnsStatError(t *testing.T) {
+	dir := t.TempDir()
+	notDir := filepath.Join(dir, "not-a-dir")
+	require.NoError(t, os.WriteFile(notDir, []byte("not a directory"), 0644))
+
+	exists, err := engineStatePathExistsChecked(filepath.Join(notDir, "engine-boots"))
+	require.Error(t, err)
+	assert.False(t, exists)
+}
+
+func TestCollectorInit_EngineStateStatErrorIsRetryableCodedError(t *testing.T) {
+	setMinimalProfileDir(t)
+	withTestCacheDir(t)
+	withEngineStateDir(t)
+
+	const jobName = "engine-state-stat-error"
+	require.NoError(t, os.WriteFile(engineBootsDir(jobName), []byte("not a directory"), 0644))
+
+	c := New()
+	c.SetJobName(jobName)
+	c.Listen.Endpoints = []EndpointConfig{{Protocol: "udp", Address: "127.0.0.1", Port: freeUDPPort(t)}}
+	c.Versions = []string{"v3"}
+	c.USMUsers = []USMUserConfig{{
+		Username:  "testuser",
+		EngineID:  testEngineIDHex,
+		AuthProto: "sha256",
+		AuthKey:   "authpassword",
+		PrivProto: "aes",
+		PrivKey:   "privpassword",
+	}}
+	c.EngineIDWhitelist = []string{testEngineIDHex}
+
+	err := c.Init(context.Background())
+	require.Error(t, err)
+	var coded interface{ DyncfgCode() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 503, coded.DyncfgCode())
+	var retryable interface{ DyncfgRetryable() bool }
+	require.ErrorAs(t, err, &retryable)
+	assert.True(t, retryable.DyncfgRetryable())
+	assert.Nil(t, c.listener)
+	assert.FileExists(t, engineBootsDir(jobName), "pre-existing invalid state path must not be removed")
 }
 
 func TestCollectorInit_CleansCreatedV3StateOnEngineBootsFailure(t *testing.T) {

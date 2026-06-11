@@ -26,17 +26,19 @@ func journalFieldNeedsBinaryString(value string) bool {
 	return journalFieldNeedsBinary([]byte(value))
 }
 
-func classifyFieldEncoding(value []byte) (binary bool, safe bool) {
-	needsBinary := journalFieldNeedsBinary(value)
-	return needsBinary, !needsBinary
-}
-
 func binaryEncodedFieldCount(fields []JournalField) int {
 	count := 0
 	for _, f := range fields {
-		if journalFieldNeedsBinary(f.Value) {
+		if journalFieldCountsAsBinaryEncoded(f.Name, f.Value) {
 			count++
 		}
 	}
 	return count
+}
+
+func journalFieldCountsAsBinaryEncoded(name string, value []byte) bool {
+	if name == "MESSAGE" {
+		return false
+	}
+	return journalFieldNeedsBinary(value)
 }

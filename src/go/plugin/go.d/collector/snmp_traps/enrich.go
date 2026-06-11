@@ -439,13 +439,14 @@ func enrichTrapEntry(entry *TrapEntry, useReverseDNS bool, dns *reverseDNSResolv
 		audit.Neighbors = skippedTopologyIfIndexAudit(trapIfIndex, topologyTrusted)
 	}
 
-	if useReverseDNS && entry.DeviceHostname == "" {
+	if useReverseDNS {
 		audit.ReverseDNS = &TrapEnrichmentLookup{Key: sourceIP, Method: "reverse_dns"}
 		if name := dns.lookupCached(sourceIP); name != "" {
-			entry.DeviceHostname = name
+			entry.ReverseDNS = name
 			audit.ReverseDNS.Status = "matched"
-			audit.ReverseDNS.Fields = []string{"_HOSTNAME"}
-			addTrapEnrichmentApplied(audit, "_HOSTNAME", name)
+			audit.ReverseDNS.Value = name
+			audit.ReverseDNS.Fields = []string{"TRAP_REVERSE_DNS"}
+			addTrapEnrichmentApplied(audit, "TRAP_REVERSE_DNS", name)
 		} else {
 			audit.ReverseDNS.Status = "pending"
 			dns.resolveAsync(sourceIP)

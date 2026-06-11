@@ -26,8 +26,8 @@ type codedErr struct {
 	code int
 }
 
-func (e *codedErr) Error() string { return e.err.Error() }
-func (e *codedErr) Code() int     { return e.code }
+func (e *codedErr) Error() string   { return e.err.Error() }
+func (e *codedErr) DyncfgCode() int { return e.code }
 
 // mockCallbacks records all callback invocations for verification.
 type mockCallbacks struct {

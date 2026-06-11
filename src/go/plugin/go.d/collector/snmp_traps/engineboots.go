@@ -41,9 +41,15 @@ func engineBootsPath(jobName string) string {
 	return filepath.Join(engineBootsDir(jobName), "engine-boots")
 }
 
-func engineStatePathExists(path string) bool {
+func engineStatePathExistsChecked(path string) (bool, error) {
 	_, err := os.Stat(path)
-	return err == nil || !os.IsNotExist(err)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }
 
 func cleanupCreatedEngineState(jobName string, removeEngineBoots, removeLocalEngineID, removeDir bool) {

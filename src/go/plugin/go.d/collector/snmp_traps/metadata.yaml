@@ -43,7 +43,7 @@ modules:
           - **OTLP/gRPC export**: Optional backend that exports traps as OTLP LogRecords. When `otlp.enabled` is `true`, traps are exported through OTLP regardless of `journal.enabled`; if direct journal storage is also enabled, both backends receive traps.
           - **Self-metrics**: Per-job counters for trap events (by category and severity), processing errors (by type), and dedup suppression (when enabled).
 
-          When direct journal storage is enabled, trap entries are written as structured systemd-journal log messages with plugin-controlled fields (`TRAP_REPORT_TYPE`, `TRAP_JOB`, `TRAP_OID`, `TRAP_NAME`, `TRAP_CATEGORY`, `TRAP_SEVERITY`, `TRAP_PDU_TYPE`, `TRAP_VERSION`, `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, `TRAP_SOURCE_UDP_PORT`, `TRAP_DEVICE_VENDOR`, `TRAP_INTERFACE`, `TRAP_NEIGHBORS`, `TRAP_SUPPRESSED_COUNT`, `TRAP_SUPPRESSED_FINGERPRINTS`, `TRAP_REPORT_PERIOD_SEC`, `TRAP_DECODE_ERROR_KIND`, `TRAP_DECODE_ERROR`, `TRAP_PACKET_SIZE`, `TRAP_PACKET_SHA256`, `TRAP_LISTENER`, `TRAP_ENGINE_ID`, `TRAP_ENRICHMENT`, `TRAP_JSON`) plus profile-defined labels (`TRAP_TAG_*`) and decoded event varbind fields (`TRAP_VAR_*`). Non-sensitive, non-redundant event varbinds are indexed as `TRAP_VAR_*`; enum-backed varbinds also emit `_RAW` with the numeric value. `TRAP_ENRICHMENT` records the source-attribution and enrichment decisions for audit/debug, and `TRAP_JSON` stores the structured varbind payload plus `netdata_packet_sequence`, a per-job receive counter assigned once per UDP datagram. Query traps with the embedded `snmp:traps` Function through Netdata Cloud or directly via the Agent HTTP API. The Function selects all direct-journal jobs by default and can narrow to one listener with `selections.__logs_sources=["<job>"]`. OTLP-only jobs do not create local journal files and therefore do not appear as log sources.
+          When direct journal storage is enabled, trap entries are written as structured systemd-journal log messages with plugin-controlled fields (`TRAP_REPORT_TYPE`, `TRAP_JOB`, `TRAP_OID`, `TRAP_NAME`, `TRAP_CATEGORY`, `TRAP_SEVERITY`, `TRAP_PDU_TYPE`, `TRAP_VERSION`, `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, `TRAP_SOURCE_UDP_PORT`, `TRAP_DEVICE_VENDOR`, `TRAP_INTERFACE`, `TRAP_NEIGHBORS`, `TRAP_REVERSE_DNS`, `TRAP_SUPPRESSED_COUNT`, `TRAP_SUPPRESSED_FINGERPRINTS`, `TRAP_REPORT_PERIOD_SEC`, `TRAP_DECODE_ERROR_KIND`, `TRAP_DECODE_ERROR`, `TRAP_PACKET_SIZE`, `TRAP_PACKET_SHA256`, `TRAP_LISTENER`, `TRAP_ENGINE_ID`, `TRAP_ENRICHMENT`, `TRAP_JSON`) plus profile-defined labels (`TRAP_TAG_*`) and decoded event varbind fields (`TRAP_VAR_*`). Non-sensitive, non-redundant event varbinds are indexed as `TRAP_VAR_*`; enum-backed varbinds also emit `_RAW` with the numeric value. `TRAP_ENRICHMENT` records the source-attribution and enrichment decisions for audit/debug, and `TRAP_JSON` stores the structured varbind payload plus `netdata_packet_sequence`, a per-job receive counter assigned once per UDP datagram. Query traps with the embedded `snmp:traps` Function through Netdata Cloud or directly via the Agent HTTP API. The Function selects all direct-journal jobs by default and can narrow to one listener with `selections.__logs_sources=["<job>"]`. OTLP-only jobs do not create local journal files and therefore do not appear as log sources.
 
           **Closed 8-category / 8-severity taxonomy** (from the OOB profile pack):
 
@@ -87,7 +87,7 @@ modules:
           1. Receives a trap PDU on a bound UDP endpoint
           2. Validates the SNMP version, community/USM, and source against the job configuration
           3. Resolves the trap OID against operator profiles and lazily-loaded stock profile files to get a name, category, severity, and varbind labels
-          4. Enriches the entry with optional reverse DNS (`_HOSTNAME`) and dedup logic (if enabled)
+          4. Enriches the entry with optional reverse DNS (`TRAP_REVERSE_DNS` annotation, never `_HOSTNAME`) and dedup logic (if enabled)
           5. Writes the structured entry to the per-job direct journal when enabled, and exports via OTLP when configured
           6. Increments the per-job self-metrics (events by category and severity, errors by type)
 
@@ -222,9 +222,17 @@ modules:
 
             - name: reverse_dns
               group: Enrichment
-              description: Optional source-IP PTR enrichment for `_HOSTNAME`. Disabled by default.
+              description: Optional source-IP PTR annotation emitted as `TRAP_REVERSE_DNS`. Disabled by default and not used for authoritative identity.
               default_value: "enabled: false"
               required: false
+
+            - name: source
+              group: Security
+              description: Source-attribution controls for forwarded traps. UDP peer is authoritative unless the peer matches an explicit trusted relay CIDR.
+              default_value: 'trusted_relays: []'
+              required: false
+              detailed_description: |
+                - `trusted_relays`: CIDR list of SNMP trap relays/proxies whose `snmpTrapAddress.0` PDU source address may override the UDP peer. Leave empty for direct listeners.
 
             - name: allowlist
               group: Security
@@ -440,10 +448,6 @@ modules:
         metric: snmp.trap.severity
         info: The SNMP trap listener is receiving warning-severity traps at storm-level rate.
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf
-      - name: snmp_trap_unknown_oids
-        metric: snmp.trap.errors
-        info: The SNMP trap listener is receiving traps for OIDs not found in any loaded profile.
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf
       - name: snmp_trap_decode_errors
         metric: snmp.trap.errors
         info: The SNMP trap listener has decode errors.
@@ -482,7 +486,7 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf
       - name: snmp_trap_binary_encoded_fields
         metric: snmp.trap.errors
-        info: The SNMP trap listener wrote fields with binary journal encoding.
+        info: The SNMP trap listener wrote structured fields with binary journal encoding.
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf
       - name: snmp_trap_profile_load_failures
         metric: snmp.trap.errors

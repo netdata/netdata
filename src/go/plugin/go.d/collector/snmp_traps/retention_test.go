@@ -53,6 +53,36 @@ func TestParseHumanSize(t *testing.T) {
 	}
 }
 
+func TestFormatHumanSizePreservesRoundTrip(t *testing.T) {
+	tests := map[string]struct {
+		bytes uint64
+		want  string
+	}{
+		"exact_gb":      {bytes: 10 * bytesPerGB, want: "10GB"},
+		"exact_mb":      {bytes: 200 * bytesPerMB, want: "200MB"},
+		"exact_kb":      {bytes: 64 * bytesPerKB, want: "64KB"},
+		"fractional_gb": {bytes: uint64(1.5 * bytesPerGB), want: "1536MB"},
+		"fractional_kb": {bytes: bytesPerKB + 1, want: "1025B"},
+		"plain_bytes":   {bytes: 512, want: "512B"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := formatHumanSize(tc.bytes)
+			if got != tc.want {
+				t.Fatalf("formatHumanSize(%d) = %q, want %q", tc.bytes, got, tc.want)
+			}
+			parsed, err := parseHumanSize(got)
+			if err != nil {
+				t.Fatalf("parse formatted size %q: %v", got, err)
+			}
+			if parsed != tc.bytes {
+				t.Fatalf("parseHumanSize(formatHumanSize(%d)) = %d", tc.bytes, parsed)
+			}
+		})
+	}
+}
+
 func TestParseHumanDuration(t *testing.T) {
 	tests := map[string]struct {
 		input    string

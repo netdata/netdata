@@ -28,6 +28,7 @@ var severityToPriority = map[Severity]string{
 const (
 	trapJSONPacketSequenceKey = "netdata_packet_sequence"
 	trapVarJournalFieldPrefix = "TRAP_VAR_"
+	trapTagJournalFieldPrefix = "TRAP_TAG_"
 	maxJournalFieldNameLen    = 64
 	trapVarFieldHashLen       = 8
 )
@@ -121,6 +122,9 @@ func serializeToJournalFields(entry *TrapEntry) ([]JournalField, error) {
 		if entry.SourceUDPPeer != "" {
 			fields = append(fields, JournalField{Name: "TRAP_SOURCE_UDP_PEER", Value: []byte(entry.SourceUDPPeer)})
 		}
+		if entry.ReverseDNS != "" {
+			fields = append(fields, JournalField{Name: "TRAP_REVERSE_DNS", Value: []byte(entry.ReverseDNS)})
+		}
 		if entry.DeviceVendor != "" {
 			fields = append(fields, JournalField{Name: "TRAP_DEVICE_VENDOR", Value: []byte(entry.DeviceVendor)})
 		}
@@ -149,7 +153,7 @@ func serializeToJournalFields(entry *TrapEntry) ([]JournalField, error) {
 		if !isValidTrapTagKey(upperKey) {
 			return nil, fmt.Errorf("invalid label key for TRAP_TAG: %q", key)
 		}
-		fields = append(fields, JournalField{Name: "TRAP_TAG_" + upperKey, Value: []byte(val)})
+		fields = append(fields, JournalField{Name: trapTagJournalFieldNameFor(upperKey), Value: []byte(val)})
 	}
 
 	if !isDedupSummary && !isDecodeError {
@@ -358,6 +362,30 @@ func trapVarbindFieldHash(value string) string {
 		hash *= prime32
 	}
 	return fmt.Sprintf("%0*X", trapVarFieldHashLen, hash)
+}
+
+func trapTagJournalFieldNameFor(upperKey string) string {
+	return prefixedHashedJournalFieldName(trapTagJournalFieldPrefix, upperKey)
+}
+
+func prefixedHashedJournalFieldName(prefix, base string) string {
+	maxBaseLen := maxJournalFieldNameLen - len(prefix)
+	if maxBaseLen <= 0 {
+		return ""
+	}
+	if len(base) <= maxBaseLen {
+		return prefix + base
+	}
+
+	hash := trapVarbindFieldHash(base)
+	keepLen := maxBaseLen - 1 - len(hash)
+	if keepLen <= 0 {
+		if len(hash) > maxBaseLen {
+			hash = hash[:maxBaseLen]
+		}
+		return prefix + hash
+	}
+	return prefix + base[:keepLen] + "_" + hash
 }
 
 func buildTrapJSON(entry *TrapEntry) ([]byte, error) {
@@ -619,6 +647,9 @@ func (s *journalHotSerializer) serialize(entry *TrapEntry) ([][]byte, int, error
 		if entry.SourceUDPPeer != "" {
 			s.addStringField("TRAP_SOURCE_UDP_PEER", entry.SourceUDPPeer)
 		}
+		if entry.ReverseDNS != "" {
+			s.addStringField("TRAP_REVERSE_DNS", entry.ReverseDNS)
+		}
 		if entry.DeviceVendor != "" {
 			s.addStringField("TRAP_DEVICE_VENDOR", entry.DeviceVendor)
 		}
@@ -646,7 +677,7 @@ func (s *journalHotSerializer) serialize(entry *TrapEntry) ([][]byte, int, error
 		if !isValidTrapTagKey(upperKey) {
 			return nil, 0, fmt.Errorf("invalid label key for TRAP_TAG: %q", key)
 		}
-		s.addStringField("TRAP_TAG_"+upperKey, val)
+		s.addStringField(trapTagJournalFieldNameFor(upperKey), val)
 	}
 
 	if !isDedupSummary && !isDecodeError {
@@ -679,7 +710,7 @@ func (s *journalHotSerializer) addStringField(name, value string) {
 	s.buf = append(s.buf, '=')
 	valueStart := len(s.buf)
 	s.buf = append(s.buf, value...)
-	s.addPayload(start, valueStart)
+	s.addPayload(start, valueStart, name != "MESSAGE")
 }
 
 func (s *journalHotSerializer) addIntField(name string, value int64) {
@@ -688,7 +719,7 @@ func (s *journalHotSerializer) addIntField(name string, value int64) {
 	s.buf = append(s.buf, '=')
 	valueStart := len(s.buf)
 	s.buf = strconv.AppendInt(s.buf, value, 10)
-	s.addPayload(start, valueStart)
+	s.addPayload(start, valueStart, true)
 }
 
 func (s *journalHotSerializer) addDecodeErrorFields(info *DecodeErrorInfo) {
@@ -713,8 +744,8 @@ func (s *journalHotSerializer) addDecodeErrorFields(info *DecodeErrorInfo) {
 	}
 }
 
-func (s *journalHotSerializer) addPayload(start, valueStart int) {
-	if journalFieldNeedsBinary(s.buf[valueStart:]) {
+func (s *journalHotSerializer) addPayload(start, valueStart int, countBinary bool) {
+	if countBinary && journalFieldNeedsBinary(s.buf[valueStart:]) {
 		s.binaryEncodedFields++
 	}
 	s.payloads = append(s.payloads, s.buf[start:])
@@ -767,14 +798,14 @@ func (s *journalHotSerializer) addTrapJSONField(entry *TrapEntry) error {
 			return err
 		}
 		s.buf = append(s.buf, trapJSON...)
-		s.addPayload(start, valueStart)
+		s.addPayload(start, valueStart, true)
 		return nil
 	}
 
 	if err := s.appendTrapJSONObject(entry); err != nil {
 		return err
 	}
-	s.addPayload(start, valueStart)
+	s.addPayload(start, valueStart, true)
 	return nil
 }
 
@@ -789,7 +820,7 @@ func (s *journalHotSerializer) addTrapEnrichmentField(entry *TrapEntry) error {
 	s.buf = append(s.buf, '=')
 	valueStart := len(s.buf)
 	s.buf = append(s.buf, enrichmentJSON...)
-	s.addPayload(start, valueStart)
+	s.addPayload(start, valueStart, true)
 	return nil
 }
 

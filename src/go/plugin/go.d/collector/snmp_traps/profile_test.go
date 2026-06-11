@@ -7,6 +7,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -334,6 +335,58 @@ func TestStockProfileStoreUsesCatalogueWithoutParsingProfiles(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, td)
 	assert.Contains(t, err.Error(), "failed to lazy-load stock trap profile")
+	assert.NotNil(t, store.failed["ciscosystems.yaml"])
+
+	writeProfileYAMLZstd(t, stockDir, "ciscosystems.yaml.zst", `
+traps:
+  - oid: 1.3.6.1.4.1.9.1.0.1
+    name: TEST-CISCO-MIB::testTrap
+    category: diagnostic
+    severity: warning
+`)
+	td, err = idx.LookupWithError("1.3.6.1.4.1.9.1.0.1")
+	require.Error(t, err)
+	assert.Nil(t, td)
+	assert.Empty(t, idx.trapsByOID, "negative cache should prevent reparsing until profile cache rebuild")
+}
+
+func TestStockProfileStoreLazyLoadFailureDoesNotPartiallyMutateIndex(t *testing.T) {
+	stockDir := t.TempDir()
+	writeProfileYAMLZstd(t, stockDir, "ciscosystems.yaml.zst", `
+traps:
+  - oid: 1.3.6.1.4.1.9.1.0.1
+    name: TEST-CISCO-MIB::duplicateTrap
+    category: diagnostic
+    severity: warning
+  - oid: 1.3.6.1.4.1.9.1.0.2
+    name: TEST-CISCO-MIB::uniqueTrap
+    category: diagnostic
+    severity: warning
+`)
+
+	existing := &TrapDef{
+		OID:        "1.3.6.1.4.1.9.1.0.1",
+		Name:       "TEST-CISCO-MIB::existingTrap",
+		sourceFile: "user.yaml",
+	}
+	idx := &ProfileIndex{
+		trapsByOID:      map[string]*TrapDef{existing.OID: existing},
+		namesByTrapName: map[string]*TrapDef{existing.Name: existing},
+	}
+	store, err := buildStockProfileStore(stockDir, multipath.New(stockDir), nil, &ProfileIndex{
+		trapsByOID:      make(map[string]*TrapDef),
+		namesByTrapName: make(map[string]*TrapDef),
+	})
+	require.NoError(t, err)
+	idx.stock = store
+
+	td, err := idx.LookupWithError("1.3.6.1.4.1.9.1.0.2")
+	require.Error(t, err)
+	assert.Nil(t, td)
+	assert.Contains(t, err.Error(), "duplicate trap OID")
+	assert.Nil(t, idx.lookupLoaded("1.3.6.1.4.1.9.1.0.2"), "unique trap from failed stock file must not be inserted")
+	assert.False(t, store.loaded["ciscosystems.yaml"])
+	assert.NotNil(t, store.failed["ciscosystems.yaml"])
 }
 
 func TestStockProfileStoreRejectsCatalogueEntryWithoutTrapOIDs(t *testing.T) {
@@ -1084,6 +1137,51 @@ extends: [../../outside.yaml]
 	_, err := AcquireProfileCache()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid extends entry")
+}
+
+func TestProfileLoadRejectsTooDeepExtendsChain(t *testing.T) {
+	dir := t.TempDir()
+	for i := 0; i <= maxProfileExtendsDepth+1; i++ {
+		name := fmt.Sprintf("p%02d.yaml", i)
+		if i == maxProfileExtendsDepth+1 {
+			writeProfileYAML(t, dir, name, `
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.3
+    name: IF-MIB::linkDown
+    category: state_change
+    severity: warning
+`)
+			continue
+		}
+		writeProfileYAML(t, dir, name, fmt.Sprintf("extends: [p%02d.yaml]\n", i+1))
+	}
+
+	_, _, err := loadProfile(filepath.Join(dir, "p00.yaml"), multipath.New(dir), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "profile extends depth exceeds maximum")
+}
+
+func TestProfileLoadAllowsMaximumExtendsChainDepth(t *testing.T) {
+	dir := t.TempDir()
+	for i := 0; i <= maxProfileExtendsDepth; i++ {
+		name := fmt.Sprintf("p%02d.yaml", i)
+		if i == maxProfileExtendsDepth {
+			writeProfileYAML(t, dir, name, `
+traps:
+  - oid: 1.3.6.1.6.3.1.1.5.3
+    name: IF-MIB::linkDown
+    category: state_change
+    severity: warning
+`)
+			continue
+		}
+		writeProfileYAML(t, dir, name, fmt.Sprintf("extends: [p%02d.yaml]\n", i+1))
+	}
+
+	traps, _, err := loadProfile(filepath.Join(dir, "p00.yaml"), multipath.New(dir), nil)
+	require.NoError(t, err)
+	require.Len(t, traps, 1)
+	assert.Equal(t, "IF-MIB::linkDown", traps[0].Name)
 }
 
 // =============================================================================

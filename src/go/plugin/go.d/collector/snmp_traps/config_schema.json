@@ -183,7 +183,7 @@
       },
       "reverse_dns": {
         "title": "Reverse DNS",
-        "description": "Optional source-IP PTR enrichment for _HOSTNAME. Disabled by default; when enabled, trap packet handling uses cached non-blocking lookups and falls back to source IP until a name is available.",
+        "description": "Optional source-IP PTR annotation emitted as TRAP_REVERSE_DNS. Disabled by default; cached lookup results never override authoritative identity fields.",
         "type": "object",
         "default": {
           "enabled": false
@@ -212,6 +212,26 @@
             "description": "Source IP CIDR allowlist matched before BER decode. Empty accepts IPv4 and IPv6 from all sources.",
             "type": ["array", "null"],
             "default": ["0.0.0.0/0", "::/0"],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "source": {
+        "title": "Source attribution",
+        "description": "Controls which packet fields are allowed to identify the trap source. By default, Netdata uses the UDP peer as the authoritative source.",
+        "type": "object",
+        "default": {
+          "trusted_relays": []
+        },
+        "additionalProperties": false,
+        "properties": {
+          "trusted_relays": {
+            "title": "Trusted relays",
+            "description": "CIDR list of SNMP trap relays allowed to supply the original source through snmpTrapAddress.0. Leave empty unless the sender is a known relay that preserves original trap identity.",
+            "type": ["array", "null"],
+            "default": [],
             "items": {
               "type": "string"
             }
@@ -517,6 +537,7 @@
           "title": "Filtering",
           "fields": [
             "allowlist",
+            "source",
             "rate_limit",
             "dedup"
           ]

@@ -125,7 +125,7 @@ func TestJournalWriterCountsBinaryEncodedFields(t *testing.T) {
 		{Name: "PRIORITY", Value: []byte("4")},
 	}
 	require.NoError(t, w.WriteEntry(fields, 1000, 1000))
-	assert.Equal(t, uint64(1), w.BinaryEncodedFields())
+	assert.Equal(t, uint64(0), w.BinaryEncodedFields())
 }
 
 func TestJournalTrapWriterCloseReturnsWorkerFailure(t *testing.T) {

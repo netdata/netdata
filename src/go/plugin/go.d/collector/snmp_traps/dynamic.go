@@ -106,16 +106,17 @@ func (r *dynamicEngineIDRegistry) accept(engineIDHex string, username string) (s
 	return engineIDHex, true, true
 }
 
-func (c *Collector) decodeTrapWithSharedTable(data []byte, peerIP net.IP) (*TrapPacketContext, error) {
+func (c *Collector) decodeTrapWithSharedTable(data []byte, peerIP net.IP, trustedRelay bool) (*TrapPacketContext, error) {
+	opts := DecodeOptions{TrustedRelay: trustedRelay}
 	if c.dynamicEngineIDReg == nil {
-		return DecodeTrap(data, peerIP, c.v3SecTable)
+		return DecodeTrapWithOptions(data, peerIP, c.v3SecTable, opts)
 	}
 	c.dynamicEngineIDReg.tableMu.RLock()
 	defer c.dynamicEngineIDReg.tableMu.RUnlock()
-	return DecodeTrap(data, peerIP, c.v3SecTable)
+	return DecodeTrapWithOptions(data, peerIP, c.v3SecTable, opts)
 }
 
-func (c *Collector) tryDynamicRetry(data []byte, peerIP net.IP, peer *net.UDPAddr, rawCtx *rawV3Context) (*TrapPacketContext, bool, bool) {
+func (c *Collector) tryDynamicRetry(data []byte, peerIP net.IP, peer *net.UDPAddr, rawCtx *rawV3Context, trustedRelay bool) (*TrapPacketContext, bool, bool) {
 	if c.dynamicEngineIDReg == nil || rawCtx.username == "" {
 		return nil, false, false
 	}
@@ -127,7 +128,7 @@ func (c *Collector) tryDynamicRetry(data []byte, peerIP net.IP, peer *net.UDPAdd
 	if tempTable == nil {
 		return nil, checked, false
 	}
-	retryCtx, err := DecodeTrap(data, peerIP, tempTable)
+	retryCtx, err := DecodeTrapWithOptions(data, peerIP, tempTable, DecodeOptions{TrustedRelay: trustedRelay})
 	if err != nil {
 		return nil, checked, false
 	}

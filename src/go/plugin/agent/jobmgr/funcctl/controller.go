@@ -96,6 +96,7 @@ func moduleMethods(creator collectorapi.Creator) []funcapi.MethodConfig {
 }
 
 func (c *Controller) moduleMethodPublicNameCollision(moduleName string, methods []funcapi.MethodConfig, planned map[string]string) (string, string, bool) {
+	modulePlanned := make(map[string]string)
 	for _, method := range methods {
 		if method.ID == "" {
 			continue
@@ -108,8 +109,14 @@ func (c *Controller) moduleMethodPublicNameCollision(moduleName string, methods 
 			if existing := planned[functionName]; existing != "" && existing != owner {
 				return functionName, existing, true
 			}
-			planned[functionName] = owner
+			if existing := modulePlanned[functionName]; existing != "" && existing != owner {
+				return functionName, existing, true
+			}
+			modulePlanned[functionName] = owner
 		}
+	}
+	for functionName, owner := range modulePlanned {
+		planned[functionName] = owner
 	}
 	return "", "", false
 }
@@ -267,8 +274,6 @@ func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []f
 			continue
 		}
 
-		// FIXME: job methods currently ignore method.Aliases and publish only the
-		// canonical module:method name. Static/module methods use methodFunctionNames().
 		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)
 		c.registerFunction(funcName, c.makeJobMethodFuncHandler(job.ModuleName(), job.Name(), method.ID))
 

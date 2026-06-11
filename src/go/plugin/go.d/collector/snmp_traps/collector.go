@@ -79,6 +79,7 @@ type Collector struct {
 	vnode              string
 	versions           map[SnmpVersion]struct{}
 	allowlist          *Allowlist
+	trustedRelays      []netip.Prefix
 	rateLimiter        *rateLimiter
 	engineBoots        *EngineBoots
 	localEngineID      *LocalEngineID
@@ -138,6 +139,11 @@ func (c *Collector) Init(ctx context.Context) error {
 	if err != nil {
 		return dyncfgConfigError(err)
 	}
+	trustedRelays, err := validateTrustedRelays(c.Source)
+	if err != nil {
+		return dyncfgConfigError(err)
+	}
+	c.warnCatchAllTrustedRelays(trustedRelays)
 
 	if err := validateRateLimit(c.RateLimit); err != nil {
 		return dyncfgConfigError(err)
@@ -145,7 +151,8 @@ func (c *Collector) Init(ctx context.Context) error {
 	if err := validateDedupConfig(c.Dedup); err != nil {
 		return dyncfgConfigError(err)
 	}
-	if _, err := validateOTLPConfig(c.OTLP); err != nil {
+	otlpRuntime, err := validateOTLPConfig(c.OTLP)
+	if err != nil {
 		return dyncfgConfigError(err)
 	}
 	journalEnabled := c.Journal.enabled()
@@ -255,9 +262,21 @@ func (c *Collector) Init(ctx context.Context) error {
 		// No engine-state files exist unless SNMPv3 setup below creates them.
 	}
 	if v3Enabled {
-		engineBootsExisted := engineStatePathExists(engineBootsPath(c.jobName))
-		localEngineIDExisted := engineStatePathExists(localEngineIDPath(c.jobName))
-		engineStateDirExisted := engineStatePathExists(engineBootsDir(c.jobName))
+		engineBootsExisted, err := engineStatePathExistsChecked(engineBootsPath(c.jobName))
+		if err != nil {
+			cleanupPreflight()
+			return dyncfgStartupError(err)
+		}
+		localEngineIDExisted, err := engineStatePathExistsChecked(localEngineIDPath(c.jobName))
+		if err != nil {
+			cleanupPreflight()
+			return dyncfgStartupError(err)
+		}
+		engineStateDirExisted, err := engineStatePathExistsChecked(engineBootsDir(c.jobName))
+		if err != nil {
+			cleanupPreflight()
+			return dyncfgStartupError(err)
+		}
 		cleanupCreatedState = func() {
 			cleanupCreatedEngineState(c.jobName, !engineBootsExisted, !localEngineIDExisted, !engineStateDirExisted)
 		}
@@ -301,8 +320,8 @@ func (c *Collector) Init(ctx context.Context) error {
 	listener.onReadError = c.logListenerReadError
 	var secondaryWriter TrapWriter
 	if c.OTLP.Enabled {
-		c.warnPlaintextOTLP()
-		secondaryWriter, err = newOTLPTrapWriter(ctx, c.jobName, c.OTLP, metrics)
+		c.warnPlaintextOTLP(otlpRuntime)
+		secondaryWriter, err = newOTLPTrapWriterWithRuntimeConfig(ctx, c.jobName, otlpRuntime, metrics)
 		if err != nil {
 			removeJobMetrics(c.jobName)
 			cleanupCreatedState()
@@ -313,7 +332,9 @@ func (c *Collector) Init(ctx context.Context) error {
 	var primaryWriter TrapWriter
 	writeFailureDim := trapWriteFailureJournal
 	if journalWriter != nil {
-		primaryWriter = newJournalTrapWriter(journalWriter, defaultQueueCapacity)
+		primaryWriter = newJournalTrapWriter(journalWriter, defaultQueueCapacity, func(err error) {
+			c.warnf("SNMP trap journal writer stopped for job %q: %v", c.jobName, err)
+		})
 	}
 	trapWriter := newFanoutTrapWriter(primaryWriter, secondaryWriter, metrics)
 	if primaryWriter == nil {
@@ -329,6 +350,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.vnode = c.Vnode
 	c.versions = versionSet(versions)
 	c.allowlist = NewAllowlist(allowlistPrefixes, c.Communities)
+	c.trustedRelays = trustedRelays
 	c.rateLimiter = newRateLimiter(c.RateLimit.Enabled, c.RateLimit.PerSourcePPS, c.RateLimit.Mode)
 	c.engineBoots = eb
 	c.localEngineID = lid
@@ -487,14 +509,15 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 		return
 	}
 
-	pktCtx, err := c.decodeTrapWithSharedTable(data, decodePeerIP)
+	trustedRelay := c.trustedRelaySource(decodePeerIP)
+	pktCtx, err := c.decodeTrapWithSharedTable(data, decodePeerIP, trustedRelay)
 	if err != nil {
 		dim := ClassifyDecodeError(err)
 		if c.v3SecTable != nil {
 			rawCtx, rawErr := extractRawV3Context(data)
 			if rawErr == nil && rawCtx != nil {
 				if c.dynamicEngineID && !rawCtx.reportable {
-					retryCtx, checked, dropped := c.tryDynamicRetry(data, decodePeerIP, peer, rawCtx)
+					retryCtx, checked, dropped := c.tryDynamicRetry(data, decodePeerIP, peer, rawCtx, trustedRelay)
 					rateLimitChecked = rateLimitChecked || checked
 					if dropped {
 						return
@@ -665,6 +688,23 @@ func packetSourceAddr(peerIP net.IP, peer *net.UDPAddr) (netip.Addr, bool) {
 	return addr.Unmap(), true
 }
 
+func (c *Collector) trustedRelaySource(peerIP net.IP) bool {
+	if len(c.trustedRelays) == 0 || peerIP == nil {
+		return false
+	}
+	addr, ok := netip.AddrFromSlice(peerIP)
+	if !ok {
+		return false
+	}
+	addr = addr.Unmap()
+	for _, prefix := range c.trustedRelays {
+		if prefix.Contains(addr) {
+			return true
+		}
+	}
+	return false
+}
+
 func shouldExtractEngineIDOnDecodeError(dim string) bool {
 	switch dim {
 	case "auth_failures", "usm_failures", "unknown_engine_id":
@@ -691,12 +731,23 @@ func (c *Collector) warnf(format string, args ...any) {
 	}
 }
 
-func (c *Collector) warnPlaintextOTLP() {
-	ep, err := parseOTLPEndpoint(c.OTLP.Endpoint)
-	if err != nil || !ep.insecure || otlpTargetIsLoopback(ep.target) {
+func (c *Collector) warnPlaintextOTLP(runtimeCfg otlpRuntimeConfig) {
+	if !runtimeCfg.insecure || otlpTargetIsLoopback(runtimeCfg.target) {
 		return
 	}
-	c.warnf("SNMP trap OTLP endpoint %q uses plaintext transport; use https:// for remote collectors", ep.target)
+	c.warnf("SNMP trap OTLP endpoint %q uses plaintext transport; use https:// for remote collectors", runtimeCfg.target)
+}
+
+func (c *Collector) warnCatchAllTrustedRelays(prefixes []netip.Prefix) {
+	for _, prefix := range prefixes {
+		if trustedRelayPrefixIsCatchAll(prefix) {
+			c.warnf("SNMP trap source.trusted_relays contains catch-all prefix %s; every UDP peer in this address family may override source identity via snmpTrapAddress.0", prefix)
+		}
+	}
+}
+
+func trustedRelayPrefixIsCatchAll(prefix netip.Prefix) bool {
+	return prefix.Bits() == 0
 }
 
 func (c *Collector) logListenerReadError(ep EndpointConfig, err error) {
@@ -791,5 +842,5 @@ func dyncfgStartupError(err error) *dyncfgCodedError {
 
 func (e *dyncfgCodedError) Error() string         { return e.err.Error() }
 func (e *dyncfgCodedError) Unwrap() error         { return e.err }
-func (e *dyncfgCodedError) Code() int             { return e.code }
+func (e *dyncfgCodedError) DyncfgCode() int       { return e.code }
 func (e *dyncfgCodedError) DyncfgRetryable() bool { return e.retryable }

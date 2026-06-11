@@ -218,8 +218,7 @@ endmeta-->
             if integration["meta"].get("module_name") == "snmp_traps":
                 md += "<!-- markdownlint-disable-file -->\n"
 
-            md += f"""
-{create_overview(integration, integration['meta']['monitored_instance']['icon_filename'])}"""
+            md += f"""{create_overview(integration, integration['meta']['monitored_instance']['icon_filename'])}"""
 
             if integration.get("setup"):
                 md += f"\n{integration['setup']}\n"

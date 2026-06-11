@@ -5,6 +5,7 @@ package snmp_traps
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -41,6 +42,7 @@ func TestSNMPTrapsJournalFunctionUsesPublicFunctionName(t *testing.T) {
 	assert.Equal(t, "Trap Jobs", fn.Config.SourceSelectorName)
 	assert.Equal(t, "Select the trap jobs to query", fn.Config.SourceSelectorHelp)
 	assert.Equal(t, "TRAP_NAME", fn.Config.DefaultHistogram)
+	assert.Contains(t, fn.Config.DefaultViewKeys, "TRAP_REVERSE_DNS")
 }
 
 func TestSNMPTrapsLogsFunctionInfoAndQuery(t *testing.T) {
@@ -108,6 +110,25 @@ func TestSNMPTrapsLogsFunctionInfoAndQuery(t *testing.T) {
 	assert.NotContains(t, string(rawFiltered), "sdk remote trap entry")
 }
 
+func TestSNMPTrapsLogsFunctionDefaultsWithHighVarbindRow(t *testing.T) {
+	root := t.TempDir()
+	writeHighVarbindTrapJournal(t, root, "local", 250)
+
+	handler := snmptrapsfunc.NewHandler(root)
+	resp := handler.HandleRaw(context.Background(), funcapiRawRequest("logs", false, []byte(`{
+  "last": 10,
+  "direction": "backward",
+  "facets": []
+}`)))
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.RawResponse)
+	assert.Equal(t, 200, resp.RawResponse["status"])
+	assertResponseFacetIDs(t, resp.RawResponse, snmptrapsfunc.DefaultLogFacets())
+	assertResponseColumnVisible(t, resp.RawResponse, "TRAP_NAME")
+	assertResponseHistogramID(t, resp.RawResponse, "TRAP_NAME")
+	assertResponseHistogramTotal(t, resp.RawResponse, "IF-MIB::linkDown", 1)
+}
+
 func TestSNMPTrapsLogsFunctionUnavailableWithoutJournal(t *testing.T) {
 	handler := snmptrapsfunc.NewHandler(filepath.Join(t.TempDir(), "missing"))
 
@@ -162,12 +183,120 @@ func writeTestTrapJournal(t *testing.T, root, jobName, message, category string)
 	return w.JournalDirectory()
 }
 
+func writeHighVarbindTrapJournal(t *testing.T, root, jobName string, varbinds int) string {
+	t.Helper()
+
+	w, err := NewJournalWriter(filepath.Join(root, jobName), RetentionConfig{}.makeJournalConfig())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, w.Close()) })
+
+	fields := []JournalField{
+		{Name: "MESSAGE", Value: []byte("high varbind trap entry")},
+		{Name: "PRIORITY", Value: []byte("4")},
+		{Name: "SYSLOG_IDENTIFIER", Value: []byte(jobName)},
+		{Name: "TRAP_JOB", Value: []byte(jobName)},
+		{Name: "_HOSTNAME", Value: []byte(jobName + "-host")},
+		{Name: "ND_LOG_SOURCE", Value: []byte("snmp-trap")},
+		{Name: "TRAP_REPORT_TYPE", Value: []byte("trap")},
+		{Name: "TRAP_OID", Value: []byte("1.3.6.1.6.3.1.1.5.3")},
+		{Name: "TRAP_NAME", Value: []byte("IF-MIB::linkDown")},
+		{Name: "TRAP_CATEGORY", Value: []byte("state_change")},
+		{Name: "TRAP_SEVERITY", Value: []byte("warning")},
+		{Name: "TRAP_SOURCE_IP", Value: []byte("192.0.2.1")},
+		{Name: "TRAP_DEVICE_VENDOR", Value: []byte("test-vendor")},
+	}
+	for i := range varbinds {
+		fields = append(fields, JournalField{
+			Name:  fmt.Sprintf("TRAP_VAR_SYNTHETIC_%03d", i),
+			Value: []byte(fmt.Sprintf("enum-%03d", i)),
+		})
+	}
+	fields = append(fields, JournalField{
+		Name:  "TRAP_JSON",
+		Value: []byte(`{"trap_oid":"1.3.6.1.6.3.1.1.5.3"}`),
+	})
+
+	now := time.Now().UnixMicro()
+	require.NoError(t, w.WriteEntry(fields, now, monotonicUsec()))
+	require.NoError(t, w.Sync())
+	return w.JournalDirectory()
+}
+
 func funcapiRawRequest(method string, info bool, payload []byte) funcapi.RawMethodRequest {
 	return funcapi.RawMethodRequest{
 		Method:  method,
 		Info:    info,
 		Payload: payload,
 		Timeout: time.Second,
+	}
+}
+
+func assertResponseHistogramID(t *testing.T, response map[string]any, want string) {
+	t.Helper()
+	histogram, ok := response["histogram"].(map[string]any)
+	require.True(t, ok, "response histogram type = %T", response["histogram"])
+	assert.Equal(t, want, histogram["id"])
+}
+
+func assertResponseHistogramTotal(t *testing.T, response map[string]any, dimension string, want uint64) {
+	t.Helper()
+	histogram, ok := response["histogram"].(map[string]any)
+	require.True(t, ok, "response histogram type = %T", response["histogram"])
+	chart, ok := histogram["chart"].(map[string]any)
+	require.True(t, ok, "histogram chart type = %T", histogram["chart"])
+	result, ok := chart["result"].(map[string]any)
+	require.True(t, ok, "histogram result type = %T", chart["result"])
+	view, ok := chart["view"].(map[string]any)
+	require.True(t, ok, "histogram view type = %T", chart["view"])
+	dimensions, ok := view["dimensions"].(map[string]any)
+	require.True(t, ok, "histogram dimensions type = %T", view["dimensions"])
+	names, ok := dimensions["names"].([]any)
+	require.True(t, ok, "histogram dimension names type = %T", dimensions["names"])
+
+	dimensionIndex := -1
+	for index, nameAny := range names {
+		if nameAny == dimension {
+			dimensionIndex = index
+			break
+		}
+	}
+	require.NotEqual(t, -1, dimensionIndex, "missing histogram dimension %s in %#v", dimension, names)
+
+	data, ok := result["data"].([]any)
+	require.True(t, ok, "histogram data type = %T", result["data"])
+	var total uint64
+	for _, pointAny := range data {
+		point, ok := pointAny.([]any)
+		require.True(t, ok, "histogram point type = %T", pointAny)
+		cellIndex := dimensionIndex + 1
+		require.Less(t, cellIndex, len(point), "histogram point has too few cells")
+		cell, ok := point[cellIndex].([]any)
+		require.True(t, ok, "histogram cell type = %T", point[cellIndex])
+		require.NotEmpty(t, cell)
+		total += responseUint64(t, cell[0])
+	}
+	assert.Equal(t, want, total)
+}
+
+func responseUint64(t *testing.T, value any) uint64 {
+	t.Helper()
+	switch v := value.(type) {
+	case uint64:
+		return v
+	case uint:
+		return uint64(v)
+	case int:
+		require.GreaterOrEqual(t, v, 0)
+		return uint64(v)
+	case int64:
+		require.GreaterOrEqual(t, v, int64(0))
+		return uint64(v)
+	case float64:
+		require.GreaterOrEqual(t, v, float64(0))
+		return uint64(v)
+	default:
+		require.Failf(t, "unexpected numeric value type", "value %v has type %T", value, value)
+		return 0
 	}
 }
 

@@ -22,6 +22,7 @@ func TestSerializeToJournalFields(t *testing.T) {
 		Message:               "linkDown on interface eth0",
 		SourceIP:              "10.0.0.1",
 		SourceUDPPeer:         "10.0.0.1",
+		ReverseDNS:            "core-sw.ptr.example.com",
 		DeviceHostname:        "core-sw-01",
 		DeviceVendor:          "cisco",
 		PduType:               PduTypeTrap,
@@ -33,7 +34,7 @@ func TestSerializeToJournalFields(t *testing.T) {
 				SnmpTrapAddress:    "192.0.2.1",
 				Selected:           "10.0.0.1",
 				Method:             "udp_peer",
-				RejectedCandidates: []string{"snmpTrapAddress.0:direct_listener_uses_udp_peer"},
+				RejectedCandidates: []string{"snmpTrapAddress.0:untrusted_relay_uses_udp_peer"},
 			},
 			Registry: &TrapEnrichmentLookup{
 				Key:     "10.0.0.1",
@@ -78,6 +79,7 @@ func TestSerializeToJournalFields(t *testing.T) {
 	assertField(t, fieldMap, "TRAP_VERSION", "v2c")
 	assertField(t, fieldMap, "TRAP_SOURCE_IP", "10.0.0.1")
 	assertField(t, fieldMap, "TRAP_SOURCE_UDP_PEER", "10.0.0.1")
+	assertField(t, fieldMap, "TRAP_REVERSE_DNS", "core-sw.ptr.example.com")
 	assertField(t, fieldMap, "TRAP_DEVICE_VENDOR", "cisco")
 	assertField(t, fieldMap, "TRAP_TAG_INTERFACE", "eth0")
 	assertField(t, fieldMap, "TRAP_TAG_VLAN", "10")
@@ -682,6 +684,42 @@ func TestSerializeToJournalFieldsLabelsSorted(t *testing.T) {
 	if labelNames[0] != "TRAP_TAG_A_KEY" {
 		t.Fatalf("expected TRAP_TAG_A_KEY first, got %s", labelNames[0])
 	}
+}
+
+func TestTrapTagJournalFieldNameIsCapped(t *testing.T) {
+	longKey := strings.Repeat("a", 80)
+	entry := &TrapEntry{
+		JobName:               "local",
+		ReportType:            ReportTypeTrap,
+		ReceivedRealtimeUsec:  1000000,
+		ReceivedMonotonicUsec: 1000,
+		TrapOID:               "1.3.6.1.6.3.1.1.5.3",
+		Message:               "test",
+		SourceIP:              "10.0.0.1",
+		PduType:               PduTypeTrap,
+		SnmpVersion:           SnmpVersionV2c,
+		Labels:                map[string]string{longKey: "value"},
+	}
+
+	fields, err := serializeToJournalFields(entry)
+	if err != nil {
+		t.Fatalf("serializeToJournalFields: %v", err)
+	}
+	fieldMap := fieldsToMap(fields)
+	var found string
+	for name := range fieldMap {
+		if strings.HasPrefix(name, "TRAP_TAG_") {
+			found = name
+			break
+		}
+	}
+	if found == "" {
+		t.Fatal("missing TRAP_TAG field")
+	}
+	if len(found) > maxJournalFieldNameLen {
+		t.Fatalf("TRAP_TAG field name length = %d, want <= %d: %s", len(found), maxJournalFieldNameLen, found)
+	}
+	assertField(t, fieldMap, found, "value")
 }
 
 func TestJournalHotSerializerMatchesSerializeToJournalFields(t *testing.T) {

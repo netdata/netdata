@@ -379,8 +379,17 @@ func TestEnrichTrapEntryReverseDNSEnabledNoSNMPState(t *testing.T) {
 	entry := &TrapEntry{SourceIP: "10.6.6.1"}
 	enrichTrapEntry(entry, true, dns)
 
-	if entry.DeviceHostname != "peer.mydc.example.com" {
-		t.Errorf("DeviceHostname = %q, want peer.mydc.example.com (reverse DNS enabled, cached)", entry.DeviceHostname)
+	if entry.DeviceHostname != "" {
+		t.Errorf("DeviceHostname = %q, want empty because reverse DNS is not authoritative identity", entry.DeviceHostname)
+	}
+	if entry.ReverseDNS != "peer.mydc.example.com" {
+		t.Errorf("ReverseDNS = %q, want peer.mydc.example.com", entry.ReverseDNS)
+	}
+	if entry.Enrichment == nil || entry.Enrichment.ReverseDNS == nil {
+		t.Fatal("missing reverse DNS audit")
+	}
+	if entry.Enrichment.ReverseDNS.Value != "peer.mydc.example.com" {
+		t.Fatalf("reverse DNS audit = %+v, want cached value", entry.Enrichment.ReverseDNS)
 	}
 }
 
@@ -405,7 +414,7 @@ func TestEnrichTrapEntryReverseDNSDisabledNoCacheUse(t *testing.T) {
 	}
 }
 
-func TestEnrichTrapEntryReverseDNSDoesNotResolveWhenHostnameKnown(t *testing.T) {
+func TestEnrichTrapEntryReverseDNSDoesNotReplaceKnownHostname(t *testing.T) {
 	regKey := "key:10.7.7.2:162"
 	ddsnmp.DeviceRegistry.Register(regKey, ddsnmp.DeviceConnectionInfo{
 		Hostname: "10.7.7.2",
@@ -414,17 +423,18 @@ func TestEnrichTrapEntryReverseDNSDoesNotResolveWhenHostnameKnown(t *testing.T) 
 	defer ddsnmp.DeviceRegistry.Unregister(regKey)
 
 	dns := newReverseDNSResolver()
+	dns.cache["10.7.7.2"] = reverseDNSCacheEntry{
+		name:      "reverse-known.example.com",
+		expiresAt: farFuture(),
+	}
 	entry := &TrapEntry{SourceIP: "10.7.7.2"}
 	enrichTrapEntry(entry, true, dns)
 
 	if entry.DeviceHostname != "known-switch" {
 		t.Errorf("DeviceHostname = %q, want known-switch", entry.DeviceHostname)
 	}
-	dns.mu.RLock()
-	_, pending := dns.pending["10.7.7.2"]
-	dns.mu.RUnlock()
-	if pending {
-		t.Fatal("reverse DNS lookup was scheduled despite known SNMP hostname")
+	if entry.ReverseDNS != "reverse-known.example.com" {
+		t.Errorf("ReverseDNS = %q, want reverse-known.example.com", entry.ReverseDNS)
 	}
 }
 

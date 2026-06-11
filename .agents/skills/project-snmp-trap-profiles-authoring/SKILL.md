@@ -38,8 +38,8 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
 
 2. **Resolve every varbind reference.** A name in a trap entry's `varbinds:`
    list MUST exist in the file-scoped `varbinds:` table or be an inline dict
-   on the trap entry. Dangling name references are a bug — they render as
-   `<missing>` at runtime and pollute the journal.
+   on the trap entry. Dangling name references are a bug — they render as empty
+   values in restricted templates and produce misleading journal messages.
 
 3. **Identify the source MIB object for every varbind.** Check the object's
    `MAX-ACCESS`. `not-accessible` index objects must still be declared in the
@@ -95,7 +95,7 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
    `profile-format.md` § "Operator overrides".
 
 10. **No `metric:` block in profiles.** Per-OID metric emission lives in
-    plugin configuration (`go.d/snmp.trap.conf`), not in profiles. Profiles
+    plugin configuration (`go.d/snmp_traps.conf`), not in profiles. Profiles
     stay vendor-curated knowledge; per-installation choices stay operator-
     editable in plugin config.
 
@@ -135,8 +135,8 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
 
 4. **LLM output validation is mandatory.** Model responses must validate
    against the JSON Schema and the semantic validators: closed category,
-   closed severity, exact placeholder allowlist, and uniform description style
-   ending with ` on {_HOSTNAME}.`. Retry invalid responses up to five total
+   closed severity, exact template helper allowlist, and uniform description
+   style ending with ` on {{hostname}}.`. Retry invalid responses up to five total
    attempts before mechanical fallback, or hard failure under `--require-llm`.
 
 5. **YAML emission** is the producer of files in `default/`. It must:
@@ -155,8 +155,8 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
 
 6. **PEN registry handling** must use the bundled snapshot by default. CMake
    installs
-   `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/iana-enterprise-numbers.txt`
-   under `usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/`. `--refresh-pen`
+   `src/go/plugin/go.d/config/go.d/snmp.profiles/metadata/iana-enterprise-numbers.txt`
+   under `usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata/`. `--refresh-pen`
    may fetch the current IANA registry when explicitly requested.
 
 7. **Regenerating the stock pack** uses the Go helper:

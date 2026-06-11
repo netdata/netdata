@@ -51,7 +51,7 @@ type Callbacks[C Config] interface {
 // CodedError allows callbacks to override the default response code.
 type CodedError interface {
 	error
-	Code() int
+	DyncfgCode() int
 }
 
 // RetryableError marks errors that should keep job auto-detection retry enabled.
@@ -519,7 +519,7 @@ func (h *Handler[C]) CmdEnable(fn Function) {
 		code := h.enableFailCode
 		var ce CodedError
 		if errors.As(err, &ce) {
-			code = ce.Code()
+			code = ce.DyncfgCode()
 		}
 		h.api.SendCodef(fn, code, "%v", err)
 
@@ -697,7 +697,7 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 		code := 200
 		var ce CodedError
 		if errors.As(err, &ce) {
-			code = ce.Code()
+			code = ce.DyncfgCode()
 		}
 		h.api.SendCodef(fn, code, "%v", err)
 		h.NotifyJobStatus(newCfg, StatusFailed)
@@ -754,7 +754,7 @@ func (h *Handler[C]) CmdRestart(fn Function) {
 		code := 422
 		var ce CodedError
 		if errors.As(err, &ce) {
-			code = ce.Code()
+			code = ce.DyncfgCode()
 		}
 		h.api.SendCodef(fn, code, "job restart failed: %v", err)
 		h.NotifyJobStatus(entry.Cfg, StatusFailed)

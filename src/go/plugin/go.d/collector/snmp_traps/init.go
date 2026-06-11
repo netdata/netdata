@@ -247,11 +247,19 @@ func validateAllowlist(al AllowlistConfig) ([]netip.Prefix, error) {
 	if len(al.SourceCIDRs) == 0 {
 		al.SourceCIDRs = defaultAllowlistCIDRs
 	}
+	return parseCIDRList("allowlist.source_cidrs", al.SourceCIDRs)
+}
+
+func validateTrustedRelays(cfg SourceConfig) ([]netip.Prefix, error) {
+	return parseCIDRList("source.trusted_relays", cfg.TrustedRelays)
+}
+
+func parseCIDRList(field string, cidrs []string) ([]netip.Prefix, error) {
 	var prefixes []netip.Prefix
-	for i, cidr := range al.SourceCIDRs {
+	for i, cidr := range cidrs {
 		prefix, err := netip.ParsePrefix(cidr)
 		if err != nil {
-			return nil, fmt.Errorf("allowlist.source_cidrs[%d]: invalid CIDR %q: %v", i, cidr, err)
+			return nil, fmt.Errorf("%s[%d]: invalid CIDR %q: %v", field, i, cidr, err)
 		}
 		prefixes = append(prefixes, prefix)
 	}

@@ -240,6 +240,46 @@ func TestDecodeRejectsOctetStringOverLimit(t *testing.T) {
 	}
 }
 
+func TestDecodeV3AuthPrivAllowsEncryptedScopedPDUOverOctetStringLimit(t *testing.T) {
+	var extra []gosnmp.SnmpPDU
+	for i := 0; i < 40; i++ {
+		extra = append(extra, gosnmp.SnmpPDU{
+			Name:  "1.3.6.1.4.1.999.1." + strconv.Itoa(i+1),
+			Type:  gosnmp.OctetString,
+			Value: strings.Repeat("x", 48),
+		})
+	}
+	data := buildV3SecuredTrap(t, v3SecuredTrapSpec{
+		user:        "testuser",
+		engineIDHex: testEngineIDHex,
+		authProto:   "sha256",
+		privProto:   "aes",
+		authKey:     "authpassword",
+		privKey:     "privpassword",
+		trapOID:     "1.3.6.1.6.3.1.1.5.1",
+		extra:       extra,
+	})
+	if len(data) <= maxOctetStringLen {
+		t.Fatalf("test packet length = %d, want encrypted ScopedPDU coverage over %d", len(data), maxOctetStringLen)
+	}
+	tbl := newTestV3SecurityTable(t, USMUserConfig{
+		Username:  "testuser",
+		EngineID:  testEngineIDHex,
+		AuthProto: "sha256",
+		AuthKey:   "authpassword",
+		PrivProto: "aes",
+		PrivKey:   "privpassword",
+	})
+
+	ctx, err := DecodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
+	if err != nil {
+		t.Fatalf("DecodeTrap failed for valid authPriv packet: %v", err)
+	}
+	if got := len(ctx.PDU.Varbinds); got < len(extra)+2 {
+		t.Fatalf("decoded varbinds = %d, want at least %d", got, len(extra)+2)
+	}
+}
+
 func TestNormalizePDUValueRejectsUnexpectedType(t *testing.T) {
 	_, err := normalizePDUValue(gosnmp.SnmpPDU{
 		Name:  "1.3.6.1.4.1.9.1",
@@ -310,7 +350,7 @@ func TestDecodeRejectsBERLimits(t *testing.T) {
 }
 
 func TestValidateBERLimitsAcceptsMaxDepth(t *testing.T) {
-	if err := validateBERLimits(nestedSequence(maxNestingDepth)); err != nil {
+	if err := validateBERLimits(nestedSequence(maxNestingDepth), validateBEROptions{}); err != nil {
 		t.Fatalf("expected max depth to pass, got %v", err)
 	}
 }
@@ -319,12 +359,12 @@ func TestSourceFromVarbind(t *testing.T) {
 	vbs := []VarbindValue{
 		{OID: snmpTrapAddressOID, Value: "10.0.0.1", Type: "IPAddress"},
 	}
-	addr := sourceFromVarbind(vbs, snmpTrapAddressOID)
+	addr, _ := sourceFromVarbindWithRejectReason(vbs, snmpTrapAddressOID)
 	if addr != "10.0.0.1" {
 		t.Errorf("expected 10.0.0.1, got %q", addr)
 	}
 
-	addr = sourceFromVarbind(vbs, "1.3.6.1.4.9.0")
+	addr, _ = sourceFromVarbindWithRejectReason(vbs, "1.3.6.1.4.9.0")
 	if addr != "" {
 		t.Errorf("expected empty for no-match, got %q", addr)
 	}
@@ -334,7 +374,7 @@ func TestSourceFromVarbindNotString(t *testing.T) {
 	vbs := []VarbindValue{
 		{OID: snmpTrapAddressOID, Value: int64(42), Type: "INTEGER"},
 	}
-	addr := sourceFromVarbind(vbs, snmpTrapAddressOID)
+	addr, _ := sourceFromVarbindWithRejectReason(vbs, snmpTrapAddressOID)
 	if addr != "" {
 		t.Errorf("expected empty for non-IP value, got %q", addr)
 	}
@@ -344,7 +384,7 @@ func TestSourceFromVarbindNetIP(t *testing.T) {
 	vbs := []VarbindValue{
 		{OID: snmpTrapAddressOID, Value: net.ParseIP("192.0.2.1"), Type: "IPAddress"},
 	}
-	addr := sourceFromVarbind(vbs, snmpTrapAddressOID)
+	addr, _ := sourceFromVarbindWithRejectReason(vbs, snmpTrapAddressOID)
 	if addr != "192.0.2.1" {
 		t.Errorf("expected 192.0.2.1, got %q", addr)
 	}
@@ -354,7 +394,7 @@ func TestSourceFromVarbindNotIP(t *testing.T) {
 	vbs := []VarbindValue{
 		{OID: snmpTrapAddressOID, Value: "not-an-ip", Type: "OctetString"},
 	}
-	addr := sourceFromVarbind(vbs, snmpTrapAddressOID)
+	addr, _ := sourceFromVarbindWithRejectReason(vbs, snmpTrapAddressOID)
 	if addr != "" {
 		t.Errorf("expected empty for non-IP value, got %q", addr)
 	}
@@ -366,7 +406,7 @@ func TestIdentifySourceCascade(t *testing.T) {
 	vbsWithSource := []VarbindValue{
 		{OID: snmpTrapAddressOID, Value: "192.168.1.1", Type: "IPAddress"},
 	}
-	addr := identifySource(vbsWithSource, peer)
+	addr := selectTrapSource(vbsWithSource, peer, false).sourceIP
 	if addr != "10.0.0.5" {
 		t.Errorf("expected UDP peer to win over snmpTrapAddress.0, got %q", addr)
 	}
@@ -374,29 +414,33 @@ func TestIdentifySourceCascade(t *testing.T) {
 	vbsNoSource := []VarbindValue{
 		{OID: sysUpTimeOID, Value: uint64(10), Type: "TimeTicks"},
 	}
-	addr = identifySource(vbsNoSource, peer)
+	addr = selectTrapSource(vbsNoSource, peer, false).sourceIP
 	if addr != "10.0.0.5" {
 		t.Errorf("expected UDP peer fallback, got %q", addr)
 	}
 
-	addr = identifySource(vbsNoSource, nil)
+	addr = selectTrapSource(vbsNoSource, nil, false).sourceIP
 	if addr != "" {
 		t.Errorf("expected empty for nil peer, got %q", addr)
 	}
 
-	addr = identifySource(vbsWithSource, nil)
-	if addr != "192.168.1.1" {
-		t.Errorf("expected snmpTrapAddress.0 value without UDP peer, got %q", addr)
+	addr = selectTrapSource(vbsWithSource, nil, false).sourceIP
+	if addr != "" {
+		t.Errorf("expected empty without trusted relay and UDP peer, got %q", addr)
+	}
+	selected := selectTrapSource(vbsWithSource, nil, false)
+	if len(selected.audit.RejectedCandidates) != 1 || selected.audit.RejectedCandidates[0] != "snmpTrapAddress.0:missing_udp_peer" {
+		t.Fatalf("source audit rejected candidates = %+v, want missing UDP peer rejection", selected.audit.RejectedCandidates)
 	}
 
 	vbsUnspecifiedSource := []VarbindValue{
 		{OID: snmpTrapAddressOID, Value: "0.0.0.0", Type: "IPAddress"},
 	}
-	addr = identifySource(vbsUnspecifiedSource, peer)
+	addr = selectTrapSource(vbsUnspecifiedSource, peer, false).sourceIP
 	if addr != "10.0.0.5" {
 		t.Errorf("expected UDP peer when snmpTrapAddress.0 is unspecified, got %q", addr)
 	}
-	selected := selectTrapSource(vbsUnspecifiedSource, peer)
+	selected = selectTrapSource(vbsUnspecifiedSource, peer, false)
 	if selected.audit == nil {
 		t.Fatal("missing source audit")
 	}
@@ -407,9 +451,54 @@ func TestIdentifySourceCascade(t *testing.T) {
 		t.Fatalf("source audit rejected candidates = %+v, want unspecified snmpTrapAddress.0 rejection", selected.audit.RejectedCandidates)
 	}
 
-	addr = identifySource(vbsUnspecifiedSource, nil)
+	addr = selectTrapSource(vbsUnspecifiedSource, nil, false).sourceIP
 	if addr != "" {
 		t.Errorf("expected empty without UDP peer when snmpTrapAddress.0 is unspecified, got %q", addr)
+	}
+}
+
+func TestSelectTrapSourceTrustedRelay(t *testing.T) {
+	peer := net.ParseIP("10.0.0.5")
+	vbsWithSource := []VarbindValue{
+		{OID: snmpTrapAddressOID, Value: "192.168.1.1", Type: "IPAddress"},
+	}
+
+	selected := selectTrapSource(vbsWithSource, peer, true)
+	if selected.sourceIP != "192.168.1.1" {
+		t.Fatalf("sourceIP = %q, want relayed snmpTrapAddress.0", selected.sourceIP)
+	}
+	if selected.audit == nil || selected.audit.Method != "trusted_relay_snmpTrapAddress.0" || !selected.audit.TrustedRelay {
+		t.Fatalf("source audit = %+v, want trusted relay snmpTrapAddress.0", selected.audit)
+	}
+
+	selected = selectTrapSource(vbsWithSource, peer, false)
+	if selected.sourceIP != "10.0.0.5" {
+		t.Fatalf("sourceIP = %q, want untrusted UDP peer", selected.sourceIP)
+	}
+	if len(selected.audit.RejectedCandidates) != 1 || selected.audit.RejectedCandidates[0] != "snmpTrapAddress.0:untrusted_relay_uses_udp_peer" {
+		t.Fatalf("source audit rejected candidates = %+v, want untrusted relay rejection", selected.audit.RejectedCandidates)
+	}
+
+	selected = selectTrapSource(vbsWithSource, nil, true)
+	if selected.sourceIP != "192.168.1.1" {
+		t.Fatalf("sourceIP = %q, want relayed snmpTrapAddress.0 when caller marks peer as trusted", selected.sourceIP)
+	}
+
+	vbsNoSource := []VarbindValue{{OID: sysUpTimeOID, Value: uint64(10), Type: "TimeTicks"}}
+	selected = selectTrapSource(vbsNoSource, peer, true)
+	if selected.sourceIP != "10.0.0.5" {
+		t.Fatalf("sourceIP = %q, want UDP peer when trusted relay has no snmpTrapAddress.0", selected.sourceIP)
+	}
+
+	vbsUnspecifiedSource := []VarbindValue{
+		{OID: snmpTrapAddressOID, Value: "0.0.0.0", Type: "IPAddress"},
+	}
+	selected = selectTrapSource(vbsUnspecifiedSource, peer, true)
+	if selected.sourceIP != "10.0.0.5" {
+		t.Fatalf("sourceIP = %q, want UDP peer when trusted relay snmpTrapAddress.0 is unspecified", selected.sourceIP)
+	}
+	if len(selected.audit.RejectedCandidates) != 1 || selected.audit.RejectedCandidates[0] != "snmpTrapAddress.0:unspecified_ip" {
+		t.Fatalf("source audit rejected candidates = %+v, want unspecified snmpTrapAddress.0 rejection", selected.audit.RejectedCandidates)
 	}
 }
 

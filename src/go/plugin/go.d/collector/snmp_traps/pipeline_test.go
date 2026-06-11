@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
@@ -767,6 +768,123 @@ func TestCollectorHandlePacketAllowsNativeIPv6SourceCIDR(t *testing.T) {
 	}
 }
 
+func TestCollectorHandlePacketUsesSnmpTrapAddressOnlyForTrustedRelay(t *testing.T) {
+	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	setSingleTestTrap(t, trap)
+	data := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1", gosnmp.SnmpPDU{
+		Name:  snmpTrapAddressOID,
+		Type:  gosnmp.IPAddress,
+		Value: "192.0.2.20",
+	})
+	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
+
+	t.Run("untrusted_peer_uses_udp_peer", func(t *testing.T) {
+		writer := &mockTrapWriter{}
+		c := newTestV2Collector("test-untrusted-relay", writer, nil, []string{"public"})
+
+		c.handlePacket(data, peer.IP, nil, peer)
+
+		if len(writer.entries) != 1 {
+			t.Fatalf("written entries = %d, want 1", len(writer.entries))
+		}
+		entry := writer.entries[0]
+		if entry.SourceIP != "10.1.2.3" {
+			t.Fatalf("SourceIP = %q, want UDP peer", entry.SourceIP)
+		}
+		if entry.Enrichment == nil || entry.Enrichment.Source == nil {
+			t.Fatal("missing source audit")
+		}
+		if entry.Enrichment.Source.Method != "udp_peer" {
+			t.Fatalf("source method = %q, want udp_peer", entry.Enrichment.Source.Method)
+		}
+	})
+
+	t.Run("trusted_peer_uses_snmpTrapAddress", func(t *testing.T) {
+		writer := &mockTrapWriter{}
+		c := newTestV2Collector("test-trusted-relay", writer, nil, []string{"public"})
+		c.trustedRelays = []netip.Prefix{netip.MustParsePrefix("10.1.2.0/24")}
+
+		c.handlePacket(data, peer.IP, nil, peer)
+
+		if len(writer.entries) != 1 {
+			t.Fatalf("written entries = %d, want 1", len(writer.entries))
+		}
+		entry := writer.entries[0]
+		if entry.SourceIP != "192.0.2.20" {
+			t.Fatalf("SourceIP = %q, want relayed snmpTrapAddress.0", entry.SourceIP)
+		}
+		if entry.SourceUDPPeer != "10.1.2.3" {
+			t.Fatalf("SourceUDPPeer = %q, want UDP peer", entry.SourceUDPPeer)
+		}
+		if entry.Enrichment == nil || entry.Enrichment.Source == nil {
+			t.Fatal("missing source audit")
+		}
+		if entry.Enrichment.Source.Method != "trusted_relay_snmpTrapAddress.0" || !entry.Enrichment.Source.TrustedRelay {
+			t.Fatalf("source audit = %+v, want trusted relay source", entry.Enrichment.Source)
+		}
+	})
+
+	t.Run("ipv4_mapped_trusted_peer_matches_ipv4_cidr", func(t *testing.T) {
+		writer := &mockTrapWriter{}
+		c := newTestV2Collector("test-trusted-relay-mapped", writer, nil, []string{"public"})
+		c.trustedRelays = []netip.Prefix{netip.MustParsePrefix("10.1.2.0/24")}
+		mappedPeer := &net.UDPAddr{IP: net.ParseIP("::ffff:10.1.2.3"), Port: 9162}
+
+		c.handlePacket(data, mappedPeer.IP, nil, mappedPeer)
+
+		if len(writer.entries) != 1 {
+			t.Fatalf("written entries = %d, want 1", len(writer.entries))
+		}
+		entry := writer.entries[0]
+		if entry.SourceIP != "192.0.2.20" {
+			t.Fatalf("SourceIP = %q, want relayed snmpTrapAddress.0", entry.SourceIP)
+		}
+		if entry.SourceUDPPeer != "10.1.2.3" {
+			t.Fatalf("SourceUDPPeer = %q, want normalized UDP peer", entry.SourceUDPPeer)
+		}
+		if entry.Enrichment == nil || entry.Enrichment.Source == nil {
+			t.Fatal("missing source audit")
+		}
+		if entry.Enrichment.Source.Method != "trusted_relay_snmpTrapAddress.0" || !entry.Enrichment.Source.TrustedRelay {
+			t.Fatalf("source audit = %+v, want trusted relay source", entry.Enrichment.Source)
+		}
+	})
+
+	t.Run("missing_peer_never_trusts_snmpTrapAddress", func(t *testing.T) {
+		writer := &mockTrapWriter{}
+		c := newTestV2Collector("test-trusted-relay-missing-peer", writer, nil, []string{"public"})
+		c.trustedRelays = []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0")}
+
+		c.handlePacket(data, nil, nil, nil)
+
+		if len(writer.entries) != 0 {
+			t.Fatalf("written entries = %d, want 0 without UDP peer", len(writer.entries))
+		}
+	})
+
+	t.Run("catch_all_trusted_peer_uses_snmpTrapAddress", func(t *testing.T) {
+		writer := &mockTrapWriter{}
+		c := newTestV2Collector("test-trusted-relay-catch-all", writer, nil, []string{"public"})
+		c.trustedRelays = []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0")}
+
+		c.handlePacket(data, peer.IP, nil, peer)
+
+		if len(writer.entries) != 1 {
+			t.Fatalf("written entries = %d, want 1", len(writer.entries))
+		}
+		entry := writer.entries[0]
+		if entry.SourceIP != "192.0.2.20" {
+			t.Fatalf("SourceIP = %q, want relayed snmpTrapAddress.0", entry.SourceIP)
+		}
+		if entry.Enrichment == nil || entry.Enrichment.Source == nil {
+			t.Fatal("missing source audit")
+		}
+		if entry.Enrichment.Source.Method != "trusted_relay_snmpTrapAddress.0" || !entry.Enrichment.Source.TrustedRelay {
+			t.Fatalf("source audit = %+v, want catch-all trusted relay source", entry.Enrichment.Source)
+		}
+	})
+}
+
 func TestCollectorHandlePacketRateLimitSampleWritesTrap(t *testing.T) {
 	packet := readColdStartUDPPacket(t)
 	const jobName = "test-rate-limit-sample"
@@ -1185,6 +1303,39 @@ func TestConfigValidation(t *testing.T) {
 		_, err := validateAllowlist(AllowlistConfig{SourceCIDRs: []string{"not-a-cidr"}})
 		if err == nil {
 			t.Fatal("expected error for invalid CIDR")
+		}
+	})
+
+	t.Run("valid trusted relays", func(t *testing.T) {
+		prefixes, err := validateTrustedRelays(SourceConfig{TrustedRelays: []string{"10.0.0.0/8", "2001:db8::/32"}})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(prefixes) != 2 {
+			t.Fatalf("prefixes = %d, want 2", len(prefixes))
+		}
+	})
+
+	t.Run("catch-all trusted relays", func(t *testing.T) {
+		prefixes, err := validateTrustedRelays(SourceConfig{TrustedRelays: []string{"0.0.0.0/0", "::/0", "10.0.0.0/8"}})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !trustedRelayPrefixIsCatchAll(prefixes[0]) {
+			t.Fatalf("%s should be catch-all", prefixes[0])
+		}
+		if !trustedRelayPrefixIsCatchAll(prefixes[1]) {
+			t.Fatalf("%s should be catch-all", prefixes[1])
+		}
+		if trustedRelayPrefixIsCatchAll(prefixes[2]) {
+			t.Fatalf("%s should not be catch-all", prefixes[2])
+		}
+	})
+
+	t.Run("invalid trusted relay CIDR", func(t *testing.T) {
+		_, err := validateTrustedRelays(SourceConfig{TrustedRelays: []string{"not-a-cidr"}})
+		if err == nil {
+			t.Fatal("expected error for invalid trusted relay CIDR")
 		}
 	})
 

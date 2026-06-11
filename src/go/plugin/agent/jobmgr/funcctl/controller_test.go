@@ -218,7 +218,7 @@ func TestModuleFuncRegistry_Concurrency(t *testing.T) {
 	<-done
 }
 
-func TestModuleFuncRegistry_MethodRouteCollisionKeepsFirstOwner(t *testing.T) {
+func TestModuleFuncRegistry_MethodRouteCollisionUsesDeterministicOwner(t *testing.T) {
 	r := newModuleFuncRegistry()
 	r.registerModuleWithMethods("bbb", collectorapi.Creator{}, []funcapi.MethodConfig{{
 		ID:           "logs",
@@ -415,6 +415,7 @@ func TestControllerLifecycleHooks(t *testing.T) {
 		"first job start registers static methods once":                {},
 		"availability-gated static method registers when available":    {},
 		"public method name collision skips colliding module":          {},
+		"rejected module does not poison planned public names":         {},
 		"topology methods register direct alias":                       {},
 		"job stop unregisters job methods":                             {},
 		"cleanup unregisters static methods":                           {},
@@ -492,6 +493,30 @@ func TestControllerLifecycleHooks(t *testing.T) {
 				assert.Equal(t, []string{"shared:logs"}, reg.registeredNames())
 				assert.True(t, controller.registry.isModuleRegistered("aaa"))
 				assert.False(t, controller.registry.isModuleRegistered("bbb"))
+
+			case "rejected module does not poison planned public names":
+				controller.RegisterModules(collectorapi.Registry{
+					"aaa": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{
+								{ID: "first", FunctionName: "later:logs"},
+								{ID: "second", FunctionName: "later:logs"},
+							}
+						},
+					},
+					"ccc": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{ID: "logs", FunctionName: "later:logs"}}
+						},
+					},
+				})
+
+				controller.OnJobStart(newTestRuntimeJob("aaa", "job1", true))
+				controller.OnJobStart(newTestRuntimeJob("ccc", "job1", true))
+
+				assert.False(t, controller.registry.isModuleRegistered("aaa"))
+				assert.True(t, controller.registry.isModuleRegistered("ccc"))
+				assert.Equal(t, []string{"later:logs"}, reg.registeredNames())
 
 			case "topology methods register direct alias":
 				controller.RegisterModules(collectorapi.Registry{

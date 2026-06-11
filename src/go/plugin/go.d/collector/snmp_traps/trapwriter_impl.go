@@ -4,6 +4,7 @@ package snmp_traps
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -34,6 +35,7 @@ type journalTrapWriter struct {
 	queueMu   sync.Mutex
 	failedErr error
 	failedMu  sync.Mutex
+	onFailure func(error)
 
 	flushInterval time.Duration
 	flushEntries  int
@@ -42,7 +44,7 @@ type journalTrapWriter struct {
 	lastRetentionSweep     time.Time
 }
 
-func newJournalTrapWriter(j *JournalWriter, capacity int) *journalTrapWriter {
+func newJournalTrapWriter(j *JournalWriter, capacity int, onFailure ...func(error)) *journalTrapWriter {
 	if capacity <= 0 {
 		capacity = defaultQueueCapacity
 	}
@@ -58,12 +60,21 @@ func newJournalTrapWriter(j *JournalWriter, capacity int) *journalTrapWriter {
 		retentionSweepInterval: journalRetentionSweepInterval(j),
 		lastRetentionSweep:     time.Now(),
 	}
+	if len(onFailure) > 0 {
+		tw.onFailure = onFailure[0]
+	}
 	go tw.worker()
 	return tw
 }
 
 func (tw *journalTrapWriter) worker() {
-	defer close(tw.doneCh)
+	defer func() {
+		if v := recover(); v != nil {
+			tw.setFailure(fmt.Errorf("SNMP trap journal writer panic: %v", v))
+			tw.drainAndDiscard()
+		}
+		close(tw.doneCh)
+	}()
 
 	ticker := time.NewTicker(tw.flushInterval)
 	defer ticker.Stop()
@@ -327,9 +338,14 @@ func (tw *journalTrapWriter) Close() error {
 }
 
 func (tw *journalTrapWriter) setFailure(err error) {
+	var shouldLog bool
 	tw.failedMu.Lock()
 	if tw.failedErr == nil {
 		tw.failedErr = err
+		shouldLog = true
 	}
 	tw.failedMu.Unlock()
+	if shouldLog && tw.onFailure != nil {
+		tw.onFailure(err)
+	}
 }

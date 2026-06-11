@@ -73,14 +73,17 @@ type otlpTrapWriter struct {
 }
 
 func newOTLPTrapWriter(ctx context.Context, jobName string, cfg OTLPConfig, metrics *perJobMetrics) (*otlpTrapWriter, error) {
+	if !cfg.Enabled {
+		return nil, nil
+	}
 	runtimeCfg, err := validateOTLPConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
-	if !cfg.Enabled {
-		return nil, nil
-	}
+	return newOTLPTrapWriterWithRuntimeConfig(ctx, jobName, runtimeCfg, metrics)
+}
 
+func newOTLPTrapWriterWithRuntimeConfig(ctx context.Context, jobName string, runtimeCfg otlpRuntimeConfig, metrics *perJobMetrics) (*otlpTrapWriter, error) {
 	conn, client, err := newOTLPClient(ctx, runtimeCfg)
 	if err != nil {
 		return nil, err
@@ -331,7 +334,16 @@ func otlpExport(ctx context.Context, client collogpb.LogsServiceClient, headers 
 }
 
 func (w *otlpTrapWriter) worker() {
-	defer close(w.doneCh)
+	defer func() {
+		if v := recover(); v != nil {
+			w.setClosedWithError(fmt.Errorf("SNMP trap OTLP writer panic: %v", v))
+			w.incOTLPExportFailed(1)
+			if w.conn != nil {
+				_ = w.conn.Close()
+			}
+		}
+		close(w.doneCh)
+	}()
 
 	ticker := time.NewTicker(w.flushInterval)
 	defer ticker.Stop()
@@ -493,6 +505,13 @@ func (w *otlpTrapWriter) setLastErr(err error) {
 	w.lastErrM.Unlock()
 }
 
+func (w *otlpTrapWriter) setClosedWithError(err error) {
+	w.setLastErr(err)
+	w.mu.Lock()
+	w.closed = true
+	w.mu.Unlock()
+}
+
 func buildOTLPExportRequest(jobName string, entries []*TrapEntry) (*collogpb.ExportLogsServiceRequest, error) {
 	records := make([]*logpb.LogRecord, 0, len(entries))
 	for _, entry := range entries {
@@ -606,6 +625,7 @@ func otlpTrapAttributes(entry *TrapEntry, severitySlug string) []*commonpb.KeyVa
 		attrs = append(attrs, otlpKVString("snmp.trap.category", category))
 		attrs = append(attrs, otlpKVString("snmp.trap.severity", severitySlug))
 		attrs = appendStringAttr(attrs, "snmp.trap.pdu_type", string(entry.PduType))
+		attrs = appendStringAttr(attrs, "snmp.source.reverse_dns", entry.ReverseDNS)
 		attrs = appendStringAttr(attrs, "snmp.device.hostname", entry.DeviceHostname)
 		attrs = appendStringAttr(attrs, "snmp.device.vendor", entry.DeviceVendor)
 		attrs = appendStringAttr(attrs, "netdata.nidl.node", entry.SourceVnodeID)

@@ -20,9 +20,14 @@ import (
 )
 
 func TestParsePENsAndVendorForOID(t *testing.T) {
-	pens := parsePENs([]byte("9\n  Cisco Systems, Inc.\n    Contact\n15\n  Xylogics, Inc.\n"))
+	pens := parsePENs([]byte("9\n  Cisco Systems, Inc.\n    Contact\n15\n  Xylogics, Inc.\n16\n  Reserved\n17\n  ---none---\n18\n  Unassigned\n"))
 	if got := pens["9"]; got != "cisco-systems-inc" {
 		t.Fatalf("PEN 9 slug = %q", got)
+	}
+	for _, id := range []string{"16", "17", "18"} {
+		if got := pens[id]; got != "" {
+			t.Fatalf("PEN %s slug = %q, want skipped", id, got)
+		}
 	}
 	tests := map[string]string{
 		"1.3.6.1.2.1.1.5":      "standard",
@@ -36,6 +41,16 @@ func TestParsePENsAndVendorForOID(t *testing.T) {
 		if got := vendorForOID(oid, pens); got != want {
 			t.Fatalf("vendorForOID(%s) = %q, want %q", oid, got, want)
 		}
+	}
+}
+
+func TestUsageIncludesCompressZstd(t *testing.T) {
+	var b bytes.Buffer
+	usage(&b)
+
+	got := b.String()
+	if !strings.Contains(got, "compress-zstd") {
+		t.Fatalf("usage missing compress-zstd: %s", got)
 	}
 }
 
@@ -73,6 +88,25 @@ func TestCompressZstdCommandCompressesAndRemovesSource(t *testing.T) {
 	}
 }
 
+func TestCompressZstdCommandSkipsDirectCompressedFiles(t *testing.T) {
+	dir := t.TempDir()
+	sourcePath := filepath.Join(dir, "already.yaml.zst")
+	sourceData := []byte("already compressed")
+	if err := os.WriteFile(sourcePath, sourceData, 0o640); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	if err := compressZstdCommand([]string{"--rm", sourcePath}); err != nil {
+		t.Fatalf("compress-zstd failed: %v", err)
+	}
+	if got, err := os.ReadFile(sourcePath); err != nil || !bytes.Equal(got, sourceData) {
+		t.Fatalf("compressed source changed: data=%q err=%v", got, err)
+	}
+	if _, err := os.Stat(sourcePath + ".zst"); !os.IsNotExist(err) {
+		t.Fatalf("direct compressed input produced nested zst file: %v", err)
+	}
+}
+
 func TestCompressZstdCommandCompressesDirectory(t *testing.T) {
 	dir := t.TempDir()
 	sourcePath := filepath.Join(dir, "vendor.yaml")
@@ -105,6 +139,43 @@ func TestCompressZstdCommandCompressesDirectory(t *testing.T) {
 		if _, err := os.Stat(path); err != nil {
 			t.Fatalf("expected file %s: %v", path, err)
 		}
+	}
+}
+
+func TestLoadPENsRefreshFailureIsFatal(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "iana-enterprise-numbers.txt")
+	if err := os.WriteFile(path, []byte("9\n  Cisco Systems, Inc.\n"), 0o640); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	_, err := loadPENs(generatorOptions{
+		PENFile:    path,
+		PENURL:     "http://127.0.0.1:1/unreachable",
+		RefreshPEN: true,
+	})
+	if err == nil {
+		t.Fatal("expected refresh failure")
+	}
+}
+
+func TestMechanicalClassificationDoesNotMatchUpInsideWords(t *testing.T) {
+	cat, _, _ := mechanicalClassification(TrapRecord{
+		QualifiedName:   "TEST-MIB::backupCompleted",
+		Name:            "backupCompleted",
+		TrapDescription: "A backup completed successfully.",
+	})
+	if cat == "state_change" {
+		t.Fatalf("backup text classified as state_change")
+	}
+
+	cat, _, _ = mechanicalClassification(TrapRecord{
+		QualifiedName:   "TEST-MIB::linkUp",
+		Name:            "linkUp",
+		TrapDescription: "Link transitioned up.",
+	})
+	if cat != "state_change" {
+		t.Fatalf("linkUp classified as %q, want state_change", cat)
 	}
 }
 

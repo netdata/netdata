@@ -217,7 +217,7 @@ func (m *Manager) sendDyncfgCmdTestError(fn dyncfg.Function, defaultCode int, fo
 	code := defaultCode
 	var coded dyncfg.CodedError
 	if errors.As(err, &coded) {
-		code = coded.Code()
+		code = coded.DyncfgCode()
 	}
 	m.dyncfgResponder.SendCodef(fn, code, format, err)
 }

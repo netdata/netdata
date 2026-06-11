@@ -93,12 +93,12 @@ traps:
     category: state_change
     severity: warning
     description: |
-      OSPF configuration mismatch on {_HOSTNAME}
-        local router ID: {ospfRouterId}
-        interface IP: {ospfIfIpAddress}
-        source of mismatched packet: {cospfPacketSrc}
-        error type: {cospfConfigErrorType}
-        packet type: {cospfPacketType}
+      OSPF configuration mismatch on {{hostname}}
+        local router ID: {{value "ospfRouterId"}}
+        interface IP: {{value "ospfIfIpAddress"}}
+        source of mismatched packet: {{value "cospfPacketSrc"}}
+        error type: {{value "cospfConfigErrorType"}}
+        packet type: {{value "cospfPacketType"}}
     status: current
     varbinds:
       - ospfRouterId
@@ -223,10 +223,10 @@ metadata, exact match wins; otherwise the longest matching profile varbind OID
 prefix wins. The trap-OID `.0.` alternate spelling rule is not applied to
 varbind OIDs.
 
-When deduplication is enabled in a later SOW and a configured
-`dedup_key_varbinds` varbind is absent from a received PDU, the fingerprint
-uses a missing-value sentinel distinct from the empty string. Profile authors
-should list only varbinds normally present on every PDU for that trap OID.
+When deduplication includes configured `dedup_key_varbinds` and one of those
+varbinds is absent from a received PDU, the fingerprint uses a missing-value
+sentinel distinct from the empty string. Profile authors should list only
+varbinds normally present on every PDU for that trap OID.
 
 #### Varbind references
 
@@ -256,7 +256,7 @@ time. Supported functions:
 | Reference | Resolved to |
 |---|---|
 | `{{hostname}}` | Resolved device hostname from enrichment, or source IP fallback; the writer does not perform DNS lookup |
-| `{{source_ip}}` | UDP source address of the trap PDU |
+| `{{source_ip}}` | Authoritative trap source address after trusted-relay handling |
 | `{{trap_name}}` | The trap's symbolic name |
 | `{{vendor}}` | Inferred device vendor slug |
 | `{{trap_interface}}` | Topology-resolved interface, when topology is co-located |
@@ -278,10 +278,6 @@ Unknown functions, unknown varbind names, malformed templates, variables,
 assignments, `if`, `range`, arbitrary pipelines, and template inclusion actions
 fail at profile load so configuration errors are visible at job creation time.
 
-Legacy single-brace templates from early development builds still render during
-transition, but regenerated stock profiles and new operator profiles should use
-the restricted Go-template syntax.
-
 If `description:` is absent the plugin renders the default template
 `"{{trap_name}} on {{hostname}}."`.
 
@@ -290,9 +286,8 @@ truncation marker when truncation is needed. Multi-line MESSAGE values are
 written using systemd-journal's binary field encoding so embedded newlines never
 inject other journal fields.
 
-The `status` field is informational in the MVP. The plugin does not filter,
-drop, or warn on `deprecated` / `mandatory` / `obsolete` / `optional` traps in
-SOW-0035; future UI or validation work may surface it.
+The `status` field is informational. The plugin does not filter, drop, or warn
+on `deprecated` / `mandatory` / `obsolete` / `optional` traps.
 Known `status` values are still validated so typos fail at profile load instead
 of silently entering the shipped pack.
 
@@ -371,13 +366,13 @@ The plugin loader mirrors the SNMP polling plugin's multipath pattern
 
 ### `TRAP_TAG_*` label namespace and collision-free design
 
-Operator labels — `labels: { tenant: acme, oper_status: "{ifOperStatus}" }` —
+Operator labels — `labels: { tenant: acme, oper_status: '{{value "ifOperStatus"}}' }` —
 always emit as `TRAP_TAG_<KEY_UPPERCASE>` journal fields (e.g.
 `TRAP_TAG_TENANT=acme`, `TRAP_TAG_OPER_STATUS=down`). The
 dedicated `TRAP_TAG_*` namespace structurally prevents collisions with
 plugin-controlled `TRAP_*` fields, even when an operator label key
 happens to match a plugin field name. For example, a profile with
-`labels: { interface_state: "{ifOperStatus}" }` and a co-located topology plugin
+`labels: { interface_state: '{{value "ifOperStatus"}}' }` and a co-located topology plugin
 both populate journal fields, but in different namespaces: the operator
 label becomes `TRAP_TAG_INTERFACE_STATE`, the topology field becomes
 `TRAP_INTERFACE`. Both can co-exist on the same trap entry without
@@ -400,7 +395,7 @@ traps:
 ```
 
 Per-OID metric opt-in (turning a trap into a dedicated chart for alerting)
-lives in plugin configuration (`go.d/snmp.trap.conf`), **not** in profiles.
+lives in plugin configuration (`go.d/snmp_traps.conf`), **not** in profiles.
 This keeps profiles vendor-curated and installation-agnostic.
 
 ## Generated stock profiles

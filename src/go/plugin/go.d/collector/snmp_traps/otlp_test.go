@@ -433,6 +433,31 @@ func TestOTLPTrapWriterWriteQueueFull(t *testing.T) {
 	require.ErrorIs(t, writer.Write(&TrapEntry{JobName: "local", Message: "second"}), errQueueFull)
 }
 
+func TestOTLPTrapWriterWorkerPanicFailsClosed(t *testing.T) {
+	writer := &otlpTrapWriter{
+		queue:          make(chan *TrapEntry, 1),
+		flushCh:        make(chan chan error),
+		closeCh:        make(chan chan error),
+		doneCh:         make(chan struct{}),
+		flushInterval:  time.Hour,
+		batchSize:      1,
+		requestTimeout: time.Millisecond,
+	}
+	go writer.worker()
+
+	require.NoError(t, writer.Write(&TrapEntry{JobName: "local", Message: "first"}))
+	select {
+	case <-writer.doneCh:
+	case <-time.After(time.Second):
+		t.Fatal("OTLP worker did not exit after panic")
+	}
+
+	require.ErrorIs(t, writer.Write(&TrapEntry{JobName: "local", Message: "second"}), errWriterClosed)
+	err := writer.Close()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "SNMP trap OTLP writer panic")
+}
+
 func TestOTLPTrapWriterExternalReceiver(t *testing.T) {
 	endpoint := os.Getenv("NETDATA_TEST_SNMP_TRAPS_OTLP_ENDPOINT")
 	if endpoint == "" {

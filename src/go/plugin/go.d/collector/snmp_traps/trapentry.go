@@ -62,6 +62,7 @@ type TrapSourceAudit struct {
 	SnmpTrapAddress    string   `json:"snmp_trap_address,omitempty"`
 	Selected           string   `json:"selected,omitempty"`
 	Method             string   `json:"method,omitempty"`
+	TrustedRelay       bool     `json:"trusted_relay,omitempty"`
 	RejectedCandidates []string `json:"rejected_candidates,omitempty"`
 }
 
@@ -77,6 +78,7 @@ type TrapEnrichmentAudit struct {
 
 type TrapEnrichmentLookup struct {
 	Key     string   `json:"key,omitempty"`
+	Value   string   `json:"value,omitempty"`
 	Status  string   `json:"status,omitempty"`
 	Method  string   `json:"method,omitempty"`
 	Matches int      `json:"matches,omitempty"`
@@ -96,6 +98,7 @@ type TrapEntry struct {
 	Message               string
 	SourceIP              string
 	SourceUDPPeer         string
+	ReverseDNS            string
 	DeviceHostname        string
 	DeviceVendor          string
 	PduType               PduType

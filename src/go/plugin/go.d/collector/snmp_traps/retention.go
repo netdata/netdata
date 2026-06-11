@@ -206,11 +206,11 @@ func parseComplexDuration(s string) (time.Duration, error) {
 
 func formatHumanSize(bytes uint64) string {
 	switch {
-	case bytes >= bytesPerGB:
+	case bytes >= bytesPerGB && bytes%bytesPerGB == 0:
 		return fmt.Sprintf("%dGB", bytes/bytesPerGB)
-	case bytes >= bytesPerMB:
+	case bytes >= bytesPerMB && bytes%bytesPerMB == 0:
 		return fmt.Sprintf("%dMB", bytes/bytesPerMB)
-	case bytes >= bytesPerKB:
+	case bytes >= bytesPerKB && bytes%bytesPerKB == 0:
 		return fmt.Sprintf("%dKB", bytes/bytesPerKB)
 	default:
 		return fmt.Sprintf("%dB", bytes)

@@ -165,6 +165,6 @@ type codedError struct {
 	code int
 }
 
-func (e *codedError) Error() string { return e.err.Error() }
-func (e *codedError) Unwrap() error { return e.err }
-func (e *codedError) Code() int     { return e.code }
+func (e *codedError) Error() string   { return e.err.Error() }
+func (e *codedError) Unwrap() error   { return e.err }
+func (e *codedError) DyncfgCode() int { return e.code }

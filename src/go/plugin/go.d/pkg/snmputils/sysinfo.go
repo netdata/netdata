@@ -265,7 +265,8 @@ func parseEnterpriseNumbers(r io.Reader) (map[string]string, error) {
 			if id == "" {
 				id = line
 				if _, ok := mapping[id]; ok {
-					return nil, fmt.Errorf("duplicate entry number: %s", line)
+					log.Warningf("skipping duplicate IANA PEN registry entry %q", id)
+					id = ""
 				}
 			}
 			continue

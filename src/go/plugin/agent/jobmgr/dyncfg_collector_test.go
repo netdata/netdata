@@ -34,7 +34,7 @@ type externalCodedError struct {
 }
 
 func (e *externalCodedError) Error() string         { return e.err.Error() }
-func (e *externalCodedError) Code() int             { return e.code }
+func (e *externalCodedError) DyncfgCode() int       { return e.code }
 func (e *externalCodedError) DyncfgRetryable() bool { return e.retryable }
 
 type foreignRetryableCodedError struct {
@@ -593,9 +593,9 @@ func TestCollectorCallbacks_Start(t *testing.T) {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)
 				if tc.wantCode != 0 {
-					var coded interface{ Code() int }
+					var coded interface{ DyncfgCode() int }
 					require.ErrorAs(t, err, &coded)
-					assert.Equal(t, tc.wantCode, coded.Code())
+					assert.Equal(t, tc.wantCode, coded.DyncfgCode())
 				}
 			} else {
 				require.NoError(t, err)
@@ -636,9 +636,9 @@ func TestCollectorCallbacks_Start_AutodetectionCodedError_PreservedNoRetry(t *te
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bind failed")
 
-	var coded interface{ Code() int }
+	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.Code())
+	assert.Equal(t, 422, coded.DyncfgCode())
 
 	_, retryPending := mgr.retryingTasks.lookup(cfg)
 	assert.False(t, retryPending, "coded autodetection failure should not schedule retry")
@@ -663,9 +663,9 @@ func TestCollectorCallbacks_Start_InitCodedError_PreservedNoRetry(t *testing.T) 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bind failed")
 
-	var coded interface{ Code() int }
+	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.Code())
+	assert.Equal(t, 422, coded.DyncfgCode())
 
 	_, retryPending := mgr.retryingTasks.lookup(cfg)
 	assert.False(t, retryPending, "coded init failure should not schedule retry")
@@ -690,16 +690,16 @@ func TestCollectorCallbacks_Start_RetryableInitCodedError_PreservedSchedulesRetr
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bind failed")
 
-	var coded interface{ Code() int }
+	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 503, coded.Code())
+	assert.Equal(t, 503, coded.DyncfgCode())
 
 	_, retryPending := mgr.retryingTasks.lookup(cfg)
 	assert.True(t, retryPending, "retryable coded init failure should schedule retry")
 	mgr.retryingTasks.remove(cfg)
 }
 
-func TestCollectorCallbacks_Start_ForeignRetryableCodedErrorDoesNotScheduleRetry(t *testing.T) {
+func TestCollectorCallbacks_Start_ForeignCodeRetryableErrorDoesNotSatisfyDyncfgContracts(t *testing.T) {
 	mgr := newCollectorTestManager()
 	mgr.modules.Register("foreignretryable", collectorapi.Creator{
 		Create: func() collectorapi.CollectorV1 {
@@ -718,12 +718,11 @@ func TestCollectorCallbacks_Start_ForeignRetryableCodedErrorDoesNotScheduleRetry
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "foreign retryable")
 
-	var coded interface{ Code() int }
-	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 503, coded.Code())
+	var coded interface{ DyncfgCode() int }
+	require.NotErrorAs(t, err, &coded)
 
 	_, retryPending := mgr.retryingTasks.lookup(cfg)
-	assert.False(t, retryPending, "foreign Retryable() coded errors must not satisfy Netdata retryable semantics")
+	assert.False(t, retryPending, "foreign Code()/Retryable() errors must not satisfy Netdata dyncfg retry contracts")
 }
 
 func TestCollectorCallbacks_Update_CreateCollectorJobPlainErrorPreserved(t *testing.T) {
@@ -760,9 +759,9 @@ func TestCollectorCallbacks_Update_CreateCollectorJobPlainErrorPreserved(t *test
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.wantErr)
 			if tc.wantCode != 0 {
-				var coded interface{ Code() int }
+				var coded interface{ DyncfgCode() int }
 				require.ErrorAs(t, err, &coded)
-				assert.Equal(t, tc.wantCode, coded.Code())
+				assert.Equal(t, tc.wantCode, coded.DyncfgCode())
 			}
 
 			assert.True(t, oldJob.stopped)
@@ -808,9 +807,9 @@ func TestCollectorCallbacks_Update_AutodetectionCodedError_PreservedNoRetry(t *t
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bind failed")
 
-	var coded interface{ Code() int }
+	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.Code())
+	assert.Equal(t, 422, coded.DyncfgCode())
 
 	_, retryPending := mgr.retryingTasks.lookup(newCfg)
 	assert.False(t, retryPending, "coded autodetection failure should not schedule retry")
@@ -848,9 +847,9 @@ func TestCollectorCallbacks_Update_InitCodedError_PreservedNoRetry(t *testing.T)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bind failed")
 
-	var coded interface{ Code() int }
+	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 422, coded.Code())
+	assert.Equal(t, 422, coded.DyncfgCode())
 
 	_, retryPending := mgr.retryingTasks.lookup(newCfg)
 	assert.False(t, retryPending, "coded init failure should not schedule retry")
@@ -888,9 +887,9 @@ func TestCollectorCallbacks_Update_RetryableInitCodedError_PreservedSchedulesRet
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bind failed")
 
-	var coded interface{ Code() int }
+	var coded interface{ DyncfgCode() int }
 	require.ErrorAs(t, err, &coded)
-	assert.Equal(t, 503, coded.Code())
+	assert.Equal(t, 503, coded.DyncfgCode())
 
 	_, retryPending := mgr.retryingTasks.lookup(newCfg)
 	assert.True(t, retryPending, "retryable coded init failure should schedule retry")

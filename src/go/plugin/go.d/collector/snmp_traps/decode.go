@@ -62,7 +62,15 @@ type TrapPacketContext struct {
 	PDU    *TrapPDU
 }
 
+type DecodeOptions struct {
+	TrustedRelay bool
+}
+
 func DecodeTrap(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3SecurityParametersTable) (*TrapPacketContext, error) {
+	return DecodeTrapWithOptions(data, udpPeer, secTable, DecodeOptions{})
+}
+
+func DecodeTrapWithOptions(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3SecurityParametersTable, opts DecodeOptions) (*TrapPacketContext, error) {
 	pkt, err := decodePacket(data, secTable)
 	if err != nil {
 		return nil, err
@@ -93,7 +101,7 @@ func DecodeTrap(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3SecurityPara
 		peerIP = udpPeer.String()
 	}
 
-	source := selectTrapSource(varbinds, udpPeer)
+	source := selectTrapSource(varbinds, udpPeer, opts.TrustedRelay)
 
 	tpdu := &TrapPDU{
 		OID:         trapOID,
@@ -297,7 +305,8 @@ func decodePacket(data []byte, secTable *gosnmp.SnmpV3SecurityParametersTable) (
 	if len(data) > maxDatagramSize {
 		return nil, fmt.Errorf("datagram too large: %d > %d", len(data), maxDatagramSize)
 	}
-	if err := validateBERLimits(data); err != nil {
+	version, versionKnown := sniffSNMPVersion(data)
+	if err := validateBERLimits(data, validateBEROptions{AllowLongOctetStrings: versionKnown && version == SnmpVersionV3}); err != nil {
 		return nil, err
 	}
 
@@ -312,7 +321,7 @@ func decodePacket(data []byte, secTable *gosnmp.SnmpV3SecurityParametersTable) (
 		Logger:                      trapDecodeLogger,
 		TrapSecurityParametersTable: secTable,
 	}
-	if version, ok := sniffSNMPVersion(data); ok && version == SnmpVersionV3 {
+	if versionKnown && version == SnmpVersionV3 {
 		decoder.Version = gosnmp.Version3
 	}
 	pkt, err = decoder.UnmarshalTrap(data, false)
@@ -458,44 +467,44 @@ type trapSourceSelection struct {
 	audit    *TrapSourceAudit
 }
 
-func identifySource(vbs []VarbindValue, udpPeer net.IP) string {
-	return selectTrapSource(vbs, udpPeer).sourceIP
-}
-
-func selectTrapSource(vbs []VarbindValue, udpPeer net.IP) trapSourceSelection {
+func selectTrapSource(vbs []VarbindValue, udpPeer net.IP, trustedRelay bool) trapSourceSelection {
 	peer := validIPString(ipString(udpPeer))
 	trapAddr, trapAddrReject := sourceFromVarbindWithRejectReason(vbs, snmpTrapAddressOID)
 
 	audit := &TrapSourceAudit{
 		UDPPeer:         peer,
 		SnmpTrapAddress: trapAddr,
+		TrustedRelay:    trustedRelay,
 	}
 
 	if peer != "" {
+		if trustedRelay && trapAddr != "" {
+			audit.Selected = trapAddr
+			audit.Method = "trusted_relay_snmpTrapAddress.0"
+			return trapSourceSelection{sourceIP: trapAddr, audit: audit}
+		}
 		audit.Selected = peer
 		audit.Method = "udp_peer"
 		if trapAddr != "" {
-			audit.RejectedCandidates = append(audit.RejectedCandidates, "snmpTrapAddress.0:direct_listener_uses_udp_peer")
+			audit.RejectedCandidates = append(audit.RejectedCandidates, "snmpTrapAddress.0:untrusted_relay_uses_udp_peer")
 		} else if trapAddrReject != "" {
 			audit.RejectedCandidates = append(audit.RejectedCandidates, "snmpTrapAddress.0:"+trapAddrReject)
 		}
 		return trapSourceSelection{sourceIP: peer, audit: audit}
 	}
 
-	if trapAddr != "" {
+	if trustedRelay && trapAddr != "" {
 		audit.Selected = trapAddr
-		audit.Method = "snmpTrapAddress.0"
+		audit.Method = "trusted_relay_snmpTrapAddress.0"
 		return trapSourceSelection{sourceIP: trapAddr, audit: audit}
+	}
+	if trapAddr != "" {
+		audit.RejectedCandidates = append(audit.RejectedCandidates, "snmpTrapAddress.0:missing_udp_peer")
 	}
 	if trapAddrReject != "" {
 		audit.RejectedCandidates = append(audit.RejectedCandidates, "snmpTrapAddress.0:"+trapAddrReject)
 	}
 	return trapSourceSelection{audit: audit}
-}
-
-func sourceFromVarbind(vbs []VarbindValue, oid string) string {
-	source, _ := sourceFromVarbindWithRejectReason(vbs, oid)
-	return source
 }
 
 func sourceFromVarbindWithRejectReason(vbs []VarbindValue, oid string) (string, string) {
@@ -614,11 +623,15 @@ func v1TrapOID(enterprise string, genericTrap, specificTrap int) string {
 	}
 }
 
-func validateBERLimits(data []byte) error {
+type validateBEROptions struct {
+	AllowLongOctetStrings bool
+}
+
+func validateBERLimits(data []byte, opts validateBEROptions) error {
 	if len(data) == 0 {
 		return errors.New("BER: empty packet")
 	}
-	consumed, err := walkBER(data, 1)
+	consumed, err := walkBER(data, 1, opts)
 	if err != nil {
 		return err
 	}
@@ -628,7 +641,7 @@ func validateBERLimits(data []byte) error {
 	return nil
 }
 
-func walkBER(data []byte, depth int) (int, error) {
+func walkBER(data []byte, depth int, opts validateBEROptions) (int, error) {
 	if depth > maxNestingDepth {
 		return 0, fmt.Errorf("BER: nesting depth %d > %d", depth, maxNestingDepth)
 	}
@@ -642,11 +655,11 @@ func walkBER(data []byte, depth int) (int, error) {
 		if tag == tagOID && len(content) > maxOIDEncodedLen {
 			return 0, fmt.Errorf("BER: OID too long: %d > %d", len(content), maxOIDEncodedLen)
 		}
-		if tag == tagOctetStr && len(content) > maxOctetStringLen {
+		if tag == tagOctetStr && !opts.AllowLongOctetStrings && len(content) > maxOctetStringLen {
 			return 0, fmt.Errorf("BER: OctetString too long: %d > %d", len(content), maxOctetStringLen)
 		}
 		if isConstructedBER(tag) && len(content) > 0 {
-			if _, err := walkBER(content, depth+1); err != nil {
+			if _, err := walkBER(content, depth+1, opts); err != nil {
 				return 0, err
 			}
 		}
@@ -692,10 +705,14 @@ func decodeBERLength(data []byte) (length int, consumed int, err error) {
 		return 0, 0, errors.New("BER: truncated length")
 	}
 
+	var length64 uint64
 	for _, lb := range data[1 : 1+n] {
-		length = (length << 8) | int(lb)
+		length64 = (length64 << 8) | uint64(lb)
+		if length64 > uint64(maxDatagramSize) {
+			return 0, 0, fmt.Errorf("BER: value length %d exceeds maximum datagram size %d", length64, maxDatagramSize)
+		}
 	}
-	return length, 1 + n, nil
+	return int(length64), 1 + n, nil
 }
 
 func isConstructedBER(tag byte) bool {

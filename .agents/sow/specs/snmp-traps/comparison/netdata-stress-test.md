@@ -342,14 +342,14 @@ Originally classified blocker in iter-1. Codex iter-2 correctly noted the "dedup
 
 ### W21. (minor) Template substitution must escape `{...}` in varbind values
 
-- **Target evidence**: `netdata.md §7 L223-243` `{varname}` template substitution; `description: "Port-security violation: MAC {cpsIfViolationMacAddress} ..."` etc.
-- **Issue**: if a varbind value contains literal `{...}` (a hostile/curated device, or a MIB octet-string containing user content), unguarded substitution may produce nested template expansion. The design says "Hot-path substitution is bounded-size buffer fill" (§7 L245) but does not specify single-pass vs recursive.
+- **Target evidence**: `netdata.md §7` restricted Go-template helpers such as `{{value "varname"}}`; `description: 'Port-security violation: MAC {{value "cpsIfViolationMacAddress"}} ...'` etc.
+- **Issue**: if a varbind value contains literal template delimiters (a hostile/curated device, or a MIB octet-string containing user content), unguarded recursive rendering may produce nested template expansion. The design says "Hot-path substitution is bounded-size buffer fill" (§7 L245) but does not specify single-pass vs recursive.
 - **Cohort contradiction**: SNMPTT (`nagios-snmptt.md §4`) FORMAT substitutions are single-pass and treat varbind values as opaque. Centreon (`centreon.md §5`) substitutes positionally with no recursive expansion.
-- **Recommended fix**: state explicitly that template substitution is single-pass, varbind values are treated as opaque strings, and `{` / `}` characters in varbind values are not interpreted as template delimiters.
+- **Recommended fix**: state explicitly that template execution is single-pass, varbind values are treated as opaque strings, and template delimiters inside varbind values are not interpreted.
 
 ### W23. (major) Journal field injection via newline / null / field-separator in varbind values
 
-- **Target evidence**: `netdata.md §7 L223-243` `{varname}` template substitution; §11 L470-492 journal entry example with MESSAGE constructed from templated varbind values; §7 L245 only states "MESSAGE capped at 512 chars."
+- **Target evidence**: `netdata.md §7` restricted Go-template helpers such as `{{value "varname"}}`; §11 journal entry example with MESSAGE constructed from templated varbind values; §7 only states "MESSAGE capped at 512 chars."
 - **Issue**: a malicious or buggy device can send a trap whose octet-string varbind value contains `\n` (newline), `\r`, `\0` (null), or systemd-journal field-separator sequences. Unsanitized substitution into `MESSAGE=...` allows the attacker to inject arbitrary trusted fields (e.g., `\nPRIORITY=0` to elevate alert priority, `\nSYSLOG_IDENTIFIER=...` to spoof origin). CWE-117 (Log Injection) class.
 - **Cohort contradiction**:
   - `librenms.md §5 L285`: explicitly notes that "multi-line varbind values and lines without a space are silently mishandled" — LibreNMS's parser is non-defensive. Netdata is targeting a higher quality bar; it must defend.

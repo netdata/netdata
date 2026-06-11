@@ -3791,7 +3791,6 @@ install(TARGETS netdata COMPONENT netdata DESTINATION "${BINDIR}")
 
 install(DIRECTORY COMPONENT netdata DESTINATION var/cache/netdata)
 install(DIRECTORY COMPONENT netdata DESTINATION var/log/netdata)
-install(DIRECTORY COMPONENT netdata DESTINATION var/log/netdata/traps)
 install(DIRECTORY COMPONENT netdata DESTINATION var/lib/netdata/registry)
 install(DIRECTORY COMPONENT netdata DESTINATION var/lib/netdata/cloud.d)
 install(DIRECTORY COMPONENT netdata DESTINATION var/run/netdata)
@@ -4397,11 +4396,14 @@ if(ENABLE_PLUGIN_GO)
     set(SNMP_TRAP_PROFILE_PACK_DIR "${CMAKE_BINARY_DIR}/snmp-trap-profile-pack")
     set(SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR "${SNMP_TRAP_PROFILE_PACK_DIR}/default")
     set(SNMP_TRAP_PROFILE_PACK_STAMP "${SNMP_TRAP_PROFILE_PACK_DIR}/.compressed-stamp")
+    set(SNMP_TRAP_PROFILE_PACK_CLEAN_SCRIPT "${CMAKE_BINARY_DIR}/snmp-trap-profile-pack-clean.cmake")
+    file(WRITE "${SNMP_TRAP_PROFILE_PACK_CLEAN_SCRIPT}"
+        "file(REMOVE_RECURSE [[${SNMP_TRAP_PROFILE_PACK_DIR}]])\n")
     file(MAKE_DIRECTORY "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}")
 
     add_custom_command(
             OUTPUT "${SNMP_TRAP_PROFILE_PACK_STAMP}"
-            COMMAND "${CMAKE_COMMAND}" -E rm -rf "${SNMP_TRAP_PROFILE_PACK_DIR}"
+            COMMAND "${CMAKE_COMMAND}" -P "${SNMP_TRAP_PROFILE_PACK_CLEAN_SCRIPT}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}"
             COMMAND "${CMAKE_COMMAND}" -E copy_directory
                 "${CMAKE_SOURCE_DIR}/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default"

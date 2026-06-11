@@ -78,6 +78,7 @@ The collector writes structured fields that are useful for queries:
 | `TRAP_SOURCE_UDP_PEER` | UDP peer address |
 | `TRAP_SOURCE_UDP_PORT` | UDP peer source port for decode-error rows |
 | `_HOSTNAME` | Source device hostname when resolved by collector identity |
+| `TRAP_REVERSE_DNS` | Optional PTR annotation for the source IP; never authoritative identity |
 | `ND_NIDL_NODE` | Netdata vnode identity when known |
 | `TRAP_DEVICE_VENDOR` | Vendor slug when known |
 | `TRAP_INTERFACE` | Topology interface when enrichment is available |

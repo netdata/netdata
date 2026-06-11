@@ -31,6 +31,8 @@ type profileLoadPaths struct {
 	all       multipath.MultiPath
 }
 
+const maxProfileExtendsDepth = 32
+
 var maxProfileFileBytes int64 = 128 * 1024 * 1024
 
 // getProfileDirs returns the multipath of profile directories.
@@ -194,6 +196,8 @@ func (idx *ProfileIndex) addTrapsLocked(traps []*TrapDef) error {
 	if idx.namesByTrapName == nil {
 		idx.namesByTrapName = make(map[string]*TrapDef, len(traps))
 	}
+	seenOIDs := make(map[string]string, len(traps))
+	seenNames := make(map[string]string, len(traps))
 	for _, td := range traps {
 		if existing, ok := idx.trapsByOID[td.OID]; ok {
 			return fmt.Errorf("%s: duplicate trap OID %s (already defined in %s)", td.sourceFile, td.OID, existing.sourceFile)
@@ -201,6 +205,16 @@ func (idx *ProfileIndex) addTrapsLocked(traps []*TrapDef) error {
 		if existing, ok := idx.namesByTrapName[td.Name]; ok {
 			return fmt.Errorf("%s: duplicate trap name %s (already defined in %s)", td.sourceFile, td.Name, existing.sourceFile)
 		}
+		if existing := seenOIDs[td.OID]; existing != "" {
+			return fmt.Errorf("%s: duplicate trap OID %s (already defined in %s)", td.sourceFile, td.OID, existing)
+		}
+		if existing := seenNames[td.Name]; existing != "" {
+			return fmt.Errorf("%s: duplicate trap name %s (already defined in %s)", td.sourceFile, td.Name, existing)
+		}
+		seenOIDs[td.OID] = td.sourceFile
+		seenNames[td.Name] = td.sourceFile
+	}
+	for _, td := range traps {
 		idx.trapsByOID[td.OID] = td
 		idx.namesByTrapName[td.Name] = td
 	}
@@ -250,6 +264,9 @@ func loadProfilesFromDir(dirpath string, extendsPaths multipath.MultiPath) ([]lo
 // loadProfile loads a single profile YAML and returns its validated trap definitions.
 // Returns traps, loaded file-level varbinds, and error.
 func loadProfile(filename string, extendsPaths multipath.MultiPath, stack []string) ([]*TrapDef, map[string]VarbindDef, error) {
+	if len(stack) > maxProfileExtendsDepth {
+		return nil, nil, fmt.Errorf("%s: profile extends depth exceeds maximum %d", filename, maxProfileExtendsDepth)
+	}
 	content, err := readProfileFile(filename)
 	if err != nil {
 		return nil, nil, err
@@ -421,6 +438,7 @@ type stockProfileStore struct {
 	exactRoutes      map[string]string
 	enterpriseRoutes map[string]string
 	loaded           map[string]bool
+	failed           map[string]error
 	mu               sync.Mutex
 }
 
@@ -439,6 +457,7 @@ func (s *stockProfileStore) cloneFiltered(replaced map[string]bool) *stockProfil
 		exactRoutes:      make(map[string]string, len(s.exactRoutes)),
 		enterpriseRoutes: make(map[string]string, len(s.enterpriseRoutes)),
 		loaded:           make(map[string]bool, len(s.loaded)),
+		failed:           make(map[string]error, len(s.failed)),
 	}
 	for name, path := range s.files {
 		if replaced[name] {
@@ -463,6 +482,12 @@ func (s *stockProfileStore) cloneFiltered(replaced map[string]bool) *stockProfil
 			continue
 		}
 		clone.loaded[name] = loaded
+	}
+	for name, err := range s.failed {
+		if replaced[name] {
+			continue
+		}
+		clone.failed[name] = err
 	}
 
 	return clone
@@ -537,6 +562,7 @@ func buildStockProfileStoreFromProfiles(dir string, extendsPaths multipath.Multi
 		exactRoutes:      make(map[string]string),
 		enterpriseRoutes: make(map[string]string),
 		loaded:           make(map[string]bool),
+		failed:           make(map[string]error),
 	}
 
 	stockOIDs := make(map[string]string)
@@ -632,6 +658,7 @@ func buildStockProfileStoreFromCatalogue(
 		exactRoutes:      make(map[string]string),
 		enterpriseRoutes: make(map[string]string),
 		loaded:           make(map[string]bool),
+		failed:           make(map[string]error),
 	}
 
 	stockOIDs := make(map[string]string)
@@ -845,15 +872,26 @@ func (s *stockProfileStore) loadForOID(idx *ProfileIndex, oid string) error {
 	if s.loaded[name] {
 		return nil
 	}
+	if s.failed == nil {
+		s.failed = make(map[string]error)
+	}
+	if err := s.failed[name]; err != nil {
+		return err
+	}
 	path := s.files[name]
 	if path == "" {
-		return fmt.Errorf("stock trap profile %q not found in %s", name, s.dir)
+		err := fmt.Errorf("stock trap profile %q not found in %s", name, s.dir)
+		s.failed[name] = err
+		return err
 	}
 	traps, _, err := loadProfile(path, s.extendsPaths, nil)
 	if err != nil {
-		return fmt.Errorf("failed to lazy-load stock trap profile %q: %w", path, err)
+		err = fmt.Errorf("failed to lazy-load stock trap profile %q: %w", path, err)
+		s.failed[name] = err
+		return err
 	}
 	if err := idx.addTraps(traps); err != nil {
+		s.failed[name] = err
 		return err
 	}
 	s.loaded[name] = true

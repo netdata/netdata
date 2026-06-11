@@ -166,6 +166,22 @@ func TestLookupEnterpriseNumberLoadsRegistryFromDisk(t *testing.T) {
 	assert.Equal(t, "Other Devices Inc.", lookupEnterpriseNumber("1.3.6.1.4.1.424246.1"))
 }
 
+func TestLookupEnterpriseNumberSkipsDuplicateRegistryEntries(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "iana-enterprise-numbers.txt")
+	require.NoError(t, os.WriteFile(path, []byte(`
+424242
+  Example Devices Inc.
+424243
+  Other Devices Inc.
+424242
+  Duplicate Devices Inc.
+`), 0644))
+	withEnterpriseNumbersFile(t, path)
+
+	assert.Equal(t, "Example Devices Inc.", lookupEnterpriseNumber("1.3.6.1.4.1.424242.1"))
+	assert.Equal(t, "Other Devices Inc.", lookupEnterpriseNumber("1.3.6.1.4.1.424243.1"))
+}
+
 func TestEnterpriseNumbersFilePathFindsSourceTreeRegistry(t *testing.T) {
 	oldPath := enterpriseNumbersPathOverride
 	enterpriseNumbersPathOverride = ""

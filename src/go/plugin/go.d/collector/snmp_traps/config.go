@@ -23,6 +23,10 @@ type AllowlistConfig struct {
 	SourceCIDRs []string `yaml:"source_cidrs" json:"source_cidrs"`
 }
 
+type SourceConfig struct {
+	TrustedRelays []string `yaml:"trusted_relays,omitempty" json:"trusted_relays"`
+}
+
 type RateLimitConfig struct {
 	Enabled      bool   `yaml:"enabled" json:"enabled"`
 	PerSourcePPS int    `yaml:"per_source_pps" json:"per_source_pps"`
@@ -84,6 +88,7 @@ type Config struct {
 	DynamicEngineID    bool                 `yaml:"dynamic_engine_id_discovery,omitempty" json:"dynamic_engine_id_discovery"`
 	DynamicEngineIDMax int                  `yaml:"dynamic_engine_id_max_pairs,omitempty" json:"dynamic_engine_id_max_pairs"`
 	Allowlist          AllowlistConfig      `yaml:"allowlist,omitempty" json:"allowlist"`
+	Source             SourceConfig         `yaml:"source,omitempty" json:"source"`
 	RateLimit          RateLimitConfig      `yaml:"rate_limit,omitempty" json:"rate_limit"`
 	Dedup              DedupConfig          `yaml:"dedup,omitempty" json:"dedup"`
 	Journal            JournalBackendConfig `yaml:"journal,omitempty" json:"journal"`
@@ -155,6 +160,7 @@ var (
 		"dynamic_engine_id_discovery": {},
 		"dynamic_engine_id_max_pairs": {},
 		"allowlist":                   {children: map[string]yamlKeySpec{"source_cidrs": {}}},
+		"source":                      {children: map[string]yamlKeySpec{"trusted_relays": {}}},
 		"rate_limit":                  {children: map[string]yamlKeySpec{"enabled": {}, "per_source_pps": {}, "mode": {}}},
 		"dedup":                       {children: map[string]yamlKeySpec{"enabled": {}, "window_sec": {}, "cache_max_entries": {}, "key_varbinds": {}}},
 		"journal":                     {children: map[string]yamlKeySpec{"enabled": {}}},

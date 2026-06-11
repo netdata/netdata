@@ -66,6 +66,7 @@ func TestJournalFieldNeedsBinary_Empty(t *testing.T) {
 
 func TestBinaryEncodedFieldCount(t *testing.T) {
 	fields := []JournalField{
+		{Name: "MESSAGE", Value: []byte("documented\nmulti-line message")},
 		{Name: "SAFE", Value: []byte("hello")},
 		{Name: "UNSAFE", Value: []byte("hello\nworld")},
 		{Name: "SAFE2", Value: []byte("world")},
