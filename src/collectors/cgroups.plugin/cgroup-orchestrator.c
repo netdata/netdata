@@ -204,6 +204,26 @@ static bool cgroup_matches_qemu_scope(const char *id)
     return strncmp(base, "qemu-", sizeof("qemu-") - 1) == 0 && cgroup_string_ends_with(base, ".scope");
 }
 
+// a "qemu-*.scope" path component anywhere in the path marks the cgroup (or a
+// child of it) as a VM; a bare "/qemu-" substring must not, or services like
+// qemu-guest-agent.service would be classified as VMs
+static bool cgroup_path_has_qemu_scope_component(const char *id)
+{
+    static const char suffix[] = ".scope";
+
+    for (const char *p = strstr(id, "/qemu-"); p; p = strstr(p + 1, "/qemu-")) {
+        const char *component = p + 1;
+        const char *end = strchr(component, '/');
+        size_t len = end ? (size_t)(end - component) : strlen(component);
+
+        if (len > sizeof(suffix) - 1 &&
+            strncmp(component + len - (sizeof(suffix) - 1), suffix, sizeof(suffix) - 1) == 0)
+            return true;
+    }
+
+    return false;
+}
+
 static bool cgroup_matches_machine_slice_service(const char *id)
 {
     const char prefix[] = "/machine.slice/";
@@ -260,7 +280,7 @@ static enum cgroups_container_orchestrator discovery_detect_orchestrator(const c
         strstr(id, ".libvirt-qemu") ||
         (proxmox_pve_present && cgroup_matches_proxmox_qemu(id)) ||
         cgroup_matches_qemu_scope(id) ||
-        strstr(id, "/qemu-"))
+        cgroup_path_has_qemu_scope_component(id))
         return CGROUPS_ORCHESTRATOR_KVM;
 
     if (strstr(id, "/docker/") ||

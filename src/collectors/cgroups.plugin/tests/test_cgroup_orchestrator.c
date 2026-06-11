@@ -138,6 +138,21 @@ int main(void)
             .expected = CGROUPS_ORCHESTRATOR_KVM,
         },
         {
+            .name = "qemu scope child",
+            .path = "/qemu-100.scope/emulator",
+            .expected = CGROUPS_ORCHESTRATOR_KVM,
+        },
+        {
+            .name = "qemu guest agent service is not a VM",
+            .path = "/system.slice/qemu-guest-agent.service",
+            .expected = CGROUPS_ORCHESTRATOR_SYSTEMD,
+        },
+        {
+            .name = "qemu named service under nested path is not a VM",
+            .path = "/system.slice/something/qemu-monitor.service",
+            .expected = CGROUPS_ORCHESTRATOR_SYSTEMD,
+        },
+        {
             .name = "proxmox qemu",
             .path = "/qemu.slice_100.scope",
             .expected = CGROUPS_ORCHESTRATOR_KVM,
