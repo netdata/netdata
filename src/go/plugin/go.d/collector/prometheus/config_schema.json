@@ -38,12 +38,12 @@
       },
       "expected_prefix": {
         "title": "Expected prefix",
-        "description": "If an endpoint does not return at least one metric with the specified prefix, the data is not processed.",
+        "description": "If set, the job's check passes only when at least one scraped metric name starts with this prefix. Guards against scraping an unexpected endpoint.",
         "type": "string"
       },
       "app": {
         "title": "Application",
-        "description": "If set, this value will be used in the chart context as 'prometheus.{app}.{metric_name}'.",
+        "description": "Application name used as the app segment of chart contexts ('prometheus.{app}.{metric}'). When unset, the segment falls back to the job name.",
         "type": "string"
       },
       "vnode": {
@@ -178,6 +178,123 @@
             "match",
             "metric_relabel_configs"
           ]
+        }
+      },
+      "profiles": {
+        "title": "Profiles",
+        "description": "Curated, exporter-specific chart profiles. `auto` (default) selects every profile whose match hits a scraped metric; `exact` selects only the named profiles (each must match); `combined` is auto plus the named profiles; `none` disables profiles (generic autogen charts only).",
+        "type": "object",
+        "properties": {
+          "mode": {
+            "title": "Profiles mode",
+            "description": "How chart profiles are selected.",
+            "type": "string",
+            "enum": [
+              "none",
+              "auto",
+              "exact",
+              "combined"
+            ],
+            "default": "auto"
+          }
+        },
+        "dependencies": {
+          "mode": {
+            "oneOf": [
+              {
+                "properties": {
+                  "mode": {
+                    "const": "none"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "auto"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "exact"
+                  },
+                  "mode_exact": {
+                    "title": "Exact profiles",
+                    "type": "object",
+                    "properties": {
+                      "entries": {
+                        "title": "Profile entries",
+                        "description": "Profiles to select. Each must match at least one scraped metric or the job fails its check.",
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "title": "Profile basename",
+                              "description": "Profile file basename: lowercase letters, digits, or underscores, starting with a letter.",
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9_]*$"
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "entries"
+                    ]
+                  }
+                },
+                "required": [
+                  "mode_exact"
+                ]
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "combined"
+                  },
+                  "mode_combined": {
+                    "title": "Combined profiles",
+                    "type": "object",
+                    "properties": {
+                      "entries": {
+                        "title": "Profile entries",
+                        "description": "Profiles to select in addition to the auto-selected ones.",
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "title": "Profile basename",
+                              "description": "Profile file basename: lowercase letters, digits, or underscores, starting with a letter.",
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9_]*$"
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "entries"
+                    ]
+                  }
+                },
+                "required": [
+                  "mode_combined"
+                ]
+              }
+            ]
+          }
         }
       },
       "max_time_series": {
@@ -346,6 +463,12 @@
           "title": "Relabeling",
           "fields": [
             "relabeling"
+          ]
+        },
+        {
+          "title": "Profiles",
+          "fields": [
+            "profiles"
           ]
         },
         {

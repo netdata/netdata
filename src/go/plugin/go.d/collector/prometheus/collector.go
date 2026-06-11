@@ -39,6 +39,7 @@ func New() *Collector {
 			},
 			MaxTS:          2000,
 			MaxTSPerMetric: 200,
+			Profiles:       ProfilesConfig{Mode: profilesModeAuto},
 		},
 		store: metrix.NewCollectorStore(),
 	}

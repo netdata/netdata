@@ -26,6 +26,14 @@ var log = logger.New().With("component", "prometheus/promprofiles")
 // validProfileName constrains a profile's identity, which is its file basename.
 var validProfileName = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
+// IsValidProfileName reports whether name satisfies the profile-identity
+// constraint (the same pattern applied to profile file basenames). Callers that
+// reference a profile by name — config entries, for example — use it to reject
+// names no catalog profile can ever have.
+func IsValidProfileName(name string) bool {
+	return validProfileName.MatchString(name)
+}
+
 // Catalog holds the resolved set of profiles, keyed by normalized name and kept
 // in discovery order so OrderedProfiles is deterministic.
 type Catalog struct {
@@ -241,7 +249,9 @@ func profilesDirFromThisFile() string {
 	}
 
 	base := filepath.Dir(thisFile)
-	candidate := filepath.Join(base, "..", "..", "..", "..", "config", "go.d", profilesDirName, "default")
+	// This file sits at plugin/go.d/collector/prometheus/promprofiles; three levels
+	// up is plugin/go.d, under which config/go.d/<profilesDirName>/default lives.
+	candidate := filepath.Join(base, "..", "..", "..", "config", "go.d", profilesDirName, "default")
 	if !isDirExists(candidate) {
 		return ""
 	}
