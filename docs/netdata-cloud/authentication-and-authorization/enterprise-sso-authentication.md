@@ -46,6 +46,12 @@ Domain verification is required to establish secure SSO connectivity:
 | **Name/Host/Alias**          | Leave blank or use @ for subdomain           |
 | **TTL (Time to Live)**       | 86400 (or use provider default)              |
 
+:::info
+
+The DNS TXT record must remain in your DNS configuration for as long as SSO is active. Removing the record may disable SSO authentication for your space. If you need to remove the record after initial setup, contact Netdata support to confirm whether your domain verification will remain valid.
+
+:::
+
 ### SSO Provider Configuration
 
 Consult your provider's documentation for detailed instructions.
