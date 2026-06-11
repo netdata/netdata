@@ -3614,7 +3614,7 @@ if(OS_WINDOWS)
                 -mno-red-zone
         )
         target_link_options(netdata_driver PRIVATE
-                -Wl,--entry,DriverEntry@8
+                -Wl,--entry,DriverEntry
                 -nostdlib
                 -Wl,--subsystem,native
                 -Wl,--image-base,0x10000
