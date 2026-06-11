@@ -18,6 +18,7 @@
 #define NV_APPS_LOOKUP_CACHE_MIN 1U
 #define NV_APPS_LOOKUP_CACHE_MAX 65536U
 #define NV_APPS_LOOKUP_CONNECT_RETRY_SEC 1U
+#define NV_APPS_LOOKUP_CALL_TIMEOUT_MS 5000U
 
 typedef struct {
     char *key;
@@ -65,7 +66,6 @@ static usec_t apps_lookup_next_retry_ut = 0;
 
 static bool apps_lookup_worker_stop = false;
 static bool apps_lookup_worker_thread_exited = false;
-static int apps_lookup_active_client_fd = -1;
 
 static uint64_t apps_lookup_requests_sent = 0;
 static uint64_t apps_lookup_requests_responded = 0;
@@ -651,11 +651,9 @@ static void nv_apps_lookup_worker_cancel(void *data __maybe_unused)
     __atomic_store_n(&apps_lookup_worker_stop, true, __ATOMIC_RELEASE);
     nv_apps_lookup_signal_worker();
 
-#if !defined(_WIN32) && !defined(__MSYS__)
-    int fd = __atomic_load_n(&apps_lookup_active_client_fd, __ATOMIC_ACQUIRE);
-    if (fd >= 0)
-        shutdown(fd, SHUT_RDWR);
-#endif
+    // unblock a worker stuck inside a synchronous netipc call (covers UDS and SHM)
+    if (apps_lookup_client_initialized)
+        nipc_client_abort(&apps_lookup_client_ctx);
 }
 
 static void nv_apps_lookup_worker_main(void *arg __maybe_unused)
@@ -702,19 +700,20 @@ static void nv_apps_lookup_worker_main(void *arg __maybe_unused)
         nipc_apps_lookup_resp_view_t response;
         nv_apps_lookup_counter_inc(&apps_lookup_requests_sent);
         usec_t started_ut = now_monotonic_usec();
-#if !defined(_WIN32) && !defined(__MSYS__)
-        int active_fd = apps_lookup_client_ctx.session_valid ? nipc_uds_session_fd(&apps_lookup_client_ctx.session) : -1;
-        __atomic_store_n(&apps_lookup_active_client_fd, active_fd, __ATOMIC_RELEASE);
-#endif
         nipc_error_t err = nipc_client_call_apps_lookup(&apps_lookup_client_ctx, pids, pid_count, &response);
-#if !defined(_WIN32) && !defined(__MSYS__)
-        __atomic_store_n(&apps_lookup_active_client_fd, -1, __ATOMIC_RELEASE);
-#endif
         nv_apps_lookup_worker_duration_observe(now_monotonic_usec() - started_ut);
+
+        if (err == NIPC_ERR_ABORTED) {
+            // shutdown aborted the in-flight call; exit quietly through the stop check
+            netdata_mutex_unlock(&apps_lookup_client_mutex);
+            freez(pids);
+            continue;
+        }
 
         if (err != NIPC_OK) {
             nv_apps_lookup_counter_inc(&apps_lookup_requests_failed);
-            nv_apps_lookup_counter_inc(&apps_lookup_peer_disconnects);
+            if (err != NIPC_ERR_TIMEOUT)
+                nv_apps_lookup_counter_inc(&apps_lookup_peer_disconnects);
             if (!request_failure_logged) {
                 netdata_log_error("network-viewer.plugin APPS_LOOKUP request failed (error %u); cache warming will retry",
                                   (unsigned int)err);
@@ -787,6 +786,7 @@ void nv_apps_lookup_init(bool *plugin_should_exit)
         .supported_profiles = NIPC_PROFILE_BASELINE | NIPC_PROFILE_SHM_HYBRID | NIPC_PROFILE_SHM_FUTEX,
         .preferred_profiles = NIPC_PROFILE_SHM_FUTEX,
         .auth_token = netipc_auth_token(),
+        .call_timeout_ms = NV_APPS_LOOKUP_CALL_TIMEOUT_MS,
     };
     nipc_client_init(&apps_lookup_client_ctx, os_run_dir(true), NV_APPS_LOOKUP_SERVICE_NAME, &config);
     apps_lookup_client_initialized = true;

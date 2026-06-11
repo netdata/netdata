@@ -9,6 +9,7 @@
 #define APPS_CGROUPS_LOOKUP_SERVICE_NAME "cgroups-lookup"
 #define APPS_CGROUPS_LOOKUP_BATCH_MAX 256U
 #define APPS_CGROUPS_LOOKUP_CONNECT_RETRY_SEC 30ULL
+#define APPS_CGROUPS_LOOKUP_CALL_TIMEOUT_MS 5000U
 
 struct cgroup_lookup_queue_entry {
     STRING *path;
@@ -27,6 +28,11 @@ static struct cgroup_lookup_queue_entry *cgroups_lookup_queue_head = NULL;
 static struct cgroup_lookup_queue_entry *cgroups_lookup_queue_tail = NULL;
 static size_t cgroups_lookup_queue_count = 0;
 static ND_THREAD *cgroups_lookup_worker_thread = NULL;
+
+// the worker thread initializes this context; cleanup aborts/closes it cross-thread,
+// so the initialized flag must be accessed atomically
+static nipc_client_ctx_t cgroups_lookup_client_ctx;
+static bool cgroups_lookup_client_initialized = false;
 
 static uint64_t cgroups_lookup_requests_sent = 0;
 static uint64_t cgroups_lookup_requests_responded = 0;
@@ -432,10 +438,12 @@ static void cgroups_lookup_worker(void *arg __maybe_unused)
         .supported_profiles = NIPC_PROFILE_BASELINE | NIPC_PROFILE_SHM_HYBRID | NIPC_PROFILE_SHM_FUTEX,
         .preferred_profiles = NIPC_PROFILE_SHM_FUTEX,
         .auth_token = netipc_auth_token(),
+        .call_timeout_ms = APPS_CGROUPS_LOOKUP_CALL_TIMEOUT_MS,
     };
 
-    nipc_client_ctx_t client = { 0 };
-    nipc_client_init(&client, os_run_dir(true), APPS_CGROUPS_LOOKUP_SERVICE_NAME, &config);
+    memset(&cgroups_lookup_client_ctx, 0, sizeof(cgroups_lookup_client_ctx));
+    nipc_client_init(&cgroups_lookup_client_ctx, os_run_dir(true), APPS_CGROUPS_LOOKUP_SERVICE_NAME, &config);
+    __atomic_store_n(&cgroups_lookup_client_initialized, true, __ATOMIC_RELEASE);
 
     bool was_ready = false;
     usec_t next_retry_ut = 0;
@@ -447,7 +455,7 @@ static void cgroups_lookup_worker(void *arg __maybe_unused)
         if (__atomic_load_n(&cgroups_lookup_worker_stop, __ATOMIC_ACQUIRE))
             break;
 
-        if (!cgroups_lookup_client_ready(&client, &was_ready, &next_retry_ut)) {
+        if (!cgroups_lookup_client_ready(&cgroups_lookup_client_ctx, &was_ready, &next_retry_ut)) {
             sleep_usec(USEC_PER_SEC);
             continue;
         }
@@ -466,11 +474,19 @@ static void cgroups_lookup_worker(void *arg __maybe_unused)
         nipc_cgroups_lookup_resp_view_t response = { 0 };
         cgroups_lookup_counter_inc(&cgroups_lookup_requests_sent);
         usec_t started_ut = now_monotonic_usec();
-        nipc_error_t err = nipc_client_call_cgroups_lookup(&client, views, count, &response);
+        nipc_error_t err = nipc_client_call_cgroups_lookup(&cgroups_lookup_client_ctx, views, count, &response);
         cgroups_lookup_duration_observe(now_monotonic_usec() - started_ut);
 
-        if (err != NIPC_OK) {
-            cgroups_lookup_counter_inc(&cgroups_lookup_requests_error);
+        if (err == NIPC_ERR_ABORTED) {
+            // shutdown aborted the in-flight call; exit quietly through the stop check
+            cgroups_lookup_clear_pending_for_paths(paths, count);
+            goto free_paths;
+        }
+        else if (err != NIPC_OK) {
+            if (err == NIPC_ERR_TIMEOUT)
+                cgroups_lookup_counter_inc(&cgroups_lookup_requests_timeout);
+            else
+                cgroups_lookup_counter_inc(&cgroups_lookup_requests_error);
             if (!request_failure_logged) {
                 netdata_log_error("apps.plugin CGROUPS_LOOKUP request failed (error %u); cgroup enrichment will retry",
                                   (unsigned int)err);
@@ -529,7 +545,8 @@ free_paths:
             string_freez(paths[i]);
     }
 
-    nipc_client_close(&client);
+    // the context is closed by apps_cgroups_lookup_cleanup() after this thread is joined,
+    // so a cross-thread abort can never race a concurrent close
 }
 
 void apps_cgroups_lookup_scan_pids(void)
@@ -600,8 +617,18 @@ void apps_cgroups_lookup_cleanup(void)
         netdata_mutex_lock(&cgroups_lookup_queue_mutex);
         netdata_cond_broadcast(&cgroups_lookup_queue_cond);
         netdata_mutex_unlock(&cgroups_lookup_queue_mutex);
+
+        // unblock a worker stuck inside a synchronous netipc call
+        if (__atomic_load_n(&cgroups_lookup_client_initialized, __ATOMIC_ACQUIRE))
+            nipc_client_abort(&cgroups_lookup_client_ctx);
+
         nd_thread_join(cgroups_lookup_worker_thread);
         cgroups_lookup_worker_thread = NULL;
+    }
+
+    if (__atomic_load_n(&cgroups_lookup_client_initialized, __ATOMIC_ACQUIRE)) {
+        nipc_client_close(&cgroups_lookup_client_ctx);
+        __atomic_store_n(&cgroups_lookup_client_initialized, false, __ATOMIC_RELEASE);
     }
 
     if (cgroups_lookup_queue_initialized) {
