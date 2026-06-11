@@ -1426,6 +1426,8 @@ groups:
 	for _, v := range update.Values {
 		gotFloat[v.Name] = v.IsFloat
 	}
+	require.Contains(t, gotFloat, "floaty")
+	require.Contains(t, gotFloat, "inty")
 	assert.True(t, gotFloat["floaty"], "WithFloat metric should render float via meta inheritance")
 	assert.False(t, gotFloat["inty"], "plain metric with no options.float should stay int")
 }
