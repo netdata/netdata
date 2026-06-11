@@ -1116,7 +1116,11 @@ static inline int link(const char *oldpath, const char *newpath) {
 // --------------------------------------------------------------------------------------------------------------------
 
 /* Define a portable way to access st_mtim across Unix variants */
-#if defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200809L
+#if defined(OS_WINDOWS)
+/* UCRT64 struct stat has only st_mtime (time_t); no st_mtim timespec member */
+#define STAT_GET_MTIME_SEC(st)  ((st).st_mtime)
+#define STAT_GET_MTIME_NSEC(st) (0)
+#elif defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200809L
 /* POSIX.1-2008 compliant systems have st_mtim */
 #define STAT_GET_MTIME_SEC(st)  ((st).st_mtim.tv_sec)
 #define STAT_GET_MTIME_NSEC(st) ((st).st_mtim.tv_nsec)
