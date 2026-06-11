@@ -521,12 +521,20 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
     static __thread bool this_thread_in_fatal = false;
     static size_t threads_in_fatal = 0;
 
+    // NOTE: the two exit paths below must NOT use stdio (fprintf/fflush). The
+    // first fatal thread is likely holding stderr's stdio lock mid-write, and a
+    // second fprintf(stderr) would block on that lock indefinitely -- defeating
+    // the bounded exit these paths are meant to guarantee. Use a raw write(),
+    // which takes no lock.
+    char msg[512];
+
     if(this_thread_in_fatal) {
         // (1) same thread re-entered fatal: the outer fatal is suspended below
         // us on this stack and cannot make progress, so do not wait for it.
-        fprintf(stderr, "\nRECURSIVE FATAL STATEMENTS, latest from %s() of %lu@%s, EXITING NOW! 23e93dfccbf64e11aac858b9410d8a82\n",
+        int n = snprintf(msg, sizeof(msg),
+                "\nRECURSIVE FATAL STATEMENTS, latest from %s() of %lu@%s, EXITING NOW! 23e93dfccbf64e11aac858b9410d8a82\n",
                 function, line, file);
-        fflush(stderr);
+        if(n > 0 && write(STDERR_FILENO, msg, (size_t)((n < (int)sizeof(msg)) ? n : (int)sizeof(msg))) < 0) { /* best effort */ }
         recursive_fatal_abort();
     }
     this_thread_in_fatal = true;
@@ -535,9 +543,10 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
         // (2) another thread is already writing a fatal. Give it a bounded
         // chance to finish, then exit quietly (not via recursive_fatal_abort,
         // which would mask the first fatal as a crash of its own).
-        fprintf(stderr, "\nCONCURRENT FATAL from %s() of %lu@%s, deferring to the first fatal and exiting.\n",
+        int n = snprintf(msg, sizeof(msg),
+                "\nCONCURRENT FATAL from %s() of %lu@%s, deferring to the first fatal and exiting.\n",
                 function, line, file);
-        fflush(stderr);
+        if(n > 0 && write(STDERR_FILENO, msg, (size_t)((n < (int)sizeof(msg)) ? n : (int)sizeof(msg))) < 0) { /* best effort */ }
         sleep(2); // give the first fatal the chance to be written
         _exit(1);
     }
