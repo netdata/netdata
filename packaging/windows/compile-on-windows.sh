@@ -84,15 +84,22 @@ fi
 
 COMMON_CFLAGS="-Wa,-mbig-obj -pipe -D_FILE_OFFSET_BITS=64 -D__USE_MINGW_ANSI_STDIO=1"
 
-# GNU BFD ld.exe crashes or OOMs on large RelWithDebInfo builds because it
+# GNU BFD ld.exe hangs (or OOMs) on large RelWithDebInfo builds because it
 # cannot handle the combined DWARF load from 700+ objects + absl + protobuf.
-# lld handles this correctly and links ~10x faster.
-# Install with: pacman -S mingw-w64-ucrt-x86_64-lld
+# lld handles this correctly and links ~10x faster. lld is a hard
+# dependency for the link of netdata.exe; install it via
+# packaging/windows/msys2-dependencies.sh (which pulls
+# mingw-w64-ucrt-x86_64-lld).
 linker_cmake_flags=()
 if [ -x "/ucrt64/bin/ld.lld" ]; then
     linker_cmake_flags=("-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld"
                         "-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld")
 else
+    echo "WARNING: /ucrt64/bin/ld.lld not found." >&2
+    echo "  The link of netdata.exe with the default BFD ld.exe is known to" >&2
+    echo "  hang or run out of memory on RelWithDebInfo builds." >&2
+    echo "  Install lld and re-run: pacman -S mingw-w64-ucrt-x86_64-lld" >&2
+    echo "  Falling back to BFD with -g1 and --no-keep-memory mitigations." >&2
     # BFD fallback: reduce DWARF from level 2 (-g) to level 1 (-g1) so the
     # linker's memory footprint stays within bounds, and tell BFD to trade
     # speed for lower memory via --no-keep-memory.
