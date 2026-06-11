@@ -1,0 +1,75 @@
+{
+  "execution": {
+    "status": "ok",
+    "mode": "full",
+    "summary": "Added a clarifying ::info admonition to the Domain Verification section in enterprise-sso-authentication.md stating the DNS TXT record must remain in DNS configuration for as long as SSO is active, with a fallback to contact Netdata support if removal is needed. The factual claim uses conservative hedging (may disable) since the actual re-verification behavior lives in the Netdata Cloud backend and could not be verified from this repository. Product team confirmation is required before merge.",
+    "repo": "netdata",
+    "edited_files": [
+      "docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md"
+    ],
+    "no_file_edits": false,
+    "evidence_refs": [
+      "docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md:49-53 (added ::info admonition)",
+      "docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md:5-9 (existing :::important admonition style reference)",
+      "No source code evidence found in repo for domain verification re-check behavior — backend logic is outside this repository"
+    ],
+    "acceptance_checks": [
+      "The Domain Verification section includes an explicit statement about DNS TXT record permanence: the :::info block states the record must remain and removing it may disable SSO.",
+      "The statement uses :::info admonition syntax consistent with the existing document style (:::important used elsewhere).",
+      "No changes are made outside the Domain Verification subsection — only lines 49-53 added between the DNS table and the SSO Provider Configuration heading.",
+      "The factual claim about permanence/re-verification has NOT been confirmed by the product team yet — this acceptance check is a pre-merge gate. The PR is a draft to allow product team review before merge."
+    ],
+    "commit_title": "docs: clarify DNS TXT record permanence for SSO domain verification",
+    "pr_title": "docs: clarify DNS TXT record permanence for SSO domain verification",
+    "pr_body": "## Summary\nAdds a clarifying note to the Domain Verification section of the Enterprise SSO Authentication guide, stating that the DNS TXT record must remain in DNS configuration for as long as SSO is active.\n\n## User Request\n\"For the Domain Verification DNS TXT entry; is this a permanent requirement or just a one time requirement when setting up the system?\"\n\n## Reason for Change\nThe existing documentation provides step-by-step instructions for creating the DNS TXT record during SSO setup but omits any guidance on whether the record must remain permanently or can be removed after initial verification. This is a genuine documentation gap — the user cannot determine the record's lifecycle from the current docs, and no information exists elsewhere in the repository.\n\n**Note for reviewers:** The actual re-verification behavior (periodic vs. one-time) is implemented in the Netdata Cloud backend, which is not part of this repository. The note uses conservative wording (\"may disable\") with a fallback directing users to contact Netdata support. Product team confirmation of the exact behavior is required before merge.",
+    "pr_draft": true,
+    "pr_labels": [
+      "nedi-audit"
+    ]
+  },
+  "context": {
+    "lane": "audit",
+    "attempt": 0,
+    "push_recovery_required": false,
+    "push_recovery_reason": null,
+    "user_request": "For the Domain Verification DNS TXT entry; is this a permanent requirement or just a one time requirement when setting up the system?",
+    "plan_item": {
+      "summary": "Task class: improve_docs — Add a clarifying note to the Domain Verification section in enterprise-sso-authentication.md stating whether the DNS TXT record must remain in place permanently or can be removed after initial verification is complete.",
+      "map_update_required": false,
+      "generalization_required": false,
+      "targets": [
+        "netdata/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md"
+      ],
+      "edit_guidance": "In the Domain Verification subsection (lines 31-48), after the DNS record specifications table and before the '### SSO Provider Configuration' heading, add a short paragraph or callout clarifying the permanence of the DNS TXT record. Recommended wording: a note block (using `:::note` or `:::info` syntax) stating something like: 'The DNS TXT record must remain in your DNS configuration for as long as SSO is active. Netdata periodically re-verifies domain ownership; removing the record will disable SSO authentication for your space.' Adjust the factual claim based on product team confirmation of whether re-verification is periodic or one-time. If it is truly one-time, instead state: 'The DNS TXT record is only required during the initial verification process. Once verification is complete, you may remove it without affecting SSO functionality.' — The product team should confirm which behavior is correct before finalizing the wording.",
+      "acceptance_checks": [
+        "The Domain Verification section includes an explicit statement about whether the DNS TXT record must remain permanently or can be removed after verification.",
+        "The statement uses an appropriate admonition syntax (e.g., `:::note` or `:::info`) consistent with the existing document style.",
+        "No changes are made outside the Domain Verification subsection.",
+        "The factual claim about permanence/re-verification has been confirmed by the product team before merge."
+      ],
+      "processed": true
+    },
+    "executor_summary": "",
+    "diff": "diff --git a/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md b/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md\nindex 64160eb0a..b9b3d1e4a 100644\n--- a/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md\n+++ b/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md\n@@ -46,6 +46,12 @@ Domain verification is required to establish secure SSO connectivity:\n | **Name/Host/Alias**          | Leave blank or use @ for subdomain           |\n | **TTL (Time to Live)**       | 86400 (or use provider default)              |\n \n+:::info\n+\n+The DNS TXT record must remain in your DNS configuration for as long as SSO is active. Removing the record may disable SSO authentication for your space. If you need to remove the record after initial setup, contact Netdata support to confirm whether your domain verification will remain valid.\n+\n+:::\n+\n ### SSO Provider Configuration\n \n Consult your provider's documentation for detailed instructions.",
+    "feedback_request": null,
+    "prior_review_findings": null,
+    "git_state_before": {
+      "rebase": false,
+      "merge": false,
+      "cherry_pick": false,
+      "revert": false
+    },
+    "git_cleanup_operations": [],
+    "git_state_after": {
+      "rebase": false,
+      "merge": false,
+      "cherry_pick": false,
+      "revert": false
+    }
+  },
+  "review": {
+    "status": "ok",
+    "findings": "",
+    "updated_prompt": ""
+  }
+}
