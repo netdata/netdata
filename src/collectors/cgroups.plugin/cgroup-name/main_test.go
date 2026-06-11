@@ -3,13 +3,16 @@
 package main
 
 import (
+	"bytes"
+	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
-	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestBuildCmdLinePreservesShellQuotingBug(t *testing.T) {
@@ -321,15 +324,15 @@ func TestK8sTLSModesAgainstSelfSignedServer(t *testing.T) {
 	r := newResolver([]string{"cgroup-name"}, &bytes.Buffer{})
 
 	t.Setenv("K8S_TLS_INSECURE", "")
-	if _, err := httpGet(ts.URL, nil, r.k8sTLSConfig(tlsModeKubelet), true, true, 0); err != nil {
+	if _, err := httpGetWithContext(context.Background(), ts.URL, nil, r.k8sTLSConfig(tlsModeKubelet), true, true, 0, 0); err != nil {
 		t.Fatalf("kubelet mode must accept a self-signed certificate, got: %v", err)
 	}
-	if _, err := httpGet(ts.URL, nil, r.k8sTLSConfig(tlsModeAPIServer), true, true, 0); err == nil {
+	if _, err := httpGetWithContext(context.Background(), ts.URL, nil, r.k8sTLSConfig(tlsModeAPIServer), true, true, 0, 0); err == nil {
 		t.Fatal("API-server mode must reject a certificate that does not chain to the service-account CA")
 	}
 
 	t.Setenv("K8S_TLS_INSECURE", "1")
-	if _, err := httpGet(ts.URL, nil, r.k8sTLSConfig(tlsModeAPIServer), true, true, 0); err != nil {
+	if _, err := httpGetWithContext(context.Background(), ts.URL, nil, r.k8sTLSConfig(tlsModeAPIServer), true, true, 0, 0); err != nil {
 		t.Fatalf("API-server mode with K8S_TLS_INSECURE=1 must accept any certificate, got: %v", err)
 	}
 }
@@ -343,5 +346,64 @@ func TestKubeletPodsURLAppendsPods(t *testing.T) {
 	t.Setenv("KUBELET_URL", "https://node-1:10250")
 	if got := kubeletPodsURL(); got != "https://node-1:10250/pods" {
 		t.Fatalf("configured kubelet url = %q, the base must get /pods appended like the shell did", got)
+	}
+}
+
+func TestSetupDeadlineBudget(t *testing.T) {
+	t.Run("unbounded when unset", func(t *testing.T) {
+		t.Setenv("NETDATA_CGROUP_NAME_TIMEOUT_MS", "")
+		r := newResolver([]string{"cgroup-name"}, &bytes.Buffer{})
+		cancel := r.setupDeadline()
+		defer cancel()
+		if !r.expiresAt.IsZero() {
+			t.Fatal("expiresAt must be zero when no timeout is configured")
+		}
+		if r.budgetExpired() {
+			t.Fatal("an unbounded budget must never report expired")
+		}
+	})
+
+	t.Run("expires after the configured budget", func(t *testing.T) {
+		t.Setenv("NETDATA_CGROUP_NAME_TIMEOUT_MS", "10")
+		r := newResolver([]string{"cgroup-name"}, &bytes.Buffer{})
+		cancel := r.setupDeadline()
+		defer cancel()
+		if r.expiresAt.IsZero() {
+			t.Fatal("expiresAt must be set when a timeout is configured")
+		}
+		if r.budgetExpired() {
+			t.Fatal("budget must not be expired immediately")
+		}
+		time.Sleep(20 * time.Millisecond)
+		if !r.budgetExpired() {
+			t.Fatal("budget must report expired after the deadline passes")
+		}
+		if r.ctx.Err() == nil {
+			t.Fatal("the deadline context must be done after the budget expires")
+		}
+	})
+}
+
+func TestLogfmtIsSingleLineAndQuoted(t *testing.T) {
+	r := newResolver([]string{"cgroup-name", "weird arg"}, &bytes.Buffer{})
+	r.logLevel = ndlpDebug
+
+	old := os.Stderr
+	rp, wp, _ := os.Pipe()
+	os.Stderr = wp
+	r.error("name has a \" quote and a\nnewline")
+	_ = wp.Close()
+	os.Stderr = old
+
+	out, _ := io.ReadAll(rp)
+	line := string(out)
+	if strings.Count(strings.TrimRight(line, "\n"), "\n") != 0 {
+		t.Fatalf("log line must be single-line, got: %q", line)
+	}
+	if !strings.Contains(line, "level=error") || !strings.Contains(line, "comm=cgroup-name") {
+		t.Fatalf("log line missing expected fields: %q", line)
+	}
+	if !strings.Contains(line, `\"`) || !strings.Contains(line, `\n`) {
+		t.Fatalf("quotes and newlines in the message must be escaped: %q", line)
 	}
 }

@@ -3,6 +3,10 @@
 #include "cgroup-internals.h"
 #include "cgroup-netipc.h"
 
+// grace period added on top of the cgroup-name timeout: the helper self-bounds
+// at the operator timeout, this is the extra slack before discovery kills it
+#define CGROUP_NAME_GRACE_MS 2000
+
 // discovery cgroup thread worker jobs
 #define WORKER_DISCOVERY_INIT               0
 #define WORKER_DISCOVERY_FIND               1
@@ -249,24 +253,57 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
     }
 
     char buffer[8192]; // we need some size for labels
-    char *new_name = fgets(buffer, sizeof(buffer), spawn_popen_stdout(instance));
-    int exit_code = spawn_popen_wait(instance);
+    char *new_name = NULL;
 
-    switch (exit_code) {
-        case 0:
-            cg->pending_renames = 0;
-            break;
+    // Bound the helper independently of whether it honors its own timeout: a
+    // custom rename script (or a wedged helper) must not stall discovery. Wait
+    // up to the operator timeout plus a grace period for the helper to produce
+    // its line, then reclaim it. cgroup_name_timeout_ms == 0 keeps the legacy
+    // unbounded behavior.
+    int wait_ms = cgroup_name_timeout_ms > 0 ? cgroup_name_timeout_ms + CGROUP_NAME_GRACE_MS : -1;
 
-        case 3:
-            cg->pending_renames = 0;
-            cg->processed = 1;
-            break;
+    struct pollfd pfd = { .fd = spawn_popen_read_fd(instance), .events = POLLIN };
+    int pr = poll(&pfd, 1, wait_ms);
 
-        default:
-            break;
+    if (pr > 0)
+        new_name = fgets(buffer, sizeof(buffer), spawn_popen_stdout(instance));
+
+    int exit_code = -1;
+    if (pr <= 0) {
+        // timeout or poll error: the helper is stuck, kill it and let the retry
+        // ladder run; never apply partial output
+        collector_error(
+            "CGROUP: rename helper for '%s' did not respond within %d ms; killing it.", cg->id, wait_ms);
+        spawn_popen_kill(instance, 0);
+        new_name = NULL;
+    } else {
+        SPAWN_TIMEDWAIT_RESULT res = spawn_popen_timedwait(instance, CGROUP_NAME_GRACE_MS, &exit_code);
+        if (res == SPAWN_TIMEDWAIT_EXITED) {
+            switch (exit_code) {
+                case 0:
+                    cg->pending_renames = 0;
+                    break;
+
+                case 3:
+                    cg->pending_renames = 0;
+                    cg->processed = 1;
+                    break;
+
+                default:
+                    break;
+            }
+        } else {
+            // still running after writing, or wait error: reclaim and treat as failure
+            spawn_popen_kill(instance, 0);
+            new_name = NULL;
+        }
     }
 
     if (cg->pending_renames || cg->processed)
+        return;
+    // a non-zero exit means the helper failed; discard whatever partial line it
+    // may have written instead of installing it as the cgroup name
+    if (exit_code != 0)
         return;
     if (!new_name || !*new_name || *new_name == '\n')
         return;

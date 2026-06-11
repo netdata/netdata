@@ -339,6 +339,7 @@ extern bool cgroup_enable_pressure;
 extern bool cgroup_enable_cpuacct_cpu_shares;
 
 extern int cgroup_check_for_new_every;
+extern int cgroup_name_timeout_ms;
 extern int cgroup_update_every;
 
 extern char *cgroup_cpuacct_base;

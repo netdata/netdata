@@ -55,9 +55,8 @@ jobs:
             cmake ninja-build pkg-config flex bison g++ \
             libatomic1 libsystemd-dev libpcre2-dev libcurl4-openssl-dev \
             liblz4-dev libzstd-dev libuv1-dev libssl-dev libelf-dev \
-            libjson-c-dev libyaml-dev zlib1g-dev \
-            libprotobuf-dev protobuf-compiler \
-            libmnl-dev libnetfilter-acct-dev
+            libjson-c-dev libyaml-dev zlib1g-dev uuid-dev \
+            libprotobuf-dev protobuf-compiler
 
       - name: Configure
         run: |
@@ -65,6 +64,13 @@ jobs:
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DENABLE_PLUGIN_GO=OFF \
             -DENABLE_PLUGIN_XENSTAT=OFF \
+            -DENABLE_PLUGIN_FREEIPMI=Off \
+            -DENABLE_PLUGIN_CUPS=Off \
+            -DENABLE_PLUGIN_NFACCT=Off \
+            -DENABLE_PLUGIN_OTEL=Off \
+            -DENABLE_PLUGIN_OTEL_SIGNAL_VIEWER=Off \
+            -DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=Off \
+            -DENABLE_EXPORTER_MONGODB=Off \
             -DENABLE_BUNDLED_PROTOBUF=Off
 
       - name: Build test binaries
@@ -108,9 +114,8 @@ jobs:
             cmake ninja-build pkg-config flex bison g++ \
             libatomic1 libsystemd-dev libpcre2-dev libcurl4-openssl-dev \
             liblz4-dev libzstd-dev libuv1-dev libssl-dev libelf-dev \
-            libjson-c-dev libyaml-dev zlib1g-dev \
-            libprotobuf-dev protobuf-compiler \
-            libmnl-dev libnetfilter-acct-dev
+            libjson-c-dev libyaml-dev zlib1g-dev uuid-dev \
+            libprotobuf-dev protobuf-compiler
 
       - name: Configure
         env:
@@ -122,6 +127,13 @@ jobs:
             -DCMAKE_BUILD_TYPE=Debug \
             -DENABLE_PLUGIN_GO=OFF \
             -DENABLE_PLUGIN_XENSTAT=OFF \
+            -DENABLE_PLUGIN_FREEIPMI=Off \
+            -DENABLE_PLUGIN_CUPS=Off \
+            -DENABLE_PLUGIN_NFACCT=Off \
+            -DENABLE_PLUGIN_OTEL=Off \
+            -DENABLE_PLUGIN_OTEL_SIGNAL_VIEWER=Off \
+            -DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=Off \
+            -DENABLE_EXPORTER_MONGODB=Off \
             -DENABLE_BUNDLED_PROTOBUF=Off
 
       - name: Build test binaries

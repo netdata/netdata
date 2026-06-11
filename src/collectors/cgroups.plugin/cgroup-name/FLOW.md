@@ -22,27 +22,30 @@ logging payload, environment handling, and known bugs.
 
 ## Logging
 
-Every log call invokes:
+Each log call writes one logfmt line to stderr, like `go.d.plugin` and
+`cgroup-network`:
 
 ```text
-systemd-cat-native --log-as-netdata
+time=<RFC3339 millis> comm=<program basename> level=<name> request=<quoted argv> msg=<message>
 ```
 
-The payload is written on stdin with these fields:
+The daemon captures helper stderr, so the short-lived helper does not open a
+per-message `systemd-cat-native` connection: a wedged journal could otherwise
+block name resolution. `request` and `msg` are Go `%q`-quoted, which escapes
+embedded quotes and newlines, so the line is always single-line and parseable.
 
-```text
-INVOCATION_ID=<NETDATA_INVOCATION_ID>
-SYSLOG_IDENTIFIER=<program basename>
-PRIORITY=<level>
-THREAD_TAG=cgroup-name
-ND_LOG_SOURCE=collector
-ND_REQUEST=<quoted argv with trailing space>
-MESSAGE=<message with literal LF bytes replaced by backslash+n>
+## Timeout And Deadline
 
-```
-
-The final blank line is intentional. `MESSAGE` uses the shell transform
-`${*//$'\n'/\\n}`, so Go uses `strings.ReplaceAll(msg, "\n", "\\n")`.
+`NETDATA_CGROUP_NAME_TIMEOUT_MS` carries the operator budget X (from the
+`[plugin:cgroups]` `cgroup-name timeout` option, default 15s). The helper sets
+`expires_at = start + X` and shares one deadline `context.Context` across every
+external command and HTTP call, so each call gets the remaining budget and
+calls after expiry are not attempted. HTTP response bodies are capped (16 MiB
+generally, 64 MiB for Kubernetes pod lists). If the name is still unresolved at
+the deadline, the helper logs a per-call time breakdown at error level and
+exits with the retry code instead of emitting a fallback name, so discovery's
+retry ladder runs. `cgroups.plugin` waits X plus a 2s grace period, then kills
+the helper; X=0 keeps the legacy unbounded behavior on both sides.
 
 ## Inputs And Exit Codes
 

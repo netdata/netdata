@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -58,6 +59,11 @@ var (
 	reHostScheme         = regexp.MustCompile(`^([a-z]+)://(.*)`)
 )
 
+type callRecord struct {
+	label    string
+	duration time.Duration
+}
+
 type resolver struct {
 	args        []string
 	stdout      io.Writer
@@ -69,6 +75,15 @@ type resolver struct {
 	exitCode    int
 	dockerHost  string
 	podmanHost  string
+
+	// ctx carries the whole-invocation deadline; every external command and
+	// HTTP call shares it, so each call gets "whatever budget remains" and
+	// calls after expiry fail immediately
+	ctx       context.Context
+	expiresAt time.Time // zero when unbounded
+
+	callsMu sync.Mutex
+	calls   []callRecord
 }
 
 func main() {
@@ -78,6 +93,8 @@ func main() {
 func run(args []string, stdout io.Writer) int {
 	setupEnvironment()
 	r := newResolver(args, stdout)
+	cancel := r.setupDeadline()
+	defer cancel()
 
 	r.dockerHost = defaultEnv("DOCKER_HOST", "unix:///var/run/docker.sock")
 	r.podmanHost = defaultEnv("PODMAN_HOST", "unix:///run/podman/podman.sock")
@@ -103,6 +120,13 @@ func run(args []string, stdout io.Writer) int {
 	if r.name == "" {
 		r.dispatchNonK8s(cgroup)
 		if r.name == "" {
+			if r.budgetExpired() {
+				// unresolved because discovery ran out of budget: exit with no
+				// output so the parent's retry ladder runs, instead of locking
+				// in the raw fallback name
+				r.logCallBreakdown()
+				return exitRetry
+			}
 			r.name = cgroup
 		}
 		if len(r.name) > 100 {
@@ -189,18 +213,66 @@ func (r *resolver) setLogMinPriority() {
 	}
 }
 
+var ndlpNames = map[int]string{
+	ndlpEmerg: "emergency",
+	ndlpAlert: "alert",
+	ndlpErr:   "error",
+	ndlpWarn:  "warning",
+	ndlpInfo:  "info",
+	ndlpDebug: "debug",
+}
+
+// logfmt to stderr, like go.d.plugin and cgroup-network: the daemon captures
+// helper stderr, so a per-message journal connection (systemd-cat-native)
+// is neither needed nor safe in a short-lived helper - a wedged journal
+// could block name resolution
 func (r *resolver) log(level int, message string) {
 	if level > r.logLevel {
 		return
 	}
-	message = strings.ReplaceAll(message, "\n", "\\n")
-	payload := fmt.Sprintf("INVOCATION_ID=%s\nSYSLOG_IDENTIFIER=%s\nPRIORITY=%d\nTHREAD_TAG=cgroup-name\nND_LOG_SOURCE=collector\nND_REQUEST=%s\nMESSAGE=%s\n\n",
-		os.Getenv("NETDATA_INVOCATION_ID"), r.programName, level, r.cmdLine, message)
+	fmt.Fprintf(os.Stderr, "time=%s comm=%s level=%s request=%q msg=%q\n",
+		time.Now().Format("2006-01-02T15:04:05.000Z07:00"),
+		r.programName, ndlpNames[level], r.cmdLine, message)
+}
 
-	cmd := exec.Command("systemd-cat-native", "--log-as-netdata")
-	cmd.Stdin = strings.NewReader(payload)
-	cmd.Stderr = os.Stderr
-	_ = cmd.Run()
+// NETDATA_CGROUP_NAME_TIMEOUT_MS carries the operator budget X from
+// cgroups.plugin, which kills the helper at X plus a grace period; the
+// helper must stop all discovery work by X on its own.
+func (r *resolver) setupDeadline() context.CancelFunc {
+	r.ctx = context.Background()
+	ms, _ := strconv.ParseInt(os.Getenv("NETDATA_CGROUP_NAME_TIMEOUT_MS"), 10, 64)
+	if ms <= 0 {
+		return func() {}
+	}
+	r.expiresAt = time.Now().Add(time.Duration(ms) * time.Millisecond)
+	ctx, cancel := context.WithDeadline(context.Background(), r.expiresAt)
+	r.ctx = ctx
+	return cancel
+}
+
+func (r *resolver) budgetExpired() bool {
+	return !r.expiresAt.IsZero() && time.Now().After(r.expiresAt)
+}
+
+func (r *resolver) track(label string, started time.Time) {
+	r.callsMu.Lock()
+	r.calls = append(r.calls, callRecord{label: label, duration: time.Since(started)})
+	r.callsMu.Unlock()
+}
+
+func (r *resolver) logCallBreakdown() {
+	r.callsMu.Lock()
+	var b strings.Builder
+	for i := range r.calls {
+		fmt.Fprintf(&b, " %s=%s", r.calls[i].label, r.calls[i].duration.Round(time.Millisecond))
+	}
+	r.callsMu.Unlock()
+
+	breakdown := b.String()
+	if breakdown == "" {
+		breakdown = " (no external calls were attempted)"
+	}
+	r.error("name resolution budget expired; time spent per external call:" + breakdown)
 }
 
 func (r *resolver) info(message string)    { r.log(ndlpInfo, message) }
@@ -371,7 +443,8 @@ func (r *resolver) parseDockerLikeInspectOutput(output string) {
 
 func (r *resolver) dockerLikeGetNameCommand(command, id string) bool {
 	format := "{{range .Config.Env}}{{println .}}{{end}}{{range $key, $value := .Config.Labels}}LABEL_{{$key}}={{$value}}{{println}}{{end}}IMAGE_NAME={{.Config.Image}}{{println}}CONT_NAME={{.Name}}"
-	cmd := exec.Command(command, "inspect", "--format="+format, id)
+	defer r.track(command+"-inspect", time.Now())
+	cmd := exec.CommandContext(r.ctx, command, "inspect", "--format="+format, id)
 	cmd.Stderr = os.Stderr
 	out, err := cmd.Output()
 	if err == nil && len(out) > 0 {
@@ -401,12 +474,13 @@ func (r *resolver) dockerLikeGetNameAPI(hostVar, containerID string) bool {
 
 	var body []byte
 	var err error
+	defer r.track(strings.ToLower(strings.TrimSuffix(hostVar, "_HOST"))+"-api", time.Now())
 	if isSocket(address) {
 		r.info(fmt.Sprintf("Running API command: curl --unix-socket \"%s\" http://localhost%s", address, path))
-		body, err = httpUnixGet(address, "http://localhost"+path)
+		body, err = httpUnixGet(r.ctx, address, "http://localhost"+path)
 	} else {
 		r.info(fmt.Sprintf("Running API command: curl \"%s%s\"", address, path))
-		body, err = httpGet(defaultHTTPURL(address+path), nil, nil, false, false, 0)
+		body, err = httpGetWithContext(r.ctx, defaultHTTPURL(address+path), nil, nil, false, false, 0, 0)
 	}
 	if err != nil || len(body) == 0 {
 		return true
@@ -430,7 +504,7 @@ func defaultHTTPURL(url string) string {
 	return "http://" + url
 }
 
-func httpUnixGet(socketPath, url string) ([]byte, error) {
+func httpUnixGet(ctx context.Context, socketPath, url string) ([]byte, error) {
 	tr := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			var d net.Dialer
@@ -438,12 +512,23 @@ func httpUnixGet(socketPath, url string) ([]byte, error) {
 		},
 	}
 	client := &http.Client{Transport: tr}
-	resp, err := client.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, defaultBodyCap+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > defaultBodyCap {
+		return nil, fmt.Errorf("response exceeds %d bytes", int64(defaultBodyCap))
+	}
+	return body, nil
 }
 
 // k8sTLSMode selects the TLS policy of an HTTPS call.
@@ -492,11 +577,18 @@ func (r *resolver) k8sTLSConfig(mode k8sTLSMode) *tls.Config {
 	return nil
 }
 
-func httpGet(url string, headers map[string]string, tlsConfig *tls.Config, noProxy, fail bool, timeout time.Duration) ([]byte, error) {
-	return httpGetWithContext(context.Background(), url, headers, tlsConfig, noProxy, fail, timeout)
-}
+// response size caps: a wedged or misbehaving endpoint must not make the
+// helper allocate without bound; pod lists on dense nodes are legitimately
+// megabytes, everything else is small
+const (
+	defaultBodyCap = 16 << 20
+	k8sPodsBodyCap = 64 << 20
+)
 
-func httpGetWithContext(ctx context.Context, url string, headers map[string]string, tlsConfig *tls.Config, noProxy, fail bool, timeout time.Duration) ([]byte, error) {
+func httpGetWithContext(ctx context.Context, url string, headers map[string]string, tlsConfig *tls.Config, noProxy, fail bool, timeout time.Duration, maxBody int64) ([]byte, error) {
+	if maxBody <= 0 {
+		maxBody = defaultBodyCap
+	}
 	tr := &http.Transport{}
 	if tlsConfig != nil {
 		tr.TLSClientConfig = tlsConfig
@@ -522,9 +614,12 @@ func httpGetWithContext(ctx context.Context, url string, headers map[string]stri
 		return nil, err
 	}
 	defer resp.Body.Close()
-	body, readErr := io.ReadAll(resp.Body)
+	body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
 	if readErr != nil {
 		return nil, readErr
+	}
+	if int64(len(body)) > maxBody {
+		return nil, fmt.Errorf("response exceeds %d bytes", maxBody)
 	}
 	if fail && (resp.StatusCode < 200 || resp.StatusCode >= 300) {
 		return body, fmt.Errorf("http status %d", resp.StatusCode)
@@ -630,8 +725,16 @@ func rawJSONScalar(raw json.RawMessage) string {
 	return string(raw)
 }
 
+func (r *resolver) snapHasDocker() bool {
+	if _, err := exec.LookPath("snap"); err != nil {
+		return false
+	}
+	defer r.track("snap-list-docker", time.Now())
+	return exec.CommandContext(r.ctx, "snap", "list", "docker").Run() == nil
+}
+
 func (r *resolver) dockerGetName(id string) {
-	if _, err := exec.LookPath("snap"); err == nil && exec.Command("snap", "list", "docker").Run() == nil {
+	if r.snapHasDocker() {
 		r.dockerLikeGetNameAPI("DOCKER_HOST", id)
 	} else if _, err := exec.LookPath("docker"); err == nil {
 		r.dockerLikeGetNameCommand("docker", id)
@@ -733,7 +836,8 @@ func (r *resolver) k8sGCPGetClusterName() (string, bool) {
 		"http://metadata/computeMetadata/v1/instance/attributes/cluster-name",
 	}
 	headers := map[string]string{"Metadata-Flavor": "Google"}
-	ctx, cancel := context.WithCancel(context.Background())
+	defer r.track("gcp-metadata", time.Now())
+	ctx, cancel := context.WithCancel(r.ctx)
 	defer cancel()
 	ch := make(chan result, len(urls))
 	var wg sync.WaitGroup
@@ -741,7 +845,7 @@ func (r *resolver) k8sGCPGetClusterName() (string, bool) {
 		wg.Add(1)
 		go func(i int, url string) {
 			defer wg.Done()
-			body, err := httpGetWithContext(ctx, url, headers, nil, true, true, 3*time.Second)
+			body, err := httpGetWithContext(ctx, url, headers, nil, true, true, 3*time.Second, 0)
 			if err != nil || len(body) == 0 {
 				cancel()
 			}
@@ -1000,7 +1104,9 @@ func (r *resolver) k8sFetchPods(fn, kubeSystemUID string) (string, string, int) 
 		var kubeSystemNS string
 		if kubeSystemUID == "" {
 			url := "https://" + host + "/api/v1/namespaces/kube-system"
-			body, err := httpGet(url, header, r.k8sTLSConfig(tlsModeAPIServer), false, true, 0)
+			started := time.Now()
+			body, err := httpGetWithContext(r.ctx, url, header, r.k8sTLSConfig(tlsModeAPIServer), false, true, 0, 0)
+			r.track("k8s-api-namespace", started)
 			if err != nil {
 				r.warning(fmt.Sprintf("%s: error on curl '%s': %s.", fn, url, err.Error()))
 			} else {
@@ -1019,7 +1125,9 @@ func (r *resolver) k8sFetchPods(fn, kubeSystemUID string) (string, string, int) 
 				url += "?fieldSelector=spec.nodeName==" + os.Getenv("MY_NODE_NAME")
 			}
 		}
-		body, err := httpGet(url, header, r.k8sTLSConfig(tlsMode), false, true, 0)
+		started := time.Now()
+		body, err := httpGetWithContext(r.ctx, url, header, r.k8sTLSConfig(tlsMode), false, true, 0, k8sPodsBodyCap)
+		r.track("k8s-pods", started)
 		if err != nil {
 			r.warning(fmt.Sprintf("%s: error on curl '%s': %s.", fn, url, err.Error()))
 			return kubeSystemNS, "", 1
@@ -1027,12 +1135,12 @@ func (r *resolver) k8sFetchPods(fn, kubeSystemUID string) (string, string, int) 
 		return kubeSystemNS, string(body), 0
 	}
 
-	if exec.Command("ps", "-C", "kubelet").Run() == nil {
+	if r.kubeletProcessRunning() {
 		if _, err := exec.LookPath("kubectl"); err == nil {
 			kubeConfig := os.Getenv("KUBE_CONFIG")
 			var kubeSystemNS string
 			if kubeSystemUID == "" {
-				out, err := kubectlOutput(kubeConfig, "get", "namespaces", "kube-system", "-o", "json")
+				out, err := r.kubectlOutput(kubeConfig, "get", "namespaces", "kube-system", "-o", "json")
 				if err != nil {
 					r.warning(fmt.Sprintf("%s: error on 'kubectl': %s.", fn, strings.TrimRight(string(out), "\n")))
 				} else {
@@ -1042,7 +1150,7 @@ func (r *resolver) k8sFetchPods(fn, kubeSystemUID string) (string, string, int) 
 			if _, ok := os.LookupEnv("KUBE_CONFIG"); !ok {
 				kubeConfig = "/etc/kubernetes/admin.conf"
 			}
-			out, err := kubectlOutput(kubeConfig, "get", "pods", "--all-namespaces", "-o", "json")
+			out, err := r.kubectlOutput(kubeConfig, "get", "pods", "--all-namespaces", "-o", "json")
 			if err != nil {
 				r.warning(fmt.Sprintf("%s: error on 'kubectl': %s.", fn, strings.TrimRight(string(out), "\n")))
 				return kubeSystemNS, "", 1
@@ -1055,9 +1163,15 @@ func (r *resolver) k8sFetchPods(fn, kubeSystemUID string) (string, string, int) 
 	return "", "", 1
 }
 
-func kubectlOutput(kubeConfig string, args ...string) ([]byte, error) {
+func (r *resolver) kubeletProcessRunning() bool {
+	defer r.track("ps-kubelet", time.Now())
+	return exec.CommandContext(r.ctx, "ps", "-C", "kubelet").Run() == nil
+}
+
+func (r *resolver) kubectlOutput(kubeConfig string, args ...string) ([]byte, error) {
+	defer r.track("kubectl", time.Now())
 	full := append([]string{"--kubeconfig=" + kubeConfig}, args...)
-	cmd := exec.Command("kubectl", full...)
+	cmd := exec.CommandContext(r.ctx, "kubectl", full...)
 	return cmd.CombinedOutput()
 }
 
