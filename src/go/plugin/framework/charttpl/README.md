@@ -658,7 +658,7 @@ dimensions:
 | `options.multiplier` | int    | no       | `1`     | Multiply the raw value by this factor.                           |
 | `options.divisor`    | int    | no       | `1`     | Divide the raw value by this factor.                             |
 | `options.hidden`     | bool   | no       | `false` | Hide this dimension in the chart (still collected).              |
-| `options.float`      | bool   | no       | `false` | Use floating-point precision for this dimension.                 |
+| `options.float`      | bool   | no       | `false` | Force floating-point precision. A dimension also inherits the metric's float flag from the collector, so this is redundant (and harmless) when the metric is already marked float. |
 
 > [!IMPORTANT]
 > There are three ways to name a dimension — pick **exactly one**:
@@ -725,7 +725,7 @@ dimensions:
       divisor: 1000
 ```
 
-**Float precision** — for ratios or small decimal values:
+**Float precision** — for ratios or small decimal values. A dimension also inherits the metric's float flag from the collector (collectors mark float-valued metrics), so `options.float` is redundant (harmless) for those and only needed to force float on a metric the collector did not mark float:
 
 ```yaml
 dimensions:
