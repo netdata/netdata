@@ -410,11 +410,12 @@ func buildOperatorMetricChartTemplate(metrics []MetricConfig) (charttplMetrics [
 
 		suffix := metricContextSuffix(m.Context)
 		chart := charttpl.Chart{
-			ID:      metricChartID(m.Context),
-			Title:   fmt.Sprintf("SNMP trap metric: %s", suffix),
-			Context: suffix,
-			Units:   "events/s",
-			Type:    "line",
+			ID:        metricChartID(m.Context),
+			Title:     fmt.Sprintf("SNMP trap metric: %s", suffix),
+			Context:   suffix,
+			Units:     "events/s",
+			Algorithm: "incremental",
+			Type:      "line",
 			Instances: &charttpl.Instances{
 				ByLabels: []string{"job_name"},
 			},

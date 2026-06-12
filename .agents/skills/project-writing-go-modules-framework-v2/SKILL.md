@@ -74,8 +74,15 @@ source files for evidence.
   one-active-state values.
 - Metric names MUST be stable and selected by `charts.yaml`.
 - In `charts.yaml`: use `version: v1`, `context_namespace`, `instances.by_labels`,
-  `label_promotion`, `algorithm: incremental` for counters, and `absolute` for
-  gauges.
+  `label_promotion`, and an explicit `algorithm` on every chart:
+  `incremental` for counters and `absolute` for gauges.
+- `Counter.ObserveTotal()` only records monotonic values in `metrix`; it does
+  NOT set the chart `DIMENSION` algorithm by itself. Every chart that presents
+  a counter as a rate MUST explicitly set `algorithm: incremental`, including
+  dynamically built `charttpl.Chart` values.
+- Do NOT rely on chartengine's metric-name suffix inference for generated
+  Netdata metrics. Suffix inference is only a fallback and MUST NOT be used as
+  the correctness mechanism for V2 collector charts.
 - Put multipliers, divisors, hidden flags, and float formatting in the chart
   template, not ad hoc chart-emission code.
 - `metrix` registers a descriptor per metric NAME permanently (no unregister), so

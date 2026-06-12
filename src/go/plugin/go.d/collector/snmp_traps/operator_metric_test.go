@@ -400,6 +400,30 @@ func TestBuildChartTemplateYAMLMultipleMetrics(t *testing.T) {
 	collecttest.AssertChartTemplateSchema(t, yaml)
 }
 
+func TestBuildChartTemplateYAMLOperatorMetricChartsDeclareIncremental(t *testing.T) {
+	cfg := []MetricConfig{
+		{OID: "1.3.6.1.4.1.9.9.43.2.0.1", Context: "snmp.trap.cisco_config"},
+		{OID: "1.3.6.1.4.1.9.9.43.2.0.1", Context: "snmp.trap.cisco_config.terminal_type", DimensionFromVarbind: "ccmHistoryEventTerminalType"},
+	}
+	yaml, err := buildChartTemplateYAML(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	charts := chartTemplatesByIDFromYAML(t, yaml)
+	assertAllChartTemplatesDeclareAlgorithm(t, charts)
+
+	for _, m := range cfg {
+		id := metricChartID(m.Context)
+		chart, ok := charts[id]
+		if !ok {
+			t.Fatalf("missing operator metric chart %q", id)
+		}
+		if chart.Algorithm != "incremental" {
+			t.Fatalf("operator metric chart %q algorithm = %q, want incremental", id, chart.Algorithm)
+		}
+	}
+}
+
 func TestOperatorMetricsIncSingleDimension(t *testing.T) {
 	cfg := []MetricConfig{
 		{OID: "1.3.6.1.4.1.9.9.43.2.0.1", Context: "snmp.trap.cisco_config"},
