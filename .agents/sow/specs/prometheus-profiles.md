@@ -43,10 +43,8 @@ is assembled. It applies to `plugin/go.d/collector/prometheus` (runtime,
 
 ## Catalog
 
-- Stock profiles live under `config/go.d/prometheus.profiles/default/`. Operator
-  profiles extend the stock set; they do not overwrite stock files.
-- Profiles are loaded from the configured directories into a catalog keyed by
-  profile name (case-insensitive selection).
+- Stock profiles live under `config/go.d/prometheus.profiles/default/`. Operator profiles extend the stock set and can override a stock profile by providing a user profile with the same basename (user profile wins).
+- Profiles are loaded from the configured directories into a catalog keyed by profile name (case-insensitive selection).
 
 ## Profile Selection
 
