@@ -2,10 +2,12 @@
 
 ## Status
 
-- Status: Phase 2 design draft.
-- Design status: recommended design written; three external design review
-  rounds incorporated; implementation is blocked until the user approves the
-  compatibility and host-scope staging decisions.
+- Status: Phase 2 design draft with approved UX direction.
+- Design status: recommended design written; four external design review rounds
+  and one follow-up UX review round incorporated. The user approved compact
+  operator authoring syntax that expands to canonical form, while stock/generated
+  profiles use canonical form for reviewability. Implementation is blocked until
+  the user approves the compatibility and host-scope staging decisions.
 - Review plan:
   - Phase 1: external gap analysis of the use-case inventory, completed and
     incorporated.
@@ -917,7 +919,27 @@ Trap profiles should gain a first-class optional `metrics:` section. The section
 is file-local, mergeable through `extends:`, and validated together with
 `varbinds:`, `traps:`, and the optional profile-local `charts:` section.
 
-Recommended shape:
+The profile format has two YAML surfaces:
+
+- Canonical form:
+  - MUST be the validation, merge, runtime, generated-stock, and source-control
+    review contract.
+  - MUST be emitted by the stock trap profile generator for files under the stock
+    profile directory.
+  - SHOULD be used in implementation tests and generated curated metric diffs.
+- Compact operator authoring form:
+  - MAY be used by operator profiles under
+    `/etc/netdata/go.d/snmp.trap-profiles/`.
+  - SHOULD be the form shown first in operator-facing documentation for simple
+    and intermediate use cases.
+  - MUST normalize to canonical form before `extends:` merge, validation, job
+    `Check()`, chart-template compilation, or runtime evaluation.
+  - MUST preserve the source file and compact field names in validation errors
+    so operators see errors for fields they actually wrote.
+  - MUST NOT be emitted by the stock generator. A stock-profile lint should
+    reject compact-only fields in generated stock output.
+
+Canonical shape for stock/generated profiles and the compiled form:
 
 ```yaml
 metrics:
@@ -951,7 +973,44 @@ charts:
       expire_after_cycles: 60
 ```
 
-Required metric rule fields:
+Compact operator authoring shape for the same rule:
+
+```yaml
+metrics:
+  - name: IF-MIB::unexpected-link-down-events
+    type: counter
+    auto_safe: true
+    on_trap: IF-MIB::linkDown
+    where:
+      ifAdminStatus: up
+    resource:
+      class: interface
+      key: ifIndex
+      max: 512
+    chart_meta:
+      title: Unexpected Link Down Events
+      family: Network/Interface/State
+```
+
+The compact rule normalizes to the canonical rule above with these defaults:
+
+- `identity.device: source`
+- `identity.resource.key_from_varbind: ifIndex`
+- `identity.resource.max_per_source: 512`
+- `output.metric`: deterministic `snmp_trap_*` name derived from `name`
+- `output.dimension: events`
+- `output.chart`: deterministic chart ID derived from `name`
+- `charts.context`: deterministic `snmp.trap.*` context derived from `name`
+- `charts.units: events/s`
+- `charts.algorithm: incremental`
+- `charts.lifecycle`: job/profile defaults unless explicitly overridden
+
+Operators can override any derived output, chart, identity, or lifecycle field
+by writing the canonical field explicitly. The implementation must expose a
+validation/debug command or equivalent diagnostics that show the fully expanded
+canonical form for a compact operator profile.
+
+Canonical metric rule fields:
 
 - `name`: stable metric-rule identity, unique after profile merge. Stock rules
   should use a MIB-qualified stable name; operator rules should use a
@@ -960,6 +1019,11 @@ Required metric rule fields:
 - `identity`: source-device scope and optional bounded resource identity.
 - `output`: emitted metric name, dimension name, and referenced chart ID.
 
+Compact operator rules MAY omit `identity` and `output` when the normalized
+values can be derived deterministically. Validation must reject compact rules
+whose derived values collide with built-in metrics, legacy shim metrics, or
+other enabled profile-local rules.
+
 Type-specific selector fields:
 
 - `counter` and `sample`: `on_trap` is required.
@@ -967,17 +1031,26 @@ Type-specific selector fields:
   `clear_trap` are required, and `on_trap` is invalid.
 - `state` with same-OID set/clear semantics: `on_trap` is required together
   with `state.set_when` and `state.clear_when`.
+- Compact operator same-OID state rules MAY use `state.varbind` together with
+  `state.set` and `state.clear`. This normalizes to canonical
+  `state.set_when` and `state.clear_when` predicates using `equals`, with
+  `problem_value: 1` and `clear_value: 0` defaults unless explicitly overridden.
 - All trap selectors resolve after the full `extends:` chain is merged, against
   the resolved profile's `traps:` section. Symbolic names and numeric OIDs must
   resolve before `Check()` returns.
 
-Required chart fields:
+Canonical chart fields:
 
 - `id`: stable chart ID within the merged profile.
 - `context`: chart context, using the `snmp.trap.*` namespace.
 - `title`, `family`, `units`, and `algorithm`.
 - `lifecycle` for every chart that can create per-source or per-resource
   instances.
+
+Compact operator rules MAY define `chart_meta` inline when one metric rule maps
+to one chart. `chart_meta` normalizes to a canonical `charts:` entry. Shared
+charts SHOULD use an explicit `chart_id` or canonical `output.chart` reference so
+the grouping is reviewable and not inferred from title text.
 
 Optional chart fields:
 
@@ -1016,6 +1089,28 @@ Optional rule fields:
 - `enabled`: disable or re-enable a merged stock rule from an operator profile.
 - `description`: author-facing note explaining why the rule exists.
 
+Compact operator-only aliases:
+
+- `metric`: alias for `output.metric`.
+- `dimension`: alias for `output.dimension`.
+- `chart_id`: alias for `output.chart`.
+- `chart_meta`: inline chart metadata that creates or completes a canonical
+  `charts:` entry.
+- `resource.key`: alias for `identity.resource.key_from_varbind`.
+- `resource.max`: alias for `identity.resource.max_per_source`.
+- `value`: alias for `value_from_varbind` on `sample` rules.
+- `state.varbind` with `state.set` and `state.clear`: alias for canonical
+  same-OID state `set_when` / `clear_when` predicates using `equals`.
+- map-form `where`, for example `where: { ifAdminStatus: up }`, is shorthand
+  for a one-element canonical predicate list with `equals`.
+- map-form `where` values may use the canonical predicate operators, for example
+  `where: { ccmHistoryEventTerminalType: { in: [console, terminal] } }`.
+
+Compact aliases are not separate runtime semantics. They are accepted only at
+the loader boundary and normalize to canonical fields before merge and
+validation. Ambiguous compact/canonical mixtures in the same rule must fail
+validation with a filename and rule name.
+
 The profile `charts:` section is a profile-local chart-template description. The
 loader compiles it into an in-memory `charttpl.Spec`; unsupported chart-template
 fields are rejected during profile validation.
@@ -1034,6 +1129,10 @@ The design should not add a separate "multi-value" type. Multiple metric rules
 may reference the same trap, and chart metadata can group their outputs into one
 chart. This supports multi-value notifications without making extraction rules
 harder to validate.
+
+The following examples use canonical form. Operator-facing documentation SHOULD
+show compact examples first and provide canonical expansion examples as the
+advanced/reference form.
 
 #### Counter Rule Example
 
@@ -1179,6 +1278,90 @@ charts:
     lifecycle:
       max_instances: 2000
       expire_after_cycles: 60
+```
+
+#### Compact Operator Examples
+
+Compact examples are not a second runtime model. They show what an operator may
+write in a local profile; the loader expands them to the canonical examples
+above before merge and validation.
+
+Filtered counter with bounded varbind predicate:
+
+```yaml
+metrics:
+  - name: CISCO-CONFIG-MAN-MIB::cli-config-change-console-events
+    type: counter
+    on_trap: CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged
+    where:
+      ccmHistoryEventTerminalType:
+        in: [console, terminal, virtual]
+    chart_meta:
+      title: Cisco CLI Configuration Changes
+      family: Configuration/Changes
+```
+
+Numeric samples from one trap sharing one chart:
+
+```yaml
+metrics:
+  - name: CISCO-PROCESS-MIB::cpu-threshold-current
+    type: sample
+    on_trap: CISCO-PROCESS-MIB::cpmCPURisingThreshold
+    value: cpmCPUTotalMonIntervalValue
+    dimension: current
+    chart_id: cisco_cpu_threshold
+    chart_meta:
+      title: Cisco CPU Threshold Trap Values
+      family: System/CPU
+      units: percentage
+
+  - name: CISCO-PROCESS-MIB::cpu-threshold-limit
+    type: sample
+    on_trap: CISCO-PROCESS-MIB::cpmCPURisingThreshold
+    value: cpmCPURisingThresholdValue
+    dimension: threshold
+    chart_id: cisco_cpu_threshold
+```
+
+Separate-OID trap-derived state:
+
+```yaml
+metrics:
+  - name: IF-MIB::link-down-state
+    type: state
+    problem_trap: IF-MIB::linkDown
+    clear_trap: IF-MIB::linkUp
+    resource:
+      class: interface
+      key: ifIndex
+      max: 512
+    chart_meta:
+      title: Trap-Derived Interface Link State
+      family: Network/Interface/State
+      units: state
+```
+
+Same-OID trap-derived state:
+
+```yaml
+metrics:
+  - name: SNMP-ALARM-MIB::alarm-set-state
+    type: state
+    on_trap: SNMP-ALARM-MIB::snmpAlarmStatusChange
+    resource:
+      class: alarm
+      key: snmpAlarmLogId
+      max: 1024
+    state:
+      varbind: snmpAlarmLogCond
+      set: set
+      clear: clear
+      ttl: 24h
+    chart_meta:
+      title: SNMP Alarm State
+      family: Alarms/State
+      units: state
 ```
 
 ### Identity And Scoping
@@ -1732,6 +1915,13 @@ Required generator behavior:
 - Generated decode knowledge remains broad.
 - Generated metric rules are absent by default unless curated inputs explicitly
   request them.
+- Generated stock profile YAML must emit canonical metric and chart syntax, not
+  compact operator aliases.
+- A stock-profile lint should reject compact-only fields in generated stock
+  output, including `chart_meta`, `chart_id`, top-level `metric`, top-level
+  `dimension`, `value`, compact `resource.key`, compact `resource.max`, map-form
+  `where`, and compact same-OID `state.varbind` / `state.set` /
+  `state.clear`.
 - Candidate generated metric rules, if produced, must default to
   `auto_safe: false`.
 - The generator must validate metric rules against the generated `varbinds:` and
@@ -1776,8 +1966,14 @@ Profile validation must reject:
   keys must at minimum be rejected instead of silently ignored;
 - unknown fields under `metrics:`;
 - unknown fields under `charts:`;
+- compact operator-only aliases in stock/generated profile output;
+- ambiguous compact/canonical mixtures in one rule, such as both `metric` and
+  `output.metric`, both `chart_id` and `output.chart`, both `value` and
+  `value_from_varbind`, or compact and canonical same-OID state predicates;
 - duplicate metric names after merge;
 - duplicate `output.metric` values after merge;
+- duplicate or colliding derived `output.metric`, `output.dimension`,
+  `output.chart`, or `charts.context` values after compact normalization;
 - duplicate chart IDs after merge unless handled by the documented replacement
   rule;
 - chart IDs or effective chart contexts that collide with built-in static trap
@@ -1827,10 +2023,14 @@ Loader migration requirements:
   `metrics:` and `charts:` is not sufficient by itself.
 - The implementation must add strict known-key validation for profile-local
   `metrics:` and `charts:` in the same change that adds those fields.
+- Compact operator syntax must normalize to canonical form at the loader boundary
+  before merge, validation, catalog selection, or runtime evaluation.
 - Full top-level strictness should use an audited allowlist of documented
   profile keys so existing stock profiles are not broken accidentally.
 - Validation errors must include the profile filename, the offending key or
   rule name, and whether the error came from parsing, merge, or job `Check()`.
+- Validation errors for compact operator profiles must also name the compact
+  field path, not only the expanded canonical path.
 
 ### Documentation And Skill Updates
 
@@ -1853,6 +2053,11 @@ Required updates:
 The SNMP trap profile authoring skill must be updated from "profiles do not
 define metrics" to "trap profiles may define metric rules only through the
 validated profile-local `metrics:` and `charts:` schema described here".
+
+Operator-facing docs and skills must present compact authoring syntax first for
+simple and intermediate cases, then show the canonical expansion/reference form.
+Stock profile generation docs and contributor docs must state that stock and
+generated profile YAML uses canonical syntax only.
 
 ### Coverage Matrix
 
@@ -1881,6 +2086,19 @@ The implementation must add tests for:
 
 - profile-local `metrics:` parsing and strict validation;
 - profile-local `charts:` parsing and strict validation;
+- compact operator syntax normalization to canonical form;
+- stock/generated profile rejection or lint failure for compact-only aliases;
+- compact map-form `where` normalization and canonical list-form passthrough;
+- compact `chart_meta` auto-creation of canonical `charts:` entries;
+- compact `chart_id` grouping for multiple rules sharing one canonical chart;
+- compact `resource.key` / `resource.max` normalization to canonical resource
+  identity fields;
+- compact `value` normalization to `value_from_varbind`;
+- compact same-OID `state.varbind` / `state.set` / `state.clear` normalization
+  to canonical `set_when` / `clear_when`;
+- compact/canonical ambiguous mixtures rejected with compact field paths in
+  validation errors;
+- derived metric name, dimension, chart ID, and context collision rejection;
 - unknown top-level key rejection or targeted rejection for `metrics:` and
   `charts:` before runtime support is complete;
 - `extends:` metric merge, override, disable, and duplicate-name detection;

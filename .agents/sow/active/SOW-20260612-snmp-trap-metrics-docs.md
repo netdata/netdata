@@ -6,8 +6,11 @@ Status: planning
 
 Sub-state: Phase 1 use-case inventory and Phase 2 recommended design are written
 in the committed-spec draft. Four external design review rounds have been
-integrated. Implementation is blocked until the user approves the final design
-and the remaining compatibility/staging decisions.
+integrated. A follow-up UX review round has been run and the user approved the
+recommended authoring model: operator docs use compact syntax; the loader expands
+to canonical form; stock/generated profiles use canonical form for reviewability.
+Implementation is blocked until the user approves the remaining
+compatibility/staging decisions.
 
 ## Requirements
 
@@ -895,6 +898,25 @@ workflow:
 - Implementation remains blocked until the spec identifies the whole goal and
   the user approves the final design.
 
+User decision: approve the trap metric profile UX direction from the follow-up
+reviewer pass:
+
+- Status: approved by user on 2026-06-12.
+- Approved option: A.
+- Decision:
+  - Operator-facing documentation should present the compact authoring syntax for
+    simple and intermediate cases.
+  - The loader should expand compact syntax into the canonical metric/chart rule
+    form before validation, merge, and runtime use.
+  - Stock/generated profiles should use the canonical syntax so generated diffs
+    stay explicit, stable, and reviewable.
+- Rationale:
+  - This keeps simple operator use cases natural and close to SNMP polling
+    profile methodology.
+  - This preserves one canonical validation/runtime contract for complex cases.
+  - This avoids weakening the stock-profile curation and source-control review
+    contract.
+
 Open decisions:
 
 1. Approve the profile-based design.
@@ -1081,6 +1103,11 @@ Pending user decisions:
     validation;
   - operator `auto_safe` override rejection and additional validation/test
     requirements.
+- Ran a follow-up UX review round with the same six reviewers and recorded the
+  user-approved direction:
+  - operator docs use compact authoring syntax for simple/intermediate cases;
+  - compact syntax expands to canonical form before validation and runtime use;
+  - stock/generated profiles use canonical form for reviewable generated diffs.
 - No implementation files changed.
 
 ## Validation
@@ -1097,6 +1124,9 @@ Tests or equivalent validation:
 
 - Targeted sensitive-data scan passed for the active SOW, the new spec, and the
   specs index.
+- Follow-up UX spec update validation:
+  - `git diff --check` passed for the changed SOW/spec files.
+  - Targeted sensitive-data scan passed for the changed SOW/spec files.
 - `.agents/sow/audit.sh` passes all checks for the new active SOW and spec index
   entry, but still fails on pre-existing legacy SOW references in older durable
   specs under `.agents/sow/specs/snmp-traps/`. Those failures are unrelated to
@@ -1125,6 +1155,11 @@ Reviewer findings:
   `deepseek`, and `qwen` were reviewed and integrated. Reviewers reported the
   remaining changes were surgical spec clarifications; no further external
   review round is required before committing the spec.
+- Follow-up UX review findings from `glm`, `minimax`, `kimi`, `mimo`,
+  `deepseek`, and `qwen` converged on keeping the canonical design and adding
+  compact operator-facing authoring sugar. The user approved option A: compact
+  syntax for operator docs, canonical form for stock/generated profiles and
+  canonical validation/runtime behavior.
 
 Same-failure scan:
 
