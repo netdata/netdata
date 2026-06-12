@@ -14,8 +14,9 @@ Netdata implements a layered access control system to protect sensitive informat
 
 ## Standalone Netdata Agent (Without Cloud)
 
-> **Note**
-> This section describes the open-source Netdata Agent running without a Cloud connection. If you are looking for Cloud On-Prem, see [Netdata Cloud On-Prem](/docs/netdata-cloud/versions.md), which is a separate enterprise product that deploys the full Cloud control plane within your own infrastructure.
+:::note
+This section describes the open-source Netdata Agent running without a Cloud connection. If you are looking for Cloud On-Prem, see [Netdata Cloud On-Prem](/docs/netdata-cloud/versions.md), which is a separate enterprise product that deploys the full Cloud control plane within your own infrastructure.
+:::
 
 Every Netdata Agent is a complete observability engine with its own dashboard at port 19999, and no data leaves your infrastructure — it works entirely without a Cloud connection. The **Anonymous** access level in all tables below represents this standalone experience.
 
