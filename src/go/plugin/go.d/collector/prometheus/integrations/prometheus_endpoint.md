@@ -85,11 +85,14 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | url | Target endpoint URL. |  | yes |
 |  | timeout | HTTP request timeout (seconds). | 10 | no |
+|  | expected_prefix | If set, the job's check passes only when at least one scraped metric name starts with this prefix. Guards against scraping an unexpected endpoint. |  | no |
+| **Customization** | app | Application name used as the app segment of chart contexts (`prometheus.<app>.<metric>`). When unset, it is taken from a matched profile, otherwise it falls back to the job name. |  | no |
 | **Filters** | [selector](#option-filters-selector) | Time series selector (filter). |  | no |
 | **Limits** | max_time_series | Global time series limit. If an endpoint returns more time series than this, the data is not processed. | 2000 | no |
 |  | max_time_series_per_metric | Per-metric time series limit. Metrics with more time series than this are skipped. | 200 | no |
 | **Customization** | [fallback_type](#option-customization-fallback-type) | Fallback type rules for untyped metrics. |  | no |
 |  | [relabeling](#option-customization-relabeling) | Prometheus-compatible metric relabeling, applied before charts are built. |  | no |
+|  | [profiles](#option-customization-profiles) | Curated, exporter-specific chart profiles. Disable with mode `none`. | auto | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
 |  | password | Password for Basic HTTP authentication. |  | no |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
@@ -173,6 +176,27 @@ relabeling:
         regex: '(\d)\d\d'
         target_label: code_class
         replacement: '${1}xx'
+```
+
+
+<a id="option-customization-profiles"></a>
+##### profiles
+
+Profiles ship curated charts for recognized exporters. `profiles.mode` selects them:
+
+- `auto` (default): every profile whose `match` hits at least one scraped metric.
+- `exact`: only the profiles named in `mode_exact.entries` (each must match, or the job fails its check).
+- `combined`: `auto` plus the profiles named in `mode_combined.entries`.
+- `none`: no profiles — generic autogen charts only (the pre-profile behavior).
+
+Only the block matching the selected mode (`mode_exact` or `mode_combined`) is read; entries under the other block are ignored. Metrics not covered by a selected profile keep their generic autogen charts.
+
+```yaml
+profiles:
+  mode: exact
+  mode_exact:
+    entries:
+      - name: haproxy
 ```
 
 
