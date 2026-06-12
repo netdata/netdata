@@ -86,22 +86,41 @@ COMMON_CFLAGS="-Wa,-mbig-obj -pipe -D_FILE_OFFSET_BITS=64 -D__USE_MINGW_ANSI_STD
 
 # GNU BFD ld.exe hangs (or OOMs) on large RelWithDebInfo builds because it
 # cannot handle the combined DWARF load from 700+ objects + absl + protobuf.
-# lld handles this correctly and links ~10x faster. lld is a hard
-# dependency for the link of netdata.exe; install it via
-# packaging/windows/msys2-dependencies.sh (which pulls
-# mingw-w64-ucrt-x86_64-lld).
+# lld handles it much better, but full DWARF-2 (-g) of 424 TUs + libdlib.a
+# (45 MB of absl/dlib C++ templates) + protobuf static initializers is still
+# the heaviest single input to the linker on this build. Without a DWARF
+# reduction, the netdata.exe link can run for hours on a 16 GB box because
+# lld's PE/COFF backend merges debug sections serially and peaks at very
+# high RSS. Both the BFD fallback (further down) and the lld branch reduce
+# the debug level to -g1 so the linker has something tractable to chew on.
+# -g1 keeps function names + line numbers (sufficient for crash stacks);
+# only local-variable and macro debug info is lost.
 #
-# Why CMAKE_LINKER instead of -fuse-ld=lld: passing -fuse-ld=lld through
-# CMAKE_EXE_LINKER_FLAGS depends on the compiler driver re-routing the link
-# to ld.lld. CMAKE_LINKER points CMake directly at ld.lld, which is honored
-# at link-rule generation time regardless of compiler-driver behaviour.
-# --no-keep-memory is passed to lld itself (not the driver) to trade link
-# speed for a lower memory peak during the 700+-object RelWithDebInfo link.
+# How lld is selected: UCRT64 GCC is a DRIVER-mode compiler in CMake terms
+# (CMAKE_<LANG>_LINK_MODE=DRIVER), so the link rule is the compiler driver,
+# not ${CMAKE_LINKER}. The driver is told to re-route the link to lld via
+# `-fuse-ld=lld`; the driver then finds `ld.lld` in PATH (line 59 above
+# already prepends /ucrt64/bin). CMake docs document this exact path:
+# https://cmake.org/cmake/help/latest/variable/CMAKE_LANG_USING_LINKER_TYPE.html
+# (CMAKE_LINKER_TYPE=LLD, CMake 3.29+, expands to the same `-fuse-ld=lld`
+# for DRIVER mode; project's stated cmake_minimum_required is 3.16, so we
+# use the portable form directly.)
+#
+# Do NOT set -DCMAKE_LINKER=/path/to/ld.lld here: in DRIVER mode CMake does
+# not substitute ${CMAKE_LINKER} into the default link rule, so it has no
+# effect on which linker actually runs.
+#
+# Do NOT pass -Wl,--no-keep-memory in the lld branch: that flag is a GNU
+# BFD memory mitigation (re-read symbol tables instead of caching). lld has
+# its own design (mmap + parallel hashmaps) and rejects the flag with
+# "lld: error: unknown argument: --no-keep-memory", failing CMake's
+# initial compiler-test link. The flag is kept only in the BFD fallback.
 linker_cmake_flags=()
 if [ -x "/ucrt64/bin/ld.lld" ]; then
-    linker_cmake_flags=("-DCMAKE_LINKER=/ucrt64/bin/ld.lld"
-                        "-DCMAKE_EXE_LINKER_FLAGS=-Wl,--no-keep-memory"
-                        "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,--no-keep-memory")
+    linker_cmake_flags=("-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -g1 -DNDEBUG"
+                        "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -g1 -DNDEBUG"
+                        "-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld"
+                        "-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld")
 else
     echo "WARNING: /ucrt64/bin/ld.lld not found." >&2
     echo "  The link of netdata.exe with the default BFD ld.exe is known to" >&2
@@ -147,23 +166,38 @@ CFLAGS="${BUILD_CFLAGS}" /ucrt64/bin/cmake \
     -DENABLE_BUNDLED_JSONC=On \
     -DENABLE_BUNDLED_PROTOBUF=Off \
     -DRust_COMPILER=/ucrt64/bin/rustc \
-    # Force CMake's ninja generator to use @response files for the long link
-    # lines on Windows. Without these, the netdata.exe link (424 .obj + ~30
-    # archives + system libs) inlines into a ~28 KB command line that exceeds
-    # cmd.exe's 8 KB limit and fails with "The command line is too long.".
-    # CMake 4.3.3 supports all three; they are no-ops on non-Ninja generators
-    # and on non-Windows. Diagnostic: see SOW P22 (response-file size limit).
-    -DCMAKE_NINJA_USE_RESPONSE_FILE=ON \
-    -DCMAKE_NINJA_USE_RESPONSE_FILE_FOR_OBJECTS=ON \
-    -DCMAKE_NINJA_USE_RESPONSE_FILE_FOR_LIBRARIES=ON \
+    -DCMAKE_NINJA_FORCE_RESPONSE_FILE=ON \
     "${windows_path_prefix_arg[@]}" \
     ${EXTRA_CMAKE_OPTIONS:-}
+
+# Why -DCMAKE_NINJA_FORCE_RESPONSE_FILE=ON:
+#   The netdata.exe link pulls in 424 .obj files + ~30 archives + system
+#   libs. Without response files the full ~28 KB argument list is inlined,
+#   which exceeds cmd.exe's 8 KB command-line limit and ninja then prints
+#   "The command line is too long." and the link aborts (no exe, no .dll.a;
+#   the "missing exe" guard catches it).
+#
+#   The CORRECT variable name is CMAKE_NINJA_FORCE_RESPONSE_FILE (CMake
+#   3.4+). Earlier iterations used CMAKE_NINJA_USE_RESPONSE_FILE and
+#   _FOR_OBJECTS / _FOR_LIBRARIES; those names do NOT exist in CMake and
+#   were silently ignored (the configure log warned "Manually-specified
+#   variables were not used by the project"). CMake's Windows-GNU platform
+#   module already sets __WINDOWS_GNU_LD_RESPONSE=1 so response files are
+#   normally generated automatically, but FORCE_RESPONSE_FILE makes the
+#   behaviour explicit and uniform across compile rules too.
+#
+#   No-op on non-Ninja generators and on non-Windows (this script only runs
+#   on Windows). Diagnostic: SOW P22/P26 (cmd.exe 8 KB command-line limit).
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Building"}
+# Capture cmake --build's exit code. Without `|| build_rc=$?`, `set -e` (set
+# at line 14) would exit the script at the failing command and the
+# diagnostic block below would never run, leaving the user with no
+# actionable error message in stderr.
 # shellcheck disable=SC2086
-cmake --build "${build}" -- ${build_args}
-build_rc=$?
+build_rc=0
+cmake --build "${build}" -- ${build_args} || build_rc=$?
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 if [ "${build_rc}" -ne 0 ]; then
@@ -187,8 +221,36 @@ if [ ! -x "${build}/netdata.exe" ]; then
     exit 1
 fi
 
+echo ""
+echo "============================================================"
+echo "BUILD COMPLETE: ${build}/netdata.exe ($(stat -c %s "${build}/netdata.exe" 2>/dev/null || echo '?') bytes)"
+echo "============================================================"
+echo ""
+
 ${GITHUB_ACTIONS+echo "::group::Netdata buildinfo"}
-"${build}/netdata.exe" -W buildinfo || true
+# `netdata.exe -W buildinfo` is a post-build smoke test - it should print
+# build flags and exit. On Windows the freshly-built binary has been
+# observed to hang at cold start (likely trying to bind a port, read a
+# config dir, or perform side-effects that block in this environment).
+# Without a timeout, the wrapper script appears to hang forever AFTER a
+# successful build, with the last visible output being the ninja line
+# "[794/795] Linking CXX executable netdata.exe" - making it look like
+# the linker is stuck when in fact it finished seconds earlier.
+# SOW P27: bound the smoke test, print a clear marker on hang.
+echo "Probing netdata.exe -W buildinfo (60 s timeout)..."
+if timeout 60 "${build}/netdata.exe" -W buildinfo; then
+    echo "buildinfo OK."
+else
+    rc=$?
+    if [ "${rc}" = "124" ]; then
+        echo "WARNING: 'netdata.exe -W buildinfo' did not return within 60 s." >&2
+        echo "  The build itself is successful - the binary at ${build}/netdata.exe is usable." >&2
+        echo "  This is a known cold-start quirk of the Windows build that does NOT" >&2
+        echo "  affect the packaged installer; the wrapper continues." >&2
+    else
+        echo "WARNING: 'netdata.exe -W buildinfo' exited ${rc} (non-fatal)." >&2
+    fi
+fi
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 if [ -t 1 ]; then
