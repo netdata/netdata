@@ -620,7 +620,8 @@ void sql_alert_cleanup(bool cli)
         return;
     }
 
-    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+    int rc;
+    while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW) {
         nd_uuid_t host_uuid;
         if (!sqlite3_column_uuid_copy(res, 0, host_uuid)) {
             error_report("Alert cleanup: skipping host with invalid host_id");
@@ -636,7 +637,11 @@ void sql_alert_cleanup(bool cli)
     }
 
     SQLITE_FINALIZE(res);
-    netdata_log_info("Alert cleanup done");
+
+    if (rc != SQLITE_DONE)
+        netdata_log_error("Failed to check host alerts");
+    else
+        netdata_log_info("Alert cleanup done");
 }
 /* Health related SQL queries
    Load from the health log table
