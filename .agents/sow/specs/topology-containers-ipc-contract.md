@@ -143,7 +143,6 @@ The Cloud topology aggregator must preserve the grouping fields, `view.group_by`
 
 - `ENABLE_CGROUPS_LOOKUP_SERVER` controls the cgroups lookup server build on Linux.
 - `ENABLE_CGROUPS_LOOKUP_TEST_CLIENT` controls the test client build.
-- `ENABLE_CGROUP_NAME` controls the Go `cgroup-name` helper build on Linux.
 - The apps and network-viewer lookup pieces are built with their owning plugins on Linux.
 
 These build knobs are for build composition and tests. They are not runtime feature toggles.

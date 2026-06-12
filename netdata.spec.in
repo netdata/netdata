@@ -628,7 +628,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libexecdir}/%{name}/%{name}-uninstaller.sh
 %{_libexecdir}/%{name}/plugins.d/alarm-notify.sh
 %{_libexecdir}/%{name}/plugins.d/anonymous-statistics.sh
-%{_libexecdir}/%{name}/plugins.d/cgroup-name
+%{_libexecdir}/%{name}/plugins.d/cgroup-name.sh
 %{_libexecdir}/%{name}/plugins.d/get-kubernetes-labels.sh
 %{_libexecdir}/%{name}/plugins.d/ioping.plugin
 %{_libexecdir}/%{name}/plugins.d/loopsleepms.sh.inc

@@ -75,7 +75,7 @@ unsigned char rrd_string_allowed_chars[256] = {
  *  space            [ ]  ->  [_]
  *  exclamation mark [!]  ->  [_] (only when it is the first character) simple patterns negation
  *  double quotes    ["]  ->  [_] needs escaping when parsing
- *  dollar           [$]  ->  [_] health variables and security in alarm-notify.sh, cgroup-name, etc.
+ *  dollar           [$]  ->  [_] health variables and security in alarm-notify.sh, cgroup-name.sh, etc.
  *  percent          [%]  ->  [_] http GET encoded characters
  *  ampersand        [&]  ->  [_] http GET fields separator
  *  single quote     [']  ->  [_] needs escaping when parsing

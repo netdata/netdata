@@ -23,8 +23,12 @@ void cgroup_netipc_lookup_update_charts(int update_every);
 void cgroup_netipc_lookup_init_for_testing(const char *run_dir, const char *service_name);
 #endif
 #else
-static inline void cgroup_netipc_lookup_init(void) {}
-static inline void cgroup_netipc_lookup_cleanup(void) {}
+static inline void cgroup_netipc_lookup_init(void) {
+    // No-op when the CGROUPS_LOOKUP server is disabled or unavailable.
+}
+static inline void cgroup_netipc_lookup_cleanup(void) {
+    // No-op when the CGROUPS_LOOKUP server is disabled or unavailable.
+}
 static inline void cgroup_netipc_lookup_update_charts(int update_every) { (void)update_every; }
 #endif
 

@@ -130,7 +130,7 @@ modules:
 
               1. Netdata is installed on the Proxmox host (not inside a VM)
               2. The `/etc/pve/` directory is accessible to the netdata user
-              3. The `cgroup-name` helper can read VM/container configuration files
+              3. The `cgroup-name.sh` script can read VM/container configuration files
           - name: Missing ZFS metrics
             description: |
               If ZFS pool metrics are not showing, ensure the `zfspool` collector is enabled and the `zpool` command is available to the netdata user.
