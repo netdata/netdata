@@ -323,6 +323,6 @@ Each file contains a `guid` field that uniquely identifies the vnode:
   guid: a1b2c3d4-e5f6-7890-abcd-ef1234567890
 ```
 
-The `guid` value is the vnode's UUID. You do **not** need to query any internal database — the YAML configuration file is the authoritative source for the vnode GUID.
+The `guid` value is the vnode's UUID. You do **not** need to query any internal database — the YAML configuration file is the authoritative source for the vnode GUID. See [Virtual Nodes](#virtual-nodes-vnodes) for the full configuration reference.
 
 </details>
