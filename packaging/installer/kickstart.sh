@@ -1861,7 +1861,7 @@ try_package_install() {
       warning "Native packages are not being published for this system."
       return 3
       ;;
-    2|3)
+    *)
       error "Unable to determine if native packages are being published for this system."
       return 1
       ;;
