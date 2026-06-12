@@ -4,6 +4,7 @@ package promprofiles
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
@@ -49,10 +50,5 @@ func groupHasChart(group charttpl.Group) bool {
 	if len(group.Charts) > 0 {
 		return true
 	}
-	for _, child := range group.Groups {
-		if groupHasChart(child) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(group.Groups, groupHasChart)
 }
