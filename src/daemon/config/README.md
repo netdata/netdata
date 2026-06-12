@@ -64,7 +64,7 @@ You can change the display name of your Netdata node by customizing the hostname
    sudo systemctl restart netdata
    ```
 
-The custom hostname will appear in dashboards, alerts, and when streaming to parent nodes.
+The custom hostname will appear in dashboards, alerts, and when streaming to parent nodes. For more context on how this relates to node identity, see [Hostname Override](/docs/learn/node-identities.md#hostname-override).
 
 ## Configuration Section Details
 
