@@ -310,6 +310,15 @@
 - Docs: disclose silent-by-default streaming alerts and enabling ([#22534](https://github.com/netdata/netdata/issues/22534))
 - Ebpfgo.plugin (Basis of new plugin) ([#22469](https://github.com/netdata/netdata/issues/22469))
 - Feat(go.d/prometheus): add job-level metric relabeling and drop label_prefix ([#22668](https://github.com/netdata/netdata/issues/22668))
+- Docs: add virtual node config example and troubleshooting ([#22540](https://github.com/netdata/netdata/issues/22540))
+- Regenerate integrations docs ([#22653](https://github.com/netdata/netdata/issues/22653))
+- Docs: task class: improve_docs — add a consolidated firewall endpoints and ([#22542](https://github.com/netdata/netdata/issues/22542))
+- Force updater to actually update in CI checks. ([#22661](https://github.com/netdata/netdata/issues/22661))
+- Docs: Add a 'Controlling Recovered (CLEAR) Notifications' section to ([#22672](https://github.com/netdata/netdata/issues/22672))
+- Fatal handler: don't let a concurrent fatal mask the first one ([#22671](https://github.com/netdata/netdata/issues/22671))
+- Update vendored NetIPC SDK ([#22680](https://github.com/netdata/netdata/issues/22680))
+- Chore(go/chartengine): template dims inherit float from the series metric meta ([#22681](https://github.com/netdata/netdata/issues/22681))
+- Go.d: add profile-based SNMP trap ingestion ([#22652](https://github.com/netdata/netdata/issues/22652))
 
 ## [2.10.0] - 2026-04-09
 
