@@ -12,14 +12,17 @@ import (
 )
 
 // Profile is a curated, exporter-specific chart profile. Match selects the
-// profile by scraped metric names; Template is a standard charttpl group
-// rendered for the matched metrics. Identity is the profile file's basename
-// (set by the loader), so the file itself carries no name field. The Template
-// is validated exactly like any other chart template, including its
-// author-written metrics: visibility list.
+// profile by scraped metric names; App, when set, is the application identity
+// used as the chart-context "app" segment (prometheus.<app>.…) when a job has no
+// `app` set (by the user or service discovery); Template is a standard charttpl group rendered
+// for the matched metrics. Identity is the profile file's basename (set by the
+// loader), so the file itself carries no name field. The Template is validated
+// exactly like any other chart template, including its author-written metrics:
+// visibility list.
 type Profile struct {
 	Name     string         `yaml:"-" json:"name"`
 	Match    string         `yaml:"match" json:"match"`
+	App      string         `yaml:"app,omitempty" json:"app,omitempty"`
 	Template charttpl.Group `yaml:"template" json:"template"`
 }
 
@@ -29,6 +32,10 @@ func (p *Profile) validate(path string) error {
 	}
 	if _, err := matcher.NewSimplePatternsMatcher(p.Match); err != nil {
 		return fmt.Errorf("%s: 'match': %w", path, err)
+	}
+
+	if p.App != "" && !validProfileName.MatchString(p.App) {
+		return fmt.Errorf("%s: 'app' %q must match %s", path, p.App, validProfileName.String())
 	}
 
 	if !groupHasChart(p.Template) {

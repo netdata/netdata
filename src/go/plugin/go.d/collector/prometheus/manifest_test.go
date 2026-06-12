@@ -148,7 +148,7 @@ test_gauge_metric{label1="value1"} 11
 `,
 		},
 		"app_job_name": {
-			// Application empty -> the app segment falls back to the job Name (see application()).
+			// Application empty and no profile declares an app -> the app segment falls back to the job Name (see resolveApp).
 			prepare: func() *Collector { c := New(); c.Name = "job_app"; return c },
 			input: `
 # TYPE test_gauge_metric gauge

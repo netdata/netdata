@@ -33,6 +33,13 @@ func TestProfile_validate(t *testing.T) {
 		"valid": {
 			profile: Profile{Match: "a_*", Template: chartGroup("fam", "ctx", "a_total", "a_count")},
 		},
+		"valid with app": {
+			profile: Profile{Match: "a_*", App: "my_app", Template: chartGroup("fam", "ctx", "a_total")},
+		},
+		"invalid app format": {
+			profile: Profile{Match: "a_*", App: "Bad App!", Template: chartGroup("fam", "ctx", "a_total")},
+			wantErr: true,
+		},
 		"empty match": {
 			profile: Profile{Match: "", Template: chartGroup("fam", "ctx", "a_total")},
 			wantErr: true,

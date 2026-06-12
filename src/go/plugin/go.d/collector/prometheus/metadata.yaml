@@ -80,7 +80,7 @@ modules:
               group: Target
 
             - name: app
-              description: Application name used as the app segment of chart contexts (`prometheus.<app>.<metric>`). When unset, the segment falls back to the job name.
+              description: Application name used as the app segment of chart contexts (`prometheus.<app>.<metric>`). When unset, it is taken from a matched profile, otherwise it falls back to the job name.
               default_value: ""
               required: false
               group: Customization
