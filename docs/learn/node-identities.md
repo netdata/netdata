@@ -224,32 +224,13 @@ If you customized `[directories]` in `netdata.conf`:
 
 By default, Netdata auto-detects the system hostname. When the system hostname is configured as an IP address (common on some cloud VMs or home servers), nodes appear in Dashboards and Netdata Cloud with that raw IP instead of a readable name.
 
-You can override the auto-detected hostname by setting the `hostname` option in `netdata.conf`:
-
-```ini
-[global]
-    hostname = my-desired-name
-```
-
-To edit `netdata.conf`, use the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from your Netdata config directory (typically `/etc/netdata`):
-
-```bash
-sudo ./edit-config netdata.conf
-```
-
-The custom hostname determines how the node appears in local Dashboards, Netdata Cloud (including the [Nodes tab](/docs/dashboards-and-charts/nodes-tab.md)), alert notifications, and streaming Parent nodes.
-
 :::info
 
 This setting changes the **display name** only — it does not affect the node's identity (Machine GUID, Node ID, or Claimed ID).
 
 :::
 
-:::note
-
-A [restart](/docs/netdata-agent/start-stop-restart.md) is required for the change to take effect.
-
-:::
+To configure a custom hostname, see [Customizing Your Node Name](/src/daemon/config/README.md#customizing-your-node-name).
 
 ## FAQ
 
