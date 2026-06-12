@@ -7,18 +7,31 @@
 
 typedef uint32_t UUIDMAP_ID;
 
-#define UUIDMAP_PARTITIONS 8
+// 2^UUIDMAP_PARTITION_BITS partitions; the remaining bits of UUIDMAP_ID are
+// the per-partition ID sequence space. IDs are never reused, so raising the
+// partition count proportionally lowers the per-partition lifetime ID
+// capacity - total lifetime capacity stays at 2^32 and random UUIDs
+// distribute evenly across partitions. The partition is also reused by MRG
+// to index its own partitions, so this knob spreads the lock words of both.
+#define UUIDMAP_PARTITION_BITS 5
+#define UUIDMAP_PARTITIONS (1u << UUIDMAP_PARTITION_BITS)
+#define UUIDMAP_ID_SEQ_BITS (32 - UUIDMAP_PARTITION_BITS)
+#define UUIDMAP_ID_SEQ_MASK ((1u << UUIDMAP_ID_SEQ_BITS) - 1)
+
+#if UUIDMAP_PARTITION_BITS < 1 || UUIDMAP_PARTITION_BITS > 8
+#error "UUIDMAP_PARTITION_BITS must be 1..8: the partition is derived from one uuid byte, is stored in uint8_t, and 0 bits would make the ID packing shifts undefined (shift by 32)"
+#endif
 
 static inline uint8_t uuid_to_uuidmap_partition(const nd_uuid_t uuid) {
-    return uuid[15] & 0x07;  // Mask for 8 partitions (0b111)
+    return uuid[15] & (UUIDMAP_PARTITIONS - 1);
 }
 
 static inline uint8_t uuidmap_id_to_partition(UUIDMAP_ID id) {
-    return (uint8_t)(id >> 29);  // Use top 3 bits for partition
+    return (uint8_t)(id >> UUIDMAP_ID_SEQ_BITS);
 }
 
 static inline UUIDMAP_ID uuidmap_make_id(uint8_t partition, uint32_t id) {
-    return ((UUIDMAP_ID)partition << 29) | (id & 0x1FFFFFFF);  // Use bottom 29 bits for sequence
+    return ((UUIDMAP_ID)partition << UUIDMAP_ID_SEQ_BITS) | (id & UUIDMAP_ID_SEQ_MASK);
 }
 
 // returns ID, or zero on error
