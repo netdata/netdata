@@ -73,6 +73,17 @@ modules:
               default_value: 10
               required: false
               group: Target
+            - name: expected_prefix
+              description: If set, the job's check passes only when at least one scraped metric name starts with this prefix. Guards against scraping an unexpected endpoint.
+              default_value: ""
+              required: false
+              group: Target
+
+            - name: app
+              description: Application name used as the app segment of chart contexts (`prometheus.<app>.<metric>`). When unset, it is taken from a matched profile, otherwise it falls back to the job name.
+              default_value: ""
+              required: false
+              group: Customization
 
             - name: selector
               description: Time series selector (filter).
@@ -159,6 +170,29 @@ modules:
                         regex: '(\d)\d\d'
                         target_label: code_class
                         replacement: '${1}xx'
+                ```
+
+            - name: profiles
+              description: Curated, exporter-specific chart profiles. Disable with mode `none`.
+              default_value: auto
+              required: false
+              group: Customization
+              detailed_description: |
+                Profiles ship curated charts for recognized exporters. `profiles.mode` selects them:
+
+                - `auto` (default): every profile whose `match` hits at least one scraped metric.
+                - `exact`: only the profiles named in `mode_exact.entries` (each must match, or the job fails its check).
+                - `combined`: `auto` plus the profiles named in `mode_combined.entries`.
+                - `none`: no profiles — generic autogen charts only (the pre-profile behavior).
+
+                Only the block matching the selected mode (`mode_exact` or `mode_combined`) is read; entries under the other block are ignored. Metrics not covered by a selected profile keep their generic autogen charts.
+
+                ```yaml
+                profiles:
+                  mode: exact
+                  mode_exact:
+                    entries:
+                      - name: haproxy
                 ```
 
             - name: username

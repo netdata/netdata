@@ -148,7 +148,7 @@ test_gauge_metric{label1="value1"} 11
 `,
 		},
 		"app_job_name": {
-			// Application empty -> the app segment falls back to the job Name (see application()).
+			// Application empty and no profile declares an app -> the app segment falls back to the job Name (see resolveApp).
 			prepare: func() *Collector { c := New(); c.Name = "job_app"; return c },
 			input: `
 # TYPE test_gauge_metric gauge
@@ -271,7 +271,7 @@ func manifestLabels(m map[string]string) map[string]string {
 // renderManifestV2 renders the V2 path into the manifestChart shape: it loads the given chart
 // template (the collector's ChartTemplateYAML output) into chartengine, plans it against a store
 // that already holds exactly one freshly-committed cycle of the collector's output, and reads the
-// plan. Taking the live template (rather than rebuilding it) keeps the Init -> ChartTemplateYAML()
+// plan. Taking the live template (rather than rebuilding it) keeps the Init -> Check -> ChartTemplateYAML()
 // wiring, including the app/Name context namespace, on the tested path. The create actions
 // (context, labels, dim name+algo, soft fields) are emitted only on the first cycle, so a single
 // cycle MUST be committed before calling this.
@@ -338,7 +338,7 @@ func renderManifestV2(t *testing.T, store metrix.CollectorStore, templateYAML st
 	return out
 }
 
-// TestCollector_compatManifestV2 drives the real V2 collector (Init then a framework-style
+// TestCollector_compatManifestV2 drives the real V2 collector (Init, Check, then a framework-style
 // store cycle around Collect) and proves its rendered chart manifest reproduces the V1
 // contract captured in the goldens: identical chart contexts, labels, and dimensions
 // (name, algorithm, value), plus units and family. Only chart type is logged rather than
@@ -353,6 +353,7 @@ func TestCollector_compatManifestV2(t *testing.T) {
 			collr := tc.prepare()
 			collr.URL = srv.URL
 			require.NoError(t, collr.Init(context.Background()))
+			require.NoError(t, collr.Check(context.Background()))
 
 			// Drive Collect exactly as the framework does: one store cycle around it.
 			cc := cycle(t, collr.MetricStore())

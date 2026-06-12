@@ -220,6 +220,18 @@ If you customized `[directories]` in `netdata.conf`:
 
 :::
 
+## Hostname Override
+
+By default, Netdata auto-detects the system hostname. When the system hostname is configured as an IP address (common on some cloud VMs or home servers), nodes appear in Dashboards and Netdata Cloud with that raw IP instead of a readable name.
+
+:::info
+
+This setting changes the **display name** only — it does not affect the node's identity (Machine GUID, Node ID, or Claimed ID).
+
+:::
+
+To configure a custom hostname, see [Customizing Your Node Name](/src/daemon/config/README.md#customizing-your-node-name).
+
 ## FAQ
 
 <details>

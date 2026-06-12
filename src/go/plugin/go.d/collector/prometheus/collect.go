@@ -41,6 +41,9 @@ func (c *Collector) check(ctx context.Context) error {
 	if c.writer.countWritable(mfs) == 0 {
 		return fmt.Errorf("endpoint '%s' exposes no usable metrics", c.URL)
 	}
+	if err := c.ensureChartTemplate(mfs); err != nil {
+		return err
+	}
 	return nil
 }
 
