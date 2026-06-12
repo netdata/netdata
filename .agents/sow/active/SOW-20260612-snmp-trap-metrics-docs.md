@@ -14,6 +14,9 @@ accepted traps are committed independently from metric attribution, vnode
 attribution is enrichment, and unresolved sources use bounded fallback metric
 identity. Implementation is blocked only on the remaining legacy job-level
 `metrics:` compatibility decision and any future implementation SOW approval.
+The user also confirmed that full receiver pipeline monitoring is a separate
+follow-up product phase, not part of the initial trap-to-metrics implementation
+scope.
 
 ## Requirements
 
@@ -25,6 +28,10 @@ Make SNMP trap metrics fit for operator use:
 - Operator-defined trap metrics MUST have clear, documented semantics and bounded cardinality.
 - End-user documentation MUST explain SNMP traps functionality, configuration, metrics, logs, enrichment, and limitations accurately.
 - The urgent counter-algorithm fix is handled separately by PR #22693; this SOW covers the broader metrics extraction and documentation closeout.
+- Full receiver pipeline monitoring is a separate follow-up product phase. This
+  SOW must preserve the identity, trap-commitment, and continuous diagnostic
+  contracts needed by that phase, but it must not silently expand the initial
+  trap-to-metrics scope into a full receiver-health implementation.
 
 ### User Request
 
@@ -860,7 +867,9 @@ Phase 1 external gap analysis results:
   - Capacity, pool, address, NAT, CPU, and RMON threshold values.
   - LLDP/STP topology and neighbor churn counters, without trap-driven topology
     mutation.
-  - Per-source receiver pipeline health for decode/auth/rate-limit/INFORM errors.
+  - Per-source receiver pipeline health for decode/auth/rate-limit/INFORM errors,
+    accepted as a follow-up product phase rather than the initial
+    trap-to-metrics implementation scope.
 - Existing use-case revisions from review:
   - Vendor severity is a specialization of filtered counters/state metrics, not a
     separate metric kind.
@@ -957,6 +966,54 @@ User correction: source identity, enrichment, and metric continuity:
     per scope.
   - `src/go/plugin/go.d/collector/cato_networks/write_metrics.go` shows an
     existing collector emitting metrics with `metrix.WithHostScope`.
+
+User decision: full receiver pipeline monitoring is a separate follow-up phase:
+
+- Status: approved by the user on 2026-06-13 and incorporated into the spec.
+- Approved:
+  - The initial trap-to-metrics implementation scope remains profile-defined
+    metric extraction, source identity, bounded attribution, and continuous
+    extraction diagnostics.
+  - Full receiver pipeline monitoring is a later product phase.
+  - The trap-to-metrics design must still preserve source identity, trap
+    commitment, and diagnostic evidence so the follow-up phase can report
+    receiver/pipeline health per source.
+- Implications:
+  - Existing listener/job-scoped built-in static charts such as trap events,
+    severities, processing errors, and dedup suppression are not migrated to
+    per-source pipeline-health charts by this SOW.
+  - Built-in extraction diagnostics required by profile metrics remain in scope:
+    attribution failures, ambiguity, rule misses, extraction failures, cap
+    overflows, and source fallback transitions.
+  - A future receiver pipeline monitoring SOW should cover raw receive rate,
+    accepted/committed rate, drop/error stages, unknown OID/MIB gaps, SNMPv3 USM
+    breakdown, INFORM outcomes, dedup/throttle suppression, source cardinality,
+    top talkers, per-source last-seen/silence, and OS receive-buffer evidence
+    where it can be collected safely.
+
+User decision: commit the two SNMP trap research documents as durable spec
+memory:
+
+- Status: approved by the user on 2026-06-13 and incorporated into the specs
+  index.
+- Approved option: B.
+- Documents:
+  - `.agents/sow/specs/snmp-traps/Skill-Distillation-SNMP-Traps-in-Network-Performance-Monitoring-NetOps-SecOps.md`
+  - `.agents/sow/specs/snmp-traps/PLAYBOOK-Monitoring-SNMP-Traps-in-Modern-Enterprise-NPM-NetOps-SecOps.md`
+- Classification:
+  - Specs/research evidence, not end-user documentation and not operator skills.
+  - They preserve domain model, operational signals, failure modes, KPIs,
+    maturity model, receiver pipeline monitoring evidence, and validation
+    scenarios.
+- Implications:
+  - `.agents/sow/specs/README.md` must index both files.
+  - Sensitive-data scanning must cover both files before commit.
+  - The trap-to-metrics spec must treat them as evidence for current and future
+    SNMP trap design, not as immediate implementation scope.
+- Sanitization:
+  - Two OID examples were formatted with `[.]` separators because the SOW
+    sensitive-data scanner otherwise interpreted SNMP OID prefixes as public IP
+    addresses on lines that also mention logs or requests.
 
 Open decisions:
 
@@ -1083,8 +1140,8 @@ Pending user decisions:
   `minimax`, `kimi`, `mimo`, `deepseek`, and `qwen`.
 - Integrated evidence-backed Phase 1 findings into the spec, including standard
   alarm set/clear, environmental/power, routing/HA adjacency, capacity
-  threshold, L2 topology-change counter, and per-source receiver-health use
-  cases.
+  threshold, L2 topology-change counter, and the per-source receiver-health use
+  case that is now recorded as a separate follow-up product phase.
 - Drafted Phase 2 recommended design in
   `.agents/sow/specs/snmp-traps/trap-metrics-profiles.md`.
 - Ran Phase 2 design review with `glm`, `minimax`, `kimi`, `mimo`, `deepseek`,
@@ -1160,6 +1217,18 @@ Pending user decisions:
     diagnostics;
   - receiver metrics, profile counters, state values, and fresh sample values
     are emitted continuously across periodic `Collect()` cycles.
+- Recorded the user-approved receiver pipeline monitoring phase split:
+  - trap-to-metrics remains the initial implementation scope;
+  - full receiver/pipeline health monitoring is deferred to a separate product
+    phase;
+  - this spec keeps the identity, commitment, and continuous diagnostic
+    contracts needed by that phase.
+- Recorded the user-approved decision to commit the two SNMP trap research
+  documents as durable spec memory:
+  - added them to `.agents/sow/specs/README.md`;
+  - classified them as specs/research evidence, not end-user docs or operator
+    skills;
+  - sanitized two OID examples that triggered scanner false positives.
 - No implementation files changed.
 
 ## Validation
@@ -1184,6 +1253,20 @@ Tests or equivalent validation:
     SOW/spec files.
   - `git diff --check -- .agents/sow/specs/snmp-traps/trap-metrics-profiles.md .agents/sow/active/SOW-20260612-snmp-trap-metrics-docs.md` passed.
   - `.agents/sow/scan-sensitive.sh .agents/sow/specs/snmp-traps/trap-metrics-profiles.md .agents/sow/active/SOW-20260612-snmp-trap-metrics-docs.md` passed.
+- Receiver pipeline monitoring phase-split validation:
+  - Targeted scope-wording scan returned no stale mandatory-current-scope
+    wording for receiver pipeline health.
+  - `git diff --check -- .agents/sow/specs/snmp-traps/trap-metrics-profiles.md .agents/sow/active/SOW-20260612-snmp-trap-metrics-docs.md` passed.
+  - `.agents/sow/scan-sensitive.sh .agents/sow/specs/snmp-traps/trap-metrics-profiles.md .agents/sow/active/SOW-20260612-snmp-trap-metrics-docs.md` passed.
+- Research document commit validation:
+  - `git diff --check -- .agents/sow/specs/snmp-traps/PLAYBOOK-Monitoring-SNMP-Traps-in-Modern-Enterprise-NPM-NetOps-SecOps.md .agents/sow/specs/snmp-traps/Skill-Distillation-SNMP-Traps-in-Network-Performance-Monitoring-NetOps-SecOps.md` passed.
+  - `.agents/sow/scan-sensitive.sh .agents/sow/specs/snmp-traps/PLAYBOOK-Monitoring-SNMP-Traps-in-Modern-Enterprise-NPM-NetOps-SecOps.md .agents/sow/specs/snmp-traps/Skill-Distillation-SNMP-Traps-in-Network-Performance-Monitoring-NetOps-SecOps.md` passed after scanner-safe OID formatting.
+  - Specs index updated in `.agents/sow/specs/README.md`.
+  - Docs gate: end-user docs unchanged because no public configuration,
+    command, schema, or operator workflow changed in this commit.
+  - Specs gate: updated with the two durable research/spec evidence documents
+    and the index entry.
+  - Operator skill gate: unchanged because no portable operator workflow changed.
 - `.agents/sow/audit.sh` passes all checks for the new active SOW and spec index
   entry, but still fails on pre-existing legacy SOW references in older durable
   specs under `.agents/sow/specs/snmp-traps/`. Those failures are unrelated to

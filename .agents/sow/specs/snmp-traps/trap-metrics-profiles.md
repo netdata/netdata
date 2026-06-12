@@ -2,7 +2,7 @@
 
 ## Status
 
-- Status: Phase 2 design draft with approved UX direction.
+- Status: Trap-to-metrics design draft with approved UX direction.
 - Design status: recommended design written; four external design review rounds
   and one follow-up UX review round incorporated. The user approved compact
   operator authoring syntax that expands to canonical form, while stock/generated
@@ -12,6 +12,8 @@
   - Phase 1: external gap analysis of the use-case inventory, completed and
     incorporated.
   - Phase 2: design proposal and external design review.
+  - These review phases are not product implementation phases. Full receiver
+    pipeline monitoring is a separate follow-up product phase.
 
 ## Purpose
 
@@ -39,6 +41,9 @@ This spec intentionally does not define:
 - file-by-file implementation plan;
 - final default enablement policy for stock-generated metric rules;
 - UI or dashboard design.
+- a full receiver pipeline monitoring design. This spec preserves the source
+  identity, trap commitment, and continuous diagnostic contracts that the
+  receiver pipeline monitoring phase must reuse.
 
 ## Ground Rules
 
@@ -661,6 +666,14 @@ Evidence:
 
 ## Use Case 16: Receiver Pipeline Health By Source
 
+Scope disposition:
+
+- This use case is accepted as an important operator requirement.
+- Full support belongs to the separate receiver pipeline monitoring phase.
+- This trap-to-metrics design must still preserve source identity, trap
+  commitment, and continuous diagnostics so that the follow-up phase can report
+  pipeline health per source without changing the trap metric identity model.
+
 Operator question:
 
 - Which source device or relay path is producing unknown OIDs, decode failures,
@@ -736,8 +749,9 @@ This use-case inventory does not require the future design to support:
 - Set/clear state must support both separate problem/clear OIDs and same-OID
   condition varbinds.
 - Metric labels must not leak sensitive values or unbounded identifiers.
-- Per-device receiver pipeline health is required even when it is not driven by
-  vendor trap profiles.
+- Full per-device receiver pipeline monitoring is a separate follow-up product
+  phase. This spec only requires the identity and continuous diagnostic hooks
+  needed by profile metric extraction and by that follow-up phase.
 - Stock-generated metrics must not create surprising high cardinality by
   default.
 - Custom profiles must not require editing shipped stock files.
@@ -1415,7 +1429,7 @@ Recommended identity model:
     enrichment.
   - Ambiguity includes conflicting registry/topology identities for the same
     trap source, or an original-source address supplied by an untrusted relay.
-- Listener-owned pipeline metrics:
+- Listener-owned diagnostics required by this spec:
   - Keep listener/job scope when the error has no trustworthy source.
   - Add source identity only for errors that can be attributed to a source.
   - Emit continuously every `Collect()` cycle. Netdata receiver metrics must not
@@ -1424,8 +1438,9 @@ Recommended identity model:
 Existing built-in static charts such as trap events, severities, processing
 errors, and dedup suppression remain listener/job scoped unless a later design
 explicitly migrates them. Per-device trap activity in this spec is delivered by
-profile-defined device-attributable rules and by built-in source-attributable
-pipeline metrics where attribution is reliable.
+profile-defined device-attributable rules. Full per-source receiver pipeline
+health is deferred to the receiver pipeline monitoring phase, which must reuse
+the same source identity and trap-commitment model.
 
 Fallback source identity priority:
 
@@ -2142,7 +2157,27 @@ generated profile YAML uses canonical syntax only.
 | Routing/HA adjacency state | Resource-scoped counters/state with explicit caps for peers/neighbors/groups. |
 | Capacity/pool/utilization thresholds | Sample plus threshold metrics and optional clear-state rules. |
 | L2 topology/neighbor counters | Counter/sample rules only; no topology mutation. |
-| Receiver pipeline health | Built-in system metrics use the same source identity policy when attribution is reliable. |
+| Receiver pipeline health | Deferred to the receiver pipeline monitoring phase; this spec supplies the source identity policy, trap commitment rule, and continuous extraction diagnostics that phase must reuse. |
+
+### Receiver Pipeline Monitoring Follow-Up
+
+Full receiver pipeline health coverage is not a prerequisite for the
+trap-to-metrics implementation. It belongs to a separate receiver pipeline
+monitoring phase.
+
+The follow-up phase should cover receiver-owned signals such as raw receive
+rate, accepted/committed rate, drop/error stages, unknown OID/MIB gaps, SNMPv3
+USM breakdown, INFORM outcomes, dedup/throttle suppression, source cardinality,
+top talkers, per-source last-seen/silence, and OS receive-buffer evidence where
+it can be collected safely.
+
+The trap-to-metrics implementation must still preserve enough common contract
+for that phase:
+
+- source identity and vnode/fallback attribution;
+- accepted trap commitment before metric attribution;
+- continuous extraction diagnostics for attribution failures, ambiguity, rule
+  misses, extraction failures, cap overflows, and source fallback transitions.
 
 ### Required Tests
 
