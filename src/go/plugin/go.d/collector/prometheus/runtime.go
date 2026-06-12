@@ -35,13 +35,39 @@ func (c *Collector) ensureChartTemplate(mfs prometheus.MetricFamilies) error {
 		return err
 	}
 
-	tmpl, err := buildMergedChartTemplate(c.application(), profiles)
+	tmpl, err := buildMergedChartTemplate(c.resolveApp(profiles), profiles)
 	if err != nil {
 		return err
 	}
 
 	c.runtime = &promRuntime{profiles: profiles, chartTemplate: tmpl}
 	return nil
+}
+
+// resolveApp is the chart-context "app" segment — the per-job identity the UI
+// turns into an Applications section. Precedence: the configured app, else the
+// first selected profile that declares one, else the job name. If selected
+// profiles declare different apps, the first (in selection order) wins and the
+// rest are logged (set the job's app to disambiguate).
+func (c *Collector) resolveApp(profiles []promprofiles.Profile) string {
+	if c.Application != "" {
+		return c.Application
+	}
+	app := ""
+	for _, p := range profiles {
+		switch {
+		case p.App == "":
+			continue
+		case app == "":
+			app = p.App
+		case p.App != app:
+			c.Warningf("profiles: selected profiles declare different apps; using %q, ignoring %q (set the job's 'app' to disambiguate)", app, p.App)
+		}
+	}
+	if app != "" {
+		return app
+	}
+	return c.Name
 }
 
 // selectProfiles resolves the profiles for this job per profiles.mode, matching

@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -652,9 +653,23 @@ haproxy_backend_response_time_average_seconds{proxy="app"} 0.05
 		"prometheus.haproxy.backend_response_time":     {"response"},
 	}
 
+	// curatedUnder reprefixes the curated contexts with an explicit <app> segment: it models
+	// a job whose app is set (by config, or automatically by service discovery in k8s) to
+	// something other than the profile's own app:. The resolved app becomes the <app> segment
+	// and the profile's context_namespace (haproxy) is KEPT as the exporter-type sub-segment
+	// (prometheus.<app>.haproxy.<context>) — the dedup's keep branch.
+	curatedUnder := func(app string) map[string][]string {
+		out := make(map[string][]string, len(curated))
+		for ctx, dims := range curated {
+			out[strings.Replace(ctx, "prometheus.", "prometheus."+app+".", 1)] = dims
+		}
+		return out
+	}
+
 	tests := map[string]struct {
-		profiles ProfilesConfig
-		want     map[string][]string
+		configApp string
+		profiles  ProfilesConfig
+		want      map[string][]string
 	}{
 		"auto mode selects haproxy": {
 			profiles: ProfilesConfig{Mode: "auto"},
@@ -667,6 +682,11 @@ haproxy_backend_response_time_average_seconds{proxy="app"} 0.05
 		"combined mode selects haproxy": {
 			profiles: ProfilesConfig{Mode: "combined", ModeCombined: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "haproxy"}}}},
 			want:     curated,
+		},
+		"a configured app keeps the profile namespace as a sub-segment": {
+			configApp: "myproxy",
+			profiles:  ProfilesConfig{Mode: "auto"},
+			want:      curatedUnder("myproxy"),
 		},
 		"none mode falls back to autogen": {
 			profiles: ProfilesConfig{Mode: "none"},
@@ -684,6 +704,7 @@ haproxy_backend_response_time_average_seconds{proxy="app"} 0.05
 
 			collr := New()
 			collr.URL = srv.URL
+			collr.Application = tc.configApp
 			collr.Profiles = tc.profiles
 			require.NoError(t, collr.Init(context.Background()))
 			require.NoError(t, collr.Check(context.Background()))
@@ -749,6 +770,15 @@ func TestCollector_HAProxyProfileAllMetrics(t *testing.T) {
 		seenChartIDs[create.ChartID] = create.Meta.Context
 	}
 	assert.NotEmpty(t, seenChartIDs, "the merged template must materialize charts")
+
+	// Every materialized context — curated and autogen-fallback alike — must carry the
+	// resolved app segment from the profile's app: (prometheus.haproxy.<leaf>). The trailing
+	// dot is load-bearing: if app: were ignored, autogen would emit prometheus.haproxy_<metric>
+	// (the metric name, no app segment), which this prefix check rejects.
+	for chartID, ctx := range seenChartIDs {
+		assert.Truef(t, strings.HasPrefix(ctx, "prometheus.haproxy."),
+			"context %q (chart %q) is missing the prometheus.haproxy. app segment", ctx, chartID)
+	}
 
 	// One representative curated context per scope, including the label-split charts.
 	curated := map[string][]string{

@@ -3,6 +3,7 @@
 package prometheus
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,9 +12,79 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 )
+
+func Test_Collector_resolveApp(t *testing.T) {
+	const hap, ngx = "haproxy", "nginx"
+
+	tests := map[string]struct {
+		configApp string
+		jobName   string
+		profiles  []promprofiles.Profile
+		want      string
+		wantWarn  bool
+	}{
+		"config app wins over a profile app": {
+			configApp: "myapp", jobName: "job",
+			profiles: []promprofiles.Profile{{Name: hap, App: hap}},
+			want:     "myapp",
+		},
+		"config app silences a profile-app conflict": {
+			configApp: "myapp", jobName: "job",
+			profiles: []promprofiles.Profile{{Name: hap, App: hap}, {Name: ngx, App: ngx}},
+			want:     "myapp",
+		},
+		"profile app when no config app": {
+			jobName:  "job",
+			profiles: []promprofiles.Profile{{Name: hap, App: hap}},
+			want:     hap,
+		},
+		"first profile app wins on conflict": {
+			jobName:  "job",
+			profiles: []promprofiles.Profile{{Name: hap, App: hap}, {Name: ngx, App: ngx}},
+			want:     hap,
+			wantWarn: true,
+		},
+		"shared profiles (no app) fall through to job name": {
+			jobName:  "job",
+			profiles: []promprofiles.Profile{{Name: "go_runtime"}, {Name: "http"}},
+			want:     "job",
+		},
+		"a profile app is used even after shared profiles": {
+			jobName:  "job",
+			profiles: []promprofiles.Profile{{Name: "go_runtime"}, {Name: hap, App: hap}},
+			want:     hap,
+		},
+		"job name when no config app and no profile declares one": {
+			jobName:  "job",
+			profiles: nil,
+			want:     "job",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var logBuf bytes.Buffer
+			c := New()
+			c.Logger = logger.NewWithWriter(&logBuf)
+			c.Application = tc.configApp
+			c.Name = tc.jobName
+
+			assert.Equal(t, tc.want, c.resolveApp(tc.profiles))
+
+			// Conflicting profile apps must emit exactly one operator warning; every other
+			// case (including config-app-wins, which short-circuits before the loop) stays silent.
+			if tc.wantWarn {
+				assert.Contains(t, logBuf.String(), "different apps")
+			} else {
+				assert.NotContains(t, logBuf.String(), "different apps")
+			}
+		})
+	}
+}
 
 func Test_profileMatchesFamilies(t *testing.T) {
 	mfs := testMetricFamilies("haproxy_up", "haproxy_frontend_status")

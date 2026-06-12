@@ -52,7 +52,18 @@ func buildChartTemplate(app string) (string, error) {
 func buildMergedChartTemplate(app string, profiles []promprofiles.Profile) (string, error) {
 	spec := newAutogenSpec(app)
 	for _, p := range profiles {
-		spec.Groups = append(spec.Groups, p.Template)
+		g := p.Template
+		// The profile's root context_namespace is the exporter-type segment
+		// (prometheus.<app>.<ns>.<context>). When the resolved app equals that namespace —
+		// e.g. app fell back to the profile's own app: because the job has no app set
+		// (by the user or service discovery) — drop the redundant segment so the
+		// context is prometheus.<app>.<context>, not prometheus.<app>.<app>.<context>. We
+		// overwrite only the scalar ContextNamespace on this local copy (g), so the shared
+		// catalog profile — including its slice fields — is not mutated.
+		if g.ContextNamespace == app {
+			g.ContextNamespace = ""
+		}
+		spec.Groups = append(spec.Groups, g)
 	}
 	return marshalChartSpec(spec)
 }

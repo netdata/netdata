@@ -8,6 +8,10 @@
 # The ?extra-counters H1/H2/SSL/QUIC/H3 families (mod label) are intentionally left to
 # the collector's autogen fallback so the common no-extra-counters menu stays focused.
 match: 'haproxy_*'
+# app: the exporter's application identity — the prometheus.<app>.… Applications section —
+# used when the job's `app` config is not set (by the user, or automatically by service
+# discovery). A configured `app` wins; the job name is the last resort.
+app: haproxy
 template:
   family: HAProxy
   context_namespace: haproxy
