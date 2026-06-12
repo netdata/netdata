@@ -12,11 +12,13 @@ Netdata implements a layered access control system to protect sensitive informat
 | **Netdata Cloud Community**   | Signed in to Netdata Cloud (free tier)                                   |
 | **Netdata Cloud paid plan**   | Signed in with a paid plan (Homelab, Business, or Enterprise On-Premise) |
 
-## Self-Hosted Netdata (Without Cloud)
+## Standalone Netdata Agent (Without Cloud)
 
-Netdata can be fully self-hosted — every Agent is a complete observability engine with its own dashboard at port 19999, and no data leaves your infrastructure. The **Anonymous** access level in all tables below represents exactly this self-hosted-without-Cloud experience.
+> **This is not Netdata Cloud On-Prem.** This section describes the open-source Netdata Agent running on your own systems without a Cloud connection. [Netdata Cloud On-Prem](/docs/netdata-cloud/versions.md) is a separate enterprise product that deploys the full Cloud control plane within your own infrastructure.
 
-### What you get self-hosted
+Every Netdata Agent is a complete observability engine with its own dashboard at port 19999, and no data leaves your infrastructure — it works entirely without a Cloud connection. The **Anonymous** access level in all tables below represents this standalone experience.
+
+### What you get without a Cloud connection
 
 | Capability | Details |
 |------------|---------|
@@ -45,7 +47,7 @@ Netdata can be fully self-hosted — every Agent is a complete observability eng
 
 Connecting to Netdata Cloud (free Community tier) unlocks sensitive functions, alert silencing, and AI features. Advanced configuration, unlimited scale, and organization features require a Business subscription.
 
-For self-hosted deployment guidance, see [Standalone deployment](/docs/deployment-guides/standalone-deployment.md) and [Deployment with centralization points](/docs/deployment-guides/deployment-with-centralization-points.md).
+For standalone deployment guidance, see [Standalone deployment](/docs/deployment-guides/standalone-deployment.md) and [Deployment with centralization points](/docs/deployment-guides/deployment-with-centralization-points.md).
 
 ## Why Access Controls Exist
 
