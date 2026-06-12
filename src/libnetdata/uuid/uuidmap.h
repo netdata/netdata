@@ -13,7 +13,7 @@ typedef uint32_t UUIDMAP_ID;
 // capacity - total lifetime capacity stays at 2^32 and random UUIDs
 // distribute evenly across partitions. The partition is also reused by MRG
 // to index its own partitions, so this knob spreads the lock words of both.
-#define UUIDMAP_PARTITION_BITS 8
+#define UUIDMAP_PARTITION_BITS 5
 #define UUIDMAP_PARTITIONS (1u << UUIDMAP_PARTITION_BITS)
 #define UUIDMAP_ID_SEQ_BITS (32 - UUIDMAP_PARTITION_BITS)
 #define UUIDMAP_ID_SEQ_MASK ((1u << UUIDMAP_ID_SEQ_BITS) - 1)
