@@ -9,8 +9,11 @@ in the committed-spec draft. Four external design review rounds have been
 integrated. A follow-up UX review round has been run and the user approved the
 recommended authoring model: operator docs use compact syntax; the loader expands
 to canonical form; stock/generated profiles use canonical form for reviewability.
-Implementation is blocked until the user approves the remaining
-compatibility/staging decisions.
+The user approved the revised source identity and metric continuity model:
+accepted traps are committed independently from metric attribution, vnode
+attribution is enrichment, and unresolved sources use bounded fallback metric
+identity. Implementation is blocked only on the remaining legacy job-level
+`metrics:` compatibility decision and any future implementation SOW approval.
 
 ## Requirements
 
@@ -305,8 +308,8 @@ Metric extraction use-case candidates:
        carries `jnxDfcInputPktRate` plus soft watermarks.
    - Required capability: `value_from_varbind` with declared units, algorithm
      (`absolute` vs `incremental`/counter), numeric type validation, scale, and
-     missing/non-numeric behavior. Documentation must state these are
-     trap-arrival samples, not continuously polled values.
+     missing/non-numeric behavior. Documentation must state these are last
+     trap-reported values held by the collector, not continuously polled values.
 
 3. Multi-value extraction from one notification.
    - Current limitation: `validateMetrics` rejects duplicate configured OIDs,
@@ -917,6 +920,44 @@ reviewer pass:
   - This avoids weakening the stock-profile curation and source-control review
     contract.
 
+User correction: source identity, enrichment, and metric continuity:
+
+- Status: approved by the user on 2026-06-12 and incorporated into the spec.
+- Approved:
+  - Profile-local metric rules are approved as option 1A.
+  - Accepted traps must be committed even when vnode/source enrichment or
+    profile metric attribution is incomplete.
+  - Device-attributable metrics use V2 host scope when `SourceVnodeID` is known.
+  - When `SourceVnodeID` is absent, profile metrics use a bounded fallback
+    source identity under the receiver/default host scope.
+  - Synthetic vnodes are not part of the initial schema.
+- Rejected framing:
+  - Unknown source-device enrichment must not mean silently dropping received
+    traps. Accepted traps must still be committed to the configured trap log or
+    output backend.
+  - Vnode attribution is enrichment, not the primary truth source for whether a
+    trap exists.
+- Required design direction:
+  - `TRAP_ENRICHMENT` or equivalent fields should provide evidence that lets
+    operators diagnose and fix enrichment and source-identification problems.
+  - Trap metrics should derive metric instances from received and enriched trap
+    information even when a vnode does not exist, subject to explicit
+    cardinality controls.
+  - When vnode attribution works and the framework supports it, metrics that
+    belong to a vnode should appear under that vnode.
+  - Receiver-owned metrics must emit continuously; Netdata does not support
+    sparse receiver metrics.
+- Resolved technical evidence:
+  - `.agents/sow/specs/go-v2-host-scope.md` states that one V2 job runtime owns
+    one chartengine engine per host scope and that series identity includes host
+    scope.
+  - `src/go/plugin/framework/jobruntime/job_v2_scope.go` lazily creates
+    per-scope runtime state, including chartengine engines.
+  - `src/go/plugin/framework/jobruntime/job_v2.go` processes and emits metrics
+    per scope.
+  - `src/go/plugin/go.d/collector/cato_networks/write_metrics.go` shows an
+    existing collector emitting metrics with `metrix.WithHostScope`.
+
 Open decisions:
 
 1. Approve the profile-based design.
@@ -924,22 +965,23 @@ Open decisions:
      profile-local `metrics:` extraction rules and profile-local `charts:`
      chart layout, validated and merged with the existing `extends:` mechanism.
 2. Approve the source-device identity target.
-   - Recommended long-term-best decision: device-attributable profile metrics
-     use V2 host scope when `SourceVnodeID` is known; unknown sources default to
-     `drop_profile_metrics`; `per_source_label` is explicit opt-in with caps.
+   - Approved long-term-best decision: device-attributable profile metrics use
+     V2 host scope when `SourceVnodeID` is known; unknown sources default to a
+     bounded `source_label` fallback; over-cap metric instances are skipped with
+     continuous diagnostics, but accepted traps are still committed.
 3. Decide implementation staging for V2 host-scope support.
-   - Recommended long-term-best decision: ship V2 host-scope emission before
-     enabling device-attributable profile metrics. If staged, selected rules
-     must fail `Check()` or be explicitly disabled with operator-visible
-     diagnostics; they must not silently degrade to per-job charts.
+   - Approved long-term-best decision: the framework already supports emitting
+     multiple host scopes from one V2 collector job, so device-attributable
+     profile metrics should use it in the first implementation that enables
+     those rules.
 4. Decide legacy job-level `metrics:` compatibility.
    - Recommended surgical decision: treat existing job-level `metrics:` as
      public unless proven otherwise, keep it as a deprecated per-job event
      counter shim, and require migration to profile-local rules for per-device
      behavior.
 5. Decide whether `synthetic_vnode` is in scope.
-   - Recommended surgical decision: reject `synthetic_vnode` in the initial
-     schema and defer it to a future approved design.
+   - Approved surgical decision: reject `synthetic_vnode` in the initial schema
+     and defer it to a future approved design.
 
 ## Implications And Decisions
 
@@ -1108,6 +1150,16 @@ Pending user decisions:
   - operator docs use compact authoring syntax for simple/intermediate cases;
   - compact syntax expands to canonical form before validation and runtime use;
   - stock/generated profiles use canonical form for reviewable generated diffs.
+- Recorded the user-approved identity and continuity correction:
+  - accepted traps are committed even when enrichment or profile metric
+    attribution is incomplete;
+  - device-attributable metrics use V2 host scope when `SourceVnodeID` is known;
+  - unresolved sources use bounded fallback source labels under the
+    receiver/default host scope;
+  - cap overflow skips only new metric instances and increments continuous
+    diagnostics;
+  - receiver metrics, profile counters, state values, and fresh sample values
+    are emitted continuously across periodic `Collect()` cycles.
 - No implementation files changed.
 
 ## Validation
@@ -1117,8 +1169,8 @@ Acceptance criteria evidence:
 - Spec use-case inventory and recommended design are complete in
   `.agents/sow/specs/snmp-traps/trap-metrics-profiles.md`.
 - Specs index updated in `.agents/sow/specs/README.md`.
-- Implementation remains blocked on user approval of the final design and
-  compatibility/staging decisions.
+- Implementation remains blocked only on the remaining legacy job-level
+  `metrics:` compatibility decision and any future implementation SOW approval.
 
 Tests or equivalent validation:
 
@@ -1127,6 +1179,11 @@ Tests or equivalent validation:
 - Follow-up UX spec update validation:
   - `git diff --check` passed for the changed SOW/spec files.
   - Targeted sensitive-data scan passed for the changed SOW/spec files.
+- Identity and continuity correction validation:
+  - Targeted obsolete identity-term scan returned no matches for the changed
+    SOW/spec files.
+  - `git diff --check -- .agents/sow/specs/snmp-traps/trap-metrics-profiles.md .agents/sow/active/SOW-20260612-snmp-trap-metrics-docs.md` passed.
+  - `.agents/sow/scan-sensitive.sh .agents/sow/specs/snmp-traps/trap-metrics-profiles.md .agents/sow/active/SOW-20260612-snmp-trap-metrics-docs.md` passed.
 - `.agents/sow/audit.sh` passes all checks for the new active SOW and spec index
   entry, but still fails on pre-existing legacy SOW references in older durable
   specs under `.agents/sow/specs/snmp-traps/`. Those failures are unrelated to

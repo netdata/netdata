@@ -201,8 +201,8 @@ Why it matters:
 - Some traps are not just event notifications. They carry the measurement that
   triggered the notification.
 - Counting those traps loses the most useful numeric information.
-- Operators need docs to understand that these are trap-arrival samples, not
-  continuously polled gauges.
+- Operators need docs to understand that these are last trap-reported values
+  held by the collector, not continuously polled gauges.
 
 Evidence:
 
@@ -816,8 +816,8 @@ jobs:
         - IF-MIB::unexpected-link-down-events
         - CISCO-CONFIG-MAN-MIB::cli-config-change-console-events
       identity:
-        device: source_vnode
-        unresolved_source: per_source_label   # explicit opt-in fallback
+        device: source
+        unresolved_source: source_label       # vnode if known, bounded fallback otherwise
         source_id_privacy: raw                # raw | hash
       limits:
         max_rules: 500
@@ -845,20 +845,30 @@ Safe defaults:
 - When `profile_metrics` is absent, no profile-local metric rules are evaluated.
 - `profile_metrics.enabled` defaults to `false`.
 - If `profile_metrics` is present but `mode` is absent, the mode is `none`.
-- `identity.device` defaults to `source_vnode`.
-- `identity.unresolved_source` defaults to `drop_profile_metrics`.
-- `identity.source_id_privacy` defaults to `hash` when `per_source_label` is
+- `identity.device` defaults to `source`.
+- `identity.unresolved_source` defaults to `source_label`.
+- `identity.source_id_privacy` defaults to `hash` when `source_label` is
   used. Exposing raw source addresses requires explicit operator opt-in.
 
 Job-level `identity.device` values:
 
-- `source_vnode`: use V2 host scope for known `SourceVnodeID`; unknown sources
-  follow `identity.unresolved_source`.
+- `source`: use V2 host scope for known `SourceVnodeID`; unknown sources follow
+  `identity.unresolved_source`.
 - `source_label`: always use bounded `source_id` labels instead of vnode host
   scope. This is an explicit operational/debug mode and remains capped.
 - `listener`: listener-owned metrics only. This is invalid for selected
   device-attributable profile rules unless those rules explicitly declare
   listener scope.
+
+Job-level `identity.unresolved_source` values:
+
+- `source_label`: emit device-attributable profile metrics under the receiver's
+  default host scope with bounded `source_id` and `source_kind` labels.
+- `drop_metric_instance`: do not create a new profile metric instance when a new
+  unresolved source would exceed configured source/instance caps. Accepted traps
+  are still committed to the trap log/output backend, and the collector must
+  increment visible overflow/error counters. This is a cap-overflow behavior,
+  not the default behavior for an ordinary unknown sender.
 
 ### Enablement Policy
 
@@ -1121,8 +1131,11 @@ The initial design must support these rule types:
 
 - `counter`: increments a cumulative event counter when the trap and optional
   predicates match.
-- `sample`: extracts a numeric varbind value as a trap-arrival sample. Samples
-  are not interpolated and do not imply continuous polling.
+- `sample`: stores the last numeric value extracted from a matching trap for the
+  source/resource identity. Samples are not interpolated and do not imply
+  continuous polling, but active sample series must still be emitted on every
+  periodic `Collect()` cycle until they expire or are cleared by lifecycle
+  rules.
 - `state`: stores current trap-derived state for a source or source/resource.
 
 The design should not add a separate "multi-value" type. Multiple metric rules
@@ -1371,28 +1384,42 @@ unless the metric is explicitly listener-owned and not device-attributable.
 
 Recommended identity model:
 
+- Trap commitment is separate from metric attribution:
+  - Accepted traps must be committed to the configured journal and/or OTLP output
+    backend even when source enrichment, vnode attribution, or profile metric
+    attribution is incomplete.
+  - Missing `SourceVnodeID` is not a reason to lose the trap.
+  - Metric attribution failures must be visible through continuous receiver-owned
+    diagnostics and `TRAP_ENRICHMENT` or equivalent log evidence.
 - Known source device:
   - Use existing trap enrichment to resolve `SourceVnodeID`.
   - Emit device-attributable trap metrics through V2 host scope for that vnode.
   - Add listener/job labels only as secondary labels where needed for debugging.
 - Unknown source device:
   - Use the configured `unresolved_source` policy.
-  - `drop_profile_metrics` is the default and emits only listener-owned health
-    counters.
-  - `per_source_label` is allowed only when the operator opts in and caps source
-    count.
+  - `source_label` is the default. It emits profile metrics under the receiver's
+    default host scope with bounded `source_id` and `source_kind` labels.
+  - `source_id` is derived from the selected trap source identity:
+    trusted `snmpTrapAddress.0` when accepted from a trusted relay, otherwise the
+    UDP peer address.
   - `synthetic_vnode` is a future opt-in mode and must be rejected by the
     initial schema until it is implemented deliberately.
   - Do not merge unrelated unknown devices into one chart.
   - Do not create unlimited synthetic vnodes by default.
 - Ambiguous source device:
-  - Treat as listener-owned and increment an ambiguity counter.
-  - Do not emit per-resource profile metrics for an ambiguous source.
+  - Commit the trap and preserve source/enrichment evidence in the trap log.
+  - Prefer the transport-selected source identity for bounded fallback metrics
+    when it is available and not over cap.
+  - Increment an ambiguity counter.
+  - Do not create or migrate vnode-scoped profile metrics from ambiguous vnode
+    enrichment.
   - Ambiguity includes conflicting registry/topology identities for the same
     trap source, or an original-source address supplied by an untrusted relay.
 - Listener-owned pipeline metrics:
   - Keep listener/job scope when the error has no trustworthy source.
   - Add source identity only for errors that can be attributed to a source.
+  - Emit continuously every `Collect()` cycle. Netdata receiver metrics must not
+    become sparse just because no trap arrived in a cycle.
 
 Existing built-in static charts such as trap events, severities, processing
 errors, and dedup suppression remain listener/job scoped unless a later design
@@ -1415,7 +1442,7 @@ Required labels for fallback source metrics:
 - `source_kind`, for example `trusted_trap_address` or `udp_peer`
 
 `identity.source_id_privacy` controls fallback source label privacy. It accepts
-`raw` or `hash`; `hash` is the default when `per_source_label` is used.
+`raw` or `hash`; `hash` is the default when `source_label` is used.
 `source_id` must be stable within the job and must respect this configured
 privacy mode:
 
@@ -1453,9 +1480,11 @@ Unresolved source eviction:
 - `max_sources` caps tracked unresolved sources per job.
 - When the cap is reached, the runtime evicts the least recently updated
   inactive unresolved source when possible.
-- If no inactive source can be evicted, new unresolved sources follow the
-  configured overflow behavior.
-- Evictions increment a built-in eviction counter.
+- If no inactive source can be evicted, accepted traps are still committed, but
+  new profile metric instances for the over-cap source are skipped according to
+  `drop_metric_instance`.
+- Evictions and skipped metric instances increment built-in continuous receiver
+  counters.
 - NAT, multi-homed devices, and relays that do not provide trusted original
   source identity can merge devices under one source address. Operators must use
   trusted relays or source-device enrichment to avoid that; the collector must
@@ -1467,18 +1496,53 @@ Identity to host-scope mapping:
   `ScopeKey=SourceVnodeID` and `GUID=SourceVnodeID`.
 - Use the enriched device hostname as host-scope hostname when present.
 - Do not add `source_id` labels to vnode-scoped device metrics by default.
-- If V2 host-scope emission is not implemented or not available, enabled rules
-  that require source-device identity must not start silently. The recommended
-  long-term path is to make V2 host-scope emission a prerequisite for shipping
-  device-attributable profile metrics.
-- If an implementation stages this work, job `Check()` must either fail with a
-  descriptive error naming the affected rules, or start only after explicitly
-  disabling those rules and exposing an operator-visible diagnostic such as
-  `profile_metrics.vnode_unavailable`. It must not degrade those rules to
-  per-job charts.
-- When V2 host scopes are available but an individual trap source is unknown,
-  the job's `unresolved_source` policy applies. The default remains
-  `drop_profile_metrics`; `per_source_label` is opt-in and capped.
+- When `SourceVnodeID` is absent, use the bounded fallback source identity under
+  the receiver/default host scope.
+- When V2 host scopes are available and a source later resolves to
+  `SourceVnodeID`, new emissions for that source use vnode host scope.
+- Existing fallback source-label chart instances are not migrated; they expire
+  through chart lifecycle. The transition must be visible through a diagnostic
+  counter or log message so chart discontinuity is explainable.
+
+Framework evidence:
+
+- Go V2 host scopes support multiple non-default host scopes from one collector
+  job; series identity includes host scope.
+- One chartengine engine is used per host scope, and explicit non-default scopes
+  emit under their `metrix.HostScope` GUID and metadata.
+- Therefore a trap listener job can keep receiver-owned metrics in the default
+  receiver scope while routing device-attributable metrics to per-source vnodes
+  when enrichment supplies them.
+
+### Metric Continuity
+
+Netdata does not support sparse receiver metrics. Trap-derived metric state is
+updated by trap arrival and emitted by the periodic collector cycle.
+
+Required behavior:
+
+- Receiver-owned metrics must be emitted every `Collect()` cycle regardless of
+  trap arrival in that cycle.
+- Counter rules keep cumulative totals per source/resource identity and emit the
+  current total every `Collect()` cycle while the identity is active.
+- State rules keep the last trap-derived state and emit it every `Collect()`
+  cycle until an explicit clear, TTL expiry, reload cleanup, or chart lifecycle
+  expiry removes it.
+- Sample rules keep the last trap-reported numeric value and emit it every
+  `Collect()` cycle while the sample is fresh.
+- Sample rules must have freshness semantics. The first implementation may use
+  chart lifecycle expiry as the freshness boundary, but it must not emit a
+  stale sample forever without an explicit profile rule or job default.
+- A missing varbind with `missing: drop` does not clear an existing active
+  sample or state value. It only skips the update for the received trap and
+  increments the relevant rule-miss or extraction-failure counter.
+- New source/resource instances are created only after a matching accepted trap,
+  unless a future approved inventory-seeding design adds pre-created instances.
+- Source/resource cap overflow must skip only the new metric instance or bucket
+  according to the configured overflow behavior. It must not drop the accepted
+  trap from the trap log/output backend.
+- Overflow, eviction, rule-miss, extraction-failure, and attribution-failure
+  diagnostics must themselves be continuous receiver-owned metrics.
 
 ### Resource Identity
 
@@ -2130,10 +2194,15 @@ The implementation must add tests for:
 - concurrent state updates from multiple trap-processing goroutines hitting the
   same rule and resource key;
 - per-source identity with known `SourceVnodeID`;
-- V2 host-scope unavailable behavior and operator-visible diagnostics;
+- V2 host-scope emission for known `SourceVnodeID`;
+- fallback source-label emission when `SourceVnodeID` is absent;
 - transition from unresolved fallback identity to known `SourceVnodeID`;
-- unresolved source fallback policy, including `drop_profile_metrics`,
-  `per_source_label`, hash privacy mode, and overflow behavior;
+- unresolved source fallback policy, including `source_label`, hash privacy
+  mode, and overflow behavior;
+- accepted trap commitment when profile metric attribution fails or cap overflow
+  skips new metric instances;
+- continuous emission of receiver counters, profile counters, state values, and
+  fresh sample values across `Collect()` cycles with no new traps;
 - hash privacy stability across restarts and absence of raw source label leakage
   in hash mode;
 - ambiguous source handling;
