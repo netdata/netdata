@@ -41,6 +41,7 @@ groups:
         title: SNMP trap events
         context: events
         units: events/s
+        algorithm: incremental
         type: stacked
         instances:
           by_labels: [job_name]
@@ -65,6 +66,7 @@ groups:
         title: SNMP trap events by severity
         context: severity
         units: events/s
+        algorithm: incremental
         type: stacked
         instances:
           by_labels: [job_name]
@@ -89,6 +91,7 @@ groups:
         title: SNMP trap processing errors
         context: errors
         units: errors/s
+        algorithm: incremental
         type: stacked
         instances:
           by_labels: [job_name]
@@ -127,6 +130,7 @@ groups:
         title: SNMP trap dedup suppressed events
         context: dedup_suppressed
         units: events/s
+        algorithm: incremental
         type: line
         instances:
           by_labels: [job_name]

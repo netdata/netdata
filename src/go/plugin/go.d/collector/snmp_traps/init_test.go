@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
@@ -21,10 +22,58 @@ func TestCollectorChartTemplateYAML(t *testing.T) {
 	collecttest.AssertChartTemplateSchema(t, New().ChartTemplateYAML())
 }
 
+func TestCollectorChartTemplateYAMLChartsDeclareAlgorithms(t *testing.T) {
+	charts := chartTemplatesByIDFromYAML(t, New().ChartTemplateYAML())
+	assertAllChartTemplatesDeclareAlgorithm(t, charts)
+
+	for _, id := range []string{
+		"events",
+		"severity",
+		"errors",
+		"dedup_suppressed",
+	} {
+		chart, ok := charts[id]
+		require.Truef(t, ok, "missing chart %q", id)
+		assert.Equalf(t, "incremental", chart.Algorithm, "chart %q algorithm", id)
+	}
+}
+
 func TestCollectorRegistrationAvailableByDefault(t *testing.T) {
 	creator, ok := collectorapi.DefaultRegistry.Lookup("snmp_traps")
 	require.True(t, ok)
 	assert.False(t, creator.Defaults.Disabled)
+}
+
+func chartTemplatesByIDFromYAML(t *testing.T, raw string) map[string]charttpl.Chart {
+	t.Helper()
+
+	spec, err := charttpl.DecodeYAML([]byte(raw))
+	require.NoError(t, err)
+
+	charts := make(map[string]charttpl.Chart)
+	collectChartTemplatesByID(t, charts, spec.Groups)
+	return charts
+}
+
+func assertAllChartTemplatesDeclareAlgorithm(t *testing.T, charts map[string]charttpl.Chart) {
+	t.Helper()
+
+	for id, chart := range charts {
+		assert.NotEmptyf(t, chart.Algorithm, "chart %q must not rely on algorithm inference", id)
+	}
+}
+
+func collectChartTemplatesByID(t *testing.T, charts map[string]charttpl.Chart, groups []charttpl.Group) {
+	t.Helper()
+
+	for _, group := range groups {
+		for _, chart := range group.Charts {
+			require.NotEmpty(t, chart.ID)
+			require.NotContainsf(t, charts, chart.ID, "duplicate chart id %q", chart.ID)
+			charts[chart.ID] = chart
+		}
+		collectChartTemplatesByID(t, charts, group.Groups)
+	}
 }
 
 func TestConfigSchemaDynCfgListFieldsHaveSafeDefaults(t *testing.T) {
