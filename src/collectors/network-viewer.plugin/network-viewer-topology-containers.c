@@ -33,9 +33,35 @@ const char *nv_cached_label_value(const NV_APPS_LOOKUP_FIELDS *fields, const cha
     return NULL;
 }
 
+static bool nv_orchestrator_uses_cgroup_name_identity(uint16_t orchestrator)
+{
+    switch(orchestrator) {
+        case NIPC_ORCHESTRATOR_DOCKER:
+        case NIPC_ORCHESTRATOR_K8S:
+        case NIPC_ORCHESTRATOR_KVM:
+        case NIPC_ORCHESTRATOR_LXC:
+        case NIPC_ORCHESTRATOR_PODMAN:
+        case NIPC_ORCHESTRATOR_NSPAWN:
+            return true;
+        default:
+            return false;
+    }
+}
+
 bool nv_cgroup_fields_have_container_identity(const NV_APPS_LOOKUP_FIELDS *fields)
 {
     if(!fields || fields->cgroup_status != NIPC_APPS_CGROUP_KNOWN)
+        return false;
+
+    const char *label = nv_cached_label_value(fields, "k8s_container_name");
+    if(label && *label)
+        return true;
+
+    label = nv_cached_label_value(fields, "container_name");
+    if(label && *label)
+        return true;
+
+    if(!nv_orchestrator_uses_cgroup_name_identity(fields->orchestrator))
         return false;
 
     char container_name[NV_TOPOLOGY_CONTAINER_NAME_MAX];

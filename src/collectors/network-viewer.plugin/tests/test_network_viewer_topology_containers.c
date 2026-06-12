@@ -195,6 +195,26 @@ static bool test_container_identity_gating(void)
              !nv_cgroup_fields_have_container_identity(&known_without_name),
              "known cgroup without name or labels should still allow user fallback") && ok;
 
+    NV_APPS_LOOKUP_FIELDS known_user_slice_with_name = {
+        .cgroup_status = NIPC_APPS_CGROUP_KNOWN,
+        .orchestrator = NIPC_ORCHESTRATOR_UNKNOWN,
+        .cgroup_path = "/sys/fs/cgroup/user.slice/user-1003.slice/user@1003.service/app.slice/app-code.scope",
+        .cgroup_name = "app-code",
+    };
+    ok = expect_true(
+             !nv_cgroup_fields_have_container_identity(&known_user_slice_with_name),
+             "known user.slice cgroup name should still allow user fallback") && ok;
+
+    NV_APPS_LOOKUP_FIELDS systemd_service_with_name = {
+        .cgroup_status = NIPC_APPS_CGROUP_KNOWN,
+        .orchestrator = NIPC_ORCHESTRATOR_SYSTEMD,
+        .cgroup_path = "/sys/fs/cgroup/system.slice/sshd.service",
+        .cgroup_name = "sshd.service",
+    };
+    ok = expect_true(
+             !nv_cgroup_fields_have_container_identity(&systemd_service_with_name),
+             "systemd service cgroup name should not claim container identity") && ok;
+
     return ok;
 }
 
