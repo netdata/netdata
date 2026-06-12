@@ -1,0 +1,1959 @@
+# SNMP Trap Metric Profiles
+
+## Status
+
+- Status: Phase 2 design draft.
+- Design status: recommended design written; three external design review
+  rounds incorporated; implementation is blocked until the user approves the
+  compatibility and host-scope staging decisions.
+- Review plan:
+  - Phase 1: external gap analysis of the use-case inventory, completed and
+    incorporated.
+  - Phase 2: design proposal and external design review.
+
+## Purpose
+
+Netdata needs a trap-to-metrics system that lets operators convert selected SNMP
+trap signals into useful metrics without losing the forensic value of trap logs.
+
+The system must support practical, profile-backed use cases across stock and
+operator-provided trap profiles. The first requirement is to identify the whole
+goal before designing the schema.
+
+## Scope Of This Spec
+
+This document records:
+
+- operator use cases;
+- concrete trap/profile examples;
+- why the current implementation is insufficient;
+- practical constraints the future design must satisfy;
+- the recommended profile-based design for supporting these use cases.
+
+This spec intentionally does not define:
+
+- runtime data structures;
+- exact Go types;
+- file-by-file implementation plan;
+- final default enablement policy for stock-generated metric rules;
+- UI or dashboard design.
+
+## Ground Rules
+
+- Per-device visibility is mandatory. A trap listener often receives traps from
+  many devices, so totals across all devices are not enough.
+- Trap logs remain the source of full event detail. Metrics are derived signals
+  for dashboards, alerting, trend detection, and quick triage.
+- High-cardinality values such as usernames, MAC addresses, source IPs,
+  interface names, peer addresses, alert keys, and free-form descriptions must
+  not become unbounded metric labels by default.
+- A trap-derived state is event-driven and lossy unless reconciled by polling.
+  Missed clear traps, packet loss, and device reboot can make state stale.
+- The stock profile pack can provide common, safe behavior, but operators must
+  be able to add or adjust site-specific trap metrics through custom profiles.
+- Every accepted use case must be backed by real profile/MIB evidence or by an
+  established open-source monitoring implementation.
+
+## Industry Context
+
+Existing open-source NMS implementations mostly treat SNMP traps as events,
+alarms, or state mutations, not as a profile-driven trap-to-time-series
+extraction system. Netdata should reuse their operational lessons for resource
+identity, problem/clear pairing, and cardinality, but should not assume there is
+a mature open-source trap-metric profile schema to copy.
+
+Evidence:
+
+- `librenms/librenms @ 5ffbb16324ad7c25f9588801ca9d4d52da45ea21`
+  `LibreNMS/Snmptrap/Handlers/LinkDown.php:48` through `:74` resolves
+  `ifIndex`, updates the matched port, and logs interface-scoped events.
+- `librenms/librenms @ 5ffbb16324ad7c25f9588801ca9d4d52da45ea21`
+  `LibreNMS/Snmptrap/Handlers/BgpEstablished.php:48` through `:65` resolves a
+  BGP peer from the trap OID suffix and updates peer state.
+- `opennms/opennms @ 40cc8535351f09c24978771a8832cfc286b85572`
+  `docs/modules/operation/pages/deep-dive/alarms/configuring-alarms.adoc:56`
+  through `:142` documents reduction keys, problem/resolution alarm types, and
+  clear keys.
+
+## Current Implementation Baseline
+
+Facts from the current SNMP trap collector:
+
+- Job-level operator metrics are configured as `oid`, `context`, and optional
+  `dimension_from_varbind`.
+- The runtime increments counters when the trap OID matches.
+- The runtime does not extract numeric values from trap varbinds.
+- The runtime does not filter metrics by varbind predicates.
+- The runtime rejects duplicate configured OIDs, so one trap OID cannot emit
+  several independent metrics through the current job-level contract.
+- Existing static and operator-created metric instances are scoped by listener
+  job, not by source device.
+- Trap profile YAML currently has `extends`, `varbinds`, and `traps`, but no
+  profile-local metric section.
+
+Evidence:
+
+- `src/go/plugin/go.d/collector/snmp_traps/config.go:72` through `:76`
+- `src/go/plugin/go.d/collector/snmp_traps/operator_metric.go:23` through `:55`
+- `src/go/plugin/go.d/collector/snmp_traps/operator_metric.go:192` through `:219`
+- `src/go/plugin/go.d/collector/snmp_traps/operator_metric.go:380` through `:420`
+- `src/go/plugin/go.d/collector/snmp_traps/profile.go:156` through `:164`
+
+## Use Case 1: Per-Device Trap Activity
+
+Operator question:
+
+- Which device is producing trap activity?
+- Which devices suddenly started sending more state-change, security, auth,
+  config-change, or diagnostic traps?
+- Which device is responsible for a spike seen on a shared trap listener?
+
+Concrete examples:
+
+- A single trap listener receives `IF-MIB::linkDown` and `IF-MIB::linkUp` from
+  many switches.
+- A single trap listener receives `SNMPv2-MIB::authenticationFailure` from many
+  devices.
+- A trap hub receives BGP transition traps from many routers.
+
+Why it matters:
+
+- Listener-level totals are operationally ambiguous. They answer "did the hub
+  receive traps?", not "which device is affected?".
+- Device-level views are the minimum useful identity for Netdata dashboards,
+  alerts, and triage.
+
+Evidence:
+
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/standard.yaml:15536`
+  through `:15555` defines `IF-MIB::linkDown` and `IF-MIB::linkUp`.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/standard.yaml:15557`
+  defines `SNMPv2-MIB::authenticationFailure`.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/standard.yaml:10068`
+  through `:10086` includes current BGP established/backward-transition
+  notifications.
+
+## Use Case 2: Filtered Event Counters
+
+Operator question:
+
+- How many trap events of a specific kind happened after excluding expected or
+  low-value events?
+- Can planned or harmless state changes be separated from operational problems?
+
+Concrete examples:
+
+- Count `IF-MIB::linkDown` only when `ifAdminStatus=up`, so planned
+  administrative shutdowns are not counted as unexpected link failures.
+- Count Cisco CLI running-config changes only for terminal types such as
+  `console`, `terminal`, `virtual`, or another explicitly selected enum value.
+- Count only CloudVision firing notifications whose carried severity is
+  `critical`.
+
+Why it matters:
+
+- Trap OID alone is often too coarse.
+- Profiles already know the varbind names and many enum values needed to make
+  useful distinctions.
+- Without filtering, operators must either count noisy events or avoid metrics
+  for those traps entirely.
+
+Evidence:
+
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/standard.yaml:2209`
+  through `:2215` defines `ifAdminStatus` enum values.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/standard.yaml:15536`
+  through `:15545` shows `linkDown` carries `ifAdminStatus`.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/ciscosystems.yaml:4211`
+  through `:4220` defines Cisco terminal type enum values.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/ciscosystems.yaml:4221`
+  through `:4224` defines the terminal user as `DisplayString`; this is useful
+  log detail, not a safe default metric label.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/ciscosystems.yaml:33139`
+  through `:33148` shows `ccmCLIRunningConfigChanged` carries terminal type and
+  terminal user.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/arista-networks-inc-formerly-arastra-inc.yaml:106`
+  through `:113` defines `aristaCvAlertSeverity`.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/arista-networks-inc-formerly-arastra-inc.yaml:271`
+  through `:284` shows CloudVision firing notifications carry the severity
+  varbind.
+
+## Use Case 3: Numeric Samples Carried By Traps
+
+Operator question:
+
+- What value did the device report when it emitted the trap?
+- How close was the resource to the threshold or limit?
+- Did the reported value trend upward across repeated threshold traps?
+
+Concrete examples:
+
+- Arista hardware utilization alerts carry in-use entries and high-watermark
+  values.
+- Juniper DFC packet-rate threshold traps carry input packet rate and watermark
+  values.
+- Juniper IDP CPU and memory notifications carry usage and threshold values.
+
+Why it matters:
+
+- Some traps are not just event notifications. They carry the measurement that
+  triggered the notification.
+- Counting those traps loses the most useful numeric information.
+- Operators need docs to understand that these are trap-arrival samples, not
+  continuously polled gauges.
+
+Evidence:
+
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/arista-networks-inc-formerly-arastra-inc.yaml:244`
+  through `:253` shows Arista hardware utilization values.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/juniper-networks-inc.yaml:4428`
+  through `:4460` shows Juniper DFC packet-rate and watermark values.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/juniper-networks-inc.yaml:4542`
+  through `:4565` shows Juniper IDP CPU/memory usage and threshold values.
+
+## Use Case 4: Multiple Metrics From One Notification Or Notification Family
+
+Operator question:
+
+- Can one received trap update all useful metric values carried by that trap?
+- Can related reported values be charted together without requiring duplicate
+  trap-profile copies?
+
+Concrete examples:
+
+- Arista CLB flow threshold notifications carry allocated, unallocated, learned,
+  threshold, and limit values across the same notification family.
+- Juniper DFC memory threshold traps carry flow usage, flow watermarks, criteria
+  usage, and criteria watermarks in one notification.
+
+Why it matters:
+
+- Real traps frequently carry several related numeric fields.
+- Restricting one trap OID to one metric forces operators to choose one value
+  and discard the rest.
+- Related values often belong on the same chart or in a small group of charts.
+
+Evidence:
+
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/arista-networks-inc-formerly-arastra-inc.yaml:300`
+  through `:347` shows Arista CLB flow fields.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/juniper-networks-inc.yaml:4497`
+  through `:4523` shows Juniper DFC hard memory fields.
+- `src/go/plugin/go.d/collector/snmp_traps/operator_metric.go:27` through `:41`
+  shows current job-level metrics reject duplicate OIDs.
+
+## Use Case 5: Per-Resource Trap Metrics
+
+Operator question:
+
+- Which interface, VLAN, service set, port group, sensor, peer, or local device
+  resource is affected?
+- Can the dashboard show the noisy or failing resource without turning every
+  arbitrary varbind into a metric label?
+
+Concrete examples:
+
+- Count `linkDown` and `linkUp` per device interface using `ifIndex` or an
+  enriched interface identity.
+- Count Cisco port-security violations per interface or VLAN while keeping the
+  violating MAC address in logs only.
+- Track Juniper DFC packet-rate threshold events per interface.
+- Track Arista CLB flow threshold events per port group.
+
+Why it matters:
+
+- Device-level identity is necessary but not always sufficient.
+- Network operators often troubleshoot at interface, peer, sensor, or service
+  object level.
+- Raw resource names can be high-cardinality, unstable, or sensitive, so the
+  use case requires bounded resource identity rather than arbitrary labels.
+- Resource strings such as port-group names can be used only when the profile or
+  operator explicitly treats them as bounded resource identities.
+
+Evidence:
+
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/standard.yaml:2224`
+  through `:2227` defines `ifIndex` as a large interface index range.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/ciscosystems.yaml:37706`
+  through `:37735` shows Cisco port-security traps carry interface/VLAN/MAC
+  detail.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/juniper-networks-inc.yaml:4428`
+  through `:4460` shows Juniper DFC packet-rate traps carry interface names.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/arista-networks-inc-formerly-arastra-inc.yaml:300`
+  through `:347` shows Arista CLB port-group fields.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md:337`
+  through `:342` distinguishes high-cardinality log content from bounded metric
+  labels.
+
+## Use Case 6: Trap-Derived Current State
+
+Operator question:
+
+- Is this resource currently in a problem state according to the last received
+  trap pair?
+- Which resources are currently firing, asserted, exceeded, down, or degraded?
+
+Concrete examples:
+
+- `IF-MIB::linkDown` marks an interface down; matching `IF-MIB::linkUp` clears
+  it.
+- Arista external alarm asserted/deasserted notifications track active external
+  alarms.
+- Arista CloudVision firing/resolved notifications track active CloudVision
+  alerts.
+- Juniper exceeded/under-threshold or notify/restored pairs track active
+  threshold state.
+
+Why it matters:
+
+- Event counters show rate and flapping, but they do not answer "is it still
+  active?".
+- Many vendor MIBs model problem and clear notifications as separate traps.
+- The resulting state is useful, but it must be documented as trap-derived and
+  potentially stale when clear traps are missed.
+
+Evidence:
+
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/standard.yaml:15536`
+  through `:15555` defines `linkDown` and `linkUp`.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/arista-networks-inc-formerly-arastra-inc.yaml:254`
+  through `:269` defines external alarm asserted/deasserted notifications.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/arista-networks-inc-formerly-arastra-inc.yaml:271`
+  through `:299` defines CloudVision firing/resolved notifications.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/juniper-networks-inc.yaml:4428`
+  through `:4523` includes exceeded/under-threshold notification pairs.
+
+## Use Case 7: Severity-Aware Metric Filtering And Grouping
+
+Operator question:
+
+- Can metrics separate critical vendor alerts from lower-priority vendor alerts?
+- Can vendor-specific severity values be normalized for metric grouping or
+  filtering while the raw value remains available in logs?
+
+Concrete examples:
+
+- Arista CloudVision firing/resolved notifications carry
+  `aristaCvAlertSeverity` with values `info`, `warning`, `error`, and
+  `critical`.
+- A user may want only `critical` CloudVision firing notifications to feed a
+  critical-alert metric, while retaining all CloudVision trap logs.
+
+Why it matters:
+
+- Static profile severity describes the default Netdata classification for the
+  trap OID.
+- Some vendors put the actual alert severity in a varbind, so the same trap OID
+  can carry different operational priority.
+- Metrics may need severity-aware filtering or grouping without changing the
+  journal severity contract in this phase.
+- This is a specialization of filtered counters and trap-derived state, not a
+  separate metric kind.
+
+Evidence:
+
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/arista-networks-inc-formerly-arastra-inc.yaml:106`
+  through `:113` defines `aristaCvAlertSeverity`.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/arista-networks-inc-formerly-arastra-inc.yaml:271`
+  through `:299` shows CloudVision firing/resolved traps carry severity.
+
+## Use Case 8: Audit And Security Counters With Sensitive Detail In Logs
+
+Operator question:
+
+- How often are configuration changes, auth failures, and security violations
+  happening per device or resource?
+- Can sensitive or high-cardinality event detail remain searchable in logs while
+  metrics stay bounded?
+
+Concrete examples:
+
+- Cisco configuration-change traps include terminal user and terminal type.
+- Cisco port-security traps include interface, VLAN, and violating MAC address.
+- SNMP authentication-failure traps indicate authentication problems, but the
+  system must not expose credentials or sensitive source details as metric
+  labels.
+
+Why it matters:
+
+- Security and audit workflows need counters and trends, but the full event
+  details are often sensitive or high-cardinality.
+- Metrics should answer rate and scope questions; logs should preserve the full
+  event context.
+
+Evidence:
+
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/ciscosystems.yaml:33139`
+  through `:33148` shows Cisco config-change user and terminal varbinds.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/ciscosystems.yaml:37706`
+  through `:37735` shows Cisco port-security MAC/interface/VLAN detail.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/ciscosystems.yaml:23357`
+  through `:23360` defines the last secure MAC address as `MacAddress`; this is
+  useful log detail, not a safe default metric label.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/standard.yaml:15557`
+  defines `SNMPv2-MIB::authenticationFailure`.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md:337`
+  through `:342` records the existing bounded-label rule.
+
+## Use Case 9: Lifecycle And Availability Event Counters
+
+Operator question:
+
+- Which devices rebooted or restarted their SNMP entity?
+- Can lifecycle changes be tracked per device without turning each event into a
+  long-lived state metric?
+
+Concrete examples:
+
+- `SNMPv2-MIB::coldStart` and `SNMPv2-MIB::warmStart` count device SNMP entity
+  initialization events.
+- Vendor restart or management-agent restart traps can be counted the same way
+  when profiles identify them.
+
+Why it matters:
+
+- Some traps are best treated as event history and rates, not numeric samples or
+  current state.
+- These counters are useful for flapping detection, incident timelines, and
+  post-reboot verification.
+- Routing and adjacency churn is related, but it is a separate use case because
+  it needs per-peer identity.
+
+Evidence:
+
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/standard.yaml:15525`
+  through `:15534` defines `coldStart` and `warmStart`.
+
+## Use Case 10: Operator-Defined Custom Trap Semantics
+
+Operator question:
+
+- How can an operator add metrics for vendor, site, or product traps that
+  Netdata does not ship yet?
+- How can an operator define metrics for generic or user-defined trap slots whose
+  semantics are site-specific?
+
+Concrete examples:
+
+- A vendor MIB has local user-defined event traps.
+- A site uses custom enterprise traps for UPS, environmental, access-control, or
+  application events.
+- A stock profile decodes a trap, but the operator wants a site-specific metric
+  view or threshold filter.
+
+Why it matters:
+
+- Stock profiles cannot predict every site-specific trap meaning.
+- Operators need a supported path that survives package upgrades.
+- Custom metric behavior should live with custom trap-profile knowledge, not in
+  collector source code.
+- This is a cross-cutting authoring requirement. It does not add a new metric
+  behavior by itself; it applies to every use case in this document.
+
+Evidence:
+
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md:36`
+  through `:46` documents stock and operator trap profile directories.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md:132`
+  through `:137` documents converting custom MIBs offline and dropping YAML
+  files under `/etc/netdata/go.d/snmp.trap-profiles/`.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md:346`
+  through `:365` documents operator override files and `extends:`.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/milestone-systems-a-s.yaml:17`
+  shows a shipped profile containing a user-defined event trap example.
+
+## Use Case 11: Standard Alarm Set/Clear Metrics
+
+Operator question:
+
+- Which standard SNMP alarms are currently set per device or resource?
+- Which alarm classes, probable causes, and perceived severities are recurring?
+- Can a single status-change trap OID both assert and clear a state metric based
+  on a carried condition varbind?
+
+Concrete examples:
+
+- `SNMP-ALARM-MIB::snmpAlarmStatusChange` carries `snmpAlarmLogCond` with `set`
+  or `clear` values plus an alarm identifier.
+- `SNMP-ALARM-MIB::snmpItuAlarmStatusChange` carries ITU alarm class, probable
+  cause, perceived severity, and additional text.
+- `RMON-MIB::risingAlarm` and `RMON-MIB::fallingAlarm` carry the sampled value,
+  threshold, sample type, and alarmed variable.
+
+Why it matters:
+
+- Some common alarm MIBs do not use separate problem and clear trap OIDs.
+- Trap-to-state logic must support set/clear semantics carried by a varbind, not
+  only OID pairs.
+- Alarm identifiers and affected variables can be resource keys, but additional
+  text must remain log detail unless explicitly bounded.
+
+Evidence:
+
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/standard.yaml:5516`
+  through `:5525` defines `snmpAlarmLogCond` set/clear values and
+  `snmpAlarmLogId`.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/standard.yaml:5559`
+  through `:5588` defines ITU alarm class, severity, and probable-cause fields.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/standard.yaml:10067`
+  through `:10128` defines BGP and RMON rising/falling notifications.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/standard.yaml:15563`
+  through `:15590` defines SNMP-ALARM-MIB status-change notifications and their
+  varbinds.
+- `opennms/opennms @ 40cc8535351f09c24978771a8832cfc286b85572`
+  `docs/modules/operation/pages/deep-dive/alarms/configuring-alarms.adoc:94`
+  through `:134` documents problem/resolution alarms and clear keys.
+
+## Use Case 12: Environmental, Power, And Component State
+
+Operator question:
+
+- Which device sensor, fan, power supply, UPS, battery, or environmental contact
+  is in a problem state?
+- What value did the device report for voltage, temperature, CPU, or another
+  component measurement when the trap fired?
+- Which problem/clear pairs are flapping?
+
+Concrete examples:
+
+- APC UPS traps report overload, on-battery, low-battery,
+  battery-needs-replacement, fault, and corresponding clear events.
+- Cisco ENVMON traps report voltage, temperature, fan, and power-supply state
+  changes, with value varbinds for voltage and temperature.
+- Cisco CPU threshold traps report threshold and current interval values.
+
+Why it matters:
+
+- Trap profiles contain many hardware and environmental notifications that are
+  operationally closer to component health than generic event counts.
+- Operators need per-device and, where bounded, per-component visibility.
+- Numeric values carried by these traps are useful samples, while problem/clear
+  pairs are useful trap-derived state.
+
+Evidence:
+
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/american-power-conversion-corp.yaml:409`
+  through `:449` defines UPS overload, on-battery, and low-battery traps.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/american-power-conversion-corp.yaml:481`
+  through `:611` defines low-battery clear, battery replacement, contact fault,
+  fan failure, and battery-pack communication events.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/american-power-conversion-corp.yaml:660`
+  through `:684` defines overload-cleared and battery-replaced traps.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/ciscosystems.yaml:32724`
+  through `:32781` defines Cisco voltage and temperature notifications with
+  value and state varbinds.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/ciscosystems.yaml:32745`
+  through `:32761` defines Cisco fan and redundant power-supply notifications.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/ciscosystems.yaml:33716`
+  through `:33736` defines Cisco CPU rising/falling threshold notifications.
+
+## Use Case 13: Routing Protocol, HA, And Adjacency State
+
+Operator question:
+
+- Which peer, neighbor, or redundancy group changed state?
+- Which device has routing adjacency churn or HA state flapping?
+- Is a routing or HA session currently up, down, degraded, or in a vendor state
+  according to the last trap?
+
+Concrete examples:
+
+- Standard BGP established and backward-transition notifications carry the BGP
+  peer address and peer state.
+- Vendor OSPF neighbor state-change notifications carry neighbor identity and
+  neighbor state.
+- Cisco HSRP notifications carry standby group state.
+
+Why it matters:
+
+- Device lifecycle counters are not enough for routing and HA operations.
+- The useful identity is usually device plus peer, neighbor, or group, not only
+  the trap OID.
+- Peer addresses and neighbor identifiers can explode cardinality in large
+  networks, so profiles need explicit resource-label discipline.
+
+Evidence:
+
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/standard.yaml:10068`
+  through `:10086` defines current BGP established/backward-transition
+  notifications with `bgpPeerRemoteAddr` and `bgpPeerState`.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/nbase-switch-communication.yaml:2757`
+  through `:2769` defines OSPF neighbor state-change varbinds.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/ciscosystems.yaml:33708`
+  through `:33714` defines Cisco HSRP state-change varbinds.
+- `librenms/librenms @ 5ffbb16324ad7c25f9588801ca9d4d52da45ea21`
+  `LibreNMS/Snmptrap/Handlers/BgpBackwardTransition.php:48` through `:66`
+  resolves a BGP peer and updates peer state.
+
+## Use Case 14: Capacity, Pool, And Utilization Thresholds
+
+Operator question:
+
+- Which device or bounded resource crossed a capacity threshold?
+- What was the reported utilization, pool count, or allocation count at the
+  time?
+- Did the threshold condition clear?
+
+Concrete examples:
+
+- Cisco DHCP free-address low/high threshold traps carry scope, current free
+  address value, threshold type, and threshold value.
+- Cisco CGN NAT port-usage watermark traps carry current port allocation and low
+  or high threshold values.
+- Cisco CPU and RMON rising/falling traps carry reported values and thresholds.
+
+Why it matters:
+
+- Capacity traps are often only useful when the reported numeric value and the
+  configured threshold are retained as metrics.
+- Many capacity conditions have a clear notification and can also drive
+  trap-derived state.
+- Scope names and variables need bounded-resource handling; raw names are not
+  safe labels by default.
+
+Evidence:
+
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/ciscosystems.yaml:34109`
+  through `:34133` defines Cisco DHCP free-address low/high threshold traps and
+  carried scope/value/threshold varbinds.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/ciscosystems.yaml:45656`
+  through `:45691` defines Cisco CGN port-usage low/high watermark and clear
+  traps.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/ciscosystems.yaml:33716`
+  through `:33736` defines Cisco CPU threshold value and current interval value
+  varbinds.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/standard.yaml:10105`
+  through `:10128` defines RMON rising/falling alarm value and threshold
+  varbinds.
+
+## Use Case 15: L2 Topology And Neighbor Change Counters
+
+Operator question:
+
+- Which devices are reporting topology or neighbor churn?
+- How many neighbor rows were inserted, deleted, dropped, or aged out?
+- Which switches reported spanning-tree root changes?
+
+Concrete examples:
+
+- LLDP remote-table change traps carry insert, delete, drop, and age-out counts.
+- STP root-election traps report topology changes that should be visible per
+  device.
+
+Why it matters:
+
+- Topology-related traps are operationally useful as counters and rates even when
+  Netdata does not mutate topology from traps.
+- LLDP table-change traps already carry multiple numeric counters in one
+  notification.
+- STP and LLDP churn can indicate loops, cabling changes, switch instability, or
+  monitoring blind spots.
+
+Evidence:
+
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/shanghai-meridian-technologies-co-ltd.yaml:1016`
+  through `:1025` defines an LLDP remote-tables-change trap with insert, delete,
+  drop, and age-out counters.
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/dell-inc.yaml:21623`
+  through `:21632` defines a Dell STP new-root-election trap.
+
+## Use Case 16: Receiver Pipeline Health By Source
+
+Operator question:
+
+- Which source device or relay path is producing unknown OIDs, decode failures,
+  auth failures, rate-limit drops, or INFORM response failures?
+- Is a trap listener healthy for all devices, or only healthy in aggregate?
+- Did relay source attribution cause device identity ambiguity?
+
+Concrete examples:
+
+- A single listener receives valid traps from most devices but decode failures
+  from one vendor profile.
+- A relay forwards traps and supplies `snmpTrapAddress.0`; misconfigured trusted
+  relay settings can affect source-device identity.
+- INFORM responses can fail for one source even while normal traps continue.
+
+Why it matters:
+
+- Pipeline health is currently job-level. That hides per-source operational
+  problems behind listener totals.
+- Source identity is the foundation for all per-device trap metrics.
+- These metrics are system metrics, not profile-derived vendor metrics, but they
+  share the same per-device requirement.
+
+Evidence:
+
+- `src/go/plugin/go.d/collector/snmp_traps/metrics.go:12` through `:28` defines
+  trap error counters including unknown OID, decode failure, rate-limit drops,
+  auth failures, unknown engine ID, INFORM response failure, and export/write
+  failures.
+- `src/go/plugin/go.d/collector/snmp_traps/metrics.go:241` through `:284`
+  collects events, severities, and errors with only a `job_name` label.
+- `src/go/plugin/go.d/collector/snmp_traps/config.go:26` through `:28` defines
+  trusted relay configuration.
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:740` through `:744`
+  warns that catch-all trusted relays let every peer override source identity
+  via `snmpTrapAddress.0`.
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:592` through `:600`
+  handles INFORM responses and increments `inform_response_failed`.
+
+## Explicit Non-Goals
+
+This use-case inventory does not require the future design to support:
+
+- Dynamic override of journal `TRAP_SEVERITY` or `PRIORITY` from varbind values.
+  Severity-aware metrics must not silently change the trap log severity
+  contract.
+- A full alarm, incident, or correlation engine. Lightweight trap-derived state
+  is required; OpenNMS-style alarm lifecycle management is not.
+- Polling reconciliation, interpolation, or gap filling. Trap-carried numeric
+  values are arrival-time samples, and trap-derived state can be stale.
+- Automatic metric generation for every decoded stock trap.
+- Arbitrary string, MAC address, IP address, username, free-form text, alarm
+  text, or peer identifier as a metric label by default.
+- Trap-driven topology mutation. Topology traps can produce counters or samples,
+  but updating Netdata topology graphs is a separate subsystem.
+- Cross-device aggregation inside the collector. Aggregation belongs in query,
+  dashboard, or alerting layers; the collector must preserve per-device identity.
+- A general-purpose expression language as a requirement of this use-case set.
+  Filtering is required, but this phase does not prescribe syntax.
+- Runtime MIB compilation, a GUI wizard, or profile editing inside the Agent.
+  Operators must be able to provide custom profile files, matching existing trap
+  profile authoring methodology.
+
+## Cross-Cutting Practical Constraints
+
+- Metric identity must include source device or an approved equivalent.
+- Resource-level metrics must be bounded, stable enough for charts, and
+  operator-understandable.
+- Missing varbinds must have explicit behavior.
+- Numeric trap samples must distinguish sample value, threshold value, and
+  event count.
+- Trap-derived current state must explain stale-state risk.
+- Set/clear state must support both separate problem/clear OIDs and same-OID
+  condition varbinds.
+- Metric labels must not leak sensitive values or unbounded identifiers.
+- Per-device receiver pipeline health is required even when it is not driven by
+  vendor trap profiles.
+- Stock-generated metrics must not create surprising high cardinality by
+  default.
+- Custom profiles must not require editing shipped stock files.
+
+## Phase 1 Review Questions
+
+External reviewers should answer only use-case coverage questions:
+
+1. Which practical trap-to-metric use cases are missing?
+2. Which missing cases are backed by common vendor MIB patterns or established
+   open-source monitoring behavior?
+3. Which listed cases are too broad, unsafe, or not useful enough to support?
+4. Which examples should be replaced with stronger real-world examples?
+5. Which use cases need explicit non-goals to avoid overbuilding?
+
+Reviewers should not propose schema syntax in Phase 1 except when needed to
+explain a missing use case.
+
+## Phase 2 Recommended Design
+
+### Summary
+
+Use the existing SNMP trap profile system as the source of truth for trap metric
+rules. A trap profile should be able to define:
+
+- how a trap is decoded, classified, and rendered;
+- which optional metrics can be derived from selected traps;
+- how those metrics are filtered, typed, scoped, bounded, and charted.
+
+The job configuration should define runtime policy only:
+
+- listener, authentication, source trust, dedup, rate limit, journal, and OTLP
+  behavior as today;
+- whether profile-defined trap metrics are enabled;
+- which profile metric rules are allowed;
+- per-source and per-resource cardinality limits;
+- how unresolved source-device identity is handled.
+
+This is intentionally closer to SNMP polling profiles than Prometheus profiles.
+Prometheus profiles organize an existing metric stream. Trap profiles must also
+define extraction, because a trap is an event plus varbinds, not an already
+emitted metric family.
+
+### Operator Workflow
+
+Common operator path:
+
+1. Configure the trap listener as today.
+2. Configure `source.trusted_relays` only when traps pass through relays that
+   must be allowed to set `snmpTrapAddress.0`.
+3. Enable profile-defined trap metrics in the job.
+4. Pick `auto`, `exact`, or `combined` selection for metric rules.
+5. Set cardinality limits appropriate for the trap hub.
+6. Add a custom or override trap profile under
+   `/etc/netdata/go.d/snmp.trap-profiles/` only when stock profiles do not
+   provide the desired metric behavior.
+
+Illustrative job configuration:
+
+```yaml
+jobs:
+  - name: campus-traps
+    listen:
+      endpoints:
+        - protocol: udp
+          address: 0.0.0.0
+          port: 162
+    versions: [v2c, v3]
+    source:
+      trusted_relays:
+        - 192.0.2.0/24
+    profile_metrics:
+      enabled: true
+      mode: combined          # none | auto | exact | combined
+      include:
+        - IF-MIB::unexpected-link-down-events
+        - CISCO-CONFIG-MAN-MIB::cli-config-change-console-events
+      identity:
+        device: source_vnode
+        unresolved_source: per_source_label   # explicit opt-in fallback
+        source_id_privacy: raw                # raw | hash
+      limits:
+        max_rules: 500
+        max_sources: 2000
+        max_resources_per_source: 512
+        max_instances_per_job: 50000
+        overflow: drop_and_count
+```
+
+The exact field names can change during implementation, but the responsibilities
+must not:
+
+- profile files define metric semantics;
+- jobs define enablement, source identity policy, and limits;
+- source-device identity is mandatory for every device-attributable trap metric.
+- `identity.device: source` inside a profile rule means "use the job's
+  configured source-device identity policy". It does not mean "use the raw
+  sender address as a label".
+- `profile_metrics:` enables profile-defined metric rules. The existing
+  job-level `metrics:` key, when retained as a legacy shim, continues to define
+  per-job OID event counters only.
+
+Safe defaults:
+
+- When `profile_metrics` is absent, no profile-local metric rules are evaluated.
+- `profile_metrics.enabled` defaults to `false`.
+- If `profile_metrics` is present but `mode` is absent, the mode is `none`.
+- `identity.device` defaults to `source_vnode`.
+- `identity.unresolved_source` defaults to `drop_profile_metrics`.
+- `identity.source_id_privacy` defaults to `hash` when `per_source_label` is
+  used. Exposing raw source addresses requires explicit operator opt-in.
+
+Job-level `identity.device` values:
+
+- `source_vnode`: use V2 host scope for known `SourceVnodeID`; unknown sources
+  follow `identity.unresolved_source`.
+- `source_label`: always use bounded `source_id` labels instead of vnode host
+  scope. This is an explicit operational/debug mode and remains capped.
+- `listener`: listener-owned metrics only. This is invalid for selected
+  device-attributable profile rules unless those rules explicitly declare
+  listener scope.
+
+### Enablement Policy
+
+Profile-defined metrics must be safe by default.
+
+Job modes:
+
+- `none`: no profile-defined trap metrics are emitted.
+- `auto`: enable stock rules explicitly marked `auto_safe: true`, plus
+  operator-owned rules explicitly marked `auto_safe: true`.
+- `exact`: enable only rule names listed in `profile_metrics.include`.
+- `combined`: enable `auto` rules plus rule names listed in
+  `profile_metrics.include`.
+
+Rule defaults:
+
+- `auto_safe` defaults to `false`.
+- Stock generated rules are not auto-enabled unless a human review marks them
+  `auto_safe: true`.
+- Operator profiles may set `enabled: false` to disable a merged rule from an
+  `extends:` chain.
+- Operator profiles may set `auto_safe: true` only for operator-owned rules.
+- Rule origin is determined from the file source: stock profile directory versus
+  operator profile directory. An operator profile must not mark an inherited
+  stock rule `auto_safe: true`; validation rejects the override and names the
+  rule.
+- `combined` is intended for sites that want the curated stock baseline plus a
+  small number of exact site rules. Operators who want only explicit site rules
+  should use `exact`.
+
+Stock `auto_safe: true` criteria:
+
+- The rule is device-scoped or explicitly listener-owned.
+- The rule has no unbounded resource identity.
+- The rule has bounded labels only.
+- The rule has explicit lifecycle limits.
+- The rule has explicit units and algorithm.
+- The rule has tests or curated evidence showing it is safe on trap hubs.
+
+`profile_metrics.include` entries select metric rule names, not trap names and
+not profile filenames.
+
+Enablement truth table:
+
+| Rule source | `auto_safe` | `enabled` | `none` | `auto` | `exact` when included | `combined` when included |
+|---|---:|---:|---:|---:|---:|---:|
+| stock | `false` | unset | off | off | on | on |
+| stock | `true` | unset | off | on | on | on |
+| stock/operator | any | `false` | off | off | off | off |
+| operator | any | unset | off | off | on | on |
+| operator | `true` | unset | off | on | on | on |
+
+`enabled: false` always wins after profile merge.
+
+### Profile Format Extension
+
+Trap profiles should gain a first-class optional `metrics:` section. The section
+is file-local, mergeable through `extends:`, and validated together with
+`varbinds:`, `traps:`, and the optional profile-local `charts:` section.
+
+Recommended shape:
+
+```yaml
+metrics:
+  - name: IF-MIB::unexpected-link-down-events
+    type: counter
+    auto_safe: true
+    on_trap: IF-MIB::linkDown
+    where:
+      - varbind: ifAdminStatus
+        equals: up
+    identity:
+      device: source
+      resource:
+        class: interface
+        key_from_varbind: ifIndex
+        max_per_source: 512
+    output:
+      metric: snmp_trap_if_unexpected_link_down_events
+      dimension: events
+      chart: unexpected_link_down_events
+
+charts:
+  - id: unexpected_link_down_events
+    title: Unexpected Link Down Events
+    family: Network/Interface/State
+    context: snmp.trap.if.unexpected_link_down_events
+    units: events/s
+    algorithm: incremental
+    lifecycle:
+      max_instances: 2000
+      expire_after_cycles: 60
+```
+
+Required metric rule fields:
+
+- `name`: stable metric-rule identity, unique after profile merge. Stock rules
+  should use a MIB-qualified stable name; operator rules should use a
+  site-specific prefix to avoid collisions.
+- `type`: one of the supported extraction types.
+- `identity`: source-device scope and optional bounded resource identity.
+- `output`: emitted metric name, dimension name, and referenced chart ID.
+
+Type-specific selector fields:
+
+- `counter` and `sample`: `on_trap` is required.
+- `state` with separate problem and clear traps: `problem_trap` and
+  `clear_trap` are required, and `on_trap` is invalid.
+- `state` with same-OID set/clear semantics: `on_trap` is required together
+  with `state.set_when` and `state.clear_when`.
+- All trap selectors resolve after the full `extends:` chain is merged, against
+  the resolved profile's `traps:` section. Symbolic names and numeric OIDs must
+  resolve before `Check()` returns.
+
+Required chart fields:
+
+- `id`: stable chart ID within the merged profile.
+- `context`: chart context, using the `snmp.trap.*` namespace.
+- `title`, `family`, `units`, and `algorithm`.
+- `lifecycle` for every chart that can create per-source or per-resource
+  instances.
+
+Optional chart fields:
+
+- `type`: chart type; defaults to the chart-template engine default. State charts
+  should use the clearest supported state/line representation available at
+  implementation time.
+- `description`: operator-facing chart description for generated documentation.
+
+Rule and chart names:
+
+- `output.metric` names should follow the existing collector metric naming style
+  and must not collide with built-in `snmp_trap_*` metric names.
+- `output.metric` names must not collide with built-in metric names emitted by
+  the current collector, including event, severity, error, dedup, and legacy
+  shim metric names.
+- `output.dimension` must match the chart-template dimension `name` that
+  selects the rule's `output.metric`.
+- `charts.context` values use the chart context namespace and must start with
+  `snmp.trap.`.
+- Profile-local chart IDs and contexts must not collide with built-in static
+  chart IDs/contexts for events, severity, errors, or dedup-suppressed metrics.
+- `output.chart` must reference a chart `id` present in the fully merged profile.
+- Forward references to charts defined later in the same profile or inherited
+  from an `extends:` base are allowed.
+- `output.chart` validation happens after full profile resolution and before
+  job `Check()` returns. Errors must name the profile file and metric rule.
+- `output.chart` references are limited to the same resolved `extends:` chain.
+  Cross-chain chart references are validation errors.
+
+Optional rule fields:
+
+- `where`: bounded predicates over profile-known varbinds or static trap fields.
+- `missing`: explicit behavior for missing varbinds.
+- `scale`: numeric multiplier/divisor for sampled values, for example
+  `scale: { multiplier: 1, divisor: 100 }`.
+- `enabled`: disable or re-enable a merged stock rule from an operator profile.
+- `description`: author-facing note explaining why the rule exists.
+
+The profile `charts:` section is a profile-local chart-template description. The
+loader compiles it into an in-memory `charttpl.Spec`; unsupported chart-template
+fields are rejected during profile validation.
+
+### Supported Metric Rule Types
+
+The initial design must support these rule types:
+
+- `counter`: increments a cumulative event counter when the trap and optional
+  predicates match.
+- `sample`: extracts a numeric varbind value as a trap-arrival sample. Samples
+  are not interpolated and do not imply continuous polling.
+- `state`: stores current trap-derived state for a source or source/resource.
+
+The design should not add a separate "multi-value" type. Multiple metric rules
+may reference the same trap, and chart metadata can group their outputs into one
+chart. This supports multi-value notifications without making extraction rules
+harder to validate.
+
+#### Counter Rule Example
+
+```yaml
+metrics:
+  - name: CISCO-CONFIG-MAN-MIB::cli-config-change-console-events
+    type: counter
+    on_trap: CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged
+    where:
+      - varbind: ccmHistoryEventTerminalType
+        in: [console, terminal, virtual]
+    identity:
+      device: source
+    output:
+      metric: snmp_trap_cisco_cli_config_change_events
+      dimension: changes
+      chart: cisco_cli_config_changes
+
+charts:
+  - id: cisco_cli_config_changes
+    title: Cisco CLI Configuration Changes
+    family: Configuration/Changes
+    context: snmp.trap.cisco.cli_config_changes
+    units: events/s
+    algorithm: incremental
+    lifecycle:
+      max_instances: 2000
+      expire_after_cycles: 60
+```
+
+#### Numeric Sample Rule Example
+
+```yaml
+metrics:
+  - name: CISCO-PROCESS-MIB::cpu-threshold-current
+    type: sample
+    on_trap: CISCO-PROCESS-MIB::cpmCPURisingThreshold
+    value_from_varbind: cpmCPUTotalMonIntervalValue
+    scale: { multiplier: 1, divisor: 1 }
+    identity:
+      device: source
+    output:
+      metric: snmp_trap_cisco_cpu_threshold_sample_percent
+      dimension: current
+      chart: cisco_cpu_threshold
+
+  - name: CISCO-PROCESS-MIB::cpu-threshold-limit
+    type: sample
+    on_trap: CISCO-PROCESS-MIB::cpmCPURisingThreshold
+    value_from_varbind: cpmCPURisingThresholdValue
+    scale: { multiplier: 1, divisor: 1 }
+    identity:
+      device: source
+    output:
+      metric: snmp_trap_cisco_cpu_threshold_limit_percent
+      dimension: threshold
+      chart: cisco_cpu_threshold
+
+charts:
+  - id: cisco_cpu_threshold
+    title: Cisco CPU Threshold Trap Values
+    family: System/CPU
+    context: snmp.trap.cisco.cpu_threshold
+    units: percentage
+    algorithm: absolute
+    lifecycle:
+      max_instances: 2000
+      expire_after_cycles: 60
+```
+
+#### State Rule With Separate Problem/Clear OIDs
+
+```yaml
+metrics:
+  - name: IF-MIB::link-down-state
+    type: state
+    problem_trap: IF-MIB::linkDown
+    clear_trap: IF-MIB::linkUp
+    identity:
+      device: source
+      resource:
+        class: interface
+        key_from_varbind: ifIndex
+        max_per_source: 512
+    state:
+      problem_value: 1
+      clear_value: 0
+      ttl: 24h
+      ttl_behavior: clear_and_expire
+    output:
+      metric: snmp_trap_if_link_down_state
+      dimension: down
+      chart: if_link_down_state
+
+charts:
+  - id: if_link_down_state
+    title: Trap-Derived Interface Link State
+    family: Network/Interface/State
+    context: snmp.trap.if.link_down_state
+    units: state
+    algorithm: absolute
+    lifecycle:
+      max_instances: 2000
+      expire_after_cycles: 60
+```
+
+#### State Rule With Same-OID Set/Clear Varbind
+
+```yaml
+metrics:
+  - name: SNMP-ALARM-MIB::alarm-set-state
+    type: state
+    on_trap: SNMP-ALARM-MIB::snmpAlarmStatusChange
+    identity:
+      device: source
+      resource:
+        class: alarm
+        key_from_varbind: snmpAlarmLogId
+        max_per_source: 1024
+    state:
+      set_when:
+        varbind: snmpAlarmLogCond
+        equals: set
+      clear_when:
+        varbind: snmpAlarmLogCond
+        equals: clear
+      problem_value: 1
+      clear_value: 0
+      ttl: 24h
+      ttl_behavior: clear_and_expire
+    output:
+      metric: snmp_trap_alarm_set_state
+      dimension: set
+      chart: snmp_alarm_set_state
+
+charts:
+  - id: snmp_alarm_set_state
+    title: SNMP Alarm State
+    family: Alarms/State
+    context: snmp.trap.alarm.state
+    units: state
+    algorithm: absolute
+    lifecycle:
+      max_instances: 2000
+      expire_after_cycles: 60
+```
+
+### Identity And Scoping
+
+Trap metrics must never aggregate all source devices into one listener total
+unless the metric is explicitly listener-owned and not device-attributable.
+
+Recommended identity model:
+
+- Known source device:
+  - Use existing trap enrichment to resolve `SourceVnodeID`.
+  - Emit device-attributable trap metrics through V2 host scope for that vnode.
+  - Add listener/job labels only as secondary labels where needed for debugging.
+- Unknown source device:
+  - Use the configured `unresolved_source` policy.
+  - `drop_profile_metrics` is the default and emits only listener-owned health
+    counters.
+  - `per_source_label` is allowed only when the operator opts in and caps source
+    count.
+  - `synthetic_vnode` is a future opt-in mode and must be rejected by the
+    initial schema until it is implemented deliberately.
+  - Do not merge unrelated unknown devices into one chart.
+  - Do not create unlimited synthetic vnodes by default.
+- Ambiguous source device:
+  - Treat as listener-owned and increment an ambiguity counter.
+  - Do not emit per-resource profile metrics for an ambiguous source.
+  - Ambiguity includes conflicting registry/topology identities for the same
+    trap source, or an original-source address supplied by an untrusted relay.
+- Listener-owned pipeline metrics:
+  - Keep listener/job scope when the error has no trustworthy source.
+  - Add source identity only for errors that can be attributed to a source.
+
+Existing built-in static charts such as trap events, severities, processing
+errors, and dedup suppression remain listener/job scoped unless a later design
+explicitly migrates them. Per-device trap activity in this spec is delivered by
+profile-defined device-attributable rules and by built-in source-attributable
+pipeline metrics where attribution is reliable.
+
+Fallback source identity priority:
+
+1. Trusted `snmpTrapAddress.0` only when the UDP peer is a configured trusted
+   relay.
+2. UDP peer address.
+3. Reverse-DNS or sysName only as display metadata, not as the stable key unless
+   the operator explicitly chooses it.
+
+Required labels for fallback source metrics:
+
+- `job_name`
+- `source_id`
+- `source_kind`, for example `trusted_trap_address` or `udp_peer`
+
+`identity.source_id_privacy` controls fallback source label privacy. It accepts
+`raw` or `hash`; `hash` is the default when `per_source_label` is used.
+`source_id` must be stable within the job and must respect this configured
+privacy mode:
+
+- `raw`: use the canonical source address string.
+- `hash`: use a deterministic one-way hash of the canonical source address and
+  job name with the agent's stable local identity as salt; expose only a
+  truncated fixed-length hex value.
+- Initial `hash` mode should use SHA-256, truncate to 16 hexadecimal
+  characters, and canonicalize addresses without transport ports.
+- Hash mode is not a security boundary. Small source-address spaces can be
+  enumerated, and an agent reinstall or stable-local-identity reset changes the
+  salt and therefore changes every hashed `source_id`.
+- The salt source must be a persisted Agent-local identity with restart-stable
+  lifetime. The implementation must document which Agent identity is used; the
+  salt value itself must not be exposed as a metric label.
+
+The design may later add an explicit opt-in mode for synthetic trap-source
+vnodes, but that must be an operator decision with caps. It is not the default.
+
+Source identity transitions:
+
+- A source can start unknown and later become known when SNMP polling, registry,
+  or topology enrichment resolves `SourceVnodeID`.
+- New emissions after the transition must use the vnode host scope.
+- Existing fallback source-label chart instances are not migrated; they expire
+  through chart lifecycle.
+- State entries created under unresolved fallback identity must not be migrated
+  silently to the vnode identity. They are cleared/expired according to the
+  rule's configured TTL and reload semantics.
+- The transition should increment a built-in diagnostic counter or log an
+  operator-visible message so chart discontinuity is explainable.
+
+Unresolved source eviction:
+
+- `max_sources` caps tracked unresolved sources per job.
+- When the cap is reached, the runtime evicts the least recently updated
+  inactive unresolved source when possible.
+- If no inactive source can be evicted, new unresolved sources follow the
+  configured overflow behavior.
+- Evictions increment a built-in eviction counter.
+- NAT, multi-homed devices, and relays that do not provide trusted original
+  source identity can merge devices under one source address. Operators must use
+  trusted relays or source-device enrichment to avoid that; the collector must
+  not pretend it can split devices it cannot identify.
+
+Identity to host-scope mapping:
+
+- When `SourceVnodeID` is known, use V2 host scope with
+  `ScopeKey=SourceVnodeID` and `GUID=SourceVnodeID`.
+- Use the enriched device hostname as host-scope hostname when present.
+- Do not add `source_id` labels to vnode-scoped device metrics by default.
+- If V2 host-scope emission is not implemented or not available, enabled rules
+  that require source-device identity must not start silently. The recommended
+  long-term path is to make V2 host-scope emission a prerequisite for shipping
+  device-attributable profile metrics.
+- If an implementation stages this work, job `Check()` must either fail with a
+  descriptive error naming the affected rules, or start only after explicitly
+  disabling those rules and exposing an operator-visible diagnostic such as
+  `profile_metrics.vnode_unavailable`. It must not degrade those rules to
+  per-job charts.
+- When V2 host scopes are available but an individual trap source is unknown,
+  the job's `unresolved_source` policy applies. The default remains
+  `drop_profile_metrics`; `per_source_label` is opt-in and capped.
+
+### Resource Identity
+
+Resource identity is separate from arbitrary labels.
+
+Allowed resource keys:
+
+- bounded enum or small-range varbinds;
+- table indexes such as `ifIndex` when capped per source;
+- alarm IDs when capped per source;
+- peer, neighbor, pool, scope, or sensor identifiers only when the profile or
+  operator marks them as bounded resource keys and sets caps.
+
+Rejected as default metric labels:
+
+- usernames;
+- MAC addresses;
+- free-form strings;
+- descriptive text;
+- peer IPs and source IPs as arbitrary labels;
+- unbounded interface names or pool names.
+
+Each resource rule must define:
+
+- `class`: interface, peer, sensor, alarm, pool, l2_topology, or another stable
+  class name;
+- `key_from_varbind` or `key_from_enrichment`;
+- `max_per_source`;
+- a job-level total cap also applies across all sources;
+- `missing` behavior;
+- `overflow` behavior.
+
+Cardinality contract:
+
+| Cap | Scope | Required behavior |
+|---|---|---|
+| `profile_metrics.limits.max_rules` | job | Maximum enabled metric rules evaluated for the job. Validation fails when the selected `auto`/`exact`/`combined` set exceeds it. |
+| `profile_metrics.limits.max_sources` | job | Maximum unresolved fallback sources tracked by the job. Vnode-scoped known devices do not consume fallback source slots. |
+| `profile_metrics.limits.max_resources_per_source` | job | Upper bound for resources tracked per source across all enabled rules. |
+| `identity.resource.max_per_source` | rule | Rule-local upper bound for resources of that class per source. |
+| `charts.lifecycle.max_instances` | chart | Upper bound for chart instances created by that chart. |
+| `profile_metrics.limits.max_instances_per_job` | job | Final upper bound across all profile-derived chart instances in the job. |
+
+Effective runtime caps use the most restrictive applicable limit. A rule cannot
+create a new source, resource, or chart instance when any applicable job, rule,
+or chart cap is exhausted.
+
+These caps are collector-enforced before writing to `metrix` and before the
+chart-template engine sees the sample. `charts.lifecycle.max_instances` remains
+a chartengine defense-in-depth limit because chart template lifecycle caps are
+best-effort for already-active instances.
+
+`max_rules` counts the post-merge, post-mode-filter set of enabled rules that
+can be evaluated by the job. Disabled rules, stock rules excluded by the selected
+mode, and rules that fail validation do not count.
+
+When the job-level instance cap has one remaining slot and multiple rules would
+create new instances in the same cycle, the implementation must use a
+deterministic tie-breaker, for example lexical `chart.id` then metric rule
+`name`. The tie-breaker must be documented and tested.
+
+Validation must reject impossible cap combinations before runtime. For example,
+if an enabled rule declares a required safe minimum that exceeds the job or chart
+cap, the job must fail validation instead of starting with a rule that can never
+emit correctly.
+
+Initial stock resource classes should be limited to:
+
+- `interface`
+- `peer`
+- `neighbor`
+- `sensor`
+- `alarm`
+- `pool`
+- `l2_topology`
+- `component`
+
+Operator-defined classes are allowed only with a site-specific prefix.
+The loader must validate stock classes against the stock list above and operator
+classes against a documented site-prefix pattern.
+Stock class validation failures are hard errors. Operator class names must match
+a documented lowercase identifier pattern and include a site-specific prefix, for
+example `site_foo_sensor`.
+
+Overflow behavior:
+
+- `drop_and_count`: drop new source/resource instances beyond the cap and
+  increment a built-in overflow counter.
+- `bucket_and_count`: emit into a bounded `_overflow` bucket and increment a
+  built-in overflow counter. The overflow bucket is one bucket per
+  source/rule/resource class, not one bucket per rejected raw value. The bucket
+  must expose the `resource.class` value but must not expose dropped raw keys as
+  metric labels.
+- `error`: validation-only policy. It fails job validation when the effective
+  job caps are lower than the rule's declared safe minimum. It is not a runtime
+  overflow action. If a runtime cap is still reached, the collector must drop the
+  sample, increment a built-in overflow/error counter, and emit a rate-limited
+  error instead of stopping the job.
+
+Each rule gets its own `_overflow` bucket within its resource class. Job-level
+caps are enforced across all rules and overflow buckets combined.
+
+Dropped raw resource keys may be logged at debug level for troubleshooting, but
+they must not be promoted to labels or durable public artifacts.
+
+### Filtering Semantics
+
+The design should support bounded predicates, not a general expression language.
+
+Required operators:
+
+- `equals`
+- `in`
+- `exists`
+- `absent`
+- `greater_than`
+- `less_than`
+- `range`
+
+Allowed predicate inputs:
+
+- trap name/OID;
+- static trap category/severity;
+- varbind enum labels;
+- booleans;
+- small numeric ranges;
+- explicit string values only when the referenced varbind is already approved as
+  bounded.
+
+Predicate semantics:
+
+- Multiple predicates are ANDed.
+- A missing varbind in `where` makes the predicate false and the rule does not
+  match.
+- `exists: true` matches when the referenced varbind is present in the received
+  trap.
+- `exists: false` is equivalent to `absent: true`.
+- `absent: true` is the only predicate that matches a missing varbind.
+- Numeric comparison operators are valid only for numeric varbind types.
+- `equals` and `in` over enum-backed varbinds match enum labels. `equals` and
+  `in` over numeric varbinds match numeric values.
+- Numeric predicates evaluate raw decoded numeric values. `TimeTicks` predicates
+  compare raw hundredths of a second; sample output conversion to seconds is
+  separate.
+- `range` is inclusive on both ends: `low <= value <= high`.
+- Negation is expressed with `not: true` on a single predicate, not with a
+  general expression language.
+- `not: true` negates the predicate result only after the referenced varbind is
+  known to be present. A missing varbind remains false even when `not: true` is
+  set.
+- `{varbind: ifAdminStatus, equals: up, not: true}` means "the varbind is
+  present and its value is not `up`".
+- For `range`, `not: true` means outside the inclusive range. For `in`, it means
+  not in the listed set. For `greater_than` or `less_than`, it negates that
+  comparison.
+- To require absence, use the `absent` operator instead of `not: true` with
+  `exists`.
+- Pattern matching is not required for the initial design. Authors should use
+  `in` over bounded values instead of regular expressions over free-form text.
+
+Missing-varbind behavior must be explicit per rule:
+
+- `drop`: do not emit the metric and increment a rule-miss counter;
+- `zero`: emit zero only for state rules where zero is semantically correct;
+- `unknown_dimension`: allowed only for bounded dimensions and capped;
+- `error`: profile validation or runtime error depending on whether the varbind
+  is statically impossible or just absent from a received trap.
+- `zero` is invalid for `sample` rules unless the rule explicitly declares that
+  absence means numeric zero.
+- The default missing behavior for state rules is `drop`, which leaves state
+  unchanged.
+- For state rules, `zero` is allowed only when the rule explicitly declares that
+  a missing condition varbind means the clear state.
+
+Sample validation:
+
+- `value_from_varbind` must reference a profile-known numeric varbind.
+- Accepted numeric source types include `INTEGER`, `Integer32`, `Unsigned32`,
+  `Gauge32`, `Counter32`, `Counter64`, and `TimeTicks`.
+- `DisplayString`, `OctetString`, `MacAddress`, `IpAddress`, `OBJECT
+  IDENTIFIER`, and free-form textual conventions are rejected for `sample`
+  rules.
+- In the initial design, `sample` rules must use the `absolute` chart algorithm.
+  `Counter32` and `Counter64` trap-carried values may be sampled only as
+  absolute snapshots. Derived counter rates from sporadic trap arrivals are a
+  deferred feature.
+- `TimeTicks` samples must be converted to seconds by dividing the raw value by
+  100 only when the profile/MIB metadata confirms the object is elapsed time;
+  otherwise validation must reject the sample rule.
+- Runtime ASN.1 values that do not match the profile numeric type are dropped
+  and counted.
+- `scale.divisor` must be greater than zero.
+- The default `missing` behavior for `sample` rules is `drop`.
+- `scale` is declarative. The preferred implementation stores the raw numeric
+  value and applies scale through chart-template dimension options. If the
+  framework cannot represent the required scale, pre-scaled storage is allowed
+  only when the emitted metric name, units, and tests make the scaled semantics
+  explicit.
+
+### Chart Generation
+
+Profile metric rules should compile into normal go.d V2 chart templates.
+
+Required behavior:
+
+- Every emitted metric must have explicit units and algorithm.
+- Counters use cumulative storage and `incremental` chart algorithm.
+- Samples and state metrics use `absolute`.
+- Multiple rules can reference one `chart.id` when they describe dimensions of
+  the same operational chart.
+- Chart instances must include source-device scope or bounded fallback source
+  identity.
+- Chart lifecycle must expire stale source/resource instances according to
+  configured caps and TTLs.
+- Every generated chart template must pass `charttpl.Spec` validation.
+- `context` values must use the `snmp.trap.*` namespace.
+
+Compilation path:
+
+- Profile metric rules and charts are compiled into an in-memory
+  `charttpl.Spec`.
+- `ChartTemplateYAML()` serves the compiled template; the implementation should
+  not write runtime-generated chart files to satisfy public requests.
+- Developer-only debug dumps of the compiled spec are allowed only outside
+  public request paths and must never become the source served by
+  `ChartTemplateYAML()`.
+- Compilation happens when the trap profile metric catalog is built or refreshed,
+  not on every collection cycle.
+- `profile_metrics.include` validation uses the compiled metric rule catalog.
+
+Chart conflict rules:
+
+- `charts:` merge by `id` within the resolved profile.
+- A child chart with the same `id` in an `extends:` chain replaces the base
+  chart in full.
+- Across the final loaded profile set, two charts may share a `context` only if
+  `title`, `family`, `units`, `algorithm`, chart type, and dimension names are
+  compatible.
+- Two rules that reference one chart must produce unique dimension names.
+- Built-in static chart contexts and IDs are reserved; profile-local charts must
+  not reuse `events`, `severity`, `errors`, or `dedup_suppressed`, nor their
+  effective `snmp.trap.*` contexts.
+- Conflicts must fail profile validation before chartengine planning.
+
+Lifecycle:
+
+- Charts that can create per-source or per-resource instances must declare
+  `lifecycle.max_instances` and `lifecycle.expire_after_cycles`.
+- `expire_after_cycles` is measured in the periodic go.d `Collect()` cycle for
+  the trap listener job. It is not measured by trap receive goroutines.
+- Job-level `profile_metrics.limits.max_instances_per_job` is an additional cap
+  across all profile metric charts for the job.
+- State TTL sweep runs at the start of each periodic `Collect()` cycle, not in a
+  background timer and not during per-trap event processing.
+- On state TTL expiry, `clear_and_expire` emits the clear value once, removes
+  the state entry, and lets chartengine remove stale chart instances through
+  normal lifecycle planning.
+- State rules evaluate `where` predicates before set/clear logic. If no
+  set/clear predicate matches, the rule increments a rule-miss counter and does
+  not change state.
+- State tables must be synchronized; race-free state updates are a required
+  implementation property.
+- The current collector processes trap metric updates serially per job. If a
+  future implementation parallelizes trap processing within a job, state table
+  access must use per-rule, per-resource, or equivalent synchronization.
+- State tables are in-memory only. After Agent restart, trap-derived state is
+  unknown until new traps arrive; the implementation must not claim a persisted
+  clear state unless a clear trap was observed after restart.
+- For state rules with `ttl_behavior: clear_and_expire`, chart
+  `expire_after_cycles` must not expire the chart before the state TTL can emit
+  its configured clear value.
+
+This reuses the chart-template engine, but extraction remains a trap-profile
+responsibility.
+
+### Metric Rule Catalog And Lazy Stock Profiles
+
+Profile-defined metric rules must be discoverable before the first matching trap
+arrives.
+
+Required behavior:
+
+- Job `Check()` must validate every `profile_metrics.include` entry against a
+  metric rule catalog.
+- The metric rule catalog must include operator profiles and stock rules
+  relevant to the selected mode.
+- The selected rule set must respect `profile_metrics.limits.max_rules` before
+  the job starts.
+- Lazy stock trap decode loading must not delay metric-rule validation until
+  trap arrival.
+- The implementation may satisfy this by eagerly loading metric sections, by
+  shipping a generated stock metric-rule catalog, or by loading selected stock
+  profiles during `Check()`.
+- The chosen implementation must preserve the existing lazy decode behavior for
+  jobs that do not enable profile metrics.
+- The implementation must measure the metric catalog memory footprint when stock
+  metric rules are introduced. If the catalog is materially larger than the
+  decode catalog used today, the first implementation must load only metric
+  sections needed for validation rather than forcing full stock decode loading
+  for every non-metric job.
+
+### Reload Behavior
+
+Metric rules participate in the existing operator-profile reload lifecycle.
+
+Required behavior:
+
+- Operator profile reload rebuilds the merged metric and chart rule set from
+  scratch.
+- After reload, the job revalidates `profile_metrics.include` names.
+- Removed or disabled metric rules stop emitting new samples.
+- State entries for removed or disabled rules emit a clear value once when the
+  rule declares `ttl_behavior: clear_and_expire`; otherwise they expire through
+  chart lifecycle.
+- Renamed rules are treated as remove plus add and must be visible through
+  reload diagnostics.
+- Stock profile metric-rule changes require a process restart or explicit cache
+  release, matching the existing stock profile lifecycle.
+- Reload diagnostics must name rules added, removed, disabled, renamed, and
+  skipped due to validation or host-scope prerequisites.
+- Job configuration changes to `profile_metrics` mode, include list, limits, or
+  identity policy require a collector job restart unless a later implementation
+  explicitly supports dynamic job reconfiguration.
+
+### Runtime Ordering
+
+Trap metric extraction must preserve current collector ordering unless a later
+design explicitly changes it:
+
+- Decode and render the trap entry.
+- Apply dedup admission.
+- Do not emit profile metrics for dedup-suppressed traps.
+- Write the trap entry to the configured output backend.
+- Do not emit profile metrics when the write fails.
+- Then update profile-defined metrics and built-in static metrics.
+
+Evidence:
+
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:637` through `:642`
+  returns early for dedup-suppressed traps.
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:645` through `:650`
+  returns early for write failures.
+- `src/go/plugin/go.d/collector/snmp_traps/collector.go:653` through `:662`
+  updates operator, event, and severity metrics after successful write.
+- `src/go/plugin/go.d/collector/snmp_traps/operator_metric_test.go:818`
+  through `:831` verifies no operator metric is emitted for write failures.
+- `src/go/plugin/go.d/collector/snmp_traps/operator_metric_test.go:962`
+  through `:985` verifies dedup-suppressed traps do not increment operator
+  metrics.
+
+### Merge And Override Semantics
+
+Trap profile merge behavior should extend the existing `extends:` model:
+
+- `varbinds:` continue to merge by symbolic name.
+- `traps:` continue to merge by trap OID.
+- `metrics:` merge by stable `name` within the resolved profile.
+- Metric rule names must be globally unique after profile resolution unless a
+  later rule is replacing an earlier rule through the same `extends:` chain.
+- Cross-profile metric name collisions outside an `extends:` replacement chain
+  are validation errors. Filesystem load order must never decide which metric
+  rule wins.
+- Later profiles in the `extends:` chain replace earlier metric rules with the
+  same `name` in full. There is no field-level merge for metric rules.
+- `enabled: false` in an extending profile disables a merged metric rule without
+  disabling trap decode.
+- `charts:` merge by `id` within the resolved profile, with full replacement in
+  an `extends:` chain.
+- Multiple metric rules may reference the same trap OID.
+- Operator profiles can add metrics that reference stock traps without copying
+  the full stock profile.
+- Abstract `_*.yaml` profiles can hold reusable metric rule blocks.
+
+Same-filename replacement remains available for full vendor-profile replacement:
+an operator file with the same filename as a stock profile replaces the stock
+file in full. Normal customization should use `extends:` plus metric overrides,
+because same-filename replacement discards all stock decode and metric content
+unless the operator file redefines it.
+
+Operator profiles that need to add metrics for traps from several stock files
+should either:
+
+- create one small override profile per stock base and use `extends:`; or
+- use a future global-index reference mode, if it is designed and approved.
+
+The initial design recommends the first option because it keeps trap and varbind
+resolution inside the explicit `extends:` chain.
+
+### Compatibility With Current Job-Level Metrics
+
+The current job-level `metrics:` list is too limited for the target design.
+
+Recommended migration:
+
+- Recommendation: treat the current job-level `metrics:` list as public unless
+  proven otherwise, and keep it as a deprecated compatibility shim for OID event
+  counters only.
+- Long-term-best cleanup: remove or rename the job-level list before release
+  only if maintainers confirm it has not shipped as a public contract.
+- The shim must internally compile each legacy entry into an equivalent
+  `counter` rule under a reserved inline pseudo-profile.
+- The shim must preserve current legacy semantics by default: per-job chart
+  identity and current legacy context behavior. It must not silently migrate
+  existing job-level `metrics:` entries to per-device or vnode-scoped charts.
+- Operators who want per-device behavior must migrate from job-level `metrics:`
+  to profile-local `metrics:` rules.
+- The shim must not gain filters, numeric samples, state, or chart grouping.
+- New capabilities belong only in profile-local `metrics:`.
+- Documentation and release notes must state the migration path from job-level
+  OID counters to profile-local rules.
+- Legacy contexts and metric names must not collide with profile-generated chart
+  contexts or metric names. Validation must fail with a migration message if an
+  enabled legacy shim entry and an enabled profile rule would emit the same
+  metric name or chart context.
+- The same trap OID may appear in both a legacy shim entry and a profile-local
+  rule only when their emitted metric names and chart contexts are distinct.
+  This supports staged migration but should produce a deprecation warning.
+- During migration, operators may temporarily see both a legacy per-job counter
+  and a profile-local per-device metric for the same trap OID. Documentation must
+  explain that these answer different questions and advise disabling the legacy
+  entry after migration.
+- Invalid legacy shim entries must fail job validation with an error identifying
+  the entry and validation failure.
+
+This is a user-owned compatibility decision before implementation.
+
+### Stock Profile Generation Contract
+
+The stock trap profile generator must not create enabled metrics for every
+decoded trap.
+
+Required generator behavior:
+
+- Generated decode knowledge remains broad.
+- Generated metric rules are absent by default unless curated inputs explicitly
+  request them.
+- Candidate generated metric rules, if produced, must default to
+  `auto_safe: false`.
+- The generator must validate metric rules against the generated `varbinds:` and
+  `traps:` sections before writing YAML.
+- Human-curated stock metric rules must be reviewable in source control.
+- A regenerated stock profile must preserve curated metric rules or regenerate
+  them from a durable curated source, not lose them silently.
+- Stock profile package size and lazy-load memory impact must be checked when
+  adding curated metric rules.
+
+Curated metric rules must have a durable source:
+
+- For generator-owned stock profiles, the preferred durable source is a
+  committed generator input such as `curated_metrics.yaml`.
+- Profile-local YAML blocks maintained directly in source control are acceptable
+  only for profiles that are not regenerated, or when the generator explicitly
+  preserves those blocks in a tested read-modify-write path.
+
+The durable source must record:
+
+- metric rule name;
+- referenced trap name/OID;
+- referenced varbinds;
+- rule type;
+- chart ID;
+- auto-safe status;
+- cardinality evidence.
+
+Promotion to `auto_safe: true` requires review evidence that the rule is
+bounded-safe and useful by default. The generator must never promote a rule to
+`auto_safe: true` automatically.
+
+Metric rules for generated profiles are therefore a curation layer on top of MIB
+decode generation, not a mechanical "one metric per trap" output.
+
+### Validation Requirements
+
+Profile validation must reject:
+
+- unknown top-level profile keys after the profile schema is upgraded; before
+  full profile-wide strictness ships, unknown top-level `metrics:` and `charts:`
+  keys must at minimum be rejected instead of silently ignored;
+- unknown fields under `metrics:`;
+- unknown fields under `charts:`;
+- duplicate metric names after merge;
+- duplicate `output.metric` values after merge;
+- duplicate chart IDs after merge unless handled by the documented replacement
+  rule;
+- chart IDs or effective chart contexts that collide with built-in static trap
+  charts;
+- metric rules referencing unknown traps;
+- metric rules referencing unknown varbinds;
+- unsafe labels;
+- resource keys without caps;
+- sample rules without numeric varbind types;
+- counters without explicit units/algorithm;
+- state rules without set and clear semantics;
+- charts with conflicting metadata for the same `chart.id`;
+- stock rules that would be enabled by default with unbounded cardinality;
+- `where` predicates over sensitive varbinds unless the predicate uses an
+  approved bounded enum or boolean representation;
+- `value_from_varbind` targeting known sensitive varbinds;
+- `output.metric` values that collide with built-in metrics emitted by
+  `metrics.go` or the reserved legacy shim namespace;
+- `output.dimension` values that do not match the chart dimension name selecting
+  the rule's `output.metric`;
+- operator-profile attempts to set `auto_safe: true` on inherited stock rules.
+
+Reserved metric name prefixes:
+
+- `snmp_trap_events_`
+- `snmp_trap_severity_`
+- `snmp_trap_errors_`
+- `snmp_trap_dedup_`
+- `snmp_trap_metric_`
+
+The first implementation step that accepts profile-local metrics must:
+
+- add a `Metrics` field and a `Charts` field to the profile data model;
+- reject or strictly validate unknown metric/chart YAML fields;
+- extend `extends:` merge logic for metric rules and chart definitions;
+- resolve symbolic trap names to canonical OIDs at load time;
+- validate every metric rule against the resolved trap's varbind set;
+- expose metric validation errors at profile load or job creation time.
+
+The loader must not silently ignore a top-level `metrics:` or `charts:` section.
+Adding profile-local metrics requires updating the profile data model and
+validation in the same implementation step.
+
+Loader migration requirements:
+
+- Current profile loading uses a lenient YAML unmarshal path, so adding
+  `metrics:` and `charts:` is not sufficient by itself.
+- The implementation must add strict known-key validation for profile-local
+  `metrics:` and `charts:` in the same change that adds those fields.
+- Full top-level strictness should use an audited allowlist of documented
+  profile keys so existing stock profiles are not broken accidentally.
+- Validation errors must include the profile filename, the offending key or
+  rule name, and whether the error came from parsing, merge, or job `Check()`.
+
+### Documentation And Skill Updates
+
+The implementation must update every durable surface that currently says trap
+profiles do not define metrics.
+
+Required updates:
+
+- `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md`
+- `.agents/skills/project-snmp-trap-profiles-authoring/SKILL.md`
+- `src/go/plugin/go.d/collector/snmp_traps/config_schema.json`
+- `src/go/plugin/go.d/collector/snmp_traps/metadata.yaml`
+- generated integration documentation for the SNMP trap listener
+- release notes or migration notes for legacy job-level `metrics:`, if that
+  public contract is retained as a deprecated shim
+- health alert templates under `src/health/health.d/snmp_traps.conf` when chart
+  contexts, label identity, or vnode scoping changes affect alert matching or
+  alert text
+
+The SNMP trap profile authoring skill must be updated from "profiles do not
+define metrics" to "trap profiles may define metric rules only through the
+validated profile-local `metrics:` and `charts:` schema described here".
+
+### Coverage Matrix
+
+| Use case | Required design support |
+|---|---|
+| Per-device trap activity | Source vnode host scope or bounded fallback `source_id`; never listener-only totals for device-attributable metrics. |
+| Filtered event counters | `counter` rules with bounded `where` predicates. |
+| Numeric samples | `sample` rules with `value_from_varbind`, numeric validation, units, scale, and explicit algorithm. |
+| Multiple metrics from one trap | Several rules can reference the same trap and share one chart. |
+| Per-resource metrics | `identity.resource` with class, key, cap, missing behavior, and overflow behavior. |
+| Trap-derived current state | `state` rules with problem/clear OIDs or same-OID set/clear predicates and TTL. |
+| Severity-aware metrics | Bounded predicates or labels over vendor severity varbinds; no dynamic journal severity override. |
+| Audit/security counters | Counters with sensitive detail kept in logs; unsafe values rejected as labels. |
+| Lifecycle counters | Device-scoped counters for restart/init traps. |
+| Operator-defined custom semantics | Custom or override trap profiles under the existing operator profile directory. |
+| Standard alarm set/clear | Same-OID state rules using set/clear condition varbinds and bounded alarm resource keys. |
+| Environmental/power/component state | State and sample rules with source/resource scope. |
+| Routing/HA adjacency state | Resource-scoped counters/state with explicit caps for peers/neighbors/groups. |
+| Capacity/pool/utilization thresholds | Sample plus threshold metrics and optional clear-state rules. |
+| L2 topology/neighbor counters | Counter/sample rules only; no topology mutation. |
+| Receiver pipeline health | Built-in system metrics use the same source identity policy when attribution is reliable. |
+
+### Required Tests
+
+The implementation must add tests for:
+
+- profile-local `metrics:` parsing and strict validation;
+- profile-local `charts:` parsing and strict validation;
+- unknown top-level key rejection or targeted rejection for `metrics:` and
+  `charts:` before runtime support is complete;
+- `extends:` metric merge, override, disable, and duplicate-name detection;
+- chart merge, chart context conflict, duplicate dimension, and `charttpl.Spec`
+  validation;
+- built-in static chart ID/context collision rejection;
+- metric rule `output.chart` references to inherited and local chart IDs;
+- rejection of cross-chain chart references;
+- metric rule catalog construction for lazy stock profiles and `include`
+  validation at `Check()`;
+- `max_rules` counting after profile merge and mode filtering;
+- multiple metrics referencing the same trap OID;
+- symbolic trap name and numeric OID resolution order;
+- missing-varbind behavior;
+- bounded filter predicates;
+- `exists` and `absent` predicate semantics;
+- numeric comparison predicates and invalid numeric predicates on non-numeric
+  varbinds;
+- `range` predicate inclusive bounds;
+- `not: true` semantics, including missing-varbind behavior and absence via
+  `absent`;
+- numeric sample extraction, scaling, and non-numeric rejection;
+- `TimeTicks` conversion to seconds;
+- rejection of `incremental` algorithm for initial `sample` rules;
+- separate-OID state pairs;
+- same-OID set/clear state;
+- state TTL sweep and race-free state updates;
+- state reset semantics after restart;
+- concurrent state updates from multiple trap-processing goroutines hitting the
+  same rule and resource key;
+- per-source identity with known `SourceVnodeID`;
+- V2 host-scope unavailable behavior and operator-visible diagnostics;
+- transition from unresolved fallback identity to known `SourceVnodeID`;
+- unresolved source fallback policy, including `drop_profile_metrics`,
+  `per_source_label`, hash privacy mode, and overflow behavior;
+- hash privacy stability across restarts and absence of raw source label leakage
+  in hash mode;
+- ambiguous source handling;
+- resource caps and overflow counters;
+- rule-miss counters for missing predicates and extraction failures;
+- sensitive/high-cardinality label rejection;
+- sensitive/high-cardinality predicate and `value_from_varbind` rejection;
+- built-in and legacy-reserved metric-name collision rejection;
+- generated chart templates and chartengine planning;
+- collector-enforced caps before charttpl best-effort lifecycle behavior;
+- V2 host-scope routing for known source devices;
+- config schema updates for `profile_metrics`;
+- generated metadata/integration documentation updates;
+- health alert compatibility when chart identity or labels change;
+- profile generator preservation of curated metric rules;
+- profile reload behavior when metric rules are added, removed, disabled, or
+  renamed;
+- rejection of operator attempts to mark inherited stock rules `auto_safe: true`;
+- legacy shim reserved namespace collision rejection;
+- job restart behavior for `profile_metrics` configuration changes;
+- dedup/write-failure runtime ordering;
+- compatibility behavior for existing job-level metrics, if retained.
+- per-cycle overhead benchmark near configured caps, covering rule evaluation,
+  hash mode, state updates, resource cap checks, and TTL sweep. The benchmark
+  must report time and allocations and define an implementation-specific
+  regression budget before release.
+
+### Phase 2 Review Questions
+
+External reviewers should answer design questions:
+
+1. Does the design cover every use case without adding a full alarm engine or
+   topology mutation system?
+2. Is profile-local `metrics:` the simplest model consistent with SNMP profile
+   methodology?
+3. Are the identity rules strong enough to satisfy per-device metrics without
+   dangerous cardinality?
+4. Are any schema concepts unnecessary, ambiguous, or weaker than existing
+   Netdata/SNMP profile patterns?
+5. What unwanted side effects could this design create in loader behavior,
+   generated stock profiles, chart templates, docs, or backward compatibility?
