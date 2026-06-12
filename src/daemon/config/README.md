@@ -254,7 +254,7 @@ By default, Netdata will enable monitoring metrics for disks, memory, and networ
 
 :::tip
 
-Use `yes` instead of `auto` in plugin configuration sections to enable these charts permanently. You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics for all internal Netdata plugins.
+Use `yes` instead of `auto` in plugin configuration sections to enable these charts permanently. You can also set the `enable zero metrics` option to `yes` in the `[db]` section which enables charts with zero metrics for all internal Netdata plugins.
 
 :::
 

@@ -371,7 +371,6 @@ The `netdata.conf` file is the primary configuration file for the Netdata agent.
 This section defines global settings for the Netdata agent.
 
 - **hostname**: The hostname used by the agent.
-- **memory mode**: Choose the memory mode for data collection (e.g., `ram` or `swap`).
 - **error log file**: Path to the file where error logs are saved.
 
 ### [web]
@@ -382,13 +381,13 @@ Configure the web interface settings here.
 - **port**: Set the port for the web interface (default: 19999).
 - **disable SSL**: Set to `yes` to disable SSL support.
 
-### [database]
+### [db]
 
 Manage database settings for data storage and retention.
 
-- **memory mode**: Choose between in-memory or disk-based storage.
-- **data retention**: Set how long to keep historical data.
-- **compression**: Enable or disable data compression.
+- **db** (formerly `memory mode`): Choose between in-memory or disk-based storage (e.g., `dbengine`, `ram`, `none`).
+- **retention**: Set how long to keep historical data.
+- **update every**: The data collection frequency in seconds.
 
 ## Complete Configuration Examples
 
