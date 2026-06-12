@@ -264,7 +264,7 @@ External plugins will have only two options at `netdata.conf`:
 
 |     setting     |                   default                    | info                                                                                                                                                                                         |
 |:---------------:|:--------------------------------------------:|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-|  update every   | the value of `[global].update every` setting | The frequency in seconds the plugin should collect values. For more information check the [performance guide](/docs/netdata-agent/configuration/optimize-the-netdata-agents-performance.md). |
+|  update every   | the value of `[db].update every` setting | The frequency in seconds the plugin should collect values. For more information check the [performance guide](/docs/netdata-agent/configuration/optimize-the-netdata-agents-performance.md). |
 | command options |                      -                       | Additional command line options to pass to the plugin.                                                                                                                                       |
 
 External plugins that need additional configuration may support a dedicated file in `/etc/netdata`. Check their documentation.
