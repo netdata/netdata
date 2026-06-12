@@ -2563,7 +2563,12 @@ if(OS_WINDOWS)
                                 COMMAND "${WEVT_GEN_BIN_FILE}" --manifest >"${WEVT_MAN_FILE}"
                                 COMMAND windmc -r "${CMAKE_BINARY_DIR}" -h "${CMAKE_BINARY_DIR}" ${WEVT_MC_FILE}
                                 COMMAND windres ${WEVT_RC_FILE} -o ${WEVT_RES_OBJECT}
-                                COMMAND ${CMAKE_LINKER} -dll --entry 0 -nostdlib -o ${WEVT_DLL_FILE} ${WEVT_RES_OBJECT}
+                                # Drive the link through the compiler so flags are translated
+                                # per linker (GNU ld, lld-gnu, lld-link). Direct ${CMAKE_LINKER}
+                                # invocation with `-dll -nostdlib` (GNU-ld syntax) fails on
+                                # lld in `link` flavor (Windows MSYS2 with CMAKE_LINKER=ld.lld),
+                                # which is the actual default on Windows UCRT64.
+                                COMMAND "${CMAKE_C_COMPILER}" -shared -nostdlib -Wl,--entry,0 -o ${WEVT_DLL_FILE} ${WEVT_RES_OBJECT}
                                 DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}"
                                 COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_MC_H_FILE} and ${WEVT_DLL_FILE}"
                         )
