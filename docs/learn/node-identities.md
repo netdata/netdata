@@ -237,7 +237,7 @@ To edit `netdata.conf`, use the [`edit-config`](/docs/netdata-agent/configuratio
 sudo ./edit-config netdata.conf
 ```
 
-The custom hostname determines how the node appears in local Dashboards, Netdata Cloud (including the [Nodes tab](/docs/dashboards-and-charts/nodes-tab.md)), alert Notifications, and streaming Parent nodes.
+The custom hostname determines how the node appears in local Dashboards, Netdata Cloud (including the [Nodes tab](/docs/dashboards-and-charts/nodes-tab.md)), alert notifications, and streaming Parent nodes.
 
 :::info
 
