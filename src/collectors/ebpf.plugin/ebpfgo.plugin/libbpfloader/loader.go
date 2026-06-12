@@ -12,6 +12,8 @@ type BTF struct {
 
 type CachestatRuntime struct{}
 
+type SocketRuntime struct{}
+
 func OpenObject(path string) (*Object, error) {
 	return nil, ErrDisabled
 }
@@ -97,4 +99,27 @@ func (r *CachestatRuntime) Close() {
 func PidIsAlive(pid uint32) bool {
 	_ = pid
 	return true
+}
+
+func NewSocketRuntime(path string, useCore bool) (*SocketRuntime, error) {
+	_ = path
+	_ = useCore
+	return nil, ErrDisabled
+}
+
+func (r *SocketRuntime) Prepare(mapsPerCore bool) error {
+	_ = mapsPerCore
+	return ErrDisabled
+}
+
+func (r *SocketRuntime) Load() error {
+	return ErrDisabled
+}
+
+func (r *SocketRuntime) Attach() error {
+	return ErrDisabled
+}
+
+func (r *SocketRuntime) Close() {
+	// No-op in the disabled build because the runtime never acquired native resources.
 }
