@@ -3,19 +3,24 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"runtime"
 	"strconv"
+	"sync"
+	"syscall"
+
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 )
 
 func main() {
-	// Cap the Go scheduler to 2 OS threads.  This plugin has exactly two
-	// active goroutines (global metric collector and SHM publisher) plus a
-	// blocked signal-handler goroutine.  The default GOMAXPROCS = NumCPU
-	// allocates O(ncpus) scheduler threads, and CGO calls on blocked
-	// goroutines cause the runtime to create up to O(ncpus) additional
-	// threads — each carrying an 8 MB Linux stack.  On a 64-core host that
-	// is ~130 threads and ~1 GB of stack RSS for no benefit.
-	runtime.GOMAXPROCS(2)
+	// Cap the Go scheduler to 3 OS threads: one per active collector goroutine
+	// (cachestat, socket) plus the blocked signal-handler goroutine.  The
+	// default GOMAXPROCS = NumCPU allocates O(ncpus) scheduler threads, and
+	// CGO calls on blocked goroutines cause the runtime to create up to
+	// O(ncpus) additional threads — each carrying an 8 MB Linux stack.  On a
+	// 64-core host that is ~130 threads and ~1 GB of stack RSS for no benefit.
+	runtime.GOMAXPROCS(3)
+
 	updateEvery := 0
 	if len(os.Args) > 1 {
 		if parsed, err := strconv.Atoi(os.Args[1]); err == nil && parsed > 0 {
@@ -23,40 +28,93 @@ func main() {
 		}
 	}
 
-	cfg, err := resolveCachestatLegacyConfig()
+	cachestatCfg, err := resolveCachestatLegacyConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat config load failed: %v\n", err)
 		os.Exit(1)
 	}
-	if !anyProgramEnabled(cfg) {
+
+	socketCfg, err := resolveSocketLegacyConfig()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: socket config load failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	if !anyProgramEnabled(cachestatCfg, socketCfg) {
 		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: all eBPF programs disabled by configuration\n")
 		os.Exit(0)
 	}
 
-	handle, err := LoadCachestatLegacy(cfg)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat load failed: %v\n", err)
-		os.Exit(1)
-	}
-	if handle == nil || handle.Runtime == nil {
-		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: no eBPF program loaded\n")
-		os.Exit(1)
+	// Shared stop channel: closed on SIGINT/SIGTERM so all collectors exit cleanly.
+	stop := make(chan struct{})
+	go func() {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		<-sigCh
+		signal.Stop(sigCh)
+		close(stop)
+	}()
+
+	api := netdataapi.New(os.Stdout)
+	var wg sync.WaitGroup
+
+	// ---- cachestat ----
+	if cachestatCfg.Enabled {
+		ue := resolveUpdateEvery(updateEvery, cachestatCfg.UpdateEvery, cachestatDefaultUpdateEvery)
+		cachestatCfg.UpdateEvery = ue
+
+		handle, herr := LoadCachestatLegacy(cachestatCfg)
+		if herr != nil {
+			fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat load failed: %v\n", herr)
+		} else if handle != nil && handle.Runtime != nil {
+			var store *cachestatSharedMemoryStore
+			if handle.AppsEnabled || handle.CgroupsEnabled {
+				store = NewCachestatSharedMemoryStore()
+			}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				runCachestatGlobalCollector(api, handle, stop, store, ue)
+				handle.Close()
+			}()
+		}
 	}
 
-	if updateEvery <= 0 {
-		updateEvery = handle.UpdateEvery
-	}
-	if updateEvery <= 0 {
-		updateEvery = cachestatDefaultUpdateEvery
-	}
-	handle.UpdateEvery = updateEvery
+	// ---- socket ----
+	if socketCfg.Enabled {
+		ue := resolveUpdateEvery(updateEvery, socketCfg.UpdateEvery, socketDefaultUpdateEvery)
+		socketCfg.UpdateEvery = ue
 
-	runCachestatPlugin(handle, updateEvery)
+		handle, herr := LoadSocketLegacy(socketCfg)
+		if herr != nil {
+			fmt.Fprintf(os.Stderr, "ebpf-go.plugin: socket load failed: %v\n", herr)
+		} else if handle != nil && handle.Runtime != nil {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				runSocketGlobalCollector(api, handle, stop, ue)
+				handle.Close()
+			}()
+		}
+	}
+
+	wg.Wait()
+}
+
+// resolveUpdateEvery returns the first positive value from: CLI arg, config, default.
+func resolveUpdateEvery(cliArg, cfgVal, fallback int) int {
+	if cliArg > 0 {
+		return cliArg
+	}
+	if cfgVal > 0 {
+		return cfgVal
+	}
+	return fallback
 }
 
 // anyProgramEnabled returns true when at least one eBPF program is enabled.
 // The plugin exits early only when every known program is disabled so that
 // adding a new program requires only a new field here, not a structural change.
-func anyProgramEnabled(cfg CachestatLegacyConfig) bool {
-	return cfg.Enabled || cfg.SocketEnabled
+func anyProgramEnabled(cachestatCfg CachestatLegacyConfig, socketCfg SocketLegacyConfig) bool {
+	return cachestatCfg.Enabled || socketCfg.Enabled
 }

@@ -29,5 +29,8 @@ func TestSocketRuntimeDisabledBuild(t *testing.T) {
 	if err := rt.Attach(); !errors.Is(err, libbpfloader.ErrDisabled) {
 		t.Fatalf("Attach: got %v, want ErrDisabled", err)
 	}
+	if _, err := rt.Snapshot(false); !errors.Is(err, libbpfloader.ErrDisabled) {
+		t.Fatalf("Snapshot: got %v, want ErrDisabled", err)
+	}
 	rt.Close() // must not panic
 }

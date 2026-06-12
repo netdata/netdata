@@ -120,6 +120,11 @@ func (r *SocketRuntime) Attach() error {
 	return ErrDisabled
 }
 
+func (r *SocketRuntime) Snapshot(mapsPerCore bool) (SocketSnapshot, error) {
+	_ = mapsPerCore
+	return SocketSnapshot{}, ErrDisabled
+}
+
 func (r *SocketRuntime) Close() {
 	// No-op in the disabled build because the runtime never acquired native resources.
 }

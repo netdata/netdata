@@ -3,9 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
@@ -343,40 +341,3 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 	}
 }
 
-func runCachestatPlugin(handle *CachestatLegacyHandle, updateEveryArg int) {
-	if handle == nil || handle.Runtime == nil {
-		return
-	}
-
-	updateEvery := updateEveryArg
-	if updateEvery <= 0 {
-		updateEvery = handle.UpdateEvery
-	}
-	if updateEvery <= 0 {
-		updateEvery = cachestatDefaultUpdateEvery
-	}
-	handle.UpdateEvery = updateEvery
-	api := netdataapi.New(os.Stdout)
-
-	stop := make(chan struct{})
-
-	// Lightweight signal handler: no CGO, stays on an existing M.
-	go func() {
-		sigCh := make(chan os.Signal, 1)
-		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-		<-sigCh
-		signal.Stop(sigCh)
-		close(stop)
-	}()
-
-	// Both global metrics and per-PID SHM run in a single goroutine so that
-	// sequential CGO calls share one OS thread instead of requiring two.
-	var store *cachestatSharedMemoryStore
-	if handle.AppsEnabled || handle.CgroupsEnabled {
-		store = NewCachestatSharedMemoryStore()
-	}
-
-	runCachestatGlobalCollector(api, handle, stop, store, updateEvery)
-
-	handle.Close()
-}

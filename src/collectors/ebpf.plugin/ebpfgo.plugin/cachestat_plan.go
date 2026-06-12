@@ -22,7 +22,6 @@ type CachestatLegacyConfig struct {
 	HasBTF          bool
 	ConfigFound     bool
 	Enabled         bool
-	SocketEnabled   bool // [ebpf programs] socket; reserved for future socket implementation
 	AppsEnabled     bool
 	CgroupsEnabled  bool
 	BTFPath         string
@@ -104,10 +103,7 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 	if fileCfg.Cachestat != nil {
 		cfg.Enabled = *fileCfg.Cachestat
 	}
-	if fileCfg.Socket != nil {
-		cfg.SocketEnabled = *fileCfg.Socket
-	}
-	if fileCfg.UpdateEvery != nil && *fileCfg.UpdateEvery > 0 {
+if fileCfg.UpdateEvery != nil && *fileCfg.UpdateEvery > 0 {
 		cfg.UpdateEvery = *fileCfg.UpdateEvery
 	}
 	if fileCfg.AppsEnabled != nil {
