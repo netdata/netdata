@@ -147,6 +147,15 @@ CFLAGS="${BUILD_CFLAGS}" /ucrt64/bin/cmake \
     -DENABLE_BUNDLED_JSONC=On \
     -DENABLE_BUNDLED_PROTOBUF=Off \
     -DRust_COMPILER=/ucrt64/bin/rustc \
+    # Force CMake's ninja generator to use @response files for the long link
+    # lines on Windows. Without these, the netdata.exe link (424 .obj + ~30
+    # archives + system libs) inlines into a ~28 KB command line that exceeds
+    # cmd.exe's 8 KB limit and fails with "The command line is too long.".
+    # CMake 4.3.3 supports all three; they are no-ops on non-Ninja generators
+    # and on non-Windows. Diagnostic: see SOW P22 (response-file size limit).
+    -DCMAKE_NINJA_USE_RESPONSE_FILE=ON \
+    -DCMAKE_NINJA_USE_RESPONSE_FILE_FOR_OBJECTS=ON \
+    -DCMAKE_NINJA_USE_RESPONSE_FILE_FOR_LIBRARIES=ON \
     "${windows_path_prefix_arg[@]}" \
     ${EXTRA_CMAKE_OPTIONS:-}
 ${GITHUB_ACTIONS+echo "::endgroup::"}
