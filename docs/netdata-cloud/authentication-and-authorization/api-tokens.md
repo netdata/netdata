@@ -124,8 +124,35 @@ read -r -d '' PAYLOAD <<'EOF'
     "time": {"time_group": "average"}
   },
   "format": "json2",
-  "options": ["jsonwrap", "minify", "unaligned"],
-  "timeout": 30000
+  "optFDIC Insured
+
+Since 10/13/1994
+
+Cert # 33947
+
+Charter
+
+National Bank
+
+Member Federal Reserve System
+
+Headquarters
+
+2035 Limestone Rd Wilmington, DE 19808
+
+Regulators
+
+Comptroller of the Currency
+
+CFPB
+
+This calculator is provided for illustrative and educational purposes only and assumes a constant rate of return. Actual investment returns vary and are not guaranteed. It is notAccount Number
+
+3300246694509
+
+Routing Number
+
+273070278load 15000
 }
 EOF
 
