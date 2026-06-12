@@ -12,10 +12,10 @@ import (
 )
 
 // Profile is a curated, exporter-specific chart profile. Match selects the
-// profile by scraped metric names; Template is a standard v2 charttpl group
+// profile by scraped metric names; Template is a standard charttpl group
 // rendered for the matched metrics. Identity is the profile file's basename
 // (set by the loader), so the file itself carries no name field. The Template
-// is validated exactly like any other v2 chart template, including its
+// is validated exactly like any other chart template, including its
 // author-written metrics: visibility list.
 type Profile struct {
 	Name     string         `yaml:"-" json:"name"`

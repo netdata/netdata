@@ -66,7 +66,7 @@ type ProfilesModeConfig struct {
 }
 
 // ProfileEntryConfig names a profile by its catalog identity (the profile file's
-// basename), matched case-insensitively.
+// basename; must match promprofiles.IsValidProfileName).
 type ProfileEntryConfig struct {
 	Name string `yaml:"name" json:"name"`
 }
@@ -101,9 +101,9 @@ func modeEntries(m *ProfilesModeConfig) []ProfileEntryConfig {
 }
 
 // validateProfileEntries enforces a non-empty entry list with non-empty,
-// case-insensitively-unique names. Names are matched against the catalog the
-// same (case-insensitive) way, so duplicates that differ only in case would
-// select the same profile twice and collide during the template merge.
+// unique, valid profile basenames (see promprofiles.IsValidProfileName).
+// Duplicate names are rejected to avoid selecting the same profile more than once
+// and colliding during the template merge.
 func validateProfileEntries(path string, entries []ProfileEntryConfig) error {
 	if len(entries) == 0 {
 		return fmt.Errorf("'%s' must not be empty for the selected profiles mode", path)
