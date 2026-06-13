@@ -140,6 +140,25 @@ static bool mock_apps_lookup_handler(
                 NULL,
                 0);
         }
+        else if (req_item.pid == 400) {
+            err = nipc_apps_lookup_builder_add(
+                builder,
+                NIPC_PID_LOOKUP_KNOWN,
+                NIPC_APPS_CGROUP_KNOWN,
+                NIPC_ORCHESTRATOR_DOCKER,
+                req_item.pid,
+                1,
+                1000,
+                423456789,
+                "proc-d",
+                6,
+                "/docker/other",
+                13,
+                "other-container",
+                15,
+                NULL,
+                0);
+        }
         else {
             err = nipc_apps_lookup_builder_add(
                 builder,
@@ -320,6 +339,27 @@ static bool run_roundtrip_test(const char *run_dir)
         goto cleanup_client;
     if (!expect_ok(__atomic_load_n(&apps_lookup_requests_failed, __ATOMIC_ACQUIRE) == 0, "client recorded a failed request"))
         goto cleanup_client;
+
+    uint32_t disjoint_pid[] = { 400 };
+    nv_apps_lookup_warm_pids(disjoint_pid, _countof(disjoint_pid));
+
+    if (!expect_ok(wait_for_counter(&mock_requests, 3), "worker did not warm the disjoint PID"))
+        goto cleanup_client;
+    if (!expect_ok(wait_for_cache_entries(4), "disjoint PID warm pruned existing cache entries"))
+        goto cleanup_client;
+    if (!expect_ok(nv_cache_lookup_pid(100, 123456789, &cached), "known PID was evicted by disjoint warm"))
+        goto cleanup_client;
+    nv_cache_lookup_fields_free(&cached);
+    if (!expect_ok(nv_cache_lookup_pid(400, 423456789, &cached), "disjoint known PID cache accessor missed"))
+        goto cleanup_client;
+    bool disjoint_ok =
+        expect_ok(cached.cgroup_status == NIPC_APPS_CGROUP_KNOWN, "disjoint PID cgroup status mismatch") &&
+        expect_ok(strcmp(cached.cgroup_path, "/docker/other") == 0, "disjoint PID cgroup path mismatch") &&
+        expect_ok(strcmp(cached.cgroup_name, "other-container") == 0, "disjoint PID cgroup name mismatch");
+    nv_cache_lookup_fields_free(&cached);
+    if (!disjoint_ok)
+        goto cleanup_client;
+
     uint64_t worker_le_50ms =
         counter_value(&apps_lookup_worker_duration_le_1ms) +
         counter_value(&apps_lookup_worker_duration_le_5ms) +
@@ -329,10 +369,16 @@ static bool run_roundtrip_test(const char *run_dir)
         goto cleanup_client;
 
     uint32_t known_pid[] = { 100 };
+    uint64_t requests_before_known_hits = counter_value(&mock_requests);
     for (size_t i = 0; i < 10; i++)
         nv_apps_lookup_warm_pids(known_pid, _countof(known_pid));
 
     if (!expect_ok(wait_for_counter(&apps_lookup_cache_hits, 11), "known PID cache hit ratio check failed"))
+        goto cleanup_client;
+    sleep_usec(100000);
+    if (!expect_ok(
+            counter_value(&mock_requests) == requests_before_known_hits,
+            "stable known PID cache hits triggered extra APPS_LOOKUP requests"))
         goto cleanup_client;
     uint64_t handler_le_5ms =
         counter_value(&apps_lookup_handler_overhead_le_1ms) +

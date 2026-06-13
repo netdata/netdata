@@ -318,6 +318,7 @@ struct sockets_stats {
     uint32_t *pids;
     size_t pid_count;
     size_t pid_capacity;
+    DICTIONARY *pid_starttime_cache;
 
     struct {
         uint32_t tcpi_rtt;
@@ -1311,11 +1312,15 @@ static void network_viewer_add_enrichment_value(BUFFER *wb, const char *value)
     buffer_json_add_array_item_string(wb, value && *value ? value : NULL);
 }
 
-static void network_viewer_add_socket_enrichment_values(BUFFER *wb, pid_t pid, uid_t uid, const char *process)
+static void network_viewer_add_socket_enrichment_values(
+    BUFFER *wb,
+    DICTIONARY *pid_starttime_cache,
+    pid_t pid,
+    uid_t uid,
+    const char *process)
 {
     NV_TOPOLOGY_CONTAINER_FIELDS fields;
-    uint64_t starttime = 0;
-    (void)topology_read_proc_starttime((uint64_t)pid, &starttime);
+    uint64_t starttime = topology_starttime_cache_get_or_load(pid_starttime_cache, (uint64_t)pid);
     topology_container_fields_fill((uint32_t)pid, starttime, uid, process, &fields);
 
     network_viewer_add_enrichment_value(wb, fields.cgroup_status);
@@ -1458,7 +1463,8 @@ static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOC
             cached_username_release(cu);
         }
 
-        network_viewer_add_socket_enrichment_values(wb, n->pid, n->uid, n->comm[0] ? n->comm : "[unknown]");
+        network_viewer_add_socket_enrichment_values(
+            wb, st->pid_starttime_cache, n->pid, n->uid, n->comm[0] ? n->comm : "[unknown]");
 
         const struct socket_endpoint *server_endpoint;
         const char *server_address;
@@ -5994,6 +6000,10 @@ static BUFFER *network_viewer_result(char *function) {
     struct sockets_stats st = {
         .wb = wb,
     };
+    st.pid_starttime_cache = dictionary_create_advanced(
+        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+        NULL,
+        sizeof(NV_PID_STARTTIME_CACHE_ENTRY));
 
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
@@ -6149,6 +6159,10 @@ static BUFFER *network_viewer_result(char *function) {
         }
 
         freez(st.pids);
+        if(st.pid_starttime_cache) {
+            dictionary_destroy(st.pid_starttime_cache);
+            st.pid_starttime_cache = NULL;
+        }
 
         buffer_json_array_close(wb);
         buffer_json_member_add_object(wb, "columns");
@@ -6624,6 +6638,8 @@ static BUFFER *network_viewer_result(char *function) {
     }
 
 close_and_send:
+    if(st.pid_starttime_cache)
+        dictionary_destroy(st.pid_starttime_cache);
     network_viewer_finalize_response_buffer(wb, now_s);
     return wb;
 }

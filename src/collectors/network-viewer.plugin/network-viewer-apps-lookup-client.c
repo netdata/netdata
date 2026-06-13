@@ -280,21 +280,6 @@ static bool nv_apps_lookup_pid_set_evict_oldest(DICTIONARY *dict, uint32_t *size
     return true;
 }
 
-static void nv_apps_lookup_cache_victim_append(
-    uint32_t **victims,
-    size_t *victims_count,
-    size_t *victims_capacity,
-    uint32_t pid)
-{
-    if (*victims_count == *victims_capacity) {
-        size_t new_capacity = *victims_capacity ? *victims_capacity * 2 : 64;
-        *victims = reallocz(*victims, new_capacity * sizeof(**victims));
-        *victims_capacity = new_capacity;
-    }
-
-    (*victims)[(*victims_count)++] = pid;
-}
-
 static bool nv_apps_lookup_pid_set_add(
     DICTIONARY *dict,
     uint32_t *size,
@@ -414,42 +399,6 @@ static size_t nv_apps_lookup_sort_unique_pids(uint32_t *pids, size_t count)
     }
 
     return unique;
-}
-
-static bool nv_apps_lookup_pid_in_sorted(const uint32_t *pids, size_t count, uint32_t pid)
-{
-    if (!pids || count == 0)
-        return false;
-
-    return bsearch(&pid, pids, count, sizeof(*pids), nv_apps_lookup_u32_compare) != NULL;
-}
-
-static void nv_apps_lookup_cache_prune_to_pids(const uint32_t *pids, size_t count)
-{
-    if (!apps_lookup_cache || apps_lookup_cache_size == 0)
-        return;
-
-    uint32_t *victims = NULL;
-    size_t victims_count = 0, victims_capacity = 0;
-
-    NV_APPS_LOOKUP_CACHE_ENTRY *entry;
-    dfe_start_read(apps_lookup_cache, entry) {
-        if (nv_apps_lookup_pid_in_sorted(pids, count, entry->pid))
-            continue;
-
-        nv_apps_lookup_cache_victim_append(&victims, &victims_count, &victims_capacity, entry->pid);
-    }
-    dfe_done(entry);
-
-    for (size_t i = 0; i < victims_count; i++) {
-        char key[16];
-        nv_apps_lookup_pid_key(victims[i], key);
-        dictionary_del(apps_lookup_cache, key);
-        if (apps_lookup_cache_size > 0)
-            apps_lookup_cache_size--;
-    }
-
-    freez(victims);
 }
 
 static bool nv_apps_lookup_cache_evict_lru(void)
@@ -852,8 +801,8 @@ void nv_apps_lookup_warm_pids(const uint32_t *pids, size_t pid_count)
         return;
     }
 
+    size_t lookup_count = 0;
     netdata_mutex_lock(&apps_lookup_cache_mutex);
-    nv_apps_lookup_cache_prune_to_pids(working_pids, working_count);
     for (size_t i = 0; i < working_count; i++) {
         char key[16];
         nv_apps_lookup_pid_key(working_pids[i], key);
@@ -861,12 +810,22 @@ void nv_apps_lookup_warm_pids(const uint32_t *pids, size_t pid_count)
         if (entry) {
             entry->last_used_usec = now_ut;
             nv_apps_lookup_counter_inc(&apps_lookup_cache_hits);
+            if (entry->cgroup_status != NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER)
+                continue;
         }
+
+        working_pids[lookup_count++] = working_pids[i];
     }
     netdata_mutex_unlock(&apps_lookup_cache_mutex);
 
+    if (lookup_count == 0) {
+        nv_apps_lookup_handler_overhead_observe(now_monotonic_usec() - started_ut);
+        freez(working_pids);
+        return;
+    }
+
     netdata_mutex_lock(&apps_lookup_intake_mutex);
-    for (size_t i = 0; i < working_count; i++)
+    for (size_t i = 0; i < lookup_count; i++)
         nv_apps_lookup_pid_set_add(
             apps_lookup_intake,
             &apps_lookup_intake_size,
