@@ -82,16 +82,4 @@ const CGROUP_SNAPSHOT_ENTRY *cgroup_snapshot_store_at(const CGROUP_SNAPSHOT_STOR
 const CGROUP_SNAPSHOT_ENTRY *cgroup_snapshot_store_find(
     const CGROUP_SNAPSHOT_STORE *store, const char *path, size_t path_len);
 
-// ---------------------------------------------------------------------------
-// Reaped set: rolling, bounded set of paths that were discovered and then
-// removed, so a lookup for a vanished cgroup answers PERMANENT instead of
-// retrying forever. It persists across publishes and shares the store rwlock.
-
-void cgroup_snapshot_reaped_add(const char *path);
-void cgroup_snapshot_reaped_set_max(size_t max_entries);
-void cgroup_snapshot_reaped_set_accepting(bool accepting);
-
-// Must be called while holding cgroup_snapshot_store_acquire().
-bool cgroup_snapshot_reaped_contains(const char *path);
-
 #endif // NETDATA_CGROUP_SNAPSHOT_STORE_H

@@ -351,7 +351,6 @@ extern char *cgroup_unified_base;
 extern int cgroup_root_count;
 extern int cgroup_root_max;
 extern int cgroup_max_depth;
-extern int cgroup_lookup_reaped_set_size;
 extern bool discovery_signal_pending;
 extern uint64_t cgroup_discovery_generation;
 extern uint64_t cgroup_discovery_scans_natural;

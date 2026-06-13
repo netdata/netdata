@@ -221,9 +221,6 @@ static bool cgroups_lookup_handler(
                 }
                 // else: discovery knows the cgroup but has not resolved its name
                 // yet -- transient, retry without waking discovery (it is aware)
-            } else if (cgroup_snapshot_reaped_contains(path)) {
-                // discovered then removed -- it will never come back
-                status = NIPC_CGROUP_LOOKUP_UNKNOWN_PERMANENT;
             } else if (cgroup_lookup_path_reachable(path, path_len)) {
                 // discovery could enumerate this path but has not seen it yet
                 should_signal_lookup_miss = true;

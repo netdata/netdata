@@ -111,7 +111,6 @@ modules:
                 - name: cache_misses_intake_dropped
                 - name: cache_evictions_pid_reuse
                 - name: cache_evictions_lru
-                - name: cache_evictions_unknown_permanent
             - name: netdata.collector.ipc.apps_lookup.client.peer
               description: APPS_LOOKUP client peer connection events
               unit: "events/s"

@@ -12,7 +12,6 @@ struct cgroup *cgroup_root = NULL;
 netdata_mutex_t cgroup_root_mutex;
 struct discovery_thread discovery_thread = { 0 };
 int cgroup_max_depth = 0;
-int cgroup_lookup_reaped_set_size = 4;
 bool discovery_signal_pending = false;
 uint64_t cgroup_discovery_generation = 0;
 
@@ -178,7 +177,6 @@ int main(void)
     char service_name[64];
     const char *known_path = "/docker/0123456789abcdef";
     const char *retry_path = "/docker/aaaaaaaaaaaaaaaa";
-    const char *gone_path = "/docker/bbbbbbbbbbbbbbbb";
     const char *missing_path = "/docker/cccccccccccccccc";
     const char *unreachable_path = "/system/some.scope"; // ancestor "/system" is excluded from the walk
     int rc = 1;
@@ -215,11 +213,8 @@ int main(void)
     }
 
     cgroup_snapshot_store_init();
-    cgroup_snapshot_reaped_set_max((size_t)cgroup_lookup_reaped_set_size);
-    cgroup_snapshot_reaped_set_accepting(true);
 
     publish_test_store(known_path, retry_path);
-    cgroup_snapshot_reaped_add(gone_path);
 
     cgroup_netipc_lookup_init_for_testing(temp_dir, service_name);
 
@@ -239,24 +234,23 @@ int main(void)
     const char *path_strings[] = {
         known_path,
         retry_path,
-        gone_path,
         missing_path,
         unreachable_path,
     };
-    nipc_str_view_t paths[5];
-    for (size_t i = 0; i < 5; i++) {
+    nipc_str_view_t paths[4];
+    for (size_t i = 0; i < 4; i++) {
         paths[i].ptr = path_strings[i];
         paths[i].len = (uint32_t)strlen(path_strings[i]);
     }
 
     nipc_cgroups_lookup_resp_view_t response;
-    nipc_error_t err = nipc_client_call_cgroups_lookup(&client, paths, 5, &response);
+    nipc_error_t err = nipc_client_call_cgroups_lookup(&client, paths, 4, &response);
     if (err != NIPC_OK) {
         fprintf(stderr, "lookup call failed: %u\n", (unsigned int)err);
         goto cleanup_client;
     }
 
-    if (response.generation != 1 || response.item_count != 5) {
+    if (response.generation != 1 || response.item_count != 4) {
         fprintf(stderr, "response header mismatch: generation=%llu items=%u\n",
                 (unsigned long long)response.generation, response.item_count);
         goto cleanup_client;
@@ -264,9 +258,8 @@ int main(void)
 
     if (!expect_item(&response, 0, known_path, NIPC_CGROUP_LOOKUP_KNOWN, NIPC_ORCHESTRATOR_DOCKER, "known-container", 1) ||
         !expect_item(&response, 1, retry_path, NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, NIPC_ORCHESTRATOR_UNKNOWN, "", 0) ||
-        !expect_item(&response, 2, gone_path, NIPC_CGROUP_LOOKUP_UNKNOWN_PERMANENT, NIPC_ORCHESTRATOR_UNKNOWN, "", 0) ||
-        !expect_item(&response, 3, missing_path, NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, NIPC_ORCHESTRATOR_UNKNOWN, "", 0) ||
-        !expect_item(&response, 4, unreachable_path, NIPC_CGROUP_LOOKUP_UNKNOWN_PERMANENT, NIPC_ORCHESTRATOR_UNKNOWN, "", 0))
+        !expect_item(&response, 2, missing_path, NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, NIPC_ORCHESTRATOR_UNKNOWN, "", 0) ||
+        !expect_item(&response, 3, unreachable_path, NIPC_CGROUP_LOOKUP_UNKNOWN_PERMANENT, NIPC_ORCHESTRATOR_UNKNOWN, "", 0))
         goto cleanup_client;
 
     if (!__atomic_load_n(&discovery_signal_pending, __ATOMIC_ACQUIRE)) {
@@ -276,25 +269,24 @@ int main(void)
 
     __atomic_store_n(&discovery_signal_pending, false, __ATOMIC_RELEASE);
 
-    // none of these must wake discovery: retry is known-but-unresolved, gone is
-    // reaped (permanent), unreachable is walk-excluded (permanent)
-    nipc_str_view_t no_signal_paths[3] = {
+    // none of these must wake discovery: retry is known-but-unresolved and
+    // unreachable is walk-excluded (permanent)
+    nipc_str_view_t no_signal_paths[2] = {
         paths[1],
-        paths[2],
-        paths[4],
+        paths[3],
     };
-    err = nipc_client_call_cgroups_lookup(&client, no_signal_paths, 3, &response);
+    err = nipc_client_call_cgroups_lookup(&client, no_signal_paths, 2, &response);
     if (err != NIPC_OK) {
-        fprintf(stderr, "retry/reaped/unreachable lookup call failed: %u\n", (unsigned int)err);
+        fprintf(stderr, "retry/unreachable lookup call failed: %u\n", (unsigned int)err);
         goto cleanup_client;
     }
 
     if (__atomic_load_n(&discovery_signal_pending, __ATOMIC_ACQUIRE)) {
-        fprintf(stderr, "unresolved/reaped/unreachable lookup incorrectly armed discovery signal flag\n");
+        fprintf(stderr, "unresolved/unreachable lookup incorrectly armed discovery signal flag\n");
         goto cleanup_client;
     }
 
-    err = nipc_client_call_cgroups_lookup(&client, paths, 5, &response);
+    err = nipc_client_call_cgroups_lookup(&client, paths, 4, &response);
     if (err != NIPC_OK) {
         fprintf(stderr, "second lookup call failed: %u\n", (unsigned int)err);
         goto cleanup_client;

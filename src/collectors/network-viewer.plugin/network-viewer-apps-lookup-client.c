@@ -75,7 +75,6 @@ static uint64_t apps_lookup_cache_misses_unknown = 0;
 static uint64_t apps_lookup_cache_misses_intake_dropped = 0;
 static uint64_t apps_lookup_cache_evictions_pid_reuse = 0;
 static uint64_t apps_lookup_cache_evictions_lru = 0;
-static uint64_t apps_lookup_cache_evictions_unknown_permanent = 0;
 static uint64_t apps_lookup_peer_connect_attempts = 0;
 static uint64_t apps_lookup_peer_disconnects = 0;
 static uint64_t apps_lookup_intake_depth = 0;
@@ -569,19 +568,10 @@ static void nv_apps_lookup_apply_response(
         nv_apps_lookup_pid_key(item.pid, key);
         NV_APPS_LOOKUP_CACHE_ENTRY *entry = dictionary_get(apps_lookup_cache, key);
 
-        if (item.cgroup_status == NIPC_APPS_CGROUP_UNKNOWN_PERMANENT) {
-            if (entry) {
-                dictionary_del(apps_lookup_cache, key);
-                if (apps_lookup_cache_size > 0)
-                    apps_lookup_cache_size--;
-                nv_apps_lookup_counter_inc(&apps_lookup_cache_evictions_unknown_permanent);
-            }
-            continue;
-        }
-
         if (item.cgroup_status != NIPC_APPS_CGROUP_KNOWN &&
             item.cgroup_status != NIPC_APPS_CGROUP_HOST_ROOT &&
-            item.cgroup_status != NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER) {
+            item.cgroup_status != NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER &&
+            item.cgroup_status != NIPC_APPS_CGROUP_UNKNOWN_PERMANENT) {
             nv_apps_lookup_counter_inc(&apps_lookup_requests_failed);
             continue;
         }
@@ -967,7 +957,6 @@ void nv_apps_lookup_send_charts_to_netdata(usec_t dt)
                 "DIMENSION cache_misses_intake_dropped '' incremental 1 1\n"
                 "DIMENSION cache_evictions_pid_reuse '' incremental 1 1\n"
                 "DIMENSION cache_evictions_lru '' incremental 1 1\n"
-                "DIMENSION cache_evictions_unknown_permanent '' incremental 1 1\n"
                 "CHART netdata.collector_ipc_apps_lookup_client_peer '' 'Network Viewer APPS_LOOKUP Client Peer' 'events/s' network-viewer.plugin netdata.collector.ipc.apps_lookup.client.peer line 140042 1\n"
                 "DIMENSION peer_connect_attempts '' incremental 1 1\n"
                 "DIMENSION peer_disconnects '' incremental 1 1\n"
@@ -1005,7 +994,6 @@ void nv_apps_lookup_send_charts_to_netdata(usec_t dt)
             "SET cache_misses_intake_dropped = %" PRIu64 "\n"
             "SET cache_evictions_pid_reuse = %" PRIu64 "\n"
             "SET cache_evictions_lru = %" PRIu64 "\n"
-            "SET cache_evictions_unknown_permanent = %" PRIu64 "\n"
             "END\n"
             "BEGIN netdata.collector_ipc_apps_lookup_client_peer %" PRIu64 "\n"
             "SET peer_connect_attempts = %" PRIu64 "\n"
@@ -1044,7 +1032,6 @@ void nv_apps_lookup_send_charts_to_netdata(usec_t dt)
             nv_apps_lookup_counter_get(&apps_lookup_cache_misses_intake_dropped),
             nv_apps_lookup_counter_get(&apps_lookup_cache_evictions_pid_reuse),
             nv_apps_lookup_counter_get(&apps_lookup_cache_evictions_lru),
-            nv_apps_lookup_counter_get(&apps_lookup_cache_evictions_unknown_permanent),
             dt,
             nv_apps_lookup_counter_get(&apps_lookup_peer_connect_attempts),
             nv_apps_lookup_counter_get(&apps_lookup_peer_disconnects),

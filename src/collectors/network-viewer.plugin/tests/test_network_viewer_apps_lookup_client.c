@@ -119,6 +119,25 @@ static bool mock_apps_lookup_handler(
                 NULL,
                 0);
         }
+        else if (req_item.pid == 300) {
+            err = nipc_apps_lookup_builder_add(
+                builder,
+                NIPC_PID_LOOKUP_KNOWN,
+                NIPC_APPS_CGROUP_UNKNOWN_PERMANENT,
+                NIPC_ORCHESTRATOR_UNKNOWN,
+                req_item.pid,
+                1,
+                955,
+                323456789,
+                "systemd-journal",
+                15,
+                "/system.slice/systemd-journal-upload.service",
+                44,
+                NULL,
+                0,
+                NULL,
+                0);
+        }
         else {
             err = nipc_apps_lookup_builder_add(
                 builder,
@@ -235,12 +254,12 @@ static bool run_roundtrip_test(const char *run_dir)
     nv_apps_lookup_start();
     client_initialized = true;
 
-    uint32_t pids[] = { 100, 200 };
+    uint32_t pids[] = { 100, 200, 300 };
     nv_apps_lookup_warm_pids(pids, _countof(pids));
 
     if (!expect_ok(wait_for_counter(&mock_requests, 1), "worker did not call APPS_LOOKUP mock"))
         goto cleanup_client;
-    if (!expect_ok(wait_for_cache_entries(2), "known and retry-later PIDs were not cached"))
+    if (!expect_ok(wait_for_cache_entries(3), "known, retry-later, and permanent PIDs were not cached"))
         goto cleanup_client;
     NV_APPS_LOOKUP_FIELDS cached;
     if (!expect_ok(nv_cache_lookup_pid(100, &cached), "known PID cache accessor missed"))
@@ -265,6 +284,18 @@ static bool run_roundtrip_test(const char *run_dir)
         expect_ok(cached.cgroup_name && cached.cgroup_name[0] == '\0', "retry-later PID cgroup name should be empty");
     nv_cache_lookup_fields_free(&cached);
     if (!partial_ok)
+        goto cleanup_client;
+    if (!expect_ok(nv_cache_lookup_pid(300, &cached), "permanent PID partial cache accessor missed"))
+        goto cleanup_client;
+    bool permanent_ok =
+        expect_ok(cached.cgroup_status == NIPC_APPS_CGROUP_UNKNOWN_PERMANENT, "permanent PID cgroup status mismatch") &&
+        expect_ok(cached.orchestrator == NIPC_ORCHESTRATOR_UNKNOWN, "permanent PID orchestrator mismatch") &&
+        expect_ok(strcmp(cached.cgroup_path, "/system.slice/systemd-journal-upload.service") == 0,
+                  "permanent PID cgroup path mismatch") &&
+        expect_ok(cached.cgroup_name && cached.cgroup_name[0] == '\0', "permanent PID cgroup name should be empty") &&
+        expect_ok(cached.cgroup_label_count == 0, "permanent PID label count mismatch");
+    nv_cache_lookup_fields_free(&cached);
+    if (!permanent_ok)
         goto cleanup_client;
     if (!expect_ok(wait_for_counter(&apps_lookup_cache_misses_unknown, 1), "retry-later PID was not counted as unknown miss"))
         goto cleanup_client;

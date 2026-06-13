@@ -146,7 +146,7 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | netdata.collector.ipc.apps_lookup.client.requests | requests_sent, requests_responded, requests_failed | requests/s |
-| netdata.collector.ipc.apps_lookup.client.cache | cache_hits, cache_misses_unknown, cache_misses_intake_dropped, cache_evictions_pid_reuse, cache_evictions_lru, cache_evictions_unknown_permanent | events/s |
+| netdata.collector.ipc.apps_lookup.client.cache | cache_hits, cache_misses_unknown, cache_misses_intake_dropped, cache_evictions_pid_reuse, cache_evictions_lru | events/s |
 | netdata.collector.ipc.apps_lookup.client.peer | peer_connect_attempts, peer_disconnects | events/s |
 | netdata.collector.ipc.apps_lookup.client.worker_request_duration_ms | le_1ms, le_5ms, le_10ms, le_50ms, le_100ms, le_500ms, le_1000ms, gt_1000ms | requests/s |
 | netdata.collector.ipc.apps_lookup.client.function_handler_overhead_ms | le_1ms, le_5ms, le_10ms, le_50ms, le_100ms, le_500ms, le_1000ms, gt_1000ms | calls/s |

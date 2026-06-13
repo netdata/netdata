@@ -816,7 +816,6 @@ static inline void discovery_cleanup_all_cgroups() {
             else
                 last->discovered_next = cg->discovered_next;
 
-            cgroup_snapshot_reaped_add(cg->id);
             cgroup_free(cg);
 
             if(!last)
@@ -1278,8 +1277,6 @@ void cgroup_discovery_worker(void *ptr)
     service_register(NULL, NULL, NULL);
 
     cgroup_snapshot_store_init();
-    cgroup_snapshot_reaped_set_max((size_t)cgroup_lookup_reaped_set_size);
-    cgroup_snapshot_reaped_set_accepting(true);
 
     cgroup_netipc_init();
     cgroup_netipc_lookup_init();
@@ -1316,7 +1313,7 @@ void cgroup_discovery_worker(void *ptr)
     }
 
     // Stop both netipc servers first so their worker threads cannot read the
-    // snapshot store; then tear the store (and its reaped set) down.
+    // snapshot store; then tear the store down.
     cgroup_netipc_lookup_cleanup();
     cgroup_netipc_cleanup();
     cgroup_snapshot_store_shutdown();

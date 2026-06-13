@@ -34,7 +34,6 @@ char *cgroup_unified_base = NULL;
 int cgroup_root_count = 0;
 int cgroup_root_max = 1000;
 int cgroup_max_depth = 0;
-int cgroup_lookup_reaped_set_size = 4096;
 bool discovery_signal_pending = false;
 uint64_t cgroup_discovery_generation = 0;
 uint64_t cgroup_discovery_scans_natural = 0;
@@ -300,12 +299,6 @@ void read_cgroup_plugin_configuration() {
 
     cgroup_root_max = (int)inicfg_get_number(&netdata_config, "plugin:cgroups", "max cgroups to allow", cgroup_root_max);
     cgroup_max_depth = (int)inicfg_get_number(&netdata_config, "plugin:cgroups", "max cgroups depth to monitor", cgroup_max_depth);
-    cgroup_lookup_reaped_set_size = (int)inicfg_get_number(
-        &netdata_config, "plugin:cgroups", "cgroup lookup reaped set size", cgroup_lookup_reaped_set_size);
-    if (cgroup_lookup_reaped_set_size < 0) {
-        cgroup_lookup_reaped_set_size = 0;
-        inicfg_set_number(&netdata_config, "plugin:cgroups", "cgroup lookup reaped set size", cgroup_lookup_reaped_set_size);
-    }
 
     enabled_cgroup_paths = simple_pattern_create(
             inicfg_get(&netdata_config, "plugin:cgroups", "enable by default cgroups matching",
