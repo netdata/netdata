@@ -39,7 +39,6 @@ static SPAWN_SERVER *spawn_srv = NULL;
 #define NETWORK_TOPOLOGY_SOURCE "network-connections"
 #define NETWORK_TOPOLOGY_LAYER "network"
 #define NV_TOPOLOGY_MAX_PPID_DEPTH 64
-#define NV_TOPOLOGY_PENDING_CONTAINER_NAME "[pending]"
 #define NV_TOPOLOGY_RESPONSE_SIZE_LIMIT (64ULL * 1024ULL * 1024ULL)
 #define NETWORK_VIEWER_TEST_DEFAULT_TIMEOUT_SECONDS 60ULL
 #define NETWORK_VIEWER_TEST_TIMEOUT_DISABLED_SECONDS (100ULL * 365ULL * 24ULL * 60ULL * 60ULL)
@@ -1134,12 +1133,6 @@ static void topology_container_fields_fill(
     if(!pid)
         return;
 
-    strncpyz(fields->container_name, NV_TOPOLOGY_PENDING_CONTAINER_NAME, sizeof(fields->container_name) - 1);
-    strncpyz(fields->cgroup_status, nv_cgroup_status_name(NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER), sizeof(fields->cgroup_status) - 1);
-    strncpyz(fields->orchestrator, "unknown", sizeof(fields->orchestrator) - 1);
-    strncpyz(fields->actor_type, "container", sizeof(fields->actor_type) - 1);
-    strncpyz(fields->actor_kind, "pending", sizeof(fields->actor_kind) - 1);
-
     NV_APPS_LOOKUP_FIELDS cached;
     if(!nv_cache_lookup_pid(pid, &cached))
         return;
@@ -1148,6 +1141,11 @@ static void topology_container_fields_fill(
     strncpyz(fields->cgroup_status, nv_cgroup_status_name(cached.cgroup_status), sizeof(fields->cgroup_status) - 1);
     strncpyz(fields->cgroup_path, cached.cgroup_path ? cached.cgroup_path : "", sizeof(fields->cgroup_path) - 1);
     strncpyz(fields->cgroup_name, cached.cgroup_name ? cached.cgroup_name : "", sizeof(fields->cgroup_name) - 1);
+    if(nv_cgroup_retry_later_without_path(cached.cgroup_status, cached.cgroup_path)) {
+        nv_cache_lookup_fields_free(&cached);
+        return;
+    }
+
     CGROUP_TOPOLOGY_CLASSIFICATION classification;
     cgroup_topology_classify(cached.cgroup_status, cached.orchestrator, cached.cgroup_path, &classification);
     strncpyz(fields->orchestrator, classification.effective_orchestrator, sizeof(fields->orchestrator) - 1);

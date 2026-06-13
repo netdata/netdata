@@ -239,6 +239,31 @@ static bool test_process_fallback_container_fields(void)
     return ok;
 }
 
+static bool test_retry_later_empty_path_fallback_gate(void)
+{
+    bool ok = true;
+
+    ok = expect_true(
+             nv_cgroup_retry_later_without_path(NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER, NULL),
+             "retry-later NULL cgroup path should keep process fallback") && ok;
+    ok = expect_true(
+             nv_cgroup_retry_later_without_path(NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER, ""),
+             "retry-later empty cgroup path should keep process fallback") && ok;
+    ok = expect_true(
+             !nv_cgroup_retry_later_without_path(
+                 NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER,
+                 "/sys/fs/cgroup/docker/0123456789abcdef"),
+             "retry-later non-empty cgroup path should remain classifiable") && ok;
+    ok = expect_true(
+             !nv_cgroup_retry_later_without_path(NIPC_APPS_CGROUP_HOST_ROOT, NULL),
+             "host-root empty cgroup path should remain classifiable") && ok;
+    ok = expect_true(
+             !nv_cgroup_retry_later_without_path(NIPC_APPS_CGROUP_KNOWN, ""),
+             "known empty cgroup path should not use retry-later fallback gate") && ok;
+
+    return ok;
+}
+
 static bool test_systemd_and_orchestrator(void)
 {
     char value[NV_TOPOLOGY_SYSTEMD_UNIT_MAX];
@@ -339,6 +364,7 @@ int main(void)
     ok = test_missing_and_fallback_labels() && ok;
     ok = test_container_identity_gating() && ok;
     ok = test_process_fallback_container_fields() && ok;
+    ok = test_retry_later_empty_path_fallback_gate() && ok;
     ok = test_systemd_and_orchestrator() && ok;
 
     return ok ? 0 : 1;

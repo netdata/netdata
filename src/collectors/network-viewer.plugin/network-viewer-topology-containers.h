@@ -41,6 +41,7 @@ const char *nv_orchestrator_name(uint16_t cgroup_status, uint16_t orchestrator);
 const char *nv_cached_label_value(const NV_APPS_LOOKUP_FIELDS *fields, const char *key);
 bool nv_cgroup_fields_have_container_identity(const NV_APPS_LOOKUP_FIELDS *fields);
 void nv_container_fields_set_process_fallback(NV_TOPOLOGY_CONTAINER_FIELDS *fields, const char *process);
+bool nv_cgroup_retry_later_without_path(uint16_t cgroup_status, const char *cgroup_path);
 
 void nv_derive_k8s_pod_name(const NV_APPS_LOOKUP_FIELDS *fields, char *dst, size_t dst_size);
 void nv_derive_k8s_namespace(const NV_APPS_LOOKUP_FIELDS *fields, char *dst, size_t dst_size);

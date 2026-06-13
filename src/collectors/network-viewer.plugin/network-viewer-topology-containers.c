@@ -83,6 +83,11 @@ void nv_container_fields_set_process_fallback(NV_TOPOLOGY_CONTAINER_FIELDS *fiel
     strncpyz(fields->actor_kind, "process", sizeof(fields->actor_kind) - 1);
 }
 
+bool nv_cgroup_retry_later_without_path(uint16_t cgroup_status, const char *cgroup_path)
+{
+    return cgroup_status == NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER && (!cgroup_path || !*cgroup_path);
+}
+
 static void nv_copy_label(const NV_APPS_LOOKUP_FIELDS *fields, const char *key, char *dst, size_t dst_size)
 {
     if (!dst || !dst_size)
