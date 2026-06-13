@@ -446,7 +446,7 @@ static bool cgroups_lookup_client_ready(nipc_client_ctx_t *client, bool *was_rea
         static bool logged_absent = false;
         if (!logged_absent) {
             logged_absent = true;
-            netdata_log_error("apps.plugin CGROUPS_LOOKUP service unavailable; cgroup enrichment will retry");
+            netdata_log_info("apps.plugin CGROUPS_LOOKUP service unavailable; cgroup enrichment will retry");
         }
     }
 

@@ -1,7 +1,7 @@
 # Topology Containers IPC Contract
 
 Status: current
-Last updated: 2026-05-28
+Last updated: 2026-06-13
 
 ## Purpose
 
@@ -48,10 +48,10 @@ Lookup caches have no time-based TTL.
 
 An entry stays valid until one of these events happens:
 
-- The producer returns `UNKNOWN_PERMANENT` for the entry.
+- The producer returns a newer status payload for the entry.
 - The consumer observes a concrete key identity change, such as PID starttime reuse or cgroup path change.
 - The consumer stops seeing the item in its own working set and prunes it as part of normal bounded-cache maintenance.
-- Bounded-cache pressure or plugin shutdown removes the entry.
+- Bounded-cache pressure, where applicable, or plugin shutdown removes the entry.
 
 Consumers must not periodically refresh known entries only because time passed, and must not invalidate a whole lookup cache during normal operation only because a producer generation changed.
 
@@ -60,8 +60,8 @@ Consumers must not periodically refresh known entries only because time passed, 
 `CGROUPS_LOOKUP` item status:
 
 - `KNOWN`: all returned item fields are valid and cacheable.
-- `UNKNOWN_RETRY_LATER`: the producer may know later; do not cache the miss; query again only if the key remains in the consumer's working set.
-- `UNKNOWN_PERMANENT`: the producer will not know this key in the current generation; evict any cached entry for the key.
+- `UNKNOWN_RETRY_LATER`: the producer may know later; cache the incomplete status with its generation so the consumer can throttle re-asks. Query again only if the key remains in the consumer's working set and the producer generation has advanced or the key identity changes.
+- `UNKNOWN_PERMANENT`: the producer will not know this key until the key identity or reachability changes; cache the negative status so the consumer does not re-query the same unreachable key every scan.
 
 `APPS_LOOKUP` has two layers:
 
@@ -72,7 +72,7 @@ Inner cgroup status:
 
 - `KNOWN`: cgroup enrichment is valid and cacheable.
 - `UNKNOWN_RETRY_LATER`: cgroup enrichment is incomplete; if the outer PID status is `KNOWN`, cache the valid PID/process facts as incomplete and re-query while the PID remains in the consumer's current working set.
-- `UNKNOWN_PERMANENT`: evict cgroup enrichment for this PID key.
+- `UNKNOWN_PERMANENT`: cache the valid PID/process facts with a permanent negative cgroup enrichment status until PID identity or cgroup path changes.
 - `HOST_ROOT`: the PID belongs to the host/root cgroup case; this is a valid non-container result.
 
 Consumers must branch on the inner `cgroup_status`; outer `KNOWN` is enough to cache PID/process facts, but not enough to cache complete container enrichment.
@@ -96,13 +96,13 @@ Required fallback behavior:
 - On disconnect or protocol error: keep current behavior and retry later.
 - On peer absence: no plugin exits, no chart context disappears, and collection continues.
 
-The current POSIX netipc client call path has no per-request timeout. A consumer that cannot tolerate blocking in its collection path must isolate IPC behind a worker thread or another non-collection-path mechanism. `network-viewer.plugin` uses an asynchronous APPS_LOOKUP worker for this reason.
+Synchronous netipc consumers must configure bounded call timeouts and abort in-flight calls during shutdown. A consumer that cannot tolerate blocking in its collection path must isolate IPC behind a worker thread or another non-collection-path mechanism. `apps.plugin` and `network-viewer.plugin` use asynchronous lookup workers for this reason.
 
 ## Concurrency
 
 - IPC handlers are read-only against collection state.
 - IPC handlers may take the relevant state mutex only for bounded snapshots.
-- `cgroups.plugin` lookup reads `cgroup_root` under `cgroup_root_mutex`.
+- `cgroups.plugin` lookup reads the discovery-published snapshot store under its snapshot-store read lock.
 - `apps.plugin` lookup reads the PID table under the apps PID-table lock introduced with the lookup server.
 - Collection loops remain the operational guarantee; IPC is opportunistic enrichment.
 

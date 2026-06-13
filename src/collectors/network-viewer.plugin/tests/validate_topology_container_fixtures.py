@@ -5,9 +5,15 @@ import json
 import sys
 from pathlib import Path
 
+try:
+    from jsonschema import Draft202012Validator
+except ImportError as err:
+    raise SystemExit("python3-jsonschema is required to validate topology fixtures") from err
+
 
 ROOT = Path(__file__).resolve().parents[4]
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "topology"
+SCHEMA_PATH = ROOT / "src" / "plugins.d" / "FUNCTION_TOPOLOGY_SCHEMA.json"
 
 GROUP_BY = ["process_name", "pid", "container"]
 
@@ -64,6 +70,31 @@ SCOPES = {
 def load_fixture(name):
     with (FIXTURE_DIR / name).open("r", encoding="utf-8") as fp:
         return json.load(fp)
+
+
+def load_schema_validator():
+    with SCHEMA_PATH.open("r", encoding="utf-8") as fp:
+        schema = json.load(fp)
+
+    Draft202012Validator.check_schema(schema)
+    return Draft202012Validator(schema)
+
+
+def schema_path(error):
+    path = "$"
+    for part in error.absolute_path:
+        if isinstance(part, int):
+            path += f"[{part}]"
+        else:
+            path += f".{part}"
+    return path
+
+
+def assert_schema(validator, fixture, payload):
+    errors = sorted(validator.iter_errors(payload), key=lambda err: list(err.absolute_path))
+    if errors:
+        err = errors[0]
+        raise AssertionError(f"{fixture}: schema validation failed at {schema_path(err)}: {err.message}")
 
 
 def decode_column(table, column_id):
@@ -217,6 +248,7 @@ def assert_mixed(payload):
 
 
 def main():
+    validator = load_schema_validator()
     checks = {
         "with-containers.json": assert_with_containers,
         "zero-containers.json": assert_zero_containers,
@@ -225,7 +257,9 @@ def main():
     }
 
     for fixture, check in checks.items():
-        check(load_fixture(fixture))
+        payload = load_fixture(fixture)
+        assert_schema(validator, fixture, payload)
+        check(payload)
 
     print(f"validated {len(checks)} topology container fixtures")
 

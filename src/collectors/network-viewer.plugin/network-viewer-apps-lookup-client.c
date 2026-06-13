@@ -627,7 +627,7 @@ static bool nv_apps_lookup_client_ensure_ready(void)
         static bool logged_absent = false;
         if (!logged_absent) {
             logged_absent = true;
-            netdata_log_error("network-viewer.plugin APPS_LOOKUP service unavailable; cache warming will retry");
+            netdata_log_info("network-viewer.plugin APPS_LOOKUP service unavailable; cache warming will retry");
         }
     }
 

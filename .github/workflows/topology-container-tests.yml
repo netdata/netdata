@@ -57,7 +57,7 @@ jobs:
             cmake ninja-build pkg-config flex bison g++ \
             libatomic1 libsystemd-dev libpcre2-dev libcurl4-openssl-dev \
             liblz4-dev libzstd-dev libuv1-dev libssl-dev libelf-dev \
-            libjson-c-dev libyaml-dev zlib1g-dev uuid-dev \
+            libjson-c-dev libyaml-dev zlib1g-dev uuid-dev python3-jsonschema \
             libprotobuf-dev protobuf-compiler
 
       - name: Configure
