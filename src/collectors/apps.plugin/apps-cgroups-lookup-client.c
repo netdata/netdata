@@ -151,43 +151,6 @@ static void cgroups_lookup_cache_create(void)
     dictionary_register_delete_callback(cgroups_lookup_cache, cgroups_lookup_entry_delete_cb, NULL);
 }
 
-static bool cgroups_lookup_cache_evict_one(void)
-{
-    if (!cgroups_lookup_cache || cgroups_lookup_cache_entries < APPS_CGROUPS_LOOKUP_CACHE_MAX)
-        return true;
-
-    STRING *victim_key = NULL;
-    uint64_t victim_last_used_iteration = UINT64_MAX;
-    struct cgroup_lookup_entry *entry;
-    dfe_start_read(cgroups_lookup_cache, entry) {
-        if (entry->refcount != 0)
-            continue;
-
-        if (entry->last_used_iteration <= victim_last_used_iteration) {
-            victim_last_used_iteration = entry->last_used_iteration;
-            string_freez(victim_key);
-            victim_key = string_dup(entry->key);
-        }
-    }
-    dfe_done(entry);
-
-    if (!victim_key) {
-        static uint64_t last_logged_iteration = 0;
-        if (last_logged_iteration != global_iterations_counter) {
-            last_logged_iteration = global_iterations_counter;
-            netdata_log_error(
-                "apps.plugin cgroups lookup cache is full (%u entries) and all entries are referenced",
-                APPS_CGROUPS_LOOKUP_CACHE_MAX);
-        }
-        return false;
-    }
-
-    dictionary_del(cgroups_lookup_cache, string2str(victim_key));
-    string_freez(victim_key);
-    cgroups_lookup_counter_inc(&cgroups_lookup_cache_evictions);
-    return cgroups_lookup_cache_entries < APPS_CGROUPS_LOOKUP_CACHE_MAX;
-}
-
 static struct cgroup_lookup_entry *cgroups_lookup_cache_get_or_create(STRING *path)
 {
     if (!path)
@@ -198,9 +161,6 @@ static struct cgroup_lookup_entry *cgroups_lookup_cache_get_or_create(STRING *pa
     struct cgroup_lookup_entry *entry = dictionary_get(cgroups_lookup_cache, string2str(path));
     if (entry)
         return entry;
-
-    if (!cgroups_lookup_cache_evict_one())
-        return NULL;
 
     entry = dictionary_set(cgroups_lookup_cache, string2str(path), NULL, sizeof(*entry));
     entry->key = string_dup(path);
@@ -314,7 +274,7 @@ static uint32_t cgroups_lookup_queue_pop_batch(STRING **paths, uint32_t capacity
 static void cgroups_lookup_queue_wait_for_work(void)
 {
     netdata_mutex_lock(&cgroups_lookup_queue_mutex);
-    while (!cgroups_lookup_worker_stop && !cgroups_lookup_queue_head)
+    while (!__atomic_load_n(&cgroups_lookup_worker_stop, __ATOMIC_ACQUIRE) && !cgroups_lookup_queue_head)
         netdata_cond_wait(&cgroups_lookup_queue_cond, &cgroups_lookup_queue_mutex);
     netdata_mutex_unlock(&cgroups_lookup_queue_mutex);
 }

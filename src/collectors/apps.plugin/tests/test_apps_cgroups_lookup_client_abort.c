@@ -48,6 +48,36 @@ static bool wait_for_counter(uint64_t *counter, uint64_t value)
     return false;
 }
 
+static bool test_cache_allows_more_than_legacy_fixed_cap(void)
+{
+    const size_t legacy_fixed_cap = 4096;
+    bool ok = true;
+
+    cgroups_lookup_cache_create();
+
+    for (size_t i = 0; i <= legacy_fixed_cap; i++) {
+        char path[128];
+        snprintfz(path, sizeof(path), "/kubepods.slice/test-%zu.scope", i);
+
+        STRING *path_string = string_strdupz(path);
+        struct cgroup_lookup_entry *entry = cgroups_lookup_cache_get_or_create(path_string);
+        string_freez(path_string);
+
+        if (!expect_ok(entry != NULL, "active cgroup lookup cache entry was rejected")) {
+            ok = false;
+            break;
+        }
+
+        entry->refcount = 1;
+    }
+
+    ok = expect_ok(cgroups_lookup_cache_entries == legacy_fixed_cap + 1,
+                   "active cgroup lookup cache did not retain all active entries") && ok;
+
+    cgroups_lookup_cache_destroy();
+    return ok;
+}
+
 static bool blocking_cgroups_lookup_handler(
     void *user __maybe_unused,
     const nipc_cgroups_lookup_req_view_t *request,
@@ -110,6 +140,9 @@ int main(void)
     if (!expect_ok(netdata_mutex_init(&apps_pids_mutex) == 0, "failed to initialize apps_pids_mutex"))
         goto cleanup_dir;
     mutex_initialized = true;
+
+    if (!expect_ok(test_cache_allows_more_than_legacy_fixed_cap(), "active cgroup cache cardinality test failed"))
+        goto cleanup_fixture;
 
     test_pid.pid = 12345;
     test_pid.cgroup_path = string_strdupz("/docker/apps-cgroups-abort");

@@ -8,7 +8,6 @@
 #ifdef OS_LINUX
 
 #define APPS_CGROUPS_LOOKUP_QUEUE_MAX 4096U
-#define APPS_CGROUPS_LOOKUP_CACHE_MAX 4096U
 
 struct cgroup_lookup_label {
     // cppcheck-suppress unusedStructMember

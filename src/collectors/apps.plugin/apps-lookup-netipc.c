@@ -7,11 +7,6 @@
 
 #include "libnetdata/netipc/netipc_netdata.h"
 
-struct apps_lookup_label_view_ctx {
-    nipc_lookup_label_view_t *views;
-    uint16_t count;
-};
-
 static nipc_managed_server_t apps_lookup_server;
 static ND_THREAD *apps_lookup_netipc_thread = NULL;
 
