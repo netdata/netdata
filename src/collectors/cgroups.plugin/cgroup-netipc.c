@@ -39,6 +39,22 @@ static int cgroup_snapshot_label_cb(
     return 0;
 }
 
+static bool cgroup_snapshot_should_log_generation(uint64_t *last_logged_generation, uint64_t snapshot_generation) {
+    uint64_t expected = __atomic_load_n(last_logged_generation, __ATOMIC_RELAXED);
+    while (expected != snapshot_generation) {
+        if (__atomic_compare_exchange_n(
+                last_logged_generation,
+                &expected,
+                snapshot_generation,
+                false,
+                __ATOMIC_RELAXED,
+                __ATOMIC_RELAXED))
+            return true;
+    }
+
+    return false;
+}
+
 // Build the immutable snapshot store from cgroup_root and publish it. Called by
 // the discovery thread right after the splice: discovery is the only writer of
 // the fields read here and is not splicing again until next cycle, so this runs
@@ -56,8 +72,6 @@ void cgroup_snapshot_rebuild_and_publish(void) {
         CGROUP_SNAPSHOT_ENTRY *e = cgroup_snapshot_builder_add_entry(sb, cg->id);
         if (!e)
             continue; // duplicate id, first wins
-
-        discovery_classify_orchestrator(cg);
 
         const char *prefix = is_cgroup_systemd_service(cg) ? services_chart_id_prefix : cgroup_chart_id_prefix;
         snprintfz(name_buf, sizeof(name_buf) - 1, "%s%s", prefix, cg->chart_id);
@@ -128,13 +142,13 @@ static bool cgroups_snapshot_handler(void *user __maybe_unused,
     bool log_zero_generation = false;
     bool log_truncated_generation = false;
 
-    if (count == 0 && last_logged_zero_generation != snapshot_generation) {
-        last_logged_zero_generation = snapshot_generation;
+    if (count == 0 &&
+        cgroup_snapshot_should_log_generation(&last_logged_zero_generation, snapshot_generation)) {
         log_zero_generation = true;
     }
 
-    if (truncated && last_logged_truncated_generation != snapshot_generation) {
-        last_logged_truncated_generation = snapshot_generation;
+    if (truncated &&
+        cgroup_snapshot_should_log_generation(&last_logged_truncated_generation, snapshot_generation)) {
         log_truncated_generation = true;
     }
 

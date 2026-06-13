@@ -16,6 +16,9 @@ struct cgroup_lookup_label {
     STRING *value;
 };
 
+// Entries are owned by the apps cgroup lookup cache. All fields are protected by
+// apps_pids_mutex; readers that keep data after unlocking must duplicate STRINGs
+// while the mutex is held.
 struct cgroup_lookup_entry {
     // cppcheck-suppress unusedStructMember
     STRING *key;
@@ -41,8 +44,11 @@ struct cgroup_lookup_entry {
 
 void apps_cgroups_lookup_init(void);
 void apps_cgroups_lookup_cleanup(void);
+// Caller must hold apps_pids_mutex.
 void apps_cgroups_lookup_scan_pids(void);
+// Caller must hold apps_pids_mutex.
 void apps_cgroups_lookup_unlink_pid(struct pid_stat *p);
+// Caller must hold apps_pids_mutex.
 void apps_cgroups_lookup_set_pid_cgroup_path(struct pid_stat *p, const char *path);
 bool apps_cgroups_lookup_is_host_root_path(const char *path);
 void apps_cgroups_lookup_send_charts_to_netdata(usec_t dt);

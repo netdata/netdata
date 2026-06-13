@@ -725,9 +725,11 @@ static void __attribute__((destructor)) destroy_mutex(void) {
 static bool apps_plugin_exit = false;
 static bool apps_lookup_server_started = false;
 
-#define APPS_LOOKUP_NETIPC_RETRY_SEC 5
+#define APPS_LOOKUP_NETIPC_RETRY_INITIAL_SEC 5U
+#define APPS_LOOKUP_NETIPC_RETRY_MAX_SEC 300U
 
 static usec_t apps_lookup_netipc_next_retry_ut = 0;
+static unsigned apps_lookup_netipc_retry_sec = APPS_LOOKUP_NETIPC_RETRY_INITIAL_SEC;
 
 static void apps_lookup_netipc_try_start(void)
 {
@@ -739,8 +741,15 @@ static void apps_lookup_netipc_try_start(void)
         return;
 
     apps_lookup_server_started = apps_lookup_netipc_init();
-    apps_lookup_netipc_next_retry_ut =
-        apps_lookup_server_started ? 0 : now_ut + APPS_LOOKUP_NETIPC_RETRY_SEC * USEC_PER_SEC;
+    if (apps_lookup_server_started) {
+        apps_lookup_netipc_next_retry_ut = 0;
+        apps_lookup_netipc_retry_sec = APPS_LOOKUP_NETIPC_RETRY_INITIAL_SEC;
+    }
+    else {
+        apps_lookup_netipc_next_retry_ut = now_ut + apps_lookup_netipc_retry_sec * USEC_PER_SEC;
+        if (apps_lookup_netipc_retry_sec < APPS_LOOKUP_NETIPC_RETRY_MAX_SEC)
+            apps_lookup_netipc_retry_sec = MIN(apps_lookup_netipc_retry_sec * 2U, APPS_LOOKUP_NETIPC_RETRY_MAX_SEC);
+    }
 }
 
 int main(int argc, char **argv) {
