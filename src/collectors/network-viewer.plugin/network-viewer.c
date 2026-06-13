@@ -4453,6 +4453,49 @@ static void topology_v1_emit_actor_type(
     buffer_json_object_close(wb);
 }
 
+typedef struct {
+    const char *id;
+    const char *label;
+    const char *icon;
+} NV_TOPOLOGY_RUNTIME_ACTOR_TYPE;
+
+static const NV_TOPOLOGY_RUNTIME_ACTOR_TYPE topology_runtime_actor_types[] = {
+    { "process_group", "Process", "process" },
+    { "container", "Container", "container" },
+    { "user", "User", "user" },
+    { "docker_container", "Docker container", "docker" },
+    { "k8s_container", "Kubernetes container", "kubernetes" },
+    { "podman_container", "Podman container", "podman" },
+    { "lxc_container", "LXC container", "lxc" },
+    { "nspawn_container", "systemd-nspawn container", "nspawn" },
+    { "vm", "Virtual machine", "vm" },
+    { "systemd_service", "Systemd service", "systemd" },
+    { "systemd_scope", "Systemd scope", "systemd" },
+    { "systemd_slice", "Systemd slice", "systemd" },
+    { "systemd_socket", "Systemd socket", "systemd" },
+    { "systemd_target", "Systemd target", "systemd" },
+    { "systemd_timer", "Systemd timer", "systemd" },
+    { "systemd_mount", "Systemd mount", "storage" },
+    { "systemd_path", "Systemd path", "systemd" },
+    { "systemd_swap", "Systemd swap", "storage" },
+    { "systemd_device", "Systemd device", "device" },
+    { "systemd_unit", "Systemd unit", "systemd" },
+};
+
+static void topology_v1_emit_runtime_actor_type(
+    BUFFER *wb,
+    const NV_TOPOLOGY_RUNTIME_ACTOR_TYPE *type,
+    const char *const *container_scopes,
+    size_t container_scopes_count,
+    NV_TOPOLOGY_GROUP_BY group_by,
+    bool detailed)
+{
+    topology_v1_emit_actor_type(
+        wb, type->id, "container_name", NULL, container_scopes, container_scopes_count,
+        type->label, "primary", type->icon, "actor", true, "metric", "socket_count", "normal", "normal", true,
+        "socket_ports", group_by, detailed, "display_name", "container_name");
+}
+
 static void topology_v1_emit_link_type(
     BUFFER *wb,
     const char *id,
@@ -4568,126 +4611,9 @@ static void topology_v1_emit_type_registry(
                 group_by,
                 detailed,
                 "display_name", "process");
-            topology_v1_emit_actor_type(
-                wb, "process_group", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "Process", "primary", "process", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "container", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "Container", "primary", "container", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "user", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "User", "primary", "user", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "docker_container", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "Docker container", "primary", "docker", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "k8s_container", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "Kubernetes container", "primary", "kubernetes", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "podman_container", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "Podman container", "primary", "podman", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "lxc_container", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "LXC container", "primary", "lxc", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "nspawn_container", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "systemd-nspawn container", "primary", "nspawn", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "vm", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "Virtual machine", "primary", "vm", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "systemd_service", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "Systemd service", "primary", "systemd", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "systemd_scope", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "Systemd scope", "primary", "systemd", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "systemd_slice", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "Systemd slice", "primary", "systemd", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "systemd_socket", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "Systemd socket", "primary", "systemd", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "systemd_target", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "Systemd target", "primary", "systemd", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "systemd_timer", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "Systemd timer", "primary", "systemd", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "systemd_mount", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "Systemd mount", "primary", "storage", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "systemd_path", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "Systemd path", "primary", "systemd", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "systemd_swap", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "Systemd swap", "primary", "storage", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "systemd_device", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "Systemd device", "primary", "device", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
-            topology_v1_emit_actor_type(
-                wb, "systemd_unit", "container_name", NULL, container_scopes, _countof(container_scopes),
-                "Systemd unit", "primary", "systemd", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
-                group_by,
-                detailed,
-                "display_name", "container_name");
+            for(size_t i = 0; i < _countof(topology_runtime_actor_types); i++)
+                topology_v1_emit_runtime_actor_type(
+                    wb, &topology_runtime_actor_types[i], container_scopes, _countof(container_scopes), group_by, detailed);
             topology_v1_emit_actor_type(
                 wb, "endpoint", "ip", "address_space", endpoint_scopes, _countof(endpoint_scopes),
                 "Correlation endpoint", "derived", "remote-endpoint", "endpoint", true, "fixed", NULL, "compact", "weaker", false, NULL,
@@ -6269,96 +6195,7 @@ static BUFFER *network_viewer_result(char *function) {
                                         RRDF_FIELD_OPTS_VISIBLE,
                                         NULL);
 
-            buffer_rrdf_table_add_field(wb, field_id++, "CgroupStatus", "Cgroup Status",
-                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                                        RRDF_FIELD_OPTS_NONE,
-                                        NULL);
-
-            buffer_rrdf_table_add_field(wb, field_id++, "CgroupPath", "Cgroup Path",
-                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                                        RRDF_FIELD_OPTS_NONE | RRDF_FIELD_OPTS_FULL_WIDTH,
-                                        NULL);
-
-            buffer_rrdf_table_add_field(wb, field_id++, "CgroupName", "Cgroup Name",
-                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                                        RRDF_FIELD_OPTS_NONE,
-                                        NULL);
-
-            buffer_rrdf_table_add_field(wb, field_id++, "ContainerName", "Container / Service Name",
-                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                                        RRDF_FIELD_OPTS_VISIBLE,
-                                        NULL);
-
-            buffer_rrdf_table_add_field(wb, field_id++, "Orchestrator", "Orchestrator",
-                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                                        RRDF_FIELD_OPTS_VISIBLE,
-                                        NULL);
-
-            buffer_rrdf_table_add_field(wb, field_id++, "K8sPodName", "Kubernetes Pod",
-                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                                        RRDF_FIELD_OPTS_NONE,
-                                        NULL);
-
-            buffer_rrdf_table_add_field(wb, field_id++, "K8sNamespace", "Kubernetes Namespace",
-                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                                        RRDF_FIELD_OPTS_NONE,
-                                        NULL);
-
-            buffer_rrdf_table_add_field(wb, field_id++, "K8sWorkload", "Kubernetes Workload",
-                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                                        RRDF_FIELD_OPTS_NONE,
-                                        NULL);
-
-            buffer_rrdf_table_add_field(wb, field_id++, "DockerContainerName", "Container Name",
-                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                                        RRDF_FIELD_OPTS_NONE,
-                                        NULL);
-
-            buffer_rrdf_table_add_field(wb, field_id++, "DockerImage", "Container Image",
-                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                                        RRDF_FIELD_OPTS_NONE | RRDF_FIELD_OPTS_FULL_WIDTH,
-                                        NULL);
-
-            buffer_rrdf_table_add_field(wb, field_id++, "SystemdUnitName", "Systemd Unit",
-                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                                        RRDF_FIELD_OPTS_NONE,
-                                        NULL);
-
-            buffer_rrdf_table_add_field(wb, field_id++, "SystemdUnitKind", "Systemd Unit Kind",
-                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                                        RRDF_FIELD_OPTS_NONE,
-                                        NULL);
-
-            buffer_rrdf_table_add_field(wb, field_id++, "ActorKind", "Actor Kind",
-                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                                        RRDF_FIELD_OPTS_NONE,
-                                        NULL);
+            cgroup_topology_emit_rrdf_table_fields(wb, &field_id, false);
 
             // Portname
             buffer_rrdf_table_add_field(wb, field_id++, "Portname", "Server Port Name",
@@ -7082,17 +6919,19 @@ static int parse_network_viewer_test_command(int argc, char **argv, struct netwo
     return 0;
 }
 
-static bool network_viewer_test_function_matches(const char *function, const char *expected)
+static bool network_viewer_test_function_matches(const char *function, const char *expected, size_t expected_len)
 {
-    size_t len = strlen(expected);
-    return function && strncmp(function, expected, len) == 0 &&
-           (function[len] == '\0' || isspace((unsigned char)function[len]));
+    return function && expected && expected_len &&
+           strncmp(function, expected, expected_len) == 0 &&
+           (function[expected_len] == '\0' || isspace((unsigned char)function[expected_len]));
 }
 
 static bool network_viewer_test_function_supported(const char *function)
 {
-    return network_viewer_test_function_matches(function, NETWORK_CONNECTIONS_VIEWER_FUNCTION) ||
-           network_viewer_test_function_matches(function, NETWORK_TOPOLOGY_VIEWER_FUNCTION);
+    return network_viewer_test_function_matches(
+               function, NETWORK_CONNECTIONS_VIEWER_FUNCTION, sizeof(NETWORK_CONNECTIONS_VIEWER_FUNCTION) - 1) ||
+           network_viewer_test_function_matches(
+               function, NETWORK_TOPOLOGY_VIEWER_FUNCTION, sizeof(NETWORK_TOPOLOGY_VIEWER_FUNCTION) - 1);
 }
 
 static uint64_t network_viewer_effective_test_timeout_seconds(uint64_t timeout_seconds)
@@ -7191,7 +7030,10 @@ static int run_network_viewer_test_command(const struct network_viewer_test_comm
     char *function = strdupz(cmd->function_name);
 
     BUFFER *result;
-    if(network_viewer_test_function_matches(function, NETWORK_TOPOLOGY_VIEWER_FUNCTION))
+    if(network_viewer_test_function_matches(
+           function,
+           NETWORK_TOPOLOGY_VIEWER_FUNCTION,
+           sizeof(NETWORK_TOPOLOGY_VIEWER_FUNCTION) - 1))
         result = network_viewer_topology_result(function, &stop_monotonic_ut, &cancelled, payload);
     else
         result = network_viewer_result(function);

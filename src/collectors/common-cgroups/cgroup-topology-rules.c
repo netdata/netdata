@@ -76,6 +76,50 @@ const char *cgroup_topology_orchestrator_name(uint16_t cgroup_status, uint16_t o
     return "unknown";
 }
 
+typedef struct {
+    const char *id;
+    const char *name;
+    RRDF_FIELD_OPTIONS options;
+} CGROUP_TOPOLOGY_RRDF_FIELD;
+
+static const CGROUP_TOPOLOGY_RRDF_FIELD cgroup_topology_rrdf_fields[] = {
+    { "CgroupStatus", "Cgroup Status", RRDF_FIELD_OPTS_NONE },
+    { "CgroupPath", "Cgroup Path", RRDF_FIELD_OPTS_NONE | RRDF_FIELD_OPTS_FULL_WIDTH },
+    { "CgroupName", "Cgroup Name", RRDF_FIELD_OPTS_NONE },
+    { "ContainerName", "Container / Service Name", RRDF_FIELD_OPTS_VISIBLE },
+    { "Orchestrator", "Orchestrator", RRDF_FIELD_OPTS_VISIBLE },
+    { "K8sPodName", "Kubernetes Pod", RRDF_FIELD_OPTS_NONE },
+    { "K8sNamespace", "Kubernetes Namespace", RRDF_FIELD_OPTS_NONE },
+    { "K8sWorkload", "Kubernetes Workload", RRDF_FIELD_OPTS_NONE },
+    { "DockerContainerName", "Container Name", RRDF_FIELD_OPTS_NONE },
+    { "DockerImage", "Container Image", RRDF_FIELD_OPTS_NONE | RRDF_FIELD_OPTS_FULL_WIDTH },
+    { "SystemdUnitName", "Systemd Unit", RRDF_FIELD_OPTS_NONE },
+    { "SystemdUnitKind", "Systemd Unit Kind", RRDF_FIELD_OPTS_NONE },
+    { "ActorKind", "Actor Kind", RRDF_FIELD_OPTS_NONE },
+};
+
+void cgroup_topology_emit_rrdf_table_fields(BUFFER *wb, size_t *field_id, bool include_actor_type)
+{
+    if(!wb || !field_id)
+        return;
+
+    for(size_t i = 0; i < _countof(cgroup_topology_rrdf_fields); i++) {
+        const CGROUP_TOPOLOGY_RRDF_FIELD *field = &cgroup_topology_rrdf_fields[i];
+        buffer_rrdf_table_add_field(
+            wb, (*field_id)++, field->id, field->name, RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+            RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT, field->options, NULL);
+    }
+
+    if(include_actor_type)
+        buffer_rrdf_table_add_field(
+            wb, (*field_id)++, "ActorType", "Actor Type", RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+            RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT, RRDF_FIELD_OPTS_NONE, NULL);
+}
+
 static const CGROUP_TOPOLOGY_SYSTEMD_RULE *cgroup_topology_systemd_rule_for_component(const char *name)
 {
     if(!name || !*name)
@@ -164,39 +208,40 @@ static void cgroup_topology_copy_label(
 
 static bool cgroup_topology_suffix_is_alnum_hash(const char *s)
 {
-    if(!s || !*s)
+    if(!s)
         return false;
 
-    size_t len = strlen(s);
-    if(len < 5 || len > 16)
-        return false;
-
+    size_t len = 0;
     bool has_digit = false;
     for(const char *p = s; *p; p++) {
         if(!isalnum((unsigned char)*p))
             return false;
+
+        if(++len > 16)
+            return false;
+
         if(isdigit((unsigned char)*p))
             has_digit = true;
     }
 
-    return has_digit;
+    return len >= 5 && has_digit;
 }
 
 static bool cgroup_topology_suffix_is_alnum_token(const char *s)
 {
-    if(!s || !*s)
+    if(!s)
         return false;
 
-    size_t len = strlen(s);
-    if(len < 5 || len > 16)
-        return false;
-
+    size_t len = 0;
     for(const char *p = s; *p; p++) {
         if(!isalnum((unsigned char)*p))
             return false;
+
+        if(++len > 16)
+            return false;
     }
 
-    return true;
+    return len >= 5;
 }
 
 static bool cgroup_topology_suffix_is_uint(const char *s)

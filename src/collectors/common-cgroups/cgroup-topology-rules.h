@@ -39,6 +39,7 @@ typedef struct {
 
 const char *cgroup_topology_cgroup_status_name(uint16_t cgroup_status);
 const char *cgroup_topology_orchestrator_name(uint16_t cgroup_status, uint16_t orchestrator);
+void cgroup_topology_emit_rrdf_table_fields(BUFFER *wb, size_t *field_id, bool include_actor_type);
 
 bool cgroup_topology_derive_systemd_unit(
     const char *cgroup_path,

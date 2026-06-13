@@ -214,7 +214,9 @@ static bool cgroup_path_has_qemu_scope_component(const char *id)
     for (const char *p = strstr(id, "/qemu-"); p; p = strstr(p + 1, "/qemu-")) {
         const char *component = p + 1;
         const char *end = strchr(component, '/');
-        size_t len = end ? (size_t)(end - component) : strlen(component);
+        size_t len = 0;
+        while(component[len] && (!end || component + len < end))
+            len++;
 
         if (len > sizeof(suffix) - 1 &&
             strncmp(component + len - (sizeof(suffix) - 1), suffix, sizeof(suffix) - 1) == 0)
