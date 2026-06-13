@@ -418,6 +418,28 @@ static void cgroups_lookup_clear_pending_for_paths(STRING **paths, uint32_t coun
     netdata_mutex_unlock(&apps_pids_mutex);
 }
 
+static void cgroups_lookup_reset_retry_later_generations_locked(void)
+{
+    cgroups_lookup_latest_generation = 0;
+
+    if (!cgroups_lookup_cache)
+        return;
+
+    struct cgroup_lookup_entry *entry;
+    dfe_start_write(cgroups_lookup_cache, entry) {
+        if (entry->cgroup_status == NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER)
+            entry->generation = 0;
+    }
+    dfe_done(entry);
+}
+
+static void cgroups_lookup_note_peer_generation_reset(void)
+{
+    netdata_mutex_lock(&apps_pids_mutex);
+    cgroups_lookup_reset_retry_later_generations_locked();
+    netdata_mutex_unlock(&apps_pids_mutex);
+}
+
 static bool cgroups_lookup_client_ready(nipc_client_ctx_t *client, bool *was_ready, usec_t *next_retry_ut)
 {
     if (nipc_client_ready(client)) {
@@ -441,6 +463,7 @@ static bool cgroups_lookup_client_ready(nipc_client_ctx_t *client, bool *was_rea
     if (*was_ready) {
         cgroups_lookup_counter_inc(&cgroups_lookup_peer_disconnects);
         netdata_log_error("apps.plugin lost CGROUPS_LOOKUP service; cgroup enrichment will retry");
+        cgroups_lookup_note_peer_generation_reset();
     }
     else {
         static bool logged_absent = false;
@@ -516,6 +539,8 @@ static void cgroups_lookup_worker(void *arg __maybe_unused)
             }
             cgroups_lookup_clear_pending_for_paths(paths, count);
             was_ready = false;
+            if (err != NIPC_ERR_TIMEOUT)
+                cgroups_lookup_note_peer_generation_reset();
         }
         else if (response.item_count != count) {
             cgroups_lookup_counter_inc(&cgroups_lookup_requests_error);
@@ -561,6 +586,8 @@ static void cgroups_lookup_worker(void *arg __maybe_unused)
                 cgroups_lookup_stage_item(&items[i], &staged[i]);
 
             netdata_mutex_lock(&apps_pids_mutex);
+            if (response.generation < cgroups_lookup_latest_generation)
+                cgroups_lookup_reset_retry_later_generations_locked();
             if (response.generation > cgroups_lookup_latest_generation)
                 cgroups_lookup_latest_generation = response.generation;
 

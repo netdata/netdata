@@ -19,6 +19,7 @@
 #define NV_APPS_LOOKUP_CACHE_MAX 65536U
 #define NV_APPS_LOOKUP_CONNECT_RETRY_SEC 1U
 #define NV_APPS_LOOKUP_CALL_TIMEOUT_MS 5000U
+#define NV_APPS_LOOKUP_RETRY_LATER_INTERVAL_SEC 1U
 
 typedef struct {
     char *key;
@@ -29,8 +30,8 @@ typedef struct {
     uint16_t cgroup_status;
     uint16_t orchestrator;
     uint64_t starttime;
-    uint64_t observed_generation;
     usec_t last_used_usec;
+    usec_t retry_after_usec;
     char *comm;
     char *cgroup_path;
     char *cgroup_name;
@@ -54,7 +55,6 @@ static uint32_t apps_lookup_max_cache_size = NV_APPS_LOOKUP_CACHE_DEFAULT;
 static uint32_t apps_lookup_cache_size = 0;
 static uint32_t apps_lookup_intake_size = 0;
 static uint64_t apps_lookup_intake_sequence = 0;
-static uint64_t apps_lookup_last_observed_generation = 0;
 
 static int apps_lookup_intake_eventfd = -1;
 static ND_THREAD *apps_lookup_worker_thread = NULL;
@@ -450,8 +450,7 @@ static NV_APPS_LOOKUP_CACHE_ENTRY *nv_apps_lookup_cache_insert(uint32_t pid)
 
 static void nv_apps_lookup_cache_fill_from_item(
     NV_APPS_LOOKUP_CACHE_ENTRY *entry,
-    const nipc_apps_lookup_item_view_t *item,
-    uint64_t generation)
+    const nipc_apps_lookup_item_view_t *item)
 {
     nv_apps_lookup_cache_entry_clear(entry);
 
@@ -462,8 +461,11 @@ static void nv_apps_lookup_cache_fill_from_item(
     entry->cgroup_status = item->cgroup_status;
     entry->orchestrator = item->orchestrator;
     entry->starttime = item->starttime;
-    entry->observed_generation = generation;
     entry->last_used_usec = now_monotonic_usec();
+    entry->retry_after_usec =
+        item->cgroup_status == NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER
+            ? entry->last_used_usec + NV_APPS_LOOKUP_RETRY_LATER_INTERVAL_SEC * USEC_PER_SEC
+            : 0;
     entry->comm = nv_apps_lookup_strndupz(item->comm.ptr, item->comm.len);
     entry->cgroup_path = nv_apps_lookup_strndupz(item->cgroup_path.ptr, item->cgroup_path.len);
     entry->cgroup_name = nv_apps_lookup_strndupz(item->cgroup_name.ptr, item->cgroup_name.len);
@@ -490,9 +492,6 @@ static void nv_apps_lookup_apply_response(
     const nipc_apps_lookup_resp_view_t *response)
 {
     netdata_mutex_lock(&apps_lookup_cache_mutex);
-
-    if (response->generation > apps_lookup_last_observed_generation)
-        apps_lookup_last_observed_generation = response->generation;
 
     for (uint32_t i = 0; i < response->item_count; i++) {
         nipc_apps_lookup_item_view_t item;
@@ -536,7 +535,7 @@ static void nv_apps_lookup_apply_response(
         }
 
         if (entry)
-            nv_apps_lookup_cache_fill_from_item(entry, &item, response->generation);
+            nv_apps_lookup_cache_fill_from_item(entry, &item);
 
         if (item.cgroup_status == NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER)
             nv_apps_lookup_counter_inc(&apps_lookup_cache_misses_unknown);
@@ -810,7 +809,8 @@ void nv_apps_lookup_warm_pids(const uint32_t *pids, size_t pid_count)
         if (entry) {
             entry->last_used_usec = now_ut;
             nv_apps_lookup_counter_inc(&apps_lookup_cache_hits);
-            if (entry->cgroup_status != NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER)
+            if (entry->cgroup_status != NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER ||
+                (entry->retry_after_usec && now_ut < entry->retry_after_usec))
                 continue;
         }
 
@@ -876,7 +876,6 @@ bool nv_cache_lookup_pid(uint32_t pid, uint64_t expected_starttime, NV_APPS_LOOK
     out->cgroup_status = entry->cgroup_status;
     out->orchestrator = entry->orchestrator;
     out->starttime = entry->starttime;
-    out->apps_lookup_generation_observed = entry->observed_generation;
     out->cgroup_path = nv_apps_lookup_strdupz_empty(entry->cgroup_path);
     out->cgroup_name = nv_apps_lookup_strdupz_empty(entry->cgroup_name);
 

@@ -78,6 +78,44 @@ static bool test_cache_allows_more_than_legacy_fixed_cap(void)
     return ok;
 }
 
+static bool test_retry_later_generation_reset(void)
+{
+    bool ok = true;
+
+    cgroups_lookup_cache_create();
+    cgroups_lookup_latest_generation = 42;
+
+    STRING *retry_path = string_strdupz("/kubepods.slice/retry.scope");
+    struct cgroup_lookup_entry *retry = cgroups_lookup_cache_get_or_create(retry_path);
+    retry->refcount = 1;
+    retry->cgroup_status = NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER;
+    retry->generation = 42;
+    retry->pending = true;
+
+    STRING *known_path = string_strdupz("/kubepods.slice/known.scope");
+    struct cgroup_lookup_entry *known = cgroups_lookup_cache_get_or_create(known_path);
+    known->refcount = 1;
+    known->cgroup_status = NIPC_CGROUP_LOOKUP_KNOWN;
+    known->generation = 42;
+    known->pending = false;
+
+    cgroups_lookup_note_peer_generation_reset();
+
+    ok =
+        expect_ok(cgroups_lookup_latest_generation == 0, "latest cgroups generation was not reset") &&
+        expect_ok(retry->generation == 0, "retry-later entry generation was not reset") &&
+        expect_ok(retry->pending, "retry-later pending state was unexpectedly changed") &&
+        expect_ok(known->generation == 42, "known entry generation was unexpectedly reset") &&
+        ok;
+
+    retry->refcount = 0;
+    known->refcount = 0;
+    string_freez(retry_path);
+    string_freez(known_path);
+    cgroups_lookup_cache_destroy();
+    return ok;
+}
+
 static bool blocking_cgroups_lookup_handler(
     void *user __maybe_unused,
     const nipc_cgroups_lookup_req_view_t *request,
@@ -142,6 +180,8 @@ int main(void)
     mutex_initialized = true;
 
     if (!expect_ok(test_cache_allows_more_than_legacy_fixed_cap(), "active cgroup cache cardinality test failed"))
+        goto cleanup_fixture;
+    if (!expect_ok(test_retry_later_generation_reset(), "retry-later generation reset test failed"))
         goto cleanup_fixture;
 
     test_pid.pid = 12345;

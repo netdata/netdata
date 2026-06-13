@@ -333,7 +333,21 @@ static bool run_roundtrip_test(const char *run_dir)
 
     if (!expect_ok(wait_for_counter(&apps_lookup_cache_hits, 1), "cached known PID was not served as a hit"))
         goto cleanup_client;
-    if (!expect_ok(wait_for_counter(&apps_lookup_cache_misses_unknown, 2), "retry-later PID was not retried"))
+    sleep_usec(100000);
+    if (!expect_ok(counter_value(&apps_lookup_requests_responded) == 1, "retry-later PID retried before backoff elapsed"))
+        goto cleanup_client;
+    bool retry_entry_found = false;
+    netdata_mutex_lock(&apps_lookup_cache_mutex);
+    NV_APPS_LOOKUP_CACHE_ENTRY *retry_entry = dictionary_get(apps_lookup_cache, "200");
+    if (retry_entry) {
+        retry_entry->retry_after_usec = 0;
+        retry_entry_found = true;
+    }
+    netdata_mutex_unlock(&apps_lookup_cache_mutex);
+    if (!expect_ok(retry_entry_found, "retry-later PID cache entry missing"))
+        goto cleanup_client;
+    nv_apps_lookup_warm_pids(pids, _countof(pids));
+    if (!expect_ok(wait_for_counter(&apps_lookup_cache_misses_unknown, 2), "retry-later PID was not retried after backoff elapsed"))
         goto cleanup_client;
     if (!expect_ok(wait_for_counter(&apps_lookup_requests_responded, 2), "worker did not complete the retry-later refresh"))
         goto cleanup_client;

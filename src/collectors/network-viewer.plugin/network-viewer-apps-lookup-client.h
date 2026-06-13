@@ -20,8 +20,6 @@ typedef struct {
     // cppcheck-suppress unusedStructMember
     uint64_t starttime;
     // cppcheck-suppress unusedStructMember
-    uint64_t apps_lookup_generation_observed;
-    // cppcheck-suppress unusedStructMember
     char *cgroup_path;
     // cppcheck-suppress unusedStructMember
     char *cgroup_name;
