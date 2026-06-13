@@ -41,6 +41,9 @@ static SPAWN_SERVER *spawn_srv = NULL;
 #define NV_TOPOLOGY_MAX_PPID_DEPTH 64
 #define NV_TOPOLOGY_PENDING_CONTAINER_NAME "[pending]"
 #define NV_TOPOLOGY_RESPONSE_SIZE_LIMIT (64ULL * 1024ULL * 1024ULL)
+#define NETWORK_VIEWER_TEST_DEFAULT_TIMEOUT_SECONDS 60ULL
+#define NETWORK_VIEWER_TEST_TIMEOUT_DISABLED_SECONDS (100ULL * 365ULL * 24ULL * 60ULL * 60ULL)
+#define NETWORK_VIEWER_TEST_MAX_REQUEST_BYTES (16ULL * 1024ULL * 1024ULL)
 
 #define NV_TOPOLOGY_USERNAME_MAX 128
 #define NV_TOPOLOGY_CMDLINE_MAX 512
@@ -249,24 +252,6 @@ static const char *topology_abort_message(NV_TOPOLOGY_ABORT_STATUS status)
             return "Request timed out.";
     }
 }
-
-typedef struct {
-    char cgroup_path[NV_TOPOLOGY_CGROUP_PATH_MAX];
-    char cgroup_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
-    char container_name[NV_TOPOLOGY_CONTAINER_NAME_MAX];
-    char cgroup_status[32];
-    char orchestrator[NV_TOPOLOGY_ORCHESTRATOR_MAX];
-    char k8s_pod_name[NV_TOPOLOGY_K8S_NAME_MAX];
-    char k8s_namespace[NV_TOPOLOGY_K8S_NAME_MAX];
-    char k8s_workload[NV_TOPOLOGY_K8S_NAME_MAX];
-    char docker_container_name[NV_TOPOLOGY_CGROUP_NAME_MAX];
-    char docker_image[NV_TOPOLOGY_DOCKER_IMAGE_MAX];
-    char systemd_unit_name[NV_TOPOLOGY_SYSTEMD_UNIT_MAX];
-    char systemd_unit_kind[NV_TOPOLOGY_SYSTEMD_KIND_MAX];
-    char actor_kind[NV_TOPOLOGY_ACTOR_KIND_MAX];
-    char actor_type[NV_TOPOLOGY_ACTOR_TYPE_MAX];
-    bool from_cache;
-} NV_TOPOLOGY_CONTAINER_FIELDS;
 
 #define SIMPLE_HASHTABLE_VALUE_TYPE LOCAL_SOCKET *
 #define SIMPLE_HASHTABLE_NAME _AGGREGATED_SOCKETS
@@ -1143,16 +1128,17 @@ static void topology_container_fields_fill(
     if(!fields)
         return;
 
-    *fields = (NV_TOPOLOGY_CONTAINER_FIELDS){ 0 };
     const char *fallback = (process && *process) ? process : "[unknown]";
+    nv_container_fields_set_process_fallback(fields, fallback);
+
+    if(!pid)
+        return;
+
     strncpyz(fields->container_name, NV_TOPOLOGY_PENDING_CONTAINER_NAME, sizeof(fields->container_name) - 1);
     strncpyz(fields->cgroup_status, nv_cgroup_status_name(NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER), sizeof(fields->cgroup_status) - 1);
     strncpyz(fields->orchestrator, "unknown", sizeof(fields->orchestrator) - 1);
     strncpyz(fields->actor_type, "container", sizeof(fields->actor_type) - 1);
     strncpyz(fields->actor_kind, "pending", sizeof(fields->actor_kind) - 1);
-
-    if(!pid)
-        return;
 
     NV_APPS_LOOKUP_FIELDS cached;
     if(!nv_cache_lookup_pid(pid, &cached))
@@ -2111,22 +2097,34 @@ static void topology_render_state_init(NV_TOPOLOGY_RENDER_STATE *state, const NV
     topology_actor_id_for_host(ctx, state->host_actor_id, sizeof(state->host_actor_id));
 }
 
-static void topology_finalize_response(const char *transaction, BUFFER *wb, time_t now_s) {
+static void network_viewer_finalize_response_buffer(BUFFER *wb, time_t now_s) {
     buffer_json_member_add_time_t(wb, "expires", now_s + NETWORK_VIEWER_RESPONSE_UPDATE_EVERY);
     buffer_json_finalize(wb);
 
-    netdata_mutex_lock(&stdout_mutex);
     wb->response_code = HTTP_RESP_OK;
     wb->content_type = CT_APPLICATION_JSON;
     wb->expires = now_s + NETWORK_VIEWER_RESPONSE_UPDATE_EVERY;
-    pluginsd_function_result_to_stdout(transaction, wb);
-    netdata_mutex_unlock(&stdout_mutex);
 }
 
-static void topology_send_error(const char *transaction, int code, const char *message)
+static BUFFER *network_viewer_json_error_response(int code, const char *message)
 {
+    BUFFER *wb = buffer_create(0, NULL);
+    char escaped[PLUGINSD_LINE_MAX + 1];
+    json_escape_string(escaped, message ? message : "", PLUGINSD_LINE_MAX);
+    buffer_sprintf(wb, "{\"status\":%d,\"error_message\":\"%s\"}", code, escaped);
+    wb->response_code = code;
+    wb->content_type = CT_APPLICATION_JSON;
+    wb->expires = now_realtime_sec();
+    return wb;
+}
+
+static void network_viewer_emit_response(const char *transaction, BUFFER *wb)
+{
+    if(!wb)
+        return;
+
     netdata_mutex_lock(&stdout_mutex);
-    pluginsd_function_json_error_to_stdout(transaction, code, message);
+    pluginsd_function_result_to_stdout(transaction, wb);
     netdata_mutex_unlock(&stdout_mutex);
 }
 
@@ -5805,36 +5803,35 @@ cleanup:
     return abort_status;
 }
 
-static void network_viewer_topology_function(
-    const char *transaction, char *function, usec_t *stop_monotonic_ut,
-    bool *cancelled, BUFFER *payload, HTTP_ACCESS access __maybe_unused,
-    const char *source __maybe_unused, void *data __maybe_unused) {
+static BUFFER *network_viewer_topology_result(
+    char *function, usec_t *stop_monotonic_ut,
+    bool *cancelled, BUFFER *payload) {
 
     time_t now_s = now_realtime_sec();
     usec_t now_ut = now_realtime_usec();
     NV_TOPOLOGY_OPTIONS options = { 0 };
     NV_TOPOLOGY_ABORT_STATUS abort_status = topology_function_abort_state(stop_monotonic_ut, cancelled);
-    if(abort_status != NV_TOPOLOGY_ABORT_NONE) {
-        topology_send_error(transaction, topology_abort_http_code(abort_status), topology_abort_message(abort_status));
-        return;
-    }
+    if(abort_status != NV_TOPOLOGY_ABORT_NONE)
+        return network_viewer_json_error_response(
+            topology_abort_http_code(abort_status),
+            topology_abort_message(abort_status));
 
     topology_parse_options(function, &options);
     CLEAN_BUFFER *error = buffer_create(0, NULL);
     if(!topology_parse_payload_options(payload, &options, error)) {
         simple_pattern_free(options.label_whitelist);
-        topology_send_error(transaction, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
-        return;
+        return network_viewer_json_error_response(HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
     }
 
     abort_status = topology_function_abort_state(stop_monotonic_ut, cancelled);
     if(abort_status != NV_TOPOLOGY_ABORT_NONE) {
         simple_pattern_free(options.label_whitelist);
-        topology_send_error(transaction, topology_abort_http_code(abort_status), topology_abort_message(abort_status));
-        return;
+        return network_viewer_json_error_response(
+            topology_abort_http_code(abort_status),
+            topology_abort_message(abort_status));
     }
 
-    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    BUFFER *wb = buffer_create(0, NULL);
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
@@ -5853,11 +5850,24 @@ static void network_viewer_topology_function(
     topology_context_destroy(&ctx);
     simple_pattern_free(options.label_whitelist);
     if(abort_status != NV_TOPOLOGY_ABORT_NONE) {
-        topology_send_error(transaction, topology_abort_http_code(abort_status), topology_abort_message(abort_status));
-        return;
+        buffer_free(wb);
+        return network_viewer_json_error_response(
+            topology_abort_http_code(abort_status),
+            topology_abort_message(abort_status));
     }
 
-    topology_finalize_response(transaction, wb, now_s);
+    network_viewer_finalize_response_buffer(wb, now_s);
+    return wb;
+}
+
+static void network_viewer_topology_function(
+    const char *transaction, char *function, usec_t *stop_monotonic_ut,
+    bool *cancelled, BUFFER *payload, HTTP_ACCESS access __maybe_unused,
+    const char *source __maybe_unused, void *data __maybe_unused) {
+
+    BUFFER *wb = network_viewer_topology_result(function, stop_monotonic_ut, cancelled, payload);
+    network_viewer_emit_response(transaction, wb);
+    buffer_free(wb);
 }
 
 static int local_sockets_compar(const void *a, const void *b) {
@@ -5865,14 +5875,12 @@ static int local_sockets_compar(const void *a, const void *b) {
     return strcmp(n1->comm, n2->comm);
 }
 
-void network_viewer_function(const char *transaction, char *function __maybe_unused, usec_t *stop_monotonic_ut __maybe_unused,
-                             bool *cancelled __maybe_unused, BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
-                             const char *source __maybe_unused, void *data __maybe_unused) {
+static BUFFER *network_viewer_result(char *function) {
 
     time_t now_s = now_realtime_sec();
     bool aggregated = false;
 
-    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    BUFFER *wb = buffer_create(0, NULL);
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
@@ -5924,7 +5932,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
     buffer_json_array_close(wb); // required_params
 #endif
 
-    char *function_copy = strdupz(function);
+    char *function_copy = strdupz(function ? function : NETWORK_CONNECTIONS_VIEWER_FUNCTION);
     char *words[1024];
     size_t num_words = quoted_strings_splitter_whitespace(function_copy, words, 1024);
     for(size_t i = 1; i < num_words ;i++) {
@@ -6510,15 +6518,19 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
     }
 
 close_and_send:
-    buffer_json_member_add_time_t(wb, "expires", now_s + NETWORK_VIEWER_RESPONSE_UPDATE_EVERY);
-    buffer_json_finalize(wb);
+    network_viewer_finalize_response_buffer(wb, now_s);
+    return wb;
+}
 
-    netdata_mutex_lock(&stdout_mutex);
-    wb->response_code = HTTP_RESP_OK;
-    wb->content_type = CT_APPLICATION_JSON;
-    wb->expires = now_s + NETWORK_VIEWER_RESPONSE_UPDATE_EVERY;
-    pluginsd_function_result_to_stdout(transaction, wb);
-    netdata_mutex_unlock(&stdout_mutex);
+void network_viewer_function(
+    const char *transaction, char *function,
+    usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
+    BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
+    const char *source __maybe_unused, void *data __maybe_unused) {
+
+    BUFFER *wb = network_viewer_result(function);
+    network_viewer_emit_response(transaction, wb);
+    buffer_free(wb);
 }
 
 // ----------------------------------------------------------------------------------------------------------------
@@ -6760,9 +6772,295 @@ void function_network_protocols(
 #endif // OS_FREEBSD
 
 // ----------------------------------------------------------------------------------------------------------------
+// test CLI
+
+struct network_viewer_test_command {
+    bool enabled;
+    const char *function_name;
+    uint64_t timeout_seconds;
+    bool timeout_seconds_set;
+};
+
+static void network_viewer_test_usage(FILE *stream)
+{
+    fprintf(
+        stream,
+        "usage: network-viewer.plugin --test <network-connections|topology:network-connections> [--timeout <seconds>] < payload.json\n");
+}
+
+static bool network_viewer_test_option_present(int argc, char **argv)
+{
+    for(int i = 1; i < argc; i++) {
+        if(strcmp(argv[i], "--test") == 0 || strncmp(argv[i], "--test=", strlen("--test=")) == 0)
+            return true;
+    }
+
+    return false;
+}
+
+static int network_viewer_set_required_option_once(const char **slot, const char *value, const char *option)
+{
+    if(*slot) {
+        fprintf(stderr, "duplicate %s\n", option);
+        network_viewer_test_usage(stderr);
+        return 2;
+    }
+
+    if(!value || !*value) {
+        fprintf(stderr, "missing value for %s\n", option);
+        network_viewer_test_usage(stderr);
+        return 2;
+    }
+
+    *slot = value;
+    return 0;
+}
+
+static int network_viewer_set_timeout_option_once(uint64_t *slot, bool *slot_set, const char *value)
+{
+    if(*slot_set) {
+        fprintf(stderr, "duplicate --timeout\n");
+        network_viewer_test_usage(stderr);
+        return 2;
+    }
+
+    if(!value || !*value) {
+        fprintf(stderr, "missing value for --timeout\n");
+        network_viewer_test_usage(stderr);
+        return 2;
+    }
+
+    for(const char *s = value; *s; s++) {
+        if(*s < '0' || *s > '9') {
+            fprintf(stderr, "invalid value for --timeout '%s'; expected seconds\n", value);
+            network_viewer_test_usage(stderr);
+            return 2;
+        }
+    }
+
+    errno = 0;
+    unsigned long long parsed = strtoull(value, NULL, 10);
+    if(errno == ERANGE) {
+        fprintf(stderr, "invalid value for --timeout '%s'; expected seconds\n", value);
+        network_viewer_test_usage(stderr);
+        return 2;
+    }
+
+#if ULLONG_MAX > UINT64_MAX
+    if(parsed > UINT64_MAX) {
+        fprintf(stderr, "invalid value for --timeout '%s'; expected seconds\n", value);
+        network_viewer_test_usage(stderr);
+        return 2;
+    }
+#endif
+
+    *slot = (uint64_t)parsed;
+    *slot_set = true;
+    return 0;
+}
+
+static int network_viewer_reject_request_option(void)
+{
+    fprintf(stderr, "--request is no longer supported; pass the request payload on stdin\n");
+    network_viewer_test_usage(stderr);
+    return 2;
+}
+
+static int parse_network_viewer_test_command(int argc, char **argv, struct network_viewer_test_command *cmd)
+{
+    *cmd = (struct network_viewer_test_command){ 0 };
+    if(!network_viewer_test_option_present(argc, argv))
+        return 0;
+
+    cmd->enabled = true;
+
+    for(int i = 1; i < argc; i++) {
+        const char *arg = argv[i];
+
+        if(strcmp(arg, "--test") == 0) {
+            if(++i >= argc)
+                return network_viewer_set_required_option_once(&cmd->function_name, NULL, "--test");
+
+            int rc = network_viewer_set_required_option_once(&cmd->function_name, argv[i], "--test");
+            if(rc)
+                return rc;
+        }
+        else if(strncmp(arg, "--test=", strlen("--test=")) == 0) {
+            int rc = network_viewer_set_required_option_once(&cmd->function_name, arg + strlen("--test="), "--test");
+            if(rc)
+                return rc;
+        }
+        else if(strcmp(arg, "--request") == 0 || strncmp(arg, "--request=", strlen("--request=")) == 0) {
+            return network_viewer_reject_request_option();
+        }
+        else if(strcmp(arg, "--timeout") == 0) {
+            if(++i >= argc)
+                return network_viewer_set_timeout_option_once(&cmd->timeout_seconds, &cmd->timeout_seconds_set, NULL);
+
+            int rc = network_viewer_set_timeout_option_once(&cmd->timeout_seconds, &cmd->timeout_seconds_set, argv[i]);
+            if(rc)
+                return rc;
+        }
+        else if(strncmp(arg, "--timeout=", strlen("--timeout=")) == 0) {
+            int rc = network_viewer_set_timeout_option_once(
+                &cmd->timeout_seconds, &cmd->timeout_seconds_set, arg + strlen("--timeout="));
+            if(rc)
+                return rc;
+        }
+        else if(strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
+            network_viewer_test_usage(stderr);
+            return 2;
+        }
+        else {
+            fprintf(stderr, "unsupported network-viewer test option '%s'\n", arg);
+            network_viewer_test_usage(stderr);
+            return 2;
+        }
+    }
+
+    if(!cmd->function_name) {
+        fprintf(stderr, "missing required --test\n");
+        network_viewer_test_usage(stderr);
+        return 2;
+    }
+
+    if(!cmd->timeout_seconds_set)
+        cmd->timeout_seconds = NETWORK_VIEWER_TEST_DEFAULT_TIMEOUT_SECONDS;
+
+    return 0;
+}
+
+static bool network_viewer_test_function_matches(const char *function, const char *expected)
+{
+    size_t len = strlen(expected);
+    return function && strncmp(function, expected, len) == 0 &&
+           (function[len] == '\0' || isspace((unsigned char)function[len]));
+}
+
+static bool network_viewer_test_function_supported(const char *function)
+{
+    return network_viewer_test_function_matches(function, NETWORK_CONNECTIONS_VIEWER_FUNCTION) ||
+           network_viewer_test_function_matches(function, NETWORK_TOPOLOGY_VIEWER_FUNCTION);
+}
+
+static uint64_t network_viewer_effective_test_timeout_seconds(uint64_t timeout_seconds)
+{
+    return timeout_seconds ? timeout_seconds : NETWORK_VIEWER_TEST_TIMEOUT_DISABLED_SECONDS;
+}
+
+static usec_t network_viewer_test_stop_monotonic_usec(uint64_t timeout_seconds)
+{
+    usec_t now_ut = now_monotonic_usec();
+    uint64_t effective_timeout_seconds = network_viewer_effective_test_timeout_seconds(timeout_seconds);
+    uint64_t max_timeout_seconds = (UINT64_MAX - now_ut) / USEC_PER_SEC;
+
+    if(effective_timeout_seconds > max_timeout_seconds)
+        return UINT64_MAX;
+
+    return now_ut + effective_timeout_seconds * USEC_PER_SEC;
+}
+
+static BUFFER *network_viewer_read_request_payload_from_stdin(void)
+{
+    BUFFER *payload = buffer_create(8192, NULL);
+    size_t total = 0;
+
+    while(true) {
+        char buffer[8192];
+        ssize_t bytes_read = read(STDIN_FILENO, buffer, sizeof(buffer));
+        if(bytes_read == -1) {
+            if(errno == EINTR)
+                continue;
+
+            fprintf(stderr, "failed to read request payload from stdin: %s\n", strerror(errno));
+            buffer_free(payload);
+            return NULL;
+        }
+
+        if(bytes_read == 0)
+            break;
+
+        if((uint64_t)total + (uint64_t)bytes_read > NETWORK_VIEWER_TEST_MAX_REQUEST_BYTES) {
+            fprintf(
+                stderr,
+                "request payload from stdin is too large: max %llu bytes\n",
+                (unsigned long long)NETWORK_VIEWER_TEST_MAX_REQUEST_BYTES);
+            buffer_free(payload);
+            return NULL;
+        }
+
+        buffer_memcat(payload, buffer, (size_t)bytes_read);
+        total += (size_t)bytes_read;
+    }
+
+    if(total == 0) {
+        fprintf(stderr, "request payload from stdin is empty\n");
+        buffer_free(payload);
+        return NULL;
+    }
+
+    payload->content_type = CT_APPLICATION_JSON;
+    return payload;
+}
+
+static int network_viewer_write_test_result(BUFFER *result)
+{
+    if(!result) {
+        fprintf(stderr, "network-viewer test function returned no result\n");
+        return 1;
+    }
+
+    if(buffer_strlen(result))
+        fwrite(buffer_tostring(result), buffer_strlen(result), 1, stdout);
+    fprintf(stdout, "\n");
+    fflush(stdout);
+
+    return (result->response_code >= HTTP_RESP_OK && result->response_code < 300) ? 0 : 1;
+}
+
+static int run_network_viewer_test_command(const struct network_viewer_test_command *cmd)
+{
+    if(!network_viewer_test_function_supported(cmd->function_name)) {
+        fprintf(
+            stderr,
+            "unsupported network-viewer test function '%s' (expected '%s' or '%s')\n",
+            cmd->function_name,
+            NETWORK_CONNECTIONS_VIEWER_FUNCTION,
+            NETWORK_TOPOLOGY_VIEWER_FUNCTION);
+        return 2;
+    }
+
+    BUFFER *payload = network_viewer_read_request_payload_from_stdin();
+    if(!payload)
+        return 1;
+
+    bool cancelled = false;
+    usec_t stop_monotonic_ut = network_viewer_test_stop_monotonic_usec(cmd->timeout_seconds);
+    char *function = strdupz(cmd->function_name);
+
+    BUFFER *result;
+    if(network_viewer_test_function_matches(function, NETWORK_TOPOLOGY_VIEWER_FUNCTION))
+        result = network_viewer_topology_result(function, &stop_monotonic_ut, &cancelled, payload);
+    else
+        result = network_viewer_result(function);
+
+    freez(function);
+    buffer_free(payload);
+
+    int rc = network_viewer_write_test_result(result);
+    buffer_free(result);
+    return rc;
+}
+
+// ----------------------------------------------------------------------------------------------------------------
 // main
 
-int main(int argc __maybe_unused, char **argv __maybe_unused) {
+int main(int argc, char **argv) {
+    struct network_viewer_test_command test_command = { 0 };
+    int test_parse_rc = parse_network_viewer_test_command(argc, argv, &test_command);
+    if(test_parse_rc)
+        exit(test_parse_rc);
+
     nd_thread_tag_set("NETWORK-VIEWER");
     nd_log_initialize_for_external_plugins("network-viewer.plugin");
     netdata_threads_init_for_external_plugins(0);
@@ -6781,6 +7079,22 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     cached_usernames_init();
     update_cached_host_users();
     sc = system_servicenames_cache_init();
+
+    if(test_command.enabled) {
+        nv_apps_lookup_init(&plugin_should_exit);
+        nv_apps_lookup_start();
+
+        int rc = run_network_viewer_test_command(&test_command);
+
+        __atomic_store_n(&plugin_should_exit, true, __ATOMIC_RELEASE);
+        nv_apps_lookup_stop();
+
+#if defined(LOCAL_SOCKETS_USE_SETNS)
+        spawn_server_destroy(spawn_srv);
+        spawn_srv = NULL;
+#endif
+        return rc;
+    }
 
     // ----------------------------------------------------------------------------------------------------------------
 

@@ -69,6 +69,20 @@ bool nv_cgroup_fields_have_container_identity(const NV_APPS_LOOKUP_FIELDS *field
     return container_name[0] != '\0';
 }
 
+void nv_container_fields_set_process_fallback(NV_TOPOLOGY_CONTAINER_FIELDS *fields, const char *process)
+{
+    if(!fields)
+        return;
+
+    *fields = (NV_TOPOLOGY_CONTAINER_FIELDS){ 0 };
+    const char *fallback = (process && *process) ? process : "[unknown]";
+    strncpyz(fields->container_name, fallback, sizeof(fields->container_name) - 1);
+    strncpyz(fields->cgroup_status, nv_cgroup_status_name(UINT16_MAX), sizeof(fields->cgroup_status) - 1);
+    strncpyz(fields->orchestrator, "unknown", sizeof(fields->orchestrator) - 1);
+    strncpyz(fields->actor_type, "process_group", sizeof(fields->actor_type) - 1);
+    strncpyz(fields->actor_kind, "process", sizeof(fields->actor_kind) - 1);
+}
+
 static void nv_copy_label(const NV_APPS_LOOKUP_FIELDS *fields, const char *key, char *dst, size_t dst_size)
 {
     if (!dst || !dst_size)

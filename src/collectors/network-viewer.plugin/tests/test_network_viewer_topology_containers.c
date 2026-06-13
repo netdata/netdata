@@ -218,6 +218,27 @@ static bool test_container_identity_gating(void)
     return ok;
 }
 
+static bool test_process_fallback_container_fields(void)
+{
+    NV_TOPOLOGY_CONTAINER_FIELDS fields;
+    nv_container_fields_set_process_fallback(&fields, NULL);
+
+    bool ok = expect_string(fields.container_name, "[unknown]", "missing process fallback container name");
+    ok = expect_string(fields.cgroup_status, "unknown", "missing process fallback cgroup status") && ok;
+    ok = expect_string(fields.orchestrator, "unknown", "missing process fallback orchestrator") && ok;
+    ok = expect_string(fields.actor_type, "process_group", "missing process fallback actor type") && ok;
+    ok = expect_string(fields.actor_kind, "process", "missing process fallback actor kind") && ok;
+    ok = expect_true(!fields.from_cache, "missing process fallback must not look cache-derived") && ok;
+
+    nv_container_fields_set_process_fallback(&fields, "postgres");
+    ok = expect_string(fields.container_name, "postgres", "process fallback container name") && ok;
+    ok = expect_string(fields.cgroup_status, "unknown", "process fallback cgroup status") && ok;
+    ok = expect_string(fields.actor_type, "process_group", "process fallback actor type") && ok;
+    ok = expect_string(fields.actor_kind, "process", "process fallback actor kind") && ok;
+
+    return ok;
+}
+
 static bool test_systemd_and_orchestrator(void)
 {
     char value[NV_TOPOLOGY_SYSTEMD_UNIT_MAX];
@@ -317,6 +338,7 @@ int main(void)
     ok = test_k8s_workload_fallbacks() && ok;
     ok = test_missing_and_fallback_labels() && ok;
     ok = test_container_identity_gating() && ok;
+    ok = test_process_fallback_container_fields() && ok;
     ok = test_systemd_and_orchestrator() && ok;
 
     return ok ? 0 : 1;
