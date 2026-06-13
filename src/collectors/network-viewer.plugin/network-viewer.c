@@ -333,7 +333,7 @@ static inline void topology_options_defaults(NV_TOPOLOGY_OPTIONS *opts) {
     memset(opts, 0, sizeof(*opts));
     opts->detailed = false; // default: aggregated graph view
     opts->group_by = NV_TOPOLOGY_GROUP_BY_PROCESS_NAME;
-    opts->sockets_listening = false;
+    opts->sockets_listening = true;
     opts->sockets_inbound = true;
     opts->sockets_outbound = true;
     opts->protocols_ipv4_tcp = true;
@@ -366,7 +366,7 @@ static void topology_options_finalize(NV_TOPOLOGY_OPTIONS *opts) {
         return;
 
     if(!topology_sockets_any_enabled(opts)) {
-        opts->sockets_listening = false;
+        opts->sockets_listening = true;
         opts->sockets_inbound = true;
         opts->sockets_outbound = true;
     }
@@ -2221,6 +2221,7 @@ static void topology_write_response_metadata(BUFFER *wb) {
                 {
                     buffer_json_member_add_string(wb, "id", "listening");
                     buffer_json_member_add_string(wb, "name", "Listening");
+                    buffer_json_member_add_boolean(wb, "defaultSelected", true);
                 }
                 buffer_json_object_close(wb);
                 buffer_json_add_array_item_object(wb);
