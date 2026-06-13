@@ -257,6 +257,29 @@ func TestCollectorHandlePacketDedupSuppressesDuplicates(t *testing.T) {
 	if got := metrics.errors.journalWriteFailed.Load(); got != 0 {
 		t.Fatalf("journal write failures = %d, want 0", got)
 	}
+
+	store := collectJobMetricsForTest(t, jobName)
+	jobLabels := metrix.Labels{"job_name": jobName}
+	for name, expected := range map[string]float64{
+		"snmp_trap_pipeline_accepted":         2,
+		"snmp_trap_pipeline_committed":        1,
+		"snmp_trap_pipeline_dedup_suppressed": 1,
+	} {
+		if v, ok := store.Read().Value(name, jobLabels); !ok || v != expected {
+			t.Fatalf("%s = %v/%v, want %v/true", name, v, ok, expected)
+		}
+	}
+	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(writer.entries[0])
+	sourceLabels := metrix.Labels{"job_name": jobName, "source_id": sourceID, "source_kind": sourceKind}
+	for name, expected := range map[string]float64{
+		"snmp_trap_source_pipeline_accepted":         2,
+		"snmp_trap_source_pipeline_committed":        1,
+		"snmp_trap_source_pipeline_dedup_suppressed": 1,
+	} {
+		if v, ok := store.Read().Value(name, sourceLabels); !ok || v != expected {
+			t.Fatalf("%s = %v/%v, want %v/true", name, v, ok, expected)
+		}
+	}
 }
 
 func TestCollectorHandlePacketDedupPreservesHealthErrorCounters(t *testing.T) {
@@ -328,6 +351,27 @@ func TestCollectorHandlePacketDedupRollsBackFingerprintAfterWriteFailure(t *test
 	if got := metrics.errors.journalWriteFailed.Load(); got != 1 {
 		t.Fatalf("journal write failures = %d, want 1", got)
 	}
+	store := collectJobMetricsForTest(t, jobName)
+	jobLabels := metrix.Labels{"job_name": jobName}
+	if v, ok := store.Read().Value("snmp_trap_pipeline_write_failed", jobLabels); !ok || v != 1 {
+		t.Fatalf("snmp_trap_pipeline_write_failed = %v/%v, want 1/true", v, ok)
+	}
+	sourceEntry := &TrapEntry{
+		JobName:       jobName,
+		SourceIP:      packet.peer.String(),
+		SourceUDPPeer: packet.peer.String(),
+		Enrichment:    &TrapEnrichmentAudit{Source: &TrapSourceAudit{Selected: packet.peer.String(), Method: "udp_peer"}},
+	}
+	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(sourceEntry)
+	sourceLabels := metrix.Labels{"job_name": jobName, "source_id": sourceID, "source_kind": sourceKind}
+	for name, expected := range map[string]float64{
+		"snmp_trap_source_pipeline_write_failed":       1,
+		"snmp_trap_source_errors_journal_write_failed": 1,
+	} {
+		if v, ok := store.Read().Value(name, sourceLabels); !ok || v != expected {
+			t.Fatalf("%s = %v/%v, want %v/true", name, v, ok, expected)
+		}
+	}
 	if got := metrics.dedup.suppressed.Load(); got != 0 {
 		t.Fatalf("dedup suppressed after failed first write = %d, want 0", got)
 	}
@@ -366,6 +410,17 @@ func TestCollectorHandlePacketDropsDisallowedVersion(t *testing.T) {
 	m := getJobMetrics("test")
 	if dr := m.errors.droppedAllowlist.Load(); dr != 1 {
 		t.Errorf("expected 1 dropped_allowlist, got %d", dr)
+	}
+	store := collectJobMetricsForTest(t, "test")
+	labels := metrix.Labels{"job_name": "test"}
+	for name, expected := range map[string]float64{
+		"snmp_trap_pipeline_received": 1,
+		"snmp_trap_pipeline_dropped":  1,
+		"snmp_trap_pipeline_accepted": 0,
+	} {
+		if v, ok := store.Read().Value(name, labels); !ok || v != expected {
+			t.Fatalf("%s = %v/%v, want %v/true", name, v, ok, expected)
+		}
 	}
 	removeJobMetrics("test")
 }
@@ -953,6 +1008,288 @@ func TestCollectMetricsEmitsCounters(t *testing.T) {
 	}
 }
 
+func TestCollectorHandlePacketEmitsPipelineAndSourceMetrics(t *testing.T) {
+	packet := readColdStartUDPPacket(t)
+	const jobName = "test-pipeline-source-metrics"
+	metrics := withCleanJobMetrics(t, jobName)
+
+	trap := testColdStartTrap("security", "warning", "coldStart from {TRAP_SOURCE_IP}")
+	setSingleTestTrap(t, trap)
+	writer := &mockTrapWriter{}
+	c := newTestV2Collector(jobName, writer, nil, []string{"public"})
+	c.metrics = metrics
+
+	c.handlePacket(packet.payload, packet.peer, nil, nil)
+
+	if len(writer.entries) != 1 {
+		t.Fatalf("written entries = %d, want 1", len(writer.entries))
+	}
+
+	store := collectJobMetricsForTest(t, jobName)
+	jobLabels := metrix.Labels{"job_name": jobName}
+	for name, expected := range map[string]float64{
+		"snmp_trap_pipeline_received":  1,
+		"snmp_trap_pipeline_decoded":   1,
+		"snmp_trap_pipeline_accepted":  1,
+		"snmp_trap_pipeline_committed": 1,
+		"snmp_trap_pipeline_dropped":   0,
+		"snmp_trap_sources_active":     1,
+	} {
+		if v, ok := store.Read().Value(name, jobLabels); !ok || v != expected {
+			t.Fatalf("%s = %v/%v, want %v/true", name, v, ok, expected)
+		}
+	}
+	if v, ok := store.Read().Value("snmp_trap_source_attribution_fallback", jobLabels); !ok || v != 1 {
+		t.Fatalf("source fallback attribution = %v/%v, want 1/true", v, ok)
+	}
+
+	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(writer.entries[0])
+	if sourceID == "" || sourceID == writer.entries[0].SourceIP {
+		t.Fatalf("hashed source_id = %q, raw source = %q", sourceID, writer.entries[0].SourceIP)
+	}
+	sourceLabels := metrix.Labels{"job_name": jobName, "source_id": sourceID, "source_kind": sourceKind}
+	for name, expected := range map[string]float64{
+		"snmp_trap_source_pipeline_accepted":  1,
+		"snmp_trap_source_pipeline_committed": 1,
+	} {
+		if v, ok := store.Read().Value(name, sourceLabels); !ok || v != expected {
+			t.Fatalf("%s = %v/%v, want %v/true", name, v, ok, expected)
+		}
+	}
+	if _, ok := store.Read().Value("snmp_trap_source_pipeline_committed", metrix.Labels{"job_name": jobName, "source_id": writer.entries[0].SourceIP, "source_kind": "entry_source"}); ok {
+		t.Fatalf("raw source label leaked in hash mode")
+	}
+	if _, ok := store.Read().Value("snmp_trap_source_last_seen_seconds", sourceLabels); !ok {
+		t.Fatalf("source last-seen metric missing")
+	}
+}
+
+func TestCollectMetricsUsesVnodeHostScopeForSourceMetrics(t *testing.T) {
+	const jobName = "test-pipeline-vnode-source"
+	metrics := withCleanJobMetrics(t, jobName)
+	entry := &TrapEntry{
+		JobName:        jobName,
+		SourceIP:       "192.0.2.10",
+		SourceVnodeID:  "vnode-1",
+		DeviceHostname: "switch-1",
+		Enrichment: &TrapEnrichmentAudit{Source: &TrapSourceAudit{
+			Selected: "192.0.2.10",
+			Method:   "udp_peer",
+		}},
+	}
+	metrics.recordSourceAccepted(entry)
+	metrics.recordSourceCommitted(entry)
+
+	store := collectJobMetricsForTest(t, jobName)
+	labels := metrix.Labels{"job_name": jobName, "source_id": "vnode-1", "source_kind": "vnode"}
+	if _, ok := store.Read().Value("snmp_trap_source_pipeline_committed", labels); ok {
+		t.Fatalf("vnode-scoped source metric appeared on default host scope")
+	}
+	if v, ok := store.Read(metrix.ReadHostScope("vnode-1")).Value("snmp_trap_source_pipeline_committed", labels); !ok || v != 1 {
+		t.Fatalf("vnode-scoped source committed metric = %v/%v, want 1/true", v, ok)
+	}
+	if v, ok := store.Read().Value("snmp_trap_source_attribution_vnode", metrix.Labels{"job_name": jobName}); !ok || v != 1 {
+		t.Fatalf("source vnode attribution = %v/%v, want 1/true", v, ok)
+	}
+}
+
+func TestCollectMetricsUsesFallbackSourceWhenVnodeAttributionConflicts(t *testing.T) {
+	const jobName = "test-pipeline-vnode-conflict-source"
+	metrics := withCleanJobMetrics(t, jobName)
+	entry := &TrapEntry{
+		JobName:        jobName,
+		SourceIP:       "192.0.2.10",
+		SourceUDPPeer:  "192.0.2.10",
+		SourceVnodeID:  "vnode-1",
+		DeviceHostname: "switch-1",
+		Enrichment: &TrapEnrichmentAudit{
+			Source: &TrapSourceAudit{
+				Selected: "192.0.2.10",
+				Method:   "udp_peer",
+			},
+			Topology: &TrapEnrichmentLookup{
+				Status: "conflict",
+				Reason: "vnode_mismatch",
+			},
+		},
+	}
+	metrics.recordSourceAccepted(entry)
+	metrics.recordSourceCommitted(entry)
+
+	store := collectJobMetricsForTest(t, jobName)
+	vnodeLabels := metrix.Labels{"job_name": jobName, "source_id": "vnode-1", "source_kind": "vnode"}
+	if _, ok := store.Read(metrix.ReadHostScope("vnode-1")).Value("snmp_trap_source_pipeline_committed", vnodeLabels); ok {
+		t.Fatalf("conflicting vnode attribution emitted vnode-scoped source metric")
+	}
+	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(entry)
+	fallbackLabels := metrix.Labels{"job_name": jobName, "source_id": sourceID, "source_kind": sourceKind}
+	if v, ok := store.Read().Value("snmp_trap_source_pipeline_committed", fallbackLabels); !ok || v != 1 {
+		t.Fatalf("fallback-scoped source committed metric = %v/%v, want 1/true", v, ok)
+	}
+	jobLabels := metrix.Labels{"job_name": jobName}
+	if v, ok := store.Read().Value("snmp_trap_source_attribution_ambiguous", jobLabels); !ok || v != 1 {
+		t.Fatalf("source ambiguous attribution = %v/%v, want 1/true", v, ok)
+	}
+	if v, ok := store.Read().Value("snmp_trap_source_attribution_fallback", jobLabels); !ok || v != 1 {
+		t.Fatalf("source fallback attribution = %v/%v, want 1/true", v, ok)
+	}
+}
+
+func TestCollectMetricsSourceAttributionDiagnostics(t *testing.T) {
+	const jobName = "test-pipeline-source-attribution"
+	metrics := withCleanJobMetrics(t, jobName)
+
+	metrics.recordSourceAccepted(&TrapEntry{JobName: jobName})
+	metrics.recordSourceAccepted(&TrapEntry{
+		JobName:  jobName,
+		SourceIP: "192.0.2.10",
+		Enrichment: &TrapEnrichmentAudit{
+			Source: &TrapSourceAudit{
+				Selected:           "192.0.2.10",
+				Method:             "udp_peer",
+				RejectedCandidates: []string{"snmpTrapAddress.0:ambiguous_source"},
+			},
+		},
+	})
+	metrics.recordSourceAccepted(&TrapEntry{
+		JobName:  jobName,
+		SourceIP: "192.0.2.11",
+		Enrichment: &TrapEnrichmentAudit{Source: &TrapSourceAudit{
+			Selected: "192.0.2.11",
+			Method:   "udp_peer",
+		}},
+	})
+	metrics.recordSourceAccepted(&TrapEntry{
+		JobName:        jobName,
+		SourceIP:       "192.0.2.11",
+		SourceVnodeID:  "vnode-transition",
+		DeviceHostname: "switch-transition",
+		Enrichment: &TrapEnrichmentAudit{Source: &TrapSourceAudit{
+			Selected: "192.0.2.11",
+			Method:   "udp_peer",
+		}},
+	})
+
+	store := collectJobMetricsForTest(t, jobName)
+	labels := metrix.Labels{"job_name": jobName}
+	for name, expected := range map[string]float64{
+		"snmp_trap_pipeline_accepted":                     4,
+		"snmp_trap_sources_active":                        3,
+		"snmp_trap_source_attribution_failed":             1,
+		"snmp_trap_source_attribution_ambiguous":          1,
+		"snmp_trap_source_attribution_fallback":           2,
+		"snmp_trap_source_attribution_vnode":              1,
+		"snmp_trap_source_attribution_source_transitions": 1,
+	} {
+		if v, ok := store.Read().Value(name, labels); !ok || v != expected {
+			t.Fatalf("%s = %v/%v, want %v/true", name, v, ok, expected)
+		}
+	}
+}
+
+func TestCollectMetricsSourceCapAndLifecycle(t *testing.T) {
+	const jobName = "test-pipeline-source-cap"
+	metrics := withCleanJobMetrics(t, jobName)
+	for i := 0; i < defaultPipelineMetricMaxSources+1; i++ {
+		entry := &TrapEntry{
+			JobName:  jobName,
+			SourceIP: privateTestIP(i),
+		}
+		metrics.recordSourceAccepted(entry)
+	}
+
+	store := collectJobMetricsForTest(t, jobName)
+	labels := metrix.Labels{"job_name": jobName}
+	if v, ok := store.Read().Value("snmp_trap_sources_active", labels); !ok || v != defaultPipelineMetricMaxSources {
+		t.Fatalf("active sources = %v/%v, want %d/true", v, ok, defaultPipelineMetricMaxSources)
+	}
+	if v, ok := store.Read().Value("snmp_trap_source_attribution_overflow_dropped", labels); !ok || v != 1 {
+		t.Fatalf("source overflow = %v/%v, want 1/true", v, ok)
+	}
+
+	for i := 0; i < defaultPipelineMetricExpireAfterCycles; i++ {
+		store = collectJobMetricsForTest(t, jobName)
+	}
+	if v, ok := store.Read().Value("snmp_trap_sources_active", labels); !ok || v != 0 {
+		t.Fatalf("active sources after expiry = %v/%v, want 0/true", v, ok)
+	}
+}
+
+func TestCollectMetricsSourceErrorsAndDedup(t *testing.T) {
+	const jobName = "test-pipeline-source-errors"
+	metrics := withCleanJobMetrics(t, jobName)
+	entry := &TrapEntry{JobName: jobName, SourceIP: "192.0.2.10"}
+
+	metrics.recordSourceAccepted(entry)
+	metrics.recordSourceError(entry, "unknown_oid")
+	metrics.recordWriteFailure(entry, "journal_write_failed")
+	metrics.recordSourceDedupSuppressed(entry)
+
+	store := collectJobMetricsForTest(t, jobName)
+	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(entry)
+	sourceLabels := metrix.Labels{"job_name": jobName, "source_id": sourceID, "source_kind": sourceKind}
+	for name, expected := range map[string]float64{
+		"snmp_trap_source_errors_unknown_oid":          1,
+		"snmp_trap_source_errors_journal_write_failed": 1,
+		"snmp_trap_source_pipeline_write_failed":       1,
+		"snmp_trap_source_pipeline_dedup_suppressed":   1,
+	} {
+		if v, ok := store.Read().Value(name, sourceLabels); !ok || v != expected {
+			t.Fatalf("%s = %v/%v, want %v/true", name, v, ok, expected)
+		}
+	}
+	jobLabels := metrix.Labels{"job_name": jobName}
+	if v, ok := store.Read().Value("snmp_trap_pipeline_write_failed", jobLabels); !ok || v != 1 {
+		t.Fatalf("pipeline write_failed = %v/%v, want 1/true", v, ok)
+	}
+	if v, ok := store.Read().Value("snmp_trap_pipeline_dedup_suppressed", jobLabels); !ok || v != 1 {
+		t.Fatalf("pipeline dedup_suppressed = %v/%v, want 1/true", v, ok)
+	}
+}
+
+func TestCollectorCollectEmitsBuiltInAndProfileMetrics(t *testing.T) {
+	const jobName = "test-built-in-and-profile-metrics"
+	metrics := withCleanJobMetrics(t, jobName)
+	metrics.incEvent("security")
+
+	idx := testProfileMetricIndex(t)
+	rt := newTestProfileMetricRuntime(t, idx, profileMetricModeAuto, nil)
+	rt.update(ciscoConfigTrapEntry(jobName))
+
+	store := metrix.NewCollectorStore()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	if !ok {
+		t.Fatal("collector store does not expose cycle control")
+	}
+
+	c := &Collector{
+		jobName:        jobName,
+		listener:       &Listener{},
+		trapWriter:     &mockTrapWriter{},
+		metrics:        metrics,
+		profileMetrics: rt,
+		store:          store,
+	}
+
+	managed.CycleController().BeginCycle()
+	if err := c.collect(context.Background()); err != nil {
+		t.Fatalf("collect failed: %v", err)
+	}
+	if err := managed.CycleController().CommitCycleSuccess(); err != nil {
+		t.Fatalf("commit collect cycle: %v", err)
+	}
+
+	jobLabels := metrix.Labels{"job_name": jobName}
+	if v, ok := store.Read().Value("snmp_trap_events_security", jobLabels); !ok || v != 1 {
+		t.Fatalf("snmp_trap_events_security = %v/%v, want 1/true", v, ok)
+	}
+
+	profileLabels := metrix.Labels{"job_name": jobName, "source_id": "192.0.2.10", "source_kind": "udp_peer"}
+	if v, ok := store.Read().Value("snmp_trap_cisco_config_events", profileLabels); !ok || v != 1 {
+		t.Fatalf("snmp_trap_cisco_config_events = %v/%v, want 1/true", v, ok)
+	}
+}
+
 func TestCollectorCollectPublishesBinaryEncodedMetric(t *testing.T) {
 	const jobName = "test-binary-encoded"
 	withCleanJobMetrics(t, jobName)
@@ -1459,10 +1796,10 @@ listen:
 		}
 	})
 
-	t.Run("implemented per-OID metrics", func(t *testing.T) {
-		err := validateDeferredConfig(Config{Metrics: []MetricConfig{{OID: "1.3.6.1.4.1.9.0.1", Context: "snmp.trap.test"}}})
+	t.Run("deferred validator permits implemented profile metrics", func(t *testing.T) {
+		err := validateDeferredConfig(Config{ProfileMetrics: ProfileMetricsConfig{Enabled: true, Mode: profileMetricModeAuto}})
 		if err != nil {
-			t.Fatalf("metrics should no longer be rejected as deferred: %v", err)
+			t.Fatalf("profile metrics should no longer be rejected as deferred: %v", err)
 		}
 	})
 }

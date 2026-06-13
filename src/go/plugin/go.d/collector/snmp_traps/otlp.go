@@ -65,6 +65,7 @@ type otlpTrapWriter struct {
 	batchSize      int
 	jobName        string
 	metrics        *perJobMetrics
+	terminalErrors bool
 
 	mu       sync.Mutex
 	closed   bool
@@ -80,10 +81,10 @@ func newOTLPTrapWriter(ctx context.Context, jobName string, cfg OTLPConfig, metr
 	if err != nil {
 		return nil, err
 	}
-	return newOTLPTrapWriterWithRuntimeConfig(ctx, jobName, runtimeCfg, metrics)
+	return newOTLPTrapWriterWithRuntimeConfig(ctx, jobName, runtimeCfg, metrics, true)
 }
 
-func newOTLPTrapWriterWithRuntimeConfig(ctx context.Context, jobName string, runtimeCfg otlpRuntimeConfig, metrics *perJobMetrics) (*otlpTrapWriter, error) {
+func newOTLPTrapWriterWithRuntimeConfig(ctx context.Context, jobName string, runtimeCfg otlpRuntimeConfig, metrics *perJobMetrics, terminalErrors bool) (*otlpTrapWriter, error) {
 	conn, client, err := newOTLPClient(ctx, runtimeCfg)
 	if err != nil {
 		return nil, err
@@ -102,6 +103,7 @@ func newOTLPTrapWriterWithRuntimeConfig(ctx context.Context, jobName string, run
 		batchSize:      runtimeCfg.batchSize,
 		jobName:        jobName,
 		metrics:        metrics,
+		terminalErrors: terminalErrors,
 	}
 	go w.worker()
 	return w, nil
@@ -334,12 +336,20 @@ func otlpExport(ctx context.Context, client collogpb.LogsServiceClient, headers 
 }
 
 func (w *otlpTrapWriter) worker() {
+	batch := make([]*TrapEntry, 0, w.batchSize)
+	reportedFailed := 0
+	var activeReplyCh chan error
+
 	defer func() {
 		if v := recover(); v != nil {
-			w.setClosedWithError(fmt.Errorf("SNMP trap OTLP writer panic: %v", v))
-			w.incOTLPExportFailed(1)
+			err := fmt.Errorf("SNMP trap OTLP writer panic: %v", v)
+			w.setClosedWithError(err)
+			w.accountWorkerPanicFailures(batch, reportedFailed)
 			if w.conn != nil {
 				_ = w.conn.Close()
+			}
+			if activeReplyCh != nil {
+				activeReplyCh <- err
 			}
 		}
 		close(w.doneCh)
@@ -348,8 +358,6 @@ func (w *otlpTrapWriter) worker() {
 	ticker := time.NewTicker(w.flushInterval)
 	defer ticker.Stop()
 
-	batch := make([]*TrapEntry, 0, w.batchSize)
-	reportedFailed := 0
 	for {
 		queueCh := w.queue
 		if len(batch) >= w.batchSize {
@@ -367,18 +375,22 @@ func (w *otlpTrapWriter) worker() {
 			_ = w.exportPending(&batch, &reportedFailed)
 
 		case replyCh := <-w.flushCh:
+			activeReplyCh = replyCh
 			err := w.drainQueue(&batch, &reportedFailed)
 			if exportErr := w.exportPending(&batch, &reportedFailed); err == nil {
 				err = exportErr
 			}
 			replyCh <- err
+			activeReplyCh = nil
 
 		case replyCh := <-w.closeCh:
+			activeReplyCh = replyCh
 			err := w.drainQueue(&batch, &reportedFailed)
 			if exportErr := w.exportPending(&batch, &reportedFailed); err == nil {
 				err = exportErr
 			}
 			replyCh <- err
+			activeReplyCh = nil
 			return
 		}
 	}
@@ -448,17 +460,25 @@ func (w *otlpTrapWriter) Close() error {
 }
 
 func (w *otlpTrapWriter) drainQueue(batch *[]*TrapEntry, reportedFailed *int) error {
+	var firstErr error
 	for {
 		select {
 		case entry := <-w.queue:
 			*batch = append(*batch, entry)
 			if len(*batch) >= w.batchSize {
 				if err := w.exportPending(batch, reportedFailed); err != nil {
-					return err
+					if firstErr == nil {
+						firstErr = err
+					}
+					// During explicit flush/close drains, every queued entry must
+					// be accounted for. Keep draining in bounded chunks after a
+					// failed export instead of carrying an oversized failed batch.
+					*batch = (*batch)[:0]
+					*reportedFailed = 0
 				}
 			}
 		default:
-			return nil
+			return firstErr
 		}
 	}
 }
@@ -469,12 +489,12 @@ func (w *otlpTrapWriter) exportPending(batch *[]*TrapEntry, reportedFailed *int)
 	}
 	req, err := buildOTLPExportRequest(w.jobName, *batch)
 	if err != nil {
-		w.incNewOTLPExportFailures(len(*batch), reportedFailed)
+		w.incNewOTLPExportFailures(*batch, reportedFailed)
 		w.setLastErr(err)
 		return err
 	}
 	if err := otlpExport(context.Background(), w.client, w.headers, w.requestTimeout, req); err != nil {
-		w.incNewOTLPExportFailures(len(*batch), reportedFailed)
+		w.incNewOTLPExportFailures(*batch, reportedFailed)
 		w.setLastErr(err)
 		return err
 	}
@@ -483,12 +503,41 @@ func (w *otlpTrapWriter) exportPending(batch *[]*TrapEntry, reportedFailed *int)
 	return nil
 }
 
-func (w *otlpTrapWriter) incNewOTLPExportFailures(batchLen int, reportedFailed *int) {
-	if batchLen <= *reportedFailed {
+func (w *otlpTrapWriter) incNewOTLPExportFailures(batch []*TrapEntry, reportedFailed *int) {
+	if len(batch) <= *reportedFailed {
 		return
 	}
-	w.incOTLPExportFailed(uint64(batchLen - *reportedFailed))
-	*reportedFailed = batchLen
+	w.incOTLPExportFailed(uint64(len(batch) - *reportedFailed))
+	if w.metrics != nil {
+		for _, entry := range batch[*reportedFailed:] {
+			if w.terminalErrors {
+				w.metrics.recordWriteFailure(entry, "otlp_export_failed")
+			} else {
+				w.metrics.recordSourceError(entry, "otlp_export_failed")
+			}
+		}
+	}
+	*reportedFailed = len(batch)
+}
+
+func (w *otlpTrapWriter) accountWorkerPanicFailures(batch []*TrapEntry, reportedFailed int) {
+	if reportedFailed < 0 {
+		reportedFailed = 0
+	}
+	pending := make([]*TrapEntry, 0, len(batch)-min(reportedFailed, len(batch))+len(w.queue))
+	if reportedFailed < len(batch) {
+		pending = append(pending, batch[reportedFailed:]...)
+	}
+	for {
+		select {
+		case entry := <-w.queue:
+			pending = append(pending, entry)
+		default:
+			reported := 0
+			w.incNewOTLPExportFailures(pending, &reported)
+			return
+		}
+	}
 }
 
 func (w *otlpTrapWriter) incOTLPExportFailed(n uint64) {

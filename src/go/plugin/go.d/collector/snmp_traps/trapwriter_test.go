@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,6 +19,7 @@ type mockTrapWriter struct {
 	mu                  sync.Mutex
 	entries             []*TrapEntry
 	flushes             int
+	closeAttempts       int
 	closed              bool
 	err                 error
 	binaryEncodedFields uint64
@@ -52,10 +54,11 @@ func (m *mockTrapWriter) BinaryEncodedFields() uint64 {
 func (m *mockTrapWriter) Close() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.closeAttempts++
+	m.closed = true
 	if m.err != nil {
 		return m.err
 	}
-	m.closed = true
 	return nil
 }
 
@@ -65,11 +68,81 @@ func TestFanoutTrapWriterSecondaryFailureDoesNotFailPrimaryWrite(t *testing.T) {
 	metrics := &perJobMetrics{}
 	writer := newFanoutTrapWriter(primary, secondary, metrics)
 
-	err := writer.Write(&TrapEntry{JobName: "local", Message: "trap"})
+	entry := testFanoutTrapEntry()
+	err := writer.Write(entry)
 	require.NoError(t, err)
 	assert.Len(t, primary.entries, 1)
 	assert.Len(t, secondary.entries, 0)
 	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
+	assert.Equal(t, uint64(0), metrics.pipeline.writeFailed.Load())
+
+	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(entry)
+	store := metrix.NewCollectorStore()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	require.True(t, ok)
+	managed.CycleController().BeginCycle()
+	collectSourceMetrics(store, "local", metrics)
+	require.NoError(t, managed.CycleController().CommitCycleSuccess())
+	labels := metrix.Labels{"job_name": "local", "source_id": sourceID, "source_kind": sourceKind}
+	if v, ok := store.Read().Value("snmp_trap_source_pipeline_write_failed", labels); !ok || v != 0 {
+		t.Fatalf("snmp_trap_source_pipeline_write_failed = %v/%v, want 0/true", v, ok)
+	}
+	if v, ok := store.Read().Value("snmp_trap_source_errors_otlp_export_failed", labels); !ok || v != 1 {
+		t.Fatalf("snmp_trap_source_errors_otlp_export_failed = %v/%v, want 1/true", v, ok)
+	}
+}
+
+func TestFanoutTrapWriterBothWriteFailuresRecordOneTerminalPipelineFailure(t *testing.T) {
+	primaryErr := errors.New("primary failed")
+	primary := &mockTrapWriter{err: primaryErr}
+	secondary := &mockTrapWriter{err: errQueueFull}
+	metrics := &perJobMetrics{}
+	writer := newFanoutTrapWriter(primary, secondary, metrics)
+
+	entry := testFanoutTrapEntry()
+	err := writer.Write(entry)
+	require.ErrorIs(t, err, primaryErr)
+	assert.Len(t, primary.entries, 0)
+	assert.Len(t, secondary.entries, 0)
+	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
+	assert.Equal(t, uint64(0), metrics.pipeline.writeFailed.Load())
+
+	metrics.recordWriteFailure(entry, trapWriteFailureJournal)
+	assert.Equal(t, uint64(1), metrics.pipeline.writeFailed.Load())
+
+	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(entry)
+	store := metrix.NewCollectorStore()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	require.True(t, ok)
+	managed.CycleController().BeginCycle()
+	collectPipeline(store, "local", metrics)
+	collectSourceMetrics(store, "local", metrics)
+	require.NoError(t, managed.CycleController().CommitCycleSuccess())
+
+	jobLabels := metrix.Labels{"job_name": "local"}
+	if v, ok := store.Read().Value("snmp_trap_pipeline_write_failed", jobLabels); !ok || v != 1 {
+		t.Fatalf("snmp_trap_pipeline_write_failed = %v/%v, want 1/true", v, ok)
+	}
+	labels := metrix.Labels{"job_name": "local", "source_id": sourceID, "source_kind": sourceKind}
+	for metric, expected := range map[string]float64{
+		"snmp_trap_source_pipeline_write_failed":       1,
+		"snmp_trap_source_errors_journal_write_failed": 1,
+		"snmp_trap_source_errors_otlp_export_failed":   1,
+	} {
+		if v, ok := store.Read().Value(metric, labels); !ok || v != expected {
+			t.Fatalf("%s = %v/%v, want %v/true", metric, v, ok, expected)
+		}
+	}
+}
+
+func testFanoutTrapEntry() *TrapEntry {
+	return &TrapEntry{
+		JobName:       "local",
+		Message:       "trap",
+		SourceIP:      "192.0.2.10",
+		SourceUDPPeer: "192.0.2.10",
+		Enrichment:    &TrapEnrichmentAudit{Source: &TrapSourceAudit{Selected: "192.0.2.10", Method: "udp_peer"}},
+	}
 }
 
 func TestFanoutTrapWriterPrimaryFailureStillAttemptsSecondaryWrite(t *testing.T) {
@@ -96,7 +169,7 @@ func TestFanoutTrapWriterSecondaryFlushFailureReturnsErrorAfterPrimaryFlush(t *t
 	err := writer.Flush()
 	require.ErrorIs(t, err, secondaryErr)
 	assert.Equal(t, 1, primary.flushes)
-	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
+	assert.Equal(t, uint64(0), metrics.errors.otlpExportFailed.Load())
 }
 
 func TestFanoutTrapWriterSecondaryCloseFailureReturnsErrorAfterPrimaryClose(t *testing.T) {
@@ -109,8 +182,10 @@ func TestFanoutTrapWriterSecondaryCloseFailureReturnsErrorAfterPrimaryClose(t *t
 	err := writer.Close()
 	require.ErrorIs(t, err, secondaryErr)
 	assert.True(t, primary.closed)
-	assert.False(t, secondary.closed)
-	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
+	assert.True(t, secondary.closed)
+	assert.Equal(t, 1, primary.closeAttempts)
+	assert.Equal(t, 1, secondary.closeAttempts)
+	assert.Equal(t, uint64(0), metrics.errors.otlpExportFailed.Load())
 }
 
 func TestFanoutTrapWriterCloseReturnsPrimaryAndSecondaryErrors(t *testing.T) {
@@ -124,7 +199,7 @@ func TestFanoutTrapWriterCloseReturnsPrimaryAndSecondaryErrors(t *testing.T) {
 	err := writer.Close()
 	require.ErrorIs(t, err, primaryErr)
 	require.ErrorIs(t, err, secondaryErr)
-	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
+	assert.Equal(t, uint64(0), metrics.errors.otlpExportFailed.Load())
 }
 
 func TestFanoutTrapWriterForwardsBinaryEncodedFieldsFromPrimary(t *testing.T) {

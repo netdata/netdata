@@ -69,12 +69,6 @@ type ReverseDNSConfig struct {
 	Enabled bool `yaml:"enabled" json:"enabled"`
 }
 
-type MetricConfig struct {
-	OID                  string `yaml:"oid" json:"oid"`
-	Context              string `yaml:"context" json:"context"`
-	DimensionFromVarbind string `yaml:"dimension_from_varbind,omitempty" json:"dimension_from_varbind"`
-}
-
 type Config struct {
 	Vnode              string               `yaml:"vnode,omitempty" json:"vnode"`
 	ReverseDNS         ReverseDNSConfig     `yaml:"reverse_dns,omitempty" json:"reverse_dns"`
@@ -95,7 +89,7 @@ type Config struct {
 	OTLP               OTLPConfig           `yaml:"otlp,omitempty" json:"otlp"`
 	Retention          jsonRetentionConfig  `yaml:"retention,omitempty" json:"retention"`
 	Overrides          []OverrideConfig     `yaml:"overrides,omitempty" json:"overrides"`
-	Metrics            []MetricConfig       `yaml:"metrics,omitempty" json:"metrics"`
+	ProfileMetrics     ProfileMetricsConfig `yaml:"profile_metrics,omitempty" json:"profile_metrics"`
 }
 
 type ListenConfig struct {
@@ -132,10 +126,26 @@ var (
 		"labels":   {allowAny: true},
 	}}
 
-	metricYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
-		"oid":                    {},
-		"context":                {},
-		"dimension_from_varbind": {},
+	profileMetricIdentityConfigYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"device":            {},
+		"unresolved_source": {},
+		"source_id_privacy": {},
+	}}
+
+	profileMetricLimitsConfigYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"max_rules":                {},
+		"max_sources":              {},
+		"max_resources_per_source": {},
+		"max_instances_per_job":    {},
+		"overflow":                 {},
+	}}
+
+	profileMetricsConfigYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"enabled":  {},
+		"mode":     {},
+		"include":  {},
+		"identity": profileMetricIdentityConfigYAMLSpec,
+		"limits":   profileMetricLimitsConfigYAMLSpec,
 	}}
 
 	configYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
@@ -167,7 +177,7 @@ var (
 		"otlp":                        {children: map[string]yamlKeySpec{"enabled": {}, "endpoint": {}, "headers": {allowAny: true}, "request_timeout": {}, "flush_interval": {}, "batch_size": {}, "queue_capacity": {}}},
 		"retention":                   {children: map[string]yamlKeySpec{"max_size": {}, "max_duration": {}, "rotation_size": {}, "rotation_duration": {}}},
 		"overrides":                   {elem: &overrideYAMLSpec},
-		"metrics":                     {elem: &metricYAMLSpec},
+		"profile_metrics":             profileMetricsConfigYAMLSpec,
 	}}
 )
 

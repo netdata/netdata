@@ -2,18 +2,23 @@
 
 ## Status
 
-- Status: Trap-to-metrics design draft with approved UX direction.
+- Status: Trap-to-metrics design with Implementation Phase A profile-defined
+  metrics and Implementation Phase B receiver/pipeline metrics implemented in
+  this branch. The Phase B external reviewer gate is in progress.
 - Design status: recommended design written; four external design review rounds
   and one follow-up UX review round incorporated. The user approved compact
   operator authoring syntax that expands to canonical form, while stock/generated
-  profiles use canonical form for reviewability. Implementation is blocked until
-  the user approves the compatibility and host-scope staging decisions.
+  profiles use canonical form for reviewability. The user approved long-term-best
+  compatibility handling: trap metrics have not shipped as a public contract, so
+  the old job-level trap `metrics:` list can be removed or renamed instead of
+  retained as a deprecated compatibility shim.
 - Review plan:
   - Phase 1: external gap analysis of the use-case inventory, completed and
     incorporated.
   - Phase 2: design proposal and external design review.
-  - These review phases are not product implementation phases. Full receiver
-    pipeline monitoring is a separate follow-up product phase.
+  - Implementation Phase A: profile-defined trap metrics.
+  - Implementation Phase B: receiver/pipeline metrics after Phase A passes the
+    requested external reviewer gate.
 
 ## Purpose
 
@@ -41,9 +46,9 @@ This spec intentionally does not define:
 - file-by-file implementation plan;
 - final default enablement policy for stock-generated metric rules;
 - UI or dashboard design.
-- a full receiver pipeline monitoring design. This spec preserves the source
-  identity, trap commitment, and continuous diagnostic contracts that the
-  receiver pipeline monitoring phase must reuse.
+- exact Go types for receiver/pipeline metrics. This spec defines the
+  product-level requirements those metrics must satisfy when implemented as
+  Phase B.
 
 ## Ground Rules
 
@@ -82,29 +87,37 @@ Evidence:
   through `:142` documents reduction keys, problem/resolution alarm types, and
   clear keys.
 
-## Current Implementation Baseline
+## Pre-Phase-A Implementation Baseline
 
-Facts from the current SNMP trap collector:
+Historical facts from the unreleased SNMP trap collector before Phase A
+replaced job-level operator metrics with profile-defined metrics:
 
-- Job-level operator metrics are configured as `oid`, `context`, and optional
+- Job-level operator metrics were configured as `oid`, `context`, and optional
   `dimension_from_varbind`.
-- The runtime increments counters when the trap OID matches.
-- The runtime does not extract numeric values from trap varbinds.
-- The runtime does not filter metrics by varbind predicates.
-- The runtime rejects duplicate configured OIDs, so one trap OID cannot emit
-  several independent metrics through the current job-level contract.
-- Existing static and operator-created metric instances are scoped by listener
-  job, not by source device.
-- Trap profile YAML currently has `extends`, `varbinds`, and `traps`, but no
-  profile-local metric section.
+- The old runtime incremented counters when the trap OID matched.
+- The old runtime did not extract numeric values from trap varbinds.
+- The old runtime did not filter metrics by varbind predicates.
+- The old runtime rejected duplicate configured OIDs, so one trap OID could not
+  emit several independent metrics through the job-level contract.
+- Existing static metric instances were scoped by listener job, not by source
+  device.
+- Trap profile YAML had `extends`, `varbinds`, and `traps`, but no profile-local
+  metric section.
 
 Evidence:
 
-- `src/go/plugin/go.d/collector/snmp_traps/config.go:72` through `:76`
-- `src/go/plugin/go.d/collector/snmp_traps/operator_metric.go:23` through `:55`
-- `src/go/plugin/go.d/collector/snmp_traps/operator_metric.go:192` through `:219`
-- `src/go/plugin/go.d/collector/snmp_traps/operator_metric.go:380` through `:420`
-- `src/go/plugin/go.d/collector/snmp_traps/profile.go:156` through `:164`
+- Pre-Phase-A `src/go/plugin/go.d/collector/snmp_traps/config.go:72` through
+  `:76`.
+- Pre-Phase-A `src/go/plugin/go.d/collector/snmp_traps/operator_metric.go:23`
+  through `:55` (file removed by Phase A).
+- Pre-Phase-A
+  `src/go/plugin/go.d/collector/snmp_traps/operator_metric.go:192` through
+  `:219` (file removed by Phase A).
+- Pre-Phase-A
+  `src/go/plugin/go.d/collector/snmp_traps/operator_metric.go:380` through
+  `:420` (file removed by Phase A).
+- Pre-Phase-A `src/go/plugin/go.d/collector/snmp_traps/profile.go:156`
+  through `:164`.
 
 ## Use Case 1: Per-Device Trap Activity
 
@@ -246,8 +259,8 @@ Evidence:
   through `:347` shows Arista CLB flow fields.
 - `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/juniper-networks-inc.yaml:4497`
   through `:4523` shows Juniper DFC hard memory fields.
-- `src/go/plugin/go.d/collector/snmp_traps/operator_metric.go:27` through `:41`
-  shows current job-level metrics reject duplicate OIDs.
+- Pre-Phase-A `src/go/plugin/go.d/collector/snmp_traps/operator_metric.go:27`
+  through `:41` shows the removed job-level metrics rejected duplicate OIDs.
 
 ## Use Case 5: Per-Resource Trap Metrics
 
@@ -669,10 +682,10 @@ Evidence:
 Scope disposition:
 
 - This use case is accepted as an important operator requirement.
-- Full support belongs to the separate receiver pipeline monitoring phase.
-- This trap-to-metrics design must still preserve source identity, trap
-  commitment, and continuous diagnostics so that the follow-up phase can report
-  pipeline health per source without changing the trap metric identity model.
+- Full support is Phase B of the implementation scope.
+- This trap-to-metrics design preserves source identity, trap commitment, and
+  continuous diagnostics so receiver/pipeline metrics can report health per
+  source without changing the trap metric identity model.
 
 Operator question:
 
@@ -749,9 +762,9 @@ This use-case inventory does not require the future design to support:
 - Set/clear state must support both separate problem/clear OIDs and same-OID
   condition varbinds.
 - Metric labels must not leak sensitive values or unbounded identifiers.
-- Full per-device receiver pipeline monitoring is a separate follow-up product
-  phase. This spec only requires the identity and continuous diagnostic hooks
-  needed by profile metric extraction and by that follow-up phase.
+- Full per-device receiver pipeline monitoring is Phase B of the implementation
+  scope. It MUST reuse the identity and continuous diagnostic hooks needed by
+  profile metric extraction.
 - Stock-generated metrics must not create surprising high cardinality by
   default.
 - Custom profiles must not require editing shipped stock files.
@@ -850,9 +863,10 @@ must not:
 - `identity.device: source` inside a profile rule means "use the job's
   configured source-device identity policy". It does not mean "use the raw
   sender address as a label".
-- `profile_metrics:` enables profile-defined metric rules. The existing
-  job-level `metrics:` key, when retained as a legacy shim, continues to define
-  per-job OID event counters only.
+- `profile_metrics:` enables profile-defined metric rules.
+- The existing job-level trap `metrics:` key is not retained as a compatibility
+  shim in the clean end state because SNMP traps have not shipped as a public
+  contract.
 
 Safe defaults:
 
@@ -878,11 +892,12 @@ Job-level `identity.unresolved_source` values:
 
 - `source_label`: emit device-attributable profile metrics under the receiver's
   default host scope with bounded `source_id` and `source_kind` labels.
-- `drop_metric_instance`: do not create a new profile metric instance when a new
-  unresolved source would exceed configured source/instance caps. Accepted traps
-  are still committed to the trap log/output backend, and the collector must
-  increment visible overflow/error counters. This is a cap-overflow behavior,
-  not the default behavior for an ordinary unknown sender.
+- `drop_metric_instance`: when `identity.device: source` cannot use vnode host
+  scope and would fall back to a source label, skip only the profile metric
+  instance. Accepted traps are still committed to the trap log/output backend,
+  and the collector increments `attribution_failed` diagnostics. Use this only
+  for strict deployments that prefer missing metrics over fallback-labelled
+  metrics.
 
 ### Enablement Policy
 
@@ -896,6 +911,8 @@ Job modes:
 - `exact`: enable only rule names listed in `profile_metrics.include`.
 - `combined`: enable `auto` rules plus rule names listed in
   `profile_metrics.include`.
+- `profile_metrics.include` is valid only with `mode: exact` or
+  `mode: combined`; it is rejected with `mode: none` or `mode: auto`.
 
 Rule defaults:
 
@@ -904,11 +921,9 @@ Rule defaults:
   `auto_safe: true`.
 - Operator profiles may set `enabled: false` to disable a merged rule from an
   `extends:` chain.
-- Operator profiles may set `auto_safe: true` only for operator-owned rules.
-- Rule origin is determined from the file source: stock profile directory versus
-  operator profile directory. An operator profile must not mark an inherited
-  stock rule `auto_safe: true`; validation rejects the override and names the
-  rule.
+- Operator profiles may set `auto_safe: true` for operator-owned rules. A rule
+  that replaces an inherited rule by the same `name` is an operator-owned full
+  replacement; the operator owns its `auto_safe` decision.
 - `combined` is intended for sites that want the curated stock baseline plus a
   small number of exact site rules. Operators who want only explicit site rules
   should use `exact`.
@@ -1045,8 +1060,8 @@ Canonical metric rule fields:
 
 Compact operator rules MAY omit `identity` and `output` when the normalized
 values can be derived deterministically. Validation must reject compact rules
-whose derived values collide with built-in metrics, legacy shim metrics, or
-other enabled profile-local rules.
+whose derived values collide with built-in metrics or other enabled
+profile-local rules.
 
 Type-specific selector fields:
 
@@ -1088,8 +1103,8 @@ Rule and chart names:
 - `output.metric` names should follow the existing collector metric naming style
   and must not collide with built-in `snmp_trap_*` metric names.
 - `output.metric` names must not collide with built-in metric names emitted by
-  the current collector, including event, severity, error, dedup, and legacy
-  shim metric names.
+  the current collector, including event, severity, error, and dedup metric
+  names.
 - `output.dimension` must match the chart-template dimension `name` that
   selects the rule's `output.metric`.
 - `charts.context` values use the chart context namespace and must start with
@@ -1405,6 +1420,17 @@ Recommended identity model:
   - Missing `SourceVnodeID` is not a reason to lose the trap.
   - Metric attribution failures must be visible through continuous receiver-owned
     diagnostics and `TRAP_ENRICHMENT` or equivalent log evidence.
+- Authoritative output semantics:
+  - When both journal and OTLP outputs are enabled, journal commitment is
+    authoritative. OTLP export failures are export errors and source-attributed
+    OTLP errors, not terminal pipeline write failures.
+  - When OTLP is the only output backend, OTLP export failures are terminal
+    output write failures.
+  - For one accepted trap, `pipeline.write_failed` increments at most once and
+    only when the authoritative output commit fails. Backend-specific
+    `source_errors` may still record more than one failure for the same trap,
+    for example `journal_write_failed` and `otlp_export_failed` when both
+    outputs fail.
 - Known source device:
   - Use existing trap enrichment to resolve `SourceVnodeID`.
   - Emit device-attributable trap metrics through V2 host scope for that vnode.
@@ -1428,7 +1454,9 @@ Recommended identity model:
   - Do not create or migrate vnode-scoped profile metrics from ambiguous vnode
     enrichment.
   - Ambiguity includes conflicting registry/topology identities for the same
-    trap source, or an original-source address supplied by an untrusted relay.
+    trap source, explicit `conflict` or `ambiguous` enrichment status,
+    `vnode_mismatch` or `ambiguous_source` reasons, rejected candidates, or an
+    original-source address supplied by an untrusted relay.
 - Listener-owned diagnostics required by this spec:
   - Keep listener/job scope when the error has no trustworthy source.
   - Add source identity only for errors that can be attributed to a source.
@@ -1436,11 +1464,43 @@ Recommended identity model:
     become sparse just because no trap arrived in a cycle.
 
 Existing built-in static charts such as trap events, severities, processing
-errors, and dedup suppression remain listener/job scoped unless a later design
-explicitly migrates them. Per-device trap activity in this spec is delivered by
-profile-defined device-attributable rules. Full per-source receiver pipeline
-health is deferred to the receiver pipeline monitoring phase, which must reuse
-the same source identity and trap-commitment model.
+errors, and dedup suppression are receiver/pipeline metrics. Phase B keeps
+listener-wide event, severity, error, and dedup totals job-scoped so receiver
+health remains visible for unattributable packets and global listener failures.
+It adds separate source-attributed receiver metrics for the signals that are
+safe and useful per source:
+
+- `snmp.trap.source_pipeline`: accepted, committed, dedup-suppressed, and
+  write-failed accepted traps by source.
+- `snmp.trap.source_errors`: unknown OID, unresolved template, profile load,
+  journal write, and OTLP export errors by source when the source is known.
+- `snmp.trap.source_last_seen`: source freshness.
+
+Phase B deliberately does not duplicate category and severity charts per source.
+Per-source category/severity would multiply the default 2000-source cap by many
+mostly-zero time series and duplicate the role of profile-defined semantic
+metrics. Operators that need per-device vendor semantics should define profile
+metric rules for those traps.
+
+Per-device trap activity from vendor semantics is delivered by profile-defined
+device-attributable rules. Receiver health and processing behavior are delivered
+by built-in receiver/pipeline metrics.
+
+Built-in receiver/pipeline metrics added in Phase B:
+
+- `snmp.trap.pipeline`: job-level packet and write pipeline progress.
+- `snmp.trap.sources`: active source identities retained for continuous
+  source-attributed metrics.
+- `snmp.trap.source_attribution`: job-level vnode/fallback/ambiguous/failed/
+  overflow/source-transition diagnostics.
+- `snmp.trap.source_pipeline`, `snmp.trap.source_errors`, and
+  `snmp.trap.source_last_seen`: bounded source-attributed receiver health.
+
+The source-attributed built-in metrics use the same source identity resolver as
+profile-defined metrics: vnode host scope when `SourceVnodeID` is available and
+bounded `source_id` / `source_kind` labels otherwise. Their source cap is 2000
+active sources per job, with inactive source identities expiring after 60
+successful collection cycles.
 
 Fallback source identity priority:
 
@@ -1455,6 +1515,10 @@ Required labels for fallback source metrics:
 - `job_name`
 - `source_id`
 - `source_kind`, for example `trusted_trap_address` or `udp_peer`
+- `source_kind` is a closed label set: `vnode`, `listener`,
+  `trusted_trap_address`, `udp_peer`, `entry_source`, `hostname_or_ip`,
+  `trap_varbind`, `topology_ifindex`, `source`, or `other`. Unknown future
+  enrichment methods map to `other`.
 
 `identity.source_id_privacy` controls fallback source label privacy. It accepts
 `raw` or `hash`; `hash` is the default when `source_label` is used.
@@ -1473,6 +1537,9 @@ privacy mode:
 - The salt source must be a persisted Agent-local identity with restart-stable
   lifetime. The implementation must document which Agent identity is used; the
   salt value itself must not be exposed as a metric label.
+- Phase A reads `/etc/machine-id`, then `/var/lib/dbus/machine-id`, then the
+  hostname, and finally uses a fixed last-resort string only when no stable
+  local identity is available.
 
 The design may later add an explicit opt-in mode for synthetic trap-source
 vnodes, but that must be an operator decision with caps. It is not the default.
@@ -1487,19 +1554,21 @@ Source identity transitions:
 - State entries created under unresolved fallback identity must not be migrated
   silently to the vnode identity. They are cleared/expired according to the
   rule's configured TTL and reload semantics.
-- The transition should increment a built-in diagnostic counter or log an
-  operator-visible message so chart discontinuity is explainable.
+- The transition increments `snmp_trap_profile_metrics_source_transitions` so
+  chart discontinuity is explainable.
+- The source-transition history is diagnostic memory and must be bounded. When
+  it exceeds the configured source cap, the oldest raw route entries are
+  pruned; losing old transition memory is acceptable, but unbounded growth is
+  not.
 
-Unresolved source eviction:
+Source cap behavior:
 
-- `max_sources` caps tracked unresolved sources per job.
-- When the cap is reached, the runtime evicts the least recently updated
-  inactive unresolved source when possible.
-- If no inactive source can be evicted, accepted traps are still committed, but
-  new profile metric instances for the over-cap source are skipped according to
-  `drop_metric_instance`.
-- Evictions and skipped metric instances increment built-in continuous receiver
-  counters.
+- `max_sources` caps tracked non-listener sources per job, including vnode and
+  fallback sources.
+- Accepted traps are still committed when source caps are full.
+- New profile metric instances for over-cap sources are skipped and counted.
+- Inactive sources release cap capacity when their profile metric chart
+  instances expire through chart lifecycle.
 - NAT, multi-homed devices, and relays that do not provide trusted original
   source identity can merge devices under one source address. Operators must use
   trusted relays or source-device enrichment to avoid that; the collector must
@@ -1510,7 +1579,10 @@ Identity to host-scope mapping:
 - When `SourceVnodeID` is known, use V2 host scope with
   `ScopeKey=SourceVnodeID` and `GUID=SourceVnodeID`.
 - Use the enriched device hostname as host-scope hostname when present.
-- Do not add `source_id` labels to vnode-scoped device metrics by default.
+- All profile metric series include `source_id` and `source_kind`, including
+  vnode-scoped series. This keeps one stable chart-template identity across
+  vnode and fallback source modes while V2 host scope remains the primary node
+  attribution.
 - When `SourceVnodeID` is absent, use the bounded fallback source identity under
   the receiver/default host scope.
 - When V2 host scopes are available and a source later resolves to
@@ -1550,9 +1622,14 @@ Required behavior:
   stale sample forever without an explicit profile rule or job default.
 - A missing varbind with `missing: drop` does not clear an existing active
   sample or state value. It only skips the update for the received trap and
-  increments the relevant rule-miss or extraction-failure counter.
+  increments the rule-miss counter.
+- A missing varbind with `missing: error` skips the update and increments the
+  extraction-failure counter.
 - New source/resource instances are created only after a matching accepted trap,
   unless a future approved inventory-seeding design adds pre-created instances.
+- Expired source/resource instances are removed. If the same identity appears
+  again after expiry, the next committed trap creates a fresh series; counter
+  charts may show a reset after idle expiry.
 - Source/resource cap overflow must skip only the new metric instance or bucket
   according to the configured overflow behavior. It must not drop the accepted
   trap from the trap log/output backend.
@@ -1565,11 +1642,13 @@ Resource identity is separate from arbitrary labels.
 
 Allowed resource keys:
 
-- bounded enum or small-range varbinds;
-- table indexes such as `ifIndex` when capped per source;
-- alarm IDs when capped per source;
-- peer, neighbor, pool, scope, or sensor identifiers only when the profile or
-  operator marks them as bounded resource keys and sets caps.
+- Implementation Phase A accepts only integer-like bounded varbind types for
+  `identity.resource.key_from_varbind`: `INTEGER`, `Integer32`, `Unsigned32`,
+  and `Gauge32`.
+- Table indexes such as `ifIndex` are valid when capped per source.
+- Future support for non-integer peer, neighbor, pool, scope, sensor, MAC, or
+  alarm identifiers requires an approved boundedness design, explicit caps, and
+  documentation before profile authors can use it.
 
 Rejected as default metric labels:
 
@@ -1578,12 +1657,15 @@ Rejected as default metric labels:
 - free-form strings;
 - descriptive text;
 - peer IPs and source IPs as arbitrary labels;
-- unbounded interface names or pool names.
+- unbounded interface names or pool names;
+- counter, time-value, string, address, payload-like, and other non-integer
+  resource-key varbinds.
 
 Each resource rule must define:
 
-- `class`: interface, peer, sensor, alarm, pool, l2_topology, or another stable
-  class name;
+- `class`: a stock resource class (`interface`, `peer`, `neighbor`, `sensor`,
+  `alarm`, `pool`, `l2_topology`, `component`) or a site-specific lowercase
+  class beginning with `site_`;
 - `key_from_varbind` or `key_from_enrichment`;
 - `max_per_source`;
 - a job-level total cap also applies across all sources;
@@ -1595,7 +1677,7 @@ Cardinality contract:
 | Cap | Scope | Required behavior |
 |---|---|---|
 | `profile_metrics.limits.max_rules` | job | Maximum enabled metric rules evaluated for the job. Validation fails when the selected `auto`/`exact`/`combined` set exceeds it. |
-| `profile_metrics.limits.max_sources` | job | Maximum unresolved fallback sources tracked by the job. Vnode-scoped known devices do not consume fallback source slots. |
+| `profile_metrics.limits.max_sources` | job | Maximum non-listener source identities tracked by the job, including vnode and fallback sources. |
 | `profile_metrics.limits.max_resources_per_source` | job | Upper bound for resources tracked per source across all enabled rules. |
 | `identity.resource.max_per_source` | rule | Rule-local upper bound for resources of that class per source. |
 | `charts.lifecycle.max_instances` | chart | Upper bound for chart instances created by that chart. |
@@ -1642,23 +1724,15 @@ Stock class validation failures are hard errors. Operator class names must match
 a documented lowercase identifier pattern and include a site-specific prefix, for
 example `site_foo_sensor`.
 
-Overflow behavior:
+Overflow behavior in Implementation Phase A:
 
 - `drop_and_count`: drop new source/resource instances beyond the cap and
   increment a built-in overflow counter.
-- `bucket_and_count`: emit into a bounded `_overflow` bucket and increment a
-  built-in overflow counter. The overflow bucket is one bucket per
-  source/rule/resource class, not one bucket per rejected raw value. The bucket
-  must expose the `resource.class` value but must not expose dropped raw keys as
-  metric labels.
-- `error`: validation-only policy. It fails job validation when the effective
-  job caps are lower than the rule's declared safe minimum. It is not a runtime
-  overflow action. If a runtime cap is still reached, the collector must drop the
-  sample, increment a built-in overflow/error counter, and emit a rate-limited
-  error instead of stopping the job.
-
-Each rule gets its own `_overflow` bucket within its resource class. Job-level
-caps are enforced across all rules and overflow buckets combined.
+- `bucket_and_count` is not exposed in Phase A. It is a possible future
+  extension only after the overflow bucket identity and chart UX are designed
+  and tested.
+- `error` is not exposed in Phase A. Runtime cap exhaustion must not stop the
+  receiver job or drop accepted traps.
 
 Dropped raw resource keys may be logged at debug level for troubleshooting, but
 they must not be promoted to labels or durable public artifacts.
@@ -1690,6 +1764,8 @@ Allowed predicate inputs:
 Predicate semantics:
 
 - Multiple predicates are ANDed.
+- Each predicate must include at least one condition operator: `equals`, `in`,
+  `exists`, `absent`, `greater_than`, `less_than`, or `range`.
 - A missing varbind in `where` makes the predicate false and the rule does not
   match.
 - `exists: true` matches when the referenced varbind is present in the received
@@ -1721,16 +1797,15 @@ Predicate semantics:
 Missing-varbind behavior must be explicit per rule:
 
 - `drop`: do not emit the metric and increment a rule-miss counter;
-- `zero`: emit zero only for state rules where zero is semantically correct;
+- `zero`: emit zero only for sample rules that explicitly declare absence means
+  numeric zero;
 - `unknown_dimension`: allowed only for bounded dimensions and capped;
 - `error`: profile validation or runtime error depending on whether the varbind
   is statically impossible or just absent from a received trap.
-- `zero` is invalid for `sample` rules unless the rule explicitly declares that
-  absence means numeric zero.
+- `zero` is invalid for `counter` and `state` rules. State rules must use
+  explicit set/clear predicates or trap pairs.
 - The default missing behavior for state rules is `drop`, which leaves state
   unchanged.
-- For state rules, `zero` is allowed only when the rule explicitly declares that
-  a missing condition varbind means the clear state.
 
 Sample validation:
 
@@ -1744,18 +1819,15 @@ Sample validation:
   `Counter32` and `Counter64` trap-carried values may be sampled only as
   absolute snapshots. Derived counter rates from sporadic trap arrivals are a
   deferred feature.
-- `TimeTicks` samples must be converted to seconds by dividing the raw value by
-  100 only when the profile/MIB metadata confirms the object is elapsed time;
-  otherwise validation must reject the sample rule.
+- `TimeTicks` samples are converted to seconds by dividing the raw value by
+  100 before profile `scale` is applied.
 - Runtime ASN.1 values that do not match the profile numeric type are dropped
   and counted.
 - `scale.divisor` must be greater than zero.
 - The default `missing` behavior for `sample` rules is `drop`.
-- `scale` is declarative. The preferred implementation stores the raw numeric
-  value and applies scale through chart-template dimension options. If the
-  framework cannot represent the required scale, pre-scaled storage is allowed
-  only when the emitted metric name, units, and tests make the scaled semantics
-  explicit.
+- Implementation Phase A applies `scale` before metric emission. Profile
+  authors must set `output.metric` names, chart titles, and units so the scaled
+  semantics are explicit to operators.
 
 ### Chart Generation
 
@@ -1797,9 +1869,13 @@ Chart conflict rules:
   `title`, `family`, `units`, `algorithm`, chart type, and dimension names are
   compatible.
 - Two rules that reference one chart must produce unique dimension names.
+- Two rules that reference one chart must have the same label shape. A chart
+  must not mix resource and non-resource rules, and a resource chart must not
+  mix multiple `identity.resource.class` values.
 - Built-in static chart contexts and IDs are reserved; profile-local charts must
-  not reuse `events`, `severity`, `errors`, or `dedup_suppressed`, nor their
-  effective `snmp.trap.*` contexts.
+  not reuse `events`, `severity`, `errors`, `dedup_suppressed`, or
+  `profile_metric_diagnostics`, nor their effective contexts such as
+  `snmp.trap.profile_metric_diagnostics`.
 - Conflicts must fail profile validation before chartengine planning.
 
 Lifecycle:
@@ -1807,7 +1883,9 @@ Lifecycle:
 - Charts that can create per-source or per-resource instances must declare
   `lifecycle.max_instances` and `lifecycle.expire_after_cycles`.
 - `expire_after_cycles` is measured in the periodic go.d `Collect()` cycle for
-  the trap listener job. It is not measured by trap receive goroutines.
+  the trap listener job. It is not measured by trap receive goroutines. Changing
+  the listener `update_every` changes the wall-clock lifetime represented by the
+  same cycle count.
 - Job-level `profile_metrics.limits.max_instances_per_job` is an additional cap
   across all profile metric charts for the job.
 - State TTL sweep runs at the start of each periodic `Collect()` cycle, not in a
@@ -1851,6 +1929,12 @@ Required behavior:
 - The implementation may satisfy this by eagerly loading metric sections, by
   shipping a generated stock metric-rule catalog, or by loading selected stock
   profiles during `Check()`.
+- The Phase A implementation keeps operator profiles eager. Stock profiles stay
+  lazy only when the loaded profile set has no metric rules and no job enables
+  `profile_metrics`. If custom profile metric rules exist, or if a job enables
+  `profile_metrics`, stock profiles are loaded before rule selection so stock
+  metric rules and custom operator metric rules that reference stock trap names
+  validate before trap arrival.
 - The chosen implementation must preserve the existing lazy decode behavior for
   jobs that do not enable profile metrics.
 - The implementation must measure the metric catalog memory footprint when stock
@@ -1890,7 +1974,7 @@ design explicitly changes it:
 - Decode and render the trap entry.
 - Apply dedup admission.
 - Do not emit profile metrics for dedup-suppressed traps.
-- Write the trap entry to the configured output backend.
+- Write the trap entry to the authoritative output backend.
 - Do not emit profile metrics when the write fails.
 - Then update profile-defined metrics and built-in static metrics.
 
@@ -1901,12 +1985,12 @@ Evidence:
 - `src/go/plugin/go.d/collector/snmp_traps/collector.go:645` through `:650`
   returns early for write failures.
 - `src/go/plugin/go.d/collector/snmp_traps/collector.go:653` through `:662`
-  updates operator, event, and severity metrics after successful write.
-- `src/go/plugin/go.d/collector/snmp_traps/operator_metric_test.go:818`
-  through `:831` verifies no operator metric is emitted for write failures.
-- `src/go/plugin/go.d/collector/snmp_traps/operator_metric_test.go:962`
-  through `:985` verifies dedup-suppressed traps do not increment operator
-  metrics.
+  updates profile, event, and severity metrics after successful write.
+- Phase A profile metric tests verify no profile metric is emitted for write
+  failures and dedup-suppressed traps. Pre-Phase-A
+  `src/go/plugin/go.d/collector/snmp_traps/operator_metric_test.go:818`
+  through `:831` and `:962` through `:985` covered the removed job-level
+  operator metric runtime.
 
 ### Merge And Override Semantics
 
@@ -1933,56 +2017,35 @@ Trap profile merge behavior should extend the existing `extends:` model:
 
 Same-filename replacement remains available for full vendor-profile replacement:
 an operator file with the same filename as a stock profile replaces the stock
-file in full. Normal customization should use `extends:` plus metric overrides,
-because same-filename replacement discards all stock decode and metric content
-unless the operator file redefines it.
+file in full. Normal customization should use either a small metric-only site
+profile that references stock traps by MIB-qualified trap name, or `extends:`
+when the operator needs to merge/override trap decode metadata too. Same-filename
+replacement discards all stock decode and metric content unless the operator file
+redefines it.
 
 Operator profiles that need to add metrics for traps from several stock files
-should either:
-
-- create one small override profile per stock base and use `extends:`; or
-- use a future global-index reference mode, if it is designed and approved.
-
-The initial design recommends the first option because it keeps trap and varbind
-resolution inside the explicit `extends:` chain.
+can use one metric-only site profile that references those stock traps by
+MIB-qualified trap name. If the metric needs varbind validation, resource keys,
+or sample extraction, the referenced stock trap definition must already define
+the needed varbind metadata.
 
 ### Compatibility With Current Job-Level Metrics
 
 The current job-level `metrics:` list is too limited for the target design.
 
-Recommended migration:
+Approved clean end state:
 
-- Recommendation: treat the current job-level `metrics:` list as public unless
-  proven otherwise, and keep it as a deprecated compatibility shim for OID event
-  counters only.
-- Long-term-best cleanup: remove or rename the job-level list before release
-  only if maintainers confirm it has not shipped as a public contract.
-- The shim must internally compile each legacy entry into an equivalent
-  `counter` rule under a reserved inline pseudo-profile.
-- The shim must preserve current legacy semantics by default: per-job chart
-  identity and current legacy context behavior. It must not silently migrate
-  existing job-level `metrics:` entries to per-device or vnode-scoped charts.
-- Operators who want per-device behavior must migrate from job-level `metrics:`
-  to profile-local `metrics:` rules.
-- The shim must not gain filters, numeric samples, state, or chart grouping.
+- SNMP traps have been merged but not released with end-user documentation, so
+  the old job-level trap `metrics:` list is not treated as a public compatibility
+  contract.
+- The implementation should remove or rename the job-level trap `metrics:` list
+  as needed for the long-term-best configuration model.
+- Profile-local `metrics:` and `charts:` are the only supported trap metric
+  authoring surface.
 - New capabilities belong only in profile-local `metrics:`.
-- Documentation and release notes must state the migration path from job-level
-  OID counters to profile-local rules.
-- Legacy contexts and metric names must not collide with profile-generated chart
-  contexts or metric names. Validation must fail with a migration message if an
-  enabled legacy shim entry and an enabled profile rule would emit the same
-  metric name or chart context.
-- The same trap OID may appear in both a legacy shim entry and a profile-local
-  rule only when their emitted metric names and chart contexts are distinct.
-  This supports staged migration but should produce a deprecation warning.
-- During migration, operators may temporarily see both a legacy per-job counter
-  and a profile-local per-device metric for the same trap OID. Documentation must
-  explain that these answer different questions and advise disabling the legacy
-  entry after migration.
-- Invalid legacy shim entries must fail job validation with an error identifying
-  the entry and validation failure.
-
-This is a user-owned compatibility decision before implementation.
+- Documentation must not teach the obsolete job-level `metrics:` list.
+- Tests that only assert the obsolete per-job trap metric authoring path should
+  be removed or rewritten to validate the profile-local model.
 
 ### Stock Profile Generation Contract
 
@@ -2070,10 +2133,9 @@ Profile validation must reject:
   approved bounded enum or boolean representation;
 - `value_from_varbind` targeting known sensitive varbinds;
 - `output.metric` values that collide with built-in metrics emitted by
-  `metrics.go` or the reserved legacy shim namespace;
+  `metrics.go`;
 - `output.dimension` values that do not match the chart dimension name selecting
-  the rule's `output.metric`;
-- operator-profile attempts to set `auto_safe: true` on inherited stock rules.
+  the rule's `output.metric`.
 
 Reserved metric name prefixes:
 
@@ -2081,7 +2143,16 @@ Reserved metric name prefixes:
 - `snmp_trap_severity_`
 - `snmp_trap_errors_`
 - `snmp_trap_dedup_`
+- `snmp_trap_pipeline_`
+- `snmp_trap_source_`
+- `snmp_trap_sources_`
 - `snmp_trap_metric_`
+- `snmp_trap_profile_metrics_`
+
+Profile-local rules must not recreate built-in receiver pipeline/source health.
+Use profile metrics for vendor or site semantics; built-in receiver metrics
+cover pipeline progress, source attribution, source errors, and source
+freshness.
 
 The first implementation step that accepts profile-local metrics must:
 
@@ -2123,8 +2194,6 @@ Required updates:
 - `src/go/plugin/go.d/collector/snmp_traps/config_schema.json`
 - `src/go/plugin/go.d/collector/snmp_traps/metadata.yaml`
 - generated integration documentation for the SNMP trap listener
-- release notes or migration notes for legacy job-level `metrics:`, if that
-  public contract is retained as a deprecated shim
 - health alert templates under `src/health/health.d/snmp_traps.conf` when chart
   contexts, label identity, or vnode scoping changes affect alert matching or
   alert text
@@ -2157,27 +2226,44 @@ generated profile YAML uses canonical syntax only.
 | Routing/HA adjacency state | Resource-scoped counters/state with explicit caps for peers/neighbors/groups. |
 | Capacity/pool/utilization thresholds | Sample plus threshold metrics and optional clear-state rules. |
 | L2 topology/neighbor counters | Counter/sample rules only; no topology mutation. |
-| Receiver pipeline health | Deferred to the receiver pipeline monitoring phase; this spec supplies the source identity policy, trap commitment rule, and continuous extraction diagnostics that phase must reuse. |
+| Receiver pipeline health | Phase B built-in receiver metrics using the same source identity policy, trap commitment rule, and continuous extraction diagnostics as profile metrics. |
 
-### Receiver Pipeline Monitoring Follow-Up
+### Receiver Pipeline Metrics Phase
 
-Full receiver pipeline health coverage is not a prerequisite for the
-trap-to-metrics implementation. It belongs to a separate receiver pipeline
-monitoring phase.
+Full receiver pipeline health coverage is Phase B of the implementation, after
+profile-defined trap metrics pass the external reviewer gate.
 
-The follow-up phase should cover receiver-owned signals such as raw receive
-rate, accepted/committed rate, drop/error stages, unknown OID/MIB gaps, SNMPv3
-USM breakdown, INFORM outcomes, dedup/throttle suppression, source cardinality,
-top talkers, per-source last-seen/silence, and OS receive-buffer evidence where
-it can be collected safely.
+Phase B SHOULD cover receiver-owned signals such as raw receive rate,
+accepted/committed rate, drop/error stages, unknown OID/MIB gaps, SNMPv3 USM
+breakdown, INFORM outcomes, dedup/throttle suppression, source cardinality, top
+talkers, per-source last-seen/silence, and OS receive-buffer evidence where it
+can be collected safely.
 
-The trap-to-metrics implementation must still preserve enough common contract
-for that phase:
+The trap-to-metrics implementation MUST preserve the common contract required by
+both phases:
 
 - source identity and vnode/fallback attribution;
 - accepted trap commitment before metric attribution;
 - continuous extraction diagnostics for attribution failures, ambiguity, rule
-  misses, extraction failures, cap overflows, and source fallback transitions.
+  misses, extraction failures, cap overflows, and source route transitions.
+
+Receiver/pipeline metrics MUST NOT silently drop accepted traps when enrichment,
+profile matching, source attribution, or metric extraction fails. Those failures
+are metrics and log evidence, not reasons to discard the trap.
+
+Receiver/pipeline metrics MUST emit continuously. Source-attributable instances
+MUST remain bounded by explicit caps and lifecycle rules; receiver-level totals
+MUST remain available for unattributable errors and global listener state.
+Job-level pipeline totals MAY be greater than the sum of per-source metrics when
+a packet has no trustworthy source, attribution fails, or the source cap is full.
+
+Implementation note:
+
+- Phase B source receiver metrics are intentionally smaller than a full
+  per-source clone of receiver charts. A benchmark at the 2000-source cap still
+  emits about 20k source series per collect cycle for pipeline/errors/last-seen,
+  so adding per-source category/severity would be an avoidable cardinality and
+  allocation cost.
 
 ### Required Tests
 
@@ -2236,6 +2322,12 @@ The implementation must add tests for:
   mode, and overflow behavior;
 - accepted trap commitment when profile metric attribution fails or cap overflow
   skips new metric instances;
+- receiver pipeline counters for received, decoded, accepted, committed,
+  dedup-suppressed, dropped, and write-failed traps;
+- source-attributed receiver metrics for accepted, committed,
+  dedup-suppressed, write-failed, source-attributed errors, and last-seen age;
+- vnode host-scope source receiver metrics and hashed fallback source labels;
+- source receiver metric cap overflow diagnostics and source lifecycle expiry;
 - continuous emission of receiver counters, profile counters, state values, and
   fresh sample values across `Collect()` cycles with no new traps;
 - hash privacy stability across restarts and absence of raw source label leakage
@@ -2245,7 +2337,7 @@ The implementation must add tests for:
 - rule-miss counters for missing predicates and extraction failures;
 - sensitive/high-cardinality label rejection;
 - sensitive/high-cardinality predicate and `value_from_varbind` rejection;
-- built-in and legacy-reserved metric-name collision rejection;
+- built-in metric-name collision rejection;
 - generated chart templates and chartengine planning;
 - collector-enforced caps before charttpl best-effort lifecycle behavior;
 - V2 host-scope routing for known source devices;
@@ -2255,11 +2347,9 @@ The implementation must add tests for:
 - profile generator preservation of curated metric rules;
 - profile reload behavior when metric rules are added, removed, disabled, or
   renamed;
-- rejection of operator attempts to mark inherited stock rules `auto_safe: true`;
-- legacy shim reserved namespace collision rejection;
 - job restart behavior for `profile_metrics` configuration changes;
 - dedup/write-failure runtime ordering;
-- compatibility behavior for existing job-level metrics, if retained.
+- rejection or removal of the obsolete job-level trap `metrics:` authoring path;
 - per-cycle overhead benchmark near configured caps, covering rule evaluation,
   hash mode, state updates, resource cap checks, and TTL sweep. The benchmark
   must report time and allocations and define an implementation-specific

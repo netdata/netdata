@@ -1,6 +1,6 @@
 ---
 name: project-snmp-trap-profiles-authoring
-description: Use when editing Netdata SNMP trap profile YAMLs, the trap profile-format documentation, the snmp-trap-profile-gen Go helper, or running a regeneration of the OOB trap profile pack. Enforces the closed 8-category / 8-severity taxonomy, the file-scoped varbinds-table pattern, cardinality discipline on labels, and stock/operator separation.
+description: Use when editing Netdata SNMP trap profile YAMLs, trap profile metric rules, the trap profile-format documentation, the snmp-trap-profile-gen Go helper, or running a regeneration of the OOB trap profile pack. Enforces the closed 8-category / 8-severity taxonomy, the file-scoped varbinds-table pattern, metric cardinality discipline, and stock/operator separation.
 ---
 
 # SNMP Trap Profile Authoring
@@ -94,10 +94,58 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
    `/etc/netdata/go.d/snmp.trap-profiles/` and are documented in
    `profile-format.md` § "Operator overrides".
 
-10. **No `metric:` block in profiles.** Per-OID metric emission lives in
-    plugin configuration (`go.d/snmp_traps.conf`), not in profiles. Profiles
-    stay vendor-curated knowledge; per-installation choices stay operator-
-    editable in plugin config.
+10. **Profile metrics use the validated `metrics:` / `charts:` schema.** Trap
+    profiles may define optional trap-to-metric rules only through the schema in
+    `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md`.
+    Listener jobs decide enablement with `profile_metrics`. Do not add ad hoc
+    metric fields, unbounded labels, or site-specific metric choices to stock
+    profiles. Site-specific metric rules belong in operator profile files under
+    `/etc/netdata/go.d/snmp.trap-profiles/`.
+
+    Required profile-metric authoring checks:
+    - Rule types are only `counter`, `sample`, and `state`; use canonical
+      fields for stock/generated profiles and keep compact aliases for
+      operator-authored examples.
+    - `where:` predicates are ANDed and may use `equals`, `in`, `exists`,
+      `absent`, `greater_than`, `less_than`, `range`, and `not`; never combine
+      `not` with `exists` or `absent`, and never define a predicate without a
+      condition operator.
+    - `sample` rules may read only numeric varbind types documented in
+      `profile-format.md`; `TimeTicks` is converted to seconds before `scale`.
+      `Counter32`, `Counter64`, and `TimeTicks` are valid for sample rules,
+      not resource identity keys.
+    - `state` rules use either separate `problem_trap` / `clear_trap` OIDs or
+      same-OID `state.set_when` / `state.clear_when` predicates. `state.ttl`
+      must be a valid Go duration string, and `state.ttl_behavior` currently
+      supports only `clear_and_expire`.
+    - `identity.resource.key_from_varbind` MUST reference an integer-like
+      bounded varbind (`INTEGER`, `Integer32`, `Unsigned32`, or `Gauge32`).
+      Never use strings, MACs, usernames, addresses, payloads, or event IDs as
+      metric resource keys.
+    - All rules sharing one chart MUST have the same label shape. Do not mix
+      resource and non-resource rules in one chart, and do not mix multiple
+      resource classes in one chart.
+    - Charts that can create source or resource instances MUST have bounded
+      lifecycle settings. Expired series are removed; if the same identity
+      appears again, the next committed trap creates a fresh series.
+    - `missing: unknown_dimension` is allowed only with resource identity.
+      `missing: drop` increments rule-miss diagnostics; `missing: error`
+      increments extraction-failure diagnostics.
+    - Metric names, chart IDs, and chart contexts MUST NOT collide with
+      built-in receiver charts, the built-in `profile_metric_diagnostics`
+      chart, or any other loaded profile rule/chart.
+      Reserved metric prefixes include `snmp_trap_events_`,
+      `snmp_trap_severity_`, `snmp_trap_errors_`, `snmp_trap_dedup_`,
+      `snmp_trap_pipeline_`, `snmp_trap_source_`, `snmp_trap_sources_`, and
+      `snmp_trap_metric_`, and `snmp_trap_profile_metrics_`.
+      Built-in source receiver metrics are automatic; profile rules should
+      describe vendor or site semantics, not duplicate receiver pipeline health.
+    - `auto_safe: true` means the rule is safe for broad trap hubs: bounded
+      labels, bounded resource identity, no sensitive values, and no surprising
+      high cardinality. Stock rules need review evidence before enabling it.
+    - Profile metrics update only after the trap is successfully committed to
+      the configured journal and/or OTLP backend. Dedup-suppressed and
+      write-failed traps do not update profile metrics.
 
 11. **No `journal_fields:` list in profiles.** The plugin derives indexed
     `TRAP_VAR_*` journal fields automatically from received non-sensitive,
