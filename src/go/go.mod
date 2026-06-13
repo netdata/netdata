@@ -87,7 +87,7 @@ require (
 	github.com/netdata/systemd-journal-sdk/go v0.6.4
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
-	golang.org/x/sys v0.45.0
+	golang.org/x/sys v0.46.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
