@@ -318,6 +318,7 @@ struct sockets_stats {
     uint32_t *pids;
     size_t pid_count;
     size_t pid_capacity;
+    DICTIONARY *container_field_snapshot;
     DICTIONARY *pid_starttime_cache;
 
     struct {
@@ -1277,8 +1278,8 @@ static void topology_container_fields_fill(
     nv_cache_lookup_fields_free(&cached);
 }
 
-static void topology_container_fields_snapshot(
-    const NV_TOPOLOGY_CONTEXT *ctx,
+static void topology_container_fields_snapshot_from_cache(
+    DICTIONARY *container_field_snapshot,
     uint32_t pid,
     uint64_t starttime,
     uid_t uid,
@@ -1288,14 +1289,14 @@ static void topology_container_fields_snapshot(
     if(!fields)
         return;
 
-    if(!ctx || !ctx->container_field_snapshot || !pid || !starttime) {
+    if(!container_field_snapshot || !pid || !starttime) {
         topology_container_fields_fill(pid, starttime, uid, process, fields);
         return;
     }
 
     char key[64];
     snprintfz(key, sizeof(key), "%u|%"PRIu64, pid, starttime);
-    NV_TOPOLOGY_CONTAINER_FIELDS *cached = dictionary_get(ctx->container_field_snapshot, key);
+    NV_TOPOLOGY_CONTAINER_FIELDS *cached = dictionary_get(container_field_snapshot, key);
     if(cached) {
         *fields = *cached;
         return;
@@ -1303,8 +1304,20 @@ static void topology_container_fields_snapshot(
 
     NV_TOPOLOGY_CONTAINER_FIELDS tmp;
     topology_container_fields_fill(pid, starttime, uid, process, &tmp);
-    dictionary_set(ctx->container_field_snapshot, key, &tmp, sizeof(tmp));
+    dictionary_set(container_field_snapshot, key, &tmp, sizeof(tmp));
     *fields = tmp;
+}
+
+static void topology_container_fields_snapshot(
+    const NV_TOPOLOGY_CONTEXT *ctx,
+    uint32_t pid,
+    uint64_t starttime,
+    uid_t uid,
+    const char *process,
+    NV_TOPOLOGY_CONTAINER_FIELDS *fields)
+{
+    topology_container_fields_snapshot_from_cache(
+        ctx ? ctx->container_field_snapshot : NULL, pid, starttime, uid, process, fields);
 }
 
 static void network_viewer_add_enrichment_value(BUFFER *wb, const char *value)
@@ -1314,6 +1327,7 @@ static void network_viewer_add_enrichment_value(BUFFER *wb, const char *value)
 
 static void network_viewer_add_socket_enrichment_values(
     BUFFER *wb,
+    DICTIONARY *container_field_snapshot,
     DICTIONARY *pid_starttime_cache,
     pid_t pid,
     uid_t uid,
@@ -1321,7 +1335,8 @@ static void network_viewer_add_socket_enrichment_values(
 {
     NV_TOPOLOGY_CONTAINER_FIELDS fields;
     uint64_t starttime = topology_starttime_cache_get_or_load(pid_starttime_cache, (uint64_t)pid);
-    topology_container_fields_fill((uint32_t)pid, starttime, uid, process, &fields);
+    topology_container_fields_snapshot_from_cache(
+        container_field_snapshot, (uint32_t)pid, starttime, uid, process, &fields);
 
     network_viewer_add_enrichment_value(wb, fields.cgroup_status);
     network_viewer_add_enrichment_value(wb, fields.cgroup_path);
@@ -1464,7 +1479,12 @@ static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOC
         }
 
         network_viewer_add_socket_enrichment_values(
-            wb, st->pid_starttime_cache, n->pid, n->uid, n->comm[0] ? n->comm : "[unknown]");
+            wb,
+            st->container_field_snapshot,
+            st->pid_starttime_cache,
+            n->pid,
+            n->uid,
+            n->comm[0] ? n->comm : "[unknown]");
 
         const struct socket_endpoint *server_endpoint;
         const char *server_address;
@@ -6000,6 +6020,10 @@ static BUFFER *network_viewer_result(char *function) {
     struct sockets_stats st = {
         .wb = wb,
     };
+    st.container_field_snapshot = dictionary_create_advanced(
+        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+        NULL,
+        sizeof(NV_TOPOLOGY_CONTAINER_FIELDS));
     st.pid_starttime_cache = dictionary_create_advanced(
         DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
         NULL,
@@ -6159,6 +6183,10 @@ static BUFFER *network_viewer_result(char *function) {
         }
 
         freez(st.pids);
+        if(st.container_field_snapshot) {
+            dictionary_destroy(st.container_field_snapshot);
+            st.container_field_snapshot = NULL;
+        }
         if(st.pid_starttime_cache) {
             dictionary_destroy(st.pid_starttime_cache);
             st.pid_starttime_cache = NULL;
@@ -6638,6 +6666,8 @@ static BUFFER *network_viewer_result(char *function) {
     }
 
 close_and_send:
+    if(st.container_field_snapshot)
+        dictionary_destroy(st.container_field_snapshot);
     if(st.pid_starttime_cache)
         dictionary_destroy(st.pid_starttime_cache);
     network_viewer_finalize_response_buffer(wb, now_s);

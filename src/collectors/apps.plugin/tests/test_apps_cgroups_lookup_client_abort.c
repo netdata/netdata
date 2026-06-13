@@ -71,7 +71,7 @@ static bool test_cache_allows_more_than_legacy_fixed_cap(void)
         entry->refcount = 1;
     }
 
-    ok = expect_ok(cgroups_lookup_cache_entries == legacy_fixed_cap + 1,
+    ok = expect_ok(dictionary_entries(cgroups_lookup_cache) == legacy_fixed_cap + 1,
                    "active cgroup lookup cache did not retain all active entries") && ok;
 
     cgroups_lookup_cache_destroy();

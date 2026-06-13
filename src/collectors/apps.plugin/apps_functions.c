@@ -1166,7 +1166,6 @@ void function_processes(const char *transaction, char *function,
         ;
 
     netdata_mutex_lock(&apps_and_stdout_mutex);
-    netdata_mutex_lock(&apps_pids_mutex);
 
     int rows= 0;
     for(p = root_of_pids(); p ; p = p->next) {
@@ -1258,7 +1257,9 @@ void function_processes(const char *transaction, char *function,
 
 #if defined(OS_LINUX)
         APPS_PROCESS_ENRICHMENT enrichment;
+        netdata_mutex_lock(&apps_pids_mutex);
         apps_process_enrichment_fill(p, &enrichment);
+        netdata_mutex_unlock(&apps_pids_mutex);
         apps_emit_process_enrichment_values(wb, &enrichment);
 #endif
 
@@ -1389,8 +1390,6 @@ void function_processes(const char *transaction, char *function,
 
         buffer_json_array_close(wb); // for each pid
     }
-
-    netdata_mutex_unlock(&apps_pids_mutex);
 
     buffer_json_array_close(wb); // data
 

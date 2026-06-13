@@ -35,8 +35,6 @@ struct cgroup_lookup_entry {
     // cppcheck-suppress unusedStructMember
     uint64_t generation;
     // cppcheck-suppress unusedStructMember
-    uint64_t last_used_iteration;
-    // cppcheck-suppress unusedStructMember
     uint32_t refcount;
     // cppcheck-suppress unusedStructMember
     bool pending;

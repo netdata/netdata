@@ -17,8 +17,6 @@ struct cgroup_lookup_queue_entry {
 };
 
 static DICTIONARY *cgroups_lookup_cache = NULL;
-static size_t cgroups_lookup_cache_entries = 0;
-static uint64_t cgroups_lookup_cache_iteration = 0;
 
 // Highest cgroups.plugin snapshot generation observed in a lookup response.
 // Written by the lookup worker and read by the scan, both under apps_pids_mutex.
@@ -125,8 +123,6 @@ static void cgroups_lookup_entry_delete_cb(const DICTIONARY_ITEM *item __maybe_u
     string_freez(entry->key);
     cgroups_lookup_entry_clear_payload(entry);
 
-    if (cgroups_lookup_cache_entries > 0)
-        cgroups_lookup_cache_entries--;
 }
 
 static void cgroups_lookup_cache_destroy(void)
@@ -136,7 +132,6 @@ static void cgroups_lookup_cache_destroy(void)
 
     dictionary_destroy(cgroups_lookup_cache);
     cgroups_lookup_cache = NULL;
-    cgroups_lookup_cache_entries = 0;
 }
 
 static void cgroups_lookup_cache_create(void)
@@ -166,8 +161,6 @@ static struct cgroup_lookup_entry *cgroups_lookup_cache_get_or_create(STRING *pa
     entry->key = string_dup(path);
     entry->cgroup_status = NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER;
     entry->orchestrator = NIPC_ORCHESTRATOR_UNKNOWN;
-    entry->last_used_iteration = ++cgroups_lookup_cache_iteration;
-    cgroups_lookup_cache_entries++;
 
     return entry;
 }
@@ -385,7 +378,6 @@ static void cgroups_lookup_commit_staged(
     entry->cgroup_status = staged->status;
     entry->generation = generation;
     entry->pending = false;
-    entry->last_used_iteration = ++cgroups_lookup_cache_iteration;
 
     if (staged->status == NIPC_CGROUP_LOOKUP_KNOWN) {
         if (staged->labels_ok) {
@@ -634,7 +626,6 @@ void apps_cgroups_lookup_scan_pids(void)
 
             p->cgroup_cache = entry;
             entry->refcount++;
-            entry->last_used_iteration = ++cgroups_lookup_cache_iteration;
         }
 
         // R09: re-ask a RETRY_LATER cgroup only when discovery has published a

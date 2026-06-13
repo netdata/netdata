@@ -38,6 +38,7 @@ typedef struct {
     char actor_type[APPS_ENRICHMENT_ACTOR_TYPE_MAX];
 } APPS_PROCESS_ENRICHMENT;
 
+// Caller must hold apps_pids_mutex while cgroup lookup cache fields are copied.
 void apps_process_enrichment_fill(struct pid_stat *p, APPS_PROCESS_ENRICHMENT *out);
 void apps_emit_process_enrichment_values(BUFFER *wb, const APPS_PROCESS_ENRICHMENT *enrichment);
 
