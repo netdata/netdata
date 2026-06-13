@@ -108,8 +108,7 @@ CGROUP_SNAPSHOT_STORE *cgroup_snapshot_builder_finalize(CGROUP_SNAPSHOT_BUILDER 
     store->count = builder->count;
     store->entries = builder->entries;          // ownership transferred
     store->by_path = dictionary_create_advanced(
-        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_NAME_LINK_DONT_CLONE |
-            DICT_OPTION_VALUE_LINK_DONT_CLONE,
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE,
         NULL, 0);
 
     for (size_t i = 0; i < store->count; i++)

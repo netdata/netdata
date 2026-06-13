@@ -3364,6 +3364,8 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                         src/libnetdata/local-sockets/local-sockets-freebsd.h
                         src/collectors/common-cgroups/cgroup-topology-rules.c
                         src/collectors/common-cgroups/cgroup-topology-rules.h
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
                         src/collectors/network-viewer.plugin/network-viewer.c
                 )
         endif()
