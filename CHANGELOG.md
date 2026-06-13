@@ -319,6 +319,17 @@
 - Update vendored NetIPC SDK ([#22680](https://github.com/netdata/netdata/issues/22680))
 - Chore(go/chartengine): template dims inherit float from the series metric meta ([#22681](https://github.com/netdata/netdata/issues/22681))
 - Go.d: add profile-based SNMP trap ingestion ([#22652](https://github.com/netdata/netdata/issues/22652))
+- Update metadata.yaml ([#22437](https://github.com/netdata/netdata/issues/22437))
+- Regenerate integrations docs ([#22684](https://github.com/netdata/netdata/issues/22684))
+- Bound v2 journal header offsets before crc reads in list checks ([#22666](https://github.com/netdata/netdata/issues/22666))
+- Simple_pattern: fix inverted empty-buffer guard in matches_buffer_extract ([#22688](https://github.com/netdata/netdata/issues/22688))
+- Feat(go.d/prometheus): add promprofiles catalog package ([#22682](https://github.com/netdata/netdata/issues/22682))
+- Increase UUIDMAP_PARTITIONS to 32 ([#22675](https://github.com/netdata/netdata/issues/22675))
+- Docs: fix stale [global] references for all fields migrated to [db] ([#22544](https://github.com/netdata/netdata/issues/22544))
+- Feat(go.d/prometheus): add profile-driven app detection for chart contexts ([#22694](https://github.com/netdata/netdata/issues/22694))
+- Fix SNMP trap counter chart algorithms ([#22693](https://github.com/netdata/netdata/issues/22693))
+- Regenerate integrations docs ([#22691](https://github.com/netdata/netdata/issues/22691))
+- Docs: add hostname override and cross-link to nodes-tab ([#22563](https://github.com/netdata/netdata/issues/22563))
 
 ## [2.10.0] - 2026-04-09
 
