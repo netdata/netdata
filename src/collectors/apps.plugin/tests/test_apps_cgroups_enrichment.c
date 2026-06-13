@@ -20,10 +20,13 @@ static bool expect_ok(bool condition, const char *message)
 
 static bool expect_str_eq(const char *actual, const char *expected, const char *message)
 {
-    if(actual && expected && strcmp(actual, expected) == 0)
+    if((actual == expected) || (actual && expected && strcmp(actual, expected) == 0))
         return true;
 
-    fprintf(stderr, "%s: expected '%s', got '%s'\n", message, expected, actual ? actual : "(null)");
+    fprintf(stderr, "%s: expected '%s', got '%s'\n",
+            message,
+            expected ? expected : "(null)",
+            actual ? actual : "(null)");
     return false;
 }
 
