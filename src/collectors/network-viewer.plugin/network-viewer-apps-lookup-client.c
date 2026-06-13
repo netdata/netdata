@@ -613,6 +613,7 @@ static void nv_apps_lookup_worker_main(void *arg __maybe_unused)
                 continue;
 
             nv_apps_lookup_counter_inc(&apps_lookup_requests_failed);
+            sleep_usec(100000);
             continue;
         }
 
