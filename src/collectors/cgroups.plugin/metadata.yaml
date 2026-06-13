@@ -884,7 +884,7 @@ modules:
                 - name: lookup_miss_signals_sent
                 - name: lookup_miss_signals_coalesced
             - name: netdata.collector.ipc.cgroups_lookup.server.request_duration_ms
-              description: CGROUPS_LOOKUP server request duration cumulative histogram
+              description: CGROUPS_LOOKUP server request duration buckets
               unit: "requests/s"
               chart_type: line
               dimensions:

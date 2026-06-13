@@ -61,21 +61,25 @@ Use the standard Cloud Function endpoint:
 Example info request:
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
 NODE="YOUR_NODE_UUID"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=topology:network-connections" \
-  -d '{"info":true,"timeout":30000}'
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
+
+agents_call_function \
+  --via cloud \
+  --node "$NODE" \
+  --function 'topology:network-connections' \
+  --body '{"info":true,"timeout":30000}'
 ```
 
 Example data request:
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
 NODE="YOUR_NODE_UUID"
+
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 
 read -r -d '' PAYLOAD <<'EOF'
 {
@@ -86,21 +90,21 @@ read -r -d '' PAYLOAD <<'EOF'
 }
 EOF
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=topology:network-connections" \
-  -d "$PAYLOAD"
+agents_call_function \
+  --via cloud \
+  --node "$NODE" \
+  --function 'topology:network-connections' \
+  --body "$PAYLOAD"
 ```
 
 Example with exact per-PID raw fields and selected labels:
 
 ```bash
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=topology:network-connections" \
-  -d '{"timeout":60000,"selections":{"group_by":["pid"],"labels":["team|app"]}}' \
+agents_call_function \
+  --via cloud \
+  --node "$NODE" \
+  --function 'topology:network-connections' \
+  --body '{"timeout":60000,"selections":{"group_by":["pid"],"labels":["team|app"]}}' \
   | jq '.data | {
       group_by: .view.group_by,
       process_scopes: .types.actor_types.process.aggregation_scopes,
@@ -112,11 +116,11 @@ curl -sS -X POST \
 Example Kubernetes pod/namespace view inspection:
 
 ```bash
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=topology:network-connections" \
-  -d '{"timeout":60000,"selections":{"group_by":["pid"]}}' \
+agents_call_function \
+  --via cloud \
+  --node "$NODE" \
+  --function 'topology:network-connections' \
+  --body '{"timeout":60000,"selections":{"group_by":["pid"]}}' \
   | jq '.data.actors as $actors
         | ($actors.columns | map(.id)) as $cols
         | ($cols | index("k8s_namespace")) as $ns

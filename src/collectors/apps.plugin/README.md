@@ -335,7 +335,7 @@ If this fails (i.e., `setcap` fails), `apps.plugin` is setuid to `root`.
 
 ## Security
 
-`apps.plugin` sends metrics to Netdata and exposes a local APPS_LOOKUP netipc socket so other Netdata components can request bounded per-PID metadata. The socket is a Unix domain socket created with owner-only permissions (`0600`) for the `netdata` user.
+`apps.plugin` sends metrics to Netdata and exposes a local APPS_LOOKUP netipc socket so other Netdata components can request bounded per-PID metadata. The socket is a Unix domain socket created with owner-only permissions (`0600`) for the plugin's effective user.
 
 Although `apps.plugin` can function without escalated privileges, it may not be able to collect all the necessary information. To ensure comprehensive data collection, it's recommended to grant the required privileges.
 

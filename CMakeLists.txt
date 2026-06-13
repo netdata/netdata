@@ -3051,6 +3051,11 @@ if(OS_LINUX)
             src/collectors/apps.plugin/apps-cgroups-path.c)
     target_link_libraries(apps-cgroups-path-test libnetdata)
 
+    add_executable(apps-cgroups-enrichment-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_cgroups_enrichment.c
+            src/collectors/common-cgroups/cgroup-topology-rules.c)
+    target_link_libraries(apps-cgroups-enrichment-test libnetdata)
+
     add_executable(apps-lookup-protocol-test EXCLUDE_FROM_ALL
             src/collectors/apps.plugin/tests/test_apps_lookup_protocol.c)
     target_link_libraries(apps-lookup-protocol-test libnetdata)

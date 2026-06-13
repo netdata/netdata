@@ -27,6 +27,7 @@ concurrency:
 env:
   TEST_TARGETS: >-
     apps-cgroups-path-test
+    apps-cgroups-enrichment-test
     apps-lookup-protocol-test
     apps-lookup-netipc-lock-test
     apps-cgroups-lookup-client-abort-test

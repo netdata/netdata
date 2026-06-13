@@ -884,14 +884,14 @@ void nv_apps_lookup_warm_pids(const uint32_t *pids, size_t pid_count)
     freez(working_pids);
 }
 
-bool nv_cache_lookup_pid(uint32_t pid, NV_APPS_LOOKUP_FIELDS *out)
+bool nv_cache_lookup_pid(uint32_t pid, uint64_t expected_starttime, NV_APPS_LOOKUP_FIELDS *out)
 {
     if (!out)
         return false;
 
     *out = (NV_APPS_LOOKUP_FIELDS){ 0 };
 
-    if (pid == 0 || !apps_lookup_cache)
+    if (pid == 0 || expected_starttime == 0 || !apps_lookup_cache)
         return false;
 
     char key[16];
@@ -900,6 +900,15 @@ bool nv_cache_lookup_pid(uint32_t pid, NV_APPS_LOOKUP_FIELDS *out)
     netdata_mutex_lock(&apps_lookup_cache_mutex);
     NV_APPS_LOOKUP_CACHE_ENTRY *entry = dictionary_get(apps_lookup_cache, key);
     if (!entry) {
+        netdata_mutex_unlock(&apps_lookup_cache_mutex);
+        return false;
+    }
+
+    if (entry->starttime != expected_starttime) {
+        dictionary_del(apps_lookup_cache, key);
+        if (apps_lookup_cache_size > 0)
+            apps_lookup_cache_size--;
+        nv_apps_lookup_counter_inc(&apps_lookup_cache_evictions_pid_reuse);
         netdata_mutex_unlock(&apps_lookup_cache_mutex);
         return false;
     }

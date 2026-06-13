@@ -33,40 +33,20 @@ const char *nv_cached_label_value(const NV_APPS_LOOKUP_FIELDS *fields, const cha
     return NULL;
 }
 
-static bool nv_orchestrator_uses_cgroup_name_identity(uint16_t orchestrator)
+static const char *nv_common_label_lookup(void *data, const char *key)
 {
-    switch(orchestrator) {
-        case NIPC_ORCHESTRATOR_DOCKER:
-        case NIPC_ORCHESTRATOR_K8S:
-        case NIPC_ORCHESTRATOR_KVM:
-        case NIPC_ORCHESTRATOR_LXC:
-        case NIPC_ORCHESTRATOR_PODMAN:
-        case NIPC_ORCHESTRATOR_NSPAWN:
-            return true;
-        default:
-            return false;
-    }
+    return nv_cached_label_value(data, key);
 }
 
 bool nv_cgroup_fields_have_container_identity(const NV_APPS_LOOKUP_FIELDS *fields)
 {
-    if(!fields || fields->cgroup_status != NIPC_APPS_CGROUP_KNOWN)
-        return false;
-
-    const char *label = nv_cached_label_value(fields, "k8s_container_name");
-    if(label && *label)
-        return true;
-
-    label = nv_cached_label_value(fields, "container_name");
-    if(label && *label)
-        return true;
-
-    if(!nv_orchestrator_uses_cgroup_name_identity(fields->orchestrator))
-        return false;
-
-    char container_name[NV_TOPOLOGY_CONTAINER_NAME_MAX];
-    nv_derive_docker_container_name(fields, fields->cgroup_name, container_name, sizeof(container_name));
-    return container_name[0] != '\0';
+    return fields &&
+        cgroup_topology_has_container_identity(
+            fields->cgroup_status,
+            fields->orchestrator,
+            nv_common_label_lookup,
+            (void *)fields,
+            fields->cgroup_name);
 }
 
 void nv_container_fields_set_process_fallback(NV_TOPOLOGY_CONTAINER_FIELDS *fields, const char *process)
@@ -88,149 +68,49 @@ bool nv_cgroup_retry_later_without_path(uint16_t cgroup_status, const char *cgro
     return cgroup_status == NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER && (!cgroup_path || !*cgroup_path);
 }
 
-static void nv_copy_label(const NV_APPS_LOOKUP_FIELDS *fields, const char *key, char *dst, size_t dst_size)
+static void nv_derive_common_labels(
+    const NV_APPS_LOOKUP_FIELDS *fields,
+    const char *cgroup_name,
+    CGROUP_TOPOLOGY_DERIVED_LABELS *derived)
 {
-    if (!dst || !dst_size)
-        return;
-
-    dst[0] = '\0';
-    const char *value = nv_cached_label_value(fields, key);
-    if (value && *value)
-        strncpyz(dst, value, dst_size - 1);
+    cgroup_topology_derive_label_fields(
+        nv_common_label_lookup,
+        (void *)fields,
+        cgroup_name,
+        derived);
 }
 
 void nv_derive_k8s_pod_name(const NV_APPS_LOOKUP_FIELDS *fields, char *dst, size_t dst_size)
 {
-    nv_copy_label(fields, "k8s_pod_name", dst, dst_size);
+    if(!dst || !dst_size)
+        return;
+
+    dst[0] = '\0';
+    CGROUP_TOPOLOGY_DERIVED_LABELS derived;
+    nv_derive_common_labels(fields, NULL, &derived);
+    strncpyz(dst, derived.k8s_pod_name, dst_size - 1);
 }
 
 void nv_derive_k8s_namespace(const NV_APPS_LOOKUP_FIELDS *fields, char *dst, size_t dst_size)
 {
-    nv_copy_label(fields, "k8s_namespace", dst, dst_size);
-}
+    if(!dst || !dst_size)
+        return;
 
-static bool nv_suffix_is_alnum_hash(const char *s)
-{
-    if (!s || !*s)
-        return false;
-
-    size_t len = strlen(s);
-    if (len < 5 || len > 16)
-        return false;
-
-    bool has_digit = false;
-    for (const char *p = s; *p; p++) {
-        if (!isalnum((unsigned char)*p))
-            return false;
-        if (isdigit((unsigned char)*p))
-            has_digit = true;
-    }
-
-    return has_digit;
-}
-
-static bool nv_suffix_is_alnum_token(const char *s)
-{
-    if (!s || !*s)
-        return false;
-
-    size_t len = strlen(s);
-    if (len < 5 || len > 16)
-        return false;
-
-    for (const char *p = s; *p; p++) {
-        if (!isalnum((unsigned char)*p))
-            return false;
-    }
-
-    return true;
-}
-
-static bool nv_suffix_is_uint(const char *s)
-{
-    if (!s || !*s)
-        return false;
-
-    for (const char *p = s; *p; p++) {
-        if (!isdigit((unsigned char)*p))
-            return false;
-    }
-
-    return true;
-}
-
-static bool nv_strip_one_suffix(
-    const char *value,
-    bool (*suffix_ok)(const char *),
-    char *dst,
-    size_t dst_size)
-{
-    if (!value || !*value || !suffix_ok || !dst || !dst_size)
-        return false;
-
-    const char *dash = strrchr(value, '-');
-    if (!dash || dash == value || !suffix_ok(dash + 1))
-        return false;
-
-    size_t len = (size_t)(dash - value);
-    if (len >= dst_size)
-        len = dst_size - 1;
-    memcpy(dst, value, len);
-    dst[len] = '\0';
-    return len > 0;
-}
-
-static bool nv_strip_replicaset_suffixes(
-    const char *pod_name,
-    bool (*suffix_ok)(const char *),
-    char *dst,
-    size_t dst_size)
-{
-    char without_pod_hash[NV_TOPOLOGY_K8S_NAME_MAX];
-    if (!nv_strip_one_suffix(pod_name, suffix_ok, without_pod_hash, sizeof(without_pod_hash)))
-        return false;
-
-    return nv_strip_one_suffix(without_pod_hash, suffix_ok, dst, dst_size);
+    dst[0] = '\0';
+    CGROUP_TOPOLOGY_DERIVED_LABELS derived;
+    nv_derive_common_labels(fields, NULL, &derived);
+    strncpyz(dst, derived.k8s_namespace, dst_size - 1);
 }
 
 void nv_derive_k8s_workload(const NV_APPS_LOOKUP_FIELDS *fields, char *dst, size_t dst_size)
 {
-    if (!dst || !dst_size)
+    if(!dst || !dst_size)
         return;
 
     dst[0] = '\0';
-
-    const char *controller_name = nv_cached_label_value(fields, "k8s_controller_name");
-    if (controller_name && *controller_name) {
-        strncpyz(dst, controller_name, dst_size - 1);
-        return;
-    }
-
-    const char *pod_name = nv_cached_label_value(fields, "k8s_pod_name");
-    if (!pod_name || !*pod_name)
-        return;
-
-    const char *controller_kind = nv_cached_label_value(fields, "k8s_controller_kind");
-    if (controller_kind && *controller_kind) {
-        if (strcmp(controller_kind, "ReplicaSet") == 0) {
-            (void)nv_strip_replicaset_suffixes(pod_name, nv_suffix_is_alnum_token, dst, dst_size);
-            return;
-        }
-        if (strcmp(controller_kind, "DaemonSet") == 0) {
-            (void)nv_strip_one_suffix(pod_name, nv_suffix_is_alnum_token, dst, dst_size);
-            return;
-        }
-        if (strcmp(controller_kind, "StatefulSet") == 0) {
-            (void)nv_strip_one_suffix(pod_name, nv_suffix_is_uint, dst, dst_size);
-            return;
-        }
-    }
-
-    if (nv_strip_replicaset_suffixes(pod_name, nv_suffix_is_alnum_hash, dst, dst_size))
-        return;
-    if (nv_strip_one_suffix(pod_name, nv_suffix_is_alnum_hash, dst, dst_size))
-        return;
-    (void)nv_strip_one_suffix(pod_name, nv_suffix_is_uint, dst, dst_size);
+    CGROUP_TOPOLOGY_DERIVED_LABELS derived;
+    nv_derive_common_labels(fields, NULL, &derived);
+    strncpyz(dst, derived.k8s_workload, dst_size - 1);
 }
 
 void nv_derive_docker_container_name(
@@ -239,24 +119,24 @@ void nv_derive_docker_container_name(
     char *dst,
     size_t dst_size)
 {
-    if (!dst || !dst_size)
+    if(!dst || !dst_size)
         return;
 
     dst[0] = '\0';
-
-    const char *value = nv_cached_label_value(fields, "k8s_container_name");
-    if (!value || !*value)
-        value = nv_cached_label_value(fields, "container_name");
-    if (!value || !*value)
-        value = cgroup_name;
-
-    if (value && *value)
-        strncpyz(dst, value, dst_size - 1);
+    CGROUP_TOPOLOGY_DERIVED_LABELS derived;
+    nv_derive_common_labels(fields, cgroup_name, &derived);
+    strncpyz(dst, derived.container_name, dst_size - 1);
 }
 
 void nv_derive_docker_image(const NV_APPS_LOOKUP_FIELDS *fields, char *dst, size_t dst_size)
 {
-    nv_copy_label(fields, "image", dst, dst_size);
+    if(!dst || !dst_size)
+        return;
+
+    dst[0] = '\0';
+    CGROUP_TOPOLOGY_DERIVED_LABELS derived;
+    nv_derive_common_labels(fields, NULL, &derived);
+    strncpyz(dst, derived.docker_image, dst_size - 1);
 }
 
 void nv_derive_systemd_unit_name(const char *cgroup_path, char *dst, size_t dst_size)

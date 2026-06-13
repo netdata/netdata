@@ -55,6 +55,7 @@ typedef struct {
     pid_t ppid;
     uid_t uid;
     uint64_t net_ns_inode;
+    uint64_t starttime;
     uint64_t sockets;
     char process[TASK_COMM_LEN + 1];
     char username[NV_TOPOLOGY_USERNAME_MAX];
@@ -81,6 +82,7 @@ typedef struct {
     uint64_t ppid;
     uint64_t uid;
     uint64_t net_ns_inode;
+    uint64_t starttime;
     char process[TASK_COMM_LEN + 1];
 } NV_ENDPOINT_OWNER;
 
@@ -101,6 +103,7 @@ typedef struct {
     uint64_t ppid;
     uint64_t uid;
     uint64_t net_ns_inode;
+    uint64_t starttime;
     uint64_t sockets;
     uint64_t retransmissions;
     uint32_t max_rtt_usec;
@@ -159,6 +162,7 @@ typedef struct {
     DICTIONARY *endpoint_owners_service_any_ns;
     DICTIONARY *links;
     DICTIONARY *container_field_snapshot;
+    DICTIONARY *pid_starttime_cache;
     usec_t now_ut;
     usec_t *stop_monotonic_ut;
     bool *cancelled;
@@ -173,6 +177,10 @@ typedef struct {
 typedef struct {
     uint64_t ppid;
 } NV_PPID_CACHE_ENTRY;
+
+typedef struct {
+    uint64_t starttime;
+} NV_PID_STARTTIME_CACHE_ENTRY;
 
 typedef struct {
     size_t process_actor_count;
@@ -760,7 +768,7 @@ static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
     char filename[FILENAME_MAX + 1];
     char status_buf[1024];
     snprintfz(filename, sizeof(filename), "%s/proc/%llu/status",
-              netdata_configured_host_prefix,
+              netdata_configured_host_prefix ? netdata_configured_host_prefix : "",
               (unsigned long long)pid);
 
     if(read_txt_file(filename, status_buf, sizeof(status_buf)))
@@ -783,6 +791,50 @@ static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
 
     *ppid = parent;
     return true;
+}
+
+static bool topology_read_proc_starttime(uint64_t pid, uint64_t *starttime) {
+    if(!pid || !starttime)
+        return false;
+
+    *starttime = 0;
+
+    char filename[FILENAME_MAX + 1];
+    char stat_buf[4096];
+    snprintfz(filename, sizeof(filename), "%s/proc/%llu/stat",
+              netdata_configured_host_prefix ? netdata_configured_host_prefix : "",
+              (unsigned long long)pid);
+
+    if(read_txt_file(filename, stat_buf, sizeof(stat_buf)))
+        return false;
+
+    char *fields = strrchr(stat_buf, ')');
+    if(!fields)
+        return false;
+
+    fields++;
+    for(uint32_t field = 3; field <= 22; field++) {
+        while(isspace((unsigned char)*fields))
+            fields++;
+
+        if(!*fields)
+            return false;
+
+        if(field == 22) {
+            char *end = NULL;
+            uint64_t value = strtoull(fields, &end, 10);
+            if(end == fields || value == 0)
+                return false;
+
+            *starttime = value;
+            return true;
+        }
+
+        while(*fields && !isspace((unsigned char)*fields))
+            fields++;
+    }
+
+    return false;
 }
 #elif defined(OS_FREEBSD)
 #include <sys/types.h>
@@ -808,6 +860,20 @@ static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
     *ppid = parent;
     return true;
 }
+
+static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *starttime) {
+    if(starttime)
+        *starttime = 0;
+
+    return false;
+}
+#else
+static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *starttime) {
+    if(starttime)
+        *starttime = 0;
+
+    return false;
+}
 #endif
 
 static uint64_t topology_ppid_cache_get_or_load(DICTIONARY *ppid_cache, uint64_t pid) {
@@ -828,6 +894,26 @@ static uint64_t topology_ppid_cache_get_or_load(DICTIONARY *ppid_cache, uint64_t
 
     cached = dictionary_set(ppid_cache, pid_key, &tmp, sizeof(tmp));
     return cached ? cached->ppid : tmp.ppid;
+}
+
+static uint64_t topology_starttime_cache_get_or_load(DICTIONARY *pid_starttime_cache, uint64_t pid) {
+    if(!pid_starttime_cache || !pid)
+        return 0;
+
+    char pid_key[64];
+    topology_pid_lookup_key(pid_key, sizeof(pid_key), pid);
+
+    NV_PID_STARTTIME_CACHE_ENTRY *cached = dictionary_get(pid_starttime_cache, pid_key);
+    if(cached)
+        return cached->starttime;
+
+    NV_PID_STARTTIME_CACHE_ENTRY tmp = { .starttime = 0 };
+    uint64_t starttime = 0;
+    if(topology_read_proc_starttime(pid, &starttime))
+        tmp.starttime = starttime;
+
+    cached = dictionary_set(pid_starttime_cache, pid_key, &tmp, sizeof(tmp));
+    return cached ? cached->starttime : tmp.starttime;
 }
 
 static NV_ENDPOINT_OWNER *topology_find_process_parent_actor(
@@ -907,6 +993,7 @@ static void topology_register_endpoint_owner(
         .ppid = pa->ppid,
         .uid = pa->uid,
         .net_ns_inode = pa->net_ns_inode,
+        .starttime = pa->starttime,
     };
     snprintf(owner.process, sizeof(owner.process), "%s", pa->process);
 
@@ -1120,6 +1207,7 @@ static bool topology_container_fields_apply_user_slice(
 
 static void topology_container_fields_fill(
     uint32_t pid,
+    uint64_t starttime,
     uid_t uid,
     const char *process,
     NV_TOPOLOGY_CONTAINER_FIELDS *fields)
@@ -1130,11 +1218,11 @@ static void topology_container_fields_fill(
     const char *fallback = (process && *process) ? process : "[unknown]";
     nv_container_fields_set_process_fallback(fields, fallback);
 
-    if(!pid)
+    if(!pid || !starttime)
         return;
 
     NV_APPS_LOOKUP_FIELDS cached;
-    if(!nv_cache_lookup_pid(pid, &cached))
+    if(!nv_cache_lookup_pid(pid, starttime, &cached))
         return;
 
     fields->from_cache = true;
@@ -1191,6 +1279,7 @@ static void topology_container_fields_fill(
 static void topology_container_fields_snapshot(
     const NV_TOPOLOGY_CONTEXT *ctx,
     uint32_t pid,
+    uint64_t starttime,
     uid_t uid,
     const char *process,
     NV_TOPOLOGY_CONTAINER_FIELDS *fields)
@@ -1198,13 +1287,13 @@ static void topology_container_fields_snapshot(
     if(!fields)
         return;
 
-    if(!ctx || !ctx->container_field_snapshot || !pid) {
-        topology_container_fields_fill(pid, uid, process, fields);
+    if(!ctx || !ctx->container_field_snapshot || !pid || !starttime) {
+        topology_container_fields_fill(pid, starttime, uid, process, fields);
         return;
     }
 
-    char key[16];
-    snprintfz(key, sizeof(key), "%u", pid);
+    char key[64];
+    snprintfz(key, sizeof(key), "%u|%"PRIu64, pid, starttime);
     NV_TOPOLOGY_CONTAINER_FIELDS *cached = dictionary_get(ctx->container_field_snapshot, key);
     if(cached) {
         *fields = *cached;
@@ -1212,7 +1301,7 @@ static void topology_container_fields_snapshot(
     }
 
     NV_TOPOLOGY_CONTAINER_FIELDS tmp;
-    topology_container_fields_fill(pid, uid, process, &tmp);
+    topology_container_fields_fill(pid, starttime, uid, process, &tmp);
     dictionary_set(ctx->container_field_snapshot, key, &tmp, sizeof(tmp));
     *fields = tmp;
 }
@@ -1225,7 +1314,9 @@ static void network_viewer_add_enrichment_value(BUFFER *wb, const char *value)
 static void network_viewer_add_socket_enrichment_values(BUFFER *wb, pid_t pid, uid_t uid, const char *process)
 {
     NV_TOPOLOGY_CONTAINER_FIELDS fields;
-    topology_container_fields_fill((uint32_t)pid, uid, process, &fields);
+    uint64_t starttime = 0;
+    (void)topology_read_proc_starttime((uint64_t)pid, &starttime);
+    topology_container_fields_fill((uint32_t)pid, starttime, uid, process, &fields);
 
     network_viewer_add_enrichment_value(wb, fields.cgroup_status);
     network_viewer_add_enrichment_value(wb, fields.cgroup_path);
@@ -1714,6 +1805,7 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
     const char *remote_address_space = local_sockets_address_space(&n->remote);
     const char *process_name = n->comm[0] ? n->comm : "[unknown]";
     const char *cmdline = string2str(n->cmdline);
+    uint64_t starttime = topology_starttime_cache_get_or_load(ctx->pid_starttime_cache, (uint64_t)n->pid);
 
     char username[NV_TOPOLOGY_USERNAME_MAX] = "[unknown]";
     if(n->uid != UID_UNSET) {
@@ -1741,6 +1833,7 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
             .ppid = n->ppid,
             .uid = n->uid,
             .net_ns_inode = n->net_ns_inode,
+            .starttime = starttime,
         };
         snprintf(hidden_owner.process, sizeof(hidden_owner.process), "%s", process_name);
         topology_register_endpoint_owner(ctx, n->net_ns_inode, n->local.protocol, local_ip, n->local.port, &hidden_owner, true);
@@ -1766,6 +1859,7 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
         tmp.ppid = n->ppid;
         tmp.uid = n->uid;
         tmp.net_ns_inode = n->net_ns_inode;
+        tmp.starttime = starttime;
         snprintf(tmp.process, sizeof(tmp.process), "%s", process_name);
         snprintf(tmp.username, sizeof(tmp.username), "%s", username);
         snprintf(tmp.namespace_type, sizeof(tmp.namespace_type), "%s", namespace_type);
@@ -1778,6 +1872,8 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
     pa->sockets++;
     if(!pa->ppid && n->ppid)
         pa->ppid = n->ppid;
+    if(!pa->starttime && starttime)
+        pa->starttime = starttime;
     if(topology_process_name_is_unknown(pa->process) && !topology_process_name_is_unknown(process_name))
         snprintf(pa->process, sizeof(pa->process), "%s", process_name);
     if(!pa->cmdline[0] && cmdline && *cmdline)
@@ -1862,6 +1958,7 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
         tmp.ppid = n->ppid;
         tmp.uid = n->uid;
         tmp.net_ns_inode = n->net_ns_inode;
+        tmp.starttime = starttime;
         tmp.client_port = client_port;
         tmp.server_port = server_port;
         tmp.process_port = n->local.port;
@@ -1883,6 +1980,8 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
         link = dictionary_set(ctx->links, link_key, &tmp, sizeof(tmp));
     }
 
+    if(!link->starttime && starttime)
+        link->starttime = starttime;
     link->sockets++;
 #if defined(OS_LINUX)
     link->retransmissions += n->info.tcp.tcpi_total_retrans;
@@ -1903,6 +2002,8 @@ static void topology_context_destroy(NV_TOPOLOGY_CONTEXT *ctx) {
         dictionary_destroy(ctx->links);
     if(ctx->container_field_snapshot)
         dictionary_destroy(ctx->container_field_snapshot);
+    if(ctx->pid_starttime_cache)
+        dictionary_destroy(ctx->pid_starttime_cache);
     if(ctx->endpoint_owners_service_any_ns)
         dictionary_destroy(ctx->endpoint_owners_service_any_ns);
     if(ctx->endpoint_owners_service)
@@ -2031,11 +2132,12 @@ static bool topology_prepare_context(
     ctx->endpoint_owners_service_any_ns = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_ENDPOINT_OWNER));
     ctx->links = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_TOPOLOGY_LINK));
     ctx->container_field_snapshot = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_TOPOLOGY_CONTAINER_FIELDS));
+    ctx->pid_starttime_cache = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_PID_STARTTIME_CACHE_ENTRY));
 
     if(!(ctx->process_actors && ctx->remote_actors && ctx->local_ips &&
          ctx->endpoint_owners_exact && ctx->endpoint_owners_exact_any_ns &&
          ctx->endpoint_owners_service && ctx->endpoint_owners_service_any_ns &&
-         ctx->links && ctx->container_field_snapshot))
+         ctx->links && ctx->container_field_snapshot && ctx->pid_starttime_cache))
         return false;
 
     if(!os_hostname(ctx->hostname, sizeof(ctx->hostname), netdata_configured_host_prefix))
@@ -2825,6 +2927,7 @@ static void topology_v1_enrich_process_actor_from_cache(
     uint64_t actor_index,
     NV_TOPOLOGY_V1_ACTOR *actor,
     uint32_t pid,
+    uint64_t starttime,
     uid_t uid,
     bool fill_actor_fields)
 {
@@ -2832,12 +2935,12 @@ static void topology_v1_enrich_process_actor_from_cache(
         return;
 
     NV_TOPOLOGY_CONTAINER_FIELDS fields = { 0 };
-    topology_container_fields_snapshot(ctx, pid, uid, actor->process, &fields);
+    topology_container_fields_snapshot(ctx, pid, starttime, uid, actor->process, &fields);
 
     bool have_cached = false;
     NV_APPS_LOOKUP_FIELDS cached;
 
-    if(ctx->options.label_whitelist && nv_cache_lookup_pid(pid, &cached))
+    if(ctx->options.label_whitelist && nv_cache_lookup_pid(pid, starttime, &cached))
         have_cached = true;
 
     if(fill_actor_fields) {
@@ -3051,7 +3154,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_actors(
         char actor_id[NV_TOPOLOGY_KEY_MAX];
         char display_name[NV_TOPOLOGY_KEY_MAX];
         NV_TOPOLOGY_CONTAINER_FIELDS container_fields = { 0 };
-        topology_container_fields_snapshot(ctx, (uint32_t)pa->pid, pa->uid, pa->process, &container_fields);
+        topology_container_fields_snapshot(ctx, (uint32_t)pa->pid, pa->starttime, pa->uid, pa->process, &container_fields);
 
         topology_actor_id_for_process(
             ctx,
@@ -3075,7 +3178,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_actors(
             topology_v1_add_process_row(payload, actor_index, pa);
             topology_v1_add_cgroup_row(payload, actor_index, pa->pid, &container_fields);
             topology_v1_enrich_process_actor_from_cache(
-                ctx, payload, actor_index, &payload->actors[actor_index], (uint32_t)pa->pid, pa->uid, false);
+                ctx, payload, actor_index, &payload->actors[actor_index], (uint32_t)pa->pid, pa->starttime, pa->uid, false);
             if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
                 topology_v1_add_actor_label_if_set(payload, actor_index, "process", pa->process, "attribute");
             topology_v1_add_actor_label_if_set(payload, actor_index, "username", pa->username, "attribute");
@@ -3106,7 +3209,8 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_actors(
             topology_v1_strncpy(actor->local_ip, sizeof(actor->local_ip), pa->local_ip);
             topology_v1_strncpy(actor->local_address_space, sizeof(actor->local_address_space), pa->local_address_space);
             topology_v1_strncpy(actor->cmdline, sizeof(actor->cmdline), pa->cmdline);
-            topology_v1_enrich_process_actor_from_cache(ctx, payload, actor_index, actor, (uint32_t)pa->pid, pa->uid, true);
+            topology_v1_enrich_process_actor_from_cache(
+                ctx, payload, actor_index, actor, (uint32_t)pa->pid, pa->starttime, pa->uid, true);
             actor->pid = (uint64_t)pa->pid;
             actor->ppid = (uint64_t)pa->ppid;
             actor->uid = (uint64_t)pa->uid;
@@ -3159,7 +3263,8 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_actors(
         topology_v1_add_actor_label_uint(payload, actor_index, "net_ns_inode", pa->net_ns_inode, pid_label_kind);
 
         if(ctx->options.group_by != NV_TOPOLOGY_GROUP_BY_PID)
-            topology_v1_enrich_process_actor_from_cache(ctx, payload, actor_index, actor, (uint32_t)pa->pid, pa->uid, false);
+            topology_v1_enrich_process_actor_from_cache(
+                ctx, payload, actor_index, actor, (uint32_t)pa->pid, pa->starttime, pa->uid, false);
 
         if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PID) {
             topology_v1_add_actor_label(payload, actor_index, "username", actor->username, "attribute");
@@ -3227,6 +3332,7 @@ static bool topology_v1_process_actor_index(
     const NV_TOPOLOGY_CONTEXT *ctx,
     NV_TOPOLOGY_V1_PAYLOAD *payload,
     uint64_t pid,
+    uint64_t starttime,
     uint64_t uid,
     uint64_t net_ns_inode,
     const char *process,
@@ -3234,7 +3340,7 @@ static bool topology_v1_process_actor_index(
     char actor_id[NV_TOPOLOGY_KEY_MAX];
     NV_TOPOLOGY_CONTAINER_FIELDS container_fields = { 0 };
     if(ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER)
-        topology_container_fields_snapshot(ctx, (uint32_t)pid, (uid_t)uid, process, &container_fields);
+        topology_container_fields_snapshot(ctx, (uint32_t)pid, starttime, (uid_t)uid, process, &container_fields);
 
     topology_actor_id_for_process(
         ctx,
@@ -3320,7 +3426,7 @@ static bool topology_v1_socket_peer_actor_index(
         NV_ENDPOINT_OWNER *owner = topology_lookup_endpoint_owner(ctx, link->net_ns_inode, link->protocol_id, ip, port, true);
         if(owner) {
             return topology_v1_process_actor_index(ctx, payload,
-                                                   owner->pid, owner->uid, owner->net_ns_inode,
+                                                   owner->pid, owner->starttime, owner->uid, owner->net_ns_inode,
                                                    owner->process, actor);
         }
 
@@ -3351,7 +3457,8 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_links(
             return abort_status;
 
         uint64_t process_actor;
-        if(!topology_v1_process_actor_index(ctx, payload, pa->pid, pa->uid, pa->net_ns_inode, pa->process, &process_actor))
+        if(!topology_v1_process_actor_index(
+               ctx, payload, pa->pid, pa->starttime, pa->uid, pa->net_ns_inode, pa->process, &process_actor))
             continue;
 
         uint64_t link_index = topology_v1_graph_link_get_or_add(
@@ -3371,7 +3478,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_collect_links(
 
         uint64_t src_actor;
         if(!topology_v1_process_actor_index(ctx, payload,
-                                            source->pid, source->uid, source->net_ns_inode,
+                                            source->pid, source->starttime, source->uid, source->net_ns_inode,
                                             source->process, &src_actor))
             continue;
 

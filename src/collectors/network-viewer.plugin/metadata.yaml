@@ -119,7 +119,7 @@ modules:
                 - name: peer_connect_attempts
                 - name: peer_disconnects
             - name: netdata.collector.ipc.apps_lookup.client.worker_request_duration_ms
-              description: APPS_LOOKUP worker request duration cumulative histogram
+              description: APPS_LOOKUP worker request duration buckets
               unit: "requests/s"
               chart_type: stacked
               dimensions:
@@ -132,7 +132,7 @@ modules:
                 - name: le_1000ms
                 - name: gt_1000ms
             - name: netdata.collector.ipc.apps_lookup.client.function_handler_overhead_ms
-              description: APPS_LOOKUP Function handler cache-check and intake-enqueue overhead cumulative histogram
+              description: APPS_LOOKUP Function handler cache-check and intake-enqueue overhead buckets
               unit: "calls/s"
               chart_type: stacked
               dimensions:

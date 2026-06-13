@@ -101,17 +101,17 @@ static void cgroup_lookup_record_request(bool success, usec_t duration_ut)
 
     if (duration_ut <= 1000)
         __atomic_add_fetch(&cgroup_lookup_duration_le_1ms, 1, __ATOMIC_RELAXED);
-    if (duration_ut <= 5000)
+    else if (duration_ut <= 5000)
         __atomic_add_fetch(&cgroup_lookup_duration_le_5ms, 1, __ATOMIC_RELAXED);
-    if (duration_ut <= 10000)
+    else if (duration_ut <= 10000)
         __atomic_add_fetch(&cgroup_lookup_duration_le_10ms, 1, __ATOMIC_RELAXED);
-    if (duration_ut <= 50000)
+    else if (duration_ut <= 50000)
         __atomic_add_fetch(&cgroup_lookup_duration_le_50ms, 1, __ATOMIC_RELAXED);
-    if (duration_ut <= 100000)
+    else if (duration_ut <= 100000)
         __atomic_add_fetch(&cgroup_lookup_duration_le_100ms, 1, __ATOMIC_RELAXED);
-    if (duration_ut <= 500000)
+    else if (duration_ut <= 500000)
         __atomic_add_fetch(&cgroup_lookup_duration_le_500ms, 1, __ATOMIC_RELAXED);
-    if (duration_ut <= USEC_PER_SEC)
+    else if (duration_ut <= USEC_PER_SEC)
         __atomic_add_fetch(&cgroup_lookup_duration_le_1000ms, 1, __ATOMIC_RELAXED);
     else
         __atomic_add_fetch(&cgroup_lookup_duration_gt_1000ms, 1, __ATOMIC_RELAXED);

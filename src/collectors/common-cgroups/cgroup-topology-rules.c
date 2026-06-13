@@ -2,6 +2,8 @@
 
 #include "cgroup-topology-rules.h"
 
+#include <ctype.h>
+
 typedef struct {
     const char *suffix;
     const char *kind;
@@ -138,6 +140,230 @@ bool cgroup_topology_parse_user_slice_uid(const char *cgroup_path, uint32_t *uid
         return true;
 
     return cgroup_topology_parse_uid_after_token(cgroup_path, "user@", uid);
+}
+
+static void cgroup_topology_copy_label(
+    CGROUP_TOPOLOGY_LABEL_LOOKUP_CB lookup_cb,
+    void *lookup_data,
+    const char *key,
+    char *dst,
+    size_t dst_size)
+{
+    if(!dst || !dst_size)
+        return;
+
+    dst[0] = '\0';
+
+    if(!lookup_cb || !key || !*key)
+        return;
+
+    const char *value = lookup_cb(lookup_data, key);
+    if(value && *value)
+        strncpyz(dst, value, dst_size - 1);
+}
+
+static bool cgroup_topology_suffix_is_alnum_hash(const char *s)
+{
+    if(!s || !*s)
+        return false;
+
+    size_t len = strlen(s);
+    if(len < 5 || len > 16)
+        return false;
+
+    bool has_digit = false;
+    for(const char *p = s; *p; p++) {
+        if(!isalnum((unsigned char)*p))
+            return false;
+        if(isdigit((unsigned char)*p))
+            has_digit = true;
+    }
+
+    return has_digit;
+}
+
+static bool cgroup_topology_suffix_is_alnum_token(const char *s)
+{
+    if(!s || !*s)
+        return false;
+
+    size_t len = strlen(s);
+    if(len < 5 || len > 16)
+        return false;
+
+    for(const char *p = s; *p; p++) {
+        if(!isalnum((unsigned char)*p))
+            return false;
+    }
+
+    return true;
+}
+
+static bool cgroup_topology_suffix_is_uint(const char *s)
+{
+    if(!s || !*s)
+        return false;
+
+    for(const char *p = s; *p; p++) {
+        if(!isdigit((unsigned char)*p))
+            return false;
+    }
+
+    return true;
+}
+
+static bool cgroup_topology_strip_one_suffix(
+    const char *value,
+    bool (*suffix_ok)(const char *),
+    char *dst,
+    size_t dst_size)
+{
+    if(!value || !*value || !suffix_ok || !dst || !dst_size)
+        return false;
+
+    const char *dash = strrchr(value, '-');
+    if(!dash || dash == value || !suffix_ok(dash + 1))
+        return false;
+
+    size_t len = (size_t)(dash - value);
+    if(len >= dst_size)
+        len = dst_size - 1;
+    memcpy(dst, value, len);
+    dst[len] = '\0';
+    return len > 0;
+}
+
+static bool cgroup_topology_strip_replicaset_suffixes(
+    const char *pod_name,
+    bool (*suffix_ok)(const char *),
+    char *dst,
+    size_t dst_size)
+{
+    char without_pod_hash[CGROUP_TOPOLOGY_K8S_NAME_MAX];
+    if(!cgroup_topology_strip_one_suffix(pod_name, suffix_ok, without_pod_hash, sizeof(without_pod_hash)))
+        return false;
+
+    return cgroup_topology_strip_one_suffix(without_pod_hash, suffix_ok, dst, dst_size);
+}
+
+static void cgroup_topology_derive_k8s_workload(
+    CGROUP_TOPOLOGY_LABEL_LOOKUP_CB lookup_cb,
+    void *lookup_data,
+    char *dst,
+    size_t dst_size)
+{
+    if(!dst || !dst_size)
+        return;
+
+    dst[0] = '\0';
+
+    if(!lookup_cb)
+        return;
+
+    const char *controller_name = lookup_cb(lookup_data, "k8s_controller_name");
+    if(controller_name && *controller_name) {
+        strncpyz(dst, controller_name, dst_size - 1);
+        return;
+    }
+
+    const char *pod_name = lookup_cb(lookup_data, "k8s_pod_name");
+    if(!pod_name || !*pod_name)
+        return;
+
+    const char *controller_kind = lookup_cb(lookup_data, "k8s_controller_kind");
+    if(controller_kind && *controller_kind) {
+        if(strcmp(controller_kind, "ReplicaSet") == 0) {
+            (void)cgroup_topology_strip_replicaset_suffixes(
+                pod_name, cgroup_topology_suffix_is_alnum_token, dst, dst_size);
+            return;
+        }
+        if(strcmp(controller_kind, "DaemonSet") == 0) {
+            (void)cgroup_topology_strip_one_suffix(
+                pod_name, cgroup_topology_suffix_is_alnum_token, dst, dst_size);
+            return;
+        }
+        if(strcmp(controller_kind, "StatefulSet") == 0) {
+            (void)cgroup_topology_strip_one_suffix(
+                pod_name, cgroup_topology_suffix_is_uint, dst, dst_size);
+            return;
+        }
+    }
+
+    if(cgroup_topology_strip_replicaset_suffixes(
+           pod_name, cgroup_topology_suffix_is_alnum_hash, dst, dst_size))
+        return;
+    if(cgroup_topology_strip_one_suffix(
+           pod_name, cgroup_topology_suffix_is_alnum_hash, dst, dst_size))
+        return;
+    (void)cgroup_topology_strip_one_suffix(pod_name, cgroup_topology_suffix_is_uint, dst, dst_size);
+}
+
+void cgroup_topology_derive_label_fields(
+    CGROUP_TOPOLOGY_LABEL_LOOKUP_CB lookup_cb,
+    void *lookup_data,
+    const char *cgroup_name,
+    CGROUP_TOPOLOGY_DERIVED_LABELS *out)
+{
+    if(!out)
+        return;
+
+    *out = (CGROUP_TOPOLOGY_DERIVED_LABELS){ 0 };
+
+    cgroup_topology_copy_label(
+        lookup_cb, lookup_data, "k8s_pod_name", out->k8s_pod_name, sizeof(out->k8s_pod_name));
+    cgroup_topology_copy_label(
+        lookup_cb, lookup_data, "k8s_namespace", out->k8s_namespace, sizeof(out->k8s_namespace));
+    cgroup_topology_derive_k8s_workload(
+        lookup_cb, lookup_data, out->k8s_workload, sizeof(out->k8s_workload));
+    cgroup_topology_copy_label(
+        lookup_cb, lookup_data, "image", out->docker_image, sizeof(out->docker_image));
+
+    const char *container_name = lookup_cb ? lookup_cb(lookup_data, "k8s_container_name") : NULL;
+    if(!container_name || !*container_name)
+        container_name = lookup_cb ? lookup_cb(lookup_data, "container_name") : NULL;
+    if(!container_name || !*container_name)
+        container_name = cgroup_name;
+    if(container_name && *container_name)
+        strncpyz(out->container_name, container_name, sizeof(out->container_name) - 1);
+}
+
+static bool cgroup_topology_orchestrator_uses_cgroup_name_identity(uint16_t orchestrator)
+{
+    switch(orchestrator) {
+        case NIPC_ORCHESTRATOR_DOCKER:
+        case NIPC_ORCHESTRATOR_K8S:
+        case NIPC_ORCHESTRATOR_KVM:
+        case NIPC_ORCHESTRATOR_LXC:
+        case NIPC_ORCHESTRATOR_PODMAN:
+        case NIPC_ORCHESTRATOR_NSPAWN:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool cgroup_topology_has_container_identity(
+    uint16_t cgroup_status,
+    uint16_t orchestrator,
+    CGROUP_TOPOLOGY_LABEL_LOOKUP_CB lookup_cb,
+    void *lookup_data,
+    const char *cgroup_name)
+{
+    if(cgroup_status != NIPC_APPS_CGROUP_KNOWN)
+        return false;
+
+    const char *label = lookup_cb ? lookup_cb(lookup_data, "k8s_container_name") : NULL;
+    if(label && *label)
+        return true;
+
+    label = lookup_cb ? lookup_cb(lookup_data, "container_name") : NULL;
+    if(label && *label)
+        return true;
+
+    if(!cgroup_topology_orchestrator_uses_cgroup_name_identity(orchestrator))
+        return false;
+
+    return cgroup_name && *cgroup_name;
 }
 
 bool cgroup_topology_derive_systemd_unit(

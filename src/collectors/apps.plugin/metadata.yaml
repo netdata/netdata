@@ -243,7 +243,7 @@ modules:
                 - name: peer_connect_attempts
                 - name: peer_disconnects
             - name: netdata.collector.ipc.cgroups_lookup.client.request_duration_ms
-              description: CGROUPS_LOOKUP client request duration cumulative histogram
+              description: CGROUPS_LOOKUP client request duration buckets
               unit: "requests/s"
               chart_type: line
               dimensions:
@@ -269,7 +269,7 @@ modules:
                 - name: requests_responded
                 - name: requests_error
             - name: netdata.collector.ipc.apps_lookup.server.request_duration_ms
-              description: APPS_LOOKUP server request duration cumulative histogram
+              description: APPS_LOOKUP server request duration buckets
               unit: "requests/s"
               chart_type: line
               dimensions:

@@ -2,6 +2,8 @@
 
 #include "libnetdata/netipc/netipc_netdata.h"
 
+#include <sys/stat.h>
+
 static const char *test_run_dir = NULL;
 
 static const char *test_os_run_dir(bool rw __maybe_unused)
@@ -246,6 +248,14 @@ static bool run_roundtrip_test(const char *run_dir)
         goto cleanup_server;
     server_initialized = true;
 
+    char socket_path[FILENAME_MAX + 1];
+    snprintfz(socket_path, sizeof(socket_path), "%s/%s.sock", run_dir, NV_APPS_LOOKUP_SERVICE_NAME);
+    struct stat socket_stat;
+    if (!expect_ok(stat(socket_path, &socket_stat) == 0, "mock APPS_LOOKUP socket stat failed"))
+        goto cleanup_server;
+    if (!expect_ok((socket_stat.st_mode & 0777) == 0600, "mock APPS_LOOKUP socket mode is not owner-only"))
+        goto cleanup_server;
+
     server_thread = nd_thread_create("appslookup-t", 0, mock_server_thread, &server);
     if (!expect_ok(server_thread != NULL, "mock APPS_LOOKUP server thread creation failed"))
         goto cleanup_server;
@@ -262,7 +272,7 @@ static bool run_roundtrip_test(const char *run_dir)
     if (!expect_ok(wait_for_cache_entries(3), "known, retry-later, and permanent PIDs were not cached"))
         goto cleanup_client;
     NV_APPS_LOOKUP_FIELDS cached;
-    if (!expect_ok(nv_cache_lookup_pid(100, &cached), "known PID cache accessor missed"))
+    if (!expect_ok(nv_cache_lookup_pid(100, 123456789, &cached), "known PID cache accessor missed"))
         goto cleanup_client;
     bool cached_ok =
         expect_ok(cached.cgroup_status == NIPC_APPS_CGROUP_KNOWN, "cached cgroup status mismatch") &&
@@ -275,7 +285,7 @@ static bool run_roundtrip_test(const char *run_dir)
     nv_cache_lookup_fields_free(&cached);
     if (!cached_ok)
         goto cleanup_client;
-    if (!expect_ok(nv_cache_lookup_pid(200, &cached), "retry-later PID partial cache accessor missed"))
+    if (!expect_ok(nv_cache_lookup_pid(200, 223456789, &cached), "retry-later PID partial cache accessor missed"))
         goto cleanup_client;
     bool partial_ok =
         expect_ok(cached.cgroup_status == NIPC_APPS_CGROUP_UNKNOWN_RETRY_LATER, "retry-later PID cgroup status mismatch") &&
@@ -285,7 +295,7 @@ static bool run_roundtrip_test(const char *run_dir)
     nv_cache_lookup_fields_free(&cached);
     if (!partial_ok)
         goto cleanup_client;
-    if (!expect_ok(nv_cache_lookup_pid(300, &cached), "permanent PID partial cache accessor missed"))
+    if (!expect_ok(nv_cache_lookup_pid(300, 323456789, &cached), "permanent PID partial cache accessor missed"))
         goto cleanup_client;
     bool permanent_ok =
         expect_ok(cached.cgroup_status == NIPC_APPS_CGROUP_UNKNOWN_PERMANENT, "permanent PID cgroup status mismatch") &&
@@ -328,6 +338,14 @@ static bool run_roundtrip_test(const char *run_dir)
         counter_value(&apps_lookup_handler_overhead_le_1ms) +
         counter_value(&apps_lookup_handler_overhead_le_5ms);
     if (!expect_ok(handler_le_5ms >= 12, "Function handler overhead exceeded the local 5ms bucket"))
+        goto cleanup_client;
+
+    uint64_t pid_reuse_evictions_before = counter_value(&apps_lookup_cache_evictions_pid_reuse);
+    if (!expect_ok(!nv_cache_lookup_pid(100, 999999, &cached), "PID reuse cache accessor returned stale entry"))
+        goto cleanup_client;
+    if (!expect_ok(
+            counter_value(&apps_lookup_cache_evictions_pid_reuse) == pid_reuse_evictions_before + 1,
+            "PID reuse cache accessor did not record eviction"))
         goto cleanup_client;
 
     rc = 0;

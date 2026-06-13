@@ -725,6 +725,24 @@ static void __attribute__((destructor)) destroy_mutex(void) {
 static bool apps_plugin_exit = false;
 static bool apps_lookup_server_started = false;
 
+#define APPS_LOOKUP_NETIPC_RETRY_SEC 5
+
+static usec_t apps_lookup_netipc_next_retry_ut = 0;
+
+static void apps_lookup_netipc_try_start(void)
+{
+    if (apps_lookup_server_started)
+        return;
+
+    usec_t now_ut = now_monotonic_usec();
+    if (apps_lookup_netipc_next_retry_ut && now_ut < apps_lookup_netipc_next_retry_ut)
+        return;
+
+    apps_lookup_server_started = apps_lookup_netipc_init();
+    apps_lookup_netipc_next_retry_ut =
+        apps_lookup_server_started ? 0 : now_ut + APPS_LOOKUP_NETIPC_RETRY_SEC * USEC_PER_SEC;
+}
+
 int main(int argc, char **argv) {
     nd_log_initialize_for_external_plugins("apps.plugin");
     netdata_threads_init_for_external_plugins(0);
@@ -841,6 +859,8 @@ int main(int argc, char **argv) {
         else
             dt = heartbeat_next(&hb);
 
+        apps_lookup_netipc_try_start();
+
         netdata_mutex_lock(&apps_and_stdout_mutex);
 
         struct pollfd pollfd = { .fd = fileno(stdout), .events = POLLERR };
@@ -875,9 +895,6 @@ int main(int argc, char **argv) {
 #endif
 
         __atomic_add_fetch(&apps_collection_generation, 1, __ATOMIC_RELEASE);
-
-        if (!apps_lookup_server_started)
-            apps_lookup_server_started = apps_lookup_netipc_init();
 
         apps_cgroups_lookup_scan_pids();
         netdata_mutex_unlock(&apps_pids_mutex);
