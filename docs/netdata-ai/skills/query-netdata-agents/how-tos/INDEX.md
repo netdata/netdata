@@ -85,6 +85,7 @@ skill-verification harness questions for `verify/questions.md`; replace each
 
 - `current-cpu-direct.md` (stub -- not yet authored)
 - `peak-memory-last-hour-direct.md` (stub -- not yet authored)
+- [verify-local-collector-contexts.md](./verify-local-collector-contexts.md) -- confirm that a local collector emits expected contexts/dimensions and that obsolete contexts are absent.
 
 ## Cross-skill how-tos
 

@@ -28,6 +28,7 @@ int do_GetSystemUptime(int update_every, usec_t dt);
 int do_GetSystemRAM(int update_every, usec_t dt);
 int do_GetSystemCPU(int update_every, usec_t dt);
 int do_GetPowerSupply(int update_every, usec_t dt);
+int do_GetFans(int update_every, usec_t dt);
 int do_GetServicesStatus(int update_every, usec_t dt);
 int do_GetHardwareInfo(int update_every, usec_t dt);
 int do_GetSensors(int update_every, usec_t dt);
@@ -53,6 +54,7 @@ int do_PerflibSMB(int update_every, usec_t dt __maybe_unused);
 
 // Cleanup
 void do_GetHardwareInfo_cleanup();
+void do_GetFans_cleanup();
 void do_Sensors_cleanup();
 void do_GetServicesStatus_cleanup();
 void do_GetSystemCPU_cleanup();

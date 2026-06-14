@@ -1,0 +1,18 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: smartctl
+placements:
+  - id: smartctl
+    section_id: system.hardware
+    title: S.M.A.R.T.
+    items:
+      - smartctl.device_smart_status
+      - smartctl.device_ata_smart_error_log_count
+      - smartctl.device_power_on_time
+      - smartctl.device_temperature
+      - smartctl.device_power_cycles_count
+      - smartctl.device_read_errors_rate
+      - smartctl.device_write_errors_rate
+      - smartctl.device_verify_errors_rate
+      - smartctl.device_smart_attr_{attribute_name}
+      - smartctl.device_smart_attr_{attribute_name}_normalized

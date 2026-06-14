@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -85,7 +87,11 @@ func TestCollector_Init(t *testing.T) {
 			if test.wantFail {
 				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init(context.Background()))
+				err := collr.Init(context.Background())
+				if runtime.GOOS == "windows" && err != nil && strings.Contains(err.Error(), "executable not found") {
+					t.Skipf("smartctl.exe is not installed on this Windows test host: %v", err)
+				}
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -123,6 +129,27 @@ func TestCollector_Cleanup(t *testing.T) {
 			collr := test.prepare()
 
 			assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
+		})
+	}
+}
+
+func TestDirectSmartctlScanArgs(t *testing.T) {
+	tests := map[string]struct {
+		open bool
+		want []string
+	}{
+		"scan": {
+			want: []string{"--json", "--scan"},
+		},
+		"scan open": {
+			open: true,
+			want: []string{"--json", "--scan-open"},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, test.want, directSmartctlScanArgs(test.open))
 		})
 	}
 }
