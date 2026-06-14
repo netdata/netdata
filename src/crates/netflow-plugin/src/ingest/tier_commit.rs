@@ -29,6 +29,10 @@ const TIER_WAKE_STAGGER_USEC: [u64; 3] = [1_000_000, 2_000_000, 3_000_000];
 const WORKER_STACK_BYTES: usize = 512 * 1024;
 const SHUTDOWN_JOIN_TIMEOUT: Duration = Duration::from_secs(30);
 
+#[cfg(test)]
+static TIER_ROW_READ_RELEASE_HOOK: Mutex<Option<std::sync::Arc<dyn Fn() + Send + Sync>>> =
+    Mutex::new(None);
+
 fn tier_bit(index: usize) -> u32 {
     1 << index
 }
@@ -282,8 +286,7 @@ fn worker_loop(shared: &TierHandoffShared, mut worker: TierWorker) {
             let mut slot = sync
                 .ready
                 .wait_while(slot, |slot| {
-                    slot.generation == seen_generation
-                        && !shared.shutdown.load(Ordering::Relaxed)
+                    slot.generation == seen_generation && !shared.shutdown.load(Ordering::Relaxed)
                 })
                 .unwrap_or_else(|_| std::process::abort());
             seen_generation = slot.generation;
@@ -358,6 +361,10 @@ fn commit_and_return(
 /// Per-commit durability for the long-retention tiers, with the loud-failure
 /// policy: three consecutive sync failures abort the process.
 fn sync_with_failure_policy(worker: &mut TierWorker) {
+    worker
+        .metrics
+        .tier_journal_syncs
+        .fetch_add(1, Ordering::Relaxed);
     if let Err(err) = worker.writer.sync() {
         worker
             .metrics
@@ -412,6 +419,10 @@ fn drain_and_exit(
             &worker.metrics,
         );
     }
+    worker
+        .metrics
+        .tier_journal_syncs
+        .fetch_add(1, Ordering::Relaxed);
     if let Err(err) = worker.writer.sync() {
         worker
             .metrics
@@ -473,9 +484,7 @@ pub(super) fn commit_batch(
     metrics: &IngestMetrics,
 ) {
     for (bucket_start, bucket) in batch {
-        let row_timestamp_usec = bucket_start
-            .saturating_add(bucket_usec)
-            .saturating_sub(1);
+        let row_timestamp_usec = bucket_start.saturating_add(bucket_usec).saturating_sub(1);
         for (&flow_ref, &row_metrics) in bucket {
             let contribution = {
                 // Poison means a thread panicked holding the store; the
@@ -487,6 +496,7 @@ pub(super) fn commit_batch(
                 });
                 indexes.emit_row(flow_ref, row_metrics, encode_buf)
             };
+            after_tier_row_index_read_for_test();
             let Some(contribution) = contribution else {
                 tracing::warn!("failed to emit tier flow {:?} for {:?}", flow_ref, tier);
                 continue;
@@ -517,12 +527,44 @@ pub(super) fn commit_batch(
 }
 
 #[cfg(test)]
+fn after_tier_row_index_read_for_test() {
+    let hook = TIER_ROW_READ_RELEASE_HOOK
+        .lock()
+        .expect("tier row-read hook mutex poisoned")
+        .clone();
+    if let Some(hook) = hook {
+        hook();
+    }
+}
+
+#[cfg(not(test))]
+fn after_tier_row_index_read_for_test() {}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::flow::FlowRecord;
     use crate::tiering::FlowMetrics;
     use std::sync::Arc;
     use std::sync::atomic::AtomicBool;
+    use std::sync::atomic::AtomicUsize;
+
+    struct TierRowReadHookGuard;
+
+    impl Drop for TierRowReadHookGuard {
+        fn drop(&mut self) {
+            *TIER_ROW_READ_RELEASE_HOOK
+                .lock()
+                .expect("tier row-read hook mutex poisoned") = None;
+        }
+    }
+
+    fn install_tier_row_read_hook(hook: Arc<dyn Fn() + Send + Sync>) -> TierRowReadHookGuard {
+        *TIER_ROW_READ_RELEASE_HOOK
+            .lock()
+            .expect("tier row-read hook mutex poisoned") = Some(hook);
+        TierRowReadHookGuard
+    }
     use std::time::{Duration, Instant};
 
     /// Compile-time gate for the whole worker-ownership design: the SDK's
@@ -566,7 +608,9 @@ mod tests {
             5
         );
         assert_eq!(
-            metrics.minute_5_commit_duration_usec.load(Ordering::Relaxed),
+            metrics
+                .minute_5_commit_duration_usec
+                .load(Ordering::Relaxed),
             1234
         );
         assert_eq!(metrics.minute_5_commit_batches.load(Ordering::Relaxed), 7);
@@ -575,6 +619,80 @@ mod tests {
         metrics.store_tier_commit_telemetry(TierKind::Raw, now, &telemetry);
         assert_eq!(metrics.minute_1_commit_batches.load(Ordering::Relaxed), 0);
         assert_eq!(metrics.hour_1_commit_batches.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn commit_batch_releases_flow_index_read_lock_between_rows() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let origin = Origin {
+            machine_id: None,
+            namespace: None,
+            source: Source::System,
+        };
+        let rotation = RotationPolicy::default().with_size_of_journal_file(1024 * 1024);
+        let retention = RetentionPolicy::default();
+        let mut writer = Log::new(
+            tmp.path(),
+            Config::new(origin, rotation, retention)
+                .with_compact(true)
+                .with_compression(Compression::None)
+                .with_live_publish_every_entries(0),
+        )
+        .expect("create tier writer");
+        let facet_runtime = crate::facet_runtime::FacetRuntime::new(tmp.path());
+        let metrics = IngestMetrics::default();
+        let store = Arc::new(RwLock::new(TierFlowIndexStore::default()));
+        let mut bucket = MetricBucket::default();
+        let timestamp = 120_000_000_u64;
+        {
+            let mut indexes = store.write().expect("seed store");
+            for seed in [1_u32, 2] {
+                let flow_ref = indexes
+                    .get_or_insert_record_flow(timestamp, &flow_record(seed))
+                    .expect("intern flow");
+                bucket.insert(
+                    flow_ref,
+                    FlowMetrics {
+                        bytes: seed as u64,
+                        packets: 1,
+                    },
+                );
+            }
+        }
+
+        let hook_calls = Arc::new(AtomicUsize::new(0));
+        let hook_store = Arc::clone(&store);
+        let hook_counter = Arc::clone(&hook_calls);
+        let hook_thread = std::thread::current().id();
+        let _hook_guard = install_tier_row_read_hook(Arc::new(move || {
+            if std::thread::current().id() != hook_thread {
+                return;
+            }
+            let guard = hook_store
+                .try_write()
+                .expect("flow-index write lock must be available between committed rows");
+            drop(guard);
+            hook_counter.fetch_add(1, Ordering::Relaxed);
+        }));
+
+        let mut encode_buf = JournalEncodeBuffer::new();
+        commit_batch(
+            TierKind::Minute1,
+            60_000_000,
+            &[(60_000_000, bucket)],
+            &store,
+            &mut writer,
+            &mut encode_buf,
+            &facet_runtime,
+            &metrics,
+        );
+
+        assert_eq!(
+            hook_calls.load(Ordering::Relaxed),
+            2,
+            "hook must run once per committed row"
+        );
+        assert_eq!(metrics.tier_entries_written.load(Ordering::Relaxed), 2);
     }
 
     /// Manual measurement gate (SOW step 5, gate b): the tick's prune holds

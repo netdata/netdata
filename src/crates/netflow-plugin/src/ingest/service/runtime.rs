@@ -4,13 +4,8 @@ use super::IngestService;
 impl IngestService {
     pub(crate) async fn run(mut self, shutdown: CancellationToken) -> Result<()> {
         self.rebuild_materialized_from_raw().await?;
-        self.spawn_tier_commit_workers();
 
-        let listen = self.cfg.listener.listen.clone();
-        let socket = UdpSocket::bind(&listen)
-            .await
-            .with_context(|| format!("failed to bind {}", listen))?;
-        Self::expand_receive_buffer(&socket, &listen);
+        let socket = self.bind_listener_and_start_workers().await?;
         let mut buffer = vec![0_u8; self.cfg.listener.max_packet_size];
         let mut entries_since_sync = 0_usize;
         let mut sync_tick = tokio::time::interval(self.cfg.listener.sync_interval);
@@ -44,6 +39,16 @@ impl IngestService {
 
         self.finish_shutdown(entries_since_sync);
         Ok(())
+    }
+
+    async fn bind_listener_and_start_workers(&mut self) -> Result<UdpSocket> {
+        let listen = self.cfg.listener.listen.clone();
+        let socket = UdpSocket::bind(&listen)
+            .await
+            .with_context(|| format!("failed to bind {}", listen))?;
+        Self::expand_receive_buffer(&socket, &listen);
+        self.spawn_tier_commit_workers();
+        Ok(socket)
     }
 
     fn handle_sync_tick(&mut self, entries_since_sync: usize) -> usize {
@@ -88,7 +93,11 @@ impl IngestService {
         const REQUESTED_RECV_BUFFER_BYTES: usize = 64 * 1024 * 1024;
         let sock_ref = socket2::SockRef::from(socket);
         if let Err(err) = sock_ref.set_recv_buffer_size(REQUESTED_RECV_BUFFER_BYTES) {
-            tracing::warn!("failed to expand UDP receive buffer for {}: {}", listen, err);
+            tracing::warn!(
+                "failed to expand UDP receive buffer for {}: {}",
+                listen,
+                err
+            );
             return;
         }
         match sock_ref.recv_buffer_size() {
@@ -99,7 +108,11 @@ impl IngestService {
                 REQUESTED_RECV_BUFFER_BYTES
             ),
             Err(err) => {
-                tracing::warn!("failed to read back UDP receive buffer for {}: {}", listen, err);
+                tracing::warn!(
+                    "failed to read back UDP receive buffer for {}: {}",
+                    listen,
+                    err
+                );
             }
         }
     }
@@ -256,13 +269,13 @@ impl IngestService {
             return;
         };
         if let Err(err) = tier_writers.sync_all() {
-            tracing::warn!("failed to sync rebuilt tier journals before worker handoff: {}", err);
+            tracing::warn!(
+                "failed to sync rebuilt tier journals before worker handoff: {}",
+                err
+            );
         }
-        let workers = tier_writers.into_workers(
-            &self.tier_flow_indexes,
-            &self.facet_runtime,
-            &self.metrics,
-        );
+        let workers =
+            tier_writers.into_workers(&self.tier_flow_indexes, &self.facet_runtime, &self.metrics);
         self.tier_worker_handles =
             super::tier_commit::spawn_tier_workers(&self.tier_handoff, workers);
     }
@@ -398,6 +411,17 @@ impl IngestService {
     #[cfg(test)]
     pub(crate) fn spawn_tier_commit_workers_for_test(&mut self) {
         self.spawn_tier_commit_workers();
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn bind_listener_and_start_workers_for_test(&mut self) -> Result<()> {
+        let _socket = self.bind_listener_and_start_workers().await?;
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn tier_commit_workers_started_for_test(&self) -> bool {
+        !self.tier_worker_handles.is_empty()
     }
 
     #[cfg(test)]

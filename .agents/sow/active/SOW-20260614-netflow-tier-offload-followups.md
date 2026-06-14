@@ -6,9 +6,9 @@ Status: in-progress
 
 Sub-state: items extracted from the completed tier-offload SOW (shipped as
 PR #22703). The requested prerequisite netflow published journal SDK refresh to
-0.6.4 is implemented and validated. Follow-up item disposition is still pending;
-each item below is independent work, and this SOW is the tracking record until
-each item is implemented, rejected with evidence, or filed as a GitHub issue.
+0.6.4 is implemented and validated. User decision on 2026-06-14: no deferred
+follow-ups for this PR; every finding below must be fixed in PR #22703 or
+rejected with evidence in this SOW.
 
 ## Requirements
 
@@ -17,7 +17,7 @@ each item is implemented, rejected with evidence, or filed as a GitHub issue.
 Track and dispose of the follow-up items surfaced by the netflow tier-commit
 offload work (PR #22703) and its 4 external-review rounds, so none are lost.
 Fit-for-purpose: each item must end as implemented, rejected-with-evidence,
-or a tracked GitHub issue before this SOW closes.
+before this SOW closes.
 
 ### User Request
 
@@ -25,100 +25,175 @@ After confirming the tier-offload work was externally reviewed, the user
 asked to close the current SOW and "create an SOW for the pending items and
 let's address them."
 
+Latest user decision: address all issues for long-term-best in PR #22703.
+No deferral: either dismiss a finding with evidence or fix it in this PR.
+
 ### Assistant Understanding
 
 Facts:
 
-- The tier-offload work is merged-pending as PR #22703 (rebased onto master,
-  487 tests green, MERGEABLE).
-- The items below were identified during implementation/review and explicitly
-  recorded as out-of-scope-for-the-offload-PR follow-ups (Scope discipline:
-  each is independent — the offload clean end state is complete without it).
+- The tier-offload work is open as PR #22703.
+- The original follow-up list mixed direct offload findings with broader
+  migration debt and pre-existing limitations; this SOW now separates those
+  classes and gives each one a terminal disposition.
+- A later PR review against `upstream/master` found two direct tier-worker
+  follow-ups: the cubic startup-leak comment is valid, and worker-mode tier
+  sync attempts are not counted in tier sync telemetry.
 
 Unknowns:
 
-- Which items the user wants done now vs. deferred vs. rejected (this is the
-  decision this SOW exists to capture).
+- None for scope. Implementation may still reject a finding if investigation
+  proves it is not a valid PR #22703 issue or cannot be implemented in this
+  repository without violating the approved dependency boundary.
 
 ### Acceptance Criteria
 
 - Every item below reaches a terminal disposition (implemented / rejected
-  with evidence / tracked GitHub issue), recorded here.
+  with evidence), recorded here. No item may be left as deferred or only
+  tracked externally.
 - Prerequisite SDK refresh: `netflow-plugin` depends on published
   `systemd-journal-sdk-*` crates version 0.6.4, the lockfile resolves those
-  crates at 0.6.4, and netflow validation passes before item-1 work starts.
+  crates at 0.6.4, and netflow validation passes before follow-up
+  implementation starts.
+- Fixed items have targeted regression coverage, and `cargo test -p
+  netflow-plugin` passes.
 
 ## Pending Items
 
 Each item: source, evidence, type, blast radius, recommendation.
 
-1. **Facet state persistence holds a Mutex across disk writes** (pre-existing
+1. **Tier workers are spawned before UDP bind succeeds** (cubic PR comment;
+   direct offload bug).
+   - Evidence: `src/crates/netflow-plugin/src/ingest/service/runtime.rs:7`
+     calls `spawn_tier_commit_workers()` before
+     `src/crates/netflow-plugin/src/ingest/service/runtime.rs:10-12` binds the
+     UDP socket.
+   - Evidence: `src/crates/netflow-plugin/src/ingest/service/runtime.rs:45`
+     calls `finish_shutdown()` only after the receive loop; the bind-error path
+     returns before `src/crates/netflow-plugin/src/ingest/service/runtime.rs:242`
+     can call `tier_handoff.begin_shutdown()`.
+   - Type: bug fix, behavioral. Blast radius: ingest service startup and tier
+     worker lifecycle.
+   - Disposition target: **fix in PR #22703**.
+   - Recommendation (surgical): fix before merge by moving worker spawn after
+     successful bind and receive-buffer setup, or by adding an explicit
+     bind-error shutdown path. Add a regression test that binds an already-used
+     UDP address and proves `run()` returns the bind error without leaving tier
+     workers alive.
+
+2. **Worker-mode tier sync attempts are not counted in telemetry** (direct
+   offload observability bug).
+   - Evidence: pre-worker tier sync increments `tier_journal_syncs` at
+     `src/crates/netflow-plugin/src/ingest/service/runtime.rs:369-371`.
+   - Evidence: worker sync calls `writer.sync()` at
+     `src/crates/netflow-plugin/src/ingest/tier_commit.rs:360-382`, and final
+     drain sync calls `writer.sync()` at
+     `src/crates/netflow-plugin/src/ingest/tier_commit.rs:415-421`, but both
+     paths only increment `tier_journal_sync_errors` on failure.
+   - Type: bug fix, telemetry correctness. Blast radius: tier commit metrics
+     and materialized-tier charts/API snapshots.
+   - Disposition target: **fix in PR #22703**.
+   - Recommendation (surgical): increment `tier_journal_syncs` for every
+     worker sync attempt, including final drain if final drain is part of the
+     intended sync-call metric. Add a focused test that worker commits advance
+     tier sync-call telemetry.
+
+3. **Facet state persistence holds a Mutex across disk writes** (pre-existing
    defect, independent of offload).
    - Evidence: `src/crates/netflow-plugin/src/facet_runtime.rs` —
      `observe_rotation` holds the facet Mutex across `write_sidecar_files` +
      `persist_state_locked` (disk I/O under the lock). Surfaced repeatedly in
      review as the heaviest facet-contention case.
+   - Additional PR-review evidence:
+     `src/crates/netflow-plugin/src/facet_runtime.rs:331-349` still performs
+     sidecar/state disk writes while holding the facet lock. With tier workers,
+     this can now contend across worker and receive threads, so it remains a
+     real isolation risk even though the defect pre-dates offload.
    - Type: bug fix, behavioral. Blast radius: facet runtime, shared with the
      query task and the new tier workers.
+   - Disposition target: **fix in PR #22703**.
    - Recommendation (long-term-best): fix it — move the disk writes outside
      the lock (snapshot under lock, write unlocked). Own PR; needs its own
      review round. **Strongest candidate to do now.**
 
-2. **Stage B: move the raw-rotation fsync off the receive thread.**
+4. **Stage B: move the raw-rotation fsync off the receive thread.**
    - Evidence: the last inline disk barrier on the receive thread is the raw
      journal's sync-on-archive; removing it needs an SDK opt-out
      (`with_sync_on_archive(false)`) plus a `nf-raw-sync` worker behind the
      `Rotated` lifecycle event.
-   - Type: feature, BLOCKED on an upstream systemd-journal-sdk release.
-   - Recommendation: defer until the SDK opt-out ships; track as a GitHub
-     issue so it is not lost.
+   - Additional evidence: published `systemd-journal-sdk-log-writer` 0.6.4
+     `src/log/config.rs` exposes `Config` fields for rotation, retention,
+     compression, compact layout, open/identity mode, strict naming,
+     live-publish cadence, field policy, and file mode; there is no
+     `sync_on_archive` / `with_sync_on_archive` option.
+   - Additional evidence: published `systemd-journal-sdk-log-writer` 0.6.4
+     `src/log/mod.rs` syncs the old active file inside
+     `rotate_existing_active_file` before archiving it.
+   - Type: feature, not implementable in this repository while netflow uses the
+     published SDK boundary.
+   - Disposition target: **reject for PR #22703 with evidence**. Implementing
+     this now would require a new upstream SDK release or vendoring/patching
+     the SDK in this PR, which would undo the just-completed published-SDK
+     boundary and mix dependency ownership with tier offload.
 
-3. **Consolidate the remaining vendored journal crates** (carried from the
+5. **Consolidate the remaining vendored journal crates** (carried from the
    migration SOW / #22665).
    - Evidence: `netdata-log-viewer` and the OTEL plugins still use the
      in-tree `journal-*` crates; only netflow moved to
      `systemd-journal-sdk-*` (updated to 0.6.4 as a prerequisite in this SOW).
-   - Type: refactor/migration, cross-plugin. Blast radius: large (other
-     plugins). Recommendation: separate effort, own SOW; track as issue.
+   - Additional evidence: PR #22703's tier-offload runtime links only
+     `netflow-plugin`; the remaining vendored journal consumers are
+     `netdata-log-viewer` and `netdata-otel/otel-plugin` manifests.
+   - Type: historical cross-plugin migration debt, not a defect introduced by
+     PR #22703's tier offload.
+   - Disposition target: **reject as a PR #22703 finding with evidence**.
+     This is real repository debt, but not a valid offload correctness issue.
 
-4. **Timing-independent CI test for the per-row lock-drop property.**
+6. **Timing-independent CI test for the per-row lock-drop property.**
    - Evidence: the per-row-read-lock gate is `#[ignore]` (timing-sensitive),
      so CI cannot catch a regression that "optimizes" it into one batch-wide
      guard (deepseek round 3). Idea: a two-thread forward-progress assertion
      proving the read lock is released between rows (logical, not timing).
-   - Type: test infrastructure, low risk. Recommendation: nice-to-have; do
-     opportunistically or track as issue.
+   - Type: test infrastructure, low risk.
+   - Disposition target: **fix in PR #22703** by adding a deterministic
+     non-ignored test hook that proves a write lock can be acquired between row
+     emissions during `commit_batch`.
 
-5. **Dead code: `ready_notify` set up but never awaited** (pre-existing,
+7. **Dead code: `ready_notify` set up but never awaited** (pre-existing,
    outside the offload diff).
    - Evidence: `src/crates/netflow-plugin/src/facet_runtime.rs` —
      `ready_notify: Notify` and `mark_ready()` exist; `notify_waiters()` is a
      no-op because nothing waits (minimax round 4).
-   - Type: trivial cleanup. Recommendation: fold into the item-1 facet PR if
-     done, else a tiny standalone cleanup.
+   - Type: trivial cleanup.
+   - Disposition target: **fix in PR #22703** together with item 3.
 
-6. **Upstream SDK comment fix.**
+8. **Upstream SDK comment fix.**
    - Evidence: `systemd-journal-sdk` `GuardedCell` comment claims "NOT Send
      or Sync"; it is wrong about `Send` (`UnsafeCell` removes only `Sync`).
      Our compile probe proves `Log: Send`.
-   - Type: one-line upstream PR (separate repo). Recommendation: low priority;
-     file upstream when convenient.
+   - Type: upstream-comment defect, not a Netdata PR #22703 code finding.
+   - Disposition target: **reject as a PR #22703 finding with evidence**.
+     The Netdata-side contract is covered by the `Log: Send` compile probe.
 
-7. **Backward clock step > bucket width can re-create committed receive-time
+9. **Backward clock step > bucket width can re-create committed receive-time
    buckets** (pre-existing; not a regression).
    - Evidence: today's inline flush has the same behavior; over-counts on the
      overlapped wall-clock span, no data loss. Recorded in the offload SOW
      risk register.
-   - Type: known limitation. Recommendation: reject as not-worth-fixing
-     (recommend NTP slewing in docs), or track as a low-priority issue.
+   - Additional evidence: published `systemd-journal-sdk-log-writer` 0.6.4
+     documents and implements strict monotonic clamping for entry realtime
+     (`src/log/mod.rs`: entry realtime and monotonic overrides are clamped to
+     `last + 1us` floors).
+   - Type: pre-existing edge case, not an offload regression.
+   - Disposition target: **reject with evidence**. Adding another local
+     receive-time monotonic layer would create future-dated flow records after
+     a backward wall-clock step, which is worse for time-window queries.
 
-## Recommended disposition (for user decision)
+## Approved Disposition
 
-- **Do now (own PRs, own review rounds):** item 1 (facet lock — real defect),
-  optionally bundling item 5 (dead code) into it.
-- **Track as GitHub issues, defer:** items 2 (SDK-blocked), 3 (cross-plugin),
-  4 (test infra), 6 (upstream).
-- **Reject with evidence (doc-only):** item 7.
+- **Fix in PR #22703:** items 1, 2, 3, 6, and 7.
+- **Reject with evidence in this SOW:** items 4, 5, 8, and 9.
+- **No deferred-only items:** per user decision on 2026-06-14.
 
 ## Analysis
 
@@ -139,12 +214,18 @@ Sources checked:
   `^0.6.4`.
 - `.agents/sow/specs/netflow-tier-commit-workers.md` records the SDK-sensitive
   tier-worker contract, including the `Log: Send` compile probe.
+- PR review against `upstream/master` confirmed the cubic startup-leak comment
+  and identified a worker-mode sync telemetry gap.
+- `systemd-journal-sdk-log-writer` 0.6.4 source checked locally from the
+  published crate: no archive-sync opt-out exists; rotation still syncs the
+  archived active file inside the SDK.
+- `rg -n "journal-(common|core|engine|index|log-writer|registry)|systemd-journal-sdk"
+  src/crates -g 'Cargo.toml'` shows remaining vendored journal consumers are
+  outside `netflow-plugin`.
 
 ## Pre-Implementation Gate
 
-Status: prerequisite SDK refresh completed; follow-up item implementation still
-begins only after the user picks the items to address and the chosen item's gate
-is filled.
+Status: in-progress for the user-approved no-deferral follow-up scope.
 
 Problem / root-cause model:
 
@@ -152,8 +233,14 @@ Problem / root-cause model:
   `systemd-journal-sdk-*` crates while log-viewer and OTEL still use the
   vendored workspace journal crates.
 - Current netflow pins are 0.6.2, while crates.io reports 0.6.4 as the current
-  SDK release set. Starting item-1 facet work on the old SDK would mix a
+  SDK release set. Starting follow-up implementation on the old SDK would mix a
   dependency update with the facet behavioral fix.
+- PR #22703's worker offload is correct only if worker lifecycle, telemetry,
+  and facet-side disk work do not reintroduce receive-path stalls or lifecycle
+  leaks.
+- Some pending items are not legitimate PR #22703 findings: they are blocked
+  by the published SDK API boundary, belong to other binaries, or are already
+  mitigated by SDK behavior.
 
 Evidence reviewed:
 
@@ -175,6 +262,9 @@ Affected contracts and surfaces:
 - Rust lockfile: `src/crates/Cargo.lock`.
 - Runtime surface: netflow raw journal writes, registry scans, index/query code,
   and tier-worker commit code that uses the SDK aliases.
+- Ingest service startup and shutdown lifecycle.
+- Tier worker commit telemetry exposed through `IngestMetrics` and charts.
+- Facet runtime state/sidecar persistence and query autocomplete.
 - No public Netdata Function schema, chart context, config, or docs contract is
   expected to change.
 
@@ -183,11 +273,22 @@ Clean-end-state target:
 - `netflow-plugin` uses the published `systemd-journal-sdk-*` 0.6.4 crates for
   all six aliases.
 - `src/crates/Cargo.lock` resolves those exact SDK packages to 0.6.4.
+- PR #22703 starts tier workers only after the UDP listener is successfully
+  bound and configured.
+- Worker sync attempts are reflected in `tier_journal_syncs`.
+- Facet runtime does not hold its state mutex across sidecar/state file disk
+  writes in the rotation/update paths touched by this PR.
+- Dead `ready_notify` state is removed.
+- CI has a deterministic test for the per-row flow-index read-lock release
+  property.
+- Rejected items are recorded with concrete evidence and are not left as
+  deferred follow-ups.
 - Removed as redundant (i): no code/config/docs/tests become redundant from a
-  version-only SDK refresh.
+  version-only SDK refresh. `ready_notify` becomes redundant when item 7 is
+  fixed and must be removed.
 - Excluded coupled items (ii): consolidating `netdata-log-viewer` and OTEL from
-  vendored journal crates remains pending item 3 because it is cross-plugin,
-  high-blast-radius migration work and not required for this prerequisite.
+  vendored journal crates is rejected as a PR #22703 finding because it is
+  outside the tier-offload binary and was not introduced by this PR.
 - Reference search: `rg -n "0\\.6\\.2|systemd-journal-sdk" src/crates/Cargo.toml
   src/crates/Cargo.lock src/crates/netflow-plugin/Cargo.toml
   src/crates/netflow-plugin -g 'Cargo.toml' -g 'Cargo.lock' -g '*.rs'` found
@@ -224,11 +325,19 @@ Sensitive data handling plan:
 
 Implementation plan:
 
-1. Update the six published SDK aliases in
+1. Completed prerequisite: update the six published SDK aliases in
    `src/crates/netflow-plugin/Cargo.toml` from 0.6.2 to 0.6.4.
-2. Refresh `src/crates/Cargo.lock` for only the SDK crate set.
-3. Run targeted netflow validation and reference searches for stale 0.6.2 SDK
-   pins.
+2. Completed prerequisite: refresh `src/crates/Cargo.lock` for only the SDK
+   crate set.
+3. Fix startup lifecycle: bind/configure the UDP socket before spawning tier
+   workers; add a bind-failure regression test.
+4. Fix worker telemetry: count worker sync attempts; extend worker tests.
+5. Fix facet runtime lock scope: snapshot under lock, write sidecars/state
+   outside the mutex, and clear dirty state only when the written snapshot still
+   matches current state.
+6. Remove unused `ready_notify` state and notify call.
+7. Add deterministic per-row lock-drop CI coverage.
+8. Record evidence-based rejections for items 4, 5, 8, and 9.
 
 Validation plan:
 
@@ -236,6 +345,8 @@ Validation plan:
   `src/crates`; Cargo updates the whole interdependent SDK crate set.
 - `cargo test -p netflow-plugin`
 - `cargo test -p netflow-plugin journal_log_is_send`
+- Targeted tests for worker startup lifecycle, worker sync telemetry, facet
+  persistence, and per-row lock release.
 - `rg -n "systemd-journal-sdk-.*0\\.6\\.2|version = \"0\\.6\\.2\""
   src/crates/netflow-plugin/Cargo.toml src/crates/Cargo.lock`
 
@@ -249,8 +360,9 @@ Artifact impact plan:
 - End-user/operator docs: no update expected; no public config or behavior
   contract changes are intended.
 - End-user/operator skills: no update expected.
-- SOW lifecycle: record prerequisite validation here; follow-up items still need
-  terminal disposition before the SOW can complete.
+- SOW lifecycle: terminal dispositions are recorded in this SOW; the active SOW
+  remains only as branch-local PR working memory until final cleanup before
+  merge.
 
 Open-source reference evidence:
 
@@ -277,8 +389,17 @@ Open decisions:
 ## Plan
 
 1. Update netflow SDK manifest pins and lockfile to 0.6.4.
-2. Validate netflow compile/tests and SDK-sensitive probes.
-3. Record validation and stale-reference search results in this SOW.
+2. Fix tier-worker startup lifecycle so bind failure cannot leave workers alive.
+3. Fix worker-mode tier sync telemetry.
+4. Move facet state and sidecar disk writes outside the facet state mutex, while
+   preserving stale-snapshot safety.
+5. Remove dead `ready_notify` state.
+6. Add deterministic CI coverage for the per-row flow-index read-lock release.
+7. Reject non-PR findings with evidence: raw-rotation fsync blocked by the
+   published SDK API, remaining vendored journal crates outside netflow,
+   upstream SDK comment, and backward clock-step behavior.
+8. Validate with targeted regression tests, full `netflow-plugin` tests, SOW
+   hygiene checks, PR comment/CI checks, then commit and push.
 
 ## Execution Log
 
@@ -293,6 +414,28 @@ Open decisions:
   `systemd-journal-sdk-common`, `systemd-journal-sdk-core`,
   `systemd-journal-sdk-engine`, `systemd-journal-sdk-index`,
   `systemd-journal-sdk-log-writer`, and `systemd-journal-sdk-registry`.
+- Moved tier worker startup behind successful UDP bind and receive-buffer
+  setup in `src/crates/netflow-plugin/src/ingest/service/runtime.rs`.
+- Added `e2e_ingest_bind_failure_does_not_start_tier_workers` to prove bind
+  failure does not start tier workers.
+- Counted worker sync attempts in `sync_with_failure_policy()` and final worker
+  drain sync in `src/crates/netflow-plugin/src/ingest/tier_commit.rs`.
+- Extended tier-worker E2E tests to assert `tier_journal_syncs` advances for
+  worker commits and shutdown drains.
+- Reworked `src/crates/netflow-plugin/src/facet_runtime.rs` persistence so
+  sidecar deletion/writes and state-file writes happen after releasing the
+  facet state mutex.
+- Added a dedicated facet persistence lock plus dirty-generation re-check so
+  stale snapshots cannot overwrite newer persisted facet state.
+- Fixed adjacent facet reconciliation correctness: clearing non-empty active
+  contributions now marks the state dirty, so a reload cannot resurrect stale
+  published facets.
+- Removed unused `ready_notify` and its `tokio::sync::Notify` import.
+- Added deterministic tests for facet disk-write lock scope, stale snapshot
+  skipping, cleared active contribution persistence, and per-row tier index
+  read-lock release.
+- Rejected items 4, 5, 8, and 9 with evidence in the pending-item list instead
+  of deferring them.
 
 ## Validation
 
@@ -301,16 +444,31 @@ Acceptance criteria evidence:
 - `cargo tree -p netflow-plugin --depth 1 | rg -n "systemd-journal-sdk|journal"`
   reports all six direct SDK dependencies at 0.6.4.
 - `git diff --stat` for implementation files is limited to
-  `src/crates/netflow-plugin/Cargo.toml` and `src/crates/Cargo.lock`
-  (18 insertions, 18 deletions).
+  the active SOW plus:
+  `src/crates/netflow-plugin/src/facet_runtime.rs`,
+  `src/crates/netflow-plugin/src/ingest/service/runtime.rs`,
+  `src/crates/netflow-plugin/src/ingest/tier_commit.rs`, and
+  `src/crates/netflow-plugin/src/main_tests.rs`.
 
 Tests or equivalent validation:
 
 - `cargo test -p netflow-plugin journal_log_is_send`: passed; 1 test passed,
-  511 filtered, plus the filtered gRPC test target.
-- `cargo test -p netflow-plugin`: passed; 487 tests passed, 25 ignored manual
+  516 filtered, plus the filtered gRPC test target.
+- `cargo test -p netflow-plugin runtime_persistence_skips_stale_snapshots`:
+  passed.
+- `cargo test -p netflow-plugin
+  runtime_reconcile_persists_cleared_active_contributions`: passed.
+- `cargo test -p netflow-plugin
+  runtime_rotation_does_not_hold_state_lock_during_disk_writes`: passed.
+- `cargo test -p netflow-plugin
+  commit_batch_releases_flow_index_read_lock_between_rows`: passed.
+- `cargo test -p netflow-plugin
+  e2e_ingest_bind_failure_does_not_start_tier_workers`: passed.
+- `cargo test -p netflow-plugin e2e_tier_commit_workers`: passed; both worker
+  E2E tests passed.
+- `cargo test -p netflow-plugin`: passed; 492 tests passed, 25 ignored manual
   gates, and `tests/grpc_build.rs` passed 1/1.
-- Both test commands emitted the pre-existing Rust warning that
+- Cargo test commands emitted the pre-existing Rust warning that
   `OpenTierRow::{timestamp_usec, flow_ref, metrics}` are never read.
 
 Same-failure scan:
@@ -322,6 +480,12 @@ Same-failure scan:
   src/crates/Cargo.lock`: no matches.
 - Generic `version = "0.6.2"` still exists in `src/crates/Cargo.lock` for
   unrelated `rustls-platform-verifier`; it is not an SDK package.
+- `rg -n "ready_notify|tokio::sync::Notify" src/crates/netflow-plugin/src`:
+  no matches.
+- `git diff --check`: passed.
+- `.agents/sow/audit.sh`: failed on pre-existing legacy `SOW-NNNN` references
+  under `.agents/sow/specs/snmp-traps/`; the audit reported this SOW has the
+  required sections and the sensitive-data scan passed.
 
 Sensitive data gate:
 
@@ -338,5 +502,6 @@ Sensitive data gate:
 - End-user/operator docs: no update needed; no public config, Function schema,
   chart, or operator-facing behavior changed.
 - End-user/operator skills: no update needed.
-- SOW lifecycle: prerequisite evidence recorded here; follow-up items still need
-  terminal disposition before this SOW can complete.
+- SOW lifecycle: all follow-up items now have terminal dispositions here. The
+  active SOW file is still branch-local working memory and must be removed
+  before final merge.

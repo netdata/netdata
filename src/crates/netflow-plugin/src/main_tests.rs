@@ -228,7 +228,12 @@ async fn e2e_rebuild_with_tiers_ahead_of_raw_adds_no_duplicate_rows() {
     let t3 = base + 3 * minute; // 1m bucket C (new), still 5m bucket P
 
     // Flows are keyed by PROTOCOL (a rollup dimension); BYTES = 100 + protocol.
-    write_raw_flows(&cfg, 0x11, 1, &[(t1, 1), (t1, 2), (t1, 3), (t2, 1), (t2, 2)]);
+    write_raw_flows(
+        &cfg,
+        0x11,
+        1,
+        &[(t1, 1), (t1, 2), (t1, 3), (t2, 1), (t2, 2)],
+    );
 
     let minute_1_dir = cfg.journal.minute_1_tier_dir();
     let minute_5_dir = cfg.journal.minute_5_tier_dir();
@@ -378,6 +383,40 @@ async fn e2e_rebuild_tolerates_torn_tier_and_raw_tails() {
 /// path production takes; the rest of the suite covers the pre-worker inline
 /// path.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_ingest_bind_failure_does_not_start_tier_workers() {
+    let (mut cfg, _tmp) = offline_journal_cfg();
+    let occupied = StdUdpSocket::bind("127.0.0.1:0").expect("bind occupied test socket");
+    cfg.listener.listen = occupied
+        .local_addr()
+        .expect("read occupied socket address")
+        .to_string();
+
+    let metrics = Arc::new(ingest::IngestMetrics::default());
+    let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+    let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+    let mut service = ingest::IngestService::new(
+        cfg,
+        Arc::clone(&metrics),
+        Arc::clone(&open_tiers),
+        Arc::clone(&tier_flow_indexes),
+    )
+    .expect("create ingest service");
+
+    let err = service
+        .bind_listener_and_start_workers_for_test()
+        .await
+        .expect_err("occupied UDP address must fail bind");
+    assert!(
+        err.to_string().contains("failed to bind"),
+        "bind error should preserve listener context: {err:#}"
+    );
+    assert!(
+        !service.tier_commit_workers_started_for_test(),
+        "tier workers must not start when listener bind fails"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_tier_commit_workers_roundtrip() {
     let (cfg, _tmp) = offline_journal_cfg();
     let metrics = Arc::new(ingest::IngestMetrics::default());
@@ -429,6 +468,16 @@ async fn e2e_tier_commit_workers_roundtrip() {
     assert!(
         committed >= expected_rows,
         "workers should commit the closed 1m and 5m buckets, got {committed}"
+    );
+    for _ in 0..1_000 {
+        if metrics.tier_journal_syncs.load(Ordering::Relaxed) >= 2 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(
+        metrics.tier_journal_syncs.load(Ordering::Relaxed) >= 2,
+        "worker commits must count one tier sync attempt per committed tier"
     );
 
     // The tick mirrors slot telemetry into the chart atomics. The entry
@@ -544,6 +593,10 @@ async fn e2e_tier_commit_workers_shutdown_drains_residual_buckets() {
     assert!(
         written >= 4,
         "shutdown must drain the residual 1m and 5m buckets through the workers, got {written}"
+    );
+    assert!(
+        metrics.tier_journal_syncs.load(Ordering::Relaxed) >= 3,
+        "shutdown drain must count final worker sync attempts"
     );
     let minute_1 = timestamp_counts(&journal_source_realtime_timestamps(
         &cfg.journal.minute_1_tier_dir(),
@@ -700,12 +753,7 @@ fn write_raw_flows(
         let mut payloads: Vec<&[u8]> = refs.iter().map(|r| &data[r.clone()]).collect();
         payloads.push(source_field.as_bytes());
         writer
-            .add_entry(
-                &mut journal_file,
-                &payloads,
-                ts_usec,
-                100 + index as u64,
-            )
+            .add_entry(&mut journal_file, &payloads, ts_usec, 100 + index as u64)
             .expect("write raw test entry");
     }
 }
@@ -818,7 +866,8 @@ fn truncate_newest_journal_mid_last_entry(dir: &Path) {
         {
             last = Some(reader.get_entry_offset().expect("entry offset"));
         }
-        last.expect("journal file should contain at least one entry").get()
+        last.expect("journal file should contain at least one entry")
+            .get()
     };
 
     let file = fs::OpenOptions::new()
@@ -2242,12 +2291,11 @@ async fn ingest_fixture_with_timestamp_source(
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_disabled_periodic_sync_syncs_raw_journal_only_at_shutdown() {
-    let (_cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture_with_config(
-        "nfv5.pcap",
-        plugin_config::TimestampSource::Input,
-        |cfg| cfg.listener.sync_every_entries = 0,
-    )
-    .await;
+    let (_cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) =
+        ingest_fixture_with_config("nfv5.pcap", plugin_config::TimestampSource::Input, |cfg| {
+            cfg.listener.sync_every_entries = 0
+        })
+        .await;
 
     assert!(
         metrics.journal_entries_written.load(Ordering::Relaxed) > 0,
@@ -2426,7 +2474,10 @@ async fn bench_udp_loss_ceiling() {
         std::env::var("NETFLOW_UDP_BENCH_FIXTURE").unwrap_or_else(|_| "nfv5.pcap".to_string());
 
     let payloads = fixture_udp_payloads(&fixture);
-    assert!(!payloads.is_empty(), "fixture {fixture} has no udp payloads");
+    assert!(
+        !payloads.is_empty(),
+        "fixture {fixture} has no udp payloads"
+    );
 
     let tmp = tempfile::tempdir().expect("create temp dir");
     let listen = reserve_udp_listen_addr();
@@ -2680,7 +2731,10 @@ async fn bench_udp_boundary_soak() {
         batches_1m >= 1,
         "the soak must cross at least one 1m boundary and commit through the worker"
     );
-    assert_eq!(stretched, 0, "a worker missed its anniversary during the soak");
+    assert_eq!(
+        stretched, 0,
+        "a worker missed its anniversary during the soak"
+    );
     assert!(tier_rows > 0, "tier rows must land on disk during the soak");
 }
 
@@ -2737,11 +2791,8 @@ async fn crash_ingest_child() {
                 ..Default::default()
             })
             .collect();
-        entries_since_sync = service.handle_decoded_batch_with_handoffs_for_test(
-            ts,
-            &records,
-            entries_since_sync,
-        );
+        entries_since_sync =
+            service.handle_decoded_batch_with_handoffs_for_test(ts, &records, entries_since_sync);
         // March a virtual minute per batch through the backlog, then trail
         // real time by ~2 minutes so receive time stays monotone.
         ts += if ts + 120 * 1_000_000 < wall_usec() {
