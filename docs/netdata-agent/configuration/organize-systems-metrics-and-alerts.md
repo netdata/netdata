@@ -85,6 +85,8 @@ To create a virtual node for your Windows server:
         url: http://203.0.113.10:9182/metrics
     ```
 
+For vSphere collector configuration with virtual nodes, see the [VMware vCenter Server integration examples](/src/go/plugin/go.d/collector/vsphere/README.md#examples).
+
 ## Host labels
 
 ### Tag your systems for smarter monitoring
