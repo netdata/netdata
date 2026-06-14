@@ -1,5 +1,21 @@
 package libbpfloader
 
+// SocketPIDEntry holds per-PID aggregated socket counters read from tbl_nd_socket.
+// Field layout mirrors struct netdata_socket_per_pid_entry in socket_libbpf.c.
+type SocketPIDEntry struct {
+	PID                 uint32
+	BytesSent           uint64
+	BytesReceived       uint64
+	CallTCPSent         uint64
+	CallTCPReceived     uint64
+	Retransmit          uint64
+	CallUDPSent         uint64
+	CallUDPReceived     uint64
+	CallClose           uint64
+	CallTCPV4Connection uint64
+	CallTCPV6Connection uint64
+}
+
 // SocketSnapshot holds the raw monotonic counters read from the socket BPF
 // maps in a single collection cycle.  Field order matches enum ebpf_socket_idx
 // from ebpf_socket.h (keys 0-17 for tbl_global_sock) plus the two inbound

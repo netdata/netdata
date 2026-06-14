@@ -3283,6 +3283,10 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/libnetdata/local-sockets/local-sockets.h
                         src/collectors/network-viewer.plugin/network-viewer.c
+                        src/collectors/collectors-ipc/ebpfgo_shared_memory.c
+                        src/collectors/collectors-ipc/ebpfgo_shared_memory.h
+                        src/collectors/network-viewer.plugin/network_viewer_ebpf_shared_memory.c
+                        src/collectors/network-viewer.plugin/network_viewer_ebpf_shared_memory.h
                 )
         endif()
         if(OS_WINDOWS)

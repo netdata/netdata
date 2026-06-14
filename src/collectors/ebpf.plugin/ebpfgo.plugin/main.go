@@ -58,6 +58,15 @@ func main() {
 	api := netdataapi.New(os.Stdout)
 	var wg sync.WaitGroup
 
+	// The shared store must exist before both collectors start so socket data
+	// can be merged into SHM entries that cachestat apps/cgroups populate.
+	var store *cachestatSharedMemoryStore
+	needsStore := socketCfg.Enabled ||
+		(cachestatCfg.Enabled && (cachestatCfg.AppsEnabled || cachestatCfg.CgroupsEnabled))
+	if needsStore {
+		store = NewCachestatSharedMemoryStore()
+	}
+
 	// ---- cachestat ----
 	if cachestatCfg.Enabled {
 		ue := resolveUpdateEvery(updateEvery, cachestatCfg.UpdateEvery, cachestatDefaultUpdateEvery)
@@ -67,14 +76,16 @@ func main() {
 		if herr != nil {
 			fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat load failed: %v\n", herr)
 		} else if handle != nil && handle.Runtime != nil {
-			var store *cachestatSharedMemoryStore
+			// Only propagate store to cachestat when it has apps/cgroups consumers;
+			// that is what triggers per-PID collection and SHM publishing.
+			var cachestatStore *cachestatSharedMemoryStore
 			if handle.AppsEnabled || handle.CgroupsEnabled {
-				store = NewCachestatSharedMemoryStore()
+				cachestatStore = store
 			}
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				runCachestatGlobalCollector(api, handle, stop, store, ue)
+				runCachestatGlobalCollector(api, handle, stop, cachestatStore, ue)
 				handle.Close()
 			}()
 		}
@@ -92,7 +103,7 @@ func main() {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				runSocketGlobalCollector(api, handle, stop, ue)
+				runSocketGlobalCollector(api, handle, stop, ue, store)
 				handle.Close()
 			}()
 		}

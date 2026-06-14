@@ -24,6 +24,7 @@ type cachestatSharedMemoryStore struct {
 	nextPrevCt  map[uint32]uint64
 	nextMiss    map[uint32]int
 	stalePIDs   []uint32
+	socketData  map[uint32]ebpfSocketPublishApps // latest per-PID socket snapshot from tbl_nd_socket
 }
 
 func NewCachestatSharedMemoryStore() *cachestatSharedMemoryStore {
@@ -34,6 +35,7 @@ func NewCachestatSharedMemoryStore() *cachestatSharedMemoryStore {
 		nextPrev:   make(map[uint32]netdataCachestat),
 		nextPrevCt: make(map[uint32]uint64),
 		nextMiss:   make(map[uint32]int),
+		socketData: make(map[uint32]ebpfSocketPublishApps),
 	}
 }
 
@@ -195,5 +197,42 @@ func (s *cachestatSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatApp
 	s.prevCt, s.nextPrevCt = s.nextPrevCt, s.prevCt
 	s.missCount, s.nextMiss = s.nextMiss, s.missCount
 	s.stalePIDs = stalePIDs
+	s.applySocketDataLocked()
 	return stalePIDs
+}
+
+// applySocketDataLocked merges the latest socket snapshot into s.entries.
+// Must be called with s.mu held for writing.
+func (s *cachestatSharedMemoryStore) applySocketDataLocked() {
+	for i := range s.entries {
+		if data, ok := s.socketData[s.entries[i].pid]; ok {
+			s.entries[i].socket = data
+		}
+	}
+}
+
+// UpdateSocketApps stores the latest per-PID socket snapshot and applies it to
+// the current entries.  Called by the socket collector each cycle.
+func (s *cachestatSharedMemoryStore) UpdateSocketApps(entries []libbpfloader.SocketPIDEntry) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for k := range s.socketData {
+		delete(s.socketData, k)
+	}
+	for _, e := range entries {
+		s.socketData[e.PID] = ebpfSocketPublishApps{
+			BytesSent:           e.BytesSent,
+			BytesReceived:       e.BytesReceived,
+			CallTCPSent:         e.CallTCPSent,
+			CallTCPReceived:     e.CallTCPReceived,
+			Retransmit:          e.Retransmit,
+			CallUDPSent:         e.CallUDPSent,
+			CallUDPReceived:     e.CallUDPReceived,
+			CallClose:           e.CallClose,
+			CallTCPV4Connection: e.CallTCPV4Connection,
+			CallTCPV6Connection: e.CallTCPV6Connection,
+		}
+	}
+	s.applySocketDataLocked()
 }

@@ -50,6 +50,78 @@ typedef struct {
 /* NETDATA_SOCKET_COUNTER = 18 (enum ebpf_socket_idx in ebpf_socket.h). */
 #define SOCKET_GLOBAL_MAP_ENTRIES 18
 
+/* -------------------------------------------------------------------------
+ * tbl_nd_socket per-PID aggregation types
+ * ---------------------------------------------------------------------- */
+
+/* BPF map key for tbl_nd_socket.  Must match netdata_socket_idx_t in
+ * ebpf_socket.h: saddr[16] + daddr[16] + dport[2] + _pad[2] + pid[4] = 40
+ * bytes.  The two-byte padding brings pid to a 4-byte boundary, matching
+ * the C compiler layout used by both the BPF program and ebpf_socket.c. */
+typedef struct {
+    uint8_t  saddr[16];
+    uint8_t  daddr[16];
+    uint16_t dport;
+    uint16_t _pad;
+    uint32_t pid;
+} netdata_socket_bpf_key_t;
+
+/* BPF map value for tbl_nd_socket.  Must match netdata_socket_t in
+ * ebpf-ipc.h.  Layout confirmed by ebpf_socket.c:2915 which allocates
+ * sizeof(netdata_socket_t) per CPU for per-CPU map reads.
+ * Total size = 112 bytes (tcp substructure = 48 bytes including 4-byte
+ * trailing pad to reach 8-byte alignment, udp = 24 bytes). */
+#define ND_SOCK_COMM_LEN 16
+typedef struct {
+    char     name[ND_SOCK_COMM_LEN];
+    uint64_t first_timestamp;
+    uint64_t current_timestamp;
+    uint16_t protocol;
+    uint16_t family;
+    uint32_t external_origin;
+    struct {
+        uint32_t call_tcp_sent;
+        uint32_t call_tcp_received;
+        uint64_t tcp_bytes_sent;
+        uint64_t tcp_bytes_received;
+        uint32_t close;
+        uint32_t retransmit;
+        uint32_t ipv4_connect;
+        uint32_t ipv6_connect;
+        uint32_t state;
+        uint32_t _pad; /* trailing pad: sizeof(tcp substructure) must be multiple of 8 */
+    } tcp;
+    struct {
+        uint32_t call_udp_sent;
+        uint32_t call_udp_received;
+        uint64_t udp_bytes_sent;
+        uint64_t udp_bytes_received;
+    } udp;
+} netdata_socket_bpf_value_t;
+
+/* Per-PID aggregated socket metrics — output type for per-PID snapshot.
+ * Field order mirrors ebpf_socket_publish_apps_t in ebpf-ipc.h so the Go
+ * layer can copy directly into ebpfSocketPublishApps. */
+struct netdata_socket_per_pid_entry {
+    uint32_t pid;
+    uint64_t bytes_sent;       /* tcp_bytes_sent  (UDP excluded — matches ebpf_socket.c:2198) */
+    uint64_t bytes_received;   /* tcp_bytes_received */
+    uint64_t call_tcp_sent;
+    uint64_t call_tcp_received;
+    uint64_t retransmit;
+    uint64_t call_udp_sent;
+    uint64_t call_udp_received;
+    uint64_t call_close;
+    uint64_t call_tcp_v4_connection;
+    uint64_t call_tcp_v6_connection;
+};
+
+/* Per-PID hash table for accumulation during a snapshot cycle.
+ * Open-addressing with linear probing; PID 0 = empty slot. */
+#define SOCKET_PID_HT_BITS 14u
+#define SOCKET_PID_HT_SIZE (1u << SOCKET_PID_HT_BITS) /* 16384 */
+#define SOCKET_PID_HT_MASK (SOCKET_PID_HT_SIZE - 1u)
+
 enum netdata_ebpf_socket_runtime_kind {
     NETDATA_SOCKET_RUNTIME_LEGACY = 0,
     NETDATA_SOCKET_RUNTIME_CORE   = 1,
@@ -71,6 +143,19 @@ struct netdata_ebpf_socket_runtime {
      * variants of the map can be read without overflow. */
     netdata_passive_conn_t *percpu_passive;
     int                     percpu_passive_cap;
+
+    /* Per-CPU buffer for tbl_nd_socket value reads (sizeof value × ncpus). */
+    netdata_socket_bpf_value_t *percpu_nd_socket;
+    int                         percpu_nd_socket_cap;
+
+    /* Flat hash-table for per-PID accumulation during a snapshot cycle.
+     * Allocated once in prepare(); reused every cycle (zeroed at start). */
+    struct netdata_socket_per_pid_entry *pid_ht;
+
+    /* Compact sorted output array from last per-PID snapshot (reused). */
+    struct netdata_socket_per_pid_entry *per_pid_entries;
+    int                                  per_pid_count;
+    int                                  per_pid_cap;
 };
 
 /* Snapshot output: raw counters from tbl_global_sock and tbl_lports. */
@@ -304,6 +389,23 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
         return -1;
     rt->percpu_passive_cap = lports_ncpu;
 
+    /* tbl_nd_socket may also be PERCPU_HASH — allocate per-CPU value buffer. */
+    rt->percpu_nd_socket = calloc((size_t)lports_ncpu, sizeof(*rt->percpu_nd_socket));
+    if (!rt->percpu_nd_socket)
+        return -1;
+    rt->percpu_nd_socket_cap = lports_ncpu;
+
+    /* PID hash-table for per-PID accumulation: SOCKET_PID_HT_SIZE entries. */
+    rt->pid_ht = calloc(SOCKET_PID_HT_SIZE, sizeof(*rt->pid_ht));
+    if (!rt->pid_ht)
+        return -1;
+
+    /* Initial output array capacity = 256 unique PIDs (grows on demand). */
+    rt->per_pid_cap = 256;
+    rt->per_pid_entries = calloc((size_t)rt->per_pid_cap, sizeof(*rt->per_pid_entries));
+    if (!rt->per_pid_entries)
+        return -1;
+
     return 0;
 }
 
@@ -425,8 +527,146 @@ void netdata_socket_runtime_close(struct netdata_ebpf_socket_runtime *rt)
     free(rt->percpu_passive);
     rt->percpu_passive = NULL;
 
+    free(rt->percpu_nd_socket);
+    rt->percpu_nd_socket = NULL;
+
+    free(rt->pid_ht);
+    rt->pid_ht = NULL;
+
+    free(rt->per_pid_entries);
+    rt->per_pid_entries = NULL;
+    rt->per_pid_count = 0;
+    rt->per_pid_cap   = 0;
+
     if (rt->obj)
         bpf_object__close(rt->obj);
 
     free(rt);
+}
+
+/* -------------------------------------------------------------------------
+ * Per-PID socket snapshot (tbl_nd_socket)
+ * ---------------------------------------------------------------------- */
+
+static int pid_ht_compare(const void *a, const void *b)
+{
+    uint32_t pa = ((const struct netdata_socket_per_pid_entry *)a)->pid;
+    uint32_t pb = ((const struct netdata_socket_per_pid_entry *)b)->pid;
+    return (pa > pb) - (pa < pb);
+}
+
+/* Accumulate one BPF value into the per-PID hash table. */
+static void pid_ht_accumulate(struct netdata_socket_per_pid_entry *ht,
+                               uint32_t pid,
+                               const netdata_socket_bpf_value_t *v)
+{
+    /* Knuth multiplicative hash for 14-bit output. */
+    uint32_t slot = (pid * 2654435761u) & SOCKET_PID_HT_MASK;
+    for (uint32_t i = 0; i < SOCKET_PID_HT_SIZE; i++) {
+        uint32_t s = (slot + i) & SOCKET_PID_HT_MASK;
+        if (ht[s].pid == 0) {
+            ht[s].pid = pid;
+        }
+        if (ht[s].pid == pid) {
+            ht[s].bytes_sent            += v->tcp.tcp_bytes_sent;
+            ht[s].bytes_received        += v->tcp.tcp_bytes_received;
+            ht[s].call_tcp_sent         += v->tcp.call_tcp_sent;
+            ht[s].call_tcp_received     += v->tcp.call_tcp_received;
+            ht[s].retransmit            += v->tcp.retransmit;
+            ht[s].call_udp_sent         += v->udp.call_udp_sent;
+            ht[s].call_udp_received     += v->udp.call_udp_received;
+            ht[s].call_close            += v->tcp.close;
+            ht[s].call_tcp_v4_connection += v->tcp.ipv4_connect;
+            ht[s].call_tcp_v6_connection += v->tcp.ipv6_connect;
+            return;
+        }
+    }
+    /* Hash table full — silent drop; should not occur for < 8192 unique PIDs. */
+}
+
+/* Read tbl_nd_socket, aggregate per PID, and store a sorted result array.
+ * Returns pointer to the sorted array (owned by rt), count via *out_count.
+ * Returns NULL on error. */
+const struct netdata_socket_per_pid_entry *
+netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out_count)
+{
+    if (!rt || !rt->obj || !rt->pid_ht || !out_count)
+        return NULL;
+
+    struct bpf_map *ndmap = bpf_object__find_map_by_name(rt->obj, "tbl_nd_socket");
+    if (!ndmap) {
+        *out_count = 0;
+        return rt->per_pid_entries;
+    }
+
+    int ndfd = bpf_map__fd(ndmap);
+    if (ndfd < 0 || !rt->percpu_nd_socket) {
+        *out_count = 0;
+        return rt->per_pid_entries;
+    }
+
+    /* Determine per-CPU count for this map. */
+    enum bpf_map_type ndtype = bpf_map__type(ndmap);
+    int ndcount = (ndtype == BPF_MAP_TYPE_PERCPU_HASH) ? rt->percpu_nd_socket_cap : 1;
+
+    /* Zero the hash table for this cycle. */
+    memset(rt->pid_ht, 0, SOCKET_PID_HT_SIZE * sizeof(*rt->pid_ht));
+
+    /* Iterate all connection entries and accumulate per PID. */
+    netdata_socket_bpf_key_t key = {}, next = {};
+    netdata_socket_bpf_value_t *vbuf = rt->percpu_nd_socket;
+
+    while (bpf_map_get_next_key(ndfd, &key, &next) == 0) {
+        if (next.pid != 0 && bpf_map_lookup_elem(ndfd, &next, vbuf) == 0) {
+            if (ndcount == 1) {
+                pid_ht_accumulate(rt->pid_ht, next.pid, vbuf);
+            } else {
+                /* PERCPU_HASH: sum per-CPU values into a temporary entry. */
+                netdata_socket_bpf_value_t agg = {0};
+                for (int c = 0; c < ndcount; c++) {
+                    agg.tcp.tcp_bytes_sent      += vbuf[c].tcp.tcp_bytes_sent;
+                    agg.tcp.tcp_bytes_received  += vbuf[c].tcp.tcp_bytes_received;
+                    agg.tcp.call_tcp_sent       += vbuf[c].tcp.call_tcp_sent;
+                    agg.tcp.call_tcp_received   += vbuf[c].tcp.call_tcp_received;
+                    agg.tcp.retransmit          += vbuf[c].tcp.retransmit;
+                    agg.udp.call_udp_sent       += vbuf[c].udp.call_udp_sent;
+                    agg.udp.call_udp_received   += vbuf[c].udp.call_udp_received;
+                    agg.tcp.close               += vbuf[c].tcp.close;
+                    agg.tcp.ipv4_connect        += vbuf[c].tcp.ipv4_connect;
+                    agg.tcp.ipv6_connect        += vbuf[c].tcp.ipv6_connect;
+                }
+                pid_ht_accumulate(rt->pid_ht, next.pid, &agg);
+            }
+        }
+        key = next;
+    }
+
+    /* Compact non-empty hash-table entries into the sorted output array. */
+    int count = 0;
+    for (uint32_t i = 0; i < SOCKET_PID_HT_SIZE; i++) {
+        if (rt->pid_ht[i].pid == 0)
+            continue;
+
+        /* Grow output array if needed. */
+        if (count >= rt->per_pid_cap) {
+            int newcap = rt->per_pid_cap * 2;
+            struct netdata_socket_per_pid_entry *tmp =
+                realloc(rt->per_pid_entries, (size_t)newcap * sizeof(*tmp));
+            if (!tmp) {
+                /* Partial result is better than nothing. */
+                break;
+            }
+            rt->per_pid_entries = tmp;
+            rt->per_pid_cap     = newcap;
+        }
+
+        rt->per_pid_entries[count++] = rt->pid_ht[i];
+    }
+
+    if (count > 1)
+        qsort(rt->per_pid_entries, (size_t)count, sizeof(*rt->per_pid_entries), pid_ht_compare);
+
+    rt->per_pid_count = count;
+    *out_count = count;
+    return rt->per_pid_entries;
 }

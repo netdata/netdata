@@ -125,6 +125,10 @@ func (r *SocketRuntime) Snapshot(mapsPerCore bool) (SocketSnapshot, error) {
 	return SocketSnapshot{}, ErrDisabled
 }
 
+func (r *SocketRuntime) SnapshotPerPID() ([]SocketPIDEntry, error) {
+	return nil, ErrDisabled
+}
+
 func (r *SocketRuntime) Close() {
 	// No-op in the disabled build because the runtime never acquired native resources.
 }

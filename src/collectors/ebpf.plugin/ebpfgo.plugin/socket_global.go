@@ -316,7 +316,8 @@ func (p socketGlobalPublish) write(api *netdataapi.API, usecSince int) {
 
 // runSocketGlobalCollector is the socket plugin collection loop.
 // It runs in its own goroutine alongside cachestat.
-func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, stop <-chan struct{}, updateEvery int) {
+// store may be nil when there are no apps/cgroups consumers for socket data.
+func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, stop <-chan struct{}, updateEvery int, store *cachestatSharedMemoryStore) {
 	if handle == nil || handle.Runtime == nil {
 		return
 	}
@@ -339,6 +340,16 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 		}
 		if publish, ok := state.Update(snap); ok {
 			publish.write(api, usecSince)
+		}
+
+		if store != nil {
+			pidEntries, pidErr := handle.Runtime.SnapshotPerPID()
+			if pidErr != nil {
+				socketRateLimitedStderr("socket.snapshot_per_pid",
+					fmt.Sprintf("ebpf-go.plugin: socket per-PID snapshot failed: %v\n", pidErr))
+			} else {
+				store.UpdateSocketApps(pidEntries)
+			}
 		}
 	}
 

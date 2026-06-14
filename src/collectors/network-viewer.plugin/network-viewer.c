@@ -25,6 +25,10 @@ static SPAWN_SERVER *spawn_srv = NULL;
 #include "libnetdata/local-sockets/local-sockets.h"
 #include "libnetdata/os/system-maps/system-services.h"
 
+#if defined(OS_LINUX)
+#include "network_viewer_ebpf_shared_memory.h"
+#endif
+
 #define NETWORK_CONNECTIONS_VIEWER_FUNCTION "network-connections"
 #define NETWORK_CONNECTIONS_VIEWER_HELP "Shows active network connections with protocol details, states, addresses, ports, and performance metrics."
 #define NETWORK_TOPOLOGY_VIEWER_FUNCTION "topology:network-connections"
@@ -971,6 +975,34 @@ static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOC
         if(st->max.tcpi_total_retrans < n->info.tcp.tcpi_total_retrans)
             st->max.tcpi_total_retrans = n->info.tcp.tcpi_total_retrans;
 #else
+        buffer_json_add_array_item_uint64(wb, 0);
+#endif
+
+        // eBPF per-PID socket counters from ebpfgo.plugin shared memory
+#if defined(OS_LINUX)
+        {
+            const struct ebpf_pid_stat *es = network_viewer_ebpf_shared_memory_lookup((pid_t)n->pid);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.bytes_sent         : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.bytes_received      : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_tcp_sent       : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_tcp_received   : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.retransmit          : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_udp_sent       : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_udp_received   : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_close          : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_tcp_v4_connection : 0);
+            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_tcp_v6_connection : 0);
+        }
+#else
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
         buffer_json_add_array_item_uint64(wb, 0);
 #endif
 
@@ -4055,6 +4087,10 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
     time_t now_s = now_realtime_sec();
     bool aggregated = false;
 
+#if defined(OS_LINUX)
+    network_viewer_ebpf_shared_memory_refresh();
+#endif
+
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
@@ -4424,6 +4460,58 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                                         RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                         RRDF_FIELD_OPTS_VISIBLE,
                                         NULL);
+
+            // eBPF per-PID socket counters (populated on Linux when ebpfgo.plugin is running)
+            buffer_rrdf_table_add_field(wb, field_id++, "eBPFBytesSent", "eBPF TCP Bytes Sent by PID",
+                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, "bytes", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+            buffer_rrdf_table_add_field(wb, field_id++, "eBPFBytesRecv", "eBPF TCP Bytes Received by PID",
+                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, "bytes", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+            buffer_rrdf_table_add_field(wb, field_id++, "eBPFTCPSent", "eBPF TCP Send Calls by PID",
+                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, "calls", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+            buffer_rrdf_table_add_field(wb, field_id++, "eBPFTCPRecv", "eBPF TCP Receive Calls by PID",
+                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, "calls", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+            buffer_rrdf_table_add_field(wb, field_id++, "eBPFRetransmit", "eBPF TCP Retransmissions by PID",
+                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, "calls", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+            buffer_rrdf_table_add_field(wb, field_id++, "eBPFUDPSent", "eBPF UDP Send Calls by PID",
+                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, "calls", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+            buffer_rrdf_table_add_field(wb, field_id++, "eBPFUDPRecv", "eBPF UDP Receive Calls by PID",
+                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, "calls", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+            buffer_rrdf_table_add_field(wb, field_id++, "eBPFClose", "eBPF TCP Close Calls by PID",
+                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, "calls", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+            buffer_rrdf_table_add_field(wb, field_id++, "eBPFConnV4", "eBPF IPv4 TCP Connections by PID",
+                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+            buffer_rrdf_table_add_field(wb, field_id++, "eBPFConnV6", "eBPF IPv6 TCP Connections by PID",
+                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                        0, "connections", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                        RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
 
             // Count
             buffer_rrdf_table_add_field(wb, field_id++, "Count", "Number of sockets like this",
