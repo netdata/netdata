@@ -3,6 +3,10 @@
 #include "cgroup-internals.h"
 #include "cgroup-netipc.h"
 
+// grace period added on top of the cgroup-name timeout: the helper self-bounds
+// at the operator timeout, this is the extra slack before discovery kills it
+#define CGROUP_NAME_GRACE_MS 2000
+
 // discovery cgroup thread worker jobs
 #define WORKER_DISCOVERY_INIT               0
 #define WORKER_DISCOVERY_FIND               1
@@ -172,6 +176,57 @@ static inline void substitute_dots_in_id(char *s) {
 #define CGROUP_RENAME_LABEL "cgroup.name="
 #define CGROUP_IGNORE_LABEL "ignore="
 
+static char *cgroup_next_label_pair(char **labels) {
+    if (!labels || !*labels)
+        return NULL;
+
+    char *s = *labels;
+    while (*s == ',' || isspace((uint8_t)*s))
+        s++;
+
+    if (!*s) {
+        *labels = NULL;
+        return NULL;
+    }
+
+    char *pair = s;
+    char quote = '\0';
+    bool escaped = false;
+
+    for (; *s; s++) {
+        if (quote) {
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+
+            if (*s == '\\') {
+                escaped = true;
+                continue;
+            }
+
+            if (*s == quote)
+                quote = '\0';
+
+            continue;
+        }
+
+        if (*s == '\'' || *s == '"') {
+            quote = *s;
+            continue;
+        }
+
+        if (*s == ',') {
+            *s++ = '\0';
+            *labels = s;
+            return pair;
+        }
+    }
+
+    *labels = NULL;
+    return pair;
+}
+
 static char *cgroup_parse_resolved_name_and_labels(struct cgroup *cg, char *data) {
     if (!cg->chart_labels)
         cg->chart_labels = rrdlabels_create();
@@ -184,8 +239,8 @@ static char *cgroup_parse_resolved_name_and_labels(struct cgroup *cg, char *data
     bool ignored = false;
 
     // the rest are key=value pairs separated by comma
-    while(data) {
-        char *pair = strsep_skip_consecutive_separators(&data, ",");
+    char *pair;
+    while((pair = cgroup_next_label_pair(&data))) {
 
         if(strncmp(pair, CGROUP_NETDATA_CLOUD_LABEL_PREFIX, sizeof(CGROUP_NETDATA_CLOUD_LABEL_PREFIX) - 1) == 0) {
             // a netdata.cloud label
@@ -245,24 +300,82 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
     }
 
     char buffer[8192]; // we need some size for labels
-    char *new_name = fgets(buffer, sizeof(buffer), spawn_popen_stdout(instance));
-    int exit_code = spawn_popen_wait(instance);
+    char *new_name = NULL;
 
-    switch (exit_code) {
-        case 0:
-            cg->pending_renames = 0;
-            break;
+    // Bound the helper independently of whether it honors its own timeout: a
+    // custom rename script (or a wedged helper) must not stall discovery. Wait
+    // up to the operator timeout plus a grace period for the helper to produce
+    // its line, then reclaim it. cgroup_name_timeout_ms == 0 keeps the legacy
+    // unbounded behavior.
+    int wait_ms = -1;
+    if (cgroup_name_timeout_ms > 0)
+        wait_ms = cgroup_name_timeout_ms > INT_MAX - CGROUP_NAME_GRACE_MS ?
+                      INT_MAX :
+                      cgroup_name_timeout_ms + CGROUP_NAME_GRACE_MS;
 
-        case 3:
-            cg->pending_renames = 0;
-            cg->processed = 1;
-            break;
+    int poll_wait_ms = wait_ms;
+    usec_t poll_deadline_ut = 0;
+    if (wait_ms > 0) {
+        usec_t now_ut = now_monotonic_usec();
+        if (now_ut)
+            poll_deadline_ut = now_ut + (usec_t)wait_ms * USEC_PER_MS;
+    }
 
-        default:
-            break;
+    struct pollfd pfd = { .fd = spawn_popen_read_fd(instance), .events = POLLIN };
+    int pr;
+    do {
+        pr = poll(&pfd, 1, poll_wait_ms);
+        // Do not give the helper a fresh full timeout after every signal.
+        if (pr < 0 && errno == EINTR && poll_deadline_ut) {
+            usec_t now_ut = now_monotonic_usec();
+            if (now_ut >= poll_deadline_ut) {
+                pr = 0;
+                break;
+            }
+
+            poll_wait_ms = (int)((poll_deadline_ut - now_ut + USEC_PER_MS - 1) / USEC_PER_MS);
+        }
+    } while (pr < 0 && errno == EINTR);
+
+    if (pr > 0)
+        new_name = fgets(buffer, sizeof(buffer), spawn_popen_stdout(instance));
+
+    int exit_code = -1;
+    if (pr <= 0) {
+        // timeout or poll error: the helper is stuck, kill it and let the retry
+        // ladder run; never apply partial output
+        collector_error(
+            "CGROUP: rename helper for '%s' did not respond within %d ms; killing it.", cg->id, wait_ms);
+        spawn_popen_kill(instance, 0);
+        new_name = NULL;
+    } else {
+        SPAWN_TIMEDWAIT_RESULT res = spawn_popen_timedwait(instance, CGROUP_NAME_GRACE_MS, &exit_code);
+        if (res == SPAWN_TIMEDWAIT_EXITED) {
+            switch (exit_code) {
+                case 0:
+                    cg->pending_renames = 0;
+                    break;
+
+                case 3:
+                    cg->pending_renames = 0;
+                    cg->processed = 1;
+                    break;
+
+                default:
+                    break;
+            }
+        } else {
+            // still running after writing, or wait error: reclaim and treat as failure
+            spawn_popen_kill(instance, 0);
+            new_name = NULL;
+        }
     }
 
     if (cg->pending_renames || cg->processed)
+        return;
+    // a non-zero exit means the helper failed; discard whatever partial line it
+    // may have written instead of installing it as the cgroup name
+    if (exit_code != 0)
         return;
     if (!new_name || !*new_name || *new_name == '\n')
         return;
@@ -881,7 +994,7 @@ static int is_digits_only(const char *s) {
 
 static int is_cgroup_k8s_container(const char *id) {
     // examples:
-    // https://github.com/netdata/netdata/blob/0fc101679dcd12f1cb8acdd07bb4c85d8e553e53/collectors/cgroups.plugin/cgroup-name.sh#L121-L147
+    // See src/collectors/cgroups.plugin/cgroup-name/FLOW.md for the cgroup-name Kubernetes path rules.
     const char *p = id;
     const char *pp = NULL;
     int i = 0;
