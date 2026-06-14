@@ -26,6 +26,12 @@ You can control what functionalities users can access in Netdata Cloud through t
 | **View-only access** - monitor specific systems without making changes                           | **Observer**         |
 | **Billing management** - handle invoices and payments without system access                      | **Billing**          |
 
+:::note
+
+Role changes take effect immediately. When you change a user's role — whether manually in Netdata Cloud or via SCIM provisioning — the updated permissions are applied right away. If the user is actively logged in, they may need to refresh the page to see the change reflected in the UI.
+
+:::
+
 ## Quick Reference
 
 <details>
