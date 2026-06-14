@@ -145,7 +145,7 @@ static int netdata_claim_prepare_strings()
     netdata_claim_convert_str(aToken, token, length - 1);
 
     length = wcslen(room) + 1;
-    aRoom = calloc(sizeof(char), length - 1);
+    aRoom = calloc(sizeof(char), length);
     if (!aRoom)
         return -1;
 
@@ -153,7 +153,7 @@ static int netdata_claim_prepare_strings()
 
     if (proxy) {
         length = wcslen(proxy) + 1;
-        aProxy = calloc(sizeof(char), length - 1);
+        aProxy = calloc(sizeof(char), length);
         if (!aProxy)
             return -1;
 
@@ -162,7 +162,7 @@ static int netdata_claim_prepare_strings()
 
     if (url) {
         length = wcslen(url) + 1;
-        aURL = calloc(sizeof(char), length - 1);
+        aURL = calloc(sizeof(char), length);
         if (!aURL)
             return -1;
 
