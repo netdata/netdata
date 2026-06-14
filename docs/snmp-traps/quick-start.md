@@ -16,14 +16,16 @@ Get one known SNMP trap into Netdata and prove it arrived. The path: create a sm
 
 - The Netdata Agent is running on the Linux host that will receive traps.
 - The SNMP trap listener is available on that Agent. If not, follow [Installation](/docs/snmp-traps/installation.md) first.
-- You can restart the Agent after changing `go.d/snmp_traps.conf`.
+- You can add a listener job from the Netdata UI (Dynamic Configuration), or by editing `go.d/snmp_traps.conf` and restarting the Agent.
 - The host has the Net-SNMP `snmptrap` command, or you can send an equivalent SNMPv2c trap from another test tool.
 
 This quick start uses UDP/9162 on `127.0.0.1` so you can test safely without changing production devices or binding the standard UDP/162 trap port.
 
 ## Step 1 - Create a local test listener
 
-Edit the Netdata configuration copy of `go.d/snmp_traps.conf`:
+The fastest path is the Netdata UI with **Dynamic Configuration** (no restart): Integrations → SNMP Trap Listener → **Configure** → **Add job**, set address `127.0.0.1`, port `9162`, version `v2c`, community `example`, source CIDR `127.0.0.1/32`, and journal enabled, then **Test** and deploy. This needs a Cloud-connected node on a paid plan — see [Installation](/docs/snmp-traps/installation.md#enable-via-dynamic-configuration).
+
+Without Cloud, edit the config file instead:
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
@@ -51,7 +53,9 @@ jobs:
       enabled: true
 ```
 
-Restart Netdata. On systemd hosts:
+`example` is a placeholder community for this loopback test. Community strings travel in cleartext on the wire, so on real networks prefer SNMPv3 — see [Configuration security](/docs/snmp-traps/configuration.md#security-versions-and-communities).
+
+Then restart Netdata so the file change takes effect. On systemd hosts:
 
 ```bash
 sudo systemctl restart netdata
@@ -60,8 +64,16 @@ sudo systemctl restart netdata
 Check that the listener is bound:
 
 ```bash
-sudo ss -unlp | grep ':9162'
+sudo ss -ulnp | grep ':9162'
 ```
+
+You should see something like:
+
+```text
+UNCONN 0 0 127.0.0.1:9162 0.0.0.0:* users:(("netdata",pid=1234,fd=42))
+```
+
+If the line is missing, the listener did not bind — recheck the YAML and the service logs.
 
 ## Step 2 - Send one known trap
 
@@ -83,7 +95,7 @@ For production devices, this is the point where you configure the device-side tr
 
 ## Step 3 - Find the trap in Logs
 
-In Netdata Cloud, open **Logs** and select **SNMP Trap Logs** (`snmp:traps`), then choose the `local-test` trap job if the source selector is shown. If this Agent is not connected to Netdata Cloud, skip to [Verify with journalctl](#verify-with-journalctl); that is the primary local verification path for standalone Agents.
+In Netdata Cloud, open **Logs** and select **SNMP Trap Logs** (`snmp:traps`), then choose the `local-test` listener job if the source selector is shown. If this Agent is not connected to Netdata Cloud, skip to [Verify with journalctl](#verify-with-journalctl); that is the primary local verification path for standalone Agents.
 
 Look for one row with:
 
@@ -115,7 +127,7 @@ Work through the checks in this order:
 1. **Listener not bound.**
 
    ```bash
-   sudo ss -unlp | grep ':9162'
+   sudo ss -ulnp | grep ':9162'
    ```
 
    If nothing is listening, check the YAML indentation, the job name, and the Netdata service logs after restart.
@@ -138,7 +150,7 @@ Work through the checks in this order:
 
 ## Verify with journalctl
 
-When local journal storage is enabled, the same trap is stored in Netdata's own journal files under the configured log directory. On default installations, you can inspect the local test job with:
+When local journal storage is enabled, the same trap is stored in Netdata's own journal files (see [Journal and Querying](/docs/snmp-traps/journal-and-querying.md) for the path and more query examples). On default installations, you can inspect the local test job with:
 
 ```bash
 sudo journalctl \
@@ -146,6 +158,16 @@ sudo journalctl \
   --since "5 minutes ago" \
   --output verbose \
   TRAP_OID=1.3.6.1.6.3.1.1.5.1
+```
+
+You should see a row like:
+
+```text
+TRAP_REPORT_TYPE=trap
+TRAP_JOB=local-test
+TRAP_OID=1.3.6.1.6.3.1.1.5.1
+TRAP_NAME=SNMPv2-MIB::coldStart
+TRAP_SOURCE_IP=127.0.0.1
 ```
 
 Look for `TRAP_OID=1.3.6.1.6.3.1.1.5.1` in the output. If present, the trap was stored locally.

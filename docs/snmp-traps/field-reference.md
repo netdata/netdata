@@ -14,6 +14,50 @@ Use this page when you need to map SNMP trap log fields to meaning, source, type
 
 SNMP trap rows are structured logs. Direct-journal jobs expose these fields through the Cloud-required `snmp:traps` Function and through `journalctl --directory=...`. OTLP export sends the same event as an OTLP LogRecord with OTLP attribute names; see [OTLP mapping notes](#otlp-mapping-notes).
 
+## On this page — field index
+
+Saw a field in a log row? Jump straight to its definition. Field families are listed alphabetically; each link lands on the section that defines it.
+
+| Field | Where it is defined |
+|---|---|
+| `_HOSTNAME` | [Source identity fields](#source-identity-fields) |
+| `MESSAGE` | [Report identity fields](#report-identity-fields) |
+| `ND_LOG_SOURCE` | [Report identity fields](#report-identity-fields) |
+| `ND_NIDL_NODE` | [Source identity fields](#source-identity-fields) |
+| `PRIORITY` | [Report identity fields](#report-identity-fields) |
+| `SYSLOG_IDENTIFIER` | [Report identity fields](#report-identity-fields) |
+| `TRAP_CATEGORY` | [Trap meaning fields](#trap-meaning-fields), [Decode error fields](#decode-error-fields) |
+| `TRAP_DECODE_ERROR` | [Decode error fields](#decode-error-fields) |
+| `TRAP_DECODE_ERROR_KIND` | [Decode error fields](#decode-error-fields) |
+| `TRAP_DEVICE_VENDOR` | [Enrichment fields](#enrichment-fields) |
+| `TRAP_ENGINE_ID` | [Packet audit fields](#packet-audit-fields) |
+| `TRAP_ENRICHMENT` | [Enrichment fields](#enrichment-fields) |
+| `TRAP_INTERFACE` | [Enrichment fields](#enrichment-fields) |
+| `TRAP_JOB` | [Report identity fields](#report-identity-fields) |
+| `TRAP_JSON` | [Varbind fields](#varbind-fields), [Dedup summary fields](#dedup-summary-fields), [Packet audit fields](#packet-audit-fields) |
+| `TRAP_LISTENER` | [Packet audit fields](#packet-audit-fields) |
+| `TRAP_NAME` | [Trap meaning fields](#trap-meaning-fields) |
+| `TRAP_NEIGHBORS` | [Enrichment fields](#enrichment-fields) |
+| `TRAP_OID` | [Trap meaning fields](#trap-meaning-fields) |
+| `TRAP_PACKET_SHA256` | [Packet audit fields](#packet-audit-fields) |
+| `TRAP_PACKET_SIZE` | [Packet audit fields](#packet-audit-fields) |
+| `TRAP_PDU_TYPE` | [Trap meaning fields](#trap-meaning-fields) |
+| `TRAP_REPORT_PERIOD_SEC` | [Dedup summary fields](#dedup-summary-fields) |
+| `TRAP_REPORT_TYPE` | [Start with report type](#start-with-report-type), [Report identity fields](#report-identity-fields) |
+| `TRAP_REVERSE_DNS` | [Source identity fields](#source-identity-fields) |
+| `TRAP_SEVERITY` | [Trap meaning fields](#trap-meaning-fields), [Decode error fields](#decode-error-fields) |
+| `TRAP_SOURCE_IP` | [Source identity fields](#source-identity-fields) |
+| `TRAP_SOURCE_UDP_PEER` | [Source identity fields](#source-identity-fields) |
+| `TRAP_SOURCE_UDP_PORT` | [Packet audit fields](#packet-audit-fields) |
+| `TRAP_SUPPRESSED_COUNT` | [Dedup summary fields](#dedup-summary-fields) |
+| `TRAP_SUPPRESSED_FINGERPRINTS` | [Dedup summary fields](#dedup-summary-fields) |
+| `TRAP_TAG_*` | [Profile tag fields](#profile-tag-fields) |
+| `TRAP_VAR_*` | [Varbind fields](#varbind-fields) |
+| `TRAP_VAR_*_RAW` | [Varbind fields](#varbind-fields) |
+| `TRAP_VERSION` | [Trap meaning fields](#trap-meaning-fields), [Decode error fields](#decode-error-fields) |
+
+For OTLP attribute names that map to these journal fields, see [OTLP mapping notes](#otlp-mapping-notes). For the default facets used by the `snmp:traps` Function, see [Default query fields](#default-query-fields).
+
 ## Start with report type
 
 Always check `TRAP_REPORT_TYPE` first. It tells you which field set to expect.
@@ -86,7 +130,7 @@ Varbinds are the event-specific payload fields inside the trap. Netdata exposes 
 
 | Field pattern | Meaning | Source | Type | Populated when | Query use and cautions |
 |---|---|---|---|---|---|
-| `TRAP_VAR_<NAME>` | Decoded event varbind value. Field names are normalized to uppercase journal-safe names. | SNMP PDU plus trap profile varbind labels. | string | `trap` rows only, for non-sensitive, non-redundant varbinds. | Prefer these fields for normal filtering. Examples: interface index, interface status, vendor event code. Do not assume every trap has the same varbind set. |
+| `TRAP_VAR_<NAME>` | Decoded event varbind value. Field names are normalized to uppercase. | SNMP PDU plus trap profile varbind labels. | string | `trap` rows only, for non-sensitive, non-redundant varbinds. | Prefer these fields for normal filtering. Examples: interface index, interface status, vendor event code. Do not assume every trap has the same varbind set. |
 | `TRAP_VAR_<NAME>_RAW` | Raw numeric value for an enum-backed varbind. | SNMP PDU plus trap profile enum mapping. | string or integer string | `trap` rows only, when `TRAP_VAR_<NAME>` uses an enum label. | Use when SIEM rules need numeric device values instead of human labels. |
 | `TRAP_JSON` | Structured payload JSON. For normal traps, contains non-sensitive varbind entries and `netdata_packet_sequence` when available. For summaries and decode errors, contains the matching summary or decode details. | Collector serialization. | JSON string | All report types. | Use for audit, payload inspection, and residual searches. Prefer `TRAP_VAR_*` for routine filtering. Review before forwarding because varbind values can contain operationally sensitive data. |
 
@@ -97,7 +141,7 @@ Varbinds are the event-specific payload fields inside the trap. Netdata exposes 
 | Profile names | A profile varbind name becomes `TRAP_VAR_<UPPERCASE_NAME>`. Non-letter and non-digit characters become underscores. |
 | OID fallback | If a varbind has no name, the field is based on the numeric OID, for example `TRAP_VAR_OID_...`. |
 | Duplicates | Duplicate field bases get numeric suffixes such as `_2`. |
-| Long names | Long field names are shortened and include a stable hash suffix to fit journal field-name limits. The full varbind name and OID remain available in `TRAP_JSON`. |
+| Long names | Long field names are shortened and include a stable hash suffix. The full varbind name and OID remain available in `TRAP_JSON`. |
 | Enum values | The main field uses the enum label. The `_RAW` field carries the raw numeric value. |
 | Skipped fields | `TRAP_VAR_*` skips the sensitive `snmpTrapCommunity` varbind and redundant protocol-control varbinds, including `sysUpTime`, `snmpTrapOID`, `snmpTrapAddress`, and `snmpTrapEnterprise`. |
 
@@ -109,7 +153,7 @@ Varbinds are the event-specific payload fields inside the trap. Netdata exposes 
 | `<varbind name or OID>` | Object with `oid`, `type`, `value`, and optional `enum`. |
 | `<varbind name>#2` | Duplicate key suffix when more than one varbind would use the same JSON key. |
 
-Binary varbind values are represented as hex strings in `TRAP_JSON`. Journal fields with control characters or invalid UTF-8 can be binary-encoded by the journal writer. Treat binary values as payload data, not display text.
+Binary varbind values are represented as hex strings in `TRAP_JSON`. Journal fields with control characters or invalid UTF-8 can be binary-encoded. Treat binary values as payload data, not display text.
 
 Unlike `TRAP_VAR_*`, `TRAP_JSON` keeps non-sensitive protocol-control varbinds such as `sysUpTime`, `snmpTrapOID`, `snmpTrapAddress`, and `snmpTrapEnterprise`. Only the sensitive `snmpTrapCommunity` varbind is omitted from `TRAP_JSON`.
 
@@ -121,7 +165,7 @@ Trap profiles and per-OID overrides can add operator labels. They are exposed as
 |---|---|---|---|---|---|
 | `TRAP_TAG_<KEY>` | Profile or override label value. Label keys are uppercased for the journal field name. | Trap profile or job override. | string | Rows where labels are applied. Most commonly `trap` rows. | Use for local policy grouping, such as site class, compliance scope, or ownership. Tags are selectable fields but not default facets. Tag values may reveal internal organization. |
 
-Long tag keys are shortened with a hash suffix to fit journal field-name limits.
+Long tag keys are shortened with a hash suffix.
 
 ## Dedup summary fields
 

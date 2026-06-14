@@ -18,7 +18,7 @@ Each anti-pattern explains:
 - the first symptom operators usually see;
 - the better practice to use instead.
 
-For the details behind these recommendations, see [Configuration](/docs/snmp-traps/configuration.md), [Validation and Data Quality](/docs/snmp-traps/validation-and-data-quality.md), [Metrics and Alerts](/docs/snmp-traps/metrics-and-alerts.md), [Sizing and Capacity](/docs/snmp-traps/sizing-and-capacity.md), [Journal and Querying](/docs/snmp-traps/journal-and-querying.md), [Forwarding to SIEM](/docs/snmp-traps/forwarding-to-siem.md), [Investigation Playbooks](/docs/snmp-traps/investigation-playbooks.md), and [Field Reference](/docs/snmp-traps/field-reference.md).
+For the details behind these recommendations, see [Configuration](/docs/snmp-traps/configuration.md), [Validation and Data Quality](/docs/snmp-traps/validation-and-data-quality.md), [Metrics](/docs/snmp-traps/metrics.md), [Alerts](/docs/snmp-traps/alerts.md), [Sizing and Capacity](/docs/snmp-traps/sizing-and-capacity.md), [Journal and Querying](/docs/snmp-traps/journal-and-querying.md), [Forwarding to SIEM](/docs/snmp-traps/forwarding-to-siem.md), [Investigation Playbooks](/docs/snmp-traps/investigation-playbooks.md), and [Field Reference](/docs/snmp-traps/field-reference.md).
 
 ## Copying quick-start config into production
 
@@ -68,7 +68,7 @@ For the details behind these recommendations, see [Configuration](/docs/snmp-tra
 
 **First symptom:** A dashboard or incident process says a device is healthy because no problem trap arrived, while receiver metrics or device polling show a different picture.
 
-**Better practice:** Use traps as event evidence. Combine them with receiver metrics, device metrics, logs, and validation checks. See [Metrics and Alerts](/docs/snmp-traps/metrics-and-alerts.md) for what trap metrics prove and what they do not prove.
+**Better practice:** Use traps as event evidence. Combine them with receiver metrics, device metrics, logs, and validation checks. See [Metrics](/docs/snmp-traps/metrics.md) for what trap metrics prove and what they do not prove.
 
 ## Treating silence as proof of health
 
@@ -88,7 +88,17 @@ For the details behind these recommendations, see [Configuration](/docs/snmp-tra
 
 **First symptom:** Alert fatigue starts immediately. Operators mute trap alerts, and real high-severity traps are missed in the noise.
 
-**Better practice:** Build alert policy from `TRAP_CATEGORY`, `TRAP_SEVERITY`, `TRAP_OID`, `TRAP_NAME`, source identity, and local overrides. Start from the shipped receiver and severity alerts in [Metrics and Alerts](/docs/snmp-traps/metrics-and-alerts.md), then add local rules only where the policy is clear.
+**Better practice:** Build alert policy from `TRAP_CATEGORY`, `TRAP_SEVERITY`, `TRAP_OID`, `TRAP_NAME`, source identity, and local overrides. Start from the shipped receiver and severity alerts in [Alerts](/docs/snmp-traps/alerts.md), then add local rules only where the policy is clear.
+
+## Blanket-suppressing authenticationFailure traps
+
+**Anti-pattern:** Treating a wave of `authenticationFailure` traps (`SNMPv2-MIB::authenticationFailure`, `TRAP_CATEGORY=auth`) as routine noise and silencing or deduplicating it away.
+
+**Why it hurts:** A surge of authentication-failure traps is a SecOps signal, not just trap noise. It commonly means a scanner is probing the device, a host is using wrong or stale SNMP credentials, or a credential rotation is half-applied. Suppress it and you lose the earliest evidence of unauthorized access attempts or a broken rotation.
+
+**First symptom:** `TRAP_CATEGORY=auth` rises across one or many devices, often from an unexpected `TRAP_SOURCE_IP`, sometimes alongside `auth_failures` or `usm_failures` on the receiver.
+
+**Better practice:** Route auth-category traps to your security workflow and investigate the source before tuning anything. Use the [Critical, security, or authentication traps](/docs/snmp-traps/investigation-playbooks.md#critical-security-or-authentication-traps) playbook to identify the source and intent. Apply deduplication or rate limiting to a confirmed-benign storming source only, never as a blanket auth filter.
 
 ## Ignoring unknown OID and profile coverage
 
@@ -108,7 +118,7 @@ For the details behind these recommendations, see [Configuration](/docs/snmp-tra
 
 **First symptom:** Operators see fewer profile-metric instances than expected, while the affected traps still appear as accepted log rows. `snmp.trap.profile_metric_diagnostics` shows `overflow_dropped`, `rule_missed`, `extraction_failed`, `attribution_failed`, or `source_transitions`.
 
-**Better practice:** Keep `profile_metrics` disabled until rules are reviewed. Prefer `profile_metrics.mode: exact`, enable only bounded rules, keep `profile_metrics.identity.source_id_privacy: hash`, and set limits intentionally. See [Configuration](/docs/snmp-traps/configuration.md) and [Metrics and Alerts](/docs/snmp-traps/metrics-and-alerts.md).
+**Better practice:** Keep `profile_metrics` disabled until rules are reviewed. Prefer `profile_metrics.mode: exact`, enable only bounded rules, keep `profile_metrics.identity.source_id_privacy: hash`, and set limits intentionally. See [Configuration](/docs/snmp-traps/configuration.md) and [Metrics](/docs/snmp-traps/metrics.md).
 
 ## Disabling journal while expecting local queries
 
@@ -172,6 +182,6 @@ Before relying on an SNMP trap listener in production, verify:
 - unknown OIDs are tracked as coverage gaps;
 - alert rules use policy, not raw trap volume alone;
 - profile metrics use bounded rules and labels;
-- the intended authoritative backend is confirmed: local direct journal for local investigation, OTLP as the only output when journal is disabled, or journal as authoritative with OTLP as secondary export;
+- the intended output is confirmed: local journal for local investigation, OTLP as the only output when journal is disabled, or journal plus OTLP export, where the local journal is the source of truth;
 - `rate_limit` and `dedup` behavior is understood before validation results are trusted;
 - retention matches investigation and storage requirements.

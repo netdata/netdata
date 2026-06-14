@@ -1,16 +1,16 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/snmp-traps/metrics-and-alerts.md"
-sidebar_label: "Metrics and Alerts"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/snmp-traps/metrics.md"
+sidebar_label: "Metrics"
 learn_status: "Published"
 learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'metrics', 'alerts', 'health', 'deduplication', 'receiver pipeline']
+keywords: ['snmp traps', 'metrics', 'health', 'deduplication', 'receiver pipeline']
 endmeta-->
 
 <!-- markdownlint-disable-file -->
 
-# Metrics and Alerts
+# SNMP Trap Metrics
 
-Use this page to check whether an SNMP trap receiver is healthy, whether traps are flowing, what the receiver is dropping or suppressing, and what the default health alerts mean.
+Use this page to read the SNMP trap receiver metrics: whether the receiver is healthy, whether traps are flowing, and what the receiver is dropping or suppressing. For the default health alerts that ship for these metrics, see [Alerts](/docs/snmp-traps/alerts.md).
 
 SNMP trap metrics describe the receiver and the traps that reached it. They do not prove the complete state of a device. Absence of traps is not proof of absence of events, because a device may be quiet, misconfigured, blocked by the network, or sending to another destination.
 
@@ -18,6 +18,7 @@ For setup and related operator workflows, see:
 
 - [Configuration](/docs/snmp-traps/configuration.md)
 - [Usage and Output](/docs/snmp-traps/usage-and-output.md)
+- [Alerts](/docs/snmp-traps/alerts.md)
 - [Validation and Data Quality](/docs/snmp-traps/validation-and-data-quality.md)
 - [Troubleshooting](/docs/snmp-traps/troubleshooting.md)
 
@@ -25,22 +26,45 @@ For setup and related operator workflows, see:
 
 The **SNMP trap receiver pipeline** chart shows per-job event rates for the receiver path. Use it first when deciding whether the listener is receiving packets and whether accepted traps are reaching the configured output backend.
 
+Every packet walks the same funnel; the branches are where traps are lost or held:
+
+```mermaid
+flowchart LR
+    P([UDP datagram]) --> R[received]
+    R --> D[decoded]
+    D --> A[accepted]
+    A --> C[committed]
+    C --> OUT(["journal and/or OTLP"])
+    R -.->|"allowlist, version,<br/>auth, malformed"| DR([dropped])
+    D -.->|"post-decode policy,<br/>engine-id, rate-limit"| DR
+    A -.->|repeated trap| DS([dedup_suppressed])
+    A -.->|output rejected| WF([write_failed])
+```
+
 | Dimension | What it means | Operator use |
 |---|---|---|
-| `received` | A UDP packet entered the trap handler. | Confirms traffic reached the listener process. |
+| `received` | A UDP packet entered the trap handler. | Confirms traffic reached the listener process. This counts *after* the kernel UDP buffer, so datagrams the kernel drops are invisible here — watch `ipv4.udperrors` (`RcvbufErrors`) for kernel drops and see [Sizing and Capacity](/docs/snmp-traps/sizing-and-capacity.md#kernel-udp-buffer-drops) for buffer tuning. |
 | `decoded` | The packet parsed as an SNMP trap or INFORM PDU. | Compare with `received` to find packets rejected before or during decode, such as source allowlist drops, unsupported sniffed versions, authentication failures, or malformed packets. |
 | `accepted` | The trap became a normal trap entry after source checks, profile lookup, template rendering, and source attribution. | Compare with `decoded` to find post-decode policy or source-identity checks that stopped a decoded trap before acceptance. |
-| `committed` | The trap was accepted by the authoritative output writer. | This is the strongest receiver-side signal that the receiver accepted the trap for local storage or export. Backend failures are exposed by write and export error metrics. |
-| `dedup_suppressed` | A repeated trap matched deduplication and was intentionally summarized instead of written as another row. | Expected during repeated events when deduplication is enabled. |
-| `dropped` | The receiver ended packet handling without a committed normal trap row, dedup-suppression result, or authoritative write-failed outcome. Decode-error rows can also increment this dimension in parallel with their error dimension. | Compare with processing errors and decode-error rows to separate decode failures, policy drops, rate limits, and other unfinished packet paths. |
-| `write_failed` | The authoritative output writer rejected the trap. | In journal-only and journal+OTLP jobs, journal write failures increment `write_failed` with the error dimension `journal_write_failed`. In OTLP-only jobs, synchronous queue-full failures and asynchronous export failures are terminal and increment `write_failed` with the error dimension `otlp_export_failed`. In journal+OTLP jobs, secondary OTLP enqueue or export failures raise `otlp_export_failed` without raising `write_failed`. |
+| `committed` | The trap was accepted by the configured output (journal or OTLP). | This is the strongest receiver-side signal that the receiver accepted the trap for local storage or export. Backend failures are exposed by write and export error metrics. |
+| `dedup_suppressed` | A repeated trap matched deduplication and was counted in a periodic summary instead of stored as its own row. | Expected during repeated events when deduplication is enabled. |
+| `dropped` | A packet entered the handler but did not become a committed trap, a dedup summary, or a write failure. Decode-error rows can also increment it alongside their error dimension. | Compare with the processing-error dimensions and decode-error rows to separate decode failures, policy drops, and rate limits. |
+| `write_failed` | The authoritative output (journal, or OTLP when journal is disabled) could not keep the trap. | Which counters rise depends on the backend mode — see the table below. |
+
+### Which counters rise on a backend failure {#backend-write-failures}
+
+| Job backend mode | On a journal write failure | On an OTLP export failure |
+|---|---|---|
+| Journal only | `write_failed` + `journal_write_failed` | — (no OTLP) |
+| Journal + OTLP | `write_failed` + `journal_write_failed` | `otlp_export_failed` only — the journal copy is unaffected, so `write_failed` does **not** rise |
+| OTLP only | — (no journal) | `write_failed` + `otlp_export_failed` — terminal; the trap is lost |
 
 Interpret gaps in order:
 
 - `received` rising while `decoded` is flat usually points to source allowlist, unsupported sniffed version, authentication, or malformed packet problems before a parsed trap exists.
 - `decoded` rising while `accepted` is flat usually points to post-decode policy checks: version or community allowlist drops, engine ID checks, or rate limits. Profile lookup problems and template issues are data-quality signals on traps that can still become accepted entries. Dedup suppression does not keep `accepted` flat; it is tracked separately.
 - `received` rising while `committed` is flat means traps are reaching the receiver but are not being accepted by the configured output writer. Check `dropped`, `dedup_suppressed`, `write_failed`, and the error dimensions.
-- `write_failed` rising points to the authoritative write path for the job: local direct journal when `journal.enabled` is `true`, or OTLP when journal is disabled. In OTLP-only jobs, both synchronous queue-full failures and asynchronous export failures increment `write_failed` with `otlp_export_failed`; when journal and OTLP are both enabled, check `otlp_export_failed` separately for secondary OTLP enqueue or export failures that do not raise `write_failed`.
+- `write_failed` rising means the authoritative backend could not keep traps. See [Which counters rise on a backend failure](#backend-write-failures) for which counter maps to which backend mode.
 - `dedup_suppressed` rising means repeated rows were intentionally collapsed. Confirm the deduplication policy before treating this as loss.
 
 ## Categories and severities
@@ -90,7 +114,7 @@ The **SNMP trap processing errors** chart shows per-job error rates. Some errors
 | `auth_failures` | Authentication or decryption failed. Check SNMP community or SNMPv3 auth/privacy settings. |
 | `usm_failures` | SNMPv3 USM processing failed. Check users, protocols, keys, and sender engine state. |
 | `unknown_engine_id` | SNMPv3 engine ID was not accepted or could not be resolved according to the job configuration. When `dynamic_engine_id_discovery` is enabled, first-time accepted `(engineID, username)` registrations also increment this counter once per job lifetime as a visibility signal. Check engine ID whitelist, dynamic discovery settings, cap exhaustion, invalid sender state, or unauthorized senders. |
-| `inform_response_failed` | The receiver failed to send an INFORM acknowledgement. Check local socket and network path back to the sender. |
+| `inform_response_failed` | The receiver failed to send an INFORM acknowledgement. This is non-blocking: the trap can still continue through the receiver. Check the local socket and network path back to the sender. |
 | `binary_encoded` | Structured fields were written with binary journal encoding for CWE-117 log-injection protection. Applies to the direct-journal path; OTLP-only jobs keep this counter at zero. A low background rate can be normal with known binary varbinds, but the default `snmp_trap_binary_encoded_fields` alert warns on any sustained non-zero rate over 10 minutes. Tune or silence that alert for known steady-state binary sources; investigate new or rising rates by checking profile labels, rendered varbind values with control characters, invalid UTF-8, or binary payload values. |
 | `profile_load_failed` | Trap profile loading or lookup failed. Check custom profile YAML and profile directories. |
 | `journal_write_failed` | Direct journal write failed. Check disk space, permissions, and the per-job journal directory. |
@@ -123,9 +147,9 @@ Source metrics help answer which senders are active and which senders are affect
 | **SNMP trap source-attributed errors** | `unknown_oid`, `template_unresolved`, `profile_load_failed`, `journal_write_failed`, `otlp_export_failed` | Per-source view of errors that can be attributed to a trap entry. |
 | **SNMP trap source last seen** | `seconds_ago` | Time since the receiver last saw activity for that source identity. |
 
-Per-source charts are labeled by `job_name`, `source_id`, and `source_kind`. When a trap can be tied to a Netdata vnode, the source identity uses that vnode. Otherwise the receiver falls back to the selected trap source, such as the enriched source, entry source, or UDP peer. Fallback source IDs are privacy-preserving hashes by default; use trap rows in [Usage and Output](/docs/snmp-traps/usage-and-output.md) when you need readable source fields.
+Per-source charts are labeled by `job_name`, `source_id`, and `source_kind`. When a trap can be tied to a Netdata vnode, the source identity uses that vnode. Otherwise the receiver falls back to the selected trap source, such as the enriched source or the UDP peer. Fallback source IDs are privacy-preserving hashes by default; use trap rows in [Usage and Output](/docs/snmp-traps/usage-and-output.md) when you need readable source fields.
 
-Source-attributed receiver metrics are bounded to 2000 active sources per job. Inactive sources expire after 60 successful collection cycles. Accepted traps can still be committed if source metric attribution fails or the source cap is full; in that case, per-job pipeline totals can be higher than the sum of per-source charts.
+Source-attributed receiver metrics are bounded to 2000 active sources per job, so plan source cardinality around that cap. Inactive sources age out automatically. Accepted traps can still be committed if source metric attribution fails or the source cap is full; in that case, per-job pipeline totals can be higher than the sum of per-source charts.
 
 This source-metric cap applies to the built-in source receiver charts: `snmp.trap.source_pipeline`, `snmp.trap.source_errors`, and `snmp.trap.source_last_seen`. Profile-defined metrics have separate cardinality limits; see [Profile-defined metrics](#profile-defined-metrics).
 
@@ -137,66 +161,15 @@ Interpret source charts carefully:
 - `overflow_dropped` means source metric tracking hit its cap. Accepted traps can still be committed, but per-source metric visibility is bounded.
 - `source_transitions` means the same raw source route changed to a different metric identity. Check relay, vnode, and source attribution configuration.
 
-## Default health alerts
-
-Netdata ships default health alerts for SNMP trap receiver metrics. They alert on receiver health and high-severity trap flow; they do not assert the complete health state of the sending devices.
-
-Default alerts check every minute and use 5-minute or 10-minute average windows, depending on the alert. Use the template names below when routing, silencing, or reviewing default alert behavior.
-
-Severity alerts:
-
-- Emergency traps alert critically when any `emerg` traps are received over the 5-minute window.
-- Alert and critical traps warn when any `alert` or `crit` traps are received, and become critical above 5 events/s for `alert` severity or above 10 events/s for `crit` severity.
-- Error and warning traps alert only at higher rates. The important default storm thresholds are `err` above 10 events/s for warning and 100 events/s for critical, and `warning` above 100 events/s for warning and 1000 events/s for critical.
-- `notice`, `info`, and `debug` severities do not alert by default.
-
-Processing and policy alerts:
-
-- Decode failures, unresolved profile templates, malformed PDUs, authentication failures, USM failures, unknown engine IDs, INFORM response failures, binary-encoded fields, profile load failures, OTLP export failures, and listener read failures warn when they appear.
-- Allowlist drops and rate-limit drops alert only at higher sustained rates. The important default thresholds are above 10 errors/s for warning and above 100 errors/s for critical.
-- Unknown OIDs are exposed as a metric but do not alert by default, because uncovered vendor traps are common in mixed networks.
-
-Output and storage alerts:
-
-- Journal write failures warn when any failures appear and become critical above 1 error/s. Treat these as urgent because direct-journal jobs cannot commit local trap rows while writes are failing.
-- OTLP export failures warn when they appear. No critical threshold is shipped by default. For OTLP-only jobs, export failures mean the configured downstream OTLP receiver is not receiving trap rows.
-
-Deduplication alert:
-
-- High deduplication suppression warns above 1000 suppressed events/s and becomes critical above 10000 suppressed events/s. This means repeated traps are being intentionally collapsed at storm-level rate.
-
-| Template | Context / dimension | Default threshold |
-|---|---|---|
-| `snmp_trap_emergency_events` | `snmp.trap.severity` / `emerg` | critical above 0 over 5m |
-| `snmp_trap_alert_events` | `snmp.trap.severity` / `alert` | warning above 0, critical above 5 over 5m |
-| `snmp_trap_critical_events` | `snmp.trap.severity` / `crit` | warning above 0, critical above 10 over 5m |
-| `snmp_trap_error_events` | `snmp.trap.severity` / `err` | warning above 10, critical above 100 over 5m |
-| `snmp_trap_warning_event_storm` | `snmp.trap.severity` / `warning` | warning above 100, critical above 1000 over 10m |
-| `snmp_trap_decode_errors` | `snmp.trap.errors` / `decode_failed` | warning above 0 over 10m |
-| `snmp_trap_template_unresolved` | `snmp.trap.errors` / `template_unresolved` | warning above 0 over 10m |
-| `snmp_trap_malformed_pdus` | `snmp.trap.errors` / `malformed_pdu` | warning above 0 over 10m |
-| `snmp_trap_allowlist_drops` | `snmp.trap.errors` / `dropped_allowlist` | warning above 10, critical above 100 over 10m |
-| `snmp_trap_rate_limited` | `snmp.trap.errors` / `rate_limited` | warning above 10, critical above 100 over 10m |
-| `snmp_trap_auth_failures` | `snmp.trap.errors` / `auth_failures` | warning above 0 over 10m |
-| `snmp_trap_usm_failures` | `snmp.trap.errors` / `usm_failures` | warning above 0 over 10m |
-| `snmp_trap_unknown_engine_id` | `snmp.trap.errors` / `unknown_engine_id` | warning above 0 over 10m |
-| `snmp_trap_inform_response_failures` | `snmp.trap.errors` / `inform_response_failed` | warning above 0 over 10m |
-| `snmp_trap_binary_encoded_fields` | `snmp.trap.errors` / `binary_encoded` | warning above 0 over 10m |
-| `snmp_trap_profile_load_failures` | `snmp.trap.errors` / `profile_load_failed` | warning above 0 over 10m |
-| `snmp_trap_journal_write_failures` | `snmp.trap.errors` / `journal_write_failed` | warning above 0, critical above 1 over 5m |
-| `snmp_trap_otlp_export_failures` | `snmp.trap.errors` / `otlp_export_failed` | warning above 0 over 10m |
-| `snmp_trap_listener_read_failures` | `snmp.trap.errors` / `listener_read_failed` | warning above 0 over 10m |
-| `snmp_trap_high_dedup_suppression` | `snmp.trap.dedup_suppressed` / `suppressed` | warning above 1000, critical above 10000 over 10m |
-
 ## Profile-defined metrics
 
 Profile-defined metrics convert selected committed traps into time-series. They are disabled by default and must be enabled with `profile_metrics` in [Configuration](/docs/snmp-traps/configuration.md).
 
 Important behavior:
 
-- Profile metrics update after the configured writer accepts the trap. For direct-journal jobs, this means the trap was accepted into the direct-journal writer. For OTLP-only jobs, this means the trap was queued for OTLP export. Later asynchronous writer or export failures do not roll back an already updated profile metric.
+- Only committed traps update profile metrics. A later journal or OTLP failure does not roll back a metric that was already updated, so a metric and its downstream export can briefly diverge.
 - Dedup-suppressed traps do not update profile metrics.
-- Synchronous write failures, including journal write failures and OTLP queue-full failures, do not update profile metrics.
+- Traps that fail to write (journal write failures or dropped OTLP records) do not update profile metrics.
 - Cardinality limits protect the node by bounding enabled rules, sources, resources per source, and total metric instances per job.
 - Over-cap profile metric instances are skipped and counted by diagnostics; the accepted trap can still be committed.
 

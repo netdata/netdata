@@ -44,8 +44,6 @@ Stock profiles provide:
 
 The current stock pack provides trap decoding coverage. It does not ship profile metric rules or chart definitions, so profile-derived charts require operator profile files that define `metrics:` and `charts:` rules.
 
-Individual stock profile files are loaded on demand when the first matching trap OID needs them, so the large stock catalogue does not load every vendor profile into memory up front.
-
 The category set is fixed: `state_change`, `config_change`, `security`, `auth`, `license`, `mobility`, `diagnostic`, and `unknown`.
 
 The severity set is fixed: `emerg`, `alert`, `crit`, `err`, `warning`, `notice`, `info`, and `debug`. Netdata maps these to the journal `PRIORITY` field.
@@ -119,7 +117,7 @@ Use the smallest control that matches the job.
 | Replace stock behavior for one vendor file | Operator profile with the same filename | The operator file fully replaces the stock file of the same name. |
 | Add site-specific traps without replacing stock vendor files | Operator profile with a different filename; use `extends:` when the file should inherit an existing profile | It adds entries alongside the stock profile set without copying the whole stock vendor file. |
 
-`extends:` entries are bare `.yaml` or `.yml` filenames without path separators. Netdata resolves them across the operator and stock profile directories, operator files first, up to 32 levels deep. They can inherit traps, varbinds, metric rules, and chart definitions from another visible profile file, and fields in the extending file win where they overlap. Circular `extends:` chains are rejected at profile load time.
+`extends:` entries are bare `.yaml` or `.yml` filenames without path separators. Netdata resolves them across the operator and stock profile directories, operator files first. They can inherit traps, varbinds, metric rules, and chart definitions from another visible profile file, and fields in the extending file win where they overlap. Deeply nested or circular `extends:` chains are rejected at profile load time.
 
 For simple policy overrides, configure the listener job:
 
@@ -138,17 +136,12 @@ Job overrides use static label values. Profile-file labels can also use template
 
 ## Profile reload behavior
 
-Profile loading is tied to active trap jobs.
+- While a listener job is running, edits to operator profiles under `/etc/netdata/go.d/snmp.trap-profiles/` are picked up automatically.
+- If a changed operator profile is invalid, the failure is logged and the last valid profiles stay active.
+- Stock profile updates apply after the Netdata Agent restarts.
+- If no listener job is active, the next listener job creation loads and validates the profile files.
 
-- Profiles are loaded when the first runnable SNMP trap job is created.
-- User profile changes under `/etc/netdata/go.d/snmp.trap-profiles/` are automatically reloaded while trap jobs are active.
-- If file watching is unavailable, Netdata falls back to periodic profile scans.
-- If a changed user profile is invalid, Netdata logs the reload failure and keeps the last valid profile index active.
-- When all trap jobs stop, the shared profile cache is released.
-- Stock profile updates are picked up when trap jobs are recreated or the Netdata Agent restarts.
-- If no trap job is active, the next trap job creation loads and validates the profile files.
-
-Profile validation failures are visible as collector errors and profile-load-failure metrics. After editing profiles, check Logs and receiver metrics before assuming a change is active; see [Metrics and Alerts](/docs/snmp-traps/metrics-and-alerts.md) for the receiver diagnostics.
+Profile validation failures are visible as collector errors and profile-load-failure metrics. After editing profiles, check Logs and receiver metrics before assuming a change is active; see [Metrics](/docs/snmp-traps/metrics.md) for the receiver diagnostics.
 
 ## Verify profile changes
 
@@ -168,31 +161,12 @@ Profiles can define optional trap-to-metric rules and chart definitions. Listene
 Profile metrics are disabled by default, and the current stock pack does not ship metric rules. To create profile-derived charts today:
 
 1. Add `metrics:` and `charts:` rules to an operator profile file under `/etc/netdata/go.d/snmp.trap-profiles/`.
-2. Wait for the file watcher reload if a trap job is already running, or start a trap job to load and watch the profile files.
+2. Wait for the automatic reload if a listener job is already running, or start a listener job to load the profile files.
 3. Enable `profile_metrics` in the listener job and select the loaded rule names.
 
-Rule names in `include` come from metric rule `name` fields in loaded profile YAML files. If no loaded profile defines metric rules, enabling `profile_metrics` creates no profile-derived charts. If an `include` name does not match a loaded rule, the listener job fails validation and does not start.
+Rule names in `include` come from metric rule `name` fields in loaded profile YAML files. If no loaded profile defines metric rules, enabling `profile_metrics` creates no profile-derived charts.
 
-Enable only reviewed rule names, for example:
-
-```yaml
-profile_metrics:
-  enabled: true
-  mode: exact
-  include:
-    - cisco.config.changed  # example only: replace with a loaded operator-profile rule
-```
-
-Selection modes:
-
-- `none`: no profile metric rules are evaluated.
-- `auto`: enables rules marked `auto_safe: true`.
-- `exact`: enables only rule names listed in `include`.
-- `combined`: enables `auto_safe: true` rules plus rule names listed in `include`.
-
-`include` is valid only with `exact` or `combined` when `profile_metrics.enabled` is `true`; using `include` with `none` or `auto` fails job validation.
-
-Rule syntax, chart syntax, identity controls, and cardinality limits are documented in [SNMP Trap Profile Format](/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md) and [Configuration](/docs/snmp-traps/configuration.md).
+The listener-side `profile_metrics` settings — selection `mode`, `include`, the identity controls, and the cardinality `limits` — are documented in [Configuration](/docs/snmp-traps/configuration.md#profile-metrics). Rule and chart syntax live in [SNMP Trap Profile Format](/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md).
 
 Use profile metrics for bounded, operator-useful trap signals, such as:
 
@@ -202,7 +176,7 @@ Use profile metrics for bounded, operator-useful trap signals, such as:
 
 Do not use high-cardinality values as metric labels or resource identities. Avoid MAC addresses, source IPs, usernames, interface descriptions, packet contents, event IDs, and other per-event values as labels. Put those values in `MESSAGE`, `TRAP_VAR_*`, and `TRAP_JSON` instead.
 
-Profile metrics update only after the authoritative output backend accepts the trap. Dedup-suppressed traps and write-failed traps do not update profile metrics. OTLP export failures do not roll back profile metrics that were already updated, even when OTLP reports a delivery error after the journal write succeeds.
+Only committed traps update profile metrics. For the exact update rule (dedup-suppressed and failed-write traps do not update metrics, and an OTLP export failure does not roll back an already-updated metric), see [Metrics](/docs/snmp-traps/metrics.md#profile-defined-metrics).
 
 If metric rules exceed source, resource, chart, or job limits, Netdata skips the over-cap metric instance, keeps accepting traps, and increments profile metric diagnostics.
 

@@ -71,23 +71,32 @@ Useful first filters:
 
 For field meanings and population rules, see [Field Reference](/docs/snmp-traps/field-reference.md).
 
-## Query with journalctl
+## Query with journalctl {#canonical-command}
 
 Use `sudo` when the trap journal files are not readable by your user.
 
-Show recent rows from one job:
+The canonical command is the same each time — only the filter changes. It reads one direct-journal job from the machine-id child of its per-job root:
 
 ```bash
-sudo journalctl --directory=/var/log/netdata/traps/edge-traps/$(tr -d '-' < /etc/machine-id) \
-  --since "2 hours ago" \
-  --no-pager
+sudo journalctl --directory=/var/log/netdata/traps/<job>/$(tr -d '-' < /etc/machine-id) \
+  --since "2 hours ago" --no-pager
 ```
+
+You should see rows like:
+
+```text
+... TRAP_JOB=edge-traps TRAP_REPORT_TYPE=trap TRAP_NAME=IF-MIB::linkDown TRAP_SOURCE_IP=192.0.2.10
+... TRAP_JOB=edge-traps TRAP_REPORT_TYPE=trap TRAP_NAME=SNMPv2-MIB::coldStart TRAP_SOURCE_IP=192.0.2.10
+```
+
+Each row carries the full `TRAP_*` field set; the lines above show only a few representative fields.
+
+Replace `<job>` with your listener job name (examples below use `edge-traps`). To narrow the query, add `FIELD=value` matches before the flags, and optionally `--output=json --output-fields=...` to project specific fields. The examples below show only the filter to add to this canonical command.
 
 Show one source IP in a time window:
 
 ```bash
-sudo journalctl --directory=/var/log/netdata/traps/edge-traps/$(tr -d '-' < /etc/machine-id) \
-  TRAP_SOURCE_IP=192.0.2.10 \
+... TRAP_SOURCE_IP=192.0.2.10 \
   --since "2 hours ago" \
   --until "now" \
   --no-pager
@@ -96,8 +105,7 @@ sudo journalctl --directory=/var/log/netdata/traps/edge-traps/$(tr -d '-' < /etc
 Show normal trap rows only:
 
 ```bash
-sudo journalctl --directory=/var/log/netdata/traps/edge-traps/$(tr -d '-' < /etc/machine-id) \
-  TRAP_REPORT_TYPE=trap \
+... TRAP_REPORT_TYPE=trap \
   --since "2 hours ago" \
   --no-pager
 ```
@@ -105,8 +113,7 @@ sudo journalctl --directory=/var/log/netdata/traps/edge-traps/$(tr -d '-' < /etc
 Filter by severity and category:
 
 ```bash
-sudo journalctl --directory=/var/log/netdata/traps/edge-traps/$(tr -d '-' < /etc/machine-id) \
-  TRAP_SEVERITY=warning \
+... TRAP_SEVERITY=warning \
   TRAP_CATEGORY=state_change \
   --since "2 hours ago" \
   --no-pager
@@ -115,8 +122,7 @@ sudo journalctl --directory=/var/log/netdata/traps/edge-traps/$(tr -d '-' < /etc
 Filter by source and trap name:
 
 ```bash
-sudo journalctl --directory=/var/log/netdata/traps/edge-traps/$(tr -d '-' < /etc/machine-id) \
-  TRAP_SOURCE_IP=192.0.2.10 \
+... TRAP_SOURCE_IP=192.0.2.10 \
   TRAP_NAME=IF-MIB::linkDown \
   --since "2 hours ago" \
   --no-pager
@@ -125,8 +131,7 @@ sudo journalctl --directory=/var/log/netdata/traps/edge-traps/$(tr -d '-' < /etc
 `journalctl` treats matches on different fields as logical AND. Repeating the same field acts as OR for that field, for example:
 
 ```bash
-sudo journalctl --directory=/var/log/netdata/traps/edge-traps/$(tr -d '-' < /etc/machine-id) \
-  TRAP_SEVERITY=crit \
+... TRAP_SEVERITY=crit \
   TRAP_SEVERITY=err \
   --since "2 hours ago" \
   --no-pager
@@ -136,11 +141,10 @@ sudo journalctl --directory=/var/log/netdata/traps/edge-traps/$(tr -d '-' < /etc
 
 Use JSON export when you want to copy rows into a ticket, process rows with a script, or feed another tool. Keep exports small and review payload fields before sharing them.
 
-Export selected fields for one source:
+Building on the [canonical command](#canonical-command), export selected fields for one source:
 
 ```bash
-sudo journalctl --directory=/var/log/netdata/traps/edge-traps/$(tr -d '-' < /etc/machine-id) \
-  TRAP_SOURCE_IP=192.0.2.10 \
+... TRAP_SOURCE_IP=192.0.2.10 \
   --since "2 hours ago" \
   --output=json \
   --output-fields=__REALTIME_TIMESTAMP,MESSAGE,TRAP_JOB,TRAP_REPORT_TYPE,TRAP_NAME,TRAP_CATEGORY,TRAP_SEVERITY,TRAP_SOURCE_IP,TRAP_JSON \
@@ -150,8 +154,7 @@ sudo journalctl --directory=/var/log/netdata/traps/edge-traps/$(tr -d '-' < /etc
 Export a compact operator view without the full payload:
 
 ```bash
-sudo journalctl --directory=/var/log/netdata/traps/edge-traps/$(tr -d '-' < /etc/machine-id) \
-  --since "2 hours ago" \
+... --since "2 hours ago" \
   --output=json \
   --output-fields=__REALTIME_TIMESTAMP,MESSAGE,TRAP_JOB,TRAP_REPORT_TYPE,TRAP_NAME,TRAP_CATEGORY,TRAP_SEVERITY,TRAP_SOURCE_IP \
   --no-pager > snmp-traps-summary.json
@@ -165,11 +168,10 @@ Decode-error rows use:
 TRAP_REPORT_TYPE=decode_error
 ```
 
-Use them when packets reached the listener but could not become normal trap rows.
+Use them when packets reached the listener but could not become normal trap rows. With the [canonical command](#canonical-command):
 
 ```bash
-sudo journalctl --directory=/var/log/netdata/traps/edge-traps/$(tr -d '-' < /etc/machine-id) \
-  TRAP_REPORT_TYPE=decode_error \
+... TRAP_REPORT_TYPE=decode_error \
   TRAP_SOURCE_IP=192.0.2.10 \
   --since "2 hours ago" \
   --output=json-pretty \
@@ -188,21 +190,16 @@ Useful decode-error fields:
 | `TRAP_ENGINE_ID` | SNMPv3 engine ID when safely extractable. Treat it as inventory data. |
 | `TRAP_JSON` | Structured decode-error details and packet sequence when available. |
 
-Raw packet bytes are not written to decode-error rows because packets can contain community strings or binary payloads. For troubleshooting workflow, see [Troubleshooting](/docs/snmp-traps/troubleshooting.md).
+Raw packet bytes are not written to decode-error rows because packets can contain community strings or binary payloads; see [Field Reference](/docs/snmp-traps/field-reference.md#decode-error-fields) for the full decode-error field set. For troubleshooting workflow, see [Troubleshooting](/docs/snmp-traps/troubleshooting.md).
 
 ## Dedup summaries
 
-When deduplication is enabled, the first matching trap is written normally. Later matching traps inside the dedup window are suppressed and counted. Netdata writes a summary row with:
+When deduplication is enabled, repeated matching traps are suppressed and reported in a periodic summary row with `TRAP_REPORT_TYPE=deduplication_summary`. For what those rows mean, see [Usage and Output](/docs/snmp-traps/usage-and-output.md#dedup-summaries).
 
-```text
-TRAP_REPORT_TYPE=deduplication_summary
-```
-
-Query summary rows:
+Query summary rows with the [canonical command](#canonical-command):
 
 ```bash
-sudo journalctl --directory=/var/log/netdata/traps/edge-traps/$(tr -d '-' < /etc/machine-id) \
-  TRAP_REPORT_TYPE=deduplication_summary \
+... TRAP_REPORT_TYPE=deduplication_summary \
   --since "2 hours ago" \
   --output=json-pretty \
   --output-fields=__REALTIME_TIMESTAMP,MESSAGE,TRAP_JOB,TRAP_SUPPRESSED_COUNT,TRAP_SUPPRESSED_FINGERPRINTS,TRAP_REPORT_PERIOD_SEC,TRAP_JSON \
@@ -222,13 +219,9 @@ A dedup summary is a job-level summary row. It is not a normal trap from one dev
 
 ## Payload and sensitive-data notes
 
-`TRAP_VAR_*` fields are query-friendly indexed varbinds. They are emitted only for normal trap rows and only for non-sensitive, non-redundant varbinds. Enum-backed varbinds can also emit `TRAP_VAR_*_RAW` with the raw numeric value.
+When querying, prefer the indexed `TRAP_VAR_*` fields for rules and use `TRAP_JSON` for audit, export, and residual searches; `TRAP_ENRICHMENT` is for debugging source/enrichment decisions, not as a broad default facet. For the `TRAP_VAR_*` vs `TRAP_JSON` model, skip rules, and enum `_RAW` handling, see [Field Reference](/docs/snmp-traps/field-reference.md#varbind-fields).
 
-`TRAP_JSON` stores structured payload detail. For normal traps, it contains non-sensitive varbind entries, including protocol-control varbinds that are not indexed as `TRAP_VAR_*`, and `netdata_packet_sequence` when available. For decode errors and dedup summaries, it contains the matching diagnostic or summary shape. Prefer specific fields for rules and use `TRAP_JSON` for audit, export, and residual searches.
-
-`TRAP_ENRICHMENT` records source-attribution and enrichment decisions. Use it to debug why source, hostname, vendor, interface, neighbor, or reverse-DNS fields were or were not applied. Do not use it as a broad default facet.
-
-Some values can contain newlines, control bytes, or invalid UTF-8. Netdata stores those fields using safe binary journal encoding so the row cannot inject fake fields. In `journalctl --output=json`, binary fields can appear as arrays of unsigned byte values. Treat them as payload data, not display text.
+Some values can contain newlines, control bytes, or invalid UTF-8. Netdata stores those fields in a binary-safe form so a hostile value cannot inject fake fields. In `journalctl --output=json`, binary fields can appear as arrays of unsigned byte values. Treat them as payload data, not display text.
 
 Trap logs can contain sensitive inventory and operational details:
 

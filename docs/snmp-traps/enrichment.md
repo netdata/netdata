@@ -18,7 +18,18 @@ Use this page to understand what those fields mean and how much trust to place i
 
 ## Source identity model
 
-Every accepted trap has a selected source identity.
+Every accepted trap has a selected source identity. How it is chosen depends on whether the device sent the trap directly or through a relay:
+
+```mermaid
+flowchart LR
+    Dev([Device 192.0.2.10]) -->|direct| ND[Netdata listener]
+    ND --> S1["TRAP_SOURCE_IP = UDP peer = 192.0.2.10"]
+    Dev2([Device 192.0.2.10]) --> Relay([Relay 192.0.2.250])
+    Relay -->|"UDP peer = relay"| ND2[Netdata listener]
+    ND2 --> Q{"relay trusted +<br/>valid snmpTrapAddress.0?"}
+    Q -->|yes| S2["TRAP_SOURCE_IP = device 192.0.2.10<br/>TRAP_SOURCE_UDP_PEER = relay"]
+    Q -->|no| S3["TRAP_SOURCE_IP = relay<br/>candidate rejected"]
+```
 
 | Field | Meaning |
 |---|---|
@@ -27,7 +38,7 @@ Every accepted trap has a selected source identity.
 | `TRAP_ENRICHMENT.source.udp_peer` | The UDP peer recorded in the audit trail. It should match `TRAP_SOURCE_UDP_PEER` when the packet source was available. |
 | `TRAP_ENRICHMENT.source.snmp_trap_address` | The usable relay-supplied `snmpTrapAddress.0` candidate, when the trap carried one. Invalid candidates are recorded in `rejected_candidates` instead. |
 | `TRAP_ENRICHMENT.source.selected` | The selected source recorded in the audit trail. It should match `TRAP_SOURCE_IP`. |
-| `TRAP_ENRICHMENT.source.method` | How Netdata selected the source. Normal production values are `udp_peer` for direct delivery and `trusted_relay_snmpTrapAddress.0` for trusted relay override. Defensive fallback rows can show `entry_source`. |
+| `TRAP_ENRICHMENT.source.method` | How Netdata selected the source. Normal production values are `udp_peer` for direct delivery and `trusted_relay_snmpTrapAddress.0` for trusted relay override. |
 
 For direct device-to-Netdata delivery, `TRAP_SOURCE_IP` and `TRAP_SOURCE_UDP_PEER` are normally the same value.
 
@@ -42,7 +53,7 @@ Do not treat a relayed original source as trustworthy unless the UDP peer is exp
 
 By default, the UDP peer is authoritative. This is the safest model for direct device-to-Netdata delivery.
 
-`allowlist.source_cidrs` is also evaluated against the UDP peer before decode. It controls which packets may enter the receiver, not whether a relayed `snmpTrapAddress.0` value is trusted as the original device identity. The default allowlist is open (`0.0.0.0/0` and `::/0`); restrict it for production listeners in [Configuration](/docs/snmp-traps/configuration.md).
+`allowlist.source_cidrs` is also evaluated against the UDP peer before the packet is parsed. It controls which packets may enter the receiver, not whether a relayed `snmpTrapAddress.0` value is trusted as the original device identity. The default allowlist is open (`0.0.0.0/0` and `::/0`); restrict it for production listeners in [Configuration](/docs/snmp-traps/configuration.md).
 
 A relay can override source identity only when all of these are true:
 
@@ -59,15 +70,7 @@ When these conditions are met:
 
 When the relay is not trusted, Netdata keeps the UDP peer as the selected source and records the rejected candidate in `TRAP_ENRICHMENT.source.rejected_candidates`.
 
-Configure trusted relays in [Configuration](/docs/snmp-traps/configuration.md):
-
-```yaml
-source:
-  trusted_relays:
-    - 10.0.30.5/32
-```
-
-Keep this list narrow. A catch-all trusted relay range allows any sender on that path to influence source attribution through `snmpTrapAddress.0`.
+Because a catch-all trusted-relay range lets any sender on that path influence source attribution through `snmpTrapAddress.0`, keep the list narrow. Configure `source.trusted_relays` in [Configuration](/docs/snmp-traps/configuration.md#trust-relays-carefully).
 
 ## Reverse DNS
 
@@ -104,7 +107,7 @@ When registry enrichment matches, Netdata can add:
 
 The match is local to the Agent receiving the trap. Running an SNMP collector for the same device on a different Agent does not enrich traps received by this Agent.
 
-If registry enrichment does not provide `_HOSTNAME`, topology enrichment can still fill it from the local topology cache. If neither enrichment source provides a hostname, the serialized log row falls back to `TRAP_SOURCE_IP`, then `TRAP_SOURCE_UDP_PEER`, so the row still has a source label. Rows without a device hostname, selected source IP, or UDP peer cannot be written as normal trap rows. Check `TRAP_ENRICHMENT.applied` when you need to know whether enrichment populated `_HOSTNAME`.
+If registry enrichment does not provide `_HOSTNAME`, topology enrichment can still fill it from the local topology cache. If neither enrichment source provides a hostname, `_HOSTNAME` falls back to `TRAP_SOURCE_IP`, then `TRAP_SOURCE_UDP_PEER`, so every row still carries a source label. Check `TRAP_ENRICHMENT.applied` when you need to know whether enrichment populated `_HOSTNAME`.
 
 ## Topology, interface, and neighbor enrichment
 

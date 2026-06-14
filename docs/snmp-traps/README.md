@@ -10,103 +10,69 @@ endmeta-->
 
 # SNMP Traps
 
-The SNMP trap listener runs in `go.d.plugin`. Netdata can listen for SNMP Trap and INFORM notifications from network devices, store them as structured log entries, summarize receiver activity as metrics, and optionally forward the same trap events as OTLP LogRecords.
+Netdata listens for SNMP Trap and INFORM notifications from your network devices, decodes them into named, categorized, structured log entries, summarizes receiver activity as metrics, and can forward the same events to a SIEM or log system.
 
-The built-in trap profile catalogue is a major part of the value: Netdata ships with **800+ stock vendor profiles** covering **6,000+ MIBs** and **150,000+ trap definitions**, so many common network devices can be decoded into meaningful names, categories, severities, and varbind labels without manual MIB work.
-
-This section is for NetOps, NOC, SRE, SecOps, platform teams, and MSP operators who need to know which network events devices reported, whether the receiver pipeline is healthy, and when trap data should be queried or forwarded into another log system.
-
-Trap data has three operator surfaces: direct-journal log entries, receiver self-metrics, and optional OTLP log export. On Linux, direct-journal jobs can be queried locally with `journalctl --directory <per-job-dir>`. In Netdata Cloud, the same jobs appear as SNMP Trap Logs sources (`__logs_sources`) through the embedded `snmp:traps` Function, which requires a Netdata Cloud connection. OTLP-only jobs do not create local journal files or local job sources in the `snmp:traps` Function.
+This section is for NetOps, NOC, SRE, SecOps, and MSP operators who need to know which network events a device reported, whether the receiver is healthy, and when trap data should be queried or forwarded.
 
 ## What trap data is
 
-An SNMP trap is an *asynchronous event notification*. A device sends it when the device decides something significant happened, such as an interface state change, an authentication failure, a configuration change, or a vendor-specific condition.
+An SNMP trap is an *asynchronous event notification*. A device sends one when it decides something happened — an interface changed state, an authentication failed, a configuration changed, a sensor crossed a threshold. It is one telemetry leg among several: traps and streaming telemetry carry events, polling confirms current state, syslog carries narrative, flow carries traffic. Traps are indispensable because every device supports them and they catch transient transitions that polling would miss between intervals.
 
-Netdata accepts:
+Three facts decide how you read every trap, and they are how trap monitoring works everywhere — not Netdata specifics:
 
-- **SNMPv1 Trap**
-- **SNMPv2c Trap and INFORM**
-- **SNMPv3 Trap and INFORM** with USM security levels, including authentication and optional privacy
-
-Netdata sends acknowledgements for all INFORM notifications.
-
-A received trap becomes a structured log entry. That entry can include:
-
-- The listener job that received it
-- The source address and transport details
-- The SNMP version and PDU type
-- The trap OID and resolved trap name
-- The profile-assigned category and severity
-- Decoded varbind fields and a structured varbind payload
-- Deduplication summary fields when repeated traps are suppressed
-
-Trap rows and OTLP exports can include sensitive operational values, such as hostnames, interface descriptions, locations, usernames, and vendor-provided varbind text. Treat trap data as operationally sensitive; see [SNMP trap field reference](/docs/snmp-traps/field-reference.md) and [Configuration](/docs/snmp-traps/configuration.md) for field and export guidance.
-
-Trap profiles provide the meaning layer. The out-of-box profile pack includes 800+ stock vendor profiles and resolves numeric OIDs to names, categories, severities, and varbind labels for common equipment. Unknown or unmatched traps are still stored, but they keep the raw OID and use the `unknown` category until profile coverage or overrides give them more meaning.
+- **Traps are pushed, and they are lossy.** A device sends a trap once, over UDP, with no retransmit and no acknowledgement (INFORMs are the acknowledged exception). A trap that is dropped in transit, blocked by a firewall, or lost to a full buffer leaves no trace. So **silence is never proof of health** — see [What you cannot answer](#what-you-cannot-answer).
+- **Most traps are noise.** The large majority of traps are low-severity informational events. The value is not in any single trap but in the *stream* — rates, repeats, clusters, and the ones you have never seen before.
+- **Traps need a meaning layer.** Without a profile (a compiled MIB), a trap is an opaque numeric OID. Netdata's [trap profiles](/docs/snmp-traps/trap-profiles.md) are that layer: they turn OIDs into names, categories, severities, and labeled fields.
 
 ## What you can answer
 
-- Did Netdata receive traps from this device, listener, or site?
-- Which trap names, OIDs, categories, and severities are active right now?
-- Which devices are sending authentication, security, configuration, state-change, license, mobility, diagnostic, or unknown events?
-- Is a trap storm mostly repeated duplicates, rate-limited traffic, decode errors, or real distinct events?
-- Are direct-journal jobs visible as local log sources through `snmp:traps`?
-- Are traps also being exported as OTLP LogRecords when OTLP/gRPC export is enabled?
-- Are receiver errors, drops, dedup suppression, source health, or profile-metric diagnostics changing?
+- Did this device, listener, or site send traps — and which trap names, categories, and severities are active now?
+- Which devices are reporting state changes, authentication failures, configuration changes, security, or license events?
+- Is a surge mostly repeated duplicates, a rate-limited flap, decode errors, or many real distinct events?
+- Is the receiver healthy, or is it dropping, suppressing, or failing to write traps?
+- Are traps also reaching my SIEM when OTLP export is enabled?
 
 ## What you cannot answer
 
-- **Is the device healthy because no traps arrived?** No. Traps are emitted only when devices are configured to send them and decide to send them. Silence does not prove health.
-- **Can traps replace polling metrics?** No. Traps are event notifications, not a current-state polling stream. Use Netdata's metrics collectors for continuous device state and performance.
-- **Is raw trap volume the same as incident severity?** No. A high count can be a flap, duplicate storm, retransmission pattern, or many legitimate events. Inspect category, severity, source, trap name, dedup, drops, and errors.
-- **Did an event definitely not happen?** Not from trap absence alone. Device configuration, network reachability, credentials, source allowlists, and receiver health all affect delivery.
-- **Is this packet capture?** No. Netdata stores decoded trap fields as logs; it is not a full packet capture workflow.
+- **Is the device healthy because no traps arrived?** No. Silence is ambiguous: the device may be quiet, not configured to send traps, blocked by a firewall or allowlist, using the wrong credentials — or the receiver may be dropping. The trap path is independent of the device's data plane, and a hard-faulted device may never get to send a trap at all. **Pair every critical device with polling; traps are the ceiling, polling is the floor.**
+- **Can traps replace polling metrics?** No. Traps are events, not a current-state stream. Use Netdata's metrics collectors for continuous device state.
+- **Is high trap volume the same as a severe incident?** No. It can be a flap, a duplicate storm, or a retransmission pattern. Read the name, category, severity, source, and dedup before reacting.
+- **Did an event definitely not happen?** Not from trap absence alone. Reachability, credentials, allowlists, and receiver health all gate delivery.
 
-If those are your questions, use traps together with polling metrics, device configuration, and receiver health signals.
+If those are your questions, use traps together with polling, device configuration, and receiver health.
 
 ## Two things to know on day one
 
-These two facts are not Netdata-specific. They are how trap-based monitoring works, and they prevent the most common first-week mistakes.
+These two truths prevent the most common first-week mistakes.
 
-### Traps are push events
+### Silence is not health
 
-Netdata does not auto-create trap listener jobs or configure devices to send traps. You create explicit SNMP trap listener jobs, then configure devices to send Trap or INFORM notifications to the Netdata listener address and port.
-
-Trap reception is event-driven. The collector metrics interval controls how often receiver self-metrics are published, not whether incoming traps are received or sampled.
-
-Because traps are pushed by devices, a quiet trap receiver can mean several different things: the network is quiet, the devices are not configured to send traps, traffic is blocked, credentials do not match, the source is not allowed, or the receiver pipeline has a problem. Confirm first receipt in Logs and watch the receiver metrics before treating silence as normal.
+Netdata does not create listener jobs or configure devices for you. You create a listener job, then point devices at it. Until you have confirmed the first trap arrived — and you are watching receiver metrics — a quiet receiver tells you nothing: it could be a quiet network, an unconfigured device, a blocked port, wrong credentials, or a broken receiver. Confirm first receipt before you trust silence.
 
 ### Trap count is only the start
 
-A trap count tells you that the receiver saw activity. It does not tell you whether the activity is severe.
-
-Use the resolved trap name, category, severity, source, and varbinds to understand meaning. Then check dedup suppression, drops, decode errors, write failures, and OTLP export errors to understand whether the receiver handled the traffic cleanly.
+A count tells you the receiver saw activity, not whether it matters. Use the resolved trap name, category, severity, source, and varbinds to understand meaning, then check dedup, drops, decode errors, and export errors to confirm the receiver handled the traffic cleanly.
 
 ## What ships with the collector
 
-The Netdata SNMP trap listener ships with:
+- **A listener** for SNMPv1, SNMPv2c, and SNMPv3 Trap and INFORM notifications, with USM authentication and privacy and SNMPv3 engine-ID controls. Netdata acknowledges every INFORM.
+- **A trap profile catalogue** — 800+ stock vendor profiles covering 6,000+ MIBs — that decodes OIDs into names, categories, severities, and labeled varbinds out of the box. Per-OID overrides and custom profiles cover the rest.
+- **Local journal storage** (default, Linux): structured trap entries you query with the Netdata Logs UI or `journalctl`.
+- **Optional OTLP/gRPC export** to forward traps as log records to a SIEM or log pipeline. At least one output — journal or OTLP — must be enabled.
+- **Receiver self-metrics and alerts**: a pipeline funnel, events by category and severity, processing errors, deduplication, and per-source health.
+- **A closed taxonomy** of 8 categories (`state_change`, `config_change`, `security`, `auth`, `license`, `mobility`, `diagnostic`, `unknown`) and 8 severities (`emerg` … `debug`), so categories and severities mean the same thing across every device.
 
-- **Explicit listener jobs** for trap reception. Netdata does not create trap listener jobs automatically.
-- **Protocol support** for SNMPv1 Trap, SNMPv2c Trap/INFORM, and SNMPv3 Trap/INFORM with USM authentication and privacy.
-- **SNMPv3 engine ID controls** with static allowlists and optional dynamic engine ID discovery for sender/user pairs.
-- **Direct journal storage** enabled by default for explicit jobs on Linux, with structured trap log entries under the Netdata log directory. The per-job root defaults to `/var/log/netdata/traps/<job>/`, and `journalctl --directory` reads its machine-id child.
-- **Embedded log querying** through the Cloud-required `snmp:traps` logs Function. Direct-journal jobs appear as selectable log sources; OTLP-only jobs do not.
-- **Optional OTLP/gRPC export** that sends traps as OTLP LogRecords. If both direct journal and OTLP export are enabled, both outputs receive traps. At least one output backend, direct journal or OTLP, must be enabled for a job to start; direct journal requires Linux, while OTLP-only jobs are not blocked by that Linux journal requirement.
-- **Out-of-box trap profiles**: 800+ stock vendor profiles covering 6,000+ MIBs and 150,000+ trap definitions, used to resolve OIDs to trap names, categories, severities, and varbind labels.
-- **Per-OID overrides** for category, severity, and labels when local policy differs from profile defaults.
-- **A closed category taxonomy**: `state_change`, `config_change`, `security`, `auth`, `license`, `mobility`, `diagnostic`, and `unknown`.
-- **A closed severity taxonomy**: `emerg`, `alert`, `crit`, `err`, `warning`, `notice`, `info`, and `debug`.
-- **Optional deduplication** that suppresses repeated identical traps inside a configured window and writes summary entries.
-- **Self-metrics** for pipeline counters, events by category and severity, errors, dedup suppression, source health, and profile-metric diagnostics.
-- **Optional profile-defined trap metrics** with cardinality limits for selected events that should also be represented as Netdata metrics.
-
-The shipped profile pack and local custom profiles assign categories and severities during decoding. See [SNMP trap profiles](/docs/snmp-traps/trap-profiles.md) for how trap definitions, overrides, and custom profiles affect decoded output.
+Trap data can carry sensitive operational values (hostnames, locations, usernames, vendor text); treat it as sensitive when querying and forwarding.
 
 ## Where to start
 
 Pick the page that matches your situation:
 
-- **Set up collection** - [Installation](/docs/snmp-traps/installation.md), [Quick Start](/docs/snmp-traps/quick-start.md), and [Configuration](/docs/snmp-traps/configuration.md).
-- **Understand decoded traps** - [SNMP trap profiles](/docs/snmp-traps/trap-profiles.md), [Enrichment and identity](/docs/snmp-traps/enrichment.md), [Use SNMP trap data](/docs/snmp-traps/usage-and-output.md), and [SNMP trap field reference](/docs/snmp-traps/field-reference.md).
-- **Query, export, and operate** - [Journal and querying](/docs/snmp-traps/journal-and-querying.md), [Forward SNMP traps to SIEM and log systems](/docs/snmp-traps/forwarding-to-siem.md), [SNMP trap metrics and alerts](/docs/snmp-traps/metrics-and-alerts.md), [SNMP trap sizing and capacity planning](/docs/snmp-traps/sizing-and-capacity.md), and [SNMP trap validation and data quality](/docs/snmp-traps/validation-and-data-quality.md).
-- **Investigate or fix problems** - [Investigation playbooks](/docs/snmp-traps/investigation-playbooks.md), [SNMP trap anti-patterns](/docs/snmp-traps/anti-patterns.md), and [Troubleshooting SNMP traps](/docs/snmp-traps/troubleshooting.md).
+- **You're setting up for the first time** — [Installation](/docs/snmp-traps/installation.md), then [Quick Start](/docs/snmp-traps/quick-start.md) to prove the first trap arrives, then [Configuration](/docs/snmp-traps/configuration.md) to harden the listener.
+- **You want decoded traps to mean something** — [Trap Profiles](/docs/snmp-traps/trap-profiles.md) turn OIDs into names and severities, and [Enrichment](/docs/snmp-traps/enrichment.md) adds device, vendor, and topology context.
+- **You have traps and need to find or triage one** — [Investigation Playbooks](/docs/snmp-traps/investigation-playbooks.md), then [Usage and Output](/docs/snmp-traps/usage-and-output.md) to read a row and the [Field Reference](/docs/snmp-traps/field-reference.md) to look up any field.
+- **You want to trust what you see** — [Validation and Data Quality](/docs/snmp-traps/validation-and-data-quality.md), and avoid the common mistakes in [Anti-patterns](/docs/snmp-traps/anti-patterns.md).
+- **You want to search or export trap data** — [Journal and Querying](/docs/snmp-traps/journal-and-querying.md).
+- **You want to alert or forward** — [Alerts](/docs/snmp-traps/alerts.md) for receiver health, [Metrics](/docs/snmp-traps/metrics.md) for the signals they watch, and [Forwarding to SIEM](/docs/snmp-traps/forwarding-to-siem.md) to send events downstream.
+- **You're planning for scale** — [Sizing and Capacity](/docs/snmp-traps/sizing-and-capacity.md).
+- **Something's wrong** — [Troubleshooting](/docs/snmp-traps/troubleshooting.md).

@@ -8,6 +8,10 @@ This directory contains Netdata-owned SNMP trap product specs and decisions.
   and metric design contract.
 - `trap-metrics-profiles.md`: profile-defined trap metrics, chart identity,
   source identity, resource identity, and cardinality contract.
+- `pipeline-internals.md`: developer-facing index of pipeline mechanics
+  (rate-limit cap eviction, BER limits, journal queue/flush, commit ordering,
+  OTLP queue, journal filename layout, profile loading lifecycle, source cap)
+  removed from the operator docs, each mapped to its authoritative spec section.
 - `netdata-snmp-hub-architecture.md`: distributed SNMP hub architecture
   principle for Netdata network observability.
 - `decisions/`: accepted architecture decisions for the Netdata trap subsystem.

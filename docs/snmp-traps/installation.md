@@ -12,14 +12,14 @@ endmeta-->
 
 Netdata receives SNMP traps with the **snmp_traps** collector in `go.d.plugin`. Trap receiving is explicit: Netdata does not create a trap listener job or configure devices to send traps by itself. You must create an explicit listener job before Netdata can receive traps.
 
-The default local direct-journal backend requires Linux. OTLP-only jobs are not blocked by the Linux direct-journal requirement, but they do not create local journal files or local SNMP trap log sources.
+The default direct-journal backend requires Linux. OTLP-only jobs are not blocked by the Linux direct-journal requirement, but they do not create local journal files or local SNMP trap log sources.
 
 The default `listen.endpoints` template uses UDP `0.0.0.0` on port `162`. The stock `go.d/snmp_traps.conf` file ships as a commented template; Netdata does not bind any UDP port until a job is uncommented, created, or applied with Dynamic Configuration.
 
 ## Prerequisites
 
 - A Netdata Agent host with the `go.d.plugin` component installed.
-- A Linux host when you want the default local direct-journal backend or local SNMP trap log sources.
+- A Linux host when you want the default direct-journal backend or local SNMP trap log sources.
 - At least one output backend enabled per listener job: `journal.enabled: true` on Linux (the default), `otlp.enabled: true`, or both.
 - For direct-journal jobs on Linux, the files `/etc/machine-id` and `/proc/sys/kernel/random/boot_id` must exist, be readable, and contain non-empty values. Minimal containers, chroots, and embedded systems should check these before relying on local journal storage.
 - UDP reachability from each trap sender to the Netdata host.
@@ -100,18 +100,32 @@ For UDP/162, the container must be allowed to bind low ports. See [UDP/162 permi
 
 ## Listener jobs
 
-The stock `snmp_traps.conf` file is a commented template. Netdata will not listen for traps until you create or uncomment a job.
+The stock `snmp_traps.conf` file is a commented template. Netdata will not listen for traps until you create a job. There are two ways to add one.
 
-Edit the collector configuration on the Netdata host:
+### Recommended: Dynamic Configuration (no restart) {#enable-via-dynamic-configuration}
+
+Add, edit, test, and remove a listener job from the Netdata UI, with no file editing and no service restart:
+
+1. In Netdata, open **Integrations** and find **SNMP Trap Listener**.
+2. Click **Configure**, then **Add job**.
+3. Fill in the job form: listener address and port, SNMP versions, communities or SNMPv3 users, and the source allowlist.
+4. Click **Test** to validate the job before it goes live.
+5. Deploy the job. It takes effect immediately, with no `netdata` restart, and can be deployed to many nodes at once.
+
+This path requires a node connected to Netdata Cloud on a paid plan; Dynamic Configuration handles permissions and security through that connection. See [Dynamic Configuration](/docs/netdata-agent/configuration/dynamic-configuration.md) for the full UI access paths and role requirements. This is the single place this caveat is stated; other pages reference it.
+
+### Fallback: edit the file and restart
+
+Use this path for headless or automated deployments, for free-tier nodes, or when the node is not connected to Netdata Cloud. Edit the collector configuration on the Netdata host:
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/snmp_traps.conf
 ```
 
-You can also configure jobs dynamically from Netdata Cloud when Dynamic Configuration is available for your node and plan. See [Dynamic Configuration](/docs/netdata-agent/configuration/dynamic-configuration.md) for the supported access paths.
+After editing, restart Netdata so the listener job is created. See [Verify the listener starts](#verify-the-listener-starts) for the restart commands.
 
-Each job binds one or more UDP endpoints under the `listen:` key. A job can listen on UDP/162, or on another UDP port if you prefer to avoid privileged bind requirements. If you choose a non-standard port, configure every trap sender to use that same destination port.
+Either way, each job binds one or more UDP endpoints under the `listen:` key. A job can listen on UDP/162, or on another UDP port if you prefer to avoid privileged bind requirements. If you choose a non-standard port, configure every trap sender to use that same destination port. For the full option list, see [Configuration](/docs/snmp-traps/configuration.md).
 
 ## Device identity and enrichment
 
@@ -146,14 +160,14 @@ If your deployment cannot bind UDP/162, use one of these approaches:
 After the job starts, verify that Netdata is listening:
 
 ```bash
-sudo ss -unlp 'sport = :162'
+sudo ss -ulnp | grep ':162'
 ```
 
 Replace `162` with your configured port when using a custom listener port.
 
 ## Journal and OTLP preflight
 
-On Linux, local direct journal storage is enabled by default for explicit jobs. The job writes trap data under the configured Netdata log directory. The per-job root is normally `/var/log/netdata/traps/<job>/`, and `journalctl --directory` reads its machine-id child. The job is exposed as an SNMP trap log source.
+On Linux, direct journal storage is enabled by default for listener jobs. The job writes trap data under the configured Netdata log directory and is exposed as an SNMP trap log source. For the exact per-job path and how the `journalctl --directory` path is built, see [Journal and Querying](/docs/snmp-traps/journal-and-querying.md).
 
 For direct-journal jobs, confirm that the Netdata log directory exists and is writable by the service that runs `go.d.plugin`. Standard systemd packages run the Netdata service as root with group `netdata`; if you changed the service user, run equivalent checks as that user.
 

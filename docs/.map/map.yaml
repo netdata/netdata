@@ -593,9 +593,13 @@ sidebar:
           edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/forwarding-to-siem.md
           description: Forward trap events through journal-native workflows or OTLP/gRPC and map fields in downstream log systems.
       - meta:
-          label: Metrics and Alerts
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/metrics-and-alerts.md
-          description: Monitor receiver pipeline health, severity/category rates, processing errors, deduplication, source metrics, and default alerts.
+          label: Metrics
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/metrics.md
+          description: Read receiver pipeline health, severity and category rates, processing errors, deduplication, and per-source metrics.
+      - meta:
+          label: Alerts
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/alerts.md
+          description: Understand, route, and silence the default SNMP trap health alerts.
       - meta:
           label: Sizing and Capacity Planning
           edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/sizing-and-capacity.md

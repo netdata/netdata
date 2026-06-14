@@ -39,32 +39,14 @@ OTLP-only jobs create no local trap journal files and do not appear as job sourc
 
 ## Direct journal backend
 
-Direct journal output is enabled by default for explicit trap jobs and requires Linux. On non-Linux systems, jobs with `journal.enabled: true` fail validation; use OTLP-only mode instead.
+Direct journal output is enabled by default for listener jobs and requires Linux. On non-Linux systems, jobs with `journal.enabled: true` fail validation; use OTLP-only mode instead.
 
 ```yaml
 journal:
   enabled: true
 ```
 
-Netdata writes trap entries below the configured Netdata log directory. The per-job root is normally:
-
-```text
-/var/log/netdata/traps/<job>/
-```
-
-or, when `NETDATA_LOG_DIR` is set:
-
-```text
-${NETDATA_LOG_DIR}/traps/<job>/
-```
-
-The effective `journalctl --directory` path is the machine-id child inside that job root. The path segment uses the unhyphenated machine ID, so normalize it if needed:
-
-```bash
-MACHINE_ID=$(tr -d '-' < /etc/machine-id)
-```
-
-These files back the job source exposed through the Cloud-required `snmp:traps` Function when the Agent is connected to Netdata Cloud. Journal filenames use the `snmp-traps` source prefix with chain naming and an at-sign separator, while individual journal entries carry `ND_LOG_SOURCE=snmp-trap`. They are journal-compatible files, not the host systemd-journald service's normal journal.
+Netdata writes trap entries as journal-compatible files below the configured Netdata log directory; for the exact per-job path and how the `journalctl --directory` path is built, see [Journal and Querying](/docs/snmp-traps/journal-and-querying.md). Each entry carries `ND_LOG_SOURCE=snmp-trap`, and these files back the job source exposed through the Cloud-required `snmp:traps` Function; they are not the host systemd-journald service's normal journal.
 
 The host must have `journalctl` installed. Use `sudo` when the trap journal files are not readable by your user. Use `journalctl --directory` to produce JSON output that your existing log shipper or SIEM ingestion path can consume:
 
@@ -83,71 +65,21 @@ For journal retention and rotation controls, see [Configuration](/docs/snmp-trap
 
 ## OTLP/gRPC export
 
-OTLP export is disabled by default. Enable it under the job's `otlp` section. This example shows a remote collector; the default endpoint is the loopback address shown in the defaults table.
+OTLP export is disabled by default. It uses gRPC transport only (HTTP/protobuf receivers on port `4318` are not supported), takes a `host:port`/`http://`/`https://` endpoint, and preflights the receiver at job startup so an unreachable collector blocks the job. For the full `otlp` option block, defaults, endpoint/TLS rules, and preflight behavior, see [Configuration](/docs/snmp-traps/configuration.md#otlpgrpc-export).
 
-```yaml
-otlp:
-  enabled: true
-  endpoint: "https://otel-collector.example.net:4317"
-  headers:
-    authorization: "${file:/run/secrets/snmp-trap-otlp-authorization}"
-  request_timeout: 5s
-  flush_interval: 200ms
-  batch_size: 512
-  queue_capacity: 10000
-```
+What matters for forwarding is the delivery behavior under pressure:
 
-Defaults:
+- Brief receiver outages recover on their own; sustained ones overflow the send queue, and over-full records are dropped and counted under `otlp_export_failed`.
+- In journal and OTLP mode the local journal is unaffected by OTLP drops, so traps remain queryable locally. In OTLP-only mode a dropped record is lost with no local copy.
+- The OTLP queue is not durable: records still waiting to be sent are lost on an ungraceful restart, so do not treat OTLP-only as durable storage.
 
-| Setting | Default |
-|---|---|
-| `endpoint` | `http://127.0.0.1:4317` |
-| `headers` | `null` |
-| `request_timeout` | `5s` |
-| `flush_interval` | `200ms` |
-| `batch_size` | `512` |
-| `queue_capacity` | `10000` |
-
-When `headers` is set, it is a gRPC metadata map. Header values can use secret references, and keys with the reserved `grpc-` prefix are rejected at job startup.
-
-OTLP export uses gRPC transport only. HTTP/protobuf OTLP receivers, commonly exposed on port `4318`, are not supported by this output.
-
-At startup, Netdata opens the OTLP connection and sends a preflight export. If the receiver is unreachable or rejects the preflight, a job defined in the configuration file does not start. A Dynamic Configuration apply is rejected with the same error. This is a startup error, not an `otlp_export_failed` metric.
-
-Records are buffered until `batch_size` records are ready or `flush_interval` expires. If an export fails, Netdata retries the pending batch on later flushes. There is no maximum retry count and no backoff; the batch is retried on each later flush interval until the receiver accepts it or the process stops. If the in-memory queue reaches `queue_capacity`, new records are dropped from the OTLP path and counted under `otlp_export_failed`. In journal and OTLP mode, Netdata queues the record for the journal backend before it queues the OTLP export, so OTLP failures do not remove records already accepted by the journal backend. In OTLP-only mode, a queue-full drop is a terminal write failure and the trap is lost. The OTLP queue is not durable; records still queued are lost if the process exits before they are exported, such as an ungraceful restart or a failed shutdown drain.
-
-Endpoint rules:
-
-| Endpoint form | Transport |
-|---|---|
-| `host:port` | Plaintext gRPC |
-| `http://host:port` | Plaintext gRPC |
-| `https://host:port` | TLS gRPC with system trust roots, TLS 1.2 or later |
-
-Paths, query strings, and fragments are not supported. Use `https://` for remote collectors when trap contents should be protected in transit. Plaintext loopback, such as the default `http://127.0.0.1:4317`, is intended for local collectors; non-loopback plaintext is allowed but logs a warning. `https://` uses the operating system trust store, so private CA certificates must be installed there. Invalid endpoints and header keys with the reserved `grpc-` prefix are rejected at job startup.
+The batching, queue, and retry knobs are defined in [Configuration](/docs/snmp-traps/configuration.md#otlpgrpc-export).
 
 ## OTLP mapping highlights
 
-OTLP export sends traps as OTLP LogRecords. Build SIEM rules against the OTLP attribute names that arrive downstream, not the direct-journal field names.
+OTLP export sends traps as OTLP LogRecords. Build SIEM rules against the OTLP attribute names that arrive downstream, not the direct-journal field names. The listener resource carries `service.name=netdata-snmptrap` and `service.instance.id=<job>`; the message becomes the log body, the report type is `snmp.trap.report_type`, the selected source is `snmp.source.ip`, and varbinds arrive as the structured `snmp.varbinds` attribute rather than separate `TRAP_VAR_*` fields.
 
-| Netdata concept | OTLP location |
-|---|---|
-| Listener identity | Resource `service.name` is `netdata-snmptrap`; resource `service.instance.id` is the job name. |
-| Message | Log body. This is equivalent to `MESSAGE`. |
-| Report type | Attribute `snmp.trap.report_type`. Values are `trap`, `deduplication_summary`, and `decode_error`. |
-| Event name | LogRecord event name. Normal traps use `snmp.trap.<category>`, dedup summaries use `snmp.trap.deduplication_summary`, and decode errors use `snmp.trap.decode_error`. |
-| Severity | OTLP severity number/text plus attribute `snmp.trap.severity`. Emitted on normal trap and decode-error rows; dedup summary rows do not include this attribute. |
-| Source identity | Attribute `snmp.source.ip`. This is the selected trap source IP: the UDP peer by default, or the relay-attributed device source when trusted relays are configured. If the selected source is unset, Netdata falls back to the UDP peer. |
-| UDP peer | Attribute `network.peer.address`. This is the packet peer. If it is empty, Netdata falls back to the selected source IP. |
-| UDP source port | Attribute `network.peer.port`. Decode-error rows only. |
-| Trap identifiers | Attributes `snmp.trap.oid`, `snmp.trap.name`, `snmp.trap.category`, `snmp.trap.pdu_type`, and `snmp.version`. |
-| Enrichment | Attributes `snmp.source.reverse_dns`, `snmp.device.hostname`, `snmp.device.vendor`, `netdata.nidl.node`, `netdata.topology.interface`, and `netdata.topology.neighbors` when available. |
-| Dedup summaries | Attributes `snmp.trap.suppressed_count`, `snmp.trap.suppressed_fingerprints`, and `snmp.trap.report_period_sec`. |
-| Decode errors | Attributes `snmp.trap.decode_error.kind`, `snmp.trap.decode_error.message`, `snmp.trap.packet_size`, `snmp.trap.packet_sha256`, `netdata.trap.listener`, and `snmp.engine_id`. |
-| Varbind payload | Attribute `snmp.varbinds`. OTLP does not export separate `TRAP_VAR_*` fields. The value is a structured list, not a flat string. |
-| Profile tags | Attributes named `trap.<lowercase key>`. |
-
-For all journal fields and OTLP attributes, see [Field Reference](/docs/snmp-traps/field-reference.md).
+For the complete journal-field-to-OTLP-attribute mapping table, see [Field Reference](/docs/snmp-traps/field-reference.md#otlp-mapping-notes).
 
 ## Security guidance
 
@@ -173,11 +105,12 @@ Validate both the Netdata output path and the downstream receiver path.
 | Cloud-required `snmp:traps` Function source | For direct-journal jobs, confirm the job appears as a trap log source in Netdata Cloud. OTLP-only jobs are not expected to appear there. |
 | Downstream receiver checks | In the SIEM or OTLP receiver, confirm records arrive with `service.name=netdata-snmptrap`, the expected `service.instance.id`, and the expected event names and attributes. |
 
-For receiver metrics and alerts, see [Metrics and Alerts](/docs/snmp-traps/metrics-and-alerts.md).
+For receiver metrics, see [Metrics](/docs/snmp-traps/metrics.md); for the default health alerts, see [Alerts](/docs/snmp-traps/alerts.md).
 
 ## Related pages
 
 - [Configuration](/docs/snmp-traps/configuration.md) - Configure output backends, retention, OTLP endpoint settings, and secrets.
 - [Field Reference](/docs/snmp-traps/field-reference.md) - Map journal fields and OTLP attributes.
 - [Journal and querying](/docs/snmp-traps/journal-and-querying.md) - Query and export direct-journal trap rows locally.
-- [Metrics and Alerts](/docs/snmp-traps/metrics-and-alerts.md) - Validate receiver health and forwarding failures.
+- [Metrics](/docs/snmp-traps/metrics.md) - Validate receiver health and forwarding failures.
+- [Alerts](/docs/snmp-traps/alerts.md) - Default alerts on OTLP export and write failures.

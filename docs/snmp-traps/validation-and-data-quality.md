@@ -23,7 +23,7 @@ Work through these checks in order during first deployment. Use [Quick Start](/d
 | First receipt | `TRAP_REPORT_TYPE`, `TRAP_JOB`, `TRAP_OID`, `TRAP_NAME`, `TRAP_SOURCE_IP`, `snmp.trap.pipeline` | A known test trap appears as `TRAP_REPORT_TYPE=trap`, and `received`, `decoded`, `accepted`, and `committed` move for the listener job. |
 | Source identity | `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, `TRAP_ENRICHMENT.source` | Direct senders usually have matching source and UDP peer. Relayed traps show why Netdata selected the reported source. OTLP-only jobs use equivalent OTLP attributes instead of journal field names. |
 | Credentials and version | `TRAP_VERSION`, `TRAP_REPORT_TYPE=decode_error`, `TRAP_DECODE_ERROR_KIND`, `snmp.trap.errors` | Expected SNMP versions are accepted. Authentication, USM, unknown engine ID, and malformed packet errors stay at expected levels. |
-| Allowed sources and communities | `TRAP_SOURCE_UDP_PEER`, `snmp.trap.errors` `dropped_allowlist`, job `allowlist.source_cidrs`, job `communities` | Only intended UDP peers reach the decoder. Only intended SNMPv1/v2c communities are accepted after decode. |
+| Allowed sources and communities | `TRAP_SOURCE_UDP_PEER`, `snmp.trap.errors` `dropped_allowlist`, job `allowlist.source_cidrs`, job `communities` | Only intended UDP peers are admitted. Only intended SNMPv1/v2c communities are accepted once the packet is parsed. |
 | Trusted relays | `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, `TRAP_ENRICHMENT.source.method`, `TRAP_ENRICHMENT.source.snmp_trap_address`, `TRAP_ENRICHMENT.source.trusted_relay` | Direct senders use `udp_peer`. Only configured relay peers can make `snmpTrapAddress.0` become the selected source. |
 | Profile coverage | `TRAP_NAME`, `MESSAGE`, `TRAP_OID`, `TRAP_CATEGORY`, `TRAP_SEVERITY`, `snmp.trap.errors` `unknown_oid` | Common device traps resolve to names, rendered messages, categories, severities, and useful varbind labels. Unknown OIDs are tracked as coverage gaps. |
 | Profile load health | `snmp.trap.errors` `profile_load_failed`, `template_unresolved` | Loaded profile YAML files parse cleanly, and profile-rendered templates resolve the varbinds and fields they reference. |
@@ -51,29 +51,9 @@ Drops that happen before a row is written may be visible only in receiver metric
 
 Source identity controls attribution, filtering, enrichment, and incident routing. Validate it before using trap data for paging or audit workflows.
 
-1. Compare `TRAP_SOURCE_IP` and `TRAP_SOURCE_UDP_PEER`.
-   - Same value: Netdata selected the UDP peer as the source.
-   - Different values: Netdata selected a relayed original source.
-2. Inspect the `source` object inside `TRAP_ENRICHMENT`.
-   - `selected` should match `TRAP_SOURCE_IP`.
-   - `udp_peer` should match `TRAP_SOURCE_UDP_PEER`.
-   - `snmp_trap_address` shows the source address reported by `snmpTrapAddress.0`, when present.
-   - `method` explains how the source was selected.
-   - `rejected_candidates` explains source candidates Netdata did not trust or use.
-3. Confirm source controls in configuration.
-   - `allowlist.source_cidrs` is checked against the UDP socket peer before decode, not against the relayed source address.
-   - `communities` controls which SNMPv1/v2c community strings are accepted after decode.
-   - `source.trusted_relays` controls whether `snmpTrapAddress.0` from a relay can become the selected source.
-4. Audit relayed traps.
-   - The UDP peer should be the known relay, such as `192.0.2.10`.
-   - The selected source should be the original device address, such as `198.51.100.20`, only when the relay is trusted.
-   - `TRAP_ENRICHMENT.source.method` should be `udp_peer` for direct senders and `trusted_relay_snmpTrapAddress.0` when a trusted-relay override is accepted. Treat other method values as troubleshooting signals.
-   - `TRAP_ENRICHMENT.source.snmp_trap_address` shows what the relay reported in `snmpTrapAddress.0`.
-   - `TRAP_ENRICHMENT.source.trusted_relay` should be `true`.
+Compare `TRAP_SOURCE_IP` with `TRAP_SOURCE_UDP_PEER` (equal for direct senders, different for a trusted-relay override), then inspect the `source` object inside `TRAP_ENRICHMENT` to confirm `selected`, `method`, `trusted_relay`, and any `rejected_candidates`. For the full source-identity model and the step-by-step trust checklist, see [Enrichment](/docs/snmp-traps/enrichment.md#how-to-validate-source-identity). Keep `source.trusted_relays` narrow: a broad range lets senders on that path influence attribution through `snmpTrapAddress.0`.
 
-Keep `trusted_relays` narrow. A broad trusted-relay range lets senders on that path influence source attribution through `snmpTrapAddress.0`.
-
-Reverse DNS is optional annotation. `TRAP_REVERSE_DNS` can make rows easier to read, but it is not identity proof and never replaces `TRAP_SOURCE_IP`. If reverse DNS is absent, pending, or surprising, use `TRAP_ENRICHMENT.reverse_dns` for audit detail and keep trust decisions based on `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, and `TRAP_ENRICHMENT.source`.
+Treat `TRAP_REVERSE_DNS` as a label only; keep trust decisions based on `TRAP_SOURCE_IP`, `TRAP_SOURCE_UDP_PEER`, and `TRAP_ENRICHMENT.source`.
 
 For OTLP-only jobs, validate the same source relationship with OTLP attributes: `snmp.source.ip` is the selected source and `network.peer.address` is the UDP peer. Use the [Field Reference](/docs/snmp-traps/field-reference.md#otlp-mapping-notes) for the journal-to-OTLP mapping.
 
@@ -135,7 +115,7 @@ Rate limiting and deduplication change what you see in logs.
 - Read `TRAP_SUPPRESSED_COUNT`, `TRAP_SUPPRESSED_FINGERPRINTS`, `TRAP_REPORT_PERIOD_SEC`, and `TRAP_JSON` to understand what was suppressed.
 - If one trap OID represents different resources, validate the dedup fingerprint before relying on summaries.
 
-Dedup-suppressed traps are summarized instead of being stored one by one. If an operator expects every repeated PDU to be visible, deduplication is the first setting to check.
+Dedup-suppressed traps are counted in periodic summary entries instead of stored as individual rows. If an operator expects every repeated PDU to be visible, deduplication is the first setting to check.
 
 ## Validate backend health and retention
 
@@ -199,17 +179,7 @@ Do not treat a quiet receiver as proof of device health. Send a known test trap,
 
 ## Security and data handling cautions
 
-Trap data can include sensitive network and device context. Validate useful data, but minimize what you copy, forward, or expose.
-
-| Data | Caution |
-|---|---|
-| SNMP communities | Treat as credentials. Do not paste real values into docs, tickets, SIEM examples, shell history, or support artifacts. Use secret references in configuration. |
-| SNMPv3 auth and privacy keys | Treat as credentials. Do not copy resolved values from files, commands, or device CLIs into logs or examples. |
-| OTLP headers | Treat as transport credentials. Store them with secret references and avoid exposing resolved header values. |
-| `TRAP_JSON` | Contains structured payload and audit detail. Varbinds can reveal usernames, interface descriptions, MACs, asset tags, locations, or public addresses. Review before forwarding wholesale. |
-| `TRAP_VAR_*` | Query-friendly fields are device-provided payload. Do not assume values are safe for public examples. |
-| `TRAP_ENRICHMENT` | Can include source addresses, relay decisions, `snmp_trap_address`, hostnames, interface names, neighbor names, and applied-field audit details. Use for troubleshooting and minimize broad export when not needed. |
-| Decode-error packet audit | `TRAP_PACKET_SHA256` is a fingerprint, not raw packet content. Raw packet bytes are not stored in decode-error rows, but source and engine identifiers still need normal operational data handling. |
+Trap data can include sensitive network and device context. Validate useful data, but minimize what you copy, forward, or expose. Treat communities, SNMPv3 keys, and OTLP headers as credentials (use secret references), and review `TRAP_JSON`, `TRAP_VAR_*`, and `TRAP_ENRICHMENT` before forwarding because device-provided varbinds and enrichment can carry usernames, interface descriptions, MACs, asset tags, locations, or public addresses. For the complete per-field sensitivity guidance, see [Field Reference](/docs/snmp-traps/field-reference.md#sensitive-data-cautions).
 
 Use RFC 5737 example IPs such as `192.0.2.10`, `198.51.100.20`, and `203.0.113.5` in examples. Use placeholders for secrets, device names, organization names, and private endpoints.
 
@@ -221,6 +191,7 @@ Use RFC 5737 example IPs such as `192.0.2.10`, `198.51.100.20`, and `203.0.113.5
 - [Field Reference](/docs/snmp-traps/field-reference.md) - Complete field meanings, population rules, sensitive-data cautions, and OTLP mapping.
 - [Journal and Querying](/docs/snmp-traps/journal-and-querying.md) - Local `journalctl` and Cloud Logs query workflows.
 - [Forwarding to SIEM](/docs/snmp-traps/forwarding-to-siem.md) - OTLP export, resource attributes, and SIEM field validation.
-- [Metrics and Alerts](/docs/snmp-traps/metrics-and-alerts.md) - Receiver metrics, pipeline counters, errors, and alert behavior.
+- [Metrics](/docs/snmp-traps/metrics.md) - Receiver metrics, pipeline counters, and errors.
+- [Alerts](/docs/snmp-traps/alerts.md) - Default health alert behavior on these receiver metrics.
 - [Troubleshooting](/docs/snmp-traps/troubleshooting.md) - Failure investigation paths when validation does not match expectations.
 - [Anti-Patterns](/docs/snmp-traps/anti-patterns.md) - Configurations and operational habits to avoid.
