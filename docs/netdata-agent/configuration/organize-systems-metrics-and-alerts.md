@@ -65,6 +65,12 @@ Virtual nodes let you split multi-component systems into distinct, monitorable u
 
 To create a virtual node for your Windows server:
 
+:::tip
+
+The recommended way to create and manage virtual nodes is through the [Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md) in the Netdata UI. Navigate to **Space Settings > Configurations** or use the **Integrations** section to configure vnodes without editing files manually.
+
+:::
+
 1. Define the virtual node in `/etc/netdata/vnodes/vnodes.conf`:
 
     ```yaml
@@ -84,6 +90,22 @@ To create a virtual node for your Windows server:
         vnode: win_server1
         url: http://203.0.113.10:9182/metrics
     ```
+
+### SNMP devices and virtual nodes
+
+The SNMP collector automatically creates a virtual node for every SNMP device (`create_vnode: true` by default). The device appears as a separate Node in Netdata Cloud without any manual vnode configuration.
+
+The recommended way to view and manage SNMP device vnode settings is through the [Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md) in the Netdata UI.
+
+:::warning
+
+**SNMP devices cannot join other vnodes**
+
+An SNMP device can only be its own vnode — it cannot be added as part of another vnode, and metrics from other collectors (for example, `ping` or `httpcheck`) cannot be attached to an SNMP device's vnode. This is an architectural constraint of how the SNMP collector manages vnode identity: it creates the vnode internally rather than referencing a shared vnode definition.
+
+:::
+
+To visualize SNMP device metrics alongside metrics from other nodes, use Netdata Cloud's dashboard features such as composite charts and correlated views across nodes in your Space.
 
 ## Host labels
 

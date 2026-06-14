@@ -136,7 +136,15 @@ This is normal for Parent nodes receiving data from Children, and for Agents usi
 | **Format** | YAML files (`.yaml`, `.yml`, `.conf`) |
 | **Identity** | User-defined GUID in config file |
 
-### Configuration
+:::tip
+
+The recommended way to create and manage virtual nodes is through the [Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md) in the Netdata UI. Navigate to **Space Settings > Configurations** or use the **Integrations** section to configure vnodes without editing files manually.
+
+Note that SNMP devices are handled differently: each SNMP device is automatically created as its own independent vnode by the SNMP collector. An SNMP device can only be its own vnode — it cannot be joined to another vnode, and metrics from other collectors cannot be merged into it. To correlate SNMP metrics with data from other sources, use Netdata Cloud's dashboard features (composite charts, cross-node views).
+
+:::
+
+### Manual Configuration (Advanced)
 
 Each virtual node is defined in a YAML file:
 
@@ -172,6 +180,12 @@ Each virtual node GUID must be unique across your entire infrastructure. Using t
 4. Parent nodes store vnode metadata alongside Children metadata
 
 Virtual nodes appear in Netdata Cloud as independent nodes, with their own dashboards and alert states.
+
+:::note
+
+When vnodes are created and managed via the [Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md), the configuration is persisted automatically and managed through the UI. This eliminates the need to manually create or edit files in `/etc/netdata/vnodes/`.
+
+:::
 
 ## Cloud: Node Identity
 
