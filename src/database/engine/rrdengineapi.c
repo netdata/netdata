@@ -1226,6 +1226,25 @@ size_t rrdeng_collectors_running(struct rrdengine_instance *ctx) {
     return __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED);
 }
 
+#define RRDENG_SHUTDOWN_WAIT_SLEEP_MS 100
+#define RRDENG_SHUTDOWN_LOG_EVERY_SEC 5
+#define RRDENG_SHUTDOWN_COLLECTORS_TIMEOUT_SEC 30
+#define RRDENG_SHUTDOWN_COMPLETION_TIMEOUT_SEC 30
+
+NORETURN
+static void rrdeng_shutdown_watchdog_timeout(struct rrdengine_instance *ctx, const char *phase) {
+    netdata_log_error(
+        "DBENGINE: shutdown watchdog timeout (%d seconds) exceeded while %s tier %d "
+        "(collectors_running=%zu, inflight_queries=%zu, extents_currently_being_flushed=%u)",
+        RRDENG_SHUTDOWN_COLLECTORS_TIMEOUT_SEC,
+        phase,
+        ctx ? ctx->config.tier : 0,
+        ctx ? __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) : 0,
+        ctx ? __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED) : 0,
+        ctx ? __atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED) : 0);
+    abort();
+}
+
 /*
  * Returns 0 on success, 1 on error
  */
@@ -1240,14 +1259,22 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     // 4. then wait for completion
 
     bool logged = false;
-    size_t count = 10;
-    while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && count && !unittest_running) {
-        if(!logged) {
-            netdata_log_info("DBENGINE: waiting for collectors to finish on tier %d...", ctx->config.tier);
+    usec_t started_ut = now_monotonic_usec();
+    usec_t next_log_ut = started_ut;
+    while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && !unittest_running) {
+        usec_t now_ut = now_monotonic_usec();
+
+        if(now_ut - started_ut >= RRDENG_SHUTDOWN_COLLECTORS_TIMEOUT_SEC * USEC_PER_SEC)
+            rrdeng_shutdown_watchdog_timeout(ctx, "waiting for collectors to finish on");
+
+        if(!logged || now_ut >= next_log_ut) {
+            netdata_log_info("DBENGINE: waiting for %zu collectors to finish on tier %d...",
+                             __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED), ctx->config.tier);
             logged = true;
+            next_log_ut = now_ut + RRDENG_SHUTDOWN_LOG_EVERY_SEC * USEC_PER_SEC;
         }
-        sleep_usec(100 * USEC_PER_MS);
-        count--;
+
+        sleep_usec(RRDENG_SHUTDOWN_WAIT_SLEEP_MS * USEC_PER_MS);
     }
 
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
@@ -1256,7 +1283,9 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     completion_init(&completion);
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_SHUTDOWN, NULL, &completion, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
 
-    completion_wait_for(&completion);
+    if(!completion_timedwait_for(&completion, RRDENG_SHUTDOWN_COMPLETION_TIMEOUT_SEC))
+        rrdeng_shutdown_watchdog_timeout(ctx, "waiting for ctx shutdown completion on");
+
     completion_destroy(&completion);
 
     if(unittest_running)
