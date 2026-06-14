@@ -33,7 +33,8 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors Kubernetes Nodes, Pods and Containers.
-        method_description: ""
+        method_description: |
+          The collector uses the Kubernetes `client-go` library to connect to the API server. It discovers resources through shared informers and collects state metrics for Nodes, Pods, Deployments, CronJobs, and Jobs.
       supported_platforms:
         include: []
         exclude: []
@@ -42,14 +43,28 @@ modules:
         description: ""
       default_behavior:
         auto_detection:
-          description: ""
+          description: |
+            This collector does not support auto-detection. It is disabled by default and requires manual configuration — add a job to `go.d/k8s_state.conf` or enable it via the Helm chart.
         limits:
           description: ""
         performance_impact:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Enable the collector explicitly
+            description: |
+              This collector is **disabled by default**. You must add a `k8s_state` job to `go.d/k8s_state.conf` to enable it.
+          - title: Network access to the Kubernetes API server
+            description: |
+              The Netdata Agent must be able to reach the Kubernetes API server.
+              When running inside a cluster, this is typically available at `https://kubernetes.default.svc`.
+          - title: RBAC permissions (in-cluster)
+            description: |
+              When running inside a Kubernetes pod (Helm or manifest deployment), the pod's ServiceAccount needs a ClusterRole with `list` and `watch` permissions for `nodes`, `pods`, `deployments`, `cronjobs`, and `jobs` resources.
+          - title: Kubeconfig file (out-of-cluster)
+            description: |
+              When running outside the cluster, a valid kubeconfig file must be available at `~/.kube/config` and the agent process must be running in a terminal (TTY).
       configuration:
         file:
           name: go.d/k8s_state.conf
@@ -63,10 +78,42 @@ modules:
           folding:
             title: Config
             enabled: true
-          list: []
+          list:
+            - name: Minimal configuration
+              description: |
+                The minimal configuration to enable the k8s_state collector.
+              config: |
+                jobs:
+                  - name: k8s_state
+            - name: Custom update interval
+              description: |
+                Collect Kubernetes state metrics every 30 seconds.
+              config: |
+                jobs:
+                  - name: k8s_state
+                    update_every: 30
     troubleshooting:
       problems:
-        list: []
+        list:
+          - name: k8s_state does not appear in the collectors list or Cloud UI
+            description: |
+              This collector is **disabled by default** and does not support auto-detection.
+
+              **Remediation:**
+              1. Add a `k8s_state` job to `go.d/k8s_state.conf`:
+                 ```yaml
+                 jobs:
+                   - name: k8s_state
+                 ```
+              2. Ensure the pod's ServiceAccount has a ClusterRole granting `list` and `watch` on `nodes`, `pods`, `deployments`, `cronjobs`, and `jobs`.
+              3. Restart the Netdata Agent or wait for the next autodetection retry cycle.
+          - name: "can not create Kubernetes client: not inside a cluster"
+            description: |
+              The collector could not detect an in-cluster environment and is not running in a terminal (TTY).
+
+              **Remediation:**
+              - If running inside Kubernetes, verify the `KUBERNETES_SERVICE_HOST` and `KUBERNETES_SERVICE_PORT` environment variables are set (they are injected automatically in pods).
+              - If running outside the cluster, run the agent in an interactive terminal with a valid `~/.kube/config` file.
     alerts:
       - name: k8s_state_deployment_condition_available
         metric: k8s_state.deployment_conditions
