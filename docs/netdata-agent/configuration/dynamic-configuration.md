@@ -293,6 +293,28 @@ In Netdata, HTTP 412 is used to indicate that an authorization bearer token was 
 
 For more information, see [Secure Your Netdata Agent with Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md).
 
+### Forbidden (HTTP 403) Error When Accessing Configuration Manager
+
+If you see **"forbidden"** (HTTP 403) when attempting to create configurations or view nodes in the Configuration Manager, one of the following restrictions is blocking the action.
+
+:::important
+
+Only users with an **Admin** or **Manager** role on a **paid plan** can perform Dynamic Configuration actions beyond listing. Troubleshooters, Observers, and Billing roles — and all users on the Community plan — will receive "forbidden" for those actions.
+
+:::
+
+**Common causes:**
+
+1. **Insufficient role** — Only Admin and Manager roles can perform Dynamic Configuration actions (Add, Update, Enable/Disable, Remove, Test, View). Troubleshooters, Observers, and Billing roles are limited to "List All" and will receive "forbidden" for all other actions.
+2. **Community (free) plan limitation** — A paid plan is required for all Dynamic Configuration Manager actions except "List All". Users on the Community plan will see "forbidden" when attempting any action beyond listing.
+3. **Not a member of the target Room** — Users must be members of the Room containing the target nodes to interact with them through the Configuration Manager.
+
+**Resolution steps:**
+
+1. **Check your assigned role**: Go to **Space Settings → Users** and verify your role. If you are not an Admin or Manager, ask a Space Admin to upgrade your role. See the [Role-Based Access Model documentation](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for the full permissions table.
+2. **Verify your subscription plan**: If you are on the Community plan, upgrade to a paid plan or ask a Space Admin to do so. A paid plan is required for all Dynamic Configuration actions except "List All".
+3. **Confirm your Room assignment**: Ensure you are a member of the Room that contains the nodes you are trying to configure. Users who are not members of a Room cannot interact with its nodes through the Configuration Manager.
+
 ---
 
 Experience the efficiency and power of the Dynamic Configuration Manager in Netdata today. Whether you're managing a handful of nodes or a vast infrastructure, this feature will make your monitoring and alerting tasks smoother and more intuitive.
