@@ -21,7 +21,7 @@ Use this page to harden a listener after the first trap has been received. If yo
 ## On this page
 
 - [Listener endpoints](#listener-endpoints)
-- [SNMP versions and communities](#security-versions-and-communities)
+- [SNMP versions and communities](#snmp-versions-and-communities)
 - [SNMPv3 users](#snmpv3-users)
 - [Source controls](#source-controls)
 - [Storm controls](#storm-controls)
@@ -137,7 +137,7 @@ listen:
 | `endpoints[].address` | `0.0.0.0` | Local address to bind. Use a specific interface address to avoid listening on every interface. |
 | `endpoints[].port` | `162` | UDP port. Port `162` requires `CAP_NET_BIND_SERVICE` or root; Netdata packages grant this to `go.d.plugin`. For a non-privileged test listener use a port above `1024`, such as `9162`. |
 
-## SNMP versions and communities {#security-versions-and-communities}
+## SNMP versions and communities
 
 The default accepts SNMPv1 and SNMPv2c. For production, enable only the versions your devices send.
 

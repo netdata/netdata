@@ -27,7 +27,7 @@ Decode is not the bottleneck — the receiver decodes traps far faster than it p
 
 If your worst-case sustained rate stays at or below ~50,000 traps/s, you have headroom on one Agent. If it does not, plan distributed before you plan bigger iron.
 
-## When the receiver can't keep up, the kernel drops first — and Netdata sees it {#kernel-udp-buffer-drops}
+## Kernel UDP buffer drops
 
 Before a trap reaches the collector, it sits in the **kernel UDP receive buffer**. If that buffer fills faster than the receiver drains it, the kernel drops the datagram. The trap collector's `received` counter counts packets *after* the kernel buffer, so these kernel drops never appear in the receiver's own pipeline metrics — **but Netdata catches them at the system level.** The `ipv4.udperrors` chart records exactly these drops on its `RcvbufErrors` dimension, and Netdata ships the **`1m_ipv4_udp_receive_buffer_errors`** alert on it. (That alert is routed `to: silent` by default — it raises in the dashboard but sends no notification until you route it to a recipient.)
 

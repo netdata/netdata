@@ -53,7 +53,7 @@ jobs:
       enabled: true
 ```
 
-`example` is a placeholder community for this loopback test. Community strings travel in cleartext on the wire, so on real networks prefer SNMPv3 — see [Configuration security](/docs/snmp-traps/configuration.md#security-versions-and-communities).
+`example` is a placeholder community for this loopback test. Community strings travel in cleartext on the wire, so on real networks prefer SNMPv3 — see [Configuration security](/docs/snmp-traps/configuration.md#snmp-versions-and-communities).
 
 Then restart Netdata so the file change takes effect. On systemd hosts:
 

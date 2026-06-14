@@ -102,9 +102,9 @@ For UDP/162, the container must be allowed to bind low ports. See [UDP/162 permi
 
 The stock `snmp_traps.conf` file is a commented template. Netdata will not listen for traps until you create a job. There are two ways to add one.
 
-### Recommended: Dynamic Configuration (no restart) {#enable-via-dynamic-configuration}
+### Enable via Dynamic Configuration
 
-Add, edit, test, and remove a listener job from the Netdata UI, with no file editing and no service restart:
+This is the recommended way to add a job. Add, edit, test, and remove a listener job from the Netdata UI, with no file editing and no service restart:
 
 1. In Netdata, open **Integrations** and find **SNMP Trap Listener**.
 2. Click **Configure**, then **Add job**.
