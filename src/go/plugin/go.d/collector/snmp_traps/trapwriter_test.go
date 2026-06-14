@@ -4,6 +4,7 @@ package snmp_traps
 
 import (
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -276,4 +277,62 @@ func TestJournalRetentionSweepInterval(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 		})
 	}
+}
+
+// newJournalTrapWriterWithInterval mirrors newJournalTrapWriter but lets a test
+// shorten the flush ticker so the time-only flush is observable without waiting
+// a full second. It constructs the writer directly because flushInterval is read
+// once when the worker starts, so mutating it after newJournalTrapWriter would race.
+func newJournalTrapWriterWithInterval(j *JournalWriter, capacity int, interval time.Duration) *journalTrapWriter {
+	tw := &journalTrapWriter{
+		journal:                j,
+		queue:                  make(chan *TrapEntry, capacity),
+		flushCh:                make(chan chan error),
+		doneCh:                 make(chan struct{}),
+		flushInterval:          interval,
+		retentionSweepInterval: journalRetentionSweepInterval(j),
+		lastRetentionSweep:     time.Now(),
+	}
+	go tw.worker()
+	return tw
+}
+
+// TestJournalTrapWriterTickerFlushesWithoutCountTrigger pins the time-only flush
+// contract introduced when the count-based fsync trigger (defaultFlushEntries=1000)
+// was removed: a handful of entries — far below the old 1000-entry threshold — must
+// be fsynced to a real journal by the interval ticker alone, with no explicit
+// Flush(), and must remain queryable after Close(). If a future change re-introduces
+// a count gate or drops the ticker flush, this test fails.
+func TestJournalTrapWriterTickerFlushesWithoutCountTrigger(t *testing.T) {
+	requireJournalctl(t)
+
+	dir := t.TempDir()
+	w, err := NewJournalWriter(dir, JournalConfig{RotateSize: 200 * bytesPerMB})
+	require.NoError(t, err)
+
+	tw := newJournalTrapWriterWithInterval(w, 1<<10, 100*time.Millisecond)
+
+	const want = 5
+	for range want {
+		require.NoError(t, tw.Write(benchmarkTrapEntry()))
+	}
+
+	// No Flush(): the interval ticker must fsync these 5 entries on its own.
+	journalDir := w.JournalDirectory()
+	deadline := time.Now().Add(5 * time.Second)
+	var count int
+	for time.Now().Before(deadline) {
+		count = strings.Count(runJournalctlAllowEmpty(t, journalDir, "TRAP_CATEGORY=security"), "TRAP_OID")
+		if count >= want {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	require.GreaterOrEqualf(t, count, want, "ticker did not flush %d entries without an explicit Flush", want)
+
+	require.NoError(t, tw.Close())
+
+	// Entries remain durable after Close.
+	count = strings.Count(runJournalctl(t, journalDir, "TRAP_CATEGORY=security"), "TRAP_OID")
+	require.GreaterOrEqual(t, count, want)
 }

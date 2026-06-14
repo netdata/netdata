@@ -12,7 +12,6 @@ import (
 
 const (
 	defaultQueueCapacity      = 10000
-	defaultFlushEntries       = 1000
 	defaultFlushInterval      = 1 * time.Second
 	maxRetentionSweepInterval = 1 * time.Hour
 	minRetentionSweepInterval = 1 * time.Second
@@ -38,7 +37,6 @@ type journalTrapWriter struct {
 	onFailure func(error)
 
 	flushInterval time.Duration
-	flushEntries  int
 
 	retentionSweepInterval time.Duration
 	lastRetentionSweep     time.Time
@@ -56,7 +54,6 @@ func newJournalTrapWriter(j *JournalWriter, capacity int, onFailure ...func(erro
 		flushCh:                make(chan chan error),
 		doneCh:                 make(chan struct{}),
 		flushInterval:          defaultFlushInterval,
-		flushEntries:           defaultFlushEntries,
 		retentionSweepInterval: journalRetentionSweepInterval(j),
 		lastRetentionSweep:     time.Now(),
 	}
@@ -79,14 +76,16 @@ func (tw *journalTrapWriter) worker() {
 	ticker := time.NewTicker(tw.flushInterval)
 	defer ticker.Stop()
 
-	written := 0
+	// Entries are written as they arrive; the durable fsync is batched onto the
+	// flushInterval ticker and the explicit Flush handshake. flushPending marks
+	// that at least one entry has been written but not yet synced.
 	flushPending := false
 
 	for {
 		select {
 		case entry, ok := <-tw.queue:
 			if !ok {
-				tw.drainRemaining(written)
+				tw.drainRemaining(flushPending)
 				return
 			}
 			if err := tw.writeOne(entry); err != nil {
@@ -94,18 +93,7 @@ func (tw *journalTrapWriter) worker() {
 				tw.drainAndDiscard()
 				return
 			}
-			written++
-			if written >= tw.flushEntries {
-				if err := tw.sync(); err != nil {
-					tw.setFailure(err)
-					tw.drainAndDiscard()
-					return
-				}
-				written = 0
-				flushPending = false
-			} else {
-				flushPending = true
-			}
+			flushPending = true
 
 		case <-ticker.C:
 			if flushPending {
@@ -114,7 +102,6 @@ func (tw *journalTrapWriter) worker() {
 					tw.drainAndDiscard()
 					return
 				}
-				written = 0
 				flushPending = false
 			}
 			if err := tw.maybeSweepRetention(time.Now()); err != nil {
@@ -124,7 +111,7 @@ func (tw *journalTrapWriter) worker() {
 			}
 
 		case replyCh := <-tw.flushCh:
-			err := tw.drainForFlush(&written, &flushPending)
+			err := tw.drainForFlush(&flushPending)
 			if err != nil {
 				tw.setFailure(err)
 				tw.drainAndDiscard()
@@ -135,7 +122,6 @@ func (tw *journalTrapWriter) worker() {
 			}
 			if flushPending {
 				err = tw.sync()
-				written = 0
 				flushPending = false
 				if err != nil {
 					tw.setFailure(err)
@@ -205,7 +191,7 @@ func (tw *journalTrapWriter) maybeSweepRetention(now time.Time) error {
 	return tw.journal.SweepRetention()
 }
 
-func (tw *journalTrapWriter) drainForFlush(written *int, flushPending *bool) error {
+func (tw *journalTrapWriter) drainForFlush(flushPending *bool) error {
 	for {
 		select {
 		case entry, ok := <-tw.queue:
@@ -215,33 +201,24 @@ func (tw *journalTrapWriter) drainForFlush(written *int, flushPending *bool) err
 			if err := tw.writeOne(entry); err != nil {
 				return err
 			}
-			*written = *written + 1
-			if *written >= tw.flushEntries {
-				if err := tw.sync(); err != nil {
-					return err
-				}
-				*written = 0
-				*flushPending = false
-			} else {
-				*flushPending = true
-			}
+			*flushPending = true
 		default:
 			return nil
 		}
 	}
 }
 
-func (tw *journalTrapWriter) drainRemaining(written int) {
+func (tw *journalTrapWriter) drainRemaining(pending bool) {
 	for entry := range tw.queue {
 		if err := tw.writeOne(entry); err != nil {
 			tw.setFailure(err)
 			continue
 		}
 		if tw.journal != nil {
-			written++
+			pending = true
 		}
 	}
-	if written > 0 && tw.journal != nil {
+	if pending && tw.journal != nil {
 		if err := tw.journal.Sync(); err != nil {
 			tw.setFailure(err)
 		}
