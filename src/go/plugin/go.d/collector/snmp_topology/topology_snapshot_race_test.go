@@ -49,7 +49,7 @@ func TestTopologyRegistry_ConcurrentSnapshotsDoNotRaceOnDeviceLabels(t *testing.
 	const goroutines = 64
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
-	for i := 0; i < goroutines; i++ {
+	for i := range goroutines {
 		// Alternate the two production read paths: Collect (snapshot) and the
 		// Function handler (snapshotWithOptions).
 		collectPath := i%2 == 0
