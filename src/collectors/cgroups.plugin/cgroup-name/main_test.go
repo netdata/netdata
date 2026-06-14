@@ -95,8 +95,37 @@ func TestLabelHelpers(t *testing.T) {
 	}
 }
 
+func withTrustedCommandDirs(t *testing.T, dirs ...string) {
+	t.Helper()
+	previous := trustedCommandDirs
+	trustedCommandDirs = append([]string(nil), dirs...)
+	t.Cleanup(func() {
+		trustedCommandDirs = previous
+	})
+}
+
+func TestTrustedCommandPathIgnoresAmbientPath(t *testing.T) {
+	tmp := t.TempDir()
+	command := "netdata-test-command"
+	if err := os.WriteFile(filepath.Join(tmp, command), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("PATH", tmp)
+	withTrustedCommandDirs(t, "/definitely-not-a-command-dir")
+	if _, ok := trustedCommandPath(command); ok {
+		t.Fatal("ambient PATH must not make a command trusted")
+	}
+
+	withTrustedCommandDirs(t, tmp)
+	if path, ok := trustedCommandPath(command); !ok || path != filepath.Join(tmp, command) {
+		t.Fatalf("trusted command path = %q/%v, want %q/true", path, ok, filepath.Join(tmp, command))
+	}
+}
+
 func TestMainDispatchPureBranches(t *testing.T) {
 	tmp := t.TempDir()
+	withTrustedCommandDirs(t, tmp)
 	t.Setenv("PATH", tmp)
 	t.Setenv("NETDATA_HOST_PREFIX", "")
 	t.Setenv("DOCKER_HOST", "")
@@ -166,6 +195,7 @@ func TestMainDispatchPureBranches(t *testing.T) {
 
 func TestProxmoxBranches(t *testing.T) {
 	tmp := t.TempDir()
+	withTrustedCommandDirs(t, tmp)
 	t.Setenv("PATH", tmp)
 	t.Setenv("NETDATA_HOST_PREFIX", tmp)
 	t.Setenv("DOCKER_HOST", "")
@@ -217,6 +247,7 @@ func TestPodsToContainerLines(t *testing.T) {
 
 func TestK8sContainerCachePath(t *testing.T) {
 	tmp := t.TempDir()
+	withTrustedCommandDirs(t, tmp)
 	if err := os.WriteFile(filepath.Join(tmp, "jq"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -255,6 +286,7 @@ func TestMirroredK8sContainerPathFixturesFromCache(t *testing.T) {
 	// sustainable-computing-io/kepler. They intentionally avoid copying upstream
 	// pod/container names while preserving the cgroup path shapes.
 	tmp := t.TempDir()
+	withTrustedCommandDirs(t, tmp)
 	if err := os.WriteFile(filepath.Join(tmp, "jq"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -400,6 +432,7 @@ func TestMirroredK8sPodListFixtureViaKubelet(t *testing.T) {
 	// OpenTelemetry kubelet fixtures: owner references, annotations, node names,
 	// Docker IDs, containerd IDs, and CRI-O IDs.
 	tmp := t.TempDir()
+	withTrustedCommandDirs(t, tmp)
 	if err := os.WriteFile(filepath.Join(tmp, "jq"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -491,6 +524,7 @@ func TestMirroredK8sPodListFixtureViaKubelet(t *testing.T) {
 
 func TestMirroredDockerAndPodmanAPIFixtures(t *testing.T) {
 	tmp := t.TempDir()
+	withTrustedCommandDirs(t, tmp)
 	if err := os.WriteFile(filepath.Join(tmp, "jq"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
