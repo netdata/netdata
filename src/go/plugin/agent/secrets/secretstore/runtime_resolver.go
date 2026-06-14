@@ -35,6 +35,7 @@ func (r *runtimeResolver) resolveContext(ctx context.Context, snapshot *Snapshot
 	kind := StoreKind(strings.TrimSpace(kindPart))
 	name := strings.TrimSpace(namePart)
 	operand = strings.TrimSpace(operand)
+	operand, escapeValue := parseStoreOperandOption(operand)
 	if !kind.IsValid() || name == "" || operand == "" {
 		return "", fmt.Errorf("resolving secret '%s': store reference must be in format 'kind:name:operand'", original)
 	}
@@ -51,11 +52,46 @@ func (r *runtimeResolver) resolveContext(ctx context.Context, snapshot *Snapshot
 		return "", fmt.Errorf("resolving secret '%s': secretstore '%s' has no published resolver state", original, storeKey)
 	}
 
-	return store.published.Resolve(ctx, ResolveRequest{
+	value, err := store.published.Resolve(ctx, ResolveRequest{
 		StoreKey:  storeKey,
 		StoreKind: kind,
 		StoreName: name,
 		Operand:   operand,
 		Original:  original,
 	})
+	if err != nil {
+		return "", err
+	}
+	if escapeValue {
+		return percentEncodeStoreValue(value), nil
+	}
+	return value, nil
+}
+
+func parseStoreOperandOption(operand string) (string, bool) {
+	const escapeSuffix = ":escape"
+	if !strings.HasSuffix(operand, escapeSuffix) {
+		return operand, false
+	}
+	return strings.TrimSpace(strings.TrimSuffix(operand, escapeSuffix)), true
+}
+
+func percentEncodeStoreValue(value string) string {
+	var out strings.Builder
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		if isRFC3986Unreserved(c) {
+			out.WriteByte(c)
+			continue
+		}
+		fmt.Fprintf(&out, "%%%02X", c)
+	}
+	return out.String()
+}
+
+func isRFC3986Unreserved(c byte) bool {
+	return (c >= 'A' && c <= 'Z') ||
+		(c >= 'a' && c <= 'z') ||
+		(c >= '0' && c <= '9') ||
+		c == '-' || c == '.' || c == '_' || c == '~'
 }

@@ -101,6 +101,23 @@ func TestApplyConfig_ResolvesStoreReferenceWithKindAndName(t *testing.T) {
 	assert.Equal(t, 7, module.Config.OptionInt)
 }
 
+func TestApplyConfig_ResolvesEscapedStoreReferenceInDSN(t *testing.T) {
+	svc := newTestSecretStoreService()
+	raw := newSecretStoreConfigWithSource(t, secretstore.KindVault, "vault_prod", map[string]any{"value": "pa/ss+word: a@"}, confgroup.TypeDyncfg, confgroup.TypeDyncfg)
+	require.NoError(t, svc.Add(context.Background(), raw))
+
+	cfg := prepareDyncfgCfg("success", "secret-job").
+		Set("option_str", "postgresql://postgres:${store:vault:vault_prod:value:escape}@db.example/postgres").
+		Set("option_int", 7)
+
+	module := &collectorapi.MockCollectorV1{}
+	err := applyConfig(t.Context(), cfg, module, secretresolver.New(), svc, svc.Capture())
+	require.NoError(t, err)
+
+	assert.Equal(t, "postgresql://postgres:pa%2Fss%2Bword%3A%20a%40@db.example/postgres", module.Config.OptionStr)
+	assert.Equal(t, 7, module.Config.OptionInt)
+}
+
 func TestRun_StartupLoadedSecretStoreIsAvailableToFirstCollectorStart(t *testing.T) {
 	initial := newSecretStoreConfigWithSource(t, secretstore.KindVault, "vault_prod", map[string]any{"value": "good"}, "file=/etc/netdata/go.d/ss/vault.conf", confgroup.TypeUser)
 	mgr := New(Config{
