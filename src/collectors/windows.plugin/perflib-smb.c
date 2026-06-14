@@ -7,30 +7,21 @@ struct smb_share {
     usec_t last_collected;
 
     RRDSET *st_current_open_file_count;
-    RRDSET *st_tree_connect_count;
-    RRDSET *st_received_bytes;
     RRDSET *st_write_requests;
     RRDSET *st_read_requests;
     RRDSET *st_metadata_requests;
-    RRDSET *st_sent_bytes;
     RRDSET *st_files_opened;
 
     RRDDIM *rd_current_open_file_count;
-    RRDDIM *rd_tree_connect_count;
-    RRDDIM *rd_received_bytes;
     RRDDIM *rd_write_requests;
     RRDDIM *rd_read_requests;
     RRDDIM *rd_metadata_requests;
-    RRDDIM *rd_sent_bytes;
     RRDDIM *rd_files_opened;
 
     COUNTER_DATA currentOpenFileCount;
-    COUNTER_DATA treeConnectCount;
-    COUNTER_DATA receivedBytes;
     COUNTER_DATA writeRequests;
     COUNTER_DATA readRequests;
     COUNTER_DATA metadataRequests;
-    COUNTER_DATA sentBytes;
     COUNTER_DATA filesOpened;
 };
 
@@ -39,24 +30,18 @@ static DICTIONARY *smb_shares = NULL;
 static void smb_share_initialize(struct smb_share *share)
 {
     share->currentOpenFileCount.key = "Current Open File Count";
-    share->treeConnectCount.key = "Tree Connect Count";
-    share->receivedBytes.key = "Received Bytes/sec";
     share->writeRequests.key = "Write Requests/sec";
     share->readRequests.key = "Read Requests/sec";
     share->metadataRequests.key = "Metadata Requests/sec";
-    share->sentBytes.key = "Sent Bytes/sec";
     share->filesOpened.key = "Files Opened/sec";
 }
 
 static void smb_share_cleanup(struct smb_share *share)
 {
     rrdset_is_obsolete___safe_from_collector_thread(share->st_current_open_file_count);
-    rrdset_is_obsolete___safe_from_collector_thread(share->st_tree_connect_count);
-    rrdset_is_obsolete___safe_from_collector_thread(share->st_received_bytes);
     rrdset_is_obsolete___safe_from_collector_thread(share->st_write_requests);
     rrdset_is_obsolete___safe_from_collector_thread(share->st_read_requests);
     rrdset_is_obsolete___safe_from_collector_thread(share->st_metadata_requests);
-    rrdset_is_obsolete___safe_from_collector_thread(share->st_sent_bytes);
     rrdset_is_obsolete___safe_from_collector_thread(share->st_files_opened);
 }
 
@@ -147,12 +132,9 @@ static bool do_smb_server_shares(PERF_DATA_BLOCK *pDataBlock, int update_every)
         share->last_collected = now_ut;
 
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->currentOpenFileCount);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->treeConnectCount);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->receivedBytes);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->writeRequests);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->readRequests);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->metadataRequests);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->sentBytes);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->filesOpened);
 
         smb_share_chart(
@@ -167,32 +149,6 @@ static bool do_smb_server_shares(PERF_DATA_BLOCK *pDataBlock, int update_every)
             "files",
             PRIO_SMB_SERVER_SHARES_CURRENT_OPEN_FILE_COUNT,
             "open");
-
-        smb_share_chart(
-            &share->st_tree_connect_count,
-            &share->rd_tree_connect_count,
-            &share->treeConnectCount,
-            update_every,
-            windows_shared_buffer,
-            "tree_connect_count",
-            "smb.server_shares_tree_connect_count",
-            "Tree connect count on the SMB share",
-            "connections",
-            PRIO_SMB_SERVER_SHARES_TREE_CONNECT_COUNT,
-            "connections");
-
-        smb_share_chart(
-            &share->st_received_bytes,
-            &share->rd_received_bytes,
-            &share->receivedBytes,
-            update_every,
-            windows_shared_buffer,
-            "received_bytes",
-            "smb.server_shares_received_bytes",
-            "Received bytes on the SMB share",
-            "bytes/s",
-            PRIO_SMB_SERVER_SHARES_RECEIVED_BYTES,
-            "received");
 
         smb_share_chart(
             &share->st_write_requests,
@@ -232,19 +188,6 @@ static bool do_smb_server_shares(PERF_DATA_BLOCK *pDataBlock, int update_every)
             "requests/s",
             PRIO_SMB_SERVER_SHARES_METADATA_REQUESTS,
             "metadata");
-
-        smb_share_chart(
-            &share->st_sent_bytes,
-            &share->rd_sent_bytes,
-            &share->sentBytes,
-            update_every,
-            windows_shared_buffer,
-            "sent_bytes",
-            "smb.server_shares_sent_bytes",
-            "Sent bytes on the SMB share",
-            "bytes/s",
-            PRIO_SMB_SERVER_SHARES_SENT_BYTES,
-            "sent");
 
         smb_share_chart(
             &share->st_files_opened,
