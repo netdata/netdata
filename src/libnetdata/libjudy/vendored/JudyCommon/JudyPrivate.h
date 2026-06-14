@@ -307,7 +307,7 @@ typedef int bool_t;
 
 // A word that is all-ones, normally equal to -1UL, but safer with ~0:
 
-#define cJU_ALLONES  (~0UL)
+#define cJU_ALLONES  (~(Word_t)0)
 
 // Note, these are forward references, but thats OK:
 
@@ -411,7 +411,7 @@ typedef PWord_t Pjv_t;   // pointer to JudyL value area.
 // processors.
 
 #define JU_LEASTBYTESMASK(BYTES) \
-        ((0x100UL << (cJU_BITSPERBYTE * ((BYTES) - 1))) - 1)
+        (((Word_t)0x100 << (cJU_BITSPERBYTE * ((BYTES) - 1))) - 1)
 
 #define JU_LEASTBYTES(INDEX,BYTES)  ((INDEX) & JU_LEASTBYTESMASK(BYTES))
 

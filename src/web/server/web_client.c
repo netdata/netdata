@@ -540,11 +540,7 @@ static int web_server_static_file(struct web_client *w, char *filename) {
     web_client_enable_wait_send(w);
     web_client_disable_wait_receive(w);
 
-#ifdef __APPLE__
-    w->response.data->date = statbuf.st_mtimespec.tv_sec;
-#else
-    w->response.data->date = statbuf.st_mtim.tv_sec;
-#endif
+    w->response.data->date = STAT_GET_MTIME_SEC(statbuf);
     w->response.data->expires = now_realtime_sec() + 86400;
 
     buffer_cacheable(w->response.data);

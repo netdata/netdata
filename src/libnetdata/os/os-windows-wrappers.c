@@ -32,7 +32,10 @@ bool netdata_registry_get_dword(unsigned int *out, void *hKey, char *subKey, cha
 
 long netdata_registry_get_string_from_open_key(char *out, unsigned int length, void *lKey, char *name)
 {
-    return RegQueryValueEx(lKey, name, NULL, NULL, (LPBYTE) out, &length);
+    // RegQueryValueEx expects LPDWORD (unsigned long*); use a DWORD local to avoid
+    // incompatible-pointer-types error on UCRT64 where DWORD != unsigned int.
+    DWORD dw_length = (DWORD)length;
+    return RegQueryValueEx(lKey, name, NULL, NULL, (LPBYTE) out, &dw_length);
 }
 
 bool netdata_registry_get_string(char *out, unsigned int length, void *hKey, char *subKey, char *name)
