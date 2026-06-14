@@ -58,15 +58,17 @@ topology skill, not to the public/operator query skills.
    ```bash
    NODE_UUID="$(jq -r '.agents[0].nd' <<<"$INFO_JSON")"
    MACHINE_GUID="$(jq -r '.agents[0].mg' <<<"$INFO_JSON")"
-   FUNCTION_NAME="topology:network-connections processes:by_name mode:aggregated sockets:inbound,outbound,listening,local protocols:ipv4_tcp,ipv6_tcp,ipv4_udp,ipv6_udp endpoints:by_ip"
+   FUNCTION_NAME="topology:network-connections"
    FUNCTION_ENCODED="$(printf '%s' "$FUNCTION_NAME" | jq -sRr @uri)"
+   REQUEST_BODY='{"selections":{"group_by":["process_name"],"__topology_mode":["aggregated"],"sockets":["inbound","outbound","listening"],"protocols":["ipv4_tcp","ipv6_tcp","ipv4_udp","ipv6_udp"],"endpoints":["by_ip"]}}'
    OUT="$(agents_audit_dir)/network-connections-aggregated-live.json"
 
    agents_query_agent \
      --node "$NODE_UUID" \
      --host "$AGENT_HOST" \
      --machine-guid "$MACHINE_GUID" \
-     GET "/api/v3/function?function=${FUNCTION_ENCODED}&timeout=120000&last=200" \
+     POST "/api/v3/function?function=${FUNCTION_ENCODED}&timeout=120000&last=200" \
+     "$REQUEST_BODY" \
      > "$OUT"
    ```
 

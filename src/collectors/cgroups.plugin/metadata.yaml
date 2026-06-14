@@ -870,6 +870,39 @@ modules:
               chart_type: line
               dimensions:
                 - name: mtu
+        - name: cgroups plugin IPC
+          description: cgroups.plugin netipc lookup-server and discovery signal health.
+          labels: []
+          metrics:
+            - name: netdata.collector.ipc.cgroups_lookup.server.requests
+              description: CGROUPS_LOOKUP server request outcomes
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: requests_responded
+                - name: requests_error
+                - name: lookup_miss_signals_sent
+                - name: lookup_miss_signals_coalesced
+            - name: netdata.collector.ipc.cgroups_lookup.server.request_duration_ms
+              description: CGROUPS_LOOKUP server request duration buckets
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: le_1ms
+                - name: le_5ms
+                - name: le_10ms
+                - name: le_50ms
+                - name: le_100ms
+                - name: le_500ms
+                - name: le_1000ms
+                - name: gt_1000ms
+            - name: netdata.collector.cgroups.discovery.scans
+              description: cgroups discovery scans by trigger source
+              unit: "scans/s"
+              chart_type: line
+              dimensions:
+                - name: discovery_scans_natural
+                - name: discovery_scans_opportunistic
   - <<: *module
     meta:
       <<: *meta

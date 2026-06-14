@@ -55,18 +55,29 @@ modules:
         list: []
       configuration:
         file:
-          name: ""
+          name: "netdata.conf"
+          section_name: "[plugin:network-viewer]"
+          description: "The netdata main configuration file."
         options:
-          description: ""
+          description: "Optional APPS_LOOKUP cache-warming controls for topology and aggregated network-connection Functions."
           folding:
-            title: ""
-            enabled: false
-          list: []
+            title: "Config options"
+            enabled: true
+          list:
+            - name: apps lookup cache size
+              description: Maximum number of per-PID APPS_LOOKUP cache entries kept by network-viewer.plugin.
+              default_value: 8192
+              required: false
         examples:
           folding:
-            enabled: false
-            title: ""
-          list: []
+            title: "Config"
+            enabled: true
+          list:
+            - name: APPS_LOOKUP cache warming
+              description: Keep the default APPS_LOOKUP cache size.
+              config: |
+                [plugin:network-viewer]
+                  apps lookup cache size = 8192
     troubleshooting:
       problems:
         list: []
@@ -77,7 +88,68 @@ modules:
         enabled: false
       description: ""
       availability: []
-      scopes: []
+      scopes:
+        - name: network-viewer plugin IPC
+          description: network-viewer.plugin APPS_LOOKUP client cache-warming health and latency.
+          labels: []
+          metrics:
+            - name: netdata.collector.ipc.apps_lookup.client.requests
+              description: APPS_LOOKUP client request outcomes
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: requests_sent
+                - name: requests_responded
+                - name: requests_failed
+            - name: netdata.collector.ipc.apps_lookup.client.cache
+              description: APPS_LOOKUP client cache outcomes
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: cache_hits
+                - name: cache_misses_unknown
+                - name: cache_misses_intake_dropped
+                - name: cache_evictions_pid_reuse
+                - name: cache_evictions_lru
+            - name: netdata.collector.ipc.apps_lookup.client.peer
+              description: APPS_LOOKUP client peer connection events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: peer_connect_attempts
+                - name: peer_disconnects
+            - name: netdata.collector.ipc.apps_lookup.client.worker_request_duration_ms
+              description: APPS_LOOKUP worker request duration buckets
+              unit: "requests/s"
+              chart_type: stacked
+              dimensions:
+                - name: le_1ms
+                - name: le_5ms
+                - name: le_10ms
+                - name: le_50ms
+                - name: le_100ms
+                - name: le_500ms
+                - name: le_1000ms
+                - name: gt_1000ms
+            - name: netdata.collector.ipc.apps_lookup.client.function_handler_overhead_ms
+              description: APPS_LOOKUP Function handler cache-check and intake-enqueue overhead buckets
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: le_1ms
+                - name: le_5ms
+                - name: le_10ms
+                - name: le_50ms
+                - name: le_100ms
+                - name: le_500ms
+                - name: le_1000ms
+                - name: gt_1000ms
+            - name: netdata.collector.ipc.apps_lookup.client.intake_depth
+              description: APPS_LOOKUP client queued PIDs awaiting worker lookup
+              unit: "pids"
+              chart_type: line
+              dimensions:
+                - name: intake_depth
     functions:
       description: |
         This plugin exposes real-time functions for viewing active network connections and,
@@ -89,8 +161,8 @@ modules:
             Shows active network connections with protocol details, states, addresses, ports, and performance metrics.
 
             Provides both aggregated and detailed views of TCP and UDP connections for IPv4 and IPv6,
-            including connection direction (listen, inbound, outbound, local), process information,
-            and TCP performance metrics (RTT, retransmissions).
+            including connection direction (listen, inbound, outbound), process information,
+            cgroup/container/service enrichment when available, and TCP performance metrics (RTT, retransmissions).
 
             On Linux, connections are classified as system or container based on network namespace.
             On FreeBSD, namespaces are not exposed to userspace and the classification is omitted.
@@ -121,6 +193,101 @@ modules:
           performance: ""
           security: ""
           availability: "FreeBSD only."
+        - id: topology:network-connections
+          name: Network Connections Topology
+          description: |
+            Shows active network connections as a topology graph with self, process or container, and endpoint actors.
+
+            The group_by selector controls the actor level. process_name groups sockets by process name, pid shows
+            one actor per PID with scalar per-PID information, and container groups sockets by canonical
+            container_name. For systemd services, container_name is the service name. For non-container,
+            non-service processes, container_name falls back to the process name.
+
+            Fields that can vary across grouped processes, such as PID, UID, network namespace, command line,
+            cgroup path, and detailed container metadata, are scalar columns in group_by:pid and merged actor
+            labels in grouped views. Free-form labels are hidden by default and can be allowed per request with
+            labels:<pattern>, where patterns are pipe-separated. Actor modals also expose producer-declared
+            Processes and CGroups tables for the selected actor.
+          parameters:
+            - id: group_by
+              name: Group By
+              description: "Use group_by:process_name, group_by:pid, or group_by:container to select the topology actor level."
+              type: select
+              required: false
+              default: process_name
+              options:
+                - id: process_name
+                  name: process_name
+                  default: true
+                - id: pid
+                  name: pid
+                - id: container
+                  name: container
+            - id: labels
+              name: Labels
+              description: "Optional pipe-separated simple-pattern whitelist for free-form actor labels. Omitted means deny all free-form labels."
+              type: string
+              required: false
+              default: ""
+              options: []
+          returns:
+            description: "Topology payload using netdata.topology.v1."
+            columns:
+              - name: container_name
+                type: string
+                unit: ""
+                description: "Canonical container/service actor name used by group_by:container."
+              - name: cgroup_path
+                type: string
+                unit: ""
+                description: "Full cgroup path; scalar in group_by:pid and merged as actor labels in grouped views."
+              - name: cgroup_name
+                type: string
+                unit: ""
+                description: "Cgroup or container display name; scalar in group_by:pid and merged as actor labels in grouped views."
+              - name: cgroup_status
+                type: string
+                unit: ""
+                description: "Cgroup enrichment status: known, host_root, retry_later, unknown_permanent, or unknown."
+              - name: orchestrator
+                type: string
+                unit: ""
+                description: "Container/orchestrator family; scalar in group_by:pid and merged as actor labels in grouped views."
+              - name: k8s_pod_name
+                type: string
+                unit: ""
+                description: "Kubernetes pod name; scalar in group_by:pid and merged as actor labels in grouped views."
+              - name: k8s_namespace
+                type: string
+                unit: ""
+                description: "Kubernetes namespace; scalar in group_by:pid and merged as actor labels in grouped views."
+              - name: k8s_workload
+                type: string
+                unit: ""
+                description: "Kubernetes controller name; scalar in group_by:pid and merged as actor labels in grouped views."
+              - name: docker_container_name
+                type: string
+                unit: ""
+                description: "Kubernetes container, Docker/Podman container, or cgroup fallback name; scalar in group_by:pid and merged as actor labels in grouped views."
+              - name: docker_image
+                type: string
+                unit: ""
+                description: "Docker/Podman image label; scalar in group_by:pid and merged as actor labels in grouped views."
+              - name: systemd_unit_name
+                type: string
+                unit: ""
+                description: "systemd unit name; scalar in group_by:pid and merged as actor labels in grouped views."
+              - name: systemd_unit_kind
+                type: string
+                unit: ""
+                description: "systemd unit kind such as service, scope, or slice; scalar in group_by:pid and merged as actor labels in grouped views."
+              - name: actor_kind
+                type: string
+                unit: ""
+                description: "Producer-derived actor kind used to classify containers, services, slices, scopes, VMs, and process fallbacks."
+          performance: "group_by:container performs APPS_LOOKUP cache reads to derive canonical container_name; cache warming runs asynchronously."
+          security: "Free-form labels are denied by default. Raw cgroup paths may expose operator-chosen path segments and are hidden in table views by default."
+          availability: "container_name uses APPS_LOOKUP data when available, keeps retry-later lookups pending, and falls back to process name only for known host/root or permanently unknown cgroup cases."
   - meta:
       plugin_name: network-viewer.plugin
       module_name: PerflibNetworkProtocols

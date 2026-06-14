@@ -196,6 +196,8 @@ cmake_dependent_option(ENABLE_PLUGIN_CUPS "Enable CUPS monitoring" ${DEFAULT_FEA
 cmake_dependent_option(ENABLE_PLUGIN_FREEIPMI "Enable IPMI monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD" False)
 
 cmake_dependent_option(ENABLE_PLUGIN_CGROUP_NETWORK "Enable Linux CGroup network usage monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+cmake_dependent_option(ENABLE_CGROUPS_LOOKUP_SERVER "Enable cgroups.plugin CGROUPS_LOOKUP netipc server" True "OS_LINUX" False)
+cmake_dependent_option(ENABLE_CGROUPS_LOOKUP_TEST_CLIENT "Build cgroups.plugin CGROUPS_LOOKUP test client" False "ENABLE_CGROUPS_LOOKUP_SERVER" False)
 cmake_dependent_option(ENABLE_PLUGIN_DEBUGFS "Enable Linux DebugFS metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_LEGACY_EBPF_PROGRAMS "Enable eBPF programs for kernels without BTF support" True "ENABLE_PLUGIN_EBPF" False)
@@ -2057,10 +2059,14 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/sys_fs_cgroup.h
         src/collectors/cgroups.plugin/cgroup-internals.h
         src/collectors/cgroups.plugin/cgroup-discovery.c
+        src/collectors/cgroups.plugin/cgroup-orchestrator.c
         src/collectors/cgroups.plugin/cgroup-charts.c
         src/collectors/cgroups.plugin/cgroup-top.c
         src/collectors/cgroups.plugin/cgroup-netipc.c
+        "$<$<BOOL:${ENABLE_CGROUPS_LOOKUP_SERVER}>:src/collectors/cgroups.plugin/cgroup-lookup-netipc.c>"
         src/collectors/cgroups.plugin/cgroup-netipc.h
+        src/collectors/cgroups.plugin/cgroup-snapshot-store.c
+        src/collectors/cgroups.plugin/cgroup-snapshot-store.h
         src/collectors/cgroups.plugin/cgroup_ebpfgo_cachestat.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.h
@@ -2820,7 +2826,18 @@ if(ENABLE_PLUGIN_APPS)
         list(APPEND APPS_PLUGIN_FILES
                 src/collectors/collectors-ipc/ebpfgo_shared_memory.h
                 src/collectors/collectors-ipc/ebpfgo_shared_memory.c
-                src/collectors/apps.plugin/apps_ebpf_shared_memory.c)
+                src/collectors/apps.plugin/apps_ebpf_shared_memory.c
+                src/collectors/common-cgroups/cgroup-topology-rules.c
+                src/collectors/common-cgroups/cgroup-topology-rules.h
+                src/collectors/apps.plugin/apps-cgroups-path.c
+                src/collectors/apps.plugin/apps-cgroups-path.h
+                src/collectors/apps.plugin/apps-cgroups-enrichment.c
+                src/collectors/apps.plugin/apps-cgroups-enrichment.h
+                src/collectors/apps.plugin/apps-cgroups-lookup-client.c
+                src/collectors/apps.plugin/apps-cgroups-lookup-client.h
+                src/collectors/apps.plugin/apps-lookup-netipc.c
+                src/collectors/apps.plugin/apps-lookup-netipc.h
+        )
     endif()
 
     add_executable(apps.plugin ${APPS_PLUGIN_FILES})
@@ -3015,6 +3032,51 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
     install(TARGETS cgroup-network
             COMPONENT netdata
             DESTINATION usr/libexec/netdata/plugins.d)
+endif()
+
+if(ENABLE_CGROUPS_LOOKUP_TEST_CLIENT)
+    add_executable(cgroup-lookup-test src/collectors/cgroups.plugin/cgroup-lookup-test/cgroup-lookup-test.c)
+    target_link_libraries(cgroup-lookup-test libnetdata)
+endif()
+
+if(OS_LINUX)
+    add_executable(cgroup-orchestrator-test EXCLUDE_FROM_ALL
+            src/collectors/cgroups.plugin/tests/test_cgroup_orchestrator.c
+            src/collectors/cgroups.plugin/cgroup-orchestrator.c)
+    target_compile_definitions(cgroup-orchestrator-test PRIVATE NETDATA_INTERNAL_CHECKS=1)
+    target_link_libraries(cgroup-orchestrator-test libnetdata)
+
+    add_executable(apps-cgroups-path-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_cgroups_path.c
+            src/collectors/apps.plugin/apps-cgroups-path.c)
+    target_link_libraries(apps-cgroups-path-test libnetdata)
+
+    add_executable(apps-cgroups-enrichment-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_cgroups_enrichment.c
+            src/collectors/common-cgroups/cgroup-topology-rules.c)
+    target_link_libraries(apps-cgroups-enrichment-test libnetdata)
+
+    add_executable(apps-lookup-protocol-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_lookup_protocol.c)
+    target_link_libraries(apps-lookup-protocol-test libnetdata)
+
+    add_executable(apps-lookup-netipc-lock-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_lookup_netipc_lock.c)
+    target_link_libraries(apps-lookup-netipc-lock-test libnetdata)
+
+    add_executable(apps-cgroups-lookup-client-abort-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_cgroups_lookup_client_abort.c)
+    target_link_libraries(apps-cgroups-lookup-client-abort-test libnetdata)
+endif()
+
+if(ENABLE_CGROUPS_LOOKUP_SERVER)
+    add_executable(cgroup-lookup-netipc-test EXCLUDE_FROM_ALL
+            src/collectors/cgroups.plugin/tests/test_cgroup_lookup_netipc.c
+            src/collectors/cgroups.plugin/cgroup-lookup-netipc.c
+            src/collectors/cgroups.plugin/cgroup-snapshot-store.c
+            src/collectors/cgroups.plugin/cgroup-orchestrator.c)
+    target_compile_definitions(cgroup-lookup-netipc-test PRIVATE NETDATA_INTERNAL_CHECKS=1)
+    target_link_libraries(cgroup-lookup-netipc-test libnetdata)
 endif()
 
 # Enable rust implementation if we don't have systemd and we want the journal plugin
@@ -3272,18 +3334,23 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                 # GCC still performs LTO when linking slim LTO static archives into a
                 # non-LTO target. Build these archives as fat objects and force a
                 # regular final link to avoid exhausting the i386 linker.
-                if(TARGET judy)
-                        target_compile_options(judy PRIVATE -ffat-lto-objects)
-                endif()
-                if(TARGET libnetdata)
-                        target_compile_options(libnetdata PRIVATE -ffat-lto-objects)
-                endif()
+                foreach(_network_viewer_fat_lto_target judy libnetdata netipc json-c)
+                        if(TARGET ${_network_viewer_fat_lto_target})
+                                target_compile_options(${_network_viewer_fat_lto_target} PRIVATE -ffat-lto-objects)
+                        endif()
+                endforeach()
         endif()
 
         set(NETWORK_VIEWER_FILES)
         if(OS_LINUX)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/libnetdata/local-sockets/local-sockets.h
+                        src/collectors/common-cgroups/cgroup-topology-rules.c
+                        src/collectors/common-cgroups/cgroup-topology-rules.h
+                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.c
+                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
                         src/collectors/network-viewer.plugin/network-viewer.c
                 )
         endif()
@@ -3295,6 +3362,11 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         if(OS_FREEBSD)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/libnetdata/local-sockets/local-sockets-freebsd.h
+                        src/collectors/common-cgroups/cgroup-topology-rules.c
+                        src/collectors/common-cgroups/cgroup-topology-rules.h
+                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
                         src/collectors/network-viewer.plugin/network-viewer.c
                 )
         endif()
@@ -3315,6 +3387,18 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         install(TARGETS network-viewer.plugin
                 COMPONENT plugin-network-viewer
                 DESTINATION usr/libexec/netdata/plugins.d)
+
+        if(OS_LINUX)
+                add_executable(network-viewer-apps-lookup-client-test EXCLUDE_FROM_ALL
+                        src/collectors/network-viewer.plugin/tests/test_network_viewer_apps_lookup_client.c)
+                target_link_libraries(network-viewer-apps-lookup-client-test libnetdata)
+
+                add_executable(network-viewer-topology-containers-test EXCLUDE_FROM_ALL
+                        src/collectors/network-viewer.plugin/tests/test_network_viewer_topology_containers.c
+                        src/collectors/common-cgroups/cgroup-topology-rules.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c)
+                target_link_libraries(network-viewer-topology-containers-test libnetdata)
+        endif()
 
         if(BUILD_FOR_PACKAGING)
                 install(FILES

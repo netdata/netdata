@@ -396,6 +396,13 @@ void functions_evloop_cancel_threads(struct functions_evloop_globals *wg) {
         nd_thread_signal_cancel(wg->worker_threads[i]);
 }
 
+void functions_evloop_join_threads(struct functions_evloop_globals *wg) {
+    nd_thread_join(wg->reader_thread);
+
+    for(size_t i = 0; i < wg->workers ; i++)
+        nd_thread_join(wg->worker_threads[i]);
+}
+
 // ----------------------------------------------------------------------------
 
 static void functions_evloop_config_cb(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
