@@ -95,7 +95,7 @@ type Collector struct {
 	deduper            *trapDeduper
 	packetSequence     atomic.Uint64
 	profileCacheHeld   bool
-	operatorMetrics    *operatorMetrics
+	profileMetrics     *profileMetricRuntime
 	dynamicChartYAML   string
 	writeFailureDim    string
 }
@@ -190,7 +190,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	if c.listener != nil {
 		return nil
 	}
-	c.operatorMetrics = nil
+	c.profileMetrics = nil
 	c.dynamicChartYAML = ""
 
 	if _, err := AcquireProfileCache(); err != nil {
@@ -209,16 +209,18 @@ func (c *Collector) Init(ctx context.Context) error {
 		releaseProfiles()
 		return dyncfgConfigError(errors.New("profile index not available"))
 	}
-	if err := validateMetrics(c.Metrics, idx); err != nil {
+	profileMetricCfg, err := normalizeProfileMetricsConfig(c.ProfileMetrics)
+	if err != nil {
 		releaseProfiles()
 		return dyncfgConfigError(err)
 	}
-	if len(c.Metrics) > 0 {
-		tmpl, err := buildChartTemplateYAML(c.Metrics)
+	if profileMetricCfg.enabled {
+		rt, tmpl, err := newProfileMetricRuntime(profileMetricCfg, idx)
 		if err != nil {
 			releaseProfiles()
 			return dyncfgConfigError(err)
 		}
+		c.profileMetrics = rt
 		c.dynamicChartYAML = tmpl
 	}
 
@@ -321,7 +323,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	var secondaryWriter TrapWriter
 	if c.OTLP.Enabled {
 		c.warnPlaintextOTLP(otlpRuntime)
-		secondaryWriter, err = newOTLPTrapWriterWithRuntimeConfig(ctx, c.jobName, otlpRuntime, metrics)
+		secondaryWriter, err = newOTLPTrapWriterWithRuntimeConfig(ctx, c.jobName, otlpRuntime, metrics, journalWriter == nil)
 		if err != nil {
 			removeJobMetrics(c.jobName)
 			cleanupCreatedState()
@@ -387,9 +389,6 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.profileCacheHeld = true
 	releaseProfileCache = false
 	c.writeFailureDim = writeFailureDim
-	if len(c.Metrics) > 0 {
-		c.operatorMetrics = newOperatorMetrics(c.Metrics, idx)
-	}
 	c.reverseDNSEnabled = c.ReverseDNS.Enabled
 	if c.reverseDNSEnabled {
 		c.reverseDNS = newReverseDNSResolver()
@@ -435,7 +434,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	}
 	removeJobMetrics(c.jobName)
 	c.metrics = nil
-	c.operatorMetrics = nil
+	c.profileMetrics = nil
 	c.dynamicChartYAML = ""
 	c.journalDir = ""
 	c.writeFailureDim = ""
@@ -474,19 +473,29 @@ func (c *Collector) collect(ctx context.Context) error {
 		}
 	}
 	collectMetrics(c.store, c.jobName)
-	if c.operatorMetrics != nil {
-		c.operatorMetrics.collect(c.store, c.jobName)
+	if c.profileMetrics != nil {
+		c.profileMetrics.collect(c.store, c.jobName)
 	}
 	return nil
 }
 
 func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, peer *net.UDPAddr) {
 	packetSequence := c.packetSequence.Add(1)
+	metrics := c.trapMetrics()
+	metrics.incPipelineReceived()
+	packetFinished := false
 
 	defer func() {
 		if v := recover(); v != nil {
 			c.incTrapError("decode_failed")
+			if !packetFinished {
+				metrics.incPipelineDropped()
+			}
 			c.Errorf("SNMP trap packet handling panic from %s: %v", peerIP, v)
+			return
+		}
+		if !packetFinished {
+			metrics.incPipelineDropped()
 		}
 	}()
 
@@ -560,6 +569,7 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 	}
 
 	pdu := pktCtx.PDU
+	metrics.incPipelineDecoded()
 
 	if !c.versionAllowed(pdu.Version) {
 		c.incTrapError("dropped_allowlist")
@@ -634,11 +644,22 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 	if trapEntryHasUnresolvedTemplate(entry) {
 		c.incTrapError("template_unresolved")
 	}
+	metrics.recordSourceAccepted(entry)
+	if profileLookupErr != nil {
+		metrics.recordSourceError(entry, "profile_load_failed")
+	}
+	if unknownOID {
+		metrics.recordSourceError(entry, "unknown_oid")
+	}
+	if trapEntryHasUnresolvedTemplate(entry) {
+		metrics.recordSourceError(entry, "template_unresolved")
+	}
 	var admission dedupAdmission
 	if c.deduper != nil {
 		var suppressed bool
 		admission, suppressed = c.deduper.Admit(entry, td, c.Dedup.KeyVarbinds)
 		if suppressed {
+			packetFinished = true
 			return
 		}
 	}
@@ -647,19 +668,23 @@ func (c *Collector) handlePacket(data []byte, peerIP net.IP, conn *net.UDPConn, 
 			c.deduper.Rollback(admission)
 		}
 		c.incTrapError(c.trapWriteFailureDim())
+		metrics.recordWriteFailure(entry, c.trapWriteFailureDim())
+		packetFinished = true
 		return
 	}
+	packetFinished = true
 
-	if c.operatorMetrics != nil {
-		c.operatorMetrics.inc(entry.TrapOID, entry, td)
+	if c.profileMetrics != nil {
+		c.profileMetrics.update(entry)
 	}
 
 	cat := Category("unknown")
 	if td != nil {
 		cat = Category(td.Category)
 	}
-	c.incTrapEvents(cat)
-	c.incTrapSeverity(entry.Severity)
+	metrics.recordSourceCommitted(entry)
+	metrics.incEvent(cat)
+	metrics.incSeverity(entry.Severity)
 }
 
 func udpPeerAddr(peer *net.UDPAddr) (netip.Addr, bool) {

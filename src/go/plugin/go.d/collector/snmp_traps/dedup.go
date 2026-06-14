@@ -168,7 +168,7 @@ func (d *trapDeduper) Admit(entry *TrapEntry, td *TrapDef, jobKeys []string) (de
 	if elem, ok := d.entries[key]; ok {
 		cacheEntry := elem.Value.(*dedupCacheEntry)
 		if now.Before(cacheEntry.expiresAt) {
-			d.recordSuppressedLocked(key, cacheEntry.trapOID)
+			d.recordSuppressedLocked(key, cacheEntry.trapOID, entry)
 			return dedupAdmission{}, true
 		}
 		d.removeElementLocked(elem)
@@ -195,7 +195,7 @@ func (d *trapDeduper) Rollback(admission dedupAdmission) {
 	}
 }
 
-func (d *trapDeduper) recordSuppressedLocked(key dedupKey, trapOID string) {
+func (d *trapDeduper) recordSuppressedLocked(key dedupKey, trapOID string, entry *TrapEntry) {
 	if trapOID == "" {
 		trapOID = "unknown"
 	}
@@ -204,6 +204,7 @@ func (d *trapDeduper) recordSuppressedLocked(key dedupKey, trapOID string) {
 	d.period.fingerprints[key] = struct{}{}
 	if d.metrics != nil {
 		d.metrics.incDedupSuppressed()
+		d.metrics.recordSourceDedupSuppressed(entry)
 	}
 }
 

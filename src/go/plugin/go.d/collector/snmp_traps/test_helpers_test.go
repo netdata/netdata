@@ -5,9 +5,11 @@ package snmp_traps
 import (
 	"net"
 	"net/netip"
+	"strconv"
 	"testing"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
 func readSinglePcapUDPPacket(t *testing.T, fixture string) pcapUDPPacket {
@@ -58,6 +60,32 @@ func withCleanJobMetrics(t *testing.T, jobName string) *perJobMetrics {
 	removeJobMetrics(jobName)
 	t.Cleanup(func() { removeJobMetrics(jobName) })
 	return getJobMetrics(jobName)
+}
+
+func collectJobMetricsForTest(t *testing.T, jobName string) metrix.CollectorStore {
+	t.Helper()
+	store := metrix.NewCollectorStore()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	if !ok {
+		t.Fatal("collector store does not expose cycle control")
+	}
+	managed.CycleController().BeginCycle()
+	collectMetrics(store, jobName)
+	if err := managed.CycleController().CommitCycleSuccess(); err != nil {
+		t.Fatalf("commit collect cycle: %v", err)
+	}
+	return store
+}
+
+func (m *perJobMetrics) fallbackSourceIdentityForTest(entry *TrapEntry) (string, string) {
+	m.sourceMu.Lock()
+	defer m.sourceMu.Unlock()
+	m.initSourceMetricsLocked()
+	return fallbackTrapSourceIdentity(entry, entry.JobName, profileMetricSourceIDHash, m.sourceHashSalt)
+}
+
+func privateTestIP(i int) string {
+	return "10." + strconv.Itoa((i/65536)%256) + "." + strconv.Itoa((i/256)%256) + "." + strconv.Itoa(i%256)
 }
 
 func newDedupTestV2Collector(t *testing.T, jobName string, writer TrapWriter) (*Collector, *perJobMetrics) {

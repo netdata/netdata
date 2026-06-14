@@ -51,11 +51,18 @@ placements:
         title: Pipeline Health
         properties: {grouping: true}
         items:
+          - snmp.trap.pipeline
           - snmp.trap.errors
           - snmp.trap.dedup_suppressed
+          - snmp.trap.sources
+          - snmp.trap.source_attribution
+          - snmp.trap.source_pipeline
+          - snmp.trap.source_errors
+          - snmp.trap.source_last_seen
+          - snmp.trap.profile_metric_diagnostics
       - type: selector
-        id: operator-metrics
-        title: Operator Metrics
+        id: profile-metrics
+        title: Profile Metrics
         context_prefix:
           - snmp.trap.
         context_prefix_exclude:
@@ -63,3 +70,10 @@ placements:
           - snmp.trap.severity
           - snmp.trap.errors
           - snmp.trap.dedup_suppressed
+          - snmp.trap.pipeline
+          - snmp.trap.sources
+          - snmp.trap.source_attribution
+          - snmp.trap.source_pipeline
+          - snmp.trap.source_errors
+          - snmp.trap.source_last_seen
+          - snmp.trap.profile_metric_diagnostics

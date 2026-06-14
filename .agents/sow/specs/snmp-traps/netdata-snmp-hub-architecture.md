@@ -4,6 +4,11 @@
 
 Document the architectural principle that shapes Netdata's SNMP support — including the trap subsystem under design. This is **not a limitation** of Netdata; it is the deliberate architectural choice that gives Netdata unbounded horizontal scalability for SNMP infrastructure observability. The comparative analysis of other monitoring systems must be read with this lens — most of them are central-correlation architectures with vertical-scale ceilings; Netdata is not.
 
+Scope note: this document includes target-state hub architecture and correlation
+principles. Public end-user documentation MUST use implementation evidence for
+shipped trap behavior and MUST NOT treat target-state topology, flow, or
+cross-signal correlation language in this document as shipped trap behavior.
+
 ## The principle
 
 > **Every site appoints one Netdata Agent as its "SNMP hub." That hub consolidates all SNMP-domain functions for the site. Hubs are independent of each other. Scale is achieved by adding more sites, not by scaling a central tier.**
@@ -95,7 +100,7 @@ For a customer operating a network-of-networks (e.g., an MSP with 200 customer s
 
 ## Implication for the eventual Netdata trap design discussion
 
-When we synthesize `comparison/netdata-design-implications.md` after all 16 systems are analysed, the hub model is **the load-bearing design constraint** — every design decision must be evaluated against it:
+When we synthesize `research/comparison/netdata-design-implications.md` after all 16 systems are analysed, the hub model is **the load-bearing design constraint** — every design decision must be evaluated against it:
 
 - Where does the trap listener bind UDP/162? **On the hub.**
 - Where does the MIB store live? **On the hub.**
