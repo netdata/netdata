@@ -398,6 +398,76 @@ ALWAYS_INLINE bool mrg_metric_clear_writer(MRG *mrg, METRIC *metric) {
 }
 #endif
 
+// sanitize journal retention values before they reach MRG, warning about
+// on-disk anomalies (rate-limited)
+static inline void mrg_sanitize_journal_retention(time_t *first_time_s, time_t *last_time_s, time_t now_s) {
+    if(unlikely(*last_time_s > now_s)) {
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+                     "DBENGINE JV2: wrong last time on-disk (%ld - %ld, now %ld), "
+                     "fixing last time to now",
+                     *first_time_s, *last_time_s, now_s);
+        *last_time_s = now_s;
+    }
+
+    if (unlikely(*first_time_s > *last_time_s)) {
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+                     "DBENGINE JV2: wrong first time on-disk (%ld - %ld, now %ld), "
+                     "fixing first time to last time",
+                     *first_time_s, *last_time_s, now_s);
+
+        *first_time_s = *last_time_s;
+    }
+
+    if (unlikely(*first_time_s == 0 || *last_time_s == 0)) {
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+                     "DBENGINE JV2: zero on-disk timestamps (%ld - %ld, now %ld), "
+                     "using them as-is",
+                     *first_time_s, *last_time_s, now_s);
+    }
+}
+
+// retention expansion + journal samples accounting on an existing metric;
+// values must already be sanitized; performs NO refcount operations
+static inline void mrg_metric_update_retention_and_granularity_sanitized(
+    MRG *mrg,
+    METRIC *metric,
+    time_t first_time_s,
+    time_t last_time_s,
+    uint32_t update_every_s,
+    uint64_t *journal_samples)
+{
+    uint64_t old_samples = 0;
+
+    if (update_every_s && metric->latest_update_every_s && metric->latest_time_s_clean)
+        old_samples = (metric->latest_time_s_clean - metric->first_time_s) / metric->latest_update_every_s;
+
+    mrg_metric_expand_retention(mrg, metric, first_time_s, last_time_s, update_every_s);
+
+    uint64_t new_samples = 0;
+    if (update_every_s && metric->latest_update_every_s && metric->latest_time_s_clean)
+        new_samples = (metric->latest_time_s_clean - metric->first_time_s) / metric->latest_update_every_s;
+
+    if (journal_samples)
+        *journal_samples += (new_samples - old_samples);
+}
+
+void mrg_metric_update_retention_and_granularity(
+    MRG *mrg,
+    METRIC *metric,
+    time_t first_time_s,
+    time_t last_time_s,
+    uint32_t update_every_s,
+    time_t now_s,
+    uint64_t *journal_samples)
+{
+    mrg_sanitize_journal_retention(&first_time_s, &last_time_s, now_s);
+    mrg_metric_update_retention_and_granularity_sanitized(
+        mrg, metric, first_time_s, last_time_s, update_every_s, journal_samples);
+}
+
 inline void mrg_update_metric_retention_and_granularity_by_uuid(
     MRG *mrg,
     Word_t section,
@@ -408,32 +478,7 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
     time_t now_s,
     uint64_t *journal_samples)
 {
-    if(unlikely(last_time_s > now_s)) {
-        nd_log_limit_static_global_var(erl, 1, 0);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
-                     "DBENGINE JV2: wrong last time on-disk (%ld - %ld, now %ld), "
-                     "fixing last time to now",
-                     first_time_s, last_time_s, now_s);
-        last_time_s = now_s;
-    }
-
-    if (unlikely(first_time_s > last_time_s)) {
-        nd_log_limit_static_global_var(erl, 1, 0);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
-                     "DBENGINE JV2: wrong first time on-disk (%ld - %ld, now %ld), "
-                     "fixing first time to last time",
-                     first_time_s, last_time_s, now_s);
-
-        first_time_s = last_time_s;
-    }
-
-    if (unlikely(first_time_s == 0 || last_time_s == 0)) {
-        nd_log_limit_static_global_var(erl, 1, 0);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
-                     "DBENGINE JV2: zero on-disk timestamps (%ld - %ld, now %ld), "
-                     "using them as-is",
-                     first_time_s, last_time_s, now_s);
-    }
+    mrg_sanitize_journal_retention(&first_time_s, &last_time_s, now_s);
 
     bool added = false;
     METRIC *metric = mrg_metric_get_and_acquire_by_uuid(mrg, uuid, section);
@@ -448,21 +493,9 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
         metric = mrg_metric_add_and_acquire(mrg, entry, &added);
     }
 
-    if (likely(!added)) {
-        uint64_t old_samples = 0;
-
-        if (update_every_s && metric->latest_update_every_s && metric->latest_time_s_clean)
-            old_samples = (metric->latest_time_s_clean - metric->first_time_s) / metric->latest_update_every_s;
-
-        mrg_metric_expand_retention(mrg, metric, first_time_s, last_time_s, update_every_s);
-
-        uint64_t new_samples = 0;
-        if (update_every_s && metric->latest_update_every_s && metric->latest_time_s_clean)
-            new_samples = (metric->latest_time_s_clean - metric->first_time_s) / metric->latest_update_every_s;
-
-        if (journal_samples)
-            *journal_samples += (new_samples - old_samples);
-    }
+    if (likely(!added))
+        mrg_metric_update_retention_and_granularity_sanitized(
+            mrg, metric, first_time_s, last_time_s, update_every_s, journal_samples);
     else {
         // Newly added
         if (update_every_s) {

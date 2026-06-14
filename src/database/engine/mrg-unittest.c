@@ -51,9 +51,160 @@ static void mrg_stress(void *ptr) {
     }
 }
 
+static void prep_expect_retention(MRG *mrg, Word_t section, nd_uuid_t *uuid,
+                                  time_t expected_first, time_t expected_last,
+                                  uint32_t expected_ue, const char *test, const char *path) {
+    METRIC *m = mrg_metric_get_and_acquire_by_uuid(mrg, uuid, section);
+    if(!m)
+        fatal("PREP-IDX: test '%s' (%s): metric not found in MRG", test, path);
+
+    time_t first, last;
+    uint32_t ue;
+    mrg_metric_get_retention(mrg, m, &first, &last, &ue);
+    mrg_metric_release(mrg, m);
+
+    if(first != expected_first || last != expected_last || ue != expected_ue)
+        fatal("PREP-IDX: test '%s' (%s): got %ld - %ld @ %u, expected %ld - %ld @ %u",
+              test, path, first, last, ue, expected_first, expected_last, expected_ue);
+}
+
+static void mrg_prepopulation_index_unittest(MRG *mrg) {
+    nd_uuid_t nil_uuid = { 0 }, unknown;
+    uuid_generate_random(unknown);
+
+    // probes must be NULL-safe before any index exists
+    if(mrg_prepopulation_index_get(unknown, 0))
+        fatal("PREP-IDX: probe without an index returned a metric");
+
+    // ---- build an index across 2 tiers, forcing several growth cycles
+    size_t n = 200000;
+    nd_uuid_t *uuids = callocz(n, sizeof(nd_uuid_t));
+    METRIC **metrics = callocz(n, sizeof(METRIC *));
+
+    mrg_prepopulation_index_init(2);
+
+    for(size_t i = 0; i < n ;i++) {
+        uuid_generate_random(uuids[i]);
+        MRG_ENTRY entry = {
+            .uuid = &uuids[i],
+            .section = (Word_t)&test_ctx_0,
+            .first_time_s = 0,
+            .last_time_s = 0,
+            .latest_update_every_s = 0,
+        };
+        bool added = false;
+        metrics[i] = mrg_metric_add_and_acquire(mrg, entry, &added);
+        if(!added)
+            fatal("PREP-IDX: failed to add test metric %zu", i);
+
+        mrg_prepopulation_index_insert(uuids[i], 0, metrics[i]);
+        if(i % 2 == 0)
+            mrg_prepopulation_index_insert(uuids[i], 1, metrics[i]);
+    }
+
+    // nil uuid marks empty slots, so inserting it must be ignored
+    mrg_prepopulation_index_insert(nil_uuid, 0, metrics[0]);
+
+    for(size_t i = 0; i < n ;i++) {
+        if(mrg_prepopulation_index_get(uuids[i], 0) != metrics[i])
+            fatal("PREP-IDX: tier 0 probe mismatch at %zu", i);
+
+        METRIC *t1 = mrg_prepopulation_index_get(uuids[i], 1);
+        if(i % 2 == 0 ? (t1 != metrics[i]) : (t1 != NULL))
+            fatal("PREP-IDX: tier 1 probe mismatch at %zu", i);
+
+        if(mrg_prepopulation_index_get(uuids[i], 2) != NULL)
+            fatal("PREP-IDX: out-of-range tier probe returned a metric");
+    }
+
+    if(mrg_prepopulation_index_get(unknown, 0))
+        fatal("PREP-IDX: unknown uuid probe returned a metric");
+
+    if(mrg_prepopulation_index_get(nil_uuid, 0))
+        fatal("PREP-IDX: nil uuid probe returned a metric");
+
+    mrg_prepopulation_index_account(123, 45);
+    mrg_prepopulation_index_free();
+
+    if(mrg_prepopulation_index_get(uuids[0], 0))
+        fatal("PREP-IDX: probe after free returned a metric");
+
+    for(size_t i = 0; i < n ;i++)
+        mrg_metric_release(mrg, metrics[i]);
+
+    freez(metrics);
+    freez(uuids);
+
+    // ---- equivalence: expanding a zero-retention prepopulated metric via
+    // mrg_metric_update_retention_and_granularity() must end with the same
+    // retention as feeding the same entries to the by_uuid path
+    time_t now_s = max_acceptable_collected_time();
+
+    struct prep_entry { time_t f, l; uint32_t ue; };
+    struct {
+        const char *name;
+        struct prep_entry e[3];
+        size_t entries;
+        struct prep_entry expected;
+    } cases[] = {
+        { "min/max merge",          {{100,200,1},{50,150,2},{150,300,3}}, 3, {50,300,3} },
+        { "ue follows newest last", {{100,200,5},{10,100,7}},             2, {10,200,5} },
+        { "zeros first",            {{0,0,4},{100,200,1}},                2, {100,200,1} },
+        { "zeros last",             {{100,200,1},{0,0,4}},                2, {100,200,1} },
+        { "future last clamped",    {{100,0,9}},                          1, {100,0,9} },
+        { "first > last fixed",     {{300,200,2}},                        1, {200,200,2} },
+    };
+
+    // runtime values for the future-last case
+    cases[4].e[0].l = now_s + 1000;
+    cases[4].expected.l = now_s;
+
+    for(size_t c = 0; c < _countof(cases) ;c++) {
+        nd_uuid_t u;
+        uuid_generate_random(u);
+
+        // path A: existing by_uuid path
+        for(size_t i = 0; i < cases[c].entries ;i++)
+            mrg_update_metric_retention_and_granularity_by_uuid(
+                mrg, (Word_t)&test_ctx_0, &u,
+                cases[c].e[i].f, cases[c].e[i].l, cases[c].e[i].ue, now_s, NULL);
+
+        // path B: prepopulated zero-retention metric, expanded directly
+        MRG_ENTRY entry = {
+            .uuid = &u,
+            .section = (Word_t)&test_ctx_1,
+            .first_time_s = 0,
+            .last_time_s = 0,
+            .latest_update_every_s = 0,
+        };
+        bool added = false;
+        METRIC *m = mrg_metric_add_and_acquire(mrg, entry, &added);
+        if(!added)
+            fatal("PREP-IDX: test '%s': failed to add metric", cases[c].name);
+
+        uint64_t samples = 0;
+        for(size_t i = 0; i < cases[c].entries ;i++)
+            mrg_metric_update_retention_and_granularity(
+                mrg, m, cases[c].e[i].f, cases[c].e[i].l, cases[c].e[i].ue, now_s, &samples);
+
+        mrg_metric_release(mrg, m);
+
+        prep_expect_retention(mrg, (Word_t)&test_ctx_0, &u,
+                              cases[c].expected.f, cases[c].expected.l, cases[c].expected.ue,
+                              cases[c].name, "by_uuid");
+        prep_expect_retention(mrg, (Word_t)&test_ctx_1, &u,
+                              cases[c].expected.f, cases[c].expected.l, cases[c].expected.ue,
+                              cases[c].name, "prepopulated");
+    }
+
+    fprintf(stderr, "DBENGINE METRIC: prepopulation index tests passed\n");
+}
+
 int mrg_unittest(void) {
     // Use mrg_create_for_unittest to avoid pre-loaded metrics that block deletion
     MRG *mrg = mrg_create_for_unittest();
+
+    mrg_prepopulation_index_unittest(mrg);
     METRIC *m1_t0, *m2_t0, *m3_t0, *m4_t0;
     METRIC *m1_t1, *m2_t1, *m3_t1, *m4_t1;
     bool ret;
