@@ -189,9 +189,35 @@ Each item: source, evidence, type, blast radius, recommendation.
      receive-time monotonic layer would create future-dated flow records after
      a backward wall-clock step, which is worse for time-window queries.
 
+10. **Torn-entry tolerant test reader can count a partially unreadable entry**
+    (cubic re-review; test correctness bug).
+    - Evidence: `src/crates/netflow-plugin/src/main_tests.rs:817-823` breaks
+      only the inner data-object loop on `data_ref()` or decompression failure;
+      `src/crates/netflow-plugin/src/main_tests.rs:832-833` can still count a
+      timestamp read earlier from the same partially unreadable entry.
+    - Type: test correctness. Blast radius: crash-recovery regression tests and
+      confidence in torn journal recovery.
+    - Disposition target: **fix in PR #22703**.
+    - Recommendation (surgical): treat any unreadable data object or malformed
+      `_SOURCE_REALTIME_TIMESTAMP` in the current entry as a torn entry and
+      stop reading that journal file before counting it.
+
+11. **Ignored crash test deadline is ineffective while stdout read blocks**
+    (cubic re-review; manual test robustness bug).
+    - Evidence: `src/crates/netflow-plugin/src/main_tests.rs:2850` blocks in
+      `reader.lines()`; the deadline check at
+      `src/crates/netflow-plugin/src/main_tests.rs:2858-2860` runs only after a
+      line arrives or EOF occurs.
+    - Type: test harness robustness. Blast radius: ignored manual SIGKILL crash
+      test.
+    - Disposition target: **fix in PR #22703**.
+    - Recommendation (surgical): read child stdout on a helper thread and use a
+      timed channel receive in the parent loop so the deadline is enforced even
+      when the child stops producing lines.
+
 ## Approved Disposition
 
-- **Fix in PR #22703:** items 1, 2, 3, 6, and 7.
+- **Fix in PR #22703:** items 1, 2, 3, 6, 7, 10, and 11.
 - **Reject with evidence in this SOW:** items 4, 5, 8, and 9.
 - **No deferred-only items:** per user decision on 2026-06-14.
 
@@ -398,7 +424,10 @@ Open decisions:
 7. Reject non-PR findings with evidence: raw-rotation fsync blocked by the
    published SDK API, remaining vendored journal crates outside netflow,
    upstream SDK comment, and backward clock-step behavior.
-8. Validate with targeted regression tests, full `netflow-plugin` tests, SOW
+8. Fix cubic re-review test-harness findings: stop counting partially
+   unreadable torn entries, and make the ignored crash test deadline
+   independent of blocking stdout reads.
+9. Validate with targeted regression tests, full `netflow-plugin` tests, SOW
    hygiene checks, PR comment/CI checks, then commit and push.
 
 ## Execution Log
@@ -436,6 +465,16 @@ Open decisions:
   read-lock release.
 - Rejected items 4, 5, 8, and 9 with evidence in the pending-item list instead
   of deferring them.
+- Fixed cubic re-review item 10 by making `readable_timestamp_counts()` stop
+  the current journal-file scan before counting an entry when any data object in
+  that entry is unreadable, cannot decompress, or has a malformed
+  `_SOURCE_REALTIME_TIMESTAMP`.
+- Fixed cubic re-review item 11 by reading the ignored crash test child's stdout
+  on a helper thread and enforcing the deadline through timed channel receives.
+- Fixed an E2E fixture race found during validation: `wait_for_ingest_progress()`
+  now waits for the raw-entry counter to become stable across two polls before
+  canceling the ingest service, so shutdown cannot race between raw write
+  accounting and tier observation.
 
 ## Validation
 
@@ -466,6 +505,11 @@ Tests or equivalent validation:
   e2e_ingest_bind_failure_does_not_start_tier_workers`: passed.
 - `cargo test -p netflow-plugin e2e_tier_commit_workers`: passed; both worker
   E2E tests passed.
+- `cargo test -p netflow-plugin
+  e2e_timestamp_source_first_switched_is_persisted_as_source_timestamp --
+  --nocapture`: failed once after the cubic re-review patches, exposing the
+  fixture cancellation race; passed after strengthening
+  `wait_for_ingest_progress()`.
 - `cargo test -p netflow-plugin`: passed; 492 tests passed, 25 ignored manual
   gates, and `tests/grpc_build.rs` passed 1/1.
 - Cargo test commands emitted the pre-existing Rust warning that

@@ -813,12 +813,15 @@ fn readable_timestamp_counts(path: &Path) -> BTreeMap<u64, usize> {
                 break;
             }
             let mut ts: Option<u64> = None;
+            let mut entry_readable = true;
             for offset in data_offsets {
                 let Ok(guard) = journal.data_ref(offset) else {
+                    entry_readable = false;
                     break;
                 };
                 let payload = if guard.is_compressed() {
                     if guard.decompress(&mut decompress_buf).is_err() {
+                        entry_readable = false;
                         break;
                     }
                     decompress_buf.as_slice()
@@ -826,8 +829,19 @@ fn readable_timestamp_counts(path: &Path) -> BTreeMap<u64, usize> {
                     guard.raw_payload()
                 };
                 if let Some(value) = payload.strip_prefix(b"_SOURCE_REALTIME_TIMESTAMP=") {
-                    ts = std::str::from_utf8(value).ok().and_then(|v| v.parse().ok());
+                    let Ok(value) = std::str::from_utf8(value) else {
+                        entry_readable = false;
+                        break;
+                    };
+                    let Ok(value) = value.parse() else {
+                        entry_readable = false;
+                        break;
+                    };
+                    ts = Some(value);
                 }
+            }
+            if !entry_readable {
+                break;
             }
             if let Some(ts) = ts {
                 *counts.entry(ts).or_insert(0) += 1;
@@ -2360,8 +2374,17 @@ async fn ingest_fixture_with_config(
 
 async fn wait_for_ingest_progress(metrics: &Arc<ingest::IngestMetrics>) {
     tokio::time::timeout(E2E_INGEST_WAIT_TIMEOUT, async {
+        let mut last_written = 0_u64;
+        let mut stable_polls = 0_u8;
         loop {
-            if metrics.journal_entries_written.load(Ordering::Relaxed) > 0 {
+            let written = metrics.journal_entries_written.load(Ordering::Relaxed);
+            if written > 0 && written == last_written {
+                stable_polls = stable_polls.saturating_add(1);
+            } else {
+                stable_polls = 0;
+                last_written = written;
+            }
+            if stable_polls >= 2 {
                 break;
             }
             tokio::time::sleep(Duration::from_millis(25)).await;
@@ -2844,28 +2867,50 @@ async fn crash_sigkill_then_rebuild_has_no_duplicates() {
     // first real anniversary (<=61s). Kill once that batch is in flight
     // (row reports arrive every 100ms, mid-commit).
     let stdout = child.stdout.take().expect("child stdout");
-    let reader = std::io::BufReader::new(stdout);
-    let deadline = Instant::now() + Duration::from_secs(120);
-    let mut saw_rows = 0_u64;
-    for line in reader.lines() {
-        let Ok(line) = line else { break };
-        if let Some(value) = line.strip_prefix("CRASH_CHILD_TIER_ROWS ") {
-            saw_rows = value.trim().parse().unwrap_or(0);
-            if saw_rows >= 40 {
+    let (line_tx, line_rx) = std::sync::mpsc::channel::<String>();
+    let reader_thread = std::thread::spawn(move || {
+        let reader = std::io::BufReader::new(stdout);
+        for line in reader.lines() {
+            let Ok(line) = line else {
+                break;
+            };
+            if line_tx.send(line).is_err() {
                 break;
             }
         }
-        if Instant::now() >= deadline {
+    });
+    let deadline = Instant::now() + Duration::from_secs(120);
+    let mut saw_rows = 0_u64;
+    while saw_rows < 40 {
+        let now = Instant::now();
+        if now >= deadline {
             break;
         }
+        let wait_for = std::cmp::min(
+            deadline.saturating_duration_since(now),
+            Duration::from_millis(500),
+        );
+        let line = match line_rx.recv_timeout(wait_for) {
+            Ok(line) => line,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+        };
+        if let Some(value) = line.strip_prefix("CRASH_CHILD_TIER_ROWS ") {
+            saw_rows = value.trim().parse().unwrap_or(0);
+        }
     }
-    assert!(
-        saw_rows >= 40,
-        "child never reached the stretch-batch commit before the deadline \
-         (saw {saw_rows} rows)"
-    );
+    if saw_rows < 40 {
+        let _ = child.kill();
+        let _ = child.wait();
+        let _ = reader_thread.join();
+        panic!(
+            "child never reached the stretch-batch commit before the deadline \
+             (saw {saw_rows} rows)"
+        );
+    }
     child.kill().expect("SIGKILL crash child");
     let _ = child.wait();
+    let _ = reader_thread.join();
 
     // Restart: rebuild must survive whatever the kill tore.
     let mut cfg = plugin_config::PluginConfig::default();
