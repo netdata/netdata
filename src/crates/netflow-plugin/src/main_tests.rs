@@ -2481,7 +2481,8 @@ fn read_udp_socket_drops(port: u16) -> u64 {
 ///
 /// Env: NETFLOW_UDP_BENCH_PPS (target datagrams/s, default 5000),
 ///      NETFLOW_UDP_BENCH_SECS (measurement duration, default 10),
-///      NETFLOW_UDP_BENCH_FIXTURE (pcap fixture, default "nfv5.pcap").
+///      NETFLOW_UDP_BENCH_FIXTURE (pcap fixture, default "nfv5.pcap"),
+///      NETFLOW_UDP_BENCH_V5_RECORDS_PER_PACKET (optional v5 record cap).
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "manual live UDP loss-ceiling load test"]
 async fn bench_udp_loss_ceiling() {
@@ -2495,12 +2496,22 @@ async fn bench_udp_loss_ceiling() {
         .unwrap_or(10);
     let fixture =
         std::env::var("NETFLOW_UDP_BENCH_FIXTURE").unwrap_or_else(|_| "nfv5.pcap".to_string());
+    let v5_records_per_packet: Option<usize> =
+        std::env::var("NETFLOW_UDP_BENCH_V5_RECORDS_PER_PACKET")
+            .ok()
+            .map(|v| {
+                v.parse::<usize>()
+                    .expect("NETFLOW_UDP_BENCH_V5_RECORDS_PER_PACKET must be an integer")
+            });
 
-    let payloads = fixture_udp_payloads(&fixture);
+    let mut payloads = fixture_udp_payloads(&fixture);
     assert!(
         !payloads.is_empty(),
         "fixture {fixture} has no udp payloads"
     );
+    if let Some(records_per_packet) = v5_records_per_packet {
+        limit_netflow_v5_records_per_packet(&mut payloads, records_per_packet);
+    }
 
     let tmp = tempfile::tempdir().expect("create temp dir");
     let listen = reserve_udp_listen_addr();
@@ -2599,6 +2610,39 @@ async fn bench_udp_loss_ceiling() {
         recv as f64 / secs,
         entries as f64 / secs,
     );
+}
+
+fn limit_netflow_v5_records_per_packet(payloads: &mut [Vec<u8>], records_per_packet: usize) {
+    assert!(
+        records_per_packet > 0,
+        "NETFLOW_UDP_BENCH_V5_RECORDS_PER_PACKET must be greater than 0"
+    );
+    const NETFLOW_V5_HEADER_LEN: usize = 24;
+    const NETFLOW_V5_RECORD_LEN: usize = 48;
+
+    for payload in payloads {
+        assert!(
+            payload.len() >= NETFLOW_V5_HEADER_LEN,
+            "NetFlow v5 benchmark payload is shorter than the header"
+        );
+        let version = u16::from_be_bytes([payload[0], payload[1]]);
+        assert_eq!(
+            version, 5,
+            "NETFLOW_UDP_BENCH_V5_RECORDS_PER_PACKET only supports NetFlow v5 payloads"
+        );
+        let existing_count = u16::from_be_bytes([payload[2], payload[3]]) as usize;
+        assert!(
+            records_per_packet <= existing_count,
+            "requested {records_per_packet} v5 records per packet, but fixture packet only has {existing_count}"
+        );
+        let new_len = NETFLOW_V5_HEADER_LEN + records_per_packet * NETFLOW_V5_RECORD_LEN;
+        assert!(
+            payload.len() >= new_len,
+            "NetFlow v5 benchmark payload is shorter than its requested record count"
+        );
+        payload[2..4].copy_from_slice(&(records_per_packet as u16).to_be_bytes());
+        payload.truncate(new_len);
+    }
 }
 
 /// SOW step-6 boundary soak: live UDP through the production `run()` loop

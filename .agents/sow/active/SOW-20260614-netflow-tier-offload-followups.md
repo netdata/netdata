@@ -28,6 +28,17 @@ let's address them."
 Latest user decision: address all issues for long-term-best in PR #22703.
 No deferral: either dismiss a finding with evidence or fix it in this PR.
 
+Additional validation request on 2026-06-14: measure UDP packet-drop ceilings
+on `/tmp`/NVMe for NetFlow v5 datagrams carrying 29, 12, and 1 flow records per
+UDP packet. Report packet/s and derived flow-record/s at the highest clean rate
+and the first dropping rate for each shape.
+
+Additional documentation request on 2026-06-14: update end-user documentation
+to state the conservative capacity guidance as 50k-100k flow records/s on
+modern hardware, provided the underlying storage can sustain the required
+journal write activity. If benchmark evidence is mentioned, describe it as
+Netdata lab evidence, not as workstation evidence.
+
 ### Assistant Understanding
 
 Facts:
@@ -364,6 +375,14 @@ Implementation plan:
 6. Remove unused `ready_notify` state and notify call.
 7. Add deterministic per-row lock-drop CI coverage.
 8. Record evidence-based rejections for items 4, 5, 8, and 9.
+9. Add a benchmark-only control to the ignored UDP loss-ceiling harness so the
+   existing NetFlow v5 fixture can be trimmed in memory to a requested
+   records-per-packet count. This does not change production behavior or add new
+   committed packet fixtures.
+10. Update user-facing NetFlow/IPFIX capacity documentation in source files only:
+    `src/crates/netflow-plugin/metadata.yaml` and
+    `docs/network-flows/sizing-capacity.md`. Do not edit generated integration
+    pages.
 
 Validation plan:
 
@@ -373,6 +392,9 @@ Validation plan:
 - `cargo test -p netflow-plugin journal_log_is_send`
 - Targeted tests for worker startup lifecycle, worker sync telemetry, facet
   persistence, and per-row lock release.
+- Ignored/manual performance validation: `bench_udp_loss_ceiling` in release
+  mode for 29, 12, and 1 NetFlow v5 records per UDP packet, using `/tmp` on the
+  local NVMe filesystem for the benchmark journal directory.
 - `rg -n "systemd-journal-sdk-.*0\\.6\\.2|version = \"0\\.6\\.2\""
   src/crates/netflow-plugin/Cargo.toml src/crates/Cargo.lock`
 
@@ -384,7 +406,9 @@ Artifact impact plan:
 - Specs: no update expected beyond this SOW; the tier-worker contract remains
   unchanged if tests pass.
 - End-user/operator docs: no update expected; no public config or behavior
-  contract changes are intended.
+  contract changes are intended. Updated by user request on 2026-06-14 to
+  include conservative 50k-100k flow-record/s sizing guidance and the required
+  storage caveat.
 - End-user/operator skills: no update expected.
 - SOW lifecycle: terminal dispositions are recorded in this SOW; the active SOW
   remains only as branch-local PR working memory until final cleanup before
@@ -514,6 +538,38 @@ Tests or equivalent validation:
   gates, and `tests/grpc_build.rs` passed 1/1.
 - Cargo test commands emitted the pre-existing Rust warning that
   `OpenTierRow::{timestamp_usec, flow_ref, metrics}` are never read.
+- Manual UDP loss-ceiling benchmark extension compiled in release mode:
+  `cargo test -p netflow-plugin --release tests::bench_udp_loss_ceiling --
+  --ignored --exact --list` passed and listed the ignored benchmark.
+- Manual UDP loss-ceiling benchmark on `/tmp`/NVMe, 30-second samples, with
+  `NETFLOW_UDP_BENCH_V5_RECORDS_PER_PACKET` trimming the NetFlow v5 fixture in
+  memory:
+  - 29 records/packet: highest clean tested `3650` UDP packets/s
+    (`105850` flow records/s); first dropping midpoint tested `3675` UDP
+    packets/s (`loss_pct=4.20`, `kernel_drops=2299`).
+  - 12 records/packet: highest clean tested `8950` UDP packets/s
+    (`107400` flow records/s); first dropping midpoint tested `8975` UDP
+    packets/s (`loss_pct=6.13`, `kernel_drops=14141`).
+  - 1 record/packet: highest clean tested `72375` UDP packets/s
+    (`72375` flow records/s); first dropping tested `72500` UDP packets/s
+    (`loss_pct=0.08`, `kernel_drops=1747`).
+- Load context during the final benchmark pass: 24 CPUs, load average roughly
+  `13-15`, memory `125GiB` total / `68GiB` used / `56GiB` available, `/tmp`
+  on `/dev/nvme1n1p2` ext4. The lab system was not idle; treat the numbers as
+  approximate lab ceilings, not isolated benchmark-rig capacity numbers.
+- A 75-second confirmation run was intentionally stopped after the user
+  clarified that approximations are sufficient on this heavily loaded
+  lab system.
+- End-user documentation updated by request:
+  `src/crates/netflow-plugin/metadata.yaml` now states 50k-100k sustained flow
+  records/s on modern hardware with the required storage caveat for NetFlow and
+  IPFIX; `docs/network-flows/sizing-capacity.md` now uses the same capacity
+  envelope and updates the sizing example to a 50k flow-record/s raw-tier
+  budget.
+- Documentation validation:
+  `ruby -e 'require "yaml"; YAML.load_file("src/crates/netflow-plugin/metadata.yaml");
+  puts "metadata yaml ok"'` passed, and `git diff --check` passed for the
+  changed SOW, docs, metadata, and benchmark files.
 
 Same-failure scan:
 
