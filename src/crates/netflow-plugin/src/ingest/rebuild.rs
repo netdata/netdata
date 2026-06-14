@@ -4,12 +4,19 @@ use crate::memory_allocator::trim_allocator_if_worthwhile;
 const REBUILD_SCAN_QUEUE_CAPACITY: usize = 1024;
 
 impl IngestService {
-    /// Query the most recent `_SOURCE_REALTIME_TIMESTAMP` from a tier's journal
-    /// files. Returns `None` when the tier directory is empty or unreadable.
-    pub(super) async fn find_last_tier_timestamp(
-        tier_dir: &std::path::Path,
-        cache: &journal_engine::FileIndexCache,
-    ) -> Option<u64> {
+    /// Find the most recent readable `_SOURCE_REALTIME_TIMESTAMP` in a tier's
+    /// journal files. Returns `None` when the tier directory is empty or
+    /// nothing is readable.
+    ///
+    /// This deliberately uses the tear-tolerant direct scanner instead of the
+    /// index engine: after a power loss the newest tier file can have a torn
+    /// tail, and an indexing failure here would collapse the cutoff to `None`,
+    /// making the rebuild re-derive rows the tier journals still hold —
+    /// duplicating them. The max readable source timestamp is exactly the
+    /// cutoff contract. Files are visited newest-first and the first file
+    /// that yields any readable row decides (tier rows are appended in
+    /// monotonically increasing bucket order).
+    pub(super) fn find_last_tier_timestamp(tier_dir: &std::path::Path) -> Option<u64> {
         let dir_str = tier_dir.to_str()?;
         let (monitor, _rx) = Monitor::new().ok()?;
         let registry = Registry::new(monitor);
@@ -18,51 +25,55 @@ impl IngestService {
         let files = registry
             .find_files_in_range(Seconds(0), Seconds(u32::MAX))
             .ok()?;
-        if files.is_empty() {
-            return None;
-        }
 
-        let source_ts = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
-        let facets = Facets::new(&["_SOURCE_REALTIME_TIMESTAMP".to_string()]);
-        let keys: Vec<FileIndexKey> = files
-            .iter()
-            .map(|fi| FileIndexKey::new(&fi.file, &facets, Some(source_ts.clone())))
-            .collect();
-
-        // QueryTimeRange aligns the end boundary up to a histogram bucket.
-        // Using u32::MAX here overflows that alignment math in debug builds.
-        let query_end = super::tier_timestamp_lookup_query_end(super::now_usec());
-        let time_range = QueryTimeRange::new(0, query_end).ok()?;
-        let cancel = CancellationToken::new();
-        let indexed = batch_compute_file_indexes(
-            cache,
-            &registry,
-            keys,
-            &time_range,
-            cancel,
-            IndexingLimits::default(),
-            None,
-        )
-        .await
-        .ok()?;
-
-        let indexes: Vec<_> = indexed.into_iter().map(|(_, idx)| idx).collect();
-        if indexes.is_empty() {
-            return None;
-        }
-
-        let entries = LogQuery::new(&indexes, Anchor::Tail, Direction::Backward)
-            .with_limit(1)
-            .execute()
-            .ok()?;
-
-        let entry = entries.into_iter().next()?;
-        for pair in &entry.fields {
-            if pair.field() == "_SOURCE_REALTIME_TIMESTAMP" {
-                return pair.value().parse::<u64>().ok();
+        for file_info in files.iter().rev() {
+            let path = vec![PathBuf::from(file_info.file.path())];
+            let mut max_source_ts: Option<u64> = None;
+            let scanned = crate::query::scan_journal_files_forward(
+                &path,
+                None,
+                None,
+                None,
+                0,
+                0,
+                &[],
+                "tier cutoff lookup",
+                |file_path, journal, _timestamp_usec, data_offsets, decompress_buf| {
+                    let mut source_ts: Option<u64> = None;
+                    let visit_result = crate::query::visit_journal_payloads(
+                        journal,
+                        file_path,
+                        data_offsets,
+                        decompress_buf,
+                        |payload| {
+                            if let Some(value) =
+                                payload.strip_prefix(b"_SOURCE_REALTIME_TIMESTAMP=")
+                            {
+                                source_ts = std::str::from_utf8(value)
+                                    .ok()
+                                    .and_then(|v| v.parse().ok());
+                            }
+                            Ok(())
+                        },
+                    );
+                    if visit_result.is_err() {
+                        // Torn payload: ignore this entry, keep what we have.
+                        return Ok(false);
+                    }
+                    if let Some(ts) = source_ts {
+                        max_source_ts = Some(max_source_ts.map_or(ts, |max| max.max(ts)));
+                    }
+                    Ok(true)
+                },
+            );
+            if scanned.is_err() {
+                continue;
+            }
+            if max_source_ts.is_some() {
+                return max_source_ts;
             }
         }
-        Some(entry.timestamp)
+        None
     }
 
     pub(super) async fn rebuild_materialized_from_raw(&mut self) -> Result<()> {
@@ -94,18 +105,11 @@ impl IngestService {
         }
 
         {
-            let cache = FileIndexCacheBuilder::new()
-                .with_memory_capacity(REBUILD_CACHE_MEMORY_CAPACITY)
-                .without_disk_cache()
-                .build()
-                .await
-                .context("failed to initialize rebuild index cache")?;
-
             let rebuild_result: Result<()> = async {
                 let mut tier_cutoffs = HashMap::new();
                 for tier in MATERIALIZED_TIERS {
                     let tier_dir = self.cfg.journal.tier_dir(tier);
-                    if let Some(ts) = Self::find_last_tier_timestamp(&tier_dir, &cache).await {
+                    if let Some(ts) = Self::find_last_tier_timestamp(&tier_dir) {
                         tracing::info!(
                             "tier {:?}: last flushed timestamp {} — skipping rebuild before it",
                             tier,
@@ -150,7 +154,7 @@ impl IngestService {
                             }
 
                             let mut fields = crate::flow::FlowFields::new();
-                            visit_journal_payloads(
+                            let visit_result = visit_journal_payloads(
                                 journal,
                                 _file_path,
                                 data_offsets,
@@ -170,7 +174,18 @@ impl IngestService {
                                     fields.insert(interned, value);
                                     Ok(())
                                 },
-                            )?;
+                            );
+                            if let Err(err) = visit_result {
+                                // A torn payload (power loss mid-write) loses
+                                // this entry only; the rebuild continues with
+                                // everything that is still readable.
+                                tracing::warn!(
+                                    "skipping unreadable raw entry in {} during tier rebuild: {}",
+                                    _file_path.display(),
+                                    err
+                                );
+                                return Ok(false);
+                            }
 
                             if rebuild_started.elapsed() >= rebuild_timeout {
                                 return Err(anyhow!(
@@ -203,12 +218,7 @@ impl IngestService {
             }
             .await;
 
-            let close_result = cache
-                .close()
-                .await
-                .context("failed to close rebuild index cache");
             rebuild_result?;
-            close_result?;
         }
 
         self.flush_closed_tiers(now)?;
