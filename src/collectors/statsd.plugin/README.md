@@ -678,6 +678,14 @@ To rename methods automatically:
 This adds dimensions named `GET`, `ADD`, and `DELETE`.
 </details>
 
+### Scope of Statsd Chart Configuration
+
+All chart and dimension configuration directives in `/etc/netdata/statsd.d/*.conf` control **local agent behavior only** — they define how the local Netdata agent processes, names, and visualizes statsd metrics it receives.
+
+The dimension `TYPE` options (`events`, `last`, `min`, `max`, `sum`, `average`, `percentile`, `median`, `stddev`) select which computed value of a metric is used on the local agent. They do **not** control how metrics are aggregated across multiple Netdata instances.
+
+Cross-node aggregation — how metrics from multiple agents are combined when viewed in Netdata Cloud dashboards — is handled by Netdata Cloud's query engine, not by statsd configuration files. There is no `aggregation = SUM` or `aggregation = AVG` directive available in statsd.d configuration.
+
 ## Using StatsD with Different Languages
 
 <details>
