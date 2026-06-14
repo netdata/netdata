@@ -17,12 +17,13 @@ struct k8s_test_data {
     int i;
 };
 
-static int read_label_callback(const char *name, const char *value, void *data)
+static int read_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data)
 {
   struct k8s_test_data *test_data = (struct k8s_test_data *)data;
 
   test_data->result_key[test_data->i] = name;
   test_data->result_value[test_data->i] = value;
+  test_data->result_ls[test_data->i] = ls;
 
   test_data->i++;
 
@@ -47,6 +48,13 @@ static void test_cgroup_parse_resolved_name(void **state)
           .key[0] = "label1", .value[0] = "value1",
           .key[1] = "label2", .value[1] = "value2",
           .key[2] = "label3", .value[2] = "value3" },
+
+        // Quoted separators and escaped quotes in values
+        { .data = "name label1=\"value,1\",label2=\"value=2\",label3=\"value\\\"3\"",
+          .name = "name",
+          .key[0] = "label1", .value[0] = "value.1",
+          .key[1] = "label2", .value[1] = "value:2",
+          .key[2] = "label3", .value[2] = "value_3" },
 
         // Comma at the end of the data string
         { .data = "name label1=\"value1\",",

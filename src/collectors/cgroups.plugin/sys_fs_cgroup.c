@@ -377,10 +377,14 @@ void read_cgroup_plugin_configuration() {
     // single operator knob for the whole cgroup-name invocation: the helper
     // receives it and self-terminates by then; discovery waits this long plus a
     // grace period before killing the helper. 0 means unbounded (legacy).
-    cgroup_name_timeout_ms = (int)inicfg_get_duration_seconds(
-        &netdata_config, "plugin:cgroups", "cgroup-name timeout", 15) * MSEC_PER_SEC;
-    if (cgroup_name_timeout_ms < 0)
+    time_t cgroup_name_timeout_s = inicfg_get_duration_seconds(
+        &netdata_config, "plugin:cgroups", "cgroup-name timeout", 15);
+    if (cgroup_name_timeout_s <= 0)
         cgroup_name_timeout_ms = 0;
+    else if ((uintmax_t)cgroup_name_timeout_s > (uintmax_t)INT_MAX / MSEC_PER_SEC)
+        cgroup_name_timeout_ms = INT_MAX;
+    else
+        cgroup_name_timeout_ms = (int)((uintmax_t)cgroup_name_timeout_s * MSEC_PER_SEC);
 
     // the helper inherits this and self-terminates by then; discovery enforces
     // the same budget plus a grace period on the parent side

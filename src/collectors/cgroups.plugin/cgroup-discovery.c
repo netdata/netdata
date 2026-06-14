@@ -176,6 +176,57 @@ static inline void substitute_dots_in_id(char *s) {
 #define CGROUP_RENAME_LABEL "cgroup.name="
 #define CGROUP_IGNORE_LABEL "ignore="
 
+static char *cgroup_next_label_pair(char **labels) {
+    if (!labels || !*labels)
+        return NULL;
+
+    char *s = *labels;
+    while (*s == ',' || isspace((uint8_t)*s))
+        s++;
+
+    if (!*s) {
+        *labels = NULL;
+        return NULL;
+    }
+
+    char *pair = s;
+    char quote = '\0';
+    bool escaped = false;
+
+    for (; *s; s++) {
+        if (quote) {
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+
+            if (*s == '\\') {
+                escaped = true;
+                continue;
+            }
+
+            if (*s == quote)
+                quote = '\0';
+
+            continue;
+        }
+
+        if (*s == '\'' || *s == '"') {
+            quote = *s;
+            continue;
+        }
+
+        if (*s == ',') {
+            *s++ = '\0';
+            *labels = s;
+            return pair;
+        }
+    }
+
+    *labels = NULL;
+    return pair;
+}
+
 static char *cgroup_parse_resolved_name_and_labels(struct cgroup *cg, char *data) {
     if (!cg->chart_labels)
         cg->chart_labels = rrdlabels_create();
@@ -188,8 +239,8 @@ static char *cgroup_parse_resolved_name_and_labels(struct cgroup *cg, char *data
     bool ignored = false;
 
     // the rest are key=value pairs separated by comma
-    while(data) {
-        char *pair = strsep_skip_consecutive_separators(&data, ",");
+    char *pair;
+    while((pair = cgroup_next_label_pair(&data))) {
 
         if(strncmp(pair, CGROUP_NETDATA_CLOUD_LABEL_PREFIX, sizeof(CGROUP_NETDATA_CLOUD_LABEL_PREFIX) - 1) == 0) {
             // a netdata.cloud label
@@ -256,10 +307,17 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
     // up to the operator timeout plus a grace period for the helper to produce
     // its line, then reclaim it. cgroup_name_timeout_ms == 0 keeps the legacy
     // unbounded behavior.
-    int wait_ms = cgroup_name_timeout_ms > 0 ? cgroup_name_timeout_ms + CGROUP_NAME_GRACE_MS : -1;
+    int wait_ms = -1;
+    if (cgroup_name_timeout_ms > 0)
+        wait_ms = cgroup_name_timeout_ms > INT_MAX - CGROUP_NAME_GRACE_MS ?
+                      INT_MAX :
+                      cgroup_name_timeout_ms + CGROUP_NAME_GRACE_MS;
 
     struct pollfd pfd = { .fd = spawn_popen_read_fd(instance), .events = POLLIN };
-    int pr = poll(&pfd, 1, wait_ms);
+    int pr;
+    do {
+        pr = poll(&pfd, 1, wait_ms);
+    } while (pr < 0 && errno == EINTR);
 
     if (pr > 0)
         new_name = fgets(buffer, sizeof(buffer), spawn_popen_stdout(instance));
