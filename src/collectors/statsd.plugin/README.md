@@ -511,6 +511,12 @@ Example of a synthetic chart combining multiple metrics:
 
 The `[app]` section defines the application and has these options:
 
+> **Important**
+>
+> The `[app]` section is a **namespace/container** — it groups metrics and sets defaults, but does **not** create any dashboard charts by itself. To see synthetic charts on the dashboard, you **must** add one or more chart definition sections (e.g., `[mychart]`) below the `[app]` section. If you only define an `[app]` section without chart definitions, the only visible charts will be private charts for individual metrics (if `private charts = yes` or the global default is enabled).
+>
+> Settings like `private charts`, `gaps when not collected`, `memory mode`, and `history` configure how the app's metrics and charts behave — they are not chart-level settings. See [Chart Definitions](#chart-definitions) below for how to create charts.
+
 :::note
 
 - **name** - Defines the application name
