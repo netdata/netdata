@@ -313,10 +313,28 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
                       INT_MAX :
                       cgroup_name_timeout_ms + CGROUP_NAME_GRACE_MS;
 
+    int poll_wait_ms = wait_ms;
+    usec_t poll_deadline_ut = 0;
+    if (wait_ms > 0) {
+        usec_t now_ut = now_monotonic_usec();
+        if (now_ut)
+            poll_deadline_ut = now_ut + (usec_t)wait_ms * USEC_PER_MS;
+    }
+
     struct pollfd pfd = { .fd = spawn_popen_read_fd(instance), .events = POLLIN };
     int pr;
     do {
-        pr = poll(&pfd, 1, wait_ms);
+        pr = poll(&pfd, 1, poll_wait_ms);
+        // Do not give the helper a fresh full timeout after every signal.
+        if (pr < 0 && errno == EINTR && poll_deadline_ut) {
+            usec_t now_ut = now_monotonic_usec();
+            if (now_ut >= poll_deadline_ut) {
+                pr = 0;
+                break;
+            }
+
+            poll_wait_ms = (int)((poll_deadline_ut - now_ut + USEC_PER_MS - 1) / USEC_PER_MS);
+        }
     } while (pr < 0 && errno == EINTR);
 
     if (pr > 0)
