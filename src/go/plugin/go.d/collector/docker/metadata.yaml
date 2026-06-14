@@ -128,6 +128,10 @@ modules:
         metric: docker.container_health_status
         info: ${label:container_name} docker container health status is unhealthy
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/docker.conf
+      - name: docker_container_down
+        metric: docker.container_state
+        info: Docker container ${label:container_name} is currently not running. This alert is disabled by default. To enable it, modify the chart labels filter in the stock health configuration (docker.conf) from container_name=!* to match your container names.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/docker.conf
     functions:
       description: |
         This collector exposes real-time functions for interactive troubleshooting in the Live tab.
