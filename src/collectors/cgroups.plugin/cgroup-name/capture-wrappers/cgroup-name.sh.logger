@@ -96,6 +96,15 @@ normalize_for_diff() {
     "$1"
 }
 
+append_diff_detail() {
+  local title="$1" left="$2" right="$3" detail_file="$4"
+
+  {
+    printf '%s\n' "$title"
+    diff -u "$left" "$right" || true
+  } >>"$detail_file"
+}
+
 tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/cgroup-name-wrapper.XXXXXX")"
 trap 'rm -rf "$tmpdir"' EXIT
 
@@ -105,14 +114,27 @@ argv_json="$(json_array "$0" "$@")"
 run_one "$shell_resolver" "$tmpdir/shell.out" "$tmpdir/shell.err" "$tmpdir/shell.code" "$tmpdir/shell.ms" "$@"
 run_one "$go_resolver" "$tmpdir/go.out" "$tmpdir/go.err" "$tmpdir/go.code" "$tmpdir/go.ms" "$@"
 
+normalize_for_diff "$tmpdir/shell.err" >"$tmpdir/shell.err.norm"
+normalize_for_diff "$tmpdir/go.err" >"$tmpdir/go.err.norm"
+
 if cmp -s "$tmpdir/shell.out" "$tmpdir/go.out" &&
    cmp -s "$tmpdir/shell.code" "$tmpdir/go.code" &&
-   diff -q <(normalize_for_diff "$tmpdir/shell.err") <(normalize_for_diff "$tmpdir/go.err") >/dev/null; then
+   cmp -s "$tmpdir/shell.err.norm" "$tmpdir/go.err.norm"; then
   diff_status="match"
   diff_detail=""
 else
   diff_status="mismatch"
-  diff_detail="$(diff -u "$tmpdir/shell.out" "$tmpdir/go.out" || true)"
+  : >"$tmpdir/diff.detail"
+  if ! cmp -s "$tmpdir/shell.out" "$tmpdir/go.out"; then
+    append_diff_detail "stdout diff:" "$tmpdir/shell.out" "$tmpdir/go.out" "$tmpdir/diff.detail"
+  fi
+  if ! cmp -s "$tmpdir/shell.err.norm" "$tmpdir/go.err.norm"; then
+    append_diff_detail "stderr diff:" "$tmpdir/shell.err.norm" "$tmpdir/go.err.norm" "$tmpdir/diff.detail"
+  fi
+  if ! cmp -s "$tmpdir/shell.code" "$tmpdir/go.code"; then
+    append_diff_detail "exit-code diff:" "$tmpdir/shell.code" "$tmpdir/go.code" "$tmpdir/diff.detail"
+  fi
+  diff_detail="$(cat "$tmpdir/diff.detail")"
 fi
 
 {
