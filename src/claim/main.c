@@ -111,7 +111,7 @@ int nd_claim_parse_args(int argc, LPWSTR *argv)
                 continue;
 
             i++;
-            size_t length = wcslen(argv[i]);
+            size_t length = wcslen(argv[i]) + 1;
             char *tmp = calloc(sizeof(char), length);
             if (!tmp)
                 ExitProcess(1);
