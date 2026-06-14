@@ -389,12 +389,17 @@ modules:
           name: Network Protocols
           description: |
             Shows Windows TCP and UDP stack counters grouped by transport protocol (TCP/UDP)
-            and IP family (IPv4/IPv6).
+            and IP family (IPv4/IPv6), and per-share SMB Server Shares traffic.
 
-            Each row covers one transport+family combination (TCPv4, TCPv6, UDPv4, UDPv6) and includes
-            traffic counters (received, sent, errors), TCP-specific connection counters
-            (active opens, established, passive opens, resets, total segments, retransmitted segments),
-            and the UDP-specific datagrams-with-no-port counter.
+            Each row covers one transport+family combination (TCPv4, TCPv6, UDPv4, UDPv6) or one
+            SMB share, and includes the transport's traffic counters (TCP/UDP: received, sent, errors;
+            SMB: received bytes, sent bytes, active tree connections), the TCP-specific connection
+            counters (active opens, established, passive opens, resets, total segments, retransmitted
+            segments), the UDP-specific datagrams-with-no-port counter, and the SMB-specific
+            active tree connections, received bytes, and sent bytes columns.
+
+            Two stacked-bar charts are exposed: "Traffic" (TCP/UDP segments/datagrams, grouped by
+            transport or IP family) and "SMB Traffic" (per-share bytes, grouped by share name).
           parameters: []
           returns:
             description: ""
