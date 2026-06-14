@@ -207,10 +207,10 @@ pod_<namespace>_<pod_name> <labels>
 Names containing `_null` followed by `_` or end warn. With
 `USE_KUBELET_FOR_PODS_METADATA` set they return `2`; otherwise they return `1`.
 
-The function prints the built name, then returns `0` if it is non-empty and `1`
-if it is empty. `k8s_get_name` prefixes successful output with `k8s_`.
-Return `1` enables `k8s_<id>`, return `2` retries with `k8s_<id>`, and every
-other code disables with `k8s_<id>`.
+The function returns the built name and code `0` when the name is non-empty, or
+code `1` when it is empty. `k8s_get_name` prefixes successful output with
+`k8s_` and `run()` writes stdout. Return `1` enables `k8s_<id>`, return `2`
+retries with `k8s_<id>`, and every other code disables with `k8s_<id>`.
 
 ## Main Dispatch
 
