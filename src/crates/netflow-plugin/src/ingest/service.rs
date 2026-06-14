@@ -19,6 +19,10 @@ struct FacetLifecycleObserver {
 impl LogLifecycleObserver for FacetLifecycleObserver {
     fn on_event(&self, event: &LogLifecycleEvent) {
         match event {
+            // A newly created active file carries no entries the facet runtime
+            // must reconcile: active files are discovered at query time and
+            // rotation is handled below. Nothing to do (matches pre-SDK behavior).
+            LogLifecycleEvent::Created { .. } => {}
             LogLifecycleEvent::Rotated { archived, active } => {
                 let archived_path = Path::new(archived.path());
                 let active_path = Path::new(active.path());

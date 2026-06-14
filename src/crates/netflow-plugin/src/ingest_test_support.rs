@@ -97,9 +97,14 @@ pub(super) fn new_disk_benchmark_raw_log() -> (TempDir, Log) {
             retention_policy.with_duration_of_journal_files(duration_of_journal_files);
     }
 
+    // Match the production fastest-storage profile so benchmarks measure the
+    // same on-disk format the plugin ships: compact, no compression, no live.
     let log = Log::new(
         &raw_dir,
-        Config::new(origin, rotation_policy, retention_policy),
+        Config::new(origin, rotation_policy, retention_policy)
+            .with_compact(true)
+            .with_compression(Compression::None)
+            .with_live_publish_every_entries(0),
     )
     .unwrap_or_else(|e| panic!("create raw benchmark log in {}: {e}", raw_dir.display()));
 

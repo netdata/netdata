@@ -21,7 +21,7 @@ use journal_engine::{
     batch_compute_file_indexes,
 };
 use journal_index::{Anchor, Direction, FieldName, Seconds};
-use journal_log_writer::{Config, EntryTimestamps, Log, RetentionPolicy, RotationPolicy};
+use journal_log_writer::{Compression, Config, EntryTimestamps, Log, RetentionPolicy, RotationPolicy};
 use journal_registry::{Monitor, Origin, Registry, Source};
 use std::collections::HashMap;
 use std::fs;

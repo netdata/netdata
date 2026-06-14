@@ -9,6 +9,7 @@ impl IngestService {
         let socket = UdpSocket::bind(&listen)
             .await
             .with_context(|| format!("failed to bind {}", listen))?;
+        Self::expand_receive_buffer(&socket, &listen);
         let mut buffer = vec![0_u8; self.cfg.listener.max_packet_size];
         let mut entries_since_sync = 0_usize;
         let mut sync_tick = tokio::time::interval(self.cfg.listener.sync_interval);
@@ -48,9 +49,51 @@ impl IngestService {
         let now = now_usec();
         self.decoders.refresh_enrichment_state();
         self.run_tier_maintenance(now);
-        let entries_since_sync = self.sync_if_needed(entries_since_sync);
+        let entries_since_sync = if self.periodic_sync_enabled() {
+            self.sync_if_needed(entries_since_sync)
+        } else {
+            // Periodic fsync is disabled (sync_every_entries = 0): the raw
+            // journal reaches disk via kernel writeback and is fully synced on
+            // rotation and at shutdown. Facet state still persists on the tick
+            // cadence, and the entry counter keeps accumulating so shutdown
+            // performs one final sync.
+            if let Err(err) = self.facet_runtime.persist_if_dirty() {
+                tracing::warn!("facet runtime persist failed: {}", err);
+            }
+            entries_since_sync
+        };
         self.persist_decoder_state_if_due(now);
         entries_since_sync
+    }
+
+    fn periodic_sync_enabled(&self) -> bool {
+        self.cfg.listener.sync_every_entries > 0
+    }
+
+    /// Request the largest UDP receive buffer the kernel allows. The
+    /// single-threaded receive loop is periodically stalled by inline disk
+    /// work (journal rotation sync, tier flushes), and the socket buffer is
+    /// what absorbs those stalls; the OS default (typically ~208 KiB, only a
+    /// few tens of datagrams) overflows after a few milliseconds at high flow
+    /// rates. The kernel caps unprivileged requests at net.core.rmem_max.
+    fn expand_receive_buffer(socket: &UdpSocket, listen: &str) {
+        const REQUESTED_RECV_BUFFER_BYTES: usize = 64 * 1024 * 1024;
+        let sock_ref = socket2::SockRef::from(socket);
+        if let Err(err) = sock_ref.set_recv_buffer_size(REQUESTED_RECV_BUFFER_BYTES) {
+            tracing::warn!("failed to expand UDP receive buffer for {}: {}", listen, err);
+            return;
+        }
+        match sock_ref.recv_buffer_size() {
+            Ok(actual) => tracing::info!(
+                "UDP receive buffer for {}: {} bytes (requested {}; capped by net.core.rmem_max)",
+                listen,
+                actual,
+                REQUESTED_RECV_BUFFER_BYTES
+            ),
+            Err(err) => {
+                tracing::warn!("failed to read back UDP receive buffer for {}: {}", listen, err);
+            }
+        }
     }
 
     fn handle_received_packet(
@@ -181,7 +224,8 @@ impl IngestService {
     }
 
     fn sync_if_threshold_reached(&mut self, entries_since_sync: usize) -> usize {
-        if entries_since_sync >= self.cfg.listener.sync_every_entries {
+        let sync_every_entries = self.cfg.listener.sync_every_entries;
+        if sync_every_entries > 0 && entries_since_sync >= sync_every_entries {
             return self.sync_if_needed(entries_since_sync);
         }
 

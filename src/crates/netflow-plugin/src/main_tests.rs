@@ -1617,6 +1617,26 @@ async fn ingest_fixture_with_timestamp_source(
     ingest_fixture_with_config(fixture_name, timestamp_source, |_| {}).await
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_disabled_periodic_sync_syncs_raw_journal_only_at_shutdown() {
+    let (_cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture_with_config(
+        "nfv5.pcap",
+        plugin_config::TimestampSource::Input,
+        |cfg| cfg.listener.sync_every_entries = 0,
+    )
+    .await;
+
+    assert!(
+        metrics.journal_entries_written.load(Ordering::Relaxed) > 0,
+        "expected raw entries to be written"
+    );
+    assert_eq!(
+        metrics.raw_journal_syncs.load(Ordering::Relaxed),
+        1,
+        "with sync_every_entries=0 the raw journal must fsync exactly once, at shutdown"
+    );
+}
+
 async fn ingest_fixture_with_config(
     fixture_name: &str,
     timestamp_source: plugin_config::TimestampSource,
@@ -1731,6 +1751,157 @@ fn reserve_udp_listen_addr() -> String {
     let sock = StdUdpSocket::bind("127.0.0.1:0").expect("reserve udp listen socket");
     let addr = sock.local_addr().expect("read local addr");
     addr.to_string()
+}
+
+/// Sum the kernel UDP receive-buffer drop counter for the socket bound to
+/// `port` (the last column of /proc/net/udp[6]). This is the authoritative
+/// packet-loss signal: it increments when the kernel discards a datagram
+/// because the socket receive buffer was full.
+fn read_udp_socket_drops(port: u16) -> u64 {
+    let want = format!(":{port:04X}");
+    let mut total = 0_u64;
+    for path in ["/proc/net/udp", "/proc/net/udp6"] {
+        let Ok(content) = fs::read_to_string(path) else {
+            continue;
+        };
+        for line in content.lines().skip(1) {
+            let cols: Vec<&str> = line.split_whitespace().collect();
+            // 0:sl 1:local_addr 2:rem 3:st 4:tx:rx 5:tr:when 6:retr 7:uid
+            // 8:timeout 9:inode 10:ref 11:pointer 12:drops
+            if cols.len() < 13 {
+                continue;
+            }
+            if cols[1].to_uppercase().ends_with(&want) {
+                total += cols[12].parse::<u64>().unwrap_or(0);
+            }
+        }
+    }
+    total
+}
+
+/// Live UDP loss-ceiling load test. Drives the REAL socket receive path of a
+/// running `IngestService` at a fixed target datagrams/s and reports kernel UDP
+/// drops plus achieved flows/s. Ramp `NETFLOW_UDP_BENCH_PPS` across runs to find
+/// the sustained rate before the kernel starts dropping datagrams (the true
+/// per-agent ingestion ceiling, end-to-end through the socket).
+///
+/// Env: NETFLOW_UDP_BENCH_PPS (target datagrams/s, default 5000),
+///      NETFLOW_UDP_BENCH_SECS (measurement duration, default 10),
+///      NETFLOW_UDP_BENCH_FIXTURE (pcap fixture, default "nfv5.pcap").
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "manual live UDP loss-ceiling load test"]
+async fn bench_udp_loss_ceiling() {
+    let target_pps: u64 = std::env::var("NETFLOW_UDP_BENCH_PPS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(5_000);
+    let duration_secs: u64 = std::env::var("NETFLOW_UDP_BENCH_SECS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10);
+    let fixture =
+        std::env::var("NETFLOW_UDP_BENCH_FIXTURE").unwrap_or_else(|_| "nfv5.pcap".to_string());
+
+    let payloads = fixture_udp_payloads(&fixture);
+    assert!(!payloads.is_empty(), "fixture {fixture} has no udp payloads");
+
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let listen = reserve_udp_listen_addr();
+    let port: u16 = listen
+        .rsplit(':')
+        .next()
+        .and_then(|p| p.parse().ok())
+        .expect("listen port");
+
+    let mut cfg = plugin_config::PluginConfig::default();
+    cfg.journal.journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
+    cfg.listener.listen = listen.clone();
+    // Production-realistic sync behavior is the default (periodic fsync
+    // disabled; files sync on rotation and shutdown). Do NOT force per-entry
+    // sync, which would not reflect the real ceiling.
+
+    let metrics = Arc::new(ingest::IngestMetrics::default());
+    let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+    let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+    let service = ingest::IngestService::new(
+        cfg.clone(),
+        Arc::clone(&metrics),
+        Arc::clone(&open_tiers),
+        Arc::clone(&tier_flow_indexes),
+    )
+    .expect("create ingest service");
+    let shutdown = CancellationToken::new();
+    let run_shutdown = shutdown.clone();
+    let ingest_task = tokio::spawn(async move { service.run(run_shutdown).await });
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    let drops_before = read_udp_socket_drops(port);
+    let recv_before = metrics.udp_packets_received.load(Ordering::Relaxed);
+    let entries_before = metrics.journal_entries_written.load(Ordering::Relaxed);
+
+    // Sender on a dedicated OS thread with a blocking socket, deadline-paced to
+    // the target rate so it does not steal the listener's tokio workers.
+    let sender_listen = listen.clone();
+    let sender = std::thread::spawn(move || -> u64 {
+        let sock = StdUdpSocket::bind("127.0.0.1:0").expect("bind sender");
+        sock.connect(&sender_listen).expect("connect sender");
+        let total = target_pps.saturating_mul(duration_secs);
+        let start = Instant::now();
+        let mut attempted = 0_u64;
+        let mut sent = 0_u64;
+        let mut idx = 0_usize;
+        while attempted < total {
+            let due = (start.elapsed().as_secs_f64() * target_pps as f64) as u64;
+            let upto = due.min(total);
+            while attempted < upto {
+                // Count only datagrams the local stack accepted; a failed
+                // send (e.g. ENOBUFS) never reached the receiver and must not
+                // inflate the reported loss.
+                if sock.send(&payloads[idx % payloads.len()]).is_ok() {
+                    sent += 1;
+                }
+                attempted += 1;
+                idx += 1;
+            }
+            if attempted < total {
+                std::thread::sleep(Duration::from_micros(150));
+            }
+        }
+        sent
+    });
+
+    let sent = sender.join().expect("join sender");
+    // Let the listener drain any datagrams still buffered in the socket.
+    tokio::time::sleep(Duration::from_millis(750)).await;
+
+    let drops = read_udp_socket_drops(port).saturating_sub(drops_before);
+    let recv = metrics.udp_packets_received.load(Ordering::Relaxed) - recv_before;
+    let entries = metrics.journal_entries_written.load(Ordering::Relaxed) - entries_before;
+
+    shutdown.cancel();
+    ingest_task
+        .await
+        .expect("join ingestion task")
+        .expect("ingestion run");
+
+    let secs = duration_secs as f64;
+    let flows_per_pkt = if recv > 0 {
+        entries as f64 / recv as f64
+    } else {
+        0.0
+    };
+    let loss_pct = if sent > 0 {
+        100.0 * sent.saturating_sub(recv) as f64 / sent as f64
+    } else {
+        0.0
+    };
+    println!(
+        "UDP_LOSS_RESULT fixture={fixture} target_pps={target_pps} dur={duration_secs}s \
+         sent_pkts={sent} recv_pkts={recv} kernel_drops={drops} flows={entries} \
+         achieved_pps={:.0} achieved_fps={:.0} flows_per_pkt={flows_per_pkt:.1} loss_pct={loss_pct:.2}",
+        recv as f64 / secs,
+        entries as f64 / secs,
+    );
 }
 
 fn assert_tier_has_files(path: &Path, tier_name: &str) {
