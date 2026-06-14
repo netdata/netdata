@@ -338,9 +338,9 @@ The plugin resolves each varbind in the PDU in this order:
    varbind by OID, use its declared name, type, and (future) `display_hint`
    directly. Lookup is exact-match-first; on miss, the longest profile varbind
    OID that prefixes the received PDU OID as `profile_oid + "."` wins. The
-   shipped OOB pack covers 437 vendor PENs / 71,787 traps with file-scoped
-   varbind metadata — operators get rich decoding for top vendors without
-   installing any MIB file.
+   shipped OOB pack currently has 803 stock vendor profiles covering 6,121 MIB
+   entries and 150,755 trap definitions with file-scoped varbind metadata —
+   operators get rich decoding for top vendors without installing any MIB file.
 2. **Raw fallback** — varbind not in any loaded profile. Render as OID-keyed entry with the ASN.1-decoded type only. The varbind still lands in `TRAP_JSON` (§11) with its OID and value; if it is not sensitive or a protocol-control duplicate, it also lands in an indexed `TRAP_VAR_OID_<NUMERIC_OID>` field.
 
 There is **no runtime MIB compilation tier**. The plugin does not parse SMIv1/v2 MIB files at runtime; there is no `pysmi`/`gosmi`/Rust-MIB-crate dependency. Operators who need coverage for a vendor MIB not in the shipped OOB pack convert their MIB files to profile YAMLs **offline** using the shipped helper `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` and drop the resulting YAML into `/etc/netdata/go.d/snmp.trap-profiles/` (per the SNMP polling plugin pattern — see §15 and the user-facing documentation shipped with the plugin).
@@ -1236,7 +1236,7 @@ Pipeline reuses (not rebuilds) these existing pieces:
 | 1. No cohort system does listener-layer per-source rate-limit | We ship per-job, default-off `rate_limit:` (token-bucket per source IP, §7.5) for operators who need to shield the plugin from misbehaving senders flooding with **unique** traps, plus first-wins opt-in plugin-level dedup with periodic summary entries (§10) for **identical** repeats. The two solve different problems and can be enabled independently per job. |
 | 2. No cohort system supports DTLS/TLS-TM | Deferred — universal cohort gap. Out of scope for SOW-0035–0039; revisited when production demand surfaces AND mature Rust/Go libraries exist (§14 Non-Goals). |
 | 3. No cohort system does topology-aware suppression | **Hub-local enrichment makes this cheap.** Journal carries upstream-device identity; alert engine can suppress downstream alerts when upstream is in alarm. |
-| 4. MIB management divergence is extreme | **Ship comprehensive vendor packs derived from public MIBs (437 vendor PENs / 71,787 traps in the OOB pack) + offline conversion tooling for operator MIBs (no runtime compilation) + automatic operator-profile hot-reload while trap jobs run.** Targets the LibreNMS-to-Datadog coverage band with the SNMP polling plugin's stock+override pattern. |
+| 4. MIB management divergence is extreme | **Ship comprehensive vendor packs derived from public MIBs (803 stock vendor profiles / 6,121 MIB entries / 150,755 traps in the OOB pack) + offline conversion tooling for operator MIBs (no runtime compilation) + automatic operator-profile hot-reload while trap jobs run.** Targets the LibreNMS-to-Datadog coverage band with the SNMP polling plugin's stock+override pattern. |
 | 5. NSTI shipped-defects cautionary tale | Acknowledged. First-release quality bar enforced via the same per-system review protocol that produced the cohort specs. |
 
 ## 17. Implementation Sequencing — 5-SOW Plan

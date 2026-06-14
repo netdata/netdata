@@ -215,6 +215,9 @@ func rejectUnknownYAMLKeys(node any, spec yamlKeySpec, path string) error {
 			child, ok := spec.children[key]
 			if !ok {
 				if path == "" {
+					if key == "metrics" {
+						return fmt.Errorf("job-level metrics is not supported; define trap metric rules in profiles and enable them with profile_metrics")
+					}
 					return fmt.Errorf("unknown config key %q", key)
 				}
 				return fmt.Errorf("%s: unknown config key %q", path, key)

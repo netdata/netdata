@@ -291,22 +291,22 @@ func BenchmarkProfileMetricRuntimeUpdateAndCollect(b *testing.B) {
 		nearMaxSources   = 63
 		nearMaxResources = 31
 	)
-	for i := 0; i < nearMaxSources; i++ {
+	for i := range nearMaxSources {
 		rt.update(benchmarkProfileMetricConfigTrapEntry("bench-profile", benchmarkSourceIP(i), 2))
 	}
-	for i := 0; i < nearMaxResources; i++ {
+	for i := range nearMaxResources {
 		rt.update(benchmarkProfileMetricPortTrapEntry("bench-profile", "10.254.0.1", i+1))
 	}
 
 	entries := make([]*TrapEntry, 0, nearMaxSources+nearMaxResources)
-	for i := 0; i < nearMaxSources; i++ {
+	for i := range nearMaxSources {
 		terminalType := 2
 		if i%2 == 1 {
 			terminalType = 3
 		}
 		entries = append(entries, benchmarkProfileMetricConfigTrapEntry("bench-profile", benchmarkSourceIP(i), terminalType))
 	}
-	for i := 0; i < nearMaxResources; i++ {
+	for i := range nearMaxResources {
 		entries = append(entries, benchmarkProfileMetricPortTrapEntry("bench-profile", "10.254.0.1", i+1))
 	}
 
@@ -347,14 +347,14 @@ func BenchmarkPipelineSourceMetricsUpdateAndCollect(b *testing.B) {
 	}
 
 	entries := make([]*TrapEntry, 0, defaultPipelineMetricMaxSources)
-	for i := 0; i < defaultPipelineMetricMaxSources; i++ {
+	for i := range defaultPipelineMetricMaxSources {
 		entries = append(entries, &TrapEntry{
 			JobName:  jobName,
 			SourceIP: benchmarkSourceIP(i),
 			Severity: "warning",
 		})
 	}
-	for i := 0; i < defaultPipelineMetricMaxSources-1; i++ {
+	for i := range defaultPipelineMetricMaxSources - 1 {
 		metrics.recordSourceAccepted(entries[i])
 		metrics.recordSourceCommitted(entries[i])
 	}

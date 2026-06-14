@@ -99,6 +99,25 @@ func TestOTLPTargetIsLoopback(t *testing.T) {
 	}
 }
 
+func collectSourceMetricsForEntry(t *testing.T, metrics *perJobMetrics, entry *TrapEntry) (metrix.CollectorStore, metrix.Labels) {
+	t.Helper()
+	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(entry)
+	store := metrix.NewCollectorStore()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	require.True(t, ok)
+	managed.CycleController().BeginCycle()
+	collectSourceMetrics(store, "local", metrics)
+	require.NoError(t, managed.CycleController().CommitCycleSuccess())
+	return store, metrix.Labels{"job_name": "local", "source_id": sourceID, "source_kind": sourceKind}
+}
+
+func assertSourceMetricValue(t *testing.T, store metrix.CollectorStore, metric string, labels metrix.Labels, want float64) {
+	t.Helper()
+	if v, ok := store.Read().Value(metric, labels); !ok || v != want {
+		t.Fatalf("%s = %v/%v, want %v/true", metric, v, ok, want)
+	}
+}
+
 func TestValidateOTLPConfig(t *testing.T) {
 	tests := map[string]struct {
 		cfg     OTLPConfig
@@ -402,21 +421,9 @@ func TestOTLPTrapWriterSecondaryAsyncExportFailureDoesNotRecordTerminalWriteFail
 	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
 	assert.Equal(t, uint64(0), metrics.pipeline.writeFailed.Load())
 
-	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(entry)
-	store := metrix.NewCollectorStore()
-	managed, ok := metrix.AsCycleManagedStore(store)
-	require.True(t, ok)
-	managed.CycleController().BeginCycle()
-	collectSourceMetrics(store, "local", metrics)
-	require.NoError(t, managed.CycleController().CommitCycleSuccess())
-
-	labels := metrix.Labels{"job_name": "local", "source_id": sourceID, "source_kind": sourceKind}
-	if v, ok := store.Read().Value("snmp_trap_source_pipeline_write_failed", labels); !ok || v != 0 {
-		t.Fatalf("snmp_trap_source_pipeline_write_failed = %v/%v, want 0/true", v, ok)
-	}
-	if v, ok := store.Read().Value("snmp_trap_source_errors_otlp_export_failed", labels); !ok || v != 1 {
-		t.Fatalf("snmp_trap_source_errors_otlp_export_failed = %v/%v, want 1/true", v, ok)
-	}
+	store, labels := collectSourceMetricsForEntry(t, metrics, entry)
+	assertSourceMetricValue(t, store, "snmp_trap_source_pipeline_write_failed", labels, 0)
+	assertSourceMetricValue(t, store, "snmp_trap_source_errors_otlp_export_failed", labels, 1)
 
 	srv.setExportErr(nil)
 	require.NoError(t, writer.Close())
@@ -435,22 +442,12 @@ func TestOTLPTrapWriterAuthoritativeAsyncExportFailureRecordsTerminalWriteFailur
 	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
 	assert.Equal(t, uint64(1), metrics.pipeline.writeFailed.Load())
 
-	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(entry)
-	store := metrix.NewCollectorStore()
-	managed, ok := metrix.AsCycleManagedStore(store)
-	require.True(t, ok)
-	managed.CycleController().BeginCycle()
-	collectSourceMetrics(store, "local", metrics)
-	require.NoError(t, managed.CycleController().CommitCycleSuccess())
-
-	labels := metrix.Labels{"job_name": "local", "source_id": sourceID, "source_kind": sourceKind}
+	store, labels := collectSourceMetricsForEntry(t, metrics, entry)
 	for metric, expected := range map[string]float64{
 		"snmp_trap_source_pipeline_write_failed":     1,
 		"snmp_trap_source_errors_otlp_export_failed": 1,
 	} {
-		if v, ok := store.Read().Value(metric, labels); !ok || v != expected {
-			t.Fatalf("%s = %v/%v, want %v/true", metric, v, ok, expected)
-		}
+		assertSourceMetricValue(t, store, metric, labels, expected)
 	}
 
 	srv.setExportErr(nil)
@@ -486,7 +483,7 @@ func TestOTLPTrapWriterDrainQueueCountsFailuresAfterFirstFailedBatch(t *testing.
 		terminalErrors: true,
 	}
 	entry := testFanoutTrapEntry()
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		writer.queue <- entry
 	}
 
@@ -607,22 +604,12 @@ func TestOTLPTrapWriterWorkerPanicFailsClosed(t *testing.T) {
 	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
 	assert.Equal(t, uint64(1), metrics.pipeline.writeFailed.Load())
 
-	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(entry)
-	store := metrix.NewCollectorStore()
-	managed, ok := metrix.AsCycleManagedStore(store)
-	require.True(t, ok)
-	managed.CycleController().BeginCycle()
-	collectSourceMetrics(store, "local", metrics)
-	require.NoError(t, managed.CycleController().CommitCycleSuccess())
-
-	labels := metrix.Labels{"job_name": "local", "source_id": sourceID, "source_kind": sourceKind}
+	store, labels := collectSourceMetricsForEntry(t, metrics, entry)
 	for metric, expected := range map[string]float64{
 		"snmp_trap_source_pipeline_write_failed":     1,
 		"snmp_trap_source_errors_otlp_export_failed": 1,
 	} {
-		if v, ok := store.Read().Value(metric, labels); !ok || v != expected {
-			t.Fatalf("%s = %v/%v, want %v/true", metric, v, ok, expected)
-		}
+		assertSourceMetricValue(t, store, metric, labels, expected)
 	}
 
 	require.ErrorIs(t, writer.Write(&TrapEntry{JobName: "local", Message: "second"}), errWriterClosed)

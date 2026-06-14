@@ -7,6 +7,7 @@ import (
 	"errors"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -28,24 +29,8 @@ const (
 	testPortSecurityTrapOID       = "1.3.6.1.4.1.9.9.46.2.0.1"
 	testLinkDownTrapOID           = "1.3.6.1.6.3.1.1.5.3"
 	testLinkUpTrapOID             = "1.3.6.1.6.3.1.1.5.4"
+	testProfileMetricJobName      = "profile-job"
 )
-
-func testBoolPtr(v bool) *bool {
-	return &v
-}
-
-func testFloat64Ptr(v float64) *float64 {
-	return &v
-}
-
-func stringSliceContains(values []string, want string) bool {
-	for _, value := range values {
-		if value == want {
-			return true
-		}
-	}
-	return false
-}
 
 func needCycleManagedStore(t *testing.T, store metrix.CollectorStore) metrix.CycleManagedStore {
 	t.Helper()
@@ -250,12 +235,112 @@ func ciscoConfigTrapEntry(jobName string) *TrapEntry {
 	}
 }
 
+func ciscoConfigTrapEntryFromSource(jobName, source string) *TrapEntry {
+	entry := ciscoConfigTrapEntry(jobName)
+	setTrapEntrySource(entry, source)
+	return entry
+}
+
+func setTrapEntrySource(entry *TrapEntry, source string) {
+	entry.SourceIP = source
+	entry.SourceUDPPeer = source
+	entry.Enrichment.Source.Selected = source
+}
+
+func profileMetricSourceLabels(sourceID string) metrix.Labels {
+	return metrix.Labels{"job_name": testProfileMetricJobName, "source_id": sourceID, "source_kind": "udp_peer"}
+}
+
+func profileMetricJobLabels() metrix.Labels {
+	return metrix.Labels{"job_name": testProfileMetricJobName}
+}
+
+func portSecurityResourceLabels(resourceID string) metrix.Labels {
+	labels := profileMetricSourceLabels("192.0.2.10")
+	labels["resource_class"] = "interface"
+	labels["resource_id"] = resourceID
+	return labels
+}
+
+func collectProfileMetricStore(t *testing.T, rt *profileMetricRuntime) metrix.CollectorStore {
+	t.Helper()
+	store := metrix.NewCollectorStore()
+	collectProfileMetricsOnce(t, rt, store, testProfileMetricJobName)
+	return store
+}
+
+func assertProfileMetricValue(t *testing.T, store metrix.CollectorStore, metric string, labels metrix.Labels, want float64) {
+	t.Helper()
+	if v, ok := store.Read().Value(metric, labels); !ok || v != want {
+		t.Fatalf("%s = %v/%v, want %v/true", metric, v, ok, want)
+	}
+}
+
+func assertProfileMetricAbsent(t *testing.T, store metrix.CollectorStore, metric string, labels metrix.Labels) {
+	t.Helper()
+	if v, ok := store.Read().Value(metric, labels); ok {
+		t.Fatalf("%s = %v/true, want metric absent", metric, v)
+	}
+}
+
+func assertProfileMetricOverflow(t *testing.T, store metrix.CollectorStore, want float64) {
+	t.Helper()
+	assertProfileMetricValue(t, store, "snmp_trap_profile_metrics_overflow_dropped", profileMetricJobLabels(), want)
+}
+
+func rawSourceRuntimeWithLimits(t *testing.T, idx *ProfileIndex, limits ProfileMetricLimitsConfig) *profileMetricRuntime {
+	t.Helper()
+	return newTestProfileMetricRuntimeWithConfig(t, idx, ProfileMetricsConfig{
+		Enabled: true,
+		Mode:    profileMetricModeAuto,
+		Identity: ProfileMetricIdentityConfig{
+			SourceIDPrivacy: profileMetricSourceIDRaw,
+		},
+		Limits: limits,
+	})
+}
+
+func profileMetricChartForTest(id, title, context, units, algorithm string) profileMetricChart {
+	return profileMetricChart{
+		ID:         id,
+		Title:      title,
+		Context:    context,
+		Units:      units,
+		Algorithm:  algorithm,
+		Type:       "line",
+		sourceFile: "test-profile.yaml",
+	}
+}
+
+func addProfileMetricRuleWithChart(t *testing.T, idx *ProfileIndex, rule profileMetricRule, chart profileMetricChart) {
+	t.Helper()
+	if err := idx.addProfileMetrics([]profileMetricRule{rule}, []profileMetricChart{chart}); err != nil {
+		t.Fatalf("addProfileMetrics failed: %v", err)
+	}
+}
+
+func profileMetricOutputForTest(metric, dimension, chart string) profileMetricOutput {
+	return profileMetricOutput{Metric: metric, Dimension: dimension, Chart: chart}
+}
+
+func portSecurityTrapEntry(resource any) *TrapEntry {
+	return &TrapEntry{
+		JobName:       testProfileMetricJobName,
+		TrapOID:       testPortSecurityTrapOID,
+		TrapName:      "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
+		SourceIP:      "192.0.2.10",
+		SourceUDPPeer: "192.0.2.10",
+		Enrichment:    &TrapEnrichmentAudit{Source: &TrapSourceAudit{Selected: "192.0.2.10", Method: "udp_peer"}},
+		Varbinds:      []VarbindValue{{OID: testIfIndexOID, Type: "INTEGER", Value: resource}},
+	}
+}
+
 func TestProfileMetricSelectionModes(t *testing.T) {
 	idx := testProfileMetricIndex(t)
 	idx.metricRulesByName["disabled.rule"] = &profileMetricRule{
 		Name:    "disabled.rule",
 		Type:    profileMetricTypeCounter,
-		Enabled: testBoolPtr(false),
+		Enabled: new(false),
 		OnTrap:  testCiscoConfigTrapOID,
 		Output:  profileMetricOutput{Metric: "snmp_trap_disabled_events", Dimension: "events", Chart: "cisco_config_changes"},
 	}
@@ -390,16 +475,10 @@ func TestProfileMetricRuntimePredicateFiltersByEnumLabel(t *testing.T) {
 	rt.update(consoleEntry)
 	rt.update(virtualEntry)
 
-	store := metrix.NewCollectorStore()
-	collectProfileMetricsOnce(t, rt, store, "profile-job")
+	store := collectProfileMetricStore(t, rt)
 
-	labels := metrix.Labels{"job_name": "profile-job", "source_id": "192.0.2.10", "source_kind": "udp_peer"}
-	if v, ok := store.Read().Value("snmp_trap_cisco_console_config_events", labels); !ok || v != 1 {
-		t.Fatalf("snmp_trap_cisco_console_config_events = %v/%v, want 1/true", v, ok)
-	}
-	if v, ok := store.Read().Value("snmp_trap_profile_metrics_rule_missed", metrix.Labels{"job_name": "profile-job"}); !ok || v != 1 {
-		t.Fatalf("snmp_trap_profile_metrics_rule_missed = %v/%v, want 1/true", v, ok)
-	}
+	assertProfileMetricValue(t, store, "snmp_trap_cisco_console_config_events", profileMetricSourceLabels("192.0.2.10"), 1)
+	assertProfileMetricValue(t, store, "snmp_trap_profile_metrics_rule_missed", profileMetricJobLabels(), 1)
 }
 
 func TestProfileMetricRuntimePredicateFiltersBySyntheticFields(t *testing.T) {
@@ -434,16 +513,10 @@ func TestProfileMetricRuntimePredicateFiltersBySyntheticFields(t *testing.T) {
 	rt.update(pass)
 	rt.update(fail)
 
-	store := metrix.NewCollectorStore()
-	collectProfileMetricsOnce(t, rt, store, "profile-job")
+	store := collectProfileMetricStore(t, rt)
 
-	labels := metrix.Labels{"job_name": "profile-job", "source_id": "192.0.2.10", "source_kind": "udp_peer"}
-	if v, ok := store.Read().Value("snmp_trap_cisco_config_synthetic_field_events", labels); !ok || v != 1 {
-		t.Fatalf("snmp_trap_cisco_config_synthetic_field_events = %v/%v, want 1/true", v, ok)
-	}
-	if v, ok := store.Read().Value("snmp_trap_profile_metrics_rule_missed", metrix.Labels{"job_name": "profile-job"}); !ok || v != 1 {
-		t.Fatalf("snmp_trap_profile_metrics_rule_missed = %v/%v, want 1/true", v, ok)
-	}
+	assertProfileMetricValue(t, store, "snmp_trap_cisco_config_synthetic_field_events", profileMetricSourceLabels("192.0.2.10"), 1)
+	assertProfileMetricValue(t, store, "snmp_trap_profile_metrics_rule_missed", profileMetricJobLabels(), 1)
 }
 
 func TestProfileMetricRuntimeAutoCounterBySource(t *testing.T) {
@@ -687,7 +760,7 @@ func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
 			Type:   profileMetricTypeCounter,
 			OnTrap: testCiscoConfigTrapOID,
 			Where: profileMetricPredicates{
-				{Varbind: testCiscoTerminalTypeVarbind, Exists: testBoolPtr(true)},
+				{Varbind: testCiscoTerminalTypeVarbind, Exists: new(true)},
 				{Varbind: testCiscoTerminalTypeVarbind, In: []any{"console", "virtual"}},
 				{Varbind: testCiscoCommandSourceVarbind, GreaterThan: 1},
 				{Varbind: testCiscoCommandSourceVarbind, LessThan: 4},
@@ -707,7 +780,7 @@ func TestProfileMetricRuntimePredicateOperators(t *testing.T) {
 			OnTrap: testCiscoConfigTrapOID,
 			Where: profileMetricPredicates{{
 				Varbind: "sysUpTime.0",
-				Absent:  testBoolPtr(true),
+				Absent:  new(true),
 			}},
 			Output: profileMetricOutput{
 				Metric:    "snmp_trap_cisco_config_absent_predicate_events",
@@ -755,7 +828,7 @@ func TestProfileMetricRuntimePredicateEdgeCases(t *testing.T) {
 			OnTrap: testCiscoConfigTrapOID,
 			Where: profileMetricPredicates{{
 				Varbind: "sysUpTime.0",
-				Exists:  testBoolPtr(false),
+				Exists:  new(false),
 			}},
 			Output: profileMetricOutput{
 				Metric:    "snmp_trap_cisco_config_exists_false_events",
@@ -873,8 +946,10 @@ func TestProfileMetricRuntimeRejectsNonFinitePredicateActual(t *testing.T) {
 
 func TestProfileMetricRuntimeSameOIDStateRule(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	if err := idx.addProfileMetrics(
-		[]profileMetricRule{{
+	addProfileMetricRuleWithChart(
+		t,
+		idx,
+		profileMetricRule{
 			Name:   "cisco.config.console_state",
 			Type:   profileMetricTypeState,
 			OnTrap: testCiscoConfigTrapOID,
@@ -882,25 +957,11 @@ func TestProfileMetricRuntimeSameOIDStateRule(t *testing.T) {
 				SetWhen:   &profileMetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "console"},
 				ClearWhen: &profileMetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "virtual"},
 			},
-			Output: profileMetricOutput{
-				Metric:    "snmp_trap_cisco_console_session_state",
-				Dimension: "active",
-				Chart:     "cisco_console_state",
-			},
+			Output:     profileMetricOutputForTest("snmp_trap_cisco_console_session_state", "active", "cisco_console_state"),
 			sourceFile: "test-profile.yaml",
-		}},
-		[]profileMetricChart{{
-			ID:         "cisco_console_state",
-			Title:      "Cisco console configuration state",
-			Context:    "snmp.trap.cisco.console.state",
-			Units:      "state",
-			Algorithm:  "absolute",
-			Type:       "line",
-			sourceFile: "test-profile.yaml",
-		}},
-	); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+		},
+		profileMetricChartForTest("cisco_console_state", "Cisco console configuration state", "snmp.trap.cisco.console.state", "state", "absolute"),
+	)
 	rt := newTestProfileMetricRuntime(t, idx, profileMetricModeExact, []string{"cisco.config.console_state"})
 	entry := ciscoConfigTrapEntry("profile-job")
 
@@ -924,8 +985,10 @@ func TestProfileMetricRuntimeSameOIDStateRule(t *testing.T) {
 
 func TestProfileMetricRuntimeSameOIDStateCustomValuesAndWhere(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	if err := idx.addProfileMetrics(
-		[]profileMetricRule{{
+	addProfileMetricRuleWithChart(
+		t,
+		idx,
+		profileMetricRule{
 			Name:   "cisco.config.console_custom_state",
 			Type:   profileMetricTypeState,
 			OnTrap: testCiscoConfigTrapOID,
@@ -936,28 +999,14 @@ func TestProfileMetricRuntimeSameOIDStateCustomValuesAndWhere(t *testing.T) {
 			State: profileMetricState{
 				SetWhen:      &profileMetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "console"},
 				ClearWhen:    &profileMetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "virtual"},
-				ProblemValue: testFloat64Ptr(5),
+				ProblemValue: new(float64(5)),
 				ClearValue:   2,
 			},
-			Output: profileMetricOutput{
-				Metric:    "snmp_trap_cisco_console_custom_state",
-				Dimension: "active",
-				Chart:     "cisco_console_custom_state",
-			},
+			Output:     profileMetricOutputForTest("snmp_trap_cisco_console_custom_state", "active", "cisco_console_custom_state"),
 			sourceFile: "test-profile.yaml",
-		}},
-		[]profileMetricChart{{
-			ID:         "cisco_console_custom_state",
-			Title:      "Cisco console custom state",
-			Context:    "snmp.trap.cisco.console.custom.state",
-			Units:      "state",
-			Algorithm:  "absolute",
-			Type:       "line",
-			sourceFile: "test-profile.yaml",
-		}},
-	); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+		},
+		profileMetricChartForTest("cisco_console_custom_state", "Cisco console custom state", "snmp.trap.cisco.console.custom.state", "state", "absolute"),
+	)
 	rt := newTestProfileMetricRuntime(t, idx, profileMetricModeExact, []string{"cisco.config.console_custom_state"})
 	entry := ciscoConfigTrapEntry("profile-job")
 	entry.Category = Category("config_change")
@@ -998,35 +1047,23 @@ func TestProfileMetricRuntimeSeparateOIDStateRuleSupportsZeroProblemValue(t *tes
 	}); err != nil {
 		t.Fatalf("addTraps failed: %v", err)
 	}
-	if err := idx.addProfileMetrics(
-		[]profileMetricRule{{
+	addProfileMetricRuleWithChart(
+		t,
+		idx,
+		profileMetricRule{
 			Name:        "if.link_state",
 			Type:        profileMetricTypeState,
 			ProblemTrap: "SNMPv2-MIB::linkDown",
 			ClearTrap:   "SNMPv2-MIB::linkUp",
 			State: profileMetricState{
-				ProblemValue: testFloat64Ptr(0),
+				ProblemValue: new(float64(0)),
 				ClearValue:   1,
 			},
-			Output: profileMetricOutput{
-				Metric:    "snmp_trap_if_link_state",
-				Dimension: "up",
-				Chart:     "if_link_state",
-			},
+			Output:     profileMetricOutputForTest("snmp_trap_if_link_state", "up", "if_link_state"),
 			sourceFile: "test-profile.yaml",
-		}},
-		[]profileMetricChart{{
-			ID:         "if_link_state",
-			Title:      "Interface link state",
-			Context:    "snmp.trap.if.link.state",
-			Units:      "state",
-			Algorithm:  "absolute",
-			Type:       "line",
-			sourceFile: "test-profile.yaml",
-		}},
-	); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+		},
+		profileMetricChartForTest("if_link_state", "Interface link state", "snmp.trap.if.link.state", "state", "absolute"),
+	)
 	rt := newTestProfileMetricRuntime(t, idx, profileMetricModeExact, []string{"if.link_state"})
 	entry := ciscoConfigTrapEntry("profile-job")
 	entry.Varbinds = nil
@@ -1062,8 +1099,10 @@ func TestProfileMetricRuntimeSeparateOIDStateRuleSupportsZeroProblemValue(t *tes
 
 func TestProfileMetricRuntimeStateTTLClearsAndExpires(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	if err := idx.addProfileMetrics(
-		[]profileMetricRule{{
+	addProfileMetricRuleWithChart(
+		t,
+		idx,
+		profileMetricRule{
 			Name:   "cisco.config.console_state_ttl",
 			Type:   profileMetricTypeState,
 			OnTrap: testCiscoConfigTrapOID,
@@ -1072,25 +1111,11 @@ func TestProfileMetricRuntimeStateTTLClearsAndExpires(t *testing.T) {
 				ClearWhen: &profileMetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "virtual"},
 				TTL:       "1ms",
 			},
-			Output: profileMetricOutput{
-				Metric:    "snmp_trap_cisco_console_ttl_state",
-				Dimension: "active",
-				Chart:     "cisco_console_ttl_state",
-			},
+			Output:     profileMetricOutputForTest("snmp_trap_cisco_console_ttl_state", "active", "cisco_console_ttl_state"),
 			sourceFile: "test-profile.yaml",
-		}},
-		[]profileMetricChart{{
-			ID:         "cisco_console_ttl_state",
-			Title:      "Cisco console TTL state",
-			Context:    "snmp.trap.cisco.console.ttl.state",
-			Units:      "state",
-			Algorithm:  "absolute",
-			Type:       "line",
-			sourceFile: "test-profile.yaml",
-		}},
-	); err != nil {
-		t.Fatalf("addProfileMetrics failed: %v", err)
-	}
+		},
+		profileMetricChartForTest("cisco_console_ttl_state", "Cisco console TTL state", "snmp.trap.cisco.console.ttl.state", "state", "absolute"),
+	)
 	rt := newTestProfileMetricRuntime(t, idx, profileMetricModeExact, []string{"cisco.config.console_state_ttl"})
 	entry := ciscoConfigTrapEntry("profile-job")
 	store := metrix.NewCollectorStore()
@@ -1394,7 +1419,7 @@ func TestProfileMetricChartTemplateUsesResourceLabels(t *testing.T) {
 		}
 	}
 	for _, want := range []string{"job_name", "source_id", "source_kind", "resource_class", "resource_id"} {
-		if !stringSliceContains(labels, want) {
+		if !slices.Contains(labels, want) {
 			t.Fatalf("resource chart labels %v missing %q", labels, want)
 		}
 	}
@@ -1406,12 +1431,10 @@ func TestProfileMetricRuntimeConcurrentUpdates(t *testing.T) {
 	entry := ciscoConfigTrapEntry("profile-job")
 
 	var wg sync.WaitGroup
-	for i := 0; i < 25; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 25 {
+		wg.Go(func() {
 			rt.update(entry)
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -1431,10 +1454,8 @@ func TestProfileMetricRuntimeConcurrentUpdateAndCollect(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for i := 0; i < 100; i++ {
+	wg.Go(func() {
+		for range 100 {
 			store := metrix.NewCollectorStore()
 			managed, ok := metrix.AsCycleManagedStore(store)
 			if !ok {
@@ -1448,9 +1469,9 @@ func TestProfileMetricRuntimeConcurrentUpdateAndCollect(t *testing.T) {
 				return
 			}
 		}
-	}()
+	})
 
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		rt.update(entry)
 	}
 	wg.Wait()
@@ -1464,137 +1485,59 @@ func TestProfileMetricRuntimeConcurrentUpdateAndCollect(t *testing.T) {
 
 func TestProfileMetricRuntimeSourceCapSkipsOnlyMetricInstance(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	rt := newTestProfileMetricRuntimeWithConfig(t, idx, ProfileMetricsConfig{
-		Enabled: true,
-		Mode:    profileMetricModeAuto,
-		Identity: ProfileMetricIdentityConfig{
-			SourceIDPrivacy: profileMetricSourceIDRaw,
-		},
-		Limits: ProfileMetricLimitsConfig{
-			MaxSources: 1,
-		},
-	})
-	first := ciscoConfigTrapEntry("profile-job")
-	second := ciscoConfigTrapEntry("profile-job")
-	second.SourceIP = "192.0.2.11"
-	second.SourceUDPPeer = "192.0.2.11"
-	second.Enrichment.Source.Selected = "192.0.2.11"
+	rt := rawSourceRuntimeWithLimits(t, idx, ProfileMetricLimitsConfig{MaxSources: 1})
+	first := ciscoConfigTrapEntry(testProfileMetricJobName)
+	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
 
 	rt.update(first)
 	rt.update(second)
 
-	store := metrix.NewCollectorStore()
-	collectProfileMetricsOnce(t, rt, store, "profile-job")
+	store := collectProfileMetricStore(t, rt)
 
-	firstLabels := metrix.Labels{"job_name": "profile-job", "source_id": "192.0.2.10", "source_kind": "udp_peer"}
-	secondLabels := metrix.Labels{"job_name": "profile-job", "source_id": "192.0.2.11", "source_kind": "udp_peer"}
-	if v, ok := store.Read().Value("snmp_trap_cisco_config_events", firstLabels); !ok || v != 1 {
-		t.Fatalf("first source snmp_trap_cisco_config_events = %v/%v, want 1/true", v, ok)
-	}
-	if _, ok := store.Read().Value("snmp_trap_cisco_config_events", secondLabels); ok {
-		t.Fatalf("second source metric exists despite max_sources=1")
-	}
-	if v, ok := store.Read().Value("snmp_trap_profile_metrics_overflow_dropped", metrix.Labels{"job_name": "profile-job"}); !ok || v != 1 {
-		t.Fatalf("snmp_trap_profile_metrics_overflow_dropped = %v/%v, want 1/true", v, ok)
-	}
+	assertProfileMetricValue(t, store, "snmp_trap_cisco_config_events", profileMetricSourceLabels("192.0.2.10"), 1)
+	assertProfileMetricAbsent(t, store, "snmp_trap_cisco_config_events", profileMetricSourceLabels("192.0.2.11"))
+	assertProfileMetricOverflow(t, store, 1)
 }
 
 func TestProfileMetricRuntimeMaxInstancesSkipsOnlyNewMetricInstance(t *testing.T) {
 	idx := testProfileMetricIndex(t)
-	rt := newTestProfileMetricRuntimeWithConfig(t, idx, ProfileMetricsConfig{
-		Enabled: true,
-		Mode:    profileMetricModeAuto,
-		Identity: ProfileMetricIdentityConfig{
-			SourceIDPrivacy: profileMetricSourceIDRaw,
-		},
-		Limits: ProfileMetricLimitsConfig{
-			MaxSources:         10,
-			MaxInstancesPerJob: 1,
-		},
-	})
-	first := ciscoConfigTrapEntry("profile-job")
-	second := ciscoConfigTrapEntry("profile-job")
-	second.SourceIP = "192.0.2.11"
-	second.SourceUDPPeer = "192.0.2.11"
-	second.Enrichment.Source.Selected = "192.0.2.11"
+	rt := rawSourceRuntimeWithLimits(t, idx, ProfileMetricLimitsConfig{MaxSources: 10, MaxInstancesPerJob: 1})
+	first := ciscoConfigTrapEntry(testProfileMetricJobName)
+	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
 
 	rt.update(first)
 	rt.update(second)
 
-	store := metrix.NewCollectorStore()
-	collectProfileMetricsOnce(t, rt, store, "profile-job")
+	store := collectProfileMetricStore(t, rt)
 
-	firstLabels := metrix.Labels{"job_name": "profile-job", "source_id": "192.0.2.10", "source_kind": "udp_peer"}
-	secondLabels := metrix.Labels{"job_name": "profile-job", "source_id": "192.0.2.11", "source_kind": "udp_peer"}
-	if v, ok := store.Read().Value("snmp_trap_cisco_config_events", firstLabels); !ok || v != 1 {
-		t.Fatalf("first source snmp_trap_cisco_config_events = %v/%v, want 1/true", v, ok)
-	}
-	if _, ok := store.Read().Value("snmp_trap_cisco_config_events", secondLabels); ok {
-		t.Fatalf("second source metric exists despite max_instances_per_job=1")
-	}
-	if v, ok := store.Read().Value("snmp_trap_profile_metrics_overflow_dropped", metrix.Labels{"job_name": "profile-job"}); !ok || v != 1 {
-		t.Fatalf("snmp_trap_profile_metrics_overflow_dropped = %v/%v, want 1/true", v, ok)
-	}
+	assertProfileMetricValue(t, store, "snmp_trap_cisco_config_events", profileMetricSourceLabels("192.0.2.10"), 1)
+	assertProfileMetricAbsent(t, store, "snmp_trap_cisco_config_events", profileMetricSourceLabels("192.0.2.11"))
+	assertProfileMetricOverflow(t, store, 1)
 }
 
 func TestProfileMetricRuntimeChartMaxInstancesSkipsOnlyNewChartInstance(t *testing.T) {
 	idx := testProfileMetricIndex(t)
 	idx.metricChartsByID["cisco_config_changes"].Lifecycle = &charttpl.Lifecycle{MaxInstances: 1, ExpireAfterCycles: 60}
-	rt := newTestProfileMetricRuntimeWithConfig(t, idx, ProfileMetricsConfig{
-		Enabled: true,
-		Mode:    profileMetricModeAuto,
-		Identity: ProfileMetricIdentityConfig{
-			SourceIDPrivacy: profileMetricSourceIDRaw,
-		},
-		Limits: ProfileMetricLimitsConfig{
-			MaxSources:         10,
-			MaxInstancesPerJob: 10,
-		},
-	})
-	first := ciscoConfigTrapEntry("profile-job")
-	second := ciscoConfigTrapEntry("profile-job")
-	second.SourceIP = "192.0.2.11"
-	second.SourceUDPPeer = "192.0.2.11"
-	second.Enrichment.Source.Selected = "192.0.2.11"
+	rt := rawSourceRuntimeWithLimits(t, idx, ProfileMetricLimitsConfig{MaxSources: 10, MaxInstancesPerJob: 10})
+	first := ciscoConfigTrapEntry(testProfileMetricJobName)
+	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
 
 	rt.update(first)
 	rt.update(second)
 
-	store := metrix.NewCollectorStore()
-	collectProfileMetricsOnce(t, rt, store, "profile-job")
+	store := collectProfileMetricStore(t, rt)
 
-	firstLabels := metrix.Labels{"job_name": "profile-job", "source_id": "192.0.2.10", "source_kind": "udp_peer"}
-	secondLabels := metrix.Labels{"job_name": "profile-job", "source_id": "192.0.2.11", "source_kind": "udp_peer"}
-	if v, ok := store.Read().Value("snmp_trap_cisco_config_events", firstLabels); !ok || v != 1 {
-		t.Fatalf("first source snmp_trap_cisco_config_events = %v/%v, want 1/true", v, ok)
-	}
-	if _, ok := store.Read().Value("snmp_trap_cisco_config_events", secondLabels); ok {
-		t.Fatalf("second source metric exists despite chart max_instances=1")
-	}
-	if v, ok := store.Read().Value("snmp_trap_profile_metrics_overflow_dropped", metrix.Labels{"job_name": "profile-job"}); !ok || v != 1 {
-		t.Fatalf("snmp_trap_profile_metrics_overflow_dropped = %v/%v, want 1/true", v, ok)
-	}
+	assertProfileMetricValue(t, store, "snmp_trap_cisco_config_events", profileMetricSourceLabels("192.0.2.10"), 1)
+	assertProfileMetricAbsent(t, store, "snmp_trap_cisco_config_events", profileMetricSourceLabels("192.0.2.11"))
+	assertProfileMetricOverflow(t, store, 1)
 }
 
 func TestProfileMetricRuntimeReleasesChartMaxInstancesAfterLifecycleExpiry(t *testing.T) {
 	idx := testProfileMetricIndex(t)
 	idx.metricChartsByID["cisco_config_changes"].Lifecycle = &charttpl.Lifecycle{MaxInstances: 1, ExpireAfterCycles: 1}
-	rt := newTestProfileMetricRuntimeWithConfig(t, idx, ProfileMetricsConfig{
-		Enabled: true,
-		Mode:    profileMetricModeAuto,
-		Identity: ProfileMetricIdentityConfig{
-			SourceIDPrivacy: profileMetricSourceIDRaw,
-		},
-		Limits: ProfileMetricLimitsConfig{
-			MaxSources:         10,
-			MaxInstancesPerJob: 10,
-		},
-	})
-	first := ciscoConfigTrapEntry("profile-job")
-	second := ciscoConfigTrapEntry("profile-job")
-	second.SourceIP = "192.0.2.11"
-	second.SourceUDPPeer = "192.0.2.11"
-	second.Enrichment.Source.Selected = "192.0.2.11"
+	rt := rawSourceRuntimeWithLimits(t, idx, ProfileMetricLimitsConfig{MaxSources: 10, MaxInstancesPerJob: 10})
+	first := ciscoConfigTrapEntry(testProfileMetricJobName)
+	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
 	store := metrix.NewCollectorStore()
 
 	rt.update(first)
@@ -1603,13 +1546,8 @@ func TestProfileMetricRuntimeReleasesChartMaxInstancesAfterLifecycleExpiry(t *te
 	rt.update(second)
 	collectProfileMetricsOnce(t, rt, store, "profile-job")
 
-	labels := metrix.Labels{"job_name": "profile-job", "source_id": "192.0.2.11", "source_kind": "udp_peer"}
-	if v, ok := store.Read().Value("snmp_trap_cisco_config_events", labels); !ok || v != 1 {
-		t.Fatalf("second source after chart lifecycle expiry = %v/%v, want 1/true", v, ok)
-	}
-	if v, ok := store.Read().Value("snmp_trap_profile_metrics_overflow_dropped", metrix.Labels{"job_name": "profile-job"}); !ok || v != 0 {
-		t.Fatalf("snmp_trap_profile_metrics_overflow_dropped = %v/%v, want 0/true", v, ok)
-	}
+	assertProfileMetricValue(t, store, "snmp_trap_cisco_config_events", profileMetricSourceLabels("192.0.2.11"), 1)
+	assertProfileMetricOverflow(t, store, 0)
 }
 
 func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T) {
@@ -1687,21 +1625,9 @@ func TestProfileMetricRuntimeMaxInstancesUsesDeterministicRuleOrder(t *testing.T
 func TestProfileMetricRuntimeReleasesSourceCapAfterLifecycleExpiry(t *testing.T) {
 	idx := testProfileMetricIndex(t)
 	idx.metricChartsByID["cisco_config_changes"].Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1}
-	rt := newTestProfileMetricRuntimeWithConfig(t, idx, ProfileMetricsConfig{
-		Enabled: true,
-		Mode:    profileMetricModeAuto,
-		Identity: ProfileMetricIdentityConfig{
-			SourceIDPrivacy: profileMetricSourceIDRaw,
-		},
-		Limits: ProfileMetricLimitsConfig{
-			MaxSources: 1,
-		},
-	})
-	first := ciscoConfigTrapEntry("profile-job")
-	second := ciscoConfigTrapEntry("profile-job")
-	second.SourceIP = "192.0.2.11"
-	second.SourceUDPPeer = "192.0.2.11"
-	second.Enrichment.Source.Selected = "192.0.2.11"
+	rt := rawSourceRuntimeWithLimits(t, idx, ProfileMetricLimitsConfig{MaxSources: 1})
+	first := ciscoConfigTrapEntry(testProfileMetricJobName)
+	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
 	store := metrix.NewCollectorStore()
 
 	rt.update(first)
@@ -1710,13 +1636,8 @@ func TestProfileMetricRuntimeReleasesSourceCapAfterLifecycleExpiry(t *testing.T)
 	rt.update(second)
 	collectProfileMetricsOnce(t, rt, store, "profile-job")
 
-	labels := metrix.Labels{"job_name": "profile-job", "source_id": "192.0.2.11", "source_kind": "udp_peer"}
-	if v, ok := store.Read().Value("snmp_trap_cisco_config_events", labels); !ok || v != 1 {
-		t.Fatalf("second source after lifecycle expiry = %v/%v, want 1/true", v, ok)
-	}
-	if v, ok := store.Read().Value("snmp_trap_profile_metrics_overflow_dropped", metrix.Labels{"job_name": "profile-job"}); !ok || v != 0 {
-		t.Fatalf("snmp_trap_profile_metrics_overflow_dropped = %v/%v, want 0/true", v, ok)
-	}
+	assertProfileMetricValue(t, store, "snmp_trap_cisco_config_events", profileMetricSourceLabels("192.0.2.11"), 1)
+	assertProfileMetricOverflow(t, store, 0)
 }
 
 func TestProfileMetricRuntimePrunesExpiredSourceRoutes(t *testing.T) {
@@ -1733,11 +1654,8 @@ func TestProfileMetricRuntimePrunesExpiredSourceRoutes(t *testing.T) {
 			MaxSources: 1,
 		},
 	})
-	first := ciscoConfigTrapEntry("profile-job")
-	second := ciscoConfigTrapEntry("profile-job")
-	second.SourceIP = "192.0.2.11"
-	second.SourceUDPPeer = "192.0.2.11"
-	second.Enrichment.Source.Selected = "192.0.2.11"
+	first := ciscoConfigTrapEntry(testProfileMetricJobName)
+	second := ciscoConfigTrapEntryFromSource(testProfileMetricJobName, "192.0.2.11")
 	rt.update(first)
 	rt.update(second)
 
@@ -1756,127 +1674,65 @@ func TestProfileMetricRuntimePrunesExpiredSourceRoutes(t *testing.T) {
 func TestProfileMetricRuntimeResourceCapSkipsOnlyNewResource(t *testing.T) {
 	idx := testProfileMetricIndex(t)
 	if err := idx.addProfileMetrics([]profileMetricRule{{
-		Name:     "cisco.port_security.ifindex_cap",
-		Type:     profileMetricTypeCounter,
-		OnTrap:   testPortSecurityTrapOID,
-		Identity: profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 1}},
-		Output: profileMetricOutput{
-			Metric:    "snmp_trap_cisco_port_security_capped_violations",
-			Dimension: "violations",
-			Chart:     "port_security_violations",
-		},
+		Name:       "cisco.port_security.ifindex_cap",
+		Type:       profileMetricTypeCounter,
+		OnTrap:     testPortSecurityTrapOID,
+		Identity:   profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 1}},
+		Output:     profileMetricOutputForTest("snmp_trap_cisco_port_security_capped_violations", "violations", "port_security_violations"),
 		sourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
 	rt := newTestProfileMetricRuntime(t, idx, profileMetricModeExact, []string{"cisco.port_security.ifindex_cap"})
-	first := &TrapEntry{
-		JobName:       "profile-job",
-		TrapOID:       testPortSecurityTrapOID,
-		TrapName:      "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
-		SourceIP:      "192.0.2.10",
-		SourceUDPPeer: "192.0.2.10",
-		Enrichment:    &TrapEnrichmentAudit{Source: &TrapSourceAudit{Selected: "192.0.2.10", Method: "udp_peer"}},
-		Varbinds:      []VarbindValue{{OID: testIfIndexOID, Type: "INTEGER", Value: 7}},
-	}
-	second := *first
-	second.Varbinds = []VarbindValue{{OID: testIfIndexOID, Type: "INTEGER", Value: 8}}
+	first := portSecurityTrapEntry(7)
+	second := portSecurityTrapEntry(8)
 
 	rt.update(first)
-	rt.update(&second)
+	rt.update(second)
 
-	store := metrix.NewCollectorStore()
-	collectProfileMetricsOnce(t, rt, store, "profile-job")
+	store := collectProfileMetricStore(t, rt)
 
-	firstLabels := metrix.Labels{
-		"job_name":       "profile-job",
-		"source_id":      "192.0.2.10",
-		"source_kind":    "udp_peer",
-		"resource_class": "interface",
-		"resource_id":    "7",
-	}
-	secondLabels := metrix.Labels{
-		"job_name":       "profile-job",
-		"source_id":      "192.0.2.10",
-		"source_kind":    "udp_peer",
-		"resource_class": "interface",
-		"resource_id":    "8",
-	}
-	if v, ok := store.Read().Value("snmp_trap_cisco_port_security_capped_violations", firstLabels); !ok || v != 1 {
-		t.Fatalf("first resource snmp_trap_cisco_port_security_capped_violations = %v/%v, want 1/true", v, ok)
-	}
-	if _, ok := store.Read().Value("snmp_trap_cisco_port_security_capped_violations", secondLabels); ok {
-		t.Fatalf("second resource metric exists despite max_per_source=1")
-	}
-	if v, ok := store.Read().Value("snmp_trap_profile_metrics_overflow_dropped", metrix.Labels{"job_name": "profile-job"}); !ok || v != 1 {
-		t.Fatalf("snmp_trap_profile_metrics_overflow_dropped = %v/%v, want 1/true", v, ok)
-	}
+	assertProfileMetricValue(t, store, "snmp_trap_cisco_port_security_capped_violations", portSecurityResourceLabels("7"), 1)
+	assertProfileMetricAbsent(t, store, "snmp_trap_cisco_port_security_capped_violations", portSecurityResourceLabels("8"))
+	assertProfileMetricOverflow(t, store, 1)
 }
 
 func TestProfileMetricRuntimeReleasesResourceCapAfterLifecycleExpiry(t *testing.T) {
 	idx := testProfileMetricIndex(t)
 	idx.metricChartsByID["port_security_violations"].Lifecycle = &charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 1}
 	if err := idx.addProfileMetrics([]profileMetricRule{{
-		Name:     "cisco.port_security.ifindex_lifecycle_cap",
-		Type:     profileMetricTypeCounter,
-		OnTrap:   testPortSecurityTrapOID,
-		Identity: profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 1}},
-		Output: profileMetricOutput{
-			Metric:    "snmp_trap_cisco_port_security_lifecycle_capped_violations",
-			Dimension: "violations",
-			Chart:     "port_security_violations",
-		},
+		Name:       "cisco.port_security.ifindex_lifecycle_cap",
+		Type:       profileMetricTypeCounter,
+		OnTrap:     testPortSecurityTrapOID,
+		Identity:   profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 1}},
+		Output:     profileMetricOutputForTest("snmp_trap_cisco_port_security_lifecycle_capped_violations", "violations", "port_security_violations"),
 		sourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
 	}
 	rt := newTestProfileMetricRuntime(t, idx, profileMetricModeExact, []string{"cisco.port_security.ifindex_lifecycle_cap"})
-	first := &TrapEntry{
-		JobName:       "profile-job",
-		TrapOID:       testPortSecurityTrapOID,
-		TrapName:      "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
-		SourceIP:      "192.0.2.10",
-		SourceUDPPeer: "192.0.2.10",
-		Enrichment:    &TrapEnrichmentAudit{Source: &TrapSourceAudit{Selected: "192.0.2.10", Method: "udp_peer"}},
-		Varbinds:      []VarbindValue{{OID: testIfIndexOID, Type: "INTEGER", Value: 7}},
-	}
-	second := *first
-	second.Varbinds = []VarbindValue{{OID: testIfIndexOID, Type: "INTEGER", Value: 8}}
+	first := portSecurityTrapEntry(7)
+	second := portSecurityTrapEntry(8)
 	store := metrix.NewCollectorStore()
 
 	rt.update(first)
 	collectProfileMetricsOnce(t, rt, store, "profile-job")
 	collectProfileMetricsOnce(t, rt, store, "profile-job")
-	rt.update(&second)
+	rt.update(second)
 	collectProfileMetricsOnce(t, rt, store, "profile-job")
 
-	secondLabels := metrix.Labels{
-		"job_name":       "profile-job",
-		"source_id":      "192.0.2.10",
-		"source_kind":    "udp_peer",
-		"resource_class": "interface",
-		"resource_id":    "8",
-	}
-	if v, ok := store.Read().Value("snmp_trap_cisco_port_security_lifecycle_capped_violations", secondLabels); !ok || v != 1 {
-		t.Fatalf("second resource after lifecycle expiry = %v/%v, want 1/true", v, ok)
-	}
-	if v, ok := store.Read().Value("snmp_trap_profile_metrics_overflow_dropped", metrix.Labels{"job_name": "profile-job"}); !ok || v != 0 {
-		t.Fatalf("snmp_trap_profile_metrics_overflow_dropped = %v/%v, want 0/true", v, ok)
-	}
+	assertProfileMetricValue(t, store, "snmp_trap_cisco_port_security_lifecycle_capped_violations", portSecurityResourceLabels("8"), 1)
+	assertProfileMetricOverflow(t, store, 0)
 }
 
 func TestProfileMetricRuntimeResourceCapUsesJobDefault(t *testing.T) {
 	idx := testProfileMetricIndex(t)
 	if err := idx.addProfileMetrics([]profileMetricRule{{
-		Name:     "cisco.port_security.ifindex_job_cap",
-		Type:     profileMetricTypeCounter,
-		OnTrap:   testPortSecurityTrapOID,
-		Identity: profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex"}},
-		Output: profileMetricOutput{
-			Metric:    "snmp_trap_cisco_port_security_job_capped_violations",
-			Dimension: "violations",
-			Chart:     "port_security_violations",
-		},
+		Name:       "cisco.port_security.ifindex_job_cap",
+		Type:       profileMetricTypeCounter,
+		OnTrap:     testPortSecurityTrapOID,
+		Identity:   profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex"}},
+		Output:     profileMetricOutputForTest("snmp_trap_cisco_port_security_job_capped_violations", "violations", "port_security_violations"),
 		sourceFile: "test-profile.yaml",
 	}}, nil); err != nil {
 		t.Fatalf("addProfileMetrics failed: %v", err)
@@ -1892,47 +1748,17 @@ func TestProfileMetricRuntimeResourceCapUsesJobDefault(t *testing.T) {
 			MaxResourcesPerSource: 1,
 		},
 	})
-	first := &TrapEntry{
-		JobName:       "profile-job",
-		TrapOID:       testPortSecurityTrapOID,
-		TrapName:      "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
-		SourceIP:      "192.0.2.10",
-		SourceUDPPeer: "192.0.2.10",
-		Enrichment:    &TrapEnrichmentAudit{Source: &TrapSourceAudit{Selected: "192.0.2.10", Method: "udp_peer"}},
-		Varbinds:      []VarbindValue{{OID: testIfIndexOID, Type: "INTEGER", Value: 7}},
-	}
-	second := *first
-	second.Varbinds = []VarbindValue{{OID: testIfIndexOID, Type: "INTEGER", Value: 8}}
+	first := portSecurityTrapEntry(7)
+	second := portSecurityTrapEntry(8)
 
 	rt.update(first)
-	rt.update(&second)
+	rt.update(second)
 
-	store := metrix.NewCollectorStore()
-	collectProfileMetricsOnce(t, rt, store, "profile-job")
+	store := collectProfileMetricStore(t, rt)
 
-	firstLabels := metrix.Labels{
-		"job_name":       "profile-job",
-		"source_id":      "192.0.2.10",
-		"source_kind":    "udp_peer",
-		"resource_class": "interface",
-		"resource_id":    "7",
-	}
-	secondLabels := metrix.Labels{
-		"job_name":       "profile-job",
-		"source_id":      "192.0.2.10",
-		"source_kind":    "udp_peer",
-		"resource_class": "interface",
-		"resource_id":    "8",
-	}
-	if v, ok := store.Read().Value("snmp_trap_cisco_port_security_job_capped_violations", firstLabels); !ok || v != 1 {
-		t.Fatalf("first resource with job default cap = %v/%v, want 1/true", v, ok)
-	}
-	if _, ok := store.Read().Value("snmp_trap_cisco_port_security_job_capped_violations", secondLabels); ok {
-		t.Fatalf("second resource metric exists despite job-level max_resources_per_source=1")
-	}
-	if v, ok := store.Read().Value("snmp_trap_profile_metrics_overflow_dropped", metrix.Labels{"job_name": "profile-job"}); !ok || v != 1 {
-		t.Fatalf("snmp_trap_profile_metrics_overflow_dropped = %v/%v, want 1/true", v, ok)
-	}
+	assertProfileMetricValue(t, store, "snmp_trap_cisco_port_security_job_capped_violations", portSecurityResourceLabels("7"), 1)
+	assertProfileMetricAbsent(t, store, "snmp_trap_cisco_port_security_job_capped_violations", portSecurityResourceLabels("8"))
+	assertProfileMetricOverflow(t, store, 1)
 }
 
 func TestProfileMetricRuntimeMissingResourceUnknownDimension(t *testing.T) {
@@ -2686,7 +2512,7 @@ func TestProfileMetricValidationRejectsUnsupportedPublicConfig(t *testing.T) {
 		OnTrap: testCiscoConfigTrapOID,
 		Where: profileMetricPredicates{{
 			Varbind: testCiscoTerminalTypeVarbind,
-			Absent:  testBoolPtr(true),
+			Absent:  new(true),
 			Not:     true,
 		}},
 		Output: profileMetricOutput{

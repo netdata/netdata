@@ -76,20 +76,9 @@ func TestFanoutTrapWriterSecondaryFailureDoesNotFailPrimaryWrite(t *testing.T) {
 	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
 	assert.Equal(t, uint64(0), metrics.pipeline.writeFailed.Load())
 
-	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(entry)
-	store := metrix.NewCollectorStore()
-	managed, ok := metrix.AsCycleManagedStore(store)
-	require.True(t, ok)
-	managed.CycleController().BeginCycle()
-	collectSourceMetrics(store, "local", metrics)
-	require.NoError(t, managed.CycleController().CommitCycleSuccess())
-	labels := metrix.Labels{"job_name": "local", "source_id": sourceID, "source_kind": sourceKind}
-	if v, ok := store.Read().Value("snmp_trap_source_pipeline_write_failed", labels); !ok || v != 0 {
-		t.Fatalf("snmp_trap_source_pipeline_write_failed = %v/%v, want 0/true", v, ok)
-	}
-	if v, ok := store.Read().Value("snmp_trap_source_errors_otlp_export_failed", labels); !ok || v != 1 {
-		t.Fatalf("snmp_trap_source_errors_otlp_export_failed = %v/%v, want 1/true", v, ok)
-	}
+	store, labels := collectSourceMetricsForEntry(t, metrics, entry)
+	assertSourceMetricValue(t, store, "snmp_trap_source_pipeline_write_failed", labels, 0)
+	assertSourceMetricValue(t, store, "snmp_trap_source_errors_otlp_export_failed", labels, 1)
 }
 
 func TestFanoutTrapWriterBothWriteFailuresRecordOneTerminalPipelineFailure(t *testing.T) {

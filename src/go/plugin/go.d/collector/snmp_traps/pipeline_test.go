@@ -1190,7 +1190,7 @@ func TestCollectMetricsSourceAttributionDiagnostics(t *testing.T) {
 func TestCollectMetricsSourceCapAndLifecycle(t *testing.T) {
 	const jobName = "test-pipeline-source-cap"
 	metrics := withCleanJobMetrics(t, jobName)
-	for i := 0; i < defaultPipelineMetricMaxSources+1; i++ {
+	for i := range defaultPipelineMetricMaxSources + 1 {
 		entry := &TrapEntry{
 			JobName:  jobName,
 			SourceIP: privateTestIP(i),
@@ -1207,7 +1207,7 @@ func TestCollectMetricsSourceCapAndLifecycle(t *testing.T) {
 		t.Fatalf("source overflow = %v/%v, want 1/true", v, ok)
 	}
 
-	for i := 0; i < defaultPipelineMetricExpireAfterCycles; i++ {
+	for range defaultPipelineMetricExpireAfterCycles {
 		store = collectJobMetricsForTest(t, jobName)
 	}
 	if v, ok := store.Read().Value("snmp_trap_sources_active", labels); !ok || v != 0 {
@@ -1463,21 +1463,21 @@ func TestPacketSourceAddrFallsBackToPeerIP(t *testing.T) {
 }
 
 func TestAllowlistCommunity(t *testing.T) {
-	al := NewAllowlist(nil, []string{"public", "private"})
+	al := NewAllowlist(nil, []string{"allowed-a", "allowed-b"})
 
 	tests := map[string]struct {
-		community string
-		want      bool
+		value string
+		want  bool
 	}{
-		"public":  {community: "public", want: true},
-		"private": {community: "private", want: true},
-		"wrong":   {community: "wrong", want: false},
+		"allowed-a": {value: "allowed-a", want: true},
+		"allowed-b": {value: "allowed-b", want: true},
+		"denied":    {value: "denied", want: false},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := al.AllowedCommunity(tc.community); got != tc.want {
-				t.Errorf("AllowedCommunity(%s) = %v, want %v", tc.community, got, tc.want)
+			if got := al.AllowedCommunity(tc.value); got != tc.want {
+				t.Errorf("AllowedCommunity(%s) = %v, want %v", tc.value, got, tc.want)
 			}
 		})
 	}
@@ -1710,6 +1710,25 @@ unexpected: true
 `), &cfg)
 		if err == nil {
 			t.Fatal("expected error for unknown top-level key")
+		}
+	})
+
+	t.Run("obsolete job-level metrics key", func(t *testing.T) {
+		var cfg Config
+		err := yaml.Unmarshal([]byte(`
+listen:
+  endpoints:
+    - protocol: udp
+      address: "127.0.0.1"
+      port: 9162
+metrics:
+  - oid: "1.3.6.1.4.1.9.9.43.2.0.1"
+`), &cfg)
+		if err == nil {
+			t.Fatal("expected error for obsolete job-level metrics key")
+		}
+		if !strings.Contains(err.Error(), "profile_metrics") {
+			t.Fatalf("expected profile_metrics guidance, got %v", err)
 		}
 	})
 

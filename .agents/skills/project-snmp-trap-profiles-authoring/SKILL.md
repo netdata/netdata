@@ -161,7 +161,7 @@ trap-OID-only: do not normalize or alternate-match varbind OIDs.
       chart, or any other loaded profile rule/chart.
       Reserved metric prefixes include `snmp_trap_events_`,
       `snmp_trap_severity_`, `snmp_trap_errors_`, `snmp_trap_dedup_`,
-      `snmp_trap_pipeline_`, `snmp_trap_source_`, `snmp_trap_sources_`, and
+      `snmp_trap_pipeline_`, `snmp_trap_source_`, `snmp_trap_sources_`,
       `snmp_trap_metric_`, and `snmp_trap_profile_metrics_`.
       Built-in source receiver metrics are automatic; profile rules should
       describe vendor or site semantics, not duplicate receiver pipeline health.
