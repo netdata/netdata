@@ -259,6 +259,7 @@ curl -sfS http://127.0.0.1:19999/v2/index.html || exit 1
 NETDATA_LIBEXEC_PARTS="
 plugins.d/apps.plugin
 plugins.d/cgroup-network
+plugins.d/cgroup-name
 plugins.d/charts.d.plugin
 plugins.d/cups.plugin
 plugins.d/debugfs.plugin

@@ -25,7 +25,7 @@ capture_file_create() {
 
   mkdir -p "$base_dir"
   chmod 700 "$base_dir" 2>/dev/null || true
-  mktemp "${base_dir%/}/capture.XXXXXX.jsonl"
+  mktemp "${base_dir%/}/capture.XXXXXX"
 }
 
 capture_file="$(capture_file_create)"

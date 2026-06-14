@@ -422,7 +422,7 @@ func (r *resolver) parseDockerLikeInspectOutput(output string) {
 	}
 
 	if vars["IMAGE_NAME"] != "" {
-		r.labels = `image="` + vars["IMAGE_NAME"] + `"`
+		r.labels = labelPair("image", vars["IMAGE_NAME"])
 	}
 
 	for line := range strings.SplitSeq(output, "\n") {
@@ -431,7 +431,7 @@ func (r *resolver) parseDockerLikeInspectOutput(output string) {
 		}
 		lname, lval, _ := strings.Cut(line, "=")
 		lname = strings.TrimPrefix(lname, "LABEL_")
-		label := lname + `="` + lval + `"`
+		label := labelPair(lname, inspectLabelValue(lval))
 		if r.labels != "" {
 			r.labels += "," + label
 		} else {
@@ -441,7 +441,7 @@ func (r *resolver) parseDockerLikeInspectOutput(output string) {
 }
 
 func (r *resolver) dockerLikeGetNameCommand(ctx context.Context, command, id string) bool {
-	format := "{{range .Config.Env}}{{println .}}{{end}}{{range $key, $value := .Config.Labels}}LABEL_{{$key}}={{$value}}{{println}}{{end}}IMAGE_NAME={{.Config.Image}}{{println}}CONT_NAME={{.Name}}"
+	format := `{{range .Config.Env}}{{println .}}{{end}}{{range $key, $value := .Config.Labels}}LABEL_{{$key}}={{printf "%q" $value}}{{println}}{{end}}IMAGE_NAME={{.Config.Image}}{{println}}CONT_NAME={{.Name}}`
 	defer r.track(command+"-inspect", time.Now())
 	cmd := exec.CommandContext(ctx, command, "inspect", "--format="+format, id)
 	cmd.Stderr = os.Stderr
@@ -563,13 +563,19 @@ var k8sTLSInsecureWarned sync.Once
 func (r *resolver) k8sTLSConfig(mode k8sTLSMode) *tls.Config {
 	switch mode {
 	case tlsModeKubelet:
-		return &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: true}
+		return &tls.Config{
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: true, // NOSONAR - kubelet serving certs are commonly self-signed; this preserves legacy helper compatibility.
+		}
 	case tlsModeAPIServer:
 		if k8sTLSInsecure() {
 			k8sTLSInsecureWarned.Do(func() {
 				r.warning("K8S_TLS_INSECURE is set: TLS verification of Kubernetes API calls is disabled")
 			})
-			return &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: true}
+			return &tls.Config{
+				MinVersion:         tls.VersionTLS12,
+				InsecureSkipVerify: true, // NOSONAR - explicit operator escape hatch for API endpoints that cannot verify against the mounted CA.
+			}
 		}
 		return k8sServiceAccountTLSConfig()
 	}
@@ -677,7 +683,7 @@ func dockerJSONToInspectOutput(body []byte) (string, bool) {
 		return "", false
 	}
 	for _, kv := range labels {
-		lines = append(lines, "LABEL_"+kv.key+"="+kv.value)
+		lines = append(lines, "LABEL_"+kv.key+"="+strconv.Quote(kv.value))
 	}
 	return strings.Join(lines, "\n"), true
 }
@@ -934,6 +940,9 @@ func (r *resolver) k8sGetKubePodName(ctx context.Context, cgroupPath, id string)
 	tmpCluster := filepath.Join(tmpDir, "netdata-cgroups-k8s-cluster-name")
 	tmpSystemUID := filepath.Join(tmpDir, "netdata-cgroups-kubesystem-uid")
 	tmpContainers := filepath.Join(tmpDir, "netdata-cgroups-containers")
+	repairPrivateFileMode(tmpCluster)
+	repairPrivateFileMode(tmpSystemUID)
+	repairPrivateFileMode(tmpContainers)
 
 	var kubeClusterName, kubeSystemUID, labels, containers string
 	if cntrID != "" && fileExists(tmpCluster) && fileExists(tmpSystemUID) && fileExists(tmpContainers) {
@@ -974,12 +983,12 @@ func (r *resolver) k8sGetKubePodName(ctx context.Context, cgroupPath, id string)
 			return "", 1
 		}
 		if kubeClusterName != "" {
-			_ = os.WriteFile(tmpCluster, []byte(kubeClusterName+"\n"), 0o644)
+			_ = writePrivateFile(tmpCluster, []byte(kubeClusterName+"\n"))
 		}
 		if kubeSystemNS != "" && kubeSystemUID != "" {
-			_ = os.WriteFile(tmpSystemUID, []byte(kubeSystemUID+"\n"), 0o644)
+			_ = writePrivateFile(tmpSystemUID, []byte(kubeSystemUID+"\n"))
 		}
-		_ = os.WriteFile(tmpContainers, []byte(containers+"\n"), 0o644)
+		_ = writePrivateFile(tmpContainers, []byte(containers+"\n"))
 	}
 
 	qosClass := "guaranteed"
@@ -1004,13 +1013,13 @@ func (r *resolver) k8sGetKubePodName(ctx context.Context, cgroupPath, id string)
 				return "", 3
 			}
 		}
-		labels += `,kind="container"`
-		labels += `,qos_class="` + qosClass + `"`
+		labels += "," + labelPair("kind", "container")
+		labels += "," + labelPair("qos_class", qosClass)
 		if kubeSystemUID != "" && kubeSystemUID != "null" {
-			labels += `,cluster_id="` + kubeSystemUID + `"`
+			labels += "," + labelPair("cluster_id", kubeSystemUID)
 		}
 		if kubeClusterName != "" && kubeClusterName != "unknown" {
-			labels += `,cluster_name="` + kubeClusterName + `"`
+			labels += "," + labelPair("cluster_name", kubeClusterName)
 		}
 		name = "cntr_" + getLblVal(labels, "namespace") + "_" + getLblVal(labels, "pod_name") + "_" + getLblVal(labels, "container_name")
 		labels = removeLbl(labels, "container_id")
@@ -1026,13 +1035,13 @@ func (r *resolver) k8sGetKubePodName(ctx context.Context, cgroupPath, id string)
 		if i := strings.Index(labels, ",container_"); i >= 0 {
 			labels = labels[:i]
 		}
-		labels += `,kind="pod"`
-		labels += `,qos_class="` + qosClass + `"`
+		labels += "," + labelPair("kind", "pod")
+		labels += "," + labelPair("qos_class", qosClass)
 		if kubeSystemUID != "" && kubeSystemUID != "null" {
-			labels += `,cluster_id="` + kubeSystemUID + `"`
+			labels += "," + labelPair("cluster_id", kubeSystemUID)
 		}
 		if kubeClusterName != "" && kubeClusterName != "unknown" {
-			labels += `,cluster_name="` + kubeClusterName + `"`
+			labels += "," + labelPair("cluster_name", kubeClusterName)
 		}
 		name = "pod_" + getLblVal(labels, "namespace") + "_" + getLblVal(labels, "pod_name")
 		labels = removeLbl(labels, "pod_uid")
@@ -1056,6 +1065,20 @@ func (r *resolver) k8sGetKubePodName(ctx context.Context, cgroupPath, id string)
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func writePrivateFile(path string, data []byte) error {
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0o600)
+}
+
+func repairPrivateFileMode(path string) {
+	st, err := os.Lstat(path)
+	if err == nil && st.Mode().IsRegular() {
+		_ = os.Chmod(path, 0o600)
+	}
 }
 
 func firstLineFile(path string) string {
@@ -1236,9 +1259,9 @@ func podsToContainerLines(raw string) (string, error) {
 	var lines []string
 	for _, item := range doc.Items {
 		var base strings.Builder
-		base.WriteString(`namespace="` + ptrString(item.Metadata.Namespace) + `",`)
-		base.WriteString(`pod_name="` + ptrString(item.Metadata.Name) + `",`)
-		base.WriteString(`pod_uid="` + ptrString(item.Metadata.UID) + `",`)
+		base.WriteString(labelPair("namespace", ptrString(item.Metadata.Namespace)) + ",")
+		base.WriteString(labelPair("pod_name", ptrString(item.Metadata.Name)) + ",")
+		base.WriteString(labelPair("pod_uid", ptrString(item.Metadata.UID)) + ",")
 
 		annotations, err := orderedStringEntries(item.Metadata.Annotations)
 		if err != nil {
@@ -1246,21 +1269,21 @@ func podsToContainerLines(raw string) (string, error) {
 		}
 		for _, ann := range annotations {
 			if strings.HasPrefix(ann.key, "netdata.cloud/") {
-				base.WriteString(ann.key + `="` + ann.value + `",`)
+				base.WriteString(labelPair(ann.key, ann.value) + ",")
 			}
 		}
 		for _, owner := range item.Metadata.OwnerReferences {
 			if owner.Controller != nil && *owner.Controller {
-				base.WriteString(`controller_kind="` + ptrString(owner.Kind) + `",`)
-				base.WriteString(`controller_name="` + ptrString(owner.Name) + `",`)
+				base.WriteString(labelPair("controller_kind", ptrString(owner.Kind)) + ",")
+				base.WriteString(labelPair("controller_name", ptrString(owner.Name)) + ",")
 				break
 			}
 		}
-		base.WriteString(`node_name="` + ptrString(item.Spec.NodeName) + `",`)
+		base.WriteString(labelPair("node_name", ptrString(item.Spec.NodeName)) + ",")
 		for _, st := range item.Status.ContainerStatuses {
 			line := base.String()
-			line += `container_name="` + ptrString(st.Name) + `",`
-			line += `container_id="` + strings.NewReplacer("docker://", "", "cri-o://", "", "containerd://", "").Replace(ptrString(st.ContainerID)) + `"`
+			line += labelPair("container_name", ptrString(st.Name)) + ","
+			line += labelPair("container_id", strings.NewReplacer("docker://", "", "cri-o://", "", "containerd://", "").Replace(ptrString(st.ContainerID)))
 			lines = append(lines, line)
 		}
 	}
@@ -1274,17 +1297,97 @@ func ptrString(s *string) string {
 	return *s
 }
 
-func getLblVal(labels, wantName string) string {
-	if labels == "" {
-		return "null"
-	}
-	for label := range strings.SplitSeq(labels, ",") {
-		lname, lval, ok := strings.Cut(label, "=")
-		if ok && lname == wantName && lval != "" {
-			if len(lval) >= 2 {
-				return lval[1 : len(lval)-1]
+func labelPair(name, value string) string {
+	var b strings.Builder
+	b.WriteString(name)
+	b.WriteString(`="`)
+	for _, r := range value {
+		switch r {
+		case '"', '\\':
+			b.WriteRune('\\')
+			b.WriteRune(r)
+		case '\t', '\n', '\r':
+			b.WriteRune(' ')
+		default:
+			if r < ' ' || r == 0x7f {
+				b.WriteRune(' ')
+			} else {
+				b.WriteRune(r)
 			}
-			return ""
+		}
+	}
+	b.WriteRune('"')
+	return b.String()
+}
+
+func inspectLabelValue(value string) string {
+	if unquoted, err := strconv.Unquote(value); err == nil {
+		return unquoted
+	}
+	return value
+}
+
+func splitLabels(labels string) []string {
+	if labels == "" {
+		return nil
+	}
+
+	var out []string
+	start := 0
+	inQuote := false
+	escaped := false
+	for i := 0; i < len(labels); i++ {
+		switch labels[i] {
+		case '\\':
+			if inQuote {
+				escaped = !escaped
+				continue
+			}
+		case '"':
+			if !escaped {
+				inQuote = !inQuote
+			}
+		case ',':
+			if !inQuote {
+				if part := strings.TrimSpace(labels[start:i]); part != "" {
+					out = append(out, part)
+				}
+				start = i + 1
+			}
+		}
+		if labels[i] != '\\' || !inQuote {
+			escaped = false
+		}
+	}
+	if part := strings.TrimSpace(labels[start:]); part != "" {
+		out = append(out, part)
+	}
+	return out
+}
+
+func labelNameValue(label string) (string, string, bool) {
+	lname, lval, ok := strings.Cut(label, "=")
+	if !ok || lname == "" || lval == "" {
+		return "", "", false
+	}
+
+	value, err := strconv.Unquote(lval)
+	if err == nil {
+		return lname, value, true
+	}
+
+	if len(lval) >= 2 && lval[0] == '"' && lval[len(lval)-1] == '"' {
+		return lname, lval[1 : len(lval)-1], true
+	}
+
+	return lname, lval, true
+}
+
+func getLblVal(labels, wantName string) string {
+	for _, label := range splitLabels(labels) {
+		lname, lval, ok := labelNameValue(label)
+		if ok && lname == wantName {
+			return lval
 		}
 	}
 	return "null"
@@ -1294,7 +1397,7 @@ func addLblPrefix(labels, prefix string) string {
 	if labels == "" {
 		return ""
 	}
-	parts := strings.Split(labels, ",")
+	parts := splitLabels(labels)
 	for i := range parts {
 		parts[i] = prefix + parts[i]
 	}
@@ -1306,7 +1409,7 @@ func removeLbl(labels, lblName string) string {
 		return ""
 	}
 	var out []string
-	for label := range strings.SplitSeq(labels, ",") {
+	for _, label := range splitLabels(labels) {
 		lname, _, _ := strings.Cut(label, "=")
 		if lname != lblName {
 			out = append(out, label)
@@ -1322,11 +1425,11 @@ func (r *resolver) k8sGetName(ctx context.Context, cgroupPath, id string) {
 		kubepodName = "k8s_" + kubepodName
 		name, labels := splitNameLabels(kubepodName)
 		if name != labels {
-			r.info(fmt.Sprintf("k8s_get_name: cgroup '%s' has chart name '%s', labels '%s", id, name, labels))
+			r.info(fmt.Sprintf("k8s_get_name: cgroup '%s' has chart name '%s', labels '%s'", id, name, labels))
 			r.name = name
 			r.labels = labels
 		} else {
-			r.info(fmt.Sprintf("k8s_get_name: cgroup '%s' has chart name '%s'", id, r.name))
+			r.info(fmt.Sprintf("k8s_get_name: cgroup '%s' has chart name '%s'", id, name))
 			r.name = name
 		}
 		r.exitCode = exitSuccess
