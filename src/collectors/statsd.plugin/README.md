@@ -496,7 +496,7 @@ For example, to monitor the application `myapp` using StatsD and Netdata, create
 
 Using this configuration, `myapp` gets its own dashboard section with one chart containing two [dimensions](https://learn.netdata.cloud/docs/developer-and-contributor-corner/glossary#d).
 
-When you send metrics like `foo:10|g` and `bar:20|g`, you'll see both private charts and your synthetic chart.
+When you send metrics like `myapp.metric1:10|g` and `myapp.metric2:20|g`, you'll see both private charts and your synthetic chart. These metric names must match the pattern defined in the `[app]` section (e.g., `myapp.*`) for them to appear in your synthetic charts.
 
 <details>
 <summary><strong>Synthetic Chart Example</strong></summary>
