@@ -233,7 +233,7 @@ For validating a new receiver, this is the priority order in terms of what is av
 
 ## Read-verification block
 
-Read `snmp-traps-in-observability.md` in whole (1038 lines, last line: "---")
+Read `../domain/snmp-traps-in-observability.md` in whole (1038 lines, last line: "---")
 Read `opennms.md` in whole (1405 lines, last line: "regression per the SOW process.")
 Read `zenoss.md` in whole (1322 lines, last line: "documented in §17.")
 Read `checkmk.md` in whole (1369 lines, last line: "do not affect the analytical conclusions.")

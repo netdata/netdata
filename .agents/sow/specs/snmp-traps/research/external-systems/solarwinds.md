@@ -305,7 +305,7 @@ OIDs are resolved against the bundled MIB DB. Result is the `OIDName` column on 
 
 **What is NOT documented**: the *matching algorithm itself*. Vendor docs (Monitor SNMP traps page; <https://documentation.solarwinds.com/en/success_center/orionplatform/content/core-monitoring-snmp-traps-sw593.htm>) describe devices sending traps to the SolarWinds Platform server but do not publish the algorithm used to resolve UDP source IP to a managed node — whether it is exact match, longest-prefix, or includes secondary IP support is not stated. The file therefore must not assert "documented behaviour" beyond the schema-level fact of the FK columns and relationship.
 
-**SNMPv1 `agent-addr` handling**: vendor docs do not describe whether the v1 `agent-addr` field inside the PDU is consulted when the UDP source IP and `agent-addr` disagree (the NAT scenario described in `snmp-traps-in-observability.md` §2). Behaviour is **undocumented**; the file does not assume one or the other.
+**SNMPv1 `agent-addr` handling**: vendor docs do not describe whether the v1 `agent-addr` field inside the PDU is consulted when the UDP source IP and `agent-addr` disagree (the NAT scenario described in `../domain/snmp-traps-in-observability.md` §2). Behaviour is **undocumented**; the file does not assume one or the other.
 
 ### 5.4 Enrichment
 

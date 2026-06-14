@@ -4,8 +4,8 @@
 
 - **System under test**: `.agents/sow/specs/snmp-traps/netdata.md` — proposed Netdata Agent SNMP trap reception, decode, enrichment, metric generation, and journal-storage subsystem (642 lines).
 - **Posture**: adversarial. The target is treated as a junior engineer's first draft. The job is to break it, not validate it.
-- **Lens**: every Netdata claim is cross-checked against the 16-system Phase A corpus (per-system specs + 6 comparison artefacts + the foundational `snmp-traps-in-observability.md` lens).
-- **Citation convention**: `netdata.md §N L<line>` for the target; `<system>.md §N` or `<system>.md L<line>` for cohort evidence; `comparison/<artefact>.md §N` for the Phase A matrix.
+- **Lens**: every Netdata claim is cross-checked against the 16-system Phase A corpus (per-system specs + 6 comparison artefacts + the foundational `../domain/snmp-traps-in-observability.md` lens).
+- **Citation convention**: `netdata.md §N L<line>` for the target; `<system>.md §N` or `<system>.md L<line>` for cohort evidence; `./<artefact>.md §N` for the Phase A matrix.
 - **Reviewer convergence**: see §10. Run after the file was drafted in whole.
 - **Authored by**: assistant under Phase B stress-test instructions.
 
@@ -21,12 +21,12 @@ Severity ladder: **blocker** (design will not work as written), **major** (desig
 4. **(blocker) "Single writer per journal file caps at ~30k rows/sec" is asserted without a citation.** `netdata.md §5 L126` and §9 L362. No Netdata benchmark is referenced; the journal writer is named "the existing Netdata journal writer," but the file gives no commit, no test, no number provenance. The whole partitioning argument that follows depends on this number. See §4.1.
 5. **(blocker) v3 USM dynamic engine-ID discovery is a security vulnerability, not an operator convenience.** `netdata.md §5 L153` adopts Splunk's pre-parse hack from `splunk-sc4snmp.md §3.5` and hot-registers `(engineID, username)` pairs. Any device on the network — including an attacker — can claim any engineID via crafted SNMPv3 PDU bytes, get hot-registered, and inject traps that the journal records as authoritative. There is a TOCTOU between discovery and Secrets lookup. CheckMK explicitly requires engine_ids configured per credential (`checkmk.md L151`); Datadog FNV-128 hashes engine ID from hostname (`datadog-agent.md L228-243`); SC4SNMP requires `DISCOVER_ENGINE_ID` opt-in (`splunk-sc4snmp.md L194-205`). The design adopts the workaround without explaining the spoofing window, persistence of hot-registered pairs, expiry, rotation, or operator opt-in/default. Additionally, plugin restart resets `snmpEngineBoots` (RFC 3414 §2.2.2), breaking INFORM Response acceptance until devices time out their cached state. See §7.2.
 6. **(major) Source-IP-hash partitioning to scale writer threads is a risky assumption for dedup state.** `netdata.md §5 L126` and §9 L366-370. Dedup cache (§10 L394) is in-memory; the target does not explicitly say whether it is global, per-listener-thread, or per-writer-shard. If the design later shards listeners → writers by source-IP hash to break the 30k/sec ceiling **and** dedup state shards with the writer, the same `(source, OID, key)` from a device whose IP changes shards mid-storm escapes dedup. The design must commit to one dedup-state model before partitioning. See §3.2.
-7. **(major) "Likely the only real-time system among the cohort" is factually wrong.** `netdata.md §1 L21` Rule 6. `comparison/feature-matrix.md L611-629` shows OpenNMS, Zenoss, CheckMK, Sensu, Zabbix, SolarWinds all do real-time evaluation; Centreon partial (~1s); LibreNMS partial (synchronous handler, cron-delayed delivery). **8 of 16 systems do real-time alarm-engine evaluation.** Netdata is competitive on this axis, not unique. See §3.7.
-8. **(major) "Repeated identical-trap" suppression hides flap signatures, not paired clears.** Earlier framing of this finding incorrectly claimed `linkUp`/`linkDown` collapse — they don't because they have different trap-OIDs (`1.3.6.1.6.3.1.1.5.3` vs `1.3.6.1.6.3.1.1.5.4`) and trap-OID is in the dedup key. The **real** risk: a flapping BGP peer sending `bgpBackwardTransition` every 800ms within a 5s dedup window produces **1 journal entry** for 6 identical traps; operators get silence for a real failing optic / failing peer. The lens (`snmp-traps-in-observability.md §11.7`) is explicit: aggressive dedup hides early hardware failure. Plus the design has no paired-clear mechanism at all — missing the cohort's gold-standard pattern (`opennms.md §5 L274-279` clear-key, `zenoss.md §5 L329-330` clear_fingerprint_hash, `logicmonitor.md L477` auto-close). See §3.3.
+7. **(major) "Likely the only real-time system among the cohort" is factually wrong.** `netdata.md §1 L21` Rule 6. `./feature-matrix.md L611-629` shows OpenNMS, Zenoss, CheckMK, Sensu, Zabbix, SolarWinds all do real-time evaluation; Centreon partial (~1s); LibreNMS partial (synchronous handler, cron-delayed delivery). **8 of 16 systems do real-time alarm-engine evaluation.** Netdata is competitive on this axis, not unique. See §3.7.
+8. **(major) "Repeated identical-trap" suppression hides flap signatures, not paired clears.** Earlier framing of this finding incorrectly claimed `linkUp`/`linkDown` collapse — they don't because they have different trap-OIDs (`1.3.6.1.6.3.1.1.5.3` vs `1.3.6.1.6.3.1.1.5.4`) and trap-OID is in the dedup key. The **real** risk: a flapping BGP peer sending `bgpBackwardTransition` every 800ms within a 5s dedup window produces **1 journal entry** for 6 identical traps; operators get silence for a real failing optic / failing peer. The lens (`../domain/snmp-traps-in-observability.md §11.7`) is explicit: aggressive dedup hides early hardware failure. Plus the design has no paired-clear mechanism at all — missing the cohort's gold-standard pattern (`opennms.md §5 L274-279` clear-key, `zenoss.md §5 L329-330` clear_fingerprint_hash, `logicmonitor.md L477` auto-close). See §3.3.
 9. **(major) "MIB compiler runs inside the plugin via inotify hot-reload" is novel, untested, and risky.** `netdata.md §7 L253` proposes inotify on `/etc/netdata/snmp-mibs/` triggering MIB recompile and in-memory swap. The cohort experience: SC4SNMP needs `pysmi` and rollout-restart (`splunk-sc4snmp.md §4`); CheckMK uploads via WATO + PySMI compile (`checkmk.md §4`); Datadog requires `ddev meta snmp generate-traps-db` and an Agent restart (`datadog-agent.md L410`); Zenoss runs `zenmib` via SubprocessJob (`zenoss.md §4`); Dynatrace requires EEC restart (`dynatrace.md §4`). **Zero** cohort systems do live MIB hot-reload inside the trap process. Smiparser / pysmi runtime cost on 28k MIB files is non-trivial. See §7.1.
 10. **(major) Profile YAML "vendor knowledge only" rule contradicts cohort norm; the two-artefact split breaks Rule 2 (simpler).** `netdata.md §7` says profile YAML "does NOT define metric emission (that lives in plugin configuration — see §7.5)." But the cohort norm — OpenNMS event XML, Datadog `dd_traps_db`, SNMPTT, Zenoss `EventClass`, LogicMonitor LogSource — is that **per-OID metric/alert emission is declared in the same artefact the vendor knowledge lives in**. Splitting profile (vendor) from plugin config (operator emit) creates two artefacts that operators must keep in sync; the design provides no consistency check between them. Rule 2 ("Simpler — for the operator this must be the simplest possible engine") is **directly violated** — enabling alerting on a single Cisco port-security OID requires edits across three locations (profile/vendor knowledge, plugin config `metrics:`, plugin config `labels:`). See §3.5.
-11. **(major) "Per-device vnode following existing SNMP polling pattern" is a cardinality bomb.** `netdata.md §12 L537` instantiates "Per-device vnode (each monitored device is a Netdata virtual node)." With a target of "any reasonable site size" and the design's appetite for unknown OIDs from unprofiled devices (§7 L253), a site with 5,000 SNMP devices means 5,000 vnodes × 2 always-on chart contexts × ~10 dimensions = 100,000 dimensions sustained on the hub just for the per-device events chart. The cohort wisdom (`snmp-traps-in-observability.md §11.7` Silent Deduplication Side-Effect, §8 Label Explosion Tension) is precisely **not to do this**. See §5.1.
-12. **(major) AGPL-3.0 licensing claim is an unreviewed legal assertion, not engineering.** `netdata.md §8 L349-351` asserts "License obligations on others' source files (GPL-2.0 for LibreNMS, AGPL-3.0 for OpenNMS) do not propagate to our derived YAML." This is a legal question, not an engineering one. AGPL-3.0 copyleft + the "derivative work" definition apply to transformations of source. Transforming 17,442 OpenNMS event-XML definitions (including severity, reduction-key, clear-key, varbind-decode mappings) into Netdata profile YAML is arguably derivative. Datadog's parallel approach is Apache-2.0-tooled producing closed-source output from open MIBs (`comparison/profile-inventory.md §6`) — a different licensing posture. Netdata's claim needs legal review before commit. See §3.8.
+11. **(major) "Per-device vnode following existing SNMP polling pattern" is a cardinality bomb.** `netdata.md §12 L537` instantiates "Per-device vnode (each monitored device is a Netdata virtual node)." With a target of "any reasonable site size" and the design's appetite for unknown OIDs from unprofiled devices (§7 L253), a site with 5,000 SNMP devices means 5,000 vnodes × 2 always-on chart contexts × ~10 dimensions = 100,000 dimensions sustained on the hub just for the per-device events chart. The cohort wisdom (`../domain/snmp-traps-in-observability.md §11.7` Silent Deduplication Side-Effect, §8 Label Explosion Tension) is precisely **not to do this**. See §5.1.
+12. **(major) AGPL-3.0 licensing claim is an unreviewed legal assertion, not engineering.** `netdata.md §8 L349-351` asserts "License obligations on others' source files (GPL-2.0 for LibreNMS, AGPL-3.0 for OpenNMS) do not propagate to our derived YAML." This is a legal question, not an engineering one. AGPL-3.0 copyleft + the "derivative work" definition apply to transformations of source. Transforming 17,442 OpenNMS event-XML definitions (including severity, reduction-key, clear-key, varbind-decode mappings) into Netdata profile YAML is arguably derivative. Datadog's parallel approach is Apache-2.0-tooled producing closed-source output from open MIBs (`./profile-inventory.md §6`) — a different licensing posture. Netdata's claim needs legal review before commit. See §3.8.
 13. **(major) Hub-down = fleet blind spot during outage.** The hub model (`netdata-snmp-hub-architecture.md` § "What each SNMP hub contains") commits to "no central correlation tier" and "Cloud aggregates for presentation; not for correlation." When Site A's hub crashes, Site B's operators see nothing from Site A — and Site A's devices' traps are silently dropped at the kernel UDP layer of the unreachable hub. SaaS-cohort systems (Datadog, Dynatrace, LogicMonitor, Splunk SC4SNMP) have resilient SaaS-side ingestion during collector downtime; the trap reaches the central tier even if the local collector is unhealthy. The hub model deliberately drops this resilience. The design does not surface the trade-off. See §3.9.
 
 ---
@@ -37,11 +37,11 @@ These are claims in `netdata.md` that hold up under cohort comparison. Every one
 
 ### S1. Journal-as-document primitive (partial vindication)
 
-`netdata.md §2 L32-49`: the choice to treat every trap as a structured journal row maps to the SaaS-cohort convergence. `comparison/design-forks.md` Fork 1(d) lists six systems — Datadog, Dynatrace, Splunk SC4SNMP, Logstash, SolarWinds (current), LogicMonitor — that converged on the log-document primitive. `datadog-agent.md L20` is explicit: traps are a `logs` data type, not metrics. `dynatrace.md L36-39`: Grail log event. So the document-primitive choice is **cohort-validated by 6 of 16 systems**. **Caveat**: every one of these six is a forwarder-to-SaaS; none of them runs the document store on-prem on the same hub. The strength is the primitive choice, not the on-prem-journal storage choice (see §3.1).
+`netdata.md §2 L32-49`: the choice to treat every trap as a structured journal row maps to the SaaS-cohort convergence. `./design-forks.md` Fork 1(d) lists six systems — Datadog, Dynatrace, Splunk SC4SNMP, Logstash, SolarWinds (current), LogicMonitor — that converged on the log-document primitive. `datadog-agent.md L20` is explicit: traps are a `logs` data type, not metrics. `dynatrace.md L36-39`: Grail log event. So the document-primitive choice is **cohort-validated by 6 of 16 systems**. **Caveat**: every one of these six is a forwarder-to-SaaS; none of them runs the document store on-prem on the same hub. The strength is the primitive choice, not the on-prem-journal storage choice (see §3.1).
 
 ### S2. Profile-derived OOB coverage *aspiration* is cohort-comparable
 
-`netdata.md §8 L302` cites Datadog vendor claim "11,000+ MIBs" but the verified count via copy of `dd_traps_db.json.gz` is **3,652 MIBs** (the design's own citation). `netdata.md §8` proposes ~28,200 raw MIB files → 8,000-12,000 deduped modules, transforming OpenNMS XML + Centreon SQL + LibreNMS PHP handlers + Datadog `dd_traps_db` + pysnmp/pysmi public MIBs + LibreNMS bundled tree. `comparison/profile-inventory.md §1` shows OpenNMS 17,442 event definitions (AGPLv3); `comparison/profile-inventory.md §3` LibreNMS 4,770 MIBs / 2,245 with notifications; `comparison/profile-inventory.md §6` notes Datadog "vendor claim" of 11,000+ vs verified 3,652. **Important caveats: (a) Netdata's 8-12k is the raw deduped MIB module count, not curated/tested coverage; (b) Datadog's verified 3,652 represents *curated* trap definitions, not raw modules; (c) the conversion tools (§8 L334-348) do not yet exist (see H2 in §7). The aspiration is cohort-comparable; the delivery target must be measured, not asserted.** **Confidence medium.**
+`netdata.md §8 L302` cites Datadog vendor claim "11,000+ MIBs" but the verified count via copy of `dd_traps_db.json.gz` is **3,652 MIBs** (the design's own citation). `netdata.md §8` proposes ~28,200 raw MIB files → 8,000-12,000 deduped modules, transforming OpenNMS XML + Centreon SQL + LibreNMS PHP handlers + Datadog `dd_traps_db` + pysnmp/pysmi public MIBs + LibreNMS bundled tree. `./profile-inventory.md §1` shows OpenNMS 17,442 event definitions (AGPLv3); `./profile-inventory.md §3` LibreNMS 4,770 MIBs / 2,245 with notifications; `./profile-inventory.md §6` notes Datadog "vendor claim" of 11,000+ vs verified 3,652. **Important caveats: (a) Netdata's 8-12k is the raw deduped MIB module count, not curated/tested coverage; (b) Datadog's verified 3,652 represents *curated* trap definitions, not raw modules; (c) the conversion tools (§8 L334-348) do not yet exist (see H2 in §7). The aspiration is cohort-comparable; the delivery target must be measured, not asserted.** **Confidence medium.**
 
 ### S3. Source identification via PDU-level fields (RFC 3584)
 
@@ -53,23 +53,23 @@ Iter-1 reviewers flagged this as soft-pedalling: a "shared cohort blind spot" is
 
 ### S5. PLUGINSD/stdio decoupling for stdout backpressure
 
-`netdata.md §5 L129-149` decouples the hot path (UDP recv + decode + counter increment + journal write) from the cold path (PLUGINSD `BEGIN`/`SET`/`END` emission). This is the right pattern for the cohort: `telegraf.md §10` documents single-goroutine throughput collapse when downstream backs up; `opennms.md L131 (isBlockWhenFull=true)` is the contrasting back-pressure choice. Netdata's choice — never let the metric pipe back-pressure into the trap-receive path — is closer to Telegraf's metric buffer + accumulator design (`comparison/feature-matrix.md L937`). **Cohort-validated.**
+`netdata.md §5 L129-149` decouples the hot path (UDP recv + decode + counter increment + journal write) from the cold path (PLUGINSD `BEGIN`/`SET`/`END` emission). This is the right pattern for the cohort: `telegraf.md §10` documents single-goroutine throughput collapse when downstream backs up; `opennms.md L131 (isBlockWhenFull=true)` is the contrasting back-pressure choice. Netdata's choice — never let the metric pipe back-pressure into the trap-receive path — is closer to Telegraf's metric buffer + accumulator design (`./feature-matrix.md L937`). **Cohort-validated.**
 
 ### S6. INFORM acknowledgement in scope
 
-`netdata.md §6 L162` includes INFORM. The cohort is split: OpenNMS, Zenoss, Centreon, Zabbix support INFORM (`comparison/feature-matrix.md L122-141`); CheckMK explicitly does NOT (`checkmk.md L152` — "We do not support them (yet)"); Dynatrace explicitly does NOT (`dynatrace.md L209-213`). The lens (`snmp-traps-in-observability.md §2`) flags INFORM as "reliability for v2c/v3"; financial/healthcare compliance asks for it. Netdata including it is **better than CheckMK and Dynatrace, on par with OpenNMS/Zabbix**.
+`netdata.md §6 L162` includes INFORM. The cohort is split: OpenNMS, Zenoss, Centreon, Zabbix support INFORM (`./feature-matrix.md L122-141`); CheckMK explicitly does NOT (`checkmk.md L152` — "We do not support them (yet)"); Dynatrace explicitly does NOT (`dynatrace.md L209-213`). The lens (`../domain/snmp-traps-in-observability.md §2`) flags INFORM as "reliability for v2c/v3"; financial/healthcare compliance asks for it. Netdata including it is **better than CheckMK and Dynatrace, on par with OpenNMS/Zabbix**.
 
 ### S7. Plugin-self metrics (`snmp.trap.events`, `snmp.trap.errors`)
 
-`netdata.md §12 L525-561` exposes per-hub pipeline-health metrics: `unknown_oid`, `decode_errors`, `deduplicated`. The cohort has this only sometimes: OpenNMS 11 JMX counters (`opennms.md L271`), Telegraf via internal metrics, Datadog `datadog.snmp_traps.*` (`comparison/operator-features.md T2-07`), Zabbix `zabbix[process,snmp trapper,*]` template (`zabbix.md L536`). Most others — CheckMK, Centreon, LibreNMS, Nagios+SNMPTT, Sensu, SolarWinds, Dynatrace, LogicMonitor — have nothing or log-scrape-only. Netdata's first-class self-telemetry is **above cohort median**. **Confidence high.**
+`netdata.md §12 L525-561` exposes per-hub pipeline-health metrics: `unknown_oid`, `decode_errors`, `deduplicated`. The cohort has this only sometimes: OpenNMS 11 JMX counters (`opennms.md L271`), Telegraf via internal metrics, Datadog `datadog.snmp_traps.*` (`./operator-features.md T2-07`), Zabbix `zabbix[process,snmp trapper,*]` template (`zabbix.md L536`). Most others — CheckMK, Centreon, LibreNMS, Nagios+SNMPTT, Sensu, SolarWinds, Dynatrace, LogicMonitor — have nothing or log-scrape-only. Netdata's first-class self-telemetry is **above cohort median**. **Confidence high.**
 
 ### S8. Cardinality discipline rule (§4)
 
-`netdata.md §4 L81-110`: MAC, source-IP-of-auth-attempt, username, RAID slot ID, packet content are FORBIDDEN as metric labels; they live in journal MESSAGE / JSON varbinds. This is exactly what the lens (`snmp-traps-in-observability.md §8.4`) and `snmp-traps-in-observability.md §4 Sampling/Aggregation Caveats` warn about. **Cohort behaviour is split**: Telegraf has explicit cardinality discipline (`telegraf.md L355`); Zabbix history_log/_text avoids labels by design (`zabbix.md L343-358`); SolarWinds creates a row per varbind in `Orion.TrapVarbinds` (`solarwinds.md L413`). Netdata's structural-reject-at-config-load (`netdata.md §4 L110`) is **stronger than any cohort default**. **Confidence high.**
+`netdata.md §4 L81-110`: MAC, source-IP-of-auth-attempt, username, RAID slot ID, packet content are FORBIDDEN as metric labels; they live in journal MESSAGE / JSON varbinds. This is exactly what the lens (`../domain/snmp-traps-in-observability.md §8.4`) and `../domain/snmp-traps-in-observability.md §4 Sampling/Aggregation Caveats` warn about. **Cohort behaviour is split**: Telegraf has explicit cardinality discipline (`telegraf.md L355`); Zabbix history_log/_text avoids labels by design (`zabbix.md L343-358`); SolarWinds creates a row per varbind in `Orion.TrapVarbinds` (`solarwinds.md L413`). Netdata's structural-reject-at-config-load (`netdata.md §4 L110`) is **stronger than any cohort default**. **Confidence high.**
 
 ### S9. Hub-local correlation (no central tier) — differentiation, but with a real trade-off
 
-`netdata.md §0 L7` and `netdata-snmp-hub-architecture.md` together commit to "no central correlation tier." The hub-with-co-located-topology-and-polling pattern is the differentiator. `comparison/feature-matrix.md L880-898`: every other system either has a central DB (OpenNMS, Zenoss, Centreon, LibreNMS, Nagios, SolarWinds), a central SaaS (Datadog, Splunk, Dynatrace, LogicMonitor), or pushes correlation to the operator (Telegraf, Logstash, Cribl). Telegraf/Logstash/Cribl are *also* distributed without central correlation, so "no central tier" is not unique — the specific combination of (UDP/162 reception + polling + topology + alert engine + log store + correlation) co-located on one hub is unique. Lens (`snmp-traps-in-observability.md §6.4 Anti-Pattern Single Manager Bottleneck`) supports the choice. **Caveats**: (a) per-hub throughput must actually deliver (see §1 #3); (b) the hub-down = fleet blind spot trade-off is unstated in the design (see §1 #13).
+`netdata.md §0 L7` and `netdata-snmp-hub-architecture.md` together commit to "no central correlation tier." The hub-with-co-located-topology-and-polling pattern is the differentiator. `./feature-matrix.md L880-898`: every other system either has a central DB (OpenNMS, Zenoss, Centreon, LibreNMS, Nagios, SolarWinds), a central SaaS (Datadog, Splunk, Dynatrace, LogicMonitor), or pushes correlation to the operator (Telegraf, Logstash, Cribl). Telegraf/Logstash/Cribl are *also* distributed without central correlation, so "no central tier" is not unique — the specific combination of (UDP/162 reception + polling + topology + alert engine + log store + correlation) co-located on one hub is unique. Lens (`../domain/snmp-traps-in-observability.md §6.4 Anti-Pattern Single Manager Bottleneck`) supports the choice. **Caveats**: (a) per-hub throughput must actually deliver (see §1 #3); (b) the hub-down = fleet blind spot trade-off is unstated in the design (see §1 #13).
 
 ### S10. Categorical taxonomy mapped to MIB-derived knowledge
 
@@ -126,12 +126,12 @@ Originally classified blocker in iter-1. Codex iter-2 correctly noted the "dedup
 
 - **Target evidence**: `netdata.md §10 L394-398` "first-wins" + "Cache entries expire after the dedup window (default e.g., 5 seconds, configurable globally and per-OID)"; §7 L208 `dedup_key_varbinds: [cpsIfViolationMacAddress, cpsIfViolationVlan]`.
 - **Clarification**: `linkUp` (`1.3.6.1.6.3.1.1.5.4`) and `linkDown` (`1.3.6.1.6.3.1.1.5.3`) have different trap-OIDs; the §10 fingerprint `hash(source_device, trap_OID, key_varbinds)` does NOT collapse them. The risk is NOT linkUp/linkDown collapse.
-- **The real risk**: repeated *identical* traps within the dedup window are hidden. A flapping BGP peer sending `bgpBackwardTransition` (`1.3.6.1.2.1.15.7.2`) every 800ms within a 5s default window produces **1 journal entry for 6+ identical traps**; operators get silence for what is a real failing peer/optic. The lens (`snmp-traps-in-observability.md §11.7 Silent Deduplication Side-Effect`) is explicit: "Aggressive deduplication (e.g., 5-minute window) suppresses a flapping interface that is actually an early hardware failure signature."
+- **The real risk**: repeated *identical* traps within the dedup window are hidden. A flapping BGP peer sending `bgpBackwardTransition` (`1.3.6.1.2.1.15.7.2`) every 800ms within a 5s default window produces **1 journal entry for 6+ identical traps**; operators get silence for what is a real failing peer/optic. The lens (`../domain/snmp-traps-in-observability.md §11.7 Silent Deduplication Side-Effect`) is explicit: "Aggressive deduplication (e.g., 5-minute window) suppresses a flapping interface that is actually an early hardware failure signature."
 - **Cohort contradiction on paired-clear**:
   - `opennms.md §5 L274-279`: alarm-layer reduction-key + `clear-key` for paired-clear (e.g., `ccmGatewayRecovered` clears `ccmGatewayFailed`). Cohort gold-standard.
   - `zenoss.md §5 L329-330`: ZEP `clear_fingerprint_hash` computed from `device|component|eventClass|eventKey` — paired traps with matching identifiers but different severity clear automatically.
   - `logicmonitor.md L477` LogSource: "Automatically close alerts when a related 'clear' trap comes in."
-  - `comparison/feature-matrix.md L522-541` Clear-pair semantics: only OpenNMS, Zenoss, LogicMonitor LogSource fully support; CheckMK partial via `match_ok`; **most others operator-built**. Netdata's design has **no paired-clear mechanism at all** — `netdata.md §14 L591` explicit non-goal "Built-in alarm-lifecycle state machine (open/ack/clear) — alert-engine territory."
+  - `./feature-matrix.md L522-541` Clear-pair semantics: only OpenNMS, Zenoss, LogicMonitor LogSource fully support; CheckMK partial via `match_ok`; **most others operator-built**. Netdata's design has **no paired-clear mechanism at all** — `netdata.md §14 L591` explicit non-goal "Built-in alarm-lifecycle state machine (open/ack/clear) — alert-engine territory."
 - **Why netdata.md gets this wrong**: §3 L79 admits paired-clear in passing ("A future release may add a `metric_filter` profile field..."), but the dedup mechanism in §10 actively hides flap signatures. The lens §11.7 calls this out as the failure mode for aggressive dedup.
 - **Recommended fix**:
   1. Document the 5s-window dedup behaviour and surface the suppressed-count as a per-trap-OID metric so operators see flap signatures even when journal entries are collapsed.
@@ -183,7 +183,7 @@ Originally classified blocker in iter-1. Codex iter-2 correctly noted the "dedup
 
 - **Target evidence**: `netdata.md §10 L388-390` "Netdata already ships built-in alerts for UDP receive-buffer overflow on all listeners. That covers the kernel-level overflow case. We do NOT duplicate that as a plugin feature"; §14 L593 explicit non-goal.
 - **Cohort contradiction**:
-  - `snmp-traps-in-observability.md §11.1 Trap Storm`: Trap Storm / Thundering Herd is the **#1 failure mode in the lens**. The lens recommends "circuit breakers that shed non-critical trap types under load; per-source token bucket rate limiting." Netdata's response is "we don't do that — the kernel alerts."
+  - `../domain/snmp-traps-in-observability.md §11.1 Trap Storm`: Trap Storm / Thundering Herd is the **#1 failure mode in the lens**. The lens recommends "circuit breakers that shed non-critical trap types under load; per-source token bucket rate limiting." Netdata's response is "we don't do that — the kernel alerts."
   - `cribl.md §10 L497`: kernel SO_RCVBUF + PQ + Drop function — three layers, even in a closed-source product positioned as a pipeline-only.
   - `opennms.md §5 L130-131`: explicit `isBlockWhenFull=true` back-pressure choice, allowing the kernel to be the buffer of last resort but the agent to push back deliberately.
   - `datadog-agent.md §5 L248-249`: bounded channel size 100, but explicit drop accounting via `EventPlatformEventsErrors[network-devices-snmp-traps]`.
@@ -197,7 +197,7 @@ Originally classified blocker in iter-1. Codex iter-2 correctly noted the "dedup
   - `splunk-sc4snmp.md L194-205`: `DISCOVER_ENGINE_ID` is **opt-in** and explicitly gated. SC4SNMP's pattern requires operator consent to accept unknown engine IDs.
   - `checkmk.md L151`: engine_ids must be pre-configured per credential. Explicit rejection of dynamic discovery.
   - `datadog-agent.md L228-243`: FNV-128 hash of hostname → engine ID. Deterministic and not operator-supplied.
-  - `comparison/operator-features.md T3-03`: 7 cohort systems support multi-user; **none** documented as accepting fully-unknown engineIDs by default.
+  - `./operator-features.md T3-03`: 7 cohort systems support multi-user; **none** documented as accepting fully-unknown engineIDs by default.
 - **Security implications netdata.md does not state**:
   1. **Engine-ID spoofing**: any device on the network can craft an SNMPv3 PDU claiming any engineID. If the netdata listener hot-registers any pair on first contact, an attacker injects a fake `(engineID, username)` pair before the legitimate device sends its trap. The journal records the attacker's trap as authoritative.
   2. **TOCTOU between discovery and Secrets lookup**: the design (§7.5 L260) says community/keys come from Secrets. If hot-register happens before Secrets lookup, the Secrets binding may not match.
@@ -236,7 +236,7 @@ Originally classified blocker in iter-1. Codex iter-2 correctly noted the "dedup
 ### W13. (major) "Likely the only real-time system among the cohort" is factually wrong
 
 - **Target evidence**: `netdata.md §1 L21` Rule 6: "Real-time (1-second from PDU arrival to alert evaluation). **Likely the only real-time system among the cohort.**"
-- **Cohort contradiction**: `comparison/feature-matrix.md L611-629` Real-time evaluation table:
+- **Cohort contradiction**: `./feature-matrix.md L611-629` Real-time evaluation table:
   - OpenNMS ✓ (`opennms.md L264` alarm engine on event bus; cosmicClear in Drools).
   - Zenoss ✓ (`zenoss.md L34` zeneventd pipeline → ZEP).
   - CheckMK ✓ (`checkmk.md L158` in-process synchronous).
@@ -254,12 +254,12 @@ Originally classified blocker in iter-1. Codex iter-2 correctly noted the "dedup
 ### W14. (major) AGPL-3.0 / GPL-3.0-or-later licensing claim needs legal review (and LibreNMS license is misstated in the design)
 
 - **Target evidence**: `netdata.md §8 L349-351` "We are transforming knowledge at development time, not redistributing other systems' files. The output (our profile YAML) is original work informed by reading public documentation, MIB definitions, and open-source classifications. License obligations on others' source files (GPL-2.0 for LibreNMS, AGPL-3.0 for OpenNMS) do not propagate to our derived YAML."
-- **Factual error in the design**: `comparison/profile-inventory.md §3 L30` and `comparison/profile-inventory.md §4 L39` both state LibreNMS license is **GPL-3.0-or-later**, not GPL-2.0 as netdata.md claims. The factual misstatement aggravates the unreviewed legal claim.
+- **Factual error in the design**: `./profile-inventory.md §3 L30` and `./profile-inventory.md §4 L39` both state LibreNMS license is **GPL-3.0-or-later**, not GPL-2.0 as netdata.md claims. The factual misstatement aggravates the unreviewed legal claim.
 - **Why this matters**: this is a **legal claim, not engineering**. AGPL-3.0 has copyleft + derivative-work provisions; whether transforming 17,442 OpenNMS event-XML definitions (including severity, reduction-key, clear-key, varbind-decode mappings) into Netdata YAML produces a derivative work is a question for legal counsel, not the design author.
 - **Cohort comparison**:
-  - Datadog (`comparison/profile-inventory.md §6`): Apache-2.0 tooling reads public MIBs and produces closed-source `dd_traps_db.json.gz`. The tooling is openly licensed; the bundled output is closed. Different posture from Netdata's claim.
-  - Centreon (`comparison/profile-inventory.md §2`): Apache-2.0 trap-engine, openly published SQL data file. Apache-2.0 reading + Apache-2.0 output = simple chain.
-  - OpenNMS AGPLv3 (`comparison/profile-inventory.md §1`): the event-XML corpus is the AGPLv3 part Netdata is transforming. AGPL-3.0 §13 (network use) and §1 (the source code definition) are non-trivial.
+  - Datadog (`./profile-inventory.md §6`): Apache-2.0 tooling reads public MIBs and produces closed-source `dd_traps_db.json.gz`. The tooling is openly licensed; the bundled output is closed. Different posture from Netdata's claim.
+  - Centreon (`./profile-inventory.md §2`): Apache-2.0 trap-engine, openly published SQL data file. Apache-2.0 reading + Apache-2.0 output = simple chain.
+  - OpenNMS AGPLv3 (`./profile-inventory.md §1`): the event-XML corpus is the AGPLv3 part Netdata is transforming. AGPL-3.0 §13 (network use) and §1 (the source code definition) are non-trivial.
 - **Recommended fix**: defer the licensing claim to legal review. Until reviewed:
   1. Remove the assertion that "license obligations do not propagate."
   2. State that the conversion approach is under legal review.
@@ -287,7 +287,7 @@ Originally classified blocker in iter-1. Codex iter-2 correctly noted the "dedup
 ### W16. (major) MIB version conflict resolution across hubs is undefined
 
 - **Target evidence**: `netdata.md §7 L253` "Operator-provided **MIB files** (raw `.mib` / `.txt` SMIv1/v2 files for vendors not covered by stock profiles) live in `/etc/netdata/snmp-mibs/`. The plugin watches the directory via inotify; compiles new MIBs on file change; updates the in-memory MIB index without restart."
-- **Why this matters**: in a multi-hub deployment, two hubs may run different versions of the same vendor MIB. A trap from Cisco device X arrives at Hub A (with Cisco-MIB v23.1) and at Hub B (with Cisco-MIB v21.0). Hub A produces `ifAdminStatus` (named); Hub B produces `1.3.6.1.2.1.2.2.1.7` (numeric). Cloud queries across both hubs see different field names for the same OID. Lens (`snmp-traps-in-observability.md §11.5 Firmware Trap Schema Drift`) calls this a top failure mode.
+- **Why this matters**: in a multi-hub deployment, two hubs may run different versions of the same vendor MIB. A trap from Cisco device X arrives at Hub A (with Cisco-MIB v23.1) and at Hub B (with Cisco-MIB v21.0). Hub A produces `ifAdminStatus` (named); Hub B produces `1.3.6.1.2.1.2.2.1.7` (numeric). Cloud queries across both hubs see different field names for the same OID. Lens (`../domain/snmp-traps-in-observability.md §11.5 Firmware Trap Schema Drift`) calls this a top failure mode.
 - **Cohort contradiction**:
   - `datadog-agent.md §4`: single `dd_traps_db.json.gz` shipped with the Agent; same Agent version = same MIB set across the fleet.
   - `dynatrace.md §4 L302-307`: bundled extension has a "fixed predefined OID set" — same set everywhere.
@@ -319,7 +319,7 @@ Originally classified blocker in iter-1. Codex iter-2 correctly noted the "dedup
 - **Cohort contradiction**:
   - `opennms.md §5`: AuthenticationFailureLogger logs each dispatcher's auth result at DEBUG. There's no metric, but there's a log signal.
   - `splunk-sc4snmp.md L194-205`: `DISCOVER_ENGINE_ID` produces a counter for engine-ID discovery events.
-  - Lens (`snmp-traps-in-observability.md §11.4` Community String / v3 Credential Mismatch Silence): the cohort's #4 failure mode is *silent* credential mismatch — operators report "no traps from device X" with no clue why. The fix is metric-level signal.
+  - Lens (`../domain/snmp-traps-in-observability.md §11.4` Community String / v3 Credential Mismatch Silence): the cohort's #4 failure mode is *silent* credential mismatch — operators report "no traps from device X" with no clue why. The fix is metric-level signal.
 - **Why netdata.md gets this wrong**: traps that fail allowlist (UDP peer not in allowlist), traps that fail v3 USM auth, traps from unknown communities — all currently silent. The §12 `snmp.trap.errors` chart should have dimensions for these.
 - **Recommended fix**: add `auth_failures`, `allowlist_dropped`, `usm_failures` (and possibly `unknown_community`) dimensions to `snmp.trap.errors` at §12 L551. Each is incremented when a PDU is rejected at the corresponding layer.
 
@@ -354,7 +354,7 @@ Originally classified blocker in iter-1. Codex iter-2 correctly noted the "dedup
 - **Cohort contradiction**:
   - `librenms.md §5 L285`: explicitly notes that "multi-line varbind values and lines without a space are silently mishandled" — LibreNMS's parser is non-defensive. Netdata is targeting a higher quality bar; it must defend.
   - `centreon.md L143-148`: writes 4096-byte atomic lines but does not sanitize newlines in payload.
-  - Lens (`snmp-traps-in-observability.md §11.4`): silent credential mismatch + lens §11.7 silent-dedup are operational anti-patterns; journal-injection is a security anti-pattern.
+  - Lens (`../domain/snmp-traps-in-observability.md §11.4`): silent credential mismatch + lens §11.7 silent-dedup are operational anti-patterns; journal-injection is a security anti-pattern.
 - **Recommended fix**:
   1. Template substitution sanitizes varbind values before MESSAGE insertion: strip / replace `\n`, `\r`, `\0`, and any byte < 0x20 with a printable substitute (e.g., `\x0a` literal).
   2. `SNMP_TRAP_JSON` uses a strict JSON encoder that escapes control characters per RFC 8259.
@@ -438,19 +438,19 @@ Features the cohort considers essential that `netdata.md` does not address.
 ### M1. Clear-pair semantics (auto-clear `linkDown` ↔ `linkUp`)
 
 - **Cohort coverage**: 4 of 16 ship paired-clear: OpenNMS (`opennms.md §5` `clear-key`), Zenoss (`zenoss.md §5` `zEventClearClasses` + `clear_fingerprint_hash`), LogicMonitor LogSource auto-close, CheckMK `match_ok` cancelling rules. 12 of 16 are operator-built.
-- **Why it matters**: the lens (`snmp-traps-in-observability.md §6.5 Absence of Clear Events`) calls this a Stage-4 maturity indicator. Without paired-clear, a missed `linkUp` (UDP loss) leaves the interface "down" in the journal forever (`snmp-traps-in-observability.md §11.2`).
+- **Why it matters**: the lens (`../domain/snmp-traps-in-observability.md §6.5 Absence of Clear Events`) calls this a Stage-4 maturity indicator. Without paired-clear, a missed `linkUp` (UDP loss) leaves the interface "down" in the journal forever (`../domain/snmp-traps-in-observability.md §11.2`).
 - **Recommendation**: **deferred to Phase 2 / Phase 3** (alignment with implications-file Phase 4). Surface loud in §14 Non-Goals of `netdata.md` for first release. The W4 dedup change (1s default + suppressed-count metric) plus operator paired-clear via the existing alert engine (e.g., alert when `linkDown` is open and no `linkUp` arrives within 5 min, then reconcile via `ifOperStatus` poll) is the first-release workaround. The profile field `clear_trap_oid:` is a Phase 2/3 deliverable.
 
 ### M2. Topology-aware suppression
 
-- **Cohort coverage**: 0 of 16 ship this as a built-in feature (`comparison/operator-features.md T3-06`).
-- **Why it matters**: the lens (`snmp-traps-in-observability.md §6.4 Topology-Aware Correlation`) calls this a Stage-4 indicator. Netdata is uniquely positioned because the hub already has topology (`netdata-snmp-hub-architecture.md`).
+- **Cohort coverage**: 0 of 16 ship this as a built-in feature (`./operator-features.md T3-06`).
+- **Why it matters**: the lens (`../domain/snmp-traps-in-observability.md §6.4 Topology-Aware Correlation`) calls this a Stage-4 indicator. Netdata is uniquely positioned because the hub already has topology (`netdata-snmp-hub-architecture.md`).
 - **Recommendation**: in-scope for the cohort-win audit. `netdata.md §16 L621` already claims "**Hub-local enrichment makes this cheap.**" — but the design provides no implementation detail. Add a §13 Open Question: how does the alert engine suppress downstream alerts when upstream is in alarm? What state does the journal carry to enable this?
 
 ### M3. INFORM-acknowledgement under the hub design
 
 - **Cohort coverage**: 4 fully (OpenNMS, Zenoss, Centreon, Zabbix); CheckMK ✗; Dynatrace ✗.
-- **Why it matters**: `netdata.md §6 L162` lists INFORM as in-scope. But INFORM under the hub design means: the hub must respond with a Response PDU on a separate UDP port back to the originating device. If the hub is behind a NAT relative to the device (per `snmp-traps-in-observability.md §11.4 NAT-Obscured Trap Source`), the INFORM Response goes to the wrong place.
+- **Why it matters**: `netdata.md §6 L162` lists INFORM as in-scope. But INFORM under the hub design means: the hub must respond with a Response PDU on a separate UDP port back to the originating device. If the hub is behind a NAT relative to the device (per `../domain/snmp-traps-in-observability.md §11.4 NAT-Obscured Trap Source`), the INFORM Response goes to the wrong place.
 - **Recommendation**: state the operational expectation: INFORM requires direct routing back to the device; not all hub deployments will support it.
 
 ### M4. Per-row cost forensics (the storage cost the design hides)
@@ -462,12 +462,12 @@ Features the cohort considers essential that `netdata.md` does not address.
 ### M5. Northbound trap re-emit
 
 - **Cohort coverage**: 7 of 16 ship native northbound (OpenNMS, Zenoss, LibreNMS, Cribl, SolarWinds, Centreon, Sensu); 9 of 16 do not.
-- **Why it matters**: enterprise customers with layered NMS hierarchies (manager-of-managers pattern, `comparison/operator-features.md T3-01`). The design (`netdata.md §13 L577`) defers this to a separate SOW.
+- **Why it matters**: enterprise customers with layered NMS hierarchies (manager-of-managers pattern, `./operator-features.md T3-01`). The design (`netdata.md §13 L577`) defers this to a separate SOW.
 - **Recommendation**: keep deferred, but document the Cloud-aggregated-for-presentation choice as a partial substitute for centralized observability.
 
 ### M6. Operator alert UX path
 
-- **Cohort coverage**: 13 of 16 ship some form of operator alert authoring UX (`comparison/operator-features.md T2-03`).
+- **Cohort coverage**: 13 of 16 ship some form of operator alert authoring UX (`./operator-features.md T2-03`).
 - **Why it matters**: the design says §0 L6 "Alerting (existing Netdata alert engine) ... handled by existing Netdata subsystems." But the cohort norm is that trap-driven alerting requires authoring per-OID rules — the existing Netdata alert engine doesn't have OID-aware authoring UX today.
 - **Recommendation**: validate that the existing Netdata alert engine's alert authoring UX supports OID-aware filtering (e.g., "alert when `snmp.trap.cisco_port_security` rises with label `interface=Gi0/1`"). If it does, cite the existing UI page. If it doesn't, this is a real gap.
 
@@ -479,7 +479,7 @@ Features the cohort considers essential that `netdata.md` does not address.
 
 ### M8. Test fixture corpus (per-vendor `.trap` fixtures, PCAPs)
 
-- **Cohort coverage**: Zenoss `trapdump.pcap` (`comparison/fixture-inventory.md §2.2`), LibreNMS 80 templated text fixtures (`comparison/fixture-inventory.md §6`), Splunk SC4SNMP pysnmp v1/v2c/v3 tests (`comparison/fixture-inventory.md §12`).
+- **Cohort coverage**: Zenoss `trapdump.pcap` (`./fixture-inventory.md §2.2`), LibreNMS 80 templated text fixtures (`./fixture-inventory.md §6`), Splunk SC4SNMP pysnmp v1/v2c/v3 tests (`./fixture-inventory.md §12`).
 - **Why it matters**: a new trap-receiver implementation needs test fixtures. The design has no §17.7-equivalent fixture-corpus commitment.
 - **Recommendation**: §17 should explicitly include "ingest the Zenoss PCAP, LibreNMS text fixtures, OpenNMS smoke-test fixtures into the Netdata test suite" as a Day-1 deliverable.
 
@@ -557,8 +557,8 @@ Features the cohort considers essential that `netdata.md` does not address.
 ### H3. The `dd_traps_db`-equivalent
 
 - **Target claim**: §8 L323-327 28,200 raw MIB files → 8-12k unique modules → "dd_traps_db-equivalent built end-to-end from public sources."
-- **Hidden complexity**: Datadog's `dd_traps_db.json.gz` is a build-time artefact. The Datadog compiler (`datadog-agent.md §4 L400-408`, `ddev meta snmp generate-traps-db`) does multi-stage parsing: read MIB → resolve imports → emit JSON. The Netdata design implies the same flow exists "for free" because pysmi and pysnmp do the work. But Datadog has a closed-source 3,652-MIB-curated build target ((`comparison/profile-inventory.md §6` says verified count 3,652, vendor claims 11,000+). Netdata's 8-12k is the **raw deduped count**, not the curated/tested count.
-- **Cohort evidence**: `datadog-agent.md §4 L394` "more than 11,000 MIBs" is a marketing number; the verified count is 3,652. `comparison/profile-inventory.md §6`: "the actual file ships inside the closed Omnibus installer."
+- **Hidden complexity**: Datadog's `dd_traps_db.json.gz` is a build-time artefact. The Datadog compiler (`datadog-agent.md §4 L400-408`, `ddev meta snmp generate-traps-db`) does multi-stage parsing: read MIB → resolve imports → emit JSON. The Netdata design implies the same flow exists "for free" because pysmi and pysnmp do the work. But Datadog has a closed-source 3,652-MIB-curated build target ((`./profile-inventory.md §6` says verified count 3,652, vendor claims 11,000+). Netdata's 8-12k is the **raw deduped count**, not the curated/tested count.
+- **Cohort evidence**: `datadog-agent.md §4 L394` "more than 11,000 MIBs" is a marketing number; the verified count is 3,652. `./profile-inventory.md §6`: "the actual file ships inside the closed Omnibus installer."
 - **Recommended treatment**: state the target as "5,000 OIDs curated for severity + category + symbolic name + display_hint" or similar. Don't promise 8-12k unique modules with no quality criterion.
 
 ### H4. The journal vacuum / rotation / corruption recovery story
@@ -601,7 +601,7 @@ The journal is on the same filesystem as the rest of Netdata's data. If Netdata'
 
 ### Q3. Does the existing Netdata alert engine support OID-aware alert authoring?
 
-§0 L6 defers alerting to "the existing Netdata alert engine." The cohort universally requires per-OID rule authoring; the cohort's experience is that the alert authoring UX is critical (`comparison/operator-features.md T2-03`). I couldn't verify from the design whether the existing engine has OID-aware UX.
+§0 L6 defers alerting to "the existing Netdata alert engine." The cohort universally requires per-OID rule authoring; the cohort's experience is that the alert authoring UX is critical (`./operator-features.md T2-03`). I couldn't verify from the design whether the existing engine has OID-aware UX.
 
 ### Q4. What does Cloud do with traps when hubs disagree on MIB versions?
 
@@ -643,16 +643,16 @@ Target:
 
 Comparison artefacts (6):
 
-2. **`comparison/feature-matrix.md`** (1,375 lines, last line: "Read `logicmonitor.md` in whole (1138 lines, last line: \"preserving cross-system framing alignment.\")")
-3. **`comparison/design-forks.md`** (398 lines, last line: "Read `logicmonitor.md` in whole (1138 lines, last line: \"preserving cross-system framing alignment.\")")
-4. **`comparison/profile-inventory.md`** (179 lines, last line: "Read `logicmonitor.md` in whole (1138 lines, last line: \"preserving cross-system framing alignment.\")")
-5. **`comparison/fixture-inventory.md`** (252 lines, last line: "Read `logicmonitor.md` in whole (1138 lines, last line: \"preserving cross-system framing alignment.\")")
-6. **`comparison/alerting-models.md`** (247 lines, last line: "Read `logicmonitor.md` in whole (1138 lines, last line: \"preserving cross-system framing alignment.\")")
-7. **`comparison/operator-features.md`** (305 lines, last line: "Read `logicmonitor.md` in whole (1138 lines, last line: \"preserving cross-system framing alignment.\")")
+2. **`./feature-matrix.md`** (1,375 lines, last line: "Read `logicmonitor.md` in whole (1138 lines, last line: \"preserving cross-system framing alignment.\")")
+3. **`./design-forks.md`** (398 lines, last line: "Read `logicmonitor.md` in whole (1138 lines, last line: \"preserving cross-system framing alignment.\")")
+4. **`./profile-inventory.md`** (179 lines, last line: "Read `logicmonitor.md` in whole (1138 lines, last line: \"preserving cross-system framing alignment.\")")
+5. **`./fixture-inventory.md`** (252 lines, last line: "Read `logicmonitor.md` in whole (1138 lines, last line: \"preserving cross-system framing alignment.\")")
+6. **`./alerting-models.md`** (247 lines, last line: "Read `logicmonitor.md` in whole (1138 lines, last line: \"preserving cross-system framing alignment.\")")
+7. **`./operator-features.md`** (305 lines, last line: "Read `logicmonitor.md` in whole (1138 lines, last line: \"preserving cross-system framing alignment.\")")
 
 Foundational lens + hub-architecture premise (2):
 
-8. **`snmp-traps-in-observability.md`** (1,038 lines, last line: "---")
+8. **`../domain/snmp-traps-in-observability.md`** (1,038 lines, last line: "---")
 9. **`netdata-snmp-hub-architecture.md`** (114 lines, last line: "End of document.")
 
 Per-system specs (16):

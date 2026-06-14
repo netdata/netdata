@@ -128,7 +128,7 @@ Source: `sensu/snmptrapd2sensu @ 50ae0ee :: main.go:153-164` (entry point), `par
 
 Deployment model:
 
-- **Process-per-trap**: snmptrapd spawns a new `snmptrapd2sensu` process for every received trap (`snmptrapd2sensu/README.md:61-67`, `traphandle default /usr/bin/snmptrapd2sensu`). There is no daemon, no queue, no connection pool. Throughput is bounded by process-spawn + JSON marshal + one HTTP POST per trap. No benchmark is present in the repo; the comparative ranking against in-process listeners (OpenNMS / Zabbix / Zenoss) is deferred to `comparison/comparative-analysis.md`.
+- **Process-per-trap**: snmptrapd spawns a new `snmptrapd2sensu` process for every received trap (`snmptrapd2sensu/README.md:61-67`, `traphandle default /usr/bin/snmptrapd2sensu`). There is no daemon, no queue, no connection pool. Throughput is bounded by process-spawn + JSON marshal + one HTTP POST per trap. No benchmark is present in the repo; the comparative ranking against in-process listeners (OpenNMS / Zabbix / Zenoss) is deferred to `../comparison/comparative-analysis.md`.
 - **Decoupling**: trap reception (UDP/162 ingress, SNMPv1/v2c/v3 decoding, MIB resolution) is **outsourced to Net-SNMP**. The Sensu side sees only post-resolution text. This means SNMPv3 USM is supported by virtue of Net-SNMP's `snmptrapd` supporting it — but the operator has to configure Net-SNMP separately and learn its `createUser` directives (Sensu's docs do not cover this).
 - **HTTP coupling**: snmptrapd2sensu connects to the Sensu Go agent API on `127.0.0.1:3031` per default (`snmptrapd2sensu/main.go:42-49`, default port in `snmptrapd2sensu.json` is `3031`). The README uses `3031` and the README's example output also references it. There is no built-in retry on HTTP failure: `main.go:140-148` calls `log.Fatalf` on errors, aborting the process.
 - **No container/Kubernetes story**: snmptrapd2sensu is a static binary released via GoReleaser, but Sensu's docs offer no Kubernetes recipe. Operators wanting to run it in k8s must containerise Net-SNMP + the binary themselves.
@@ -618,7 +618,7 @@ Two-stage:
 1. **Varbind-name regex → result key** (`RESULT_MAP`, `snmp-trap.rb:9-15`): includes one `:status`-mapping line for any varbind whose symbolic name matches `/severity/i`, plus a Palo Alto specific rule (`/pansystemseverity/i`).
 2. **Trap-OID regex → numeric status** (`RESULT_STATUS_MAP`, `:17-20`): `/down/i` → CRITICAL (2), `/authenticationfailure/i` → WARNING (1).
 
-Anything else defaults to OK (0) — `determine_trap_status` (`:274-280`) — which means **unknown traps become OK events** that are still routed through Sensu's handler graph but with a default-OK status. The operational implication: trap floods of unknown OIDs do not raise alerts by default. Cross-system comparison of unknown-trap defaults is deferred to `comparison/comparative-analysis.md`; the per-system analyses already done indicate this default-OK behaviour is on the permissive end of the spectrum (OpenNMS sets `Indeterminate` with `alarm-type=3` per `opennms.md:215-218`; Zenoss sets `SEVERITY_WARNING` per `zenoss.md:265`; Centreon by default silently drops unknown traps per `centreon.md:304-306`; CheckMK requires `archive_orphans=True` to retain them per `checkmk.md:475`). So Sensu's default-OK behaviour is not "the opposite of every other system" — it is one point on a wide spectrum that already varies among the other systems analysed.
+Anything else defaults to OK (0) — `determine_trap_status` (`:274-280`) — which means **unknown traps become OK events** that are still routed through Sensu's handler graph but with a default-OK status. The operational implication: trap floods of unknown OIDs do not raise alerts by default. Cross-system comparison of unknown-trap defaults is deferred to `../comparison/comparative-analysis.md`; the per-system analyses already done indicate this default-OK behaviour is on the permissive end of the spectrum (OpenNMS sets `Indeterminate` with `alarm-type=3` per `opennms.md:215-218`; Zenoss sets `SEVERITY_WARNING` per `zenoss.md:265`; Centreon by default silently drops unknown traps per `centreon.md:304-306`; CheckMK requires `archive_orphans=True` to retain them per `checkmk.md:475`). So Sensu's default-OK behaviour is not "the opposite of every other system" — it is one point on a wide spectrum that already varies among the other systems analysed.
 
 Customisation surface: user `result_status_map` is prepended to the built-in (`:87-94`) — user rules take precedence; built-ins remain.
 
@@ -660,7 +660,7 @@ Per docs (`sensu-docs/.../snmp.md:105-112`) the `severities` filter controls whi
 
 ### 10.4 Summary
 
-None of the three bridges has any rate limit, any dedup key, or any backpressure beyond what the surrounding OS/Sensu provides. Compared to the storm-handling mechanisms documented in the other per-system files reviewed so far (OpenNMS's blocking sink dispatcher; CheckMK's facility/priority rule_hash; Centreon's debounce window; Zabbix's per-poller queue), Sensu's storm-handling story is the most minimal — comparative ranking is deferred to `comparison/comparative-analysis.md`. Operators relying on Sensu for SNMP trap reception must:
+None of the three bridges has any rate limit, any dedup key, or any backpressure beyond what the surrounding OS/Sensu provides. Compared to the storm-handling mechanisms documented in the other per-system files reviewed so far (OpenNMS's blocking sink dispatcher; CheckMK's facility/priority rule_hash; Centreon's debounce window; Zabbix's per-poller queue), Sensu's storm-handling story is the most minimal — comparative ranking is deferred to `../comparison/comparative-analysis.md`. Operators relying on Sensu for SNMP trap reception must:
 
 - pre-filter at the source devices, or
 - rate-limit upstream (e.g. via iptables hashlimit or an snmptrapd front-end), or
@@ -755,7 +755,7 @@ CI: GitHub Actions. Two workflow files in `sensu-snmp-trap-handler/.github/workf
 
 ### 12.5 Summary
 
-Trap test coverage across the three Sensu bridges is **shallow**. One real PDU end-to-end test in the Classic extension. No PDU-on-wire test in snmptrapd2sensu. No PDU-on-wire test in the outbound handler. Compared to the trap test inventories captured in the other per-system files reviewed so far (OpenNMS's `TrapdInformIT`, `TrapdWithKafkaIT`, and ~13 trap-pipeline tests; Zabbix's snmptrapper test fixtures), Sensu's PDU-on-wire test surface is the most minimal of the cohort analysed to date; final cross-cohort ranking is deferred to `comparison/comparative-analysis.md`.
+Trap test coverage across the three Sensu bridges is **shallow**. One real PDU end-to-end test in the Classic extension. No PDU-on-wire test in snmptrapd2sensu. No PDU-on-wire test in the outbound handler. Compared to the trap test inventories captured in the other per-system files reviewed so far (OpenNMS's `TrapdInformIT`, `TrapdWithKafkaIT`, and ~13 trap-pipeline tests; Zabbix's snmptrapper test fixtures), Sensu's PDU-on-wire test surface is the most minimal of the cohort analysed to date; final cross-cohort ranking is deferred to `../comparison/comparative-analysis.md`.
 
 ## 13. Out-of-the-Box Coverage (defaults)
 
@@ -803,7 +803,7 @@ A fresh Sensu Go install handling SNMP traps requires the operator to:
 7. Send a test trap to validate end-to-end.
 8. Define Sensu filters/handlers for routing.
 
-Steps 1-3, 5, and 7 are operator labour with no Sensu-provided defaults to ease them. Compared to the day-1 setup paths documented in the other per-system files reviewed so far (OpenNMS's preloaded Indeterminate default-trap row plus 17k+ optional vendor event definitions; CheckMK's empty-by-default rule_pack but with auto-decoded trap-as-syslog event; Zenoss's `/Unknown` default class; Centreon's pre-seeded 214-trap catalogue), Sensu's day-1 cost for inbound trap reception is on the high end — comparative ranking deferred to `comparison/comparative-analysis.md`.
+Steps 1-3, 5, and 7 are operator labour with no Sensu-provided defaults to ease them. Compared to the day-1 setup paths documented in the other per-system files reviewed so far (OpenNMS's preloaded Indeterminate default-trap row plus 17k+ optional vendor event definitions; CheckMK's empty-by-default rule_pack but with auto-decoded trap-as-syslog event; Zenoss's `/Unknown` default class; Centreon's pre-seeded 214-trap catalogue), Sensu's day-1 cost for inbound trap reception is on the high end — comparative ranking deferred to `../comparison/comparative-analysis.md`.
 
 ## 14. User Customization Surface
 
@@ -1229,7 +1229,7 @@ Three reviewers accepted or had zero major findings; codex's remaining majors we
 
 #### Iter-2 findings NOT applied
 
-- **codex minor 4 sub-finding** (cite comparison matrix rows for superlatives): the comparison matrix has not yet been built, so I softened the language without citing matrix rows. Once `comparison/comparative-analysis.md` is authored, the soft language can be replaced with cited cross-cohort statements.
+- **codex minor 4 sub-finding** (cite comparison matrix rows for superlatives): the comparison matrix has not yet been built, so I softened the language without citing matrix rows. Once `../comparison/comparative-analysis.md` is authored, the soft language can be replaced with cited cross-cohort statements.
 - **kimi nit 4** (sensu-plugins vs sensu-extensions org name in §0): the commit hash is the authoritative anchor; the org name is whichever GitHub redirects to. Not changed.
 - **kimi minor 5** ("README example output references port 3031" wording): the README's config example does show port 3031 (`README.md:48-50`); the prose was already accurate. No change needed.
 
@@ -1290,10 +1290,10 @@ By iter-3 four of five working reviewers had ZERO majors; codex alone continues 
 
 Surviving minor items (none affect the document's analytical conclusions for the cross-system comparison):
 - minimax minor 5 verification of `sensuctl asset add sensu/sensu-snmp-trap-handler` exact command form — accepted as-is.
-- codex minor 4 cross-system superlatives — softened with deferral language; will be backed by the comparison matrix once `comparison/comparative-analysis.md` is authored.
+- codex minor 4 cross-system superlatives — softened with deferral language; will be backed by the comparison matrix once `../comparison/comparative-analysis.md` is authored.
 
 Convergence achieved. Document marked **accepted** at iter-3.
 
-Cross-system synthesis points (such as how Sensu's "everything-is-a-plugin" architecture interacts with first-party SNMP trap requirements, and how Sensu's distributed agent/backend model compares to Netdata's hub architecture) will be added to `comparison/comparative-analysis.md` and `comparison/netdata-design-implications.md` after all per-system files are complete. They are intentionally omitted from the per-system file to keep the §0-§20 template scope clean.
+Cross-system synthesis points (such as how Sensu's "everything-is-a-plugin" architecture interacts with first-party SNMP trap requirements, and how Sensu's distributed agent/backend model compares to Netdata's hub architecture) will be added to `../comparison/comparative-analysis.md` and `../comparison/netdata-design-implications.md` after all per-system files are complete. They are intentionally omitted from the per-system file to keep the §0-§20 template scope clean.
 
 End of document.

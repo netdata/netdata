@@ -244,7 +244,7 @@ This is a strength: unmatched traps are **never silently dropped**; they always 
 
 Node resolution is via `InterfaceToNodeCache.getFirstNodeId(location, sourceTrapAddress)` (`EventCreator.java:115-122`). If no node matches, the event still gets persisted but with no `nodeid` set; if `new-suspect-on-trap="true"`, `TrapSinkConsumer.handleMessage` will additionally emit a `NEW_SUSPECT_INTERFACE_EVENT_UEI` (`TrapSinkConsumer.java:102-111, 147-156`), triggering OpenNMS's provisiond to discover the unknown device.
 
-OpenNMS explicitly addresses the NAT-obscured-source edge case via RFC 3584 (`docs/modules/operation/pages/deep-dive/events/sources/snmp-traps.adoc:357-380`), and the per-Minion `trapd.useAddressFromVarbind` switch lets remote sites configure this independently. Cross-cohort ranking deferred to `comparison/comparative-analysis.md`.
+OpenNMS explicitly addresses the NAT-obscured-source edge case via RFC 3584 (`docs/modules/operation/pages/deep-dive/events/sources/snmp-traps.adoc:357-380`), and the per-Minion `trapd.useAddressFromVarbind` switch lets remote sites configure this independently. Cross-cohort ranking deferred to `../comparison/comparative-analysis.md`.
 
 ### Enrichment (varbind decoration, lookup tables, topology join)
 
@@ -635,7 +635,7 @@ The deliberate non-default-load of these 17,442 definitions reflects an honest t
 | Northbound mapping customization | Add `<mapping-group>` entries in `snmptrap-northbounder-configuration.xml` or per-file under `snmptrap-northbounder-mappings.d/`. Use SpEL for filtering and value extraction. |
 | Source-address override (RFC 3584) | Toggle `use-address-from-varbind="true"` in `trapd-configuration.xml`; for Minion: `trapd.useAddressFromVarbind=true` in `org.opennms.netmgt.trapd.cfg`. |
 
-The customization surface is broad and file-/DB-driven — non-trivial operator changes typically require editing XML, SpEL expressions, or Drools rules. This is the chief axis on which OpenNMS has a steep learning curve, with corresponding flexibility once learned. Cross-system ranking deferred to `comparison/comparative-analysis.md`.
+The customization surface is broad and file-/DB-driven — non-trivial operator changes typically require editing XML, SpEL expressions, or Drools rules. This is the chief axis on which OpenNMS has a steep learning curve, with corresponding flexibility once learned. Cross-system ranking deferred to `../comparison/comparative-analysis.md`.
 
 ---
 
@@ -676,14 +676,14 @@ After install with default config:
 - `trapd.log` — daemon-specific log, distinct from `manager.log`/`web.log`.
 - The REST API returns trapd config + (with security caveat) credentials for verification.
 
-OpenNMS provides a strong pipeline-health story: explicit raw vs. processed counters, per-device opt-in metrics, and a Prometheus integration that the documentation describes step-by-step. (A cross-cohort superlative is deliberately avoided here — comparative rankings belong in `comparison/comparative-analysis.md` after every system is analysed.)
+OpenNMS provides a strong pipeline-health story: explicit raw vs. processed counters, per-device opt-in metrics, and a Prometheus integration that the documentation describes step-by-step. (A cross-cohort superlative is deliberately avoided here — comparative rankings belong in `../comparison/comparative-analysis.md` after every system is analysed.)
 
 ---
 
 ## 16. Strengths
 
 1. **First-class trap → event → alarm pipeline with end-to-end coverage**. Every trap is preserved as an event row (`features/events/traps/src/main/java/org/opennms/netmgt/trapd/EventCreator.java:104-111`), and matched traps optionally promote to alarms with dedup-by-reduction-key. No silent drop except via explicit `discardtraps`.
-2. **RFC 3584 source-address recovery (NAT-aware)**. `use-address-from-varbind="true"` + the `snmpTrapAddress` varbind lookup at `features/events/traps/src/main/java/org/opennms/netmgt/trapd/TrapSinkModule.java:89-92` directly addresses a documented domain-level pitfall (the SNMPv1/v2c NAT/agent-addr issue called out in `snmp-traps-in-observability.md:80`).
+2. **RFC 3584 source-address recovery (NAT-aware)**. `use-address-from-varbind="true"` + the `snmpTrapAddress` varbind lookup at `features/events/traps/src/main/java/org/opennms/netmgt/trapd/TrapSinkModule.java:89-92` directly addresses a documented domain-level pitfall (the SNMPv1/v2c NAT/agent-addr issue called out in `../domain/snmp-traps-in-observability.md:80`).
 3. **Hot reload via Twin propagation**. `Trapd.handleReloadEvent → m_trapListener.reload() → m_twinSession.publish(...)` at `Trapd.java:231-253` updates SNMPv3 user creds and listener config across all Minions without restart.
 4. **Inform support** with proper Response PDU acknowledgement, tested by `TrapdInformIT.java` (273 lines).
 5. **Catch-all default trap**: unmatched traps never go missing. `EventCreator.java:107-108` sets `uei.opennms.org/default/trap`; the bundled default definition (`core/schema/src/main/resources/sql/eventconf_events.sql:2672+`) ensures the trap is preserved and visible.
@@ -831,7 +831,7 @@ The corresponding **problem** event (`ccmGatewayFailed`, line 2631) carries `ala
 - Resolution trap → event with `alarm-type=2` and a `clear-key` that equals the problem's `reduction-key` (cross-links the two events to one alarm lifecycle)
 - The Drools `cosmicClear` rule then sets the failed alarm's severity to `Cleared`.
 
-This is a noteworthy OpenNMS design choice — typed, declarative clear linkage encoded directly into the event definition rather than in operator-authored rules. Whether other systems take a similar approach or a different one is documented in their respective per-system specs and synthesised in `comparison/comparative-analysis.md`.
+This is a noteworthy OpenNMS design choice — typed, declarative clear linkage encoded directly into the event definition rather than in operator-authored rules. Whether other systems take a similar approach or a different one is documented in their respective per-system specs and synthesised in `../comparison/comparative-analysis.md`.
 
 ### 18.3 SNMP4J listener registration with multi-USM-context support
 

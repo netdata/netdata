@@ -15,7 +15,7 @@ Audience: enterprise network engineers running multi-vendor Cisco/Juniper/Arista
 ### T1-02: OID-to-symbolic-name resolution
 
 - **Description**: translate numeric OIDs (`1.3.6.1.6.3.1.1.5.3`) to symbolic names (`IF-MIB::linkDown`) so operators can read the trap.
-- **Rationale**: the foundational spec calls "Naked OID Storage" an anti-pattern (`snmp-traps-in-observability.md:439-443`). Operators triage at 3 AM by name, not by dotted decimal.
+- **Rationale**: the foundational spec calls "Naked OID Storage" an anti-pattern (`../domain/snmp-traps-in-observability.md:439-443`). Operators triage at 3 AM by name, not by dotted decimal.
 - **Cohort coverage**: 14 of 16 fully (CheckMK is off-by-default; Cribl Stream has no embedded compiler). 
   - Always-on: OpenNMS, Zenoss, Centreon (Net-SNMP), Zabbix (via snmptrapd `-O STte`), LibreNMS (snmptrapd-side), Nagios+SNMPTT, Sensu (Classic), Telegraf (configurable backend), Logstash, Datadog Agent, Splunk SC4SNMP, SolarWinds, Dynatrace, LogicMonitor (LogSource).
   - Off-by-default: CheckMK (`translate_snmptraps=False`).
@@ -24,7 +24,7 @@ Audience: enterprise network engineers running multi-vendor Cisco/Juniper/Arista
 ### T1-03: Device identification (source IP → monitored device)
 
 - **Description**: map the trap's source to a device row in the local CMDB/inventory.
-- **Rationale**: operators triage by device name, not by source IP literal. The lens calls "trap from `10.0.0.1`" instead of "trap from `core-router-01, NYC`" a Stage-1 maturity indicator (`snmp-traps-in-observability.md:743`).
+- **Rationale**: operators triage by device name, not by source IP literal. The lens calls "trap from `10.0.0.1`" instead of "trap from `core-router-01, NYC`" a Stage-1 maturity indicator (`../domain/snmp-traps-in-observability.md:743`).
 - **Cohort coverage**: 12 of 16 ✓; 4 partial.
   - ✓: OpenNMS, Zenoss, CheckMK, Centreon, Zabbix, LibreNMS, SolarWinds, Dynatrace, LogicMonitor (LogSource and EventSource paths, EA Collector 36.100+), Sensu (Classic ext reverse-DNS lookup), Datadog Agent (`snmp_device` tag), Splunk SC4SNMP (host field).
   - Telegraf, Logstash: `source`/`host` field is raw IP; no inventory join (operator-built).
@@ -33,7 +33,7 @@ Audience: enterprise network engineers running multi-vendor Cisco/Juniper/Arista
 ### T1-04: Severity assignment
 
 - **Description**: each trap should arrive with an operator-readable severity (critical / major / warning / info), either intrinsic to the trap definition or assigned by a rule.
-- **Rationale**: every NOC ticketing system is severity-routed (P1/P2/P3). The lens calls "Severity Trust Without Normalization" an anti-pattern (`snmp-traps-in-observability.md:474-478`).
+- **Rationale**: every NOC ticketing system is severity-routed (P1/P2/P3). The lens calls "Severity Trust Without Normalization" an anti-pattern (`../domain/snmp-traps-in-observability.md:474-478`).
 - **Cohort coverage**:
   - Built-in: OpenNMS (7-level OnmsSeverity per event definition), Zenoss (per-EventClass + transforms), LibreNMS (per-handler), Nagios+SNMPTT (5-level SNMPTT severity per EVENT), Sensu Classic (RESULT_MAP), LogicMonitor (5-level per EventSource), SolarWinds (rule-driven).
   - Operator-defined: CheckMK (per-rule), Centreon (per-trap row), Zabbix (per-trigger), Datadog Agent (SaaS log monitor), Splunk SC4SNMP (Splunk SPL), Dynatrace (log event rule).
@@ -41,7 +41,7 @@ Audience: enterprise network engineers running multi-vendor Cisco/Juniper/Arista
 
 ### T1-05: Storage / retention / search
 
-- **Description**: traps must be queryable for incident review weeks or months later. Forensic analysis cited in the lens (`snmp-traps-in-observability.md:493-497`) requires this.
+- **Description**: traps must be queryable for incident review weeks or months later. Forensic analysis cited in the lens (`../domain/snmp-traps-in-observability.md:493-497`) requires this.
 - **Rationale**: post-mortems require "what traps were firing 3 weeks ago at 02:13?"
 - **Cohort coverage**: 14 of 16 have some store.
   - PostgreSQL: OpenNMS (default 6 weeks).
@@ -70,7 +70,7 @@ Audience: enterprise network engineers running multi-vendor Cisco/Juniper/Arista
 ### T1-08: Authentication / restricted access
 
 - **Description**: SNMPv3 USM credentials + ideally restricted IP allowlist + audit log of trap-related config changes.
-- **Rationale**: management-plane attacks against SNMP are real; cleartext communities are a long-known liability (the lens flags `SNMPv1 Everywhere` as an anti-pattern, `snmp-traps-in-observability.md:432-436`).
+- **Rationale**: management-plane attacks against SNMP are real; cleartext communities are a long-known liability (the lens flags `SNMPv1 Everywhere` as an anti-pattern, `../domain/snmp-traps-in-observability.md:432-436`).
 - **Cohort coverage**:
   - SNMPv3 USM: 16 of 16.
   - Secret vault integration: OpenNMS (SCV), Telegraf (config.Secret), Splunk SC4SNMP (k8s Secrets).
@@ -105,7 +105,7 @@ Audience: enterprise network engineers running multi-vendor Cisco/Juniper/Arista
 ### T2-03: Trap-to-alert routing rules
 
 - **Description**: per-OID rules to assign severity, route to specific recipient, escalate.
-- **Rationale**: not every trap should page; tuning is critical for alert fatigue (`snmp-traps-in-observability.md:425-431`).
+- **Rationale**: not every trap should page; tuning is critical for alert fatigue (`../domain/snmp-traps-in-observability.md:425-431`).
 - **Cohort coverage**: 13 of 16 ✓ via various surfaces (OpenNMS event defs, Zenoss transforms, CheckMK rule packs, Centreon traps_matching_properties, Zabbix triggers, LibreNMS alert rules, Nagios+SNMPTT EVENT EXEC, Sensu handlers, Datadog/Splunk/Dynatrace/LogicMonitor SaaS-side, SolarWinds Log Viewer rules). Telegraf, Logstash, Cribl: downstream.
 
 ### T2-04: Alert acknowledgement / clear flow
@@ -286,7 +286,7 @@ Audience: enterprise network engineers running multi-vendor Cisco/Juniper/Arista
 
 ## Read-verification block
 
-Read `snmp-traps-in-observability.md` in whole (1038 lines, last line: "---")
+Read `../domain/snmp-traps-in-observability.md` in whole (1038 lines, last line: "---")
 Read `opennms.md` in whole (1405 lines, last line: "regression per the SOW process.")
 Read `zenoss.md` in whole (1322 lines, last line: "documented in §17.")
 Read `checkmk.md` in whole (1369 lines, last line: "do not affect the analytical conclusions.")

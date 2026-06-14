@@ -17,6 +17,31 @@ authoritative subsystem design is
 `.agents/sow/specs/snmp-traps/netdata.md`. This skill is the working checklist
 that keeps repository edits aligned with both.
 
+## SNMP Trap SOW Spec Organization
+
+The SNMP trap SOW spec directory intentionally separates Netdata product
+contracts from research evidence.
+
+- Netdata-owned specs and decisions live directly under
+  `.agents/sow/specs/snmp-traps/`:
+  - `netdata.md`
+  - `trap-metrics-profiles.md`
+  - `netdata-snmp-hub-architecture.md`
+  - `decisions/`
+- Research evidence lives under `.agents/sow/specs/snmp-traps/research/`:
+  - `domain/` for general SNMP trap observability research;
+  - `playbooks/` for operational playbooks and skill-distillation source
+    material;
+  - `netdata-existing/` for inventories of existing Netdata subsystems used as
+    design inputs;
+  - `external-systems/` for per-product studies of other trap implementations;
+  - `comparison/` for cross-system matrices, stress tests, and synthesis.
+
+Do not put new research files beside the Netdata specs. Research can inform
+specs, but it is not itself a Netdata product contract. When a research finding
+becomes a product rule, copy the accepted rule into a top-level spec or
+`decisions/` entry and cite the research path as evidence.
+
 ## Trap OID `.0.` tolerance
 
 Profile authors should use the canonical trap OID form produced by the source

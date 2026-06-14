@@ -50,7 +50,7 @@ Relationship to upstream tools is **explicit and loose**:
 - The integration recipe is documented in Nagios's own contrib tree (`nagioscore :: contrib/eventhandlers/submit_check_result`, 36 lines, written by Ethan Galstad on 2002-02-18) and in SNMPTT's documentation (`snmptt.org :: docs/snmptt.shtml`).
 - NSTI is one of several UIs; the SNMPTT MySQL schema (`snmptt`, `snmptt_unknown`, `snmptt_statistics`) is a published interface that anyone can write a UI against.
 
-The pattern is older than most observability platforms in this comparative analysis (the Nagios+SNMPTT cookbook predates Centreon, Zabbix, OpenNMS, Datadog), and it is the **de-facto reference for the "loose-coupling translator + passive check" approach** — every Nagios-family product (Naemon, Icinga 1, Centreon's `centreontrapd`, OP5 Monitor) descends from or borrows from this design. Centreon's own Perl trap-handling code is **explicitly attributed** to SNMPTT in source (`centreon-collect :: perl-libs/lib/centreon/trapd/lib.pm:594-598` — "Code from SNMPTT Modified / Copyright 2002-2009 Alex Burger"; see the Centreon analysis at `.agents/sow/specs/snmp-traps/centreon.md`).
+The pattern is older than most observability platforms in this comparative analysis (the Nagios+SNMPTT cookbook predates Centreon, Zabbix, OpenNMS, Datadog), and it is the **de-facto reference for the "loose-coupling translator + passive check" approach** — every Nagios-family product (Naemon, Icinga 1, Centreon's `centreontrapd`, OP5 Monitor) descends from or borrows from this design. Centreon's own Perl trap-handling code is **explicitly attributed** to SNMPTT in source (`centreon-collect :: perl-libs/lib/centreon/trapd/lib.pm:594-598` — "Code from SNMPTT Modified / Copyright 2002-2009 Alex Burger"; see the Centreon analysis at `.agents/sow/specs/snmp-traps/research/external-systems/centreon.md`).
 
 ---
 
@@ -1038,7 +1038,7 @@ Poor. The pipeline's health-signals (snmptrapd syslog, snmptt.log, snmpttstatist
 
 Each strength tied to file:line evidence.
 
-1. **Loose coupling = composability**. Every layer (snmptrapd, SNMPTT, Nagios, NSTI) can be replaced or swapped independently. Operators can drop NSTI and write their own UI against the SNMPTT MySQL schema (the schema is published — `nsti :: nsti/dist/nsti.sql`). They can replace SNMPTT with `centreontrapd` (which Centreon explicitly forked from SNMPTT — see `.agents/sow/specs/snmp-traps/centreon.md`). They can replace Nagios with Naemon, Icinga 1, or Op5 Monitor (all share the same external command file protocol).
+1. **Loose coupling = composability**. Every layer (snmptrapd, SNMPTT, Nagios, NSTI) can be replaced or swapped independently. Operators can drop NSTI and write their own UI against the SNMPTT MySQL schema (the schema is published — `nsti :: nsti/dist/nsti.sql`). They can replace SNMPTT with `centreontrapd` (which Centreon explicitly forked from SNMPTT — see `.agents/sow/specs/snmp-traps/research/external-systems/centreon.md`). They can replace Nagios with Naemon, Icinga 1, or Op5 Monitor (all share the same external command file protocol).
 
 2. **Text-everywhere debugging**. Every layer's intermediate state is a flat text file or DB row that the operator can `cat`, `tail`, or `SELECT` from. `/var/spool/snmptt/snmptt-<random>` files survive in the filesystem until snmptt picks them up; `/var/log/snmptt/snmptt.log` is the durable trail; `nagios.cmd` writes show up in `nagios.log`. This is a powerful forensic property — every step is observable without specialized tools.
 
@@ -1451,7 +1451,7 @@ For every SNMPTT-specific claim in this document, the cited URL is the SNMPTT up
 | §0 Metadata (lineage and version) | high | All four commits verifiable via `git rev-parse HEAD` in the mirror; SNMPTT upstream version 1.5 cited from `snmptt.org` retrieved 2026-05-22 |
 | §0 NSTI unmaintained since 2017 | high | `git log -1` returns `2017-06-17 Bryan Heden update readme for github markdown. fix license info` |
 | §1 Component lineage | high | All four repos' READMEs read directly; SNMPTT upstream author/license cited |
-| §1 SNMPTT being the lineage ancestor of Centreon's centreontrapd | high | Verbatim attribution at `centreon-collect :: perl-libs/lib/centreon/trapd/lib.pm:594-598` reproduced in `.agents/sow/specs/snmp-traps/centreon.md` |
+| §1 SNMPTT being the lineage ancestor of Centreon's centreontrapd | high | Verbatim attribution at `centreon-collect :: perl-libs/lib/centreon/trapd/lib.pm:594-598` reproduced in `.agents/sow/specs/snmp-traps/research/external-systems/centreon.md` |
 | §2 Architecture diagram | high | Every component and data flow source-traced; the diagram is a synthesis of in-source evidence and upstream docs |
 | §2 Languages and libs | high | Each language asserted is traceable to a specific file (Python in `database.py`, C in `commands.c`, Perl is upstream-docs cited) |
 | §2 IPC | high | snmptrapd→handler→spool→snmptt→DB/EXEC paths each verified; the Nagios named pipe path verified at `submit_check_result:30` |

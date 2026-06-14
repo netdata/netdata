@@ -4,7 +4,7 @@ Purpose: provide reference context for the SNMP-trap design discussion. The flow
 
 Repository: `netdata/netdata @ snmptraps` (this working tree).
 
-Scope boundary: this is **not** a comparative system spec (SOW-0032 governs those, with a 20-section template). It is an internal inventory mirroring the shape of `.agents/sow/specs/snmp-traps/netdata-existing-snmp.md`.
+Scope boundary: this is **not** a comparative system spec (SOW-0032 governs those, with a 20-section template). It is an internal inventory mirroring the shape of `.agents/sow/specs/snmp-traps/research/netdata-existing/netdata-existing-snmp.md`.
 
 ---
 
@@ -155,7 +155,7 @@ Effectively **none**. The runtime loop has only one buffer, one socket, no queue
 - There is `parse_errors`, `template_errors`, and protocol-specific packet counts on the same chart — these reflect what the decoder saw, **not** what the kernel dropped.
 - The README explicitly warns: "Above the knee, achieved rate stays at the plateau while offered rate grows" (`README.md:434-435`) — the plateau is observed at the application layer; what the kernel did with overflow is not measured.
 
-This is a real gap for high-rate exporters, and one the trap design must NOT inherit because trap storms are part of the threat model (foundational spec `.agents/sow/specs/snmp-traps/snmp-traps-in-observability.md` §6.6).
+This is a real gap for high-rate exporters, and one the trap design must NOT inherit because trap storms are part of the threat model (foundational spec `.agents/sow/specs/snmp-traps/research/domain/snmp-traps-in-observability.md` §6.6).
 
 ### 3.4 Error tolerance
 
@@ -554,6 +554,6 @@ Records that **fail** required metadata (missing exporter metadata or missing sa
 - No CI workflow dedicated to netflow: `find .github/workflows -name '*netflow*'` → empty
 - No flow health alerts: `find src/health/health.d -iname '*netflow*' -o -iname '*flow*'` → empty
 - Recent SOWs read for context: `.agents/sow/done/SOW-0014-20260506-netflow-sflow-ipfix-documentation-guide.md`, `.agents/sow/done/SOW-0015-20260508-netflow-enrichment-verification.md`
-- Reference style: `.agents/sow/specs/snmp-traps/netdata-existing-snmp.md`
+- Reference style: `.agents/sow/specs/snmp-traps/research/netdata-existing/netdata-existing-snmp.md`
 
 End of inventory.

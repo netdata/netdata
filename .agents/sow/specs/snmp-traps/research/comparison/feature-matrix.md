@@ -8,7 +8,7 @@ This matrix records observed support per system, with file:line evidence per cel
 
 Systems in order: OpenNMS, Zenoss, CheckMK, Centreon, Zabbix, LibreNMS, Nagios+SNMPTT, Sensu, Telegraf, Logstash, Datadog Agent, Splunk SC4SNMP, Cribl, SolarWinds, Dynatrace, LogicMonitor.
 
-Lens reference: `snmp-traps-in-observability.md`.
+Lens reference: `../domain/snmp-traps-in-observability.md`.
 
 ---
 
@@ -1356,7 +1356,7 @@ Lens reference: `snmp-traps-in-observability.md`.
 
 ## Read-verification block
 
-Read `snmp-traps-in-observability.md` in whole (1038 lines, last line: "---")
+Read `../domain/snmp-traps-in-observability.md` in whole (1038 lines, last line: "---")
 Read `opennms.md` in whole (1405 lines, last line: "regression per the SOW process.")
 Read `zenoss.md` in whole (1322 lines, last line: "documented in §17.")
 Read `checkmk.md` in whole (1369 lines, last line: "do not affect the analytical conclusions.")

@@ -2,10 +2,10 @@
 
 ## 0. Document Metadata
 
-- **Companion to**: `comparison/netdata-stress-test.md` (the stress-test findings).
+- **Companion to**: `./netdata-stress-test.md` (the stress-test findings).
 - **Purpose**: synthesise the actionable design implications from the stress-test for the team that will write the SOW for implementation.
 - **Posture**: decision-grade. Each item is either a commit (proceed), revisit (re-design), defer (push to a later SOW), or abandon (drop). No "interesting to consider" items.
-- **Citation convention**: `netdata.md §N L<line>` for the target design; `<system>.md §N` or `<system>.md L<line>` for cohort evidence; `comparison/<artefact>.md §N` for Phase A matrix.
+- **Citation convention**: `netdata.md §N L<line>` for the target design; `<system>.md §N` or `<system>.md L<line>` for cohort evidence; `./<artefact>.md §N` for Phase A matrix.
 - **Authored by**: assistant under Phase B stress-test instructions.
 
 ---
@@ -17,7 +17,7 @@ These design choices survive the stress test. Cohort evidence supports them; the
 ### C1. Document-primitive choice (trap → journal row)
 
 - **Source**: `netdata.md §2 L36-49`.
-- **Cohort validation**: 6 of 16 systems converged on log-document primitive (`comparison/design-forks.md` Fork 1(d)): Datadog, Dynatrace, Splunk SC4SNMP, Logstash, SolarWinds (current Log Viewer/Analyzer), LogicMonitor (LogSource path).
+- **Cohort validation**: 6 of 16 systems converged on log-document primitive (`./design-forks.md` Fork 1(d)): Datadog, Dynatrace, Splunk SC4SNMP, Logstash, SolarWinds (current Log Viewer/Analyzer), LogicMonitor (LogSource path).
 - **Why it's right**: clean separation of forensic store from alerting; reuses existing Logs UI; avoids the per-row alarm-lifecycle storage tax that OpenNMS/Zenoss/CheckMK pay.
 - **Caveat**: storage policy must be spelled out (see §2 R1).
 
@@ -42,7 +42,7 @@ These design choices survive the stress test. Cohort evidence supports them; the
 ### C5. Plugin-self metrics (`snmp.trap.events`, `snmp.trap.errors`)
 
 - **Source**: `netdata.md §12 L525-561`.
-- **Cohort validation**: OpenNMS 11 JMX counters, Telegraf internal metrics, Datadog `datadog.snmp_traps.*` (`comparison/operator-features.md T2-07`) — first-class self-telemetry is above cohort median.
+- **Cohort validation**: OpenNMS 11 JMX counters, Telegraf internal metrics, Datadog `datadog.snmp_traps.*` (`./operator-features.md T2-07`) — first-class self-telemetry is above cohort median.
 - **Why it's right**: lens §13 "Pipeline self-monitoring" calls this out as a Tier-2 must-have. The cohort gap on this is real; Netdata closes it.
 
 ### C6. (MOVED TO REVISIT) — see R9 below
@@ -78,7 +78,7 @@ INFORM acknowledgement was previously listed as "commit-to" on the strength of g
 ### C11. Public-source strategy for stock vendor profile coverage
 
 - **Source**: `netdata.md §8 L298-356`.
-- **Cohort validation**: `comparison/profile-inventory.md §1-15` shows that the cohort's open sources (OpenNMS XML, LibreNMS MIB tree, Centreon SQL, public IETF MIBs, pysnmp MIB collection) are sufficient bootstrap material. Iter-2 reviewer correctly noted that raw module count is not curated coverage — the **strategy is sound**; the **delivered coverage** is a separate question (see R3).
+- **Cohort validation**: `./profile-inventory.md §1-15` shows that the cohort's open sources (OpenNMS XML, LibreNMS MIB tree, Centreon SQL, public IETF MIBs, pysnmp MIB collection) are sufficient bootstrap material. Iter-2 reviewer correctly noted that raw module count is not curated coverage — the **strategy is sound**; the **delivered coverage** is a separate question (see R3).
 - **Why it's right**: building the catalogue from public, open-licensed sources avoids closed-bundle opacity (Datadog `dd_traps_db.json.gz`) and the operator-pain it creates (`datadog-agent.md §17`).
 - **Caveat**: the *strategy* commit is "use public sources + transform tools at build time." The *coverage number* (5,000 curated trap definitions across top-10 vendors) is the measurable target tracked in R3.
 
@@ -217,7 +217,7 @@ These choices in `netdata.md` require redesign before implementation begins.
 ### R13. AGPL-3.0 / GPL-3.0-or-later licensing claim — legal review before commit
 
 - **Stress-test reference**: W14.
-- **What's wrong**: `netdata.md §8 L349-351` asserts that GPL-2.0 / AGPL-3.0 obligations "do not propagate to our derived YAML." This is a legal claim. **Factual correction**: LibreNMS is GPL-**3.0**-or-later (per `comparison/profile-inventory.md §3 L30` and §4 L39), not GPL-2.0 as netdata.md states. The conversion-tool approach reads AGPL-3.0 OpenNMS event-XML definitions and GPL-3.0-or-later LibreNMS sources, transforms them with curated severity/category logic, and emits Netdata YAML. AGPL-3.0 §1 (definition of source code) and §13 (network use), plus GPL-3.0 §5 (conveying modified source) and the derivative-work definitions, are non-trivial.
+- **What's wrong**: `netdata.md §8 L349-351` asserts that GPL-2.0 / AGPL-3.0 obligations "do not propagate to our derived YAML." This is a legal claim. **Factual correction**: LibreNMS is GPL-**3.0**-or-later (per `./profile-inventory.md §3 L30` and §4 L39), not GPL-2.0 as netdata.md states. The conversion-tool approach reads AGPL-3.0 OpenNMS event-XML definitions and GPL-3.0-or-later LibreNMS sources, transforms them with curated severity/category logic, and emits Netdata YAML. AGPL-3.0 §1 (definition of source code) and §13 (network use), plus GPL-3.0 §5 (conveying modified source) and the derivative-work definitions, are non-trivial.
 - **Recommended approach**:
   1. Remove the licensing assertion from §8 until legal review.
   2. Engage Netdata legal counsel; document the conclusion in the SOW.
@@ -324,13 +324,13 @@ These features in `netdata.md` should be removed from the first release scope an
 ### D2. DTLS / TLS-TM
 
 - **Source**: `netdata.md §6 L164`, §13 L585.
-- **Why defer**: zero cohort systems support this (`comparison/operator-features.md T3-04`). The design already says "in scope if mature libraries exist." Rust and Go SNMP libraries do not have mature TLS-TM support today. Pretending this is in scope creates a checkbox that won't be ticked.
+- **Why defer**: zero cohort systems support this (`./operator-features.md T3-04`). The design already says "in scope if mature libraries exist." Rust and Go SNMP libraries do not have mature TLS-TM support today. Pretending this is in scope creates a checkbox that won't be ticked.
 - **Recommended action**: move from "in scope conditionally" to "explicit non-goal for first release; tracked for future."
 
 ### D3. Topology-aware suppression
 
 - **Source**: `netdata.md §16 L621` ("Hub-local enrichment makes this cheap").
-- **Why defer**: the claim "cheap" is unsupported. The hub has topology, yes, but suppression rules require operator authoring (cohort gap, `comparison/operator-features.md T3-06`). First-release: ship topology annotation in the journal (`ND_TOPOLOGY_*` fields), defer suppression to a follow-up.
+- **Why defer**: the claim "cheap" is unsupported. The hub has topology, yes, but suppression rules require operator authoring (cohort gap, `./operator-features.md T3-06`). First-release: ship topology annotation in the journal (`ND_TOPOLOGY_*` fields), defer suppression to a follow-up.
 - **Recommended action**: move §16's "topology-aware suppression" claim to §13 Open Questions and surface it as a real follow-up SOW.
 
 ### D4. Profile-to-Secrets binding UX
@@ -393,7 +393,7 @@ These features the design has but should be removed outright.
 ### A3. The "1-second" alerting rule (Rule 6)
 
 - **Source**: `netdata.md §1 L21` "Real-time (1-second from PDU arrival to alert evaluation). Likely the only real-time system among the cohort."
-- **Why abandon**: factually wrong. `comparison/feature-matrix.md L611-629` shows OpenNMS, Zenoss, CheckMK, Sensu, Zabbix, SolarWinds, Centreon (median ~1s), LibreNMS (synchronous handler, cron-delayed delivery) all do real-time evaluation. Netdata is **not unique** in real-time alerting.
+- **Why abandon**: factually wrong. `./feature-matrix.md L611-629` shows OpenNMS, Zenoss, CheckMK, Sensu, Zabbix, SolarWinds, Centreon (median ~1s), LibreNMS (synchronous handler, cron-delayed delivery) all do real-time evaluation. Netdata is **not unique** in real-time alerting.
 - **Replacement**: drop the "only real-time system" claim. Say: "Real-time at metric-update cadence (1 second), competitive with the alarm-engine cohort and faster than the SaaS-log-monitor cohort."
 
 ### A4. The "comprehensive vendor packs OOB" implied count of 8-12k unique modules
@@ -505,7 +505,7 @@ Load-bearing assumptions that, if wrong, invalidate the design.
 
 - **Assumption**: §10 dedup + kernel UDP buffer + UDP-overflow alert is sufficient.
 - **What's at stake**: behaviour under unique-OID storm (a misbehaving device sending varied OIDs at high rate).
-- **Verification**: stress test with a synthetic generator (per `comparison/fixture-inventory.md §1.1` OpenNMS udpgen pattern) emitting 50k unique trap OIDs/sec from a single source. Measure: journal-write rate sustained, dedup metric increment rate, lost trap count.
+- **Verification**: stress test with a synthetic generator (per `./fixture-inventory.md §1.1` OpenNMS udpgen pattern) emitting 50k unique trap OIDs/sec from a single source. Measure: journal-write rate sustained, dedup metric increment rate, lost trap count.
 - **Mitigation if wrong**: per-source token-bucket rate-limit becomes Phase 2 mandatory.
 
 ### Risk 6: The "existing Netdata alert engine" really alerts on traps

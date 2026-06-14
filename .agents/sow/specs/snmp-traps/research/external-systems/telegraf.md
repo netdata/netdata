@@ -1234,7 +1234,7 @@ Both share the philosophy of "decode and ship; downstream handles the rest." Dif
 
 ## Appendix B. Key Insights for Netdata Trap Design
 
-*Comparative takeaways feeding the Netdata hub design — sharpened by analysing Telegraf alongside the NMS systems already covered. These insights inform the cross-system synthesis in `comparison/comparative-analysis.md` and `comparison/netdata-design-implications.md`.*
+*Comparative takeaways feeding the Netdata hub design — sharpened by analysing Telegraf alongside the NMS systems already covered. These insights inform the cross-system synthesis in `../comparison/comparative-analysis.md` and `../comparison/netdata-design-implications.md`.*
 
 1. **A small plugin boundary is achievable in Go.** Telegraf's ~370 LOC trap plugin proves the surface area of a trap listener can be modest when the agent core takes on severity, dedup, storage, and UI. Netdata's trap collector can target a similar footprint.
 

@@ -703,7 +703,7 @@ Customisation budget summary:
 
 ## 15. End-User Value Analysis
 
-Through the lens of the SOW's foundational spec at `.agents/sow/specs/snmp-traps/snmp-traps-in-observability.md`:
+Through the lens of the SOW's foundational spec at `.agents/sow/specs/snmp-traps/research/domain/snmp-traps-in-observability.md`:
 
 **Strengths from the operator perspective**:
 

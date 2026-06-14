@@ -7,7 +7,7 @@
 - **Architectural premise**: distributed by design — one Netdata Agent per site is appointed as that site's SNMP hub. The hub consolidates polling, discovery, topology, traps, NetFlow, and syslog. There is no central correlation tier; correlation happens locally on each hub. This is a deliberate design choice for unbounded horizontal scalability. All decisions below assume it.
 - **Author**: assistant.
 - **Status**: design complete after Phase A (cohort-naïve matrix) and Phase B (stress-test); resolved user decisions and 4 rounds of reviewer iteration documented inline (see §13 Resolved-by-user-decisions list).
-- **Citation convention for cohort evidence**: `<system>.md §<section>` referring to the per-system specs already produced under `.agents/sow/specs/snmp-traps/`. Cross-system summaries cite the Phase A artefacts in `.agents/sow/specs/snmp-traps/comparison/`.
+- **Citation convention for cohort evidence**: `<system>.md §<section>` referring to the per-system research under `.agents/sow/specs/snmp-traps/research/external-systems/`. Cross-system summaries cite the Phase A artifacts in `.agents/sow/specs/snmp-traps/research/comparison/`.
 
 ## 1. The Six Design Rules (verbatim)
 
@@ -22,7 +22,7 @@ These rules drive every choice that follows.
 
 ## 2. Trap-as-X Primitive — the foundational choice
 
-The cohort exhibits six distinct trap-as-X primitives (see `comparison/design-forks.md` Fork 1).
+The cohort exhibits six distinct trap-as-X primitives (see `research/comparison/design-forks.md` Fork 1).
 
 | Primitive | Cohort examples | Fit for our rules |
 |---|---|---|
@@ -192,7 +192,7 @@ This decoupling means the hot path is not blocked by stdout back-pressure; if th
 
 ### v3 USM engine-ID discovery (opt-in, SOW-0038)
 
-Dynamic discovery for v3 Trap sender engine IDs follows the Splunk SC4SNMP pattern (`splunk-sc4snmp.md` §3.5; `traps.py:229-258`). The listener peeks at raw bytes pre-parse, BER-decodes the SNMPv3 header to extract `engineID` + `username` + `msgFlags`, retries parse with a per-packet temporary USM security table, and hot-registers the pair only after the retry authenticates and decodes a v3 Trap PDU.
+Dynamic discovery for v3 Trap sender engine IDs follows the Splunk SC4SNMP pattern (`research/external-systems/splunk-sc4snmp.md` §3.5; `traps.py:229-258`). The listener peeks at raw bytes pre-parse, BER-decodes the SNMPv3 header to extract `engineID` + `username` + `msgFlags`, retries parse with a per-packet temporary USM security table, and hot-registers the pair only after the retry authenticates and decodes a v3 Trap PDU.
 
 **This feature is opt-in (disabled by default)** because hot-registering arbitrary `(engineID, username)` pairs at runtime has security/correctness concerns:
 
@@ -220,7 +220,7 @@ Reception is **per-job** (§5). Each listener (job) opens all configured endpoin
 
 ### Protocols and crypto
 
-- SNMPv1, SNMPv2c, SNMPv3-USM with full HMAC-SHA-2 family (SHA-224 / SHA-256 / SHA-384 / SHA-512) and AES-128 / AES-192 / AES-256 priv (per `logstash.md` §3.6 verification of SNMP4j coverage). The Go implementation selected in SOW-0035 M1 must reach this parity.
+- SNMPv1, SNMPv2c, SNMPv3-USM with full HMAC-SHA-2 family (SHA-224 / SHA-256 / SHA-384 / SHA-512) and AES-128 / AES-192 / AES-256 priv (per `research/external-systems/logstash.md` §3.6 verification of SNMP4j coverage). The Go implementation selected in SOW-0035 M1 must reach this parity.
 - Multiple v3 USM users per job (gosnmp/equivalent's `TrapSecurityParametersTable` semantics).
 - IPv4 and IPv6.
 
@@ -569,7 +569,7 @@ The OTLP writer implements the same `TrapWriter` interface as the journal writer
 
 ## 8. OOB Catalog Strategy
 
-Phase A surfaced (`comparison/profile-inventory.md`):
+Phase A surfaced (`research/comparison/profile-inventory.md`):
 
 - Datadog Agent: claims "11,000+ MIBs" in public marketing; verified count via a copy of `dd_traps_db.json.gz` is **3,652 MIBs** (67,680 trap definitions, 40,617 varbind definitions). The compiled artifact is closed (Omnibus build) but the **compiler is Apache-2.0** (`datadog/integrations-core :: datadog_checks_dev/datadog_checks/dev/tooling/commands/meta/snmp/generate_traps_db.py`) and the **input MIBs are public** (pysnmp mirror + integrations-core's own MIB tree).
 - LibreNMS: 4,770 MIB files / 2,245 with notifications (license per the project's `composer.json` — historically GPL-3.0-or-later; subject to legal review before any redistribution).
@@ -624,7 +624,7 @@ We are **transforming knowledge at development time**, not redistributing other 
 
 ### Coverage target
 
-Aim for the LibreNMS-to-Datadog band: ~2,000-12,000 OID families across major vendors (Cisco, Juniper, Arista, Aruba, HPE, Dell, Fortinet, Palo Alto, F5, MikroTik, Ubiquiti, …). Ship YAML in the repo so operators can `grep` for their vendor before install (the Datadog `dd_traps_db.json.gz` opacity is a real customer pain — `datadog-agent.md` §17).
+Aim for the LibreNMS-to-Datadog band: ~2,000-12,000 OID families across major vendors (Cisco, Juniper, Arista, Aruba, HPE, Dell, Fortinet, Palo Alto, F5, MikroTik, Ubiquiti, …). Ship YAML in the repo so operators can `grep` for their vendor before install (the Datadog `dd_traps_db.json.gz` opacity is a real customer pain — `research/external-systems/datadog-agent.md` §17).
 
 ## 9. Hot Path vs Cold Path Throughput
 
@@ -641,7 +641,7 @@ To exceed one writer's measured ceiling, scale **horizontally with per-job isola
 - Operators scale by adding more jobs (each bound to a different port and/or with different community/USM/source-IP allowlists), partitioning the trap stream at the listener layer.
 - Intra-listener multi-writer sharding (one listener feeding multiple writer threads by source-IP hash) is explicitly out of scope (§14 Non-Goals); if a single high-volume sender exceeds one writer's ceiling, the operator splits the sender's traffic across multiple jobs.
 
-Phase A cohort numbers for context (`comparison/feature-matrix.md`):
+Phase A cohort numbers for context (`research/comparison/feature-matrix.md`):
 
 | System | Throughput |
 |---|---|
@@ -994,7 +994,7 @@ The plugin's journal-write path applies this check uniformly to `MESSAGE`, all `
 
 ### Forensics
 
-All operator-facing questions (Phase A `operator-features.md` E1-E6) become journal queries through the existing Logs UI. No new UI code.
+All operator-facing questions (Phase A `research/comparison/operator-features.md` E1-E6) become journal queries through the existing Logs UI. No new UI code.
 
 The optional standards-compliant OTLP exporter (operator opt-in, defaults off) is documented separately in §11b. It uses dotted-lowercase attribute names per OTEL semantic conventions and is intentionally vendor-neutral — Netdata's own OTEL plugin is one possible receiver among many.
 
@@ -1249,7 +1249,7 @@ The implementation is tracked through five sequential SOWs under `.agents/sow/pe
 | **SOW-0036** | SNMPv3 USM (static engineID whitelist, per-job) + INFORM acknowledgement + `snmpEngineBoots` persistence per job; per-job allowlist + rate limiting; plugin configuration schema + DynCfg per-job orchestration refinement; plugin-self NIDL metrics (per-job dimensions, full error universe per §12, including BER limit violations from §18) | Production-grade per-job auth + rate limiting + telemetry |
 | **SOW-0037** | Cross-plugin enrichment (sysName/vendor/topology); **opt-in** deduplication (per-job, disabled by default — see §10) with periodic summary entries; profile YAML hot-reload via DynCfg (no runtime MIB compilation per §14); profile-defined trap metrics enabled per listener job | Operational depth: enriched, optionally deduped, hot-reloadable |
 | **SOW-0038** | Throughput benchmark harness; SNMPv3 dynamic engineID discovery (opt-in); standards-compliant OTLP exporter (§11b — optional, vendor-neutral; works with Netdata's OTEL plugin and any OTLP-compliant receiver) | Scale + interop |
-| **SOW-0039** | **Collector consistency bundle**: `metadata.yaml` + `config_schema.json` + stock `.conf` + `health.d/snmp_traps.conf` + `README.md` + `taxonomy.yaml` (passes `check-markdown.yml` + `check_collector_taxonomy.py` CI gates). **Embedded SNMP traps logs Function** in `go.d.plugin`, exposed as `snmp:traps`, with direct-journal jobs selected through `__logs_sources` and trap-specific default facets. **End-user AI skill `query-snmp-traps`** (`docs/netdata-ai/skills/query-snmp-traps/`) + how-tos catalog. **User documentation** for the offline MIB-to-YAML conversion workflow (per §7). **SOW-0032 comparative-analysis.md closeout**. **Final merge gate** — single PR sequence ending here. | Mergeable, CI-passing, documented |
+| **SOW-0039** | **Collector consistency bundle**: `metadata.yaml` + `config_schema.json` + stock `.conf` + `health.d/snmp_traps.conf` + `README.md` + `taxonomy.yaml` (passes `check-markdown.yml` + `check_collector_taxonomy.py` CI gates). **Embedded SNMP traps logs Function** in `go.d.plugin`, exposed as `snmp:traps`, with direct-journal jobs selected through `__logs_sources` and trap-specific default facets. **End-user AI skill `query-snmp-traps`** (`docs/netdata-ai/skills/query-snmp-traps/`) + how-tos catalog. **User documentation** for the offline MIB-to-YAML conversion workflow (per §7). **SOW-0032 research/comparison/comparative-analysis.md closeout**. **Final merge gate** — single PR sequence ending here. | Mergeable, CI-passing, documented |
 
 The OTLP exporter (§11b) is intentionally deferred to SOW-0038 — it is optional, operator-opt-in, and not part of the MVP. The journal-direct backend (§11) is the load-bearing path and ships in SOW-0035.
 
@@ -1266,7 +1266,6 @@ The hot path (§5) decodes untrusted UDP-delivered ASN.1 BER. Malformed or hosti
 | Max constructed BER nesting depth | 8 | SNMPv3 message structure tops out at ~6 constructed levels; 8 covers all standard PDU shapes. |
 | Max OID encoded length | 128 bytes | RFC 2578 OID encoding cap. |
 | Max OctetString varbind value | 1024 bytes | Long enough for real-world MIB strings, short enough to bound memory per trap. |
-| Per-PDU decode budget | 1 ms | Wall-clock budget per PDU on the hot path. Exceeding triggers drop. |
 
 These limits apply per-job (each job has its own decoder thread per §5) with the same default values listed in the table. They are not operator-configurable. The wording "global" here means the same defaults apply across every job; it does NOT mean a single shared decoder state — each job's decoder enforces the limits independently against its own UDP buffer.
 
