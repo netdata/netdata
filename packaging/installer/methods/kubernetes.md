@@ -142,6 +142,16 @@ size of the persistent metrics volume on the parent node:
 helm upgrade --set parent.database.volumesize=4Gi netdata netdata/netdata
 ```
 
+### Streaming and API keys
+
+The Helm chart deploys both a `parent` pod and `child` pods. Children stream their metrics to the parent pod within the cluster, using an API key for authentication. The Helm chart configures this API key automatically — for standard deployments, you do not need to generate or set one manually.
+
+:::note
+
+If you need to stream metrics to a parent node outside the Kubernetes cluster, you must provide a custom API key by overriding the `parent.configs.stream.data` and `child.configs.stream.data` values in your Helm chart configuration. See the [streaming documentation](/src/streaming/README.md) for details on generating and configuring API keys.
+
+:::
+
 ### Configure service discovery
 
 Netdata's [service discovery](https://github.com/netdata/agent-service-discovery/#service-discovery), installed as part
