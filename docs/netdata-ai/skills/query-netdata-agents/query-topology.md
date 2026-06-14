@@ -8,6 +8,15 @@ transport. For the production topology schema, response fields, compact table
 format, and interpretation rules, see
 [../query-netdata-cloud/query-topology.md](../query-netdata-cloud/query-topology.md).
 
+For `topology:network-connections`, supported grouping ids are `process_name`,
+`pid`, and `container`. `group_by:pid` emits one process actor per PID and is
+the only view that exposes raw fields such as PID, UID, command line, cgroup
+path, and detailed container metadata. `group_by:container` emits container
+actors grouped by canonical `container_name`.
+
+Use `labels:<pattern>` to opt in to free-form labels with pipe-separated
+`simple_pattern` tokens, for example `labels:team|app`.
+
 ## Endpoint
 
 `POST /api/v3/function?function=topology:<source>`
@@ -41,6 +50,23 @@ agents_query_agent \
       actors: .actors.rows,
       links: .links.rows,
       evidence_rows: ([.evidence[]?.table.rows] | add // 0)
+    }'
+```
+
+Example with exact per-PID raw fields and grouping metadata:
+
+```bash
+agents_query_agent \
+    --node "$NODE_UUID" \
+    --host "$AGENT_TARGET" \
+    --machine-guid "$AGENT_MG" \
+    POST '/api/v3/function?function=topology:network-connections' \
+    '{"timeout":60000,"selections":{"group_by":["pid"],"labels":["team|app"]}}' \
+  | jq '.data | {
+      group_by: .view.group_by,
+      process_scopes: .types.actor_types.process.aggregation_scopes,
+      container_scopes: .types.actor_types.container.aggregation_scopes,
+      actor_columns: [.actors.columns[].id]
     }'
 ```
 

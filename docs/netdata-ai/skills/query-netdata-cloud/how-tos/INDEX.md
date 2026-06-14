@@ -85,6 +85,8 @@ skill-verification harness questions for `verify/questions.md`; replace each
 ### Topology / flows
 
 - `local-l2-topology-summary.md` (stub -- not yet authored)
+- [`group-network-topology-by-kubernetes-pod.md`](./group-network-topology-by-kubernetes-pod.md) -- summarize `topology:network-connections` process actors by Kubernetes pod and namespace through Cloud.
+- [`find-containers-for-topology-port.md`](./find-containers-for-topology-port.md) -- find containers or pods exposing a specific TCP port from the Cloud topology Function payload.
 - [`validate-local-netflow-function.md`](./validate-local-netflow-function.md)
 - `top-flow-talkers-last-hour.md` (stub -- not yet authored)
 
