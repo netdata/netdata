@@ -46,7 +46,15 @@ impl IngestService {
                 retention_policy =
                     retention_policy.with_duration_of_journal_files(duration_of_journal_files);
             }
+            // Fastest-storage profile for the netflow flow store: compact
+            // on-disk layout, no DATA compression, no FSS sealing (not enabled),
+            // and live publication disabled (0) — the plugin reads its own files
+            // by opening them, not via journalctl --follow, so the per-entry
+            // inotify/set_len publication is pure overhead here.
             Config::new(origin, rotation_policy, retention_policy)
+                .with_compact(true)
+                .with_compression(Compression::None)
+                .with_live_publish_every_entries(0)
         };
         let raw_journal =
             Self::build_raw_journal(&cfg, &build_journal_cfg, Arc::clone(&lifecycle_observer))?;
@@ -76,7 +84,9 @@ impl IngestService {
             decoder_state_dir,
             last_decoder_state_persist_usec: now_usec(),
             raw_journal,
-            tier_writers,
+            tier_writers: Some(tier_writers),
+            tier_handoff: Arc::new(super::super::tier_commit::TierHandoffShared::new()),
+            tier_worker_handles: Vec::new(),
             tier_accumulators,
             open_tiers,
             tier_flow_indexes,

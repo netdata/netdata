@@ -278,7 +278,9 @@ prepare_cmake_options() {
   # Keep forwarding the install prefix even when it is empty.
   # This installer uses an empty prefix for /usr/... destinations instead of
   # CMake's /usr/local default.
+  # shellcheck disable=SC2034
   NETDATA_CMAKE_INSTALL_PREFIX_OPTION="-DCMAKE_INSTALL_PREFIX=${NETDATA_PREFIX-}"
+  # shellcheck disable=SC2034
   NETDATA_WINDOWS_PATH_PREFIX_OPTION=
 
   #
@@ -288,6 +290,7 @@ prepare_cmake_options() {
   # callers can pass them as separately quoted arguments.
 
   if [ -n "${NETDATA_WINDOWS_PATH_PREFIX:-}" ]; then
+    # shellcheck disable=SC2034
     NETDATA_WINDOWS_PATH_PREFIX_OPTION="-DNETDATA_WINDOWS_PATH_PREFIX=${NETDATA_WINDOWS_PATH_PREFIX}"
   fi
 
@@ -776,6 +779,26 @@ install_netdata_tmpfiles() {
   fi
 }
 
+install_netdata_snmp_trap_log_dir() {
+  if [ "${UID}" -ne 0 ]; then
+    return 0
+  fi
+
+  if ! run mkdir -p "${NETDATA_LOG_DIR}/traps"; then
+    warning "Failed to create ${NETDATA_LOG_DIR}/traps. SNMP trap jobs using direct journals will fail until it is created manually."
+    return 0
+  fi
+  if ! run chown "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_LOG_DIR}/traps"; then
+    warning "Failed to set ownership on ${NETDATA_LOG_DIR}/traps. SNMP trap jobs using direct journals will fail until it is fixed manually."
+    return 0
+  fi
+  if ! run chmod 0755 "${NETDATA_LOG_DIR}/traps"; then
+    warning "Failed to set permissions on ${NETDATA_LOG_DIR}/traps. SNMP trap jobs using direct journals will fail until it is fixed manually."
+  fi
+
+  return 0
+}
+
 install_netdata_dirs() {
   _DIRS_INSTALLED=0
   if install_netdata_tmpfiles && command -v systemd-tmpfiles >/dev/null 2>&1 ; then
@@ -805,6 +828,8 @@ install_netdata_dirs() {
     run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_CLAIMING_DIR}"
     run chmod 770 "${NETDATA_CLAIMING_DIR}"
   fi
+
+  install_netdata_snmp_trap_log_dir
 }
 
 # -----------------------------------------------------------------------------

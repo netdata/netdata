@@ -370,6 +370,7 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 			name,
 			labels,
 			meta,
+			ctx.reader,
 			ctx.index,
 			ctx.prog.Revision(),
 			buildSeq,

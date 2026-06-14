@@ -11,8 +11,14 @@ import (
 )
 
 type moduleFuncRegistry struct {
-	mu      sync.RWMutex
-	modules map[string]*moduleFunc
+	mu           sync.RWMutex
+	modules      map[string]*moduleFunc
+	methodRoutes map[string]methodRoute
+}
+
+type methodRoute struct {
+	moduleName string
+	methodID   string
 }
 
 type moduleFunc struct {
@@ -31,18 +37,18 @@ type jobEntry struct {
 
 func newModuleFuncRegistry() *moduleFuncRegistry {
 	return &moduleFuncRegistry{
-		modules: make(map[string]*moduleFunc),
+		modules:      make(map[string]*moduleFunc),
+		methodRoutes: make(map[string]methodRoute),
 	}
 }
 
 func (r *moduleFuncRegistry) registerModule(name string, creator collectorapi.Creator) {
+	r.registerModuleWithMethods(name, creator, moduleMethods(creator))
+}
+
+func (r *moduleFuncRegistry) registerModuleWithMethods(name string, creator collectorapi.Creator, methods []funcapi.MethodConfig) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	var methods []funcapi.MethodConfig
-	if creator.Methods != nil {
-		methods = creator.Methods()
-	}
 
 	r.modules[name] = &moduleFunc{
 		creator:     creator,
@@ -51,6 +57,7 @@ func (r *moduleFuncRegistry) registerModule(name string, creator collectorapi.Cr
 		jobs:        make(map[string]*jobEntry),
 		jobMethods:  make(map[string][]funcapi.MethodConfig),
 	}
+	r.rebuildMethodRoutesLocked()
 }
 
 func indexMethods(methods []funcapi.MethodConfig) map[string]funcapi.MethodConfig {
@@ -140,6 +147,17 @@ func (r *moduleFuncRegistry) getMethod(moduleName, methodID string) (*funcapi.Me
 		return nil, false
 	}
 	return &cfg, true
+}
+
+func (r *moduleFuncRegistry) resolveMethodRoute(functionName string) (string, string, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	route, ok := r.methodRoutes[functionName]
+	if !ok {
+		return "", "", false
+	}
+	return route.moduleName, route.methodID, true
 }
 
 func (r *moduleFuncRegistry) getMethods(moduleName string) []funcapi.MethodConfig {
@@ -286,13 +304,27 @@ func (r *moduleFuncRegistry) findMethodCollision(moduleName, jobName, methodID s
 	return "", false
 }
 
-func (r *moduleFuncRegistry) snapshotCreators() map[string]collectorapi.Creator {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	out := make(map[string]collectorapi.Creator, len(r.modules))
-	for name, module := range r.modules {
-		out[name] = module.creator
+func (r *moduleFuncRegistry) rebuildMethodRoutesLocked() {
+	r.methodRoutes = make(map[string]methodRoute)
+	moduleNames := make([]string, 0, len(r.modules))
+	for moduleName := range r.modules {
+		moduleNames = append(moduleNames, moduleName)
 	}
-	return out
+	sort.Strings(moduleNames)
+
+	for _, moduleName := range moduleNames {
+		module := r.modules[moduleName]
+		for _, method := range module.methods {
+			if method.ID == "" {
+				continue
+			}
+			route := methodRoute{moduleName: moduleName, methodID: method.ID}
+			for _, functionName := range funcapi.MethodFunctionNames(moduleName, method) {
+				if _, exists := r.methodRoutes[functionName]; exists {
+					continue
+				}
+				r.methodRoutes[functionName] = route
+			}
+		}
+	}
 }

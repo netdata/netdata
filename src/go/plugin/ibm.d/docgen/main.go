@@ -235,7 +235,7 @@ func (g *DocGenerator) parseConfig() ([]ConfigField, error) {
 				defaultVal = val
 			}
 		}
-		fields = append([]ConfigField{ConfigField{
+		fields = append([]ConfigField{{
 			Name:        name,
 			JSONName:    name,
 			Type:        fieldType,

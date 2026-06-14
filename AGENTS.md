@@ -368,8 +368,10 @@ validation for PR takeover. Commit the active SOW on the feature branch when
 takeover or handoff is expected. When no takeover is expected, keeping the
 active SOW local and uncommitted is acceptable, but the SOW still MUST be used
 as working memory. Before merge, complete the SOW, transfer durable knowledge,
-and delete the active SOW file. `master` and the final merge head MUST contain
-no SOW working files; durable memory belongs in `.agents/sow/specs/`, project
+and remove the active SOW file from git / the branch head. Removing it from git
+MUST NOT delete the local checkout copy unless the user explicitly asks to
+discard that local handoff artifact. `master` and the final merge head MUST
+contain no SOW working files; durable memory belongs in `.agents/sow/specs/`, project
 skills, docs, code, and tests.
 
 The SOW system is self-contained in this repository. Normal SOW work must not depend on `~/.agents`, `~/.AGENTS.md`, global skills, global templates, or global scripts. Use this `AGENTS.md`, the branch-local SOW, project-local specs, and project-local skills.
@@ -497,7 +499,9 @@ When unsure, treat the work as non-trivial.
 There is no `done/` directory and no committed pending queue. On `master`,
 `.agents/sow/active/` is empty except for `.gitkeep`; real SOW files exist only
 on feature branches. Feature branches and PRs may commit active SOW files when
-takeover or handoff is expected, but active SOW files are deleted before merge.
+takeover or handoff is expected, but active SOW files are removed from git before
+merge. They MUST remain available in the local checkout for handoff/debugging
+unless the user explicitly approves deleting the local file contents.
 
 Create new SOW files from `.agents/sow/SOW.template.md`. The template is project-local and may be customized for this repository.
 
@@ -525,8 +529,22 @@ Deferred work has two valid tracking paths:
 - private or local follow-up: `<repo-root>/.local/sow/`.
 
 Active implementation work still MUST use `.agents/sow/active/`. Active SOW
-files MAY be committed for takeover or handoff and still MUST be deleted before
-merge.
+files MAY be committed for takeover or handoff and still MUST be removed from
+git before merge. That is a git/index/branch-head operation, not permission to
+delete the local working copy.
+
+Destructive local deletion guard:
+
+- Assistants MUST NOT use `rm`, `apply_patch` delete hunks, editor delete
+  operations, or any equivalent filesystem operation to remove a SOW working
+  file from the local checkout unless the user explicitly asks to discard the
+  local SOW.
+- To clear a merge guard for a tracked SOW while preserving handoff memory, use
+  a git/index operation such as `git rm --cached <path>` and leave the local file
+  available in the checkout.
+- If keeping the untracked local SOW would make future staging risky, ask the
+  user whether to park a copy under `.local/sow/`; do not silently move or delete
+  it.
 
 Filename:
 
@@ -543,7 +561,9 @@ SOW state lives in the file's `Status:` field:
 - `ready` - the Pre-Implementation Gate is complete and, where the goal-approval round ("Plan before non-trivial work") applies, the user has approved the goal and plan; implementation can start.
 - `in-progress` - implementation is underway.
 - `paused` - work is intentionally stopped but may resume on the branch.
-- `completed` - work is validated and durable memory has been transferred; this is a transient state before deleting the SOW file.
+- `completed` - work is validated and durable memory has been transferred. This
+  is a transient state before removing the SOW file from git. Keep the local file
+  for handoff unless the user explicitly asks to delete it.
 
 ### SOW Completion And Merge
 
@@ -554,13 +574,18 @@ When a SOW's work is ready to merge:
 1. Finish implementation, docs, specs, skills, validation, and follow-up mapping.
 2. Transfer all durable knowledge into `.agents/sow/specs/`, project skills, docs, code, and tests. After this step, the SOW body MUST hold nothing durable that is not captured elsewhere.
 3. Update the SOW to `Status: completed`.
-4. Delete the SOW working file before merge.
+4. Remove the SOW working file from git before merge, while preserving the local
+   checkout copy unless the user explicitly asks to delete it. Use git/index
+   operations such as `git rm --cached <path>` for a tracked SOW when the local
+   handoff file should remain.
 
 Draft and ready-for-review PRs MAY temporarily contain
 `.agents/sow/active/SOW-*.md` files when takeover or handoff is expected. The
 SOW CI job still rejects committed active SOW files; that red check is an
 intentional merge guard, not a sign that handoff or takeover is forbidden. The
 branch HEAD that merges MUST contain no `.agents/sow/active/SOW-*.md` file.
+Clearing that merge guard MUST NOT be done by destructively deleting the local
+SOW content unless the user explicitly approves losing the local handoff file.
 
 ### Enforcement
 
@@ -651,7 +676,8 @@ A SOW cannot be completed until Validation records:
 - reviewer findings and how they were handled;
 - same-failure search results;
 - artifact maintenance gate for `AGENTS.md`, runtime project skills, specs, end-user/operator docs, end-user/operator skills, and SOW lifecycle;
-- SOW working file removed before merge;
+- SOW working file removed from git before merge while preserving any needed
+  local handoff copy;
 - spec update or specific reason no spec update was needed;
 - project skill update or specific reason no skill update was needed;
 - end-user/operator docs update or evidence-backed reason none were affected;
@@ -755,6 +781,10 @@ Runtime input skills:
   Trigger: editing SNMP profile YAMLs, topology SNMP profiles, ddsnmp profile parsing, or SNMP profile-format documentation.
   Purpose: require MIB `MAX-ACCESS` checks and index-derived extraction for `not-accessible` INDEX objects.
 
+- `.agents/skills/project-snmp-trap-profiles-authoring/`
+  Trigger: editing SNMP trap profile YAMLs under `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/`, the trap profile-format documentation, the `src/go/cmd/snmptrapprofilegen/` Go helper, or running a regeneration of the OOB trap profile pack.
+  Purpose: enforce the closed 8-category / 8-severity taxonomy, the file-scoped `varbinds:` table pattern, cardinality discipline on `labels:`, and stock/operator separation. Documents the regeneration recipe.
+
 - `.agents/skills/project-writing-collectors/`
   Trigger: authoring or modifying any Netdata data-collection plugin or module (Go go.d / ibm.d, Rust crates, internal C plugins, external plugins via PLUGINSD). Read before adding a new collector, modifying an existing one, working on NetFlow/sFlow/IPFIX, OTEL ingestion, topology, SNMP profiles, or interactive Functions.
   Status: live. Updates that close gaps or fix outdated pointers must ship in the same PR that exposed the issue.
@@ -816,6 +846,11 @@ Public skills (canonical under `docs/netdata-ai/skills/<name>/`; relative symlin
   Trigger: querying Netdata Agents directly on port 19999, including auto-mint of per-agent bearer tokens from a Cloud token.
   Symlink: `.agents/skills/query-netdata-agents` -> `../../docs/netdata-ai/skills/query-netdata-agents`.
   Status: live. SKILL.md plus `scripts/_lib.sh` helpers (`agents_resolve_bearer`, `agents_call_function`, `agents_netdata_prefix`).
+
+- `docs/netdata-ai/skills/query-snmp-traps/`
+  Trigger: querying SNMP trap logs through Netdata Cloud or directly from a Netdata Agent; use for trap journal entries, severities, categories, senders, deduplication summaries, `TRAP_*` fields, and `TRAP_JSON` varbind searches.
+  Symlink: `.agents/skills/query-snmp-traps` -> `../../docs/netdata-ai/skills/query-snmp-traps`.
+  Status: live. SKILL.md plus `how-tos/INDEX.md` and seeded operator how-tos.
 
 Output/reference skills:
 

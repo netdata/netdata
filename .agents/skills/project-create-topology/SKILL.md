@@ -66,6 +66,27 @@ developer-facing and must stay in this project skill, not under
    - Declare `identity`, `merge_identity`, and `parent_identity` in actor types.
    - Prepare aggregation scopes such as node, process name, PID, container,
      Kubernetes workload, SNMP device/interface, or vSphere object.
+  - For network-connections, the product contract is explicit actor-level
+     grouping: `group_by:process_name` emits grouped `process` actors,
+     `group_by:pid` emits per-PID `process` actors with scalar per-PID details, and
+     `group_by:container` emits `container` actors grouped by canonical
+     `container_name`. In container grouping, producer-declared actor types may
+     be more specific than `container` (`docker_container`, `systemd_service`,
+     `user`, `vm`, etc.) as long as they share the `container` aggregation
+     scope. `user.slice/user-UID.slice` paths are grouped by resolved username,
+     or `user${UID}` when username resolution is unavailable; leaf scopes remain
+     cgroup/detail evidence, not graph actor identities. Grouped views must not
+     pretend variable per-PID fields are scalar actor identity; instead, expose
+     them through merged/set-valued actor labels or declared `set` aggregation
+     metadata so actor modals and Cloud aggregation preserve the contributing
+     process/container facts.
+   - Keep topology display classification rule-based and local to a shared
+     module. Do not scatter orchestrator/path special cases through topology
+     emitters. Metric cgroup selection rules and topology actor-kind/icon/name
+     rules are related but separate contracts.
+   - Network-connections advertises `v: 3`; verify selector behavior with the
+     actual POST payload shape (`selections.group_by`) and keep legacy
+     function-string aliases only as compatibility paths.
 
 3. Pick graph links.
    - Graph links are renderable relationship groups.
@@ -93,10 +114,17 @@ developer-facing and must stay in this project skill, not under
    - Use a compact actor-owned `actor_labels` table for modal labels:
      `actor`, `key`, `value`, optional `source`, optional `kind`, and optional
      `value_index`.
+   - For network-connections, expose contributing process and cgroup facts as
+     actor-owned `processes` and `cgroups` tables. Do not rely on the generic
+     Labels tab for structured PID/cgroup inspection when the producer has typed
+     rows.
    - Expose complete host/node labels when available.
    - Expose useful non-node actor labels and metadata, while keeping identity,
      correlation, grouping, sorting, filtering, and aggregation facts as typed
      canonical columns.
+   - When labels feed user-facing grouping, derive the grouping fields into
+     typed columns and apply any free-form label whitelist only at the Function
+     output boundary. Do not rely on `actor_labels` for grouping keys.
 
 6. Define telemetry overlays.
    - Use overlay templates once per payload or type.
@@ -192,6 +220,9 @@ developer-facing and must stay in this project skill, not under
      later product decision explicitly re-enables force-strength tuning.
    - Use only closed icon tokens. Do not emit raw SVG or depend on frontend
      capability-string icon inference; add a schema/UI icon token first.
+     Runtime/container-family tokens include `docker`, `kubernetes`, `lxc`,
+     `nspawn`, `podman`, `systemd`, `user`, and the existing `container` and
+     `vm` tokens.
    - Missing v1 `size.scale`, `layout.repulsion`, and `search` use neutral
      defaults. Do not expect the UI to preserve legacy self/device/SNMP/
      endpoint heuristics for v1.
@@ -413,6 +444,9 @@ For SNMP/L2 managed device actor modals:
 - Treat `actor_labels` as sensitive topology Function data. Preserve the source
   Function's access-control assumptions when forwarding, aggregating, testing,
   or documenting labels.
+- For sparse grouping columns, validate that consumers preserve actor identity
+  for null or empty grouping keys instead of merging every null row into one
+  bucket.
 - Modal sections are recipes over existing facts and do not duplicate
   high-cardinality evidence rows.
 - Raw JSON columns are hidden/debug-only unless a schema-declared projection

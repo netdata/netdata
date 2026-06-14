@@ -179,6 +179,7 @@ fn run_storage_footprint_child() -> StorageFootprintReport {
     let (_tmp, mut service) = new_disk_benchmark_ingest_service(ConfigDecapsulationMode::None);
     let layer = ResourceLayer::AllTiersBatched;
     configure_service_for_layer(&mut service, layer);
+    service.spawn_tier_commit_workers_for_test();
 
     let raw_dir = service.cfg.journal.raw_tier_dir();
     let m1_dir = service.cfg.journal.minute_1_tier_dir();
@@ -202,6 +203,7 @@ fn run_storage_footprint_child() -> StorageFootprintReport {
             Duration::from_secs(sample_interval_secs),
             entries_since_sync,
             false,
+            true,
         );
         entries_since_sync = segment.entries_since_sync;
         total_flows_ingested = total_flows_ingested.saturating_add(segment.ingested_flows as u64);
@@ -437,6 +439,13 @@ fn run_plugin_resource_envelope(
     configure_service_for_layer(&mut service, layer);
 
     let raw_only = matches!(layer, ResourceLayer::RawOnly);
+    // Only the production-shaped layer runs tier commits on workers; the
+    // isolation layers (writer-only, raw-only, minute1-only) keep their
+    // historical inline form so their numbers stay comparable.
+    let tier_workers = matches!(layer, ResourceLayer::AllTiersBatched);
+    if tier_workers {
+        service.spawn_tier_commit_workers_for_test();
+    }
     let warmup_result = run_paced_plugin_loop(
         &mut service,
         &record_batches,
@@ -444,6 +453,7 @@ fn run_plugin_resource_envelope(
         Duration::from_secs(warmup_secs),
         0,
         raw_only,
+        tier_workers,
     );
     let metrics_before = service.metrics.snapshot();
     let proc_before = take_proc_snapshot();
@@ -455,6 +465,7 @@ fn run_plugin_resource_envelope(
         Duration::from_secs(measurement_secs),
         warmup_result.entries_since_sync,
         raw_only,
+        tier_workers,
     );
     let elapsed = started.elapsed();
     let proc_after = take_proc_snapshot();
@@ -537,6 +548,7 @@ fn run_paced_plugin_loop(
     duration: Duration,
     initial_entries_since_sync: usize,
     raw_only: bool,
+    tier_workers: bool,
 ) -> PacedLoopResult {
     let total_ticks = duration.as_secs().saturating_mul(TICKS_PER_SECOND);
     let tick_interval = Duration::from_millis(1000 / TICKS_PER_SECOND);
@@ -569,6 +581,14 @@ fn run_paced_plugin_loop(
                     batch,
                     entries_since_sync,
                 )
+            } else if tier_workers {
+                // Production shape: ingest + doorbell service per batch;
+                // commits run on the worker threads.
+                service.handle_decoded_batch_with_handoffs_for_test(
+                    tick_receive_time_usec,
+                    batch,
+                    entries_since_sync,
+                )
             } else {
                 service.handle_decoded_batch_for_test(
                     tick_receive_time_usec,
@@ -579,6 +599,12 @@ fn run_paced_plugin_loop(
             ingested_flows += batch.len();
             available_flows = available_flows.saturating_sub(batch_flows);
             batch_index += 1;
+        }
+
+        // Worker mode mirrors the live loop's 1s tick (handoffs, telemetry
+        // mirror, prune, open-tier refresh).
+        if tier_workers && tick_index % TICKS_PER_SECOND == TICKS_PER_SECOND - 1 {
+            entries_since_sync = service.handle_sync_tick_for_test(entries_since_sync);
         }
 
         let now = Instant::now();

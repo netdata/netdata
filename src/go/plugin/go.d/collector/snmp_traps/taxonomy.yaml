@@ -1,0 +1,79 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: snmp_traps
+placements:
+  - id: snmp-traps
+    section_id: remote-devices.snmp
+    title: SNMP traps
+    short_name: Traps
+    icon: snmp
+    families: true
+    properties:
+      important: false
+      grouping: false
+    items:
+      - type: grid
+        id: snmp-trap-heads
+        items:
+          - type: context
+            title: Events by Category
+            contexts: [snmp.trap.events]
+            chart_library: bars
+            dimensions_sort: valueDesc
+            layout: {left: 0, top: 0, width: 3, height: 4}
+          - type: context
+            title: Events by Severity
+            contexts: [snmp.trap.severity]
+            chart_library: bars
+            dimensions_sort: valueDesc
+            layout: {left: 3, top: 0, width: 3, height: 4}
+          - type: context
+            title: Processing Errors
+            contexts: [snmp.trap.errors]
+            chart_library: bars
+            dimensions_sort: valueDesc
+            layout: {left: 6, top: 0, width: 3, height: 4}
+          - type: context
+            title: Dedup Suppressed
+            contexts: [snmp.trap.dedup_suppressed]
+            chart_library: dygraph
+            group_by: [selected]
+            layout: {left: 9, top: 0, width: 3, height: 4}
+      - type: group
+        id: trap-events
+        title: Trap Events
+        properties: {grouping: true}
+        items:
+          - snmp.trap.events
+          - snmp.trap.severity
+      - type: group
+        id: pipeline-health
+        title: Pipeline Health
+        properties: {grouping: true}
+        items:
+          - snmp.trap.pipeline
+          - snmp.trap.errors
+          - snmp.trap.dedup_suppressed
+          - snmp.trap.sources
+          - snmp.trap.source_attribution
+          - snmp.trap.source_pipeline
+          - snmp.trap.source_errors
+          - snmp.trap.source_last_seen
+          - snmp.trap.profile_metric_diagnostics
+      - type: selector
+        id: profile-metrics
+        title: Profile Metrics
+        context_prefix:
+          - snmp.trap.
+        context_prefix_exclude:
+          - snmp.trap.events
+          - snmp.trap.severity
+          - snmp.trap.errors
+          - snmp.trap.dedup_suppressed
+          - snmp.trap.pipeline
+          - snmp.trap.sources
+          - snmp.trap.source_attribution
+          - snmp.trap.source_pipeline
+          - snmp.trap.source_errors
+          - snmp.trap.source_last_seen
+          - snmp.trap.profile_metric_diagnostics

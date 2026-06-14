@@ -1,4 +1,5 @@
 use super::*;
+use super::tier_commit::TierCommitTelemetry;
 
 #[derive(Default)]
 pub(crate) struct IngestMetrics {
@@ -30,6 +31,18 @@ pub(crate) struct IngestMetrics {
     pub(crate) tier_flushes: AtomicU64,
     pub(crate) tier_journal_syncs: AtomicU64,
     pub(crate) tier_journal_sync_errors: AtomicU64,
+    pub(crate) minute_1_commit_age_seconds: AtomicU64,
+    pub(crate) minute_5_commit_age_seconds: AtomicU64,
+    pub(crate) hour_1_commit_age_seconds: AtomicU64,
+    pub(crate) minute_1_commit_duration_usec: AtomicU64,
+    pub(crate) minute_5_commit_duration_usec: AtomicU64,
+    pub(crate) hour_1_commit_duration_usec: AtomicU64,
+    pub(crate) minute_1_commit_batches: AtomicU64,
+    pub(crate) minute_5_commit_batches: AtomicU64,
+    pub(crate) hour_1_commit_batches: AtomicU64,
+    pub(crate) minute_1_commit_stretched: AtomicU64,
+    pub(crate) minute_5_commit_stretched: AtomicU64,
+    pub(crate) hour_1_commit_stretched: AtomicU64,
     pub(crate) decoder_state_persist_calls: AtomicU64,
     pub(crate) decoder_state_persist_bytes: AtomicU64,
     pub(crate) decoder_state_write_errors: AtomicU64,
@@ -199,6 +212,54 @@ impl IngestMetrics {
             self.tier_journal_sync_errors.load(Ordering::Relaxed),
         );
         stats.insert(
+            "minute_1_commit_age_seconds".to_string(),
+            self.minute_1_commit_age_seconds.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "minute_5_commit_age_seconds".to_string(),
+            self.minute_5_commit_age_seconds.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "hour_1_commit_age_seconds".to_string(),
+            self.hour_1_commit_age_seconds.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "minute_1_commit_duration_usec".to_string(),
+            self.minute_1_commit_duration_usec.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "minute_5_commit_duration_usec".to_string(),
+            self.minute_5_commit_duration_usec.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "hour_1_commit_duration_usec".to_string(),
+            self.hour_1_commit_duration_usec.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "minute_1_commit_batches".to_string(),
+            self.minute_1_commit_batches.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "minute_5_commit_batches".to_string(),
+            self.minute_5_commit_batches.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "hour_1_commit_batches".to_string(),
+            self.hour_1_commit_batches.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "minute_1_commit_stretched".to_string(),
+            self.minute_1_commit_stretched.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "minute_5_commit_stretched".to_string(),
+            self.minute_5_commit_stretched.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "hour_1_commit_stretched".to_string(),
+            self.hour_1_commit_stretched.load(Ordering::Relaxed),
+        );
+        stats.insert(
             "decoder_state_persist_calls".to_string(),
             self.decoder_state_persist_calls.load(Ordering::Relaxed),
         );
@@ -268,5 +329,71 @@ impl IngestMetrics {
             self.bioris_observe_streams_active.load(Ordering::Relaxed),
         );
         stats
+    }
+}
+
+impl IngestMetrics {
+    /// Mirror one tier's slot telemetry, called by the tick once per second.
+    /// `last_commit_usec == 0` means no claim has completed yet (workers not
+    /// spawned, or the first anniversary is still ahead): report age 0, not
+    /// the distance to the epoch.
+    pub(super) fn store_tier_commit_telemetry(
+        &self,
+        tier: TierKind,
+        now_usec: u64,
+        telemetry: &TierCommitTelemetry,
+    ) {
+        let (age, duration, batches, stretched) = match tier {
+            TierKind::Minute1 => (
+                &self.minute_1_commit_age_seconds,
+                &self.minute_1_commit_duration_usec,
+                &self.minute_1_commit_batches,
+                &self.minute_1_commit_stretched,
+            ),
+            TierKind::Minute5 => (
+                &self.minute_5_commit_age_seconds,
+                &self.minute_5_commit_duration_usec,
+                &self.minute_5_commit_batches,
+                &self.minute_5_commit_stretched,
+            ),
+            TierKind::Hour1 => (
+                &self.hour_1_commit_age_seconds,
+                &self.hour_1_commit_duration_usec,
+                &self.hour_1_commit_batches,
+                &self.hour_1_commit_stretched,
+            ),
+            TierKind::Raw => return,
+        };
+        let age_seconds = if telemetry.last_commit_usec == 0 {
+            0
+        } else {
+            now_usec.saturating_sub(telemetry.last_commit_usec) / 1_000_000
+        };
+        age.store(age_seconds, Ordering::Relaxed);
+        duration.store(telemetry.last_commit_duration_usec, Ordering::Relaxed);
+        batches.store(telemetry.committed_batches, Ordering::Relaxed);
+        stretched.store(telemetry.stretched_commits, Ordering::Relaxed);
+    }
+
+    /// Per-tier write counters, callable from any thread (Relaxed atomics).
+    pub(super) fn increment_materialized_tier(&self, tier: TierKind, logical_bytes: u64) {
+        match tier {
+            TierKind::Minute1 => {
+                self.minute_1_entries_written.fetch_add(1, Ordering::Relaxed);
+                self.minute_1_logical_bytes
+                    .fetch_add(logical_bytes, Ordering::Relaxed);
+            }
+            TierKind::Minute5 => {
+                self.minute_5_entries_written.fetch_add(1, Ordering::Relaxed);
+                self.minute_5_logical_bytes
+                    .fetch_add(logical_bytes, Ordering::Relaxed);
+            }
+            TierKind::Hour1 => {
+                self.hour_1_entries_written.fetch_add(1, Ordering::Relaxed);
+                self.hour_1_logical_bytes
+                    .fetch_add(logical_bytes, Ordering::Relaxed);
+            }
+            TierKind::Raw => {}
+        }
     }
 }

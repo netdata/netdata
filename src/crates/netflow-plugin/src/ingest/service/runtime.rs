@@ -5,10 +5,7 @@ impl IngestService {
     pub(crate) async fn run(mut self, shutdown: CancellationToken) -> Result<()> {
         self.rebuild_materialized_from_raw().await?;
 
-        let listen = self.cfg.listener.listen.clone();
-        let socket = UdpSocket::bind(&listen)
-            .await
-            .with_context(|| format!("failed to bind {}", listen))?;
+        let socket = self.bind_listener_and_start_workers().await?;
         let mut buffer = vec![0_u8; self.cfg.listener.max_packet_size];
         let mut entries_since_sync = 0_usize;
         let mut sync_tick = tokio::time::interval(self.cfg.listener.sync_interval);
@@ -44,13 +41,80 @@ impl IngestService {
         Ok(())
     }
 
+    async fn bind_listener_and_start_workers(&mut self) -> Result<UdpSocket> {
+        let listen = self.cfg.listener.listen.clone();
+        let socket = UdpSocket::bind(&listen)
+            .await
+            .with_context(|| format!("failed to bind {}", listen))?;
+        Self::expand_receive_buffer(&socket, &listen);
+        self.spawn_tier_commit_workers();
+        Ok(socket)
+    }
+
     fn handle_sync_tick(&mut self, entries_since_sync: usize) -> usize {
         let now = now_usec();
         self.decoders.refresh_enrichment_state();
-        self.run_tier_maintenance(now);
-        let entries_since_sync = self.sync_if_needed(entries_since_sync);
+        // Tier commits belong to the workers; the tick serves handoff
+        // requests (covers idle networks), prunes with in-flight awareness,
+        // and refreshes the open-tier snapshot — all moved here from the
+        // per-packet path.
+        self.handle_tier_handoffs();
+        self.mirror_tier_commit_telemetry(now);
+        self.prune_unused_tier_flow_indexes();
+        self.refresh_open_tier_state(now);
+        let entries_since_sync = if self.periodic_sync_enabled() {
+            self.sync_if_needed(entries_since_sync)
+        } else {
+            // Periodic fsync is disabled (sync_every_entries = 0): the raw
+            // journal reaches disk via kernel writeback and is fully synced on
+            // rotation and at shutdown. Facet state still persists on the tick
+            // cadence, and the entry counter keeps accumulating so shutdown
+            // performs one final sync.
+            if let Err(err) = self.facet_runtime.persist_if_dirty() {
+                tracing::warn!("facet runtime persist failed: {}", err);
+            }
+            entries_since_sync
+        };
         self.persist_decoder_state_if_due(now);
         entries_since_sync
+    }
+
+    fn periodic_sync_enabled(&self) -> bool {
+        self.cfg.listener.sync_every_entries > 0
+    }
+
+    /// Request the largest UDP receive buffer the kernel allows. The
+    /// single-threaded receive loop is periodically stalled by inline disk
+    /// work (journal rotation sync, tier flushes), and the socket buffer is
+    /// what absorbs those stalls; the OS default (typically ~208 KiB, only a
+    /// few tens of datagrams) overflows after a few milliseconds at high flow
+    /// rates. The kernel caps unprivileged requests at net.core.rmem_max.
+    fn expand_receive_buffer(socket: &UdpSocket, listen: &str) {
+        const REQUESTED_RECV_BUFFER_BYTES: usize = 64 * 1024 * 1024;
+        let sock_ref = socket2::SockRef::from(socket);
+        if let Err(err) = sock_ref.set_recv_buffer_size(REQUESTED_RECV_BUFFER_BYTES) {
+            tracing::warn!(
+                "failed to expand UDP receive buffer for {}: {}",
+                listen,
+                err
+            );
+            return;
+        }
+        match sock_ref.recv_buffer_size() {
+            Ok(actual) => tracing::info!(
+                "UDP receive buffer for {}: {} bytes (requested {}; capped by net.core.rmem_max)",
+                listen,
+                actual,
+                REQUESTED_RECV_BUFFER_BYTES
+            ),
+            Err(err) => {
+                tracing::warn!(
+                    "failed to read back UDP receive buffer for {}: {}",
+                    listen,
+                    err
+                );
+            }
+        }
     }
 
     fn handle_received_packet(
@@ -85,7 +149,8 @@ impl IngestService {
             }
         }
 
-        self.run_tier_maintenance(now_usec());
+        // Per-packet cost of the tier handoff: one relaxed atomic load.
+        self.handle_tier_handoffs();
         self.sync_if_threshold_reached(entries_since_sync)
     }
 
@@ -166,12 +231,106 @@ impl IngestService {
     }
 
     fn finish_shutdown(&mut self, entries_since_sync: usize) {
-        self.run_tier_maintenance(now_usec());
+        if self.tier_worker_handles.is_empty() {
+            // Pre-worker mode (in-process tests, benchmarks, rebuild-only
+            // paths): the inline flush + sync, exactly as before.
+            self.run_tier_maintenance(now_usec());
+            let _ = self.sync_if_needed(entries_since_sync);
+            let _ = self.sync_all_tiers();
+            self.persist_decoder_state();
+            return;
+        }
+
+        // Worker shutdown sequence (order matters; see the SOW): the final
+        // per-tier response runs FIRST, filling every slot's pending under
+        // its mutex BEFORE the shutdown flag is raised. A worker can only
+        // reach its drain after observing the flag, and the flag is stored
+        // after the responses on this same thread — so the drain always
+        // finds the final batch already posted. Signaling first raced the
+        // respond against the drain and could strand the last buckets.
+        let now = now_usec();
+        for index in 0..MATERIALIZED_TIERS.len() {
+            self.respond_tier_handoff(index, now);
+        }
+        self.tier_handoff.begin_shutdown();
         let _ = self.sync_if_needed(entries_since_sync);
-        let _ = self.sync_all_tiers();
+        super::tier_commit::join_workers(std::mem::take(&mut self.tier_worker_handles));
+        if let Err(err) = self.facet_runtime.persist_if_dirty() {
+            tracing::warn!("facet runtime persist failed: {}", err);
+        }
         self.persist_decoder_state();
     }
 
+    /// Hand the tier `Log`s to their commit workers. Called once, after the
+    /// rebuild's inline flush; each rebuilt tier is synced first so restart
+    /// history is durable before ownership moves.
+    pub(in crate::ingest) fn spawn_tier_commit_workers(&mut self) {
+        let Some(mut tier_writers) = self.tier_writers.take() else {
+            return;
+        };
+        if let Err(err) = tier_writers.sync_all() {
+            tracing::warn!(
+                "failed to sync rebuilt tier journals before worker handoff: {}",
+                err
+            );
+        }
+        let workers =
+            tier_writers.into_workers(&self.tier_flow_indexes, &self.facet_runtime, &self.metrics);
+        self.tier_worker_handles =
+            super::tier_commit::spawn_tier_workers(&self.tier_handoff, workers);
+    }
+
+    /// The receive path's side of the doorbell protocol: one relaxed load per
+    /// call; on a raised bit, move that tier's closed buckets into the slot
+    /// and recycle the returned containers. Microseconds, at most a few times
+    /// per minute.
+    fn handle_tier_handoffs(&mut self) {
+        if !self.tier_handoff.has_requests() {
+            return;
+        }
+        let now = now_usec();
+        for index in 0..MATERIALIZED_TIERS.len() {
+            if self.tier_handoff.requested(index) {
+                self.respond_tier_handoff(index, now);
+            }
+        }
+    }
+
+    fn respond_tier_handoff(&mut self, index: usize, now_usec: u64) {
+        const HOUR_USEC: u64 = 3_600_000_000;
+        let tier = MATERIALIZED_TIERS[index];
+        let Some(acc) = self.tier_accumulators.get_mut(&tier) else {
+            return;
+        };
+        // An empty take still responds: the worker unblocks on the bumped
+        // generation and simply has nothing to commit this window.
+        let taken = acc.take_closed_buckets(now_usec);
+        // Rows in a bucket share the bucket's hour (receive-time interning),
+        // so the in-flight set is one entry per bucket — no row scan here.
+        let in_flight_hours: std::collections::BTreeSet<u64> = taken
+            .iter()
+            .map(|(start, _)| (start / HOUR_USEC) * HOUR_USEC)
+            .collect();
+        let recycled = self.tier_handoff.respond(index, taken, in_flight_hours);
+        if let Some(acc) = self.tier_accumulators.get_mut(&tier) {
+            for container in recycled {
+                acc.recycle(container);
+            }
+        }
+    }
+
+    /// Mirror each tier slot's commit telemetry into the chart atomics.
+    /// Three short mutex holds per second; the workers touch those mutexes
+    /// at most once per anniversary.
+    fn mirror_tier_commit_telemetry(&self, now_usec: u64) {
+        for (index, tier) in MATERIALIZED_TIERS.iter().enumerate() {
+            let telemetry = self.tier_handoff.commit_telemetry(index);
+            self.metrics
+                .store_tier_commit_telemetry(*tier, now_usec, &telemetry);
+        }
+    }
+
+    /// Pre-worker maintenance (rebuild, in-process tests, benchmarks).
     fn run_tier_maintenance(&mut self, now_usec: u64) {
         if let Err(err) = self.flush_closed_tiers(now_usec) {
             tracing::warn!("tier flush failed: {}", err);
@@ -181,7 +340,8 @@ impl IngestService {
     }
 
     fn sync_if_threshold_reached(&mut self, entries_since_sync: usize) -> usize {
-        if entries_since_sync >= self.cfg.listener.sync_every_entries {
+        let sync_every_entries = self.cfg.listener.sync_every_entries;
+        if sync_every_entries > 0 && entries_since_sync >= sync_every_entries {
             return self.sync_if_needed(entries_since_sync);
         }
 
@@ -213,11 +373,16 @@ impl IngestService {
         0
     }
 
+    /// Pre-worker mode only (in-process tests/benchmarks); after the workers
+    /// spawn they own the tier `Log`s and fsync per commit.
     fn sync_all_tiers(&mut self) -> usize {
+        let Some(tier_writers) = self.tier_writers.as_mut() else {
+            return 0;
+        };
         self.metrics
             .tier_journal_syncs
             .fetch_add(1, Ordering::Relaxed);
-        if let Err(err) = self.tier_writers.sync_all() {
+        if let Err(err) = tier_writers.sync_all() {
             self.metrics
                 .journal_sync_errors
                 .fetch_add(1, Ordering::Relaxed);
@@ -241,6 +406,27 @@ impl IngestService {
         entries_since_sync: usize,
     ) -> usize {
         self.handle_received_packet(source, payload, entries_since_sync)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn spawn_tier_commit_workers_for_test(&mut self) {
+        self.spawn_tier_commit_workers();
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn bind_listener_and_start_workers_for_test(&mut self) -> Result<()> {
+        let _socket = self.bind_listener_and_start_workers().await?;
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn tier_commit_workers_started_for_test(&self) -> bool {
+        !self.tier_worker_handles.is_empty()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn handle_tier_handoffs_for_test(&mut self) {
+        self.handle_tier_handoffs();
     }
 
     #[cfg(test)]
@@ -292,6 +478,31 @@ impl IngestService {
     #[cfg(test)]
     pub(crate) fn handle_sync_tick_for_test(&mut self, entries_since_sync: usize) -> usize {
         self.handle_sync_tick(entries_since_sync)
+    }
+
+    /// Production-shaped batch path for worker-mode benchmarks: ingest the
+    /// records, serve raised doorbells (the per-packet cost), and apply the
+    /// sync threshold — exactly what `handle_received_packet` does, minus
+    /// the decode.
+    #[cfg(test)]
+    pub(crate) fn handle_decoded_batch_with_handoffs_for_test(
+        &mut self,
+        receive_time_usec: u64,
+        records: &[crate::flow::FlowRecord],
+        mut entries_since_sync: usize,
+    ) -> usize {
+        for record in records {
+            if self.ingest_decoded_record_internal(
+                receive_time_usec,
+                receive_time_usec,
+                record,
+                true,
+            ) {
+                entries_since_sync += 1;
+            }
+        }
+        self.handle_tier_handoffs();
+        self.sync_if_threshold_reached(entries_since_sync)
     }
 
     #[cfg(test)]

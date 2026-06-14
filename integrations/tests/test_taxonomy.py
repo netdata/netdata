@@ -624,6 +624,35 @@ modules:
             with patch.object(check_collector_taxonomy, 'run_git', return_value=''):
                 self.assertFalse(check_collector_taxonomy.metadata_metrics_touched('base...head', path))
 
+    def test_touched_collectors_ignores_non_collector_metadata(self):
+        collector_metadata = (
+            check_collector_taxonomy.REPO_PATH /
+            'src/go/plugin/go.d/collector/demo/metadata.yaml'
+        )
+        sd_metadata = (
+            check_collector_taxonomy.REPO_PATH /
+            'src/go/plugin/go.d/discovery/sdext/discoverer/snmpsd/metadata.yaml'
+        )
+        diff = '\n'.join([
+            f'M\t{check_collector_taxonomy.relpath(collector_metadata)}',
+            f'M\t{check_collector_taxonomy.relpath(sd_metadata)}',
+        ])
+
+        with patch.object(check_collector_taxonomy, 'run_git', return_value=diff), \
+                patch.object(
+                    check_collector_taxonomy,
+                    'get_collector_metadata_entries',
+                    return_value=[('netdata/netdata', collector_metadata)],
+                ), \
+                patch.object(
+                    check_collector_taxonomy,
+                    'metadata_metrics_touched',
+                    return_value=True,
+                ):
+            touched = check_collector_taxonomy.touched_collectors('base...head')
+
+        self.assertEqual(touched, [collector_metadata.parent])
+
     def test_deleted_collector_does_not_require_taxonomy(self):
         with tempfile.TemporaryDirectory() as tmp:
             collector_dir = Path(tmp) / 'demo'

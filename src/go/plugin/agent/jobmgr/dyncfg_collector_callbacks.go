@@ -4,6 +4,7 @@ package jobmgr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -87,13 +88,24 @@ func (cb *collectorCallbacks) Start(cfg confgroup.Config) error {
 
 	job, err := cb.mgr.createCollectorJob(cfg)
 	if err != nil {
-		return &codedError{err: fmt.Errorf("invalid configuration: failed to apply configuration: %v", err), code: 400}
+		var ce dyncfg.CodedError
+		if errors.As(err, &ce) {
+			return err
+		}
+		return &codedError{err: fmt.Errorf("invalid configuration: failed to apply configuration: %w", err), code: 400}
 	}
 
 	if err := job.AutoDetection(); err != nil {
 		job.Cleanup()
+		var ce dyncfg.CodedError
+		if errors.As(err, &ce) {
+			if dyncfg.IsRetryableError(err) {
+				cb.mgr.scheduleRetryTask(cfg, job)
+			}
+			return err
+		}
 		cb.mgr.scheduleRetryTask(cfg, job)
-		return fmt.Errorf("job enable failed: %v", err)
+		return fmt.Errorf("job enable failed: %w", err)
 	}
 
 	cb.mgr.startRunningJob(job)
@@ -107,13 +119,24 @@ func (cb *collectorCallbacks) Update(oldCfg, newCfg confgroup.Config) error {
 
 	job, err := cb.mgr.createCollectorJob(newCfg)
 	if err != nil {
-		return fmt.Errorf("job update failed: %v", err)
+		var ce dyncfg.CodedError
+		if errors.As(err, &ce) {
+			return err
+		}
+		return fmt.Errorf("job update failed: %w", err)
 	}
 
 	if err := job.AutoDetection(); err != nil {
 		job.Cleanup()
+		var ce dyncfg.CodedError
+		if errors.As(err, &ce) {
+			if dyncfg.IsRetryableError(err) {
+				cb.mgr.scheduleRetryTask(newCfg, job)
+			}
+			return err
+		}
 		cb.mgr.scheduleRetryTask(newCfg, job)
-		return fmt.Errorf("job update failed: %v", err)
+		return fmt.Errorf("job update failed: %w", err)
 	}
 
 	cb.mgr.startRunningJob(job)
@@ -142,6 +165,6 @@ type codedError struct {
 	code int
 }
 
-func (e *codedError) Error() string { return e.err.Error() }
-func (e *codedError) Unwrap() error { return e.err }
-func (e *codedError) Code() int     { return e.code }
+func (e *codedError) Error() string   { return e.err.Error() }
+func (e *codedError) Unwrap() error   { return e.err }
+func (e *codedError) DyncfgCode() int { return e.code }

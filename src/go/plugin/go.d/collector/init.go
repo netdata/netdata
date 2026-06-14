@@ -110,6 +110,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/smartctl"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/spigotmc"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/sql"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/squid"

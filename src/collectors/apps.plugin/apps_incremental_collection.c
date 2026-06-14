@@ -59,6 +59,12 @@ bool managed_log(struct pid_stat *p, PID_LOG log, bool status) {
                         break;
 #endif
 
+                    case PID_LOG_CGROUP:
+#if defined(OS_LINUX)
+                        netdata_log_error("Cannot process %s/proc/%d/cgroup (command '%s')", netdata_configured_host_prefix, p->pid, pid_stat_comm(p));
+#endif
+                        break;
+
                     case PID_LOG_STAT:
                         break;
 
@@ -138,6 +144,13 @@ int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
         pid_collection_failed(p);
         return 0;
     }
+
+    // --------------------------------------------------------------------
+    // /proc/<pid>/cgroup
+
+#if defined(OS_LINUX)
+    managed_log(p, PID_LOG_CGROUP, apps_os_read_pid_cgroup_linux(p, ptr));
+#endif
 
     // --------------------------------------------------------------------
     // /proc/<pid>/fd

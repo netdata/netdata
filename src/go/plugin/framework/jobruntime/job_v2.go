@@ -270,7 +270,9 @@ func (j *JobV2) AutoDetection() (err error) {
 	if err = j.init(); err != nil {
 		j.Errorf("init failed: %v", err)
 		j.Unmute()
-		j.disableAutoDetection()
+		if !isRetryableError(err) {
+			j.disableAutoDetection()
+		}
 		return err
 	}
 	if err = j.check(); err != nil {

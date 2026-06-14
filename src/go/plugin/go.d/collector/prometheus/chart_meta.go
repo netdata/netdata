@@ -15,16 +15,6 @@ const (
 	prioGORuntime = prioDefault + 10
 )
 
-// application is the "app" segment of a chart context: the configured Application, else
-// the job Name. It selects the per-job chart-template namespace ("prometheus" when empty,
-// else "prometheus.<app>").
-func (c *Collector) application() string {
-	if c.Application != "" {
-		return c.Application
-	}
-	return c.Name
-}
-
 // getChartTitle derives a chart title (description) from the metric HELP, falling back to
 // the metric name when HELP is absent. It is fed into the metrix instrument meta so
 // chartengine autogen reproduces the V1 chart title.

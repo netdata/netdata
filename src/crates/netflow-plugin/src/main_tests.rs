@@ -206,6 +206,692 @@ async fn e2e_timestamp_source_first_switched_is_persisted_as_source_timestamp() 
     );
 }
 
+/// Characterization: restarting with tier journals already covering (part of)
+/// the raw window (the "rollups ahead of raw" crash ordering) must not
+/// duplicate tier rows. The protection is the `find_last_tier_timestamp`
+/// cutoff (`rebuild.rs`) consumed by `observe_tiers_with_cutoffs` (`tiers.rs`).
+///
+/// Tiers bucket by receive time, so this writes a synthetic raw journal with
+/// receive timestamps far enough in the past that every bucket is closed.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_rebuild_with_tiers_ahead_of_raw_adds_no_duplicate_rows() {
+    let (cfg, _tmp) = offline_journal_cfg();
+    let minute = 60_000_000_u64;
+    // Anchor to a CLOSED 5m boundary ~20min in the past: deterministic 1m and
+    // 5m buckets, and safely inside the rebuild raw-file window (the rebuild
+    // only considers raw files overlapping roughly the last hour — flows
+    // older than that are not rebuilt at all, which rules out using a closed
+    // 1h bucket here; the 1h tier shares the identical per-tier cutoff loop).
+    let base = closed_5m_base();
+    let t1 = base + minute; // 1m bucket A, 5m bucket P
+    let t2 = base + 2 * minute; // 1m bucket B, same 5m bucket P
+    let t3 = base + 3 * minute; // 1m bucket C (new), still 5m bucket P
+
+    // Flows are keyed by PROTOCOL (a rollup dimension); BYTES = 100 + protocol.
+    write_raw_flows(
+        &cfg,
+        0x11,
+        1,
+        &[(t1, 1), (t1, 2), (t1, 3), (t2, 1), (t2, 2)],
+    );
+
+    let minute_1_dir = cfg.journal.minute_1_tier_dir();
+    let minute_5_dir = cfg.journal.minute_5_tier_dir();
+
+    rebuild_tiers_with_fresh_service(&cfg).await;
+    let after_first = timestamp_counts(&journal_source_realtime_timestamps(&minute_1_dir));
+    assert_eq!(
+        after_first.len(),
+        2,
+        "rebuild should materialize the two closed 1m buckets: {after_first:?}"
+    );
+    assert_eq!(after_first.values().sum::<usize>(), 5, "{after_first:?}");
+    // Metric content, not just row counts: per-1m-bucket BYTES sums.
+    let bytes_first = bucket_bytes_sums(&minute_1_dir);
+    assert_eq!(
+        bytes_first.values().copied().collect::<Vec<_>>(),
+        vec![101 + 102 + 103, 101 + 102],
+        "1m tier BYTES must aggregate the raw flows: {bytes_first:?}"
+    );
+    // The same flows roll into one 5m bucket: 3 protocol rows, metrics merged.
+    let bytes_5m_first = bucket_bytes_sums(&minute_5_dir);
+    assert_eq!(
+        timestamp_counts(&journal_source_realtime_timestamps(&minute_5_dir))
+            .values()
+            .copied()
+            .collect::<Vec<_>>(),
+        vec![3]
+    );
+    assert_eq!(
+        bytes_5m_first.values().copied().collect::<Vec<_>>(),
+        vec![2 * 101 + 2 * 102 + 103],
+        "5m tier must merge per-protocol metrics across the bucket"
+    );
+
+    // Raw grows past the 1m tier (t3 opens a new 1m bucket) while staying
+    // INSIDE the 5m bucket the 5m tier already flushed.
+    write_raw_flows(&cfg, 0x22, 100, &[(t3, 1), (t3, 2)]);
+    rebuild_tiers_with_fresh_service(&cfg).await;
+    let after_second = timestamp_counts(&journal_source_realtime_timestamps(&minute_1_dir));
+    for (ts, count) in &after_first {
+        assert_eq!(
+            after_second.get(ts),
+            Some(count),
+            "bucket {ts} changed row count after rebuild — duplicated or lost tier rows: {after_second:?}"
+        );
+    }
+    assert_eq!(
+        after_second.len(),
+        3,
+        "the new 1m bucket must be materialized exactly once: {after_second:?}"
+    );
+    let bytes_second = bucket_bytes_sums(&minute_1_dir);
+    assert_eq!(
+        bytes_second.values().copied().collect::<Vec<_>>(),
+        vec![101 + 102 + 103, 101 + 102, 101 + 102],
+        "covered buckets keep their metrics; only the new bucket is added: {bytes_second:?}"
+    );
+    // Per-tier cutoff semantics (characterized on purpose): t3 falls INSIDE
+    // the 5m bucket the 5m tier already flushed, so its flows are never
+    // re-derived into that tier — the crash window loses late arrivals to an
+    // already-covered bucket. The 1m tier picked them up because its cutoff
+    // was earlier. The 1h tier shares this exact mechanism.
+    assert_eq!(
+        bucket_bytes_sums(&minute_5_dir),
+        bytes_5m_first,
+        "5m tier must not re-derive flows inside its already-covered bucket"
+    );
+
+    // Strict rollups-ahead-of-raw: the tiers now cover everything raw holds.
+    // A further rebuild must be a no-op on all tiers.
+    rebuild_tiers_with_fresh_service(&cfg).await;
+    assert_eq!(
+        after_second,
+        timestamp_counts(&journal_source_realtime_timestamps(&minute_1_dir)),
+        "rebuild with tiers fully ahead of raw must be a no-op (cutoff must skip all raw rows)"
+    );
+    assert_eq!(bytes_second, bucket_bytes_sums(&minute_1_dir));
+    assert_eq!(bucket_bytes_sums(&minute_5_dir), bytes_5m_first);
+}
+
+/// Characterization: a torn tail on the newest tier and raw journal files
+/// (power loss mid-write) must not break the next startup — the cutoff lookup
+/// and the rebuild scan must tolerate a partial last entry.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_rebuild_tolerates_torn_tier_and_raw_tails() {
+    let (cfg, _tmp) = offline_journal_cfg();
+    let minute = 60_000_000_u64;
+    let base = closed_5m_base();
+    // Two 1m buckets with two flows each.
+    write_raw_flows(
+        &cfg,
+        0x11,
+        1,
+        &[
+            (base + minute, 1),
+            (base + minute, 2),
+            (base + 2 * minute, 1),
+            (base + 2 * minute, 2),
+        ],
+    );
+
+    // Materialize tier files, then tear the newest tier and raw tails.
+    rebuild_tiers_with_fresh_service(&cfg).await;
+    let minute_1_dir = cfg.journal.minute_1_tier_dir();
+    let intact = timestamp_counts(&journal_source_realtime_timestamps(&minute_1_dir));
+    assert_eq!(
+        intact.values().copied().collect::<Vec<_>>(),
+        vec![2, 2],
+        "two 1m buckets with two protocol rows each: {intact:?}"
+    );
+    truncate_newest_journal_mid_last_entry(&minute_1_dir);
+    truncate_newest_journal_mid_last_entry(&cfg.journal.raw_tier_dir());
+
+    // The tear must be visible to readers: the torn last tier entry is gone.
+    let torn = readable_timestamp_counts(&minute_1_dir);
+    assert_eq!(
+        torn.values().sum::<usize>(),
+        3,
+        "truncation must destroy exactly the last tier row: {torn:?}"
+    );
+
+    // Two consecutive restarts: the first sees the torn tails, the second sees
+    // whatever the first left behind. Both must succeed.
+    rebuild_tiers_with_fresh_service(&cfg).await;
+    rebuild_tiers_with_fresh_service(&cfg).await;
+
+    // Recovery semantics (characterized, not aspirational): a surviving row in
+    // the torn row's bucket advances the cutoff over that bucket, so the torn
+    // tier row is NOT re-derived from raw — the crash window loses that one
+    // row, nothing else. Both restarts converge on the same stable state.
+    let recovered = readable_timestamp_counts(&minute_1_dir);
+    assert_eq!(
+        recovered.values().sum::<usize>(),
+        3,
+        "post-recovery tier rows must be stable, with only the torn row lost: {recovered:?}"
+    );
+    assert_eq!(
+        recovered.len(),
+        2,
+        "both 1m buckets must still be present: {recovered:?}"
+    );
+}
+
+/// Cross-thread tier commit roundtrip: closed buckets handed to the spawned
+/// workers via the doorbell protocol must land in the tier journals (with one
+/// fsync per batch), and the shutdown drain must join cleanly. This is the
+/// path production takes; the rest of the suite covers the pre-worker inline
+/// path.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_ingest_bind_failure_does_not_start_tier_workers() {
+    let (mut cfg, _tmp) = offline_journal_cfg();
+    let occupied = StdUdpSocket::bind("127.0.0.1:0").expect("bind occupied test socket");
+    cfg.listener.listen = occupied
+        .local_addr()
+        .expect("read occupied socket address")
+        .to_string();
+
+    let metrics = Arc::new(ingest::IngestMetrics::default());
+    let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+    let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+    let mut service = ingest::IngestService::new(
+        cfg,
+        Arc::clone(&metrics),
+        Arc::clone(&open_tiers),
+        Arc::clone(&tier_flow_indexes),
+    )
+    .expect("create ingest service");
+
+    let err = service
+        .bind_listener_and_start_workers_for_test()
+        .await
+        .expect_err("occupied UDP address must fail bind");
+    assert!(
+        err.to_string().contains("failed to bind"),
+        "bind error should preserve listener context: {err:#}"
+    );
+    assert!(
+        !service.tier_commit_workers_started_for_test(),
+        "tier workers must not start when listener bind fails"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_tier_commit_workers_roundtrip() {
+    let (cfg, _tmp) = offline_journal_cfg();
+    let metrics = Arc::new(ingest::IngestMetrics::default());
+    let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+    let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+    let mut service = ingest::IngestService::new(
+        cfg.clone(),
+        Arc::clone(&metrics),
+        Arc::clone(&open_tiers),
+        Arc::clone(&tier_flow_indexes),
+    )
+    .expect("create ingest service");
+
+    // Two flows with back-dated receive times: their 1m and 5m buckets are
+    // already closed when the workers claim on spawn.
+    let receive_ts = closed_5m_base() + 60_000_000;
+    for protocol in [1_u8, 2] {
+        let record = crate::flow::FlowRecord {
+            flow_version: "ipfix",
+            protocol,
+            bytes: 100 + protocol as u64,
+            packets: 1,
+            flows: 1,
+            ..Default::default()
+        };
+        assert!(service.ingest_decoded_record_for_test(receive_ts, &record));
+    }
+
+    service.spawn_tier_commit_workers_for_test();
+
+    // The workers raise their doorbells immediately (claim-on-spawn); play
+    // the receive thread's role and respond until the commits land. In the
+    // first ~25 minutes of an hour the back-dated timestamps fall in the
+    // previous hour, so the 1h bucket is closed too and contributes 2 more
+    // rows — the totals below are lower bounds; the per-tier journal
+    // assertions stay exact.
+    let expected_rows = 4; // 2 protocol rows in the 1m bucket + 2 in the 5m.
+    let mut committed = 0;
+    // Generous bound: on a machine still digesting a rebuild, worker
+    // commits can lag the poll by whole seconds.
+    for _ in 0..1_000 {
+        service.handle_tier_handoffs_for_test();
+        committed = metrics.tier_entries_written.load(Ordering::Relaxed);
+        if committed >= expected_rows {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(
+        committed >= expected_rows,
+        "workers should commit the closed 1m and 5m buckets, got {committed}"
+    );
+    for _ in 0..1_000 {
+        if metrics.tier_journal_syncs.load(Ordering::Relaxed) >= 2 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(
+        metrics.tier_journal_syncs.load(Ordering::Relaxed) >= 2,
+        "worker commits must count one tier sync attempt per committed tier"
+    );
+
+    // The tick mirrors slot telemetry into the chart atomics. The entry
+    // counter increments before the worker stamps its slot, so poll the
+    // mirrored values rather than asserting after a single tick.
+    for _ in 0..1_000 {
+        service.handle_sync_tick_for_test(0);
+        if metrics.minute_1_commit_batches.load(Ordering::Relaxed) >= 1
+            && metrics.minute_5_commit_batches.load(Ordering::Relaxed) >= 1
+        {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(
+        metrics.minute_1_commit_batches.load(Ordering::Relaxed) >= 1,
+        "tick must mirror the 1m worker's committed batches"
+    );
+    assert!(
+        metrics.minute_5_commit_batches.load(Ordering::Relaxed) >= 1,
+        "tick must mirror the 5m worker's committed batches"
+    );
+    assert!(
+        metrics.minute_1_commit_age_seconds.load(Ordering::Relaxed) <= 60,
+        "a just-committed tier must report a small commit age"
+    );
+    assert_eq!(
+        metrics.minute_1_commit_stretched.load(Ordering::Relaxed),
+        0,
+        "a single-bucket batch is not a stretched window"
+    );
+
+    // Shutdown must wake every worker promptly; a lost shutdown wakeup leaves
+    // a worker sleeping toward its next anniversary until the 30s join
+    // deadline abandons it. Normal drains take milliseconds.
+    let shutdown_started = std::time::Instant::now();
+    service.finish_shutdown_for_test(0);
+    assert!(
+        shutdown_started.elapsed() < Duration::from_secs(15),
+        "worker shutdown took {:?}; a stuck worker burned the join deadline",
+        shutdown_started.elapsed()
+    );
+
+    let minute_1 = timestamp_counts(&journal_source_realtime_timestamps(
+        &cfg.journal.minute_1_tier_dir(),
+    ));
+    assert_eq!(minute_1.values().sum::<usize>(), 2, "{minute_1:?}");
+    let minute_5 = timestamp_counts(&journal_source_realtime_timestamps(
+        &cfg.journal.minute_5_tier_dir(),
+    ));
+    assert_eq!(minute_5.values().sum::<usize>(), 2, "{minute_5:?}");
+    let bytes = bucket_bytes_sums(&cfg.journal.minute_1_tier_dir());
+    assert_eq!(
+        bytes.values().copied().collect::<Vec<_>>(),
+        vec![101 + 102],
+        "worker-committed rows must carry the aggregated metrics: {bytes:?}"
+    );
+}
+
+/// Shutdown with residual closed buckets that no handoff ever responded to:
+/// `finish_shutdown` posts the final per-tier response BEFORE raising the
+/// shutdown flag, so the workers' drain must commit these rows. Guards the
+/// respond/drain ordering — signaling first let a worker drain an empty slot
+/// and exit while the final buckets were posted behind it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_tier_commit_workers_shutdown_drains_residual_buckets() {
+    let (cfg, _tmp) = offline_journal_cfg();
+    let metrics = Arc::new(ingest::IngestMetrics::default());
+    let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+    let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+    let mut service = ingest::IngestService::new(
+        cfg.clone(),
+        Arc::clone(&metrics),
+        Arc::clone(&open_tiers),
+        Arc::clone(&tier_flow_indexes),
+    )
+    .expect("create ingest service");
+
+    // Spawn first: the claim-on-spawn doorbells block on a response that
+    // never comes, so the buckets ingested below stay in the accumulators.
+    service.spawn_tier_commit_workers_for_test();
+
+    let receive_ts = closed_5m_base() + 60_000_000;
+    for protocol in [1_u8, 2] {
+        let record = crate::flow::FlowRecord {
+            flow_version: "ipfix",
+            protocol,
+            bytes: 100 + protocol as u64,
+            packets: 1,
+            flows: 1,
+            ..Default::default()
+        };
+        assert!(service.ingest_decoded_record_for_test(receive_ts, &record));
+    }
+    assert_eq!(
+        metrics.tier_entries_written.load(Ordering::Relaxed),
+        0,
+        "nothing responded yet; the closed buckets must still be residual"
+    );
+
+    let shutdown_started = std::time::Instant::now();
+    service.finish_shutdown_for_test(0);
+    assert!(
+        shutdown_started.elapsed() < Duration::from_secs(15),
+        "worker shutdown took {:?}; a stuck worker burned the join deadline",
+        shutdown_started.elapsed()
+    );
+
+    // The 1h bucket is also closed (and adds 2 rows) when the back-dated
+    // timestamps fall in the previous hour; the total is a lower bound and
+    // the per-tier journal assertions below stay exact.
+    let written = metrics.tier_entries_written.load(Ordering::Relaxed);
+    assert!(
+        written >= 4,
+        "shutdown must drain the residual 1m and 5m buckets through the workers, got {written}"
+    );
+    assert!(
+        metrics.tier_journal_syncs.load(Ordering::Relaxed) >= 3,
+        "shutdown drain must count final worker sync attempts"
+    );
+    let minute_1 = timestamp_counts(&journal_source_realtime_timestamps(
+        &cfg.journal.minute_1_tier_dir(),
+    ));
+    assert_eq!(minute_1.values().sum::<usize>(), 2, "{minute_1:?}");
+    let minute_5 = timestamp_counts(&journal_source_realtime_timestamps(
+        &cfg.journal.minute_5_tier_dir(),
+    ));
+    assert_eq!(minute_5.values().sum::<usize>(), 2, "{minute_5:?}");
+    let bytes = bucket_bytes_sums(&cfg.journal.minute_1_tier_dir());
+    assert_eq!(
+        bytes.values().copied().collect::<Vec<_>>(),
+        vec![101 + 102],
+        "drained rows must carry the aggregated metrics: {bytes:?}"
+    );
+}
+
+/// A journal config rooted in a fresh temp dir, with no UDP listener involved.
+fn offline_journal_cfg() -> (plugin_config::PluginConfig, TempDir) {
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let mut cfg = plugin_config::PluginConfig::default();
+    cfg.journal.journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
+    (cfg, tmp)
+}
+
+/// Start of a fully closed 5m bucket ~20-25 minutes in the past: 1m and 5m
+/// buckets derived from it are deterministically closed, and the timestamps
+/// stay inside the rebuild's ~1h raw-file window (a fully closed 1h bucket
+/// would necessarily fall outside it).
+fn closed_5m_base() -> u64 {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system time")
+        .as_micros() as u64;
+    let five_minutes = 300_000_000_u64;
+    bucket_start_usec(now, five_minutes) - 4 * five_minutes
+}
+
+/// Per-bucket sums of the BYTES field across all rows of a tier directory,
+/// keyed by `_SOURCE_REALTIME_TIMESTAMP`.
+fn bucket_bytes_sums(path: &Path) -> BTreeMap<u64, u64> {
+    let mut sums = BTreeMap::new();
+    for file_path in journal_files(path) {
+        let repo_file = RepoFile::from_path(&file_path).expect("parse journal repository metadata");
+        let journal =
+            JournalFile::<Mmap>::open(&repo_file, 8 * 1024 * 1024).expect("open journal file");
+        let mut reader = JournalReader::default();
+        reader.set_location(Location::Head);
+        let mut decompress_buf = Vec::new();
+        loop {
+            if !reader
+                .step(&journal, Direction::Forward)
+                .expect("step journal reader")
+            {
+                break;
+            }
+            let mut data_offsets = Vec::<NonZeroU64>::new();
+            reader
+                .entry_data_offsets(&journal, &mut data_offsets)
+                .expect("enumerate journal data offsets");
+            let mut ts: Option<u64> = None;
+            let mut bytes: Option<u64> = None;
+            for offset in data_offsets {
+                let guard = journal.data_ref(offset).expect("read data object");
+                let payload = if guard.is_compressed() {
+                    guard
+                        .decompress(&mut decompress_buf)
+                        .expect("decompress payload");
+                    decompress_buf.as_slice()
+                } else {
+                    guard.raw_payload()
+                };
+                if let Some(value) = payload.strip_prefix(b"_SOURCE_REALTIME_TIMESTAMP=") {
+                    ts = std::str::from_utf8(value).ok().and_then(|v| v.parse().ok());
+                } else if let Some(value) = payload.strip_prefix(b"BYTES=") {
+                    bytes = std::str::from_utf8(value).ok().and_then(|v| v.parse().ok());
+                }
+            }
+            if let (Some(ts), Some(bytes)) = (ts, bytes) {
+                *sums.entry(ts).or_insert(0_u64) += bytes;
+            }
+        }
+    }
+    sums
+}
+
+/// Write one synthetic ARCHIVED raw-tier journal file containing flows with
+/// explicit (historical) entry realtimes, so the tier buckets derived from
+/// them are already closed. The `Log` writer cannot back-date entries (its
+/// realtime clock enforces monotonicity from open time), so this uses the
+/// core `JournalWriter` directly — the same pattern as the query scan tests.
+/// Each flow is keyed by `protocol_key`: addresses and ports are raw-only
+/// fields that do NOT survive into rollups, so PROTOCOL (a rollup dimension)
+/// is what drives distinct rollup rows; BYTES = 100 + protocol_key.
+fn write_raw_flows(
+    cfg: &plugin_config::PluginConfig,
+    seq_seed: u8,
+    head_seqnum: u64,
+    flows: &[(u64, u8)],
+) {
+    use journal_core::{JournalFileOptions, JournalWriter};
+
+    let head_realtime = flows.first().expect("at least one flow").0;
+    let machine_dir = cfg
+        .journal
+        .raw_tier_dir()
+        .join("11111111-1111-1111-1111-111111111111");
+    fs::create_dir_all(&machine_dir).expect("create raw machine dir");
+    let seqnum_id_hex = format!("{seq_seed:02x}").repeat(16);
+    let path = machine_dir.join(format!(
+        "system@{seqnum_id_hex}-{head_seqnum:016x}-{head_realtime:016x}.journal"
+    ));
+
+    let test_uuid = |seed: u8| uuid::Uuid::from_bytes([seed; 16]);
+    let repo_file = RepoFile::from_path(&path).expect("archived test path should parse");
+    let mut journal_file = JournalFile::create(
+        &repo_file,
+        JournalFileOptions::new(
+            test_uuid(seq_seed),
+            test_uuid(seq_seed.wrapping_add(1)),
+            test_uuid(seq_seed.wrapping_add(2)),
+        ),
+    )
+    .expect("create raw test journal");
+    let mut writer = JournalWriter::new(
+        &mut journal_file,
+        head_seqnum,
+        test_uuid(seq_seed.wrapping_add(3)),
+    )
+    .expect("create raw test writer");
+
+    let mut data = Vec::new();
+    let mut refs = Vec::new();
+    for (index, &(ts_usec, protocol_key)) in flows.iter().enumerate() {
+        let record = crate::flow::FlowRecord {
+            flow_version: "ipfix",
+            protocol: protocol_key,
+            src_port: 5000 + protocol_key as u16,
+            dst_port: 53,
+            bytes: 100 + protocol_key as u64,
+            packets: 1,
+            flows: 1,
+            src_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(
+                10,
+                0,
+                0,
+                protocol_key,
+            ))),
+            dst_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(192, 0, 2, 1))),
+            ..Default::default()
+        };
+        record.encode_to_journal_buf(&mut data, &mut refs);
+        let source_field = format!("_SOURCE_REALTIME_TIMESTAMP={ts_usec}");
+        let mut payloads: Vec<&[u8]> = refs.iter().map(|r| &data[r.clone()]).collect();
+        payloads.push(source_field.as_bytes());
+        writer
+            .add_entry(&mut journal_file, &payloads, ts_usec, 100 + index as u64)
+            .expect("write raw test entry");
+    }
+}
+
+async fn rebuild_tiers_with_fresh_service(cfg: &plugin_config::PluginConfig) {
+    let metrics = Arc::new(ingest::IngestMetrics::default());
+    let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+    let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+    let mut service = ingest::IngestService::new(
+        cfg.clone(),
+        Arc::clone(&metrics),
+        Arc::clone(&open_tiers),
+        Arc::clone(&tier_flow_indexes),
+    )
+    .expect("create rebuild ingest service");
+    service
+        .rebuild_materialized_from_raw_for_test()
+        .await
+        .expect("rebuild materialized tiers from raw");
+}
+
+fn timestamp_counts(timestamps: &[u64]) -> BTreeMap<u64, usize> {
+    let mut counts = BTreeMap::new();
+    for &ts in timestamps {
+        *counts.entry(ts).or_insert(0) += 1;
+    }
+    counts
+}
+
+/// Like `journal_source_realtime_timestamps` + `timestamp_counts`, but stops
+/// at the first unreadable entry instead of panicking — the journald-style
+/// tolerant read needed to inspect a deliberately torn file (the low-level
+/// `JournalReader::step` surfaces a torn entry as an error and leaves the
+/// tolerance decision to the caller).
+fn readable_timestamp_counts(path: &Path) -> BTreeMap<u64, usize> {
+    let mut counts = BTreeMap::new();
+    for file_path in journal_files(path) {
+        let Some(repo_file) = RepoFile::from_path(&file_path) else {
+            continue;
+        };
+        let Ok(journal) = JournalFile::<Mmap>::open(&repo_file, 8 * 1024 * 1024) else {
+            continue;
+        };
+        let mut reader = JournalReader::default();
+        reader.set_location(Location::Head);
+        let mut decompress_buf = Vec::new();
+        loop {
+            match reader.step(&journal, Direction::Forward) {
+                Ok(true) => {}
+                Ok(false) | Err(_) => break,
+            }
+            let mut data_offsets = Vec::<NonZeroU64>::new();
+            if reader
+                .entry_data_offsets(&journal, &mut data_offsets)
+                .is_err()
+            {
+                break;
+            }
+            let mut ts: Option<u64> = None;
+            let mut entry_readable = true;
+            for offset in data_offsets {
+                let Ok(guard) = journal.data_ref(offset) else {
+                    entry_readable = false;
+                    break;
+                };
+                let payload = if guard.is_compressed() {
+                    if guard.decompress(&mut decompress_buf).is_err() {
+                        entry_readable = false;
+                        break;
+                    }
+                    decompress_buf.as_slice()
+                } else {
+                    guard.raw_payload()
+                };
+                if let Some(value) = payload.strip_prefix(b"_SOURCE_REALTIME_TIMESTAMP=") {
+                    let Ok(value) = std::str::from_utf8(value) else {
+                        entry_readable = false;
+                        break;
+                    };
+                    let Ok(value) = value.parse() else {
+                        entry_readable = false;
+                        break;
+                    };
+                    ts = Some(value);
+                }
+            }
+            if !entry_readable {
+                break;
+            }
+            if let Some(ts) = ts {
+                *counts.entry(ts).or_insert(0) += 1;
+            }
+        }
+    }
+    counts
+}
+
+/// Tear the most recently modified journal file in `dir` mid-way through its
+/// LAST entry object. Truncating a fixed number of trailing bytes is not
+/// enough: journal files grow in rounded size increments, so the tail of the
+/// file is unused arena padding and cutting it tears nothing. This locates the
+/// last entry's offset with the reader and truncates 13 (non-8-aligned) bytes
+/// past it, destroying exactly that entry.
+fn truncate_newest_journal_mid_last_entry(dir: &Path) {
+    let newest = journal_files(dir)
+        .into_iter()
+        .max_by_key(|path| {
+            fs::metadata(path)
+                .and_then(|m| m.modified())
+                .expect("journal file mtime")
+        })
+        .expect("tier directory should contain at least one journal file");
+
+    let last_entry_offset = {
+        let repo_file = RepoFile::from_path(&newest).expect("parse journal repository metadata");
+        let journal =
+            JournalFile::<Mmap>::open(&repo_file, 8 * 1024 * 1024).expect("open journal file");
+        let mut reader = JournalReader::default();
+        reader.set_location(Location::Head);
+        let mut last = None;
+        while reader
+            .step(&journal, Direction::Forward)
+            .expect("step journal reader")
+        {
+            last = Some(reader.get_entry_offset().expect("entry offset"));
+        }
+        last.expect("journal file should contain at least one entry")
+            .get()
+    };
+
+    let file = fs::OpenOptions::new()
+        .write(true)
+        .open(&newest)
+        .expect("open journal for truncation");
+    file.set_len(last_entry_offset + 13)
+        .expect("truncate journal mid last entry");
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_query_service_timeseries_path_returns_chart_data() {
     let (cfg, _metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
@@ -1617,6 +2303,25 @@ async fn ingest_fixture_with_timestamp_source(
     ingest_fixture_with_config(fixture_name, timestamp_source, |_| {}).await
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_disabled_periodic_sync_syncs_raw_journal_only_at_shutdown() {
+    let (_cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) =
+        ingest_fixture_with_config("nfv5.pcap", plugin_config::TimestampSource::Input, |cfg| {
+            cfg.listener.sync_every_entries = 0
+        })
+        .await;
+
+    assert!(
+        metrics.journal_entries_written.load(Ordering::Relaxed) > 0,
+        "expected raw entries to be written"
+    );
+    assert_eq!(
+        metrics.raw_journal_syncs.load(Ordering::Relaxed),
+        1,
+        "with sync_every_entries=0 the raw journal must fsync exactly once, at shutdown"
+    );
+}
+
 async fn ingest_fixture_with_config(
     fixture_name: &str,
     timestamp_source: plugin_config::TimestampSource,
@@ -1669,8 +2374,17 @@ async fn ingest_fixture_with_config(
 
 async fn wait_for_ingest_progress(metrics: &Arc<ingest::IngestMetrics>) {
     tokio::time::timeout(E2E_INGEST_WAIT_TIMEOUT, async {
+        let mut last_written = 0_u64;
+        let mut stable_polls = 0_u8;
         loop {
-            if metrics.journal_entries_written.load(Ordering::Relaxed) > 0 {
+            let written = metrics.journal_entries_written.load(Ordering::Relaxed);
+            if written > 0 && written == last_written {
+                stable_polls = stable_polls.saturating_add(1);
+            } else {
+                stable_polls = 0;
+                last_written = written;
+            }
+            if stable_polls >= 2 {
                 break;
             }
             tokio::time::sleep(Duration::from_millis(25)).await;
@@ -1731,6 +2445,566 @@ fn reserve_udp_listen_addr() -> String {
     let sock = StdUdpSocket::bind("127.0.0.1:0").expect("reserve udp listen socket");
     let addr = sock.local_addr().expect("read local addr");
     addr.to_string()
+}
+
+/// Sum the kernel UDP receive-buffer drop counter for the socket bound to
+/// `port` (the last column of /proc/net/udp[6]). This is the authoritative
+/// packet-loss signal: it increments when the kernel discards a datagram
+/// because the socket receive buffer was full.
+fn read_udp_socket_drops(port: u16) -> u64 {
+    let want = format!(":{port:04X}");
+    let mut total = 0_u64;
+    for path in ["/proc/net/udp", "/proc/net/udp6"] {
+        let Ok(content) = fs::read_to_string(path) else {
+            continue;
+        };
+        for line in content.lines().skip(1) {
+            let cols: Vec<&str> = line.split_whitespace().collect();
+            // 0:sl 1:local_addr 2:rem 3:st 4:tx:rx 5:tr:when 6:retr 7:uid
+            // 8:timeout 9:inode 10:ref 11:pointer 12:drops
+            if cols.len() < 13 {
+                continue;
+            }
+            if cols[1].to_uppercase().ends_with(&want) {
+                total += cols[12].parse::<u64>().unwrap_or(0);
+            }
+        }
+    }
+    total
+}
+
+/// Live UDP loss-ceiling load test. Drives the REAL socket receive path of a
+/// running `IngestService` at a fixed target datagrams/s and reports kernel UDP
+/// drops plus achieved flows/s. Ramp `NETFLOW_UDP_BENCH_PPS` across runs to find
+/// the sustained rate before the kernel starts dropping datagrams (the true
+/// per-agent ingestion ceiling, end-to-end through the socket).
+///
+/// Env: NETFLOW_UDP_BENCH_PPS (target datagrams/s, default 5000),
+///      NETFLOW_UDP_BENCH_SECS (measurement duration, default 10),
+///      NETFLOW_UDP_BENCH_FIXTURE (pcap fixture, default "nfv5.pcap"),
+///      NETFLOW_UDP_BENCH_V5_RECORDS_PER_PACKET (optional v5 record cap).
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "manual live UDP loss-ceiling load test"]
+async fn bench_udp_loss_ceiling() {
+    let target_pps: u64 = std::env::var("NETFLOW_UDP_BENCH_PPS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(5_000);
+    let duration_secs: u64 = std::env::var("NETFLOW_UDP_BENCH_SECS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10);
+    let fixture =
+        std::env::var("NETFLOW_UDP_BENCH_FIXTURE").unwrap_or_else(|_| "nfv5.pcap".to_string());
+    let v5_records_per_packet: Option<usize> =
+        std::env::var("NETFLOW_UDP_BENCH_V5_RECORDS_PER_PACKET")
+            .ok()
+            .map(|v| {
+                v.parse::<usize>()
+                    .expect("NETFLOW_UDP_BENCH_V5_RECORDS_PER_PACKET must be an integer")
+            });
+
+    let mut payloads = fixture_udp_payloads(&fixture);
+    assert!(
+        !payloads.is_empty(),
+        "fixture {fixture} has no udp payloads"
+    );
+    if let Some(records_per_packet) = v5_records_per_packet {
+        limit_netflow_v5_records_per_packet(&mut payloads, records_per_packet);
+    }
+
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let listen = reserve_udp_listen_addr();
+    let port: u16 = listen
+        .rsplit(':')
+        .next()
+        .and_then(|p| p.parse().ok())
+        .expect("listen port");
+
+    let mut cfg = plugin_config::PluginConfig::default();
+    cfg.journal.journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
+    cfg.listener.listen = listen.clone();
+    // Production-realistic sync behavior is the default (periodic fsync
+    // disabled; files sync on rotation and shutdown). Do NOT force per-entry
+    // sync, which would not reflect the real ceiling.
+
+    let metrics = Arc::new(ingest::IngestMetrics::default());
+    let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+    let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+    let service = ingest::IngestService::new(
+        cfg.clone(),
+        Arc::clone(&metrics),
+        Arc::clone(&open_tiers),
+        Arc::clone(&tier_flow_indexes),
+    )
+    .expect("create ingest service");
+    let shutdown = CancellationToken::new();
+    let run_shutdown = shutdown.clone();
+    let ingest_task = tokio::spawn(async move { service.run(run_shutdown).await });
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    let drops_before = read_udp_socket_drops(port);
+    let recv_before = metrics.udp_packets_received.load(Ordering::Relaxed);
+    let entries_before = metrics.journal_entries_written.load(Ordering::Relaxed);
+
+    // Sender on a dedicated OS thread with a blocking socket, deadline-paced to
+    // the target rate so it does not steal the listener's tokio workers.
+    let sender_listen = listen.clone();
+    let sender = std::thread::spawn(move || -> u64 {
+        let sock = StdUdpSocket::bind("127.0.0.1:0").expect("bind sender");
+        sock.connect(&sender_listen).expect("connect sender");
+        let total = target_pps.saturating_mul(duration_secs);
+        let start = Instant::now();
+        let mut attempted = 0_u64;
+        let mut sent = 0_u64;
+        let mut idx = 0_usize;
+        while attempted < total {
+            let due = (start.elapsed().as_secs_f64() * target_pps as f64) as u64;
+            let upto = due.min(total);
+            while attempted < upto {
+                // Count only datagrams the local stack accepted; a failed
+                // send (e.g. ENOBUFS) never reached the receiver and must not
+                // inflate the reported loss.
+                if sock.send(&payloads[idx % payloads.len()]).is_ok() {
+                    sent += 1;
+                }
+                attempted += 1;
+                idx += 1;
+            }
+            if attempted < total {
+                std::thread::sleep(Duration::from_micros(150));
+            }
+        }
+        sent
+    });
+
+    let sent = sender.join().expect("join sender");
+    // Let the listener drain any datagrams still buffered in the socket.
+    tokio::time::sleep(Duration::from_millis(750)).await;
+
+    let drops = read_udp_socket_drops(port).saturating_sub(drops_before);
+    let recv = metrics.udp_packets_received.load(Ordering::Relaxed) - recv_before;
+    let entries = metrics.journal_entries_written.load(Ordering::Relaxed) - entries_before;
+
+    shutdown.cancel();
+    ingest_task
+        .await
+        .expect("join ingestion task")
+        .expect("ingestion run");
+
+    let secs = duration_secs as f64;
+    let flows_per_pkt = if recv > 0 {
+        entries as f64 / recv as f64
+    } else {
+        0.0
+    };
+    let loss_pct = if sent > 0 {
+        100.0 * sent.saturating_sub(recv) as f64 / sent as f64
+    } else {
+        0.0
+    };
+    println!(
+        "UDP_LOSS_RESULT fixture={fixture} target_pps={target_pps} dur={duration_secs}s \
+         sent_pkts={sent} recv_pkts={recv} kernel_drops={drops} flows={entries} \
+         achieved_pps={:.0} achieved_fps={:.0} flows_per_pkt={flows_per_pkt:.1} loss_pct={loss_pct:.2}",
+        recv as f64 / secs,
+        entries as f64 / secs,
+    );
+}
+
+fn limit_netflow_v5_records_per_packet(payloads: &mut [Vec<u8>], records_per_packet: usize) {
+    assert!(
+        records_per_packet > 0,
+        "NETFLOW_UDP_BENCH_V5_RECORDS_PER_PACKET must be greater than 0"
+    );
+    const NETFLOW_V5_HEADER_LEN: usize = 24;
+    const NETFLOW_V5_RECORD_LEN: usize = 48;
+
+    for payload in payloads {
+        assert!(
+            payload.len() >= NETFLOW_V5_HEADER_LEN,
+            "NetFlow v5 benchmark payload is shorter than the header"
+        );
+        let version = u16::from_be_bytes([payload[0], payload[1]]);
+        assert_eq!(
+            version, 5,
+            "NETFLOW_UDP_BENCH_V5_RECORDS_PER_PACKET only supports NetFlow v5 payloads"
+        );
+        let existing_count = u16::from_be_bytes([payload[2], payload[3]]) as usize;
+        assert!(
+            records_per_packet <= existing_count,
+            "requested {records_per_packet} v5 records per packet, but fixture packet only has {existing_count}"
+        );
+        let new_len = NETFLOW_V5_HEADER_LEN + records_per_packet * NETFLOW_V5_RECORD_LEN;
+        assert!(
+            payload.len() >= new_len,
+            "NetFlow v5 benchmark payload is shorter than its requested record count"
+        );
+        payload[2..4].copy_from_slice(&(records_per_packet as u16).to_be_bytes());
+        payload.truncate(new_len);
+    }
+}
+
+/// SOW step-6 boundary soak: live UDP through the production `run()` loop
+/// (tier workers included) for >=75 s at >=30k flows/s, crossing at least one
+/// 1m tier boundary, with a per-packet srcaddr-mutating NetFlow v5 sender so
+/// the closed buckets carry real cardinality. Asserts ZERO kernel UDP drops
+/// across the whole run (the boundary commit must never stall the receive
+/// path), that the 1m worker committed during the soak, and that no commit
+/// window stretched. Env: NETFLOW_UDP_SOAK_PPS (datagrams/s, default 1100 ~
+/// 32k flows/s on nfv5's 29 flows/packet), NETFLOW_UDP_SOAK_SECS (default 75),
+/// NETFLOW_UDP_SOAK_ADDRS (srcaddr pool, default 2048).
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "manual live UDP boundary soak"]
+async fn bench_udp_boundary_soak() {
+    let target_pps: u64 = std::env::var("NETFLOW_UDP_SOAK_PPS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1_100);
+    let duration_secs: u64 = std::env::var("NETFLOW_UDP_SOAK_SECS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(75);
+    let addr_pool: u32 = std::env::var("NETFLOW_UDP_SOAK_ADDRS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(2_048);
+
+    let payloads = fixture_udp_payloads("nfv5.pcap");
+    let base_payload = payloads.first().expect("nfv5 payload").clone();
+    let record_count = u16::from_be_bytes([base_payload[2], base_payload[3]]) as usize;
+    assert!(record_count > 0 && base_payload.len() >= 24 + record_count * 48);
+
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let listen = reserve_udp_listen_addr();
+    let port: u16 = listen
+        .rsplit(':')
+        .next()
+        .and_then(|p| p.parse().ok())
+        .expect("listen port");
+
+    let mut cfg = plugin_config::PluginConfig::default();
+    cfg.journal.journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
+    cfg.listener.listen = listen.clone();
+
+    let metrics = Arc::new(ingest::IngestMetrics::default());
+    let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+    let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+    let service = ingest::IngestService::new(
+        cfg.clone(),
+        Arc::clone(&metrics),
+        Arc::clone(&open_tiers),
+        Arc::clone(&tier_flow_indexes),
+    )
+    .expect("create ingest service");
+    let shutdown = CancellationToken::new();
+    let run_shutdown = shutdown.clone();
+    let ingest_task = tokio::spawn(async move { service.run(run_shutdown).await });
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    let drops_before = read_udp_socket_drops(port);
+    let recv_before = metrics.udp_packets_received.load(Ordering::Relaxed);
+
+    // Deadline-paced sender; every datagram rewrites each record's srcaddr
+    // from a bounded counter pool so per-minute buckets hold tens of
+    // thousands of distinct rows.
+    let sender_listen = listen.clone();
+    let sender = std::thread::spawn(move || -> u64 {
+        let sock = StdUdpSocket::bind("127.0.0.1:0").expect("bind sender");
+        sock.connect(&sender_listen).expect("connect sender");
+        let mut buf = base_payload.clone();
+        let total = target_pps.saturating_mul(duration_secs);
+        let start = Instant::now();
+        let mut attempted = 0_u64;
+        let mut sent = 0_u64;
+        while attempted < total {
+            let due = (start.elapsed().as_secs_f64() * target_pps as f64) as u64;
+            let upto = due.min(total);
+            while attempted < upto {
+                // Cardinality must survive the rollup: addresses and ports
+                // are raw-only dimensions, so mutate the AS numbers and
+                // interface indexes (and srcaddr for raw-side variety).
+                let bucket = attempted as u32 % addr_pool;
+                let addr = 0x0a00_0000_u32 | bucket;
+                let src_as = (16_000 + (bucket % 32_768) as u16).to_be_bytes();
+                let dst_as = (32_000 + (bucket % 32_768) as u16).to_be_bytes();
+                let in_if = (1 + (bucket % 4_096) as u16).to_be_bytes();
+                let out_if = (1 + ((bucket / 7) % 4_096) as u16).to_be_bytes();
+                for record in 0..record_count {
+                    let off = 24 + record * 48;
+                    buf[off..off + 4].copy_from_slice(&addr.to_be_bytes());
+                    buf[off + 12..off + 14].copy_from_slice(&in_if);
+                    buf[off + 14..off + 16].copy_from_slice(&out_if);
+                    buf[off + 40..off + 42].copy_from_slice(&src_as);
+                    buf[off + 42..off + 44].copy_from_slice(&dst_as);
+                }
+                if sock.send(&buf).is_ok() {
+                    sent += 1;
+                }
+                attempted += 1;
+            }
+            if attempted < total {
+                std::thread::sleep(Duration::from_micros(150));
+            }
+        }
+        sent
+    });
+
+    // Per-second drop timeline while the sender runs: a stall at a tier
+    // boundary shows up as a drop burst in that second's sample.
+    let mut last_drops = 0_u64;
+    for second in 0..duration_secs {
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        let drops = read_udp_socket_drops(port).saturating_sub(drops_before);
+        let tier_rows = metrics.tier_entries_written.load(Ordering::Relaxed);
+        let batches_1m = metrics.minute_1_commit_batches.load(Ordering::Relaxed);
+        if drops != last_drops || second % 15 == 0 {
+            println!(
+                "SOAK_SAMPLE sec={second} kernel_drops={drops} tier_rows={tier_rows} \
+                 commit_batches_1m={batches_1m}"
+            );
+            last_drops = drops;
+        }
+    }
+
+    let sent = sender.join().expect("join sender");
+    tokio::time::sleep(Duration::from_millis(750)).await;
+
+    let drops = read_udp_socket_drops(port).saturating_sub(drops_before);
+    let recv = metrics.udp_packets_received.load(Ordering::Relaxed) - recv_before;
+    let entries = metrics.journal_entries_written.load(Ordering::Relaxed);
+    let tier_rows = metrics.tier_entries_written.load(Ordering::Relaxed);
+    let batches_1m = metrics.minute_1_commit_batches.load(Ordering::Relaxed);
+    let stretched: u64 = metrics.minute_1_commit_stretched.load(Ordering::Relaxed)
+        + metrics.minute_5_commit_stretched.load(Ordering::Relaxed)
+        + metrics.hour_1_commit_stretched.load(Ordering::Relaxed);
+
+    shutdown.cancel();
+    ingest_task
+        .await
+        .expect("join ingestion task")
+        .expect("ingestion run");
+
+    println!(
+        "SOAK_RESULT pps={target_pps} dur={duration_secs}s sent={sent} recv={recv} \
+         kernel_drops={drops} raw_rows={entries} tier_rows={tier_rows} \
+         commit_batches_1m={batches_1m} stretched={stretched} \
+         achieved_fps={:.0}",
+        entries as f64 / duration_secs as f64,
+    );
+
+    assert_eq!(drops, 0, "kernel dropped datagrams during the soak");
+    assert!(
+        batches_1m >= 1,
+        "the soak must cross at least one 1m boundary and commit through the worker"
+    );
+    assert_eq!(
+        stretched, 0,
+        "a worker missed its anniversary during the soak"
+    );
+    assert!(tier_rows > 0, "tier rows must land on disk during the soak");
+}
+
+/// SOW step-7 crash-child helper: ingests two-protocol minute buckets from
+/// ~50 minutes ago toward now (monotone receive time), serving worker
+/// doorbells per batch, and reports committed tier rows on stdout. The
+/// parent SIGKILLs it mid-commit. Runs only when NETFLOW_CRASH_CHILD=1.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "manual crash-test child helper"]
+async fn crash_ingest_child() {
+    if std::env::var_os("NETFLOW_CRASH_CHILD").is_none() {
+        return;
+    }
+    let dir = std::env::var("NETFLOW_CRASH_DIR").expect("NETFLOW_CRASH_DIR");
+
+    let mut cfg = plugin_config::PluginConfig::default();
+    cfg.journal.journal_dir = dir;
+    let metrics = Arc::new(ingest::IngestMetrics::default());
+    let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+    let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+    let mut service = ingest::IngestService::new(
+        cfg,
+        Arc::clone(&metrics),
+        Arc::clone(&open_tiers),
+        Arc::clone(&tier_flow_indexes),
+    )
+    .expect("create crash child service");
+    service
+        .rebuild_materialized_from_raw_for_test()
+        .await
+        .expect("crash child rebuild");
+    service.spawn_tier_commit_workers_for_test();
+
+    fn wall_usec() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time")
+            .as_micros() as u64
+    }
+
+    let minute = 60_000_000_u64;
+    let mut ts = wall_usec() - 50 * minute;
+    let mut entries_since_sync = 0_usize;
+    let mut last_reported = u64::MAX;
+    loop {
+        let records: Vec<crate::flow::FlowRecord> = [6_u8, 17]
+            .into_iter()
+            .map(|protocol| crate::flow::FlowRecord {
+                flow_version: "ipfix",
+                protocol,
+                bytes: 100 + protocol as u64,
+                packets: 1,
+                flows: 1,
+                ..Default::default()
+            })
+            .collect();
+        entries_since_sync =
+            service.handle_decoded_batch_with_handoffs_for_test(ts, &records, entries_since_sync);
+        // March a virtual minute per batch through the backlog, then trail
+        // real time by ~2 minutes so receive time stays monotone.
+        ts += if ts + 120 * 1_000_000 < wall_usec() {
+            minute
+        } else {
+            100_000
+        };
+
+        let rows = metrics.tier_entries_written.load(Ordering::Relaxed);
+        if rows != last_reported {
+            println!("CRASH_CHILD_TIER_ROWS {rows}");
+            last_reported = rows;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
+/// SOW step-7 crash test: SIGKILL a child mid-ingest right after its first
+/// worker tier commits land (the first 1m claim carries a ~48-bucket
+/// stretch batch, so the kill hits an active multi-bucket commit), then
+/// rebuild on the same journals and prove recovery: startup tolerates the
+/// torn tails, no tier bucket holds duplicate rows, and a second rebuild is
+/// a strict no-op.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "manual SIGKILL crash test"]
+async fn crash_sigkill_then_rebuild_has_no_duplicates() {
+    use std::io::BufRead;
+
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
+    let current_exe = std::env::current_exe().expect("locate test binary");
+
+    let mut child = std::process::Command::new(&current_exe)
+        .arg("--ignored")
+        .arg("--exact")
+        .arg("tests::crash_ingest_child")
+        .arg("--nocapture")
+        .arg("--test-threads=1")
+        .env("NETFLOW_CRASH_CHILD", "1")
+        .env("NETFLOW_CRASH_DIR", &journal_dir)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .expect("spawn crash child");
+
+    // Watch the child's committed-row reports. The first doorbell response
+    // commits the oldest bucket within milliseconds (claim-on-spawn); the
+    // ~48-bucket backlog commits as one stretch batch at the 1m worker's
+    // first real anniversary (<=61s). Kill once that batch is in flight
+    // (row reports arrive every 100ms, mid-commit).
+    let stdout = child.stdout.take().expect("child stdout");
+    let (line_tx, line_rx) = std::sync::mpsc::channel::<String>();
+    let reader_thread = std::thread::spawn(move || {
+        let reader = std::io::BufReader::new(stdout);
+        for line in reader.lines() {
+            let Ok(line) = line else {
+                break;
+            };
+            if line_tx.send(line).is_err() {
+                break;
+            }
+        }
+    });
+    let deadline = Instant::now() + Duration::from_secs(120);
+    let mut saw_rows = 0_u64;
+    while saw_rows < 40 {
+        let now = Instant::now();
+        if now >= deadline {
+            break;
+        }
+        let wait_for = std::cmp::min(
+            deadline.saturating_duration_since(now),
+            Duration::from_millis(500),
+        );
+        let line = match line_rx.recv_timeout(wait_for) {
+            Ok(line) => line,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+        };
+        if let Some(value) = line.strip_prefix("CRASH_CHILD_TIER_ROWS ") {
+            saw_rows = value.trim().parse().unwrap_or(0);
+        }
+    }
+    if saw_rows < 40 {
+        let _ = child.kill();
+        let _ = child.wait();
+        let _ = reader_thread.join();
+        panic!(
+            "child never reached the stretch-batch commit before the deadline \
+             (saw {saw_rows} rows)"
+        );
+    }
+    child.kill().expect("SIGKILL crash child");
+    let _ = child.wait();
+    let _ = reader_thread.join();
+
+    // Restart: rebuild must survive whatever the kill tore.
+    let mut cfg = plugin_config::PluginConfig::default();
+    cfg.journal.journal_dir = journal_dir;
+    rebuild_tiers_with_fresh_service(&cfg).await;
+
+    let counts_after_first: Vec<BTreeMap<u64, usize>> = [
+        cfg.journal.minute_1_tier_dir(),
+        cfg.journal.minute_5_tier_dir(),
+        cfg.journal.hour_1_tier_dir(),
+    ]
+    .iter()
+    .map(|dir| readable_timestamp_counts(dir))
+    .collect();
+
+    let minute_1_rows: usize = counts_after_first[0].values().sum();
+    assert!(
+        minute_1_rows > 0,
+        "recovery must leave 1m tier rows on disk"
+    );
+    for (tier, counts) in ["1m", "5m", "1h"].iter().zip(&counts_after_first) {
+        for (bucket, count) in counts {
+            assert!(
+                *count <= 2,
+                "tier {tier} bucket {bucket} has {count} rows — duplicates \
+                 (the child writes exactly two protocols per bucket)"
+            );
+        }
+    }
+
+    // A second rebuild must change nothing.
+    rebuild_tiers_with_fresh_service(&cfg).await;
+    let counts_after_second: Vec<BTreeMap<u64, usize>> = [
+        cfg.journal.minute_1_tier_dir(),
+        cfg.journal.minute_5_tier_dir(),
+        cfg.journal.hour_1_tier_dir(),
+    ]
+    .iter()
+    .map(|dir| readable_timestamp_counts(dir))
+    .collect();
+    assert_eq!(
+        counts_after_first, counts_after_second,
+        "a second rebuild after recovery must be a strict no-op"
+    );
+
+    println!(
+        "CRASH_RESULT killed_at_rows={saw_rows} recovered_1m_rows={minute_1_rows} \
+         recovered_1m_buckets={}",
+        counts_after_first[0].len()
+    );
 }
 
 fn assert_tier_has_files(path: &Path, tier_name: &str) {

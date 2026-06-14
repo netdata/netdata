@@ -20,12 +20,16 @@ bitvec = { workspace = true }
 bytesize = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
-journal-common = { workspace = true }
-journal-core = { workspace = true }
-journal-engine = { workspace = true }
-journal-index = { workspace = true }
-journal-log-writer = { workspace = true }
-journal-registry = { workspace = true }
+# Journal I/O migrated to the published systemd-journal-sdk (was vendored path
+# crates). Aliased to the historical names so call sites keep `use journal_*`.
+# Scope: netflow-plugin only; log-viewer/otel still use the vendored workspace
+# crates (tracked as a follow-up). One source of journal-core in this binary.
+journal-common = { package = "systemd-journal-sdk-common", version = "0.7.0" }
+journal-core = { package = "systemd-journal-sdk-core", version = "0.7.0" }
+journal-engine = { package = "systemd-journal-sdk-engine", version = "0.7.0" }
+journal-index = { package = "systemd-journal-sdk-index", version = "0.7.0" }
+journal-log-writer = { package = "systemd-journal-sdk-log-writer", version = "0.7.0" }
+journal-registry = { package = "systemd-journal-sdk-registry", version = "0.7.0" }
 humantime = { workspace = true }
 humantime-serde = { workspace = true }
 hashbrown = { workspace = true }

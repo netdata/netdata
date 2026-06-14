@@ -54,6 +54,20 @@ groups:
 `
 }
 
+type namedTestV1Module struct {
+	testV1Module
+	jobName string
+}
+
+func (m *namedTestV1Module) SetJobName(name string) { m.jobName = name }
+
+type namedTestV2Module struct {
+	testV2Module
+	jobName string
+}
+
+func (m *namedTestV2Module) SetJobName(name string) { m.jobName = name }
+
 func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 	tests := map[string]struct {
 		creator      collectorapi.Creator
@@ -124,4 +138,34 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 			assert.Equal(t, tc.wantV2, isV2)
 		})
 	}
+}
+
+func TestManagerCreateCollectorJobSetsJobNameV2(t *testing.T) {
+	mod := &namedTestV2Module{testV2Module: testV2Module{store: metrix.NewCollectorStore()}}
+	mgr := New(Config{PluginName: testPluginName})
+	mgr.modules = collectorapi.Registry{
+		"testmod": {
+			CreateV2: func() collectorapi.CollectorV2 { return mod },
+		},
+	}
+
+	job, err := mgr.createCollectorJob(prepareUserCfg("testmod", "job1"))
+	require.NoError(t, err)
+	assert.Same(t, mod, job.Collector())
+	assert.Equal(t, "job1", mod.jobName)
+}
+
+func TestManagerCreateCollectorJobSetsJobNameV1(t *testing.T) {
+	mod := &namedTestV1Module{}
+	mgr := New(Config{PluginName: testPluginName})
+	mgr.modules = collectorapi.Registry{
+		"testmod": {
+			Create: func() collectorapi.CollectorV1 { return mod },
+		},
+	}
+
+	job, err := mgr.createCollectorJob(prepareUserCfg("testmod", "job1"))
+	require.NoError(t, err)
+	assert.Same(t, mod, job.Collector())
+	assert.Equal(t, "job1", mod.jobName)
 }

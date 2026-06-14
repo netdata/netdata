@@ -46,6 +46,32 @@ fn chart_metadata_uses_honest_contexts_and_units() {
     let decoder = DecoderScopeMetrics::chart_metadata();
     assert_eq!(decoder.context, "netdata.netflow.decoder_scopes");
     assert_eq!(decoder.units, "scopes");
+
+    let commit_age = TierCommitAgeMetrics::chart_metadata();
+    assert_eq!(commit_age.context, "netdata.netflow.tier_commit_age");
+    assert_eq!(commit_age.family, "netflow");
+    assert_eq!(commit_age.units, "seconds");
+
+    let commit_duration = TierCommitDurationMetrics::chart_metadata();
+    assert_eq!(
+        commit_duration.context,
+        "netdata.netflow.tier_commit_duration"
+    );
+    assert_eq!(commit_duration.units, "microseconds");
+
+    let commit_batches = TierCommitBatchesMetrics::chart_metadata();
+    assert_eq!(
+        commit_batches.context,
+        "netdata.netflow.tier_commit_batches"
+    );
+    assert_eq!(commit_batches.units, "batches/s");
+
+    let commit_stretched = TierCommitStretchedMetrics::chart_metadata();
+    assert_eq!(
+        commit_stretched.context,
+        "netdata.netflow.tier_commit_stretched"
+    );
+    assert_eq!(commit_stretched.units, "events/s");
 }
 
 #[test]
@@ -73,6 +99,16 @@ fn snapshot_collects_current_metric_totals_and_open_rows() {
     metrics.decoder_legacy_sources.store(7, Ordering::Relaxed);
     metrics.decoder_namespaces.store(8, Ordering::Relaxed);
     metrics.decoder_hydrated_sources.store(9, Ordering::Relaxed);
+    metrics
+        .minute_1_commit_age_seconds
+        .store(12, Ordering::Relaxed);
+    metrics
+        .minute_5_commit_duration_usec
+        .store(345, Ordering::Relaxed);
+    metrics.hour_1_commit_batches.store(67, Ordering::Relaxed);
+    metrics
+        .minute_1_commit_stretched
+        .store(89, Ordering::Relaxed);
 
     let snapshot = NetflowChartsSnapshot::collect(
         &metrics,
@@ -141,6 +177,10 @@ fn snapshot_collects_current_metric_totals_and_open_rows() {
     assert_eq!(snapshot.decoder_scopes.legacy_sources, 7);
     assert_eq!(snapshot.decoder_scopes.namespaces, 8);
     assert_eq!(snapshot.decoder_scopes.hydrated_sources, 9);
+    assert_eq!(snapshot.tier_commit_age.minute_1, 12);
+    assert_eq!(snapshot.tier_commit_duration.minute_5, 345);
+    assert_eq!(snapshot.tier_commit_batches.hour_1, 67);
+    assert_eq!(snapshot.tier_commit_stretched.minute_1, 89);
     assert_eq!(snapshot.open_tiers.minute_1, 1);
     assert_eq!(snapshot.open_tiers.minute_5, 2);
     assert_eq!(snapshot.open_tiers.hour_1, 0);

@@ -369,6 +369,15 @@ of the test process during the measurement window, divided by wall time, as a
 percent of one core. 100% means one core's worth of CPU was consumed; values
 above 100% are normal for multi-threaded saturation.
 
+> **Note (2026-06):** the recorded tables below predate the migration of the
+> journal backend to `systemd-journal-sdk` (compact file format, no
+> compression, periodic fsync disabled by default). Spot re-runs after the
+> migration show roughly 20-40% higher throughput at every point (e.g.
+> high-cardinality post-decode saturation moved from ~37k to ~43-46k flows/s,
+> low-cardinality full ingest from ~85-95k to ~110-120k flows/s) and about
+> half the physical disk write per flow (~400 bytes/flow). Re-run the
+> commands above for current numbers on your host.
+
 Reference measurements:
 
 - CPU: `12th Gen Intel(R) Core(TM) i9-12900K`
@@ -458,14 +467,16 @@ Single-threaded peak throughput at native fixture cardinality:
 - The post-decode ingest hot path is currently single-threaded. CPU pins at
   ~98-99% of one core at saturation; it does not scale further with more cores.
 - Low-cardinality saturation is above 60 000 flows/s for NetFlow v9 and IPFIX,
-  and around 70 000 flows/s for sFlow on this host. The matrix above does not
-  reach those ceilings on purpose; extrapolate from the CPU% column.
+  and around 70 000 flows/s for sFlow on this host (above 100 000 flows/s
+  post-decode after the systemd-journal-sdk migration). The matrix above does
+  not reach those ceilings on purpose; extrapolate from the CPU% column.
 - High-cardinality saturation is around 30 000 flows/s post-decode for all
-  three protocols. Above the knee, achieved rate stays at the plateau while
-  offered rate grows.
+  three protocols (~43-46 000 flows/s after the migration). Above the knee,
+  achieved rate stays at the plateau while offered rate grows.
 - Adding decode (~10 µs/flow) on top of post-decode ingest brings the practical
   full-path ceiling to roughly 22-25 000 flows/s at high cardinality on this
-  host, with the four-tier pipeline running and no enrichment. UDP socket
+  host (~40 000 flows/s after the migration), with the four-tier pipeline
+  running and no enrichment. UDP socket
   receive is not measured; at these flow rates packet rate (1-5k pps) is well
   below typical socket limits.
 - Disk reads stay near zero because the benchmark isolates the ingest path
