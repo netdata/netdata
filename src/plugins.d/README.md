@@ -119,12 +119,12 @@ Netdata parses lines starting with:
 -    `CLABEL` - add a label to a chart
 -    `CLABEL_COMMIT` - commit added labels to the chart
 -    `FUNCTION` - define a function that can be called later to execute it
+-    `FUNCTION_DEL` - unregister a function
 -    `BEGIN` - initialize data collection for a chart
 -    `SET` - set the value of a dimension for the initialized chart
 -    `END` - complete data collection for the initialized chart
 -    `FLUSH` - ignore the last collected values
 -    `DISABLE` - disable this plugin
--    `FUNCTION` - define functions
 -    `FUNCTION_PROGRESS` - report the progress of a function execution
 -    `FUNCTION_RESULT_BEGIN` - to initiate the transmission of function results
 -    `FUNCTION_RESULT_END` - to end the transmission of function result
@@ -162,7 +162,6 @@ available for the plugin to use.
 |:--------------------------------:|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 |    `NETDATA_USER_CONFIG_DIR`     | The directory where all Netdata-related user configuration should be stored. If the plugin requires custom user configuration, this is the place the user has saved it (normally under `/etc/netdata`).                                                |
 |    `NETDATA_STOCK_CONFIG_DIR`    | The directory where all Netdata -related stock configuration should be stored. If the plugin is shipped with configuration files, this is the place they can be found (normally under `/usr/lib/netdata/conf.d`).                                      |
-|     `NETDATA_STOCK_DATA_DIR`     | The directory where immutable Netdata stock data files are stored. Plugins can use this for packaged data assets such as MMDB files (normally under `/usr/share/netdata`).                                                                            |
 |      `NETDATA_PLUGINS_DIR`       | The directory where all Netdata plugins are stored.                                                                                                                                                                                                    |
 |   `NETDATA_USER_PLUGINS_DIRS`    | The list of directories where custom plugins are stored.                                                                                                                                                                                               |
 |        `NETDATA_WEB_DIR`         | The directory where the web files of Netdata are saved.                                                                                                                                                                                                |
@@ -333,15 +332,6 @@ the template is:
 
     a space separated list of options, enclosed in quotes. The following options are currently supported: `obsolete` to mark a chart as obsolete (Netdata will hide it and delete it after some time), `store_first` to make Netdata store the first collected value, assuming there was an invisible previous value set to zero (this is used by statsd charts - if the first data collected value of incremental dimensions is not zero based, unrealistic spikes will appear with this option set) and `hidden` to perform all operations on a chart, but do not offer it on dashboards (the chart will be send to external databases). `CHART` options have been added in Netdata v1.7 and the `hidden` option was added in 1.10.
 
-    (for CHART options see above; DIMENSION-specific options are described below)
-
-#### DIMENSION options
-
-Additional option: `type=float` (default `type=int`).
-- `type=int` (default): values parsed as 64-bit integers; wrap/reset detection applies for incremental counters.
-- `type=float`: values parsed as double; incremental/delta-incremental allowed but wrap detection uses simple drop detection (no uint64 wrap math).
-  Older parents without `FLOATBASELINE` capability will truncate baselines to int when streaming/replicating.
-
 -   `plugin` and `module`
 
     both are just names that are used to let the user identify the plugin and the module that generated the chart. If `plugin` is unset or empty, Netdata will automatically set the filename of the plugin that generated the chart. `module` has not default.
@@ -489,6 +479,16 @@ Users can use a function to ask for more information from the collector. Netdata
 Both node and chart functions are exactly the same, but chart functions allow Netdata to relate functions with charts and therefore present a context-sensitive menu of functions related to the chart the user is using.
 
 Users can get a list of all the registered functions using the `/api/v1/functions` endpoint of Netdata and call functions using the `/api/v1/function` API call of Netdata.
+
+#### FUNCTION_DEL
+
+The plugin can unregister a previously registered function while continuing to run:
+
+> FUNCTION_DEL [GLOBAL] "name of the function"
+
+- Use `GLOBAL` for host-level functions (the same scope as `FUNCTION GLOBAL`).
+- Unregistered functions disappear from `/api/v1/functions` and return 503 on calls.
+- Functions can be re-registered later with a new `FUNCTION` line.
 
 Once a function is called, the plugin will receive at its standard input a command that looks like this:
 
@@ -907,3 +907,5 @@ There are a few rules for writing plugins properly:
 3.  If you are not sure of memory leaks, exit every one hour. Netdata will re-start your process.
 
 4.  If possible, try to autodetect if your plugin should be enabled, without any configuration.
+
+
