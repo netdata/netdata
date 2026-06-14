@@ -63,6 +63,16 @@ Netdata supports multiple log formats to integrate with different systems:
 
 The format is automatically selected based on the output destination, but can be manually specified in the configuration.
 
+### Timestamps
+
+All log timestamps use the system timezone. Netdata auto-detects the timezone from the `[global].timezone` setting and the `TZ` environment variable (default: `:/etc/localtime`). There is no separate Netdata configuration to change the log timestamp format or timezone independently of the system — to adjust the timezone used in logs, set the system timezone or the `TZ` environment variable before starting Netdata (see the [environment variables section](/src/daemon/config/README.md) for `TZ` details).
+
+The timestamp representation depends on the log format:
+
+- **logfmt / ETW / WEL** — RFC 3339 in the local timezone with millisecond precision (e.g., `2025-01-19T16:00:00.000+02:00`). The `Z` suffix appears only when the system timezone is UTC.
+- **JSON** — Unix epoch microseconds as a raw numeric value (e.g., `1737302400000000`). No timezone conversion is applied.
+- **systemd-journal** — The native journal timestamp (`_SOURCE_REALTIME_TIMESTAMP`), managed by journald.
+
 ### Field Transformations (Annotators)
 
 The LOGFMT, ETW, and WEL formats apply special transformations (annotators) to certain fields for better human readability:
