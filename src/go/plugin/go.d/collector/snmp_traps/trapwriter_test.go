@@ -3,7 +3,9 @@
 package snmp_traps
 
 import (
+	"context"
 	"errors"
+	"os/exec"
 	"strings"
 	"sync"
 	"testing"
@@ -318,11 +320,15 @@ func TestJournalTrapWriterTickerFlushesWithoutCountTrigger(t *testing.T) {
 	}
 
 	// No Flush(): the interval ticker must fsync these 5 entries on its own.
+	// Bound the whole wait with a context so a stalled journalctl child is killed
+	// rather than blocking past the deadline (the loop only re-checks the clock
+	// between calls).
 	journalDir := w.JournalDirectory()
-	deadline := time.Now().Add(5 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	var count int
-	for time.Now().Before(deadline) {
-		count = strings.Count(runJournalctlAllowEmpty(t, journalDir, "TRAP_CATEGORY=security"), "TRAP_OID")
+	for ctx.Err() == nil {
+		count = journalctlRowCount(ctx, journalDir, "TRAP_CATEGORY=security", "TRAP_OID")
 		if count >= want {
 			break
 		}
@@ -333,6 +339,14 @@ func TestJournalTrapWriterTickerFlushesWithoutCountTrigger(t *testing.T) {
 	require.NoError(t, tw.Close())
 
 	// Entries remain durable after Close.
-	count = strings.Count(runJournalctl(t, journalDir, "TRAP_CATEGORY=security"), "TRAP_OID")
-	require.GreaterOrEqual(t, count, want)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel2()
+	require.GreaterOrEqual(t, journalctlRowCount(ctx2, journalDir, "TRAP_CATEGORY=security", "TRAP_OID"), want)
+}
+
+// journalctlRowCount runs journalctl under ctx (so a stalled child is killed when
+// ctx expires) and returns how many output rows contain field.
+func journalctlRowCount(ctx context.Context, dir, match, field string) int {
+	out, _ := exec.CommandContext(ctx, "journalctl", "--directory="+dir, match, "-o", "json", "--no-pager").CombinedOutput()
+	return strings.Count(string(out), field)
 }
