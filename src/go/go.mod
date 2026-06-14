@@ -58,7 +58,7 @@ require (
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba
 	golang.org/x/net v0.55.0
 	golang.org/x/sync v0.21.0
-	golang.org/x/text v0.37.0
+	golang.org/x/text v0.38.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20220504211119-3d4a969bb56b
 	google.golang.org/grpc v1.81.1
 	gopkg.in/ini.v1 v1.67.2
