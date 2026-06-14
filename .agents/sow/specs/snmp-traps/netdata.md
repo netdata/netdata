@@ -7,7 +7,7 @@
 - **Architectural premise**: distributed by design — one Netdata Agent per site is appointed as that site's SNMP hub. The hub consolidates polling, discovery, topology, traps, NetFlow, and syslog. There is no central correlation tier; correlation happens locally on each hub. This is a deliberate design choice for unbounded horizontal scalability. All decisions below assume it.
 - **Author**: assistant.
 - **Status**: design complete after Phase A (cohort-naïve matrix) and Phase B (stress-test); resolved user decisions and 4 rounds of reviewer iteration documented inline (see §13 Resolved-by-user-decisions list).
-- **Citation convention for cohort evidence**: `<system>.md §<section>` referring to the per-system specs already produced under `.agents/sow/specs/snmp-traps/`. Cross-system summaries cite the Phase A artefacts in `.agents/sow/specs/snmp-traps/comparison/`.
+- **Citation convention for cohort evidence**: `<system>.md §<section>` referring to the per-system research under `.agents/sow/specs/snmp-traps/research/external-systems/`. Cross-system summaries cite the Phase A artifacts in `.agents/sow/specs/snmp-traps/research/comparison/`.
 
 ## 1. The Six Design Rules (verbatim)
 
@@ -22,7 +22,7 @@ These rules drive every choice that follows.
 
 ## 2. Trap-as-X Primitive — the foundational choice
 
-The cohort exhibits six distinct trap-as-X primitives (see `comparison/design-forks.md` Fork 1).
+The cohort exhibits six distinct trap-as-X primitives (see `research/comparison/design-forks.md` Fork 1).
 
 | Primitive | Cohort examples | Fit for our rules |
 |---|---|---|
@@ -37,7 +37,7 @@ The cohort exhibits six distinct trap-as-X primitives (see `comparison/design-fo
 
 1. **Every trap is captured in the direct journal by default for explicit jobs.** In the default job configuration (`journal.enabled` omitted or `true`, dedup disabled), the plugin writes one journal entry per received trap, no exceptions. Operators can opt-in to deduplication (§10) for flap-heavy environments; when opt-in dedup is enabled, repeated identical traps within a configurable window are collapsed and surfaced periodically through a dedup-summary entry. Operators who enable dedup accept that suppressed individual trap PDUs are summarized rather than persisted in full. Operators can explicitly disable direct journal output with `journal.enabled: false` only when another output backend, currently OTLP, is enabled.
 2. **Plugin-self metrics** (two NIDL contexts always emitted plus an opt-in third for dedup — see §12) for plugin health monitoring.
-3. **Per-OID metrics for alerting are opt-in** — operator selects which OIDs get a dedicated metric via plugin configuration (NOT via profile YAML). See §7.
+3. **Trap metrics are profile-defined and job-enabled** — profile YAML carries the reusable trap-to-metric rules and chart definitions; listener jobs choose whether to evaluate them with `profile_metrics`. See §7 and `trap-metrics-profiles.md`.
 
 Direct journal storage is the default foundation. Metrics are a derived signal for alerting on specific traps the operator cares about. OTLP-only jobs are supported for operators who want remote log delivery without local journal files, but those jobs do not create local journal sources and therefore do not appear in the embedded local logs Function's `__logs_sources` selector.
 
@@ -192,7 +192,7 @@ This decoupling means the hot path is not blocked by stdout back-pressure; if th
 
 ### v3 USM engine-ID discovery (opt-in, SOW-0038)
 
-Dynamic discovery for v3 Trap sender engine IDs follows the Splunk SC4SNMP pattern (`splunk-sc4snmp.md` §3.5; `traps.py:229-258`). The listener peeks at raw bytes pre-parse, BER-decodes the SNMPv3 header to extract `engineID` + `username` + `msgFlags`, retries parse with a per-packet temporary USM security table, and hot-registers the pair only after the retry authenticates and decodes a v3 Trap PDU.
+Dynamic discovery for v3 Trap sender engine IDs follows the Splunk SC4SNMP pattern (`research/external-systems/splunk-sc4snmp.md` §3.5; `traps.py:229-258`). The listener peeks at raw bytes pre-parse, BER-decodes the SNMPv3 header to extract `engineID` + `username` + `msgFlags`, retries parse with a per-packet temporary USM security table, and hot-registers the pair only after the retry authenticates and decodes a v3 Trap PDU.
 
 **This feature is opt-in (disabled by default)** because hot-registering arbitrary `(engineID, username)` pairs at runtime has security/correctness concerns:
 
@@ -220,7 +220,7 @@ Reception is **per-job** (§5). Each listener (job) opens all configured endpoin
 
 ### Protocols and crypto
 
-- SNMPv1, SNMPv2c, SNMPv3-USM with full HMAC-SHA-2 family (SHA-224 / SHA-256 / SHA-384 / SHA-512) and AES-128 / AES-192 / AES-256 priv (per `logstash.md` §3.6 verification of SNMP4j coverage). The Go implementation selected in SOW-0035 M1 must reach this parity.
+- SNMPv1, SNMPv2c, SNMPv3-USM with full HMAC-SHA-2 family (SHA-224 / SHA-256 / SHA-384 / SHA-512) and AES-128 / AES-192 / AES-256 priv (per `research/external-systems/logstash.md` §3.6 verification of SNMP4j coverage). The Go implementation selected in SOW-0035 M1 must reach this parity.
 - Multiple v3 USM users per job (gosnmp/equivalent's `TrapSecurityParametersTable` semantics).
 - IPv4 and IPv6.
 
@@ -247,9 +247,17 @@ Reception is **per-job** (§5). Each listener (job) opens all configured endpoin
 
 - **DTLS / TLS-TM** — Phase A finding: zero cohort systems support this (universal gap). Defer until production demand surfaces and Rust/Go libraries mature. Listed in §14 Non-Goals.
 
-## 7. Profile YAML — vendor knowledge only
+## 7. Profile YAML — vendor knowledge plus optional metric rules
 
-Profile YAML defines vendor-curated knowledge ONLY. It does NOT define journal field names manually (the plugin derives indexed `TRAP_VAR_*` fields from received non-sensitive, non-redundant event varbinds and keeps the audit copy in `TRAP_JSON` — see §11), and it does NOT define metric emission (that lives in plugin configuration — see §7.5).
+Profile YAML defines vendor-curated trap decode knowledge and may also define
+optional trap-to-metric rules and chart definitions. It does NOT define journal
+field names manually: the plugin derives indexed `TRAP_VAR_*` fields from
+received non-sensitive, non-redundant event varbinds and keeps the audit copy in
+`TRAP_JSON` (see §11).
+
+Metric rules in profile YAML are inert by themselves. Listener jobs decide
+whether to evaluate them with `profile_metrics` (see §7.5), so profile YAML can
+carry reusable metric knowledge without unilaterally emitting metrics.
 
 The authoritative profile schema is `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md` (shipped with the OOB pack). The example below is illustrative of the schema; the schema doc is the ground truth.
 
@@ -330,9 +338,9 @@ The plugin resolves each varbind in the PDU in this order:
    varbind by OID, use its declared name, type, and (future) `display_hint`
    directly. Lookup is exact-match-first; on miss, the longest profile varbind
    OID that prefixes the received PDU OID as `profile_oid + "."` wins. The
-   shipped OOB pack covers 437 vendor PENs / 71,787 traps with file-scoped
-   varbind metadata — operators get rich decoding for top vendors without
-   installing any MIB file.
+   shipped OOB pack currently has 803 stock vendor profiles covering 6,121 MIB
+   entries and 150,755 trap definitions with file-scoped varbind metadata —
+   operators get rich decoding for top vendors without installing any MIB file.
 2. **Raw fallback** — varbind not in any loaded profile. Render as OID-keyed entry with the ASN.1-decoded type only. The varbind still lands in `TRAP_JSON` (§11) with its OID and value; if it is not sensitive or a protocol-control duplicate, it also lands in an indexed `TRAP_VAR_OID_<NUMERIC_OID>` field.
 
 There is **no runtime MIB compilation tier**. The plugin does not parse SMIv1/v2 MIB files at runtime; there is no `pysmi`/`gosmi`/Rust-MIB-crate dependency. Operators who need coverage for a vendor MIB not in the shipped OOB pack convert their MIB files to profile YAMLs **offline** using the shipped helper `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` and drop the resulting YAML into `/etc/netdata/go.d/snmp.trap-profiles/` (per the SNMP polling plugin pattern — see §15 and the user-facing documentation shipped with the plugin).
@@ -372,9 +380,13 @@ pre-validated template with per-trap functions. MESSAGE capped at 512 bytes
 512-byte cap includes the marker bytes. Full forensic data remains in
 `TRAP_VAR_*` fields and `TRAP_JSON`.
 
-### No `journal_fields:` list, no `metric:` block
+### No `journal_fields:` list; profile metrics are job-enabled
 
-The journal captures every non-sensitive event varbind as an indexed `TRAP_VAR_*` field and keeps the structured audit copy in `TRAP_JSON` (§11). The plugin emits its own self-metrics always (§12). Operator-defined per-OID metrics are configured separately (§7.5).
+The journal captures every non-sensitive event varbind as an indexed
+`TRAP_VAR_*` field and keeps the structured audit copy in `TRAP_JSON` (§11).
+Profiles may define optional `metrics:` and `charts:` sections, but the plugin
+evaluates those rules only for listener jobs that enable `profile_metrics`
+(§7.5). The plugin also emits its own receiver self-metrics (§12).
 
 ### Profile loading — lazy shared cache, multipath, filename-dedup, field-merge on extends-chain
 
@@ -462,26 +474,61 @@ jobs:
         labels:
           compliance: pci
           tenant: acme
-    # Per-OID metric opt-in
-    metrics:
-      - oid: 1.3.6.1.4.1.9.9.43.2.0.1
-        context: snmp.trap.cisco_config_changes
-        dimension_from_varbind: ccmHistoryEventTerminalType
+    # Profile-defined trap metrics are enabled per listener job.
+    profile_metrics:
+      enabled: true
+      mode: combined
+      include:
+        - site.cisco.console_config_changes
+      identity:
+        device: source
+        unresolved_source: source_label
+        source_id_privacy: hash
 ```
 
-### Per-OID metric opt-in
+### Profile-defined trap metrics
 
-Explicit list of OIDs the operator wants emitted as their own metric chart for finer-grained alerting:
+Trap metric extraction lives in the same profile artifact as trap decode
+knowledge. Profiles may define optional `metrics:` rules and profile-local
+`charts:`; listener jobs enable selected rules with `profile_metrics`.
 
 ```yaml
 metrics:
-  - oid: 1.3.6.1.4.1.9.9.43.2.0.1     # Cisco config change
-    context: snmp.trap.cisco_config_changes
-    dimension_from_varbind: ccmHistoryEventTerminalType   # MUST be bounded-cardinality
-  - oid: 1.3.6.1.4.1.9.9.46.2.0.1     # Cisco port-security violation
-    context: snmp.trap.cisco_port_security
-    # no dimension_from_varbind → single-dimension counter
+  - name: site.cisco.console_config_changes
+    type: counter
+    on_trap: CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged
+    where:
+      - varbind: ccmHistoryEventTerminalType
+        equals: console
+    output:
+      metric: snmp_trap_cisco_console_config_changes
+      dimension: changes
+      chart: cisco_config_changes
+
+charts:
+  - id: cisco_config_changes
+    title: Cisco config changes
+    context: snmp.trap.cisco.config.changes
+    units: events/s
+    algorithm: incremental
 ```
+
+The full contract is maintained in `trap-metrics-profiles.md` and the
+operator-facing `profile-format.md` documentation. The important runtime
+rules are:
+
+- Profile metric rules are inert unless a listener job enables
+  `profile_metrics`.
+- Supported rule types are `counter`, `sample`, and `state`.
+- Predicates use bounded trap fields or varbinds and support `equals`, `in`,
+  `exists`, `absent`, numeric comparisons, ranges, and `not`.
+- Source identity is per device where possible: vnode host scope when
+  enrichment finds an unambiguous vnode, otherwise bounded `source_id` /
+  `source_kind` labels under the listener job.
+- Resource identity is explicit and bounded with `identity.resource`.
+- Accepted traps are committed independently from metric attribution; metric
+  extraction failures and cardinality overflow increment diagnostics instead
+  of dropping the trap.
 
 ### Per-OID overrides and labels
 
@@ -499,9 +546,11 @@ Labels are free-form key-value pairs. Keys must match `[a-z][a-z0-9_]*` (lowerca
 - Any key that uppercases to a standard systemd field name (`MESSAGE`, `PRIORITY`, etc.) — again impossible under the `TRAP_TAG_*` prefix.
 - In practice, the `TRAP_TAG_*` prefix structurally prevents collisions. The only remaining validation is the `[a-z][a-z0-9_]*` syntax check.
 
-Operators do NOT copy entire profiles to enable metrics or add labels. The profile remains the vendor's curated knowledge; per-installation choices are surgical edits in plugin config.
-
-If `dimension_from_varbind` references a varbind that can take unbounded values (MAC, IP, username, packet content), the plugin REJECTS the config at load with a clear error. The value must be a symbolic varbind name referenced by that trap definition, not a raw OID or an arbitrary file-scoped varbind. Cardinality discipline is structurally enforced: accepted dimension varbinds must be enum-backed with at most 64 values, boolean/truthvalue, or a numeric range with at most 64 values. At runtime, invalid values from otherwise bounded varbinds stay bounded too: unknown enum values collapse to `unknown`, numeric values outside the job-creation-time bounded range collapse to `out_of_range`, missing configured varbinds collapse to `<missing>`, and profile-reload metadata drift that would otherwise become unbounded collapses to `unknown`.
+Operators do not have to copy stock profiles to enable existing metric rules:
+they enable rules by name in the listener job. Site-specific metric rules belong
+in custom profile files under `/etc/netdata/go.d/snmp.trap-profiles/`, where the
+same validation rejects unbounded labels, unsupported resource keys, and unsafe
+metric names before runtime.
 
 ### OTLP exporter config
 
@@ -520,7 +569,7 @@ The OTLP writer implements the same `TrapWriter` interface as the journal writer
 
 ## 8. OOB Catalog Strategy
 
-Phase A surfaced (`comparison/profile-inventory.md`):
+Phase A surfaced (`research/comparison/profile-inventory.md`):
 
 - Datadog Agent: claims "11,000+ MIBs" in public marketing; verified count via a copy of `dd_traps_db.json.gz` is **3,652 MIBs** (67,680 trap definitions, 40,617 varbind definitions). The compiled artifact is closed (Omnibus build) but the **compiler is Apache-2.0** (`datadog/integrations-core :: datadog_checks_dev/datadog_checks/dev/tooling/commands/meta/snmp/generate_traps_db.py`) and the **input MIBs are public** (pysnmp mirror + integrations-core's own MIB tree).
 - LibreNMS: 4,770 MIB files / 2,245 with notifications (license per the project's `composer.json` — historically GPL-3.0-or-later; subject to legal review before any redistribution).
@@ -575,7 +624,7 @@ We are **transforming knowledge at development time**, not redistributing other 
 
 ### Coverage target
 
-Aim for the LibreNMS-to-Datadog band: ~2,000-12,000 OID families across major vendors (Cisco, Juniper, Arista, Aruba, HPE, Dell, Fortinet, Palo Alto, F5, MikroTik, Ubiquiti, …). Ship YAML in the repo so operators can `grep` for their vendor before install (the Datadog `dd_traps_db.json.gz` opacity is a real customer pain — `datadog-agent.md` §17).
+Aim for the LibreNMS-to-Datadog band: ~2,000-12,000 OID families across major vendors (Cisco, Juniper, Arista, Aruba, HPE, Dell, Fortinet, Palo Alto, F5, MikroTik, Ubiquiti, …). Ship YAML in the repo so operators can `grep` for their vendor before install (the Datadog `dd_traps_db.json.gz` opacity is a real customer pain — `research/external-systems/datadog-agent.md` §17).
 
 ## 9. Hot Path vs Cold Path Throughput
 
@@ -592,7 +641,7 @@ To exceed one writer's measured ceiling, scale **horizontally with per-job isola
 - Operators scale by adding more jobs (each bound to a different port and/or with different community/USM/source-IP allowlists), partitioning the trap stream at the listener layer.
 - Intra-listener multi-writer sharding (one listener feeding multiple writer threads by source-IP hash) is explicitly out of scope (§14 Non-Goals); if a single high-volume sender exceeds one writer's ceiling, the operator splits the sender's traffic across multiple jobs.
 
-Phase A cohort numbers for context (`comparison/feature-matrix.md`):
+Phase A cohort numbers for context (`research/comparison/feature-matrix.md`):
 
 | System | Throughput |
 |---|---|
@@ -945,7 +994,7 @@ The plugin's journal-write path applies this check uniformly to `MESSAGE`, all `
 
 ### Forensics
 
-All operator-facing questions (Phase A `operator-features.md` E1-E6) become journal queries through the existing Logs UI. No new UI code.
+All operator-facing questions (Phase A `research/comparison/operator-features.md` E1-E6) become journal queries through the existing Logs UI. No new UI code.
 
 The optional standards-compliant OTLP exporter (operator opt-in, defaults off) is documented separately in §11b. It uses dotted-lowercase attribute names per OTEL semantic conventions and is intentionally vendor-neutral — Netdata's own OTEL plugin is one possible receiver among many.
 
@@ -1047,68 +1096,62 @@ For decode-error entries (§11), the same translation applies:
 
 OTLP is protobuf-encoded — attribute values are length-prefixed and cannot escape their field boundary on the wire. Newlines, NULs, and other control bytes in varbind values traverse OTLP safely. Downstream receivers' handling is out of scope for this spec; Netdata's own OTEL plugin (`src/crates/netdata-otel/otel-plugin/src/logs_service.rs`) writes flattened key/value pairs to systemd-journal using the journal-writer crate, so the same byte-safety properties of that crate apply when traps reach the journal via the OTEL path.
 
-## 12. Plugin-Self Metrics (NIDL contexts) — always emitted
+## 12. Receiver And Profile Metrics
 
-Three NIDL contexts. Contexts 1 and 2 (`snmp.trap.events`, `snmp.trap.errors`) are **always emitted**. Context 3 (`snmp.trap.dedup_suppressed`) is **conditionally emitted** — only when at least one job has opt-in dedup enabled (see §10). The SOW-0036 implementation emits contexts 1 and 2 with `job_name` only. The richer per-device labels below are the target contract for the SOW-0037/SOW-0039 enrichment/collector-consistency closeout, where device vnode identity is available.
+The collector emits three metric families:
 
-### Context 1: `snmp.trap.events`
+- **Receiver job totals**: continuous per-listener pipeline metrics with
+  `job_name`, so receiver health remains visible even when packets cannot be
+  attributed to a source device.
+- **Source-attributed receiver metrics**: bounded per-source metrics with
+  `source_id` and `source_kind`; when enrichment finds an unambiguous vnode,
+  these metrics are written under that vnode host scope.
+- **Profile-defined trap metrics**: dynamic metrics generated from profile
+  `metrics:` / `charts:` rules selected by the listener job's
+  `profile_metrics` configuration.
 
-| Aspect | Value |
-|---|---|
-| Instance | Per device (one instance per source device the hub knows about) |
-| Dimensions | Categories: `state_change`, `config_change`, `security`, `auth`, `license`, `mobility`, `diagnostic`, `unknown` (the closed 8-slug set per §3) |
-| Unit | events/s (incremental counter) |
-| Labels | `job_name`, `severity` (one of the 8 syslog severities), `device`, `vendor`, `hub`, plus operator-defined labels from profile/plugin config |
-| Node / vnode | Per-device vnode — **inherited from the SNMP polling subsystem**. The trap plugin does not create vnodes; it emits metrics against the vnodes that SNMP polling already established for each monitored device. If polling is not configured for a given device, traps for that device emit against the hub vnode with `device` as a label. |
-| Title | "SNMP Traps Received" |
+Built-in receiver contexts:
 
-This is one chart. Operator slices/dices via NIDL controls:
-- Filter to severity=crit → see crit events only across devices.
-- Group by device → per-device breakdown.
-- Group by category → per-category breakdown across the fleet.
-- Filter to one vnode (device) → drill into that device's recent traps.
-- Group by `job_name` → per-listener volume.
+- `snmp.trap.pipeline`: receiver packet and write pipeline progress by job.
+- `snmp.trap.events`: committed trap events by category, grouped by job.
+- `snmp.trap.severity`: committed trap events by severity, grouped by job.
+- `snmp.trap.errors`: processing errors by type, grouped by job.
+- `snmp.trap.dedup_suppressed`: traps suppressed by dedup, emitted only for
+  jobs with dedup enabled.
+- `snmp.trap.sources`: number of active source metric identities tracked by
+  the job.
+- `snmp.trap.source_attribution`: vnode/fallback/ambiguous/failure/overflow
+  attribution diagnostics by job.
+- `snmp.trap.source_pipeline`: accepted, committed, dedup-suppressed, and
+  write-failed trap events by source.
+- `snmp.trap.source_errors`: source-attributed processing errors when a source
+  can be identified.
+- `snmp.trap.source_last_seen`: seconds since a source last produced an
+  accepted trap.
+- `snmp.trap.profile_metric_diagnostics`: profile metric extraction,
+  attribution, overflow, and source-transition diagnostics, emitted when
+  `profile_metrics` selects at least one rule.
 
-### Context 2: `snmp.trap.errors`
+Commitment and attribution rules:
 
-| Aspect | Value |
-|---|---|
-| Instance | Per job (one instance per listener) |
-| Dimensions | `unknown_oid`, `decode_failed`, `template_unresolved`, `malformed_pdu`, `dropped_allowlist`, `rate_limited`, `auth_failures`, `usm_failures`, `unknown_engine_id`, `inform_response_failed`, `binary_encoded`, `profile_load_failed`, `journal_write_failed`, `otlp_export_failed` |
-| Unit | events/s (incremental counter) |
-| Labels | `job_name`, `hub`, possibly `source_device` where source is identifiable |
-| Node / vnode | Hub vnode |
-| Title | "SNMP Trap Pipeline Errors" |
+- `accepted` and source-attributed error counters are recorded before dedup
+  suppression.
+- `committed`, category/severity counters, and profile-defined metrics are
+  recorded only after successful authoritative output commitment.
+- When both direct journal and OTLP are enabled, the direct journal path is the
+  authoritative commitment path; OTLP failures are export failures.
+- When OTLP is the only backend, OTLP export failure is a terminal write failure.
+- Accepted traps are still committed when source metric attribution fails or the
+  source cap is full; diagnostics expose the skipped metric attribution.
+- Per-job totals may exceed the sum of per-source metrics because some errors
+  have no trustworthy source, source attribution may fail, or the source cap may
+  be full.
 
-Operators alert on these for pipeline health:
-- `unknown_oid > 0 sustained` → profile coverage gap; consider adding a profile YAML to `/etc/netdata/go.d/snmp.trap-profiles/` (operators convert MIBs offline — see §7).
-- `decode_failed > 0` or `malformed_pdu > 0` → investigate sending device.
-- `template_unresolved > 0` → profile template references a varbind not present in incoming traps; fix profile or sender.
-- `dropped_allowlist > 0` sustained → policy drop before journaling: source CIDR miss, community miss, or SNMP version disabled for this listener.
-- `rate_limited > 0` → trap storm signal; investigate source.
-- `auth_failures` / `usm_failures` > 0 → SNMPv3 authentication, privacy, username, or USM configuration problem.
-- `unknown_engine_id` > 0 → in static mode, sender engine ID is missing from the receiver whitelist or the sender is misconfigured; in dynamic mode, the first increment for a newly accepted `(engineID, username)` pair is expected visibility with a spoofing advisory, while repeated/new rejected increments indicate cap exhaustion, invalid sender state, or an unauthorized/misconfigured sender.
-- `inform_response_failed > 0` → INFORM Response send failures; investigate UDP socket health.
-- `binary_encoded > 0` sustained → varbind values containing control characters being binary-encoded; investigate sender.
-- `profile_load_failed > 0` → profile validation/reload failed, or a previously validated stock profile file could not be lazy-loaded after job start. During automatic operator-profile reload, the plugin continues with the previous profile index; the operator must fix the bad YAML and the next DynCfg test/apply/job creation fails at creation time until the profile set validates. During runtime stock lazy-load failure, the trap is still written with raw OID/varbind data and the operator should inspect the installed stock profile files.
-- `journal_write_failed > 0` → disk-full, permission, or filesystem error while writing to the per-job journal directory; trap is dropped, hot path continues (the writer never blocks).
-- `otlp_export_failed > 0` → the OTLP backend could not accept or export one or more trap records after the job had already started. For direct-journal+OTLP jobs, the journal-direct path remains authoritative and continues independently. For OTLP-only jobs, this means the only configured backend dropped or failed records. Investigate the configured OTLP receiver, network path, TLS/auth configuration, or queue sizing.
-
-### Context 3: `snmp.trap.dedup_suppressed` (only when opt-in dedup is enabled on at least one job)
-
-| Aspect | Value |
-|---|---|
-| Instance | Per job (only jobs with `dedup.enabled: true`) |
-| Dimensions | Single dimension: `suppressed` |
-| Unit | events/s (incremental counter) |
-| Labels | `job_name` in the SOW-0037 M2 implementation. A `hub` label remains a SOW-0039 collector-consistency target if a stable hub identity is available in the go.d metric path. |
-| Title | "SNMP Trap Deduplication Suppressed" |
-
-Operators alert on `dedup_suppressed > X/sec sustained` as a flap-storm signal. When dedup is disabled (the default), this metric is not emitted.
-
-### Operator-opted-in per-OID metrics
-
-In addition to the two plugin-self contexts, operator-selected OIDs (via §7.5) produce their own context. Naming convention: `snmp.trap.<vendor>_<short_name>` (e.g., `snmp.trap.cisco_config_changes`). These are surgical, opt-in, and shaped per the operator's alerting needs.
+Profile metric contexts are dynamic. The chart context comes from the selected
+profile chart definition and must live under the `snmp.trap.` namespace.
+Profile metrics support counters, last trap-reported numeric samples, and
+trap-derived state gauges; see `trap-metrics-profiles.md` and
+`profile-format.md` for the full operator contract.
 
 ## 13. Open Questions (post-Phase-B status)
 
@@ -1157,7 +1200,9 @@ Phase B resolved most of the original questions. What remains:
 - Central correlation across hubs (hub-local by design choice).
 - Automatic device profiling (Rule 4 — operator drops a profile YAML; everything else decodes automatically).
 - Profile YAML manually controlling journal field names (`TRAP_VAR_*` is derived from received varbind metadata; no profile knob needed).
-- Profile YAML controlling metric emission (metric emission is operator choice in plugin config).
+- Profile YAML unilaterally enabling metric emission. Profiles may define metric
+  rules, but listener jobs decide whether to evaluate them with
+  `profile_metrics`.
 - **Runtime MIB compilation** — no `pysmi`/`gosmi`/Rust-MIB-crate dependency at runtime. Operators convert MIBs to profile YAMLs offline using `/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen` (see §7). This mirrors the SNMP polling plugin's pattern.
 - **DTLS / TLS-TM** — Phase A finding: zero cohort systems support this (universal gap). Defer until production demand surfaces and mature libraries exist.
 - **Intra-listener multi-writer sharding** — operators scale by adding more jobs when one listener's writer ceiling is exceeded or when they need isolation. A single listener can already own multiple endpoints; the documented operational threshold for splitting is throughput or materially different policy, not the need for another port alone.
@@ -1191,7 +1236,7 @@ Pipeline reuses (not rebuilds) these existing pieces:
 | 1. No cohort system does listener-layer per-source rate-limit | We ship per-job, default-off `rate_limit:` (token-bucket per source IP, §7.5) for operators who need to shield the plugin from misbehaving senders flooding with **unique** traps, plus first-wins opt-in plugin-level dedup with periodic summary entries (§10) for **identical** repeats. The two solve different problems and can be enabled independently per job. |
 | 2. No cohort system supports DTLS/TLS-TM | Deferred — universal cohort gap. Out of scope for SOW-0035–0039; revisited when production demand surfaces AND mature Rust/Go libraries exist (§14 Non-Goals). |
 | 3. No cohort system does topology-aware suppression | **Hub-local enrichment makes this cheap.** Journal carries upstream-device identity; alert engine can suppress downstream alerts when upstream is in alarm. |
-| 4. MIB management divergence is extreme | **Ship comprehensive vendor packs derived from public MIBs (437 vendor PENs / 71,787 traps in the OOB pack) + offline conversion tooling for operator MIBs (no runtime compilation) + automatic operator-profile hot-reload while trap jobs run.** Targets the LibreNMS-to-Datadog coverage band with the SNMP polling plugin's stock+override pattern. |
+| 4. MIB management divergence is extreme | **Ship comprehensive vendor packs derived from public MIBs (803 stock vendor profiles / 6,121 MIB entries / 150,755 traps in the OOB pack) + offline conversion tooling for operator MIBs (no runtime compilation) + automatic operator-profile hot-reload while trap jobs run.** Targets the LibreNMS-to-Datadog coverage band with the SNMP polling plugin's stock+override pattern. |
 | 5. NSTI shipped-defects cautionary tale | Acknowledged. First-release quality bar enforced via the same per-system review protocol that produced the cohort specs. |
 
 ## 17. Implementation Sequencing — 5-SOW Plan
@@ -1202,9 +1247,9 @@ The implementation is tracked through five sequential SOWs under `.agents/sow/pe
 |---|---|---|
 | **SOW-0035** | Go implementation architecture decision (process model, journal-writer backend, TrapWriter interface contract); multi-endpoint listener (per-job DynCfg orchestration; every configured endpoint binds or job creation fails with retryable HTTP-503 surfaced in DynCfg — no automatic high-port fallback) + SNMPv1/v2c decode + source identification + replayable pcap test corpus; shared lazy profile YAML loader loaded on first runnable job creation (multipath, filename-dedup, extends-chain merge — mirroring the SNMP polling plugin) + OID index + 2-tier varbind resolution + template rendering; journal writer per-job (one journal directory per job at `${NETDATA_LOG_DIR}/traps/{job_name}/`, retention config with intentional deviation on the `max_duration` default) with creation-time directory/writer preflight and CWE-117 binary-field encoding | Operator sees decoded trap from a replayed pcap in a per-job journal directory |
 | **SOW-0036** | SNMPv3 USM (static engineID whitelist, per-job) + INFORM acknowledgement + `snmpEngineBoots` persistence per job; per-job allowlist + rate limiting; plugin configuration schema + DynCfg per-job orchestration refinement; plugin-self NIDL metrics (per-job dimensions, full error universe per §12, including BER limit violations from §18) | Production-grade per-job auth + rate limiting + telemetry |
-| **SOW-0037** | Cross-plugin enrichment (sysName/vendor/topology); **opt-in** deduplication (per-job, disabled by default — see §10) with periodic summary entries; profile YAML hot-reload via DynCfg (no runtime MIB compilation per §14); operator per-OID metric opt-in | Operational depth: enriched, optionally deduped, hot-reloadable |
+| **SOW-0037** | Cross-plugin enrichment (sysName/vendor/topology); **opt-in** deduplication (per-job, disabled by default — see §10) with periodic summary entries; profile YAML hot-reload via DynCfg (no runtime MIB compilation per §14); profile-defined trap metrics enabled per listener job | Operational depth: enriched, optionally deduped, hot-reloadable |
 | **SOW-0038** | Throughput benchmark harness; SNMPv3 dynamic engineID discovery (opt-in); standards-compliant OTLP exporter (§11b — optional, vendor-neutral; works with Netdata's OTEL plugin and any OTLP-compliant receiver) | Scale + interop |
-| **SOW-0039** | **Collector consistency bundle**: `metadata.yaml` + `config_schema.json` + stock `.conf` + `health.d/snmp_traps.conf` + `README.md` + `taxonomy.yaml` (passes `check-markdown.yml` + `check_collector_taxonomy.py` CI gates). **Embedded SNMP traps logs Function** in `go.d.plugin`, exposed as `snmp:traps`, with direct-journal jobs selected through `__logs_sources` and trap-specific default facets. **End-user AI skill `query-snmp-traps`** (`docs/netdata-ai/skills/query-snmp-traps/`) + how-tos catalog. **User documentation** for the offline MIB-to-YAML conversion workflow (per §7). **SOW-0032 comparative-analysis.md closeout**. **Final merge gate** — single PR sequence ending here. | Mergeable, CI-passing, documented |
+| **SOW-0039** | **Collector consistency bundle**: `metadata.yaml` + `config_schema.json` + stock `.conf` + `health.d/snmp_traps.conf` + `README.md` + `taxonomy.yaml` (passes `check-markdown.yml` + `check_collector_taxonomy.py` CI gates). **Embedded SNMP traps logs Function** in `go.d.plugin`, exposed as `snmp:traps`, with direct-journal jobs selected through `__logs_sources` and trap-specific default facets. **End-user AI skill `query-snmp-traps`** (`docs/netdata-ai/skills/query-snmp-traps/`) + how-tos catalog. **User documentation** for the offline MIB-to-YAML conversion workflow (per §7). **SOW-0032 research/comparison/comparative-analysis.md closeout**. **Final merge gate** — single PR sequence ending here. | Mergeable, CI-passing, documented |
 
 The OTLP exporter (§11b) is intentionally deferred to SOW-0038 — it is optional, operator-opt-in, and not part of the MVP. The journal-direct backend (§11) is the load-bearing path and ships in SOW-0035.
 
@@ -1221,7 +1266,6 @@ The hot path (§5) decodes untrusted UDP-delivered ASN.1 BER. Malformed or hosti
 | Max constructed BER nesting depth | 8 | SNMPv3 message structure tops out at ~6 constructed levels; 8 covers all standard PDU shapes. |
 | Max OID encoded length | 128 bytes | RFC 2578 OID encoding cap. |
 | Max OctetString varbind value | 1024 bytes | Long enough for real-world MIB strings, short enough to bound memory per trap. |
-| Per-PDU decode budget | 1 ms | Wall-clock budget per PDU on the hot path. Exceeding triggers drop. |
 
 These limits apply per-job (each job has its own decoder thread per §5) with the same default values listed in the table. They are not operator-configurable. The wording "global" here means the same defaults apply across every job; it does NOT mean a single shared decoder state — each job's decoder enforces the limits independently against its own UDP buffer.
 

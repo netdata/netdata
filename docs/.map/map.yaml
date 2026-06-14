@@ -546,6 +546,76 @@ sidebar:
       - meta:
           label: Troubleshooting
           edit_url: https://github.com/netdata/netdata/edit/master/docs/network-flows/troubleshooting.md
+  # SNMP Traps
+  - meta:
+      label: SNMP Traps
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/README.md
+      description: Receive, decode, store, query, and forward SNMP Trap and INFORM events with the Netdata Agent.
+    items:
+      - meta:
+          label: Installation
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/installation.md
+      - meta:
+          label: Quick Start
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/quick-start.md
+          description: Configure a listener, send a test trap, and prove Netdata received it.
+      - meta:
+          label: Configuration
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/configuration.md
+          description: Configure listener endpoints, SNMP versions, source controls, storage, forwarding, deduplication, and profile metrics.
+      - meta:
+          label: Trap Profiles
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/trap-profiles.md
+          description: Understand stock trap coverage, custom profiles, overrides, MIB conversion, and profile-defined metrics.
+      - meta:
+          label: SNMP Trap Profile Format
+          path: snmp-trap-profile-format
+          edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md
+          description: Reference for SNMP trap profile YAML, trap definitions, varbind metadata, rendering, and profile metric rules.
+      - meta:
+          label: Enrichment
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/enrichment.md
+          description: Understand source identity, trusted relays, reverse DNS, device identity, interface context, and enrichment audit fields.
+      - meta:
+          label: Usage and Output
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/usage-and-output.md
+          description: Read normal trap rows, decode errors, deduplication summaries, varbinds, tags, and payload fields.
+      - meta:
+          label: Field Reference
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/field-reference.md
+          description: Complete reference for journal fields, report types, enrichment fields, varbind fields, tags, and OTLP mappings.
+      - meta:
+          label: Journal and Querying
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/journal-and-querying.md
+          description: Query, export, copy, and inspect direct-journal trap data with Netdata Logs and journalctl-compatible workflows.
+      - meta:
+          label: Forwarding to SIEM
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/forwarding-to-siem.md
+          description: Forward trap events through journal-native workflows or OTLP/gRPC and map fields in downstream log systems.
+      - meta:
+          label: Metrics and Alerts
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/metrics-and-alerts.md
+          description: Monitor receiver pipeline health, severity/category rates, processing errors, deduplication, source metrics, and default alerts.
+      - meta:
+          label: Sizing and Capacity Planning
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/sizing-and-capacity.md
+          description: Plan receiver capacity, output backends, retention, storm controls, profile metrics, source visibility, and validation.
+      - meta:
+          label: Validation and Data Quality
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/validation-and-data-quality.md
+          description: Prove first receipt, source identity, profile coverage, enrichment quality, backend health, retention, and downstream fields.
+      - meta:
+          label: Investigation Playbooks
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/investigation-playbooks.md
+          description: Follow operator playbooks for storms, critical traps, interface changes, restart signals, missing traps, unknown OIDs, SNMPv3 failures, and forwarding checks.
+      - meta:
+          label: Anti-patterns
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/anti-patterns.md
+          description: Avoid unsafe listeners, broad relay trust, inline secrets, high-cardinality metrics, noisy alerting, and storage blind spots.
+      - meta:
+          label: Troubleshooting
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/snmp-traps/troubleshooting.md
+          description: Diagnose missing rows, inactive listeners, UDP delivery, allowlist drops, SNMPv3 failures, profile issues, backend failures, and retention problems.
   # Logs
   - meta:
       label: Logs

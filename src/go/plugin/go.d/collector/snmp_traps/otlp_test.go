@@ -4,12 +4,14 @@ package snmp_traps
 
 import (
 	"context"
+	"errors"
 	"net"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	collogpb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
@@ -94,6 +96,25 @@ func TestOTLPTargetIsLoopback(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, tc.want, otlpTargetIsLoopback(tc.target))
 		})
+	}
+}
+
+func collectSourceMetricsForEntry(t *testing.T, metrics *perJobMetrics, entry *TrapEntry) (metrix.CollectorStore, metrix.Labels) {
+	t.Helper()
+	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(entry)
+	store := metrix.NewCollectorStore()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	require.True(t, ok)
+	managed.CycleController().BeginCycle()
+	collectSourceMetrics(store, "local", metrics)
+	require.NoError(t, managed.CycleController().CommitCycleSuccess())
+	return store, metrix.Labels{"job_name": "local", "source_id": sourceID, "source_kind": sourceKind}
+}
+
+func assertSourceMetricValue(t *testing.T, store metrix.CollectorStore, metric string, labels metrix.Labels, want float64) {
+	t.Helper()
+	if v, ok := store.Read().Value(metric, labels); !ok || v != want {
+		t.Fatalf("%s = %v/%v, want %v/true", metric, v, ok, want)
 	}
 }
 
@@ -384,6 +405,130 @@ func TestOTLPTrapWriterPreflightHeadersAndFlush(t *testing.T) {
 	assert.Equal(t, uint64(0), metrics.errors.otlpExportFailed.Load())
 }
 
+func TestOTLPTrapWriterSecondaryAsyncExportFailureDoesNotRecordTerminalWriteFailure(t *testing.T) {
+	srv := startOTLPFixture(t, nil)
+	metrics := &perJobMetrics{}
+	writer := newTestOTLPTrapWriter(t, srv, metrics, false)
+
+	primary := &mockTrapWriter{}
+	fanout := newFanoutTrapWriter(primary, writer, metrics)
+	entry := testFanoutTrapEntry()
+
+	srv.setExportErr(errors.New("export failed"))
+	require.NoError(t, fanout.Write(entry))
+	require.Error(t, fanout.Flush())
+
+	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
+	assert.Equal(t, uint64(0), metrics.pipeline.writeFailed.Load())
+
+	store, labels := collectSourceMetricsForEntry(t, metrics, entry)
+	assertSourceMetricValue(t, store, "snmp_trap_source_pipeline_write_failed", labels, 0)
+	assertSourceMetricValue(t, store, "snmp_trap_source_errors_otlp_export_failed", labels, 1)
+
+	srv.setExportErr(nil)
+	require.NoError(t, writer.Close())
+}
+
+func TestOTLPTrapWriterAuthoritativeAsyncExportFailureRecordsTerminalWriteFailure(t *testing.T) {
+	srv := startOTLPFixture(t, nil)
+	metrics := &perJobMetrics{}
+	writer := newTestOTLPTrapWriter(t, srv, metrics, true)
+	entry := testFanoutTrapEntry()
+
+	srv.setExportErr(errors.New("export failed"))
+	require.NoError(t, writer.Write(entry))
+	require.Error(t, writer.Flush())
+
+	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
+	assert.Equal(t, uint64(1), metrics.pipeline.writeFailed.Load())
+
+	store, labels := collectSourceMetricsForEntry(t, metrics, entry)
+	for metric, expected := range map[string]float64{
+		"snmp_trap_source_pipeline_write_failed":     1,
+		"snmp_trap_source_errors_otlp_export_failed": 1,
+	} {
+		assertSourceMetricValue(t, store, metric, labels, expected)
+	}
+
+	srv.setExportErr(nil)
+	require.NoError(t, writer.Close())
+}
+
+func TestOTLPTrapWriterDrainQueueCountsFailuresAfterFirstFailedBatch(t *testing.T) {
+	srv := startOTLPFixture(t, nil)
+	runtimeCfg, err := validateOTLPConfig(OTLPConfig{
+		Enabled:        true,
+		Endpoint:       srv.endpoint,
+		RequestTimeout: "2s",
+		FlushInterval:  "1h",
+		BatchSize:      2,
+		QueueCapacity:  10,
+	})
+	require.NoError(t, err)
+	conn, client, err := newOTLPClient(t.Context(), runtimeCfg)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	srv.setExportErr(errors.New("export failed"))
+
+	metrics := &perJobMetrics{}
+	writer := &otlpTrapWriter{
+		client:         client,
+		conn:           conn,
+		queue:          make(chan *TrapEntry, runtimeCfg.queueCapacity),
+		headers:        runtimeCfg.headers,
+		requestTimeout: runtimeCfg.requestTimeout,
+		batchSize:      runtimeCfg.batchSize,
+		jobName:        "local",
+		metrics:        metrics,
+		terminalErrors: true,
+	}
+	entry := testFanoutTrapEntry()
+	for range 5 {
+		writer.queue <- entry
+	}
+
+	batch := make([]*TrapEntry, 0, writer.batchSize)
+	reportedFailed := 0
+	err = writer.drainQueue(&batch, &reportedFailed)
+	require.Error(t, err)
+	_ = writer.exportPending(&batch, &reportedFailed)
+
+	assert.Equal(t, uint64(5), metrics.errors.otlpExportFailed.Load())
+	assert.Equal(t, uint64(5), metrics.pipeline.writeFailed.Load())
+
+	reqs := srv.requests()
+	totalRecords := 0
+	for i, req := range reqs {
+		if len(req.ResourceLogs) == 0 {
+			continue
+		}
+		require.Len(t, req.ResourceLogs, 1)
+		require.Len(t, req.ResourceLogs[0].ScopeLogs, 1)
+		records := req.ResourceLogs[0].ScopeLogs[0].LogRecords
+		assert.LessOrEqualf(t, len(records), runtimeCfg.batchSize, "request %d exceeded batch size", i)
+		totalRecords += len(records)
+	}
+	assert.Equal(t, 5, totalRecords)
+
+	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(entry)
+	store := metrix.NewCollectorStore()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	require.True(t, ok)
+	managed.CycleController().BeginCycle()
+	collectSourceMetrics(store, "local", metrics)
+	require.NoError(t, managed.CycleController().CommitCycleSuccess())
+
+	labels := metrix.Labels{"job_name": "local", "source_id": sourceID, "source_kind": sourceKind}
+	for metric, expected := range map[string]float64{
+		"snmp_trap_source_pipeline_write_failed":     5,
+		"snmp_trap_source_errors_otlp_export_failed": 5,
+	} {
+		if v, ok := store.Read().Value(metric, labels); !ok || v != expected {
+			t.Fatalf("%s = %v/%v, want %v/true", metric, v, ok, expected)
+		}
+	}
+}
+
 func TestOTLPTrapWriterPreflightFailure(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -434,6 +579,7 @@ func TestOTLPTrapWriterWriteQueueFull(t *testing.T) {
 }
 
 func TestOTLPTrapWriterWorkerPanicFailsClosed(t *testing.T) {
+	metrics := &perJobMetrics{}
 	writer := &otlpTrapWriter{
 		queue:          make(chan *TrapEntry, 1),
 		flushCh:        make(chan chan error),
@@ -442,20 +588,93 @@ func TestOTLPTrapWriterWorkerPanicFailsClosed(t *testing.T) {
 		flushInterval:  time.Hour,
 		batchSize:      1,
 		requestTimeout: time.Millisecond,
+		metrics:        metrics,
+		terminalErrors: true,
 	}
 	go writer.worker()
 
-	require.NoError(t, writer.Write(&TrapEntry{JobName: "local", Message: "first"}))
+	entry := testFanoutTrapEntry()
+	require.NoError(t, writer.Write(entry))
 	select {
 	case <-writer.doneCh:
 	case <-time.After(time.Second):
 		t.Fatal("OTLP worker did not exit after panic")
 	}
 
+	assert.Equal(t, uint64(1), metrics.errors.otlpExportFailed.Load())
+	assert.Equal(t, uint64(1), metrics.pipeline.writeFailed.Load())
+
+	store, labels := collectSourceMetricsForEntry(t, metrics, entry)
+	for metric, expected := range map[string]float64{
+		"snmp_trap_source_pipeline_write_failed":     1,
+		"snmp_trap_source_errors_otlp_export_failed": 1,
+	} {
+		assertSourceMetricValue(t, store, metric, labels, expected)
+	}
+
 	require.ErrorIs(t, writer.Write(&TrapEntry{JobName: "local", Message: "second"}), errWriterClosed)
 	err := writer.Close()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "SNMP trap OTLP writer panic")
+}
+
+func TestOTLPTrapWriterWorkerPanicUnblocksFlushAndAccountsQueuedEntries(t *testing.T) {
+	metrics := &perJobMetrics{}
+	writer := &otlpTrapWriter{
+		queue:          make(chan *TrapEntry, 10),
+		flushCh:        make(chan chan error),
+		closeCh:        make(chan chan error),
+		doneCh:         make(chan struct{}),
+		flushInterval:  time.Hour,
+		batchSize:      10,
+		requestTimeout: time.Millisecond,
+		metrics:        metrics,
+		terminalErrors: true,
+	}
+	go writer.worker()
+
+	entry := testFanoutTrapEntry()
+	require.NoError(t, writer.Write(entry))
+	require.NoError(t, writer.Write(entry))
+
+	done := make(chan error, 1)
+	go func() {
+		done <- writer.Flush()
+	}()
+
+	select {
+	case err := <-done:
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "SNMP trap OTLP writer panic")
+	case <-time.After(time.Second):
+		t.Fatal("Flush blocked after OTLP worker panic")
+	}
+	select {
+	case <-writer.doneCh:
+	case <-time.After(time.Second):
+		t.Fatal("OTLP worker did not exit after panic")
+	}
+
+	assert.Equal(t, uint64(2), metrics.errors.otlpExportFailed.Load())
+	assert.Equal(t, uint64(2), metrics.pipeline.writeFailed.Load())
+
+	sourceID, sourceKind := metrics.fallbackSourceIdentityForTest(entry)
+	store := metrix.NewCollectorStore()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	require.True(t, ok)
+	managed.CycleController().BeginCycle()
+	collectSourceMetrics(store, "local", metrics)
+	require.NoError(t, managed.CycleController().CommitCycleSuccess())
+
+	labels := metrix.Labels{"job_name": "local", "source_id": sourceID, "source_kind": sourceKind}
+	for metric, expected := range map[string]float64{
+		"snmp_trap_source_pipeline_write_failed":     2,
+		"snmp_trap_source_errors_otlp_export_failed": 2,
+	} {
+		if v, ok := store.Read().Value(metric, labels); !ok || v != expected {
+			t.Fatalf("%s = %v/%v, want %v/true", metric, v, ok, expected)
+		}
+	}
 }
 
 func TestOTLPTrapWriterExternalReceiver(t *testing.T) {
@@ -525,6 +744,28 @@ func startOTLPFixture(t *testing.T, exportErr error) *otlpFixture {
 		_ = ln.Close()
 	})
 	return f
+}
+
+func newTestOTLPTrapWriter(t *testing.T, srv *otlpFixture, metrics *perJobMetrics, terminalErrors bool) *otlpTrapWriter {
+	t.Helper()
+	runtimeCfg, err := validateOTLPConfig(OTLPConfig{
+		Enabled:        true,
+		Endpoint:       srv.endpoint,
+		RequestTimeout: "2s",
+		FlushInterval:  "1h",
+		BatchSize:      10,
+		QueueCapacity:  10,
+	})
+	require.NoError(t, err)
+	writer, err := newOTLPTrapWriterWithRuntimeConfig(t.Context(), "local", runtimeCfg, metrics, terminalErrors)
+	require.NoError(t, err)
+	return writer
+}
+
+func (f *otlpFixture) setExportErr(err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.err = err
 }
 
 func (f *otlpFixture) Export(ctx context.Context, req *collogpb.ExportLogsServiceRequest) (*collogpb.ExportLogsServiceResponse, error) {

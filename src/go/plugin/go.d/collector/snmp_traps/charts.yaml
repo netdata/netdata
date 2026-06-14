@@ -36,7 +36,54 @@ groups:
       - snmp_trap_errors_otlp_export_failed
       - snmp_trap_errors_listener_read_failed
       - snmp_trap_dedup_suppressed
+      - snmp_trap_pipeline_received
+      - snmp_trap_pipeline_decoded
+      - snmp_trap_pipeline_accepted
+      - snmp_trap_pipeline_committed
+      - snmp_trap_pipeline_dedup_suppressed
+      - snmp_trap_pipeline_dropped
+      - snmp_trap_pipeline_write_failed
+      - snmp_trap_sources_active
+      - snmp_trap_source_attribution_vnode
+      - snmp_trap_source_attribution_fallback
+      - snmp_trap_source_attribution_ambiguous
+      - snmp_trap_source_attribution_failed
+      - snmp_trap_source_attribution_overflow_dropped
+      - snmp_trap_source_attribution_source_transitions
+      - snmp_trap_source_pipeline_accepted
+      - snmp_trap_source_pipeline_committed
+      - snmp_trap_source_pipeline_dedup_suppressed
+      - snmp_trap_source_pipeline_write_failed
+      - snmp_trap_source_errors_unknown_oid
+      - snmp_trap_source_errors_template_unresolved
+      - snmp_trap_source_errors_profile_load_failed
+      - snmp_trap_source_errors_journal_write_failed
+      - snmp_trap_source_errors_otlp_export_failed
+      - snmp_trap_source_last_seen_seconds
     charts:
+      - id: pipeline
+        title: SNMP trap receiver pipeline
+        context: pipeline
+        units: events/s
+        algorithm: incremental
+        type: line
+        instances:
+          by_labels: [job_name]
+        dimensions:
+          - selector: snmp_trap_pipeline_received
+            name: received
+          - selector: snmp_trap_pipeline_decoded
+            name: decoded
+          - selector: snmp_trap_pipeline_accepted
+            name: accepted
+          - selector: snmp_trap_pipeline_committed
+            name: committed
+          - selector: snmp_trap_pipeline_dedup_suppressed
+            name: dedup_suppressed
+          - selector: snmp_trap_pipeline_dropped
+            name: dropped
+          - selector: snmp_trap_pipeline_write_failed
+            name: write_failed
       - id: events
         title: SNMP trap events
         context: events
@@ -137,3 +184,82 @@ groups:
         dimensions:
           - selector: snmp_trap_dedup_suppressed
             name: suppressed
+      - id: sources
+        title: SNMP trap active sources
+        context: sources
+        units: sources
+        algorithm: absolute
+        type: line
+        instances:
+          by_labels: [job_name]
+        dimensions:
+          - selector: snmp_trap_sources_active
+            name: active
+      - id: source_attribution
+        title: SNMP trap source attribution
+        context: source_attribution
+        units: events/s
+        algorithm: incremental
+        type: stacked
+        instances:
+          by_labels: [job_name]
+        dimensions:
+          - selector: snmp_trap_source_attribution_vnode
+            name: vnode
+          - selector: snmp_trap_source_attribution_fallback
+            name: fallback
+          - selector: snmp_trap_source_attribution_ambiguous
+            name: ambiguous
+          - selector: snmp_trap_source_attribution_failed
+            name: failed
+          - selector: snmp_trap_source_attribution_overflow_dropped
+            name: overflow_dropped
+          - selector: snmp_trap_source_attribution_source_transitions
+            name: source_transitions
+      - id: source_pipeline
+        title: SNMP trap source pipeline
+        context: source_pipeline
+        units: events/s
+        algorithm: incremental
+        type: line
+        instances:
+          by_labels: [job_name, source_id, source_kind]
+        dimensions:
+          - selector: snmp_trap_source_pipeline_accepted
+            name: accepted
+          - selector: snmp_trap_source_pipeline_committed
+            name: committed
+          - selector: snmp_trap_source_pipeline_dedup_suppressed
+            name: dedup_suppressed
+          - selector: snmp_trap_source_pipeline_write_failed
+            name: write_failed
+      - id: source_errors
+        title: SNMP trap source-attributed errors
+        context: source_errors
+        units: errors/s
+        algorithm: incremental
+        type: stacked
+        instances:
+          by_labels: [job_name, source_id, source_kind]
+        dimensions:
+          - selector: snmp_trap_source_errors_unknown_oid
+            name: unknown_oid
+          - selector: snmp_trap_source_errors_template_unresolved
+            name: template_unresolved
+          - selector: snmp_trap_source_errors_profile_load_failed
+            name: profile_load_failed
+          - selector: snmp_trap_source_errors_journal_write_failed
+            name: journal_write_failed
+          - selector: snmp_trap_source_errors_otlp_export_failed
+            name: otlp_export_failed
+      - id: source_last_seen
+        title: SNMP trap source last seen
+        context: source_last_seen
+        units: seconds
+        algorithm: absolute
+        type: line
+        instances:
+          by_labels: [job_name, source_id, source_kind]
+        dimensions:
+          - selector: snmp_trap_source_last_seen_seconds
+            name: seconds_ago

@@ -103,7 +103,7 @@ func isDir(path string) bool {
 // loadProfileCache loads user profiles and builds a lazy route table for stock profiles.
 func loadProfileCache() (*ProfileIndex, error) {
 	paths := getProfileLoadPaths()
-	index, seen, err := loadUserProfiles(paths)
+	index, seen, accepted, err := loadUserProfileTraps(paths)
 	if err != nil {
 		return nil, err
 	}
@@ -117,6 +117,14 @@ func loadProfileCache() (*ProfileIndex, error) {
 		} else {
 			index.stock = store
 		}
+	}
+	if loadedProfilesHaveMetrics(accepted) {
+		if err := index.loadStockProfileMetrics(); err != nil {
+			return nil, err
+		}
+	}
+	if err := addLoadedProfileMetrics(index, accepted); err != nil {
+		return nil, err
 	}
 
 	if len(index.trapsByOID) == 0 && (index.stock == nil || index.stock.empty()) {
@@ -135,13 +143,21 @@ func loadUserProfileCache(current *ProfileIndex) (*ProfileIndex, error) {
 	}
 
 	paths := getProfileLoadPaths()
-	index, seen, err := loadUserProfiles(paths)
+	index, seen, accepted, err := loadUserProfileTraps(paths)
 	if err != nil {
 		return nil, err
 	}
 
 	index.stock = current.stock.cloneFiltered(seen)
-	if err := copyLoadedStockTraps(index, current, seen); err != nil {
+	if err := copyLoadedStockProfiles(index, current, seen); err != nil {
+		return nil, err
+	}
+	if loadedProfilesHaveMetrics(accepted) {
+		if err := index.loadStockProfileMetrics(); err != nil {
+			return nil, err
+		}
+	}
+	if err := addLoadedProfileMetrics(index, accepted); err != nil {
 		return nil, err
 	}
 
@@ -153,18 +169,32 @@ func loadUserProfileCache(current *ProfileIndex) (*ProfileIndex, error) {
 }
 
 func loadUserProfiles(paths profileLoadPaths) (*ProfileIndex, map[string]bool, error) {
+	index, seen, accepted, err := loadUserProfileTraps(paths)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := addLoadedProfileMetrics(index, accepted); err != nil {
+		return nil, nil, err
+	}
+	return index, seen, nil
+}
+
+func loadUserProfileTraps(paths profileLoadPaths) (*ProfileIndex, map[string]bool, []loadedProfileFile, error) {
 	seen := make(map[string]bool)
 
 	index := &ProfileIndex{
-		trapsByOID:      make(map[string]*TrapDef),
-		namesByTrapName: make(map[string]*TrapDef),
+		trapsByOID:        make(map[string]*TrapDef),
+		namesByTrapName:   make(map[string]*TrapDef),
+		metricRulesByName: make(map[string]*profileMetricRule),
+		metricChartsByID:  make(map[string]*profileMetricChart),
 	}
 
+	var accepted []loadedProfileFile
 	for _, dir := range paths.eagerDirs {
 		files, err := loadProfilesFromDir(dir, paths.all)
 		if err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
-				return nil, nil, fmt.Errorf("failed to load trap profiles from '%s': %w", dir, err)
+				return nil, nil, nil, fmt.Errorf("failed to load trap profiles from '%s': %w", dir, err)
 			}
 			continue
 		}
@@ -174,13 +204,32 @@ func loadUserProfiles(paths profileLoadPaths) (*ProfileIndex, map[string]bool, e
 				continue
 			}
 			seen[file.name] = true
+			accepted = append(accepted, file)
 			if err := index.addTraps(file.traps); err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 		}
 	}
 
-	return index, seen, nil
+	return index, seen, accepted, nil
+}
+
+func addLoadedProfileMetrics(index *ProfileIndex, accepted []loadedProfileFile) error {
+	for _, file := range accepted {
+		if err := index.addProfileMetrics(file.metrics, file.charts); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func loadedProfilesHaveMetrics(files []loadedProfileFile) bool {
+	for _, file := range files {
+		if len(file.metrics) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (idx *ProfileIndex) addTraps(traps []*TrapDef) error {
@@ -221,9 +270,126 @@ func (idx *ProfileIndex) addTrapsLocked(traps []*TrapDef) error {
 	return nil
 }
 
+func (idx *ProfileIndex) addProfileMetrics(rules []profileMetricRule, charts []profileMetricChart) error {
+	if len(rules) == 0 && len(charts) == 0 {
+		return nil
+	}
+	if idx == nil {
+		return fmt.Errorf("profile index not available")
+	}
+
+	idx.mu.RLock()
+	knownCharts := make(map[string]*profileMetricChart, len(idx.metricChartsByID)+len(charts))
+	maps.Copy(knownCharts, idx.metricChartsByID)
+	knownRules := make(map[string]*profileMetricRule, len(idx.metricRulesByName)+len(rules))
+	maps.Copy(knownRules, idx.metricRulesByName)
+	idx.mu.RUnlock()
+	knownOutputMetrics := make(map[string]string, len(knownRules)+len(rules))
+	for name, rule := range knownRules {
+		if rule == nil || rule.Output.Metric == "" {
+			continue
+		}
+		knownOutputMetrics[rule.Output.Metric] = fmt.Sprintf("rule %q in %s", name, rule.sourceFile)
+	}
+
+	newCharts := make([]profileMetricChart, len(charts))
+	for i := range charts {
+		chart := charts[i]
+		if err := normalizeProfileMetricChart(&chart); err != nil {
+			return fmt.Errorf("%s: metric chart: %w", chart.sourceFile, err)
+		}
+		if existing := knownCharts[chart.ID]; existing != nil {
+			return fmt.Errorf("%s: duplicate metric chart %q (already defined in %s)", chart.sourceFile, chart.ID, existing.sourceFile)
+		}
+		newCharts[i] = chart
+		knownCharts[chart.ID] = &newCharts[i]
+	}
+
+	newRules := make([]profileMetricRule, len(rules))
+	for i := range rules {
+		rule := rules[i]
+		if existing := knownRules[rule.Name]; existing != nil {
+			return fmt.Errorf("%s: duplicate metric rule %q (already defined in %s)", rule.sourceFile, rule.Name, existing.sourceFile)
+		}
+		if err := validateProfileMetricRule(&rule, idx, knownCharts); err != nil {
+			return err
+		}
+		if existing := knownOutputMetrics[rule.Output.Metric]; existing != "" {
+			return fmt.Errorf("%s: metric rule %q output.metric %q already used by %s", rule.sourceFile, rule.Name, rule.Output.Metric, existing)
+		}
+		newRules[i] = rule
+		knownRules[rule.Name] = &newRules[i]
+		knownOutputMetrics[rule.Output.Metric] = fmt.Sprintf("rule %q in %s", rule.Name, rule.sourceFile)
+	}
+	if err := validateProfileMetricChartRuleShapes(knownRules); err != nil {
+		return err
+	}
+
+	idx.mu.Lock()
+	defer idx.mu.Unlock()
+	if idx.metricRulesByName == nil {
+		idx.metricRulesByName = make(map[string]*profileMetricRule, len(rules))
+	}
+	if idx.metricChartsByID == nil {
+		idx.metricChartsByID = make(map[string]*profileMetricChart, len(charts))
+	}
+	for i := range newCharts {
+		chart := newCharts[i]
+		idx.metricChartsByID[chart.ID] = &newCharts[i]
+	}
+	for i := range newRules {
+		rule := newRules[i]
+		idx.metricRulesByName[rule.Name] = &newRules[i]
+	}
+	return nil
+}
+
+func validateProfileMetricChartRuleShapes(rules map[string]*profileMetricRule) error {
+	type chartRuleShape struct {
+		ruleName      string
+		sourceFile    string
+		usesResource  bool
+		resourceClass string
+	}
+	names := make([]string, 0, len(rules))
+	for name := range rules {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+
+	shapes := make(map[string]chartRuleShape)
+	for _, name := range names {
+		rule := rules[name]
+		if rule == nil {
+			continue
+		}
+		shape := chartRuleShape{
+			ruleName:     rule.Name,
+			sourceFile:   rule.sourceFile,
+			usesResource: rule.Identity.Resource != nil,
+		}
+		if rule.Identity.Resource != nil {
+			shape.resourceClass = rule.Identity.Resource.Class
+		}
+		existing, ok := shapes[rule.Output.Chart]
+		if !ok {
+			shapes[rule.Output.Chart] = shape
+		} else if existing.usesResource != shape.usesResource {
+			return fmt.Errorf("%s: metric rule %q chart %q mixes resource and non-resource rules (already used by rule %q in %s)",
+				rule.sourceFile, rule.Name, rule.Output.Chart, existing.ruleName, existing.sourceFile)
+		} else if shape.usesResource && existing.resourceClass != shape.resourceClass {
+			return fmt.Errorf("%s: metric rule %q chart %q mixes resource classes %q and %q (already used by rule %q in %s)",
+				rule.sourceFile, rule.Name, rule.Output.Chart, existing.resourceClass, shape.resourceClass, existing.ruleName, existing.sourceFile)
+		}
+	}
+	return nil
+}
+
 type loadedProfileFile struct {
-	name  string
-	traps []*TrapDef
+	name    string
+	traps   []*TrapDef
+	metrics []profileMetricRule
+	charts  []profileMetricChart
 }
 
 // loadProfilesFromDir walks a directory and loads all supported profile files.
@@ -247,12 +413,17 @@ func loadProfilesFromDir(dirpath string, extendsPaths multipath.MultiPath) ([]lo
 			return nil
 		}
 
-		fileTraps, _, ferr := loadProfile(path, extendsPaths, nil)
+		bundle, ferr := loadProfileBundle(path, extendsPaths, nil)
 		if ferr != nil {
 			return fmt.Errorf("invalid profile '%s': %w", path, ferr)
 		}
 
-		files = append(files, loadedProfileFile{name: profileLogicalName(d.Name()), traps: fileTraps})
+		files = append(files, loadedProfileFile{
+			name:    profileLogicalName(d.Name()),
+			traps:   bundle.traps,
+			metrics: bundle.metrics,
+			charts:  bundle.charts,
+		})
 		return nil
 	}); err != nil {
 		return nil, err
@@ -261,24 +432,41 @@ func loadProfilesFromDir(dirpath string, extendsPaths multipath.MultiPath) ([]lo
 	return files, nil
 }
 
+type profileLoadBundle struct {
+	traps    []*TrapDef
+	varbinds map[string]VarbindDef
+	metrics  []profileMetricRule
+	charts   []profileMetricChart
+}
+
 // loadProfile loads a single profile YAML and returns its validated trap definitions.
 // Returns traps, loaded file-level varbinds, and error.
 func loadProfile(filename string, extendsPaths multipath.MultiPath, stack []string) ([]*TrapDef, map[string]VarbindDef, error) {
+	bundle, err := loadProfileBundle(filename, extendsPaths, stack)
+	if err != nil {
+		return nil, nil, err
+	}
+	return bundle.traps, bundle.varbinds, nil
+}
+
+func loadProfileBundle(filename string, extendsPaths multipath.MultiPath, stack []string) (profileLoadBundle, error) {
 	if len(stack) > maxProfileExtendsDepth {
-		return nil, nil, fmt.Errorf("%s: profile extends depth exceeds maximum %d", filename, maxProfileExtendsDepth)
+		return profileLoadBundle{}, fmt.Errorf("%s: profile extends depth exceeds maximum %d", filename, maxProfileExtendsDepth)
 	}
 	content, err := readProfileFile(filename)
 	if err != nil {
-		return nil, nil, err
+		return profileLoadBundle{}, err
 	}
 
 	var def ProfileDefinition
 	if err := unmarshalProfileYAML(content, &def); err != nil {
-		return nil, nil, err
+		return profileLoadBundle{}, err
 	}
 
 	// resolve extends chain
 	var allTraps []*TrapDef
+	var allMetrics []profileMetricRule
+	var allCharts []profileMetricChart
 	fileVarbinds := cloneVarbindMap(def.Varbinds)
 	currentVarbinds := make(map[string]bool, len(def.Varbinds))
 	for name := range def.Varbinds {
@@ -291,30 +479,53 @@ func loadProfile(filename string, extendsPaths multipath.MultiPath, stack []stri
 			continue
 		}
 		if currentTrapOIDs[td.OID] {
-			return nil, nil, fmt.Errorf("%s: duplicate trap OID %s in profile", filename, td.OID)
+			return profileLoadBundle{}, fmt.Errorf("%s: duplicate trap OID %s in profile", filename, td.OID)
 		}
 		currentTrapOIDs[td.OID] = true
 	}
 	baseByOID := make(map[string]*TrapDef)
 	allTrapPos := make(map[string]int)
+	allMetricPos := make(map[string]int)
+	allChartPos := make(map[string]int)
+
+	currentMetricNames := make(map[string]bool, len(def.Metrics))
+	for _, metric := range def.Metrics {
+		if metric.Name == "" {
+			continue
+		}
+		if currentMetricNames[metric.Name] {
+			return profileLoadBundle{}, fmt.Errorf("%s: duplicate metric rule %s in profile", filename, metric.Name)
+		}
+		currentMetricNames[metric.Name] = true
+	}
+	currentChartIDs := make(map[string]bool, len(def.Charts))
+	for _, chart := range def.Charts {
+		if chart.ID == "" {
+			continue
+		}
+		if currentChartIDs[chart.ID] {
+			return profileLoadBundle{}, fmt.Errorf("%s: duplicate metric chart %s in profile", filename, chart.ID)
+		}
+		currentChartIDs[chart.ID] = true
+	}
 
 	if len(def.Extends) > 0 {
 		for _, extName := range def.Extends {
 			if err := validateExtendsName(extName); err != nil {
-				return nil, nil, fmt.Errorf("%s: invalid extends entry %q: %w", filename, extName, err)
+				return profileLoadBundle{}, fmt.Errorf("%s: invalid extends entry %q: %w", filename, extName, err)
 			}
 			if stacksContains(stack, extName) {
-				return nil, nil, fmt.Errorf("%s: circular extends detected: %q", filename, extName)
+				return profileLoadBundle{}, fmt.Errorf("%s: circular extends detected: %q", filename, extName)
 			}
 			extPath, err := findProfileExtends(extendsPaths, extName)
 			if err != nil {
-				return nil, nil, fmt.Errorf("%s: cannot find extension %q: %v", filename, extName, err)
+				return profileLoadBundle{}, fmt.Errorf("%s: cannot find extension %q: %v", filename, extName, err)
 			}
-			baseTraps, baseVarbinds, err := loadProfile(extPath, extendsPaths, append(stack, extName))
+			base, err := loadProfileBundle(extPath, extendsPaths, append(stack, extName))
 			if err != nil {
-				return nil, nil, err
+				return profileLoadBundle{}, err
 			}
-			for _, bt := range baseTraps {
+			for _, bt := range base.traps {
 				baseByOID[bt.OID] = bt
 				if currentTrapOIDs[bt.OID] {
 					continue
@@ -326,13 +537,15 @@ func loadProfile(filename string, extendsPaths multipath.MultiPath, stack []stri
 					allTraps = append(allTraps, bt)
 				}
 			}
-			mergeBaseVarbinds(fileVarbinds, baseVarbinds, currentVarbinds)
+			mergeProfileMetricRules(&allMetrics, allMetricPos, base.metrics, currentMetricNames)
+			mergeProfileMetricCharts(&allCharts, allChartPos, base.charts, currentChartIDs)
+			mergeBaseVarbinds(fileVarbinds, base.varbinds, currentVarbinds)
 		}
 	}
 
 	absFile, _ := filepath.Abs(filename)
 	if err := validateFileVarbinds(fileVarbinds, absFile); err != nil {
-		return nil, nil, err
+		return profileLoadBundle{}, err
 	}
 
 	for i := range def.Traps {
@@ -343,7 +556,7 @@ func loadProfile(filename string, extendsPaths multipath.MultiPath, stack []stri
 		}
 
 		if err := validateTrapDef(td, fileVarbinds); err != nil {
-			return nil, nil, err
+			return profileLoadBundle{}, err
 		}
 
 		td.sharedVarbinds = buildSharedVarbinds(td, fileVarbinds)
@@ -353,7 +566,29 @@ func loadProfile(filename string, extendsPaths multipath.MultiPath, stack []stri
 		allTraps = append(allTraps, &def.Traps[i])
 	}
 
-	return allTraps, fileVarbinds, nil
+	for i := range def.Metrics {
+		rule := &def.Metrics[i]
+		rule.sourceFile = absFile
+		if err := normalizeProfileMetricRule(rule); err != nil {
+			return profileLoadBundle{}, fmt.Errorf("%s: metric rule: %w", absFile, err)
+		}
+		if chart := chartFromMetricRule(rule); chart != nil {
+			mergeProfileMetricCharts(&allCharts, allChartPos, []profileMetricChart{*chart}, nil)
+		}
+		allMetrics = append(allMetrics, *rule)
+	}
+	for i := range def.Charts {
+		chart := &def.Charts[i]
+		chart.sourceFile = absFile
+		mergeProfileMetricCharts(&allCharts, allChartPos, []profileMetricChart{*chart}, nil)
+	}
+
+	return profileLoadBundle{
+		traps:    allTraps,
+		varbinds: fileVarbinds,
+		metrics:  allMetrics,
+		charts:   allCharts,
+	}, nil
 }
 
 func readProfileFile(filename string) ([]byte, error) {
@@ -439,6 +674,7 @@ type stockProfileStore struct {
 	enterpriseRoutes map[string]string
 	loaded           map[string]bool
 	failed           map[string]error
+	metricsLoaded    bool
 	mu               sync.Mutex
 }
 
@@ -458,6 +694,7 @@ func (s *stockProfileStore) cloneFiltered(replaced map[string]bool) *stockProfil
 		enterpriseRoutes: make(map[string]string, len(s.enterpriseRoutes)),
 		loaded:           make(map[string]bool, len(s.loaded)),
 		failed:           make(map[string]error, len(s.failed)),
+		metricsLoaded:    s.metricsLoaded,
 	}
 	for name, path := range s.files {
 		if replaced[name] {
@@ -513,7 +750,7 @@ func (s *stockProfileStore) loadedProfilePaths(replaced map[string]bool) map[str
 	return paths
 }
 
-func copyLoadedStockTraps(dst, current *ProfileIndex, replaced map[string]bool) error {
+func copyLoadedStockProfiles(dst, current *ProfileIndex, replaced map[string]bool) error {
 	if dst == nil || current == nil || current.stock == nil {
 		return nil
 	}
@@ -524,6 +761,8 @@ func copyLoadedStockTraps(dst, current *ProfileIndex, replaced map[string]bool) 
 	}
 
 	var traps []*TrapDef
+	var metrics []profileMetricRule
+	var charts []profileMetricChart
 	current.mu.RLock()
 	for _, td := range current.trapsByOID {
 		if td == nil {
@@ -533,9 +772,28 @@ func copyLoadedStockTraps(dst, current *ProfileIndex, replaced map[string]bool) 
 			traps = append(traps, td)
 		}
 	}
+	for _, rule := range current.metricRulesByName {
+		if rule == nil {
+			continue
+		}
+		if _, ok := loadedPaths[filepath.Clean(rule.sourceFile)]; ok {
+			metrics = append(metrics, *rule)
+		}
+	}
+	for _, chart := range current.metricChartsByID {
+		if chart == nil {
+			continue
+		}
+		if _, ok := loadedPaths[filepath.Clean(chart.sourceFile)]; ok {
+			charts = append(charts, *chart)
+		}
+	}
 	current.mu.RUnlock()
 
-	return dst.addTraps(traps)
+	if err := dst.addTraps(traps); err != nil {
+		return err
+	}
+	return dst.addProfileMetrics(metrics, charts)
 }
 
 func (s *stockProfileStore) empty() bool {
@@ -860,6 +1118,61 @@ func (idx *ProfileIndex) loadStockForOID(oid string) error {
 	return idx.stock.loadForOID(idx, oid)
 }
 
+func (idx *ProfileIndex) loadStockProfileMetrics() error {
+	if idx == nil || idx.stock == nil {
+		return nil
+	}
+	return idx.stock.loadProfileMetrics(idx)
+}
+
+func (s *stockProfileStore) loadProfileMetrics(idx *ProfileIndex) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.metricsLoaded {
+		return nil
+	}
+	names := make([]string, 0, len(s.files))
+	for name := range s.files {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		if s.loaded[name] {
+			continue
+		}
+		path := s.files[name]
+		if path == "" {
+			continue
+		}
+		bundle, err := loadProfileBundle(path, s.extendsPaths, nil)
+		if err != nil {
+			if s.failed == nil {
+				s.failed = make(map[string]error)
+			}
+			s.failed[name] = fmt.Errorf("failed to load stock trap profile for metrics from %q: %w", path, err)
+			return s.failed[name]
+		}
+		if err := idx.addTraps(bundle.traps); err != nil {
+			if s.failed == nil {
+				s.failed = make(map[string]error)
+			}
+			s.failed[name] = err
+			return err
+		}
+		if err := idx.addProfileMetrics(bundle.metrics, bundle.charts); err != nil {
+			if s.failed == nil {
+				s.failed = make(map[string]error)
+			}
+			s.failed[name] = err
+			return err
+		}
+		s.loaded[name] = true
+	}
+	s.metricsLoaded = true
+	return nil
+}
+
 func (s *stockProfileStore) loadForOID(idx *ProfileIndex, oid string) error {
 	name := s.route(oid)
 	if name == "" {
@@ -884,13 +1197,17 @@ func (s *stockProfileStore) loadForOID(idx *ProfileIndex, oid string) error {
 		s.failed[name] = err
 		return err
 	}
-	traps, _, err := loadProfile(path, s.extendsPaths, nil)
+	bundle, err := loadProfileBundle(path, s.extendsPaths, nil)
 	if err != nil {
 		err = fmt.Errorf("failed to lazy-load stock trap profile %q: %w", path, err)
 		s.failed[name] = err
 		return err
 	}
-	if err := idx.addTraps(traps); err != nil {
+	if err := idx.addTraps(bundle.traps); err != nil {
+		s.failed[name] = err
+		return err
+	}
+	if err := idx.addProfileMetrics(bundle.metrics, bundle.charts); err != nil {
 		s.failed[name] = err
 		return err
 	}
@@ -965,6 +1282,34 @@ func mergeBaseVarbinds(target, base map[string]VarbindDef, protected map[string]
 	}
 }
 
+func mergeProfileMetricRules(target *[]profileMetricRule, positions map[string]int, base []profileMetricRule, protected map[string]bool) {
+	for _, rule := range base {
+		if protected != nil && protected[rule.Name] {
+			continue
+		}
+		if pos, ok := positions[rule.Name]; ok {
+			(*target)[pos] = rule
+			continue
+		}
+		positions[rule.Name] = len(*target)
+		*target = append(*target, rule)
+	}
+}
+
+func mergeProfileMetricCharts(target *[]profileMetricChart, positions map[string]int, base []profileMetricChart, protected map[string]bool) {
+	for _, chart := range base {
+		if protected != nil && protected[chart.ID] {
+			continue
+		}
+		if pos, ok := positions[chart.ID]; ok {
+			(*target)[pos] = chart
+			continue
+		}
+		positions[chart.ID] = len(*target)
+		*target = append(*target, chart)
+	}
+}
+
 func cloneVarbindMap(src map[string]VarbindDef) map[string]VarbindDef {
 	dst := make(map[string]VarbindDef, len(src))
 	maps.Copy(dst, src)
@@ -997,11 +1342,85 @@ func stacksContains(stack []string, name string) bool {
 	return slices.Contains(stack, name)
 }
 
+var (
+	profileMetricResourceYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"class":            {},
+		"key":              {},
+		"key_from_varbind": {},
+		"max":              {},
+		"max_per_source":   {},
+	}}
+
+	charttplDimensionLifecycleYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"max_dims":            {},
+		"expire_after_cycles": {},
+	}}
+
+	charttplLifecycleYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"max_instances":       {},
+		"expire_after_cycles": {},
+		"dimensions":          charttplDimensionLifecycleYAMLSpec,
+	}}
+
+	profileMetricRuleYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"name":               {},
+		"type":               {},
+		"auto_safe":          {},
+		"enabled":            {},
+		"on_trap":            {},
+		"problem_trap":       {},
+		"clear_trap":         {},
+		"where":              {allowAny: true},
+		"identity":           {children: map[string]yamlKeySpec{"device": {}, "resource": profileMetricResourceYAMLSpec}},
+		"resource":           profileMetricResourceYAMLSpec,
+		"output":             {children: map[string]yamlKeySpec{"metric": {}, "dimension": {}, "chart": {}}},
+		"state":              {children: map[string]yamlKeySpec{"set_when": {allowAny: true}, "clear_when": {allowAny: true}, "problem_value": {}, "clear_value": {}, "ttl": {}, "ttl_behavior": {}, "varbind": {}, "set": {}, "clear": {}}},
+		"scale":              {children: map[string]yamlKeySpec{"multiplier": {}, "divisor": {}}},
+		"missing":            {},
+		"value_from_varbind": {},
+		"chart_meta":         {children: map[string]yamlKeySpec{"title": {}, "family": {}, "context": {}, "units": {}, "algorithm": {}, "type": {}, "description": {}, "lifecycle": charttplLifecycleYAMLSpec}},
+		"metric":             {},
+		"dimension":          {},
+		"chart_id":           {},
+		"value":              {},
+	}}
+
+	profileMetricChartYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"id":          {},
+		"title":       {},
+		"family":      {},
+		"context":     {},
+		"units":       {},
+		"algorithm":   {},
+		"type":        {},
+		"description": {},
+		"lifecycle":   charttplLifecycleYAMLSpec,
+	}}
+
+	profileYAMLSpec = yamlKeySpec{children: map[string]yamlKeySpec{
+		"vendor":     {},
+		"mib_count":  {},
+		"trap_count": {},
+		"extends":    {},
+		"varbinds":   {allowAny: true},
+		"traps":      {allowAny: true},
+		"metrics":    {elem: &profileMetricRuleYAMLSpec},
+		"charts":     {elem: &profileMetricChartYAMLSpec},
+	}}
+)
+
 func unmarshalProfileYAML(content []byte, def *ProfileDefinition) (err error) {
 	defer func() {
 		if v := recover(); v != nil {
 			err = fmt.Errorf("panic parsing profile YAML: %v", v)
 		}
 	}()
+	var raw any
+	if err := yaml.Unmarshal(content, &raw); err != nil {
+		return err
+	}
+	if err := rejectUnknownYAMLKeys(raw, profileYAMLSpec, "profile"); err != nil {
+		return err
+	}
 	return yaml.Unmarshal(content, def)
 }

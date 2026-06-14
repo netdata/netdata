@@ -161,14 +161,18 @@ type ProfileDefinition struct {
 	Extends   []string              `yaml:"extends,omitempty"`
 	Varbinds  map[string]VarbindDef `yaml:"varbinds,omitempty"`
 	Traps     []TrapDef             `yaml:"traps,omitempty"`
+	Metrics   []profileMetricRule   `yaml:"metrics,omitempty"`
+	Charts    []profileMetricChart  `yaml:"charts,omitempty"`
 }
 
 // ProfileIndex is a loaded, validated OID index ready for trap lookup.
 type ProfileIndex struct {
-	mu              sync.RWMutex
-	trapsByOID      map[string]*TrapDef
-	namesByTrapName map[string]*TrapDef
-	stock           *stockProfileStore
+	mu                sync.RWMutex
+	trapsByOID        map[string]*TrapDef
+	namesByTrapName   map[string]*TrapDef
+	metricRulesByName map[string]*profileMetricRule
+	metricChartsByID  map[string]*profileMetricChart
+	stock             *stockProfileStore
 }
 
 // Lookup returns the TrapDef for a given numeric OID, or nil if not found.

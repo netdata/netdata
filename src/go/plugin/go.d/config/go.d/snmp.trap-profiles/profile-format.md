@@ -19,13 +19,14 @@ A profile tells the Netdata SNMP trap plugin:
 - which **varbinds** ship with each trap (their OIDs, MIB types, value enums)
 - how to **classify** each trap (category + severity)
 - how to **render** each trap into a human-readable journal `MESSAGE`
+- which optional **metrics** and charts can be derived from selected traps
 
 Trap profiles do **not** define journal field names manually. The plugin derives
 indexed `TRAP_VAR_*` journal fields from received non-sensitive, non-redundant
 event varbinds, and also keeps the complete structured audit copy in
-`TRAP_JSON` (see the SNMP trap subsystem design doc). Profiles also do **not**
-define per-trap metric emission; operators opt-in OIDs to metric emission in
-plugin configuration, not in profiles.
+`TRAP_JSON` (see the SNMP trap subsystem design doc). Profiles may define
+optional trap-to-metric rules and chart definitions. Listener jobs still decide
+whether to enable those rules through `profile_metrics`.
 
 A profile is a single YAML file. One file per vendor by convention; stock
 profiles ship under `default/` and are organized by inferred enterprise-PEN
@@ -106,6 +107,25 @@ traps:
       - cospfPacketSrc
       - cospfConfigErrorType
       - cospfPacketType
+
+# Optional chart definitions for profile metric rules.
+charts:
+  - id: ospf_config_errors
+    title: OSPF configuration errors
+    context: snmp.trap.ospf.config.errors
+    units: events/s
+    algorithm: incremental
+
+# Optional trap-to-metric rules. Jobs enable these with profile_metrics.
+metrics:
+  - name: cisco.ospf.config_error
+    type: counter
+    auto_safe: true
+    on_trap: CISCO-OSPF-TRAP-MIB::cospfIfConfigError
+    output:
+      metric: snmp_trap_ospf_config_error_events
+      dimension: events
+      chart: ospf_config_errors
 ```
 
 ## Schema reference
@@ -178,6 +198,324 @@ emit time — it never enters the `varbinds:` table, and any reference to it
 from a trap entry's `varbinds:` list is removed in lockstep. This keeps the
 shipped pack free of dangling references; description templates can only
 reference varbinds that survive to disk.
+
+### Optional `metrics:` rules and `charts:`
+
+Profiles may define trap-to-metric rules next to trap decode information. These
+rules are inert until a listener job enables them with `profile_metrics`.
+
+Metric rules are merged through `extends:` by rule `name`; a child profile can
+replace or disable an inherited rule by using the same name. Chart definitions
+are merged by chart `id`.
+
+Custom profile files under `/etc/netdata/go.d/snmp.trap-profiles/` are loaded
+eagerly. Stock trap profiles remain lazy when the loaded profile set has no
+metric rules and no listener enables `profile_metrics`. When custom profile
+metric rules exist, or when a listener enables `profile_metrics`, stock profiles
+are loaded before rule selection so custom rules can validate references to
+stock trap names before the first matching trap.
+
+Enable profile metrics in the listener job, not in the profile file:
+
+```yaml
+profile_metrics:
+  enabled: true
+  mode: exact        # none | auto | exact | combined
+  include:
+    - cisco.config.changed
+  identity:
+    device: source   # source | source_label | listener
+    unresolved_source: source_label
+    source_id_privacy: hash
+  limits:
+    max_rules: 500
+    max_sources: 2000
+    max_resources_per_source: 512
+    max_instances_per_job: 50000
+    overflow: drop_and_count
+```
+
+Selection modes:
+
+- `profile_metrics.enabled` defaults to `false`; profile rules are inactive
+  until the job enables them.
+- `none`: no profile metric rules are evaluated.
+- `auto`: enable rules marked `auto_safe: true`.
+- `exact`: enable only names listed in `profile_metrics.include`.
+- `combined`: enable `auto_safe: true` rules plus names listed in `include`.
+
+`profile_metrics.include` is valid only with `mode: exact` or
+`mode: combined`. It is rejected with `mode: none` or `mode: auto`, because it
+would otherwise look configured while having no selection effect.
+
+Use `auto_safe: true` only for rules reviewed as bounded and safe for trap
+hubs. A child profile rule with the same `name` fully replaces the inherited
+rule; if an operator replacement sets `auto_safe: true`, the operator owns that
+safety decision.
+
+Identity behavior:
+
+- `identity.device: source` emits device-attributable metrics under vnode host
+  scope when trap enrichment supplies an unambiguous `SourceVnodeID`.
+- When no vnode is known, the metric is emitted under the listener job with
+  bounded `source_id` and `source_kind` labels.
+- Ambiguous or conflicting vnode enrichment falls back to source-label metrics
+  and increments attribution diagnostics instead of creating or migrating vnode
+  metrics.
+- Vnode-scoped profile metric series also include `source_id` and
+  `source_kind`; generated chart instances use the same label identity in both
+  vnode and fallback modes.
+- `identity.device: source_label` always emits under the listener job with
+  bounded `source_id` and `source_kind` labels, even when vnode enrichment is
+  available.
+- `identity.device: listener` is only for listener-owned rules that should merge
+  all source devices.
+- `source_id_privacy: hash` hides raw source values behind a stable local hash
+  derived from the selected source value, job name, and local Agent identity.
+  Use `raw` only when source labels are acceptable in your environment.
+  Treat hashed `source_id` values as local listener identifiers, not portable
+  join keys across Agents, listeners, or reinstalls.
+  The local salt is read from `/etc/machine-id`, then
+  `/var/lib/dbus/machine-id`, then hostname, with a fixed last-resort fallback
+  only when no stable local identity is available. The emitted `source_id` is
+  truncated to 16 hex characters.
+- `source_kind` is a closed label set: `vnode`, `listener`,
+  `trusted_trap_address`, `udp_peer`, `entry_source`, `hostname_or_ip`,
+  `trap_varbind`, `topology_ifindex`, `source`, or `other`.
+
+Cardinality behavior:
+
+- `limits.max_sources` caps non-listener source identities tracked by the job,
+  including vnode and fallback sources.
+- `limits.max_resources_per_source` is the default per-source, per-resource-class
+  resource cap.
+- `identity.resource.max_per_source` overrides the default for one rule's
+  resource class.
+- `identity.resource.key_from_varbind` must reference an integer-like bounded
+  varbind (`INTEGER`, `Integer32`, `Unsigned32`, or `Gauge32`). String, MAC,
+  username, address, and payload-like fields are rejected as resource keys to
+  protect metric cardinality.
+  `Counter32`, `Counter64`, and `TimeTicks` are valid sample values, not
+  resource identity keys.
+- `identity.resource.class` must be one of the stock classes `interface`,
+  `peer`, `neighbor`, `sensor`, `alarm`, `pool`, `l2_topology`, `component`, or
+  a site-specific lowercase class beginning with `site_`, such as
+  `site_foo_sensor`.
+- `limits.max_instances_per_job` is the final job-level safety cap.
+- `limits.overflow` currently supports `drop_and_count`: accepted traps are
+  still committed, but over-cap metric instances are skipped and diagnostics
+  increment.
+- `charts.lifecycle.expire_after_cycles` counts go.d collection cycles, so
+  changing the listener job `update_every` changes its wall-clock expiry time.
+  State rule `state.ttl` uses wall-clock duration syntax and must be greater
+  than zero when set.
+- Expired series are removed. If the same source/resource appears again later,
+  the next committed trap creates a fresh series; counter charts may show a
+  reset after idle expiry.
+- All rules that share one chart must have the same label shape. Do not mix
+  resource and non-resource rules in one chart, and do not mix multiple
+  `identity.resource.class` values in one chart.
+
+Supported rule types:
+
+- `counter`: increments a counter when `on_trap` is committed.
+- `sample`: reads a numeric varbind from `value_from_varbind` on `on_trap`.
+- `state`: sets or clears a gauge using either `problem_trap`/`clear_trap` or
+  `on_trap` plus `state.set_when` and `state.clear_when`.
+  For same-OID state rules, `state.set_when` takes precedence when both
+  `state.set_when` and `state.clear_when` match the same trap.
+
+Canonical rule fields:
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `name` | yes | Stable rule identity, unique after profile merge |
+| `enabled` | no | Defaults to enabled; set `false` in a child profile to disable an inherited rule |
+| `type` | yes | `counter`, `sample`, or `state` |
+| `auto_safe` | no | Allows `profile_metrics.mode: auto` to enable the rule |
+| `on_trap` | yes for `counter`/`sample` | Trap name or numeric OID |
+| `problem_trap` / `clear_trap` | yes for separate-trap `state` | Trap names or numeric OIDs |
+| `where` | no | Predicate list or compact varbind map for filtering |
+| `identity.resource` | no | Bounded resource identity, such as interface index |
+| `value_from_varbind` | yes for `sample` | Symbolic varbind name; must be numeric |
+| `scale.multiplier` / `scale.divisor` | no | Applied to `sample` values before emission |
+| `missing` | no | `drop`, `zero`, `unknown_dimension`, or `error` |
+| `output.metric` | no | Defaults to a deterministic `snmp_trap_*` name |
+| `output.dimension` | no | Defaults to `events`, `value`, or `state` by rule type |
+| `output.chart` | no | Chart ID; defaults from rule name |
+| `state.set_when` / `state.clear_when` | yes for same-OID `state` | Predicate objects used with `on_trap`; `set_when` takes precedence if both match |
+| `state.problem_value` / `state.clear_value` | no | State values; defaults are `1` and `0` |
+| `state.ttl` | no | Positive duration after which state is cleared/expired during `Collect()` |
+| `state.ttl_behavior` | no | Only `clear_and_expire` is supported |
+| `chart_meta` | no | Inline chart definition for compact single-chart rules |
+
+Predicate behavior:
+
+- Multiple `where` predicates are ANDed.
+- Predicates may reference one of the synthetic fields `category`, `severity`,
+  `trap_name`, or `trap_oid`.
+- Varbind predicates must reference varbinds declared on every trap the rule can
+  process; typos fail profile validation instead of silently missing.
+- Each predicate must include at least one condition operator: `equals`, `in`,
+  `exists`, `absent`, `greater_than`, `less_than`, or `range`.
+- Compact map-form `where` is accepted for hand-authored rules, for example
+  `where: { ccmHistoryEventTerminalType: { in: [console, terminal] } }`.
+- `equals` and `in` match enum labels when the referenced varbind has an enum.
+- Numeric predicates support `greater_than`, `less_than`, and inclusive
+  two-value `range`; bounds must be finite numbers and `range` must have
+  exactly two values ordered with `lower <= upper`.
+- Non-finite runtime varbind values such as `NaN` or `Inf` do not match numeric
+  predicates and increment the rule-miss diagnostic.
+- `exists` and `absent` match varbind presence.
+- `not: true` negates a predicate only when the referenced varbind is present;
+  use `absent: true` to match missing varbinds. `not` cannot be combined with
+  `exists` or `absent`.
+
+Missing-value behavior:
+
+- `drop` skips the metric update and increments the rule-miss diagnostic.
+- `zero` is supported only for `sample` rules when absence explicitly means
+  zero. It is not valid for `counter` or `state`; state rules must use explicit
+  set/clear predicates or trap pairs.
+- `unknown_dimension` is supported only with `identity.resource`; it emits the
+  bounded resource ID `unknown`.
+- `error` skips the metric update and increments the extraction-failure
+  diagnostic.
+
+Numeric sample behavior:
+
+- Accepted numeric source types are `INTEGER`, `Integer32`, `Unsigned32`,
+  `Gauge32`, `Counter32`, `Counter64`, and `TimeTicks`.
+- `Counter32`, `Counter64`, and `TimeTicks` are accepted only for sample rules;
+  they are not valid `identity.resource.key_from_varbind` types.
+- `TimeTicks` values are converted from hundredths of seconds to seconds before
+  `scale` is applied.
+- `scale.multiplier` and `scale.divisor` are applied before the metric is
+  emitted. Use chart units and metric names that describe the scaled value.
+- `Counter32` and `Counter64` trap varbinds are treated as absolute
+  trap-reported snapshots. They are not converted into rates from sparse trap
+  arrivals.
+
+Diagnostics are emitted as continuous receiver metrics on the
+`snmp.trap.profile_metric_diagnostics` chart with these dimensions:
+
+- `rule_missed`
+- `extraction_failed`
+- `attribution_failed`
+- `overflow_dropped`
+- `source_transitions`
+
+Diagnostics are listener-scoped receiver metrics. They are not emitted under
+per-device vnode scopes. `attribution_failed` includes cases where
+`identity.unresolved_source: drop_metric_instance` refuses fallback source-label
+emission. `overflow_dropped` is reserved for source, resource, chart, or job
+cardinality caps. `source_transitions` counts when the same raw source maps to a
+different metric identity, for example from fallback source labels to vnode
+scope after enrichment starts resolving the device.
+
+Runtime ordering:
+
+- Profile metrics update only after the trap is successfully committed to the
+  authoritative output backend. When journal and OTLP are both enabled, journal
+  commitment is authoritative and OTLP failures are `otlp_export_failed`
+  export/source errors. When OTLP is the only output backend, OTLP export
+  failures are terminal write failures and also increment
+  `pipeline.write_failed` and source-attributed `source_pipeline.write_failed`
+  when the source is known.
+- Dedup-suppressed traps and write-failed traps do not update profile metrics.
+- Trap-derived samples and states are last-reported values. They are not
+  continuously polled measurements.
+
+Compact aliases are accepted for common hand-authored rules:
+
+- Compact aliases are for operator-authored profiles. Stock and generated
+  profile output should use canonical fields for reviewability.
+- `metric`: alias for `output.metric`
+- `dimension`: alias for `output.dimension`
+- `chart_id`: alias for `output.chart`
+- `value`: alias for `value_from_varbind`
+- `resource.key`: alias for `identity.resource.key_from_varbind`
+- `resource.max`: alias for `identity.resource.max_per_source`
+- `state.varbind` plus `state.set` and `state.clear`: compact same-OID state
+  rule syntax. Both `set` and `clear` are required.
+
+Chart metadata defaults and validation:
+
+- `chart_meta.type` and `charts[].type` default to `line`.
+- Supported chart types are `line`, `area`, `stacked`, and `heatmap`.
+- `chart_meta.algorithm` and `charts[].algorithm` default to `incremental`.
+- `sample` and `state` rule charts must use `algorithm: absolute`.
+- `counter` rule charts must use `algorithm: incremental`.
+
+Example compact counter rule with inline chart metadata:
+
+```yaml
+metrics:
+  - name: cisco.config.changed
+    type: counter
+    auto_safe: true
+    on_trap: CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged
+    metric: snmp_trap_cisco_config_events
+    chart_id: cisco_config_changes
+    chart_meta:
+      title: Cisco configuration changes
+      context: snmp.trap.cisco.config.changes
+      units: events/s
+      algorithm: incremental
+```
+
+Example per-resource counter rule:
+
+```yaml
+metrics:
+  - name: cisco.port_security.ifindex
+    type: counter
+    on_trap: CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation
+    resource:
+      class: interface
+      key: ifIndex
+      max: 48
+    output:
+      metric: snmp_trap_cisco_port_security_violations
+      dimension: violations
+      chart: port_security_violations
+
+charts:
+  - id: port_security_violations
+    title: Port security violations
+    context: snmp.trap.cisco.port.security.violations
+    units: events/s
+    algorithm: incremental
+```
+
+Profile metric validation rejects:
+
+- unknown `metrics:` or `charts:` fields;
+- duplicate rule names or chart IDs after merge;
+- unknown traps or varbind references;
+- sample rules that read non-numeric varbinds;
+- negative `scale.multiplier` and non-positive `scale.divisor`;
+- invalid predicate combinations such as `not` with `exists` or `absent`;
+- metric names that collide with built-in SNMP trap metric prefixes;
+- chart IDs or contexts that collide with built-in SNMP trap charts.
+- chart algorithms other than `incremental` or `absolute`.
+
+Reserved metric name prefixes:
+
+- `snmp_trap_events_`
+- `snmp_trap_severity_`
+- `snmp_trap_errors_`
+- `snmp_trap_dedup_`
+- `snmp_trap_pipeline_`
+- `snmp_trap_source_`
+- `snmp_trap_sources_`
+- `snmp_trap_metric_`
+- `snmp_trap_profile_metrics_`
+
+Built-in source receiver metrics are automatic. Profile authors should not
+recreate receiver pipeline health with profile rules; use profile metrics for
+vendor or site semantics, such as trap-derived state, counters, and bounded
+resource samples.
 
 ### Trap entries (`traps:` list)
 
@@ -356,7 +694,9 @@ The plugin loader mirrors the SNMP polling plugin's multipath pattern
    whole file to customize one vendor.
 2. **Different filename adds entries.** Operator `site-additions.yaml`
    (different filename) merges its `traps:` into the loaded set without
-   touching stock files.
+   touching stock files. Metric-only site profiles can also use a different
+   filename and reference stock traps by MIB-qualified trap name in
+   `on_trap`, `problem_trap`, or `clear_trap`.
 3. **`extends:` chain field-merge** (when an override profile lists
    `extends: [_base.yaml, other-base.yaml]`): entries must be YAML filenames
    only, not paths. The loader merges trap
@@ -394,9 +734,9 @@ traps:
       change_window: business_hours
 ```
 
-Per-OID metric opt-in (turning a trap into a dedicated chart for alerting)
-lives in plugin configuration (`go.d/snmp_traps.conf`), **not** in profiles.
-This keeps profiles vendor-curated and installation-agnostic.
+Per-OID metric extraction lives in profile `metrics:` and `charts:` sections.
+Listener jobs only enable/select those profile rules and choose identity,
+privacy, and cardinality limits through `profile_metrics`.
 
 ## Generated stock profiles
 

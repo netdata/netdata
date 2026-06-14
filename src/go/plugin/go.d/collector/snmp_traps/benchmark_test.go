@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 )
 
@@ -247,6 +248,278 @@ func reportDrops(b *testing.B, packets, entries int64) {
 	if packets > 0 {
 		b.ReportMetric(100*float64(drops)/float64(packets), "drop_pct")
 	}
+}
+
+// BenchmarkProfileMetricRuntimeUpdateAndCollect exercises the profile-metric
+// hot path near configured caps: rule evaluation, hash-mode source identity,
+// resource cap checks, state updates, metric collection, and TTL sweep.
+func BenchmarkProfileMetricRuntimeUpdateAndCollect(b *testing.B) {
+	idx := benchmarkProfileMetricIndex(b)
+	cfg, err := normalizeProfileMetricsConfig(ProfileMetricsConfig{
+		Enabled: true,
+		Mode:    profileMetricModeExact,
+		Include: []string{
+			"bench.config.changed",
+			"bench.config.terminal_type",
+			"bench.config.console_state",
+			"bench.port_security.ifindex",
+		},
+		Identity: ProfileMetricIdentityConfig{
+			SourceIDPrivacy: profileMetricSourceIDHash,
+		},
+		Limits: ProfileMetricLimitsConfig{
+			MaxRules:              4,
+			MaxSources:            64,
+			MaxResourcesPerSource: 32,
+			MaxInstancesPerJob:    4096,
+		},
+	})
+	if err != nil {
+		b.Fatalf("normalizeProfileMetricsConfig: %v", err)
+	}
+	rt, _, err := newProfileMetricRuntime(cfg, idx)
+	if err != nil {
+		b.Fatalf("newProfileMetricRuntime: %v", err)
+	}
+	store := metrix.NewCollectorStore()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	if !ok {
+		b.Fatal("metrix.AsCycleManagedStore returned false")
+	}
+
+	const (
+		nearMaxSources   = 63
+		nearMaxResources = 31
+	)
+	for i := range nearMaxSources {
+		rt.update(benchmarkProfileMetricConfigTrapEntry("bench-profile", benchmarkSourceIP(i), 2))
+	}
+	for i := range nearMaxResources {
+		rt.update(benchmarkProfileMetricPortTrapEntry("bench-profile", "10.254.0.1", i+1))
+	}
+
+	entries := make([]*TrapEntry, 0, nearMaxSources+nearMaxResources)
+	for i := range nearMaxSources {
+		terminalType := 2
+		if i%2 == 1 {
+			terminalType = 3
+		}
+		entries = append(entries, benchmarkProfileMetricConfigTrapEntry("bench-profile", benchmarkSourceIP(i), terminalType))
+	}
+	for i := range nearMaxResources {
+		entries = append(entries, benchmarkProfileMetricPortTrapEntry("bench-profile", "10.254.0.1", i+1))
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rt.update(entries[i%len(entries)])
+		managed.CycleController().BeginCycle()
+		rt.collect(store, "bench-profile")
+		if err := managed.CycleController().CommitCycleSuccess(); err != nil {
+			b.Fatalf("CommitCycleSuccess: %v", err)
+		}
+	}
+	b.StopTimer()
+
+	rt.mu.Lock()
+	seriesCount := len(rt.series)
+	sourceCount := len(rt.sources)
+	resourceGroupCount := len(rt.resources)
+	rt.mu.Unlock()
+	b.ReportMetric(float64(seriesCount), "series")
+	b.ReportMetric(float64(sourceCount), "sources")
+	b.ReportMetric(float64(resourceGroupCount), "resource_groups")
+	if elapsed := b.Elapsed().Seconds(); elapsed > 0 {
+		b.ReportMetric(float64(b.N)/elapsed, "cycles/s")
+	}
+}
+
+// BenchmarkPipelineSourceMetricsUpdateAndCollect exercises the built-in
+// receiver/pipeline source-metric hot path near the internal source cap.
+func BenchmarkPipelineSourceMetricsUpdateAndCollect(b *testing.B) {
+	const jobName = "bench-pipeline"
+	metrics := &perJobMetrics{}
+	store := metrix.NewCollectorStore()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	if !ok {
+		b.Fatal("metrix.AsCycleManagedStore returned false")
+	}
+
+	entries := make([]*TrapEntry, 0, defaultPipelineMetricMaxSources)
+	for i := range defaultPipelineMetricMaxSources {
+		entries = append(entries, &TrapEntry{
+			JobName:  jobName,
+			SourceIP: benchmarkSourceIP(i),
+			Severity: "warning",
+		})
+	}
+	for i := range defaultPipelineMetricMaxSources - 1 {
+		metrics.recordSourceAccepted(entries[i])
+		metrics.recordSourceCommitted(entries[i])
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		entry := entries[i%len(entries)]
+		metrics.recordSourceAccepted(entry)
+		metrics.recordSourceCommitted(entry)
+		managed.CycleController().BeginCycle()
+		collectSourceMetrics(store, jobName, metrics)
+		if err := managed.CycleController().CommitCycleSuccess(); err != nil {
+			b.Fatalf("CommitCycleSuccess: %v", err)
+		}
+	}
+	b.StopTimer()
+
+	metrics.sourceMu.Lock()
+	sourceCount := len(metrics.sources)
+	overflowDropped := metrics.sourceDiagnostics.overflowDropped
+	metrics.sourceMu.Unlock()
+	b.ReportMetric(float64(sourceCount), "sources")
+	b.ReportMetric(float64(overflowDropped), "overflow_dropped")
+	if elapsed := b.Elapsed().Seconds(); elapsed > 0 {
+		b.ReportMetric(float64(b.N)/elapsed, "cycles/s")
+	}
+}
+
+func benchmarkProfileMetricIndex(b testing.TB) *ProfileIndex {
+	b.Helper()
+	idx := &ProfileIndex{
+		trapsByOID:      make(map[string]*TrapDef),
+		namesByTrapName: make(map[string]*TrapDef),
+	}
+	traps := []*TrapDef{
+		{
+			OID:      testCiscoConfigTrapOID,
+			Name:     "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
+			Category: "config_change",
+			Severity: "notice",
+			sharedVarbinds: map[string]*VarbindDef{
+				testCiscoTerminalTypeOID: {
+					OID:     testCiscoTerminalTypeOID,
+					Type:    "INTEGER",
+					rawName: testCiscoTerminalTypeVarbind,
+					Enum: map[string]string{
+						"1": "none",
+						"2": "console",
+						"3": "virtual",
+						"4": "aux",
+					},
+				},
+				sysUpTimeOID: {
+					OID:     sysUpTimeOID,
+					Type:    "TimeTicks",
+					rawName: "sysUpTime.0",
+				},
+			},
+		},
+		{
+			OID:      testPortSecurityTrapOID,
+			Name:     "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
+			Category: "security",
+			Severity: "warning",
+			sharedVarbinds: map[string]*VarbindDef{
+				testIfIndexOID: {
+					OID:         testIfIndexOID,
+					Type:        "INTEGER",
+					rawName:     "ifIndex",
+					Constraints: "(1..48)",
+				},
+			},
+		},
+	}
+	if err := idx.addTraps(traps); err != nil {
+		b.Fatalf("addTraps: %v", err)
+	}
+
+	rules := []profileMetricRule{
+		{
+			Name:       "bench.config.changed",
+			Type:       profileMetricTypeCounter,
+			OnTrap:     testCiscoConfigTrapOID,
+			Output:     profileMetricOutput{Metric: "snmp_trap_bench_config_events", Dimension: "events", Chart: "bench_config_changes"},
+			sourceFile: "benchmark-profile.yaml",
+		},
+		{
+			Name:             "bench.config.terminal_type",
+			Type:             profileMetricTypeSample,
+			OnTrap:           testCiscoConfigTrapOID,
+			ValueFromVarbind: testCiscoTerminalTypeVarbind,
+			Output:           profileMetricOutput{Metric: "snmp_trap_bench_terminal_type", Dimension: "terminal_type", Chart: "bench_terminal_type"},
+			sourceFile:       "benchmark-profile.yaml",
+		},
+		{
+			Name:   "bench.config.console_state",
+			Type:   profileMetricTypeState,
+			OnTrap: testCiscoConfigTrapOID,
+			State: profileMetricState{
+				SetWhen:   &profileMetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "console"},
+				ClearWhen: &profileMetricPredicate{Varbind: testCiscoTerminalTypeVarbind, Equals: "virtual"},
+				TTL:       "1ns",
+			},
+			Output:     profileMetricOutput{Metric: "snmp_trap_bench_console_state", Dimension: "active", Chart: "bench_console_state"},
+			sourceFile: "benchmark-profile.yaml",
+		},
+		{
+			Name:       "bench.port_security.ifindex",
+			Type:       profileMetricTypeCounter,
+			OnTrap:     testPortSecurityTrapOID,
+			Identity:   profileMetricIdentity{Resource: &profileMetricResource{Class: "interface", KeyFromVarbind: "ifIndex", MaxPerSource: 32}},
+			Output:     profileMetricOutput{Metric: "snmp_trap_bench_port_security_violations", Dimension: "violations", Chart: "bench_port_security"},
+			sourceFile: "benchmark-profile.yaml",
+		},
+	}
+	charts := []profileMetricChart{
+		{ID: "bench_config_changes", Title: "Benchmark config changes", Context: "snmp.trap.bench.config.changes", Units: "events/s", Algorithm: "incremental", sourceFile: "benchmark-profile.yaml"},
+		{ID: "bench_terminal_type", Title: "Benchmark terminal type", Context: "snmp.trap.bench.terminal.type", Units: "type", Algorithm: "absolute", sourceFile: "benchmark-profile.yaml"},
+		{ID: "bench_console_state", Title: "Benchmark console state", Context: "snmp.trap.bench.console.state", Units: "state", Algorithm: "absolute", sourceFile: "benchmark-profile.yaml"},
+		{ID: "bench_port_security", Title: "Benchmark port security", Context: "snmp.trap.bench.port.security", Units: "events/s", Algorithm: "incremental", sourceFile: "benchmark-profile.yaml"},
+	}
+	if err := idx.addProfileMetrics(rules, charts); err != nil {
+		b.Fatalf("addProfileMetrics: %v", err)
+	}
+	return idx
+}
+
+func benchmarkProfileMetricConfigTrapEntry(jobName, sourceIP string, terminalType int) *TrapEntry {
+	return &TrapEntry{
+		JobName:       jobName,
+		TrapOID:       testCiscoConfigTrapOID,
+		TrapName:      "CISCO-CONFIG-MAN-MIB::ccmCLIRunningConfigChanged",
+		SourceIP:      sourceIP,
+		SourceUDPPeer: sourceIP,
+		Enrichment: &TrapEnrichmentAudit{Source: &TrapSourceAudit{
+			Selected: sourceIP,
+			Method:   "udp_peer",
+		}},
+		Varbinds: []VarbindValue{
+			{OID: testCiscoTerminalTypeOID, Type: "INTEGER", Value: terminalType},
+			{OID: sysUpTimeOID, Type: "TimeTicks", Value: uint64(12345)},
+		},
+	}
+}
+
+func benchmarkProfileMetricPortTrapEntry(jobName, sourceIP string, ifIndex int) *TrapEntry {
+	return &TrapEntry{
+		JobName:       jobName,
+		TrapOID:       testPortSecurityTrapOID,
+		TrapName:      "CISCO-PORT-SECURITY-MIB::cpsSecureMacAddrViolation",
+		SourceIP:      sourceIP,
+		SourceUDPPeer: sourceIP,
+		Enrichment: &TrapEnrichmentAudit{Source: &TrapSourceAudit{
+			Selected: sourceIP,
+			Method:   "udp_peer",
+		}},
+		Varbinds: []VarbindValue{
+			{OID: testIfIndexOID, Type: "INTEGER", Value: ifIndex},
+		},
+	}
+}
+
+func benchmarkSourceIP(i int) string {
+	return fmt.Sprintf("10.%d.%d.%d", 100+(i/65025), (i/255)%255, i%255+1)
 }
 
 // ---------------------------------------------------------------------------

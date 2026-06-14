@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -31,11 +32,62 @@ func TestCollectorChartTemplateYAMLChartsDeclareAlgorithms(t *testing.T) {
 		"severity",
 		"errors",
 		"dedup_suppressed",
+		"pipeline",
+		"source_attribution",
+		"source_pipeline",
+		"source_errors",
 	} {
 		chart, ok := charts[id]
 		require.Truef(t, ok, "missing chart %q", id)
 		assert.Equalf(t, "incremental", chart.Algorithm, "chart %q algorithm", id)
 	}
+	for _, id := range []string{
+		"sources",
+		"source_last_seen",
+	} {
+		chart, ok := charts[id]
+		require.Truef(t, ok, "missing chart %q", id)
+		assert.Equalf(t, "absolute", chart.Algorithm, "chart %q algorithm", id)
+	}
+}
+
+func TestCollectorChartTemplateYAMLIncludesProfileMetricCharts(t *testing.T) {
+	idx := testProfileMetricIndex(t)
+	cfg, err := normalizeProfileMetricsConfig(ProfileMetricsConfig{
+		Enabled: true,
+		Mode:    profileMetricModeExact,
+		Include: []string{"cisco.config.changed"},
+		Identity: ProfileMetricIdentityConfig{
+			SourceIDPrivacy: profileMetricSourceIDRaw,
+		},
+	})
+	require.NoError(t, err)
+
+	rt, tmpl, err := newProfileMetricRuntime(cfg, idx)
+	require.NoError(t, err)
+	require.NotNil(t, rt)
+	require.NotEmpty(t, tmpl)
+
+	c := New()
+	c.profileMetrics = rt
+	c.dynamicChartYAML = tmpl
+
+	collecttest.AssertChartTemplateSchema(t, c.ChartTemplateYAML())
+	charts := chartTemplatesByIDFromYAML(t, c.ChartTemplateYAML())
+	assert.Contains(t, charts, "profile_metric_diagnostics")
+	assert.Contains(t, charts, "cisco_config_changes")
+
+	spec, err := charttpl.DecodeYAML([]byte(c.ChartTemplateYAML()))
+	require.NoError(t, err)
+	program, err := chartengine.Compile(spec, 1)
+	require.NoError(t, err)
+
+	contexts := make(map[string]bool)
+	for _, chart := range program.Charts() {
+		contexts[chart.Meta.Context] = true
+	}
+	assert.Contains(t, contexts, "snmp.trap.profile_metric_diagnostics")
+	assert.Contains(t, contexts, "snmp.trap.cisco.config.changes")
 }
 
 func TestCollectorRegistrationAvailableByDefault(t *testing.T) {
@@ -97,7 +149,7 @@ func TestConfigSchemaDynCfgListFieldsHaveSafeDefaults(t *testing.T) {
 		{name: "source.trusted_relays", path: []string{"jsonSchema", "properties", "source", "properties", "trusted_relays"}},
 		{name: "dedup.key_varbinds", path: []string{"jsonSchema", "properties", "dedup", "properties", "key_varbinds"}},
 		{name: "overrides", path: []string{"jsonSchema", "properties", "overrides"}},
-		{name: "metrics", path: []string{"jsonSchema", "properties", "metrics"}},
+		{name: "profile_metrics.include", path: []string{"jsonSchema", "properties", "profile_metrics", "properties", "include"}},
 	} {
 		wantDefault := tc.wantDefault
 		if wantDefault == nil {
@@ -125,6 +177,9 @@ func TestConfigSchemaDynCfgObjectFieldsHaveSafeDefaults(t *testing.T) {
 		{name: "otlp", path: []string{"jsonSchema", "properties", "otlp"}},
 		{name: "retention", path: []string{"jsonSchema", "properties", "retention"}},
 		{name: "overrides.labels", path: []string{"jsonSchema", "properties", "overrides", "items", "properties", "labels"}},
+		{name: "profile_metrics", path: []string{"jsonSchema", "properties", "profile_metrics"}},
+		{name: "profile_metrics.identity", path: []string{"jsonSchema", "properties", "profile_metrics", "properties", "identity"}},
+		{name: "profile_metrics.limits", path: []string{"jsonSchema", "properties", "profile_metrics", "properties", "limits"}},
 	} {
 		prop := schemaProperty(t, schema, tc.path...)
 		require.Containsf(t, prop, "default", "schema property %q has no default", tc.name)
@@ -194,7 +249,7 @@ func TestConfigSchemaDynCfgTabsRenderAllTopLevelFieldsOnce(t *testing.T) {
 		{title: "Outputs", fields: []string{"journal", "otlp"}},
 		{title: "Storage", fields: []string{"retention"}},
 		{title: "Enrichment", fields: []string{"reverse_dns", "overrides"}},
-		{title: "Metrics", fields: []string{"metrics"}},
+		{title: "Metrics", fields: []string{"profile_metrics"}},
 	}
 	require.Len(t, tabsRaw, len(wantTabs))
 
