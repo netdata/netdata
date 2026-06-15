@@ -32,7 +32,7 @@ fi
 # Use cygpath directly within the heredoc
 cat << EOF > "$temp_bat"
 @echo off
-set "PATH=%SYSTEMROOT%;${win_sdk_path};${vs_sdk_path}"
+set "PATH=%SystemRoot%\System32;${win_sdk_path};${vs_sdk_path}"
 call "$(cygpath -w -a "$SCRIPT_DIR/wevt_netdata_compile.bat")" "$(cygpath -w -a "$src_dir")" "$(cygpath -w -a "$dest_dir")"
 EOF
 

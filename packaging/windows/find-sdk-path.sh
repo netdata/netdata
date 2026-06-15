@@ -73,10 +73,68 @@ find_sdk_tools() {
 
 # Function to find tools in Visual Studio
 find_visual_studio_tools() {
-  versions=("2026" "2022")
-  found=0
+  # vswhere.exe is the Microsoft-recommended way to locate VS installations,
+  # guaranteed present on any machine with VS or VS Build Tools installed.
+  local vswhere_path="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
 
-  for version in "${versions[@]}"; do
+  if [ -f "$vswhere_path" ]; then
+    echo "Checking for Visual Studio via vswhere.exe..." >&2
+    local vs_install_path
+    vs_install_path=$("$vswhere_path" -latest -products '*' \
+      -requires 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64' \
+      -property installationPath 2>/dev/null | tr -d '\r\n')
+
+    if [ -z "$vs_install_path" ]; then
+      # Retry without component filter for stripped installs or Build Tools
+      vs_install_path=$("$vswhere_path" -latest -products '*' \
+        -property installationPath 2>/dev/null | tr -d '\r\n')
+    fi
+
+    if [ -n "$vs_install_path" ]; then
+      local vs_unix_path msvc_tools_dir latest_msvc tool_path
+      vs_unix_path=$(cygpath -u "$vs_install_path")
+      msvc_tools_dir="$vs_unix_path/VC/Tools/MSVC"
+
+      if [ -d "$msvc_tools_dir" ]; then
+        latest_msvc=$(ls "$msvc_tools_dir" | grep -E "^[0-9]+\." | sort -V | tail -n 1)
+        if [ -n "$latest_msvc" ]; then
+          tool_path="$msvc_tools_dir/$latest_msvc/bin/Hostx64/x64"
+          if [ -f "$tool_path/link.exe" ]; then
+            echo "Found VS tools via vswhere in: \"$tool_path\"" >&2
+            echo "$tool_path"
+            return 0
+          fi
+        fi
+      fi
+      echo "WARNING: vswhere found VS at \"$vs_install_path\" but VC tools not available there." >&2
+    else
+      echo "WARNING: vswhere.exe found no VS installations with VC tools." >&2
+    fi
+  else
+    echo "WARNING: vswhere.exe not found at \"$vswhere_path\", falling back to directory scan." >&2
+  fi
+
+  # Fall back: scan available year directories instead of using a fixed list
+  local vs_base_path="/c/Program Files/Microsoft Visual Studio"
+  if [ ! -d "$vs_base_path" ]; then
+    echo "ERROR: Visual Studio base path \"$vs_base_path\" does not exist." >&2
+    echo "$system_root"
+    return 1
+  fi
+
+  local available_versions
+  available_versions=$(ls "$vs_base_path" | grep -E "^[0-9]{4}$" | sort -V -r)
+  if [ -z "$available_versions" ]; then
+    echo "ERROR: No Visual Studio year directories found in \"$vs_base_path\"." >&2
+    echo "$system_root"
+    return 1
+  fi
+
+  echo "Found VS year directories: $(echo "$available_versions" | tr '\n' ' ')" >&2
+
+  local found=0
+  local tool_path_candidate
+  for version in $available_versions; do
     if tool_path_candidate="$(check_visual_studio_version "${version}")"; then
       echo "${tool_path_candidate}"
       found=1
@@ -85,7 +143,8 @@ find_visual_studio_tools() {
   done
 
   if [ "${found}" -ne 1 ]; then
-    echo "ERROR: Failed to find a usable version of Visual Studio"
+    echo "ERROR: Failed to find a usable version of Visual Studio" >&2
+    echo "$system_root"
     return 1
   fi
 }
@@ -214,21 +273,21 @@ fi
 
 # Determine which function to call based on the search mode
 if [ "$search_mode" = "sdk" ]; then
-  tool_path=$(find_sdk_tools)
-else
-  tool_path=$(find_visual_studio_tools)
-fi
-
-# If a valid path is found, output it
-if [ "$tool_path" != "$system_root" ]; then
-  if [ "$windows_format" -eq 1 ]; then
-    windows_tool_path=$(convert_to_windows_format "$tool_path")
-    echo "$windows_tool_path"
-  else
-    echo "$tool_path"
+  if ! tool_path=$(find_sdk_tools); then
+    exit 1
   fi
 else
-  exit 1
+  if ! tool_path=$(find_visual_studio_tools); then
+    exit 1
+  fi
+fi
+
+# Output the discovered path
+if [ "$windows_format" -eq 1 ]; then
+  windows_tool_path=$(convert_to_windows_format "$tool_path")
+  echo "$windows_tool_path"
+else
+  echo "$tool_path"
 fi
 
 exit 0
