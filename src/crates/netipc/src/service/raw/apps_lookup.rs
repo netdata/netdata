@@ -23,6 +23,17 @@ impl RawClient {
         &mut self,
         pids: &[u32],
     ) -> Result<AppsLookupResponseView<'_>, NipcError> {
+        self.call_apps_lookup_with_timeout(pids, 0)
+    }
+
+    /// Blocking typed call with an explicit timeout in milliseconds.
+    ///
+    /// A zero timeout uses the client's context-level default.
+    pub fn call_apps_lookup_with_timeout(
+        &mut self,
+        pids: &[u32],
+        timeout_ms: u32,
+    ) -> Result<AppsLookupResponseView<'_>, NipcError> {
         self.validate_method(METHOD_APPS_LOOKUP)?;
 
         let dir_size = pids
@@ -41,8 +52,12 @@ impl RawClient {
             let req_buf = self.request_scratch(req_size);
             protocol::encode_apps_lookup_request(pids, req_buf)?
         };
-        let response =
-            self.raw_call_with_retry(METHOD_APPS_LOOKUP, req_len, RawCallKind::single())?;
+        let response = self.raw_call_with_retry_timeout(
+            METHOD_APPS_LOOKUP,
+            req_len,
+            RawCallKind::single(),
+            timeout_ms,
+        )?;
         let view = AppsLookupResponseView::decode(self.response_payload(response)?)?;
         if view.item_count != pids.len() as u32 {
             return Err(NipcError::BadItemCount);

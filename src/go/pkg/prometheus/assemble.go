@@ -31,6 +31,25 @@ type assemblyKey struct {
 	hash uint64
 }
 
+// Assemble folds a (possibly relabeled) SampleBatch into typed MetricFamilies
+// using a fresh assembler. Each sample's Kind/FamilyType drives folding; labels
+// are copied into the result, so the returned families do not alias the batch.
+func Assemble(batch SampleBatch) (MetricFamilies, error) {
+	var a assembler
+	a.reset()
+
+	for _, h := range batch.Help {
+		a.applyHelp(h.Name, h.Help)
+	}
+	for _, s := range batch.Samples {
+		if err := a.applySample(s); err != nil {
+			return nil, err
+		}
+	}
+
+	return a.families(), nil
+}
+
 func (a *assembler) reset() {
 	a.currName = ""
 	a.currFamily = nil

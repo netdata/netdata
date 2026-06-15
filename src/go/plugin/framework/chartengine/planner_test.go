@@ -1367,12 +1367,69 @@ groups:
 		break
 	}
 	require.NotNil(t, createdDim)
-	assert.False(t, createdDim.Float)
+	// The series is registered WithFloat, and template dims now inherit that float
+	// hint from the metric meta (as autogen does), so the dim renders at full precision.
+	assert.True(t, createdDim.Float)
 	update := findUpdateAction(plan)
 	require.NotNil(t, update)
 	require.Len(t, update.Values, 1)
-	assert.False(t, update.Values[0].IsFloat)
-	assert.Equal(t, int64(10), update.Values[0].Int64)
+	assert.True(t, update.Values[0].IsFloat)
+	assert.Equal(t, float64(10), update.Values[0].Float64)
+}
+
+// TestBuildPlanTemplateDimFloatFromMetricMeta pins the additive float contract for
+// template dimensions: a dim binding a metric the collector marked float (WithFloat)
+// renders float via meta inheritance, while a dim binding a plain metric (no WithFloat,
+// no options.float) stays int.
+func TestBuildPlanTemplateDimFloatFromMetricMeta(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: svc
+    metrics:
+      - svc.floaty_total
+      - svc.inty_total
+    charts:
+      - id: svc_mixed
+        title: Mixed
+        context: mixed
+        units: units
+        dimensions:
+          - selector: svc.floaty_total
+            name: floaty
+          - selector: svc.inty_total
+            name: inty
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	floaty := sm.Counter("floaty_total", metrix.WithFloat(true))
+	inty := sm.Counter("inty_total")
+	ls := sm.LabelSet(metrix.Label{Key: "id", Value: "a"})
+
+	cc.BeginCycle()
+	floaty.ObserveTotal(3, ls)
+	inty.ObserveTotal(7, ls)
+	cc.CommitCycleSuccess()
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	update := findUpdateAction(plan)
+	require.NotNil(t, update)
+	gotFloat := map[string]bool{}
+	for _, v := range update.Values {
+		gotFloat[v.Name] = v.IsFloat
+	}
+	require.Contains(t, gotFloat, "floaty")
+	require.Contains(t, gotFloat, "inty")
+	assert.True(t, gotFloat["floaty"], "WithFloat metric should render float via meta inheritance")
+	assert.False(t, gotFloat["inty"], "plain metric with no options.float should stay int")
 }
 
 func runTestBuildPlanAutogenStrictOverflowDrop(t *testing.T) {

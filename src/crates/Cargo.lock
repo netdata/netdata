@@ -394,6 +394,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "block-buffer"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cdd35008169921d80bc60d3d0ab416eecb028c4cd653352907921d95084790be"
+dependencies = [
+ "hybrid-array",
+]
+
+[[package]]
 name = "bridge"
 version = "0.1.3"
 dependencies = [
@@ -635,10 +644,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "531185e432bb31db1ecda541e9e7ab21468d4d844ad7505e0546a49b4945d49b"
 dependencies = [
  "cfg-if",
- "cpufeatures",
+ "cpufeatures 0.2.17",
  "proptest",
  "serde_core",
 ]
+
+[[package]]
+name = "const-oid"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
 
 [[package]]
 name = "core-foundation"
@@ -672,6 +687,15 @@ name = "cpufeatures"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "cpufeatures"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b2a41393f66f16b0823bb79094d54ac5fbd34ab292ddafb9a0456ac9f87d201"
 dependencies = [
  "libc",
 ]
@@ -745,6 +769,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "crypto-common"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce6e4c961d6cd6c9a86db418387425e8bdeaf05b3c8bc1411e6dca4c252f1453"
+dependencies = [
+ "hybrid-array",
+]
+
+[[package]]
 name = "ctor"
 version = "0.1.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -806,8 +839,20 @@ version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
- "block-buffer",
- "crypto-common",
+ "block-buffer 0.10.4",
+ "crypto-common 0.1.7",
+ "subtle",
+]
+
+[[package]]
+name = "digest"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1dd6dbb5841937940781866fa1281a1ff7bd3bf827091440879f9994983d5c2"
+dependencies = [
+ "block-buffer 0.12.0",
+ "const-oid",
+ "crypto-common 0.2.2",
 ]
 
 [[package]]
@@ -1376,6 +1421,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "242402749acf71e6f32f5857598b7002c4058a4e3c3b22b4c7d51cab9aea754e"
 
 [[package]]
+name = "hmac"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
+dependencies = [
+ "digest 0.10.7",
+]
+
+[[package]]
 name = "http"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1434,6 +1488,15 @@ checksum = "57a3db5ea5923d99402c94e9feb261dc5ee9b4efa158b0315f788cf549cc200c"
 dependencies = [
  "humantime",
  "serde",
+]
+
+[[package]]
+name = "hybrid-array"
+version = "0.4.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9155a582abd142abc056962c29e3ce5ff2ad5469f4246b537ed42c5deba857da"
+dependencies = [
+ "typenum",
 ]
 
 [[package]]
@@ -1925,8 +1988,8 @@ dependencies = [
  "journal-common",
  "journal-registry",
  "libc",
- "lz4_flex",
- "lzma-rust2",
+ "lz4_flex 0.12.1",
+ "lzma-rust2 0.15.7",
  "md5",
  "memmap2",
  "nix 0.30.1",
@@ -2019,7 +2082,7 @@ dependencies = [
  "journal-core",
  "journal-registry",
  "regex",
- "roaring",
+ "roaring 0.11.2",
  "serde",
  "static_assertions",
  "tempfile",
@@ -2187,13 +2250,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98c23545df7ecf1b16c303910a69b079e8e251d60f7dd2cc9b4177f2afaf1746"
 
 [[package]]
+name = "lz4_flex"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ef0d4ed8669f8f8826eb00dc878084aa8f253506c4fd5e8f58f5bce72ddb97e"
+
+[[package]]
 name = "lzma-rust2"
 version = "0.15.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1670343e58806300d87950e3401e820b519b9384281bbabfb15e3636689ffd69"
 dependencies = [
  "crc",
- "sha2",
+ "sha2 0.10.9",
+]
+
+[[package]]
+name = "lzma-rust2"
+version = "0.16.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce716bf1a316f47a280fc76295f6495b5bea4752bca01c3b3885e101b1c23c02"
+dependencies = [
+ "sha2 0.11.0",
 ]
 
 [[package]]
@@ -2469,12 +2547,6 @@ dependencies = [
  "jaq-core",
  "jaq-json",
  "jaq-std",
- "journal-common",
- "journal-core",
- "journal-engine",
- "journal-index",
- "journal-log-writer",
- "journal-registry",
  "libc",
  "maxminddb",
  "memchr",
@@ -2492,7 +2564,7 @@ dependencies = [
  "regex",
  "reqwest 0.13.2",
  "rmp-serde",
- "roaring",
+ "roaring 0.11.2",
  "rt",
  "rustc-hash",
  "schemars",
@@ -2501,6 +2573,12 @@ dependencies = [
  "serde_yaml",
  "sflow-parser",
  "socket2 0.6.3",
+ "systemd-journal-sdk-common",
+ "systemd-journal-sdk-core",
+ "systemd-journal-sdk-engine",
+ "systemd-journal-sdk-index",
+ "systemd-journal-sdk-log-writer",
+ "systemd-journal-sdk-registry",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
@@ -3660,6 +3738,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "roaring"
+version = "0.11.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1dedc5658c6ecb3bdb5ef5f3295bb9253f42dcf3fd1402c03f6b1f7659c3c4a9"
+dependencies = [
+ "bytemuck",
+ "byteorder",
+ "serde",
+]
+
+[[package]]
 name = "rt"
 version = "0.1.3"
 dependencies = [
@@ -3800,9 +3889,9 @@ dependencies = [
 
 [[package]]
 name = "ruzstd"
-version = "0.8.2"
+version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5ff0cc5e135c8870a775d3320910cd9b564ec036b4dc0b8741629020be63f01"
+checksum = "a7c1c839d570d835527c9a5e4db7cb2198683a988cb9d7293fc8674e6bd58fc8"
 dependencies = [
  "twox-hash",
 ]
@@ -4009,8 +4098,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
 dependencies = [
  "cfg-if",
- "cpufeatures",
- "digest",
+ "cpufeatures 0.2.17",
+ "digest 0.10.7",
+]
+
+[[package]]
+name = "sha2"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "446ba717509524cb3f22f17ecc096f10f4822d76ab5c0b9822c5f9c284e825f4"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.0",
+ "digest 0.11.3",
 ]
 
 [[package]]
@@ -4179,6 +4279,135 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "systemd-journal-sdk-common"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1840de1963100b920cfe33724c77d350a63f1967ebc67711022099f08226275"
+dependencies = [
+ "libc",
+ "rustc-hash",
+ "serde",
+ "uuid",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "systemd-journal-sdk-core"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c277c0acd0800c0678fe38a15bc7e4786eb772e01052ab1e628023a8453076ae"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "crossbeam-channel",
+ "hashers",
+ "hmac",
+ "libc",
+ "lz4_flex 0.13.1",
+ "lzma-rust2 0.16.4",
+ "md5",
+ "memmap2",
+ "notify",
+ "num-bigint",
+ "parking_lot",
+ "rand 0.9.2",
+ "regex",
+ "rustc-hash",
+ "ruzstd",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "siphasher",
+ "static_assertions",
+ "systemd-journal-sdk-common",
+ "systemd-journal-sdk-registry",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "twox-hash",
+ "uuid",
+ "walkdir",
+ "windows-sys 0.61.2",
+ "zerocopy 0.9.0-alpha.0",
+ "zstd",
+]
+
+[[package]]
+name = "systemd-journal-sdk-engine"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "beb46ca836ac762f9bee6b0a1f68a7ce0932a2af696911b365830622bac15704"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "foyer",
+ "futures",
+ "lru",
+ "parking_lot",
+ "rayon",
+ "serde",
+ "serde_json",
+ "static_assertions",
+ "systemd-journal-sdk-core",
+ "systemd-journal-sdk-index",
+ "systemd-journal-sdk-registry",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "systemd-journal-sdk-index"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4121207d6d8c0756338fd8a9b76416f17e2f93ba2af81696b0f780c77b2bc877"
+dependencies = [
+ "regex",
+ "roaring 0.11.4",
+ "serde",
+ "static_assertions",
+ "systemd-journal-sdk-common",
+ "systemd-journal-sdk-core",
+ "systemd-journal-sdk-registry",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
+name = "systemd-journal-sdk-log-writer"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88ef67ce2874b5ddeec41e0232b79758f1a371eb676b61a0f7edf7c8fe7c47e4"
+dependencies = [
+ "itoa",
+ "systemd-journal-sdk-common",
+ "systemd-journal-sdk-core",
+ "systemd-journal-sdk-registry",
+ "thiserror 2.0.18",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "systemd-journal-sdk-registry"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "480f7f6d6044b85e0b7b9949ff8a689c10fdd65a3c148098583e6d5c8a1a440a"
+dependencies = [
+ "notify",
+ "parking_lot",
+ "serde",
+ "systemd-journal-sdk-common",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "uuid",
+ "walkdir",
 ]
 
 [[package]]
@@ -4664,9 +4893,9 @@ checksum = "6af6ae20167a9ece4bcb41af5b80f8a1f1df981f6391189ce00fd257af04126a"
 
 [[package]]
 name = "typenum"
-version = "1.19.0"
+version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "562d481066bde0658276a35467c4af00bdc6ee726305698a55b86e61d7ad82bb"
+checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
 name = "unarray"

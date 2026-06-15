@@ -38,11 +38,15 @@ import (
 // free), Scrape a few percent slower on CPU (per-sample Sample + iterate indirection +
 // assembler dispatch — makeSample/applySample, inherent to the single-driver model).
 //
-// A transform runs with ownLabels=true, so each kept sample owns a copy of its labels
-// — the cost metric relabeling pays to mutate safely (captured 2026-06-08):
+// parseToSamples is the streaming path metric relabeling uses: it buffers the flat,
+// classified sample stream (ownLabels=true, so each sample owns a copy of its labels —
+// the cost paid to mutate them safely) instead of folding in place; the collector then
+// relabels and calls Assemble. It trades more allocation (the label copies) for skipping
+// the in-parse fold (captured 2026-06-10, Apple M4 Pro):
 //
-//	parseToMetricFamilies                142135 ns/op    73412 B/op   1314 allocs/op
-//	parseToMetricFamiliesWithTransform   147460 ns/op    93940 B/op   1709 allocs/op
+//	parseToMetricFamilies   143348 ns/op    73412 B/op   1314 allocs/op
+//	parseToSeries           118127 ns/op   100450 B/op   1584 allocs/op
+//	parseToSamples          127885 ns/op   190735 B/op   1726 allocs/op
 
 func readBenchData(tb testing.TB) []byte {
 	tb.Helper()
@@ -65,7 +69,7 @@ func BenchmarkPromTextParser_parseToMetricFamilies(b *testing.B) {
 	b.SetBytes(int64(len(data)))
 	b.ResetTimer()
 	for range b.N {
-		if _, err := p.parseToMetricFamilies(data, nil); err != nil {
+		if _, err := p.parseToMetricFamilies(data); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -84,15 +88,14 @@ func BenchmarkPromTextParser_parseToSeries(b *testing.B) {
 	}
 }
 
-func BenchmarkPromTextParser_parseToMetricFamiliesWithTransform(b *testing.B) {
+func BenchmarkPromTextParser_parseToSamples(b *testing.B) {
 	data := readBenchData(b)
 	var p promTextParser
-	keep := func(s Sample) (Sample, bool, error) { return s, true, nil }
 	b.ReportAllocs()
 	b.SetBytes(int64(len(data)))
 	b.ResetTimer()
 	for range b.N {
-		if _, err := p.parseToMetricFamilies(data, keep); err != nil {
+		if _, err := p.parseToSamples(data); err != nil {
 			b.Fatal(err)
 		}
 	}

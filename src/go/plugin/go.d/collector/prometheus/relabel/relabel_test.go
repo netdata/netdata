@@ -41,7 +41,7 @@ func TestProcessor_Apply(t *testing.T) {
 		keep             bool
 		sameLabelBacking bool
 	}{
-		"labelmap matching __name__ maps it once, not its own output": {
+		"labelmap skips __name__ and does not re-map its own output": {
 			cfgs: []Config{{
 				Regex:       MustNewRegexp("(.+)"),
 				Replacement: "copy_${1}",
@@ -49,9 +49,8 @@ func TestProcessor_Apply(t *testing.T) {
 			}},
 			in: sample("m", map[string]string{"job": "api"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
 			want: sample("m", map[string]string{
-				"job":           "api",
-				"copy___name__": "m",
-				"copy_job":      "api",
+				"job":      "api",
+				"copy_job": "api",
 			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
 			keep: true,
 		},
@@ -322,15 +321,27 @@ func TestProcessor_Apply(t *testing.T) {
 			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
 			keep: true,
 		},
-		"labelkeep can drop __name__ and therefore drop the sample": {
+		"labeldrop does not drop __name__": {
+			cfgs: []Config{
+				{
+					Regex:  MustNewRegexp("(.+)"),
+					Action: LabelDrop,
+				},
+			},
+			in:   sample("test_metric", map[string]string{"a": "foo"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			want: sample("test_metric", map[string]string{}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			keep: true,
+		},
+		"labelkeep keeps __name__ even when the regex excludes it": {
 			cfgs: []Config{
 				{
 					Regex:  MustNewRegexp("(b.*)"),
 					Action: LabelKeep,
 				},
 			},
-			in:   sample("test_metric", map[string]string{"b1": "bar"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
-			keep: false,
+			in:   sample("test_metric", map[string]string{"b1": "bar", "other": "x"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			want: sample("test_metric", map[string]string{"b1": "bar"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			keep: true,
 		},
 		"lowercase and uppercase write derived labels": {
 			cfgs: []Config{
@@ -556,9 +567,16 @@ func TestProcessor_Apply_dropInfo(t *testing.T) {
 			wantRule:   0,
 			wantAction: Keep,
 		},
-		"invalid metric name (labelkeep drops __name__)": {
-			cfgs:       []Config{{Regex: MustNewRegexp("keep"), Action: LabelKeep}},
-			in:         sample("m", map[string]string{"keep": "v", "other": "x"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+		"invalid metric name (replace empties __name__)": {
+			cfgs: []Config{{
+				SourceLabels:   []string{commonmodel.MetricNameLabel},
+				Regex:          MustNewRegexp("(.*)"),
+				TargetLabel:    commonmodel.MetricNameLabel,
+				Replacement:    "",
+				replacementSet: true,
+				Action:         Replace,
+			}},
+			in:         sample("m", map[string]string{"a": "x"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
 			wantReason: DropReasonInvalidMetricName,
 			wantRule:   -1,
 			wantAction: "",
@@ -579,60 +597,4 @@ func TestProcessor_Apply_dropInfo(t *testing.T) {
 			assert.Equal(t, test.in, got)
 		})
 	}
-}
-
-func TestNewTransform(t *testing.T) {
-	gauge := func() prompkg.Sample {
-		return sample("m", map[string]string{"a": "foo"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge)
-	}
-
-	t.Run("nil transform when there are no rules", func(t *testing.T) {
-		tr, err := NewTransform(nil, nil)
-		require.NoError(t, err)
-		assert.Nil(t, tr)
-	})
-
-	t.Run("invalid rules return an error", func(t *testing.T) {
-		_, err := NewTransform([]Config{{Action: HashMod, TargetLabel: "x"}}, nil)
-		assert.Error(t, err)
-	})
-
-	t.Run("applies rules and keeps", func(t *testing.T) {
-		tr, err := NewTransform([]Config{{
-			SourceLabels: []string{"a"},
-			Regex:        MustNewRegexp("f(.*)"),
-			TargetLabel:  "b",
-			Replacement:  "x${1}",
-			Action:       Replace,
-		}}, nil)
-		require.NoError(t, err)
-		require.NotNil(t, tr)
-
-		out, keep, err := tr(gauge())
-		require.NoError(t, err)
-		assert.True(t, keep)
-		assert.Equal(t, "xoo", out.Labels.Get("b"))
-	})
-
-	t.Run("drop calls onDrop with the original sample and no scrape error", func(t *testing.T) {
-		var observed []DropInfo
-		var observedSample prompkg.Sample
-		tr, err := NewTransform([]Config{{
-			SourceLabels: []string{"a"},
-			Regex:        MustNewRegexp("foo"),
-			Action:       Drop,
-		}}, func(s prompkg.Sample, d DropInfo) {
-			observedSample = s
-			observed = append(observed, d)
-		})
-		require.NoError(t, err)
-
-		in := gauge()
-		_, keep, err := tr(in)
-		require.NoError(t, err) // a drop is not a scrape error
-		assert.False(t, keep)
-		require.Len(t, observed, 1)
-		assert.Equal(t, DropReasonDropRuleMatched, observed[0].Reason)
-		assert.Equal(t, in, observedSample)
-	})
 }

@@ -10,7 +10,20 @@
 
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/un.h>
+
+#define NIPC_UDS_HANDSHAKE_TIMEOUT_SEC 5
+
+static int nipc_uds_set_recv_timeout(int fd, long sec, long usec)
+{
+    struct timeval tv = {
+        .tv_sec = sec,
+        .tv_usec = usec,
+    };
+
+    return setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+}
 
 static int copy_cstr_checked(char *dst, size_t dst_size, const char *src)
 {
@@ -81,25 +94,9 @@ int nipc_uds_build_socket_path(char *dst, size_t dst_len,
     return 0;
 }
 
-bool nipc_uds_run_dir_allows_stale_unlink(const char *run_dir)
-{
-    struct stat st;
-    if (stat(run_dir, &st) != 0)
-        return false;
-    if (!S_ISDIR(st.st_mode))
-        return false;
-    if (st.st_uid != geteuid())
-        return false;
-    return (st.st_mode & (S_IWGRP | S_IWOTH)) == 0;
-}
-
 static int unlink_stale_socket_path(const char *run_dir,
-                                    const char *socket_name,
-                                    bool allow_stale_unlink)
+                                    const char *socket_name)
 {
-    if (!allow_stale_unlink)
-        return -1;
-
     DIR *dir = opendir(run_dir);
     if (!dir)
         return -1;
@@ -110,20 +107,13 @@ static int unlink_stale_socket_path(const char *run_dir,
         return -1;
     }
 
-    struct stat st;
-    if (fstatat(dir_fd, socket_name, &st, AT_SYMLINK_NOFOLLOW) != 0) {
-        int ret = (errno == ENOENT) ? 0 : -1;
-        closedir(dir);
-        return ret;
-    }
-
-    if (!S_ISSOCK(st.st_mode)) {
-        closedir(dir);
-        return -1;
-    }
-
+    /* Whatever sits at the endpoint name is not a live server (the connect
+     * probe already failed): a dead server's socket or a foreign file.
+     * Reclaim the name; directories are junk too. */
     int ret = -1;
     if (unlinkat(dir_fd, socket_name, 0) == 0 || errno == ENOENT)
+        ret = 0;
+    else if (errno == EISDIR && unlinkat(dir_fd, socket_name, AT_REMOVEDIR) == 0)
         ret = 0;
 
     closedir(dir);
@@ -132,12 +122,14 @@ static int unlink_stale_socket_path(const char *run_dir,
 
 int nipc_uds_check_and_recover_stale(const char *run_dir,
                                      const char *socket_name,
-                                     const char *path,
-                                     bool allow_stale_unlink)
+                                     const char *path)
 {
     int probe = socket(AF_UNIX, SOCK_SEQPACKET, 0);
-    if (probe < 0)
-        return -1;
+    if (probe < 0) {
+        /* Cannot probe liveness (fd exhaustion) — keep the endpoint and
+         * report it in use rather than risk deleting a live socket. */
+        return 1;
+    }
 
     struct sockaddr_un addr;
     if (fill_sockaddr_path(&addr, path) != 0) {
@@ -154,11 +146,8 @@ int nipc_uds_check_and_recover_stale(const char *run_dir,
         close(probe);
         if (saved_errno == ENOENT) {
             ret = -1;
-        } else if (saved_errno == ECONNREFUSED) {
-            ret = (unlink_stale_socket_path(run_dir, socket_name,
-                                            allow_stale_unlink) == 0) ? 0 : 1;
         } else {
-            ret = 1;
+            ret = (unlink_stale_socket_path(run_dir, socket_name) == 0) ? 0 : 1;
         }
     }
     return ret;
@@ -188,9 +177,7 @@ nipc_uds_error_t nipc_uds_listen(const char *run_dir,
     if (name_rc < 0)
         return NIPC_UDS_ERR_PATH_TOO_LONG;
 
-    bool allow_stale_unlink = nipc_uds_run_dir_allows_stale_unlink(run_dir);
-    int stale = nipc_uds_check_and_recover_stale(run_dir, socket_name, path,
-                                                allow_stale_unlink);
+    int stale = nipc_uds_check_and_recover_stale(run_dir, socket_name, path);
     if (stale == 1)
         return NIPC_UDS_ERR_ADDR_IN_USE;
 
@@ -206,6 +193,12 @@ nipc_uds_error_t nipc_uds_listen(const char *run_dir,
 
     if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         close(fd);
+        return NIPC_UDS_ERR_SOCKET;
+    }
+
+    if (chmod(path, S_IRUSR | S_IWUSR) < 0) {
+        close(fd);
+        unlink(path);
         return NIPC_UDS_ERR_SOCKET;
     }
 
@@ -240,12 +233,22 @@ nipc_uds_error_t nipc_uds_accept(nipc_uds_listener_t *listener,
     if (client_fd < 0)
         return NIPC_UDS_ERR_ACCEPT;
 
+    if (nipc_uds_set_recv_timeout(client_fd, NIPC_UDS_HANDSHAKE_TIMEOUT_SEC, 0) < 0) {
+        close(client_fd);
+        return NIPC_UDS_ERR_SOCKET;
+    }
+
     nipc_uds_error_t err = nipc_uds_server_handshake(
         client_fd, &listener->config, session_id, out);
     if (err != NIPC_UDS_OK) {
         close(client_fd);
         out->fd = -1;
         return err;
+    }
+
+    if (nipc_uds_set_recv_timeout(client_fd, 0, 0) < 0) {
+        nipc_uds_close_session(out);
+        return NIPC_UDS_ERR_SOCKET;
     }
 
     return NIPC_UDS_OK;

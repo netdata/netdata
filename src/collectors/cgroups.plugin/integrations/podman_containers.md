@@ -141,6 +141,10 @@ Metrics:
 | cgroup.io_full_pressure | some10, some60, some300 | percentage |
 | cgroup.io_full_pressure_stall_time | time | ms |
 | cgroup.pids_current | pids | pids |
+| cgroup.cachestat_ratio | ratio | % |
+| cgroup.cachestat_dirties | dirty | page/s |
+| cgroup.cachestat_hits | hit | hits/s |
+| cgroup.cachestat_misses | miss | misses/s |
 
 ### Per cgroup network device
 

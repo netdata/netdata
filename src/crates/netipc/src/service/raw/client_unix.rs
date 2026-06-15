@@ -1,5 +1,3 @@
-#![cfg(unix)]
-
 use super::client::{ClientState, RawClient};
 use super::common::{CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS, CLIENT_SHM_ATTACH_RETRY_TIMEOUT_MS};
 #[cfg(target_os = "linux")]

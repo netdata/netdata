@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,6 +17,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
@@ -56,6 +59,110 @@ func TestCollector_Init(t *testing.T) {
 		"default": {
 			wantFail: true,
 			config:   New().Config,
+		},
+		"valid relabeling block": {
+			wantFail: false,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				Relabeling: []RelabelBlock{{
+					Match:                "app_*",
+					MetricRelabelConfigs: []relabel.Config{{SourceLabels: []string{"__name__"}, Regex: relabel.MustNewRegexp("x"), Action: relabel.Drop}},
+				}},
+			},
+		},
+		"invalid relabeling match pattern": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				Relabeling: []RelabelBlock{{
+					Match:                "[a-",
+					MetricRelabelConfigs: []relabel.Config{{SourceLabels: []string{"__name__"}, Regex: relabel.MustNewRegexp("x"), Action: relabel.Drop}},
+				}},
+			},
+		},
+		"invalid relabeling rule": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				Relabeling: []RelabelBlock{{Match: "*", MetricRelabelConfigs: []relabel.Config{{Action: "bogus"}}}},
+			},
+		},
+		"relabeling block with no match": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				Relabeling: []RelabelBlock{{MetricRelabelConfigs: []relabel.Config{{SourceLabels: []string{"__name__"}, Regex: relabel.MustNewRegexp("x"), Action: relabel.Drop}}}},
+			},
+		},
+		"relabeling block with no rules": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				Relabeling: []RelabelBlock{{Match: "app_*"}},
+			},
+		},
+		"profiles mode none": {
+			wantFail: false,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				Profiles:   ProfilesConfig{Mode: "none"},
+			},
+		},
+		"profiles mode exact with entries": {
+			wantFail: false,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				Profiles:   ProfilesConfig{Mode: "exact", ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "haproxy"}}}},
+			},
+		},
+		"profiles mode exact without entries": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				Profiles:   ProfilesConfig{Mode: "exact"},
+			},
+		},
+		"profiles mode combined with entries": {
+			wantFail: false,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				Profiles:   ProfilesConfig{Mode: "combined", ModeCombined: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "haproxy"}}}},
+			},
+		},
+		"profiles mode combined without entries": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				Profiles:   ProfilesConfig{Mode: "combined"},
+			},
+		},
+		"profiles unknown mode": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				Profiles:   ProfilesConfig{Mode: "bogus"},
+			},
+		},
+		"profiles duplicate entries": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				Profiles:   ProfilesConfig{Mode: "exact", ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "haproxy"}, {Name: "haproxy"}}}},
+			},
+		},
+		"profiles invalid entry name": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				Profiles:   ProfilesConfig{Mode: "exact", ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "HAProxy"}}}},
+			},
+		},
+		"profiles entry empty name": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				Profiles:   ProfilesConfig{Mode: "exact", ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "  "}}}},
+			},
 		},
 	}
 
@@ -354,7 +461,7 @@ test_gauge_metric{label1="value2"} 12
 		"relabel applies before assembly (drop + rename via __name__)": {
 			prepare: func() *Collector {
 				c := New()
-				c.relabelConfigs = []relabel.Config{
+				c.Relabeling = []RelabelBlock{{Match: "*", MetricRelabelConfigs: []relabel.Config{
 					{
 						SourceLabels: []string{"__name__"},
 						Regex:        relabel.MustNewRegexp("test_drop_me"),
@@ -367,7 +474,7 @@ test_gauge_metric{label1="value2"} 12
 						Replacement:  "renamed_${1}",
 						Action:       relabel.Replace,
 					},
-				}
+				}}}
 				return c
 			},
 			input: `
@@ -389,7 +496,7 @@ test_drop_me{label1="value1"} 22
 		"relabel rewrites a regular label (copy via Replace)": {
 			prepare: func() *Collector {
 				c := New()
-				c.relabelConfigs = []relabel.Config{
+				c.Relabeling = []RelabelBlock{{Match: "*", MetricRelabelConfigs: []relabel.Config{
 					{
 						SourceLabels: []string{"method"},
 						Regex:        relabel.MustNewRegexp("(.+)"),
@@ -397,7 +504,7 @@ test_drop_me{label1="value1"} 22
 						Replacement:  "${1}",
 						Action:       relabel.Replace,
 					},
-				}
+				}}}
 				return c
 			},
 			input: `
@@ -433,7 +540,7 @@ test_requests_total{method="get"} 5
 }
 
 // TestCollector_ChartCoverage verifies the collector's own ChartTemplateYAML() (the per-job
-// autogen template built in Init from the configured app) plus the collected store materialize
+// autogen template built at Check from the configured app) plus the collected store materialize
 // the expected chart contexts and dimensions. Unlike the manifest parity test (which builds the
 // template directly), this exercises the real CollectorV2.ChartTemplateYAML() method and the
 // "prometheus" / "prometheus.<app>" context namespace end-to-end via chartengine autogen.
@@ -485,6 +592,7 @@ test_gauge_metric{label1="value1"} 11
 			collr := tc.prepare()
 			collr.URL = srv.URL
 			require.NoError(t, collr.Init(context.Background()))
+			require.NoError(t, collr.Check(context.Background()))
 
 			cc := cycle(t, collr.MetricStore())
 			cc.BeginCycle()
@@ -492,6 +600,235 @@ test_gauge_metric{label1="value1"} 11
 			require.NoError(t, cc.CommitCycleSuccess())
 
 			collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{RequiredContexts: tc.want})
+		})
+	}
+}
+
+// TestCollector_HAProxyProfile exercises the full profile path against the stock
+// haproxy profile: selection (auto/exact/combined select it; none falls back to
+// autogen) and the curated charts rendering under the per-app namespace, including
+// the label-split charts (status by `state`, http responses by `code`).
+func TestCollector_HAProxyProfile(t *testing.T) {
+	const input = `
+# TYPE haproxy_frontend_status gauge
+haproxy_frontend_status{proxy="http",state="UP"} 1
+# TYPE haproxy_frontend_current_sessions gauge
+haproxy_frontend_current_sessions{proxy="http"} 5
+haproxy_frontend_current_sessions{proxy="https"} 12
+# TYPE haproxy_frontend_sessions_total counter
+haproxy_frontend_sessions_total{proxy="http"} 100
+# TYPE haproxy_frontend_bytes_in_total counter
+haproxy_frontend_bytes_in_total{proxy="http"} 1000
+# TYPE haproxy_frontend_bytes_out_total counter
+haproxy_frontend_bytes_out_total{proxy="http"} 2000
+# TYPE haproxy_frontend_http_requests_total counter
+haproxy_frontend_http_requests_total{proxy="http"} 50
+# TYPE haproxy_frontend_http_responses_total counter
+haproxy_frontend_http_responses_total{proxy="http",code="2xx"} 40
+haproxy_frontend_http_responses_total{proxy="http",code="5xx"} 2
+# TYPE haproxy_backend_current_sessions gauge
+haproxy_backend_current_sessions{proxy="app"} 3
+# TYPE haproxy_backend_sessions_total counter
+haproxy_backend_sessions_total{proxy="app"} 70
+# TYPE haproxy_backend_current_queue gauge
+haproxy_backend_current_queue{proxy="app"} 1
+# TYPE haproxy_backend_bytes_in_total counter
+haproxy_backend_bytes_in_total{proxy="app"} 500
+# TYPE haproxy_backend_bytes_out_total counter
+haproxy_backend_bytes_out_total{proxy="app"} 800
+# TYPE haproxy_backend_response_time_average_seconds gauge
+haproxy_backend_response_time_average_seconds{proxy="app"} 0.05
+`
+	curated := map[string][]string{
+		"prometheus.haproxy.frontend_status":           {"UP"},
+		"prometheus.haproxy.frontend_current_sessions": {"current"},
+		"prometheus.haproxy.frontend_sessions":         {"sessions"},
+		"prometheus.haproxy.frontend_traffic":          {"received", "sent"},
+		"prometheus.haproxy.frontend_http_requests":    {"requests"},
+		"prometheus.haproxy.frontend_http_responses":   {"2xx", "5xx"},
+		"prometheus.haproxy.backend_current_sessions":  {"current"},
+		"prometheus.haproxy.backend_sessions":          {"sessions"},
+		"prometheus.haproxy.backend_queue":             {"queued"},
+		"prometheus.haproxy.backend_traffic":           {"received", "sent"},
+		"prometheus.haproxy.backend_response_time":     {"response"},
+	}
+
+	// curatedUnder reprefixes the curated contexts with an explicit <app> segment: it models
+	// a job whose app is set (by config, or automatically by service discovery in k8s) to
+	// something other than the profile's own app:. The resolved app becomes the <app> segment
+	// and the profile's context_namespace (haproxy) is KEPT as the exporter-type sub-segment
+	// (prometheus.<app>.haproxy.<context>) — the dedup's keep branch.
+	curatedUnder := func(app string) map[string][]string {
+		out := make(map[string][]string, len(curated))
+		for ctx, dims := range curated {
+			out[strings.Replace(ctx, "prometheus.", "prometheus."+app+".", 1)] = dims
+		}
+		return out
+	}
+
+	tests := map[string]struct {
+		configApp string
+		profiles  ProfilesConfig
+		want      map[string][]string
+	}{
+		"auto mode selects haproxy": {
+			profiles: ProfilesConfig{Mode: "auto"},
+			want:     curated,
+		},
+		"exact mode selects haproxy": {
+			profiles: ProfilesConfig{Mode: "exact", ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "haproxy"}}}},
+			want:     curated,
+		},
+		"combined mode selects haproxy": {
+			profiles: ProfilesConfig{Mode: "combined", ModeCombined: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "haproxy"}}}},
+			want:     curated,
+		},
+		"a configured app keeps the profile namespace as a sub-segment": {
+			configApp: "myproxy",
+			profiles:  ProfilesConfig{Mode: "auto"},
+			want:      curatedUnder("myproxy"),
+		},
+		"none mode falls back to autogen": {
+			profiles: ProfilesConfig{Mode: "none"},
+			want: map[string][]string{
+				"prometheus.haproxy_frontend_current_sessions": {"haproxy_frontend_current_sessions"},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(
+				func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(input)) }))
+			defer srv.Close()
+
+			collr := New()
+			collr.URL = srv.URL
+			collr.Application = tc.configApp
+			collr.Profiles = tc.profiles
+			require.NoError(t, collr.Init(context.Background()))
+			require.NoError(t, collr.Check(context.Background()))
+
+			cc := cycle(t, collr.MetricStore())
+			cc.BeginCycle()
+			require.NoError(t, collr.Collect(context.Background()))
+			require.NoError(t, cc.CommitCycleSuccess())
+
+			collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{RequiredContexts: tc.want})
+		})
+	}
+}
+
+// TestCollector_HAProxyProfileAllMetrics feeds the synthetic full HAProxy scrape
+// (every source-derived family, incl. ?extra-counters) through the haproxy profile
+// in auto mode and proves the merged template (autogen + profile groups) accepts the
+// whole set: it compiles and plans with no error and produces no chart-ID collision.
+// It also checks that a representative curated context from every scope materializes
+// (process/frontend/listener/backend/server/resolver/sticktable + the state/code
+// label-split charts). Synthetic placeholder values are not asserted.
+func TestCollector_HAProxyProfileAllMetrics(t *testing.T) {
+	input, err := os.ReadFile(filepath.Join("testdata", "haproxy_all_metrics.prom"))
+	require.NoError(t, err)
+
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(input) }))
+	defer srv.Close()
+
+	collr := New()
+	collr.URL = srv.URL
+	collr.Profiles = ProfilesConfig{Mode: "auto"}
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+
+	cc := cycle(t, collr.MetricStore())
+	cc.BeginCycle()
+	require.NoError(t, collr.Collect(context.Background()))
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	// The merged template (autogen base + haproxy profile groups) must compile and
+	// plan over the whole scraped set without error, and every materialized chart ID
+	// must be unique (curated and autogen contexts share no derived chart ID).
+	eng, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
+
+	attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+	require.NoError(t, err)
+	defer attempt.Abort()
+	plan := attempt.Plan()
+	require.NoError(t, attempt.Commit())
+
+	seenChartIDs := make(map[string]string)
+	for _, a := range plan.Actions {
+		create, ok := a.(chartengine.CreateChartAction)
+		if !ok {
+			continue
+		}
+		if prev, dup := seenChartIDs[create.ChartID]; dup {
+			t.Fatalf("chart-ID collision %q: contexts %q and %q", create.ChartID, prev, create.Meta.Context)
+		}
+		seenChartIDs[create.ChartID] = create.Meta.Context
+	}
+	assert.NotEmpty(t, seenChartIDs, "the merged template must materialize charts")
+
+	// Every materialized context — curated and autogen-fallback alike — must carry the
+	// resolved app segment from the profile's app: (prometheus.haproxy.<leaf>). The trailing
+	// dot is load-bearing: if app: were ignored, autogen would emit prometheus.haproxy_<metric>
+	// (the metric name, no app segment), which this prefix check rejects.
+	for chartID, ctx := range seenChartIDs {
+		assert.Truef(t, strings.HasPrefix(ctx, "prometheus.haproxy."),
+			"context %q (chart %q) is missing the prometheus.haproxy. app segment", ctx, chartID)
+	}
+
+	// One representative curated context per scope, including the label-split charts.
+	curated := map[string][]string{
+		"prometheus.haproxy.process_connections":       {"connections"},
+		"prometheus.haproxy.frontend_status":           {"UP", "DOWN"},
+		"prometheus.haproxy.frontend_http_responses":   {"1xx", "2xx", "3xx", "4xx", "5xx", "other"},
+		"prometheus.haproxy.listener_current_sessions": {"current"},
+		"prometheus.haproxy.backend_status":            {"UP", "DOWN"},
+		"prometheus.haproxy.server_current_sessions":   {"current"},
+		"prometheus.haproxy.resolver_events":           {"sent", "valid"},
+		"prometheus.haproxy.sticktable_entries":        {"used", "size"},
+	}
+	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{RequiredContexts: curated})
+}
+
+// TestCollector_ProfileSelectionErrors covers the exact/combined contract: a named
+// profile that does not exist, or that matches no scraped metric, fails Check.
+func TestCollector_ProfileSelectionErrors(t *testing.T) {
+	// No haproxy_* metrics, so the haproxy profile resolves but matches nothing.
+	const nonHAProxyInput = "# TYPE up gauge\nup 1\n"
+
+	tests := map[string]struct {
+		input    string
+		profiles ProfilesConfig
+	}{
+		"exact names an unknown profile": {
+			input:    nonHAProxyInput,
+			profiles: ProfilesConfig{Mode: "exact", ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "does_not_exist"}}}},
+		},
+		"exact profile matches no scraped metric": {
+			input:    nonHAProxyInput,
+			profiles: ProfilesConfig{Mode: "exact", ModeExact: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "haproxy"}}}},
+		},
+		"combined names an unknown profile": {
+			input:    nonHAProxyInput,
+			profiles: ProfilesConfig{Mode: "combined", ModeCombined: &ProfilesModeConfig{Entries: []ProfileEntryConfig{{Name: "does_not_exist"}}}},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(
+				func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(tc.input)) }))
+			defer srv.Close()
+
+			collr := New()
+			collr.URL = srv.URL
+			collr.Profiles = tc.profiles
+			require.NoError(t, collr.Init(context.Background()))
+			assert.Error(t, collr.Check(context.Background()))
 		})
 	}
 }

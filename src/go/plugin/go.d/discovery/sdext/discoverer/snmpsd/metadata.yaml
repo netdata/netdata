@@ -223,7 +223,7 @@ services:
         description: 'Value of `sysLocation.0`. May be empty.'
       - name: '.SysInfo.Organization'
         type: 'string'
-        description: 'Vendor or organization parsed from `sysObjectID` against the embedded enterprise-numbers table. Defaults to `Unknown` when the OID is not in the table.'
+        description: 'Vendor or organization parsed from `sysObjectID` against the bundled enterprise-numbers table. Defaults to `Unknown` when the OID is not in the table.'
       - name: '.SysInfo.Vendor'
         type: 'string'
         description: 'Vendor name inferred from `sysObjectID` and `sysDescr` via the bundled overrides. Empty when no override matches.'

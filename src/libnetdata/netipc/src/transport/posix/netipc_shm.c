@@ -101,16 +101,24 @@ static int build_shm_path(char *dst, size_t dst_len,
     return 0;
 }
 
-static bool dir_fd_allows_stale_unlink(int dir_fd)
+/*
+ * Open failures that mean the liveness check itself could not run (fd
+ * exhaustion). Deleting on these could remove a live endpoint, so the
+ * entry is kept and reported as in-use.
+ */
+static bool stale_check_unavailable(int err)
 {
-    struct stat st;
-    if (dir_fd < 0 || fstat(dir_fd, &st) != 0)
-        return false;
-    if (!S_ISDIR(st.st_mode))
-        return false;
-    if (st.st_uid != geteuid())
-        return false;
-    return (st.st_mode & (S_IWGRP | S_IWOTH)) == 0;
+    return err == EMFILE || err == ENFILE;
+}
+
+/* Remove a junk entry at an endpoint name; directories are junk too. */
+static int unlink_stale_name(int dir_fd, const char *name)
+{
+    if (unlinkat(dir_fd, name, 0) == 0 || errno == ENOENT)
+        return 0;
+    if (errno == EISDIR && unlinkat(dir_fd, name, AT_REMOVEDIR) == 0)
+        return 0;
+    return -1;
 }
 
 static int open_run_dir_fd(const char *run_dir)
@@ -196,12 +204,8 @@ static inline uint32_t *shm_u32_ptr(void *base, int offset)
  *  -1  = doesn't exist
  *  -2  = exists but undersized / invalid (treated as stale, unlinked)
  */
-static int unlink_same_file(int dir_fd, const char *name, const struct stat *expected,
-                            bool allow_stale_unlink)
+static int unlink_same_file(int dir_fd, const char *name, const struct stat *expected)
 {
-    if (!allow_stale_unlink)
-        return -1;
-
     struct stat current;
     if (fstatat(dir_fd, name, &current, AT_SYMLINK_NOFOLLOW) != 0)
         return (errno == ENOENT) ? 0 : -1;
@@ -209,15 +213,10 @@ static int unlink_same_file(int dir_fd, const char *name, const struct stat *exp
     if (current.st_dev != expected->st_dev || current.st_ino != expected->st_ino)
         return -1;
 
-    /* Stale recovery only unlinks same-inode entries in a private run directory. */
-    if (unlinkat(dir_fd, name, 0) == 0 || errno == ENOENT)
-        return 0;
-
-    return -1;
+    return unlink_stale_name(dir_fd, name);
 }
 
-static int check_shm_stale(int dir_fd, const char *name,
-                           bool allow_stale_unlink)
+static int check_shm_stale(int dir_fd, const char *name)
 {
 #ifdef O_NOFOLLOW
     int fd = openat(dir_fd, name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
@@ -227,9 +226,12 @@ static int check_shm_stale(int dir_fd, const char *name,
     if (fd < 0) {
         if (errno == ENOENT)
             return -1;
-        /* Symlinks, permission failures, and other ambiguous path states are
-         * treated as live so stale recovery cannot remove an unsafe path. */
-        return 1;
+        if (stale_check_unavailable(errno))
+            return 1;
+        /* Unopenable entries (symlinks, unreadable files) cannot be live
+         * endpoints we can verify — they are junk squatting on the endpoint
+         * name. Reclaim them. */
+        return (unlink_stale_name(dir_fd, name) == 0) ? -2 : 1;
     }
 
     struct stat st;
@@ -240,19 +242,19 @@ static int check_shm_stale(int dir_fd, const char *name,
 
     if (!S_ISREG(st.st_mode)) {
         close(fd);
-        return 1;
+        return (unlink_same_file(dir_fd, name, &st) == 0) ? -2 : 1;
     }
 
     /* Must be at least header-sized to inspect. */
     if (st.st_size < (off_t)NIPC_SHM_HEADER_LEN) {
         close(fd);
-        return (unlink_same_file(dir_fd, name, &st, allow_stale_unlink) == 0) ? -2 : 1;
+        return (unlink_same_file(dir_fd, name, &st) == 0) ? -2 : 1;
     }
 
     void *map = mmap(NULL, NIPC_SHM_HEADER_LEN, PROT_READ, MAP_SHARED, fd, 0);
     close(fd);
     if (map == MAP_FAILED) {
-        return (unlink_same_file(dir_fd, name, &st, allow_stale_unlink) == 0) ? -2 : 1;
+        return (unlink_same_file(dir_fd, name, &st) == 0) ? -2 : 1;
     }
 
     const nipc_shm_region_header_t *hdr = (const nipc_shm_region_header_t *)map;
@@ -260,7 +262,7 @@ static int check_shm_stale(int dir_fd, const char *name,
     /* Validate magic first. */
     if (hdr->magic != NIPC_SHM_REGION_MAGIC) {
         munmap(map, NIPC_SHM_HEADER_LEN);
-        return (unlink_same_file(dir_fd, name, &st, allow_stale_unlink) == 0) ? -2 : 1;
+        return (unlink_same_file(dir_fd, name, &st) == 0) ? -2 : 1;
     }
 
     int32_t owner = hdr->owner_pid;
@@ -272,7 +274,7 @@ static int check_shm_stale(int dir_fd, const char *name,
     }
 
     /* Dead owner or zero generation (uninitialized/legacy) — stale */
-    return (unlink_same_file(dir_fd, name, &st, allow_stale_unlink) == 0) ? 0 : 1;
+    return (unlink_same_file(dir_fd, name, &st) == 0) ? 0 : 1;
 }
 
 /* ------------------------------------------------------------------ */
@@ -336,9 +338,7 @@ nipc_shm_error_t nipc_shm_server_create(const char *run_dir,
 
     /* If O_EXCL failed because file exists, do stale recovery and retry. */
     if (fd < 0 && errno == EEXIST) {
-        bool allow_stale_unlink = dir_fd_allows_stale_unlink(dir_fd);
-
-        int stale = check_shm_stale(dir_fd, shm_name, allow_stale_unlink);
+        int stale = check_shm_stale(dir_fd, shm_name);
         if (stale == 1) {
             close(dir_fd);
             return NIPC_SHM_ERR_ADDR_IN_USE;
@@ -896,8 +896,6 @@ void nipc_shm_cleanup_stale(const char *run_dir, const char *service_name)
         return;
     }
 
-    bool allow_stale_unlink = dir_fd_allows_stale_unlink(dir_fd);
-
     struct dirent *ent;
     while ((ent = readdir(dir)) != NULL) {
         size_t nlen = strlen(ent->d_name);
@@ -912,7 +910,7 @@ void nipc_shm_cleanup_stale(const char *run_dir, const char *service_name)
 
         /* check_shm_stale unlinks stale files and returns:
          *   0 = stale (unlinked), +1 = live, -1 = gone, -2 = invalid (unlinked) */
-        check_shm_stale(dir_fd, ent->d_name, allow_stale_unlink);
+        check_shm_stale(dir_fd, ent->d_name);
     }
 
     closedir(dir);

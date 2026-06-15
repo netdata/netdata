@@ -9,6 +9,10 @@ pub(super) struct NetflowChartsSnapshot {
     pub(super) raw_journal_bytes: RawJournalBytesMetrics,
     pub(super) materialized_tier_ops: MaterializedTierOpsMetrics,
     pub(super) materialized_tier_bytes: MaterializedTierBytesMetrics,
+    pub(super) tier_commit_age: TierCommitAgeMetrics,
+    pub(super) tier_commit_duration: TierCommitDurationMetrics,
+    pub(super) tier_commit_batches: TierCommitBatchesMetrics,
+    pub(super) tier_commit_stretched: TierCommitStretchedMetrics,
     pub(super) open_tiers: OpenTierMetrics,
     pub(super) journal_io_ops: JournalIoOpsMetrics,
     pub(super) journal_io_bytes: JournalIoBytesMetrics,
@@ -89,6 +93,26 @@ impl NetflowChartsSnapshot {
                 minute_1_logical_written: metrics.minute_1_logical_bytes.load(Ordering::Relaxed),
                 minute_5_logical_written: metrics.minute_5_logical_bytes.load(Ordering::Relaxed),
                 hour_1_logical_written: metrics.hour_1_logical_bytes.load(Ordering::Relaxed),
+            },
+            tier_commit_age: TierCommitAgeMetrics {
+                minute_1: metrics.minute_1_commit_age_seconds.load(Ordering::Relaxed),
+                minute_5: metrics.minute_5_commit_age_seconds.load(Ordering::Relaxed),
+                hour_1: metrics.hour_1_commit_age_seconds.load(Ordering::Relaxed),
+            },
+            tier_commit_duration: TierCommitDurationMetrics {
+                minute_1: metrics.minute_1_commit_duration_usec.load(Ordering::Relaxed),
+                minute_5: metrics.minute_5_commit_duration_usec.load(Ordering::Relaxed),
+                hour_1: metrics.hour_1_commit_duration_usec.load(Ordering::Relaxed),
+            },
+            tier_commit_batches: TierCommitBatchesMetrics {
+                minute_1: metrics.minute_1_commit_batches.load(Ordering::Relaxed),
+                minute_5: metrics.minute_5_commit_batches.load(Ordering::Relaxed),
+                hour_1: metrics.hour_1_commit_batches.load(Ordering::Relaxed),
+            },
+            tier_commit_stretched: TierCommitStretchedMetrics {
+                minute_1: metrics.minute_1_commit_stretched.load(Ordering::Relaxed),
+                minute_5: metrics.minute_5_commit_stretched.load(Ordering::Relaxed),
+                hour_1: metrics.hour_1_commit_stretched.load(Ordering::Relaxed),
             },
             open_tiers: OpenTierMetrics {
                 minute_1: open_tier_counts.0,

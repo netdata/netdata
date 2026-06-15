@@ -53,7 +53,7 @@ The plugin starts when enabled in netflow.yaml and listens on the configured UDP
 
 #### Limits
 
-Operational limits are driven by sustained flows/s, cardinality, retention, storage speed, and enrichment. Plan around 25k sustained flows/s per well-provisioned agent for the full raw + rollup pipeline; use distributed agents for larger deployments.
+Operational limits are driven by sustained flows/s, cardinality, retention, storage speed, and enrichment. Plan around 30k-100k sustained flows/s per well-provisioned agent for the full raw + rollup pipeline, depending on flow cardinality and disk I/O; use distributed agents for larger deployments.
 
 #### Performance Impact
 

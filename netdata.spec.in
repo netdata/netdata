@@ -935,7 +935,9 @@ so most users will want it installed.
 %defattr(0750,root,netdata,0750)
 # CAP_NET_ADMIN needed for WireGuard collector
 # CAP_NET_RAW needed for ping collector
-%caps(cap_dac_read_search,cap_net_admin,cap_net_raw=eip) %{_libexecdir}/%{name}/plugins.d/go.d.plugin
+# CAP_NET_BIND_SERVICE needed for SNMP traps on UDP/162
+%caps(cap_dac_read_search,cap_net_admin,cap_net_raw,cap_net_bind_service=eip) %{_libexecdir}/%{name}/plugins.d/go.d.plugin
+%{_libexecdir}/%{name}/plugins.d/snmp-trap-profile-gen
 %defattr(0644,root,netdata,0755)
 %{_libdir}/%{name}/conf.d/go.d.conf
 %{_libdir}/%{name}/conf.d/go.d

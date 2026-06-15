@@ -38,17 +38,12 @@
       },
       "expected_prefix": {
         "title": "Expected prefix",
-        "description": "If an endpoint does not return at least one metric with the specified prefix, the data is not processed.",
-        "type": "string"
-      },
-      "label_prefix": {
-        "title": "Label prefix",
-        "description": "An optional prefix that will be added to all labels of all charts. If set, the label names will be automatically formatted as `prefix_name` (the prefix followed by an underscore and the original name).",
+        "description": "If set, the job's check passes only when at least one scraped metric name starts with this prefix. Guards against scraping an unexpected endpoint.",
         "type": "string"
       },
       "app": {
         "title": "Application",
-        "description": "If set, this value will be used in the chart context as 'prometheus.{app}.{metric_name}'.",
+        "description": "Application name used as the app segment of chart contexts ('prometheus.{app}.{metric}'). When unset, it is taken from a matched profile, otherwise it falls back to the job name.",
         "type": "string"
       },
       "vnode": {
@@ -66,7 +61,7 @@
         "properties": {
           "allow": {
             "title": "Allow",
-            "description": "Allow time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/prometheus/selector#readme).",
+            "description": "Allow time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/pkg/prometheus/selector#readme).",
             "type": [
               "array",
               "null"
@@ -79,7 +74,7 @@
           },
           "deny": {
             "title": "Deny",
-            "description": "Deny time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/prometheus/selector#readme).",
+            "description": "Deny time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/pkg/prometheus/selector#readme).",
             "type": [
               "array",
               "null"
@@ -89,6 +84,216 @@
               "type": "string"
             },
             "uniqueItems": true
+          }
+        }
+      },
+      "relabeling": {
+        "title": "Metric relabeling",
+        "description": "Prometheus-compatible metric relabeling applied before charts are built. Each block scopes its rules to the metrics whose name matches `match`. See the [relabeling reference](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/prometheus/relabel#readme) for the full syntax and examples.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Relabeling block",
+          "type": "object",
+          "properties": {
+            "match": {
+              "title": "Match",
+              "description": "Netdata simple patterns matched against the full metric name (including any _bucket/_sum/_count suffix, so prefer globs like `app_lat*`). Use `*` to target every metric.",
+              "type": "string"
+            },
+            "metric_relabel_configs": {
+              "title": "Rules",
+              "description": "Prometheus relabel rules applied, in order, to the matched metrics.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "title": "Rule",
+                "type": "object",
+                "properties": {
+                  "source_labels": {
+                    "title": "Source labels",
+                    "description": "Labels whose values are joined (by separator) to form the rule input.",
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "title": "Label",
+                      "type": "string"
+                    }
+                  },
+                  "separator": {
+                    "title": "Separator",
+                    "description": "Separator used to join source label values.",
+                    "type": "string"
+                  },
+                  "regex": {
+                    "title": "Regex",
+                    "description": "Regular expression matched against the joined source label values.",
+                    "type": "string"
+                  },
+                  "modulus": {
+                    "title": "Modulus",
+                    "description": "Modulus for the hashmod action.",
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "target_label": {
+                    "title": "Target label",
+                    "description": "Label (or `__name__` for the metric name) written by the action.",
+                    "type": "string"
+                  },
+                  "replacement": {
+                    "title": "Replacement",
+                    "description": "Replacement value (regex capture groups allowed, e.g. `${1}`).",
+                    "type": "string"
+                  },
+                  "action": {
+                    "title": "Action",
+                    "description": "Relabeling action to perform.",
+                    "type": "string",
+                    "enum": [
+                      "replace",
+                      "keep",
+                      "drop",
+                      "keepequal",
+                      "dropequal",
+                      "hashmod",
+                      "labelmap",
+                      "labeldrop",
+                      "labelkeep",
+                      "lowercase",
+                      "uppercase"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "match",
+            "metric_relabel_configs"
+          ]
+        }
+      },
+      "profiles": {
+        "title": "Profiles",
+        "description": "Curated, exporter-specific chart profiles. `auto` (default) selects every profile whose match hits a scraped metric; `exact` selects only the named profiles (each must match); `combined` is auto plus the named profiles; `none` disables profiles (generic autogen charts only).",
+        "type": "object",
+        "properties": {
+          "mode": {
+            "title": "Profiles mode",
+            "description": "How chart profiles are selected.",
+            "type": "string",
+            "enum": [
+              "none",
+              "auto",
+              "exact",
+              "combined"
+            ],
+            "default": "auto"
+          }
+        },
+        "dependencies": {
+          "mode": {
+            "oneOf": [
+              {
+                "properties": {
+                  "mode": {
+                    "const": "none"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "auto"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "exact"
+                  },
+                  "mode_exact": {
+                    "title": "Exact profiles",
+                    "type": "object",
+                    "properties": {
+                      "entries": {
+                        "title": "Profile entries",
+                        "description": "Profiles to select. Each must match at least one scraped metric or the job fails its check.",
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "title": "Profile basename",
+                              "description": "Profile file basename: lowercase letters, digits, or underscores, starting with a letter.",
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9_]*$"
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "entries"
+                    ]
+                  }
+                },
+                "required": [
+                  "mode_exact"
+                ]
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "combined"
+                  },
+                  "mode_combined": {
+                    "title": "Combined profiles",
+                    "type": "object",
+                    "properties": {
+                      "entries": {
+                        "title": "Profile entries",
+                        "description": "Profiles to select in addition to the auto-selected ones.",
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "title": "Profile basename",
+                              "description": "Profile file basename: lowercase letters, digits, or underscores, starting with a letter.",
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9_]*$"
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "entries"
+                    ]
+                  }
+                },
+                "required": [
+                  "mode_combined"
+                ]
+              }
+            ]
           }
         }
       },
@@ -252,6 +457,18 @@
           "title": "Selectors",
           "fields": [
             "selector"
+          ]
+        },
+        {
+          "title": "Relabeling",
+          "fields": [
+            "relabeling"
+          ]
+        },
+        {
+          "title": "Profiles",
+          "fields": [
+            "profiles"
           ]
         },
         {

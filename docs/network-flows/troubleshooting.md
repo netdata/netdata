@@ -101,15 +101,14 @@ grep ^Udp: /proc/net/snmp          # RcvbufErrors counter (system-wide)
 
 `/proc/net/udp` lists open sockets and includes per-socket `drops`; the kernel-wide UDP `RcvbufErrors` total lives under the `Udp:` line of `/proc/net/snmp` (this is what Netdata's own `ipv4.udperrors` chart and the `1m_ipv4_udp_receive_buffer_errors` alert read).
 
-If drops are occurring, the kernel UDP receive buffer is too small for the burst rate. Tune:
+If drops are occurring, the kernel UDP receive buffer is too small for the burst rate. The plugin requests a 64 MiB receive buffer at startup, but the kernel silently caps unprivileged requests at `net.core.rmem_max` — and distribution defaults are tiny (~208 KiB, a few tens of datagrams). Raise the cap:
 
 ```bash
-sudo sysctl -w net.core.rmem_max=33554432
-sudo sysctl -w net.core.rmem_default=8388608
+sudo sysctl -w net.core.rmem_max=67108864
 sudo sysctl -w net.core.netdev_max_backlog=250000
 ```
 
-Persist in `/etc/sysctl.d/99-netflow.conf`.
+Persist in `/etc/sysctl.d/99-netflow.conf` and restart the plugin (it logs the effective buffer size at startup). `net.core.rmem_default` does not matter for the plugin's socket — only `rmem_max` does.
 
 **Per-protocol switch off:**
 
@@ -174,6 +173,17 @@ See [Sizing and Capacity Planning](/docs/network-flows/sizing-capacity.md) for m
 - If `rss` climbs and `netflow.memory_accounted_bytes` shows `unaccounted` growing, that's an unattributed allocation — could be allocator fragmentation, possibly a leak.
 - If `tier_indexes` or `open_tiers` is the climbing dimension, ingest is outpacing tier flushes. Check `netflow.materialized_tier_ops` for `flushes` rate and `*_errors`.
 - If `netflow.decoder_scopes` is growing without bound, your exporter is rotating template IDs. Investigate per-router behaviour.
+
+**Tier commit worker health:**
+
+Rollup tiers (1m / 5m / 1h) are committed to disk by dedicated worker threads so the receive path never blocks on tier disk I/O. Four charts expose their health:
+
+- `netflow.tier_commit_age` — seconds since each tier's worker last completed a claim cycle. This tracks worker liveness, not tier traffic: it stays low even on an idle tier. A steadily climbing age means the worker is stuck (most likely blocked on disk I/O) — check disk latency on the journal volume.
+- `netflow.tier_commit_duration` — how long the last commit batch took, fsync included. Sustained growth means the disk is falling behind the rollup volume.
+- `netflow.tier_commit_batches` — commit batches per second; each tier normally commits once per its bucket interval.
+- `netflow.tier_commit_stretched` — commit windows that carried more than one closed bucket because the worker missed an anniversary. Occasional events after a restart (catch-up) are normal; a steady rate means the disk cannot keep up with the rollup cadence. Data is not lost — windows stretch (a 1m rollup may become a 70-80s rollup) — but investigate disk throughput.
+
+Note: the live (open) tier rows shown by queries refresh on a 1-second cadence, so the current minute's in-progress rollup can lag the raw tier by up to one second.
 
 **Disk fill:**
 

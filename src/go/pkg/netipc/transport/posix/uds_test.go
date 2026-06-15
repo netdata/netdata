@@ -635,6 +635,28 @@ func TestStaleRecovery(t *testing.T) {
 	}
 }
 
+func TestStaleRecoveryInGroupWritableRunDir(t *testing.T) {
+	// Crash recovery must work regardless of run-dir permissions
+	// (netdata's systemd unit ships RuntimeDirectoryMode=0775).
+	runDir := t.TempDir()
+	if err := os.Chmod(runDir, 0o775); err != nil {
+		t.Fatalf("chmod run dir: %v", err)
+	}
+	service := uniqueService(t)
+	sockPath := filepath.Join(runDir, service+".sock")
+
+	// A foreign regular file squatting on the socket path
+	if err := os.WriteFile(sockPath, []byte("accidentally copied file"), 0o644); err != nil {
+		t.Fatalf("cannot create foreign file: %v", err)
+	}
+
+	listener, err := Listen(runDir, service, defaultServerConfig())
+	if err != nil {
+		t.Fatalf("Listen must reclaim the endpoint in a group-writable run dir: %v", err)
+	}
+	listener.Close()
+}
+
 // ---------------------------------------------------------------------------
 //  Test: Disconnect detection
 // ---------------------------------------------------------------------------

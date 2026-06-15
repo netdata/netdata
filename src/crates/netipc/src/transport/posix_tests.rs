@@ -473,20 +473,14 @@ fn test_request_payload_over_cap() {
 //  Test 7: Stale socket recovery
 // -----------------------------------------------------------------------
 
-#[test]
-fn test_stale_recovery() {
-    ensure_run_dir();
-    let svc = unique_service("rs_stale");
-    cleanup_socket(&svc);
-
-    let path = format!("{TEST_RUN_DIR}/{svc}.sock");
-
-    // Create a stale socket file (bound but not listening)
+/// Create a socket file that is bound but not listening — what a crashed
+/// server leaves behind.
+fn create_stale_socket_file(path: &str) {
     unsafe {
         let sock = libc::socket(libc::AF_UNIX, libc::SOCK_SEQPACKET, 0);
         assert!(sock >= 0);
 
-        let c_path = CString::new(path.as_str()).unwrap();
+        let c_path = CString::new(path).unwrap();
         let mut addr: libc::sockaddr_un = std::mem::zeroed();
         addr.sun_family = libc::AF_UNIX as libc::sa_family_t;
         let path_bytes = c_path.as_bytes_with_nul();
@@ -501,12 +495,56 @@ fn test_stale_recovery() {
         // Close without unlink => stale
         libc::close(sock);
     }
+}
 
+#[test]
+fn test_stale_recovery() {
+    ensure_run_dir();
+    let svc = unique_service("rs_stale");
+    cleanup_socket(&svc);
+
+    let path = format!("{TEST_RUN_DIR}/{svc}.sock");
+    create_stale_socket_file(&path);
     assert!(Path::new(&path).exists(), "stale socket should exist");
 
     // listen should recover it
     let listener = UdsListener::bind(TEST_RUN_DIR, &svc, default_server_config())
         .expect("listen should recover stale socket");
+    drop(listener);
+    cleanup_socket(&svc);
+}
+
+#[test]
+fn test_stale_recovery_in_group_writable_run_dir() {
+    use std::os::unix::fs::PermissionsExt;
+    // Crash recovery must work regardless of run-dir permissions
+    // (netdata's systemd unit ships RuntimeDirectoryMode=0775).
+    let dir = format!("{TEST_RUN_DIR}_0775");
+    let _ = std::fs::create_dir_all(&dir);
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o775)).expect("chmod 0775");
+
+    let svc = unique_service("rs_stale_gw");
+    let path = format!("{dir}/{svc}.sock");
+    let _ = std::fs::remove_file(&path);
+    create_stale_socket_file(&path);
+
+    let listener = UdsListener::bind(&dir, &svc, default_server_config())
+        .expect("stale recovery must work in a group-writable run dir");
+    drop(listener);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_foreign_file_at_socket_path_is_reclaimed() {
+    ensure_run_dir();
+    let svc = unique_service("rs_foreign");
+    cleanup_socket(&svc);
+
+    let path = format!("{TEST_RUN_DIR}/{svc}.sock");
+    std::fs::write(&path, b"accidentally copied file").expect("write foreign file");
+
+    let listener = UdsListener::bind(TEST_RUN_DIR, &svc, default_server_config())
+        .expect("listen should silently replace a foreign file at the socket path");
     drop(listener);
     cleanup_socket(&svc);
 }

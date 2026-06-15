@@ -200,3 +200,136 @@ fn different_dimensions_separate() {
     let rows = acc.flush_closed_rows(180_000_000);
     assert_eq!(rows.len(), 2);
 }
+
+/// Feed the same observations into two fresh accumulators so the legacy
+/// row-expanding flush and the container-moving take can be compared.
+fn two_identical_accumulators(
+    store: &mut TierFlowIndexStore,
+    observations: &[(u64, u8, u64)],
+) -> (TierAccumulator, TierAccumulator) {
+    let mut left = TierAccumulator::new(TierKind::Minute1);
+    let mut right = TierAccumulator::new(TierKind::Minute1);
+    for &(ts, protocol, bytes) in observations {
+        let mut rec = FlowRecord::default();
+        rec.protocol = protocol;
+        rec.bytes = bytes;
+        rec.packets = 1;
+        let flow_ref = store
+            .get_or_insert_record_flow(ts, &rec)
+            .expect("intern flow");
+        let metrics = FlowMetrics::from_record(&rec);
+        left.observe_flow(ts, flow_ref, metrics);
+        right.observe_flow(ts, flow_ref, metrics);
+    }
+    (left, right)
+}
+
+#[test]
+fn take_closed_buckets_matches_flush_closed_rows() {
+    let mut store = TierFlowIndexStore::default();
+    let minute = 60_000_000_u64;
+    // Two closed buckets (starts 60s and 120s) and one open (180s) at now=240s-1.
+    let observations = [
+        (minute + 1, 6, 100),
+        (minute + 2, 17, 200),
+        (2 * minute + 1, 6, 300),
+        (3 * minute + 1, 6, 400),
+    ];
+    let (mut legacy, mut taken_side) = two_identical_accumulators(&mut store, &observations);
+    let now = 4 * minute - 1;
+
+    let row_key = |ts: u64, flow_ref: TierFlowRef, m: FlowMetrics| {
+        (ts, flow_ref.hour_start_usec, flow_ref.flow_id, m.bytes, m.packets)
+    };
+    let mut legacy_rows: Vec<_> = legacy
+        .flush_closed_rows(now)
+        .into_iter()
+        .map(|row| row_key(row.timestamp_usec, row.flow_ref, row.metrics))
+        .collect();
+    legacy_rows.sort();
+
+    let bucket_usec = taken_side.bucket_usec();
+    let taken = taken_side.take_closed_buckets(now);
+    assert_eq!(
+        taken.iter().map(|(start, _)| *start).collect::<Vec<_>>(),
+        vec![minute, 2 * minute],
+        "take must return exactly the closed buckets, in order"
+    );
+    let mut taken_rows: Vec<_> = taken
+        .iter()
+        .flat_map(|(start, bucket)| {
+            let row_ts = start + bucket_usec - 1;
+            bucket
+                .iter()
+                .map(move |(&flow_ref, &m)| row_key(row_ts, flow_ref, m))
+        })
+        .collect();
+    taken_rows.sort();
+
+    assert_eq!(legacy_rows, taken_rows);
+
+    // The open bucket must remain in both.
+    assert_eq!(legacy.snapshot_open_rows(now).len(), 1);
+    assert_eq!(taken_side.snapshot_open_rows(now).len(), 1);
+}
+
+#[test]
+fn take_closed_buckets_closes_exactly_at_bucket_end() {
+    let mut store = TierFlowIndexStore::default();
+    let minute = 60_000_000_u64;
+    let (_, mut acc) =
+        two_identical_accumulators(&mut store, &[(minute + 1, 6, 1), (2 * minute + 1, 6, 1)]);
+
+    // now == end of the first bucket: first closes, second stays open.
+    let taken = acc.take_closed_buckets(2 * minute);
+    assert_eq!(
+        taken.iter().map(|(s, _)| *s).collect::<Vec<_>>(),
+        vec![minute]
+    );
+    assert_eq!(acc.snapshot_open_rows(2 * minute).len(), 1);
+}
+
+#[test]
+fn recycled_container_capacity_is_reused_without_allocation() {
+    let mut store = TierFlowIndexStore::default();
+    let mut acc = TierAccumulator::new(TierKind::Minute1);
+    let minute = 60_000_000_u64;
+
+    // Fill one bucket with many unique flows to grow the container.
+    for i in 0..512_u32 {
+        let mut rec = FlowRecord::default();
+        rec.protocol = 6;
+        rec.src_as = 64_000 + i;
+        rec.bytes = 1;
+        rec.packets = 1;
+        let flow_ref = store
+            .get_or_insert_record_flow(minute + 1, &rec)
+            .expect("intern flow");
+        acc.observe_flow(minute + 1, flow_ref, FlowMetrics::from_record(&rec));
+    }
+
+    let taken = acc.take_closed_buckets(2 * minute);
+    assert_eq!(taken.len(), 1);
+    let (_, container) = taken.into_iter().next().expect("one bucket");
+    let grown_capacity = container.capacity();
+    assert!(grown_capacity >= 512);
+
+    acc.recycle(container);
+    assert_eq!(acc.free_pool_len(), 1);
+
+    // The next opened bucket must consume the recycled container and start at
+    // the previous high-water capacity.
+    let mut rec = FlowRecord::default();
+    rec.protocol = 17;
+    rec.bytes = 1;
+    rec.packets = 1;
+    let flow_ref = store
+        .get_or_insert_record_flow(2 * minute + 1, &rec)
+        .expect("intern flow");
+    acc.observe_flow(2 * minute + 1, flow_ref, FlowMetrics::from_record(&rec));
+    assert_eq!(acc.free_pool_len(), 0, "new bucket must reuse the pool");
+    assert!(
+        acc.bucket_capacity(2 * minute).expect("open bucket") >= grown_capacity,
+        "recycled capacity must be retained"
+    );
+}

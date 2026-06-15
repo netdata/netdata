@@ -11,10 +11,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 )
 
 //go:embed "config_schema.json"
@@ -41,39 +40,25 @@ func New() *Collector {
 			},
 			MaxTS:          2000,
 			MaxTSPerMetric: 200,
+			Profiles:       ProfilesConfig{Mode: profilesModeAuto},
 		},
-		store: metrix.NewCollectorStore(),
+		store:              metrix.NewCollectorStore(),
+		loadProfileCatalog: promprofiles.DefaultCatalog,
 	}
-}
-
-type Config struct {
-	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	web.HTTPConfig     `yaml:",inline" json:""`
-	Name               string        `yaml:"name,omitempty" json:"name"`
-	Application        string        `yaml:"app,omitempty" json:"app"`
-	LabelPrefix        string        `yaml:"label_prefix,omitempty" json:"label_prefix"`
-	Selector           selector.Expr `yaml:"selector,omitempty" json:"selector"`
-	ExpectedPrefix     string        `yaml:"expected_prefix,omitempty" json:"expected_prefix"`
-	MaxTS              int           `yaml:"max_time_series" json:"max_time_series"`
-	MaxTSPerMetric     int           `yaml:"max_time_series_per_metric" json:"max_time_series_per_metric"`
-	FallbackType       struct {
-		Gauge   []string `yaml:"gauge,omitempty" json:"gauge"`
-		Counter []string `yaml:"counter,omitempty" json:"counter"`
-	} `yaml:"fallback_type,omitempty" json:"fallback_type"`
 }
 
 type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	prom             prometheus.Prometheus
-	relabelConfigs   []relabel.Config
-	relabelTransform prometheus.SampleTransform
-	store            metrix.CollectorStore
-	writer           *metricFamilyWriter
-	chartTemplate    string
+	prom          prometheus.Prometheus
+	relabelBlocks []relabelBlock
+	store         metrix.CollectorStore
+	writer        *metricFamilyWriter
+	runtime       *promRuntime
+
+	// loadProfileCatalog resolves the profile catalog; a field so tests inject a fake.
+	loadProfileCatalog func() (promprofiles.Catalog, error)
 }
 
 func (c *Collector) Configuration() any {
@@ -91,14 +76,13 @@ func (c *Collector) Init(context.Context) error {
 	}
 	c.prom = prom
 
-	// relabelConfigs are empty in this PR (rules are set by tests; profiles populate
-	// them later), so NewTransform returns a nil transform and Scrape keeps its
-	// no-transform fast path. A non-empty, invalid rule set fails Init here.
-	transform, err := relabel.NewTransform(c.relabelConfigs, c.onRelabelDrop)
+	// With no relabeling blocks the scrape keeps the direct, no-buffering Scrape fast
+	// path; invalid rules or match patterns fail Init here.
+	blocks, err := c.initRelabelBlocks()
 	if err != nil {
-		return fmt.Errorf("init relabel: %v", err)
+		return fmt.Errorf("init relabeling: %v", err)
 	}
-	c.relabelTransform = transform
+	c.relabelBlocks = blocks
 
 	gaugeFallback, err := c.initFallbackTypeMatcher(c.FallbackType.Gauge)
 	if err != nil {
@@ -110,17 +94,10 @@ func (c *Collector) Init(context.Context) error {
 	}
 
 	c.writer = newMetricFamilyWriter(c.store, metricFamilyWriterPolicy{
-		labelPrefix:           c.LabelPrefix,
 		maxTSPerMetric:        c.MaxTSPerMetric,
 		isFallbackTypeGauge:   gaugeFallback,
 		isFallbackTypeCounter: counterFallback,
 	}, c.Logger)
-
-	tmpl, err := buildChartTemplate(c.application())
-	if err != nil {
-		return fmt.Errorf("build chart template: %v", err)
-	}
-	c.chartTemplate = tmpl
 
 	return nil
 }
@@ -134,6 +111,7 @@ func (c *Collector) Collect(ctx context.Context) error {
 }
 
 func (c *Collector) Cleanup(context.Context) {
+	c.runtime = nil
 	if c.prom != nil && c.prom.HTTPClient() != nil {
 		c.prom.HTTPClient().CloseIdleConnections()
 	}
@@ -144,5 +122,8 @@ func (c *Collector) MetricStore() metrix.CollectorStore {
 }
 
 func (c *Collector) ChartTemplateYAML() string {
-	return c.chartTemplate
+	if c.runtime == nil {
+		return ""
+	}
+	return c.runtime.chartTemplate
 }

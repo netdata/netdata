@@ -59,7 +59,7 @@ Controls the UDP socket and the journal write cadence.
 listener:
   listen: "0.0.0.0:2055"
   max_packet_size: 9216
-  sync_every_entries: 1024
+  sync_every_entries: 0
   sync_interval: "1s"
 ```
 
@@ -67,20 +67,19 @@ listener:
 |---|---|---|---|
 | `listen` | `--netflow-listen` | `0.0.0.0:2055` | Address and port for the UDP socket. Same socket handles NetFlow v5/v7/v9, IPFIX, and sFlow. |
 | `max_packet_size` | `--netflow-max-packet-size` | `9216` | Maximum UDP datagram in bytes. Increase for jumbo sFlow datagrams or routers that send oversized IPFIX. |
-| `sync_every_entries` | `--netflow-sync-every-entries` | `1024` | Flush the raw journal to disk after this many records, regardless of `sync_interval`. |
-| `sync_interval` | `--netflow-sync-interval` | `1s` | Maximum time between forced flushes. |
+| `sync_every_entries` | `--netflow-sync-every-entries` | `0` | Periodic fsync of the active raw journal. `0` (default) disables it: data reaches disk via kernel writeback, and every journal file is fully synced when rotated and at shutdown. Values > 0 fsync after that many records (and at least once per `sync_interval`); at high flow rates the fsync stalls the receive path and can cause UDP drops. |
+| `sync_interval` | `--netflow-sync-interval` | `1s` | Maximum time between forced fsyncs when `sync_every_entries` > 0. Also the cadence for facet-state persistence and tier maintenance. |
 
 ### UDP buffer tuning is not in this file
 
-If you receive a high flow rate, the kernel UDP receive buffer matters more than `max_packet_size`. Tune at the kernel level:
+If you receive a high flow rate, the kernel UDP receive buffer matters more than `max_packet_size`. The plugin requests a large buffer (64 MiB) at startup via `setsockopt(SO_RCVBUF)`, but the kernel silently caps unprivileged requests at `net.core.rmem_max`, and distribution defaults are tiny (~208 KiB). Raise the cap at the kernel level:
 
 ```bash
-sudo sysctl -w net.core.rmem_max=33554432
-sudo sysctl -w net.core.rmem_default=8388608
+sudo sysctl -w net.core.rmem_max=67108864
 sudo sysctl -w net.core.netdev_max_backlog=250000
 ```
 
-Persist these in `/etc/sysctl.d/99-netflow.conf`. The plugin does not call `setsockopt(SO_RCVBUF)` itself; whatever the kernel default is, that's what the listener gets.
+Persist these in `/etc/sysctl.d/99-netflow.conf`. The plugin logs the effective buffer size at startup; `net.core.rmem_default` does not affect it — only `rmem_max` does.
 
 ## `protocols`
 

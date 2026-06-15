@@ -389,6 +389,137 @@ static nipc_np_error_t wait_readable(HANDLE pipe,
     }
 }
 
+typedef struct {
+    bool infinite;
+    ULONGLONG deadline;
+    HANDLE abort_event;
+} receive_wait_t;
+
+static void inflight_fail_all(nipc_np_session_t *s);
+
+static receive_wait_t receive_wait_init(uint32_t timeout_ms,
+                                        HANDLE abort_event)
+{
+    receive_wait_t wait = {
+        .infinite = (timeout_ms == 0),
+        .deadline = 0,
+        .abort_event = abort_event,
+    };
+    if (!wait.infinite)
+        wait.deadline = GetTickCount64() + timeout_ms;
+    return wait;
+}
+
+static bool receive_wait_expired(const receive_wait_t *wait)
+{
+    return !wait->infinite && GetTickCount64() >= wait->deadline;
+}
+
+static bool receive_wait_aborted(const receive_wait_t *wait)
+{
+    return wait->abort_event &&
+           WaitForSingleObject(wait->abort_event, 0) == WAIT_OBJECT_0;
+}
+
+static nipc_np_error_t wait_readable_for_receive(HANDLE pipe,
+                                                  const receive_wait_t *wait,
+                                                  bool *readable_out)
+{
+    int yielded = 0;
+
+    if (readable_out)
+        *readable_out = false;
+
+    for (;;) {
+        if (receive_wait_aborted(wait))
+            return NIPC_NP_ERR_ABORTED;
+
+        DWORD available = 0;
+        BOOL ok = PeekNamedPipe(pipe, NULL, 0, NULL, &available, NULL);
+        if (!ok) {
+            DWORD err = GetLastError();
+            if (is_disconnect_error(err))
+                return NIPC_NP_ERR_DISCONNECTED;
+            return NIPC_NP_ERR_RECV;
+        }
+
+        if (available > 0) {
+            if (readable_out)
+                *readable_out = true;
+            return NIPC_NP_OK;
+        }
+
+        if (receive_wait_expired(wait))
+            return NIPC_NP_ERR_TIMEOUT;
+
+        if (!yielded) {
+            yielded = 1;
+            for (int i = 0; i < 256; i++) {
+                if (receive_wait_aborted(wait))
+                    return NIPC_NP_ERR_ABORTED;
+
+                SwitchToThread();
+
+                available = 0;
+                ok = PeekNamedPipe(pipe, NULL, 0, NULL, &available, NULL);
+                if (!ok) {
+                    DWORD err = GetLastError();
+                    if (is_disconnect_error(err))
+                        return NIPC_NP_ERR_DISCONNECTED;
+                    return NIPC_NP_ERR_RECV;
+                }
+
+                if (available > 0) {
+                    if (readable_out)
+                        *readable_out = true;
+                    return NIPC_NP_OK;
+                }
+
+                if (receive_wait_expired(wait))
+                    return NIPC_NP_ERR_TIMEOUT;
+            }
+            continue;
+        }
+
+        Sleep(1);
+    }
+}
+
+static nipc_np_error_t raw_recv_with_wait(nipc_np_session_t *session,
+                                           void *buf,
+                                           size_t buf_size,
+                                           const receive_wait_t *wait,
+                                           DWORD *bytes_read)
+{
+    bool readable = false;
+    nipc_np_error_t werr = wait_readable_for_receive(
+        session->pipe, wait, &readable);
+    if (werr != NIPC_NP_OK)
+        return werr;
+    if (!readable)
+        return NIPC_NP_ERR_TIMEOUT;
+
+    int rc = raw_recv(session->pipe, buf, buf_size, bytes_read);
+    if (rc <= 0) {
+        inflight_fail_all(session);
+        return NIPC_NP_ERR_RECV;
+    }
+    return NIPC_NP_OK;
+}
+
+static nipc_np_error_t raw_recv_blocking(nipc_np_session_t *session,
+                                          void *buf,
+                                          size_t buf_size,
+                                          DWORD *bytes_read)
+{
+    int rc = raw_recv(session->pipe, buf, buf_size, bytes_read);
+    if (rc <= 0) {
+        inflight_fail_all(session);
+        return NIPC_NP_ERR_RECV;
+    }
+    return NIPC_NP_OK;
+}
+
 /* ------------------------------------------------------------------ */
 /*  In-flight message_id tracking (client side)                        */
 /* ------------------------------------------------------------------ */
@@ -1092,16 +1223,31 @@ nipc_np_error_t nipc_np_receive(nipc_np_session_t *session,
                                  const void **payload_out,
                                  size_t *payload_len_out)
 {
+    return nipc_np_receive_timeout(session, buf, buf_size, hdr_out,
+                                    payload_out, payload_len_out, 0, NULL);
+}
+
+nipc_np_error_t nipc_np_receive_timeout(nipc_np_session_t *session,
+                                         void *buf, size_t buf_size,
+                                         nipc_header_t *hdr_out,
+                                         const void **payload_out,
+                                         size_t *payload_len_out,
+                                         uint32_t timeout_ms,
+                                         HANDLE abort_event)
+{
     if (!session || session->pipe == INVALID_HANDLE_VALUE)
         return NIPC_NP_ERR_BAD_PARAM;
 
+    receive_wait_t wait = receive_wait_init(timeout_ms, abort_event);
+    bool controlled_receive = timeout_ms != 0 || abort_event != NULL;
+
     /* Read first message */
     DWORD bytes_read = 0;
-    int rc = raw_recv(session->pipe, buf, buf_size, &bytes_read);
-    if (rc <= 0) {
-        inflight_fail_all(session);
-        return NIPC_NP_ERR_RECV;
-    }
+    nipc_np_error_t rerr = controlled_receive
+        ? raw_recv_with_wait(session, buf, buf_size, &wait, &bytes_read)
+        : raw_recv_blocking(session, buf, buf_size, &bytes_read);
+    if (rerr != NIPC_NP_OK)
+        return rerr;
 
     size_t n = (size_t)bytes_read;
     if (n < NIPC_HEADER_LEN)
@@ -1182,11 +1328,12 @@ nipc_np_error_t nipc_np_receive(nipc_np_session_t *session,
 
     for (uint32_t ci = 1; assembled < hdr_out->payload_len; ci++) {
         DWORD cn = 0;
-        int crc = raw_recv(session->pipe, pkt_buf, pkt_buf_size, &cn);
-        if (crc <= 0) {
+        rerr = controlled_receive
+            ? raw_recv_with_wait(session, pkt_buf, pkt_buf_size, &wait, &cn)
+            : raw_recv_blocking(session, pkt_buf, pkt_buf_size, &cn);
+        if (rerr != NIPC_NP_OK) {
             free(pkt_buf);
-            inflight_fail_all(session);
-            return NIPC_NP_ERR_RECV;
+            return rerr;
         }
 
         if ((size_t)cn < NIPC_HEADER_LEN) {

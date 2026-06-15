@@ -9,7 +9,7 @@ from pathlib import Path
 from ruamel.yaml import YAML, YAMLError
 
 from gen_taxonomy import FATAL, Finding, build_taxonomy, relpath
-from _common import REPO_PATH
+from _common import REPO_PATH, get_collector_metadata_entries
 
 HUNK_RE = re.compile(r'^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@')
 
@@ -96,8 +96,13 @@ def metadata_metrics_touched(diff_range, path):
     return False
 
 
+def collector_metadata_paths():
+    return {path.resolve() for _, path in get_collector_metadata_entries()}
+
+
 def touched_collectors(diff_range):
     output = run_git('diff', '--name-status', diff_range)
+    collector_metadata = collector_metadata_paths()
     touched = set()
     for line in output.splitlines():
         if not line.strip():
@@ -110,6 +115,8 @@ def touched_collectors(diff_range):
         if name == 'taxonomy.yaml':
             touched.add(path.parent)
         elif name == 'metadata.yaml':
+            if path.resolve() not in collector_metadata:
+                continue
             if status.startswith(('A', 'D')):
                 touched.add(path.parent)
             elif metadata_metrics_touched(diff_range, path):

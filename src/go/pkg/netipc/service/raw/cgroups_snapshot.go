@@ -16,6 +16,10 @@ func SnapshotMaxItems(responseBufSize int, override uint32) uint32 {
 // CallSnapshot performs a blocking typed cgroups snapshot call.
 // The returned view is valid until the next typed call on this client.
 func (c *Client) CallSnapshot() (*protocol.CgroupsResponseView, error) {
+	return c.CallSnapshotWithTimeout(0)
+}
+
+func (c *Client) CallSnapshotWithTimeout(timeoutMs uint32) (*protocol.CgroupsResponseView, error) {
 	if err := c.validateMethod(protocol.MethodCgroupsSnapshot); err != nil {
 		return nil, err
 	}
@@ -29,7 +33,7 @@ func (c *Client) CallSnapshot() (*protocol.CgroupsResponseView, error) {
 			return protocol.ErrTruncated
 		}
 
-		_, payload, rerr := c.doRawCall(protocol.MethodCgroupsSnapshot, reqBuf[:])
+		_, payload, rerr := c.doRawCallWithTimeout(protocol.MethodCgroupsSnapshot, reqBuf[:], timeoutMs)
 		if rerr != nil {
 			return rerr
 		}

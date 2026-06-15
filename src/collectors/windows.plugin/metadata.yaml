@@ -965,18 +965,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: open
-            - name: smb.server_shares_tree_connect_count
-              description: Count of user connections to the SMB share.
-              unit: "connections"
-              chart_type: line
-              dimensions:
-                - name: connections
-            - name: smb.server_shares_received_bytes
-              description: Received bytes on the SMB share.
-              unit: "bytes/s"
-              chart_type: line
-              dimensions:
-                - name: received
             - name: smb.server_shares_write_requests
               description: Write requests on the SMB share.
               unit: "requests/s"
@@ -995,12 +983,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: metadata
-            - name: smb.server_shares_sent_bytes
-              description: Sent bytes on the SMB share.
-              unit: "bytes/s"
-              chart_type: line
-              dimensions:
-                - name: sent
             - name: smb.server_shares_files_opened
               description: Files opened on the SMB share.
               unit: "files/s"

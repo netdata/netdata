@@ -16,7 +16,7 @@ use crate::transport::windows::{
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-pub use raw::{AppsLookupHandler, ClientState, ClientStatus};
+pub use raw::{AppsLookupHandler, ClientAbortHandle, ClientState, ClientStatus};
 
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
@@ -109,8 +109,32 @@ impl AppsLookupClient {
         self.inner.status()
     }
 
+    pub fn set_call_timeout(&mut self, timeout_ms: u32) {
+        self.inner.set_call_timeout(timeout_ms);
+    }
+
+    pub fn abort_handle(&self) -> ClientAbortHandle {
+        self.inner.abort_handle()
+    }
+
+    pub fn abort(&self) {
+        self.inner.abort();
+    }
+
+    pub fn clear_abort(&self) {
+        self.inner.clear_abort();
+    }
+
     pub fn call(&mut self, pids: &[u32]) -> Result<AppsLookupResponseView<'_>, NipcError> {
-        self.inner.call_apps_lookup(pids)
+        self.call_with_timeout(pids, 0)
+    }
+
+    pub fn call_with_timeout(
+        &mut self,
+        pids: &[u32],
+        timeout_ms: u32,
+    ) -> Result<AppsLookupResponseView<'_>, NipcError> {
+        self.inner.call_apps_lookup_with_timeout(pids, timeout_ms)
     }
 
     pub fn close(&mut self) {

@@ -902,11 +902,26 @@ skip_file:
 // Checks that the extent list checksum is valid
 static int journalfile_check_v2_extent_list (void *data_start, size_t file_size)
 {
-    UNUSED(file_size);
     uLong crc;
 
     struct journal_v2_header *j2_header = (void *) data_start;
     struct journal_v2_block_trailer *journal_v2_trailer;
+
+    // Bound the header-controlled offsets against the trusted file size before
+    // reading through them. Check extent_offset first so the subtraction cannot
+    // underflow, then bound extent_count via division instead of multiplying
+    // extent_count * sizeof(...), which would wrap size_t on 32-bit builds. The
+    // on-disk layout (journalfile_migrate_to_v2_callback) places the extent
+    // trailer immediately after the extent list. Same pattern as the walk in
+    // journalfile_v2_populate_retention_to_mrg().
+    if ((size_t)j2_header->extent_offset > file_size ||
+        (size_t)j2_header->extent_count > (file_size - (size_t)j2_header->extent_offset) / sizeof(struct journal_extent_list) ||
+        (size_t)j2_header->extent_trailer_offset > file_size ||
+        file_size - (size_t)j2_header->extent_trailer_offset < sizeof(struct journal_v2_block_trailer) ||
+        (size_t)j2_header->extent_trailer_offset != (size_t)j2_header->extent_offset + (size_t)j2_header->extent_count * sizeof(struct journal_extent_list)) {
+        netdata_log_error("DBENGINE: extent list header offsets out of range");
+        return 1;
+    }
 
     journal_v2_trailer = (struct journal_v2_block_trailer *) ((uint8_t *) data_start + j2_header->extent_trailer_offset);
     crc = crc32(0L, Z_NULL, 0);
@@ -922,11 +937,26 @@ static int journalfile_check_v2_extent_list (void *data_start, size_t file_size)
 // Checks that the metric list (UUIDs) checksum is valid
 static int journalfile_check_v2_metric_list(void *data_start, size_t file_size)
 {
-    UNUSED(file_size);
     uLong crc;
 
     struct journal_v2_header *j2_header = (void *) data_start;
     struct journal_v2_block_trailer *journal_v2_trailer;
+
+    // Bound the header-controlled offsets against the trusted file size before
+    // reading through them. Check metric_offset first so the subtraction cannot
+    // underflow, then bound metric_count via division instead of multiplying
+    // metric_count * sizeof(...), which would wrap size_t on 32-bit builds. The
+    // on-disk layout (journalfile_migrate_to_v2_callback) places the metric
+    // trailer immediately after the metric list. Same pattern as the walk in
+    // journalfile_v2_populate_retention_to_mrg().
+    if ((size_t)j2_header->metric_offset > file_size ||
+        (size_t)j2_header->metric_count > (file_size - (size_t)j2_header->metric_offset) / sizeof(struct journal_metric_list) ||
+        (size_t)j2_header->metric_trailer_offset > file_size ||
+        file_size - (size_t)j2_header->metric_trailer_offset < sizeof(struct journal_v2_block_trailer) ||
+        (size_t)j2_header->metric_trailer_offset != (size_t)j2_header->metric_offset + (size_t)j2_header->metric_count * sizeof(struct journal_metric_list)) {
+        netdata_log_error("DBENGINE: metric list header offsets out of range");
+        return 1;
+    }
 
     journal_v2_trailer = (struct journal_v2_block_trailer *) ((uint8_t *) data_start + j2_header->metric_trailer_offset);
     crc = crc32(0L, Z_NULL, 0);

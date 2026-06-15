@@ -196,6 +196,8 @@ cmake_dependent_option(ENABLE_PLUGIN_CUPS "Enable CUPS monitoring" ${DEFAULT_FEA
 cmake_dependent_option(ENABLE_PLUGIN_FREEIPMI "Enable IPMI monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD" False)
 
 cmake_dependent_option(ENABLE_PLUGIN_CGROUP_NETWORK "Enable Linux CGroup network usage monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+cmake_dependent_option(ENABLE_CGROUPS_LOOKUP_SERVER "Enable cgroups.plugin CGROUPS_LOOKUP netipc server" True "OS_LINUX" False)
+cmake_dependent_option(ENABLE_CGROUPS_LOOKUP_TEST_CLIENT "Build cgroups.plugin CGROUPS_LOOKUP test client" False "ENABLE_CGROUPS_LOOKUP_SERVER" False)
 cmake_dependent_option(ENABLE_PLUGIN_DEBUGFS "Enable Linux DebugFS metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_LEGACY_EBPF_PROGRAMS "Enable eBPF programs for kernels without BTF support" True "ENABLE_PLUGIN_EBPF" False)
@@ -2061,10 +2063,14 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/sys_fs_cgroup.h
         src/collectors/cgroups.plugin/cgroup-internals.h
         src/collectors/cgroups.plugin/cgroup-discovery.c
+        src/collectors/cgroups.plugin/cgroup-orchestrator.c
         src/collectors/cgroups.plugin/cgroup-charts.c
         src/collectors/cgroups.plugin/cgroup-top.c
         src/collectors/cgroups.plugin/cgroup-netipc.c
+        "$<$<BOOL:${ENABLE_CGROUPS_LOOKUP_SERVER}>:src/collectors/cgroups.plugin/cgroup-lookup-netipc.c>"
         src/collectors/cgroups.plugin/cgroup-netipc.h
+        src/collectors/cgroups.plugin/cgroup-snapshot-store.c
+        src/collectors/cgroups.plugin/cgroup-snapshot-store.h
         src/collectors/cgroups.plugin/cgroup_ebpfgo_cachestat.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.h
@@ -2856,7 +2862,18 @@ if(ENABLE_PLUGIN_APPS)
         list(APPEND APPS_PLUGIN_FILES
                 src/collectors/collectors-ipc/ebpfgo_shared_memory.h
                 src/collectors/collectors-ipc/ebpfgo_shared_memory.c
-                src/collectors/apps.plugin/apps_ebpf_shared_memory.c)
+                src/collectors/apps.plugin/apps_ebpf_shared_memory.c
+                src/collectors/common-cgroups/cgroup-topology-rules.c
+                src/collectors/common-cgroups/cgroup-topology-rules.h
+                src/collectors/apps.plugin/apps-cgroups-path.c
+                src/collectors/apps.plugin/apps-cgroups-path.h
+                src/collectors/apps.plugin/apps-cgroups-enrichment.c
+                src/collectors/apps.plugin/apps-cgroups-enrichment.h
+                src/collectors/apps.plugin/apps-cgroups-lookup-client.c
+                src/collectors/apps.plugin/apps-cgroups-lookup-client.h
+                src/collectors/apps.plugin/apps-lookup-netipc.c
+                src/collectors/apps.plugin/apps-lookup-netipc.h
+        )
     endif()
 
     add_executable(apps.plugin ${APPS_PLUGIN_FILES})
@@ -3051,6 +3068,51 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
     install(TARGETS cgroup-network
             COMPONENT netdata
             DESTINATION usr/libexec/netdata/plugins.d)
+endif()
+
+if(ENABLE_CGROUPS_LOOKUP_TEST_CLIENT)
+    add_executable(cgroup-lookup-test src/collectors/cgroups.plugin/cgroup-lookup-test/cgroup-lookup-test.c)
+    target_link_libraries(cgroup-lookup-test libnetdata)
+endif()
+
+if(OS_LINUX)
+    add_executable(cgroup-orchestrator-test EXCLUDE_FROM_ALL
+            src/collectors/cgroups.plugin/tests/test_cgroup_orchestrator.c
+            src/collectors/cgroups.plugin/cgroup-orchestrator.c)
+    target_compile_definitions(cgroup-orchestrator-test PRIVATE NETDATA_INTERNAL_CHECKS=1)
+    target_link_libraries(cgroup-orchestrator-test libnetdata)
+
+    add_executable(apps-cgroups-path-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_cgroups_path.c
+            src/collectors/apps.plugin/apps-cgroups-path.c)
+    target_link_libraries(apps-cgroups-path-test libnetdata)
+
+    add_executable(apps-cgroups-enrichment-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_cgroups_enrichment.c
+            src/collectors/common-cgroups/cgroup-topology-rules.c)
+    target_link_libraries(apps-cgroups-enrichment-test libnetdata)
+
+    add_executable(apps-lookup-protocol-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_lookup_protocol.c)
+    target_link_libraries(apps-lookup-protocol-test libnetdata)
+
+    add_executable(apps-lookup-netipc-lock-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_lookup_netipc_lock.c)
+    target_link_libraries(apps-lookup-netipc-lock-test libnetdata)
+
+    add_executable(apps-cgroups-lookup-client-abort-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_cgroups_lookup_client_abort.c)
+    target_link_libraries(apps-cgroups-lookup-client-abort-test libnetdata)
+endif()
+
+if(ENABLE_CGROUPS_LOOKUP_SERVER)
+    add_executable(cgroup-lookup-netipc-test EXCLUDE_FROM_ALL
+            src/collectors/cgroups.plugin/tests/test_cgroup_lookup_netipc.c
+            src/collectors/cgroups.plugin/cgroup-lookup-netipc.c
+            src/collectors/cgroups.plugin/cgroup-snapshot-store.c
+            src/collectors/cgroups.plugin/cgroup-orchestrator.c)
+    target_compile_definitions(cgroup-lookup-netipc-test PRIVATE NETDATA_INTERNAL_CHECKS=1)
+    target_link_libraries(cgroup-lookup-netipc-test libnetdata)
 endif()
 
 # Enable rust implementation if we don't have systemd and we want the journal plugin
@@ -3308,18 +3370,23 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                 # GCC still performs LTO when linking slim LTO static archives into a
                 # non-LTO target. Build these archives as fat objects and force a
                 # regular final link to avoid exhausting the i386 linker.
-                if(TARGET judy)
-                        target_compile_options(judy PRIVATE -ffat-lto-objects)
-                endif()
-                if(TARGET libnetdata)
-                        target_compile_options(libnetdata PRIVATE -ffat-lto-objects)
-                endif()
+                foreach(_network_viewer_fat_lto_target judy libnetdata netipc json-c)
+                        if(TARGET ${_network_viewer_fat_lto_target})
+                                target_compile_options(${_network_viewer_fat_lto_target} PRIVATE -ffat-lto-objects)
+                        endif()
+                endforeach()
         endif()
 
         set(NETWORK_VIEWER_FILES)
         if(OS_LINUX)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/libnetdata/local-sockets/local-sockets.h
+                        src/collectors/common-cgroups/cgroup-topology-rules.c
+                        src/collectors/common-cgroups/cgroup-topology-rules.h
+                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.c
+                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
                         src/collectors/network-viewer.plugin/network-viewer.c
                 )
         endif()
@@ -3331,6 +3398,11 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         if(OS_FREEBSD)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/libnetdata/local-sockets/local-sockets-freebsd.h
+                        src/collectors/common-cgroups/cgroup-topology-rules.c
+                        src/collectors/common-cgroups/cgroup-topology-rules.h
+                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
                         src/collectors/network-viewer.plugin/network-viewer.c
                 )
         endif()
@@ -3351,6 +3423,18 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         install(TARGETS network-viewer.plugin
                 COMPONENT plugin-network-viewer
                 DESTINATION usr/libexec/netdata/plugins.d)
+
+        if(OS_LINUX)
+                add_executable(network-viewer-apps-lookup-client-test EXCLUDE_FROM_ALL
+                        src/collectors/network-viewer.plugin/tests/test_network_viewer_apps_lookup_client.c)
+                target_link_libraries(network-viewer-apps-lookup-client-test libnetdata)
+
+                add_executable(network-viewer-topology-containers-test EXCLUDE_FROM_ALL
+                        src/collectors/network-viewer.plugin/tests/test_network_viewer_topology_containers.c
+                        src/collectors/common-cgroups/cgroup-topology-rules.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c)
+                target_link_libraries(network-viewer-topology-containers-test libnetdata)
+        endif()
 
         if(BUILD_FOR_PACKAGING)
                 install(FILES
@@ -3601,6 +3685,18 @@ if(ENABLE_PLUGIN_GO)
     add_go_target(go-plugin ${GO_PLUGIN_BIN} src/go cmd/godplugin)
 
     install(PROGRAMS ${CMAKE_BINARY_DIR}/${GO_PLUGIN_BIN}
+            COMPONENT plugin-go
+            DESTINATION usr/libexec/netdata/plugins.d)
+
+    if (OS_WINDOWS)
+        set(SNMP_TRAP_PROFILE_GEN_BIN snmp-trap-profile-gen.exe)
+    else()
+        set(SNMP_TRAP_PROFILE_GEN_BIN snmp-trap-profile-gen)
+    endif()
+
+    add_go_target(snmp_trap_profile_gen ${SNMP_TRAP_PROFILE_GEN_BIN} src/go cmd/snmptrapprofilegen)
+
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/${SNMP_TRAP_PROFILE_GEN_BIN}
             COMPONENT plugin-go
             DESTINATION usr/libexec/netdata/plugins.d)
 
@@ -4409,6 +4505,74 @@ if(ENABLE_PLUGIN_GO)
     install(FILES ${GO_SNMP_META_FILES}
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata)
+    install(FILES src/go/plugin/go.d/config/go.d/snmp.profiles/metadata/iana-enterprise-numbers.txt
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata)
+
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default)
+
+    file(GLOB GO_SNMP_TRAP_PROFILE_FILES CONFIGURE_DEPENDS
+            src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/*.yaml
+            src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/*.yml)
+
+    set(SNMP_TRAP_PROFILE_PACK_DIR "${CMAKE_BINARY_DIR}/snmp-trap-profile-pack")
+    set(SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR "${SNMP_TRAP_PROFILE_PACK_DIR}/default")
+    set(SNMP_TRAP_PROFILE_PACK_STAMP "${SNMP_TRAP_PROFILE_PACK_DIR}/.compressed-stamp")
+    set(SNMP_TRAP_PROFILE_PACK_CLEAN_SCRIPT "${CMAKE_BINARY_DIR}/snmp-trap-profile-pack-clean.cmake")
+    file(WRITE "${SNMP_TRAP_PROFILE_PACK_CLEAN_SCRIPT}"
+        "file(REMOVE_RECURSE [[${SNMP_TRAP_PROFILE_PACK_DIR}]])\n")
+    file(MAKE_DIRECTORY "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}")
+
+    add_custom_command(
+            OUTPUT "${SNMP_TRAP_PROFILE_PACK_STAMP}"
+            COMMAND "${CMAKE_COMMAND}" -P "${SNMP_TRAP_PROFILE_PACK_CLEAN_SCRIPT}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}"
+            COMMAND "${CMAKE_COMMAND}" -E copy_directory
+                "${CMAKE_SOURCE_DIR}/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default"
+                "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}"
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+                "${CMAKE_SOURCE_DIR}/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json"
+                "${SNMP_TRAP_PROFILE_PACK_DIR}/catalogue.json"
+            COMMAND "${CMAKE_COMMAND}" -E env
+                GOROOT=${GO_ROOT}
+                CGO_ENABLED=0
+                GOPROXY=https://proxy.golang.org,direct
+                "${GO_EXECUTABLE}" run -buildvcs=false -ldflags "${GO_LDFLAGS}" ./cmd/snmptrapprofilegen compress-zstd --rm
+                "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}"
+                "${SNMP_TRAP_PROFILE_PACK_DIR}/catalogue.json"
+            COMMAND "${CMAKE_COMMAND}" -E touch "${SNMP_TRAP_PROFILE_PACK_STAMP}"
+            DEPENDS
+                ${GO_SNMP_TRAP_PROFILE_FILES}
+                "${CMAKE_SOURCE_DIR}/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json"
+                ${snmp_trap_profile_gen_DEPS}
+            COMMENT "Compressing SNMP trap profile pack"
+            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/src/go"
+            VERBATIM)
+    add_custom_target(snmp_trap_profile_pack ALL
+            DEPENDS "${SNMP_TRAP_PROFILE_PACK_STAMP}")
+
+    install(CODE "
+        if(NOT EXISTS \"${SNMP_TRAP_PROFILE_PACK_STAMP}\")
+            message(FATAL_ERROR \"SNMP trap profile pack is not built; build target snmp_trap_profile_pack before install\")
+        endif()
+    " COMPONENT plugin-go)
+    install(DIRECTORY "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}/"
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default
+            FILES_MATCHING
+                PATTERN "*.yaml.zst"
+                PATTERN "*.yml.zst")
+    install(FILES "${SNMP_TRAP_PROFILE_PACK_DIR}/catalogue.json.zst"
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
+    install(FILES src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
 
     install(DIRECTORY
             COMPONENT plugin-go
@@ -4420,6 +4584,17 @@ if(ENABLE_PLUGIN_GO)
     install(FILES ${GO_AZURE_MON_PROFILE_FILES}
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default)
+
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/prometheus.profiles)
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/prometheus.profiles/default)
+    file(GLOB GO_PROMETHEUS_PROFILE_FILES src/go/plugin/go.d/config/go.d/prometheus.profiles/default/*.yaml)
+    install(FILES ${GO_PROMETHEUS_PROFILE_FILES}
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/prometheus.profiles/default)
 
     if(BUILD_FOR_PACKAGING)
         install(FILES

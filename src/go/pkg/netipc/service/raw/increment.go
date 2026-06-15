@@ -8,6 +8,10 @@ type IncrementHandler func(uint64) (uint64, bool)
 // CallIncrement performs a blocking INCREMENT call.
 // Sends requestValue, returns the server's response value.
 func (c *Client) CallIncrement(requestValue uint64) (uint64, error) {
+	return c.CallIncrementWithTimeout(requestValue, 0)
+}
+
+func (c *Client) CallIncrementWithTimeout(requestValue uint64, timeoutMs uint32) (uint64, error) {
 	if err := c.validateMethod(protocol.MethodIncrement); err != nil {
 		return 0, err
 	}
@@ -20,7 +24,7 @@ func (c *Client) CallIncrement(requestValue uint64) (uint64, error) {
 			return protocol.ErrTruncated
 		}
 
-		_, payload, rerr := c.doRawCall(protocol.MethodIncrement, reqBuf[:])
+		_, payload, rerr := c.doRawCallWithTimeout(protocol.MethodIncrement, reqBuf[:], timeoutMs)
 		if rerr != nil {
 			return rerr
 		}
@@ -38,6 +42,10 @@ func (c *Client) CallIncrement(requestValue uint64) (uint64, error) {
 // CallIncrementBatch performs a blocking batch INCREMENT call.
 // Sends multiple values, returns the server's response values.
 func (c *Client) CallIncrementBatch(values []uint64) ([]uint64, error) {
+	return c.CallIncrementBatchWithTimeout(values, 0)
+}
+
+func (c *Client) CallIncrementBatchWithTimeout(values []uint64, timeoutMs uint32) ([]uint64, error) {
 	if err := c.validateMethod(protocol.MethodIncrement); err != nil {
 		return nil, err
 	}
@@ -106,7 +114,8 @@ func (c *Client) CallIncrementBatch(values []uint64) ([]uint64, error) {
 			return err
 		}
 
-		respHdr, respPayload, err := c.transportReceive()
+		respHdr, respPayload, err := c.transportReceiveWithControl(
+			c.resolvedCallTimeout(timeoutMs), c.abortSignal())
 		if err != nil {
 			return err
 		}

@@ -90,6 +90,8 @@ var (
 	ErrBadAlignment = errors.New("item not 8-byte aligned")
 	ErrBadItemCount = errors.New("item count inconsistent")
 	ErrOverflow     = errors.New("builder out of space")
+	ErrTimeout      = errors.New("synchronous call deadline expired")
+	ErrAborted      = errors.New("synchronous call aborted")
 )
 
 // ---------------------------------------------------------------------------

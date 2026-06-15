@@ -1099,6 +1099,8 @@ void ebpf_stop_threads(int sig)
     }
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 
+    ebpf_cgroup_cache_abort();
+
     for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
         enum ebpf_threads_status enabled = ebpf_module_enabled_get(&ebpf_modules[i]);
 

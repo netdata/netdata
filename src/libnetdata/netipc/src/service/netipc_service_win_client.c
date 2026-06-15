@@ -35,6 +35,14 @@ static void client_sleep_ms(uint32_t ms)
     Sleep(ms);
 }
 
+static void close_abort_event(nipc_client_ctx_t *ctx)
+{
+    if (ctx->abort_event) {
+        CloseHandle(ctx->abort_event);
+        ctx->abort_event = NULL;
+    }
+}
+
 const nipc_service_common_client_ops_t *nipc_service_win_client_ops(void)
 {
     static const nipc_service_common_client_ops_t ops = {
@@ -72,8 +80,12 @@ void nipc_client_init(nipc_client_ctx_t *ctx,
 {
     nipc_service_common_client_init(ctx, run_dir, service_name);
     ctx->session.pipe = INVALID_HANDLE_VALUE;
+    ctx->abort_event = CreateEventW(NULL, TRUE, FALSE, NULL);
 
     ctx->transport_config = service_client_config_to_transport(config);
+    ctx->call_timeout_ms = (config && config->call_timeout_ms != 0)
+        ? config->call_timeout_ms
+        : NIPC_CLIENT_CALL_TIMEOUT_DEFAULT_MS;
     if (ctx->transport_config.max_request_payload_bytes == 0)
         ctx->transport_config.max_request_payload_bytes =
             nipc_service_common_request_payload_default();
@@ -93,9 +105,40 @@ void nipc_client_status(const nipc_client_ctx_t *ctx,
     nipc_service_common_client_status(ctx, out);
 }
 
+void nipc_client_set_call_timeout(nipc_client_ctx_t *ctx, uint32_t timeout_ms)
+{
+    if (!ctx)
+        return;
+    ctx->call_timeout_ms = (timeout_ms != 0)
+        ? timeout_ms
+        : NIPC_CLIENT_CALL_TIMEOUT_DEFAULT_MS;
+}
+
+void nipc_client_abort(nipc_client_ctx_t *ctx)
+{
+    if (!ctx)
+        return;
+
+    __atomic_store_n(&ctx->abort_requested, 1u, __ATOMIC_RELEASE);
+    if (ctx->abort_event)
+        SetEvent(ctx->abort_event);
+}
+
+void nipc_client_clear_abort(nipc_client_ctx_t *ctx)
+{
+    if (!ctx)
+        return;
+
+    if (ctx->abort_event)
+        ResetEvent(ctx->abort_event);
+    __atomic_store_n(&ctx->abort_requested, 0u, __ATOMIC_RELEASE);
+}
+
 void nipc_client_close(nipc_client_ctx_t *ctx)
 {
     nipc_service_win_client_disconnect(ctx);
+    close_abort_event(ctx);
+    __atomic_store_n(&ctx->abort_requested, 0u, __ATOMIC_RELEASE);
     nipc_service_common_client_close_buffers(ctx);
 }
 

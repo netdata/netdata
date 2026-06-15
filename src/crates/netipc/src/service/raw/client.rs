@@ -1,5 +1,7 @@
 use super::common::{ensure_client_scratch, next_power_of_2_u32};
 use crate::protocol::{self, NipcError, MAX_PAYLOAD_CAP};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 #[cfg(unix)]
 pub(super) use crate::transport::posix::ClientConfig;
@@ -18,6 +20,11 @@ use crate::transport::windows::NpSession;
 
 #[cfg(windows)]
 use crate::transport::win_shm::WinShmContext;
+
+/// Default timeout for synchronous client calls.
+pub const CLIENT_CALL_TIMEOUT_DEFAULT_MS: u32 = 30_000;
+
+pub(super) const CLIENT_ABORT_POLL_MS: u32 = 100;
 
 /// Client connection state machine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,6 +78,30 @@ pub struct RawClient {
     pub(super) reconnect_count: u32,
     pub(super) call_count: u32,
     pub(super) error_count: u32,
+
+    pub(super) call_timeout_ms: u32,
+    pub(super) abort_requested: Arc<AtomicBool>,
+}
+
+/// Cloneable handle that can abort a blocking client call from another thread.
+///
+/// Abort is sticky until `clear()` is called on either the handle or the
+/// owning client.
+#[derive(Clone, Debug)]
+pub struct ClientAbortHandle {
+    requested: Arc<AtomicBool>,
+}
+
+impl ClientAbortHandle {
+    /// Request abort of an in-flight or future synchronous call.
+    pub fn abort(&self) {
+        self.requested.store(true, Ordering::Release);
+    }
+
+    /// Clear a previous abort request.
+    pub fn clear(&self) {
+        self.requested.store(false, Ordering::Release);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -123,7 +154,49 @@ impl RawClient {
             reconnect_count: 0,
             call_count: 0,
             error_count: 0,
+            call_timeout_ms: CLIENT_CALL_TIMEOUT_DEFAULT_MS,
+            abort_requested: Arc::new(AtomicBool::new(false)),
         }
+    }
+
+    pub(super) fn resolved_call_timeout(&self, timeout_ms: u32) -> u32 {
+        if timeout_ms != 0 {
+            return timeout_ms;
+        }
+        if self.call_timeout_ms != 0 {
+            return self.call_timeout_ms;
+        }
+        CLIENT_CALL_TIMEOUT_DEFAULT_MS
+    }
+
+    pub(super) fn abort_requested(&self) -> bool {
+        self.abort_requested.load(Ordering::Acquire)
+    }
+
+    /// Set the context-level default timeout for blocking calls.
+    pub fn set_call_timeout(&mut self, timeout_ms: u32) {
+        self.call_timeout_ms = if timeout_ms == 0 {
+            CLIENT_CALL_TIMEOUT_DEFAULT_MS
+        } else {
+            timeout_ms
+        };
+    }
+
+    /// Return a cloneable handle that can abort calls from another thread.
+    pub fn abort_handle(&self) -> ClientAbortHandle {
+        ClientAbortHandle {
+            requested: self.abort_requested.clone(),
+        }
+    }
+
+    /// Request abort of an in-flight or future synchronous call.
+    pub fn abort(&self) {
+        self.abort_requested.store(true, Ordering::Release);
+    }
+
+    /// Clear a previous abort request so the client can be refreshed/reused.
+    pub fn clear_abort(&self) {
+        self.abort_requested.store(false, Ordering::Release);
     }
 
     /// Attempt connect if DISCONNECTED/NOT_FOUND, reconnect if BROKEN.
@@ -231,6 +304,7 @@ impl RawClient {
     pub fn close(&mut self) {
         self.disconnect();
         self.state = ClientState::Disconnected;
+        self.clear_abort();
     }
 
     /// Tear down the current connection.

@@ -77,6 +77,8 @@ var (
 	ErrDuplicateMsgID = errors.New("duplicate message_id")
 	ErrUnknownMsgID   = errors.New("unknown response message_id")
 	ErrDisconnected   = errors.New("peer disconnected")
+	ErrTimeout        = errors.New("receive deadline expired")
+	ErrAborted        = errors.New("receive aborted")
 )
 
 func wrapErr(sentinel error, detail string) error {

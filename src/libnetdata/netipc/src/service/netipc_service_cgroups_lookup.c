@@ -51,6 +51,7 @@ typedef struct {
     const nipc_str_view_t *paths;
     uint32_t path_count;
     nipc_cgroups_lookup_resp_view_t *view_out;
+    uint32_t timeout_ms;
 } cgroups_lookup_call_state_t;
 
 static nipc_error_t do_cgroups_lookup_attempt(nipc_client_ctx_t *ctx,
@@ -80,7 +81,7 @@ static nipc_error_t do_cgroups_lookup_attempt(nipc_client_ctx_t *ctx,
     size_t payload_len;
     nipc_error_t err = nipc_service_platform_do_raw_call(
         ctx, NIPC_METHOD_CGROUPS_LOOKUP, ctx->send_buf, req_len,
-        &payload, &payload_len);
+        &payload, &payload_len, s->timeout_ms);
     if (err != NIPC_OK)
         return err;
 
@@ -107,10 +108,22 @@ nipc_error_t nipc_client_call_cgroups_lookup(
     uint32_t path_count,
     nipc_cgroups_lookup_resp_view_t *view_out)
 {
+    return nipc_client_call_cgroups_lookup_timeout(
+        ctx, paths, path_count, view_out, 0);
+}
+
+nipc_error_t nipc_client_call_cgroups_lookup_timeout(
+    nipc_client_ctx_t *ctx,
+    const nipc_str_view_t *paths,
+    uint32_t path_count,
+    nipc_cgroups_lookup_resp_view_t *view_out,
+    uint32_t timeout_ms)
+{
     cgroups_lookup_call_state_t state = {
         .paths = paths,
         .path_count = path_count,
         .view_out = view_out,
+        .timeout_ms = timeout_ms,
     };
     return nipc_service_platform_call_with_retry(
         ctx, do_cgroups_lookup_attempt, &state);

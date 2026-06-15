@@ -5,6 +5,8 @@ package funcctl
 import (
 	"context"
 	"fmt"
+	"maps"
+	"sort"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -66,12 +68,56 @@ func (c *Controller) SetAPI(api *dyncfg.Responder) {
 }
 
 func (c *Controller) RegisterModules(modules collectorapi.Registry) {
-	for name, creator := range modules {
+	names := make([]string, 0, len(modules))
+	for name := range modules {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	plannedPublicNames := make(map[string]string)
+	for _, name := range names {
+		creator := modules[name]
 		if creator.Methods == nil && creator.JobMethods == nil {
 			continue
 		}
-		c.registry.registerModule(name, creator)
+		methods := moduleMethods(creator)
+		if functionName, owner, collides := c.moduleMethodPublicNameCollision(name, methods, plannedPublicNames); collides {
+			c.Errorf("skipping function registration for module '%s': public function name '%s' collides with %s", name, functionName, owner)
+			continue
+		}
+		c.registry.registerModuleWithMethods(name, creator, methods)
 	}
+}
+
+func moduleMethods(creator collectorapi.Creator) []funcapi.MethodConfig {
+	if creator.Methods == nil {
+		return nil
+	}
+	return creator.Methods()
+}
+
+func (c *Controller) moduleMethodPublicNameCollision(moduleName string, methods []funcapi.MethodConfig, planned map[string]string) (string, string, bool) {
+	modulePlanned := make(map[string]string)
+	for _, method := range methods {
+		if method.ID == "" {
+			continue
+		}
+		owner := fmt.Sprintf("%s:%s", moduleName, method.ID)
+		for _, functionName := range funcapi.MethodFunctionNames(moduleName, method) {
+			if routeModule, routeMethod, ok := c.registry.resolveMethodRoute(functionName); ok {
+				return functionName, fmt.Sprintf("%s:%s", routeModule, routeMethod), true
+			}
+			if existing := planned[functionName]; existing != "" && existing != owner {
+				return functionName, existing, true
+			}
+			if existing := modulePlanned[functionName]; existing != "" && existing != owner {
+				return functionName, existing, true
+			}
+			modulePlanned[functionName] = owner
+		}
+	}
+	maps.Copy(planned, modulePlanned)
+	return "", "", false
 }
 
 func (c *Controller) GetJobNames(moduleName string) []string {
@@ -84,7 +130,7 @@ func (c *Controller) OnJobStart(job collectorapi.RuntimeJob) {
 	}
 
 	c.registry.addJob(job.ModuleName(), job.Name(), job)
-	c.registerModuleMethodsOnFirstJobStart(job.ModuleName())
+	c.registerModuleMethodsOnJobStart(job.ModuleName())
 
 	creator, ok := c.registry.getCreator(job.ModuleName())
 	if !ok || creator.JobMethods == nil {
@@ -107,35 +153,24 @@ func (c *Controller) OnJobStop(job collectorapi.RuntimeJob) {
 }
 
 func (c *Controller) Cleanup() {
-	for name, creator := range c.registry.snapshotCreators() {
-		if creator.Methods == nil {
-			continue
-		}
-		for _, method := range creator.Methods() {
-			if method.ID == "" {
-				continue
-			}
-			for _, funcName := range methodFunctionNames(name, method) {
-				c.fnReg.Unregister(funcName)
-				if c.api != nil {
-					c.api.FunctionRemove(funcName)
-				}
-			}
+	for funcName := range c.staticMethodsSeen {
+		c.fnReg.Unregister(funcName)
+		if c.api != nil {
+			c.api.FunctionRemove(funcName)
 		}
 	}
 }
 
-func (c *Controller) registerModuleMethodsOnFirstJobStart(moduleName string) {
-	if _, ok := c.staticMethodsSeen[moduleName]; ok {
-		return
-	}
-
+func (c *Controller) registerModuleMethodsOnJobStart(moduleName string) {
 	creator, ok := c.registry.getCreator(moduleName)
 	if !ok || creator.Methods == nil {
 		return
 	}
 
 	for _, method := range creator.Methods() {
+		if !methodAvailable(method) {
+			continue
+		}
 		if method.ID == "" {
 			c.Warningf("skipping function registration for module '%s': empty method ID", moduleName)
 			continue
@@ -153,45 +188,55 @@ func (c *Controller) registerModuleMethodsOnFirstJobStart(moduleName string) {
 				access = cloudAccess
 			}
 
-			for _, funcName := range methodFunctionNames(moduleName, method) {
-				c.fnReg.Register(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
+			for _, funcName := range funcapi.MethodFunctionNames(moduleName, method) {
+				if _, seen := c.staticMethodsSeen[funcName]; seen {
+					continue
+				}
+				c.registerFunction(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
 				c.api.FunctionGlobal(netdataapi.FunctionGlobalOpts{
 					Name:     funcName,
 					Timeout:  60,
 					Help:     help,
-					Tags:     "top",
+					Tags:     methodTags(method),
 					Access:   access,
 					Priority: 100,
 					Version:  3,
 				})
+				c.staticMethodsSeen[funcName] = struct{}{}
 			}
 			continue
 		}
 
-		for _, funcName := range methodFunctionNames(moduleName, method) {
-			c.fnReg.Register(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
+		for _, funcName := range funcapi.MethodFunctionNames(moduleName, method) {
+			if _, seen := c.staticMethodsSeen[funcName]; seen {
+				continue
+			}
+			c.registerFunction(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
+			c.staticMethodsSeen[funcName] = struct{}{}
 		}
 	}
-
-	c.staticMethodsSeen[moduleName] = struct{}{}
 }
 
-func methodFunctionNames(moduleName string, method funcapi.MethodConfig) []string {
-	funcName := fmt.Sprintf("%s:%s", moduleName, method.ID)
-	funcNames := []string{funcName}
-	seen := map[string]struct{}{funcName: {}}
-
-	for _, alias := range method.Aliases {
-		if alias == "" {
-			continue
-		}
-		if _, ok := seen[alias]; ok {
-			continue
-		}
-		seen[alias] = struct{}{}
-		funcNames = append(funcNames, alias)
+func methodTags(method funcapi.MethodConfig) string {
+	if method.Tags != "" {
+		return method.Tags
 	}
-	return funcNames
+	return "top"
+}
+
+func methodAvailable(method funcapi.MethodConfig) bool {
+	return method.Available == nil || method.Available()
+}
+
+func (c *Controller) registerFunction(name string, handler functions.Handler) {
+	if ctxReg, ok := c.fnReg.(functions.ContextRegistry); ok {
+		ctxReg.RegisterWithContext(name, handler)
+		return
+	}
+
+	c.fnReg.Register(name, func(fn functions.Function) {
+		handler(c.baseContext(), fn)
+	})
 }
 
 func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []funcapi.MethodConfig) {
@@ -201,6 +246,10 @@ func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []f
 		if method.ID == "" {
 			c.Warningf("skipping job method registration for %s[%s]: empty method ID", job.ModuleName(), job.Name())
 			continue
+		}
+		if method.FunctionName != "" || len(method.Aliases) != 0 {
+			c.Errorf("job method registration aborted for %s[%s]: method '%s' uses public FunctionName or Aliases, which are supported only for module methods", job.ModuleName(), job.Name(), method.ID)
+			return
 		}
 
 		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)
@@ -224,10 +273,8 @@ func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []f
 			continue
 		}
 
-		// FIXME: job methods currently ignore method.Aliases and publish only the
-		// canonical module:method name. Static/module methods use methodFunctionNames().
 		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)
-		c.fnReg.Register(funcName, c.makeJobMethodFuncHandler(job.ModuleName(), job.Name(), method.ID))
+		c.registerFunction(funcName, c.makeJobMethodFuncHandler(job.ModuleName(), job.Name(), method.ID))
 
 		if c.api != nil {
 			help := method.Help
@@ -245,7 +292,7 @@ func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []f
 				Name:     funcName,
 				Timeout:  60,
 				Help:     help,
-				Tags:     "top",
+				Tags:     methodTags(method),
 				Access:   access,
 				Priority: 100,
 				Version:  3,

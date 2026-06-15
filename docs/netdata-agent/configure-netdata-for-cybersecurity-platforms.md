@@ -18,6 +18,42 @@ If you are not sure which model to use, start with the smallest exposed surface:
 2. Use **access through a security platform** if you must publish the local dashboard to users.
 3. Use **private management network access** only when you already have a trusted admin network.
 
+## Required endpoints and ports
+
+For firewall and proxy allowlisting, your Netdata Agents need the following network access:
+
+| Direction | Port      | Protocol  | Purpose                                                |
+|-----------|-----------|-----------|--------------------------------------------------------|
+| Inbound   | 19999/TCP | TCP       | Local dashboard access and streaming from Child Agents |
+| Outbound  | 19999/TCP | TCP       | Streaming to a Parent Agent (Child Agents only)        |
+| Outbound  | 443/TCP   | WSS/HTTPS | Agent-Cloud Link (ACLK) and node claiming              |
+
+:::note
+
+Port `19999` is the default, configurable via `[web] port` in `netdata.conf`, and is multiplexed: the same port handles both dashboard HTTP requests and the Netdata streaming protocol (a custom binary protocol over TCP). The server auto-detects which protocol the client is using based on the initial handshake. From a firewall perspective, both are simply TCP on port `19999`.
+
+You can disable inbound access on port `19999` by setting `mode = none` in `netdata.conf` when using Cloud-only access. This also disables inbound streaming. See [Configure Cloud-only access](#configure-cloud-only-access) for details.
+
+:::
+
+### Outbound domain allowlist
+
+Allow the following Netdata Cloud domains through your firewall or proxy:
+
+| Domain               | Purpose                   |
+|----------------------|---------------------------|
+| `app.netdata.cloud`  | Netdata Cloud application |
+| `api.netdata.cloud`  | Netdata Cloud API         |
+| `mqtt.netdata.cloud` | Agent-Cloud Link MQTT     |
+
+:::important
+
+Prefer **domain-based allowlisting** over IP-based rules. IP addresses can change without notice and vary based on your geographic location due to CDN-edge servers.
+
+:::
+
+For broader firewall design principles and recommended network architecture, see [Network rules your cybersecurity platform should enforce](#network-rules-your-cybersecurity-platform-should-enforce) below.
+
 ## Configure Cloud-only access
 
 Use this pattern when your security platform mainly controls outbound traffic and users access dashboards via Netdata Cloud instead of connecting directly to port `19999`.
