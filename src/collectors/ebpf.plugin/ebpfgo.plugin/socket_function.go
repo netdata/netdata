@@ -109,6 +109,7 @@ func handleNetworkProtocols(api *netdataapi.API, fnStore *socketFunctionStore, u
 		return
 	}
 
+	pluginOutputMu.Lock()
 	api.FUNCRESULT(netdataapi.FunctionResult{
 		UID:             uid,
 		Code:            "200",
@@ -116,10 +117,12 @@ func handleNetworkProtocols(api *netdataapi.API, fnStore *socketFunctionStore, u
 		ExpireTimestamp: strconv.FormatInt(expires, 10),
 		Payload:         payload,
 	})
+	pluginOutputMu.Unlock()
 }
 
 func sendFunctionError(api *netdataapi.API, uid string, code int, msg string) {
 	payload := fmt.Sprintf(`{"status":%d,"message":"%s"}`, code, msg)
+	pluginOutputMu.Lock()
 	api.FUNCRESULT(netdataapi.FunctionResult{
 		UID:             uid,
 		Code:            strconv.Itoa(code),
@@ -127,6 +130,7 @@ func sendFunctionError(api *netdataapi.API, uid string, code int, msg string) {
 		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
 		Payload:         payload,
 	})
+	pluginOutputMu.Unlock()
 }
 
 // buildNetworkProtocolsJSON produces the JSON table matching the FreeBSD network-protocols schema.

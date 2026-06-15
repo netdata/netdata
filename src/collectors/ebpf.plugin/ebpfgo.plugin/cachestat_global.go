@@ -89,7 +89,12 @@ var cachestatGlobalCharts = []cachestatGlobalChart{
 }
 
 var cachestatGlobalChartsOnce sync.Once
-var cachestatStdoutMutex sync.Mutex
+
+// pluginOutputMu serializes all writes to the pluginsd stdout stream.
+// Cachestat's multi-call sequences (BEGIN/SET/END) and the socket
+// function handler's FUNCRESULT writes share a single api; without
+// this lock they can interleave and corrupt the protocol stream.
+var pluginOutputMu sync.Mutex
 
 // cachestatErrorLogInterval is the minimum gap between repeated stderr
 // messages from a single error site.  A persistent failure (e.g. unhealthy
@@ -170,8 +175,8 @@ func diffCounters(current, previous uint64) int64 {
 
 func createCachestatGlobalCharts(api *netdataapi.API, updateEvery int) {
 	cachestatGlobalChartsOnce.Do(func() {
-		cachestatStdoutMutex.Lock()
-		defer cachestatStdoutMutex.Unlock()
+		pluginOutputMu.Lock()
+		defer pluginOutputMu.Unlock()
 
 		if api != nil {
 			api.HOST("")
@@ -214,8 +219,8 @@ func (p cachestatGlobalPublish) write(api *netdataapi.API, usecSince int) {
 		return
 	}
 
-	cachestatStdoutMutex.Lock()
-	defer cachestatStdoutMutex.Unlock()
+	pluginOutputMu.Lock()
+	defer pluginOutputMu.Unlock()
 
 	for _, item := range []struct {
 		chart string

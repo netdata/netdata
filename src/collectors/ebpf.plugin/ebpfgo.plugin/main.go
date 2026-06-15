@@ -108,6 +108,7 @@ func main() {
 		} else if handle != nil && handle.Runtime != nil {
 			fnStore := newSocketFunctionStore(ue)
 
+			pluginOutputMu.Lock()
 			api.FUNCTIONGLOBAL(netdataapi.FunctionGlobalOpts{
 				Name:     socketFunctionName,
 				Timeout:  socketFunctionTimeout,
@@ -117,6 +118,7 @@ func main() {
 				Priority: socketFunctionPriority,
 				Version:  socketFunctionVersion,
 			})
+			pluginOutputMu.Unlock()
 
 			go runStdinDispatcher(api, fnStore, closeStop)
 
