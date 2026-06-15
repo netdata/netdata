@@ -34,11 +34,11 @@ For offline installation on Windows, see [Install Netdata on Windows](/packaging
 
 On your internet-connected machine, you'll need:
 
-| Requirement                 | Purpose                                    |
-|-----------------------------|--------------------------------------------|
-| `curl` or `wget`            | Download the script                        |
-| `sha256sum` or `shasum`     | Verify script downloads                    |
-| POSIX-compliant shell       | Required to run the script                 |
+| Requirement             | Purpose                    |
+|-------------------------|----------------------------|
+| `curl` or `wget`        | Download the script        |
+| `sha256sum` or `shasum` | Verify script downloads    |
+| POSIX-compliant shell   | Required to run the script |
 
 You also need a writable target directory for the package and a temporary directory where the user running the script can write and execute files.
 
@@ -93,7 +93,7 @@ The installation script expects the exact directory structure and filenames.
 
 :::
 
-## Install Netdata on the Target (Offline) System
+## Step 3: Install Netdata on the Target (Offline) System
 
 On the offline system, navigate into the transferred directory and run the installer:
 
