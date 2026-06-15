@@ -234,3 +234,5 @@ Then run the plugin in debug mode, specifying your target collector:
 ```
 
 Replace `<collector_name>` with the [specific collector](#available-collectors) you wish to debug.
+
+Debug mode (`-d`) runs the collector in a continuous live collection loop — it does **not** exit after producing output, so the command will appear to run indefinitely. This is expected; press **Ctrl+C** to stop it when you are done. Collection output appears periodically, once every `update_every` seconds (default: `1`), so wait at least one collection interval before concluding the collector is broken. If you see no output at all after waiting, the collector likely failed to connect to its target or no job is configured for it — check the preceding log lines for connection or autodetection errors.
