@@ -125,8 +125,8 @@ impl TierAccumulator {
         rows
     }
 
-    pub(crate) fn snapshot_open_rows(&self, now_usec: u64) -> Vec<OpenTierRow> {
-        let mut rows = Vec::new();
+    pub(crate) fn snapshot_open_rows_into(&self, now_usec: u64, rows: &mut Vec<OpenTierRow>) {
+        rows.clear();
         for (start, entries) in &self.buckets {
             let end = start.saturating_add(self.bucket_usec);
             if end <= now_usec {
@@ -141,16 +141,20 @@ impl TierAccumulator {
                 });
             }
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn snapshot_open_rows(&self, now_usec: u64) -> Vec<OpenTierRow> {
+        let mut rows = Vec::new();
+        self.snapshot_open_rows_into(now_usec, &mut rows);
         rows
     }
 
-    pub(crate) fn active_hours(&self) -> BTreeSet<u64> {
-        let mut hours = BTreeSet::new();
+    pub(crate) fn extend_active_hours(&self, hours: &mut BTreeSet<u64>) {
         for entries in self.buckets.values() {
             for flow_ref in entries.keys() {
                 hours.insert(flow_ref.hour_start_usec);
             }
         }
-        hours
     }
 }

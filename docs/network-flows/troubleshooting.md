@@ -166,12 +166,15 @@ See [Sizing and Capacity Planning](/docs/network-flows/sizing-capacity.md) for m
 **Memory growth:**
 
 ```bash
-# Watch the resident memory chart over time
-# netflow.memory_resident_bytes - rss dimension
+# Watch default lightweight state-cardinality charts over time
+# netflow.facet_values
+# netflow.tier_index_entries
+# netflow.open_tiers
 ```
 
-- If `rss` climbs and `netflow.memory_accounted_bytes` shows `unaccounted` growing, that's an unattributed allocation — could be allocator fragmentation, possibly a leak.
-- If `tier_indexes` or `open_tiers` is the climbing dimension, ingest is outpacing tier flushes. Check `netflow.materialized_tier_ops` for `flushes` rate and `*_errors`.
+- If `netflow.facet_values` climbs, facet vocabulary is growing.
+- If `netflow.tier_index_entries` or `netflow.open_tiers` climbs, ingest is outpacing tier flushes. Check `netflow.materialized_tier_ops` for `flushes` rate and `*_errors`.
+- If you need byte-level attribution, enable `charts.memory_diagnostics` in `netflow.yaml` and inspect `netflow.memory_resident_bytes` and `netflow.memory_accounted_bytes`.
 - If `netflow.decoder_scopes` is growing without bound, your exporter is rotating template IDs. Investigate per-router behaviour.
 
 **Tier commit worker health:**
@@ -235,7 +238,7 @@ Collect this before opening a bug report:
 
 - Plugin version (`netdata --version` from the running daemon).
 - A sample of `netflow.input_packets` chart for the failure window — all dimensions visible.
-- A sample of `netflow.memory_resident_bytes` if performance-related.
+- A sample of `netflow.facet_values`, `netflow.tier_index_entries`, and `netflow.open_tiers` if performance-related. Include `netflow.memory_resident_bytes` only if memory diagnostics were enabled.
 - A small packet-capture file (`tcpdump -w` from the agent's interface) reproducing the issue.
 - Sanitised `netflow.yaml` (redact internal IPs, customer names, secrets).
 - Relevant log lines from `journalctl --namespace netdata`.

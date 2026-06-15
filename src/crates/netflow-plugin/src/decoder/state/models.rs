@@ -6,6 +6,16 @@ pub(crate) struct DecoderStateNamespaceKey {
     pub(crate) observation_domain_id: u32,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DecoderPacketContext {
+    pub(crate) version: u16,
+    pub(crate) exporter_ip: IpAddr,
+    pub(crate) observation_domain_id: u32,
+    // Derived once so packet-path callers reuse the same scope without reallocating it.
+    pub(crate) parser_source: SocketAddr,
+    pub(crate) key: DecoderStateNamespaceKey,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct PersistedSamplingRate {
     pub(crate) version: u16,

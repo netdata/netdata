@@ -56,8 +56,15 @@ impl NetflowFlowsHandler {
                     .map_err(|err| NetdataPluginError::Other {
                         message: format!("failed to autocomplete facet values: {err:#}"),
                     })?;
-            let mut stats = self.metrics.snapshot();
-            stats.extend(query_output.stats);
+            let query::FlowAutocompleteQueryOutput {
+                agent_id,
+                field,
+                term,
+                values,
+                mut stats,
+                warnings,
+            } = query_output;
+            self.metrics.extend_snapshot(&mut stats);
 
             Ok(FlowsFunctionResponse::Autocomplete(
                 FlowAutocompleteResponse {
@@ -68,14 +75,14 @@ impl NetflowFlowsHandler {
                         schema_version: FLOWS_SCHEMA_VERSION.to_string(),
                         source: "netflow".to_string(),
                         layer: "3".to_string(),
-                        agent_id: query_output.agent_id,
+                        agent_id,
                         collected_at: Utc::now().to_rfc3339(),
                         mode: "autocomplete".to_string(),
-                        field: query_output.field,
-                        term: query_output.term,
-                        values: query_output.values,
+                        field,
+                        term,
+                        values,
                         stats,
-                        warnings: query_output.warnings,
+                        warnings,
                     },
                     has_history: true,
                     update_every: FLOWS_UPDATE_EVERY_SECONDS,
@@ -98,8 +105,16 @@ impl NetflowFlowsHandler {
                 message: format!("failed to query flow metrics: {err:#}"),
             })?;
             let view = request.normalized_view().to_string();
-            let mut stats = self.metrics.snapshot();
-            stats.extend(query_output.stats);
+            let query::FlowMetricsQueryOutput {
+                agent_id,
+                group_by,
+                columns,
+                metric,
+                chart,
+                mut stats,
+                warnings,
+            } = query_output;
+            self.metrics.extend_snapshot(&mut stats);
 
             Ok(FlowsFunctionResponse::Metrics(FlowMetricsResponse {
                 status: 200,
@@ -109,15 +124,15 @@ impl NetflowFlowsHandler {
                     schema_version: FLOWS_SCHEMA_VERSION.to_string(),
                     source: "netflow".to_string(),
                     layer: "3".to_string(),
-                    agent_id: query_output.agent_id,
+                    agent_id,
                     collected_at: Utc::now().to_rfc3339(),
                     view,
-                    group_by: query_output.group_by,
-                    columns: query_output.columns,
-                    metric: query_output.metric,
-                    chart: query_output.chart,
+                    group_by,
+                    columns,
+                    metric,
+                    chart,
                     stats,
-                    warnings: query_output.warnings,
+                    warnings,
                 },
                 has_history: true,
                 update_every: FLOWS_UPDATE_EVERY_SECONDS,
@@ -144,8 +159,17 @@ impl NetflowFlowsHandler {
                 message: format!("failed to query flows: {err:#}"),
             })?;
             let view = request.normalized_view().to_string();
-            let mut stats = self.metrics.snapshot();
-            stats.extend(query_output.stats);
+            let query::FlowQueryOutput {
+                agent_id,
+                group_by,
+                columns,
+                flows,
+                mut stats,
+                metrics,
+                warnings,
+                facets,
+            } = query_output;
+            self.metrics.extend_snapshot(&mut stats);
 
             Ok(FlowsFunctionResponse::Table(FlowsResponse {
                 status: 200,
@@ -155,16 +179,16 @@ impl NetflowFlowsHandler {
                     schema_version: FLOWS_SCHEMA_VERSION.to_string(),
                     source: "netflow".to_string(),
                     layer: "3".to_string(),
-                    agent_id: query_output.agent_id,
+                    agent_id,
                     collected_at: Utc::now().to_rfc3339(),
                     view,
-                    group_by: query_output.group_by,
-                    columns: query_output.columns,
-                    flows: query_output.flows,
+                    group_by,
+                    columns,
+                    flows,
                     stats,
-                    metrics: query_output.metrics,
-                    warnings: query_output.warnings,
-                    facets: query_output.facets,
+                    metrics,
+                    warnings,
+                    facets,
                 },
                 has_history: true,
                 update_every: FLOWS_UPDATE_EVERY_SECONDS,

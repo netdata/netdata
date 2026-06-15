@@ -15,14 +15,29 @@ impl FlowDecoders {
         }
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn decoder_state_namespace_key(
         source: SocketAddr,
         payload: &[u8],
     ) -> Option<DecoderStateNamespaceKey> {
-        let (_version, observation_domain_id) = template_scope(payload)?;
-        Some(DecoderStateNamespaceKey {
-            exporter_ip: canonicalize_ip_addr(source.ip()).to_string(),
+        Self::decoder_packet_context(source, payload).map(|context| context.key)
+    }
+
+    pub(crate) fn decoder_packet_context(
+        source: SocketAddr,
+        payload: &[u8],
+    ) -> Option<DecoderPacketContext> {
+        let (version, observation_domain_id) = template_scope(payload)?;
+        let exporter_ip = canonicalize_ip_addr(source.ip());
+        Some(DecoderPacketContext {
+            version,
+            exporter_ip,
             observation_domain_id,
+            parser_source: SocketAddr::new(exporter_ip, 0),
+            key: DecoderStateNamespaceKey {
+                exporter_ip: exporter_ip.to_string(),
+                observation_domain_id,
+            },
         })
     }
 
@@ -38,24 +53,32 @@ impl FlowDecoders {
         self.loaded_decoder_namespaces.contains(key)
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn decoder_state_source_needs_hydration(
         &self,
         key: &DecoderStateNamespaceKey,
         source: SocketAddr,
     ) -> bool {
         let source = normalize_template_scope_source(source);
+        self.decoder_state_normalized_source_needs_hydration(key, source)
+    }
+
+    pub(crate) fn decoder_state_normalized_source_needs_hydration(
+        &self,
+        key: &DecoderStateNamespaceKey,
+        source: SocketAddr,
+    ) -> bool {
         !self
             .hydrated_namespace_sources
             .get(key)
             .is_some_and(|sources| sources.contains(&source))
     }
 
-    pub(crate) fn mark_decoder_state_namespace_absent(
+    pub(crate) fn mark_decoder_state_namespace_absent_for_normalized_source(
         &mut self,
         key: DecoderStateNamespaceKey,
         source: SocketAddr,
     ) {
-        let source = normalize_template_scope_source(source);
         self.loaded_decoder_namespaces.insert(key.clone());
         self.decoder_state_namespaces
             .entry(key.clone())

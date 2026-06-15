@@ -2,11 +2,12 @@ use super::{
     CANONICAL_FLOW_DEFAULTS, DECODER_STATE_HEADER_LEN, DECODER_STATE_MAGIC,
     DECODER_STATE_SCHEMA_VERSION, DIRECTION_EGRESS, DIRECTION_INGRESS, DecapsulationMode,
     DecodeStats, DecodedFlow, DecoderStateNamespace, ETYPE_IPV4, ETYPE_IPV6, FlowDecoders,
-    FlowFields, FlowRecord, MAX_DECODER_STATE_PAYLOAD_LEN, SamplingState, TimestampSource,
-    append_mpls_label, append_unique_flows, apply_icmp_port_fallback, apply_v9_special_mappings,
-    decode_persisted_namespace_file, decode_v9_special_from_raw_payload, default_exporter_name,
-    field_tracks_presence, finalize_canonical_flow_fields, normalize_direction_value,
-    observe_v9_templates_from_raw_payload, to_field_token, xxhash64,
+    FlowFields, FlowRecord, IPFIX_FIELD_DATALINK_FRAME_SECTION, IPFIX_FIELD_DIRECTION,
+    IPFIX_FIELD_INPUT_SNMP, IPFIX_SET_ID_TEMPLATE, MAX_DECODER_STATE_PAYLOAD_LEN, SamplingState,
+    TimestampSource, append_mpls_label, append_unique_flows, apply_icmp_port_fallback,
+    apply_v9_special_mappings, decode_persisted_namespace_file, decode_v9_special_from_raw_payload,
+    default_exporter_name, field_tracks_presence, finalize_canonical_flow_fields,
+    normalize_direction_value, observe_v9_templates_from_raw_payload, to_field_token, xxhash64,
 };
 use crate::enrichment::FlowEnricher;
 use crate::plugin_config::{EnrichmentConfig, NetworkAttributesConfig, NetworkAttributesValue};
@@ -1030,6 +1031,121 @@ fn synthetic_v9_datalink_special_decoder_matches_expected_projection() {
             ("IPTTL", "119"),
             ("IP_FRAGMENT_ID", "36608"),
         ],
+    );
+}
+
+#[test]
+fn v9_datalink_decode_is_scoped_by_exporter_and_source_id() {
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
+    let other_exporter = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), 2055);
+    let frame = synthetic_vlan_ipv4_udp_frame();
+    let template = synthetic_v9_datalink_template_packet(256, 42, frame.len() as u16);
+    let matching_data = synthetic_v9_datalink_data_packet(256, 42, 582, 0, &frame);
+    let other_source_id_data = synthetic_v9_datalink_data_packet(256, 43, 582, 0, &frame);
+    let mut decoders = FlowDecoders::new();
+
+    let template_context = FlowDecoders::decoder_packet_context(source, &template);
+    let _ = decoders.decode_udp_payload_at_with_context(
+        source,
+        &template,
+        TEST_INPUT_REALTIME_USEC,
+        template_context.as_ref(),
+    );
+
+    let other_exporter_context =
+        FlowDecoders::decoder_packet_context(other_exporter, &matching_data);
+    let decoded = decoders.decode_udp_payload_at_with_context(
+        other_exporter,
+        &matching_data,
+        TEST_INPUT_REALTIME_USEC,
+        other_exporter_context.as_ref(),
+    );
+    assert!(
+        decoded.flows.is_empty(),
+        "v9 datalink templates must not cross exporter IP scope"
+    );
+
+    let other_source_id_context =
+        FlowDecoders::decoder_packet_context(source, &other_source_id_data);
+    let decoded = decoders.decode_udp_payload_at_with_context(
+        source,
+        &other_source_id_data,
+        TEST_INPUT_REALTIME_USEC,
+        other_source_id_context.as_ref(),
+    );
+    assert!(
+        decoded.flows.is_empty(),
+        "v9 datalink templates must not cross source ID scope"
+    );
+
+    let matching_context = FlowDecoders::decoder_packet_context(source, &matching_data);
+    let decoded = decoders.decode_udp_payload_at_with_context(
+        source,
+        &matching_data,
+        TEST_INPUT_REALTIME_USEC,
+        matching_context.as_ref(),
+    );
+    assert_eq!(
+        decoded.flows.len(),
+        1,
+        "matching v9 datalink template scope should still decode"
+    );
+}
+
+#[test]
+fn ipfix_datalink_decode_is_scoped_by_exporter_and_observation_domain() {
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
+    let other_exporter = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), 2055);
+    let frame = synthetic_vlan_ipv4_udp_frame();
+    let template = synthetic_ipfix_datalink_template_packet(256, 42, frame.len() as u16);
+    let matching_data = synthetic_ipfix_datalink_data_packet(256, 42, 582, 0, &frame);
+    let other_domain_data = synthetic_ipfix_datalink_data_packet(256, 43, 582, 0, &frame);
+    let mut decoders = FlowDecoders::new();
+
+    let template_context = FlowDecoders::decoder_packet_context(source, &template);
+    let _ = decoders.decode_udp_payload_at_with_context(
+        source,
+        &template,
+        TEST_INPUT_REALTIME_USEC,
+        template_context.as_ref(),
+    );
+
+    let other_exporter_context =
+        FlowDecoders::decoder_packet_context(other_exporter, &matching_data);
+    let decoded = decoders.decode_udp_payload_at_with_context(
+        other_exporter,
+        &matching_data,
+        TEST_INPUT_REALTIME_USEC,
+        other_exporter_context.as_ref(),
+    );
+    assert!(
+        decoded.flows.is_empty(),
+        "ipfix datalink templates must not cross exporter IP scope"
+    );
+
+    let other_domain_context = FlowDecoders::decoder_packet_context(source, &other_domain_data);
+    let decoded = decoders.decode_udp_payload_at_with_context(
+        source,
+        &other_domain_data,
+        TEST_INPUT_REALTIME_USEC,
+        other_domain_context.as_ref(),
+    );
+    assert!(
+        decoded.flows.is_empty(),
+        "ipfix datalink templates must not cross observation domain scope"
+    );
+
+    let matching_context = FlowDecoders::decoder_packet_context(source, &matching_data);
+    let decoded = decoders.decode_udp_payload_at_with_context(
+        source,
+        &matching_data,
+        TEST_INPUT_REALTIME_USEC,
+        matching_context.as_ref(),
+    );
+    assert_eq!(
+        decoded.flows.len(),
+        1,
+        "matching ipfix datalink template scope should still decode"
     );
 }
 
@@ -2874,6 +2990,61 @@ fn persisted_decoder_state_keeps_latest_effective_template_only() {
 }
 
 #[test]
+fn decoder_packet_context_reuses_scope_and_normalized_source() {
+    let source = SocketAddr::new("::ffff:192.0.2.10".parse().unwrap(), 2055);
+    let payload = synthetic_v9_datalink_template_packet(256, 42, 96);
+    let context = FlowDecoders::decoder_packet_context(source, &payload)
+        .expect("expected v9 decoder packet context");
+
+    assert_eq!(context.version, 9);
+    assert_eq!(
+        context.exporter_ip,
+        IpAddr::V4(Ipv4Addr::new(192, 0, 2, 10))
+    );
+    assert_eq!(context.observation_domain_id, 42);
+    assert_eq!(
+        context.parser_source,
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 10)), 0)
+    );
+    assert_eq!(
+        context.key,
+        super::DecoderStateNamespaceKey {
+            exporter_ip: "192.0.2.10".to_string(),
+            observation_domain_id: 42,
+        }
+    );
+}
+
+#[test]
+fn decoder_scope_snapshot_tracks_context_reused_namespace_and_hydration() {
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
+    let alternate_source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9999);
+    let template = synthetic_v9_datalink_template_packet(256, 42, 96);
+    let data = synthetic_v9_datalink_data_packet(256, 42, 582, 0, &synthetic_vlan_ipv4_udp_frame());
+    let mut decoders = FlowDecoders::new();
+
+    let _ = decoders.decode_udp_payload(source, &template);
+    let snapshot = decoders.decoder_scope_snapshot();
+    assert_eq!(snapshot.namespaces, 1);
+    assert_eq!(snapshot.hydrated_sources, 1);
+    assert_eq!(snapshot.v9_sources, 1);
+
+    let decoded = decoders.decode_udp_payload(alternate_source, &data);
+    assert_eq!(decoded.flows.len(), 1);
+
+    let snapshot = decoders.decoder_scope_snapshot();
+    assert_eq!(snapshot.namespaces, 1);
+    assert_eq!(
+        snapshot.hydrated_sources, 1,
+        "source-port churn must keep one normalized hydrated source"
+    );
+    assert_eq!(
+        snapshot.v9_sources, 1,
+        "source-port churn must keep one parser source"
+    );
+}
+
+#[test]
 fn v9_parser_scope_reuses_templates_across_source_port_churn() {
     let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
     let alternate_source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9999);
@@ -3450,6 +3621,77 @@ fn synthetic_v9_datalink_data_packet(
     flowset.extend_from_slice(frame);
     flowset.resize(flowset_len, 0);
     packet.extend_from_slice(&flowset);
+    packet
+}
+
+fn synthetic_ipfix_header(
+    packet_len: u16,
+    export_time: u32,
+    sequence: u32,
+    observation_domain_id: u32,
+) -> Vec<u8> {
+    let mut out = Vec::with_capacity(16);
+    out.extend_from_slice(&10_u16.to_be_bytes());
+    out.extend_from_slice(&packet_len.to_be_bytes());
+    out.extend_from_slice(&export_time.to_be_bytes());
+    out.extend_from_slice(&sequence.to_be_bytes());
+    out.extend_from_slice(&observation_domain_id.to_be_bytes());
+    out
+}
+
+fn synthetic_ipfix_datalink_template_packet(
+    template_id: u16,
+    observation_domain_id: u32,
+    datalink_length: u16,
+) -> Vec<u8> {
+    let mut set = Vec::with_capacity(20);
+    set.extend_from_slice(&IPFIX_SET_ID_TEMPLATE.to_be_bytes());
+    set.extend_from_slice(&20_u16.to_be_bytes());
+    set.extend_from_slice(&template_id.to_be_bytes());
+    set.extend_from_slice(&3_u16.to_be_bytes());
+    set.extend_from_slice(&IPFIX_FIELD_INPUT_SNMP.to_be_bytes());
+    set.extend_from_slice(&4_u16.to_be_bytes());
+    set.extend_from_slice(&IPFIX_FIELD_DIRECTION.to_be_bytes());
+    set.extend_from_slice(&1_u16.to_be_bytes());
+    set.extend_from_slice(&IPFIX_FIELD_DATALINK_FRAME_SECTION.to_be_bytes());
+    set.extend_from_slice(&datalink_length.to_be_bytes());
+
+    let mut packet = synthetic_ipfix_header(
+        (16 + set.len()) as u16,
+        1_700_000_000,
+        1,
+        observation_domain_id,
+    );
+    packet.extend_from_slice(&set);
+    packet
+}
+
+fn synthetic_ipfix_datalink_data_packet(
+    template_id: u16,
+    observation_domain_id: u32,
+    in_if: u32,
+    direction: u8,
+    frame: &[u8],
+) -> Vec<u8> {
+    let record_len = 4_usize.saturating_add(1).saturating_add(frame.len());
+    let padding = (4 - (record_len % 4)) % 4;
+    let set_len = 4_usize.saturating_add(record_len).saturating_add(padding);
+
+    let mut set = Vec::with_capacity(set_len);
+    set.extend_from_slice(&template_id.to_be_bytes());
+    set.extend_from_slice(&(set_len as u16).to_be_bytes());
+    set.extend_from_slice(&in_if.to_be_bytes());
+    set.push(direction);
+    set.extend_from_slice(frame);
+    set.resize(set_len, 0);
+
+    let mut packet = synthetic_ipfix_header(
+        (16 + set.len()) as u16,
+        1_700_000_001,
+        2,
+        observation_domain_id,
+    );
+    packet.extend_from_slice(&set);
     packet
 }
 

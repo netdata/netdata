@@ -54,6 +54,7 @@ pub(crate) fn decode_netflow(
     enable_v7: bool,
     enable_v9: bool,
     enable_ipfix: bool,
+    packet_context: Option<&DecoderPacketContext>,
 ) -> DecodedBatch {
     let mut batch = DecodedBatch {
         stats: DecodeStats {
@@ -63,10 +64,15 @@ pub(crate) fn decode_netflow(
         ..Default::default()
     };
 
-    // Skip special datalink-frame decode paths when no datalink templates are registered.
+    // Skip special datalink-frame decode paths when this packet has no scoped templates.
     // These functions parse the raw payload looking for template-matched records — pointless
     // when no templates exist, and they are a significant fraction of per-packet CPU cost.
-    let raw_v9_flows = if enable_v9 && sampling.has_any_v9_datalink_templates() {
+    let raw_v9_flows = if enable_v9
+        && packet_context.is_some_and(|context| {
+            context.version == 9
+                && sampling
+                    .has_v9_datalink_templates(context.exporter_ip, context.observation_domain_id)
+        }) {
         decode_v9_special_from_raw_payload(
             source,
             payload,
@@ -79,7 +85,14 @@ pub(crate) fn decode_netflow(
         Vec::new()
     };
 
-    let raw_ipfix_flows = if enable_ipfix && sampling.has_any_ipfix_datalink_templates() {
+    let raw_ipfix_flows = if enable_ipfix
+        && packet_context.is_some_and(|context| {
+            context.version == 10
+                && sampling.has_ipfix_datalink_templates(
+                    context.exporter_ip,
+                    context.observation_domain_id,
+                )
+        }) {
         decode_ipfix_special_from_raw_payload(
             source,
             payload,
@@ -92,7 +105,11 @@ pub(crate) fn decode_netflow(
         Vec::new()
     };
 
-    match parser.parse_from_source(normalize_template_scope_source(source), payload) {
+    let parser_source = packet_context
+        .map(|context| context.parser_source)
+        .unwrap_or_else(|| normalize_template_scope_source(source));
+
+    match parser.parse_from_source(parser_source, payload) {
         Ok(packets) => {
             batch.stats.parsed_packets = packets.len() as u64;
             for packet in packets {

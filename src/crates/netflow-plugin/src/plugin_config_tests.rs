@@ -247,6 +247,86 @@ fn plugin_enabled_defaults_to_true() {
 }
 
 #[test]
+fn memory_diagnostics_default_to_disabled_with_bounded_interval() {
+    let cfg = PluginConfig::default();
+
+    assert!(!cfg.charts.memory_diagnostics.enabled);
+    assert_eq!(
+        cfg.charts.memory_diagnostics.interval,
+        Duration::from_secs(10)
+    );
+}
+
+#[test]
+fn yaml_can_enable_memory_diagnostics() {
+    let yaml = r#"
+memory_diagnostics:
+  enabled: true
+  interval: 30s
+"#;
+
+    let charts: ChartsConfig = serde_yaml::from_str(yaml).expect("yaml should parse");
+    let mut cfg = PluginConfig::default();
+    cfg.charts = charts;
+
+    assert!(cfg.charts.memory_diagnostics.enabled);
+    assert_eq!(
+        cfg.charts.memory_diagnostics.interval,
+        Duration::from_secs(30)
+    );
+    cfg.validate().expect("configuration should validate");
+}
+
+#[test]
+fn plugin_yaml_can_enable_nested_memory_diagnostics() {
+    let yaml = r#"
+enabled: true
+listener:
+  listen: "127.0.0.1:2055"
+  max_packet_size: 9216
+  sync_every_entries: 1024
+  sync_interval: 1s
+protocols:
+  v5: true
+  v7: true
+  v9: true
+  ipfix: true
+  sflow: true
+  decapsulation_mode: none
+  timestamp_source: input
+journal:
+  journal_dir: flows
+  query_max_groups: 50000
+charts:
+  memory_diagnostics:
+    enabled: true
+    interval: 30s
+"#;
+
+    let cfg: PluginConfig = serde_yaml::from_str(yaml).expect("yaml should parse");
+
+    assert!(cfg.charts.memory_diagnostics.enabled);
+    assert_eq!(
+        cfg.charts.memory_diagnostics.interval,
+        Duration::from_secs(30)
+    );
+    cfg.validate().expect("configuration should validate");
+}
+
+#[test]
+fn validate_rejects_subsecond_memory_diagnostics_interval_when_enabled() {
+    let mut cfg = PluginConfig::default();
+    cfg.charts.memory_diagnostics.enabled = true;
+    cfg.charts.memory_diagnostics.interval = Duration::from_millis(500);
+
+    let err = cfg.validate().expect_err("expected validation error");
+    assert!(
+        err.to_string()
+            .contains("charts.memory_diagnostics.interval must be at least 1s")
+    );
+}
+
+#[test]
 fn deserialized_empty_enrichment_section_keeps_provider_defaults() {
     let cfg: EnrichmentConfig = serde_yaml::from_str("{}").expect("parse enrichment config");
 

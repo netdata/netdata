@@ -1,7 +1,10 @@
 use super::*;
 use crate::facet_runtime::FacetMemoryBreakdown;
+use crate::facet_runtime::FacetRuntime;
 use crate::memory_allocator::AllocatorMemorySample;
-use crate::tiering::{FlowMetrics, OpenTierRow, TierFlowRef};
+use crate::plugin_config::{MemoryDiagnosticsConfig, PluginConfig};
+use crate::tiering::{FlowMetrics, OpenTierRow, TierFlowIndexStore, TierFlowRef};
+use rt::PluginRuntime;
 
 #[test]
 fn chart_metadata_uses_honest_contexts_and_units() {
@@ -47,6 +50,21 @@ fn chart_metadata_uses_honest_contexts_and_units() {
     assert_eq!(decoder.context, "netdata.netflow.decoder_scopes");
     assert_eq!(decoder.units, "scopes");
 
+    let facet_values = FacetValueMetrics::chart_metadata();
+    assert_eq!(facet_values.context, "netdata.netflow.facet_values");
+    assert_eq!(facet_values.units, "values");
+
+    let facet_fields = FacetFieldMetrics::chart_metadata();
+    assert_eq!(facet_fields.context, "netdata.netflow.facet_fields");
+    assert_eq!(facet_fields.units, "fields");
+
+    let tier_index_entries = TierIndexEntryMetrics::chart_metadata();
+    assert_eq!(
+        tier_index_entries.context,
+        "netdata.netflow.tier_index_entries"
+    );
+    assert_eq!(tier_index_entries.units, "entries");
+
     let commit_age = TierCommitAgeMetrics::chart_metadata();
     assert_eq!(commit_age.context, "netdata.netflow.tier_commit_age");
     assert_eq!(commit_age.family, "netflow");
@@ -72,6 +90,29 @@ fn chart_metadata_uses_honest_contexts_and_units() {
         "netdata.netflow.tier_commit_stretched"
     );
     assert_eq!(commit_stretched.units, "events/s");
+}
+
+#[test]
+fn memory_byte_charts_are_registered_only_when_enabled() {
+    let (reader, writer) = tokio::io::duplex(64);
+    let mut runtime = PluginRuntime::with_streams("netflow-test", reader, writer);
+    let charts = NetflowCharts::new(&mut runtime, &PluginConfig::default().charts);
+
+    assert!(!charts.memory_diagnostics_registered_for_test());
+
+    let (reader, writer) = tokio::io::duplex(64);
+    let mut runtime = PluginRuntime::with_streams("netflow-test", reader, writer);
+    let charts = NetflowCharts::new(
+        &mut runtime,
+        &ChartsConfig {
+            memory_diagnostics: MemoryDiagnosticsConfig {
+                enabled: true,
+                interval: Duration::from_secs(10),
+            },
+        },
+    );
+
+    assert!(charts.memory_diagnostics_registered_for_test());
 }
 
 #[test]
@@ -113,50 +154,62 @@ fn snapshot_collects_current_metric_totals_and_open_rows() {
     let snapshot = NetflowChartsSnapshot::collect(
         &metrics,
         (1, 2, 0),
-        1234,
-        TierIndexSamplerState {
-            bytes: 5678,
-            breakdown: crate::tiering::TierFlowIndexMemoryBreakdown {
-                index_keys_bytes: 100,
-                schema_bytes: 200,
-                field_store_bytes: 300,
-                flow_lookup_bytes: 400,
-                row_storage_bytes: 500,
-                scratch_field_ids_bytes: 600,
-            },
+        crate::tiering::TierFlowIndexCardinality {
+            hours: 2,
+            flows: 42,
         },
-        FacetMemoryBreakdown {
-            archived_bytes: 10,
-            active_bytes: 20,
-            active_contributions_bytes: 30,
-            published_bytes: 40,
-            archived_path_bytes: 50,
+        FacetCardinalitySnapshot {
+            populated_fields: 5,
+            total_values: 70,
+            exposed_values: 35,
+            autocomplete_fields: 2,
         },
-        ProcessMemorySample {
-            rss_bytes: 10_000,
-            hwm_bytes: 20_000,
-            rss_anon_bytes: 3_000,
-            rss_file_bytes: 4_000,
-            rss_shmem_bytes: 5_000,
-            anon_huge_pages_bytes: 6_000,
-            resident_mappings: ProcessResidentMappingBreakdown {
-                heap_bytes: 700,
-                anon_other_bytes: 800,
-                journal_raw_bytes: 900,
-                journal_1m_bytes: 1_000,
-                journal_5m_bytes: 1_100,
-                journal_1h_bytes: 1_200,
-                geoip_asn_bytes: 1_250,
-                geoip_geo_bytes: 1_275,
-                other_file_bytes: 1_300,
-                shmem_bytes: 1_400,
+        MemoryDiagnosticsSample {
+            open_tier_bytes: 1234,
+            tier_index: TierIndexSamplerState {
+                bytes: 5678,
+                breakdown: crate::tiering::TierFlowIndexMemoryBreakdown {
+                    index_keys_bytes: 100,
+                    schema_bytes: 200,
+                    field_store_bytes: 300,
+                    flow_lookup_bytes: 400,
+                    row_storage_bytes: 500,
+                    scratch_field_ids_bytes: 600,
+                },
             },
-            allocator: AllocatorMemorySample {
-                heap_in_use_bytes: 111,
-                heap_free_bytes: 222,
-                heap_arena_bytes: 333,
-                mmap_in_use_bytes: 444,
-                releasable_bytes: 555,
+            facet_breakdown: FacetMemoryBreakdown {
+                archived_bytes: 10,
+                active_bytes: 20,
+                active_contributions_bytes: 30,
+                published_bytes: 40,
+                archived_path_bytes: 50,
+            },
+            process_memory: ProcessMemorySample {
+                rss_bytes: 10_000,
+                hwm_bytes: 20_000,
+                rss_anon_bytes: 3_000,
+                rss_file_bytes: 4_000,
+                rss_shmem_bytes: 5_000,
+                anon_huge_pages_bytes: 6_000,
+                resident_mappings: ProcessResidentMappingBreakdown {
+                    heap_bytes: 700,
+                    anon_other_bytes: 800,
+                    journal_raw_bytes: 900,
+                    journal_1m_bytes: 1_000,
+                    journal_5m_bytes: 1_100,
+                    journal_1h_bytes: 1_200,
+                    geoip_asn_bytes: 1_250,
+                    geoip_geo_bytes: 1_275,
+                    other_file_bytes: 1_300,
+                    shmem_bytes: 1_400,
+                },
+                allocator: AllocatorMemorySample {
+                    heap_in_use_bytes: 111,
+                    heap_free_bytes: 222,
+                    heap_arena_bytes: 333,
+                    mmap_in_use_bytes: 444,
+                    releasable_bytes: 555,
+                },
             },
         },
     );
@@ -177,6 +230,12 @@ fn snapshot_collects_current_metric_totals_and_open_rows() {
     assert_eq!(snapshot.decoder_scopes.legacy_sources, 7);
     assert_eq!(snapshot.decoder_scopes.namespaces, 8);
     assert_eq!(snapshot.decoder_scopes.hydrated_sources, 9);
+    assert_eq!(snapshot.facet_values.total, 70);
+    assert_eq!(snapshot.facet_values.exposed, 35);
+    assert_eq!(snapshot.facet_fields.populated, 5);
+    assert_eq!(snapshot.facet_fields.autocomplete, 2);
+    assert_eq!(snapshot.tier_index_entries.hours, 2);
+    assert_eq!(snapshot.tier_index_entries.flows, 42);
     assert_eq!(snapshot.tier_commit_age.minute_1, 12);
     assert_eq!(snapshot.tier_commit_duration.minute_5, 345);
     assert_eq!(snapshot.tier_commit_batches.hour_1, 67);
@@ -223,7 +282,7 @@ fn snapshot_collects_current_metric_totals_and_open_rows() {
 }
 
 #[test]
-fn try_sample_open_tier_state_reads_current_lengths_and_bytes() {
+fn try_sample_open_tier_state_reads_current_lengths() {
     let state = RwLock::new(OpenTierState {
         generation: 1,
         minute_1: vec![
@@ -257,7 +316,6 @@ fn try_sample_open_tier_state_reads_current_lengths_and_bytes() {
 
     let sample = try_sample_open_tier_state(&state).expect("open tier sample");
     assert_eq!(sample.counts, (2, 1, 0));
-    assert!(sample.bytes > 0);
 }
 
 #[test]
@@ -274,17 +332,8 @@ fn sample_open_tier_state_reuses_previous_lengths_when_write_lock_is_contended()
     let _guard = state.write().expect("take write lock");
 
     assert_eq!(
-        sample_open_tier_state(
-            &state,
-            OpenTierSamplerState {
-                counts: (7, 8, 9),
-                bytes: 123
-            }
-        ),
-        OpenTierSamplerState {
-            counts: (7, 8, 9),
-            bytes: 123
-        }
+        sample_open_tier_state(&state, OpenTierSamplerState { counts: (7, 8, 9) }),
+        OpenTierSamplerState { counts: (7, 8, 9) }
     );
 }
 
@@ -318,4 +367,196 @@ fn try_sample_open_tier_state_recovers_from_poison_and_clears_poisoned_state() {
         !state.is_poisoned(),
         "successful recovery should clear the poison flag"
     );
+}
+
+#[test]
+fn chart_sampler_work_helper_collects_production_sampler_inputs() {
+    let tmp = tempfile::tempdir().expect("create chart sampler tempdir");
+    let metrics = IngestMetrics::default();
+    metrics.udp_packets_received.store(3, Ordering::Relaxed);
+
+    let open_tiers = RwLock::new(OpenTierState {
+        generation: 1,
+        minute_1: vec![OpenTierRow {
+            timestamp_usec: 1,
+            flow_ref: TierFlowRef {
+                hour_start_usec: 1,
+                flow_id: 1,
+            },
+            metrics: FlowMetrics::default(),
+        }],
+        minute_5: Vec::new(),
+        hour_1: Vec::new(),
+    });
+    let tier_flow_indexes = RwLock::new(TierFlowIndexStore::default());
+    let facet_runtime = FacetRuntime::new(tmp.path());
+    let resident_mapping_paths = ProcessResidentMappingPaths::new(
+        &tmp.path().join("raw"),
+        &tmp.path().join("1m"),
+        &tmp.path().join("5m"),
+        &tmp.path().join("1h"),
+        &[],
+        &[],
+    );
+    let mut state = ChartSamplerWorkState::default();
+
+    let sample = sample_chart_sampler_work_for_test(
+        &metrics,
+        &open_tiers,
+        &tier_flow_indexes,
+        &facet_runtime,
+        &resident_mapping_paths,
+        &ChartsConfig::default(),
+        &mut state,
+    );
+
+    assert_eq!(sample.open_tier_counts, (1, 0, 0));
+    assert_eq!(sample.tier_index_hours, 0);
+    assert_eq!(sample.tier_index_flows, 0);
+    assert_eq!(
+        sample.memory_diagnostics,
+        MemoryDiagnosticsSample::default()
+    );
+}
+
+#[test]
+fn chart_sampler_work_helper_collects_memory_diagnostics_only_when_enabled() {
+    let tmp = tempfile::tempdir().expect("create chart sampler tempdir");
+    let metrics = IngestMetrics::default();
+    let open_tiers = RwLock::new(OpenTierState {
+        generation: 1,
+        minute_1: vec![OpenTierRow {
+            timestamp_usec: 1,
+            flow_ref: TierFlowRef {
+                hour_start_usec: 1,
+                flow_id: 1,
+            },
+            metrics: FlowMetrics::default(),
+        }],
+        minute_5: Vec::new(),
+        hour_1: Vec::new(),
+    });
+    let tier_flow_indexes = RwLock::new(TierFlowIndexStore::default());
+    let facet_runtime = FacetRuntime::new(tmp.path());
+    let resident_mapping_paths = ProcessResidentMappingPaths::new(
+        &tmp.path().join("raw"),
+        &tmp.path().join("1m"),
+        &tmp.path().join("5m"),
+        &tmp.path().join("1h"),
+        &[],
+        &[],
+    );
+    let mut disabled_state = ChartSamplerWorkState::default();
+    let mut enabled_state = ChartSamplerWorkState::default();
+    let enabled_config = ChartsConfig {
+        memory_diagnostics: MemoryDiagnosticsConfig {
+            enabled: true,
+            interval: Duration::from_secs(10),
+        },
+    };
+
+    let disabled = sample_chart_sampler_work_for_test(
+        &metrics,
+        &open_tiers,
+        &tier_flow_indexes,
+        &facet_runtime,
+        &resident_mapping_paths,
+        &ChartsConfig::default(),
+        &mut disabled_state,
+    );
+    let enabled_sample = sample_chart_sampler_work_for_test(
+        &metrics,
+        &open_tiers,
+        &tier_flow_indexes,
+        &facet_runtime,
+        &resident_mapping_paths,
+        &enabled_config,
+        &mut enabled_state,
+    );
+
+    assert_eq!(
+        disabled.memory_diagnostics,
+        MemoryDiagnosticsSample::default()
+    );
+    #[cfg(target_os = "linux")]
+    assert_ne!(
+        enabled_sample.memory_diagnostics.process_memory,
+        ProcessMemorySample::default()
+    );
+    assert!(enabled_sample.memory_diagnostics.open_tier_bytes > 0);
+}
+
+#[test]
+fn chart_sampler_work_helper_refreshes_memory_diagnostics_on_configured_cadence() {
+    let tmp = tempfile::tempdir().expect("create chart sampler tempdir");
+    let metrics = IngestMetrics::default();
+    let open_tiers = RwLock::new(OpenTierState {
+        generation: 1,
+        minute_1: vec![OpenTierRow {
+            timestamp_usec: 1,
+            flow_ref: TierFlowRef {
+                hour_start_usec: 1,
+                flow_id: 1,
+            },
+            metrics: FlowMetrics::default(),
+        }],
+        minute_5: Vec::new(),
+        hour_1: Vec::new(),
+    });
+    let tier_flow_indexes = RwLock::new(TierFlowIndexStore::default());
+    let facet_runtime = FacetRuntime::new(tmp.path());
+    let resident_mapping_paths = ProcessResidentMappingPaths::new(
+        &tmp.path().join("raw"),
+        &tmp.path().join("1m"),
+        &tmp.path().join("5m"),
+        &tmp.path().join("1h"),
+        &[],
+        &[],
+    );
+    let config = ChartsConfig {
+        memory_diagnostics: MemoryDiagnosticsConfig {
+            enabled: true,
+            interval: Duration::from_secs(2),
+        },
+    };
+    let mut state = ChartSamplerWorkState::default();
+
+    let first = sample_chart_sampler_work_for_test(
+        &metrics,
+        &open_tiers,
+        &tier_flow_indexes,
+        &facet_runtime,
+        &resident_mapping_paths,
+        &config,
+        &mut state,
+    );
+    let first_bytes = first.memory_diagnostics.open_tier_bytes;
+    assert!(first_bytes > 0);
+
+    {
+        let mut guard = open_tiers.write().expect("open tier write lock");
+        guard.minute_1.reserve_exact(128);
+    }
+
+    let second = sample_chart_sampler_work_for_test(
+        &metrics,
+        &open_tiers,
+        &tier_flow_indexes,
+        &facet_runtime,
+        &resident_mapping_paths,
+        &config,
+        &mut state,
+    );
+    assert_eq!(second.memory_diagnostics.open_tier_bytes, first_bytes);
+
+    let third = sample_chart_sampler_work_for_test(
+        &metrics,
+        &open_tiers,
+        &tier_flow_indexes,
+        &facet_runtime,
+        &resident_mapping_paths,
+        &config,
+        &mut state,
+    );
+    assert!(third.memory_diagnostics.open_tier_bytes > first_bytes);
 }

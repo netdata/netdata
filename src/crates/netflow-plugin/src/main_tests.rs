@@ -956,6 +956,9 @@ fn default_group_by_required_param_preserves_selected_field_order() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_flows_function_returns_expected_response_sections() {
     let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
+    metrics
+        .udp_packets_received
+        .store(12_345, Ordering::Relaxed);
     let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
         .await
         .expect("create query service");
@@ -1019,6 +1022,15 @@ async fn e2e_flows_function_returns_expected_response_sections() {
     assert!(
         !response.data.metrics.is_empty(),
         "expected top-level metrics to remain in table-family response"
+    );
+    assert_eq!(
+        response.data.stats.get("udp_packets_received").copied(),
+        Some(12_345),
+        "expected table response stats to include ingest counters"
+    );
+    assert!(
+        response.data.stats.contains_key("query_returned_rows"),
+        "expected table response stats to include query-specific counters"
     );
     assert!(
         response
@@ -1220,6 +1232,7 @@ async fn e2e_flows_function_honors_cancelled_execution_context() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_flows_function_supports_autocomplete_mode() {
     let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
+    metrics.udp_bytes_received.store(98_765, Ordering::Relaxed);
     let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
         .await
         .expect("create query service");
@@ -1255,11 +1268,24 @@ async fn e2e_flows_function_supports_autocomplete_mode() {
             .any(|entry| entry["value"] == "6"),
         "expected autocomplete values to contain protocol 6"
     );
+    assert_eq!(
+        response.data.stats.get("udp_bytes_received").copied(),
+        Some(98_765),
+        "expected autocomplete response stats to include ingest counters"
+    );
+    assert!(
+        response
+            .data
+            .stats
+            .contains_key("query_facet_autocomplete_values"),
+        "expected autocomplete response stats to include query-specific counters"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallback() {
     let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
+    metrics.parse_attempts.store(54_321, Ordering::Relaxed);
     let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
         .await
         .expect("create query service");
@@ -1305,6 +1331,11 @@ async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallba
     assert_eq!(
         response.data.stats.get("query_bucket_seconds").copied(),
         Some(60)
+    );
+    assert_eq!(
+        response.data.stats.get("decoded_parse_attempts").copied(),
+        Some(54_321),
+        "expected timeseries response stats to include ingest counters"
     );
     assert!(
         response.data.chart["view"]["dimensions"]["ids"]
