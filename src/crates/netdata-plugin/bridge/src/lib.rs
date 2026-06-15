@@ -18,7 +18,7 @@ pub mod function;
 use netdata_plugin_types::{FunctionDeclaration, FunctionResult};
 use serde::{Deserialize, Serialize};
 
-use config::PluginConfig;
+use config::{LegacyLogsConfig, PluginConfig};
 
 /// Max ferryboat message size for the supervisor ↔ worker IPC links.
 ///
@@ -94,6 +94,44 @@ pub enum LedgerRequest {
 /// Messages sent from the ledger worker back to the supervisor.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LedgerResponse {
+    /// Worker is initialized and ready. Carries zero or more function declarations.
+    Ready {
+        declarations: Vec<FunctionDeclaration>,
+    },
+    /// Function completed.
+    Result(FunctionResult),
+    /// Progress update for a running function.
+    Progress {
+        transaction: String,
+        done: usize,
+        total: usize,
+    },
+}
+
+// --- Legacy OTel logs viewer subprocess ---
+
+/// Messages sent from the supervisor to the legacy-logs worker.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LegacyLogsRequest {
+    /// Configuration for the worker (sent once after connection).
+    Configure(LegacyLogsConfig),
+    /// Execute a function.
+    Call {
+        transaction: String,
+        timeout: u32,
+        name: String,
+        args: Vec<String>,
+        payload: Option<Vec<u8>>,
+    },
+    /// Cancel a running function.
+    Cancel { transaction: String },
+    /// Shut down gracefully.
+    Shutdown,
+}
+
+/// Messages sent from the legacy-logs worker back to the supervisor.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LegacyLogsResponse {
     /// Worker is initialized and ready. Carries zero or more function declarations.
     Ready {
         declarations: Vec<FunctionDeclaration>,

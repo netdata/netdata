@@ -26,6 +26,44 @@ pub struct PluginConfig {
     pub writer_socket_path: String,
 }
 
+/// Configuration for the read-only legacy OTel logs viewer worker.
+///
+/// The former otel plugin stored logs as systemd journal files; this worker
+/// serves a read-only `legacy-otel-logs` function over those files. The new
+/// [`PluginConfig`] schema does not carry the former `logs.journal_dir`, so the
+/// supervisor resolves the directory (and the viewer's cache location)
+/// separately and sends them here. The viewer never writes to `journal_dir`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LegacyLogsConfig {
+    /// Directory holding the former otel-plugin journal files. Read-only.
+    pub journal_dir: PathBuf,
+    /// Disk-backed index cache directory for the viewer.
+    pub cache_dir: PathBuf,
+    /// Number of file indexes to keep in memory.
+    pub memory_capacity: usize,
+    /// Disk cache capacity for file indexes.
+    pub disk_capacity: ByteSize,
+    /// Max distinct values indexed per field (cardinality cap).
+    pub max_unique_values_per_field: usize,
+    /// Max indexed field payload size in bytes.
+    pub max_field_payload_size: usize,
+}
+
+impl LegacyLogsConfig {
+    /// Build with the former viewer's stock indexing defaults; the supervisor
+    /// supplies the resolved directories.
+    pub fn new(journal_dir: PathBuf, cache_dir: PathBuf) -> Self {
+        Self {
+            journal_dir,
+            cache_dir,
+            memory_capacity: 1000,
+            disk_capacity: ByteSize::mb(32),
+            max_unique_values_per_field: 500,
+            max_field_payload_size: 100,
+        }
+    }
+}
+
 /// gRPC server endpoint configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EndpointConfig {

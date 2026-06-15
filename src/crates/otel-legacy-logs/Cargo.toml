@@ -1,5 +1,5 @@
 [package]
-name = "otel-plugin"
+name = "otel-legacy-logs"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -7,25 +7,18 @@ rust-version.workspace = true
 [lints]
 workspace = true
 
-[[bin]]
-name = "otel-plugin"
-path = "src/main.rs"
-
 [dependencies]
 anyhow = { workspace = true }
+async-trait = { workspace = true }
 bridge = { path = "../netdata-plugin/bridge" }
-clap = { workspace = true }
-bytesize = { workspace = true }
 ferryboat = { workspace = true }
-humantime = { workspace = true }
+netdata-plugin-error = { path = "../netdata-plugin/error" }
 netdata-plugin-protocol = { path = "../netdata-plugin/protocol" }
+netdata-plugin-schema = { path = "../netdata-plugin/schema" }
 netdata-plugin-types = { path = "../netdata-plugin/types" }
-otel-ledger = { workspace = true }
-otel-ingestor = { path = "../otel-ingestor" }
-otel-legacy-logs = { path = "../otel-legacy-logs" }
-rt = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
+journal-function = { workspace = true }
+journal-index = { workspace = true }
 serde_json = { workspace = true }
-serde_yaml = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 tracing = { workspace = true }

@@ -13,6 +13,7 @@ members = [
     "journal-log-writer",
     "journal-engine",
     "journal-registry",
+    "journal-function",
 
     # Netdata plugin workspace members
     "netdata-plugin/error",
@@ -37,6 +38,7 @@ members = [
 
     "otel-normalize",
     "otel-ingestor",
+    "otel-legacy-logs",
 
     # WAL
     "file-registry",
@@ -193,6 +195,7 @@ journal-index = { path = "journal-index", default-features = false }
 chunk-file = { path = "chunk-file" }
 journal-engine = { path = "journal-engine" }
 journal-registry = { path = "journal-registry" }
+journal-function = { path = "journal-function" }
 rdp = { path = "rdp" }
 fst-index = { path = "fst-index" }
 treight = { path = "treight" }

@@ -2597,6 +2597,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "journal-function"
+version = "0.1.3"
+dependencies = [
+ "allocative",
+ "chrono",
+ "journal-core",
+ "journal-engine",
+ "journal-index",
+ "journal-registry",
+ "nix 0.30.1",
+ "rt",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "journal-index"
 version = "0.1.3"
 dependencies = [
@@ -3766,6 +3786,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "otel-legacy-logs"
+version = "0.1.3"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bridge",
+ "ferryboat",
+ "journal-function",
+ "journal-index",
+ "netdata-plugin-error",
+ "netdata-plugin-protocol",
+ "netdata-plugin-schema",
+ "netdata-plugin-types",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "otel-normalize"
 version = "0.1.3"
 dependencies = [
@@ -3787,6 +3827,7 @@ dependencies = [
  "netdata-plugin-types",
  "otel-ingestor",
  "otel-ledger",
+ "otel-legacy-logs",
  "rt",
  "serde",
  "serde_json",

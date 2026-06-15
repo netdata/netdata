@@ -10,7 +10,7 @@ mod env;
 mod logs;
 mod metrics;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use bridge::config::PluginConfig;
@@ -19,6 +19,91 @@ use serde::Deserialize;
 use endpoint::EndpointOverride;
 use logs::LogsOverride;
 use metrics::MetricsOverride;
+
+/// Standard-install fallback when the agent's log directory is unknown.
+const LEGACY_DEFAULT_JOURNAL_DIR: &str = "/var/log/netdata/otel/v1";
+
+/// Resolve the read-only journal directory of the former otel plugin.
+/// The former schema's `logs.journal_dir` does not exist in the
+/// current [`PluginConfig`], so this reads it in place from the user otel.yaml
+/// (then stock), tolerating the former schema since neither file denies unknown
+/// fields. The viewer never writes here.
+///
+/// The default mirrors the former plugin's `@logdir_POST@/otel/v1`: the agent's
+/// log directory (`NETDATA_LOG_DIR`) plus `otel/v1`, so custom install prefixes
+/// and in-place upgrades resolve correctly. It falls back to the standard
+/// `/var/log/netdata/otel/v1` only when `NETDATA_LOG_DIR` is unset.
+pub fn resolve_legacy_journal_dir() -> PathBuf {
+    const CONFIG_FILENAME: &str = "otel.yaml";
+
+    let mut candidates = Vec::new();
+    if let Ok(dir) = std::env::var("NETDATA_USER_CONFIG_DIR") {
+        candidates.push(Path::new(&dir).join(CONFIG_FILENAME));
+    }
+    if let Ok(dir) = std::env::var("NETDATA_STOCK_CONFIG_DIR") {
+        candidates.push(Path::new(&dir).join(CONFIG_FILENAME));
+    }
+
+    for path in candidates {
+        let Ok(contents) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        match journal_dir_from_yaml(&contents) {
+            Ok(Some(dir)) => {
+                tracing::info!(
+                    "resolved former otel journal_dir from {}: {}",
+                    path.display(),
+                    dir.display()
+                );
+                return dir;
+            }
+            // Parsed, but no `logs.journal_dir` override here — try the next candidate.
+            Ok(None) => {}
+            // A malformed otel.yaml must not fall back to the default *silently*:
+            // the user may have set logs.journal_dir behind the syntax error, so we
+            // still fall back (next candidate, then the default) but warn loudly so
+            // the unexpected directory choice is traceable.
+            Err(e) => {
+                tracing::warn!(
+                    "could not parse {} while resolving the former otel journal_dir; \
+                     ignoring it and continuing: {e}",
+                    path.display()
+                );
+            }
+        }
+    }
+
+    // Default to the former plugin's templated `@logdir_POST@/otel/v1`, i.e. the
+    // agent's log directory plus `otel/v1`. Standard service installs report
+    // `NETDATA_LOG_DIR=/var/log/netdata`, matching the historical default.
+    if let Ok(log_dir) = std::env::var("NETDATA_LOG_DIR") {
+        return Path::new(&log_dir).join("otel").join("v1");
+    }
+
+    PathBuf::from(LEGACY_DEFAULT_JOURNAL_DIR)
+}
+
+/// Extract `logs.journal_dir` from a (possibly former-schema) otel.yaml.
+///
+/// Returns `Ok(None)` when the file parses but carries no override, and `Err`
+/// when the YAML is malformed (the caller warns and falls back rather than
+/// silently using the default). Unknown fields are tolerated — the former
+/// schema is a superset and neither config file denies unknown fields.
+fn journal_dir_from_yaml(contents: &str) -> Result<Option<PathBuf>, serde_yaml::Error> {
+    #[derive(Deserialize)]
+    struct Probe {
+        #[serde(default)]
+        logs: Option<LogsProbe>,
+    }
+    #[derive(Deserialize)]
+    struct LogsProbe {
+        #[serde(default)]
+        journal_dir: Option<PathBuf>,
+    }
+
+    let probe: Probe = serde_yaml::from_str(contents)?;
+    Ok(probe.logs.and_then(|logs| logs.journal_dir))
+}
 
 /// Load and resolve the plugin configuration.
 ///
@@ -580,5 +665,43 @@ logs:
             apply_overrides(&mut config, &env);
             assert_eq!(config.endpoint.path, "0.0.0.0:4317");
         });
+    }
+
+    // -- Legacy journal_dir resolution (former-schema otel.yaml parsing) --
+    //
+    // These cover the pure extraction + the malformed-file signal. The full
+    // env/file precedence (user → stock → NETDATA_LOG_DIR → default) is exercised
+    // by the best-effort E2E rather than a unit test: it depends on process-global
+    // env vars (unsafe to mutate under edition 2024) and the host config layout.
+
+    #[test]
+    fn journal_dir_from_yaml_reads_former_field() {
+        let dir = journal_dir_from_yaml("logs:\n  journal_dir: /var/log/netdata/otel/v1\n")
+            .expect("valid yaml parses");
+        assert_eq!(dir.as_deref(), Some(Path::new("/var/log/netdata/otel/v1")));
+    }
+
+    #[test]
+    fn journal_dir_from_yaml_tolerates_superset_schema() {
+        // The current schema's logs.wal/index fields coexist with the former
+        // logs.journal_dir; unknown fields must not prevent extraction.
+        let yaml = "logs:\n  journal_dir: /data/otel/v1\n  wal:\n    dir: /x\n  index:\n    dir: /y\n";
+        let dir = journal_dir_from_yaml(yaml).expect("valid yaml parses");
+        assert_eq!(dir.as_deref(), Some(Path::new("/data/otel/v1")));
+    }
+
+    #[test]
+    fn journal_dir_from_yaml_none_when_absent() {
+        // logs present but no journal_dir, and no logs section at all → no override.
+        assert_eq!(journal_dir_from_yaml("logs:\n  wal:\n    dir: /x\n").unwrap(), None);
+        assert_eq!(journal_dir_from_yaml("endpoint:\n  path: x\n").unwrap(), None);
+        assert_eq!(journal_dir_from_yaml("").unwrap(), None);
+    }
+
+    #[test]
+    fn journal_dir_from_yaml_errors_on_malformed() {
+        // A syntax error must surface as Err so the caller warns instead of
+        // silently falling back to the default (which would hide a user override).
+        assert!(journal_dir_from_yaml("logs:\n  journal_dir: [unterminated\n").is_err());
     }
 }

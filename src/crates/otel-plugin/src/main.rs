@@ -18,6 +18,12 @@ enum WorkerKind {
         #[arg(long)]
         socket: String,
     },
+    /// Run the read-only legacy OTel logs viewer worker.
+    LegacyLogs {
+        /// IPC socket path for communication with the supervisor.
+        #[arg(long)]
+        socket: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -54,6 +60,9 @@ async fn run_worker(kind: WorkerKind) -> anyhow::Result<()> {
         WorkerKind::Ledger { socket } => otel_ledger::run_worker(&socket)
             .await
             .context("ledger worker failed"),
+        WorkerKind::LegacyLogs { socket } => otel_legacy_logs::run_worker(&socket)
+            .await
+            .context("legacy-logs worker failed"),
     }
 }
 
@@ -65,6 +74,7 @@ async fn main() {
         Some(CliCommand::Worker { kind }) => match kind {
             WorkerKind::Ingestor { .. } => "otel-plugin/ingestor",
             WorkerKind::Ledger { .. } => "otel-plugin/ledger",
+            WorkerKind::LegacyLogs { .. } => "otel-plugin/legacy-logs",
         },
         None => "otel-plugin",
     };
