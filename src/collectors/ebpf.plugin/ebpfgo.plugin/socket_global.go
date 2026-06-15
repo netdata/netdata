@@ -45,16 +45,14 @@ type socketGlobalState struct {
 	prev        libbpfloader.SocketSnapshot
 }
 
-// socketDelta returns abs(current - prev).  On the first non-zero read (prev==0)
-// it returns 0 to avoid a false spike from the accumulated counter history.
+// socketDelta returns the increment of a monotonically increasing BPF counter.
+// Returns 0 when prev is zero (first read — avoids a spike from accumulated
+// counter history) or when current is not greater than prev (counter reset or wrap).
 func socketDelta(current, prev uint64) uint64 {
-	if current == prev || prev == 0 {
+	if prev == 0 || current <= prev {
 		return 0
 	}
-	if current > prev {
-		return current - prev
-	}
-	return prev - current
+	return current - prev
 }
 
 // bytesToKbits converts byte count to kilobits (×8 ÷ 1000), matching the C plugin.
