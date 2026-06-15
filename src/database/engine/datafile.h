@@ -75,7 +75,7 @@ struct rrdengine_datafile {
     } writers;
 
     struct {
-        SPINLOCK spinlock;
+        SPINLOCK_TRACKED spinlock;  // tracked: 3600s deadlock fatals here are un-triagable without holder identity
         unsigned lockers;
         unsigned lockers_by_reason[DATAFILE_ACQUIRE_MAX];
         bool available;

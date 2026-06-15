@@ -53,6 +53,36 @@ void spinlock_unlock_with_trace(SPINLOCK *spinlock, const char *func __maybe_unu
 bool spinlock_trylock_with_trace(SPINLOCK *spinlock, const char *func __maybe_unused);
 #define spinlock_trylock(spinlock) spinlock_trylock_with_trace(spinlock, __FUNCTION__)
 
+// ----------------------------------------------------------------------------
+// SPINLOCK_TRACKED: a spinlock that records its current holder (thread id,
+// acquire-site function, and acquire time) so the deadlock detector can name
+// the holder, not just the waiter, in its fatal message.
+//
+// Unlike SPINLOCK's locker_pid (NETDATA_INTERNAL_CHECKS-only), the holder is
+// recorded in PRODUCTION. The cost (a cached gettid, a monotonic clock read,
+// and a few relaxed stores per acquire) is paid ONLY by the few known-
+// contended locks that opt in to this type; every plain SPINLOCK is untouched
+// and pays nothing. Use it on locks whose 3600s deadlock fatals are
+// un-triagable without holder identity.
+typedef struct netdata_spinlock_tracked {
+    SPINLOCK spinlock;
+    pid_t holder_tid;           // gettid_cached() of the current holder; 0 when free
+    const char *holder_func;    // acquire-site function (rodata literal); NULL when free
+    usec_t holder_since_ut;     // monotonic time the current holder acquired the lock
+} SPINLOCK_TRACKED;
+
+void spinlock_tracked_init_with_trace(SPINLOCK_TRACKED *spinlock, const char *func);
+#define spinlock_tracked_init(spinlock) spinlock_tracked_init_with_trace(spinlock, __FUNCTION__)
+
+void spinlock_tracked_lock_with_trace(SPINLOCK_TRACKED *spinlock, const char *func);
+#define spinlock_tracked_lock(spinlock) spinlock_tracked_lock_with_trace(spinlock, __FUNCTION__)
+
+void spinlock_tracked_unlock_with_trace(SPINLOCK_TRACKED *spinlock, const char *func __maybe_unused);
+#define spinlock_tracked_unlock(spinlock) spinlock_tracked_unlock_with_trace(spinlock, __FUNCTION__)
+
+bool spinlock_tracked_trylock_with_trace(SPINLOCK_TRACKED *spinlock, const char *func);
+#define spinlock_tracked_trylock(spinlock) spinlock_tracked_trylock_with_trace(spinlock, __FUNCTION__)
+
 #endif
 
 #endif //NETDATA_SPINLOCK_H
