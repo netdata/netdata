@@ -451,7 +451,6 @@ set(CPACK_COMPONENT_PLUGIN-OTEL_DESCRIPTION
 
 set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_NAME "netdata-plugin-otel")
 set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_SECTION "net")
-set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_DEPENDS "netdata-plugin-otel-signal-viewer (= ${CPACK_PACKAGE_VERSION})")
 set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_CONFLICTS "netdata (<< 1.40)")
 set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_PREDEPENDS "netdata-user")
 
@@ -459,25 +458,6 @@ set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-otel/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-OTEL_DEBUGINFO_PACKAGE Off)
-
-#
-# otel-signal-viewer
-#
-
-set(CPACK_COMPONENT_PLUGIN-OTEL-SIGNAL-VIEWER_DEPENDS "netdata")
-set(CPACK_COMPONENT_PLUGIN-OTEL-SIGNAL-VIEWER_DESCRIPTION
-		"The OTel signal viewer plugin for the Netdata Agent
- This plugin provides OTel signal viewing and querying functionality
- with histogram analysis and faceted search capabilities.")
-
-set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_PACKAGE_NAME "netdata-plugin-otel-signal-viewer")
-set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_PACKAGE_SECTION "net")
-set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
-
-set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_PACKAGE_CONTROL_EXTRA
-		"${PKG_FILES_PATH}/deb/plugin-otel-signal-viewer/postinst")
-
-set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_DEBUGINFO_PACKAGE Off)
 
 #
 # netflow.plugin
@@ -719,9 +699,6 @@ if(ENABLE_PLUGIN_XENSTAT)
 endif()
 if(ENABLE_PLUGIN_OTEL)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-otel")
-endif()
-if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-otel-signal-viewer")
 endif()
 
 include(CPack)

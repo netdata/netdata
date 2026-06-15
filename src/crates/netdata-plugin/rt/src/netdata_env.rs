@@ -3,7 +3,7 @@
 use std::env;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct NetdataEnv {
     pub user_config_dir: Option<PathBuf>,
     pub stock_config_dir: Option<PathBuf>,
@@ -12,6 +12,7 @@ pub struct NetdataEnv {
     pub user_plugins_dirs: Option<Vec<PathBuf>>,
     pub web_dir: Option<PathBuf>,
     pub cache_dir: Option<PathBuf>,
+    pub run_dir: Option<PathBuf>,
     pub log_dir: Option<PathBuf>,
     pub host_prefix: Option<String>,
     pub debug_flags: Option<String>,
@@ -26,7 +27,7 @@ pub struct NetdataEnv {
     pub systemd_journal_path: Option<PathBuf>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum LogMethod {
     Syslog,
     Journal,
@@ -34,14 +35,14 @@ pub enum LogMethod {
     None,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum LogFormat {
     Journal,
     Logfmt,
     Json,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum LogLevel {
     Emergency,
     Alert,
@@ -53,7 +54,7 @@ pub enum LogLevel {
     Debug,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum SyslogFacility {
     Auth,
     Authpriv,
@@ -89,6 +90,7 @@ impl NetdataEnv {
                 .map(|s| s.split(':').map(PathBuf::from).collect()),
             web_dir: env::var("NETDATA_WEB_DIR").ok().map(PathBuf::from),
             cache_dir: env::var("NETDATA_CACHE_DIR").ok().map(PathBuf::from),
+            run_dir: env::var("NETDATA_RUN_DIR").ok().map(PathBuf::from),
             log_dir: env::var("NETDATA_LOG_DIR").ok().map(PathBuf::from),
             host_prefix: env::var("NETDATA_HOST_PREFIX").ok(),
             debug_flags: env::var("NETDATA_DEBUG_FLAGS").ok(),

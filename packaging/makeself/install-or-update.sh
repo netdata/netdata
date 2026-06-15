@@ -187,7 +187,7 @@ fi
 
 progress "changing plugins ownership and permissions"
 
-for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin ebpf-go.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin snmp-trap-profile-gen ioping.plugin cgroup-network-helper.sh otel-plugin otel-signal-viewer-plugin systemd-journal.plugin netflow-plugin; do
+for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin ebpf-go.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin snmp-trap-profile-gen ioping.plugin cgroup-network-helper.sh otel-plugin systemd-journal.plugin netflow-plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
   if [ -f "${f}" ]; then
     run chown root:${NETDATA_GROUP} "${f}"
@@ -216,11 +216,6 @@ if command -v setcap >/dev/null 2>&1; then
   if ! run setcap "${perf_caps}" "usr/libexec/netdata/plugins.d/perf.plugin"; then
     run chmod 4750 "usr/libexec/netdata/plugins.d/perf.plugin"
   fi
-  if [ -f "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin" ]; then
-    if ! run setcap "cap_dac_read_search=eip" "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"; then
-      run chmod 4750 "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"
-    fi
-  fi
   if [ -f "usr/libexec/netdata/plugins.d/systemd-journal.plugin" ]; then
     if ! run setcap "cap_dac_read_search=eip" "usr/libexec/netdata/plugins.d/systemd-journal.plugin"; then
       run chmod 4750 "usr/libexec/netdata/plugins.d/systemd-journal.plugin"
@@ -231,9 +226,6 @@ else
     f="usr/libexec/netdata/plugins.d/${x}"
     run chmod 4750 "${f}"
   done
-  if [ -f "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin" ]; then
-    run chmod 4750 "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"
-  fi
   if [ -f "usr/libexec/netdata/plugins.d/systemd-journal.plugin" ]; then
     run chmod 4750 "usr/libexec/netdata/plugins.d/systemd-journal.plugin"
   fi

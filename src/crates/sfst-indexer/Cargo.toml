@@ -1,0 +1,30 @@
+[package]
+name = "sfst-indexer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "WAL to SFST index builder: decode frames, accumulate rows, emit the container"
+
+[lints]
+workspace = true
+
+[dependencies]
+sfst = { workspace = true }
+wal = { workspace = true }
+wal-otap = { workspace = true }
+
+fst-index = { workspace = true, features = ["serde"] }
+treight = { workspace = true, features = ["roaring", "serde"] }
+file-registry = { workspace = true }
+
+bumpalo = { workspace = true }
+hashbrown = { workspace = true }
+roaring = { workspace = true }
+twox-hash = { workspace = true, features = ["xxhash64"] }
+
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+uuid = { workspace = true }

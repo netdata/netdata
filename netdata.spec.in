@@ -719,10 +719,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 # systemd-journal belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin
 
-# otel-signal-viewer belongs to a different sub-package
-%exclude %{_libexecdir}/%{name}/plugins.d/otel-signal-viewer-plugin
-%exclude %{_libdir}/%{name}/conf.d/otel-signal-viewer.yaml
-
 # xenstat belongs to a different sub-package
 %if %{_have_xenstat}
 %exclude %{_libexecdir}/%{name}/plugins.d/xenstat.plugin
@@ -3323,7 +3319,6 @@ Requires(pre): %{name}-user >= %{version}
 Summary: The Open Telemetry plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} >= %{version}
-Requires: %{name}-plugin-otel-signal-viewer = %{version}
 Conflicts: %{name} < %{version}
 %if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
@@ -3337,27 +3332,6 @@ Requires(pre): %{name}-user >= %{version}
 %files plugin-otel
 %defattr(0750,root,netdata,0750)
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/otel-plugin
-%endif
-
-%if 0%{_have_rust}
-%package plugin-otel-signal-viewer
-Summary: The OTel signal viewer plugin for the Netdata Agent
-Group: Applications/System
-Requires: %{name} = %{version}
-Conflicts: %{name} < %{version}
-%if ! %{_have_sysuser}
-Requires(pre): %{name}-user >= %{version}
-%endif
-
-%description plugin-otel-signal-viewer
- This plugin provides OTel signal viewing and querying functionality
- with histogram analysis and faceted search capabilities for the Netdata Agent.
-
-%files plugin-otel-signal-viewer
-%defattr(0750,root,netdata,0750)
-# CAP_DAC_READ_SEARCH required for reading journal files.
-%caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/otel-signal-viewer-plugin
-%attr(0640,root,netdata) %{_libdir}/%{name}/conf.d/otel-signal-viewer.yaml
 %endif
 
 %package user
