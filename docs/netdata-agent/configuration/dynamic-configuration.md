@@ -4,7 +4,7 @@
 
 :::important
 
-Netdata Cloud paid plan is required for creating, editing, testing, enabling, disabling, or removing configurations. On Community plans, you can still list configurable items.
+Netdata Cloud paid plan is required.
 
 :::
 
@@ -293,28 +293,41 @@ In Netdata, HTTP 412 is used to indicate that an authorization bearer token was 
 
 For more information, see [Secure Your Netdata Agent with Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md).
 
-### Forbidden (HTTP 403) Error When Accessing Configuration Manager
+### Disabled Alert Prototype Still Appears on Nodes
 
-If you see **"forbidden"** (HTTP 403) when opening configuration details or creating, editing, testing, enabling, disabling, or removing configurations in the Configuration Manager, one of the following restrictions is blocking the action.
+If you disabled an alert prototype (for example `10min_cpu_usage`) through the Dynamic Configuration Manager but still see the alert firing on an individual node, this happens because **a disable is processed by the single agent that receives the request and does not change any other agent's health configuration.**
 
-:::important
+**Why this happens:**
 
-Only users with an **Admin** or **Manager** role on a **paid plan** can perform Dynamic Configuration actions beyond listing. Users without Dynamic Configuration permissions and all users on the Community plan will receive **"forbidden"** for those actions.
+Each Netdata Agent — including every child in a parent/child streaming setup — maintains its own health configuration and evaluates its own alerts independently. When you disable a prototype, the change is applied by the agent whose API handled the request and takes effect only on that agent's own health evaluation. Disabling a prototype on one agent (such as a parent or a standalone node) does not change the configuration of any other agent.
+
+If the alert still appears on a node, that node's own agent is still evaluating the alert from its own local configuration.
+
+**Resolution:**
+
+Apply the disable to each agent that is actually raising the alert. You have two options:
+
+1. **Multi-node deployment (recommended):** Use the [Multi-Node Deployment](#multi-node-deployment) feature to select every node whose agent is still raising the alert and push the disabled configuration to all of them at once.
+
+2. **Manual configuration on each node:** On each affected node, disable the alert in its local health configuration, then apply the change:
+   - In `netdata.conf`, under the `[health]` section, exclude the alert name and restart the agent:
+     ```conf
+     [health]
+         enabled alarms = !10min_cpu_usage *
+     ```
+     Restarting the agent is required because `netdatacli reload-health` reloads health configuration files but does not reload `netdata.conf`.
+   - Alternatively, edit the corresponding `health.d/*.conf` file (for example `health.d/cpu.conf`), comment out the alert definition, and run `netdatacli reload-health`.
+
+   For the full manual configuration syntax, see [How to Disable or Silence Alerts](/src/health/REFERENCE.md#how-to-disable-or-silence-alerts).
+
+:::note
+
+After the disable takes effect on the correct node, an already-triggered alert clears on that node's next health evaluation cycle (based on the alert's configured check interval).
 
 :::
-
-**Common causes:**
-
-1. **Insufficient role** — Only Admin and Manager roles can perform Dynamic Configuration actions such as **View**, **Add**, **Update**, **Enable/Disable**, **Remove**, and **Test**. Troubleshooters, Observers, and Billing users can still use **List All**, but they will receive **"forbidden"** for actions beyond listing.
-2. **Community (free) plan limitation** — A paid plan is required for all Dynamic Configuration Manager actions except **List All**. Users on the Community plan will see **"forbidden"** when attempting any action beyond listing.
-
-**Resolution steps:**
-
-1. **Check your assigned role**: Go to **Space Settings → Users** and verify your role. If you are not an Admin or Manager, ask a Space Admin to upgrade your role. See the [Role-Based Access Model documentation](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for the full permissions table.
-2. **Verify your subscription plan**: If you are on the Community plan, [upgrade to a paid plan](https://www.netdata.cloud/pricing/) or ask a Space Admin to do so. A paid plan is required for all Dynamic Configuration actions except **List All**.
 
 ---
 
 Experience the efficiency and power of the Dynamic Configuration Manager in Netdata today. Whether you're managing a handful of nodes or a vast infrastructure, this feature will make your monitoring and alerting tasks smoother and more intuitive.
 
-[Read more](/docs/developer-and-contributor-corner/dyncfg.md) on developing with dynamic configuration.
+Developing with dynamic configuration? [Click here](https://learn.netdata.cloud/docs/developer-and-contributor-corner/dynamic-configuration/).
