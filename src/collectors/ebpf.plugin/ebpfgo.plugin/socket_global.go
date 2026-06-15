@@ -6,18 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
 
-const (
-	socketGlobalGroup  = "ip"
-	socketGlobalFamily = "kernel"
-	socketGlobalModule = "socket"
-	socketGlobalPlugin = "ebpf-go.plugin"
-)
-
-// socketGlobalPublish holds the per-cycle values ready for chart emission.
+// socketGlobalPublish holds the per-cycle delta values for the network-protocols function.
 //
 // TCP function/bandwidth/error charts use dimension IDs "tcp_cleanup_rbuf" and
 // "tcp_sendmsg" in the same cross-mapped order as the C plugin: the field that
@@ -34,18 +26,18 @@ type socketGlobalPublish struct {
 	tcpDimSendmsgKbits int64  // +bytesToKbits(BytesTCPCleanupRbuf) [positive = recv]
 	tcpDimSendmsgErr   uint64 // delta of ErrorTCPCleanupRbuf
 
-	tcpCloseCalls   uint64 // delta of CallsTCPClose
-	tcpRetransmit   uint64 // delta of TCPRetransmit
-	tcpV4Conn       uint64 // delta of CallsTCPConnectIPv4
-	tcpV6Conn       uint64 // delta of CallsTCPConnectIPv6
-	udpRecvCalls    uint64 // delta of CallsUDPRecvmsg
-	udpSendCalls    uint64 // delta of CallsUDPSendmsg
-	udpRecvKbits    int64  // +bytesToKbits(BytesUDPRecvmsg)
-	udpSendKbits    int64  // -bytesToKbits(BytesUDPSendmsg)     [negative = sent]
-	udpRecvErr      uint64 // delta of ErrorUDPRecvmsg
-	udpSendErr      uint64 // delta of ErrorUDPSendmsg
-	inboundTCP      uint64 // InboundConnTCP (raw cumulative; INCREMENTAL chart)
-	inboundUDP      uint64 // InboundConnUDP (raw cumulative; INCREMENTAL chart)
+	tcpCloseCalls uint64 // delta of CallsTCPClose
+	tcpRetransmit uint64 // delta of TCPRetransmit
+	tcpV4Conn     uint64 // delta of CallsTCPConnectIPv4
+	tcpV6Conn     uint64 // delta of CallsTCPConnectIPv6
+	udpRecvCalls  uint64 // delta of CallsUDPRecvmsg
+	udpSendCalls  uint64 // delta of CallsUDPSendmsg
+	udpRecvKbits  int64  // +bytesToKbits(BytesUDPRecvmsg)
+	udpSendKbits  int64  // -bytesToKbits(BytesUDPSendmsg)     [negative = sent]
+	udpRecvErr    uint64 // delta of ErrorUDPRecvmsg
+	udpSendErr    uint64 // delta of ErrorUDPSendmsg
+	inboundTCP    uint64 // delta of InboundConnTCP
+	inboundUDP    uint64 // delta of InboundConnUDP
 }
 
 type socketGlobalState struct {
@@ -71,16 +63,13 @@ func bytesToKbits(b uint64) int64 {
 }
 
 func (s *socketGlobalState) Update(snap libbpfloader.SocketSnapshot) (socketGlobalPublish, bool) {
-	p := socketGlobalPublish{
-		inboundTCP: snap.InboundConnTCP,
-		inboundUDP: snap.InboundConnUDP,
-	}
-
 	if !s.initialized {
 		s.prev = snap
 		s.initialized = true
-		return p, true
+		return socketGlobalPublish{}, true
 	}
+
+	p := socketGlobalPublish{}
 
 	// TCP function chart (cross-mapped: "tcp_cleanup_rbuf" dim ← sendmsg data).
 	p.tcpDimCleanupCalls = socketDelta(snap.CallsTCPSendmsg, s.prev.CallsTCPSendmsg)
@@ -106,14 +95,14 @@ func (s *socketGlobalState) Update(snap libbpfloader.SocketSnapshot) (socketGlob
 	p.udpRecvErr = socketDelta(snap.ErrorUDPRecvmsg, s.prev.ErrorUDPRecvmsg)
 	p.udpSendErr = socketDelta(snap.ErrorUDPSendmsg, s.prev.ErrorUDPSendmsg)
 
+	p.inboundTCP = socketDelta(snap.InboundConnTCP, s.prev.InboundConnTCP)
+	p.inboundUDP = socketDelta(snap.InboundConnUDP, s.prev.InboundConnUDP)
+
 	s.prev = snap
 	return p, true
 }
 
-// ---- chart creation --------------------------------------------------------
-
-var socketGlobalChartsOnce sync.Once
-var socketStdoutMutex sync.Mutex
+// ---- rate-limited stderr ---------------------------------------------------
 
 const socketErrorLogInterval = 60 * time.Second
 
@@ -133,191 +122,12 @@ func socketRateLimitedStderr(site, msg string) {
 	fmt.Fprint(os.Stderr, msg)
 }
 
-func createSocketGlobalCharts(api *netdataapi.API, updateEvery int) {
-	socketGlobalChartsOnce.Do(func() {
-		socketStdoutMutex.Lock()
-		defer socketStdoutMutex.Unlock()
-		emitSocketGlobalCharts(api, updateEvery)
-	})
-}
-
-func emitSocketGlobalCharts(api *netdataapi.API, updateEvery int) {
-	if api == nil {
-		return
-	}
-
-	order := 21070 // NETDATA_SOCKET_CHART_ORDER_BASE
-
-	// inbound_conn
-	api.CHART(netdataapi.ChartOpts{
-		TypeID: socketGlobalGroup, ID: "inbound_conn",
-		Title: "Inbound connections.", Units: "connections/s",
-		Family: socketGlobalFamily, Context: "ip.inbound_conn",
-		ChartType: "line", Priority: order, UpdateEvery: updateEvery,
-		Plugin: socketGlobalPlugin, Module: socketGlobalModule,
-	})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "inet_csk_accept_tcp", Name: "connected_tcp", Algorithm: "incremental", Multiplier: 1, Divisor: 1})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "inet_csk_accept_udp", Name: "connected_udp", Algorithm: "incremental", Multiplier: 1, Divisor: 1})
-	order++
-
-	// tcp_outbound_conn
-	api.CHART(netdataapi.ChartOpts{
-		TypeID: socketGlobalGroup, ID: "tcp_outbound_conn",
-		Title: "TCP outbound connections.", Units: "connections/s",
-		Family: socketGlobalFamily, Context: "ip.tcp_outbound_conn",
-		ChartType: "line", Priority: order, UpdateEvery: updateEvery,
-		Plugin: socketGlobalPlugin, Module: socketGlobalModule,
-	})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "tcp_connect_v4", Name: "connected_V4", Algorithm: "absolute", Multiplier: 1, Divisor: 1})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "tcp_connect_v6", Name: "connected_V6", Algorithm: "absolute", Multiplier: 1, Divisor: 1})
-	order++
-
-	// tcp_functions
-	api.CHART(netdataapi.ChartOpts{
-		TypeID: socketGlobalGroup, ID: "tcp_functions",
-		Title: "Calls to internal functions", Units: "calls/s",
-		Family: socketGlobalFamily, Context: "ip.tcp_functions",
-		ChartType: "line", Priority: order, UpdateEvery: updateEvery,
-		Plugin: socketGlobalPlugin, Module: socketGlobalModule,
-	})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "tcp_cleanup_rbuf", Name: "received", Algorithm: "absolute", Multiplier: 1, Divisor: 1})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "tcp_sendmsg", Name: "sent", Algorithm: "absolute", Multiplier: 1, Divisor: 1})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "tcp_close", Name: "close", Algorithm: "absolute", Multiplier: 1, Divisor: 1})
-	order++
-
-	// total_tcp_bandwidth
-	api.CHART(netdataapi.ChartOpts{
-		TypeID: socketGlobalGroup, ID: "total_tcp_bandwidth",
-		Title: "TCP bandwidth", Units: "kilobits/s",
-		Family: socketGlobalFamily, Context: "ip.total_tcp_bandwidth",
-		ChartType: "line", Priority: order, UpdateEvery: updateEvery,
-		Plugin: socketGlobalPlugin, Module: socketGlobalModule,
-	})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "tcp_cleanup_rbuf", Name: "received", Algorithm: "absolute", Multiplier: 1, Divisor: 1})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "tcp_sendmsg", Name: "sent", Algorithm: "absolute", Multiplier: 1, Divisor: 1})
-	order++
-
-	// tcp_error
-	api.CHART(netdataapi.ChartOpts{
-		TypeID: socketGlobalGroup, ID: "tcp_error",
-		Title: "TCP errors", Units: "calls/s",
-		Family: socketGlobalFamily, Context: "ip.tcp_error",
-		ChartType: "line", Priority: order, UpdateEvery: updateEvery,
-		Plugin: socketGlobalPlugin, Module: socketGlobalModule,
-	})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "tcp_cleanup_rbuf", Name: "received", Algorithm: "absolute", Multiplier: 1, Divisor: 1})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "tcp_sendmsg", Name: "sent", Algorithm: "absolute", Multiplier: 1, Divisor: 1})
-	order++
-
-	// tcp_retransmit
-	api.CHART(netdataapi.ChartOpts{
-		TypeID: socketGlobalGroup, ID: "tcp_retransmit",
-		Title: "Packages retransmitted", Units: "calls/s",
-		Family: socketGlobalFamily, Context: "ip.tcp_retransmit",
-		ChartType: "line", Priority: order, UpdateEvery: updateEvery,
-		Plugin: socketGlobalPlugin, Module: socketGlobalModule,
-	})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "tcp_retransmit_skb", Name: "retransmitted", Algorithm: "absolute", Multiplier: 1, Divisor: 1})
-	order++
-
-	// udp_functions
-	api.CHART(netdataapi.ChartOpts{
-		TypeID: socketGlobalGroup, ID: "udp_functions",
-		Title: "UDP calls", Units: "calls/s",
-		Family: socketGlobalFamily, Context: "ip.udp_functions",
-		ChartType: "line", Priority: order, UpdateEvery: updateEvery,
-		Plugin: socketGlobalPlugin, Module: socketGlobalModule,
-	})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "udp_recvmsg", Name: "received", Algorithm: "absolute", Multiplier: 1, Divisor: 1})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "udp_sendmsg", Name: "sent", Algorithm: "absolute", Multiplier: 1, Divisor: 1})
-	order++
-
-	// total_udp_bandwidth
-	api.CHART(netdataapi.ChartOpts{
-		TypeID: socketGlobalGroup, ID: "total_udp_bandwidth",
-		Title: "UDP bandwidth", Units: "kilobits/s",
-		Family: socketGlobalFamily, Context: "ip.total_udp_bandwidth",
-		ChartType: "line", Priority: order, UpdateEvery: updateEvery,
-		Plugin: socketGlobalPlugin, Module: socketGlobalModule,
-	})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "udp_recvmsg", Name: "received", Algorithm: "absolute", Multiplier: 1, Divisor: 1})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "udp_sendmsg", Name: "sent", Algorithm: "absolute", Multiplier: 1, Divisor: 1})
-	order++
-
-	// udp_error
-	api.CHART(netdataapi.ChartOpts{
-		TypeID: socketGlobalGroup, ID: "udp_error",
-		Title: "UDP errors", Units: "calls/s",
-		Family: socketGlobalFamily, Context: "ip.udp_error",
-		ChartType: "line", Priority: order, UpdateEvery: updateEvery,
-		Plugin: socketGlobalPlugin, Module: socketGlobalModule,
-	})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "udp_recvmsg", Name: "received", Algorithm: "absolute", Multiplier: 1, Divisor: 1})
-	api.DIMENSION(netdataapi.DimensionOpts{ID: "udp_sendmsg", Name: "sent", Algorithm: "absolute", Multiplier: 1, Divisor: 1})
-}
-
-// ---- chart emission --------------------------------------------------------
-
-func (p socketGlobalPublish) write(api *netdataapi.API, usecSince int) {
-	if api == nil {
-		return
-	}
-
-	socketStdoutMutex.Lock()
-	defer socketStdoutMutex.Unlock()
-
-	api.BEGIN(socketGlobalGroup, "inbound_conn", usecSince)
-	api.SET("inet_csk_accept_tcp", int64(p.inboundTCP))
-	api.SET("inet_csk_accept_udp", int64(p.inboundUDP))
-	api.END()
-
-	api.BEGIN(socketGlobalGroup, "tcp_outbound_conn", usecSince)
-	api.SET("tcp_connect_v4", int64(p.tcpV4Conn))
-	api.SET("tcp_connect_v6", int64(p.tcpV6Conn))
-	api.END()
-
-	api.BEGIN(socketGlobalGroup, "tcp_functions", usecSince)
-	api.SET("tcp_cleanup_rbuf", int64(p.tcpDimCleanupCalls))
-	api.SET("tcp_sendmsg", int64(p.tcpDimSendmsgCalls))
-	api.SET("tcp_close", int64(p.tcpCloseCalls))
-	api.END()
-
-	api.BEGIN(socketGlobalGroup, "total_tcp_bandwidth", usecSince)
-	api.SET("tcp_cleanup_rbuf", p.tcpDimCleanupKbits)
-	api.SET("tcp_sendmsg", p.tcpDimSendmsgKbits)
-	api.END()
-
-	api.BEGIN(socketGlobalGroup, "tcp_error", usecSince)
-	api.SET("tcp_cleanup_rbuf", int64(p.tcpDimCleanupErr))
-	api.SET("tcp_sendmsg", int64(p.tcpDimSendmsgErr))
-	api.END()
-
-	api.BEGIN(socketGlobalGroup, "tcp_retransmit", usecSince)
-	api.SET("tcp_retransmit_skb", int64(p.tcpRetransmit))
-	api.END()
-
-	api.BEGIN(socketGlobalGroup, "udp_functions", usecSince)
-	api.SET("udp_recvmsg", int64(p.udpRecvCalls))
-	api.SET("udp_sendmsg", int64(p.udpSendCalls))
-	api.END()
-
-	api.BEGIN(socketGlobalGroup, "total_udp_bandwidth", usecSince)
-	api.SET("udp_recvmsg", p.udpRecvKbits)
-	api.SET("udp_sendmsg", p.udpSendKbits)
-	api.END()
-
-	api.BEGIN(socketGlobalGroup, "udp_error", usecSince)
-	api.SET("udp_recvmsg", int64(p.udpRecvErr))
-	api.SET("udp_sendmsg", int64(p.udpSendErr))
-	api.END()
-}
-
 // ---- collection loop -------------------------------------------------------
 
 // runSocketGlobalCollector is the socket plugin collection loop.
 // It runs in its own goroutine alongside cachestat.
 // store may be nil when there are no apps/cgroups consumers for socket data.
-func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, stop <-chan struct{}, updateEvery int, store *cachestatSharedMemoryStore) {
+func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, updateEvery int, store *cachestatSharedMemoryStore, fnStore *socketFunctionStore) {
 	if handle == nil || handle.Runtime == nil {
 		return
 	}
@@ -326,12 +136,9 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 		updateEvery = socketDefaultUpdateEvery
 	}
 
-	createSocketGlobalCharts(api, updateEvery)
-
 	state := &socketGlobalState{}
-	lastCollection := time.Now()
 
-	collectAndPublish := func(usecSince int) {
+	collectAndPublish := func() {
 		snap, err := handle.Runtime.Snapshot(handle.MapsPerCore)
 		if err != nil {
 			socketRateLimitedStderr("socket.snapshot",
@@ -339,7 +146,7 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 			return
 		}
 		if publish, ok := state.Update(snap); ok {
-			publish.write(api, usecSince)
+			fnStore.update(publish)
 		}
 
 		if store != nil {
@@ -353,8 +160,7 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 		}
 	}
 
-	collectAndPublish(0)
-	lastCollection = time.Now()
+	collectAndPublish()
 
 	ticker := time.NewTicker(time.Duration(updateEvery) * time.Second)
 	defer ticker.Stop()
@@ -366,12 +172,6 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 		case <-ticker.C:
 		}
 
-		now := time.Now()
-		usecSince := int(now.Sub(lastCollection).Microseconds())
-		if usecSince < 0 {
-			usecSince = 0
-		}
-		lastCollection = now
-		collectAndPublish(usecSince)
+		collectAndPublish()
 	}
 }

@@ -13,13 +13,14 @@ import (
 )
 
 func main() {
-	// Cap the Go scheduler to 3 OS threads: one per active collector goroutine
-	// (cachestat, socket) plus the blocked signal-handler goroutine.  The
-	// default GOMAXPROCS = NumCPU allocates O(ncpus) scheduler threads, and
-	// CGO calls on blocked goroutines cause the runtime to create up to
-	// O(ncpus) additional threads — each carrying an 8 MB Linux stack.  On a
-	// 64-core host that is ~130 threads and ~1 GB of stack RSS for no benefit.
-	runtime.GOMAXPROCS(3)
+	// Cap the Go scheduler to 4 OS threads: one per active collector goroutine
+	// (cachestat, socket), one for the signal handler, and one for the stdin
+	// dispatcher goroutine that blocks on os.Stdin reads.  The default
+	// GOMAXPROCS = NumCPU allocates O(ncpus) scheduler threads, and CGO calls
+	// on blocked goroutines cause the runtime to create up to O(ncpus)
+	// additional threads — each carrying an 8 MB Linux stack.  On a 64-core
+	// host that is ~130 threads and ~1 GB of stack RSS for no benefit.
+	runtime.GOMAXPROCS(4)
 
 	updateEvery := 0
 	if len(os.Args) > 1 {
@@ -45,14 +46,19 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Shared stop channel: closed on SIGINT/SIGTERM so all collectors exit cleanly.
+	// Shared stop channel: closed on SIGINT/SIGTERM or stdin QUIT.
+	// closeStop uses sync.Once so both the signal handler and the stdin
+	// dispatcher can call it safely without a double-close panic.
 	stop := make(chan struct{})
+	var closeStopOnce sync.Once
+	closeStop := func() { closeStopOnce.Do(func() { close(stop) }) }
+
 	go func() {
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 		<-sigCh
 		signal.Stop(sigCh)
-		close(stop)
+		closeStop()
 	}()
 
 	api := netdataapi.New(os.Stdout)
@@ -100,10 +106,24 @@ func main() {
 		if herr != nil {
 			fmt.Fprintf(os.Stderr, "ebpf-go.plugin: socket load failed: %v\n", herr)
 		} else if handle != nil && handle.Runtime != nil {
+			fnStore := newSocketFunctionStore(ue)
+
+			api.FUNCTIONGLOBAL(netdataapi.FunctionGlobalOpts{
+				Name:     socketFunctionName,
+				Timeout:  socketFunctionTimeout,
+				Help:     socketFunctionHelp,
+				Tags:     socketFunctionTags,
+				Access:   socketFunctionAccess,
+				Priority: socketFunctionPriority,
+				Version:  socketFunctionVersion,
+			})
+
+			go runStdinDispatcher(api, fnStore, closeStop)
+
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				runSocketGlobalCollector(api, handle, stop, ue, store)
+				runSocketGlobalCollector(handle, stop, ue, store, fnStore)
 				handle.Close()
 			}()
 		}
