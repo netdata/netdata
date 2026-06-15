@@ -141,6 +141,18 @@ func TestParsePluginConfigFile(t *testing.T) {
 	}
 }
 
+func TestParsePluginConfigFileCollectPidInvalid(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ebpf.d.conf")
+	if err := os.WriteFile(path, []byte("[global]\ncollect pid = invalid\n"), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	_, _, err := parsePluginConfigFile(path)
+	if err == nil {
+		t.Fatal("expected parse error for invalid collect pid, got nil")
+	}
+}
+
 func TestParsePluginConfigFileEbpfPrograms(t *testing.T) {
 	tests := map[string]struct {
 		content       string

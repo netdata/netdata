@@ -209,9 +209,10 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			// Legacy key from the old ebpf.plugin; controls the BPF apps
 			// collection level written to the cstat_ctrl map.
 			level := parseCollectPidLevel(value)
-			if level >= 0 {
-				cfg.CollectPidLevel = intPtr(level)
+			if level < 0 {
+				return pluginConfigFile{}, false, fmt.Errorf("%s: invalid collect pid %q", path, value)
 			}
+			cfg.CollectPidLevel = intPtr(level)
 			found = true
 		}
 	}
