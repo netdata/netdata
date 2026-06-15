@@ -917,6 +917,200 @@ fn facet_vocabularies_ignore_active_filters_and_do_not_return_metrics() {
 }
 
 #[test]
+fn facet_vocabularies_keep_selected_values_for_missing_published_field() {
+    let requested_fields = vec!["PROTOCOL".to_string()];
+    let selections = HashMap::from([(
+        "PROTOCOL".to_string(),
+        vec!["6".to_string(), "17".to_string()],
+    )]);
+
+    let facets =
+        super::build_facet_vocabulary_payload(&requested_fields, &selections, &BTreeMap::new());
+
+    let protocol = facets["fields"]
+        .as_array()
+        .expect("fields array")
+        .iter()
+        .find(|entry| entry["field"] == "PROTOCOL")
+        .expect("protocol facet");
+    assert_eq!(protocol["total_values"], 2);
+    assert_eq!(protocol["truncated"], false);
+    assert_eq!(protocol["autocomplete"], false);
+    assert_eq!(
+        protocol["values"]
+            .as_array()
+            .expect("protocol values")
+            .iter()
+            .map(|entry| {
+                (
+                    entry["value"].as_str().unwrap_or_default(),
+                    entry["name"].as_str().unwrap_or_default(),
+                )
+            })
+            .collect::<Vec<_>>(),
+        vec![("6", "TCP"), ("17", "UDP")]
+    );
+}
+
+#[test]
+fn facet_vocabularies_mark_autocomplete_payloads_truncated_without_extra_values() {
+    let requested_fields = vec!["PROTOCOL".to_string()];
+    let facets = super::build_facet_vocabulary_payload(
+        &requested_fields,
+        &HashMap::new(),
+        &BTreeMap::from([(
+            "PROTOCOL".to_string(),
+            crate::facet_runtime::FacetPublishedField {
+                total_values: 2,
+                autocomplete: true,
+                values: vec!["17".to_string(), "6".to_string()],
+            },
+        )]),
+    );
+
+    let protocol = facets["fields"]
+        .as_array()
+        .expect("fields array")
+        .iter()
+        .find(|entry| entry["field"] == "PROTOCOL")
+        .expect("protocol facet");
+    assert_eq!(protocol["total_values"], 2);
+    assert_eq!(protocol["truncated"], true);
+    assert_eq!(protocol["autocomplete"], true);
+    assert_eq!(
+        protocol["values"]
+            .as_array()
+            .expect("protocol values")
+            .iter()
+            .map(|entry| entry["value"].as_str().unwrap_or_default())
+            .collect::<Vec<_>>(),
+        vec!["6", "17"]
+    );
+}
+
+#[test]
+fn facet_vocabularies_keep_exact_value_limit_untruncated() {
+    let requested_fields = vec!["SRC_AS_NAME".to_string()];
+    let published_values = (0..super::FACET_VALUE_LIMIT)
+        .rev()
+        .map(|index| format!("AS{index:05} PROVIDER"))
+        .collect::<Vec<_>>();
+
+    let facets = super::build_facet_vocabulary_payload(
+        &requested_fields,
+        &HashMap::new(),
+        &BTreeMap::from([(
+            "SRC_AS_NAME".to_string(),
+            crate::facet_runtime::FacetPublishedField {
+                total_values: published_values.len(),
+                autocomplete: false,
+                values: published_values,
+            },
+        )]),
+    );
+
+    let src_as = facets["fields"]
+        .as_array()
+        .expect("fields array")
+        .iter()
+        .find(|entry| entry["field"] == "SRC_AS_NAME")
+        .expect("src_as facet");
+    assert_eq!(src_as["total_values"], super::FACET_VALUE_LIMIT);
+    assert_eq!(src_as["truncated"], false);
+
+    let values = src_as["values"]
+        .as_array()
+        .expect("src_as values")
+        .iter()
+        .map(|entry| entry["value"].as_str().unwrap_or_default())
+        .collect::<Vec<_>>();
+    let expected_last = format!("AS{:05} PROVIDER", super::FACET_VALUE_LIMIT - 1);
+    assert_eq!(values.len(), super::FACET_VALUE_LIMIT);
+    assert_eq!(values.first().copied(), Some("AS00000 PROVIDER"));
+    assert_eq!(values.last().copied(), Some(expected_last.as_str()));
+}
+
+#[test]
+fn facet_vocabularies_keep_selected_values_and_sorted_limited_prefix_for_high_cardinality() {
+    let requested_fields = vec!["SRC_AS_NAME".to_string()];
+    let selections = HashMap::from([(
+        "SRC_AS_NAME".to_string(),
+        vec![
+            "AS99999 SELECTED".to_string(),
+            "AS00103 PROVIDER".to_string(),
+            "AS99999 SELECTED".to_string(),
+            "AS00103 PROVIDER".to_string(),
+        ],
+    )]);
+    let published_values = (0..(super::FACET_VALUE_LIMIT + 5))
+        .rev()
+        .map(|index| format!("AS{index:05} PROVIDER"))
+        .collect::<Vec<_>>();
+
+    let facets = super::build_facet_vocabulary_payload(
+        &requested_fields,
+        &selections,
+        &BTreeMap::from([(
+            "SRC_AS_NAME".to_string(),
+            crate::facet_runtime::FacetPublishedField {
+                total_values: published_values.len(),
+                autocomplete: false,
+                values: published_values,
+            },
+        )]),
+    );
+
+    let fields = facets["fields"].as_array().expect("fields array");
+    let src_as = fields
+        .iter()
+        .find(|entry| entry["field"] == "SRC_AS_NAME")
+        .expect("src_as facet");
+    assert_eq!(src_as["total_values"], super::FACET_VALUE_LIMIT + 6);
+    assert_eq!(src_as["truncated"], true);
+
+    let values = src_as["values"]
+        .as_array()
+        .expect("src_as values")
+        .iter()
+        .map(|entry| entry["value"].as_str().unwrap_or_default())
+        .collect::<Vec<_>>();
+    assert_eq!(values.len(), super::FACET_VALUE_LIMIT);
+    assert_eq!(
+        &values[..4],
+        &[
+            "AS99999 SELECTED",
+            "AS00103 PROVIDER",
+            "AS00000 PROVIDER",
+            "AS00001 PROVIDER",
+        ]
+    );
+    assert!(
+        values.contains(&"AS00097 PROVIDER"),
+        "expected the sorted prefix to fill the remaining response slots"
+    );
+    assert!(
+        !values.contains(&"AS00098 PROVIDER"),
+        "expected values after the response limit to be omitted"
+    );
+    assert_eq!(
+        values
+            .iter()
+            .filter(|value| **value == "AS00103 PROVIDER")
+            .count(),
+        1,
+        "selected published values must not be duplicated"
+    );
+    assert_eq!(
+        values
+            .iter()
+            .filter(|value| **value == "AS99999 SELECTED")
+            .count(),
+        1,
+        "selected missing values must not be duplicated"
+    );
+}
+
+#[test]
 fn captured_facet_helpers_resolve_virtual_values_and_ignore_self_selection() {
     let capture_positions = super::FastHashMap::from([
         ("PROTOCOL".to_string(), 0usize),

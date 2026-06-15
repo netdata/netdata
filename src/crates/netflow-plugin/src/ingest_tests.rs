@@ -3,7 +3,41 @@ use super::test_support::{
 };
 use super::*;
 use crate::plugin_config::DecapsulationMode as ConfigDecapsulationMode;
-use std::sync::atomic::AtomicBool;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+#[test]
+fn ingest_metrics_extend_snapshot_key_count_matches_inserted_stats() {
+    let metrics = IngestMetrics::default();
+    let mut stats = HashMap::new();
+
+    metrics.extend_snapshot(&mut stats);
+
+    assert_eq!(stats.len(), super::metrics::INGEST_STATS_SNAPSHOT_KEY_COUNT);
+}
+
+#[test]
+fn ingest_metrics_extend_snapshot_preserves_existing_query_stats_on_key_collision() {
+    let metrics = IngestMetrics::default();
+    metrics
+        .udp_packets_received
+        .store(12_345, Ordering::Relaxed);
+    metrics.parse_attempts.store(67, Ordering::Relaxed);
+    let mut stats = HashMap::from([
+        ("query_returned_rows".to_string(), 42),
+        ("udp_packets_received".to_string(), 999),
+    ]);
+
+    metrics.extend_snapshot(&mut stats);
+
+    assert_eq!(stats.get("query_returned_rows").copied(), Some(42));
+    assert_eq!(
+        stats.get("udp_packets_received").copied(),
+        Some(999),
+        "existing query stats must keep the old snapshot-then-query override behavior"
+    );
+    assert_eq!(stats.get("decoded_parse_attempts").copied(), Some(67));
+}
 
 #[test]
 fn ingest_service_with_decap_none_keeps_outer_header_view() {
