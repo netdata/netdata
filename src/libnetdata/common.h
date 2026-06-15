@@ -530,10 +530,22 @@ static inline long sysconf(int name) {
 // ── strcasestr() ── GNU extension absent from UCRT64 ──────────────────────────
 static inline char *strcasestr(const char *haystack, const char *needle) {
     if (!needle || !*needle) return (char *)haystack;
-    size_t nlen = strlen(needle);
-    for (; *haystack; haystack++)
-        if (strncasecmp(haystack, needle, nlen) == 0)
+    if (!haystack) return NULL;
+
+    for (; *haystack; haystack++) {
+        const char *h = haystack;
+        const char *n = needle;
+
+        while (*h && *n &&
+               tolower((unsigned char)*h) == tolower((unsigned char)*n)) {
+            h++;
+            n++;
+        }
+
+        if (!*n)
             return (char *)haystack;
+    }
+
     return NULL;
 }
 
@@ -1098,9 +1110,9 @@ static inline int unsetenv(const char *name) {
 #endif
 
 // ── random() / srandom() ── POSIX PRNG, absent from UCRT64 ───────────────────
-// Map to rand()/srand(); sufficient for stress-test and non-cryptographic use.
-static inline long random(void)          { return (long)rand(); }
-static inline void srandom(unsigned seed) { srand(seed); }
+// Implemented in os-windows-wrappers.c to preserve a POSIX-like 31-bit range.
+long random(void);
+void srandom(unsigned int seed);
 
 // ── link() ── POSIX hard-link creation, absent from UCRT64 ───────────────────
 // CreateHardLinkA argument order is (newpath, existingpath) — the reverse of link().
