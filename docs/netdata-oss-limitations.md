@@ -24,7 +24,7 @@ Every Netdata Agent is a complete observability engine with its own dashboard at
 
 | Capability               | Details                                                                         |
 |--------------------------|---------------------------------------------------------------------------------|
-| Real-time metrics        | All collectors, full resolution                                                 |
+| Real-time metrics        | 800+ integrations, full resolution                                              |
 | Historical data & retention | Local database, configurable retention                                       |
 | Charts & dashboards      | Agent dashboard, 1 custom dashboard per Agent                                   |
 | ML anomaly detection     | Trained and evaluated locally on each Agent                                     |
