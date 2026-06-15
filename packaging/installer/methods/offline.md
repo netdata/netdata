@@ -30,7 +30,7 @@ On your internet-connected machine, you'll need:
 |-------------------------|----------------------------|
 | `curl` or `wget`        | Download the script        |
 | `sha256sum` or `shasum` | Verify script downloads    |
-| POSIX-compliant shell   | Required to run the script  |
+| POSIX-compliant shell   | Required to run the script |
 | `sudo`, `doas`, or `pkexec` | Gain root privileges (required to prepare) |
 
 :::note
@@ -135,7 +135,7 @@ Automatic updates are *disabled* by default for offline installations — since 
 If you see the following error when running the preparation command:
 
 ```
-ABORTED This script needs root privileges to install Netdata, but cannot find a way to gain them (we support sudo, doas, and pkexec). Either re-run this script as root, or set $ROOTCMD to a command that can be used to gain root privileges.
+ABORTED  This script needs root privileges to install Netdata, but cannot find a way to gain them (we support sudo, doas, and pkexec). Either re-run this script as root, or set $ROOTCMD to a command that can be used to gain root privileges.
 ```
 
 This means none of the supported privilege escalation tools (`sudo`, `doas`, or `pkexec`) were found on your system, or you are running the script as an unprivileged user without access to any of them.
