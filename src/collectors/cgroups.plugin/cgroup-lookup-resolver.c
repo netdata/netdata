@@ -313,28 +313,6 @@ static bool cgroup_lookup_clean_join(const char *base, const char *relative, cha
     return ok;
 }
 
-static bool cgroup_lookup_prefix_has_parent_component(const char *path)
-{
-    if(!path)
-        return true;
-
-    const char *p = path;
-    while(*p) {
-        while(*p == '/')
-            p++;
-
-        const char *start = p;
-        while(*p && *p != '/')
-            p++;
-
-        size_t len = (size_t)(p - start);
-        if(len == 2 && start[0] == '.' && start[1] == '.')
-            return true;
-    }
-
-    return false;
-}
-
 static bool cgroup_lookup_build_host_proc_self_cgroup_path(char *dst, size_t dst_size)
 {
     static const char proc_self_cgroup[] = "/proc/self/cgroup";
@@ -343,7 +321,7 @@ static bool cgroup_lookup_build_host_proc_self_cgroup_path(char *dst, size_t dst
         return false;
 
     const char *prefix = netdata_configured_host_prefix;
-    if(prefix[0] != '/' || cgroup_lookup_prefix_has_parent_component(prefix))
+    if(prefix[0] != '/' || cgroup_lookup_path_has_parent_component(prefix))
         return false;
 
     size_t prefix_len = strlen(prefix);
