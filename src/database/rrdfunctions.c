@@ -283,17 +283,26 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
         }
     }
 
+    // Mark the function unregistered before removing it from the dictionary.
+    // The flag makes the function unavailable to any thread that already holds
+    // an acquired reference during the delete window (it cannot be freed until
+    // that reference is released), and lets rrd_functions_find_by_name() report
+    // a specific "unregistered by the plugin" error in that window.
     __atomic_store_n(&rdcf->unregistered, true, __ATOMIC_RELAXED);
     dictionary_acquired_item_release(host->functions, item);
 
     if(st && st->functions_view)
         dictionary_del(st->functions_view, key);
 
+    dictionary_del(host->functions, key);
+
     if(!st)
         stream_send_function_del(host, key);
 
     if(!st)
         rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+
+    dictionary_garbage_collect(host->functions);
 
     return true;
 }
