@@ -150,14 +150,58 @@ ALWAYS_INLINE void spinlock_tracked_lock_with_trace(SPINLOCK_TRACKED *spinlock, 
     spinlock_lock_core(&spinlock->spinlock, func, spinlock);
 }
 
-ALWAYS_INLINE void spinlock_tracked_unlock_with_trace(SPINLOCK_TRACKED *spinlock, const char *func __maybe_unused) {
-    // clear the holder while still holding the lock, then release
-    __atomic_store_n(&spinlock->holder_tid, 0, __ATOMIC_RELAXED);
+ALWAYS_INLINE void spinlock_tracked_unlock_with_trace(SPINLOCK_TRACKED *spinlock, const char *func) {
+    // Intentionally do NOT clear the holder fields here. They are advisory and
+    // read by the deadlock detector ONLY while the lock is held (it reads them
+    // from inside the spin loop, i.e. when locked == true). Clearing holder_tid
+    // before releasing would let a waiter observe holder_tid == 0 with the lock
+    // still held and falsely report "[holder: NONE - possible corruption]";
+    // clearing after releasing would race a new acquirer and wipe its identity.
+    // Leaving the previous holder in place is harmless: a free lock is never
+    // reported, and the next acquirer overwrites these fields via
+    // spinlock_tracked_record_holder().
     spinlock_unlock_with_trace(&spinlock->spinlock, func);
 }
 
 ALWAYS_INLINE bool spinlock_tracked_trylock_with_trace(SPINLOCK_TRACKED *spinlock, const char *func) {
     if (spinlock_trylock_with_trace(&spinlock->spinlock, func)) {
+        spinlock_tracked_record_holder(spinlock, func);
+        return true;
+    }
+
+    return false;
+}
+
+#else // SPINLOCK_IMPL_WITH_MUTEX
+
+// ----------------------------------------------------------------------------
+// SPINLOCK_TRACKED on top of the mutex-backed SPINLOCK. This implementation
+// does not spin, so it has no holder-aware deadlock detector; it only records
+// the holder fields so the type and API match the spinning implementation.
+
+void spinlock_tracked_init_with_trace(SPINLOCK_TRACKED *spinlock, const char *func __maybe_unused) {
+    memset(spinlock, 0, sizeof(SPINLOCK_TRACKED));
+    spinlock_init(&spinlock->spinlock);
+}
+
+static ALWAYS_INLINE void spinlock_tracked_record_holder(SPINLOCK_TRACKED *spinlock, const char *func) {
+    __atomic_store_n(&spinlock->holder_tid, gettid_cached(), __ATOMIC_RELAXED);
+    __atomic_store_n(&spinlock->holder_func, func, __ATOMIC_RELAXED);
+    __atomic_store_n(&spinlock->holder_since_ut, now_monotonic_usec(), __ATOMIC_RELAXED);
+}
+
+void spinlock_tracked_lock_with_trace(SPINLOCK_TRACKED *spinlock, const char *func) {
+    spinlock_lock(&spinlock->spinlock);
+    spinlock_tracked_record_holder(spinlock, func);
+}
+
+void spinlock_tracked_unlock_with_trace(SPINLOCK_TRACKED *spinlock, const char *func __maybe_unused) {
+    // Holder fields are intentionally left in place; see the spinning impl.
+    spinlock_unlock(&spinlock->spinlock);
+}
+
+bool spinlock_tracked_trylock_with_trace(SPINLOCK_TRACKED *spinlock, const char *func) {
+    if(spinlock_trylock(&spinlock->spinlock)) {
         spinlock_tracked_record_holder(spinlock, func);
         return true;
     }
