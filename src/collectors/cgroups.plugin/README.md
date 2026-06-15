@@ -135,6 +135,110 @@ or [CetusGuard](https://github.com/hectorm/cetusguard)
 can also be used to give Netdata restricted access to the socket. Note that `PODMAN_HOST` in Netdata's environment
 should be set to the proxy's URL in this case.
 
+### Customizing cgroup names
+
+When Netdata resolves a cgroup to a friendly name (a Docker container name, a
+Kubernetes pod name, and so on), you can override the resolved name with your own
+value by setting a label or annotation with the key `netdata.cloud/cgroup.name`.
+The value becomes the cgroup's display name, and Netdata derives the chart
+identifier from it.
+
+This is useful when the auto-resolved name is a raw container ID, a long
+auto-generated string, or simply not the name you want to see on the dashboard —
+for example, to turn a chart name like
+`cgroup_twxae02wzkyy2d19gz4dsj6a-storefront-green-1.cpu` into
+`cgroup_storefront-green.cpu`.
+
+The override changes only the cgroup-name segment of a chart name such as
+`cgroup_<name>.cpu`. It does not affect the chart-type prefix (`cgroup_`), the
+metric suffix (e.g. `.cpu`), or the `@<node>` identifier shown when metrics come
+from a different node.
+
+#### Docker and Podman containers
+
+Add a container label named `netdata.cloud/cgroup.name`:
+
+```sh
+docker run --label netdata.cloud/cgroup.name=my-web-app ...
+```
+
+With Docker Compose, set it under the service `labels`:
+
+```yaml
+services:
+  web:
+    image: nginx
+    labels:
+      - "netdata.cloud/cgroup.name=my-web-app"
+```
+
+Netdata reads the label from the same `docker inspect` / `podman inspect` output
+it already uses for name resolution and applies the override. Podman works the
+same way (see the [Podman note](#note-on-podman-container-names) for the socket
+access requirement).
+
+#### Kubernetes pods
+
+Add a pod annotation named `netdata.cloud/cgroup.name`:
+
+```sh
+kubectl annotate pods <pod-name> netdata.cloud/cgroup.name=<desired-name>
+```
+
+For declarative workloads, add the annotation in the pod template:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storefront
+spec:
+  template:
+    metadata:
+      annotations:
+        netdata.cloud/cgroup.name: "storefront-green"
+```
+
+Netdata extracts `netdata.cloud/*` annotations from pod metadata and uses
+`netdata.cloud/cgroup.name` to override the resolved name.
+
+#### How the chart identifier is derived from the name
+
+The override value is used as the cgroup's display name. Netdata then derives a
+chart identifier from that name by sanitizing it. This sanitization performs
+character substitution only — it does **not** prepend a hash or any other prefix.
+
+| Override name (input) | Chart identifier (output) |
+|:----------------------|:--------------------------|
+| `My Web App`          | `My_Web_App`              |
+| `storefront.green`    | `storefront-green`        |
+| `app@host`            | `app_host`                |
+
+The transformations applied are:
+
+- Spaces become underscores (`_`).
+- The `@` character becomes `_`.
+- Dots (`.`) become hyphens (`-`).
+- Other special characters (`$`, `%`, `&`, `*`, `+`, `=`, `?`, `|`, `^`, single
+  and double quotes) are replaced with `_`.
+- Letters, digits, hyphens, underscores, and a few separator characters (`:`,
+  `-`, `/`) are preserved.
+
+> If you see a long alphanumeric string such as `twxae02wzkyy2d19gz4dsj6a-` at the
+> start of a chart name, that string is part of the resolved name itself (typically
+> a container ID or Kubernetes UID taken from the cgroup path), not a prefix added
+> by Netdata. Setting `netdata.cloud/cgroup.name` replaces it with your own value.
+
+You can list the chart names Netdata actually created through the Agent's
+`/api/v1/charts` endpoint and filter for the `cgroup_` prefix to confirm the
+result. If you use the raw name instead of the sanitized chart identifier in a
+query, the query will not match — use the chart identifier shown by that endpoint.
+
+If no override is set and runtime resolution does not find a name, the raw cgroup
+path is used as the name, and the chart identifier is derived from it by removing
+the leading slash, replacing dots with hyphens, and sanitizing the remaining
+characters as described above.
+
 ### Alerts
 
 CPU and memory limits are watched and used to rise alerts. Memory usage for every cgroup is checked against `ram`
