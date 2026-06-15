@@ -58,19 +58,18 @@ This collector is supported on all platforms.
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
 The monitoring user requires the VIEW SERVER STATE permission to access DMVs.
+
 SQL Agent job metrics require access to `msdb.dbo.sysjobs`.
-SQL Agent job execution metrics additionally require access to
-`msdb.dbo.sysjobhistory` and `msdb.dbo.sysjobactivity`.
-If those optional `msdb` grants are missing, the collector continues
-collecting other SQL Server metrics and omits only the affected SQL Agent job metrics.
-Current job execution time is based on the latest visible SQL Server Agent
-activity session. If SQL Server Agent stops or crashes while a job is recorded
-as running, `sysjobactivity` can report that job as running until Agent creates
-a newer session or activity/history state changes.
-Last execution warning detection checks failed step history between the previous
-and latest completed job summary rows. If SQL Server Agent step history is
-suppressed or purged before collection, a job that completed successfully with
-failed intermediate steps can be reported as `ok` instead of `warning`.
+
+SQL Agent job execution metrics additionally require access to `msdb.dbo.sysjobhistory` and `msdb.dbo.sysjobactivity`.
+If those optional `msdb` grants are missing, the collector continues collecting other SQL Server metrics and omits only the affected SQL Agent job metrics.
+
+Current job execution time is based on the latest visible SQL Server Agent activity session.
+If SQL Server Agent stops or crashes while a job is recorded as running, `sysjobactivity` can report that job as running until Agent creates a newer session or activity/history state changes.
+
+Last execution warning detection checks failed step history between the previous and latest completed job summary rows.
+If SQL Server Agent step history is suppressed or purged before collection, a job that completed successfully with failed intermediate steps can be reported as `ok` instead of `warning`.
+
 Always On AG monitoring requires VIEW ANY DEFINITION for access to availability group catalog views.
 On SQL Server 2022+, HADR DMVs may additionally require VIEW SERVER PERFORMANCE STATE.
 
@@ -472,7 +471,7 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
 |:------|:----------|:----|:---:|:---:|
 | mssql.user_connections | user | connections | • | • |
 | mssql.session_connections | user, internal | connections | • | • |
@@ -512,7 +511,7 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
 |:------|:----------|:----|:---:|:---:|
 | mssql.database_active_transactions | active | transactions | • | • |
 | mssql.database_transactions | transactions | transactions/s | • | • |
@@ -541,7 +540,7 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
 |:------|:----------|:----|:---:|:---:|
 | mssql.lock_stats_deadlocks | deadlocks | deadlocks/s | • | • |
 | mssql.lock_stats_waits | waits | waits/s | • | • |
@@ -560,7 +559,7 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
 |:------|:----------|:----|:---:|:---:|
 | mssql.locks_by_resource | locks | locks | • | • |
 
@@ -577,7 +576,7 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
 |:------|:----------|:----|:---:|:---:|
 | mssql.wait_total_time | duration | ms | • | • |
 | mssql.wait_resource_time | duration | ms | • | • |
@@ -597,7 +596,7 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
 |:------|:----------|:----|:---:|:---:|
 | mssql.job_status | enabled, disabled | status | • |   |
 | mssql.job_last_execution_status | unknown, ok, warning, error, canceled | status | • |   |
@@ -618,7 +617,7 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
 |:------|:----------|:----|:---:|:---:|
 | mssql.replication_status | started, succeeded, in_progress, idle, retrying, failed | status | • | • |
 | mssql.replication_warning | expiration, latency, merge_expiration, merge_slow_duration, merge_fast_duration, merge_fast_speed, merge_slow_speed | flags | • | • |
@@ -637,7 +636,7 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
 |:------|:----------|:----|:---:|:---:|
 | mssql.ag_sync_health | not_healthy, partially_healthy, healthy | state | • | • |
 | mssql.ag_recovery_health | primary_online, primary_in_progress, secondary_online, secondary_in_progress | state | • | • |
@@ -658,7 +657,7 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
 |:------|:----------|:----|:---:|:---:|
 | mssql.ag_replica_role | primary, secondary, resolving, unknown | state | • | • |
 | mssql.ag_replica_connected_state | connected, disconnected, unknown | state | • | • |
@@ -678,7 +677,7 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
 |:------|:----------|:----|:---:|:---:|
 | mssql.ag_db_sync_state | not_synchronizing, synchronizing, synchronized, reverting, initializing | state | • | • |
 | mssql.ag_db_log_send_queue | queue_size | bytes | • | • |
@@ -699,7 +698,7 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
 |:------|:----------|:----|:---:|:---:|
 | mssql.ag_cluster_quorum_state | normal, forced, unknown | state | • | • |
 
@@ -715,7 +714,7 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
 |:------|:----------|:----|:---:|:---:|
 | mssql.ag_cluster_member_state | up, down | state | • | • |
 | mssql.ag_cluster_member_quorum_votes | votes | votes | • | • |
@@ -732,7 +731,7 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+| Metric | Dimensions | Unit | SQL Server | Azure SQL Database |
 |:------|:----------|:----|:---:|:---:|
 | mssql.ag_page_repair | successful, failed | repairs | • | • |
 

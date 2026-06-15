@@ -74,19 +74,18 @@ modules:
       additional_permissions:
         description: |
           The monitoring user requires the VIEW SERVER STATE permission to access DMVs.
+
           SQL Agent job metrics require access to `msdb.dbo.sysjobs`.
-          SQL Agent job execution metrics additionally require access to
-          `msdb.dbo.sysjobhistory` and `msdb.dbo.sysjobactivity`.
-          If those optional `msdb` grants are missing, the collector continues
-          collecting other SQL Server metrics and omits only the affected SQL Agent job metrics.
-          Current job execution time is based on the latest visible SQL Server Agent
-          activity session. If SQL Server Agent stops or crashes while a job is recorded
-          as running, `sysjobactivity` can report that job as running until Agent creates
-          a newer session or activity/history state changes.
-          Last execution warning detection checks failed step history between the previous
-          and latest completed job summary rows. If SQL Server Agent step history is
-          suppressed or purged before collection, a job that completed successfully with
-          failed intermediate steps can be reported as `ok` instead of `warning`.
+
+          SQL Agent job execution metrics additionally require access to `msdb.dbo.sysjobhistory` and `msdb.dbo.sysjobactivity`.
+          If those optional `msdb` grants are missing, the collector continues collecting other SQL Server metrics and omits only the affected SQL Agent job metrics.
+
+          Current job execution time is based on the latest visible SQL Server Agent activity session.
+          If SQL Server Agent stops or crashes while a job is recorded as running, `sysjobactivity` can report that job as running until Agent creates a newer session or activity/history state changes.
+
+          Last execution warning detection checks failed step history between the previous and latest completed job summary rows.
+          If SQL Server Agent step history is suppressed or purged before collection, a job that completed successfully with failed intermediate steps can be reported as `ok` instead of `warning`.
+
           Always On AG monitoring requires VIEW ANY DEFINITION for access to availability group catalog views.
           On SQL Server 2022+, HADR DMVs may additionally require VIEW SERVER PERFORMANCE STATE.
       supported_platforms:
@@ -983,7 +982,7 @@ modules:
         enabled: false
       description: ""
       availability:
-        - SQL Server 2016+
+        - SQL Server
         - Azure SQL Database
       scopes:
         - name: global
@@ -1335,7 +1334,7 @@ modules:
             - name: mssql.job_status
               description: Job Status
               availability:
-                - SQL Server 2016+
+                - SQL Server
               unit: status
               chart_type: line
               dimensions:
@@ -1344,7 +1343,7 @@ modules:
             - name: mssql.job_last_execution_status
               description: Job Last Execution Status
               availability:
-                - SQL Server 2016+
+                - SQL Server
               unit: status
               chart_type: line
               dimensions:
@@ -1356,7 +1355,7 @@ modules:
             - name: mssql.job_last_execution_duration
               description: Job Last Execution Duration
               availability:
-                - SQL Server 2016+
+                - SQL Server
               unit: seconds
               chart_type: line
               dimensions:
@@ -1364,7 +1363,7 @@ modules:
             - name: mssql.job_last_execution_age
               description: Job Last Execution Age
               availability:
-                - SQL Server 2016+
+                - SQL Server
               unit: seconds
               chart_type: line
               dimensions:
@@ -1372,7 +1371,7 @@ modules:
             - name: mssql.job_current_execution_time
               description: Job Current Execution Time
               availability:
-                - SQL Server 2016+
+                - SQL Server
               unit: seconds
               chart_type: line
               dimensions:

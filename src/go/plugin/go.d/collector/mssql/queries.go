@@ -226,10 +226,6 @@ WITH final_summary_rows AS (
     run_date,
     run_time,
     run_duration,
-    LEAD(instance_id) OVER (
-      PARTITION BY job_id
-      ORDER BY instance_id DESC
-    ) AS previous_summary_instance_id,
     ROW_NUMBER() OVER (
       PARTITION BY job_id
       ORDER BY instance_id DESC
@@ -240,25 +236,34 @@ WITH final_summary_rows AS (
 ),
 latest_final_summary AS (
   SELECT
-    job_id,
-    instance_id,
-    previous_summary_instance_id,
-    run_status,
-    ((CAST(run_duration AS bigint) / 10000) * 3600)
-      + (((CAST(run_duration AS bigint) % 10000) / 100) * 60)
-      + (CAST(run_duration AS bigint) % 100) AS duration_seconds,
+    fs.job_id,
+    fs.instance_id,
+    (
+      SELECT MAX(prev.instance_id)
+      FROM final_summary_rows AS prev
+      WHERE prev.job_id = fs.job_id
+        AND prev.instance_id < fs.instance_id
+    ) AS previous_summary_instance_id,
+    fs.run_status,
+    ((CAST(fs.run_duration AS bigint) / 10000) * 3600)
+      + (((CAST(fs.run_duration AS bigint) % 10000) / 100) * 60)
+      + (CAST(fs.run_duration AS bigint) % 100) AS duration_seconds,
     DATEADD(
       second,
-      ((run_time / 10000) * 3600)
-        + (((run_time % 10000) / 100) * 60)
-        + (run_time % 100),
-      TRY_CONVERT(
+      ((fs.run_time / 10000) * 3600)
+        + (((fs.run_time % 10000) / 100) * 60)
+        + (fs.run_time % 100),
+      CONVERT(
         datetime,
-        RIGHT('00000000' + CONVERT(varchar(8), NULLIF(run_date, 0)), 8),
+        CASE
+          WHEN ISDATE(CONVERT(char(8), NULLIF(fs.run_date, 0))) = 1
+            THEN CONVERT(char(8), fs.run_date)
+          ELSE NULL
+        END,
         112
       )
     ) AS started_at
-  FROM final_summary_rows
+  FROM final_summary_rows AS fs
   WHERE row_num = 1
 ),
 failed_steps AS (

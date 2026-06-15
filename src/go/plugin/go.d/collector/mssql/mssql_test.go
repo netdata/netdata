@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -142,6 +143,13 @@ func TestAGDatabaseReplicaQuery(t *testing.T) {
 	assert.Equal(t, queryAGDatabaseReplicas16, agDatabaseReplicaQuery(14))
 	assert.Equal(t, queryAGDatabaseReplicas16, agDatabaseReplicaQuery(15))
 	assert.Equal(t, queryAGDatabaseReplicas16, agDatabaseReplicaQuery(16))
+}
+
+func TestQueryJobLastExecutionsAvoidsSQLServer2012OnlyFunctions(t *testing.T) {
+	query := strings.ToUpper(queryJobLastExecutions)
+
+	assert.NotContains(t, query, "TRY_CONVERT")
+	assert.NotContains(t, query, "LEAD(")
 }
 
 func TestCollectJobLastExecution(t *testing.T) {
