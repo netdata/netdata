@@ -182,8 +182,13 @@ fn decode_pcap_flows(path: &Path, service: &mut IngestService) -> Vec<crate::dec
     while let Some(packet) = reader.next_packet() {
         let packet = packet.unwrap_or_else(|e| panic!("read packet {}: {e}", path.display()));
         if let Some((source, payload)) = extract_udp_payload(packet.data.as_ref()) {
-            service.prepare_decoder_state_namespace(source, payload);
-            let decoded = service.decoders.decode_udp_payload(source, payload);
+            let packet_context = service.prepare_decoder_state_namespace(source, payload);
+            let decoded = service.decoders.decode_udp_payload_at_with_context(
+                source,
+                payload,
+                now_usec(),
+                packet_context.as_ref(),
+            );
             flows.extend(
                 decoded
                     .flows

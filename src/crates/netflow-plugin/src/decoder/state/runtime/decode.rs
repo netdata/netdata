@@ -17,7 +17,31 @@ impl FlowDecoders {
         payload: &[u8],
         input_realtime_usec: u64,
     ) -> DecodedBatch {
-        let template_state_changed = self.observe_decoder_state_from_payload(source, payload);
+        let packet_context = Self::decoder_packet_context(source, payload);
+        self.decode_udp_payload_at_with_context(
+            source,
+            payload,
+            input_realtime_usec,
+            packet_context.as_ref(),
+        )
+    }
+
+    pub(crate) fn decode_udp_payload_at_with_context(
+        &mut self,
+        source: SocketAddr,
+        payload: &[u8],
+        input_realtime_usec: u64,
+        packet_context: Option<&DecoderPacketContext>,
+    ) -> DecodedBatch {
+        let computed_context = if packet_context.is_none() {
+            Self::decoder_packet_context(source, payload)
+        } else {
+            None
+        };
+        let packet_context = packet_context.or(computed_context.as_ref());
+        let template_state_changed = packet_context.is_some_and(|context| {
+            self.observe_decoder_state_from_context(source, payload, context)
+        });
 
         let mut batch = if is_sflow_payload(payload) && self.enable_sflow {
             decode_sflow(
@@ -40,6 +64,7 @@ impl FlowDecoders {
                 self.enable_v7,
                 self.enable_v9,
                 self.enable_ipfix,
+                packet_context,
             )
         };
 
@@ -53,10 +78,19 @@ impl FlowDecoders {
                 .retain_mut(|flow| enricher.enrich_record(&mut flow.record));
         }
 
-        if let Some(key) = template_state_changed {
-            let hydrated = self.hydrated_namespace_sources.entry(key).or_default();
-            hydrated.clear();
-            hydrated.insert(normalize_template_scope_source(source));
+        if template_state_changed {
+            debug_assert!(
+                packet_context.is_some(),
+                "template state changed without decoder packet context"
+            );
+            if let Some(context) = packet_context {
+                let hydrated = self
+                    .hydrated_namespace_sources
+                    .entry(context.key.clone())
+                    .or_default();
+                hydrated.clear();
+                hydrated.insert(context.parser_source);
+            }
         }
 
         self.stats.merge(&batch.stats);

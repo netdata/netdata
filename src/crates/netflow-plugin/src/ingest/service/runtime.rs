@@ -135,10 +135,13 @@ impl IngestService {
             .fetch_add(payload.len() as u64, Ordering::Relaxed);
 
         let receive_time_usec = now_usec();
-        self.prepare_decoder_state_namespace(source, payload);
-        let batch = self
-            .decoders
-            .decode_udp_payload_at(source, payload, receive_time_usec);
+        let packet_context = self.prepare_decoder_state_namespace(source, payload);
+        let batch = self.decoders.decode_udp_payload_at_with_context(
+            source,
+            payload,
+            receive_time_usec,
+            packet_context.as_ref(),
+        );
         self.metrics
             .update_decoder_scope_snapshot(self.decoders.decoder_scope_snapshot());
         self.metrics.apply_decode_stats(&batch.stats);
