@@ -63,6 +63,7 @@ func main() {
 
 	api := netdataapi.New(os.Stdout)
 	var wg sync.WaitGroup
+	anyStarted := false
 
 	// The shared store must exist before both collectors start so socket data
 	// can be merged into SHM entries that cachestat apps/cgroups populate.
@@ -88,6 +89,7 @@ func main() {
 			if handle.AppsEnabled || handle.CgroupsEnabled {
 				cachestatStore = store
 			}
+			anyStarted = true
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -120,6 +122,7 @@ func main() {
 			})
 			pluginOutputMu.Unlock()
 
+			anyStarted = true
 			go runStdinDispatcher(api, fnStore, closeStop)
 
 			wg.Add(1)
@@ -129,6 +132,11 @@ func main() {
 				handle.Close()
 			}()
 		}
+	}
+
+	if !anyStarted {
+		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: all enabled programs failed to load\n")
+		os.Exit(1)
 	}
 
 	wg.Wait()
