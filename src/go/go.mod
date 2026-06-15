@@ -84,7 +84,7 @@ require (
 	github.com/klauspost/compress v1.18.6
 	github.com/maxmind/mmdbwriter v1.2.0
 	github.com/microsoft/go-mssqldb v1.10.0
-	github.com/netdata/systemd-journal-sdk/go v0.7.0
+	github.com/netdata/systemd-journal-sdk/go v0.7.1
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	golang.org/x/sys v0.46.0
