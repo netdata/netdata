@@ -124,6 +124,29 @@ modules:
     troubleshooting:
       problems:
         list:
+          - name: Kickstart fails during apt-get update (401 Unauthorized)
+            description: |
+              A default Proxmox VE installation enables the `pve-enterprise` package repository, which requires a paid Proxmox subscription. Without a subscription, the `apt-get update` step the kickstart runs to install dependencies fails with an error such as:
+
+              ```
+              Err:5 https://enterprise.proxmox.com/debian/pve bookworm InRelease
+                401  Unauthorized [IP: ...]
+              ```
+
+              Choose one of these remediation paths:
+
+              - **Use a valid subscription:** register your Proxmox VE subscription so the enterprise repository authenticates successfully.
+              - **Use the no-subscription repository:** comment out the enterprise line in `/etc/apt/sources.list.d/pve-enterprise.list`, then add the no-subscription repository. Replace `<codename>` with your Debian release codename (for example, `bookworm`):
+
+                ```
+                deb http://download.proxmox.com/debian/pve <codename> pve-no-subscription
+                ```
+
+              After fixing the apt source, re-run the kickstart command:
+
+              ```bash
+              wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh
+              ```
           - name: VM or container names not resolved
             description: |
               If VMs or containers show raw cgroup paths instead of friendly names, verify that:
