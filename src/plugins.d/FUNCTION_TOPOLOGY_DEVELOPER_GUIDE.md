@@ -1,4 +1,4 @@
-<!-- markdownlint-disable-file MD043 -->
+<!-- markdownlint-disable-file MD013 MD043 -->
 
 # Netdata Topology Function Schema
 
@@ -600,7 +600,8 @@ Icon tokens:
 `router`, `switch`, `firewall`, `access_point`, `server`, `storage`,
 `load_balancer`, `printer`, `phone`, `ups`, `camera`, `process`, `agent`,
 `netdata-agent`, `parent`, `remote-endpoint`, `local-endpoint`, `segment`,
-`self`, `ip`, `cloud`, `container`, `vm`, `database`, `service`, `datacenter`,
+`self`, `ip`, `cloud`, `container`, `docker`, `kubernetes`, `lxc`, `nspawn`,
+`podman`, `systemd`, `user`, `vm`, `database`, `service`, `datacenter`,
 `cluster`, `host`, `network`, `datastore`, `datastore_cluster`,
 `resource_pool`, `device`, `endpoint`, `correlation`, `interface`, `group`,
 `unknown`.
@@ -952,8 +953,15 @@ underlying canonical table.
 Topology should be refreshable without recomputing topology. Overlay templates
 define how the UI or Cloud can query metrics for an actor or link.
 
-Templates live once in the type registry. Overlay refs carry only template ids
-and parameters.
+Templates live once in the type registry. Overlay refs carry only template ids,
+one owner reference, and selector parameters.
+
+For `provider: "netdata.metrics"`, selector params are interpreted by the
+consumer:
+
+- `node_id` scopes the metric query to a node;
+- `collect_job` maps to the chart label `_collect_job`;
+- other params map to same-named chart labels.
 
 Example:
 
@@ -965,7 +973,7 @@ Example:
         "provider": "netdata.metrics",
         "contexts": ["snmp.interface_traffic"],
         "dimensions": ["received", "sent"],
-        "selector_params": ["node_id", "interface_id"],
+        "selector_params": ["node_id", "if_name"],
         "merge": {
           "refs": "set",
           "values": "sum"
@@ -977,17 +985,37 @@ Example:
     "refs": {
       "rows": 1,
       "columns": [
-        {"id": "owner_kind", "type": "string_ref", "dictionary": "strings"},
-        {"id": "owner", "type": "link_ref"},
         {"id": "template", "type": "string_ref", "dictionary": "strings"},
+        {"id": "link", "type": "link_ref", "role": "reference"},
         {"id": "node_id", "type": "string_ref", "dictionary": "strings"},
-        {"id": "interface_id", "type": "string_ref", "dictionary": "strings"}
+        {"id": "if_name", "type": "string_ref", "dictionary": "strings"}
       ],
-      "values": []
+      "values": [
+        {"codec": "const", "value": 0},
+        {"codec": "const", "value": 0},
+        {"codec": "const", "value": 1},
+        {"codec": "const", "value": 2}
+      ]
     }
   }
 }
 ```
+
+Overlay refs use schema ids for column names, so selector params and ref column
+ids must start with a letter and contain only letters, digits, `_`, `.`, `:`,
+or `-`. The `template` column identifies the template by name. Exactly one
+convention owner column must be present: `actor` with type `actor_ref` or `link`
+with type `link_ref`. No other `actor_ref` or `link_ref` columns are valid in
+overlay refs. Every row must have a non-null value in the owner column. Each
+selector param used by a referenced template must have a same-named refs-table
+column.
+Selector params must not use the reserved refs-table convention column names
+`template`, `actor`, or `link`.
+
+The `template` column and selector-param columns required by a row's resolved
+template must be `string` or `string_ref`. Required selector-param values must
+resolve to non-empty strings. Selector-param columns used by other templates may
+be nullable and null on rows whose template does not require them.
 
 Overlay refs are optional. Do not fabricate per-link bandwidth if the producer
 does not have it. For network sockets, current evidence may include snapshot
@@ -1014,6 +1042,61 @@ Common column rules:
 
 If a table or column has no valid aggregation, mark it `none` and keep rows
 attached to their owner. Do not silently drop rows.
+
+### Network Connections Actor Grouping
+
+`topology:network-connections` supports three actor grouping levels:
+
+- `group_by:process_name`: one `process` actor per process name.
+- `group_by:pid`: one `process` actor per PID. This is the only mode that may
+  emit raw per-PID fields.
+- `group_by:container`: one `container` actor per canonical `container_name`.
+  For systemd services, `container_name` is the service name. For
+  `user.slice/user-UID.slice`, network-connections uses a composed user actor
+  only when cgroups did not return a usable container name; the actor name is
+  the process UID's resolved username, or `user${UID}` if username resolution is
+  unavailable. Known rootless Docker and other known cgroups with a container
+  label or cgroup name keep their cgroups-provided container identity. For
+  non-container, non-service processes, it falls back to process name.
+
+The actor columns are:
+
+| Column | Role | Source |
+|---|---|---|
+| `process` | group key | process name; populated for `process_name` and `pid` modes |
+| `pid` | identity | host PID; populated only for `group_by:pid` |
+| `container_name` | group key | cgroups-provided container name or cgroup name when known; otherwise user-slice username, systemd unit, then process fallback |
+| `cgroup_path` | attribute | APPS_LOOKUP cgroup path; populated only for `group_by:pid` |
+| `cgroup_name` | attribute | APPS_LOOKUP cgroup name; populated only for `group_by:pid` |
+| `orchestrator` | attribute | rendered from APPS_LOOKUP cgroup status and orchestrator enum; populated only for `group_by:pid` |
+| `k8s_pod_name` | attribute | `k8s_pod_name` label; populated only for `group_by:pid` |
+| `k8s_namespace` | attribute | `k8s_namespace` label; populated only for `group_by:pid` |
+| `k8s_workload` | attribute | `k8s_controller_name`, or pod-name suffix stripping; populated only for `group_by:pid` |
+| `docker_container_name` | attribute | `k8s_container_name`, `container_name`, then `cgroup_name`; populated only for `group_by:pid` |
+| `docker_image` | attribute | `image` label; populated only for `group_by:pid` |
+| `systemd_unit_name` | attribute | systemd unit component from `cgroup_path`; populated only for `group_by:pid` |
+
+The actor types advertise these aggregation scopes:
+
+- `process_name` -> `process`
+- `pid` -> `pid`, `net_ns_inode`
+- `container` -> `container_name`
+
+`view.group_by` lists exactly `process_name`, `pid`, and `container`.
+`view.scope` is the active group selected for the Function call.
+
+The `orchestrator` column values are `systemd`, `docker`, `k8s`, `kvm`,
+`lxc`, `podman`, `nspawn`, `host_root`, and `unknown`. `host_root` is a
+producer-local rendering of APPS_LOOKUP `cgroup_status == HOST_ROOT`; it is
+not a netipc orchestrator enum value. These values are raw PID-mode attributes,
+not standalone topology groupings in the current contract.
+
+Free-form cgroup labels are not emitted by default. Operators opt in per
+Function call with `labels:<pattern>`, where `pattern` is pipe-separated and
+matched against label keys with `simple_pattern` semantics, for example
+`labels:team|app|version-*`. Commas are literal characters. The whitelist is
+applied only at Function-output emission; upstream caches and IPC payloads
+carry the raw labels. Raw cgroup paths are emitted only in `group_by:pid`.
 
 ## Correlation Plane
 
@@ -1117,6 +1200,12 @@ Do not emit these per socket:
 In the measured Cloud corpus, this production-only socket evidence shape was
 about 7.25 MB raw for 323,077 socket evidence rows, or about 11.25 MB raw when
 including current RTT/retransmission metrics.
+
+`topology:network-connections` has a fixed producer-side response budget of
+64 MiB. If a live request would exceed that budget, return a Function error with
+HTTP status `413`; do not emit a truncated topology and do not add
+partial-topology metadata unless a future product/schema decision introduces that
+contract.
 
 Network-connections graph direction is dependency direction: link types use
 `direction_role: "dependency"`, the client actor is always `src_actor`, and the

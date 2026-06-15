@@ -115,38 +115,6 @@ ebpf_module_t ebpf_modules[] = {
      .maps_per_core = CONFIG_BOOLEAN_YES,
      .lifetime = EBPF_DEFAULT_LIFETIME,
      .running_time = 0},
-    {.info =
-         {.thread_name = "cachestat",
-          .config_name = "cachestat",
-          .thread_description = NETDATA_EBPF_CACHESTAT_MODULE_DESC},
-     .functions =
-         {.start_routine = ebpf_cachestat_thread,
-          .apps_routine = ebpf_cachestat_create_apps_charts,
-          .fnct_routine = NULL,
-          .bpf_unload = ebpf_cachestat_unload_bpf},
-     .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
-     .update_every = EBPF_DEFAULT_UPDATE_EVERY,
-     .global_charts = 1,
-     .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
-     .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT,
-     .cgroup_charts = CONFIG_BOOLEAN_NO,
-     .mode = MODE_ENTRY,
-     .optional = 0,
-     .maps = cachestat_maps,
-     .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE,
-     .names = NULL,
-     .cfg = &cachestat_config,
-     .config_file = NETDATA_CACHESTAT_CONFIG_FILE,
-     .kernels = NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14 |
-                NETDATA_V5_15 | NETDATA_V5_16,
-     .load = EBPF_LOAD_LEGACY,
-     .targets = cachestat_targets,
-     .probe_links = NULL,
-     .objects = NULL,
-     .thread = NULL,
-     .maps_per_core = CONFIG_BOOLEAN_YES,
-     .lifetime = EBPF_DEFAULT_LIFETIME,
-     .running_time = 0},
     {.info = {.thread_name = "sync", .config_name = "sync", .thread_description = NETDATA_EBPF_SYNC_MODULE_DESC},
      .functions =
          {.start_routine = ebpf_sync_thread,
@@ -582,14 +550,6 @@ struct netdata_static_thread ebpf_threads[] = {
      .thread = NULL,
      .init_routine = NULL,
      .start_routine = NULL},
-    {.name = "EBPF CACHESTAT",
-     .config_section = NULL,
-     .config_name = NULL,
-     .env_name = NULL,
-     .enabled = 1,
-     .thread = NULL,
-     .init_routine = NULL,
-     .start_routine = NULL},
     {.name = "EBPF SYNC",
      .config_section = NULL,
      .config_name = NULL,
@@ -879,7 +839,6 @@ static bool ebpf_pre_exit_check_done = false;
 
 #ifdef LIBBPF_MAJOR_VERSION
 struct btf *default_btf = NULL;
-struct cachestat_bpf *cachestat_bpf_obj = NULL;
 struct dc_bpf *dc_bpf_obj = NULL;
 struct disk_bpf *disk_bpf_obj = NULL;
 struct fd_bpf *fd_bpf_obj = NULL;
@@ -1140,6 +1099,8 @@ void ebpf_stop_threads(int sig)
     }
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 
+    ebpf_cgroup_cache_abort();
+
     for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
         enum ebpf_threads_status enabled = ebpf_module_enabled_get(&ebpf_modules[i]);
 
@@ -1266,7 +1227,6 @@ static void ebpf_parse_args(int argc, char **argv)
     static struct option long_options[] = {
         {"process", no_argument, 0, 0},
         {"net", no_argument, 0, 0},
-        {"cachestat", no_argument, 0, 0},
         {"sync", no_argument, 0, 0},
         {"dcstat", no_argument, 0, 0},
         {"swap", no_argument, 0, 0},
@@ -1333,14 +1293,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 select_threads |= 1 << EBPF_MODULE_SOCKET_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
                 netdata_log_info("EBPF enabling \"NET\" charts, because it was started with the option \"[-]-net\".");
-#endif
-                break;
-            }
-            case EBPF_MODULE_CACHESTAT_IDX: {
-                select_threads |= 1 << EBPF_MODULE_CACHESTAT_IDX;
-#ifdef NETDATA_INTERNAL_CHECKS
-                netdata_log_info(
-                    "EBPF enabling \"CACHESTAT\" charts, because it was started with the option \"[-]-cachestat\".");
 #endif
                 break;
             }

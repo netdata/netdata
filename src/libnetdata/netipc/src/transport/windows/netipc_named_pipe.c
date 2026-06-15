@@ -11,6 +11,7 @@
 #include "netipc/netipc_named_pipe.h"
 #include "netipc/netipc_protocol.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,12 +51,14 @@ static inline uint32_t apply_default(uint32_t val, uint32_t def)
 
 static bool header_payload_len(size_t payload_len, size_t *msg_len_out)
 {
-#if SIZE_MAX <= UINT32_MAX
     if (payload_len > SIZE_MAX - NIPC_HEADER_LEN)
         return false;
-#endif
 
-    *msg_len_out = NIPC_HEADER_LEN + payload_len;
+    size_t msg_len = NIPC_HEADER_LEN + payload_len;
+    if (msg_len > UINT32_MAX)
+        return false;
+
+    *msg_len_out = msg_len;
     return true;
 }
 
@@ -384,6 +387,137 @@ static nipc_np_error_t wait_readable(HANDLE pipe,
 
         Sleep(1);
     }
+}
+
+typedef struct {
+    bool infinite;
+    ULONGLONG deadline;
+    HANDLE abort_event;
+} receive_wait_t;
+
+static void inflight_fail_all(nipc_np_session_t *s);
+
+static receive_wait_t receive_wait_init(uint32_t timeout_ms,
+                                        HANDLE abort_event)
+{
+    receive_wait_t wait = {
+        .infinite = (timeout_ms == 0),
+        .deadline = 0,
+        .abort_event = abort_event,
+    };
+    if (!wait.infinite)
+        wait.deadline = GetTickCount64() + timeout_ms;
+    return wait;
+}
+
+static bool receive_wait_expired(const receive_wait_t *wait)
+{
+    return !wait->infinite && GetTickCount64() >= wait->deadline;
+}
+
+static bool receive_wait_aborted(const receive_wait_t *wait)
+{
+    return wait->abort_event &&
+           WaitForSingleObject(wait->abort_event, 0) == WAIT_OBJECT_0;
+}
+
+static nipc_np_error_t wait_readable_for_receive(HANDLE pipe,
+                                                  const receive_wait_t *wait,
+                                                  bool *readable_out)
+{
+    int yielded = 0;
+
+    if (readable_out)
+        *readable_out = false;
+
+    for (;;) {
+        if (receive_wait_aborted(wait))
+            return NIPC_NP_ERR_ABORTED;
+
+        DWORD available = 0;
+        BOOL ok = PeekNamedPipe(pipe, NULL, 0, NULL, &available, NULL);
+        if (!ok) {
+            DWORD err = GetLastError();
+            if (is_disconnect_error(err))
+                return NIPC_NP_ERR_DISCONNECTED;
+            return NIPC_NP_ERR_RECV;
+        }
+
+        if (available > 0) {
+            if (readable_out)
+                *readable_out = true;
+            return NIPC_NP_OK;
+        }
+
+        if (receive_wait_expired(wait))
+            return NIPC_NP_ERR_TIMEOUT;
+
+        if (!yielded) {
+            yielded = 1;
+            for (int i = 0; i < 256; i++) {
+                if (receive_wait_aborted(wait))
+                    return NIPC_NP_ERR_ABORTED;
+
+                SwitchToThread();
+
+                available = 0;
+                ok = PeekNamedPipe(pipe, NULL, 0, NULL, &available, NULL);
+                if (!ok) {
+                    DWORD err = GetLastError();
+                    if (is_disconnect_error(err))
+                        return NIPC_NP_ERR_DISCONNECTED;
+                    return NIPC_NP_ERR_RECV;
+                }
+
+                if (available > 0) {
+                    if (readable_out)
+                        *readable_out = true;
+                    return NIPC_NP_OK;
+                }
+
+                if (receive_wait_expired(wait))
+                    return NIPC_NP_ERR_TIMEOUT;
+            }
+            continue;
+        }
+
+        Sleep(1);
+    }
+}
+
+static nipc_np_error_t raw_recv_with_wait(nipc_np_session_t *session,
+                                           void *buf,
+                                           size_t buf_size,
+                                           const receive_wait_t *wait,
+                                           DWORD *bytes_read)
+{
+    bool readable = false;
+    nipc_np_error_t werr = wait_readable_for_receive(
+        session->pipe, wait, &readable);
+    if (werr != NIPC_NP_OK)
+        return werr;
+    if (!readable)
+        return NIPC_NP_ERR_TIMEOUT;
+
+    int rc = raw_recv(session->pipe, buf, buf_size, bytes_read);
+    if (rc <= 0) {
+        inflight_fail_all(session);
+        return NIPC_NP_ERR_RECV;
+    }
+    return NIPC_NP_OK;
+}
+
+static nipc_np_error_t raw_recv_blocking(nipc_np_session_t *session,
+                                          void *buf,
+                                          size_t buf_size,
+                                          DWORD *bytes_read)
+{
+    int rc = raw_recv(session->pipe, buf, buf_size, bytes_read);
+    if (rc <= 0) {
+        inflight_fail_all(session);
+        return NIPC_NP_ERR_RECV;
+    }
+    return NIPC_NP_OK;
 }
 
 /* ------------------------------------------------------------------ */
@@ -936,6 +1070,8 @@ nipc_np_error_t nipc_np_send(nipc_np_session_t *session,
     hdr->magic      = NIPC_MAGIC_MSG;
     hdr->version    = NIPC_VERSION;
     hdr->header_len = NIPC_HEADER_LEN;
+    /* validate_outbound_limits() rejects payloads that cannot fit the header. */
+    assert(payload_len <= UINT32_MAX);
     hdr->payload_len = (uint32_t)payload_len;
 
     size_t total_msg;
@@ -961,12 +1097,16 @@ nipc_np_error_t nipc_np_send(nipc_np_session_t *session,
     }
 
     /* Chunked send */
-    size_t chunk_payload_budget = session->packet_size - NIPC_HEADER_LEN;
-    if (chunk_payload_budget == 0) {
+    if (session->packet_size <= NIPC_HEADER_LEN) {
         if (tracked) inflight_remove(session, hdr->message_id);
         return NIPC_NP_ERR_BAD_PARAM;
     }
 
+    /* header_payload_len() rejects totals wider than the wire field. */
+    assert(total_msg <= UINT32_MAX);
+    uint32_t total_msg_u32 = (uint32_t)total_msg;
+
+    size_t chunk_payload_budget = session->packet_size - NIPC_HEADER_LEN;
     size_t remaining = payload_len;
     size_t first_chunk_payload = remaining < chunk_payload_budget
                                      ? remaining : chunk_payload_budget;
@@ -974,8 +1114,8 @@ nipc_np_error_t nipc_np_send(nipc_np_session_t *session,
     remaining -= first_chunk_payload;
     uint32_t continuation_chunks = 0;
     if (remaining > 0) {
-        continuation_chunks = (uint32_t)((remaining + chunk_payload_budget - 1)
-                                          / chunk_payload_budget);
+        continuation_chunks = (uint32_t)(1 + ((remaining - 1)
+                                              / chunk_payload_budget));
     }
     uint32_t chunk_count = 1 + continuation_chunks;
 
@@ -1002,13 +1142,15 @@ nipc_np_error_t nipc_np_send(nipc_np_session_t *session,
     for (uint32_t ci = 1; ci < chunk_count; ci++) {
         size_t this_chunk = remaining < chunk_payload_budget
                                 ? remaining : chunk_payload_budget;
+        /* packet_size is negotiated as uint32_t, so continuation chunks fit u32. */
+        assert(this_chunk <= UINT32_MAX);
 
         nipc_chunk_header_t chk = {
             .magic             = NIPC_MAGIC_CHUNK,
             .version           = NIPC_VERSION,
             .flags             = 0,
             .message_id        = hdr->message_id,
-            .total_message_len = (uint32_t)total_msg,
+            .total_message_len = total_msg_u32,
             .chunk_index       = ci,
             .chunk_count       = chunk_count,
             .chunk_payload_len = (uint32_t)this_chunk,
@@ -1081,16 +1223,31 @@ nipc_np_error_t nipc_np_receive(nipc_np_session_t *session,
                                  const void **payload_out,
                                  size_t *payload_len_out)
 {
+    return nipc_np_receive_timeout(session, buf, buf_size, hdr_out,
+                                    payload_out, payload_len_out, 0, NULL);
+}
+
+nipc_np_error_t nipc_np_receive_timeout(nipc_np_session_t *session,
+                                         void *buf, size_t buf_size,
+                                         nipc_header_t *hdr_out,
+                                         const void **payload_out,
+                                         size_t *payload_len_out,
+                                         uint32_t timeout_ms,
+                                         HANDLE abort_event)
+{
     if (!session || session->pipe == INVALID_HANDLE_VALUE)
         return NIPC_NP_ERR_BAD_PARAM;
 
+    receive_wait_t wait = receive_wait_init(timeout_ms, abort_event);
+    bool controlled_receive = timeout_ms != 0 || abort_event != NULL;
+
     /* Read first message */
     DWORD bytes_read = 0;
-    int rc = raw_recv(session->pipe, buf, buf_size, &bytes_read);
-    if (rc <= 0) {
-        inflight_fail_all(session);
-        return NIPC_NP_ERR_RECV;
-    }
+    nipc_np_error_t rerr = controlled_receive
+        ? raw_recv_with_wait(session, buf, buf_size, &wait, &bytes_read)
+        : raw_recv_blocking(session, buf, buf_size, &bytes_read);
+    if (rerr != NIPC_NP_OK)
+        return rerr;
 
     size_t n = (size_t)bytes_read;
     if (n < NIPC_HEADER_LEN)
@@ -1126,8 +1283,11 @@ nipc_np_error_t nipc_np_receive(nipc_np_session_t *session,
     if (!header_payload_len(hdr_out->payload_len, &total_msg))
         return NIPC_NP_ERR_LIMIT_EXCEEDED;
 
+    if (n > total_msg)
+        return NIPC_NP_ERR_PROTOCOL;
+
     /* Non-chunked: entire message in one read */
-    if (n >= total_msg) {
+    if (n == total_msg) {
         *payload_out = (const uint8_t *)buf + NIPC_HEADER_LEN;
         *payload_len_out = hdr_out->payload_len;
 
@@ -1155,9 +1315,8 @@ nipc_np_error_t nipc_np_receive(nipc_np_session_t *session,
     size_t remaining_after_first = hdr_out->payload_len - first_payload_bytes;
     uint32_t expected_continuations = 0;
     if (remaining_after_first > 0 && chunk_payload_budget > 0) {
-        expected_continuations = (uint32_t)((remaining_after_first +
-                                              chunk_payload_budget - 1)
-                                             / chunk_payload_budget);
+        expected_continuations = (uint32_t)(1 + ((remaining_after_first - 1)
+                                             / chunk_payload_budget));
     }
     uint32_t expected_chunk_count = 1 + expected_continuations;
 
@@ -1169,11 +1328,12 @@ nipc_np_error_t nipc_np_receive(nipc_np_session_t *session,
 
     for (uint32_t ci = 1; assembled < hdr_out->payload_len; ci++) {
         DWORD cn = 0;
-        int crc = raw_recv(session->pipe, pkt_buf, pkt_buf_size, &cn);
-        if (crc <= 0) {
+        rerr = controlled_receive
+            ? raw_recv_with_wait(session, pkt_buf, pkt_buf_size, &wait, &cn)
+            : raw_recv_blocking(session, pkt_buf, pkt_buf_size, &cn);
+        if (rerr != NIPC_NP_OK) {
             free(pkt_buf);
-            inflight_fail_all(session);
-            return NIPC_NP_ERR_RECV;
+            return rerr;
         }
 
         if ((size_t)cn < NIPC_HEADER_LEN) {

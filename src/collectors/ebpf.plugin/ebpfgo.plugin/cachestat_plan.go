@@ -1,0 +1,197 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
+)
+
+const cachestatKernelMask uint32 = (1 << 12) - 1
+const cachestatDefaultPIDTableSize uint32 = 32768
+const cachestatMaxPIDTableSize uint32 = 32768
+const cachestatDefaultBTFFile = "vmlinux"
+
+type CachestatLegacyConfig struct {
+	PluginsDir      string
+	Kernels         uint32
+	IsRHF           int
+	KernelVersion   uint32
+	IsDebian        bool
+	HasBTF          bool
+	ConfigFound     bool
+	Enabled         bool
+	AppsEnabled     bool
+	CgroupsEnabled  bool
+	BTFPath         string
+	UpdateEvery     int
+	PidTableSize    uint32
+	MapsPerCore     bool
+	ObjectFlavor    string
+	AccountFunction string
+	AppsLevel       int // BPF apps collection level: 0=real parent, 1=parent, 2=all
+	Targets         CachestatTargets
+}
+
+type CachestatLegacyHandle struct {
+	Plan           LoadPlan
+	Runtime        *libbpfloader.CachestatRuntime
+	SharedMemory   *SharedPidMemoryPublisher
+	UpdateEvery    int
+	ConfigFound    bool
+	PidTableSize   uint32
+	MapsPerCore    bool
+	AppsEnabled    bool
+	CgroupsEnabled bool
+	AppsLevel      int
+}
+
+func (h *CachestatLegacyHandle) Close() {
+	if h == nil || h.Runtime == nil {
+		if h != nil && h.SharedMemory != nil {
+			h.SharedMemory.Close()
+			h.SharedMemory = nil
+		}
+		return
+	}
+
+	h.Runtime.Close()
+	h.Runtime = nil
+	if h.SharedMemory != nil {
+		h.SharedMemory.Close()
+		h.SharedMemory = nil
+	}
+}
+
+func defaultPluginsDir() string {
+	if dir := os.Getenv("NETDATA_PLUGINS_DIR"); dir != "" {
+		return dir
+	}
+
+	return filepath.Join(netdataRuntimePrefix, "usr/libexec/netdata/plugins.d")
+}
+
+func defaultCachestatLegacyConfig() CachestatLegacyConfig {
+	return CachestatLegacyConfig{
+		PluginsDir:     defaultPluginsDir(),
+		Kernels:        cachestatKernelMask,
+		IsRHF:          -1,
+		IsDebian:       IsDebianFlavor(),
+		BTFPath:        cachestatDefaultBTFPath,
+		UpdateEvery:    cachestatDefaultUpdateEvery,
+		HasBTF:         kernelBTFSupported(cachestatDefaultBTFPath),
+		PidTableSize:   cachestatDefaultPIDTableSize,
+		MapsPerCore:    true,
+		ObjectFlavor:   cachestatDefaultObjectFlavor,
+		Enabled:        true,
+		AppsEnabled:    false,
+		CgroupsEnabled: false,
+		AppsLevel:      0, // NETDATA_APPS_LEVEL_REAL_PARENT — matches stock cachestat.conf default
+		Targets:        defaultCachestatTargets(),
+	}
+}
+
+func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
+	cfg := defaultCachestatLegacyConfig()
+
+	fileCfg, found, err := loadCachestatConfigFiles()
+	if err != nil {
+		return CachestatLegacyConfig{}, err
+	}
+	cfg.ConfigFound = found
+	if fileCfg.Enabled != nil {
+		cfg.Enabled = *fileCfg.Enabled
+	}
+	if fileCfg.UpdateEvery != nil && *fileCfg.UpdateEvery > 0 {
+		cfg.UpdateEvery = *fileCfg.UpdateEvery
+	}
+	if fileCfg.AppsEnabled != nil {
+		cfg.AppsEnabled = *fileCfg.AppsEnabled
+	}
+	if fileCfg.Cgroups != nil {
+		cfg.CgroupsEnabled = *fileCfg.Cgroups
+	}
+	if fileCfg.PidTable != nil && *fileCfg.PidTable > 0 {
+		cfg.PidTableSize = applyPidTableSizeClamp(*fileCfg.PidTable)
+	}
+	if fileCfg.MapsPerCore != nil {
+		cfg.MapsPerCore = *fileCfg.MapsPerCore
+	}
+	if fileCfg.BTFPath != nil && *fileCfg.BTFPath != "" {
+		cfg.BTFPath = *fileCfg.BTFPath
+		cfg.HasBTF = kernelBTFSupported(cfg.BTFPath)
+	}
+	if fileCfg.Lifetime != nil && *fileCfg.Lifetime > 0 {
+		// lifetime controls how long the thread runs when activated by a cloud
+		// Function call in the old ebpf.plugin.  The Go plugin runs until
+		// signalled and has no equivalent lifecycle, so this value is parsed
+		// for compatibility but not consumed.
+	}
+	if fileCfg.CollectPidLevel != nil {
+		cfg.AppsLevel = *fileCfg.CollectPidLevel
+	}
+	if fileCfg.ObjectFlavor != nil && *fileCfg.ObjectFlavor != "" {
+		cfg.ObjectFlavor = *fileCfg.ObjectFlavor
+	}
+
+	kver, err := KernelVersion()
+	if err != nil {
+		return CachestatLegacyConfig{}, err
+	}
+	cfg.KernelVersion = kver
+
+	if rhf, err := RedHatRelease(); err == nil {
+		cfg.IsRHF = rhf
+	}
+
+	if err := cfg.Targets.ResolveAccountPageTarget(); err != nil {
+		return CachestatLegacyConfig{}, err
+	}
+	cfg.AccountFunction = cfg.Targets.AccountPageDirtied.Name
+
+	return cfg, nil
+}
+
+func BuildCachestatLegacyPlan(cfg CachestatLegacyConfig) LoadPlan {
+	flavor := selectCachestatObjectFlavor(cfg.ObjectFlavor, cfg.KernelVersion, cfg.IsDebian)
+	loadMode := SelectLoadMode(cfg.HasBTF, LoadCore, cfg.KernelVersion, cfg.IsRHF)
+
+	selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
+	return LoadPlan{
+		KernelVersion: cfg.KernelVersion,
+		IsRHF:         cfg.IsRHF,
+		Selector:      selector,
+		Flavor:        flavor,
+		ObjectPath:    BuildObjectPathWithFlavor(cfg.PluginsDir, selector, "cachestat", false, cfg.IsRHF, flavor),
+		LoadMode:      loadMode,
+		ProgramMode:   LoadTrampoline,
+	}
+}
+
+func selectCachestatObjectFlavor(requested string, kver uint32, isDebian bool) ObjectFlavor {
+	switch strings.ToLower(strings.TrimSpace(requested)) {
+	case "", "buffer":
+		if kver >= minimumKernelVersionBuffer {
+			return ObjectFlavorBuffer
+		}
+	case "arena":
+		if kver >= minimumKernelVersionArena && !isDebian {
+			return ObjectFlavorArena
+		}
+	}
+
+	return ObjectFlavorBase
+}
+
+func kernelBTFSupported(btfPath string) bool {
+	_, err := os.Stat(filepath.Join(btfPath, cachestatDefaultBTFFile))
+	return err == nil
+}
+
+func applyPidTableSizeClamp(n uint32) uint32 {
+	if n > cachestatMaxPIDTableSize {
+		return cachestatMaxPIDTableSize
+	}
+	return n
+}

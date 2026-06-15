@@ -1,16 +1,21 @@
 use super::*;
 use crate::protocol::{
-    increment_encode, BatchBuilder, CgroupsBuilder, CgroupsRequest, Header, HelloAck, NipcError,
-    CODE_HELLO_ACK, FLAG_BATCH, HEADER_SIZE, INCREMENT_PAYLOAD_SIZE, KIND_CONTROL, KIND_REQUEST,
-    KIND_RESPONSE, METHOD_CGROUPS_SNAPSHOT, METHOD_INCREMENT, METHOD_STRING_REVERSE,
-    PROFILE_BASELINE, PROFILE_SHM_HYBRID, STATUS_INTERNAL_ERROR, STATUS_OK, VERSION,
+    increment_encode, AppsLookupBuilder, BatchBuilder, CgroupsBuilder, CgroupsLookupBuilder,
+    CgroupsRequest, Header, HelloAck, NipcError, APPS_CGROUP_HOST_ROOT, APPS_CGROUP_KNOWN,
+    CGROUP_LOOKUP_KNOWN, CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, CODE_HELLO_ACK, FLAG_BATCH,
+    HEADER_SIZE, INCREMENT_PAYLOAD_SIZE, KIND_CONTROL, KIND_REQUEST, KIND_RESPONSE,
+    METHOD_APPS_LOOKUP, METHOD_CGROUPS_LOOKUP, METHOD_CGROUPS_SNAPSHOT, METHOD_INCREMENT,
+    METHOD_STRING_REVERSE, NIPC_UID_UNSET, ORCHESTRATOR_DOCKER, ORCHESTRATOR_K8S, PID_LOOKUP_KNOWN,
+    PID_LOOKUP_UNKNOWN, PROFILE_BASELINE, PROFILE_SHM_HYBRID, STATUS_INTERNAL_ERROR, STATUS_OK,
+    VERSION,
 };
 use crate::transport::windows::build_pipe_name;
 use std::ptr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::mpsc;
 use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const TEST_RUN_DIR: &str = r"C:\Temp\nipc_svc_rust_test";
 const AUTH_TOKEN: u64 = 0xDEADBEEFCAFEBABE;
@@ -116,6 +121,14 @@ fn string_reverse_client(service: &str, config: ClientConfig) -> RawClient {
     RawClient::new_string_reverse(TEST_RUN_DIR, service, config)
 }
 
+fn cgroups_lookup_client(service: &str, config: ClientConfig) -> RawClient {
+    RawClient::new_cgroups_lookup(TEST_RUN_DIR, service, config)
+}
+
+fn apps_lookup_client(service: &str, config: ClientConfig) -> RawClient {
+    RawClient::new_apps_lookup(TEST_RUN_DIR, service, config)
+}
+
 fn fill_test_cgroups_snapshot(builder: &mut CgroupsBuilder<'_>) -> bool {
     let items = [
         (
@@ -161,6 +174,96 @@ fn increment_dispatch_handler() -> DispatchHandler {
     increment_dispatch(Arc::new(|value| Some(value + 1)))
 }
 
+fn cgroups_lookup_dispatch_handler() -> DispatchHandler {
+    cgroups_lookup_dispatch(Arc::new(|req, builder: &mut CgroupsLookupBuilder<'_>| {
+        builder.set_generation(55);
+        for i in 0..req.item_count {
+            let path = match req.item(i) {
+                Ok(path) => path,
+                Err(_) => return false,
+            };
+            let result = if path.as_bytes() == b"/docker/abc" {
+                builder.add(
+                    CGROUP_LOOKUP_KNOWN,
+                    ORCHESTRATOR_DOCKER,
+                    path.as_bytes(),
+                    b"container-a",
+                    &[(b"role".as_slice(), b"web".as_slice())],
+                )
+            } else {
+                builder.add(
+                    CGROUP_LOOKUP_UNKNOWN_RETRY_LATER,
+                    0,
+                    path.as_bytes(),
+                    b"",
+                    &[],
+                )
+            };
+            if result.is_err() {
+                return false;
+            }
+        }
+        true
+    }))
+}
+
+fn apps_lookup_dispatch_handler() -> DispatchHandler {
+    apps_lookup_dispatch(Arc::new(|req, builder: &mut AppsLookupBuilder<'_>| {
+        builder.set_generation(77);
+        for i in 0..req.item_count {
+            let pid = match req.item(i) {
+                Ok(pid) => pid,
+                Err(_) => return false,
+            };
+            let result = match pid {
+                123 => builder.add(
+                    PID_LOOKUP_KNOWN,
+                    APPS_CGROUP_KNOWN,
+                    ORCHESTRATOR_K8S,
+                    pid,
+                    1,
+                    1000,
+                    42,
+                    b"nginx",
+                    b"/kubepods/pod-a",
+                    b"pod-a",
+                    &[(b"namespace".as_slice(), b"default".as_slice())],
+                ),
+                124 => builder.add(
+                    PID_LOOKUP_KNOWN,
+                    APPS_CGROUP_HOST_ROOT,
+                    0,
+                    pid,
+                    1,
+                    0,
+                    43,
+                    b"sshd",
+                    b"",
+                    b"",
+                    &[],
+                ),
+                _ => builder.add(
+                    PID_LOOKUP_UNKNOWN,
+                    APPS_CGROUP_KNOWN,
+                    0,
+                    pid,
+                    0,
+                    NIPC_UID_UNSET,
+                    0,
+                    b"",
+                    b"",
+                    b"",
+                    &[],
+                ),
+            };
+            if result.is_err() {
+                return false;
+            }
+        }
+        true
+    }))
+}
+
 fn connect_ready(client: &mut RawClient) {
     for _ in 0..200 {
         client.refresh();
@@ -183,6 +286,75 @@ fn wait_for_state(client: &mut RawClient, want: ClientState) {
     }
 
     panic!("client did not reach state {:?}", want);
+}
+
+#[test]
+fn test_client_call_timeout_on_wedged_peer() {
+    let svc = unique_service("rs_win_call_timeout");
+    let mut server =
+        start_raw_session_server(&svc, server_config(), move |_session, _hdr, _payload| {
+            thread::sleep(Duration::from_millis(150));
+            Ok(())
+        });
+
+    let mut client = increment_client(&svc, client_config());
+    connect_ready(&mut client);
+
+    let start = Instant::now();
+    let err = client
+        .call_increment_with_timeout(41, 30)
+        .expect_err("wedged peer should time out");
+    assert_eq!(err, NipcError::Timeout);
+    assert!(
+        start.elapsed() < Duration::from_secs(1),
+        "timeout took too long: {:?}",
+        start.elapsed()
+    );
+
+    client.close();
+    server.wait();
+    cleanup_all(&svc);
+}
+
+#[test]
+fn test_client_abort_unblocks_call() {
+    let svc = unique_service("rs_win_call_abort");
+    let (entered_tx, entered_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel();
+    let mut server =
+        start_raw_session_server(&svc, server_config(), move |_session, _hdr, _payload| {
+            let _ = entered_tx.send(());
+            let _ = release_rx.recv_timeout(Duration::from_secs(5));
+            Ok(())
+        });
+
+    let mut client = increment_client(&svc, client_config());
+    connect_ready(&mut client);
+    let abort = client.abort_handle();
+
+    let call_thread = thread::spawn(move || {
+        client
+            .call_increment_with_timeout(41, 5_000)
+            .expect_err("aborted call should fail")
+    });
+
+    entered_rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("server handler should receive request");
+
+    let start = Instant::now();
+    abort.abort();
+    let err = call_thread.join().expect("call thread should not panic");
+    assert_eq!(err, NipcError::Aborted);
+    assert!(
+        start.elapsed() < Duration::from_secs(1),
+        "abort took too long: {:?}",
+        start.elapsed()
+    );
+
+    release_tx.send(()).expect("release handler");
+    server.wait();
+    cleanup_all(&svc);
 }
 
 struct TestServer {
@@ -585,6 +757,85 @@ fn test_cgroups_call_windows_shm() {
     let view = client.call_snapshot().expect("snapshot");
     assert_eq!(view.item_count, 3);
     assert_eq!(view.generation, 42);
+
+    client.close();
+    server.stop();
+}
+
+#[test]
+fn test_cgroups_lookup_call_windows_baseline() {
+    let svc = unique_service("rs_win_cgroups_lookup");
+    let mut server = TestServer::start(
+        &svc,
+        METHOD_CGROUPS_LOOKUP,
+        cgroups_lookup_dispatch_handler(),
+    );
+
+    let mut client = cgroups_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+
+    let paths: [&[u8]; 2] = [b"/docker/abc".as_slice(), b"/missing".as_slice()];
+    let view = client.call_cgroups_lookup(&paths).expect("cgroups lookup");
+    assert_eq!(view.item_count, 2);
+    assert_eq!(view.generation, 55);
+
+    let known = view.item(0).expect("known item");
+    assert_eq!(known.status, CGROUP_LOOKUP_KNOWN);
+    assert_eq!(known.orchestrator, ORCHESTRATOR_DOCKER);
+    assert_eq!(known.path.as_bytes(), b"/docker/abc");
+    assert_eq!(known.name.as_bytes(), b"container-a");
+    let label = known.label(0).expect("known label");
+    assert_eq!(label.key.as_bytes(), b"role");
+    assert_eq!(label.value.as_bytes(), b"web");
+
+    let unknown = view.item(1).expect("unknown item");
+    assert_eq!(unknown.status, CGROUP_LOOKUP_UNKNOWN_RETRY_LATER);
+    assert_eq!(unknown.path.as_bytes(), b"/missing");
+    assert_eq!(unknown.name.as_bytes(), b"");
+    assert_eq!(client.status().call_count, 1);
+
+    client.close();
+    server.stop();
+}
+
+#[test]
+fn test_apps_lookup_call_windows_baseline() {
+    let svc = unique_service("rs_win_apps_lookup");
+    let mut server = TestServer::start(&svc, METHOD_APPS_LOOKUP, apps_lookup_dispatch_handler());
+
+    let mut client = apps_lookup_client(&svc, client_config());
+    connect_ready(&mut client);
+
+    let view = client
+        .call_apps_lookup(&[123, 124, 999])
+        .expect("apps lookup");
+    assert_eq!(view.item_count, 3);
+    assert_eq!(view.generation, 77);
+
+    let known = view.item(0).expect("known pid");
+    assert_eq!(known.status, PID_LOOKUP_KNOWN);
+    assert_eq!(known.cgroup_status, APPS_CGROUP_KNOWN);
+    assert_eq!(known.orchestrator, ORCHESTRATOR_K8S);
+    assert_eq!(known.pid, 123);
+    assert_eq!(known.comm.as_bytes(), b"nginx");
+    assert_eq!(known.cgroup_path.as_bytes(), b"/kubepods/pod-a");
+    assert_eq!(known.cgroup_name.as_bytes(), b"pod-a");
+    let label = known.label(0).expect("known pid label");
+    assert_eq!(label.key.as_bytes(), b"namespace");
+    assert_eq!(label.value.as_bytes(), b"default");
+
+    let host = view.item(1).expect("host pid");
+    assert_eq!(host.status, PID_LOOKUP_KNOWN);
+    assert_eq!(host.cgroup_status, APPS_CGROUP_HOST_ROOT);
+    assert_eq!(host.comm.as_bytes(), b"sshd");
+    assert_eq!(host.cgroup_path.as_bytes(), b"");
+
+    let unknown = view.item(2).expect("unknown pid");
+    assert_eq!(unknown.status, PID_LOOKUP_UNKNOWN);
+    assert_eq!(unknown.pid, 999);
+    assert_eq!(unknown.uid, NIPC_UID_UNSET);
+    assert_eq!(unknown.comm.as_bytes(), b"");
+    assert_eq!(client.status().call_count, 1);
 
     client.close();
     server.stop();

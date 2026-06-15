@@ -48,7 +48,11 @@ func writeRawShmRegionFile(t *testing.T, runDir, service string, sessionID uint6
 	if err != nil {
 		t.Fatalf("open %s: %v", path, err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			t.Fatalf("close %s: %v", path, err)
+		}
+	}()
 
 	if err := f.Truncate(int64(size)); err != nil {
 		t.Fatalf("truncate %s: %v", path, err)
@@ -403,8 +407,8 @@ func TestCheckShmStaleVariants(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dirPath, "keep"), 0700); err != nil {
 		t.Fatalf("mkdir stale dir: %v", err)
 	}
-	if got := checkShmStale(dirPath); got != shmStaleInvalid {
-		t.Fatalf("directory path result = %v, want %v", got, shmStaleInvalid)
+	if got := checkShmStale(dirPath); got != shmStaleLive {
+		t.Fatalf("directory path result = %v, want %v", got, shmStaleLive)
 	}
 	if info, err := os.Stat(dirPath); err != nil || !info.IsDir() {
 		t.Fatalf("non-empty stale directory should remain, stat err = %v", err)
@@ -470,8 +474,10 @@ func TestShmCleanupStaleMixedEntries(t *testing.T) {
 	if _, err := os.Stat(unrelatedPath); err != nil {
 		t.Fatalf("unrelated file should remain, stat err = %v", err)
 	}
-	if info, err := os.Stat(matchingDir); err != nil || !info.IsDir() {
-		t.Fatalf("matching directory should remain, stat err = %v", err)
+	// An empty directory squatting on a matching SHM name is junk and is
+	// reclaimed; non-empty directories survive (see TestCheckShmStaleVariants).
+	if _, err := os.Stat(matchingDir); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("matching empty directory should be removed, stat err = %v", err)
 	}
 }
 

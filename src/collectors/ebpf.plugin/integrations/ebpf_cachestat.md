@@ -143,40 +143,6 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 
 
-### Per eBPF Cachestat instance
-
-These metrics show total number of calls to functions inside kernel.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.cachestat_ratio | ratio | % |
-| mem.cachestat_dirties | dirty | page/s |
-| mem.cachestat_hits | hit | hits/s |
-| mem.cachestat_misses | miss | misses/s |
-
-### Per apps
-
-These Metrics show grouped information per apps group.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| app_group | The name of the group defined in the configuration. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| app.ebpf_cachestat_hit_ratio | ratio | % |
-| app.ebpf_cachestat_dirty_pages | pages | page/s |
-| app.ebpf_cachestat_access | hits | hits/s |
-| app.ebpf_cachestat_misses | misses | misses/s |
-
 ### Per cgroup
 
 

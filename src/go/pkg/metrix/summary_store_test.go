@@ -13,6 +13,34 @@ func TestSummaryStoreScenarios(t *testing.T) {
 	tests := map[string]struct {
 		run func(t *testing.T)
 	}{
+		"snapshot summary stores NaN quantile values (sparse window -> gap downstream)": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				sum := s.Write().SnapshotMeter("svc").Summary("latency", WithSummaryQuantiles(0.5, 0.9))
+
+				cc.BeginCycle()
+				require.NotPanics(t, func() {
+					sum.ObservePoint(SummaryPoint{
+						Count: 0,
+						Sum:   0,
+						Quantiles: []QuantilePoint{
+							{Quantile: 0.5, Value: SampleValue(math.NaN())},
+							{Quantile: 0.9, Value: SampleValue(math.NaN())},
+						},
+					})
+				})
+				cc.CommitCycleSuccess()
+
+				point, ok := s.Read().Summary("svc.latency", nil)
+				require.True(t, ok)
+				require.Len(t, point.Quantiles, 2)
+				for _, q := range point.Quantiles {
+					require.Truef(t, math.IsNaN(float64(q.Value)),
+						"quantile %v value must be stored as NaN, got %v", q.Quantile, q.Value)
+				}
+			},
+		},
 		"snapshot summary count sum read and flatten": {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()

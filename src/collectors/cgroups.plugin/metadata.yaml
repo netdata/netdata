@@ -32,7 +32,7 @@ modules:
         - linux containers
     overview: &overview
       data_collection: &data_collection
-        metrics_description: "Monitor containers and virtual machines resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
+        metrics_description: "Monitor containers and virtual machines resource utilization — CPU, memory, disk I/O, network, and page cache activity — via Linux cgroups."
         method_description: ""
       supported_platforms:
         include:
@@ -329,6 +329,30 @@ modules:
               chart_type: line
               dimensions:
                 - name: pids
+            - name: cgroup.cachestat_ratio
+              description: Hit ratio
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: cgroup.cachestat_dirties
+              description: Number of dirty pages
+              unit: "page/s"
+              chart_type: line
+              dimensions:
+                - name: dirty
+            - name: cgroup.cachestat_hits
+              description: Number of accessed files
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: hit
+            - name: cgroup.cachestat_misses
+              description: Files out of page cache
+              unit: "misses/s"
+              chart_type: line
+              dimensions:
+                - name: miss
         - name: cgroup network device
           description: ""
           labels:
@@ -846,6 +870,39 @@ modules:
               chart_type: line
               dimensions:
                 - name: mtu
+        - name: cgroups plugin IPC
+          description: cgroups.plugin netipc lookup-server and discovery signal health.
+          labels: []
+          metrics:
+            - name: netdata.collector.ipc.cgroups_lookup.server.requests
+              description: CGROUPS_LOOKUP server request outcomes
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: requests_responded
+                - name: requests_error
+                - name: lookup_miss_signals_sent
+                - name: lookup_miss_signals_coalesced
+            - name: netdata.collector.ipc.cgroups_lookup.server.request_duration_ms
+              description: CGROUPS_LOOKUP server request duration buckets
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: le_1ms
+                - name: le_5ms
+                - name: le_10ms
+                - name: le_50ms
+                - name: le_100ms
+                - name: le_500ms
+                - name: le_1000ms
+                - name: gt_1000ms
+            - name: netdata.collector.cgroups.discovery.scans
+              description: cgroups discovery scans by trigger source
+              unit: "scans/s"
+              chart_type: line
+              dimensions:
+                - name: discovery_scans_natural
+                - name: discovery_scans_opportunistic
   - <<: *module
     meta:
       <<: *meta
@@ -979,6 +1036,30 @@ modules:
               chart_type: line
               dimensions:
                 - name: pids
+            - name: systemd.service.cachestat_ratio
+              description: Hit ratio
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: systemd.service.cachestat_dirties
+              description: Number of dirty pages
+              unit: "page/s"
+              chart_type: line
+              dimensions:
+                - name: dirty
+            - name: systemd.service.cachestat_hits
+              description: Number of accessed files
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: hit
+            - name: systemd.service.cachestat_misses
+              description: Files out of page cache
+              unit: "misses/s"
+              chart_type: line
+              dimensions:
+                - name: miss
   - <<: *module
     meta:
       <<: *meta

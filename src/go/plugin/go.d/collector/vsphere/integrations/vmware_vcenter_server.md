@@ -881,7 +881,7 @@ No additional configuration is required.
 
 #### Returns
 
-Cached vSphere inventory topology payload using the netdata.topology.v1 schema. Actors represent discovered inventory objects and links represent inventory ownership, VM-to-host runtime placement, and host/VM network attachment relationships.
+Cached vSphere inventory topology payload using the netdata.topology.v1 schema. Actors represent discovered inventory objects, links represent inventory ownership, VM-to-host runtime placement, and host/VM network attachment relationships, and overlays expose refreshable datastore utilization metrics.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
@@ -896,7 +896,8 @@ Cached vSphere inventory topology payload using the netdata.topology.v1 schema. 
 | links | object |  |  | Compact link table for relationships between vSphere inventory actors. |
 | evidence | object |  |  | Relationship evidence tables backing the rendered links. |
 | tables | object |  |  | Actor detail and label tables used by topology modals. |
-| stats | object |  |  | Counts of discovered inventory objects, actors, and links included in the response. |
+| overlays | object |  |  | Telemetry overlay refs for refreshable metrics, including datastore used-space utilization selected by collector job and vSphere managed object ID. |
+| stats | object |  |  | Counts of discovered inventory objects, actors, links, and overlay refs included in the response. |
 
 
 

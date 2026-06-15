@@ -29,6 +29,29 @@ Known producer families:
 Always start with an info request to discover the parameters supported by the
 Agent version you are querying.
 
+## Network-connections grouping
+
+`topology:network-connections` supports three actor grouping levels:
+
+- `group_by:process_name` returns grouped process-name actors.
+- `group_by:pid` returns one process actor per PID and is the only view that
+  emits raw fields such as PID, UID, command line, cgroup path, and detailed
+  container metadata.
+- `group_by:container` returns container actors grouped by canonical
+  `container_name`. Services use the service name, and non-container,
+  non-service processes fall back to process name.
+
+The payload advertises these `view.group_by` ids: `process_name`, `pid`, and
+`container`.
+
+Useful request arguments:
+
+- `group_by:pid` returns per-PID process actors.
+- `group_by:container` returns container/service actors.
+- `labels:<pattern>` allows optional free-form actor labels. Omit it to hide
+  free-form labels. Tokens are pipe-separated, for example
+  `labels:team|app|version-*`; commas are literal.
+
 ## Endpoint
 
 Use the standard Cloud Function endpoint:
@@ -38,21 +61,25 @@ Use the standard Cloud Function endpoint:
 Example info request:
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
 NODE="YOUR_NODE_UUID"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=topology:network-connections" \
-  -d '{"info":true,"timeout":30000}'
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
+
+agents_call_function \
+  --via cloud \
+  --node "$NODE" \
+  --function 'topology:network-connections' \
+  --body '{"info":true,"timeout":30000}'
 ```
 
 Example data request:
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
 NODE="YOUR_NODE_UUID"
+
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 
 read -r -d '' PAYLOAD <<'EOF'
 {
@@ -63,11 +90,42 @@ read -r -d '' PAYLOAD <<'EOF'
 }
 EOF
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=topology:network-connections" \
-  -d "$PAYLOAD"
+agents_call_function \
+  --via cloud \
+  --node "$NODE" \
+  --function 'topology:network-connections' \
+  --body "$PAYLOAD"
+```
+
+Example with exact per-PID raw fields and selected labels:
+
+```bash
+agents_call_function \
+  --via cloud \
+  --node "$NODE" \
+  --function 'topology:network-connections' \
+  --body '{"timeout":60000,"selections":{"group_by":["pid"],"labels":["team|app"]}}' \
+  | jq '.data | {
+      group_by: .view.group_by,
+      process_scopes: .types.actor_types.process.aggregation_scopes,
+      container_scopes: .types.actor_types.container.aggregation_scopes,
+      actor_columns: [.actors.columns[].id]
+    }'
+```
+
+Example Kubernetes pod/namespace view inspection:
+
+```bash
+agents_call_function \
+  --via cloud \
+  --node "$NODE" \
+  --function 'topology:network-connections' \
+  --body '{"timeout":60000,"selections":{"group_by":["pid"]}}' \
+  | jq '.data.actors as $actors
+        | ($actors.columns | map(.id)) as $cols
+        | ($cols | index("k8s_namespace")) as $ns
+        | ($cols | index("k8s_pod_name")) as $pod
+        | {namespaces: $actors.values[$ns].values, pods: $actors.values[$pod].values}'
 ```
 
 ## Response shape

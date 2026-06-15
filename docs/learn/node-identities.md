@@ -220,6 +220,18 @@ If you customized `[directories]` in `netdata.conf`:
 
 :::
 
+## Hostname Override
+
+By default, Netdata auto-detects the system hostname. When the system hostname is configured as an IP address (common on some cloud VMs or home servers), nodes appear in Dashboards and Netdata Cloud with that raw IP instead of a readable name.
+
+:::info
+
+This setting changes the **display name** only — it does not affect the node's identity (Machine GUID, Node ID, or Claimed ID).
+
+:::
+
+To configure a custom hostname, see [Customizing Your Node Name](/src/daemon/config/README.md#customizing-your-node-name).
+
 ## FAQ
 
 <details>
@@ -336,5 +348,26 @@ A virtual node's identity is determined by its **`guid`** field — not its `hos
 - **`name`** — The Agent ignores this field. When set to a value different from `hostname`, the Agent logs a warning and overrides it with `hostname`.
 
 **To preserve data continuity when renaming a vnode**, change only the `hostname` field in the YAML config file under `/etc/netdata/vnodes/` and keep the `guid` unchanged. If a true identity change is needed, accept that historical data belongs to the old identity.
+
+</details>
+
+<details>
+<summary>How do I find the UUID of my existing vnode?</summary>
+
+The GUID for each virtual node is stored in its YAML configuration file under `/etc/netdata/vnodes/`. To look it up:
+
+```bash
+cat /etc/netdata/vnodes/*
+```
+
+Each file contains a `guid` field that uniquely identifies the vnode:
+
+```yaml
+- name: my-remote-server
+  hostname: remote-server.example.com
+  guid: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+```
+
+The `guid` value is the vnode's UUID. You do **not** need to query any internal database — the YAML configuration file is the authoritative source for the vnode GUID. See [Virtual Nodes](#virtual-nodes-vnodes) for the full configuration reference.
 
 </details>

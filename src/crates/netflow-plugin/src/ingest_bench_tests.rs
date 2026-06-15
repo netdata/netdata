@@ -142,6 +142,9 @@ fn benchmark_protocol_full_ingest(
 ) -> ThroughputReport {
     let (_tmp, mut service) = new_benchmark_ingest_service(ConfigDecapsulationMode::None);
     warm_protocol_templates(&mut service, scenario);
+    // Production mode: tier commits happen on the worker threads; the
+    // packet path below serves their doorbells exactly as the live loop.
+    service.spawn_tier_commit_workers_for_test();
 
     let mut entries_since_sync = 0;
     for _ in 0..warmup_rounds {
@@ -213,6 +216,7 @@ fn benchmark_protocol_post_decode(
 ) -> ThroughputReport {
     let decoded = collect_decoded_flows_for_scenario(scenario, data_payloads);
     let (_tmp, mut service) = new_benchmark_ingest_service(ConfigDecapsulationMode::None);
+    service.spawn_tier_commit_workers_for_test();
     let started = Instant::now();
     let mut entries_since_sync = 0_usize;
 
@@ -245,6 +249,7 @@ fn benchmark_cardinality_mode(
 ) -> CardinalityBenchmarkReport {
     let records = build_cardinality_records(decoded, total_flows, mode);
     let (_tmp, mut service) = new_benchmark_ingest_service(ConfigDecapsulationMode::None);
+    service.spawn_tier_commit_workers_for_test();
 
     for record in records.iter().take(warmup_flows) {
         service.ingest_decoded_record_for_test(CARDINALITY_BENCH_RECEIVE_TIME_USEC, record);

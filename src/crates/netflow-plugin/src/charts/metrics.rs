@@ -126,6 +126,78 @@ pub(super) struct MaterializedTierBytesMetrics {
 
 #[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
 #[schemars(
+    extend("x-chart-id" = "netflow.tier_commit_age"),
+    extend("x-chart-title" = "Netflow Tier Commit Age"),
+    extend("x-chart-units" = "seconds"),
+    extend("x-chart-type" = "line"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.tier_commit_age"),
+)]
+pub(super) struct TierCommitAgeMetrics {
+    #[schemars(extend("x-dimension-algorithm" = "absolute"))]
+    pub(super) minute_1: u64,
+    #[schemars(extend("x-dimension-algorithm" = "absolute"))]
+    pub(super) minute_5: u64,
+    #[schemars(extend("x-dimension-algorithm" = "absolute"))]
+    pub(super) hour_1: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
+    extend("x-chart-id" = "netflow.tier_commit_duration"),
+    extend("x-chart-title" = "Netflow Tier Commit Duration"),
+    extend("x-chart-units" = "microseconds"),
+    extend("x-chart-type" = "line"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.tier_commit_duration"),
+)]
+pub(super) struct TierCommitDurationMetrics {
+    #[schemars(extend("x-dimension-algorithm" = "absolute"))]
+    pub(super) minute_1: u64,
+    #[schemars(extend("x-dimension-algorithm" = "absolute"))]
+    pub(super) minute_5: u64,
+    #[schemars(extend("x-dimension-algorithm" = "absolute"))]
+    pub(super) hour_1: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
+    extend("x-chart-id" = "netflow.tier_commit_batches"),
+    extend("x-chart-title" = "Netflow Tier Commit Batches"),
+    extend("x-chart-units" = "batches/s"),
+    extend("x-chart-type" = "line"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.tier_commit_batches"),
+)]
+pub(super) struct TierCommitBatchesMetrics {
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) minute_1: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) minute_5: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) hour_1: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
+    extend("x-chart-id" = "netflow.tier_commit_stretched"),
+    extend("x-chart-title" = "Netflow Tier Commit Stretched Windows"),
+    extend("x-chart-units" = "events/s"),
+    extend("x-chart-type" = "line"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.tier_commit_stretched"),
+)]
+pub(super) struct TierCommitStretchedMetrics {
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) minute_1: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) minute_5: u64,
+    #[schemars(extend("x-dimension-algorithm" = "incremental"))]
+    pub(super) hour_1: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
     extend("x-chart-id" = "netflow.open_tiers"),
     extend("x-chart-title" = "Netflow Open Tier Rows"),
     extend("x-chart-units" = "rows"),

@@ -20,7 +20,7 @@ jobs:
   no-working-files:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Reject committed SOW working files
         run: |
@@ -30,7 +30,7 @@ jobs:
 
           while IFS= read -r file; do
             [ -n "$file" ] || continue
-            echo "::error file=${file}::SOW working files are branch-local and must be deleted before merge."
+            echo "::error file=${file}::SOW working files may be committed for takeover/handoff and must be deleted before merge."
             found=1
           done < <(
             {
@@ -44,7 +44,7 @@ jobs:
   sensitive-data:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 

@@ -5,6 +5,9 @@ package funcapi
 // MethodConfig describes a function method provided by a module.
 type MethodConfig struct {
 	ID string // Method ID (e.g., "top-queries")
+	// FunctionName overrides the public Function name for module/static methods.
+	// Empty uses the default "<module>:<method>" name.
+	FunctionName string
 	// FIXME: funcctl currently honors aliases only for module/static methods.
 	// Job method registration still publishes only the canonical module:method name.
 	Aliases      []string // Additional function names to register for this method
@@ -12,7 +15,14 @@ type MethodConfig struct {
 	UpdateEvery  int      // Default UI refresh interval
 	Help         string   // Description for UI
 	RequireCloud bool     // Indicates whether the method requires cloud connection
+	Tags         string   // Function tags for registration; empty defaults to "top"
 	ResponseType string   // Response schema type; empty defaults to "table" when dispatched
+	// Available gates first publication of module/static methods. Nil means available.
+	// Once a Function is published, later false results do not remove it.
+	Available func() bool
+	// RawRequest routes the complete Function request to a RawMethodHandler.
+	// Use this for Function APIs that need raw payloads, args, or full response envelopes.
+	RawRequest bool
 	// FIXME: AgentWide currently removes __job from the public API, but funcctl still
 	// dispatches through the first running job for the module instead of a true
 	// agent-level execution path.
@@ -44,6 +54,10 @@ type FunctionResponse struct {
 	Columns           map[string]any // Column definitions for the table
 	Data              any            // Row data: [][]any (array of arrays, ordered by column index)
 	DefaultSortColumn string         // Default sort column ID
+
+	// RawResponse is a complete Function response envelope sent unchanged.
+	// When set, Status/Message/Columns/Data and framework response wrapping are ignored.
+	RawResponse map[string]any
 
 	// Optional dynamic required params (override MethodConfig.RequiredParams)
 	RequiredParams []ParamConfig

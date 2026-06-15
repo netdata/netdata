@@ -11,6 +11,10 @@ pub(crate) struct NetflowCharts {
     raw_journal_bytes: ChartHandle<RawJournalBytesMetrics>,
     materialized_tier_ops: ChartHandle<MaterializedTierOpsMetrics>,
     materialized_tier_bytes: ChartHandle<MaterializedTierBytesMetrics>,
+    tier_commit_age: ChartHandle<TierCommitAgeMetrics>,
+    tier_commit_duration: ChartHandle<TierCommitDurationMetrics>,
+    tier_commit_batches: ChartHandle<TierCommitBatchesMetrics>,
+    tier_commit_stretched: ChartHandle<TierCommitStretchedMetrics>,
     open_tiers: ChartHandle<OpenTierMetrics>,
     journal_io_ops: ChartHandle<JournalIoOpsMetrics>,
     journal_io_bytes: ChartHandle<JournalIoBytesMetrics>,
@@ -45,6 +49,14 @@ impl NetflowCharts {
                 MaterializedTierBytesMetrics::default(),
                 Duration::from_secs(1),
             ),
+            tier_commit_age: runtime
+                .register_chart(TierCommitAgeMetrics::default(), Duration::from_secs(1)),
+            tier_commit_duration: runtime
+                .register_chart(TierCommitDurationMetrics::default(), Duration::from_secs(1)),
+            tier_commit_batches: runtime
+                .register_chart(TierCommitBatchesMetrics::default(), Duration::from_secs(1)),
+            tier_commit_stretched: runtime
+                .register_chart(TierCommitStretchedMetrics::default(), Duration::from_secs(1)),
             open_tiers: runtime.register_chart(OpenTierMetrics::default(), Duration::from_secs(1)),
             journal_io_ops: runtime
                 .register_chart(JournalIoOpsMetrics::default(), Duration::from_secs(1)),
@@ -125,6 +137,14 @@ impl NetflowCharts {
             .update(|chart| *chart = snapshot.materialized_tier_ops);
         self.materialized_tier_bytes
             .update(|chart| *chart = snapshot.materialized_tier_bytes);
+        self.tier_commit_age
+            .update(|chart| *chart = snapshot.tier_commit_age);
+        self.tier_commit_duration
+            .update(|chart| *chart = snapshot.tier_commit_duration);
+        self.tier_commit_batches
+            .update(|chart| *chart = snapshot.tier_commit_batches);
+        self.tier_commit_stretched
+            .update(|chart| *chart = snapshot.tier_commit_stretched);
         self.open_tiers.update(|chart| *chart = snapshot.open_tiers);
         self.journal_io_ops
             .update(|chart| *chart = snapshot.journal_io_ops);

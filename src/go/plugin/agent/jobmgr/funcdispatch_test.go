@@ -178,6 +178,31 @@ func TestExecuteFunction_ModuleMethodPaths(t *testing.T) {
 	}
 }
 
+func TestExecuteFunction_ModuleMethodPublicFunctionName(t *testing.T) {
+	writer := &jsonWriteCapture{}
+	var gotMethod string
+
+	mgr := newModuleDispatchTestManager(t, nil, writer.write, &mockMethodHandler{
+		handleFunc: func(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+			gotMethod = method
+			return &funcapi.FunctionResponse{Status: 200, Help: "trap logs"}
+		},
+	}, []funcapi.MethodConfig{{
+		ID:           "logs",
+		FunctionName: "snmp:traps",
+	}})
+
+	mgr.ExecuteFunction("snmp:traps", functions.Function{
+		UID:     "public-name",
+		Timeout: time.Second,
+	})
+
+	resp := writer.requireResponse(t)
+	assert.Equal(t, float64(200), resp["status"])
+	assert.Equal(t, "trap logs", resp["help"])
+	assert.Equal(t, "logs", gotMethod)
+}
+
 func TestExecuteFunction_ContextBehavior(t *testing.T) {
 	tests := map[string]struct {
 		managerCtx      context.Context

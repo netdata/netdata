@@ -82,6 +82,7 @@ func (e *Engine) resolveSeriesRoutes(
 	name string,
 	labels metrix.LabelView,
 	meta metrix.SeriesMeta,
+	reader metrix.Reader,
 	index matchIndex,
 	revision uint64,
 	buildSeq uint64,
@@ -97,6 +98,16 @@ func (e *Engine) resolveSeriesRoutes(
 	candidates := make([]routeCandidate, 0, len(index.byMetricName[name])+len(index.wildcardMatchers))
 	candidates = append(candidates, index.byMetricName[name]...)
 	candidates = append(candidates, index.wildcardMatchers...)
+
+	// Inherit the family-level float hint (the same source autogen uses) so float-native
+	// metrics render at full precision in template charts; the authored options.float only adds to it.
+	// Skip the lookup when there are no template candidates (the common autogen-only series).
+	metricFloat := false
+	if len(candidates) > 0 {
+		if mm, ok := reader.MetricMeta(name); ok {
+			metricFloat = mm.Float
+		}
+	}
 
 	routes := make([]routeBinding, 0)
 	for _, candidate := range candidates {
@@ -131,7 +142,7 @@ func (e *Engine) resolveSeriesRoutes(
 			Hidden:            candidate.dimension.Hidden,
 			Multiplier:        candidate.dimension.Multiplier,
 			Divisor:           candidate.dimension.Divisor,
-			Float:             candidate.dimension.Float,
+			Float:             candidate.dimension.Float || metricFloat,
 			Static:            !candidate.dimension.Dynamic,
 			Inferred:          candidate.dimension.InferNameFromSeriesMeta,
 			Autogen:           false,

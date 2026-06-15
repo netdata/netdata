@@ -15,6 +15,7 @@ set(GO_LDFLAGS "${GO_LDFLAGS} -X ${BUILDINFO_PKG}.PluginsDir=${PLUGINS_DIR}")
 set(GO_LDFLAGS "${GO_LDFLAGS} -X ${BUILDINFO_PKG}.UserConfigDir=${CONFIG_DIR}")
 set(GO_LDFLAGS "${GO_LDFLAGS} -X ${BUILDINFO_PKG}.StockConfigDir=${LIBCONFIG_DIR}")
 set(GO_LDFLAGS "${GO_LDFLAGS} -X ${BUILDINFO_PKG}.CacheDir=${CACHE_DIR}")
+set(GO_LDFLAGS "${GO_LDFLAGS} -X ${BUILDINFO_PKG}.LogDir=${LOG_DIR}")
 
 # add_go_target: Add a new target that needs to be built using the Go toolchain.
 #

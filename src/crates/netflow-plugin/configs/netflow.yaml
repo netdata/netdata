@@ -17,7 +17,12 @@ listener:
   # UDP socket for NetFlow/IPFIX/sFlow exporters.
   listen: "0.0.0.0:2055"
   max_packet_size: 9216
-  sync_every_entries: 1024
+  # Periodic fsync of the active raw journal. 0 (default) disables it: data
+  # reaches disk via kernel writeback, and every journal file is fully synced
+  # when rotated and at shutdown. Values > 0 fsync after that many records
+  # (and at least once per sync_interval); at high flow rates this stalls the
+  # receive path and can cause UDP drops.
+  sync_every_entries: 0
   sync_interval: 1s
 
 protocols:

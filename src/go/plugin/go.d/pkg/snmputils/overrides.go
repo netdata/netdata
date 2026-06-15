@@ -29,7 +29,9 @@ type (
 		SysObjectIDs      sysObjectIDOverrides       `yaml:"sysobjectids"`
 	}
 	enterpriseNumbersOverrides struct {
-		// Map PEN org names -> canonical vendor names
+		// Map IANA Private Enterprise Numbers -> canonical vendor names.
+		PenToVendor map[string]string `yaml:"pen_to_vendor"`
+		// Map PEN org names -> canonical vendor names. Kept for older metadata files.
 		OrgToVendor map[string]string `yaml:"org_to_vendor"`
 	}
 	sysObjectIDOverrides struct {
@@ -110,6 +112,17 @@ func loadOverridesFromDir(dir string) (*overrides, error) {
 func mergeOverrides(dst, src *overrides) {
 	if src == nil {
 		return
+	}
+
+	if len(src.EnterpriseNumbers.PenToVendor) > 0 {
+		if dst.EnterpriseNumbers.PenToVendor == nil {
+			dst.EnterpriseNumbers.PenToVendor = make(map[string]string, len(src.EnterpriseNumbers.PenToVendor))
+		}
+		for k, v := range src.EnterpriseNumbers.PenToVendor {
+			if v != "" {
+				dst.EnterpriseNumbers.PenToVendor[k] = v
+			}
+		}
 	}
 
 	if len(src.EnterpriseNumbers.OrgToVendor) > 0 {

@@ -94,6 +94,16 @@ This offline method uses `msiexec /qn` with a locally available MSI. Netdata Clo
 
 :::
 
+## Verify the Installation
+
+After installation, verify that the Netdata service is running:
+
+```powershell
+Get-Service netdata
+```
+
+If your subscription and installation mode allow local monitoring, open <http://localhost:19999> to access the Netdata Dashboard.
+
 ## License Information
 
 By using silent installation, you agree to:
@@ -104,7 +114,8 @@ By using silent installation, you agree to:
 ## Where is Netdata?
 
 When Netdata is installed on Windows, it automatically registers as a Windows Service and appears in
-**Add or remove programs** (also known as **Programs and Features** or **Apps & features** in newer Windows versions). To start, stop, or restart the service, use Windows Services (services.msc) or command-line tools
+**Add or remove programs** (also known as **Programs and Features** or **Apps & features** in newer Windows versions).
+To start, stop, or restart the service, use the [PowerShell commands described in Service Control](/docs/netdata-agent/start-stop-restart.md#windows).
 
 ## Automatic Updates
 
@@ -169,3 +180,62 @@ Instead of daily updates, you might prefer:
 - Only on specific days of the week
 
 :::
+
+## Working with Netdata on Windows
+
+Netdata on Windows includes a bundled MSYS2 environment for working with Netdata configuration files and other internals.
+
+### Open the MSYS2 environment
+
+Launch the bundled MSYS2 shell using one of these methods (the paths below assume Netdata is installed in the default location):
+
+- **Windows Run dialog**: Press `Win + R`, enter `"C:\Program Files\Netdata\msys2.exe"`, and press `Enter`.
+- **PowerShell**: `& "C:\Program Files\Netdata\msys2.exe"`
+- **Command Prompt**: `"C:\Program Files\Netdata\msys2.exe"`
+
+When `msys2.exe` starts, it opens a shell environment for working with the Netdata files installed on your system.
+
+### Writing Windows paths in MSYS format
+
+Netdata configuration files consumed from the MSYS side require MSYS-style paths instead of native Windows drive-letter format.
+
+Conversion pattern:
+
+- Replace the drive letter with its lowercase equivalent preceded by `/` (e.g., `C:` → `/c`, `D:` → `/d`)
+- Replace backslashes `\` with forward slashes `/`
+- Keep spaces in the path, but quote or escape the full path when using it in shell commands
+
+Examples:
+
+| Windows path                                   | MSYS-style path                                |
+|------------------------------------------------|------------------------------------------------|
+| `C:\Program Files\Netdata\etc\netdata`         | `/c/Program Files/Netdata/etc/netdata/`        |
+| `C:\Program Files\Netdata\usr\bin\netdata.exe` | `/c/Program Files/Netdata/usr/bin/netdata.exe` |
+
+### Editing configuration files
+
+Inside the MSYS2 environment, use the `edit-config` helper to edit Netdata configuration files:
+
+```bash
+cd /etc/netdata
+./edit-config netdata.conf
+```
+
+For the complete `edit-config` workflow and configuration directory layout, see [Netdata Agent Configuration](/docs/netdata-agent/configuration/README.md#edit-configuration-files).
+
+On Windows, `edit-config` opens files with the `nano` editor.
+
+### Basic nano commands
+
+| Action                | Keybinding                                     |
+|-----------------------|------------------------------------------------|
+| Edit text             | Type normally, use arrow keys to navigate      |
+| Search                | `Ctrl + W`, type search text, `Enter`          |
+| Save                  | `Ctrl + O`, `Enter` to confirm filename        |
+| Exit                  | `Ctrl + X`                                     |
+| Exit with save prompt | `Ctrl + X`, then `Y` to save or `N` to discard |
+
+## Related Windows documentation
+
+- [Service Control](/docs/netdata-agent/start-stop-restart.md#windows) — Start, stop, restart, and check status of the Netdata Agent
+- [Switching Install Types and Release Channels on Windows](/docs/install/windows-release-channels.md)

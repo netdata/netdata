@@ -460,6 +460,7 @@ int netdata_main(int argc, char **argv) {
                             if (yaml_unittest()) return 1;
                             if (json_c_parser_unittest()) return 1;
                             if (unittest_waiting_queue()) return 1;
+                            if (rw_spinlock_unittest()) return 1;
                             if (uuidmap_unittest()) return 1;
 #ifdef HAVE_LIBBACKTRACE
                             if (stacktrace_unittest()) return 1;
@@ -512,6 +513,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "rwlockstest") == 0) {
                             unittest_running = true;
                             return rwlocks_stress_test();
+                        }
+                        else if(strcmp(optarg, "rwspinlocktest") == 0) {
+                            unittest_running = true;
+                            return rw_spinlock_unittest();
                         }
                         else if(strcmp(optarg, "prd-array-stress") == 0) {
                             unittest_running = true;

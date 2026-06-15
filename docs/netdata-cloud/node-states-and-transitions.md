@@ -266,6 +266,17 @@ journalctl -u netdata MESSAGE_ID=6e2e3839-0676-4896-8b64-6045dbf28d66
 netdatacli remove-stale-node <node-id>
 ```
 
+### No alerts received when node went offline
+
+**Cause:** The `streaming_disconnected` and `streaming_never_connected` alerts are configured with `to: silent` by default. They trigger on the Parent dashboard but do not send notifications unless you override the delivery setting.
+
+**Check:**
+1. Is the node marked as **permanent**? Ephemeral nodes are excluded from these alerts. Check `netdata.conf` for `is ephemeral node = yes`.
+2. On the Parent dashboard, can you see the alert raised? If the alert is visible but no notification arrived, the `to: silent` default is in effect.
+3. Has a Space administrator [enabled Alert notifications](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-notification-methods.md#manage-space-notification-settings) for your Space?
+
+**Solution:** See [Enabling Notifications for Streaming Alerts](/docs/nodes-ephemerality.md#enabling-notifications-for-streaming-alerts) for step-by-step instructions covering alert override and Cloud notification setup.
+
 ### Node reappears after deletion
 
 **Cause:** Agent is still running and configured to reconnect.

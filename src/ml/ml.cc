@@ -18,7 +18,132 @@
 #define WORKER_TRAIN_FLUSH_MODELS      7
 
 sqlite3 *ml_db = NULL;
+// File-private. Accessed exclusively via __atomic_* operations -- callers
+// in other TUs must go through ml_db_is_unusable() / ml_db_mark_corrupt().
+static bool ml_db_unusable = false;
 static netdata_mutex_t db_mutex;
+
+bool ml_db_is_unusable(void)
+{
+    return __atomic_load_n(&ml_db_unusable, __ATOMIC_RELAXED);
+}
+
+void ml_db_force_unusable(void)
+{
+    __atomic_store_n(&ml_db_unusable, true, __ATOMIC_RELAXED);
+}
+
+void ml_db_mark_corrupt(int rc)
+{
+    // Latch the flag first so concurrent callers stop hitting the bad DB
+    // even if the sentinel write fails. Use __ATOMIC_RELAXED -- this is a
+    // best-effort poison flag, not a synchronization primitive.
+    if (__atomic_exchange_n(&ml_db_unusable, true, __ATOMIC_RELAXED))
+        return; // already flagged, sentinel already attempted
+
+    char sentinel[FILENAME_MAX + 1];
+    snprintfz(sentinel, sizeof(sentinel), "%s/.ml.db.delete", netdata_configured_cache_dir);
+
+    // Use O_CREAT|O_EXCL (atomic create-or-fail) so a malicious symlink at
+    // the sentinel path cannot redirect a O_TRUNC write to an attacker-
+    // chosen target. EEXIST is treated as success-equivalent: the desired
+    // post-condition is "next agent start will see something at this path
+    // and try to quarantine", and that is satisfied whether the path holds
+    // our sentinel or any other file/symlink. Startup attempts unlink()
+    // before quarantine; if unlink fails with anything other than ENOENT
+    // (e.g. EISDIR on a directory, EACCES on a permission-denied path,
+    // EROFS on a read-only mount), quarantine is deferred and the operator
+    // is logged at NDLP_ERR -- we cannot promise quarantine, only "will be
+    // attempted".
+    int fd = open(sentinel, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+    int oerr = errno;
+    if (fd >= 0) {
+        close(fd);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "ML: ml.db reported corruption (rc=%d); sentinel %s created. "
+               "Quarantine to a timestamped ml.db.bad.* will be attempted at next agent start. "
+               "Stored anomaly-detection models will be lost; ML will retrain.",
+               rc, sentinel);
+    }
+    else if (oerr == EEXIST) {
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "ML: ml.db reported corruption (rc=%d); sentinel %s already present. "
+               "Quarantine to ml.db.bad.* will be attempted at next agent start "
+               "(deferred if the sentinel path cannot be unlinked then).",
+               rc, sentinel);
+    }
+    else {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "ML: ml.db reported corruption (rc=%d) but failed to create sentinel %s (errno=%d). "
+               "Operator must remove ml.db manually.", rc, sentinel, oerr);
+    }
+}
+
+// Mask with 0xFF to also catch SQLite extended result codes (e.g.
+// SQLITE_CORRUPT_VTAB, SQLITE_CORRUPT_INDEX, ...) which encode the primary
+// code in the low 8 bits. Extended codes are off by default but can be
+// enabled per-connection via sqlite3_extended_result_codes(); masking is
+// the canonical way to compare regardless of that setting.
+bool ml_db_mark_if_corrupt(int rc)
+{
+    if (int primary = rc & 0xFF; primary != SQLITE_CORRUPT && primary != SQLITE_NOTADB)
+        return false;
+    ml_db_mark_corrupt(rc);
+    return true;
+}
+
+// Execute a prepared model-table statement (INSERT/DELETE/UPDATE) and reset
+// it. Latches ml.db corruption on either step so the sentinel is dropped
+// regardless of which call surfaces the bad page. `action_name` is the
+// infinitive used in "Failed to <action_name>" ("store model",
+// "delete models", "prune old models"); `gerund_name` is the form used in
+// "Failed to reset statement when <gerund_name>" ("storing model",
+// "deleting models", "pruning old models"). The exact wording is preserved
+// so operator log searches keep matching.
+static int execute_and_reset_model_stmt(sqlite3_stmt *res,
+                                        const char *action_name,
+                                        const char *gerund_name)
+{
+    int step_rc = execute_insert(res);
+    if (unlikely(step_rc != SQLITE_DONE)) {
+        error_report("Failed to %s, rc = %d", action_name, step_rc);
+        ml_db_mark_if_corrupt(step_rc);
+
+        // SQLite requires the statement to be reset before it can be reused
+        // after a failed sqlite3_step(). Without this, the next call that
+        // reuses the cached prepared statement (e.g. next flush iteration
+        // on a transient BUSY/IOERR) would re-bind onto a statement in an
+        // undefined state. Best-effort reset; latch separately if it
+        // surfaces corruption the step didn't.
+        int reset_rc = sqlite3_reset(res);
+        if (unlikely(reset_rc != SQLITE_OK && reset_rc != step_rc))
+            ml_db_mark_if_corrupt(reset_rc);
+        return step_rc;
+    }
+
+    int reset_rc = sqlite3_reset(res);
+    if (unlikely(reset_rc != SQLITE_OK)) {
+        error_report("Failed to reset statement when %s, rc = %d", gerund_name, reset_rc);
+        ml_db_mark_if_corrupt(reset_rc);
+        return reset_rc;
+    }
+
+    return 0;
+}
+
+// Common bind-failure handler for model-table statements. Reports which
+// parameter failed, attempts a reset (logging separately if reset also
+// fails), and returns the original bind rc.
+static int handle_model_bind_fail(sqlite3_stmt *res, int param, int rc, const char *action_name)
+{
+    error_report("Failed to bind parameter %d to %s, rc = %d", param, action_name, rc);
+    int reset_rc = sqlite3_reset(res);
+    if (unlikely(reset_rc != SQLITE_OK)) {
+        error_report("Failed to reset statement to %s, rc = %d", action_name, reset_rc);
+        ml_db_mark_if_corrupt(reset_rc);
+    }
+    return rc;
+}
 
 static void __attribute__((constructor)) init_mutex(void) {
     netdata_mutex_init(&db_mutex);
@@ -236,10 +361,14 @@ ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *
         return 1;
     }
 
+    if (unlikely(ml_db_is_unusable()))
+        return 1;
+
     if (unlikely(!res)) {
         rc = prepare_statement(ml_db, db_models_add_model, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to store model, rc = %d", rc);
+            ml_db_mark_if_corrupt(rc);
             return 1;
         }
     }
@@ -276,26 +405,10 @@ ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *
         }
     }
 
-    rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE)) {
-        error_report("Failed to store model, rc = %d", rc);
-        return rc;
-    }
-
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to reset statement when storing model, rc = %d", rc);
-        return rc;
-    }
-
-    return 0;
+    return execute_and_reset_model_stmt(res, "store model", "storing model");
 
 bind_fail:
-    error_report("Failed to bind parameter %d to store model, rc = %d", param, rc);
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement to store model, rc = %d", rc);
-    return rc;
+    return handle_model_bind_fail(res, param, rc, "store model");
 }
 
 static int
@@ -311,10 +424,14 @@ ml_dimension_delete_models(const nd_uuid_t *metric_uuid, time_t before)
         return 1;
     }
 
+    if (unlikely(ml_db_is_unusable()))
+        return 1;
+
     if (unlikely(!res)) {
         rc = prepare_statement(ml_db, db_models_delete, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to delete models, rc = %d", rc);
+            ml_db_mark_if_corrupt(rc);
             return rc;
         }
     }
@@ -327,26 +444,10 @@ ml_dimension_delete_models(const nd_uuid_t *metric_uuid, time_t before)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE)) {
-        error_report("Failed to delete models, rc = %d", rc);
-        return rc;
-    }
-
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to reset statement when deleting models, rc = %d", rc);
-        return rc;
-    }
-
-    return 0;
+    return execute_and_reset_model_stmt(res, "delete models", "deleting models");
 
 bind_fail:
-    error_report("Failed to bind parameter %d to delete models, rc = %d", param, rc);
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement to delete models, rc = %d", rc);
-    return rc;
+    return handle_model_bind_fail(res, param, rc, "delete models");
 }
 
 static int
@@ -362,10 +463,14 @@ ml_prune_old_models(size_t num_models_to_prune)
         return 1;
     }
 
+    if (unlikely(ml_db_is_unusable()))
+        return 1;
+
     if (unlikely(!res)) {
         rc = prepare_statement(ml_db, db_models_prune, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to prune models, rc = %d", rc);
+            ml_db_mark_if_corrupt(rc);
             return rc;
         }
     }
@@ -380,26 +485,10 @@ ml_prune_old_models(size_t num_models_to_prune)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE)) {
-        error_report("Failed to prune old models, rc = %d", rc);
-        return rc;
-    }
-
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to reset statement when pruning old models, rc = %d", rc);
-        return rc;
-    }
-
-    return 0;
+    return execute_and_reset_model_stmt(res, "prune old models", "pruning old models");
 
 bind_fail:
-    error_report("Failed to bind parameter %d to prune old models, rc = %d", param, rc);
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement to prune old models, rc = %d", rc);
-    return rc;
+    return handle_model_bind_fail(res, param, rc, "prune old models");
 }
 
 int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
@@ -419,6 +508,9 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     sqlite3_stmt *res = active_stmt ? *active_stmt : NULL;
     int rc = 0;
     int param = 0;
+    int step_rc = 0;
+    bool step_corrupt = false;
+    bool cleanup_corrupt = false;
 
     if (unlikely(!ml_db)) {
         nd_log_limit_static_global_var(erl, 1, 0);
@@ -426,10 +518,14 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
         return 1;
     }
 
+    if (unlikely(ml_db_is_unusable()))
+        return 1;
+
     if (unlikely(!res)) {
         rc = sqlite3_prepare_v2(ml_db, db_models_load, -1, &res, NULL);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to load models, rc = %d", rc);
+            ml_db_mark_if_corrupt(rc);
             return 1;
         }
         if (active_stmt)
@@ -499,15 +595,47 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
 
     spinlock_unlock(&dim->slock);
 
-    if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to load models, rc = %d", rc);
+    step_rc = rc;
+    if (unlikely(step_rc != SQLITE_DONE))
+        error_report("Failed to load models, rc = %d", step_rc);
 
     if (active_stmt)
         rc = sqlite3_reset(res);
     else
         rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
+    // sqlite3_reset returns the prior step error if step failed; only log if
+    // reset reports a new error beyond what we already logged for step.
+    if (unlikely(rc != SQLITE_OK && rc != step_rc))
         error_report("Failed to %s statement when loading models, rc = %d", active_stmt ? "reset" : "finalize", rc);
+
+    // Latch on either step-time OR cleanup-time corruption. sqlite3_reset /
+    // sqlite3_finalize can surface SQLITE_CORRUPT / SQLITE_NOTADB even when
+    // step succeeded; without both checks, cleanup-only corruption would log
+    // but never trip ml_db_unusable. Both calls are idempotent.
+    step_corrupt    = ml_db_mark_if_corrupt(step_rc);
+    cleanup_corrupt = ml_db_mark_if_corrupt(rc);
+
+    // Partial step results may be polluting dim state -- roll back whenever
+    // step did NOT cleanly return SQLITE_DONE, not only on CORRUPT/NOTADB.
+    // SQLITE_BUSY-after-retries, SQLITE_IOERR, SQLITE_INTERRUPT etc. all
+    // leave a partial km_contexts behind, and the training-enqueue gate in
+    // ml_public.cc only requeues UNTRAINED dims -- so leaving ts=TRAINED
+    // with a truncated context locks the dim onto stale models until the
+    // next agent restart. Cleanup-only corruption (step=DONE, reset/
+    // finalize=CORRUPT) does NOT trigger this: step returned DONE so the
+    // rows already loaded are structurally valid; only the DB-level flag
+    // needs setting for future calls.
+    if (step_rc != SQLITE_DONE) {
+        spinlock_lock(&dim->slock);
+        dim->km_contexts.clear();
+        dim->ts = TRAINING_STATUS_UNTRAINED;
+        spinlock_unlock(&dim->slock);
+    }
+
+    // Either signal trips skip_models in metadata_scan_host so we stop
+    // hammering the bad DB.
+    if (step_corrupt || cleanup_corrupt)
+        return 1;
 
     return 0;
 
@@ -726,6 +854,14 @@ bool ml_should_publish_model_update(bool host_running,
     return true;
 }
 
+void ml_dimension_finalize_constant_state(ml_dimension_t *dim)
+{
+    dim->mt = METRIC_TYPE_CONSTANT;
+    dim->ts = TRAINING_STATUS_TRAINED;
+    dim->suppression_anomaly_counter = 0;
+    dim->suppression_window_counter = 0;
+}
+
 static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim, uint32_t expected_generation, bool from_downstream)
 {
     worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
@@ -769,11 +905,7 @@ static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim,
         }
     }
 
-    dim->mt = METRIC_TYPE_CONSTANT;
-    dim->ts = TRAINING_STATUS_TRAINED;
-
-    dim->suppression_anomaly_counter = 0;
-    dim->suppression_window_counter = 0;
+    ml_dimension_finalize_constant_state(dim);
 
     // Add the latest model to the list of pending models to flush.
     ml_model_info_t model_info;
@@ -860,6 +992,17 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
 
         // Apply sampling during lag feature extraction
         ml_features_preprocess(&features, worker->training_samples, sampling_ratio);
+
+        // Preprocessing can leave fewer than 2 vectors after diff/smooth/lag/sampling.
+        // k-means cannot build 2 cluster centers from that input, so reuse the
+        // post-cycle state machine and bail out before kmeans_train.
+        if (worker->training_samples.size() < 2) {
+            spinlock_lock(&dim->slock);
+            ml_dimension_finalize_constant_state(dim);
+            dim->training_in_progress = false;
+            spinlock_unlock(&dim->slock);
+            return ML_WORKER_RESULT_NOT_ENOUGH_COLLECTED_VALUES;
+        }
 
         ml_kmeans_init(&dim->kmeans);
         ml_kmeans_train(&dim->kmeans, worker->training_samples, Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
@@ -1076,11 +1219,15 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
 {
     worker_is_busy(WORKER_JOB_DETECTION_COLLECT_STATS);
 
-    host->mls = {};
     ml_machine_learning_stats_t mls_copy = {};
+    ml_machine_learning_stats_t host_mls = {};
+    calculated_number_t host_anomaly_rate = 0.0;
 
     if (host->ml_running) {
-        netdata_mutex_lock(&host->mutex);
+        // Snapshot the stop generation before the unlocked walk. If it changes
+        // by the time we publish, a stop ran while we were reading chart->mls
+        // and the accumulated snapshot must be discarded.
+        uint64_t stop_gen_before = host->ml_stop_generation.load();
 
         /*
          * prediction/detection stats
@@ -1098,20 +1245,20 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
 
             ml_machine_learning_stats_t chart_mls = chart->mls;
 
-            host->mls.num_machine_learning_status_enabled += chart_mls.num_machine_learning_status_enabled;
-            host->mls.num_machine_learning_status_disabled_sp += chart_mls.num_machine_learning_status_disabled_sp;
+            host_mls.num_machine_learning_status_enabled += chart_mls.num_machine_learning_status_enabled;
+            host_mls.num_machine_learning_status_disabled_sp += chart_mls.num_machine_learning_status_disabled_sp;
 
-            host->mls.num_metric_type_constant += chart_mls.num_metric_type_constant;
-            host->mls.num_metric_type_variable += chart_mls.num_metric_type_variable;
+            host_mls.num_metric_type_constant += chart_mls.num_metric_type_constant;
+            host_mls.num_metric_type_variable += chart_mls.num_metric_type_variable;
 
-            host->mls.num_training_status_untrained += chart_mls.num_training_status_untrained;
-            host->mls.num_training_status_pending_without_model += chart_mls.num_training_status_pending_without_model;
-            host->mls.num_training_status_trained += chart_mls.num_training_status_trained;
-            host->mls.num_training_status_pending_with_model += chart_mls.num_training_status_pending_with_model;
-            host->mls.num_training_status_silenced += chart_mls.num_training_status_silenced;
+            host_mls.num_training_status_untrained += chart_mls.num_training_status_untrained;
+            host_mls.num_training_status_pending_without_model += chart_mls.num_training_status_pending_without_model;
+            host_mls.num_training_status_trained += chart_mls.num_training_status_trained;
+            host_mls.num_training_status_pending_with_model += chart_mls.num_training_status_pending_with_model;
+            host_mls.num_training_status_silenced += chart_mls.num_training_status_silenced;
 
-            host->mls.num_anomalous_dimensions += chart_mls.num_anomalous_dimensions;
-            host->mls.num_normal_dimensions += chart_mls.num_normal_dimensions;
+            host_mls.num_anomalous_dimensions += chart_mls.num_anomalous_dimensions;
+            host_mls.num_normal_dimensions += chart_mls.num_normal_dimensions;
 
             if (spinlock_trylock(&host->context_anomaly_rate_spinlock))
             {
@@ -1137,20 +1284,44 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
         }
         rrdset_foreach_done(rsp);
 
-        host->host_anomaly_rate = 0.0;
-        size_t NumActiveDimensions = host->mls.num_anomalous_dimensions + host->mls.num_normal_dimensions;
-        if (NumActiveDimensions)
-              host->host_anomaly_rate = static_cast<double>(host->mls.num_anomalous_dimensions) / NumActiveDimensions;
+        size_t num_active_dimensions = host_mls.num_anomalous_dimensions + host_mls.num_normal_dimensions;
+        if (num_active_dimensions)
+            host_anomaly_rate = static_cast<double>(host_mls.num_anomalous_dimensions) / num_active_dimensions;
 
-        mls_copy = host->mls;
+        // Publish the final host snapshot after chart traversal so chart
+        // deletion cannot block other host->mutex users for the full walk.
+        // Discard the snapshot if either (a) ml_running is now false, or
+        // (b) the stop generation changed since the walk started — the
+        // latter catches a stop+start that completed during the walk and
+        // would otherwise pass the boolean check. In either case our
+        // unlocked chart->mls reads may have raced ml_host_stop, so zero
+        // the snapshot and the per-context counts. The chart updates below
+        // run unconditionally: ml_update_dimensions_chart reads
+        // host->ml_running directly (so the ml_running chart records the
+        // stop), and the chart-update path resets and republishes the rest.
+        netdata_mutex_lock(&host->mutex);
+        uint64_t stop_gen_after = host->ml_stop_generation.load();
+        if (!host->ml_running || stop_gen_before != stop_gen_after) {
+            host_mls = {};
+            host_anomaly_rate = 0.0;
 
+            spinlock_lock(&host->context_anomaly_rate_spinlock);
+            for (auto &p : host->context_anomaly_rate) {
+                p.second.anomalous_dimensions = 0;
+                p.second.normal_dimensions = 0;
+            }
+            spinlock_unlock(&host->context_anomaly_rate_spinlock);
+        }
+        host->mls = host_mls;
+        host->host_anomaly_rate = host_anomaly_rate;
+        mls_copy = host_mls;
         netdata_mutex_unlock(&host->mutex);
 
         worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);
         ml_update_dimensions_chart(host, mls_copy);
 
         worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
-        ml_update_host_and_detection_rate_charts(host, host->host_anomaly_rate * 10000.0, owa);
+        ml_update_host_and_detection_rate_charts(host, host_anomaly_rate * 10000.0, owa);
     } else {
         host->host_anomaly_rate = 0.0;
     }
@@ -1218,8 +1389,27 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
     static time_t next_vacuum_run = 0;
     int op_no = 1;
 
-    // begin transaction
-    int rc = db_execute(ml_db, "BEGIN TRANSACTION;", NULL);
+    // Bail when ml.db is missing OR poisoned. The NULL check covers
+    // non-corruption init failures (sqlite3_open ENOSPC/EACCES, ...) that
+    // leave ml_db == NULL without setting the unusable flag -- without it
+    // we'd drive db_execute(NULL, ...) / vacuum_database(NULL, ...) every
+    // flush and spam the log.
+    if (unlikely(!ml_db || ml_db_is_unusable())) {
+        worker->pending_model_info.clear();
+        return;
+    }
+
+    // begin transaction. Capture the SQLite rc so we can latch the corrupt
+    // flag if BEGIN/COMMIT/ROLLBACK themselves trip CORRUPT or NOTADB --
+    // db_execute() returns only 0/1, the actual rc is exposed via the
+    // out-param.
+    // Reset sqlite_rc before every db_execute() call: db_execute() returns
+    // early without writing the out-param if its `db` argument is NULL, so
+    // a stale value from a prior call could otherwise survive and be fed
+    // to ml_db_mark_if_corrupt().
+    int sqlite_rc = SQLITE_OK;
+    int rc = db_execute(ml_db, "BEGIN TRANSACTION;", &sqlite_rc);
+    ml_db_mark_if_corrupt(sqlite_rc);
 
     // add/delete models
     if (!rc) {
@@ -1246,14 +1436,23 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
     // commit transaction
     if (!rc) {
         op_no++;
-        rc = db_execute(ml_db, "COMMIT TRANSACTION;", NULL);
+        sqlite_rc = SQLITE_OK;
+        rc = db_execute(ml_db, "COMMIT TRANSACTION;", &sqlite_rc);
+        ml_db_mark_if_corrupt(sqlite_rc);
     }
 
+    // If corruption was detected mid-loop (add/delete/prune set ml_db_unusable
+    // before returning), skip rollback and vacuum -- the DB is already flagged
+    // and will be quarantined at next restart; further SQL only spams errors.
+    bool became_unusable = ml_db_is_unusable();
+
     // rollback transaction on failure
-    if (rc) {
+    if (rc && !became_unusable) {
         netdata_log_error("Trying to rollback ML transaction because it failed with rc=%d, op_no=%d", rc, op_no);
         op_no++;
-        rc = db_execute(ml_db, "ROLLBACK;", NULL);
+        sqlite_rc = SQLITE_OK;
+        rc = db_execute(ml_db, "ROLLBACK;", &sqlite_rc);
+        ml_db_mark_if_corrupt(sqlite_rc);
         if (rc)
             netdata_log_error("ML transaction rollback failed with rc=%d", rc);
     }
@@ -1263,7 +1462,8 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
         worker->num_models_to_prune += worker->pending_model_info.size();
     }
 
-    vacuum_database(ml_db, "ML", 0, 0, &next_vacuum_run);
+    if (likely(!became_unusable))
+        vacuum_database(ml_db, "ML", 0, 0, &next_vacuum_run);
 
     worker->pending_model_info.clear();
 }

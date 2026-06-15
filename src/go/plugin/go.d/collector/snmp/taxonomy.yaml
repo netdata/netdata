@@ -167,3 +167,5 @@ placements:
         title: SNMP profile metrics
         context_prefix:
           - snmp.
+        context_prefix_exclude:
+          - snmp.trap.

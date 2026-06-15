@@ -175,6 +175,32 @@ fn test_stale_recovery() {
 }
 
 #[test]
+fn test_stale_recovery_in_group_writable_run_dir() {
+    use std::os::unix::fs::PermissionsExt;
+    // Crash recovery must work regardless of run-dir permissions
+    // (netdata's systemd unit ships RuntimeDirectoryMode=0775).
+    let dir = format!("{TEST_RUN_DIR}_0775");
+    let _ = std::fs::create_dir_all(&dir);
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o775)).expect("chmod 0775");
+
+    let svc = "rs_shm_stale_gw";
+    let sid: u64 = 7060;
+    let path = format!("{dir}/{svc}-{sid:016x}.ipcshm");
+    let _ = std::fs::remove_file(&path);
+
+    let mut first = ShmContext::server_create(&dir, svc, sid, 1024, 1024).expect("first create");
+    let hdr = first.base as *mut RegionHeader;
+    unsafe { (*hdr).owner_pid = 99999 }; // very unlikely alive
+    first.close(); // close without unlink
+
+    // server_create must reclaim the dead-owner region through its EEXIST path
+    let mut second = ShmContext::server_create(&dir, svc, sid, 1024, 1024)
+        .expect("crash recovery must work in a group-writable run dir");
+    second.destroy();
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
 fn test_large_message() {
     ensure_run_dir();
     let svc = "rs_shm_large";
@@ -1137,30 +1163,15 @@ fn test_check_shm_stale_invalid_cstring_returns_not_exist() {
 }
 
 #[test]
-fn test_stale_open_failure_policies_are_conservative() {
-    assert!(should_unlink_cleanup_open_failure(libc::ENOENT));
-    assert!(!should_unlink_cleanup_open_failure(libc::EACCES));
-    assert!(!should_unlink_cleanup_open_failure(libc::EPERM));
-    assert!(!should_unlink_cleanup_open_failure(libc::EMFILE));
-    assert!(!should_unlink_cleanup_open_failure(libc::ENFILE));
-    assert!(!should_unlink_cleanup_open_failure(libc::ELOOP));
-
-    assert!(matches!(
-        classify_stale_open_failure(libc::ENOENT),
-        StaleResult::NotExist
-    ));
-    assert!(matches!(
-        classify_stale_open_failure(libc::EACCES),
-        StaleResult::Invalid
-    ));
-    assert!(matches!(
-        classify_stale_open_failure(libc::EMFILE),
-        StaleResult::Invalid
-    ));
-    assert!(matches!(
-        classify_stale_open_failure(libc::ELOOP),
-        StaleResult::Invalid
-    ));
+fn test_stale_check_unavailable_only_for_fd_exhaustion() {
+    // Only fd exhaustion keeps an entry alive without a liveness check;
+    // every other open failure marks the entry as junk to reclaim.
+    assert!(stale_check_unavailable(libc::EMFILE));
+    assert!(stale_check_unavailable(libc::ENFILE));
+    assert!(!stale_check_unavailable(libc::ENOENT));
+    assert!(!stale_check_unavailable(libc::EACCES));
+    assert!(!stale_check_unavailable(libc::EPERM));
+    assert!(!stale_check_unavailable(libc::ELOOP));
 }
 
 #[test]
@@ -1235,17 +1246,13 @@ fn test_cleanup_stale_invalid_entries() {
     assert!(!build_shm_path(TEST_RUN_DIR, svc, magic_sid)
         .unwrap()
         .exists());
-    // Under non-root: unreadable file is preserved (EACCES skip).
-    // Under root: chmod 000 has no effect, so the file gets opened,
-    // inspected, and removed normally.
-    if unsafe { libc::geteuid() } != 0 {
-        assert!(
-            unreadable_path.exists(),
-            "unreadable entry should be preserved (EACCES skip)"
-        );
-    }
-    // Clean up
-    unsafe { libc::chmod(unreadable_c.as_ptr(), 0o600) };
+    // An unreadable entry at a matching name is junk: it cannot be a live
+    // endpoint we can verify, so cleanup reclaims it (under root chmod 000
+    // has no effect and the file is opened, inspected, and removed instead).
+    assert!(
+        !unreadable_path.exists(),
+        "unreadable entry should be reclaimed"
+    );
     std::fs::remove_file(&unreadable_path).ok();
 }
 
@@ -1334,15 +1341,13 @@ fn test_check_shm_stale_open_failure_invalid() {
     );
 
     assert!(matches!(check_shm_stale(&path), StaleResult::Invalid));
-    // Under non-root: file preserved (EACCES). Under root: chmod 000
-    // has no effect, so the file is opened, inspected, and removed.
-    if unsafe { libc::geteuid() } != 0 {
-        assert!(
-            path.exists(),
-            "unopenable file should be preserved (EACCES skip)"
-        );
-    }
-    unsafe { libc::chmod(c_path.as_ptr(), 0o600) };
+    // An unopenable file at the region path is junk: it cannot be a live
+    // endpoint we can verify, so it is reclaimed (under root chmod 000 has
+    // no effect and the file is opened, inspected, and removed instead).
+    assert!(
+        !path.exists(),
+        "unopenable file at the region path should be reclaimed"
+    );
     std::fs::remove_file(&path).ok();
 }
 
@@ -1396,7 +1401,7 @@ fn test_cleanup_stale_unlinks_dangling_symlink() {
 }
 
 #[test]
-fn test_cleanup_stale_preserves_self_referential_symlink_open_failure() {
+fn test_cleanup_stale_unlinks_self_referential_symlink() {
     ensure_run_dir();
     let svc = "rs_shm_cleanup_self_symlink";
     let sid: u64 = 7061;
@@ -1414,14 +1419,12 @@ fn test_cleanup_stale_preserves_self_referential_symlink_open_failure() {
 
     cleanup_stale(TEST_RUN_DIR, svc);
 
+    // A symlink at an endpoint name (ELOOP on open) cannot be a live
+    // endpoint — it is junk and is reclaimed.
     assert!(
-        std::fs::symlink_metadata(&path)
-            .map(|meta| meta.file_type().is_symlink())
-            .unwrap_or(false),
-        "ambiguous open failures must not delete the entry"
+        std::fs::symlink_metadata(&path).is_err(),
+        "self-referential symlink entry should be removed"
     );
-
-    std::fs::remove_file(&path).expect("remove self symlink");
 }
 
 #[test]

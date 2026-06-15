@@ -127,12 +127,9 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | smb.server_shares_current_open_file_count | open | files |
-| smb.server_shares_tree_connect_count | connections | connections |
-| smb.server_shares_received_bytes | received | bytes/s |
 | smb.server_shares_write_requests | writes | requests/s |
 | smb.server_shares_read_requests | reads | requests/s |
 | smb.server_shares_metadata_requests | metadata | requests/s |
-| smb.server_shares_sent_bytes | sent | bytes/s |
 | smb.server_shares_files_opened | opened | files/s |
 
 

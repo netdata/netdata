@@ -1206,6 +1206,44 @@ static void log_invalid_magic(SPAWN_INSTANCE *instance, struct status_report *sr
            instance->child_pid, instance->request_id, sr->magic, buf);
 }
 
+SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms, int *status) {
+    if(!instance) { if(status) *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
+
+    // close the child pipes, to make it exit (same as spawn_server_exec_wait)
+    if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
+    if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
+
+    // a non-positive timeout means "wait forever" to wait_on_socket_or_cancel_with_timeout();
+    // this primitive must always be bounded, so clamp to a minimal positive slice.
+    if(timeout_ms <= 0) timeout_ms = 1;
+
+    // the spawn server sends the final status report on instance->sock when the child exits
+    short revents = 0;
+    NETDATA_SSL ssl = { 0 };
+    int rc = wait_on_socket_or_cancel_with_timeout(&ssl, instance->sock, timeout_ms, POLLIN, &revents);
+    if(rc == -1 /* thread cancelled */ || rc == 1 /* timeout */)
+        // the child is still running; the caller decides whether to keep waiting or kill it
+        return SPAWN_TIMEDWAIT_RUNNING;
+
+    if(rc == 2 /* error on the socket */) {
+        // the status channel to the spawn server is broken (the spawn server itself died). We
+        // cannot confirm the child exited, so we must NOT resolve as EXITED and free the instance
+        // (that could leak a still-alive child). But this is terminal, not a transient "still
+        // running" state, so we must NOT report RUNNING either (a caller looping on RUNNING with a
+        // 0/"wait forever" timeout would spin forever). Report ERROR: the caller keeps the instance
+        // and reclaims it by killing it.
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: status socket error for request No %zu, pid %d",
+               instance->request_id, instance->child_pid);
+        return SPAWN_TIMEDWAIT_ERROR;
+    }
+
+    // rc == 0: the status report is ready to read; the blocking wait returns immediately now.
+    int st = spawn_server_exec_wait(server, instance);
+    if(status) *status = st;
+    return SPAWN_TIMEDWAIT_EXITED;
+}
+
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
     int rc = -1;
 
@@ -1256,8 +1294,38 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
     }
 
     // kill the child, if it is still running
-    if(instance->child_pid)
+    if(instance->child_pid) {
         kill(instance->child_pid, SIGTERM);
+
+        // wait a bounded grace for the child to exit after SIGTERM. NOTE: timeout_ms is already
+        // consumed above as the pre-kill grace (voluntary exit before SIGTERM); the post-SIGTERM
+        // grace uses the fixed default so the caller's grace is not applied twice.
+        // No PID-reuse race on the RUNNING path: the spawn server reaps the child and only then
+        // sends the status report that makes timedwait return EXITED, so a RUNNING result means
+        // the child has not been reaped yet and its PID is still held.
+        int status;
+        if(spawn_server_exec_timedwait(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
+            return status;
+
+        // still not gone: force-kill, then wait another bounded grace. We must NOT fall through to
+        // an unbounded blocking wait here - a child we cannot signal (e.g. SIGKILL returns EPERM)
+        // would otherwise hang the caller (and shutdown) forever, the very thing this path prevents.
+        if(kill(instance->child_pid, SIGKILL) != 0)
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: SIGKILL of pid %d failed for request No %zu", instance->child_pid, instance->request_id);
+
+        if(spawn_server_exec_timedwait(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
+            return status;
+
+        // could not confirm the child exited within the bounded waits; reclaim the instance so we
+        // neither leak it nor block. The spawn server reaps the child if/when it actually dies.
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: giving up waiting for pid %d after SIGKILL (request No %zu) - reclaiming",
+               instance->child_pid, instance->request_id);
+        instance->child_pid = 0; // already signalled; skip the SIGTERM in destroy
+        spawn_server_exec_destroy(instance);
+        return -1;
+    }
 
     return spawn_server_exec_wait(server, instance);
 }

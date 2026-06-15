@@ -6,6 +6,7 @@
 //!
 //! Wire-compatible with the C implementation in netipc_shm.c.
 
+use std::ffi::CString;
 use std::path::{Path, PathBuf};
 use std::ptr;
 
@@ -760,11 +761,11 @@ pub fn cleanup_stale(run_dir: &str, service_name: &str) {
         // Open read-only to inspect the header
         let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_RDONLY) };
         if fd < 0 {
-            // The entry vanished after readdir() (for example, a dangling symlink
-            // target disappeared) — remove the stale directory entry. Any other
-            // open failure is ambiguous, so leave the entry alone.
-            if should_unlink_cleanup_open_failure(errno()) {
-                unsafe { libc::unlink(c_path.as_ptr()) };
+            // Entries that cannot be opened are junk (vanished, unreadable,
+            // dangling symlink) — remove them. Keep the entry only when fd
+            // exhaustion prevented the liveness check from running at all.
+            if !stale_check_unavailable(errno()) {
+                let _ = unlink_stale_path(&c_path);
             }
             continue;
         }
@@ -773,8 +774,8 @@ pub fn cleanup_stale(run_dir: &str, service_name: &str) {
         if unsafe { libc::fstat(fd, &mut st) } != 0 || (st.st_size as usize) < HEADER_LEN as usize {
             unsafe {
                 libc::close(fd);
-                libc::unlink(c_path.as_ptr());
             }
+            let _ = unlink_stale_path(&c_path);
             continue;
         }
 
@@ -791,7 +792,7 @@ pub fn cleanup_stale(run_dir: &str, service_name: &str) {
         unsafe { libc::close(fd) };
 
         if map == libc::MAP_FAILED {
-            unsafe { libc::unlink(c_path.as_ptr()) };
+            let _ = unlink_stale_path(&c_path);
             continue;
         }
 
@@ -800,8 +801,8 @@ pub fn cleanup_stale(run_dir: &str, service_name: &str) {
         if magic != REGION_MAGIC {
             unsafe {
                 libc::munmap(map, HEADER_LEN as usize);
-                libc::unlink(c_path.as_ptr());
             }
+            let _ = unlink_stale_path(&c_path);
             continue;
         }
 
@@ -811,7 +812,7 @@ pub fn cleanup_stale(run_dir: &str, service_name: &str) {
 
         // If owner is dead (or generation is zero / legacy), unlink
         if !pid_alive(owner) || gen == 0 {
-            unsafe { libc::unlink(c_path.as_ptr()) };
+            let _ = unlink_stale_path(&c_path);
         }
     }
 }
@@ -966,16 +967,19 @@ enum StaleResult {
     Invalid,
 }
 
-fn should_unlink_cleanup_open_failure(err: i32) -> bool {
-    err == libc::ENOENT
+/// Open failures that mean the liveness check itself could not run (fd
+/// exhaustion). Deleting on these could remove a live endpoint, so the
+/// entry is kept and reported as in-use.
+fn stale_check_unavailable(err: i32) -> bool {
+    err == libc::EMFILE || err == libc::ENFILE
 }
 
-fn classify_stale_open_failure(err: i32) -> StaleResult {
-    if err == libc::ENOENT {
-        StaleResult::NotExist
-    } else {
-        StaleResult::Invalid
+fn unlink_stale_path(c_path: &CString) -> bool {
+    if unsafe { libc::unlink(c_path.as_ptr()) } == 0 || errno() == libc::ENOENT {
+        return true;
     }
+    // A directory squatting on the region path is junk too.
+    errno() == libc::EISDIR && unsafe { libc::rmdir(c_path.as_ptr()) } == 0
 }
 
 #[allow(dead_code)]
@@ -991,13 +995,22 @@ fn check_shm_stale(path: &Path) -> StaleResult {
     }
 
     if (st.st_size as usize) < HEADER_LEN as usize {
-        unsafe { libc::unlink(c_path.as_ptr()) };
+        if !unlink_stale_path(&c_path) {
+            return StaleResult::LiveServer;
+        }
         return StaleResult::Invalid;
     }
 
     let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_RDONLY) };
     if fd < 0 {
-        return classify_stale_open_failure(errno());
+        let e = errno();
+        if e == libc::ENOENT {
+            return StaleResult::NotExist;
+        }
+        if stale_check_unavailable(e) || !unlink_stale_path(&c_path) {
+            return StaleResult::LiveServer;
+        }
+        return StaleResult::Invalid;
     }
 
     let map = unsafe {
@@ -1013,7 +1026,9 @@ fn check_shm_stale(path: &Path) -> StaleResult {
     unsafe { libc::close(fd) };
 
     if map == libc::MAP_FAILED {
-        unsafe { libc::unlink(c_path.as_ptr()) };
+        if !unlink_stale_path(&c_path) {
+            return StaleResult::LiveServer;
+        }
         return StaleResult::Invalid;
     }
 
@@ -1022,7 +1037,9 @@ fn check_shm_stale(path: &Path) -> StaleResult {
     if magic != REGION_MAGIC {
         unsafe {
             libc::munmap(map, HEADER_LEN as usize);
-            libc::unlink(c_path.as_ptr());
+        }
+        if !unlink_stale_path(&c_path) {
+            return StaleResult::LiveServer;
         }
         return StaleResult::Invalid;
     }
@@ -1036,7 +1053,9 @@ fn check_shm_stale(path: &Path) -> StaleResult {
     }
 
     // Dead owner or zero generation (PID reuse / legacy) — stale
-    unsafe { libc::unlink(c_path.as_ptr()) };
+    if !unlink_stale_path(&c_path) {
+        return StaleResult::LiveServer;
+    }
     StaleResult::Recovered
 }
 

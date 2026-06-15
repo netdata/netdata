@@ -111,11 +111,11 @@ func TestWinShmCreateAttachAndCloseValidation(t *testing.T) {
 	}
 	defer client.WinShmClose()
 
-	if server.GetRole() != WinShmRoleServer {
-		t.Fatalf("server role = %d, want %d", server.GetRole(), WinShmRoleServer)
+	if server.Role() != WinShmRoleServer {
+		t.Fatalf("server role = %d, want %d", server.Role(), WinShmRoleServer)
 	}
-	if client.GetRole() != WinShmRoleClient {
-		t.Fatalf("client role = %d, want %d", client.GetRole(), WinShmRoleClient)
+	if client.Role() != WinShmRoleClient {
+		t.Fatalf("client role = %d, want %d", client.Role(), WinShmRoleClient)
 	}
 }
 

@@ -83,6 +83,7 @@ required_sections=(
   "### Roles"
   "### Git Worktrees"
   "### Sensitive Data In Durable Artifacts"
+  "### Durable AI-Facing Artifact Formatting"
   "### Open-Source Reference Evidence"
   "### Pre-Implementation Gate"
   "### SOW Completion And Merge"

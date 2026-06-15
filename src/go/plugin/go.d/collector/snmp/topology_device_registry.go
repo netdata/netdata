@@ -26,6 +26,13 @@ func (c *Collector) vnodeGUID() string {
 	return ""
 }
 
+func (c *Collector) vnodeHostname() string {
+	if c.vnode != nil {
+		return c.vnode.Hostname
+	}
+	return ""
+}
+
 func (c *Collector) vnodeLabels() map[string]string {
 	if c.vnode != nil && len(c.vnode.Labels) > 0 {
 		cp := make(map[string]string, len(c.vnode.Labels))
@@ -69,6 +76,7 @@ func (c *Collector) registerDeviceForTopology(si *snmputils.SysInfo) {
 		DisableBulkWalk: c.disableBulkWalk,
 		ManualProfiles:  c.ManualProfiles,
 		VnodeGUID:       c.vnodeGUID(),
+		VnodeHostname:   c.vnodeHostname(),
 		VnodeLabels:     c.vnodeLabels(),
 	})
 }

@@ -160,7 +160,11 @@ type WinShmContext struct {
 }
 
 // Role returns the context role.
-func (c *WinShmContext) GetRole() WinShmRole { return c.role }
+func (c *WinShmContext) Role() WinShmRole { return c.role }
+
+// GetRole returns the context role.
+// Deprecated: use Role.
+func (c *WinShmContext) GetRole() WinShmRole { return c.Role() }
 
 // ---------------------------------------------------------------------------
 //  Server API

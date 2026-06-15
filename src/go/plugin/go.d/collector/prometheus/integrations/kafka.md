@@ -89,11 +89,14 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | url | Target endpoint URL. |  | yes |
 |  | timeout | HTTP request timeout (seconds). | 10 | no |
+|  | expected_prefix | If set, the job's check passes only when at least one scraped metric name starts with this prefix. Guards against scraping an unexpected endpoint. |  | no |
+| **Customization** | app | Application name used as the app segment of chart contexts (`prometheus.<app>.<metric>`). When unset, it is taken from a matched profile, otherwise it falls back to the job name. |  | no |
 | **Filters** | [selector](#option-filters-selector) | Time series selector (filter). |  | no |
 | **Limits** | max_time_series | Global time series limit. If an endpoint returns more time series than this, the data is not processed. | 2000 | no |
 |  | max_time_series_per_metric | Per-metric time series limit. Metrics with more time series than this are skipped. | 200 | no |
 | **Customization** | [fallback_type](#option-customization-fallback-type) | Fallback type rules for untyped metrics. |  | no |
-|  | label_prefix | Optional prefix added to all labels of all charts. Labels will be formatted as `prefix_name`. |  | no |
+|  | [relabeling](#option-customization-relabeling) | Prometheus-compatible metric relabeling, applied before charts are built. |  | no |
+|  | [profiles](#option-customization-profiles) | Curated, exporter-specific chart profiles. Disable with mode `none`. | auto | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
 |  | password | Password for Basic HTTP authentication. |  | no |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
@@ -147,6 +150,57 @@ fallback_type:
   gauge:
     - metric_name_pattern3
     - metric_name_pattern4
+```
+
+
+<a id="option-customization-relabeling"></a>
+##### relabeling
+
+A list of relabeling blocks. Each block applies a list of Prometheus
+`metric_relabel_configs` rules to the metrics whose name matches `match`. See the
+[relabeling reference](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/relabel/README.md)
+for the full action set and more examples.
+
+- `match`: Netdata simple patterns matched against the full metric name — including
+  any `_bucket`/`_sum`/`_count` suffix, so prefer globs like `app_lat*` over an exact
+  `app_lat` (space-separated; `*` matches any sequence, `?` any character, a leading
+  `!` negates). Use `*` to target every metric. Required.
+- `metric_relabel_configs`: Prometheus relabel rules (`source_labels`, `separator`,
+  `regex`, `modulus`, `target_label`, `replacement`, `action`), applied in order to
+  the scraped samples before charts are built.
+
+Relabeling that would corrupt a histogram or summary — splitting it, dropping a
+component, mutating the `le`/`quantile` label, or merging two families — is rejected.
+
+```yaml
+relabeling:
+  - match: 'http_*'
+    metric_relabel_configs:
+      - source_labels: [code]
+        regex: '(\d)\d\d'
+        target_label: code_class
+        replacement: '${1}xx'
+```
+
+
+<a id="option-customization-profiles"></a>
+##### profiles
+
+Profiles ship curated charts for recognized exporters. `profiles.mode` selects them:
+
+- `auto` (default): every profile whose `match` hits at least one scraped metric.
+- `exact`: only the profiles named in `mode_exact.entries` (each must match, or the job fails its check).
+- `combined`: `auto` plus the profiles named in `mode_combined.entries`.
+- `none`: no profiles — generic autogen charts only (the pre-profile behavior).
+
+Only the block matching the selected mode (`mode_exact` or `mode_combined`) is read; entries under the other block are ignored. Metrics not covered by a selected profile keep their generic autogen charts.
+
+```yaml
+profiles:
+  mode: exact
+  mode_exact:
+    entries:
+      - name: haproxy
 ```
 
 
@@ -273,6 +327,53 @@ jobs:
 
   - name: remote
     url: http://192.0.2.1:9090/metrics
+
+```
+</details>
+
+###### Metric relabeling
+
+Derive a `code_class` label (2xx, 4xx, ...) on metrics named `http_*`.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: local
+    url: http://127.0.0.1:9090/metrics
+    relabeling:
+      - match: 'http_*'
+        metric_relabel_configs:
+          - source_labels: [code]
+            regex: '(\d)\d\d'
+            target_label: code_class
+            replacement: '${1}xx'
+
+```
+</details>
+
+###### Rename labels that collide with Netdata's reserved labels
+
+When these metrics are re-exported in Prometheus format, Netdata adds its own `instance`,
+`family`, `chart`, and `dimension` labels. If the scraped endpoint already uses one of those
+names, the re-export emits a duplicate label and a downstream Prometheus rejects the scrape.
+Rename the colliding labels to avoid it (the use case the former `label_prefix` option served).
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: coredns
+    url: http://127.0.0.1:9153/metrics
+    relabeling:
+      - match: '*'
+        metric_relabel_configs:
+          - regex: '(instance|family)'
+            action: labelmap
+            replacement: 'coredns_$1'
+          - regex: '(instance|family)'
+            action: labeldrop
 
 ```
 </details>

@@ -182,6 +182,10 @@ Keep a record of profile decisions in a project-local doc under
 - `api/issues/search` is paged at `ps=500` max. The `sq_paginate` helper
   in `_lib.sh` walks every page until `paging.total`; use it from any
   new script instead of re-implementing the loop.
+- PR new-code measures returned by `api/measures/component_tree` are stored
+  under `measures[].periods[0].value`, not `measures[].value`. This matters for
+  quality-gate metrics such as `new_duplicated_lines`,
+  `new_duplicated_lines_density`, and `new_lines`.
 - Hotspot `ruleKey` filtering is client-side (search only filters by
   status/project), so the family-mode helper does it in Python.
 - An issue may be transitioned only between certain states; if you get

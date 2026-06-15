@@ -29,6 +29,7 @@ type methodExecutionInput struct {
 	methodCfg     *funcapi.MethodConfig
 	job           collectorapi.RuntimeJob
 	jobGen        uint64
+	info          bool
 	payload       map[string]any
 	argValues     map[string][]string
 	resolveParams methodParamResolver
@@ -37,17 +38,25 @@ type methodExecutionInput struct {
 }
 
 func (c *Controller) ExecuteFunction(functionName string, fn functions.Function) {
+	if moduleName, methodID, ok := c.registry.resolveMethodRoute(functionName); ok {
+		c.makeMethodFuncHandler(moduleName, methodID)(c.baseContext(), fn)
+		return
+	}
+
 	moduleName, methodID, err := functions.SplitFunctionName(functionName)
 	if err != nil {
 		c.respondError(fn, 400, "%v", err)
 		return
 	}
 
-	c.makeMethodFuncHandler(moduleName, methodID)(fn)
+	c.makeMethodFuncHandler(moduleName, methodID)(c.baseContext(), fn)
 }
 
-func (c *Controller) executeMethodRequest(in methodExecutionInput) {
-	ctx, cancel := context.WithTimeout(c.baseContext(), in.fn.Timeout)
+func (c *Controller) executeMethodRequest(parent context.Context, in methodExecutionInput) {
+	if parent == nil {
+		parent = c.baseContext()
+	}
+	ctx, cancel := context.WithTimeout(parent, in.fn.Timeout)
 	defer cancel()
 
 	if !in.job.IsRunning() {
@@ -64,6 +73,36 @@ func (c *Controller) executeMethodRequest(in methodExecutionInput) {
 	handler := creator.MethodHandler(in.job)
 	if handler == nil {
 		c.respondError(in.fn, 500, "module '%s' returned nil handler for job '%s'", in.moduleName, in.jobName)
+		return
+	}
+
+	if in.methodCfg.RawRequest {
+		// Raw handlers receive the worker's request context so cancellation reaches
+		// engines that poll it while building their own response envelope.
+		rawHandler, ok := handler.(funcapi.RawMethodHandler)
+		if !ok {
+			c.respondError(in.fn, 500, "module '%s' method '%s' requires raw request handling", in.moduleName, in.methodID)
+			return
+		}
+
+		dataResp := rawHandler.HandleRaw(ctx, funcapi.RawMethodRequest{
+			Method:      in.methodID,
+			Info:        in.info,
+			Args:        append([]string(nil), in.fn.Args...),
+			Payload:     append([]byte(nil), in.fn.Payload...),
+			ContentType: in.fn.ContentType,
+			Timeout:     in.fn.Timeout,
+			Permissions: in.fn.Permissions,
+			Source:      in.fn.Source,
+		})
+
+		if !c.registry.verifyJobGeneration(in.moduleName, in.jobName, in.jobGen) {
+			c.respondError(in.fn, 503, "job '%s' was replaced during request, please retry", in.jobLabel)
+			return
+		}
+
+		updateEvery := max(in.methodCfg.UpdateEvery, 1)
+		in.respond(dataResp, nil, updateEvery)
 		return
 	}
 
@@ -101,16 +140,16 @@ func (c *Controller) executeMethodRequest(in methodExecutionInput) {
 	in.respond(dataResp, methodParams, updateEvery)
 }
 
-func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) func(functions.Function) {
-	return func(fn functions.Function) {
-		if slices.Contains(fn.Args, "info") {
-			c.handleMethodFuncInfo(moduleName, methodID, fn)
-			return
-		}
-
+func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) functions.Handler {
+	return func(ctx context.Context, fn functions.Function) {
 		methodCfg, ok := c.registry.getMethod(moduleName, methodID)
 		if !ok {
 			c.respondError(fn, 404, "unknown method '%s' for module '%s'", methodID, moduleName)
+			return
+		}
+		info := slices.Contains(fn.Args, "info")
+		if info && !methodCfg.RawRequest {
+			c.handleMethodFuncInfo(moduleName, methodID, fn)
 			return
 		}
 
@@ -154,7 +193,7 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) func(fun
 			return
 		}
 
-		c.executeMethodRequest(methodExecutionInput{
+		c.executeMethodRequest(ctx, methodExecutionInput{
 			fn:         fn,
 			moduleName: moduleName,
 			jobName:    jobName,
@@ -163,6 +202,7 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) func(fun
 			methodCfg:  methodCfg,
 			job:        job,
 			jobGen:     jobGen,
+			info:       info,
 			payload:    payload,
 			argValues:  argValues,
 			resolveParams: func(ctx context.Context, methodCfg *funcapi.MethodConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, bool, error) {
@@ -422,16 +462,16 @@ func methodRequiresJobParam(cfg *funcapi.MethodConfig) bool {
 	return cfg == nil || !cfg.AgentWide
 }
 
-func (c *Controller) makeJobMethodFuncHandler(moduleName, jobName, methodID string) func(functions.Function) {
-	return func(fn functions.Function) {
-		if slices.Contains(fn.Args, "info") {
-			c.handleJobMethodFuncInfo(moduleName, jobName, methodID, fn)
-			return
-		}
-
+func (c *Controller) makeJobMethodFuncHandler(moduleName, jobName, methodID string) functions.Handler {
+	return func(ctx context.Context, fn functions.Function) {
 		methodCfg, ok := c.registry.getJobMethod(moduleName, jobName, methodID)
 		if !ok {
 			c.respondError(fn, 404, "unknown method '%s' for job '%s:%s'", methodID, moduleName, jobName)
+			return
+		}
+		info := slices.Contains(fn.Args, "info")
+		if info && !methodCfg.RawRequest {
+			c.handleJobMethodFuncInfo(moduleName, jobName, methodID, fn)
 			return
 		}
 
@@ -444,7 +484,7 @@ func (c *Controller) makeJobMethodFuncHandler(moduleName, jobName, methodID stri
 			return
 		}
 
-		c.executeMethodRequest(methodExecutionInput{
+		c.executeMethodRequest(ctx, methodExecutionInput{
 			fn:         fn,
 			moduleName: moduleName,
 			jobName:    jobName,
@@ -453,6 +493,7 @@ func (c *Controller) makeJobMethodFuncHandler(moduleName, jobName, methodID stri
 			methodCfg:  methodCfg,
 			job:        job,
 			jobGen:     jobGen,
+			info:       info,
 			payload:    payload,
 			argValues:  argValues,
 			resolveParams: func(ctx context.Context, methodCfg *funcapi.MethodConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, bool, error) {

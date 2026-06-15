@@ -1,3 +1,5 @@
+<!-- markdownlint-disable-file -->
+
 # Monitor Cgroups (cgroups.plugin)
 
 You can monitor containers and virtual machines using **cgroups**.
@@ -11,6 +13,9 @@ accounting is reported (and resource usage limits are applied) also in a hierarc
 To visualize cgroup metrics Netdata provides configuration for cherry-picking the cgroups of interest. By default,
 Netdata should pick **systemd services**, all kinds of **containers** (lxc, docker, etc.) and **virtual machines** spawn
 by managers that register them with cgroups (qemu, libvirt, etc.).
+
+The collector also exposes cachestat charts for both regular cgroups and systemd services, mirroring the legacy
+`ebpf.plugin` contexts.
 
 ## Supported Technologies
 
@@ -104,13 +109,16 @@ Renaming is configured with the following options:
 	script to get cgroup names = /usr/libexec/netdata/plugins.d/cgroup-name.sh
 ```
 
-The whole point for the additional pattern list, is to limit the number of times the script will be called. Without this
-pattern list, the script might be called thousands of times, depending on the number of cgroups available in the system.
+The whole point for the additional pattern list, is to limit the number of
+times the script will be called. Without this pattern list, the script
+might be called thousands of times, depending on the number of cgroups
+available in the system.
 
-The above pattern list is matched against the path of the cgroup. For matched cgroups, Netdata calls the
+The above pattern list is matched against the path of the cgroup. For matched
+cgroups, Netdata calls the
 script [cgroup-name.sh](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/cgroup-name.sh.in)
-to get its name. This script queries `docker`, `kubectl`, `podman`, or applies heuristics to find give a name for the
-cgroup.
+to get its name. This script queries `docker`, `kubectl`, `podman`, or applies
+heuristics to find a name for the cgroup.
 
 #### Note on Podman container names
 
@@ -238,7 +246,7 @@ Which systemd services are monitored by Netdata is determined by the following p
 
 ```text
 [plugin:cgroups]
-	cgroups to match as systemd services =  !/system.slice/*/*.service  /system.slice/*.service
+	cgroups to match as systemd services =  !/system.slice/*.service/*.service  /system.slice/*.service
 ```
 
 - - -
@@ -257,7 +265,7 @@ log a few errors in error.log complaining about files it cannot find, but immedi
 4. Obsolete charts are not be offered on new dashboard sessions (so hit F5 and the charts are gone)
 5. Existing dashboard sessions will continue to see them, but of course they will not refresh
 6. Obsolete charts will be removed from memory, 1 hour after the last user viewed them (configurable)
-   with `[global].cleanup obsolete charts after seconds = 3600` (at `netdata.conf`).
+   with `[db].cleanup obsolete charts after = 3600` (at `netdata.conf`).
 
 ### Monitored container metrics
 

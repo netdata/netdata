@@ -6,9 +6,6 @@ pub(super) fn validate_listener_and_protocols(cfg: &PluginConfig) -> Result<()> 
     if cfg.listener.max_packet_size == 0 {
         anyhow::bail!("listener.max_packet_size must be greater than 0");
     }
-    if cfg.listener.sync_every_entries == 0 {
-        anyhow::bail!("listener.sync_every_entries must be greater than 0");
-    }
 
     cfg.listener
         .listen

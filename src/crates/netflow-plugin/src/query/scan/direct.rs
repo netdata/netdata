@@ -41,22 +41,44 @@ where
     files.sort_by(|left, right| left.0.cmp(&right.0));
 
     for (registry_file, file_path) in files {
-        let journal = JournalFile::<Mmap>::open(&registry_file, FACET_CACHE_JOURNAL_WINDOW_SIZE)
-            .with_context(|| {
-                format!(
-                    "failed to open journal file {} for {}",
+        // Journal read failures below are treated per journald semantics: a
+        // torn tail (power loss mid-write) makes everything from the tear
+        // onward unrecoverable, but must not fail the whole scan — that would
+        // turn one damaged file into a startup (rebuild) or query outage.
+        // Only caller-side errors (cancellation checkpoints, the on_entry
+        // closure) abort the scan.
+        let journal = match JournalFile::<Mmap>::open(&registry_file, FACET_CACHE_JOURNAL_WINDOW_SIZE)
+        {
+            Ok(journal) => journal,
+            Err(err) => {
+                tracing::warn!(
+                    "skipping unreadable journal file {} during {}: {}",
                     file_path.display(),
-                    purpose
-                )
-            })?;
+                    purpose,
+                    err
+                );
+                continue;
+            }
+        };
 
         let mut reader = JournalReader::default();
         for pair in prefilter_matches {
             reader.add_match(pair);
         }
         let mut cursor = JournalCursor::new();
-        if let Some(filter_expr) = reader.build_filter(&journal)? {
-            cursor.set_filter(filter_expr);
+        match reader.build_filter(&journal) {
+            Ok(Some(filter_expr)) => cursor.set_filter(filter_expr),
+            Ok(None) => {}
+            Err(err) => {
+                // The filter is an optimization over the file's hash tables;
+                // a damaged region there must not hide the readable entries.
+                tracing::warn!(
+                    "scanning {} unfiltered during {}: filter build failed: {}",
+                    file_path.display(),
+                    purpose,
+                    err
+                );
+            }
         }
         drop(reader);
         cursor.set_location(match after_usec {
@@ -65,36 +87,39 @@ where
         });
 
         loop {
-            let has_entry = cursor
-                .step(&journal, JournalDirection::Forward)
-                .with_context(|| {
-                    format!(
-                        "failed to step journal reader for {} during {}",
+            let has_entry = match cursor.step(&journal, JournalDirection::Forward) {
+                Ok(has_entry) => has_entry,
+                Err(err) => {
+                    tracing::warn!(
+                        "treating torn or unreadable entry in {} as end of file during {}: {}",
                         file_path.display(),
-                        purpose
-                    )
-                })?;
+                        purpose,
+                        err
+                    );
+                    break;
+                }
+            };
             if !has_entry {
                 break;
             }
 
             counts.streamed_entries = counts.streamed_entries.saturating_add(1);
-            let entry_offset = cursor.position().with_context(|| {
-                format!(
-                    "failed to read current entry offset from {} during {}",
-                    file_path.display(),
-                    purpose
-                )
-            })?;
-            let timestamp_usec = {
-                let entry_guard = journal.entry_ref(entry_offset).with_context(|| {
-                    format!(
-                        "failed to read current entry from {} during {}",
+            let read_entry = || -> Result<(NonZeroU64, u64)> {
+                let entry_offset = cursor.position()?;
+                let entry_guard = journal.entry_ref(entry_offset)?;
+                Ok((entry_offset, entry_guard.header.realtime))
+            };
+            let (entry_offset, timestamp_usec) = match read_entry() {
+                Ok(read) => read,
+                Err(err) => {
+                    tracing::warn!(
+                        "treating torn or unreadable entry in {} as end of file during {}: {}",
                         file_path.display(),
-                        purpose
-                    )
-                })?;
-                entry_guard.header.realtime
+                        purpose,
+                        err
+                    );
+                    break;
+                }
             };
             if after_usec.is_some_and(|after_usec| timestamp_usec < after_usec) {
                 continue;
@@ -103,14 +128,15 @@ where
                 return Ok(counts);
             }
             data_offsets.clear();
-            journal
-                .entry_data_object_offsets(entry_offset, &mut data_offsets)
-                .with_context(|| {
-                    format!(
-                        "failed to collect payload offsets from current entry in {}",
-                        file_path.display()
-                    )
-                })?;
+            if let Err(err) = journal.entry_data_object_offsets(entry_offset, &mut data_offsets) {
+                tracing::warn!(
+                    "treating torn or unreadable entry in {} as end of file during {}: {}",
+                    file_path.display(),
+                    purpose,
+                    err
+                );
+                break;
+            }
             if let Some(execution) = execution {
                 execution.checkpoint(
                     pass_index,

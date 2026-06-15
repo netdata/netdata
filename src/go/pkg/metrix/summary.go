@@ -219,7 +219,11 @@ func normalizeSummaryPoint(point SummaryPoint, schema *summarySchema) (SampleVal
 		if idx == -1 {
 			panic(fmt.Errorf("%w: quantile %v is not declared", errSummaryPoint, q.Quantile))
 		}
-		mustFiniteSample(q.Value)
+		// A summary may report a NaN quantile value (e.g. an empty observation window). Store it;
+		// chartengine renders a non-finite dimension value as a gap (SETEMPTY). Reject only Inf.
+		if math.IsInf(float64(q.Value), 0) {
+			panic(fmt.Errorf("%w: infinite quantile value %v", errSummaryPoint, q.Value))
+		}
 		values[idx] = q.Value
 	}
 

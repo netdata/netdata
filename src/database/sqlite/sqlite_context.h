@@ -25,6 +25,7 @@ typedef struct ctx_dimension {
     char *id;
     char *name;
     bool hidden;
+    int algorithm;
 
     char *context;
     char *chart_id;

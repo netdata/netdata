@@ -28,7 +28,12 @@ type topologyShape struct {
 	tableTypeOwners    map[string]string
 	actorTables        map[string]map[string]string
 	relationshipTables map[string]map[string]string
+	overlayTemplates   map[string]overlayTemplateShape
 	scaleKeys          map[string]struct{}
+}
+
+type overlayTemplateShape struct {
+	selectorParams []string
 }
 
 // ValidateDecodedResponse validates a full topology v1 Function response.
@@ -96,6 +101,9 @@ func ValidateDecodedData(data map[string]any) error {
 	}
 	shape, err := collectTopologyShape(data)
 	if err != nil {
+		return err
+	}
+	if err := validateOverlaySemantics(data, shape, ctx); err != nil {
 		return err
 	}
 	if err := validateTypeColumns(data, shape); err != nil {
@@ -270,6 +278,193 @@ func validateOverlayRefs(raw any, ctx validationContext) error {
 		return err
 	}
 	return nil
+}
+
+func validateOverlaySemantics(data map[string]any, shape topologyShape, ctx validationContext) error {
+	types, _ := data["types"].(map[string]any)
+	if err := validateLinkTypeOverlayTemplates(types["link_types"], shape.overlayTemplates); err != nil {
+		return err
+	}
+	return validateOverlayRefRows(data["overlays"], shape.overlayTemplates, ctx.dictionaries)
+}
+
+func validateLinkTypeOverlayTemplates(raw any, templates map[string]overlayTemplateShape) error {
+	linkTypes, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("data.types.link_types is not an object")
+	}
+	known := make(map[string]struct{}, len(templates))
+	for id := range templates {
+		known[id] = struct{}{}
+	}
+	for typeID, rawType := range linkTypes {
+		linkType, ok := rawType.(map[string]any)
+		if !ok {
+			return fmt.Errorf("data.types.link_types.%s is not an object", typeID)
+		}
+		if err := validateOptionalIDArrayRefs("data.types.link_types."+typeID+".overlay_templates", linkType["overlay_templates"], known, "overlay template"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateOverlayRefRows(raw any, templates map[string]overlayTemplateShape, dictionaries map[string]any) error {
+	if raw == nil {
+		return nil
+	}
+	overlays, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("data.overlays is not an object")
+	}
+	refs, ok := overlays["refs"]
+	if !ok {
+		return nil
+	}
+
+	rows, columns, err := decodedColumnsFromCompactTable("data.overlays.refs", refs)
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return nil
+	}
+
+	templateColumn, ok := columns[OverlayRefsTemplateColumn]
+	if !ok {
+		return fmt.Errorf("data.overlays.refs is missing required %s column", OverlayRefsTemplateColumn)
+	}
+	if !isOverlayRefsStringColumn(templateColumn) {
+		return fmt.Errorf("data.overlays.refs.%s column must be string or string_ref", OverlayRefsTemplateColumn)
+	}
+	ownerColumn, err := validateOverlayOwnerColumns(columns)
+	if err != nil {
+		return err
+	}
+
+	for row := range rows {
+		if ownerColumn.values[row] == nil {
+			return fmt.Errorf("data.overlays.refs.%s[%d] is not a non-null owner reference", ownerColumn.id, row)
+		}
+		templateID, ok := resolveStringValue(templateColumn.values[row], templateColumn.columnType, templateColumn.dictionary, dictionaries)
+		if !ok || templateID == "" {
+			return fmt.Errorf("data.overlays.refs.template[%d] is not a non-empty string", row)
+		}
+		template, ok := templates[templateID]
+		if !ok {
+			return fmt.Errorf("data.overlays.refs.template[%d] references unknown overlay template %q", row, templateID)
+		}
+		for _, param := range template.selectorParams {
+			column, ok := columns[param]
+			if !ok {
+				return fmt.Errorf("data.overlays.refs row %d template %q is missing selector param column %q", row, templateID, param)
+			}
+			if !isOverlayRefsStringColumn(column) {
+				return fmt.Errorf("data.overlays.refs.%s column must be string or string_ref", param)
+			}
+			value, ok := resolveStringValue(column.values[row], column.columnType, column.dictionary, dictionaries)
+			if !ok || value == "" {
+				return fmt.Errorf("data.overlays.refs.%s[%d] is not a non-empty string", param, row)
+			}
+		}
+	}
+
+	return nil
+}
+
+func validateOverlayOwnerColumns(columns map[string]decodedCompactColumn) (decodedCompactColumn, error) {
+	owners := 0
+	ownerColumn := decodedCompactColumn{}
+	if column, ok := columns[OverlayRefsActorColumn]; ok {
+		if column.columnType != "actor_ref" {
+			return decodedCompactColumn{}, fmt.Errorf("data.overlays.refs.%s column must be actor_ref", OverlayRefsActorColumn)
+		}
+		ownerColumn = column
+		owners++
+	}
+	if column, ok := columns[OverlayRefsLinkColumn]; ok {
+		if column.columnType != "link_ref" {
+			return decodedCompactColumn{}, fmt.Errorf("data.overlays.refs.%s column must be link_ref", OverlayRefsLinkColumn)
+		}
+		ownerColumn = column
+		owners++
+	}
+	for id, column := range columns {
+		if id == OverlayRefsActorColumn || id == OverlayRefsLinkColumn {
+			continue
+		}
+		if column.columnType == "actor_ref" || column.columnType == "link_ref" {
+			return decodedCompactColumn{}, fmt.Errorf("data.overlays.refs.%s uses non-convention %s owner column", id, column.columnType)
+		}
+	}
+	if owners != 1 {
+		return decodedCompactColumn{}, fmt.Errorf("data.overlays.refs must contain exactly one owner column: actor actor_ref or link link_ref")
+	}
+	return ownerColumn, nil
+}
+
+func isOverlayRefsStringColumn(column decodedCompactColumn) bool {
+	return column.columnType == "string" || column.columnType == "string_ref"
+}
+
+type decodedCompactColumn struct {
+	id         string
+	columnType string
+	dictionary string
+	values     []any
+}
+
+func decodedColumnsFromCompactTable(path string, raw any) (int, map[string]decodedCompactColumn, error) {
+	table, ok := raw.(map[string]any)
+	if !ok {
+		return 0, nil, fmt.Errorf("%s is not an object", path)
+	}
+	rows, err := decodedTableRows(table)
+	if err != nil {
+		return 0, nil, fmt.Errorf("%s: %w", path, err)
+	}
+	rawColumns, ok := table["columns"].([]any)
+	if !ok {
+		return 0, nil, fmt.Errorf("%s.columns is not an array", path)
+	}
+	rawValues, ok := table["values"].([]any)
+	if !ok {
+		return 0, nil, fmt.Errorf("%s.values is not an array", path)
+	}
+	if len(rawColumns) != len(rawValues) {
+		return 0, nil, fmt.Errorf("%s columns/values length mismatch: %d columns, %d values", path, len(rawColumns), len(rawValues))
+	}
+
+	columns := make(map[string]decodedCompactColumn, len(rawColumns))
+	for i, rawColumn := range rawColumns {
+		column, ok := rawColumn.(map[string]any)
+		if !ok {
+			return 0, nil, fmt.Errorf("%s.columns[%d] is not an object", path, i)
+		}
+		columnID, _ := column["id"].(string)
+		if columnID == "" {
+			return 0, nil, fmt.Errorf("%s.columns[%d].id is required", path, i)
+		}
+		if _, ok := columns[columnID]; ok {
+			return 0, nil, fmt.Errorf("%s.columns[%d].id duplicates column %q", path, i, columnID)
+		}
+		columnType, _ := column["type"].(string)
+		if columnType == "" {
+			return 0, nil, fmt.Errorf("%s.columns[%d].type is required", path, i)
+		}
+		values, err := decodeColumn(path, i, rows, rawValues[i])
+		if err != nil {
+			return 0, nil, err
+		}
+		dictionary, _ := column["dictionary"].(string)
+		columns[columnID] = decodedCompactColumn{
+			id:         columnID,
+			columnType: columnType,
+			dictionary: dictionary,
+			values:     values,
+		}
+	}
+	return rows, columns, nil
 }
 
 func validateCompactTable(path string, raw any, ctx validationContext) (int, error) {
@@ -501,6 +696,10 @@ func collectTopologyShape(data map[string]any) (topologyShape, error) {
 	if err != nil {
 		return topologyShape{}, err
 	}
+	overlayTemplates, err := collectOverlayTemplates(types["overlay_templates"])
+	if err != nil {
+		return topologyShape{}, err
+	}
 
 	return topologyShape{
 		actorColumns:       actorColumns,
@@ -513,6 +712,7 @@ func collectTopologyShape(data map[string]any) (topologyShape, error) {
 		tableTypeOwners:    tableTypeOwners,
 		actorTables:        actorTables,
 		relationshipTables: relationshipTables,
+		overlayTemplates:   overlayTemplates,
 		scaleKeys:          scaleKeys,
 	}, nil
 }
@@ -2162,6 +2362,96 @@ func collectScaleKeys(raw any) (map[string]struct{}, error) {
 	return keys, nil
 }
 
+func collectOverlayTemplates(raw any) (map[string]overlayTemplateShape, error) {
+	templates := make(map[string]overlayTemplateShape)
+	if raw == nil {
+		return templates, nil
+	}
+	rawTemplates, ok := raw.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("data.types.overlay_templates is not an object")
+	}
+	for templateID, rawTemplate := range rawTemplates {
+		template, ok := rawTemplate.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("data.types.overlay_templates.%s is not an object", templateID)
+		}
+		if _, err := requiredEnum("data.types.overlay_templates."+templateID+".provider", template["provider"], overlayProviderTokens...); err != nil {
+			return nil, err
+		}
+		if err := validateStringList("data.types.overlay_templates."+templateID+".contexts", template["contexts"], true); err != nil {
+			return nil, err
+		}
+		if err := validateStringList("data.types.overlay_templates."+templateID+".dimensions", template["dimensions"], true); err != nil {
+			return nil, err
+		}
+		selectorParams, err := collectStringList("data.types.overlay_templates."+templateID+".selector_params", template["selector_params"], true)
+		if err != nil {
+			return nil, err
+		}
+		for i, param := range selectorParams {
+			if isOverlayRefsConventionColumn(param) {
+				return nil, fmt.Errorf("data.types.overlay_templates.%s.selector_params[%d] uses reserved overlay refs column %q", templateID, i, param)
+			}
+		}
+		merge, ok := template["merge"].(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("data.types.overlay_templates.%s.merge is not an object", templateID)
+		}
+		if _, err := requiredEnum("data.types.overlay_templates."+templateID+".merge.refs", merge["refs"], overlayMergeRefsTokens...); err != nil {
+			return nil, err
+		}
+		if _, err := requiredEnum("data.types.overlay_templates."+templateID+".merge.values", merge["values"], overlayMergeValuesTokens...); err != nil {
+			return nil, err
+		}
+		templates[templateID] = overlayTemplateShape{
+			selectorParams: selectorParams,
+		}
+	}
+	return templates, nil
+}
+
+func isOverlayRefsConventionColumn(column string) bool {
+	switch column {
+	case OverlayRefsTemplateColumn, OverlayRefsActorColumn, OverlayRefsLinkColumn:
+		return true
+	default:
+		return false
+	}
+}
+
+func validateStringList(path string, raw any, optional bool) error {
+	_, err := collectStringList(path, raw, optional)
+	return err
+}
+
+func collectStringList(path string, raw any, optional bool) ([]string, error) {
+	if raw == nil {
+		if optional {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("%s is not an array", path)
+	}
+	rawValues, ok := raw.([]any)
+	if !ok {
+		return nil, fmt.Errorf("%s is not an array", path)
+	}
+	values := make([]string, 0, len(rawValues))
+	seen := make(map[string]struct{}, len(rawValues))
+	for i, rawValue := range rawValues {
+		value, ok := rawValue.(string)
+		if !ok || value == "" {
+			return nil, fmt.Errorf("%s[%d] is not a non-empty string", path, i)
+		}
+		if _, ok := seen[value]; ok {
+			return nil, fmt.Errorf("%s[%d] duplicates value %q", path, i, value)
+		}
+		seen[value] = struct{}{}
+		values = append(values, value)
+	}
+	return values, nil
+}
+
 func requiredEnum(path string, raw any, allowed ...string) (string, error) {
 	value, ok := raw.(string)
 	if !ok || value == "" {
@@ -2223,19 +2513,24 @@ var (
 		"info", "structural", "warning", "success", "danger", "blue", "green", "orange",
 		"purple", "cyan", "yellow", "teal", "gray",
 	}
-	opacityTokens          = []string{"normal", "muted", "faded"}
-	widthTokens            = []string{"thin", "normal", "thick", "emphasis"}
-	layoutStrengthTokens   = []string{"weakest", "weaker", "normal", "stronger", "strongest"}
-	layoutDistanceTokens   = []string{"closest", "closer", "normal", "farther", "farthest"}
-	actorSizeScaleTokens   = []string{"compact", "normal", "emphasized"}
-	linkSemanticRoleTokens = []string{"normal", "discovery", "ownership", "traffic", "correlation", "control"}
-	iconTokens             = []string{
+	opacityTokens            = []string{"normal", "muted", "faded"}
+	widthTokens              = []string{"thin", "normal", "thick", "emphasis"}
+	layoutStrengthTokens     = []string{"weakest", "weaker", "normal", "stronger", "strongest"}
+	layoutDistanceTokens     = []string{"closest", "closer", "normal", "farther", "farthest"}
+	actorSizeScaleTokens     = []string{"compact", "normal", "emphasized"}
+	linkSemanticRoleTokens   = []string{"normal", "discovery", "ownership", "traffic", "correlation", "control"}
+	overlayProviderTokens    = []string{OverlayProviderNetdataMetrics, OverlayProviderNetdataFunction, OverlayProviderExternal}
+	overlayMergeRefsTokens   = []string{OverlayMergeRefsAppend, OverlayMergeRefsSet}
+	overlayMergeValuesTokens = []string{
+		OverlayMergeValuesSum, OverlayMergeValuesMin, OverlayMergeValuesMax, OverlayMergeValuesAvg, OverlayMergeValuesLast, OverlayMergeValuesNone,
+	}
+	iconTokens = []string{
 		"router", "switch", "firewall", "access_point", "server", "storage", "load_balancer",
 		"printer", "phone", "ups", "camera", "process", "agent", "netdata-agent", "parent",
 		"remote-endpoint", "local-endpoint", "segment", "self", "ip", "cloud", "container",
-		"vm", "database", "service", "datacenter", "cluster", "host", "network", "datastore",
-		"datastore_cluster", "resource_pool", "device", "endpoint", "correlation", "interface",
-		"group", "unknown",
+		"docker", "kubernetes", "lxc", "nspawn", "podman", "systemd", "user", "vm", "database",
+		"service", "datacenter", "cluster", "host", "network", "datastore", "datastore_cluster",
+		"resource_pool", "device", "endpoint", "correlation", "interface", "group", "unknown",
 	}
 )
 

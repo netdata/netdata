@@ -366,9 +366,9 @@ func secretStoreErrorCode(err error) int {
 }
 
 func secretStoreCommandCode(err error) int {
-	var ce interface{ Code() int }
+	var ce interface{ DyncfgCode() int }
 	if errors.As(err, &ce) {
-		return ce.Code()
+		return ce.DyncfgCode()
 	}
 	return secretStoreErrorCode(err)
 }

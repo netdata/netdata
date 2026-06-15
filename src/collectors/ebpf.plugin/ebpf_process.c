@@ -229,7 +229,7 @@ static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_mod
     if (!ret) {
         ebpf_process_set_hash_tables(obj);
 
-        ebpf_update_controller(cachestat_maps[NETDATA_PROCESS_CTRL_TABLE].map_fd, em);
+        ebpf_update_controller(process_maps[NETDATA_PROCESS_CTRL_TABLE].map_fd, em);
     }
 
     return ret;

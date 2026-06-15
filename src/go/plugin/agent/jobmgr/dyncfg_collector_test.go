@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -25,6 +26,58 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
+
+type externalCodedError struct {
+	err       error
+	code      int
+	retryable bool
+}
+
+func (e *externalCodedError) Error() string         { return e.err.Error() }
+func (e *externalCodedError) DyncfgCode() int       { return e.code }
+func (e *externalCodedError) DyncfgRetryable() bool { return e.retryable }
+
+type foreignRetryableCodedError struct {
+	err  error
+	code int
+}
+
+func (e foreignRetryableCodedError) Error() string   { return e.err.Error() }
+func (e foreignRetryableCodedError) Code() int       { return e.code }
+func (e foreignRetryableCodedError) Retryable() bool { return true }
+
+type jobNameRequiredV2Collector struct {
+	collectorapi.Base
+
+	jobName string
+	store   metrix.CollectorStore
+}
+
+func newJobNameRequiredV2Collector() *jobNameRequiredV2Collector {
+	return &jobNameRequiredV2Collector{
+		store: metrix.NewCollectorStore(),
+	}
+}
+
+func (c *jobNameRequiredV2Collector) SetJobName(name string) {
+	c.jobName = name
+}
+
+func (c *jobNameRequiredV2Collector) Init(context.Context) error {
+	if c.jobName == "" {
+		return errors.New("job name missing")
+	}
+	return nil
+}
+
+func (c *jobNameRequiredV2Collector) Check(context.Context) error   { return nil }
+func (c *jobNameRequiredV2Collector) Collect(context.Context) error { return nil }
+func (c *jobNameRequiredV2Collector) Cleanup(context.Context)       {}
+func (c *jobNameRequiredV2Collector) Configuration() any            { return map[string]any{} }
+func (c *jobNameRequiredV2Collector) MetricStore() metrix.CollectorStore {
+	return c.store
+}
+func (c *jobNameRequiredV2Collector) ChartTemplateYAML() string { return "" }
 
 func TestDyncfgConfigUserconfig_InvalidPayload_Returns400Only(t *testing.T) {
 	tests := map[string]struct {
@@ -129,6 +182,96 @@ func TestDyncfgCmdTestTimeout_RequestTimeoutOverridesDefault(t *testing.T) {
 
 	withoutTimeout := dyncfg.NewFunction(functions.Function{})
 	assert.Equal(t, cmdTestDefaultTimeout, mgr.dyncfgCmdTestTimeout(withoutTimeout))
+}
+
+func TestDyncfgCmdTest_PassesJobNameToV2Collector(t *testing.T) {
+	var buf bytes.Buffer
+
+	mgr := newCollectorTestManager()
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
+	mgr.modules.Register("jobnamerequired", collectorapi.Creator{
+		CreateV2: func() collectorapi.CollectorV2 {
+			return newJobNameRequiredV2Collector()
+		},
+	})
+
+	fn := dyncfg.NewFunction(functions.Function{
+		UID:         "test-v2-job-name",
+		ContentType: "application/json",
+		Payload:     mustMarshalCollectorConfigPayload(t, prepareDyncfgCfg("jobnamerequired", "payload-name")),
+		Args:        []string{mgr.dyncfgModID("jobnamerequired"), string(dyncfg.CommandTest), "tested-job"},
+	})
+
+	mgr.dyncfgCmdTest(fn)
+	mgr.cmdTestWG.Wait()
+
+	var resp map[string]any
+	mustDecodeFunctionPayload(t, buf.String(), "test-v2-job-name", &resp)
+	assert.Equal(t, float64(200), resp["status"])
+}
+
+func TestDyncfgCmdTest_CodedInitAndCheckErrorsPreserveCode(t *testing.T) {
+	tests := map[string]struct {
+		register   func(*Manager, string)
+		wantStatus float64
+		wantError  string
+	}{
+		"init coded error": {
+			register: func(mgr *Manager, moduleName string) {
+				mgr.modules.Register(moduleName, collectorapi.Creator{
+					Create: func() collectorapi.CollectorV1 {
+						return &collectorapi.MockCollectorV1{
+							InitFunc: func(context.Context) error {
+								return &externalCodedError{err: errors.New("bind failed"), code: 503}
+							},
+						}
+					},
+				})
+			},
+			wantStatus: 503,
+			wantError:  "Job initialization failed: bind failed",
+		},
+		"check coded error": {
+			register: func(mgr *Manager, moduleName string) {
+				mgr.modules.Register(moduleName, collectorapi.Creator{
+					Create: func() collectorapi.CollectorV1 {
+						return &collectorapi.MockCollectorV1{
+							CheckFunc: func(context.Context) error {
+								return &externalCodedError{err: errors.New("preflight failed"), code: 503}
+							},
+						}
+					},
+				})
+			},
+			wantStatus: 503,
+			wantError:  "Job check failed: preflight failed",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var buf bytes.Buffer
+			moduleName := strings.ReplaceAll(name, " ", "_")
+			mgr := newCollectorTestManager()
+			mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
+			tc.register(mgr, moduleName)
+
+			fn := dyncfg.NewFunction(functions.Function{
+				UID:         name,
+				ContentType: "application/json",
+				Payload:     mustMarshalCollectorConfigPayload(t, prepareDyncfgCfg(moduleName, "payload-name")),
+				Args:        []string{mgr.dyncfgModID(moduleName), string(dyncfg.CommandTest), "tested-job"},
+			})
+
+			mgr.dyncfgCmdTest(fn)
+			mgr.cmdTestWG.Wait()
+
+			var resp map[string]any
+			mustDecodeFunctionPayload(t, buf.String(), name, &resp)
+			assert.Equal(t, tc.wantStatus, resp["status"])
+			assert.Contains(t, resp["errorMessage"], tc.wantError)
+		})
+	}
 }
 
 func TestDyncfgCollectorSeqExec_SyncsSecretStoreDepsForMutatingCommands(t *testing.T) {
@@ -450,9 +593,9 @@ func TestCollectorCallbacks_Start(t *testing.T) {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)
 				if tc.wantCode != 0 {
-					var coded interface{ Code() int }
+					var coded interface{ DyncfgCode() int }
 					require.ErrorAs(t, err, &coded)
-					assert.Equal(t, tc.wantCode, coded.Code())
+					assert.Equal(t, tc.wantCode, coded.DyncfgCode())
 				}
 			} else {
 				require.NoError(t, err)
@@ -472,6 +615,286 @@ func TestCollectorCallbacks_Start(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCollectorCallbacks_Start_AutodetectionCodedError_PreservedNoRetry(t *testing.T) {
+	mgr := newCollectorTestManager()
+	mgr.modules.Register("codedcheck", collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				CheckFunc: func(context.Context) error {
+					return &externalCodedError{err: errors.New("bind failed"), code: 422}
+				},
+			}
+		},
+	})
+	cb := &collectorCallbacks{mgr: mgr}
+
+	cfg := prepareDyncfgCfg("codedcheck", "job")
+	err := cb.Start(cfg)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bind failed")
+
+	var coded interface{ DyncfgCode() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 422, coded.DyncfgCode())
+
+	_, retryPending := mgr.retryingTasks.lookup(cfg)
+	assert.False(t, retryPending, "coded autodetection failure should not schedule retry")
+}
+
+func TestCollectorCallbacks_Start_InitCodedError_PreservedNoRetry(t *testing.T) {
+	mgr := newCollectorTestManager()
+	mgr.modules.Register("codedinit", collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				InitFunc: func(context.Context) error {
+					return &externalCodedError{err: errors.New("bind failed"), code: 422}
+				},
+			}
+		},
+	})
+	cb := &collectorCallbacks{mgr: mgr}
+
+	cfg := prepareDyncfgCfg("codedinit", "job")
+	err := cb.Start(cfg)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bind failed")
+
+	var coded interface{ DyncfgCode() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 422, coded.DyncfgCode())
+
+	_, retryPending := mgr.retryingTasks.lookup(cfg)
+	assert.False(t, retryPending, "coded init failure should not schedule retry")
+}
+
+func TestCollectorCallbacks_Start_RetryableInitCodedError_PreservedSchedulesRetry(t *testing.T) {
+	mgr := newCollectorTestManager()
+	mgr.modules.Register("retryableinit", collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				InitFunc: func(context.Context) error {
+					return &externalCodedError{err: errors.New("bind failed"), code: 503, retryable: true}
+				},
+			}
+		},
+	})
+	cb := &collectorCallbacks{mgr: mgr}
+
+	cfg := prepareDyncfgCfg("retryableinit", "job").Set("autodetection_retry", 1)
+	err := cb.Start(cfg)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bind failed")
+
+	var coded interface{ DyncfgCode() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 503, coded.DyncfgCode())
+
+	_, retryPending := mgr.retryingTasks.lookup(cfg)
+	assert.True(t, retryPending, "retryable coded init failure should schedule retry")
+	mgr.retryingTasks.remove(cfg)
+}
+
+func TestCollectorCallbacks_Start_ForeignCodeRetryableErrorDoesNotSatisfyDyncfgContracts(t *testing.T) {
+	mgr := newCollectorTestManager()
+	mgr.modules.Register("foreignretryable", collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				InitFunc: func(context.Context) error {
+					return foreignRetryableCodedError{err: errors.New("foreign retryable"), code: 503}
+				},
+			}
+		},
+	})
+	cb := &collectorCallbacks{mgr: mgr}
+
+	cfg := prepareDyncfgCfg("foreignretryable", "job").Set("autodetection_retry", 1)
+	err := cb.Start(cfg)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "foreign retryable")
+
+	var coded interface{ DyncfgCode() int }
+	require.NotErrorAs(t, err, &coded)
+
+	_, retryPending := mgr.retryingTasks.lookup(cfg)
+	assert.False(t, retryPending, "foreign Code()/Retryable() errors must not satisfy Netdata dyncfg retry contracts")
+}
+
+func TestCollectorCallbacks_Update_CreateCollectorJobPlainErrorPreserved(t *testing.T) {
+	tests := map[string]struct {
+		oldCfg   confgroup.Config
+		newCfg   confgroup.Config
+		wantErr  string
+		wantCode int
+	}{
+		"invalid config returns plain error in update path": {
+			oldCfg:   prepareDyncfgCfg("success", "job"),
+			newCfg:   prepareDyncfgCfg("missing", "job"),
+			wantErr:  "job update failed",
+			wantCode: 0,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			mgr := newCollectorTestManager()
+			cb := &collectorCallbacks{mgr: mgr}
+			oldJob := &collectorProbeJob{
+				fullName:   tc.oldCfg.FullName(),
+				moduleName: tc.oldCfg.Module(),
+				name:       tc.oldCfg.Name(),
+			}
+
+			mgr.runningJobs.lock()
+			mgr.runningJobs.add(oldJob.FullName(), oldJob)
+			mgr.runningJobs.unlock()
+			mgr.fileStatus.add(tc.oldCfg, dyncfg.StatusRunning.String())
+
+			err := cb.Update(tc.oldCfg, tc.newCfg)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantErr)
+			if tc.wantCode != 0 {
+				var coded interface{ DyncfgCode() int }
+				require.ErrorAs(t, err, &coded)
+				assert.Equal(t, tc.wantCode, coded.DyncfgCode())
+			}
+
+			assert.True(t, oldJob.stopped)
+			if tc.wantCode == 0 {
+				// Plain error - old retry/status cleanup still happens
+				_, oldRetryPending := mgr.retryingTasks.lookup(tc.oldCfg)
+				assert.False(t, oldRetryPending)
+				_, oldFileStatus := mgr.fileStatus.lookup(tc.oldCfg)
+				assert.False(t, oldFileStatus)
+			}
+		})
+	}
+}
+
+func TestCollectorCallbacks_Update_AutodetectionCodedError_PreservedNoRetry(t *testing.T) {
+	mgr := newCollectorTestManager()
+	mgr.modules.Register("codedcheck", collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				CheckFunc: func(context.Context) error {
+					return &externalCodedError{err: errors.New("bind failed"), code: 422}
+				},
+			}
+		},
+	})
+	cb := &collectorCallbacks{mgr: mgr}
+
+	oldCfg := prepareDyncfgCfg("success", "job")
+	newCfg := prepareDyncfgCfg("codedcheck", "job")
+	oldJob := &collectorProbeJob{
+		fullName:   oldCfg.FullName(),
+		moduleName: oldCfg.Module(),
+		name:       oldCfg.Name(),
+	}
+
+	mgr.runningJobs.lock()
+	mgr.runningJobs.add(oldJob.FullName(), oldJob)
+	mgr.runningJobs.unlock()
+	mgr.fileStatus.add(oldCfg, dyncfg.StatusRunning.String())
+
+	err := cb.Update(oldCfg, newCfg)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bind failed")
+
+	var coded interface{ DyncfgCode() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 422, coded.DyncfgCode())
+
+	_, retryPending := mgr.retryingTasks.lookup(newCfg)
+	assert.False(t, retryPending, "coded autodetection failure should not schedule retry")
+	assert.True(t, oldJob.stopped)
+}
+
+func TestCollectorCallbacks_Update_InitCodedError_PreservedNoRetry(t *testing.T) {
+	mgr := newCollectorTestManager()
+	mgr.modules.Register("codedinit", collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				InitFunc: func(context.Context) error {
+					return &externalCodedError{err: errors.New("bind failed"), code: 422}
+				},
+			}
+		},
+	})
+	cb := &collectorCallbacks{mgr: mgr}
+
+	oldCfg := prepareDyncfgCfg("success", "job")
+	newCfg := prepareDyncfgCfg("codedinit", "job")
+	oldJob := &collectorProbeJob{
+		fullName:   oldCfg.FullName(),
+		moduleName: oldCfg.Module(),
+		name:       oldCfg.Name(),
+	}
+
+	mgr.runningJobs.lock()
+	mgr.runningJobs.add(oldJob.FullName(), oldJob)
+	mgr.runningJobs.unlock()
+	mgr.fileStatus.add(oldCfg, dyncfg.StatusRunning.String())
+
+	err := cb.Update(oldCfg, newCfg)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bind failed")
+
+	var coded interface{ DyncfgCode() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 422, coded.DyncfgCode())
+
+	_, retryPending := mgr.retryingTasks.lookup(newCfg)
+	assert.False(t, retryPending, "coded init failure should not schedule retry")
+	assert.True(t, oldJob.stopped)
+}
+
+func TestCollectorCallbacks_Update_RetryableInitCodedError_PreservedSchedulesRetry(t *testing.T) {
+	mgr := newCollectorTestManager()
+	mgr.modules.Register("retryableinit", collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				InitFunc: func(context.Context) error {
+					return &externalCodedError{err: errors.New("bind failed"), code: 503, retryable: true}
+				},
+			}
+		},
+	})
+	cb := &collectorCallbacks{mgr: mgr}
+
+	oldCfg := prepareDyncfgCfg("success", "job")
+	newCfg := prepareDyncfgCfg("retryableinit", "job").Set("autodetection_retry", 1)
+	oldJob := &collectorProbeJob{
+		fullName:   oldCfg.FullName(),
+		moduleName: oldCfg.Module(),
+		name:       oldCfg.Name(),
+	}
+
+	mgr.runningJobs.lock()
+	mgr.runningJobs.add(oldJob.FullName(), oldJob)
+	mgr.runningJobs.unlock()
+	mgr.fileStatus.add(oldCfg, dyncfg.StatusRunning.String())
+
+	err := cb.Update(oldCfg, newCfg)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bind failed")
+
+	var coded interface{ DyncfgCode() int }
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, 503, coded.DyncfgCode())
+
+	_, retryPending := mgr.retryingTasks.lookup(newCfg)
+	assert.True(t, retryPending, "retryable coded init failure should schedule retry")
+	assert.True(t, oldJob.stopped)
+	mgr.retryingTasks.remove(newCfg)
 }
 
 func TestCollectorCallbacks_Update(t *testing.T) {

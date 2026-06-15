@@ -1,0 +1,5 @@
+taxonomy_version: 1
+plugin_name: cgroups.plugin
+module_name: /sys/fs/cgroup
+taxonomy_optout:
+  reason: cgroups.plugin exposes dynamic cgroup, container, VM, cachestat, and internal collector health metrics through legacy dashboard handling; collector taxonomy is not yet authored for these charts.

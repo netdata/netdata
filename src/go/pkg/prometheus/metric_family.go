@@ -3,6 +3,9 @@
 package prometheus
 
 import (
+	"math"
+	"slices"
+
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
 )
@@ -104,6 +107,13 @@ func (u Untyped) Value() float64 { return u.value }
 func (s Summary) Count() float64        { return s.count }
 func (s Summary) Sum() float64          { return s.sum }
 func (s Summary) Quantiles() []Quantile { return s.quantiles }
+
+// IsNaN reports whether every quantile value is NaN, which a Prometheus summary emits for an
+// empty observation window (a summary with no quantiles also reports true). Callers skip such
+// a summary so a chart is not created until it carries a real value.
+func (s Summary) IsNaN() bool {
+	return !slices.ContainsFunc(s.quantiles, func(q Quantile) bool { return !math.IsNaN(q.value) })
+}
 
 func (q Quantile) Quantile() float64 { return q.quantile }
 func (q Quantile) Value() float64    { return q.value }

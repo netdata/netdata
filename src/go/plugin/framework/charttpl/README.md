@@ -268,6 +268,18 @@ For example:
 | Chart `context`               | `queries`           |
 | **Resulting context**         | **`mysql.queries`** |
 
+**Autogen charts** — the **top-level** `context_namespace` also prefixes the contexts of charts
+created by `engine.autogen` (metrics not matched by any template dimension), joined with the same
+`.`. Group-level `context_namespace` does not apply to autogen, since unmatched series belong to
+no group. For example, with top-level `context_namespace: nagios`, an unmatched metric
+`check_load` autogenerates the context `nagios.check_load`.
+
+The autogen context is `context_namespace` joined with the **full metric name**, and a metric's name
+includes any `SnapshotMeter("<prefix>")` prefix (`<prefix>.<instrument>`). So a non-empty meter prefix
+**stacks after** `context_namespace` — e.g. `context_namespace: app` with `SnapshotMeter("app")` and
+instrument `foo` yields `app.app.foo`. When you set `context_namespace`, write metrics with
+`SnapshotMeter("")` so the namespace has a single source; do not also encode it in the meter prefix.
+
 ### 3. engine
 
 Template-level policy that controls metric filtering and autogeneration.
@@ -646,7 +658,7 @@ dimensions:
 | `options.multiplier` | int    | no       | `1`     | Multiply the raw value by this factor.                           |
 | `options.divisor`    | int    | no       | `1`     | Divide the raw value by this factor.                             |
 | `options.hidden`     | bool   | no       | `false` | Hide this dimension in the chart (still collected).              |
-| `options.float`      | bool   | no       | `false` | Use floating-point precision for this dimension.                 |
+| `options.float`      | bool   | no       | `false` | Force floating-point precision. A dimension also inherits the metric's float flag from the collector, so this is redundant (and harmless) when the metric is already marked float. |
 
 > [!IMPORTANT]
 > There are three ways to name a dimension — pick **exactly one**:
@@ -713,7 +725,7 @@ dimensions:
       divisor: 1000
 ```
 
-**Float precision** — for ratios or small decimal values:
+**Float precision** — for ratios or small decimal values. A dimension also inherits the metric's float flag from the collector (collectors mark float-valued metrics), so `options.float` is redundant (harmless) for those and only needed to force float on a metric the collector did not mark float:
 
 ```yaml
 dimensions:

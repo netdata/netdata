@@ -74,10 +74,30 @@ source files for evidence.
   one-active-state values.
 - Metric names MUST be stable and selected by `charts.yaml`.
 - In `charts.yaml`: use `version: v1`, `context_namespace`, `instances.by_labels`,
-  `label_promotion`, `algorithm: incremental` for counters, and `absolute` for
-  gauges.
+  `label_promotion`, and an explicit `algorithm` on every chart:
+  `incremental` for counters and `absolute` for gauges.
+- `Counter.ObserveTotal()` only records monotonic values in `metrix`; it does
+  NOT set the chart `DIMENSION` algorithm by itself. Every chart that presents
+  a counter as a rate MUST explicitly set `algorithm: incremental`, including
+  dynamically built `charttpl.Chart` values.
+- Do NOT rely on chartengine's metric-name suffix inference for generated
+  Netdata metrics. Suffix inference is only a fallback and MUST NOT be used as
+  the correctness mechanism for V2 collector charts.
 - Put multipliers, divisors, hidden flags, and float formatting in the chart
   template, not ad hoc chart-emission code.
+- `metrix` registers a descriptor per metric NAME permanently (no unregister), so
+  re-registering a name with a changed kind, summary quantile set, or histogram
+  bounds PANICS. When a name's contract can drift across cycles, keep the per-name
+  handle for the job lifetime and SKIP a drifted series instead of re-registering.
+- To reproduce a V1 chart context in a migration, inject `context_namespace` (the
+  fixed prefix, or `prefix.<app>` per job) so autogen rebuilds `prefix.<metric>` /
+  `prefix.<app>.<metric>` without hand-built chart IDs.
+- Skip empty distributions -- e.g. a summary whose every quantile is NaN -- so a
+  chart waits for real data, matching how scalar NaN values are already skipped.
+- For dynamic surfaces whose label sets churn, `metrix`'s `Vec` handle cache is
+  unbounded; cache per-series instruments yourself and evict handles unseen for N
+  cycles to stay bounded. Prefer a framework fix if the need is general
+  (Decision Discipline).
 
 ## Compatibility Rules
 

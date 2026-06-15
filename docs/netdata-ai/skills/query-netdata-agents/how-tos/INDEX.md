@@ -78,6 +78,8 @@ skill-verification harness questions for `verify/questions.md`; replace each
 ### Topology / flows
 
 - `topology-summary-direct.md` (stub -- not yet authored)
+- [group-network-topology-by-kubernetes-pod-direct.md](./group-network-topology-by-kubernetes-pod-direct.md) -- summarize `topology:network-connections` process actors by Kubernetes pod and namespace through a direct Agent call.
+- [find-containers-for-topology-port-direct.md](./find-containers-for-topology-port-direct.md) -- find containers or pods exposing a specific TCP port from the direct Agent topology Function payload.
 - `flows-top-talkers-direct.md` (stub -- not yet authored)
 - [validate-direct-local-flow-function.md](./validate-direct-local-flow-function.md) -- prove a local Cloud-connected `flows:netflow` Function works through a Cloud-minted direct-agent bearer.
 

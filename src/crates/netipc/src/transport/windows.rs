@@ -11,7 +11,8 @@ use crate::protocol::{
 };
 use std::collections::HashSet;
 use std::ptr;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::{Duration, Instant};
 
 // ---------------------------------------------------------------------------
 //  Win32 FFI — using windows-sys when available, raw bindings as fallback
@@ -148,6 +149,10 @@ pub enum NpError {
     Send(u32),
     /// ReadFile failed or peer disconnected.
     Recv(u32),
+    /// Receive timed out before a complete message arrived.
+    Timeout,
+    /// Receive was aborted by the caller.
+    Aborted,
     /// Handshake protocol error.
     Handshake(String),
     /// Authentication token rejected.
@@ -185,6 +190,8 @@ impl std::fmt::Display for NpError {
             NpError::Accept(e) => write!(f, "accept failed: {e}"),
             NpError::Send(e) => write!(f, "send failed: {e}"),
             NpError::Recv(e) => write!(f, "recv failed: {e}"),
+            NpError::Timeout => write!(f, "receive timed out"),
+            NpError::Aborted => write!(f, "receive aborted"),
             NpError::Handshake(s) => write!(f, "handshake error: {s}"),
             NpError::AuthFailed => write!(f, "authentication token rejected"),
             NpError::NoProfile => write!(f, "no common transport profile"),
@@ -496,6 +503,164 @@ fn raw_recv(handle: ffi::HANDLE, buf: &mut [u8]) -> Result<usize, NpError> {
 }
 
 #[cfg(windows)]
+struct ReceiveWait<'a> {
+    deadline: Option<Instant>,
+    abort: Option<&'a AtomicBool>,
+}
+
+#[cfg(windows)]
+impl<'a> ReceiveWait<'a> {
+    fn new(timeout_ms: u32, abort: Option<&'a AtomicBool>) -> Self {
+        Self {
+            deadline: (timeout_ms != 0)
+                .then(|| Instant::now() + Duration::from_millis(timeout_ms as u64)),
+            abort,
+        }
+    }
+
+    fn aborted(&self) -> bool {
+        self.abort
+            .map(|flag| flag.load(Ordering::Acquire))
+            .unwrap_or(false)
+    }
+
+    fn wait_slice_ms(&self) -> Result<u32, NpError> {
+        if self.aborted() {
+            return Err(NpError::Aborted);
+        }
+
+        let mut wait_ms: Option<u128> = if let Some(deadline) = self.deadline {
+            let now = Instant::now();
+            if now >= deadline {
+                return Err(NpError::Timeout);
+            }
+            Some(deadline.duration_since(now).as_millis())
+        } else {
+            None
+        };
+
+        if self.abort.is_some() {
+            wait_ms = Some(wait_ms.map_or(100, |ms| ms.min(100)));
+        }
+
+        Ok(wait_ms.unwrap_or(u32::MAX as u128).min(u32::MAX as u128) as u32)
+    }
+}
+
+#[cfg(windows)]
+fn wait_pipe_readable(handle: ffi::HANDLE, timeout_ms: u32) -> Result<bool, NpError> {
+    if handle == ffi::INVALID_HANDLE_VALUE || handle == 0 {
+        return Err(NpError::BadParam("session closed".into()));
+    }
+
+    let deadline = unsafe { ffi::GetTickCount64() }.saturating_add(timeout_ms as u64);
+    let mut yielded = false;
+    loop {
+        let mut available: u32 = 0;
+        let ok = unsafe {
+            ffi::PeekNamedPipe(
+                handle,
+                ptr::null_mut(),
+                0,
+                ptr::null_mut(),
+                &mut available,
+                ptr::null_mut(),
+            )
+        };
+        if ok == 0 {
+            let err = last_error();
+            if is_disconnect_error(err) {
+                return Err(NpError::Disconnected);
+            }
+            return Err(NpError::Recv(err));
+        }
+        if available > 0 {
+            return Ok(true);
+        }
+
+        if unsafe { ffi::GetTickCount64() } >= deadline {
+            return Ok(false);
+        }
+
+        if !yielded {
+            yielded = true;
+            for _ in 0..256 {
+                unsafe {
+                    ffi::SwitchToThread();
+                }
+
+                let mut yielded_available: u32 = 0;
+                let yielded_ok = unsafe {
+                    ffi::PeekNamedPipe(
+                        handle,
+                        ptr::null_mut(),
+                        0,
+                        ptr::null_mut(),
+                        &mut yielded_available,
+                        ptr::null_mut(),
+                    )
+                };
+                if yielded_ok == 0 {
+                    let err = last_error();
+                    if is_disconnect_error(err) {
+                        return Err(NpError::Disconnected);
+                    }
+                    return Err(NpError::Recv(err));
+                }
+                if yielded_available > 0 {
+                    return Ok(true);
+                }
+
+                if unsafe { ffi::GetTickCount64() } >= deadline {
+                    return Ok(false);
+                }
+            }
+            continue;
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+}
+
+#[cfg(windows)]
+fn raw_recv_with_wait(
+    handle: ffi::HANDLE,
+    buf: &mut [u8],
+    wait: &mut ReceiveWait<'_>,
+) -> Result<usize, NpError> {
+    loop {
+        let wait_ms = wait.wait_slice_ms()?;
+        if !wait_pipe_readable(handle, wait_ms)? {
+            if wait.aborted() {
+                return Err(NpError::Aborted);
+            }
+            if wait.deadline.is_some() {
+                return Err(NpError::Timeout);
+            }
+            continue;
+        }
+        if wait.aborted() {
+            return Err(NpError::Aborted);
+        }
+        return raw_recv(handle, buf);
+    }
+}
+
+#[cfg(windows)]
+fn raw_recv_control(
+    handle: ffi::HANDLE,
+    buf: &mut [u8],
+    controlled: bool,
+    wait: &mut ReceiveWait<'_>,
+) -> Result<usize, NpError> {
+    if controlled {
+        raw_recv_with_wait(handle, buf, wait)
+    } else {
+        raw_recv(handle, buf)
+    }
+}
+
+#[cfg(windows)]
 fn close_handle(handle: ffi::HANDLE) {
     if handle != ffi::INVALID_HANDLE_VALUE && handle != 0 {
         unsafe {
@@ -552,77 +717,7 @@ impl NpSession {
 
     /// Wait until the pipe becomes readable or the timeout expires.
     pub fn wait_readable(&self, timeout_ms: u32) -> Result<bool, NpError> {
-        if self.handle == ffi::INVALID_HANDLE_VALUE || self.handle == 0 {
-            return Err(NpError::BadParam("session closed".into()));
-        }
-
-        let deadline = unsafe { ffi::GetTickCount64() }.saturating_add(timeout_ms as u64);
-        let mut yielded = false;
-        loop {
-            let mut available: u32 = 0;
-            let ok = unsafe {
-                ffi::PeekNamedPipe(
-                    self.handle,
-                    ptr::null_mut(),
-                    0,
-                    ptr::null_mut(),
-                    &mut available,
-                    ptr::null_mut(),
-                )
-            };
-            if ok == 0 {
-                let err = last_error();
-                if is_disconnect_error(err) {
-                    return Err(NpError::Disconnected);
-                }
-                return Err(NpError::Recv(err));
-            }
-            if available > 0 {
-                return Ok(true);
-            }
-
-            if unsafe { ffi::GetTickCount64() } >= deadline {
-                return Ok(false);
-            }
-
-            if !yielded {
-                yielded = true;
-                for _ in 0..256 {
-                    unsafe {
-                        ffi::SwitchToThread();
-                    }
-
-                    let mut yielded_available: u32 = 0;
-                    let yielded_ok = unsafe {
-                        ffi::PeekNamedPipe(
-                            self.handle,
-                            ptr::null_mut(),
-                            0,
-                            ptr::null_mut(),
-                            &mut yielded_available,
-                            ptr::null_mut(),
-                        )
-                    };
-                    if yielded_ok == 0 {
-                        let err = last_error();
-                        if is_disconnect_error(err) {
-                            return Err(NpError::Disconnected);
-                        }
-                        return Err(NpError::Recv(err));
-                    }
-                    if yielded_available > 0 {
-                        return Ok(true);
-                    }
-
-                    if unsafe { ffi::GetTickCount64() } >= deadline {
-                        return Ok(false);
-                    }
-                }
-                continue;
-            }
-
-            std::thread::sleep(std::time::Duration::from_millis(1));
-        }
+        wait_pipe_readable(self.handle, timeout_ms)
     }
 
     /// Return the most recently reassembled payload stored in the internal
@@ -689,7 +784,9 @@ impl NpSession {
                 self.max_response_batch_items,
             )
         };
-        if payload.len() > max_payload as usize || payload.len() > u32::MAX as usize {
+        if payload.len() > max_payload as usize
+            || payload.len() > (u32::MAX as usize).saturating_sub(HEADER_SIZE)
+        {
             return Err(NpError::LimitExceeded);
         }
         if hdr.item_count > max_items {
@@ -748,7 +845,7 @@ impl NpSession {
         let remaining_after_first = payload.len() - first_chunk_payload;
 
         let continuation_chunks = if remaining_after_first > 0 {
-            (remaining_after_first + chunk_payload_budget - 1) / chunk_payload_budget
+            1 + ((remaining_after_first - 1) / chunk_payload_budget)
         } else {
             0
         };
@@ -799,11 +896,24 @@ impl NpSession {
     /// Receive one logical message. buf is a scratch buffer for the first read.
     /// The payload view is valid until the next receive call on this session.
     pub fn receive<'a>(&'a mut self, buf: &'a mut [u8]) -> Result<(Header, &'a [u8]), NpError> {
+        self.receive_with_control(buf, 0, None)
+    }
+
+    /// Receive one logical message with an optional deadline and abort flag.
+    pub fn receive_with_control<'a>(
+        &'a mut self,
+        buf: &'a mut [u8],
+        timeout_ms: u32,
+        abort: Option<&AtomicBool>,
+    ) -> Result<(Header, &'a [u8]), NpError> {
         if self.handle == ffi::INVALID_HANDLE_VALUE {
             return Err(NpError::BadParam("session closed".into()));
         }
 
-        let n = match raw_recv(self.handle, buf) {
+        let controlled = timeout_ms != 0 || abort.is_some();
+        let mut wait = ReceiveWait::new(timeout_ms, abort);
+
+        let n = match raw_recv_control(self.handle, buf, controlled, &mut wait) {
             Ok(n) => n,
             Err(err) => {
                 self.fail_all_inflight();
@@ -847,8 +957,14 @@ impl NpSession {
 
         let total_msg = HEADER_SIZE + hdr.payload_len as usize;
 
+        if n > total_msg {
+            return Err(NpError::Protocol(
+                "packet exceeds declared payload_len".into(),
+            ));
+        }
+
         // Non-chunked
-        if n >= total_msg {
+        if n == total_msg {
             let payload = &buf[HEADER_SIZE..HEADER_SIZE + hdr.payload_len as usize];
 
             // Validate batch directory
@@ -885,7 +1001,7 @@ impl NpSession {
 
         let remaining_after_first = hdr.payload_len as usize - first_payload_bytes;
         let expected_continuations = if remaining_after_first > 0 && chunk_payload_budget > 0 {
-            (remaining_after_first + chunk_payload_budget - 1) / chunk_payload_budget
+            1 + ((remaining_after_first - 1) / chunk_payload_budget)
         } else {
             0
         };
@@ -897,7 +1013,7 @@ impl NpSession {
 
         let mut ci: u32 = 1;
         while assembled < hdr.payload_len as usize {
-            let cn = match raw_recv(self.handle, &mut self.pkt_buf) {
+            let cn = match raw_recv_control(self.handle, &mut self.pkt_buf, controlled, &mut wait) {
                 Ok(n) => n,
                 Err(err) => {
                     self.fail_all_inflight();
@@ -1787,6 +1903,60 @@ mod tests {
         assert_eq!(rhdr.kind, KIND_RESPONSE);
         assert_eq!(rhdr.message_id, 42);
         assert_eq!(rpayload, payload);
+
+        session.close();
+        server.join().expect("server join");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_receive_packet_longer_than_declared_payload() {
+        ensure_run_dir();
+        let svc = unique_service("rs_trailing");
+
+        let mut listener =
+            NpListener::bind(TEST_RUN_DIR, &svc, default_server_config()).expect("bind");
+        let server = thread::spawn(move || {
+            let mut session = listener.accept().expect("accept");
+            let mut buf = [0u8; 256];
+            let (req_hdr, _) = session.receive(&mut buf).expect("recv request");
+
+            let mut pkt = [0u8; HEADER_SIZE + 2];
+            let resp_hdr = Header {
+                magic: MAGIC_MSG,
+                version: VERSION,
+                header_len: protocol::HEADER_LEN,
+                kind: KIND_RESPONSE,
+                code: req_hdr.code,
+                flags: 0,
+                transport_status: protocol::STATUS_OK,
+                payload_len: 1,
+                item_count: 1,
+                message_id: req_hdr.message_id,
+            };
+            resp_hdr.encode(&mut pkt[..HEADER_SIZE]);
+            pkt[HEADER_SIZE..].copy_from_slice(&[0xBE, 0xEF]);
+            raw_write(session.handle, &pkt).expect("raw trailing packet write");
+            session.close();
+        });
+
+        let mut session =
+            NpSession::connect(TEST_RUN_DIR, &svc, &default_client_config()).expect("connect");
+        let mut hdr = Header {
+            kind: KIND_REQUEST,
+            code: protocol::METHOD_INCREMENT,
+            item_count: 1,
+            message_id: 43,
+            ..Header::default()
+        };
+        session.send(&mut hdr, &[0xAA]).expect("send request");
+
+        let mut rbuf = [0u8; 256];
+        let err = session
+            .receive(&mut rbuf)
+            .expect_err("trailing bytes should be rejected");
+        assert!(matches!(err, NpError::Protocol(ref msg)
+            if msg.contains("exceeds declared payload_len")));
 
         session.close();
         server.join().expect("server join");

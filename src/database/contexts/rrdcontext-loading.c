@@ -60,6 +60,7 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
         .id = string_strdupz(sd->id),
         .name = string_strdupz(sd->name),
         .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_UPDATE_REASON_LOAD_SQL, // no need for atomic
+        .algorithm = (RRD_ALGORITHM)sd->algorithm,
     };
     if(sd->hidden) trm.flags |= RRD_FLAG_HIDDEN;
 
