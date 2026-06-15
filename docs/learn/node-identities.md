@@ -307,7 +307,7 @@ A virtual node's identity is determined by its **`guid`** field — not its `hos
 </details>
 
 <details>
-<summary>How do I find the GUID of an existing virtual node?</summary>
+<summary>How do I find the UUID of my existing vnode?</summary>
 
 The GUID for each virtual node is stored in its YAML configuration file under `/etc/netdata/vnodes/`. To look it up:
 
