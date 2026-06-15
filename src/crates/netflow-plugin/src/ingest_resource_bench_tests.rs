@@ -7,7 +7,10 @@ use super::resource_bench_support::{
     cpu_percent_of_one_core, journal_dir_size_bytes, parse_child_report, print_resource_report,
     take_proc_snapshot,
 };
-use super::test_support::{new_disk_benchmark_ingest_service, new_disk_benchmark_raw_log};
+use super::test_support::{
+    new_disk_benchmark_ingest_service, new_disk_benchmark_raw_log,
+    new_production_benchmark_ingest_service,
+};
 use super::*;
 use crate::plugin_config::DecapsulationMode as ConfigDecapsulationMode;
 use std::process::Command;
@@ -35,6 +38,7 @@ const DEFAULT_HIGH_POOL_FLOWS: usize = 4_096;
 const TICKS_PER_SECOND: u64 = 10;
 const TICK_USEC: u64 = 1_000_000 / TICKS_PER_SECOND;
 const BENCHMARK_RATES: &[u64] = &[5_000, 10_000, 20_000, 30_000];
+const PRODUCTION_SHAPED_RATES: &[u64] = &[30, 5_000];
 
 #[derive(Clone, Copy)]
 enum ResourceLayer {
@@ -42,6 +46,7 @@ enum ResourceLayer {
     RawOnly,
     Minute1Only,
     AllTiersBatched,
+    ProductionShaped,
 }
 
 impl ResourceLayer {
@@ -51,16 +56,25 @@ impl ResourceLayer {
             Self::RawOnly => "plugin-raw-only",
             Self::Minute1Only => "plugin-raw-plus-1m",
             Self::AllTiersBatched => "plugin-all-tiers-batched",
+            Self::ProductionShaped => "plugin-production-shaped",
         }
     }
 
-    fn all() -> [Self; 4] {
+    fn all() -> [Self; 5] {
         [
             Self::WriterOnly,
             Self::RawOnly,
             Self::Minute1Only,
             Self::AllTiersBatched,
+            Self::ProductionShaped,
         ]
+    }
+
+    fn benchmark_rates(self) -> &'static [u64] {
+        match self {
+            Self::ProductionShaped => PRODUCTION_SHAPED_RATES,
+            _ => BENCHMARK_RATES,
+        }
     }
 
     fn from_env() -> Self {
@@ -69,6 +83,7 @@ impl ResourceLayer {
             Ok("raw-only") => Self::RawOnly,
             Ok("minute1-only") => Self::Minute1Only,
             Ok("all-tiers-batched") => Self::AllTiersBatched,
+            Ok("production-shaped") => Self::ProductionShaped,
             Ok(other) => panic!("unsupported resource benchmark layer: {other}"),
             Err(err) => panic!("missing {LAYER_ENV}: {err}"),
         }
@@ -113,14 +128,103 @@ impl ResourceProfile {
     }
 }
 
+#[derive(Default)]
+struct RecordBatchCursor {
+    batch_index: usize,
+    batch_offset: usize,
+}
+
+impl RecordBatchCursor {
+    fn next_chunk<'a>(
+        &mut self,
+        record_batches: &'a [Vec<crate::flow::FlowRecord>],
+        max_flows: u64,
+    ) -> Option<&'a [crate::flow::FlowRecord]> {
+        if max_flows == 0 || record_batches.is_empty() {
+            return None;
+        }
+
+        let batch_count = record_batches.len();
+        self.batch_index %= batch_count;
+        let max_flows = usize::try_from(max_flows).unwrap_or(usize::MAX);
+
+        for _ in 0..batch_count {
+            let batch = &record_batches[self.batch_index];
+            if self.batch_offset >= batch.len() {
+                self.advance_batch(batch_count);
+                continue;
+            }
+
+            let start = self.batch_offset;
+            let end = start.saturating_add(max_flows).min(batch.len());
+            self.batch_offset = end;
+            if self.batch_offset == batch.len() {
+                self.advance_batch(batch_count);
+            }
+            return Some(&batch[start..end]);
+        }
+
+        None
+    }
+
+    fn advance_batch(&mut self, batch_count: usize) {
+        self.batch_index = (self.batch_index + 1) % batch_count;
+        self.batch_offset = 0;
+    }
+}
+
 struct PacedLoopResult {
     ingested_flows: usize,
     entries_since_sync: usize,
     logical_bytes_written: u64,
     logical_entries_written: u64,
+    sync_tick_calls: u64,
+    sync_tick_wall_time: Duration,
+    chart_sampler_samples: u64,
+    chart_sampler_wall_time: Duration,
     peak_rss_bytes: u64,
     peak_rss_anon_bytes: u64,
     peak_rss_file_bytes: u64,
+}
+
+struct ChartSamplerBench {
+    state: crate::charts::ChartSamplerWorkState,
+    resident_mapping_paths: crate::charts::ProcessResidentMappingPaths,
+    samples: u64,
+    elapsed: Duration,
+}
+
+impl ChartSamplerBench {
+    fn new(service: &IngestService) -> Self {
+        Self {
+            state: crate::charts::ChartSamplerWorkState::default(),
+            resident_mapping_paths: crate::charts::ProcessResidentMappingPaths::new(
+                &service.cfg.journal.raw_tier_dir(),
+                &service.cfg.journal.minute_1_tier_dir(),
+                &service.cfg.journal.minute_5_tier_dir(),
+                &service.cfg.journal.hour_1_tier_dir(),
+                &service.cfg.enrichment.geoip.asn_database,
+                &service.cfg.enrichment.geoip.geo_database,
+            ),
+            samples: 0,
+            elapsed: Duration::ZERO,
+        }
+    }
+
+    fn sample(&mut self, service: &IngestService) -> crate::charts::ChartSamplerWorkSample {
+        let sample = crate::charts::sample_chart_sampler_work_for_test(
+            service.metrics.as_ref(),
+            service.open_tiers.as_ref(),
+            service.tier_flow_indexes.as_ref(),
+            service.facet_runtime.as_ref(),
+            &self.resident_mapping_paths,
+            &service.cfg.charts,
+            &mut self.state,
+        );
+        self.samples = self.samples.saturating_add(1);
+        self.elapsed += sample.elapsed;
+        sample
+    }
 }
 
 #[test]
@@ -132,7 +236,7 @@ fn bench_resource_envelope_matrix() {
         for profile in [ResourceProfile::Low, ResourceProfile::High] {
             eprintln!();
             eprintln!("--- Profile: {} ---", profile.label());
-            for &rate in BENCHMARK_RATES {
+            for &rate in layer.benchmark_rates() {
                 let report = run_resource_envelope_case(layer, profile, rate);
                 print_resource_report(&report);
             }
@@ -204,6 +308,8 @@ fn run_storage_footprint_child() -> StorageFootprintReport {
             entries_since_sync,
             false,
             true,
+            SyncTickMode::WorkerOneSecond,
+            None,
         );
         entries_since_sync = segment.entries_since_sync;
         total_flows_ingested = total_flows_ingested.saturating_add(segment.ingested_flows as u64);
@@ -269,6 +375,7 @@ fn run_resource_envelope_case(
                 ResourceLayer::RawOnly => "raw-only",
                 ResourceLayer::Minute1Only => "minute1-only",
                 ResourceLayer::AllTiersBatched => "all-tiers-batched",
+                ResourceLayer::ProductionShaped => "production-shaped",
             },
         )
         .env(
@@ -323,15 +430,16 @@ fn run_resource_envelope_child() -> ResourceEnvelopeReport {
         ResourceLayer::WriterOnly => {
             run_writer_only_resource_envelope(profile, flows_per_sec, warmup_secs, measurement_secs)
         }
-        ResourceLayer::RawOnly | ResourceLayer::Minute1Only | ResourceLayer::AllTiersBatched => {
-            run_plugin_resource_envelope(
-                layer,
-                profile,
-                flows_per_sec,
-                warmup_secs,
-                measurement_secs,
-            )
-        }
+        ResourceLayer::RawOnly
+        | ResourceLayer::Minute1Only
+        | ResourceLayer::AllTiersBatched
+        | ResourceLayer::ProductionShaped => run_plugin_resource_envelope(
+            layer,
+            profile,
+            flows_per_sec,
+            warmup_secs,
+            measurement_secs,
+        ),
     }
 }
 
@@ -413,6 +521,16 @@ fn run_writer_only_resource_envelope(
             .write_bytes
             .saturating_sub(proc_before.write_bytes) as f64
             / elapsed.as_secs_f64(),
+        sync_tick_calls: 0,
+        sync_tick_wall_usec_per_sec: 0.0,
+        sync_tick_wall_usec_per_call: 0.0,
+        raw_journal_syncs_per_sec: 0.0,
+        tier_journal_syncs_per_sec: 0.0,
+        tier_flushes_per_sec: 0.0,
+        decoder_state_persist_calls_per_sec: 0.0,
+        chart_sampler_samples: 0,
+        chart_sampler_wall_usec_per_sec: 0.0,
+        chart_sampler_wall_usec_per_sample: 0.0,
         final_rss_bytes: proc_after.rss_bytes,
         peak_rss_bytes: measurement_result.peak_rss_bytes.max(proc_after.rss_bytes),
         peak_rss_anon_bytes: measurement_result
@@ -435,17 +553,33 @@ fn run_plugin_resource_envelope(
     measurement_secs: u64,
 ) -> ResourceEnvelopeReport {
     let (record_batches, protocol_name) = build_record_batches(profile);
-    let (_tmp, mut service) = new_disk_benchmark_ingest_service(ConfigDecapsulationMode::None);
+    let (_tmp, mut service) = match layer {
+        ResourceLayer::ProductionShaped => {
+            new_production_benchmark_ingest_service(ConfigDecapsulationMode::None)
+        }
+        _ => new_disk_benchmark_ingest_service(ConfigDecapsulationMode::None),
+    };
     configure_service_for_layer(&mut service, layer);
 
     let raw_only = matches!(layer, ResourceLayer::RawOnly);
     // Only the production-shaped layer runs tier commits on workers; the
     // isolation layers (writer-only, raw-only, minute1-only) keep their
     // historical inline form so their numbers stay comparable.
-    let tier_workers = matches!(layer, ResourceLayer::AllTiersBatched);
+    let tier_workers = matches!(
+        layer,
+        ResourceLayer::AllTiersBatched | ResourceLayer::ProductionShaped
+    );
+    let sync_tick_mode = match layer {
+        ResourceLayer::ProductionShaped => SyncTickMode::ConfiguredInterval,
+        _ => SyncTickMode::WorkerOneSecond,
+    };
     if tier_workers {
         service.spawn_tier_commit_workers_for_test();
     }
+    let mut chart_sampler = match layer {
+        ResourceLayer::ProductionShaped => Some(ChartSamplerBench::new(&service)),
+        _ => None,
+    };
     let warmup_result = run_paced_plugin_loop(
         &mut service,
         &record_batches,
@@ -454,6 +588,8 @@ fn run_plugin_resource_envelope(
         0,
         raw_only,
         tier_workers,
+        sync_tick_mode,
+        chart_sampler.as_mut(),
     );
     let metrics_before = service.metrics.snapshot();
     let proc_before = take_proc_snapshot();
@@ -466,6 +602,8 @@ fn run_plugin_resource_envelope(
         warmup_result.entries_since_sync,
         raw_only,
         tier_workers,
+        sync_tick_mode,
+        chart_sampler.as_mut(),
     );
     let elapsed = started.elapsed();
     let proc_after = take_proc_snapshot();
@@ -487,13 +625,18 @@ fn run_plugin_resource_envelope(
         ResourceLayer::AllTiersBatched => {
             total_logical_bytes_delta(&metrics_before, &metrics_after)
         }
+        ResourceLayer::ProductionShaped => {
+            total_logical_bytes_delta(&metrics_before, &metrics_after)
+        }
         ResourceLayer::WriterOnly => 0,
     };
     let entries_written = match layer {
         ResourceLayer::RawOnly => {
             counter_delta(&metrics_before, &metrics_after, "journal_entries_written")
         }
-        ResourceLayer::Minute1Only | ResourceLayer::AllTiersBatched => {
+        ResourceLayer::Minute1Only
+        | ResourceLayer::AllTiersBatched
+        | ResourceLayer::ProductionShaped => {
             total_entries_written_delta(&metrics_before, &metrics_after)
         }
         ResourceLayer::WriterOnly => 0,
@@ -516,6 +659,48 @@ fn run_plugin_resource_envelope(
             .write_bytes
             .saturating_sub(proc_before.write_bytes) as f64
             / elapsed.as_secs_f64(),
+        sync_tick_calls: measurement_result.sync_tick_calls,
+        sync_tick_wall_usec_per_sec: duration_usec_per_sec(
+            measurement_result.sync_tick_wall_time,
+            elapsed,
+        ),
+        sync_tick_wall_usec_per_call: duration_usec_per_call(
+            measurement_result.sync_tick_wall_time,
+            measurement_result.sync_tick_calls,
+        ),
+        raw_journal_syncs_per_sec: counter_rate(
+            &metrics_before,
+            &metrics_after,
+            "raw_journal_syncs",
+            elapsed,
+        ),
+        tier_journal_syncs_per_sec: counter_rate(
+            &metrics_before,
+            &metrics_after,
+            "tier_journal_syncs",
+            elapsed,
+        ),
+        tier_flushes_per_sec: counter_rate(
+            &metrics_before,
+            &metrics_after,
+            "tier_flushes",
+            elapsed,
+        ),
+        decoder_state_persist_calls_per_sec: counter_rate(
+            &metrics_before,
+            &metrics_after,
+            "decoder_state_persist_calls",
+            elapsed,
+        ),
+        chart_sampler_samples: measurement_result.chart_sampler_samples,
+        chart_sampler_wall_usec_per_sec: duration_usec_per_sec(
+            measurement_result.chart_sampler_wall_time,
+            elapsed,
+        ),
+        chart_sampler_wall_usec_per_sample: duration_usec_per_call(
+            measurement_result.chart_sampler_wall_time,
+            measurement_result.chart_sampler_samples,
+        ),
         final_rss_bytes: proc_after.rss_bytes,
         peak_rss_bytes: measurement_result.peak_rss_bytes.max(proc_after.rss_bytes),
         peak_rss_anon_bytes: measurement_result
@@ -549,6 +734,8 @@ fn run_paced_plugin_loop(
     initial_entries_since_sync: usize,
     raw_only: bool,
     tier_workers: bool,
+    sync_tick_mode: SyncTickMode,
+    mut chart_sampler: Option<&mut ChartSamplerBench>,
 ) -> PacedLoopResult {
     let total_ticks = duration.as_secs().saturating_mul(TICKS_PER_SECOND);
     let tick_interval = Duration::from_millis(1000 / TICKS_PER_SECOND);
@@ -556,9 +743,17 @@ fn run_paced_plugin_loop(
     let mut flow_budget = 0_u64;
     let mut entries_since_sync = initial_entries_since_sync;
     let mut ingested_flows = 0_usize;
-    let mut batch_index = 0_usize;
+    let mut record_cursor = RecordBatchCursor::default();
+    let mut sync_tick_calls = 0_u64;
+    let mut sync_tick_wall_time = Duration::ZERO;
+    let mut chart_sampler_samples = 0_u64;
+    let mut chart_sampler_wall_time = Duration::ZERO;
     let mut peak = take_proc_snapshot();
-    let mut next_sync = Instant::now() + service.cfg.listener.sync_interval;
+    let mut next_sync = match sync_tick_mode {
+        SyncTickMode::ConfiguredInterval => Instant::now(),
+        SyncTickMode::WorkerOneSecond => Instant::now() + service.cfg.listener.sync_interval,
+    };
+    let mut next_chart_sample = Instant::now();
     let mut next_deadline = Instant::now() + tick_interval;
 
     for tick_index in 0..total_ticks {
@@ -569,9 +764,11 @@ fn run_paced_plugin_loop(
             benchmark_start_usec.saturating_add(tick_index.saturating_mul(TICK_USEC));
 
         while available_flows > 0 {
-            let batch = &record_batches[batch_index % record_batches.len()];
+            let Some(batch) = record_cursor.next_chunk(record_batches, available_flows) else {
+                break;
+            };
             let batch_flows = batch.len() as u64;
-            if batch_flows > available_flows {
+            if batch_flows == 0 {
                 break;
             }
 
@@ -598,19 +795,43 @@ fn run_paced_plugin_loop(
             };
             ingested_flows += batch.len();
             available_flows = available_flows.saturating_sub(batch_flows);
-            batch_index += 1;
         }
 
-        // Worker mode mirrors the live loop's 1s tick (handoffs, telemetry
-        // mirror, prune, open-tier refresh).
-        if tier_workers && tick_index % TICKS_PER_SECOND == TICKS_PER_SECOND - 1 {
-            entries_since_sync = service.handle_sync_tick_for_test(entries_since_sync);
+        // Historical worker-mode benchmarks mirror the live default 1s tick,
+        // while production-shaped benchmarks use the configured interval so the
+        // benchmark does not accidentally hide non-default listener settings.
+        if sync_tick_mode == SyncTickMode::WorkerOneSecond
+            && tier_workers
+            && tick_index % TICKS_PER_SECOND == TICKS_PER_SECOND - 1
+        {
+            entries_since_sync = timed_sync_tick(
+                service,
+                entries_since_sync,
+                &mut sync_tick_calls,
+                &mut sync_tick_wall_time,
+            );
         }
 
         let now = Instant::now();
-        while now >= next_sync {
-            entries_since_sync = service.handle_sync_tick_for_test(entries_since_sync);
+        while sync_tick_mode == SyncTickMode::ConfiguredInterval && now >= next_sync {
+            entries_since_sync = timed_sync_tick(
+                service,
+                entries_since_sync,
+                &mut sync_tick_calls,
+                &mut sync_tick_wall_time,
+            );
             next_sync += service.cfg.listener.sync_interval;
+        }
+
+        if let Some(sampler) = chart_sampler.as_mut() {
+            if now >= next_chart_sample {
+                let sample = sampler.sample(service);
+                chart_sampler_samples = chart_sampler_samples.saturating_add(1);
+                chart_sampler_wall_time += sample.elapsed;
+                while now >= next_chart_sample {
+                    next_chart_sample += Duration::from_secs(1);
+                }
+            }
         }
 
         let sample = take_proc_snapshot();
@@ -630,10 +851,64 @@ fn run_paced_plugin_loop(
         entries_since_sync,
         logical_bytes_written: 0,
         logical_entries_written: 0,
+        sync_tick_calls,
+        sync_tick_wall_time,
+        chart_sampler_samples,
+        chart_sampler_wall_time,
         peak_rss_bytes: peak.rss_bytes,
         peak_rss_anon_bytes: peak.rss_anon_bytes,
         peak_rss_file_bytes: peak.rss_file_bytes,
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SyncTickMode {
+    WorkerOneSecond,
+    ConfiguredInterval,
+}
+
+#[test]
+fn production_shaped_resource_layer_uses_low_rate_and_configured_sync() {
+    assert_eq!(
+        ResourceLayer::ProductionShaped.label(),
+        "plugin-production-shaped"
+    );
+    assert_eq!(
+        ResourceLayer::ProductionShaped.benchmark_rates(),
+        PRODUCTION_SHAPED_RATES
+    );
+
+    let layer = ResourceLayer::ProductionShaped;
+    let sync_tick_mode = match layer {
+        ResourceLayer::ProductionShaped => SyncTickMode::ConfiguredInterval,
+        _ => SyncTickMode::WorkerOneSecond,
+    };
+    assert_eq!(sync_tick_mode, SyncTickMode::ConfiguredInterval);
+}
+
+#[test]
+fn production_shaped_resource_layer_accounts_for_chart_sampler_work() {
+    let (_tmp, service) = new_production_benchmark_ingest_service(ConfigDecapsulationMode::None);
+    let mut chart_sampler = ChartSamplerBench::new(&service);
+
+    let sample = chart_sampler.sample(&service);
+
+    assert_eq!(chart_sampler.samples, 1);
+    assert_eq!(chart_sampler.elapsed, sample.elapsed);
+}
+
+#[test]
+fn paced_record_cursor_splits_batches_when_tick_budget_is_smaller_than_batch() {
+    let record_batches = vec![
+        vec![crate::flow::FlowRecord::default(); 5],
+        vec![crate::flow::FlowRecord::default(); 2],
+    ];
+    let mut cursor = RecordBatchCursor::default();
+
+    assert_eq!(cursor.next_chunk(&record_batches, 3).unwrap().len(), 3);
+    assert_eq!(cursor.next_chunk(&record_batches, 3).unwrap().len(), 2);
+    assert_eq!(cursor.next_chunk(&record_batches, 3).unwrap().len(), 2);
+    assert_eq!(cursor.next_chunk(&record_batches, 3).unwrap().len(), 3);
 }
 
 fn run_paced_writer_loop(
@@ -650,7 +925,7 @@ fn run_paced_writer_loop(
     let mut ingested_flows = 0_usize;
     let mut logical_bytes_written = 0_u64;
     let mut logical_entries_written = 0_u64;
-    let mut batch_index = 0_usize;
+    let mut record_cursor = RecordBatchCursor::default();
     let mut peak = take_proc_snapshot();
     let mut next_deadline = Instant::now() + tick_interval;
 
@@ -662,9 +937,11 @@ fn run_paced_writer_loop(
             benchmark_start_usec.saturating_add(tick_index.saturating_mul(TICK_USEC));
 
         while available_flows > 0 {
-            let batch = &record_batches[batch_index % record_batches.len()];
+            let Some(batch) = record_cursor.next_chunk(record_batches, available_flows) else {
+                break;
+            };
             let batch_flows = batch.len() as u64;
-            if batch_flows > available_flows {
+            if batch_flows == 0 {
                 break;
             }
 
@@ -682,7 +959,6 @@ fn run_paced_writer_loop(
             }
 
             available_flows = available_flows.saturating_sub(batch_flows);
-            batch_index += 1;
         }
 
         let sample = take_proc_snapshot();
@@ -702,6 +978,10 @@ fn run_paced_writer_loop(
         entries_since_sync: 0,
         logical_bytes_written,
         logical_entries_written,
+        sync_tick_calls: 0,
+        sync_tick_wall_time: Duration::ZERO,
+        chart_sampler_samples: 0,
+        chart_sampler_wall_time: Duration::ZERO,
         peak_rss_bytes: peak.rss_bytes,
         peak_rss_anon_bytes: peak.rss_anon_bytes,
         peak_rss_file_bytes: peak.rss_file_bytes,
@@ -718,6 +998,40 @@ fn counter_delta(
         .copied()
         .unwrap_or(0)
         .saturating_sub(before.get(key).copied().unwrap_or(0))
+}
+
+fn counter_rate(
+    before: &std::collections::HashMap<String, u64>,
+    after: &std::collections::HashMap<String, u64>,
+    key: &str,
+    elapsed: Duration,
+) -> f64 {
+    counter_delta(before, after, key) as f64 / elapsed.as_secs_f64()
+}
+
+fn duration_usec_per_sec(duration: Duration, elapsed: Duration) -> f64 {
+    duration.as_secs_f64() * 1_000_000.0 / elapsed.as_secs_f64()
+}
+
+fn duration_usec_per_call(duration: Duration, calls: u64) -> f64 {
+    if calls > 0 {
+        duration.as_secs_f64() * 1_000_000.0 / calls as f64
+    } else {
+        0.0
+    }
+}
+
+fn timed_sync_tick(
+    service: &mut IngestService,
+    entries_since_sync: usize,
+    calls: &mut u64,
+    wall_time: &mut Duration,
+) -> usize {
+    let started = Instant::now();
+    let entries_since_sync = service.handle_sync_tick_for_test(entries_since_sync);
+    *calls = calls.saturating_add(1);
+    *wall_time += started.elapsed();
+    entries_since_sync
 }
 
 fn total_entries_written_delta(

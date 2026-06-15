@@ -68,6 +68,30 @@ pub(super) fn new_disk_benchmark_ingest_service(
     (tmp, service)
 }
 
+pub(super) fn new_production_benchmark_ingest_service(
+    decapsulation_mode: ConfigDecapsulationMode,
+) -> (TempDir, IngestService) {
+    let tmp = new_disk_benchmark_tempdir("resource-bench-production-");
+    let mut cfg = PluginConfig::default();
+    cfg.journal.journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
+    cfg.protocols.decapsulation_mode = decapsulation_mode;
+
+    for dir in cfg.journal.all_tier_dirs() {
+        std::fs::create_dir_all(&dir)
+            .unwrap_or_else(|e| panic!("create tier directory {}: {e}", dir.display()));
+    }
+
+    let service = IngestService::new(
+        cfg,
+        Arc::new(IngestMetrics::default()),
+        Arc::new(RwLock::new(OpenTierState::default())),
+        Arc::new(RwLock::new(TierFlowIndexStore::default())),
+    )
+    .expect("create production-shaped ingest benchmark service");
+
+    (tmp, service)
+}
+
 pub(super) fn new_disk_benchmark_raw_log() -> (TempDir, Log) {
     let tmp = new_disk_benchmark_tempdir("resource-bench-raw-");
     let mut cfg = PluginConfig::default();
@@ -239,4 +263,31 @@ fn new_disk_benchmark_tempdir(prefix: &str) -> TempDir {
         .prefix(prefix)
         .tempdir_in(&base)
         .unwrap_or_else(|e| panic!("create disk benchmark temp dir {}: {e}", base.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn benchmark_ingest_helpers_make_sync_shape_explicit() {
+        let (_tmp, service) = new_benchmark_ingest_service(ConfigDecapsulationMode::None);
+        assert_eq!(service.cfg.listener.sync_every_entries, usize::MAX);
+        assert_eq!(
+            service.cfg.listener.sync_interval,
+            Duration::from_secs(60 * 60)
+        );
+
+        let (_tmp, service) = new_disk_benchmark_ingest_service(ConfigDecapsulationMode::None);
+        assert_eq!(service.cfg.listener.sync_every_entries, usize::MAX);
+        assert_eq!(
+            service.cfg.listener.sync_interval,
+            Duration::from_secs(60 * 60)
+        );
+
+        let (_tmp, service) =
+            new_production_benchmark_ingest_service(ConfigDecapsulationMode::None);
+        assert_eq!(service.cfg.listener.sync_every_entries, 0);
+        assert_eq!(service.cfg.listener.sync_interval, Duration::from_secs(1));
+    }
 }

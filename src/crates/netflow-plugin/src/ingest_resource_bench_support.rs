@@ -27,6 +27,16 @@ pub(super) struct ResourceEnvelopeReport {
     pub(super) logical_entries_per_sec: f64,
     pub(super) read_bytes_per_sec: f64,
     pub(super) write_bytes_per_sec: f64,
+    pub(super) sync_tick_calls: u64,
+    pub(super) sync_tick_wall_usec_per_sec: f64,
+    pub(super) sync_tick_wall_usec_per_call: f64,
+    pub(super) raw_journal_syncs_per_sec: f64,
+    pub(super) tier_journal_syncs_per_sec: f64,
+    pub(super) tier_flushes_per_sec: f64,
+    pub(super) decoder_state_persist_calls_per_sec: f64,
+    pub(super) chart_sampler_samples: u64,
+    pub(super) chart_sampler_wall_usec_per_sec: f64,
+    pub(super) chart_sampler_wall_usec_per_sample: f64,
     pub(super) final_rss_bytes: u64,
     pub(super) peak_rss_bytes: u64,
     pub(super) peak_rss_anon_bytes: u64,
@@ -106,6 +116,35 @@ pub(super) fn print_resource_report(report: &ResourceEnvelopeReport) {
         report.logical_write_bytes_per_sec / 1024.0,
         report.logical_entries_per_sec
     );
+    if report.sync_tick_calls > 0 {
+        eprintln!(
+            "  sync tick:            {} calls | {:.0} usec/s | {:.0} usec/call",
+            report.sync_tick_calls,
+            report.sync_tick_wall_usec_per_sec,
+            report.sync_tick_wall_usec_per_call
+        );
+    }
+    if report.raw_journal_syncs_per_sec > 0.0
+        || report.tier_journal_syncs_per_sec > 0.0
+        || report.tier_flushes_per_sec > 0.0
+        || report.decoder_state_persist_calls_per_sec > 0.0
+    {
+        eprintln!(
+            "  background I/O:       raw sync {:.2}/s | tier sync {:.2}/s | tier flush {:.2}/s | decoder persist {:.2}/s",
+            report.raw_journal_syncs_per_sec,
+            report.tier_journal_syncs_per_sec,
+            report.tier_flushes_per_sec,
+            report.decoder_state_persist_calls_per_sec
+        );
+    }
+    if report.chart_sampler_samples > 0 {
+        eprintln!(
+            "  chart sampler:        {} samples | {:.0} usec/s | {:.0} usec/sample",
+            report.chart_sampler_samples,
+            report.chart_sampler_wall_usec_per_sec,
+            report.chart_sampler_wall_usec_per_sample
+        );
+    }
     eprintln!(
         "  duration:             warmup {}s | measure {}s | pool {}",
         report.warmup_secs, report.measurement_secs, report.record_pool_size
@@ -229,4 +268,52 @@ pub(super) fn journal_dir_size_bytes(path: &Path) -> u64 {
         }
     }
     total
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resource_report_serializes_background_overhead_buckets() {
+        let report = ResourceEnvelopeReport {
+            methodology: "test".to_string(),
+            layer: "plugin-production-shaped".to_string(),
+            profile: "low-cardinality-mixed".to_string(),
+            protocol: "mixed".to_string(),
+            requested_flows_per_sec: 30,
+            achieved_flows_per_sec: 30.0,
+            cpu_percent_of_one_core: 1.0,
+            logical_write_bytes_per_sec: 2.0,
+            logical_entries_per_sec: 3.0,
+            read_bytes_per_sec: 4.0,
+            write_bytes_per_sec: 5.0,
+            sync_tick_calls: 2,
+            sync_tick_wall_usec_per_sec: 6.0,
+            sync_tick_wall_usec_per_call: 7.0,
+            raw_journal_syncs_per_sec: 8.0,
+            tier_journal_syncs_per_sec: 9.0,
+            tier_flushes_per_sec: 10.0,
+            decoder_state_persist_calls_per_sec: 11.0,
+            chart_sampler_samples: 12,
+            chart_sampler_wall_usec_per_sec: 13.0,
+            chart_sampler_wall_usec_per_sample: 14.0,
+            final_rss_bytes: 15,
+            peak_rss_bytes: 16,
+            peak_rss_anon_bytes: 17,
+            peak_rss_file_bytes: 18,
+            warmup_secs: 1,
+            measurement_secs: 2,
+            record_pool_size: 256,
+        };
+
+        let value = serde_json::to_value(&report).expect("serialize resource report");
+
+        assert_eq!(value["sync_tick_calls"], 2);
+        assert_eq!(value["raw_journal_syncs_per_sec"], 8.0);
+        assert_eq!(value["tier_journal_syncs_per_sec"], 9.0);
+        assert_eq!(value["tier_flushes_per_sec"], 10.0);
+        assert_eq!(value["decoder_state_persist_calls_per_sec"], 11.0);
+        assert_eq!(value["chart_sampler_samples"], 12);
+    }
 }

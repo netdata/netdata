@@ -270,6 +270,54 @@ pub(super) struct DecoderScopeMetrics {
 
 #[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
 #[schemars(
+    extend("x-chart-id" = "netflow.facet_values"),
+    extend("x-chart-title" = "Netflow Facet Values"),
+    extend("x-chart-units" = "values"),
+    extend("x-chart-type" = "line"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.facet_values"),
+)]
+pub(super) struct FacetValueMetrics {
+    #[schemars(extend("x-dimension-algorithm" = "absolute"))]
+    pub(super) total: u64,
+    #[schemars(extend("x-dimension-algorithm" = "absolute"))]
+    pub(super) exposed: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
+    extend("x-chart-id" = "netflow.facet_fields"),
+    extend("x-chart-title" = "Netflow Facet Fields"),
+    extend("x-chart-units" = "fields"),
+    extend("x-chart-type" = "line"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.facet_fields"),
+)]
+pub(super) struct FacetFieldMetrics {
+    #[schemars(extend("x-dimension-algorithm" = "absolute"))]
+    pub(super) populated: u64,
+    #[schemars(extend("x-dimension-algorithm" = "absolute"))]
+    pub(super) autocomplete: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
+    extend("x-chart-id" = "netflow.tier_index_entries"),
+    extend("x-chart-title" = "Netflow Tier Index Entries"),
+    extend("x-chart-units" = "entries"),
+    extend("x-chart-type" = "line"),
+    extend("x-chart-family" = "netflow"),
+    extend("x-chart-context" = "netdata.netflow.tier_index_entries"),
+)]
+pub(super) struct TierIndexEntryMetrics {
+    #[schemars(extend("x-dimension-algorithm" = "absolute"))]
+    pub(super) hours: u64,
+    #[schemars(extend("x-dimension-algorithm" = "absolute"))]
+    pub(super) flows: u64,
+}
+
+#[derive(JsonSchema, NetdataChart, Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[schemars(
     extend("x-chart-id" = "netflow.memory_resident_bytes"),
     extend("x-chart-title" = "Netflow Process Memory"),
     extend("x-chart-units" = "bytes"),

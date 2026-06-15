@@ -142,6 +142,35 @@ fn indexed_field_lookup_matches_rollup_materialization_semantics() {
 }
 
 #[test]
+fn tier_flow_index_store_cardinality_counts_hours_and_flows() {
+    let mut store = TierFlowIndexStore::default();
+
+    let mut tcp = FlowRecord::default();
+    tcp.protocol = 6;
+    tcp.src_port = 12345;
+    tcp.dst_port = 443;
+
+    let mut udp = FlowRecord::default();
+    udp.protocol = 17;
+    udp.src_port = 5353;
+    udp.dst_port = 5353;
+
+    store
+        .get_or_insert_record_flow(120_000_000, &tcp)
+        .expect("intern tcp flow");
+    store
+        .get_or_insert_record_flow(120_000_001, &udp)
+        .expect("intern udp flow");
+    store
+        .get_or_insert_record_flow(3_720_000_000, &tcp)
+        .expect("intern next-hour tcp flow");
+
+    let cardinality = store.cardinality();
+    assert_eq!(cardinality.hours, 2);
+    assert_eq!(cardinality.flows, 3);
+}
+
+#[test]
 fn same_dimensions_aggregate() {
     let mut acc = TierAccumulator::new(TierKind::Minute1);
     let mut store = TierFlowIndexStore::default();
