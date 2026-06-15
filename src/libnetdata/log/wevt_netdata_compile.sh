@@ -20,11 +20,11 @@ SCRIPT_DIR="$(dirname "$0")"
 temp_bat=$(mktemp --suffix=.bat)
 
 # Determine paths for SDKs
-if win_sdk_path="$("${mylocation}/../../../packaging/windows/find-sdk-path.sh" --sdk -w)"; then
+if ! win_sdk_path="$("${mylocation}/../../../packaging/windows/find-sdk-path.sh" --sdk -w)"; then
     echo "ERROR: Failed to find Windows SDK"
     exit 1
 fi
-if vs_sdk_path="$("${mylocation}/../../../packaging/windows/find-sdk-path.sh" --visualstudio -w)"; then
+if ! vs_sdk_path="$("${mylocation}/../../../packaging/windows/find-sdk-path.sh" --visualstudio -w)"; then
     echo "ERROR: Failed to find Visual Studio SDK"
     exit 1
 fi
