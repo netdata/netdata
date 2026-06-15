@@ -4,8 +4,8 @@ mylocation=$(dirname "${0}")
 
 # Check if both parameters are provided
 if [ $# -ne 2 ]; then
-    echo "Error: Incorrect number of parameters."
-    echo "Usage: $0 <source_directory> <destination_directory>"
+    echo "Error: Incorrect number of parameters." >&2
+    echo "Usage: $0 <source_directory> <destination_directory>" >&2
     exit 1
 fi
 
@@ -21,11 +21,11 @@ temp_bat=$(mktemp --suffix=.bat)
 
 # Determine paths for SDKs
 if ! win_sdk_path="$("${mylocation}/../../../packaging/windows/find-sdk-path.sh" --sdk -w)"; then
-    echo "ERROR: Failed to find Windows SDK"
+    echo "ERROR: Failed to find Windows SDK" >&2
     exit 1
 fi
 if ! vs_sdk_path="$("${mylocation}/../../../packaging/windows/find-sdk-path.sh" --visualstudio -w)"; then
-    echo "ERROR: Failed to find Visual Studio SDK"
+    echo "ERROR: Failed to find Visual Studio SDK" >&2
     exit 1
 fi
 # Write the contents to the temporary batch file
@@ -51,7 +51,7 @@ rm "$temp_bat"
 if [ $exit_status -eq 0 ]; then
     echo "nd_wevents_compile.bat executed successfully."
 else
-    echo "nd_wevents_compile.bat failed with exit status $exit_status."
+    echo "nd_wevents_compile.bat failed with exit status $exit_status." >&2
 fi
 
 exit $exit_status
