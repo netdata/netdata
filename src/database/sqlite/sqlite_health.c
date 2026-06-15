@@ -595,22 +595,6 @@ done:
     SQLITE_FINALIZE(res);
 }
 
-static int clean_host_alerts(void *data, int argc, char **argv, char **column)
-{
-    UNUSED(argc);
-    UNUSED(data);
-    UNUSED(column);
-
-    char guid[UUID_STR_LEN];
-    uuid_unparse_lower(*(nd_uuid_t *)argv[0], guid);
-
-    netdata_log_info("Checking host %s (%s)", guid, (const char *) argv[1]);
-    sql_remove_alerts_from_deleted_charts(NULL, (nd_uuid_t *)argv[0]);
-
-    return 0;
-}
-
-
 #define SQL_HEALTH_CHECK_ALL_HOSTS "SELECT host_id, hostname FROM host"
 
 void sql_alert_cleanup(bool cli)
@@ -623,12 +607,35 @@ void sql_alert_cleanup(bool cli)
         return;
     }
     netdata_log_info("Alert cleanup running ...");
-    int rc = sqlite3_exec_monitored(db_meta, SQL_HEALTH_CHECK_ALL_HOSTS, clean_host_alerts, NULL, NULL);
-    if (rc != SQLITE_OK)
+
+    sqlite3_stmt *res = NULL;
+    if (!PREPARE_STATEMENT(db_meta, SQL_HEALTH_CHECK_ALL_HOSTS, &res)) {
+        netdata_log_error("Failed to check host alerts");
+        return;
+    }
+
+    int rc;
+    while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW) {
+        nd_uuid_t host_uuid;
+        if (!sqlite3_column_uuid_copy(res, 0, host_uuid)) {
+            error_report("Alert cleanup: skipping host with invalid host_id");
+            continue;
+        }
+
+        char guid[UUID_STR_LEN];
+        uuid_unparse_lower(host_uuid, guid);
+
+        const char *hostname = (const char *) sqlite3_column_text(res, 1);
+        netdata_log_info("Checking host %s (%s)", guid, hostname ? hostname : "unknown");
+        sql_remove_alerts_from_deleted_charts(NULL, &host_uuid);
+    }
+
+    SQLITE_FINALIZE(res);
+
+    if (rc != SQLITE_DONE)
         netdata_log_error("Failed to check host alerts");
     else
         netdata_log_info("Alert cleanup done");
-
 }
 /* Health related SQL queries
    Load from the health log table
