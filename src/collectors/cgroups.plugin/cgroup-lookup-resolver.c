@@ -313,51 +313,6 @@ static bool cgroup_lookup_clean_join(const char *base, const char *relative, cha
     return ok;
 }
 
-static bool cgroup_lookup_prefix_has_parent_component(const char *path)
-{
-    if(!path)
-        return true;
-
-    const char *p = path;
-    while(*p) {
-        while(*p == '/')
-            p++;
-
-        const char *start = p;
-        while(*p && *p != '/')
-            p++;
-
-        size_t len = (size_t)(p - start);
-        if(len == 2 && start[0] == '.' && start[1] == '.')
-            return true;
-    }
-
-    return false;
-}
-
-static bool cgroup_lookup_build_host_proc_self_cgroup_path(char *dst, size_t dst_size)
-{
-    static const char proc_self_cgroup[] = "/proc/self/cgroup";
-
-    if(!dst || dst_size == 0 || !netdata_configured_host_prefix || !*netdata_configured_host_prefix)
-        return false;
-
-    const char *prefix = netdata_configured_host_prefix;
-    if(prefix[0] != '/' || cgroup_lookup_prefix_has_parent_component(prefix))
-        return false;
-
-    size_t prefix_len = strlen(prefix);
-    size_t child_len = sizeof(proc_self_cgroup) - 1;
-    bool prefix_has_trailing_slash = prefix[prefix_len - 1] == '/';
-    size_t child_offset = prefix_has_trailing_slash ? 1 : 0;
-    if(prefix_len + child_len - child_offset >= dst_size)
-        return false;
-
-    memcpy(dst, prefix, prefix_len);
-    memcpy(dst + prefix_len, proc_self_cgroup + child_offset, child_len + 1 - child_offset);
-    return true;
-}
-
 static bool cgroup_lookup_stat_under_base(const char *base, const char *cgroup_id, struct stat *st)
 {
     if(!base || !*base || !cgroup_id || !st)
@@ -523,21 +478,12 @@ static const CGROUP_SNAPSHOT_ENTRY *cgroup_lookup_resolve_with_self_views(
     const CGROUP_SNAPSHOT_STORE *store,
     const char *path)
 {
-    char proc_path[FILENAME_MAX + 1];
     char self_cgroup[FILENAME_MAX + 1];
 
     if(cgroup_lookup_read_proc_self_cgroup("/proc/self/cgroup", self_cgroup, sizeof(self_cgroup))) {
         const CGROUP_SNAPSHOT_ENTRY *entry = cgroup_lookup_resolve_with_self_path(store, self_cgroup, path);
         if(entry)
             return entry;
-    }
-
-    if(cgroup_lookup_build_host_proc_self_cgroup_path(proc_path, sizeof(proc_path))) {
-        if(cgroup_lookup_read_proc_self_cgroup(proc_path, self_cgroup, sizeof(self_cgroup))) {
-            const CGROUP_SNAPSHOT_ENTRY *entry = cgroup_lookup_resolve_with_self_path(store, self_cgroup, path);
-            if(entry)
-                return entry;
-        }
     }
 
     return NULL;
